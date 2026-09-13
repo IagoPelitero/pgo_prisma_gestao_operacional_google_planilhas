@@ -3,7 +3,8 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 5 de 12 etapas construídas · 133 testes passando.
+**Estado geral:** 5 de 12 etapas construídas, a 6ª em obra · 163 testes
+passando.
 
 ---
 
@@ -19,8 +20,8 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 2 | Acesso | ✅ pronta | 30 |
 | 3 | Casca | ✅ pronta | 27 |
 | 4 | Cadastrar Caso | ✅ pronta | 26 |
-| 5 | Dashboard | ✅ pronta | 15 |
-| 6 | Configurações | 🔨 próxima | — |
+| 5 | Dashboard | ✅ pronta | 18 |
+| 6 | Configurações | 🔨 servidor pronto, tela em construção | 25 |
 | 7 | Buscar Caso | ⏳ | — |
 | 8 | Painel Analítico | ⏳ | — |
 | 9 | Minha Performance | ⏳ | — |
@@ -162,9 +163,40 @@ acerta hoje e erra na mesa que vier depois.
 
 ## Etapa 6 — Configurações 🔨
 
-- Campos do formulário: criar, ordenar, mascarar e escolher quem vê
-- Catálogo, usuários, níveis de acesso e a senha de administrador
-- Reconciliação de colunas quando um cabeçalho muda na planilha
+**A tela mais importante do produto: tudo o que as outras fazem sai daqui.**
+
+O servidor está pronto e testado — `Back-End/Configuracoes.gs`, 25 testes.
+A tela é o que falta.
+
+### Três níveis de risco, três guardas
+
+| O que se mexe | Guarda | Exemplo |
+|---|---|---|
+| **Conteúdo** | permissão `configurar` | renomear uma situação, cadastrar usuário |
+| **Regra** | permissão `configurar` | o que um nível pode, quem vê qual campo |
+| **Estrutura** | **+ senha de administrador** | criar coluna, apagar mesa |
+
+A senha não é burocracia: criar coluna escreve na planilha de produção, e ali
+não existe desfazer.
+
+### As travas que o servidor já impõe
+
+- **Trocar o cabeçalho de um campo é recusado** — cabeçalho é o nome da coluna
+  na planilha. Rótulo, seção, máscara e obrigatoriedade são livres: isso é
+  aparência, não endereço
+- **Reordenar muda a tela, nunca a planilha.** Foi reordenando coluna que o
+  sistema anterior corrompeu dado
+- **Renomear um item de lista em uso é recusado**, dizendo em quantos casos ele
+  está gravado — e oferecendo a saída certa, que é trocar o rótulo
+- **Ninguém se tranca do lado de fora**: tirar Configurações do único nível que
+  a tem, ou a estrutura do único que pode mexer nela, é recusado
+- **Coluna apagada na planilha aparece marcada** na lista de campos, em vez de
+  o campo parar de funcionar sem explicação
+
+### O que falta
+
+A tela: o submenu das seis seções, a lista central, o painel de propriedades à
+direita e o diálogo da senha.
 
 ---
 
