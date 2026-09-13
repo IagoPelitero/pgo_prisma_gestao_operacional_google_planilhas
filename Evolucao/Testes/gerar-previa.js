@@ -249,7 +249,7 @@ function gerar(pastaDeSaida) {
     { analista: 'Marcos Vieira', status: 'Concluído',
       'data de recepção do protocolo': diasAtras(41),
       'nome do cliente': 'Retenção do mês passado', protocolo: 'RET-2026-0891' },
-    { analista: 'Patrícia Nunes', status: 'Em tratativa',
+    { analista: 'Patrícia Nunes', status: 'Pendente',
       'data de recepção do protocolo': diasAtras(36),
       'nome do cliente': 'Outra do mês passado', protocolo: 'RET-2026-0892' }
   ]);
@@ -280,7 +280,7 @@ function gerar(pastaDeSaida) {
       'valor do prêmio': 3410.5, 'valor do prêmio retido': 0,
       'prêmio mensal retido': 0, canal: 'Telefone',
       protocolo: 'RET-2026-1023', cod_sucursal: '0000000012', cod_ramo: '0000000993',
-      Num_apolice: '0000020023', CPF: '00900000002', status: 'Não tratado',
+      Num_apolice: '0000020023', CPF: '00900000002', status: 'Não trabalhado',
       'Forma de pagamento': 'Boleto',
       'motivo do cancelamento': 'Coberturas', 'e-mail': 'cliente23@example.invalid',
       'telefones de contato': '11900000023', 'tentativas de contato': 0,
@@ -295,7 +295,7 @@ function gerar(pastaDeSaida) {
       'valor do prêmio': 890, 'valor do prêmio retido': 0,
       'prêmio mensal retido': 0, canal: 'E-mail',
       protocolo: 'RET-2026-1022', cod_sucursal: '0000000012', cod_ramo: '0000000993',
-      Num_apolice: '0000020022', CPF: '00900000003', status: 'Retorno agendado',
+      Num_apolice: '0000020022', CPF: '00900000003', status: '2º contato realizado',
       'Forma de pagamento': 'Cartão de crédito',
       'motivo do cancelamento': 'Dificuldade financeira',
       'e-mail': 'cliente22@example.invalid',
@@ -311,7 +311,7 @@ function gerar(pastaDeSaida) {
       'valor do prêmio': 2140.75, 'valor do prêmio retido': 2140.75,
       'prêmio mensal retido': 178.4, canal: 'Corretora',
       protocolo: 'RET-2026-1021', cod_sucursal: '0000000012', cod_ramo: '0000000993',
-      Num_apolice: '0000020021', CPF: '00900000004', status: 'Em tratativa',
+      Num_apolice: '0000020021', CPF: '00900000004', status: '1º contato realizado',
       'Forma de pagamento': 'PIX',
       'motivo do cancelamento': 'Aumento do prêmio na renovação',
       'e-mail': 'cliente21@example.invalid',
@@ -327,7 +327,7 @@ function gerar(pastaDeSaida) {
       'valor do prêmio': 5620, 'valor do prêmio retido': 0,
       'prêmio mensal retido': 0, canal: 'Ouvidoria',
       protocolo: 'RET-2026-1020', cod_sucursal: '0000000012', cod_ramo: '0000000993',
-      Num_apolice: '0000020020', CPF: '00900000005', status: 'Aguardando segurado',
+      Num_apolice: '0000020020', CPF: '00900000005', status: 'Pendente',
       'Forma de pagamento': 'Boleto',
       'motivo do cancelamento': 'Proposta de concorrente',
       'e-mail': 'cliente20@example.invalid',
@@ -361,7 +361,7 @@ function gerar(pastaDeSaida) {
       'valor do prêmio': 760.2, 'valor do prêmio retido': 0,
       'prêmio mensal retido': 0, canal: 'URA',
       protocolo: 'RET-2026-1018', cod_sucursal: '0000000012', cod_ramo: '0000000993',
-      Num_apolice: '0000020018', CPF: '00900000007', status: 'Não tratado',
+      Num_apolice: '0000020018', CPF: '00900000007', status: 'Aguardando transmissão',
       'Forma de pagamento': 'Boleto',
       'motivo do cancelamento': 'Insatisfação com atendimento',
       'e-mail': 'cliente18@example.invalid',
@@ -388,7 +388,7 @@ function gerar(pastaDeSaida) {
         chamar('inserirRegistro_')('AUDITORIA', {
           DataHora: new Date(), UsuarioId: porNome[caso[coluna]] || '',
           Acao: 'caso.status', Entidade: aba, RegistroId: caso.__id,
-          Detalhe: 'de "Em tratativa" para "Concluído"'
+          Detalhe: 'de "1º contato realizado" para "Concluído"'
         });
       }
     });

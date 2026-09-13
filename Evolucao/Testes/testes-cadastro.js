@@ -47,7 +47,7 @@ function rodarTestesDeCadastro() {
     igual(status.tipo, 'seletor');
     igual(status.opcoes.length, 6, 'os seis status da Mesa Diamante');
     igual(status.opcoes[0].valor, 'Transmissão pendente');
-    verdadeiro(!status.opcoes.some((o) => o.valor === 'Em tratativa'),
+    verdadeiro(!status.opcoes.some((o) => o.valor === 'Aguardando transmissão'),
       'status da RET não pode aparecer na Mesa');
 
     const canal = todos.find((campo) => campo.chave === 'canal');

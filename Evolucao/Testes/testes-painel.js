@@ -64,8 +64,11 @@ function rodarTestesDoPainel() {
       'Total de casos | Pendente | Concluído | Finalizados na célula');
 
     const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    igual(chamar('resumoDaMesa')(ret.id, {}).cartoes.length, 6,
-      'total mais as cinco situações da RET');
+    const daRet = chamar('resumoDaMesa')(ret.id, {}).cartoes.map((c) => c.rotulo);
+    igual(daRet.join(' | '),
+      'Total de casos | Aguardando transmissão | Pendente | 1º contato realizado'
+      + ' | 2º contato realizado | Não trabalhado',
+      'o total mais as cinco situações que ainda pedem trabalho');
   });
 
   teste('desligar um cartão tira ele da tela e não toca em caso nenhum', () => {
@@ -133,7 +136,10 @@ function rodarTestesDoPainel() {
     const daRet = {};
     chamar('resumoDaMesa')(ret.id, {}).cartoes
       .forEach((c) => { daRet[c.rotulo] = c.valor; });
-    igual(daRet['Em tratativa'], 0, 'situação sem caso vale zero, não some');
+    igual(daRet['Aguardando transmissão'], 0,
+      'situação sem caso vale zero, não some');
+    verdadeiro(!Object.prototype.hasOwnProperty.call(daRet, 'Concluído'),
+      'a RET não abre com cartão de concluído: o painel é o que falta fazer');
   });
 
   teste('cada situação leva a sua cor para o cartão e para a fila', () => {

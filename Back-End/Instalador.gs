@@ -254,9 +254,9 @@ function semearDadosIniciais_(emailDoInstalador) {
   // Cada situação com a sua cor. A cor não é enfeite: numa fila de trinta
   // linhas, ela é o que faz "não trabalhado" saltar aos olhos sem ninguém
   // precisar ler. As cores válidas estão em RECC_TONS.
-  [['Em tratativa', 'destaque'], ['Aguardando segurado', 'atencao'],
-   ['Não tratado', 'violeta'], ['Retorno agendado', 'bom'],
-   ['Concluído', 'bom']].forEach(function (par, i) {
+  [['Aguardando transmissão', 'destaque'], ['Pendente', 'atencao'],
+   ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
+   ['Não trabalhado', 'ruim'], ['Concluído', 'bom']].forEach(function (par, i) {
     itens.push(novoItemDeCatalogo_('STATUS', idRet, par[0], i + 1, par[1]));
   });
   [['Transmissão pendente', 'destaque'], ['Pendente', 'atencao'],
@@ -409,10 +409,14 @@ function cartoesIniciaisDoPainel_(idRet, idMesa) {
     };
   }
 
+  // A RET mostra o total e as cinco situações que ainda pedem trabalho.
+  // "Concluído" existe como situação, mas NÃO ganha cartão: o Dashboard
+  // responde "o que eu tenho que trabalhar hoje", e caso concluído não é
+  // trabalho. Quem quiser o número acrescenta o cartão em Configurações.
   cartoes.push(novoCartao(idRet, 'Total de casos', 'total', '', 'destaque', 1));
-  [['Em tratativa', 'destaque'], ['Aguardando segurado', 'atencao'],
-   ['Não tratado', 'violeta'], ['Retorno agendado', 'bom'],
-   ['Concluído', 'bom']].forEach(function (par, i) {
+  [['Aguardando transmissão', 'destaque'], ['Pendente', 'atencao'],
+   ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
+   ['Não trabalhado', 'ruim']].forEach(function (par, i) {
     cartoes.push(novoCartao(idRet, par[0], 'situacao', par[0], par[1], i + 2));
   });
 
