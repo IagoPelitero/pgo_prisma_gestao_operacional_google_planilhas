@@ -1,0 +1,4 @@
+# A prévia é gerada por node Evolucao/Testes/gerar-previa.js — não se versiona.
+previa/
+node_modules/
+.DS_Store
