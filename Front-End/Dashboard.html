@@ -157,6 +157,14 @@ var TelaDashboard = (function () {
     }).join('');
   }
 
+  /**
+   * As ações da linha: ver e editar, e só.
+   *
+   * Alterar situação e excluir moram no rodapé do modal. Quatro botões por
+   * linha, repetidos trinta vezes, tomavam a largura de uma coluna inteira de
+   * dado — e a coluna que sumia era "Responsável". Duas ações na linha, as
+   * outras a um clique, cabem e continuam à mão.
+   */
   function acoesDaLinha(caso) {
     var botoes = '<button type="button" class="acao ver" data-caso="'
       + escapar(caso.id) + '">' + Moldura.icone('olho') + ' Ver detalhes</button>';
@@ -164,20 +172,7 @@ var TelaDashboard = (function () {
     if (resumo.podeEditar) {
       botoes += '<button type="button" class="acao-icone" data-editar="'
         + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
-        + Moldura.icone('editar') + '</button>'
-        // `data-trocar-situacao`, e não `data-situacao`: os CARTÕES já usam
-        // `data-situacao` para filtrar a fila. Com o mesmo nome, clicar num
-        // cartão abriria o diálogo de troca de situação de um caso que não
-        // existe — o valor ali é o rótulo do cartão, não um Id.
-        + '<button type="button" class="acao-icone" data-trocar-situacao="'
-        + escapar(caso.id) + '" title="Alterar situação"'
-        + ' aria-label="Alterar situação">'
-        + Moldura.icone('trocarSituacao') + '</button>';
-    }
-    if (resumo.podeOcultar) {
-      botoes += '<button type="button" class="acao-icone perigo" data-ocultar="'
-        + escapar(caso.id) + '" title="Excluir — a linha permanece na planilha"'
-        + ' aria-label="Excluir caso">' + Moldura.icone('ocultar') + '</button>';
+        + Moldura.icone('editar') + '</button>';
     }
     return botoes;
   }
@@ -239,13 +234,6 @@ var TelaDashboard = (function () {
     ligarCliques('[data-editar]', function (botao) {
       CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-editar'),
         carregar, true);
-    });
-    ligarCliques('[data-trocar-situacao]', function (botao) {
-      CasoEmModal.trocarSituacao(mesaEscolhida,
-        botao.getAttribute('data-trocar-situacao'), carregar);
-    });
-    ligarCliques('[data-ocultar]', function (botao) {
-      ocultar(botao.getAttribute('data-ocultar'));
     });
   }
 

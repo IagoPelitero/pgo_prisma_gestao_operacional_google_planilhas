@@ -506,7 +506,38 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 /* A agrupada precisa de mais largura: são cinco grupos e quatro botões de
    ação. Apertada, o texto do último grupo corria para debaixo da coluna de
    ações, que é fixa na direita. Melhor a tabela rolar do que esconder dado. */
-table.fila.agrupada { min-width: 1180px; }
+/*
+  Largura fixa, e não automática: com automática o grupo de texto mais longo
+  ("Motivo / assunto") tomava o espaço que quisesse e empurrava "Responsável"
+  para fora da tela. Fixa, os cinco grupos dividem o que sobra depois da
+  coluna de ações, e o que não couber é cortado com reticências em vez de
+  esconder uma coluna inteira.
+*/
+table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
+table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
+  width: 190px;
+}
+/* Na agrupada o texto PODE quebrar: cada célula já tem várias linhas, então
+   quebrar mais uma não desalinha nada — e é o que faz as cinco colunas
+   caberem sem empurrar "Responsável" para debaixo da coluna de ações. */
+table.fila.agrupada th, table.fila.agrupada td { white-space: normal; }
+/* Menos a linha PRINCIPAL de cada grupo: o protocolo e o nome do cliente são
+   o que a pessoa varre com o olho, e partidos em duas linhas param de servir
+   para isso. O que pode quebrar é o apoio e o cabeçalho. */
+table.fila.agrupada .principal,
+table.fila.agrupada td:first-child > span:first-child {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+table.fila.agrupada .apoio { overflow-wrap: anywhere; }
+/* A coluna de ações não quebra — os quatro botões em duas linhas dobrariam a
+   altura de cada linha — e, na agrupada, também não é fixa na direita.
+   Fixa, ela ficava POR CIMA de "Responsável" sempre que a tabela passava da
+   largura da tela, escondendo uma coluna inteira sem avisar. Aqui a tabela
+   inteira rola junto: ninguém perde coluna, e quem tem tela larga vê tudo. */
+table.fila.agrupada th.acoes-coluna,
+table.fila.agrupada td.acoes-coluna {
+  white-space: nowrap; position: static; box-shadow: none;
+}
 table.fila th, table.fila td {
   /* Respiro menor que o resto da tela: a fila tem sete colunas e cada pixel
      de folga aqui empurra a coluna de ações para fora do campo de visão. */
@@ -805,6 +836,8 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   background: var(--superficie); color: var(--texto); border-color: var(--linha);
 }
 .botao.vazado:hover { background: var(--superficie-2); border-color: var(--linha-forte); }
+.botao.vazado.perigo { color: var(--ruim); border-color: color-mix(in srgb, var(--ruim) 32%, transparent); }
+.botao.vazado.perigo:hover { background: var(--ruim-tenue); border-color: var(--ruim); }
 
 .config-explica {
   font-size: 12.5px; color: var(--suave); line-height: 1.45;

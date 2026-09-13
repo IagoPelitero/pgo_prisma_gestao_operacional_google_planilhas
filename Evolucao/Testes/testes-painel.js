@@ -268,16 +268,17 @@ function rodarTestesDoPainel() {
     const modal = fs.readFileSync(path.join(pasta, 'CasoEmModal.html'), 'utf8');
 
     contem(dashboard, 'CasoEmModal.abrir(', 'ver detalhes abre o modal');
-    contem(dashboard, 'CasoEmModal.trocarSituacao(');
-    contem(dashboard, "Servidor.chamar('ocultarCaso'");
-    contem(modal, "Servidor.chamar('editarCaso'");
+    contem(dashboard, 'data-editar', 'e o lápis abre o mesmo modal, já em edição');
 
-    // O botão da linha NÃO pode dividir o atributo com o cartão: os cartões
-    // usam data-situacao para filtrar a fila, e com o mesmo nome clicar num
-    // cartão abriria a troca de situação de um caso que não existe.
-    contem(dashboard, 'data-trocar-situacao');
-    verdadeiro(dashboard.indexOf("ligarCliques('[data-situacao]'") < 0,
-      'o mesmo atributo em duas coisas diferentes já quebrou aqui uma vez');
+    // As quatro ações do caso existem, e todas passam pelo modal: duas na
+    // linha (ver e editar) e as outras duas no rodapé dele. Quatro botões por
+    // linha comiam a largura da coluna "Responsável".
+    contem(modal, "Servidor.chamar('editarCaso'");
+    contem(modal, "Servidor.chamar('ocultarCaso'");
+    contem(modal, "Servidor.chamar('alterarSituacaoDoCaso'");
+    verdadeiro(dashboard.indexOf('data-trocar-situacao') < 0
+      && dashboard.indexOf('data-ocultar') < 0,
+      'as duas ações menos frequentes não repetem em toda linha');
 
     // Quatro saídas do modal: Esc, o X, o botão e clicar fora. Modal que
     // prende é modal que a pessoa aprende a não abrir.

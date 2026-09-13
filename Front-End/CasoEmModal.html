@@ -145,7 +145,15 @@ var CasoEmModal = (function () {
       + '</div>'
       + desenharHistorico();
 
+    // As quatro ações do caso vivem aqui: as duas da linha, mais alterar
+    // situação e excluir. Na fila só cabem duas sem comer uma coluna de dado.
     elemento('modal-pe').innerHTML = botaoFechar()
+      + (detalhe.podeOcultar
+        ? '<button type="button" class="botao vazado perigo" id="modal-excluir">'
+          + Moldura.icone('ocultar') + ' Excluir</button>' : '')
+      + (detalhe.podeEditar
+        ? '<button type="button" class="botao vazado" id="modal-situacao">'
+          + Moldura.icone('trocarSituacao') + ' Alterar situação</button>' : '')
       + (detalhe.podeEditar
         ? '<button type="button" class="botao" id="modal-editar">'
           + Moldura.icone('editar') + ' Editar caso</button>' : '');
@@ -153,6 +161,29 @@ var CasoEmModal = (function () {
 
     var editar = elemento('modal-editar');
     if (editar) editar.addEventListener('click', abrirEdicao);
+
+    var situacao = elemento('modal-situacao');
+    if (situacao) {
+      situacao.addEventListener('click', function () {
+        trocarSituacao(mesaAtual, idAtual, function () {
+          mudouAlgo = true;
+          carregar();
+        });
+      });
+    }
+
+    var excluir = elemento('modal-excluir');
+    if (excluir) excluir.addEventListener('click', function () {
+      // O texto diz a verdade: a linha permanece na planilha. Prometer "não
+      // poderá ser desfeito" quando dá para desfazer assusta à toa.
+      if (!window.confirm('Excluir o caso ' + idAtual + '?\n\n'
+        + 'Ele sai do sistema para todo mundo. A linha permanece na planilha '
+        + 'e pode ser trazida de volta por um administrador.')) return;
+
+      Servidor.chamar('ocultarCaso', mesaAtual, idAtual)
+        .entao(function () { mudouAlgo = true; fechar(); })
+        .senao(function (erro) { window.alert(erro.message || String(erro)); });
+    });
   }
 
   function desenharHistorico() {
