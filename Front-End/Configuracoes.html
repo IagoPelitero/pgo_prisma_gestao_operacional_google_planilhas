@@ -1,0 +1,1133 @@
+<script>
+/* ============================================================================
+   PGO — Configuracoes.html · a tela que ajusta o sistema por dentro
+   ============================================================================
+   Três colunas, e a divisão entre elas é a ideia da tela toda:
+
+     SEÇÕES    à esquerda, o que dá para ajustar. Sete assuntos, cada um com
+               o seu tamanho ao lado — "55 campos", "4 níveis" —, porque saber
+               quanta coisa tem ali ajuda a decidir onde entrar.
+
+     LISTA     no meio, os itens da seção. Só leitura: clicar escolhe.
+
+     PROPRIEDADES  à direita, o item escolhido, aberto para edição. Nada é
+               gravado enquanto não se aperta Salvar.
+
+   A tela ESCONDE o que a pessoa não pode fazer, por educação. Quem confere de
+   verdade é o servidor, em toda função. Botão escondido nunca foi segurança.
+
+   As ações sem volta — criar coluna na planilha — passam pelo diálogo de
+   senha. Ele guarda a ação pendente, pede a senha, e só então executa: assim
+   a pessoa não precisa preencher o formulário de novo depois de digitar a
+   senha.
+   ============================================================================ */
+
+var TelaConfiguracoes = (function () {
+
+  var resumo = null;
+  var pacoteDoSistema = null;   // o pacote de partida, para as mesas
+  var secaoAtual = 'campos';
+  var mesaEscolhida = '';
+  var tipoDeListaEscolhido = '';
+  var escolhido = null;        // o item aberto no painel da direita
+  var dados = {};              // o que a seção atual carregou do servidor
+  var acaoPendente = null;     // guardada enquanto a senha não vem
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  function texto(valor) {
+    return String(valor === null || valor === undefined ? '' : valor);
+  }
+
+  /* ============================================================ a moldura */
+
+  function montar(pacote) {
+    pacoteDoSistema = pacote;
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    return '<div class="config" id="config">'
+      + '<p class="carregando-campos">Abrindo as configurações…</p>'
+      + '</div>';
+  }
+
+  function desenharTudo() {
+    elemento('config').innerHTML =
+      '<nav class="config-secoes" id="config-secoes">' + desenharSecoes() + '</nav>'
+      + '<div class="config-lista" id="config-lista"></div>'
+      + '<aside class="config-painel" id="config-painel"></aside>';
+    ligarSecoes();
+    carregarSecao();
+  }
+
+  function desenharSecoes() {
+    var aviso = '';
+    if (!resumo.estrutura.emOrdem) {
+      aviso = '<button type="button" class="config-alerta" data-secao="estrutura">'
+        + 'A planilha saiu do contrato — ver o laudo</button>';
+    } else if (!resumo.senhaDefinida) {
+      aviso = '<button type="button" class="config-alerta suave" data-secao="identidade">'
+        + 'Sem senha de administrador definida</button>';
+    }
+
+    return resumo.secoes.map(function (secao) {
+      return '<button type="button" class="config-secao'
+        + (secao.chave === secaoAtual ? ' atual' : '') + '"'
+        + ' data-secao="' + escapar(secao.chave) + '">'
+        + '<span class="titulo">' + escapar(secao.titulo) + '</span>'
+        + '<span class="descricao">' + escapar(secao.descricao) + '</span>'
+        + (secao.quantidade
+          ? '<span class="quantos">' + secao.quantidade + '</span>' : '')
+        + '</button>';
+    }).join('') + aviso;
+  }
+
+  function ligarSecoes() {
+    var botoes = document.querySelectorAll('[data-secao]');
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () {
+        secaoAtual = this.getAttribute('data-secao');
+        escolhido = null;
+        elemento('config-secoes').innerHTML = desenharSecoes();
+        ligarSecoes();
+        carregarSecao();
+      });
+    }
+  }
+
+  /* ====================================================== carga por seção */
+
+  function aguarde(mensagem) {
+    elemento('config-lista').innerHTML =
+      '<p class="carregando-campos">' + escapar(mensagem) + '</p>';
+    elemento('config-painel').innerHTML = '';
+  }
+
+  function falhou(erro) {
+    elemento('config-lista').innerHTML = '<p class="carregando-campos erro-carga">'
+      + escapar(erro.message || String(erro)) + '</p>';
+  }
+
+  /**
+   * Cada seção pede ao servidor só o que ela usa.
+   *
+   * Trocar de seção recarrega: preferimos uma ida ao servidor a mostrar uma
+   * lista velha depois de alguém ter salvado alguma coisa em outra aba.
+   */
+  function carregarSecao() {
+    dados = {};
+
+    if (secaoAtual === 'campos') return carregarCampos();
+    if (secaoAtual === 'usuarios') return carregarUsuarios();
+    if (secaoAtual === 'niveis') return carregarNiveis();
+    if (secaoAtual === 'catalogo') return carregarListas();
+    if (secaoAtual === 'mesas') return carregarMesas();
+    if (secaoAtual === 'identidade') return desenharIdentidade();
+    if (secaoAtual === 'estrutura') return carregarEstrutura();
+  }
+
+  /* --------------------------------------------------- campos do formulário */
+
+  function carregarCampos() {
+    aguarde('Lendo os campos da mesa…');
+    Servidor.chamar('opcoesDeConfiguracaoDeCampo')
+      .entao(function (opcoes) {
+        dados.opcoes = opcoes;
+        Servidor.chamar('listarCamposDaMesa', mesaEscolhida)
+          .entao(function (campos) {
+            dados.campos = campos;
+            desenharCampos();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharCampos() {
+    var linhas = dados.campos.map(function (campo, posicao) {
+      return '<li class="config-item' + (escolhido && escolhido.id === campo.id
+        ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-campo="' + escapar(campo.id) + '">'
+        + '<span class="nome">' + escapar(campo.rotulo) + '</span>'
+        + '<span class="detalhe">' + escapar(campo.secao) + ' · '
+        + escapar(campo.tipo)
+        + (campo.obrigatorio ? ' · obrigatório' : '')
+        + (campo.ativo ? '' : ' · desligado no formulário')
+        + (campo.colunaExiste ? ''
+          : ' · <strong class="alerta">coluna ausente na planilha</strong>')
+        + '</span></button>'
+        + '<span class="mover">'
+        + '<button type="button" class="seta" data-subir="' + posicao + '"'
+        + (posicao === 0 ? ' disabled' : '') + ' title="Subir">↑</button>'
+        + '<button type="button" class="seta" data-descer="' + posicao + '"'
+        + (posicao === dados.campos.length - 1 ? ' disabled' : '')
+        + ' title="Descer">↓</button></span>'
+        + '</li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML =
+      '<div class="config-cabeca">'
+      + '<div class="config-mesas">' + caixaDeMesas() + '</div>'
+      + (resumo.podeMexerNaEstrutura
+        ? '<button type="button" class="botao pequeno" id="novo-campo">'
+          + 'Criar campo</button>' : '')
+      + '</div>'
+      + '<p class="config-explica">A ordem aqui é a ordem do formulário. '
+      + 'Mudar de lugar não mexe na planilha: a coluna fica onde está.</p>'
+      + '<ul class="config-itens">' + linhas + '</ul>';
+
+    ligarListaDeCampos();
+    if (escolhido) desenharPainelDoCampo(acharCampo(escolhido.id));
+    else painelVazio('Escolha um campo para ver e mudar as propriedades dele.');
+  }
+
+  function acharCampo(id) {
+    for (var i = 0; i < dados.campos.length; i++) {
+      if (dados.campos[i].id === id) return dados.campos[i];
+    }
+    return null;
+  }
+
+  function caixaDeMesas() {
+    return '<select id="mesa-da-config" aria-label="Mesa">'
+      + pacoteDoSistema.mesas.map(function (mesa) {
+        return '<option value="' + escapar(mesa.id) + '"'
+          + (mesa.id === mesaEscolhida ? ' selected' : '') + '>'
+          + escapar(mesa.nome) + '</option>';
+      }).join('') + '</select>';
+  }
+
+  function ligarListaDeCampos() {
+    var seletor = elemento('mesa-da-config');
+    if (seletor) {
+      seletor.addEventListener('change', function () {
+        mesaEscolhida = this.value;
+        escolhido = null;
+        carregarCampos();
+      });
+    }
+
+    ligarCliques('[data-campo]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-campo') };
+      desenharCampos();
+    });
+
+    ligarCliques('[data-subir]', function (botao) {
+      trocarDeLugar(Number(botao.getAttribute('data-subir')), -1);
+    });
+    ligarCliques('[data-descer]', function (botao) {
+      trocarDeLugar(Number(botao.getAttribute('data-descer')), 1);
+    });
+
+    var novo = elemento('novo-campo');
+    if (novo) novo.addEventListener('click', abrirCampoNovo);
+  }
+
+  function trocarDeLugar(posicao, passo) {
+    var destino = posicao + passo;
+    if (destino < 0 || destino >= dados.campos.length) return;
+
+    var lista = dados.campos.slice();
+    var guardado = lista[posicao];
+    lista[posicao] = lista[destino];
+    lista[destino] = guardado;
+    dados.campos = lista;
+    desenharCampos();
+
+    // A ordem já mudou na tela — se o servidor recusar, a lista volta ao que
+    // era e o motivo aparece no painel. Nunca deixamos a tela mostrando uma
+    // ordem que a planilha não tem.
+    Servidor.chamar('reordenarCampos', mesaEscolhida, lista.map(function (campo) {
+      return campo.id;
+    })).senao(function (erro) {
+      // O recado flutua, e não mora no painel: recarregar a lista redesenha o
+      // painel inteiro, e o erro sumiria junto antes de alguém ler.
+      avisar(erro.message || String(erro), 'ruim');
+      carregarCampos();
+    });
+  }
+
+  function desenharPainelDoCampo(campo) {
+    if (!campo) return painelVazio('Escolha um campo.');
+
+    var opcoes = dados.opcoes;
+    var configuracao = campo.catalogo
+      ? 'catalogo' : (campo.listaDe ? 'listaDe' : '');
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-campo">'
+      + tituloDoPainel(campo.rotulo, 'Campo do formulário')
+      + avisoDaColuna(campo)
+      + campoDeTexto('rotulo', 'Rótulo na tela', campo.rotulo,
+        'O que o analista lê. Trocar isto não mexe na planilha.')
+      + campoSomenteLeitura('Cabeçalho na planilha', campo.cabecalho,
+        'É o nome da coluna. Não muda por aqui — é o que amarra o dado ao '
+        + 'Power BI.')
+      + campoDeTexto('descricao', 'Dica embaixo do campo', campo.descricao, '')
+      + campoDeTexto('secao', 'Seção do formulário', campo.secao,
+        'Campos com a mesma seção aparecem juntos.')
+      + caixaDeOpcoes('tipo', 'Tipo', opcoes.tipos, campo.tipo, '')
+      + campoDeTexto('mascara', 'Máscara', campo.mascara,
+        'Ex.: 000.000.000-00. A planilha recebe só os dígitos.')
+      + caixaDeOpcoes('catalogo', 'Lista do catálogo',
+        [''].concat(opcoes.tiposDeCatalogo), campo.catalogo,
+        'Preenche as opções a partir da aba CATALOGO.')
+      + caixaDeOpcoes('listaDe', 'Lista de um cadastro',
+        [''].concat(opcoes.cadastros), campo.listaDe,
+        'Preenche as opções a partir de um cadastro do sistema.')
+      + caixaDeSimNao('obrigatorio', 'Obrigatório', campo.obrigatorio)
+      + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + '</div></form>';
+
+    elemento('form-campo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      salvarCampo(campo);
+    });
+  }
+
+  function avisoDaColuna(campo) {
+    if (campo.colunaExiste) return '';
+    return '<p class="config-aviso">A coluna <strong>'
+      + escapar(campo.cabecalho) + '</strong> não existe mais na planilha. '
+      + 'O campo continua cadastrado, mas nada será gravado nele até a coluna '
+      + 'voltar com esse nome exato.</p>';
+  }
+
+  function salvarCampo(campo) {
+    var envio = {
+      id: campo.id,
+      rotulo: valorDe('rotulo'),
+      descricao: valorDe('descricao'),
+      secao: valorDe('secao'),
+      tipo: valorDe('tipo'),
+      mascara: valorDe('mascara'),
+      catalogo: valorDe('catalogo'),
+      listaDe: valorDe('listaDe'),
+      obrigatorio: marcado('obrigatorio'),
+      ativo: marcado('ativo')
+    };
+    Servidor.chamar('salvarCampo', envio)
+      .entao(function () { avisarSalvo(); carregarCampos(); })
+      .senao(mostrarErroNoPainel);
+  }
+
+  /**
+   * Criar campo cria COLUNA. É a ação mais cara da tela, e a única desta
+   * seção que passa pela senha de administrador.
+   */
+  function abrirCampoNovo() {
+    escolhido = null;
+    desenharCampos();
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-novo">'
+      + tituloDoPainel('Campo novo', 'Cria uma coluna na planilha')
+      + '<p class="config-aviso forte">Isto escreve na base de produção e '
+      + '<strong>não tem desfazer</strong>. A coluna nasce no fim da aba, com '
+      + 'o nome que você der aqui.</p>'
+      + campoDeTexto('rotulo', 'Nome do campo', '',
+        'Serve de rótulo na tela e de cabeçalho na planilha.')
+      + campoDeTexto('secao', 'Seção do formulário', 'Geral', '')
+      + campoDeTexto('descricao', 'Dica embaixo do campo', '', '')
+      + caixaDeOpcoes('tipo', 'Tipo', dados.opcoes.tipos, 'texto', '')
+      + campoDeTexto('mascara', 'Máscara', '', '')
+      + caixaDeSimNao('obrigatorio', 'Obrigatório', false)
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Criar coluna</button>'
+      + '<button type="button" class="botao vazado" id="desistir">Desistir</button>'
+      + '</div></form>';
+
+    elemento('desistir').addEventListener('click', function () {
+      painelVazio('Escolha um campo para ver as propriedades dele.');
+    });
+    elemento('form-novo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var envio = {
+        rotulo: valorDe('rotulo'),
+        secao: valorDe('secao'),
+        descricao: valorDe('descricao'),
+        tipo: valorDe('tipo'),
+        mascara: valorDe('mascara'),
+        obrigatorio: marcado('obrigatorio')
+      };
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('criarCampo', mesaEscolhida, envio)
+          .entao(function (criada) {
+            avisarSalvo('Coluna "' + criada.cabecalho + '" criada em '
+              + criada.mesa + '.');
+            carregarCampos();
+          })
+          .senao(mostrarErroNoPainel);
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------- usuários */
+
+  function carregarUsuarios() {
+    aguarde('Lendo o cadastro…');
+    Servidor.chamar('listarNiveisDeAcesso')
+      .entao(function (niveis) {
+        dados.niveis = niveis;
+        Servidor.chamar('listarCatalogo', 'CARGO', '')
+          .entao(function (cargos) {
+            dados.cargos = cargos;
+            Servidor.chamar('listarUsuarios')
+              .entao(function (usuarios) {
+                dados.usuarios = usuarios;
+                desenharUsuarios();
+              })
+              .senao(falhou);
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharUsuarios() {
+    var linhas = dados.usuarios.map(function (usuario) {
+      return '<li class="config-item' + (escolhido && escolhido.id === usuario.id
+        ? ' atual' : '') + (usuario.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-usuario="'
+        + escapar(usuario.id) + '">'
+        + '<span class="nome">' + escapar(usuario.nome) + '</span>'
+        + '<span class="detalhe">' + escapar(usuario.email) + ' · '
+        + escapar(usuario.nivelAcesso)
+        + (usuario.ativo ? '' : ' · sem acesso') + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.usuarios.length + ' pessoas</span>'
+      + '<button type="button" class="botao pequeno" id="novo-usuario">'
+      + 'Cadastrar pessoa</button></div>'
+      + '<p class="config-explica">Cadastrar alguém aqui é, literalmente, dar '
+      + 'acesso: a pessoa entra com a conta Google dela, sem senha própria.</p>'
+      + '<ul class="config-itens">' + linhas + '</ul>';
+
+    ligarCliques('[data-usuario]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-usuario') };
+      desenharUsuarios();
+    });
+    elemento('novo-usuario').addEventListener('click', function () {
+      escolhido = null;
+      desenharUsuarios();
+      desenharPainelDoUsuario(null);
+    });
+
+    if (escolhido) {
+      desenharPainelDoUsuario(acharNaLista(dados.usuarios, escolhido.id));
+    } else painelVazio('Escolha uma pessoa, ou cadastre uma nova.');
+  }
+
+  function desenharPainelDoUsuario(usuario) {
+    var ehNovo = !usuario;
+    var pessoa = usuario || {
+      id: '', nome: '', email: '', canalQueAtende: '', cargoId: '',
+      nivelAcessoId: '', matricula: '', ativo: true
+    };
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-usuario">'
+      + tituloDoPainel(ehNovo ? 'Pessoa nova' : pessoa.nome,
+        ehNovo ? 'Dar acesso ao sistema' : 'Cadastro de acesso')
+      + campoDeTexto('nome', 'Nome', pessoa.nome, '')
+      + campoDeTexto('email', 'E-mail Google', pessoa.email,
+        'É por ele que a pessoa entra. Tem de ser a conta que ela usa.')
+      + campoDeTexto('canal', 'Canal que atende', pessoa.canalQueAtende,
+        'Usado pelo alcance EQUIPE: quem atende o mesmo canal vê os mesmos casos.')
+      + campoDeTexto('matricula', 'Matrícula', pessoa.matricula, '')
+      + caixaDeItens('cargo', 'Cargo', dados.cargos, pessoa.cargoId,
+        'O cargo é só descrição — quem decide o acesso é o nível abaixo.')
+      + caixaDeItens('nivel', 'Nível de acesso', dados.niveis, pessoa.nivelAcessoId,
+        'É isto que define telas, campos, ações e alcance.')
+      + caixaDeSimNao('ativo', 'Pode entrar', pessoa.ativo !== false)
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (ehNovo ? '' : '<button type="button" class="botao vazado" id="desativar">'
+        + 'Tirar o acesso</button>')
+      + '</div></form>';
+
+    elemento('form-usuario').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarUsuario', {
+        id: pessoa.id,
+        nome: valorDe('nome'),
+        email: valorDe('email'),
+        canalQueAtende: valorDe('canal'),
+        matricula: valorDe('matricula'),
+        cargoId: valorDe('cargo'),
+        nivelAcessoId: valorDe('nivel'),
+        ativo: marcado('ativo')
+      }).entao(function () { avisarSalvo(); carregarUsuarios(); })
+        .senao(mostrarErroNoPainel);
+    });
+
+    var desativar = elemento('desativar');
+    if (desativar) {
+      desativar.addEventListener('click', function () {
+        if (!window.confirm('Tirar o acesso de ' + pessoa.nome + '?\n\n'
+          + 'O cadastro permanece, com o histórico. Só a entrada é fechada.')) return;
+        Servidor.chamar('desativarUsuario', pessoa.id)
+          .entao(function () { avisarSalvo(); carregarUsuarios(); })
+          .senao(mostrarErroNoPainel);
+      });
+    }
+  }
+
+  /* ------------------------------------------------------ níveis de acesso */
+
+  function carregarNiveis() {
+    aguarde('Lendo os níveis…');
+    Servidor.chamar('opcoesDeNivelDeAcesso')
+      .entao(function (opcoes) {
+        dados.opcoesDeNivel = opcoes;
+        Servidor.chamar('listarNiveisDeAcesso')
+          .entao(function (niveis) {
+            dados.niveis = niveis;
+            desenharNiveis();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharNiveis() {
+    var linhas = dados.niveis.map(function (nivel) {
+      return '<li class="config-item' + (escolhido && escolhido.id === nivel.id
+        ? ' atual' : '') + (nivel.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-nivel="' + escapar(nivel.id) + '">'
+        + '<span class="nome">' + escapar(nivel.nome) + '</span>'
+        + '<span class="detalhe">' + nivel.telas.length + ' telas · '
+        + nivel.acoes.length + ' ações · alcance ' + escapar(nivel.escopo)
+        + ' · ' + nivel.pessoas + ' pessoa(s)'
+        + (nivel.defeito
+          ? ' · <strong class="alerta">' + escapar(nivel.defeito) + '</strong>' : '')
+        + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.niveis.length + ' níveis</span></div>'
+      + '<p class="config-explica">O cargo não decide nada. É o nível de acesso '
+      + 'que diz quais telas abrem, o que a pessoa pode fazer e até onde ela '
+      + 'enxerga os dados.</p>'
+      + '<ul class="config-itens">' + linhas + '</ul>';
+
+    ligarCliques('[data-nivel]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-nivel') };
+      desenharNiveis();
+    });
+
+    if (escolhido) desenharPainelDoNivel(acharNaLista(dados.niveis, escolhido.id));
+    else painelVazio('Escolha um nível para ver o que ele pode.');
+  }
+
+  function desenharPainelDoNivel(nivel) {
+    if (!nivel) return painelVazio('Escolha um nível.');
+    var opcoes = dados.opcoesDeNivel;
+
+    var telas = opcoes.telas.map(function (tela) {
+      return caixaDeMarcar('tela-' + tela.chave, tela.titulo,
+        nivel.telas.indexOf(tela.chave) >= 0, '');
+    }).join('');
+
+    var acoes = opcoes.acoes.map(function (acao) {
+      return caixaDeMarcar('acao-' + acao.chave, acao.chave,
+        nivel.acoes.indexOf(acao.chave) >= 0, acao.descricao);
+    }).join('');
+
+    var escopos = opcoes.escopos.map(function (escopo) {
+      return '<label class="config-radio">'
+        + '<input type="radio" name="escopo" value="' + escapar(escopo.chave) + '"'
+        + (nivel.escopo === escopo.chave ? ' checked' : '') + '>'
+        + '<span><strong>' + escapar(escopo.chave) + '</strong>'
+        + '<em>' + escapar(escopo.descricao) + '</em></span></label>';
+    }).join('');
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-nivel">'
+      + tituloDoPainel(nivel.nome, nivel.pessoas + ' pessoa(s) neste nível')
+      + campoDeTexto('nome', 'Nome do nível', nivel.nome, '')
+      + caixaDeSimNao('ativo', 'Nível em uso', nivel.ativo)
+      + '<fieldset class="config-grupo"><legend>Telas que abrem</legend>'
+      + telas + '</fieldset>'
+      + '<fieldset class="config-grupo"><legend>O que pode fazer</legend>'
+      + acoes + '</fieldset>'
+      + '<fieldset class="config-grupo"><legend>Até onde enxerga</legend>'
+      + escopos + '</fieldset>'
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button></div></form>';
+
+    elemento('form-nivel').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+
+      var telasMarcadas = [];
+      opcoes.telas.forEach(function (tela) {
+        if (marcado('tela-' + tela.chave)) telasMarcadas.push(tela.chave);
+      });
+      var acoesMarcadas = [];
+      opcoes.acoes.forEach(function (acao) {
+        if (marcado('acao-' + acao.chave)) acoesMarcadas.push(acao.chave);
+      });
+
+      var escolhidoEscopo = document.querySelector('input[name="escopo"]:checked');
+
+      Servidor.chamar('salvarNivelDeAcesso', {
+        id: nivel.id,
+        nome: valorDe('nome'),
+        ativo: marcado('ativo'),
+        telas: telasMarcadas,
+        acoes: acoesMarcadas,
+        escopo: escolhidoEscopo ? escolhidoEscopo.value : nivel.escopo,
+        campos: nivel.campos
+      }).entao(function () { avisarSalvo(); carregarNiveis(); })
+        .senao(mostrarErroNoPainel);
+    });
+  }
+
+  /* --------------------------------------------------------------- listas */
+
+  function carregarListas() {
+    aguarde('Lendo as listas…');
+    Servidor.chamar('opcoesDeConfiguracaoDeCampo')
+      .entao(function (opcoes) {
+        dados.tipos = opcoes.tiposDeCatalogo;
+        dados.tons = opcoes.tons;
+        if (!tipoDeListaEscolhido && dados.tipos.length) {
+          tipoDeListaEscolhido = dados.tipos[0];
+        }
+        Servidor.chamar('listarCatalogo', tipoDeListaEscolhido, '')
+          .entao(function (itens) {
+            dados.itens = itens;
+            desenharListas();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharListas() {
+    var linhas = dados.itens.map(function (item) {
+      return '<li class="config-item' + (escolhido && escolhido.id === item.id
+        ? ' atual' : '') + (item.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-item="' + escapar(item.id) + '">'
+        + '<span class="nome"><span class="ponto tom-' + escapar(item.cor)
+        + '"></span>' + escapar(item.rotulo) + '</span>'
+        + '<span class="detalhe">grava como "' + escapar(item.nome) + '"'
+        + (item.ativo ? '' : ' · desligado') + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<select id="tipo-da-lista" aria-label="Tipo de lista">'
+      + dados.tipos.map(function (tipo) {
+        return '<option value="' + escapar(tipo) + '"'
+          + (tipo === tipoDeListaEscolhido ? ' selected' : '') + '>'
+          + escapar(tipo) + '</option>';
+      }).join('') + '</select>'
+      + '<button type="button" class="botao pequeno" id="novo-item">'
+      + 'Novo item</button></div>'
+      + '<p class="config-explica">O <strong>nome</strong> é o que fica gravado '
+      + 'no caso; o <strong>rótulo</strong> é o que aparece na tela. Por isso '
+      + 'trocar o rótulo é sempre seguro, e trocar o nome de um item já usado '
+      + 'é recusado.</p>'
+      + '<ul class="config-itens">' + linhas + '</ul>';
+
+    elemento('tipo-da-lista').addEventListener('change', function () {
+      tipoDeListaEscolhido = this.value;
+      escolhido = null;
+      carregarListas();
+    });
+    elemento('novo-item').addEventListener('click', function () {
+      escolhido = null;
+      desenharListas();
+      desenharPainelDoItem(null);
+    });
+    ligarCliques('[data-item]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-item') };
+      desenharListas();
+    });
+
+    if (escolhido) desenharPainelDoItem(acharNaLista(dados.itens, escolhido.id));
+    else painelVazio('Escolha um item, ou crie um novo.');
+  }
+
+  function desenharPainelDoItem(item) {
+    var ehNovo = !item;
+    var atual = item || {
+      id: '', nome: '', rotulo: '', cor: 'neutro', ordem: dados.itens.length + 1,
+      ativo: true, codigo: ''
+    };
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-item">'
+      + tituloDoPainel(ehNovo ? 'Item novo' : atual.rotulo,
+        'Lista ' + tipoDeListaEscolhido)
+      + campoDeTexto('nome', 'Nome gravado no caso', atual.nome,
+        'É este texto que vai para a célula da planilha.')
+      + campoDeTexto('rotulo', 'Rótulo na tela', atual.rotulo, '')
+      + campoDeTexto('codigo', 'Código', atual.codigo, 'Só dígitos, se houver.')
+      + caixaDeOpcoes('cor', 'Tom', dados.tons, atual.cor,
+        'O tom acompanha o tema: escolher "ruim" fica vermelho no claro e no '
+        + 'escuro, sem ninguém precisar mexer.')
+      + campoDeTexto('ordem', 'Ordem', atual.ordem, '')
+      + caixaDeSimNao('ativo', 'Aparece nas listas', atual.ativo)
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button></div></form>';
+
+    elemento('form-item').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarItemDoCatalogo', {
+        id: atual.id,
+        tipo: tipoDeListaEscolhido,
+        nome: valorDe('nome'),
+        rotulo: valorDe('rotulo'),
+        codigo: valorDe('codigo'),
+        cor: valorDe('cor'),
+        ordem: valorDe('ordem'),
+        ativo: marcado('ativo')
+      }).entao(function () { avisarSalvo(); carregarListas(); })
+        .senao(mostrarErroNoPainel);
+    });
+  }
+
+  /* ---------------------------------------------------------------- mesas */
+
+  function carregarMesas() {
+    aguarde('Lendo as mesas…');
+    Servidor.chamar('listarMesasConfiguraveis')
+      .entao(function (mesas) { dados.mesas = mesas; desenharMesas(); })
+      .senao(falhou);
+  }
+
+  function desenharMesas() {
+    var linhas = dados.mesas.map(function (mesa) {
+      return '<li class="config-item' + (escolhido && escolhido.id === mesa.id
+        ? ' atual' : '') + (mesa.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-mesa="' + escapar(mesa.id) + '">'
+        + '<span class="nome">' + escapar(mesa.nome) + '</span>'
+        + '<span class="detalhe">aba ' + escapar(mesa.aba)
+        + (mesa.abaExiste ? '' : ' · <strong class="alerta">aba ausente</strong>')
+        + (mesa.ativo ? '' : ' · desligada') + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.mesas.length + ' mesas</span></div>'
+      + '<p class="config-explica">Aqui se ajusta o que a mesa MOSTRA. Onde ela '
+      + 'mora — a aba da planilha — não muda: os casos já gravados estão lá.</p>'
+      + '<ul class="config-itens">' + linhas + '</ul>';
+
+    ligarCliques('[data-mesa]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-mesa') };
+      desenharMesas();
+    });
+
+    if (escolhido) desenharPainelDaMesa(acharNaLista(dados.mesas, escolhido.id));
+    else painelVazio('Escolha uma mesa.');
+  }
+
+  function desenharPainelDaMesa(mesa) {
+    if (!mesa) return painelVazio('Escolha uma mesa.');
+    var colunas = [''].concat(mesa.colunasDaBase);
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-mesa">'
+      + tituloDoPainel(mesa.nome, 'Aba ' + mesa.aba)
+      + campoDeTexto('nome', 'Nome da mesa', mesa.nome, '')
+      + campoDeTexto('descricao', 'Descrição', mesa.descricao, '')
+      + caixaDeOpcoes('colunaDaData', 'Coluna da data de entrada', colunas,
+        mesa.colunaDaData,
+        'É daqui que sai a "data do último registro" da barra superior.')
+      + caixaDeOpcoes('colunaDaHora', 'Coluna da hora', colunas, mesa.colunaDaHora, '')
+      + caixaDeOpcoes('colunaDoStatus', 'Coluna da situação', colunas,
+        mesa.colunaDoStatus, 'É por ela que os cartões do painel contam.')
+      + campoDeTexto('colunasDaFila', 'Colunas da fila', mesa.colunasDaFila,
+        'Separadas por vírgula, na ordem em que aparecem na tabela.')
+      + campoDeTexto('cartoesDoPainel', 'Situações que viram cartão',
+        mesa.cartoesDoPainel,
+        'Separadas por vírgula. Vazio mostra todas — o que só faz sentido em '
+        + 'mesa de bastante volume.')
+      + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
+        mesa.colunaDaFinalizacao, '')
+      + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
+        colunas, mesa.colunaDaAreaResponsavel, '')
+      + campoDeTexto('ordem', 'Ordem no seletor', mesa.ordem, '')
+      + caixaDeSimNao('ativo', 'Mesa em uso', mesa.ativo)
+      + (mesa.situacoes.length
+        ? '<p class="config-explica">Situações cadastradas nesta mesa: '
+          + escapar(mesa.situacoes.join(', ')) + '.</p>'
+        : '')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button></div></form>';
+
+    elemento('form-mesa').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarMesa', {
+        id: mesa.id,
+        nome: valorDe('nome'),
+        descricao: valorDe('descricao'),
+        colunaDaData: valorDe('colunaDaData'),
+        colunaDaHora: valorDe('colunaDaHora'),
+        colunaDoStatus: valorDe('colunaDoStatus'),
+        colunasDaFila: valorDe('colunasDaFila'),
+        cartoesDoPainel: valorDe('cartoesDoPainel'),
+        colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
+        colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
+        ordem: valorDe('ordem'),
+        ativo: marcado('ativo')
+      }).entao(function () { avisarSalvo(); carregarMesas(); })
+        .senao(mostrarErroNoPainel);
+    });
+  }
+
+  /* --------------------------------------------------- identidade e senha */
+
+  function desenharIdentidade() {
+    var identidade = resumo.identidade;
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">Identidade da operação</span></div>'
+      + '<p class="config-explica">O sistema é a plataforma; a operação é quem '
+      + 'a usa. Trocar estes campos é o que faz o mesmo produto atender outra '
+      + 'operação sem uma linha de código.</p>'
+      + '<form class="config-form larga" id="form-identidade">'
+      + campoDeTexto('nome', 'Nome curto', identidade.nome,
+        'Aparece na barra superior e no título da janela.')
+      + campoDeTexto('nomeLongo', 'Nome por extenso', identidade.nomeLongo, '')
+      + campoDeTexto('operacao', 'Operação', identidade.operacao,
+        'Assina a tela de quem não está cadastrado.')
+      + campoDeTexto('frase', 'Frase de abertura', identidade.frase,
+        'Aparece no painel azul da tela de quem não está cadastrado.')
+      + campoDeTexto('corPrimaria', 'Cor da operação', identidade.corPrimaria,
+        'No formato #RRGGBB. Vale só no tema padrão — os outros três têm a '
+        + 'paleta deles.')
+      + campoDeTexto('plataforma', 'Plataforma', identidade.plataforma, '')
+      + campoDeTexto('fabricante', 'Fabricante', identidade.fabricante, '')
+      + campoDeTexto('logo', 'Logo', identidade.logo,
+        'Endereço https:// de uma imagem, ou a própria imagem em texto '
+        + '(data:image/…). Vazio deixa o nome da operação assinar sozinho.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar identidade</button>'
+      + '</div></form>';
+
+    elemento('form-identidade').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var logo = valorDe('logo');
+      Servidor.chamar('salvarIdentidade', {
+        nome: valorDe('nome'),
+        nomeLongo: valorDe('nomeLongo'),
+        operacao: valorDe('operacao'),
+        corPrimaria: valorDe('corPrimaria'),
+        plataforma: valorDe('plataforma'),
+        fabricante: valorDe('fabricante'),
+        frase: valorDe('frase')
+      }).entao(function (nova) {
+        resumo.identidade = nova;
+        Servidor.chamar('definirLogo', logo)
+          .entao(function () {
+            avisarSalvo('Identidade salva. Recarregue para ver a barra nova.');
+          })
+          .senao(mostrarErroNoPainel);
+      }).senao(mostrarErroNoPainel);
+    });
+
+    desenharSenha();
+  }
+
+  function desenharSenha() {
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-senha">'
+      + tituloDoPainel('Senha de administrador',
+        resumo.senhaDefinida ? 'Definida' : 'Ainda não definida')
+      + '<p class="config-explica">Ela não é a sua senha de entrada — quem faz '
+      + 'isso é a conta Google. Esta senha guarda as ações que não têm '
+      + 'desfazer, como criar coluna na planilha. Libera por 5 minutos; três '
+      + 'erros trancam por 24 horas.</p>'
+      + (resumo.senhaDefinida
+        ? campoDeSenha('atual', 'Senha atual', '') : '')
+      + campoDeSenha('nova', 'Senha nova', 'No mínimo 8 caracteres.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">'
+      + (resumo.senhaDefinida ? 'Trocar senha' : 'Definir senha') + '</button>'
+      + '</div></form>';
+
+    elemento('form-senha').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('definirSenhaDeAdministrador',
+        valorDe('nova'), resumo.senhaDefinida ? valorDe('atual') : '')
+        .entao(function () {
+          resumo.senhaDefinida = true;
+          avisarSalvo('Senha guardada.');
+          desenharSenha();
+        })
+        .senao(mostrarErroNoPainel);
+    });
+  }
+
+  /* ------------------------------------------------- estrutura e auditoria */
+
+  function carregarEstrutura() {
+    aguarde('Conferindo a planilha…');
+    Servidor.chamar('conferirEstruturaDaPlanilha')
+      .entao(function (laudo) {
+        dados.laudo = laudo;
+        Servidor.chamar('listarAuditoria', 40)
+          .entao(function (trilha) {
+            dados.trilha = trilha;
+            desenharEstrutura();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharEstrutura() {
+    var laudo = dados.laudo;
+
+    var abas = laudo.abas.map(function (aba) {
+      var problema = !aba.existe || aba.faltando.length;
+      return '<li class="config-item' + (problema ? ' com-problema' : '') + '">'
+        + '<span class="nome">' + escapar(aba.aba) + '</span>'
+        + '<span class="detalhe">'
+        + (!aba.existe ? 'A aba não existe na planilha.'
+          : aba.linhas + ' linhas'
+            + (aba.faltando.length
+              ? ' · <strong class="alerta">faltam: '
+                + escapar(aba.faltando.join(', ')) + '</strong>' : '')
+            + (aba.aMais.length
+              ? ' · fora do contrato: ' + escapar(aba.aMais.join(', ')) : ''))
+        + '</span></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">'
+      + (laudo.ok ? 'A planilha está no contrato' : 'A planilha saiu do contrato')
+      + '</span></div>'
+      + '<p class="config-explica">Coluna que sumiu e coluna que apareceu são '
+      + 'mostradas lado a lado, sem conserto automático: o sistema não adivinha '
+      + 'que uma virou a outra, porque adivinhar erraria calado e o dado iria '
+      + 'para a coluna errada.</p>'
+      + '<ul class="config-itens laudo">' + abas + '</ul>';
+
+    elemento('config-painel').innerHTML = '<div class="config-form">'
+      + tituloDoPainel('O que foi feito', 'As 40 ações mais recentes')
+      + (dados.trilha.length
+        ? '<ul class="trilha">' + dados.trilha.map(function (linha) {
+          return '<li><span class="quando">' + escapar(linha.dataHora) + '</span>'
+            + '<span class="oque">' + escapar(linha.acao) + '</span>'
+            + '<span class="quem">' + escapar(linha.quem)
+            + (linha.detalhe ? ' · ' + escapar(linha.detalhe) : '')
+            + '</span></li>';
+        }).join('') + '</ul>'
+        : '<p class="config-vazio">Nada foi alterado ainda. A trilha começa a '
+          + 'encher no primeiro ajuste — e guarda quem fez, o quê e quando.</p>')
+      + '</div>';
+  }
+
+  /* ================================================ o diálogo de senha */
+
+  /**
+   * Executa a ação, pedindo a senha antes se ela ainda não foi liberada.
+   *
+   * A ação fica GUARDADA: depois de acertar a senha ela roda sozinha, sem a
+   * pessoa ter de preencher tudo de novo. Refazer o formulário depois de
+   * digitar a senha é o tipo de coisa que faz alguém desistir no meio.
+   */
+  function comSenhaDeAdministrador(acao) {
+    acaoPendente = acao;
+
+    if (!resumo.senhaDefinida) {
+      window.alert('Ainda não existe senha de administrador. Defina uma em '
+        + '"Identidade e segurança" antes de mexer na estrutura.');
+      acaoPendente = null;
+      return;
+    }
+    abrirDialogoDaSenha();
+  }
+
+  function abrirDialogoDaSenha() {
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-senha';
+    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="dialogo-titulo">'
+      + '<h3 id="dialogo-titulo">Ação sem desfazer</h3>'
+      + '<p>Isto escreve na planilha de produção. Confirme com a senha de '
+      + 'administrador — ela libera as ações de estrutura por 5 minutos.</p>'
+      + '<form id="form-dialogo">'
+      + '<input type="password" id="senha-do-dialogo" autocomplete="off"'
+      + ' placeholder="Senha de administrador" aria-label="Senha de administrador">'
+      + '<p class="dialogo-erro" id="dialogo-erro" hidden></p>'
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Confirmar</button>'
+      + '<button type="button" class="botao vazado" id="dialogo-desistir">'
+      + 'Desistir</button></div></form></div>';
+    document.body.appendChild(caixa);
+
+    var campo = elemento('senha-do-dialogo');
+    campo.focus();
+
+    elemento('dialogo-desistir').addEventListener('click', fecharDialogoDaSenha);
+    elemento('form-dialogo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('liberarComSenha', campo.value)
+        .entao(function () {
+          var acao = acaoPendente;
+          fecharDialogoDaSenha();
+          if (acao) acao();
+        })
+        .senao(function (erro) {
+          var aviso = elemento('dialogo-erro');
+          aviso.textContent = erro.message || String(erro);
+          aviso.hidden = false;
+          campo.value = '';
+          campo.focus();
+        });
+    });
+  }
+
+  function fecharDialogoDaSenha() {
+    var caixa = elemento('dialogo-senha');
+    if (caixa) caixa.parentNode.removeChild(caixa);
+    acaoPendente = null;
+  }
+
+  /* ======================================================== peças da tela */
+
+  function tituloDoPainel(titulo, subtitulo) {
+    return '<header class="config-painel-cabeca">'
+      + '<h3>' + escapar(titulo) + '</h3>'
+      + '<p>' + escapar(subtitulo) + '</p></header>';
+  }
+
+  function painelVazio(mensagem) {
+    elemento('config-painel').innerHTML =
+      '<p class="config-vazio">' + escapar(mensagem) + '</p>';
+  }
+
+  function campoDeTexto(nome, rotulo, valor, dica) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<input type="text" id="cfg-' + nome + '" value="'
+      + escapar(texto(valor)) + '">'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  function campoDeSenha(nome, rotulo, dica) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<input type="password" id="cfg-' + nome + '" autocomplete="off">'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  function campoSomenteLeitura(rotulo, valor, dica) {
+    return '<label class="config-campo travado"><span>' + escapar(rotulo) + '</span>'
+      + '<input type="text" value="' + escapar(texto(valor)) + '" readonly>'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  function caixaDeOpcoes(nome, rotulo, opcoes, escolhida, dica) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<select id="cfg-' + nome + '">'
+      + opcoes.map(function (opcao) {
+        return '<option value="' + escapar(opcao) + '"'
+          + (texto(opcao) === texto(escolhida) ? ' selected' : '') + '>'
+          + (opcao ? escapar(opcao) : '— nenhuma —') + '</option>';
+      }).join('') + '</select>'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  /** Uma caixa de opções montada de itens que têm id e nome. */
+  function caixaDeItens(nome, rotulo, itens, escolhido, dica) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<select id="cfg-' + nome + '">'
+      + '<option value="">— escolha —</option>'
+      + itens.map(function (item) {
+        return '<option value="' + escapar(item.id) + '"'
+          + (texto(item.id) === texto(escolhido) ? ' selected' : '') + '>'
+          + escapar(item.nome) + '</option>';
+      }).join('') + '</select>'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  function caixaDeSimNao(nome, rotulo, ligado) {
+    return '<label class="config-chave">'
+      + '<input type="checkbox" id="cfg-' + nome + '"'
+      + (ligado ? ' checked' : '') + '>'
+      + '<span>' + escapar(rotulo) + '</span></label>';
+  }
+
+  function caixaDeMarcar(nome, rotulo, ligado, dica) {
+    return '<label class="config-chave">'
+      + '<input type="checkbox" id="cfg-' + nome + '"'
+      + (ligado ? ' checked' : '') + '>'
+      + '<span>' + escapar(rotulo)
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</span></label>';
+  }
+
+  /* ------------------------------------------------------------ utilidades */
+
+  function valorDe(nome) {
+    var campo = elemento('cfg-' + nome);
+    return campo ? campo.value : '';
+  }
+
+  function marcado(nome) {
+    var campo = elemento('cfg-' + nome);
+    return campo ? campo.checked : false;
+  }
+
+  function acharNaLista(lista, id) {
+    for (var i = 0; i < lista.length; i++) {
+      if (texto(lista[i].id) === texto(id)) return lista[i];
+    }
+    return null;
+  }
+
+  function ligarCliques(seletor, oQueFazer) {
+    var botoes = document.querySelectorAll(seletor);
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () { oQueFazer(this); });
+    }
+  }
+
+  function avisarSalvo(mensagem) {
+    avisar(mensagem || 'Salvo.', 'bom');
+  }
+
+  /** Um recado flutuante, no tom pedido. Some sozinho. */
+  function avisar(mensagem, tom) {
+    var aviso = document.createElement('div');
+    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
+    aviso.setAttribute('role', 'status');
+    aviso.textContent = mensagem;
+    document.body.appendChild(aviso);
+    window.setTimeout(function () {
+      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
+    }, tom === 'ruim' ? 6000 : 3200);
+  }
+
+  function mostrarErroNoPainel(erro) {
+    var painel = elemento('config-painel');
+    if (!painel) return window.alert(erro.message || String(erro));
+
+    var antigo = painel.querySelector('.config-erro');
+    if (antigo) antigo.parentNode.removeChild(antigo);
+
+    var caixa = document.createElement('p');
+    caixa.className = 'config-erro';
+    caixa.textContent = erro.message || String(erro);
+    painel.insertBefore(caixa, painel.firstChild);
+    painel.scrollTop = 0;
+  }
+
+  /* ------------------------------------------------------------- ligar */
+
+  function ligar(pacote) {
+    if (pacote) pacoteDoSistema = pacote;
+    Servidor.chamar('resumoDasConfiguracoes')
+      .entao(function (resposta) {
+        resumo = resposta;
+        desenharTudo();
+      })
+      .senao(function (erro) {
+        elemento('config').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function desligar() { fecharDialogoDaSenha(); }
+
+  return { montar: montar, ligar: ligar, desligar: desligar };
+})();
+</script>

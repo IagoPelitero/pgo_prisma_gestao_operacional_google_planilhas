@@ -40,6 +40,29 @@ const RECC_ESCOPOS = {
   TODOS: 'TODOS'
 };
 
+/**
+ * As telas do sistema, na ordem em que aparecem no menu.
+ *
+ * Mora AQUI, junto das ações e dos escopos, porque é uma lista de permissão:
+ * é ela que a tela de Configurações oferece ao montar um nível de acesso, e é
+ * ela que o menu percorre. Ter a lista escrita em dois lugares é como ter dois
+ * mapas do mesmo mar: um dia eles divergem, e a tela nova nasce inacessível
+ * porque ninguém lembrou de acrescentá-la no segundo.
+ *
+ * O título aqui é o nome de fábrica. O administrador pode trocá-lo em
+ * MENU.TITULOS sem que o sistema perca de vista qual tela é qual — o que
+ * identifica a tela é a CHAVE, nunca o texto.
+ */
+const RECC_TELAS_DO_SISTEMA = [
+  { tela: 'dashboard', titulo: 'Dashboard' },
+  { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
+  { tela: 'minhaPerformance', titulo: 'Minha Performance' },
+  { tela: 'buscarCaso', titulo: 'Buscar Caso' },
+  { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
+  { tela: 'painelAnalitico', titulo: 'Painel Analítico' },
+  { tela: 'configuracoes', titulo: 'Configurações' }
+];
+
 /** Como um campo pode aparecer para um nível de acesso. */
 const RECC_VISIBILIDADE = {
   OCULTO: 'oculto',
@@ -65,6 +88,7 @@ function usuarioAtual_() {
   if (!email) {
     return {
       cadastrado: false,
+      situacao: 'SEM_EMAIL',
       email: '',
       motivo: 'O Google não informou o e-mail de quem está acessando.'
     };
@@ -82,6 +106,7 @@ function usuarioAtual_() {
   if (!encontrado) {
     return {
       cadastrado: false,
+      situacao: 'NAO_CADASTRADO',
       email: email,
       motivo: 'Este e-mail não está cadastrado no sistema.'
     };
@@ -89,6 +114,7 @@ function usuarioAtual_() {
   if (normalizarParaComparar_(encontrado.Ativo) !== 'sim') {
     return {
       cadastrado: false,
+      situacao: 'DESATIVADO',
       email: email,
       motivo: 'Este e-mail está cadastrado, mas o acesso está desativado.'
     };
@@ -98,6 +124,7 @@ function usuarioAtual_() {
   if (!nivel) {
     return {
       cadastrado: false,
+      situacao: 'NIVEL_INEXISTENTE',
       email: email,
       motivo: 'O nível de acesso deste usuário não existe mais no catálogo. ' +
         'Peça a um administrador para reatribuir.'
@@ -107,6 +134,7 @@ function usuarioAtual_() {
   if (normalizarParaComparar_(nivel.Ativo) !== 'sim') {
     return {
       cadastrado: false,
+      situacao: 'NIVEL_DESLIGADO',
       email: email,
       motivo: 'O nível de acesso "' + nivel.Nome + '" está desligado. ' +
         'Enquanto estiver assim, ninguém que dependa dele entra.'

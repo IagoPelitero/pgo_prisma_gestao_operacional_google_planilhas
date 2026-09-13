@@ -24,6 +24,10 @@ function doGet() {
     var bloqueio = HtmlService.createTemplateFromFile('SemAcesso');
     bloqueio.email = quem.email;
     bloqueio.motivo = quem.motivo;
+    // O código da recusa, e não só a frase: o título da tela muda conforme o
+    // caso, e comparar texto para decidir isso quebraria no dia em que
+    // alguém corrigir uma vírgula na frase.
+    bloqueio.situacao = quem.situacao || 'NAO_CADASTRADO';
     bloqueio.identidade = identidade;
     return bloqueio.evaluate()
       .setTitle(identidade.nome + ' — acesso não liberado')
@@ -164,13 +168,12 @@ function montarMenu_(permissoes) {
     titulos = {};
   }
 
-  var ordem = ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-    'tabelaCorretoras', 'painelAnalitico', 'configuracoes'];
-
-  return ordem
-    .filter(function (tela) { return podeVerTela_(permissoes, tela); })
-    .map(function (tela) {
-      return { tela: tela, titulo: titulos[tela] || tela };
+  // A ordem sai de RECC_TELAS_DO_SISTEMA, a mesma lista que a tela de
+  // Configurações oferece ao montar um nível. Uma lista só, um lugar só.
+  return RECC_TELAS_DO_SISTEMA
+    .filter(function (item) { return podeVerTela_(permissoes, item.tela); })
+    .map(function (item) {
+      return { tela: item.tela, titulo: titulos[item.tela] || item.titulo };
     });
 }
 
@@ -342,6 +345,7 @@ function lerIdentidadeVisual_() {
     logo: valorDaConfiguracao_('IDENTIDADE.LOGO_URL', ''),
     corPrimaria: valorDaConfiguracao_('IDENTIDADE.COR_PRIMARIA', '#0B77CE'),
     plataforma: valorDaConfiguracao_('IDENTIDADE.PLATAFORMA', ''),
-    fabricante: valorDaConfiguracao_('IDENTIDADE.FABRICANTE', '')
+    fabricante: valorDaConfiguracao_('IDENTIDADE.FABRICANTE', ''),
+    frase: valorDaConfiguracao_('IDENTIDADE.FRASE', '')
   };
 }

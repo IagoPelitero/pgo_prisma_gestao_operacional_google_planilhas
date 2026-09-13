@@ -3,8 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 5 de 12 etapas construídas, a 6ª em obra · 163 testes
-passando.
+**Estado geral:** 6 de 12 etapas construídas · 174 testes passando.
 
 ---
 
@@ -17,11 +16,11 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | # | Etapa | Estado | Testes |
 |---|---|---|---|
 | 1 | Fundação | ✅ pronta | 32 |
-| 2 | Acesso | ✅ pronta | 30 |
-| 3 | Casca | ✅ pronta | 27 |
-| 4 | Cadastrar Caso | ✅ pronta | 26 |
-| 5 | Dashboard | ✅ pronta | 18 |
-| 6 | Configurações | 🔨 servidor pronto, tela em construção | 25 |
+| 2 | Acesso | ✅ pronta | 32 |
+| 3 | Casca | ✅ pronta | 28 |
+| 4 | Cadastrar Caso | ✅ pronta | 28 |
+| 5 | Dashboard | ✅ pronta | 19 |
+| 6 | Configurações | ✅ pronta | 35 |
 | 7 | Buscar Caso | ⏳ | — |
 | 8 | Painel Analítico | ⏳ | — |
 | 9 | Minha Performance | ⏳ | — |
@@ -161,12 +160,22 @@ acerta hoje e erra na mesa que vier depois.
 
 ---
 
-## Etapa 6 — Configurações 🔨
+## Etapa 6 — Configurações ✅
 
 **A tela mais importante do produto: tudo o que as outras fazem sai daqui.**
 
-O servidor está pronto e testado — `Back-End/Configuracoes.gs`, 25 testes.
-A tela é o que falta.
+`Back-End/Configuracoes.gs` e `Front-End/Configuracoes.html`, 35 testes.
+
+### Três colunas
+
+| Coluna | O que é |
+|---|---|
+| **Seções** | os sete assuntos, cada um com o seu tamanho ao lado |
+| **Lista** | os itens da seção; clicar escolhe |
+| **Propriedades** | o item escolhido, aberto para edição. Nada grava sem Salvar |
+
+As sete seções: campos do formulário, usuários, níveis de acesso, listas,
+mesas de trabalho, identidade e segurança, estrutura e auditoria.
 
 ### Três níveis de risco, três guardas
 
@@ -193,10 +202,23 @@ não existe desfazer.
 - **Coluna apagada na planilha aparece marcada** na lista de campos, em vez de
   o campo parar de funcionar sem explicação
 
-### O que falta
+### E as travas que a tela acrescentou
 
-A tela: o submenu das seis seções, a lista central, o painel de propriedades à
-direita e o diálogo da senha.
+- **A aba de uma mesa não muda por aqui** — os casos já gravados moram nela
+- **Nome de coluna é escolhido numa lista**, nunca digitado: o nome que não
+  existe é recusado dizendo quais existem, em vez de deixar o painel em branco
+  dias depois
+- **Desligar a última mesa ativa é recusado** — o Dashboard e o cadastro
+  ficariam sem base nenhuma
+- **A lista de telas é uma só.** `RECC_TELAS_DO_SISTEMA` alimenta o menu e a
+  tela de níveis ao mesmo tempo; duas listas divergiriam, e a tela nova
+  nasceria inacessível
+
+### O diálogo da senha guarda a ação
+
+Criar coluna pede a senha e, quando ela vem, **executa o que estava
+pendente** — sem pedir o formulário de novo. Refazer tudo depois de digitar a
+senha é o tipo de detalhe que faz alguém desistir no meio.
 
 ---
 
@@ -206,5 +228,6 @@ direita e o diálogo da senha.
 |---|---|
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
-| **Editar um caso pela fila** | `editarCaso` já existe e está testado, mas ainda não há tela para isso — a fila abre o detalhe em leitura. Entra junto de Configurações |
+| **Editar um caso pela fila** | `editarCaso` já existe e está testado, mas ainda não há tela para isso — a fila abre o detalhe em leitura |
+| **Criar e apagar mesa** | A tela ajusta as mesas que existem. Criar uma mesa nova é estrutura (cria aba), e ainda não passa por Configurações |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

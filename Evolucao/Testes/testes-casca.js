@@ -52,7 +52,7 @@ function rodarTestesDaCasca() {
     contem(html, 'id="aplicacao"', 'a casca precisa estar na página');
     contem(html, 'id="lateral"', 'o menu lateral');
     contem(html, 'id="superior"', 'a barra superior');
-    verdadeiro(html.indexOf('Seu acesso ainda não foi liberado') < 0,
+    verdadeiro(html.indexOf('Seu usuário ainda') < 0,
       'quem está cadastrado não pode receber a tela de bloqueio');
   });
 
@@ -349,7 +349,7 @@ function rodarTestesDaCasca() {
     contem(gerada.paginaDoSistema, '"disponivel": true',
       'o pacote embutido é o que o servidor devolveu');
     igual(gerada.pacote.menu.length, 7, 'o menu da prévia é o menu de verdade');
-    contem(gerada.telaSemAcesso, 'Seu acesso ainda não foi liberado');
+    contem(gerada.telaSemAcesso, 'Seu usuário ainda');
 
     verdadeiro(fs.existsSync(path.join(pasta, 'sistema.html')));
     fs.rmSync(pasta, { recursive: true, force: true });

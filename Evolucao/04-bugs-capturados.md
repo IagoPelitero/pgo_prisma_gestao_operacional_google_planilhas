@@ -279,11 +279,37 @@ cima de um fundo saturado, lido de relance o dia inteiro.
 ícones de 1,7 para 1,5. Um teste tranca os pesos — é fácil alguém "reforçar"
 o menu de novo sem perceber o custo.
 
+### 18 · O aviso de "salvo" pintava branco à mão
+
+**Etapa 6, pego pelo teste de tema.** O recado que aparece depois de gravar
+nasceu com `color: #FFFFFF` escrito direto no componente. Num tema claro
+ninguém veria diferença; no tema em que o verde é claro, o texto sumiria
+dentro do próprio aviso.
+
+**Defesa.** O teste que veio do achado 10 — "nenhum componente escreve cor à
+mão" — apontou o arquivo e a linha antes de o aviso ser visto uma única vez na
+tela. O recado passou a usar `--tom` e `--tom-tenue`, como todo o resto.
+
+Vale registrar o que aconteceu aqui: a defesa de um bug antigo pegou um bug
+novo sozinha, sem ninguém lembrar da regra. É para isso que ela existe.
+
+### 19 · O menu ia em texto escuro sobre o azul
+
+**Etapa 6, apontado pelo PO.** O texto do menu era azul-marinho sobre o azul
+vivo da marca. Legível, mas de pouco contraste — e diferente do que a operação
+tinha aprovado.
+
+**Defesa.** `--lateral-texto` passou a branco nos três temas de fundo saturado
+(padrão, rosa e Brasil), com opacidade .92 para o branco não vibrar, e o item
+atual continua sendo o único totalmente opaco. Os sete desenhos do menu foram
+refeitos para bater com o print: painel de quatro quadrados, mais, pulso, lupa,
+prédio, barras e engrenagem. Um teste confere a cor nos três temas.
+
 ---
 
 ## O que esta lista ensina
 
-**Treze dos vinte eram silenciosos.** Não davam erro, não travavam, não
+**Treze dos vinte e dois eram silenciosos.** Não davam erro, não travavam, não
 apareciam no log. Gravavam dado errado e seguiam em frente.
 
 Daí as duas práticas que o projeto não abre mão:
@@ -293,7 +319,11 @@ Daí as duas práticas que o projeto não abre mão:
    calado é pior que operação parada.
 2. **Olhar a tela.** Os itens 9, 10 e 13 nenhum teste pegaria sozinho — e o
    13 só apareceu numa foto de página inteira.
-3. **Ouvir quem vai usar.** Os itens 15 a 17 não são defeitos de código: são
-   de leitura, e vieram do PO olhando a tela pronta. Painel que cansa deixa de
-   ser olhado, e painel que ninguém olha não serve para nada. Teste não enxerga
-   "está feio" nem "essa cor não devia estar aqui".
+3. **Ouvir quem vai usar.** Os itens 15 a 17 e o 19 não são defeitos de
+   código: são de leitura, e vieram do PO olhando a tela pronta. Painel que
+   cansa deixa de ser olhado, e painel que ninguém olha não serve para nada.
+   Teste não enxerga "está feio" nem "essa cor não devia estar aqui".
+4. **Defesa velha pega bug novo.** O item 18 foi apontado pelo teste que
+   nasceu do item 10, meses de trabalho depois, num arquivo que nem existia
+   quando a regra foi escrita. Guarda que só serve para o bug que a criou não
+   valeria o custo de mantê-la.

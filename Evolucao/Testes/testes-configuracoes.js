@@ -8,8 +8,34 @@
  * ============================================================================
  */
 
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
   require('./ferramentas');
+
+const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
+
+function lerTela(nome) {
+  return fs.readFileSync(path.join(PASTA_DAS_TELAS, nome), 'utf8');
+}
+
+/**
+ * Carrega os scripts de uma ou mais telas no mesmo contexto.
+ *
+ * A tela de Configurações usa o Moldura para escapar texto, então as duas
+ * precisam morar juntas — como moram na página de verdade.
+ */
+function carregarTelas(nomes) {
+  const contexto = vm.createContext({ console });
+  nomes.forEach((nome) => {
+    const fonte = lerTela(nome)
+      .replace(/^<script>/, '')
+      .replace(/<\/script>\s*$/, '');
+    vm.runInContext(fonte, contexto, { filename: nome });
+  });
+  return contexto;
+}
 
 function rodarTestesDeConfiguracoes() {
   console.log('\nEtapa 6 — Configurações');
@@ -22,7 +48,10 @@ function rodarTestesDeConfiguracoes() {
 
   teste('a tela abre sabendo o tamanho de cada seção', () => {
     const resumo = chamar('resumoDasConfiguracoes()');
-    igual(resumo.secoes.length, 6);
+    // Conferimos as CHAVES, e não só quantas são: contar 7 continuaria
+    // passando se uma seção sumisse e outra nascesse no mesmo commit.
+    igual(resumo.secoes.map((s) => s.chave).join(','),
+      'campos,usuarios,niveis,catalogo,mesas,identidade,estrutura');
     igual(resumo.podeMexerNaEstrutura, true);
     igual(resumo.senhaDefinida, false, 'instalação nova ainda não tem senha');
     verdadeiro(resumo.secoes.find((s) => s.chave === 'campos').quantidade >= 55);
@@ -298,6 +327,141 @@ function rodarTestesDeConfiguracoes() {
     verdadeiro(mesa4.aMais.indexOf('Valor negociado') >= 0,
       'coluna nova é respeitada, e o laudo diz que ela não é do contrato');
     igual(mesa4.faltando.length, 0);
+  });
+
+  secao('Níveis — o que a tela oferece');
+
+  teste('as telas oferecidas são as MESMAS que o menu percorre', () => {
+    const opcoes = chamar('opcoesDeNivelDeAcesso()');
+    const doMenu = chamar('RECC_TELAS_DO_SISTEMA').map((t) => t.tela);
+
+    igual(opcoes.telas.map((t) => t.chave).join(','), doMenu.join(','),
+      'duas listas de telas divergiriam, e a tela nova nasceria inacessível');
+    igual(opcoes.acoes.length, 6);
+    igual(opcoes.escopos.length, 4);
+    opcoes.acoes.forEach((acao) => {
+      verdadeiro(acao.descricao.length > 10,
+        'toda ação explica o que faz: "estrutura" não diz nada sozinho');
+    });
+  });
+
+  secao('Mesas de trabalho');
+
+  teste('a mesa vem com as colunas da base, para não digitar nome à mão', () => {
+    const mesas = chamar('listarMesasConfiguraveis()');
+    igual(mesas.length, 2);
+    const diamante = mesas.find((m) => m.aba === 'BASE_MESA');
+    verdadeiro(diamante.abaExiste);
+    verdadeiro(diamante.colunasDaBase.indexOf('Status') >= 0);
+    verdadeiro(diamante.colunasDaBase.every((c) => c.charAt(0) !== '_'),
+      'as colunas de controle não são para escolher');
+    verdadeiro(diamante.situacoes.indexOf('Concluído') >= 0);
+  });
+
+  teste('coluna que não existe é recusada, dizendo quais existem', () => {
+    const erro = lanca(() => chamar('salvarMesa')({
+      id: mesa.id, nome: 'Mesa Diamante', colunaDoStatus: 'Sittuação'
+    }), 'não existe na aba');
+    contem(erro, 'Status', 'o recado lista as colunas de verdade');
+  });
+
+  teste('trocar a aba de uma mesa é recusado — os casos moram nela', () => {
+    lanca(() => chamar('salvarMesa')({
+      id: mesa.id, nome: 'Mesa Diamante', aba: 'BASE_RET'
+    }), 'não muda por aqui');
+  });
+
+  teste('desligar a última mesa ativa é recusado', () => {
+    const ret = chamar('listarMesasConfiguraveis()').find((m) => m.aba === 'BASE_RET');
+    const comoEstava = { id: ret.id, nome: ret.nome, ordem: ret.ordem,
+      colunaDaData: ret.colunaDaData, colunaDaHora: ret.colunaDaHora,
+      colunaDoStatus: ret.colunaDoStatus, colunasDaFila: ret.colunasDaFila,
+      cartoesDoPainel: ret.cartoesDoPainel,
+      colunaDaFinalizacao: ret.colunaDaFinalizacao,
+      colunaDaAreaResponsavel: ret.colunaDaAreaResponsavel };
+
+    chamar('salvarMesa')(Object.assign({}, comoEstava, { ativo: false }));
+
+    lanca(() => chamar('salvarMesa')({
+      id: mesa.id, nome: 'Mesa Diamante', ativo: false
+    }), 'última mesa ativa');
+
+    chamar('salvarMesa')(Object.assign({}, comoEstava, { ativo: true }));
+  });
+
+  teste('mudar os cartões da mesa muda o painel na hora seguinte', () => {
+    chamar('salvarMesa')({
+      id: mesa.id, nome: 'Mesa Diamante',
+      colunaDaData: 'Data de entrada', colunaDaHora: 'Horário',
+      colunaDoStatus: 'Status', colunasDaFila: 'Nome do segurado, Status',
+      cartoesDoPainel: 'Pendente'
+    });
+    const painel = chamar('resumoDaMesa')(mesa.id, {});
+    // Pela CHAVE, e não pelo rótulo: o rótulo é editável, e um teste anterior
+    // desta mesma suíte já trocou o de "Pendente".
+    const situacoes = painel.cartoes
+      .filter((c) => c.chave !== 'total' && c.chave !== 'naCelula')
+      .map((c) => c.chave);
+    igual(situacoes.join(','), 'pendente',
+      'a mesa declara quais situações viram cartão, e o painel obedece');
+  });
+
+  secao('A tela');
+
+  teste('a página inclui a tela, e a rota chama ela', () => {
+    contem(lerTela('Index.html'), "incluir('Configuracoes')",
+      'tela fora do Index não existe para o Apps Script');
+    const rotas = lerTela('Aplicacao.html');
+    contem(rotas, 'TelaConfiguracoes.montar(pacote)');
+    contem(rotas, 'TelaConfiguracoes.desligar()',
+      'sair da tela precisa fechar o diálogo da senha');
+  });
+
+  teste('a tela monta as três colunas e escolhe a primeira mesa sozinha', () => {
+    const { TelaConfiguracoes } = carregarTelas(['Moldura.html', 'Configuracoes.html']);
+    const casca = TelaConfiguracoes.montar(chamar('pacoteDePartida()'));
+    contem(casca, 'id="config"');
+    contem(casca, 'Abrindo as configurações',
+      'a tela avisa que está carregando em vez de ficar branca');
+  });
+
+  teste('toda gravação da tela passa por uma função que confere permissão', () => {
+    // A lista de chamadas que a tela faz ao servidor, tirada do próprio
+    // arquivo. Uma função nova que esquecesse exigirPermissao_ apareceria
+    // aqui, e não meses depois.
+    const tela = lerTela('Configuracoes.html');
+    const servidor = lerTela('../Back-End/Configuracoes.gs')
+      + lerTela('../Back-End/Usuarios.gs') + lerTela('../Back-End/Principal.gs');
+
+    const chamadas = {};
+    (tela.match(/Servidor\.chamar\('([a-zA-Z]+)'/g) || []).forEach((achado) => {
+      chamadas[achado.replace(/[^a-zA-Z]/g, '').replace('Servidorchamar', '')] = true;
+    });
+    verdadeiro(Object.keys(chamadas).length >= 15,
+      'a tela conversa com o servidor em muitas frentes, achei '
+      + Object.keys(chamadas).length);
+
+    Object.keys(chamadas).forEach((nome) => {
+      const inicio = servidor.indexOf('function ' + nome + '(');
+      verdadeiro(inicio >= 0, 'a tela chama ' + nome + ', que não existe no servidor');
+      const corpo = servidor.substring(inicio, inicio + 900);
+      verdadeiro(corpo.indexOf('exigirPermissao_') >= 0
+        || corpo.indexOf('usuarioAtual_') >= 0,
+        nome + ' não confere quem está chamando');
+    });
+  });
+
+  teste('o menu da lateral vai em branco, como a operação aprovou', () => {
+    const estilos = lerTela('Estilos.html');
+    ['padrao', 'rosa', 'brasil'].forEach((tema) => {
+      const marca = estilos.indexOf(tema === 'padrao'
+        ? ':root, :root[data-tema="padrao"] {'
+        : ':root[data-tema="' + tema + '"] {');
+      verdadeiro(marca >= 0, 'falta o bloco do tema ' + tema);
+      const bloco = estilos.substring(marca, estilos.indexOf('}', marca));
+      contem(bloco, '--lateral-texto: #FFFFFF',
+        'no tema ' + tema + ' o texto do menu é branco sobre o fundo saturado');
+    });
   });
 
   secao('Auditoria');

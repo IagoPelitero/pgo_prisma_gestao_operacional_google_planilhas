@@ -344,11 +344,35 @@ function rodarTestesDeAcesso() {
   teste('doGet serve a tela institucional, com o e-mail e o motivo', () => {
     ambiente.definirEmail('estranho@exemplo.com');
     const html = chamar('doGet()').getContent();
-    contem(html, 'Seu acesso ainda não foi liberado', 'título da tela');
+    contem(html, 'Seu usuário ainda', 'título da tela');
     contem(html, 'estranho@exemplo.com', 'o e-mail usado precisa aparecer');
     contem(html, 'não está cadastrado', 'o motivo precisa aparecer');
     contem(html, 'RECC', 'o nome do sistema vem de CONFIG');
+    contem(html, 'Um espaço para cuidar de cada atendimento',
+      'a frase do painel vem de CONFIG');
+    contem(html, 'Tentar novamente', 'a saída da tela');
     ambiente.definirEmail('primeiro.adm@exemplo.com');
+  });
+
+  teste('o título muda conforme o motivo, e não é a mesma frase para tudo', () => {
+    // Quatro recusas diferentes levam a quatro lugares diferentes. Decidimos
+    // pelo CÓDIGO da recusa, nunca comparando a frase: corrigir uma vírgula
+    // no texto não pode mudar o comportamento da tela.
+    const desativado = chamar('salvarUsuario')({
+      nome: 'Bruno Sales', email: 'bruno@exemplo.com', ativo: true,
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Administrador').Id
+    });
+    chamar('desativarUsuario')(desativado);
+
+    comoUsuario(ambiente, 'bruno@exemplo.com', () => {
+      igual(chamar('usuarioAtual_()').situacao, 'DESATIVADO');
+      contem(chamar('doGet()').getContent(), 'Seu acesso foi desativado');
+    });
+    comoUsuario(ambiente, 'ninguem@exemplo.com', () => {
+      igual(chamar('usuarioAtual_()').situacao, 'NAO_CADASTRADO');
+      contem(chamar('doGet()').getContent(), 'Seu usuário ainda');
+    });
   });
 
   teste('sem imagem, quem assina a tela é a OPERAÇÃO, não o sistema', () => {
@@ -359,8 +383,8 @@ function rodarTestesDeAcesso() {
       verdadeiro(html.indexOf('<img') < 0, 'não deveria haver imagem sem logo definida');
       contem(html, '<div class="assinatura">Porto Seguro</div>',
         'a operação assina a tela');
-      contem(html, '<div class="sistema">RECC</div>',
-        'e o nome do sistema fica embaixo, discreto');
+      contem(html, 'Acesso ao RECC',
+        'e o nome do sistema abre o recado, do outro lado');
     });
   });
 

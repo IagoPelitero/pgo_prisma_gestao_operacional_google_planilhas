@@ -146,13 +146,9 @@ var Rotas = (function () {
     configuracoes: {
       titulo: 'Configurações',
       subtitulo: 'Personalize o sistema de acordo com a realidade da sua operação.',
-      montar: function () {
-        return emConstrucao(6, [
-          'Campos do formulário: criar, ordenar, mascarar e escolher quem vê',
-          'Catálogo, usuários, níveis de acesso e senha de administrador',
-          'Reconciliação de colunas quando um cabeçalho muda na planilha'
-        ]);
-      }
+      montar: function (pacote) { return TelaConfiguracoes.montar(pacote); },
+      ligar: function (pacote) { TelaConfiguracoes.ligar(pacote); },
+      desligar: function () { TelaConfiguracoes.desligar(); }
     }
   };
 

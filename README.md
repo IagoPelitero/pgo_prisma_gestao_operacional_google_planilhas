@@ -68,7 +68,7 @@ Dentro de `Evolucao/`:
 | [`03-manutencao.md`](Evolucao/03-manutencao.md) | Como mexer sem quebrar — leia antes de tocar em código |
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
-| `Testes/` | A suíte: 133 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 174 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -120,13 +120,13 @@ nascem vazios.
 node Evolucao/Testes/rodar.js
 ```
 
-133 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+174 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 132 não valeriam nada.
+realmente corrompe — sem ele, os outros 173 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -162,6 +162,30 @@ sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
 O selo da SUSEP responde três coisas, e as três são informação: **liberada**
 com o segmento, **bloqueada** com o motivo, ou **não encontrada** — que não é
 erro, é uma corretora que o cadastro ainda não conhece.
+
+---
+
+## Configurações, a tela que muda todas as outras
+
+Três colunas: os **assuntos** à esquerda, os **itens** no meio, as
+**propriedades** do que foi escolhido à direita. Nada é gravado sem apertar
+Salvar.
+
+![A tela de Configurações](Evolucao/imagens/tela-configuracoes.png)
+
+Cada ação carrega a guarda que o estrago dela pede:
+
+| O que se mexe | Guarda | Exemplo |
+|---|---|---|
+| **Conteúdo** | permissão `configurar` | renomear uma situação, cadastrar pessoa |
+| **Regra** | permissão `configurar` | o que um nível pode, quem vê qual campo |
+| **Estrutura** | **+ senha de administrador** | criar coluna na planilha |
+
+E as três coisas que o sistema **recusa fazer**, por mais permissão que se
+tenha: trocar o cabeçalho de um campo (é o nome da coluna, e o Power BI aponta
+para ele), renomear um item de lista que já está gravado em casos, e tirar
+Configurações do último nível que ainda a tem — ninguém se tranca do lado de
+fora.
 
 ---
 

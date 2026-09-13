@@ -21,49 +21,47 @@ var Moldura = (function () {
    * traço. É o que faz sete desenhos diferentes parecerem um conjunto.
    */
   var DESENHOS = {
-    // painel: quatro áreas, como os cartões da tela
+    // painel: quatro áreas iguais, como os cartões da tela
     dashboard:
-      '<rect x="3.2" y="3.2" width="7.6" height="8.6" rx="1.6"></rect>'
-      + '<rect x="13.2" y="3.2" width="7.6" height="5.4" rx="1.6"></rect>'
-      + '<rect x="3.2" y="14.2" width="7.6" height="6.6" rx="1.6"></rect>'
-      + '<rect x="13.2" y="11" width="7.6" height="9.8" rx="1.6"></rect>',
+      '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
+      + '<rect x="13.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
+      + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>'
+      + '<rect x="13.5" y="13.5" width="7" height="7" rx="1.6"></rect>',
 
-    // registrar: a folha nova, com o mais
+    // registrar: o mais, sem moldura. Acrescentar é o gesto mais simples do
+    // sistema, e o desenho mais simples é o que se reconhece de relance.
     cadastrarCaso:
-      '<path d="M13.5 3.2H6.8A1.6 1.6 0 0 0 5.2 4.8v14.4a1.6 1.6 0 0 0 1.6 1.6h10.4a1.6 1.6 0 0 0 1.6-1.6V8.4z"></path>'
-      + '<path d="M13.5 3.2v5.2h5.3"></path>'
-      + '<path d="M12 12v5M9.5 14.5h5"></path>',
+      '<path d="M12 4.6v14.8M4.6 12h14.8"></path>',
 
-    // desempenho: as barras crescendo, com a régua embaixo
+    // desempenho: a linha de pulso, que sobe e desce como o dia da operação
     minhaPerformance:
-      '<path d="M4 20.2h16"></path>'
-      + '<rect x="5.6" y="12.4" width="3.4" height="5.4" rx="1"></rect>'
-      + '<rect x="10.3" y="8.6" width="3.4" height="9.2" rx="1"></rect>'
-      + '<rect x="15" y="4.6" width="3.4" height="13.2" rx="1"></rect>',
+      '<path d="M3.2 12.4h3.6l2.4-7 4 14.2 2.6-7.2h5"></path>',
 
     // buscar: a lupa
     buscarCaso:
-      '<circle cx="10.8" cy="10.8" r="6.6"></circle>'
-      + '<path d="M15.6 15.6 20.4 20.4"></path>',
+      '<circle cx="10.8" cy="10.8" r="6.4"></circle>'
+      + '<path d="M15.5 15.5 20.4 20.4"></path>',
 
-    // tabela: o cabeçalho e as linhas
+    // corretoras: o prédio, com as janelas e a porta
     tabelaCorretoras:
-      '<rect x="3.2" y="4.4" width="17.6" height="15.2" rx="1.8"></rect>'
-      + '<path d="M3.2 9.2h17.6M3.2 14.4h17.6M9.6 9.2v10.4"></path>',
+      '<path d="M4.4 20.6V4.9a1.5 1.5 0 0 1 1.5-1.5h6.8a1.5 1.5 0 0 1 1.5 1.5v15.7"></path>'
+      + '<path d="M14.2 10.4h4a1.5 1.5 0 0 1 1.5 1.5v8.7"></path>'
+      + '<path d="M2.9 20.6h18.2"></path>'
+      + '<path d="M7.4 7.4h1.3M11 7.4h1.3M7.4 11.2h1.3M11 11.2h1.3"></path>'
+      + '<path d="M9.2 20.6v-4.2h1.6v4.2"></path>',
 
-    // análise: a tendência, com o ponto onde ela chega
+    // análise: as barras em pé, sobre a régua
     painelAnalitico:
-      '<path d="M4 19.6 9.4 13l3.6 3.4L20 8.4"></path>'
-      + '<path d="M15.4 8.4H20v4.6"></path>'
-      + '<circle cx="9.4" cy="13" r="1.5"></circle>',
+      '<path d="M3.6 20.4h16.8"></path>'
+      + '<path d="M7.4 20.4v-6.2M12 20.4V6.8M16.6 20.4v-9.6"></path>',
 
-    // configurações: a engrenagem, feita de dentes em volta do eixo em vez de
-    // um contorno gigante — mesmo efeito, e legível para quem for mexer.
-    // Os dentes ENCOSTAM no círculo: afastados, o desenho vira um sol.
+    // configurações: a engrenagem — anel, dentes por fora e o eixo no meio.
+    // Os dentes ENCOSTAM no anel: afastados, o desenho vira um sol.
     configuracoes:
-      '<circle cx="12" cy="12" r="3.4"></circle>'
-      + '<path d="M12 4.6v3.2M12 16.2v3.2M4.6 12h3.2M16.2 12h3.2'
-      + 'M6.8 6.8 9 9M15 15l2.2 2.2M17.2 6.8 15 9M9 15l-2.2 2.2"></path>'
+      '<circle cx="12" cy="12" r="7.1"></circle>'
+      + '<circle cx="12" cy="12" r="2.9"></circle>'
+      + '<path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3'
+      + 'M5.3 5.3 6.9 6.9M17.1 17.1l1.6 1.6M18.7 5.3 17.1 6.9M6.9 17.1l-1.6 1.6"></path>'
   };
 
   var TEMAS = [

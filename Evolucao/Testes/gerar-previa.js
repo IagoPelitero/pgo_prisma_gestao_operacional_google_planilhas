@@ -34,6 +34,26 @@ const PASTA_PADRAO = path.join(__dirname, '..', 'previa');
  * atropelavam: a resposta da consulta de SUSEP chegava na mão de quem tinha
  * pedido o formulário. O produto estava certo; o substituto é que mentia.
  */
+/**
+ * As funções que GRAVAM, todas recusando com a mesma frase.
+ *
+ * Uma prévia que fingisse ter salvo seria pior do que uma que não salva:
+ * a pessoa fecharia a aba achando que mudou a configuração da operação.
+ */
+function gravacoesRecusadas(nomes) {
+  return nomes.map(function (nome) {
+    return "      " + nome + ": function () {\n"
+      + "        setTimeout(function () {\n"
+      + "          if (aoDarErrado) {\n"
+      + "            aoDarErrado(new Error(\"Esta é uma prévia: ela lê o "
+      + "servidor de verdade, mas não grava. No sistema publicado esta ação "
+      + "seria gravada na planilha e registrada na auditoria.\"));\n"
+      + "          }\n"
+      + "        }, 160);\n"
+      + "      },\n";
+  }).join('');
+}
+
 function pontePreparada(respostas) {
   return '<script>\n'
     + '/* Substituto do google.script.run, só para a prévia. No Apps Script\n'
@@ -93,7 +113,45 @@ function pontePreparada(respostas) {
     + 'No sistema publicado, o caso seria registrado na planilha."));\n'
     + '          }\n'
     + '        }, 200);\n'
-    + '      }\n'
+    + '      },\n'
+    // A tela de Configurações: tudo o que ela LÊ vem do servidor de verdade,
+    // e tudo o que ela GRAVA é recusado com uma frase só. Assim dá para
+    // navegar as sete seções e ver as propriedades de cada item sem que a
+    // prévia finja ter gravado algo que não gravou.
+    + '      resumoDasConfiguracoes: function () {\n'
+    + '        responder(respostas.configuracoes.resumo);\n'
+    + '      },\n'
+    + '      opcoesDeConfiguracaoDeCampo: function () {\n'
+    + '        responder(respostas.configuracoes.opcoesDeCampo);\n'
+    + '      },\n'
+    + '      opcoesDeNivelDeAcesso: function () {\n'
+    + '        responder(respostas.configuracoes.opcoesDeNivel);\n'
+    + '      },\n'
+    + '      listarCamposDaMesa: function (idDaMesa) {\n'
+    + '        responder(respostas.configuracoes.campos[idDaMesa]);\n'
+    + '      },\n'
+    + '      listarUsuarios: function () {\n'
+    + '        responder(respostas.configuracoes.usuarios);\n'
+    + '      },\n'
+    + '      listarNiveisDeAcesso: function () {\n'
+    + '        responder(respostas.configuracoes.niveis);\n'
+    + '      },\n'
+    + '      listarCatalogo: function (tipo) {\n'
+    + '        responder(respostas.configuracoes.listas[tipo] || []);\n'
+    + '      },\n'
+    + '      listarMesasConfiguraveis: function () {\n'
+    + '        responder(respostas.configuracoes.mesas);\n'
+    + '      },\n'
+    + '      conferirEstruturaDaPlanilha: function () {\n'
+    + '        responder(respostas.configuracoes.laudo);\n'
+    + '      },\n'
+    + '      listarAuditoria: function () {\n'
+    + '        responder(respostas.configuracoes.trilha);\n'
+    + '      },\n'
+    + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'reordenarCampos',
+      'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarUsuario',
+      'desativarUsuario', 'salvarMesa', 'salvarIdentidade', 'definirLogo',
+      'definirSenhaDeAdministrador', 'liberarComSenha'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -218,6 +276,35 @@ function gerar(pastaDeSaida) {
     '7654321': chamar('consultarSusep')('7654321')
   };
 
+  // Uma senha de administrador, só na prévia, para o diálogo das ações sem
+  // desfazer aparecer. O instalador de verdade não define senha nenhuma —
+  // quem define é o primeiro administrador, na própria tela.
+  chamar('definirSenhaDeAdministrador_')('previa-do-recc', '');
+
+  // A tela de Configurações, respondida pelo servidor de verdade.
+  const opcoesDeCampo = chamar('opcoesDeConfiguracaoDeCampo()');
+  const camposPorMesa = {};
+  pacote.mesas.forEach((mesa) => {
+    camposPorMesa[mesa.id] = chamar('listarCamposDaMesa')(mesa.id);
+  });
+  const listas = {};
+  opcoesDeCampo.tiposDeCatalogo.forEach((tipo) => {
+    listas[tipo] = chamar('listarCatalogo')(tipo, '');
+  });
+
+  const configuracoes = {
+    resumo: chamar('resumoDasConfiguracoes()'),
+    opcoesDeCampo: opcoesDeCampo,
+    opcoesDeNivel: chamar('opcoesDeNivelDeAcesso()'),
+    campos: camposPorMesa,
+    usuarios: chamar('listarUsuarios()'),
+    niveis: chamar('listarNiveisDeAcesso()'),
+    listas: listas,
+    mesas: chamar('listarMesasConfiguraveis()'),
+    laudo: chamar('conferirEstruturaDaPlanilha()'),
+    trilha: chamar('listarAuditoria')(40)
+  };
+
   // E a mesma instalação vista por quem não está cadastrado.
   ambiente.definirEmail('nao.cadastrado@exemplo.com');
   const telaSemAcesso = chamar('doGet()').getContent();
@@ -225,7 +312,9 @@ function gerar(pastaDeSaida) {
 
   const paginaDoSistema = chamar('doGet()').getContent().replace(
     '</head>',
-    pontePreparada({ pacoteDePartida: pacote, formularios, suseps, paineis })
+    pontePreparada({
+      pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes
+    })
       + '</head>');
 
   fs.mkdirSync(pastaDeSaida, { recursive: true });
@@ -236,7 +325,8 @@ function gerar(pastaDeSaida) {
   console.log('  sistema.html    ' + paginaDoSistema.length + ' bytes  ('
     + pacote.menu.length + ' itens de menu, nível ' + pacote.usuario.nivelAcesso
     + ', ' + Object.keys(formularios).length + ' formulários, '
-    + Object.keys(paineis).length + ' painéis)');
+    + Object.keys(paineis).length + ' painéis, '
+    + configuracoes.resumo.secoes.length + ' seções de configuração)');
   console.log('  sem-acesso.html ' + telaSemAcesso.length + ' bytes');
   return { paginaDoSistema, telaSemAcesso, pacote };
 }

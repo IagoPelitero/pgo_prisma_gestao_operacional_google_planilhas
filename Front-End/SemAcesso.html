@@ -1,9 +1,15 @@
 <!--
   ============================================================================
-  RECC — SemAcesso.html · a tela de quem não está cadastrado
+  PGO — SemAcesso.html · a tela de quem não está cadastrado
   ============================================================================
   Serve para uma coisa só: dizer com clareza que o acesso não está liberado e
-  o que a pessoa faz a seguir. Nenhum dado da planilha é carregado aqui.
+  o que a pessoa faz a seguir. Nenhum dado da planilha é carregado aqui — o
+  acesso é conferido ANTES de qualquer leitura.
+
+  Duas metades. À esquerda, o painel da operação: a marca, a frase e o nome da
+  plataforma. À direita, o recado. É a divisão do desenho aprovado, e ela tem
+  razão de ser: quem chega aqui foi barrado antes de entrar e precisa
+  reconhecer a casa antes de ler o motivo.
 
   Os trechos em scriptlet, que abrem com menor-que-interrogação, são
   preenchidos pelo servidor antes de a página sair (ver doGet em Principal.gs).
@@ -13,8 +19,8 @@
   explicação não escreve a sintaxe literal — se escrevesse, a página quebraria
   ao ser montada. Foi um teste que pegou isso aqui.
 
-  A logo vem de CONFIG, não do código: quando a plataforma servir outra
-  operação, a marca troca junto com o nome, sem tocar aqui.
+  A logo, a frase e a cor vêm de CONFIG, não do código: quando a plataforma
+  servir outra operação, a marca troca junto com o nome, sem tocar aqui.
   ============================================================================
 -->
 <!DOCTYPE html>
@@ -22,16 +28,19 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= identidade.nome ?> — acesso não liberado</title>
   <style>
     :root {
       --azul: <?= identidade.corPrimaria ?>;
-      --azul-escuro: #06266B;
-      --tinta: #14213A;
+      --azul-claro: color-mix(in srgb, var(--azul) 62%, white);
+      --azul-fundo: color-mix(in srgb, var(--azul) 88%, black);
+      --tinta: #0F1B33;
       --suave: #5A6A85;
+      --tenue: #8494A9;
       --papel: #FFFFFF;
-      --fundo: #EEF3FA;
-      --linha: #D9E2EF;
+      --fundo: #F4F7FB;
+      --linha: #DCE4EE;
     }
 
     * { box-sizing: border-box; }
@@ -39,172 +48,299 @@
     body {
       margin: 0;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      background:
-        radial-gradient(1100px 520px at 50% -10%,
-          color-mix(in srgb, var(--azul) 16%, transparent), transparent 70%),
-        var(--fundo);
+      background: var(--papel);
       color: var(--tinta);
       font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
       line-height: 1.6;
     }
 
-    .cartao {
-      width: min(560px, 100%);
-      background: var(--papel);
-      border: 1px solid var(--linha);
-      border-radius: 16px;
-      padding: 40px 36px 32px;
-      text-align: center;
-      box-shadow: 0 24px 60px -32px rgba(20, 33, 58, .45);
+    .tela {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
     }
+
+    /* ------------------------------------------------ o painel da operação */
+    .painel {
+      position: relative;
+      overflow: hidden;
+      padding: 40px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      color: #FFFFFF;
+      background: linear-gradient(155deg, var(--azul-claro) 0%,
+        var(--azul) 46%, var(--azul-fundo) 100%);
+    }
+
+    /*
+      Os anéis do fundo. São desenhados com borda, e não com imagem: imagem
+      externa é mais um arquivo que pode não carregar, e o Apps Script serve a
+      página num quadro isolado.
+    */
+    .aneis {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: .28;
+    }
+    .aneis span {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(255, 255, 255, .55);
+      border-radius: 50%;
+    }
+    .aneis span:nth-child(1) { width: 420px; height: 420px; }
+    .aneis span:nth-child(2) { width: 640px; height: 640px; }
+    .aneis span:nth-child(3) { width: 880px; height: 880px; }
 
     .marca {
-      display: grid;
-      place-items: center;
-      gap: 10px;
-      margin-bottom: 28px;
+      position: relative;
+      justify-self: start;
+      background: var(--papel);
+      border-radius: 14px;
+      padding: 14px 22px;
+      box-shadow: 0 14px 34px -18px rgba(6, 20, 45, .55);
     }
-    .marca img { max-height: 52px; max-width: 220px; }
+    .marca img { display: block; max-height: 40px; max-width: 210px; }
 
     /* Sem imagem configurada, quem assina a tela é o NOME DA OPERAÇÃO, em
-       tipografia — e não o nome do sistema. Quem chega aqui foi barrado antes
-       de entrar: precisa reconhecer a casa, não o software.
-
-       Isto é texto, não um desenho da marca. Assim que a imagem oficial for
-       apontada em Configurações, ela toma este lugar. */
+       tipografia. Isto é texto, não um desenho da marca — assim que a imagem
+       oficial for apontada em Configurações, ela toma este lugar. */
     .marca .assinatura {
-      font-size: 34px;
+      font-size: 26px;
       font-weight: 700;
       letter-spacing: -.025em;
-      color: var(--azul);
       line-height: 1.1;
-    }
-    .marca .sistema {
-      font-size: 12px;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: var(--suave);
+      color: var(--azul);
+      white-space: nowrap;
     }
 
-    .selo {
-      width: 62px;
-      height: 62px;
-      margin: 0 auto 22px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      background: color-mix(in srgb, var(--azul) 12%, transparent);
+    .recado-da-marca {
+      position: relative;
+      align-self: center;
+      display: flex;
+      align-items: center;
+      gap: 28px;
     }
-    .selo svg { width: 30px; height: 30px; stroke: var(--azul); fill: none;
-      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .escudo { flex: none; width: 108px; height: 108px; }
+    .escudo svg {
+      width: 100%; height: 100%;
+      fill: none; stroke: #FFFFFF; stroke-width: 1.3;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .frase {
+      margin: 0;
+      font-size: clamp(22px, 2.4vw, 30px);
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1.22;
+      text-wrap: balance;
+    }
+    .plataforma {
+      margin: 12px 0 0;
+      font-size: 13.5px;
+      color: rgba(255, 255, 255, .82);
+    }
+
+    .rodape-do-painel {
+      position: relative;
+      font-size: 12px;
+      color: rgba(255, 255, 255, .7);
+    }
+
+    /* ---------------------------------------------------------- o recado */
+    .aviso {
+      display: grid;
+      align-content: center;
+      padding: 40px clamp(28px, 5vw, 72px);
+      max-width: 620px;
+    }
+
+    .sobrancelha {
+      margin: 0 0 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--azul);
+    }
 
     h1 {
-      margin: 0 0 10px;
-      font-size: 24px;
-      letter-spacing: -.015em;
+      margin: 0 0 16px;
+      font-size: clamp(26px, 3.2vw, 38px);
+      font-weight: 700;
+      letter-spacing: -.028em;
+      line-height: 1.14;
       text-wrap: balance;
     }
 
     .explicacao {
-      margin: 0 auto 24px;
-      max-width: 42ch;
+      margin: 0 0 12px;
+      max-width: 44ch;
       color: var(--suave);
     }
 
     .conta {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      max-width: 100%;
-      padding: 10px 16px;
-      border: 1px solid var(--linha);
-      border-radius: 999px;
-      background: var(--fundo);
+      margin: 0 0 22px;
       font-size: 14px;
-      margin-bottom: 26px;
-    }
-    .conta span:first-child { color: var(--suave); white-space: nowrap; }
-    .conta strong {
-      font-weight: 600;
+      color: var(--tenue);
       overflow-wrap: anywhere;
     }
+    .conta strong { color: var(--suave); font-weight: 600; }
 
-    .passos {
-      text-align: left;
-      border-top: 1px solid var(--linha);
-      padding-top: 22px;
-      margin: 0;
-    }
-    .passos h2 {
-      margin: 0 0 12px;
+    .protegido {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border: 1px solid var(--linha);
+      border-radius: 10px;
+      background: var(--fundo);
       font-size: 13px;
+      color: var(--suave);
+      margin-bottom: 26px;
+    }
+    .protegido svg {
+      flex: none; width: 17px; height: 17px;
+      fill: none; stroke: var(--azul); stroke-width: 1.6;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .passos { margin: 0 0 26px; }
+    .passos h2 {
+      margin: 0 0 10px;
+      font-size: 12px;
       letter-spacing: .1em;
       text-transform: uppercase;
-      color: var(--suave);
+      color: var(--tenue);
     }
-    .passos ol { margin: 0; padding-left: 20px; }
-    .passos li { margin-bottom: 8px; }
+    .passos ol { margin: 0; padding-left: 20px; color: var(--suave); }
+    .passos li { margin-bottom: 6px; }
     .passos li:last-child { margin-bottom: 0; }
 
-    .rodape {
-      margin-top: 26px;
-      font-size: 12px;
-      color: var(--suave);
+    .tentar {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--azul);
+      cursor: pointer;
     }
+    .tentar svg {
+      width: 16px; height: 16px;
+      fill: none; stroke: currentColor; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round;
+    }
+    .tentar:hover { text-decoration: underline; }
 
+    /* Telas estreitas: o painel vira uma faixa em cima, e o recado desce. */
+    @media (max-width: 900px) {
+      .tela { grid-template-columns: 1fr; }
+      .painel { padding: 26px; gap: 26px; min-height: auto; }
+      .recado-da-marca { gap: 18px; }
+      .escudo { width: 66px; height: 66px; }
+      .aneis span:nth-child(3) { display: none; }
+      .aviso { padding: 32px 26px 44px; max-width: none; }
+    }
     @media (max-width: 480px) {
-      .cartao { padding: 30px 22px 26px; }
-      h1 { font-size: 21px; }
+      .recado-da-marca { flex-direction: column; align-items: flex-start; }
+      .marca .assinatura { font-size: 22px; }
     }
   </style>
 </head>
 <body>
-  <main class="cartao">
-    <div class="marca">
-      <? if (identidade.logo) { ?>
-        <img src="<?= identidade.logo ?>"
-             alt="<?= identidade.operacao || identidade.nome ?>">
+  <div class="tela">
+
+    <section class="painel">
+      <div class="aneis" aria-hidden="true"><span></span><span></span><span></span></div>
+
+      <div class="marca">
+        <? if (identidade.logo) { ?>
+          <img src="<?= identidade.logo ?>"
+               alt="<?= identidade.operacao || identidade.nome ?>">
+        <? } else { ?>
+          <div class="assinatura"><?= identidade.operacao || identidade.nome ?></div>
+        <? } ?>
+      </div>
+
+      <div class="recado-da-marca">
+        <div class="escudo" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <path d="M24 3.6 42 10.4v12.9c0 11.2-7.4 17.9-18 21.1-10.6-3.2-18-9.9-18-21.1V10.4z"></path>
+            <path d="m16.4 23.8 5.6 5.8 10-11.4"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="frase"><?= identidade.frase || 'Um espaço para cuidar de cada atendimento.' ?></p>
+          <p class="plataforma"><?= identidade.plataforma || identidade.nome ?></p>
+        </div>
+      </div>
+
+      <div class="rodape-do-painel"><?= identidade.fabricante ?></div>
+    </section>
+
+    <main class="aviso">
+      <p class="sobrancelha">Acesso ao <?= identidade.nome ?></p>
+
+      <? if (situacao === 'DESATIVADO') { ?>
+        <h1>Seu acesso foi desativado.</h1>
+      <? } else if (situacao === 'NIVEL_DESLIGADO' || situacao === 'NIVEL_INEXISTENTE') { ?>
+        <h1>Seu nível de acesso está fora do ar.</h1>
+      <? } else if (situacao === 'SEM_EMAIL') { ?>
+        <h1>Não consegui identificar a sua conta.</h1>
       <? } else { ?>
-        <div class="assinatura"><?= identidade.operacao || identidade.nome ?></div>
+        <h1>Seu usuário ainda<br>não está cadastrado.</h1>
       <? } ?>
-      <div class="sistema"><?= identidade.nome ?></div>
-    </div>
 
-    <div class="selo" aria-hidden="true">
-      <svg viewBox="0 0 24 24">
-        <rect x="4" y="10.5" width="16" height="10" rx="2"></rect>
-        <path d="M8 10.5V7.5a4 4 0 0 1 8 0"></path>
-        <circle cx="12" cy="15.5" r="1.1"></circle>
-      </svg>
-    </div>
+      <!--
+        O motivo vem do servidor e é diferente para cada caso: não cadastrado,
+        desativado, nível desligado ou nível apagado. Cada um leva a um lugar
+        diferente, e uma frase só para os quatro mandaria a pessoa procurar a
+        solução errada.
+      -->
+      <p class="explicacao"><?= motivo ?> Procure o administrador do
+        <?= identidade.nome ?> e solicite a liberação da sua conta.</p>
 
-    <h1>Seu acesso ainda não foi liberado</h1>
-    <p class="explicacao"><?= motivo ?></p>
+      <? if (email) { ?>
+        <p class="conta">Você entrou como <strong><?= email ?></strong></p>
+      <? } ?>
 
-    <div class="conta">
-      <span>Você entrou como</span>
-      <strong><?= email ?></strong>
-    </div>
+      <div class="protegido">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4.5" y="10.5" width="15" height="9.5" rx="2"></rect>
+          <path d="M8.2 10.5V7.6a3.8 3.8 0 0 1 7.6 0v2.9"></path>
+        </svg>
+        <span>Acesso protegido · os casos ficam disponíveis somente após a
+          liberação.</span>
+      </div>
 
-    <div class="passos">
-      <h2>Como conseguir acesso</h2>
-      <ol>
-        <li>Peça a um administrador do <?= identidade.nome ?> para cadastrar
-            o e-mail acima.</li>
-        <li>Informe o seu <strong>cargo</strong> e o <strong>canal que você
-            atende</strong> — é o que define o que você vai enxergar.</li>
-        <li>Assim que o cadastro for feito, atualize esta página. Não é
-            preciso entrar de novo.</li>
-      </ol>
-    </div>
+      <div class="passos">
+        <h2>Como conseguir acesso</h2>
+        <ol>
+          <li>Peça a um administrador para cadastrar o e-mail acima.</li>
+          <li>Informe o seu <strong>cargo</strong> e o <strong>canal que você
+              atende</strong> — é o que define o que você vai enxergar.</li>
+          <li>Assim que o cadastro for feito, use o botão abaixo. Não é
+              preciso entrar de novo.</li>
+        </ol>
+      </div>
 
-    <p class="rodape">
-      Se você acredita que já deveria ter acesso, confira se entrou com a conta
-      corporativa correta.
-    </p>
-  </main>
+      <button type="button" class="tentar" onclick="location.reload()">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"></path>
+          <path d="M20.5 4.4V10h-5.6"></path>
+        </svg>
+        Tentar novamente
+      </button>
+    </main>
+
+  </div>
 </body>
 </html>

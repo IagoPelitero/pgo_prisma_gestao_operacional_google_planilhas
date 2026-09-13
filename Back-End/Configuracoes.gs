@@ -63,6 +63,9 @@ function resumoDasConfiguracoes() {
         quantidade: lerRegistros_('MESAS').length },
       { chave: 'identidade', titulo: 'Identidade e segurança',
         descricao: 'Nome, logo, cor e a senha de administrador',
+        quantidade: 0 },
+      { chave: 'estrutura', titulo: 'Estrutura e auditoria',
+        descricao: 'O laudo da planilha e o que foi feito no sistema',
         quantidade: 0 }
     ],
     estrutura: {
@@ -501,6 +504,187 @@ function exigirQueAlguemContinueEntrando_(idAlterado, telas, acoes) {
   }
 }
 
+/**
+ * O que a tela precisa saber para montar um nível de acesso: quais telas
+ * existem, quais ações e quais escopos.
+ *
+ * A lista de telas NÃO é escrita aqui — vem de RECC_TELAS_DO_SISTEMA, a mesma
+ * que o menu percorre. Se um dia nascer uma tela nova, ela aparece nos dois
+ * lugares no mesmo instante.
+ */
+function opcoesDeNivelDeAcesso() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var oQueCadaAcaoFaz = {
+    criar: 'Cadastrar casos novos',
+    editar: 'Alterar casos já cadastrados',
+    ocultar: 'Tirar um caso da tela (a linha permanece na planilha)',
+    exportar: 'Baixar o que está vendo',
+    configurar: 'Abrir Configurações e mexer em conteúdo e regra',
+    estrutura: 'Criar coluna e mesa — pede senha de administrador'
+  };
+
+  var oQueCadaEscopoAlcanca = {
+    PROPRIOS: 'Só os casos em que a pessoa é a responsável',
+    EQUIPE: 'Os casos de quem atende o mesmo canal que ela',
+    MESA: 'Todos os casos das mesas que ela enxerga',
+    TODOS: 'Todos os casos, de todas as mesas'
+  };
+
+  return {
+    telas: RECC_TELAS_DO_SISTEMA.map(function (item) {
+      return { chave: item.tela, titulo: item.titulo };
+    }),
+    acoes: Object.keys(RECC_ACOES).map(function (chave) {
+      var acao = RECC_ACOES[chave];
+      return { chave: acao, descricao: oQueCadaAcaoFaz[acao] || '' };
+    }),
+    escopos: Object.keys(RECC_ESCOPOS).map(function (chave) {
+      return { chave: chave, descricao: oQueCadaEscopoAlcanca[chave] || '' };
+    })
+  };
+}
+
+// ============================================================================
+// MESAS DE TRABALHO
+// ============================================================================
+
+/**
+ * As mesas, inclusive as desligadas — aqui se administra.
+ *
+ * Vem com as colunas da base junto porque quase toda escolha desta seção é
+ * "qual coluna guarda isto": escrever o nome da coluna à mão é como navegar
+ * sem Log Pose — funciona até o dia em que você erra uma letra e o painel
+ * fica em branco sem dizer por quê.
+ */
+function listarMesasConfiguraveis() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  return lerRegistros_('MESAS')
+    .sort(function (uma, outra) {
+      return (Number(uma.Ordem) || 0) - (Number(outra.Ordem) || 0);
+    })
+    .map(function (mesa) {
+      var colunas = [];
+      var situacoes = [];
+      try {
+        colunas = estruturaDaAba_(String(mesa.Aba)).cabecalhos
+          .filter(function (cabecalho) {
+            return cabecalho && cabecalho.charAt(0) !== '_';
+          });
+        situacoes = listarCatalogo('STATUS', mesa.__id).map(function (item) {
+          return item.nome;
+        });
+      } catch (erro) {
+        // Aba que não existe não derruba a tela: a mesa aparece marcada, e o
+        // administrador vê qual é o problema em vez de uma página branca.
+        colunas = [];
+      }
+
+      return {
+        id: mesa.__id,
+        nome: String(mesa.Nome),
+        descricao: String(mesa.Descricao || ''),
+        aba: String(mesa.Aba),
+        abaExiste: colunas.length > 0,
+        colunaDaData: String(mesa.ColunaDaData || ''),
+        colunaDaHora: String(mesa.ColunaDaHora || ''),
+        colunaDoStatus: String(mesa.ColunaDoStatus || ''),
+        colunasDaFila: String(mesa.ColunasDaFila || ''),
+        cartoesDoPainel: String(mesa.CartoesDoPainel || ''),
+        colunaDaFinalizacao: String(mesa.ColunaDaFinalizacao || ''),
+        colunaDaAreaResponsavel: String(mesa.ColunaDaAreaResponsavel || ''),
+        icone: String(mesa.Icone || ''),
+        ordem: Number(mesa.Ordem) || 0,
+        ativo: normalizarParaComparar_(mesa.Ativo) === 'sim',
+        colunasDaBase: colunas,
+        situacoes: situacoes
+      };
+    });
+}
+
+/**
+ * Altera uma mesa que já existe.
+ *
+ * Muda o que a mesa MOSTRA — nome, ícone, quais colunas viram fila, quais
+ * situações viram cartão. Não muda onde ela mora: a aba é escolhida quando a
+ * mesa nasce, e trocá-la apontaria todos os casos já gravados para o lugar
+ * errado. Criar mesa nova é estrutura, e ainda não passa por aqui.
+ */
+function salvarMesa(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var id = converterParaIdentificador_(dados.id);
+  var atual = buscarRegistros_('MESAS', 'Id', id, 1)[0];
+  if (!atual) throw new Error('Mesa ' + id + ' não encontrada.');
+
+  if (dados.aba && String(dados.aba) !== String(atual.Aba)) {
+    throw new Error('A aba de uma mesa não muda por aqui: os casos já ' +
+      'gravados moram nela. Crie outra mesa apontando para a aba nova.');
+  }
+
+  var nome = String(dados.nome || '').trim();
+  if (!nome) throw new Error('Dê um nome à mesa.');
+
+  var estrutura = estruturaDaAba_(String(atual.Aba));
+  ['colunaDaData', 'colunaDaHora', 'colunaDoStatus', 'colunaDaFinalizacao',
+    'colunaDaAreaResponsavel'].forEach(function (chave) {
+    conferirQueAColunaExiste_(estrutura, dados[chave], atual.Aba);
+  });
+  String(dados.colunasDaFila || '').split(',').forEach(function (pedaco) {
+    conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
+  });
+
+  // Desligar a última mesa ativa deixaria o Dashboard sem nada para mostrar,
+  // e o cadastro sem formulário — o sistema inteiro pareceria quebrado.
+  if (dados.ativo === false) {
+    var outrasAtivas = lerRegistros_('MESAS').filter(function (mesa) {
+      return converterParaIdentificador_(mesa.Id) !== id
+        && normalizarParaComparar_(mesa.Ativo) === 'sim';
+    });
+    if (!outrasAtivas.length) {
+      throw new Error('Esta é a última mesa ativa. Desligá-la deixaria o ' +
+        'Dashboard e o cadastro sem nenhuma base para trabalhar.');
+    }
+  }
+
+  atualizarRegistro_('MESAS', id, {
+    Nome: nome,
+    Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
+    ColunaDaData: String(dados.colunaDaData || ''),
+    ColunaDaHora: String(dados.colunaDaHora || ''),
+    ColunaDoStatus: String(dados.colunaDoStatus || ''),
+    ColunasDaFila: String(dados.colunasDaFila || ''),
+    CartoesDoPainel: String(dados.cartoesDoPainel || ''),
+    ColunaDaFinalizacao: String(dados.colunaDaFinalizacao || ''),
+    ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
+    Icone: String(dados.icone || atual.Icone || ''),
+    Ordem: Number(dados.ordem) || Number(atual.Ordem) || 0,
+    Ativo: dados.ativo === false ? 'NAO' : 'SIM'
+  });
+
+  esquecerEstruturaLida_();
+  registrarAuditoria_('mesa.editar', 'MESAS', id, nome);
+  return true;
+}
+
+/**
+ * Recusa o nome de uma coluna que não existe na base da mesa.
+ *
+ * Sem esta conferência o erro só apareceria no Dashboard, dias depois, como
+ * uma coluna em branco — e ninguém ligaria a coisa à letra trocada aqui.
+ */
+function conferirQueAColunaExiste_(estrutura, nomeDaColuna, nomeDaAba) {
+  var nome = String(nomeDaColuna || '').trim();
+  if (!nome) return;
+  if (posicaoDaColuna_(estrutura, nome) >= 0) return;
+
+  throw new Error('A coluna "' + nome + '" não existe na aba ' + nomeDaAba +
+    '. As colunas dela são: ' + estrutura.cabecalhos.filter(function (cabecalho) {
+      return cabecalho && cabecalho.charAt(0) !== '_';
+    }).join(', ') + '.');
+}
+
 // ============================================================================
 // IDENTIDADE E SEGURANÇA
 // ============================================================================
@@ -515,7 +699,8 @@ function salvarIdentidade(dados) {
     'IDENTIDADE.OPERACAO': String(dados.operacao || '').trim(),
     'IDENTIDADE.COR_PRIMARIA': String(dados.corPrimaria || '').trim(),
     'IDENTIDADE.PLATAFORMA': String(dados.plataforma || '').trim(),
-    'IDENTIDADE.FABRICANTE': String(dados.fabricante || '').trim()
+    'IDENTIDADE.FABRICANTE': String(dados.fabricante || '').trim(),
+    'IDENTIDADE.FRASE': String(dados.frase || '').trim()
   };
 
   if (!mudancas['IDENTIDADE.NOME']) {
