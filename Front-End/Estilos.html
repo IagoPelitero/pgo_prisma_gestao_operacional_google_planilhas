@@ -397,25 +397,148 @@ button { font: inherit; color: inherit; }
   box-shadow: var(--sombra);
 }
 
+/* =========================================================== dashboard === */
+
+.cartoes {
+  display: grid; gap: 12px; margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+.indicador {
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-top: 3px solid var(--linha-forte);
+  border-radius: var(--raio); padding: 14px 16px 15px;
+  box-shadow: var(--sombra);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.indicador .rotulo {
+  font-size: 12.5px; color: var(--suave); line-height: 1.3;
+  min-height: 2.6em;   /* o número fica na mesma altura em todos os cartões */
+}
+.indicador .numero {
+  font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.indicador.tom-destaque { border-top-color: var(--destaque); }
+.indicador.tom-destaque .numero { color: var(--destaque); }
+.indicador.tom-bom { border-top-color: var(--bom); }
+.indicador.tom-bom .numero { color: var(--bom); }
+.indicador.tom-atencao { border-top-color: var(--atencao); }
+.indicador.tom-ruim { border-top-color: var(--ruim); }
+.indicador.tom-ruim .numero { color: var(--ruim); }
+
+.filtros {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-bottom: 14px;
+}
+.filtro {
+  padding: 9px 13px; font: inherit; font-size: 14px;
+  color: var(--texto); background: var(--superficie);
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  max-width: 230px;
+}
+.limpar-filtros {
+  border: 0; background: transparent; color: var(--destaque);
+  font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 4px;
+}
+.filtros .contagem {
+  margin-left: auto; font-size: 13px; color: var(--suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.cartao.sem-forro { padding: 0; overflow: hidden; }
+.cartao.vazio { text-align: center; padding: 40px 24px; }
+.cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
+.cartao.vazio p { margin: 0 auto; max-width: 46ch; color: var(--suave); }
+
+.aviso-fila {
+  margin: 0; padding: 11px 16px; font-size: 13px; color: var(--atencao);
+  background: var(--atencao-tenue); border-bottom: 1px solid var(--linha);
+}
+
+/* A tabela rola sozinha em vez de empurrar a página para o lado. */
+.rolagem-tabela { overflow-x: auto; }
+table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+table.fila th, table.fila td {
+  text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--linha);
+  vertical-align: middle;
+  /* Sem quebra de linha: "Corretora XYZ" partido em duas linhas deixa a fila
+     desalinhada e mais alta. Quando não couber, a tabela rola. */
+  white-space: nowrap;
+}
+table.fila thead th {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--tenue);
+  background: var(--superficie-2); white-space: nowrap;
+}
+table.fila tbody tr:last-child td { border-bottom: 0; }
+table.fila tbody tr:hover { background: var(--superficie-2); }
+table.fila tr.aberta { background: var(--destaque-tenue); }
+table.fila tr.aberta:hover { background: var(--destaque-tenue); }
+
+.situacao {
+  display: inline-block; font-size: 12.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--superficie-2); border: 1px solid var(--linha);
+  white-space: nowrap;
+}
+
+.acoes-coluna { white-space: nowrap; text-align: right; }
+.acao {
+  border: 1px solid var(--linha); background: var(--superficie);
+  color: var(--texto); border-radius: var(--raio-pequeno);
+  padding: 6px 12px; font-size: 13px; cursor: pointer; margin-left: 6px;
+}
+.acao:hover { border-color: var(--linha-forte); }
+.acao.remover { color: var(--ruim); border-color: color-mix(in srgb, var(--ruim) 32%, transparent); }
+.acao.remover:hover { background: var(--ruim-tenue); }
+
+tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
+.detalhe-secoes {
+  display: grid; gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.detalhe-secao h4 {
+  margin: 0 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--tenue);
+}
+.detalhe-secao .par {
+  display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px;
+}
+.detalhe-secao .par span { font-size: 12.5px; color: var(--suave); }
+.detalhe-secao .par strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+
+@media (max-width: 560px) {
+  .filtro { max-width: none; flex: 1 1 100%; }
+  .filtros .contagem { margin-left: 0; flex-basis: 100%; }
+}
+
 /* ====================================================== cadastrar caso === */
 
 /* A escolha da mesa vem antes do formulário porque é ela que decide quais
    campos existem. */
 .mesas { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
 .mesa {
-  flex: 1 1 240px; text-align: left; cursor: pointer;
+  flex: 1 1 240px; cursor: pointer;
+  display: flex; align-items: center; gap: 13px; text-align: left;
   padding: 13px 16px; border-radius: var(--raio);
   border: 1px solid var(--linha); background: var(--superficie);
   box-shadow: var(--sombra);
 }
+.mesa svg { flex: 0 0 26px; width: 26px; height: 26px; color: var(--destaque); }
+.mesa .dizeres { min-width: 0; }
 .mesa strong { display: block; font-size: 15.5px; }
-.mesa span { font-size: 13px; color: var(--suave); }
+.mesa .dizeres span { font-size: 13px; color: var(--suave); }
 .mesa:hover { border-color: var(--linha-forte); }
+
+/* A mesa escolhida usa o azul do menu, escurecido — é o mesmo azul da casa,
+   e escuro o bastante para a letra branca ficar legível em cima dele. */
 .mesa.atual {
-  border-color: var(--destaque);
-  background: var(--destaque-tenue);
-  box-shadow: inset 0 0 0 1px var(--destaque);
+  background: color-mix(in srgb, var(--lateral-fundo) 68%, black);
+  border-color: color-mix(in srgb, var(--lateral-fundo) 68%, black);
+  color: var(--lateral-titulo);
 }
+.mesa.atual svg { color: var(--lateral-titulo); }
+.mesa.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
 
 .formulario { max-width: 1080px; }
 

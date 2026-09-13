@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 4 de 12 etapas construídas · 112 testes passando.
+**Estado geral:** 5 de 12 etapas construídas · 133 testes passando.
 
 ---
 
@@ -18,9 +18,9 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 1 | Fundação | ✅ pronta | 32 |
 | 2 | Acesso | ✅ pronta | 30 |
 | 3 | Casca | ✅ pronta | 27 |
-| 4 | Cadastrar Caso | ✅ pronta | 21 |
-| 5 | Dashboard | 🔨 próxima | — |
-| 6 | Configurações | ⏳ | — |
+| 4 | Cadastrar Caso | ✅ pronta | 26 |
+| 5 | Dashboard | ✅ pronta | 15 |
+| 6 | Configurações | 🔨 próxima | — |
 | 7 | Buscar Caso | ⏳ | — |
 | 8 | Painel Analítico | ⏳ | — |
 | 9 | Minha Performance | ⏳ | — |
@@ -125,12 +125,46 @@ inteira e um que era defeito da própria ferramenta de prévia.
 
 ---
 
-## Etapa 5 — Dashboard 🔨
+## Etapa 5 — Dashboard ✅
 
-- Seletor de mesa e os cards do dia
-- Fila de trabalho com filtros de status, motivo, origem e próximo contato
-- O indicador de "finalizado na célula": finalização preenchida e área
-  responsável vazia
+**A visão do dia: quanto tem, e o que fazer agora.**
+
+| Arquivo | Entrega |
+|---|---|
+| `Back-End/Painel.gs` | Cartões, fila, filtros e o detalhe de um caso |
+| `Front-End/Dashboard.html` | A tela |
+| `Front-End/SeletorDeMesa.html` | A escolha da mesa, usada aqui e no cadastro |
+
+**Cartão e fila saem da mesma lista.** Contar de um lado e listar de outro
+deixaria o cartão dizendo 12 e a fila mostrando 7, sem ninguém saber qual está
+certo.
+
+- Um cartão por situação, e **situação sem caso aparece zerada** — sumir do
+  painel esconderia justamente a informação de que ela zerou
+- **"Finalizados na célula"**: finalização preenchida e área responsável
+  vazia. É conta, não coluna, então não mente quando alguém edita a área
+  direto na planilha. A mesa que não declara essas colunas não ganha o cartão
+- Os filtros **são os campos que já são lista**: nada escrito em código. Campo
+  que virar seletor vira filtro sozinho
+- O alcance do nível vale no painel: quem enxerga só os próprios casos tem
+  cartões contando só os dele
+- A fila abre o caso inteiro sem recarregar a tela, e o detalhe respeita a
+  mesma regra de visibilidade do formulário
+
+A mesa passou a declarar, na aba `MESAS`, onde guarda cada coisa:
+`ColunaDoStatus`, `ColunasDaFila`, `ColunaDaFinalizacao` e
+`ColunaDaAreaResponsavel`. Declarado, e não adivinhado pelo nome — adivinhar
+acerta hoje e erra na mesa que vier depois.
+
+![O Dashboard](imagens/tela-dashboard.png)
+
+---
+
+## Etapa 6 — Configurações 🔨
+
+- Campos do formulário: criar, ordenar, mascarar e escolher quem vê
+- Catálogo, usuários, níveis de acesso e a senha de administrador
+- Reconciliação de colunas quando um cabeçalho muda na planilha
 
 ---
 
@@ -140,4 +174,5 @@ inteira e um que era defeito da própria ferramenta de prévia.
 |---|---|
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
+| **Editar um caso pela fila** | `editarCaso` já existe e está testado, mas ainda não há tela para isso — a fila abre o detalhe em leitura. Entra junto de Configurações |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

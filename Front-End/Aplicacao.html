@@ -89,13 +89,8 @@ var Rotas = (function () {
     dashboard: {
       titulo: 'Dashboard',
       subtitulo: 'Visão do dia: indicadores e a fila de trabalho da sua equipe.',
-      montar: function () {
-        return emConstrucao(5, [
-          'Seletor de mesa: RET Vida e Mesa Diamante',
-          'Cards de total, transmissões pendentes, pendentes, contatos e não trabalhados',
-          'Fila de trabalho com filtros de status, motivo, origem e próximo contato'
-        ]);
-      }
+      montar: function (pacote) { return TelaDashboard.montar(pacote); },
+      ligar: function (pacote) { TelaDashboard.ligar(pacote); }
     },
     cadastrarCaso: {
       titulo: 'Cadastrar Caso',

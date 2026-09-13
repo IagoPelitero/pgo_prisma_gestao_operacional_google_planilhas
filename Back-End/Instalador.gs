@@ -211,6 +211,11 @@ function semearDadosIniciais_(emailDoInstalador) {
       Aba: 'BASE_RET',
       ColunaDaData: 'data de recepção do protocolo',
       ColunaDaHora: '',
+      ColunaDoStatus: 'status',
+      ColunasDaFila: 'data de recepção do protocolo, status, nome do cliente, '
+        + 'protocolo, produto, analista',
+      ColunaDaFinalizacao: '',
+      ColunaDaAreaResponsavel: '',
       Icone: 'escudo',
       Ordem: 1,
       Ativo: true
@@ -221,6 +226,11 @@ function semearDadosIniciais_(emailDoInstalador) {
       Aba: 'BASE_MESA',
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
+      ColunaDoStatus: 'Status',
+      ColunasDaFila: 'Data de entrada, Status, Nome do segurado, '
+        + 'Documento (CPF), Corretora, Analista',
+      ColunaDaFinalizacao: 'Data da finalização',
+      ColunaDaAreaResponsavel: 'Área responsável',
       Icone: 'diamante',
       Ordem: 2,
       Ativo: true
@@ -381,7 +391,7 @@ function novaConfiguracao_(chave, valor, descricao) {
  */
 const RECC_PADRAO_DO_FORMULARIO = {
   // ---------------------------------------------------------- Mesa Diamante
-  analista: { secao: 'Atendimento' },
+  analista: { tipoCampo: 'seletor', listaDe: 'usuarios', secao: 'Atendimento' },
   status: { tipoCampo: 'seletor', catalogo: 'STATUS', obrigatorio: true, secao: 'Situação' },
   canal: { tipoCampo: 'seletor', catalogo: 'CANAL', secao: 'Situação' },
   datadeentrada: { secao: 'Situação' },
@@ -446,6 +456,7 @@ function camposDoFormularioDaBase_(nomeDaAba, mesaId) {
 
     var configuracao = {};
     if (padrao.catalogo) configuracao.catalogo = padrao.catalogo;
+    if (padrao.listaDe) configuracao.listaDe = padrao.listaDe;
     if (padrao.largura) configuracao.largura = padrao.largura;
 
     campos.push({

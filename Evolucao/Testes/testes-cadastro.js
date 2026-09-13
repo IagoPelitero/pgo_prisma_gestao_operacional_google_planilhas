@@ -62,6 +62,83 @@ function rodarTestesDeCadastro() {
     igual(chamar('quantosDigitosAMascaraPede_')(cpf.mascara), 11);
   });
 
+  teste('o analista é um seletor com quem está cadastrado e ativo', () => {
+    chamar('salvarUsuario')({
+      nome: 'Diego Castilho', email: 'diego@exemplo.com',
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
+      ativo: true
+    });
+    const desativado = chamar('salvarUsuario')({
+      nome: 'Saiu da Equipe', email: 'saiu@exemplo.com',
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
+      ativo: true
+    });
+    chamar('desativarUsuario')(desativado);
+
+    const analista = chamar('formularioDaMesa')(mesaDiamante.id)
+      .secoes.reduce((soma, s) => soma.concat(s.campos), [])
+      .find((campo) => campo.chave === 'analista');
+
+    igual(analista.tipo, 'seletor');
+    const nomes = analista.opcoes.map((o) => o.valor);
+    verdadeiro(nomes.indexOf('Diego Castilho') >= 0, 'quem está ativo aparece');
+    verdadeiro(nomes.indexOf('Saiu da Equipe') < 0, 'quem foi desativado não');
+    igual(nomes.slice().sort().join('|'), nomes.join('|'), 'a lista vem em ordem');
+  });
+
+  teste('a lista de analistas vem de USUARIOS, e não de uma cópia', () => {
+    // Repetir os nomes no catálogo criaria duas verdades sobre a mesma coisa:
+    // bastaria alguém sair da equipe para elas divergirem.
+    const campo = chamar('lerRegistros_("CAMPOS")')
+      .find((c) => c.ChaveTecnica === 'analista' && c.Aba === 'BASE_MESA');
+    igual(JSON.parse(campo.Configuracao).listaDe, 'usuarios');
+  });
+
+  teste('seletor de lista vazia aceita texto livre, em vez de travar', () => {
+    // A aba PRODUTOS nasce vazia. Um seletor apontado para ela não pode
+    // deixar o campo impossível de preencher e sem explicação.
+    igual(chamar('opcoesDeUmCadastro_')('produtos').length, 0);
+    igual(chamar('conferirCampo_')(
+      { tipo: 'seletor', opcoes: [], obrigatorio: false }, 'Vida Individual'), '');
+    igual(chamar('conferirCampo_')(
+      { tipo: 'seletor', opcoes: [{ valor: 'A' }], obrigatorio: false }, 'B'),
+      'não é uma das opções da lista');
+  });
+
+  teste('cadastro desconhecido em listaDe é erro, e diz quais existem', () => {
+    lanca(() => chamar('opcoesDeUmCadastro_')('planetas'),
+      'Os cadastros são usuarios, produtos e canais');
+  });
+
+  teste('cada mesa aparece com o seu desenho, vindo da aba MESAS', () => {
+    const fonte = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'SeletorDeMesa.html'), 'utf8')
+      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    const contexto = vm.createContext({
+      Moldura: { escapar: (t) => String(t) }, document: {}, console });
+    vm.runInContext(fonte, contexto);
+
+    const botoes = contexto.SeletorDeMesa.montar(mesas, mesas[0].id);
+    igual((botoes.match(/<svg/g) || []).length, 2, 'um desenho por mesa');
+    verdadeiro(botoes.indexOf('M12 15.4c-2-1.3') >= 0, 'o escudo com coração da RET');
+    verdadeiro(botoes.indexOf('M7.4 3.6h9.2') >= 0, 'o diamante da Mesa');
+    verdadeiro(botoes.indexOf('class="mesa atual"') >= 0, 'a mesa escolhida se marca');
+  });
+
+  teste('o seletor de mesa é uma peça só, usada pelas duas telas', () => {
+    // Duas cópias divergiriam na primeira mudança.
+    const cadastro = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
+    const painel = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'Dashboard.html'), 'utf8');
+    contem(cadastro, 'SeletorDeMesa.montar');
+    contem(painel, 'SeletorDeMesa.montar');
+    verdadeiro(cadastro.indexOf('DESENHOS_DAS_MESAS') < 0,
+      'o desenho das mesas não pode estar duplicado na tela de cadastro');
+  });
+
   teste('campo oculto para o nível NÃO chega ao navegador', () => {
     // Não é esconder no HTML: quem não pode ver, não recebe.
     const operacao = chamar('lerRegistros_("CATALOGO")')

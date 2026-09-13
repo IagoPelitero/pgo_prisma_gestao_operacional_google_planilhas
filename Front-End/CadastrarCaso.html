@@ -55,7 +55,14 @@ var TelaCadastrarCaso = (function () {
     var travado = campo.somenteLeitura ? ' disabled' : '';
     var controle;
 
-    if (campo.tipo === 'seletor') {
+    // Seletor sem opção nenhuma vira caixa de texto: uma lista vazia na tela
+    // é um campo que não dá para preencher, e ninguém entenderia por quê.
+    if (campo.tipo === 'seletor' && !campo.opcoes.length) {
+      controle = '<input type="text" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '" autocomplete="off"'
+        + ' placeholder="A lista ainda está vazia — digite o valor"' + travado + '>';
+
+    } else if (campo.tipo === 'seletor') {
       var opcoes = ['<option value="">Selecione uma opção</option>'];
       campo.opcoes.forEach(function (opcao) {
         opcoes.push('<option value="' + escapar(opcao.valor) + '">'
@@ -111,26 +118,12 @@ var TelaCadastrarCaso = (function () {
       + '</div></fieldset>';
   }
 
-  function seletorDeMesa(mesas) {
-    return '<div class="mesas" role="group" aria-label="Mesa de trabalho">'
-      + mesas.map(function (mesa) {
-        var atual = mesa.id === mesaEscolhida;
-        return '<button type="button" class="mesa' + (atual ? ' atual' : '') + '"'
-          + ' data-mesa="' + escapar(mesa.id) + '"'
-          + ' aria-pressed="' + (atual ? 'true' : 'false') + '">'
-          + '<strong>' + escapar(mesa.nome) + '</strong>'
-          + '<span>' + escapar(mesa.descricao) + '</span>'
-          + '</button>';
-      }).join('')
-      + '</div>';
-  }
-
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
     if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
 
-    return seletorDeMesa(pacote.mesas)
+    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
@@ -289,13 +282,10 @@ var TelaCadastrarCaso = (function () {
   }
 
   function ligar(pacote) {
-    var mesas = document.querySelectorAll('.mesa');
-    for (var i = 0; i < mesas.length; i++) {
-      mesas[i].addEventListener('click', function () {
-        mesaEscolhida = this.getAttribute('data-mesa');
-        Aplicacao.remontar();
-      });
-    }
+    SeletorDeMesa.ligar(function (idDaMesa) {
+      mesaEscolhida = idDaMesa;
+      Aplicacao.remontar();
+    });
 
     elemento('formulario-do-caso').addEventListener('submit', function (evento) {
       evento.preventDefault();

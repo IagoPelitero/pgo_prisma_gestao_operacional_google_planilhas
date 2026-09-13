@@ -191,6 +191,10 @@ function mesasVisiveis_() {
         aba: mesa.Aba,
         colunaDaData: mesa.ColunaDaData,
         colunaDaHora: mesa.ColunaDaHora,
+        colunaDoStatus: mesa.ColunaDoStatus,
+        colunasDaFila: mesa.ColunasDaFila,
+        colunaDaFinalizacao: mesa.ColunaDaFinalizacao,
+        colunaDaAreaResponsavel: mesa.ColunaDaAreaResponsavel,
         icone: mesa.Icone
       };
     });

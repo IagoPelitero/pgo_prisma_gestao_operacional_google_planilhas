@@ -105,10 +105,11 @@ function lerConfiguracaoDoCampo_(campo) {
 }
 
 /**
- * As opções de um seletor.
+ * As opções de um seletor. Três origens possíveis:
  *
- *   { "catalogo": "STATUS" }        vem da aba CATALOGO, da mesa ou global
- *   { "opcoes": ["Sim", "Não"] }    lista escrita à mão na configuração
+ *   { "catalogo": "STATUS" }      da aba CATALOGO, da mesa ou global
+ *   { "listaDe": "usuarios" }     de um cadastro: usuários, produtos, canais
+ *   { "opcoes": ["Sim", "Não"] }  lista escrita à mão na configuração
  */
 function opcoesDoCampo_(configuracao, idDaMesa) {
   if (Array.isArray(configuracao.opcoes)) {
@@ -116,6 +117,7 @@ function opcoesDoCampo_(configuracao, idDaMesa) {
       return { valor: String(opcao), rotulo: String(opcao) };
     });
   }
+  if (configuracao.listaDe) return opcoesDeUmCadastro_(configuracao.listaDe);
   if (!configuracao.catalogo) return [];
 
   var tipo = normalizarParaComparar_(configuracao.catalogo);
@@ -139,6 +141,47 @@ function opcoesDoCampo_(configuracao, idDaMesa) {
         codigo: String(item.Codigo || '')
       };
     });
+}
+
+/**
+ * Opções vindas de um cadastro, e não do catálogo.
+ *
+ * O caso que motivou isto é o analista: a lista de quem atende já existe na
+ * aba USUARIOS, e repetir os mesmos nomes no catálogo criaria duas verdades
+ * sobre a mesma coisa — bastaria alguém sair da equipe para as duas
+ * divergirem.
+ */
+function opcoesDeUmCadastro_(qualCadastro) {
+  var cadastro = String(qualCadastro).toLowerCase();
+
+  if (cadastro === 'usuarios') {
+    return lerRegistros_('USUARIOS')
+      .filter(function (usuario) {
+        return normalizarParaComparar_(usuario.Ativo) === 'sim';
+      })
+      .map(function (usuario) { return String(usuario.Nome); })
+      .sort()
+      .map(function (nome) { return { valor: nome, rotulo: nome }; });
+  }
+
+  if (cadastro === 'produtos') {
+    return lerRegistros_('PRODUTOS').map(function (produto) {
+      return {
+        valor: String(produto.Produto),
+        rotulo: String(produto.Produto),
+        codigo: String(produto.CodigoProduto || '')
+      };
+    });
+  }
+
+  if (cadastro === 'canais') {
+    return lerRegistros_('CANAIS').map(function (canal) {
+      return { valor: String(canal.Nome), rotulo: String(canal.Nome) };
+    });
+  }
+
+  throw new Error('Cadastro desconhecido em listaDe: "' + qualCadastro + '". ' +
+    'Os cadastros são usuarios, produtos e canais.');
 }
 
 function mesaPeloId_(idDaMesa) {
@@ -237,6 +280,10 @@ function conferirCampo_(campo, valor) {
     return 'precisa ser um e-mail';
   }
 
+  // Seletor com lista VAZIA aceita o que for digitado. Um cadastro ainda não
+  // preenchido não pode travar o campo: sem esta linha, escolher "produtos"
+  // como origem antes de cadastrar produto nenhum deixaria o campo
+  // impossível de preencher e sem explicação na tela.
   if (campo.tipo === 'seletor' && campo.opcoes.length) {
     for (var i = 0; i < campo.opcoes.length; i++) {
       if (normalizarParaComparar_(campo.opcoes[i].valor) === normalizarParaComparar_(texto)) {

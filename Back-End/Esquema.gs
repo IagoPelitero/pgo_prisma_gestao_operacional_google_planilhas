@@ -242,6 +242,13 @@ const RECC_ESQUEMA = {
       // adivinhadas, porque cada mesa nomeia essa coluna do seu jeito.
       { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
+      // O painel precisa saber onde a mesa guarda cada coisa. Declarado, e
+      // não adivinhado pelo nome: cada mesa batiza a coluna do seu jeito, e
+      // adivinhar acerta hoje e erra na mesa que vier depois.
+      { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunasDaFila', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }

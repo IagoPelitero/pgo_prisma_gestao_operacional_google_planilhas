@@ -1,0 +1,233 @@
+<script>
+/* ============================================================================
+   PGO — Dashboard.html · a visão do dia
+   ============================================================================
+   Cartões em cima, fila embaixo. Os dois vêm da MESMA resposta do servidor,
+   já filtrados pelo alcance do nível — e por isso o número do cartão sempre
+   bate com o que a fila mostra. Contar de um lado e listar de outro deixaria
+   o cartão dizendo 12 e a fila mostrando 7, sem ninguém entender qual está
+   certo.
+   ============================================================================ */
+
+var TelaDashboard = (function () {
+
+  var mesaEscolhida = '';
+  var filtrosEscolhidos = {};
+  var resumo = null;
+  var casoAberto = '';
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+      + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
+  }
+
+  function desenharCartoes() {
+    return '<div class="cartoes">'
+      + resumo.cartoes.map(function (cartao) {
+        return '<div class="indicador tom-' + escapar(cartao.tom || 'neutro') + '"'
+          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"' : '')
+          + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
+          + '<strong class="numero">' + cartao.valor + '</strong></div>';
+      }).join('')
+      + '</div>';
+  }
+
+  function desenharFiltros() {
+    if (!resumo.filtrosDisponiveis.length) return '';
+
+    var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
+      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      filtro.opcoes.forEach(function (opcao) {
+        var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
+          ? ' selected' : '';
+        opcoes.push('<option value="' + escapar(opcao.valor) + '"' + marcado + '>'
+          + escapar(opcao.rotulo) + '</option>');
+      });
+      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
+        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
+        + opcoes.join('') + '</select>';
+    });
+
+    var algumAtivo = Object.keys(filtrosEscolhidos).some(function (chave) {
+      return filtrosEscolhidos[chave];
+    });
+
+    return '<div class="filtros">' + caixas.join('')
+      + (algumAtivo
+        ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
+          + 'Limpar filtros</button>'
+        : '')
+      + '<span class="contagem">' + resumo.total + ' de ' + resumo.totalNoPeriodo
+      + ' casos · ' + escapar(resumo.periodo.rotulo) + '</span>'
+      + '</div>';
+  }
+
+  function desenharFila() {
+    if (!resumo.fila.length) {
+      return '<div class="cartao vazio">'
+        + '<strong>Nenhum caso para mostrar aqui.</strong>'
+        + '<p>' + (resumo.totalNoPeriodo
+          ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
+            + 'pelos filtros escolhidos.'
+          : 'Nada foi registrado nos ' + resumo.periodo.dias + ' dias mais recentes. '
+            + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
+    }
+
+    var cabecalho = resumo.colunas.map(function (coluna) {
+      return '<th>' + escapar(coluna.cabecalho) + '</th>';
+    }).join('') + '<th class="acoes-coluna">Ações</th>';
+
+    var linhas = resumo.fila.map(function (caso) {
+      var celulas = caso.valores.map(function (valor, i) {
+        if (resumo.colunas[i].ehStatus) {
+          return '<td><span class="situacao">' + escapar(valor) + '</span></td>';
+        }
+        return '<td>' + escapar(valor) + '</td>';
+      }).join('');
+
+      var botoes = '<button type="button" class="acao ver" data-caso="'
+        + escapar(caso.id) + '">'
+        + (casoAberto === caso.id ? 'Fechar' : 'Detalhes') + '</button>'
+        + (resumo.podeOcultar
+          ? '<button type="button" class="acao remover" data-ocultar="'
+            + escapar(caso.id) + '" title="Tirar da tela — a linha permanece '
+            + 'na planilha">Ocultar</button>'
+          : '');
+
+      var detalhe = casoAberto === caso.id
+        ? '<tr class="detalhe"><td colspan="' + (resumo.colunas.length + 1) + '"'
+          + ' id="detalhe-do-caso">Abrindo…</td></tr>'
+        : '';
+
+      return '<tr' + (casoAberto === caso.id ? ' class="aberta"' : '') + '>'
+        + celulas + '<td class="acoes-coluna">' + botoes + '</td></tr>' + detalhe;
+    }).join('');
+
+    return '<div class="cartao sem-forro">'
+      + (resumo.truncada
+        ? '<p class="aviso-fila">A fila mostra as ' + resumo.fila.length
+          + ' mais recentes. Para o histórico completo, use Buscar Caso.</p>'
+        : '')
+      + '<div class="rolagem-tabela"><table class="fila">'
+      + '<thead><tr>' + cabecalho + '</tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div></div>';
+  }
+
+  function desenharPainel() {
+    elemento('painel').innerHTML =
+      desenharCartoes() + desenharFiltros() + desenharFila();
+    ligarPainel();
+  }
+
+  /* ---------------------------------------------------------- comportamento */
+
+  function carregar() {
+    var painel = elemento('painel');
+    if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
+
+    Servidor.chamar('resumoDaMesa', mesaEscolhida, filtrosEscolhidos)
+      .entao(function (resposta) {
+        resumo = resposta;
+        desenharPainel();
+      })
+      .senao(function (erro) {
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function ligarPainel() {
+    var caixas = document.querySelectorAll('.filtro');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
+        casoAberto = '';
+        carregar();
+      });
+    }
+
+    var limpar = elemento('limpar-filtros');
+    if (limpar) {
+      limpar.addEventListener('click', function () {
+        filtrosEscolhidos = {};
+        casoAberto = '';
+        carregar();
+      });
+    }
+
+    var veres = document.querySelectorAll('.acao.ver');
+    for (var v = 0; v < veres.length; v++) {
+      veres[v].addEventListener('click', function () {
+        var caso = this.getAttribute('data-caso');
+        casoAberto = (casoAberto === caso) ? '' : caso;
+        desenharPainel();
+        if (casoAberto) abrirDetalhe(casoAberto);
+      });
+    }
+
+    var remocoes = document.querySelectorAll('.acao.remover');
+    for (var r = 0; r < remocoes.length; r++) {
+      remocoes[r].addEventListener('click', function () {
+        ocultar(this.getAttribute('data-ocultar'));
+      });
+    }
+  }
+
+  function abrirDetalhe(idDoCaso) {
+    Servidor.chamar('detalhesDoCaso', mesaEscolhida, idDoCaso)
+      .entao(function (resposta) {
+        var caixa = elemento('detalhe-do-caso');
+        if (!caixa) return;
+
+        var porSecao = {};
+        var ordem = [];
+        resposta.linhas.forEach(function (linha) {
+          if (!porSecao[linha.secao]) { porSecao[linha.secao] = []; ordem.push(linha.secao); }
+          porSecao[linha.secao].push(linha);
+        });
+
+        caixa.innerHTML = '<div class="detalhe-secoes">'
+          + ordem.map(function (secao) {
+            return '<div class="detalhe-secao"><h4>' + escapar(secao) + '</h4>'
+              + porSecao[secao].map(function (linha) {
+                return '<div class="par"><span>' + escapar(linha.rotulo) + '</span>'
+                  + '<strong>' + escapar(linha.valor) + '</strong></div>';
+              }).join('') + '</div>';
+          }).join('')
+          + '</div>';
+      })
+      .senao(function (erro) {
+        var caixa = elemento('detalhe-do-caso');
+        if (caixa) caixa.textContent = erro.message || String(erro);
+      });
+  }
+
+  function ocultar(idDoCaso) {
+    // Ocultar não apaga, mas some da tela de todo mundo — vale perguntar.
+    if (!window.confirm('Tirar o caso ' + idDoCaso + ' da tela?\n\n'
+      + 'A linha permanece na planilha e pode voltar depois.')) return;
+
+    Servidor.chamar('ocultarCaso', mesaEscolhida, idDoCaso)
+      .entao(function () { casoAberto = ''; carregar(); })
+      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+  }
+
+  function ligar(pacote) {
+    SeletorDeMesa.ligar(function (idDaMesa) {
+      mesaEscolhida = idDaMesa;
+      filtrosEscolhidos = {};
+      casoAberto = '';
+      Aplicacao.remontar();
+    });
+    carregar();
+  }
+
+  return { montar: montar, ligar: ligar };
+})();
+</script>

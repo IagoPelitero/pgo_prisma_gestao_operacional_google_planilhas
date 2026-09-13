@@ -68,7 +68,7 @@ Dentro de `Evolucao/`:
 | [`03-manutencao.md`](Evolucao/03-manutencao.md) | Como mexer sem quebrar — leia antes de tocar em código |
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
-| `Testes/` | A suíte: 112 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 133 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -120,13 +120,13 @@ nascem vazios.
 node Evolucao/Testes/rodar.js
 ```
 
-112 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+133 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 111 não valeriam nada.
+realmente corrompe — sem ele, os outros 132 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -138,6 +138,16 @@ Escreve `previa/sistema.html` e `previa/sem-acesso.html`, que abrem em qualquer
 navegador. São montados pelo **mesmo código do servidor**; só a ponte com o
 Google é substituída. Serve para conferir menu, temas e navegação sem publicar
 a cada mudança.
+
+---
+
+## A visão do dia
+
+Cartões e fila saem da **mesma lista**, já filtrada pelo alcance do nível — por
+isso o número do cartão sempre bate com o que a fila mostra. Os filtros são os
+campos que já são lista: nada escrito em código.
+
+![O Dashboard](Evolucao/imagens/tela-dashboard.png)
 
 ---
 
@@ -178,13 +188,13 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**4 de 12 etapas construídas.** O detalhe de cada uma está em
+**5 de 12 etapas construídas.** O detalhe de cada uma está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
 
-| ✅ | Fundação · Acesso · Casca · Cadastrar Caso |
+| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Dashboard |
 |---|---|
-| 🔨 | Dashboard |
-| ⏳ | Configurações · Buscar Caso · Painel Analítico · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico |
+| 🔨 | Configurações |
+| ⏳ | Buscar Caso · Painel Analítico · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico |
 
 ---
 

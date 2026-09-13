@@ -211,6 +211,26 @@ function exigirPermissao_(acao) {
 }
 
 /**
+ * A guarda de quem só quer VER uma tela.
+ *
+ * Abrir o Dashboard não é uma ação como criar ou editar — é uma tela. Exigir
+ * "criar" para ver o painel tiraria o painel de quem só consulta, e exigir
+ * nada deixaria qualquer nível abrir qualquer tela pelo endereço.
+ */
+function exigirTela_(nomeDaTela) {
+  var quem = usuarioAtual_();
+  if (!quem.cadastrado) throw new Error('Acesso negado: ' + quem.motivo);
+  if (quem.permissoes.defeito) {
+    throw new Error('Acesso indisponível: ' + quem.permissoes.defeito);
+  }
+  if (!podeVerTela_(quem.permissoes, nomeDaTela)) {
+    throw new Error('Seu nível de acesso ("' + quem.nivel + '") não abre a tela '
+      + nomeDaTela + '.');
+  }
+  return quem;
+}
+
+/**
  * Como cada campo aparece para este nível.
  *
  * O padrão é EDIÇÃO: um campo novo criado pelo administrador nasce visível
