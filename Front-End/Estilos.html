@@ -503,6 +503,10 @@ button { font: inherit; color: inherit; }
 /* A tabela rola sozinha em vez de empurrar a página para o lado. */
 .rolagem-tabela { overflow-x: auto; }
 table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+/* A agrupada precisa de mais largura: são cinco grupos e quatro botões de
+   ação. Apertada, o texto do último grupo corria para debaixo da coluna de
+   ações, que é fixa na direita. Melhor a tabela rolar do que esconder dado. */
+table.fila.agrupada { min-width: 1180px; }
 table.fila th, table.fila td {
   /* Respiro menor que o resto da tela: a fila tem sete colunas e cada pixel
      de folga aqui empurra a coluna de ações para fora do campo de visão. */
@@ -521,6 +525,23 @@ table.fila tbody tr:last-child td { border-bottom: 0; }
 table.fila tbody tr:hover { background: var(--superficie-2); }
 table.fila tr.aberta { background: var(--destaque-tenue); }
 table.fila tr.aberta:hover { background: var(--destaque-tenue); }
+
+/*
+  A fila agrupada: cada célula junta várias colunas debaixo de um título só.
+  A primeira linha do grupo é a que salta — é o que a pessoa procura ao varrer
+  a fila. As de baixo vêm menores, porque são o que ela confere depois de já
+  ter achado a linha.
+*/
+table.fila.agrupada td { vertical-align: top; padding: 13px 12px; }
+table.fila.agrupada td > span { display: block; }
+/* A etiqueta de situação é do tamanho do texto dela, e não da coluna. */
+table.fila.agrupada td > span.situacao { display: inline-flex; }
+table.fila.agrupada .principal { font-weight: 600; }
+table.fila.agrupada .apoio { font-size: 12.5px; color: var(--tenue); }
+table.fila.agrupada td:first-child .apoio:first-child {
+  font-size: 13px; color: var(--suave); margin-bottom: 5px;
+}
+table.fila.agrupada .situacao { margin-top: 2px; }
 
 .situacao {
   display: inline-flex; align-items: center; gap: 6px;
@@ -549,14 +570,29 @@ table.fila th.acoes-coluna, table.fila td.acoes-coluna {
 table.fila thead th.acoes-coluna { background: var(--superficie-2); }
 table.fila tbody tr:hover td.acoes-coluna { background: var(--superficie-2); }
 table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
+/* "Ver detalhes" é a ação principal da linha, e por isso é a única cheia. */
 .acao {
-  border: 1px solid var(--linha); background: var(--superficie);
-  color: var(--texto); border-radius: var(--raio-pequeno);
-  padding: 6px 12px; font-size: 13px; cursor: pointer; margin-left: 6px;
+  display: inline-flex; align-items: center; gap: 7px; vertical-align: middle;
+  border: 1px solid var(--destaque); background: var(--destaque);
+  color: var(--destaque-sobre); border-radius: var(--raio-pequeno);
+  padding: 7px 13px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
-.acao:hover { border-color: var(--linha-forte); }
-.acao.remover { color: var(--ruim); border-color: color-mix(in srgb, var(--ruim) 32%, transparent); }
-.acao.remover:hover { background: var(--ruim-tenue); }
+.acao:hover { background: var(--destaque-escuro); border-color: var(--destaque-escuro); }
+.acao svg { width: 16px; height: 16px; flex: none; }
+
+/* As outras três são só o desenho: elas se repetem em toda linha, e três
+   botões escritos por linha empurrariam a fila inteira para fora da tela. */
+.acao-icone {
+  display: inline-grid; place-items: center; vertical-align: middle;
+  width: 34px; height: 34px; margin-left: 6px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--suave);
+}
+.acao-icone svg { width: 17px; height: 17px; }
+.acao-icone:hover { border-color: var(--destaque); color: var(--destaque); }
+.acao-icone.perigo:hover {
+  border-color: var(--ruim); color: var(--ruim); background: var(--ruim-tenue);
+}
 
 tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 .detalhe-secoes {
@@ -898,6 +934,71 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   display: grid; place-items: center; padding: 20px;
   background: rgba(6, 14, 28, .55);
 }
+/* O modal do caso é o mesmo diálogo, mais largo e com cabeça e pé fixos: o
+   miolo rola, e os botões de Fechar e Editar ficam sempre à mão. */
+.dialogo-caixa.larga {
+  max-width: 860px;
+  display: flex; flex-direction: column;
+  max-height: min(88vh, 900px);
+  padding: 0;
+}
+.modal-cabeca {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--linha);
+}
+.modal-cabeca h3 { margin: 0; font-size: 19px; letter-spacing: -.015em; }
+.modal-cabeca p { margin: 3px 0 0; font-size: 12.5px; color: var(--tenue); }
+.modal-fechar {
+  margin-left: auto; flex: none; width: 34px; height: 34px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--suave); font-size: 15px;
+}
+.modal-fechar:hover { border-color: var(--destaque); color: var(--destaque); }
+
+.modal-corpo { padding: 18px 24px; overflow-y: auto; flex: 1 1 auto; }
+.modal-corpo > .situacao { margin-bottom: 16px; }
+
+/* Duas colunas, e não quantas couberem: o olho lê um par por vez, e três
+   colunas de rótulos curtos viram uma grade que ninguém sabe por onde começar. */
+.modal-pares {
+  display: grid; gap: 16px 40px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.par-do-caso { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.par-do-caso > span { font-size: 12px; color: var(--tenue); }
+.par-do-caso > strong {
+  font-weight: 500; font-size: 14px; overflow-wrap: anywhere;
+}
+
+.historico { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linha); }
+.historico h4 { margin: 0 0 14px; font-size: 16px; letter-spacing: -.01em; }
+.historico ul { list-style: none; margin: 0; padding: 0; }
+.historico li {
+  position: relative; padding: 0 0 16px 22px;
+  border-left: 2px solid var(--linha);
+}
+.historico li:last-child { padding-bottom: 0; border-left-color: transparent; }
+.historico li::before {
+  content: ''; position: absolute; left: -6px; top: 4px;
+  width: 10px; height: 10px; border-radius: 50%; background: var(--destaque);
+}
+.historico strong { display: block; font-size: 13.5px; }
+.historico em { display: block; font-style: normal; font-size: 12.5px; color: var(--suave); }
+.historico span { display: block; font-size: 12px; color: var(--tenue); }
+
+.modal-pe {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 24px; border-top: 1px solid var(--linha);
+  background: var(--superficie-2);
+}
+.modal-pe .recado { margin-right: auto; margin-left: 0; }
+.modal-pe .botao { display: inline-flex; align-items: center; gap: 7px; }
+.modal-pe .botao svg { width: 16px; height: 16px; }
+
+/* Dentro do modal o formulário não tem cartão próprio — o modal já é um. */
+.formulario.no-modal { background: none; border: 0; padding: 0; box-shadow: none; }
+
 .dialogo-caixa {
   width: 100%; max-width: 400px;
   background: var(--superficie); border: 1px solid var(--linha);
@@ -929,6 +1030,71 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   font-size: 13.5px; font-weight: 600; line-height: 1.45;
   box-shadow: var(--sombra);
 }
+
+/* ------------------------------------------------- os cards dos painéis -- */
+.config-mesas-cartao {
+  display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 16px;
+}
+.mesa-cartao {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  cursor: pointer; padding: 13px 15px;
+  border: 1px solid var(--linha); border-radius: var(--raio);
+  background: var(--superficie); color: var(--texto);
+}
+.mesa-cartao:hover { border-color: var(--linha-forte); }
+.mesa-cartao.atual {
+  background: var(--destaque); border-color: var(--destaque);
+  color: var(--destaque-sobre);
+}
+.mesa-cartao svg { width: 24px; height: 24px; flex: none; }
+.mesa-cartao strong { display: block; font-size: 14px; }
+.mesa-cartao em {
+  display: block; font-style: normal; font-size: 12px; opacity: .75;
+}
+
+.card-editavel {
+  border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 14px 16px; margin-bottom: 10px; background: var(--superficie);
+}
+.card-linha {
+  display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-bottom: 12px;
+}
+.card-linha.rodape {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 0;
+  padding-top: 10px; border-top: 1px solid var(--linha);
+}
+.card-linha.rodape .botao-texto { margin-left: auto; }
+
+.tira-de-tons { display: flex; gap: 6px; flex-wrap: wrap; }
+.tom-escolha {
+  width: 34px; height: 34px; cursor: pointer; border-radius: var(--raio-pequeno);
+  border: 2px solid transparent; background: var(--tom, var(--tenue));
+}
+.tom-escolha[aria-pressed="true"] {
+  border-color: var(--texto);
+  box-shadow: 0 0 0 2px var(--superficie) inset;
+}
+
+.botao-texto {
+  background: none; border: 0; padding: 6px 4px; cursor: pointer;
+  color: var(--destaque); font-weight: 600; font-size: 13px;
+}
+.botao-texto:hover { text-decoration: underline; }
+.botao-texto.perigo { color: var(--ruim); }
+
+/* O escolhedor de arquivo da logo. O campo de texto continua ali para quem
+   preferir colar um endereço — o botão é o atalho, não o único caminho. */
+.escolher-arquivo {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px;
+}
+.escolher-arquivo input[type="file"] { display: none; }
+.previa-da-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border: 1px solid var(--linha);
+  border-radius: var(--raio-pequeno); background: var(--superficie-2);
+}
+.previa-da-logo img { max-height: 30px; max-width: 150px; display: block; }
 
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
@@ -966,10 +1132,17 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   .config-secao .descricao { display: none; }
   .config-alerta { flex-basis: 100%; margin-top: 0; }
   .config-painel { position: static; max-height: none; }
+  .config-mesas-cartao { grid-template-columns: 1fr; }
+  .card-linha { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 680px) {
   .config { grid-template-columns: minmax(0, 1fr); }
+  .dialogo-caixa.larga { max-height: 92vh; }
+  .modal-cabeca, .modal-corpo, .modal-pe { padding-inline: 18px; }
+  .modal-pares { grid-template-columns: 1fr; }
+  .modal-pe { justify-content: stretch; }
+  .modal-pe .botao { flex: 1 1 auto; justify-content: center; }
 }
 
 @media (max-width: 560px) {

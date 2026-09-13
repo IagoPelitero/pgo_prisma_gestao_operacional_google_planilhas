@@ -305,11 +305,49 @@ atual continua sendo o único totalmente opaco. Os sete desenhos do menu foram
 refeitos para bater com o print: painel de quatro quadrados, mais, pulso, lupa,
 prédio, barras e engrenagem. Um teste confere a cor nos três temas.
 
+### 20 · O servidor recusava a resposta que ele mesmo tinha dado
+
+**Etapa 7, pego pelo teste.** A tela lia os cards com `listarCardsDoPainel`,
+deixava a pessoa mexer e devolvia a lista com `salvarCardsDoPainel`. O
+servidor recusava: *"Não sei contar nacelula"*. Ele tinha devolvido
+`nacelula`, porque a comparação de textos do sistema tira acento e caixa — e
+esperava receber `naCelula` de volta.
+
+**Defesa.** `dimensaoDoCartao_` traz a regra de contagem para uma forma
+canônica só, e as duas pontas passam por ela. O mesmo defeito escondia um
+segundo: o cartão "Finalizados na célula" **nunca aparecia**, porque a
+comparação também falhava na hora de desenhar.
+
+A lição: quando o que sai e o que entra são a mesma coisa, tem de passar pela
+mesma função. Sempre.
+
+### 21 · Um atributo servindo a duas coisas diferentes
+
+**Etapa 7, pego no navegador.** O botão de trocar situação da linha nasceu com
+`data-situacao`. Os **cartões** já usavam `data-situacao` para filtrar a fila.
+Resultado: clicar num cartão abria o diálogo de troca de situação de um caso
+que não existe — o valor ali é o rótulo do cartão, não um Id.
+
+**Defesa.** O botão passou a `data-trocar-situacao`, e um teste procura o
+nome antigo para garantir que ele não volte. Nenhum teste de servidor pegaria
+isto: os dois lados estavam certos sozinhos.
+
+### 22 · A logo do protocolo perdia as letras
+
+**Etapa 7, pego na prévia.** `RET-2026-1018` aparecia como `20261018`. A
+coluna `protocolo` estava declarada como `identificador`, e identificador
+guarda **só dígitos** — de propósito, porque é o que o Power BI usa para
+juntar tabelas.
+
+**Defesa.** O protocolo da operação é alfanumérico, então virou `texto`. Vale
+o registro de que o tipo estava fazendo exatamente o que promete: o erro foi
+declarar o tipo errado, e só se enxergou com dado de verdade na tela.
+
 ---
 
 ## O que esta lista ensina
 
-**Treze dos vinte e dois eram silenciosos.** Não davam erro, não travavam, não
+**Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
 apareciam no log. Gravavam dado errado e seguiam em frente.
 
 Daí as duas práticas que o projeto não abre mão:
@@ -327,3 +365,7 @@ Daí as duas práticas que o projeto não abre mão:
    nasceu do item 10, meses de trabalho depois, num arquivo que nem existia
    quando a regra foi escrita. Guarda que só serve para o bug que a criou não
    valeria o custo de mantê-la.
+5. **Abrir no navegador é parte do teste.** Os itens 21 e 22 nenhum teste de
+   servidor pegaria: nos dois, cada lado estava certo sozinho e o encontro
+   entre eles é que estava errado. Só apareceram com o sistema aberto e dado
+   de verdade na tela.

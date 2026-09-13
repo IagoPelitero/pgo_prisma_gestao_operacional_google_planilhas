@@ -212,10 +212,15 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'data de recepção do protocolo',
       ColunaDaHora: '',
       ColunaDoStatus: 'status',
-      ColunasDaFila: 'data de recepção do protocolo, status, nome do cliente, '
-        + 'protocolo, produto, analista',
-      CartoesDoPainel: '',
-      ColunaDaFinalizacao: '',
+      // Fila agrupada: cinco colunas na tela, e cada uma junta o que a
+      // pessoa lê de uma vez só. Trinta e cinco colunas lado a lado não
+      // cabem, e escolher seis perde o resto.
+      ColunasDaFila: 'Situação: data de recepção do protocolo, status'
+        + '; Dados da proposta: protocolo, número da proposta, Num_apolice, produto'
+        + '; Dados cadastrais: nome do cliente, CPF, e-mail'
+        + '; Motivo / assunto: motivo do cancelamento'
+        + '; Responsável: analista',
+      ColunaDaFinalizacao: 'data da transmissão',
       ColunaDaAreaResponsavel: '',
       Icone: 'escudo',
       Ordem: 1,
@@ -228,9 +233,11 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
       ColunaDoStatus: 'Status',
-      ColunasDaFila: 'Data de entrada, Status, Nome do segurado, '
-        + 'Documento (CPF), Corretora, Analista',
-      CartoesDoPainel: 'Pendente, Concluído',
+      ColunasDaFila: 'Situação: Data de entrada, Status'
+        + '; Dados do caso: Ramo, Assunto'
+        + '; Dados cadastrais: Nome do segurado, Documento (CPF)'
+        + '; Corretora: Corretora, SUSEP'
+        + '; Responsável: Analista',
       ColunaDaFinalizacao: 'Data da finalização',
       ColunaDaAreaResponsavel: 'Área responsável',
       Icone: 'diamante',
@@ -249,7 +256,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   // precisar ler. As cores válidas estão em RECC_TONS.
   [['Em tratativa', 'destaque'], ['Aguardando segurado', 'atencao'],
    ['Não tratado', 'violeta'], ['Retorno agendado', 'bom'],
-   ['Concluído', 'neutro']].forEach(function (par, i) {
+   ['Concluído', 'bom']].forEach(function (par, i) {
     itens.push(novoItemDeCatalogo_('STATUS', idRet, par[0], i + 1, par[1]));
   });
   [['Transmissão pendente', 'destaque'], ['Pendente', 'atencao'],
@@ -282,6 +289,14 @@ function semearDadosIniciais_(emailDoInstalador) {
   });
   contagem.catalogo = inserirVariosRegistros_('CATALOGO', itens).length +
     contagem.niveis + contagem.cargos;
+
+  // --- cartões do Dashboard -------------------------------------------------
+  // Os cartões moram em PAINEIS, e não em MESAS: são uma LISTA de coisas
+  // configuráveis, cada uma com nome, cor e ordem próprios. Guardá-los como
+  // um texto separado por vírgula dentro da mesa dava conta de escolher
+  // QUAIS, e de mais nada — não de renomear um, nem de trocar a cor.
+  contagem.paineis = inserirVariosRegistros_('PAINEIS',
+    cartoesIniciaisDoPainel_(idRet, idMesa)).length;
 
   // --- campos do formulário -------------------------------------------------
   // Gerados a partir do contrato: é isto que faz CAMPOS ser o mapa
@@ -362,6 +377,51 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
       widgets: {}
     })
   };
+}
+
+/**
+ * Os cartões que o Dashboard mostra quando o sistema nasce.
+ *
+ * A RET Vida mostra todas as situações; a Mesa Diamante mostra duas. Não é
+ * capricho: a Mesa tem muito menos volume, e sete cartões de números pequenos
+ * viram uma parede que ninguém lê. Tudo isso é editável em Configurações —
+ * este é o ponto de partida, não a regra.
+ */
+function cartoesIniciaisDoPainel_(idRet, idMesa) {
+  var cartoes = [];
+
+  function novoCartao(mesaId, titulo, dimensao, filtro, cor, ordem) {
+    return {
+      Tela: 'dashboard',
+      MesaId: mesaId,
+      Titulo: titulo,
+      TipoWidget: 'cartao',
+      CampoDimensao: dimensao,
+      CampoMedida: '',
+      Agregacao: 'contagem',
+      Limite: 0,
+      Filtro: filtro,
+      Ordem: ordem,
+      Largura: 1,
+      Cor: cor,
+      VisivelPara: '',
+      Ativo: true
+    };
+  }
+
+  cartoes.push(novoCartao(idRet, 'Total de casos', 'total', '', 'destaque', 1));
+  [['Em tratativa', 'destaque'], ['Aguardando segurado', 'atencao'],
+   ['Não tratado', 'violeta'], ['Retorno agendado', 'bom'],
+   ['Concluído', 'bom']].forEach(function (par, i) {
+    cartoes.push(novoCartao(idRet, par[0], 'situacao', par[0], par[1], i + 2));
+  });
+
+  cartoes.push(novoCartao(idMesa, 'Total de casos', 'total', '', 'destaque', 1));
+  cartoes.push(novoCartao(idMesa, 'Pendente', 'situacao', 'Pendente', 'atencao', 2));
+  cartoes.push(novoCartao(idMesa, 'Concluído', 'situacao', 'Concluído', 'bom', 3));
+  cartoes.push(novoCartao(idMesa, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
+
+  return cartoes;
 }
 
 function novoItemDeCatalogo_(tipo, mesaId, nome, ordem, cor) {

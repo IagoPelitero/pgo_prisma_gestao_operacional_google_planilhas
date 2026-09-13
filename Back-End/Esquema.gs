@@ -114,7 +114,10 @@ const RECC_ESQUEMA = {
       { cabecalho: 'canal', tipo: 'texto', protegido: true },
       { cabecalho: 'relacionamento', tipo: 'texto', protegido: true },
       { cabecalho: 'contato', tipo: 'texto', protegido: true },
-      { cabecalho: 'protocolo', tipo: 'identificador', protegido: true },
+      // Texto, e não identificador: o protocolo da operação é alfanumérico
+      // ("RET-2026-1024"), e como identificador ele perderia as letras — o
+      // tipo identificador guarda só dígitos, de propósito.
+      { cabecalho: 'protocolo', tipo: 'texto', protegido: true },
       { cabecalho: 'cod_sucursal', tipo: 'identificador', protegido: true },
       { cabecalho: 'cod_ramo', tipo: 'identificador', protegido: true },
       { cabecalho: 'Num_apolice', tipo: 'identificador', protegido: true },
@@ -246,10 +249,15 @@ const RECC_ESQUEMA = {
       // não adivinhado pelo nome: cada mesa batiza a coluna do seu jeito, e
       // adivinhar acerta hoje e erra na mesa que vier depois.
       { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
-      { cabecalho: 'ColunasDaFila', tipo: 'texto', protegido: false },
-      // Quais situações viram cartão. Vazio = todas. A Mesa Diamante tem
-      // menos demanda que a RET, e sete cartões para poucos casos é ruído.
-      { cabecalho: 'CartoesDoPainel', tipo: 'texto', protegido: false },
+      // As colunas da fila. Aceita duas escritas:
+      //
+      //   plana      Data de entrada, Status, Nome do segurado
+      //   agrupada   Situação: Data, Status; Dados da proposta: Protocolo…
+      //
+      // A agrupada junta várias colunas debaixo de um título só — é o que
+      // deixa a fila legível quando o caso tem trinta e cinco campos e a
+      // pessoa precisa achar o dele de relance.
+      { cabecalho: 'ColunasDaFila', tipo: 'textoLongo', protegido: false },
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
@@ -314,7 +322,10 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Tela', tipo: 'texto', protegido: true },
       { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
+      // 'cartao' no Dashboard; pizza, linha e barras no Painel Analítico.
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
+      // Para um cartão, é a regra de contagem: 'total', 'situacao' ou
+      // 'naCelula'. Para um gráfico, é o campo que vira eixo.
       { cabecalho: 'CampoDimensao', tipo: 'texto', protegido: false },
       { cabecalho: 'CampoMedida', tipo: 'texto', protegido: false },
       { cabecalho: 'Agregacao', tipo: 'texto', protegido: false },
@@ -322,6 +333,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Filtro', tipo: 'textoLongo', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Largura', tipo: 'numero', protegido: false },
+      // O tom, por NOME — 'bom', 'ruim', 'atencao'… Guardar '#15794A' aqui
+      // deixaria o verde do tema claro aparecendo no tema escuro.
+      { cabecalho: 'Cor', tipo: 'texto', protegido: false },
       { cabecalho: 'VisivelPara', tipo: 'texto', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
     ]

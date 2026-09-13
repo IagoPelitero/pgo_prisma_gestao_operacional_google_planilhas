@@ -14,7 +14,6 @@ var TelaDashboard = (function () {
   var mesaEscolhida = '';
   var filtrosEscolhidos = {};
   var resumo = null;
-  var casoAberto = '';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -116,35 +115,17 @@ var TelaDashboard = (function () {
             + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
     }
 
-    var cabecalho = resumo.colunas.map(function (coluna) {
-      return '<th>' + escapar(coluna.cabecalho) + '</th>';
+    var cabecalho = resumo.colunas.map(function (grupo) {
+      return '<th>' + escapar(grupo.titulo) + '</th>';
     }).join('') + '<th class="acoes-coluna">Ações</th>';
 
     var linhas = resumo.fila.map(function (caso) {
-      var celulas = caso.valores.map(function (valor, i) {
-        if (resumo.colunas[i].ehStatus) {
-          return '<td><span class="situacao tom-' + escapar(caso.tom || 'neutro')
-            + '">' + escapar(valor) + '</span></td>';
-        }
-        return '<td>' + escapar(valor) + '</td>';
+      var celulas = caso.celulas.map(function (grupo, i) {
+        return '<td>' + desenharGrupo(grupo, caso, i === 0) + '</td>';
       }).join('');
 
-      var botoes = '<button type="button" class="acao ver" data-caso="'
-        + escapar(caso.id) + '">'
-        + (casoAberto === caso.id ? 'Fechar' : 'Detalhes') + '</button>'
-        + (resumo.podeOcultar
-          ? '<button type="button" class="acao remover" data-ocultar="'
-            + escapar(caso.id) + '" title="Tirar da tela — a linha permanece '
-            + 'na planilha">Ocultar</button>'
-          : '');
-
-      var detalhe = casoAberto === caso.id
-        ? '<tr class="detalhe"><td colspan="' + (resumo.colunas.length + 1) + '"'
-          + ' id="detalhe-do-caso">Abrindo…</td></tr>'
-        : '';
-
-      return '<tr' + (casoAberto === caso.id ? ' class="aberta"' : '') + '>'
-        + celulas + '<td class="acoes-coluna">' + botoes + '</td></tr>' + detalhe;
+      return '<tr>' + celulas + '<td class="acoes-coluna">'
+        + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
     return '<div class="cartao sem-forro">'
@@ -152,9 +133,53 @@ var TelaDashboard = (function () {
         ? '<p class="aviso-fila">A fila mostra as ' + resumo.fila.length
           + ' mais recentes. Para o histórico completo, use Buscar Caso.</p>'
         : '')
-      + '<div class="rolagem-tabela"><table class="fila">'
+      + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
       + '<tbody>' + linhas + '</tbody></table></div></div>';
+  }
+
+  /**
+   * Um grupo de colunas dentro de uma célula.
+   *
+   * A primeira linha do grupo é a que salta — é o que a pessoa procura ao
+   * varrer a fila: o protocolo, o nome do cliente. As de baixo vêm menores,
+   * porque são o que ela confere depois de já ter achado a linha.
+   */
+  function desenharGrupo(grupo, caso, ehOPrimeiro) {
+    return grupo.map(function (celula, i) {
+      if (celula.ehStatus) {
+        return '<span class="situacao tom-' + escapar(caso.tom || 'neutro') + '">'
+          + escapar(celula.valor || '—') + '</span>';
+      }
+      var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
+      return '<span class="' + classe + '" title="' + escapar(celula.cabecalho)
+        + '">' + escapar(celula.valor || '—') + '</span>';
+    }).join('');
+  }
+
+  function acoesDaLinha(caso) {
+    var botoes = '<button type="button" class="acao ver" data-caso="'
+      + escapar(caso.id) + '">' + Moldura.icone('olho') + ' Ver detalhes</button>';
+
+    if (resumo.podeEditar) {
+      botoes += '<button type="button" class="acao-icone" data-editar="'
+        + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
+        + Moldura.icone('editar') + '</button>'
+        // `data-trocar-situacao`, e não `data-situacao`: os CARTÕES já usam
+        // `data-situacao` para filtrar a fila. Com o mesmo nome, clicar num
+        // cartão abriria o diálogo de troca de situação de um caso que não
+        // existe — o valor ali é o rótulo do cartão, não um Id.
+        + '<button type="button" class="acao-icone" data-trocar-situacao="'
+        + escapar(caso.id) + '" title="Alterar situação"'
+        + ' aria-label="Alterar situação">'
+        + Moldura.icone('trocarSituacao') + '</button>';
+    }
+    if (resumo.podeOcultar) {
+      botoes += '<button type="button" class="acao-icone perigo" data-ocultar="'
+        + escapar(caso.id) + '" title="Excluir — a linha permanece na planilha"'
+        + ' aria-label="Excluir caso">' + Moldura.icone('ocultar') + '</button>';
+    }
+    return botoes;
   }
 
   function desenharPainel() {
@@ -185,7 +210,6 @@ var TelaDashboard = (function () {
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
         filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
-        casoAberto = '';
         carregar();
       });
     }
@@ -194,7 +218,6 @@ var TelaDashboard = (function () {
     if (limpar) {
       limpar.addEventListener('click', function () {
         filtrosEscolhidos = {};
-        casoAberto = '';
         carregar();
       });
     }
@@ -206,65 +229,43 @@ var TelaDashboard = (function () {
         // Clicar de novo no mesmo cartão desliga o filtro.
         filtrosEscolhidos.status =
           (filtrosEscolhidos.status === situacao) ? '' : situacao;
-        casoAberto = '';
         carregar();
       });
     }
 
-    var veres = document.querySelectorAll('.acao.ver');
-    for (var v = 0; v < veres.length; v++) {
-      veres[v].addEventListener('click', function () {
-        var caso = this.getAttribute('data-caso');
-        casoAberto = (casoAberto === caso) ? '' : caso;
-        desenharPainel();
-        if (casoAberto) abrirDetalhe(casoAberto);
-      });
-    }
-
-    var remocoes = document.querySelectorAll('.acao.remover');
-    for (var r = 0; r < remocoes.length; r++) {
-      remocoes[r].addEventListener('click', function () {
-        ocultar(this.getAttribute('data-ocultar'));
-      });
-    }
+    ligarCliques('[data-caso]', function (botao) {
+      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-caso'), carregar);
+    });
+    ligarCliques('[data-editar]', function (botao) {
+      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-editar'),
+        carregar, true);
+    });
+    ligarCliques('[data-trocar-situacao]', function (botao) {
+      CasoEmModal.trocarSituacao(mesaEscolhida,
+        botao.getAttribute('data-trocar-situacao'), carregar);
+    });
+    ligarCliques('[data-ocultar]', function (botao) {
+      ocultar(botao.getAttribute('data-ocultar'));
+    });
   }
 
-  function abrirDetalhe(idDoCaso) {
-    Servidor.chamar('detalhesDoCaso', mesaEscolhida, idDoCaso)
-      .entao(function (resposta) {
-        var caixa = elemento('detalhe-do-caso');
-        if (!caixa) return;
-
-        var porSecao = {};
-        var ordem = [];
-        resposta.linhas.forEach(function (linha) {
-          if (!porSecao[linha.secao]) { porSecao[linha.secao] = []; ordem.push(linha.secao); }
-          porSecao[linha.secao].push(linha);
-        });
-
-        caixa.innerHTML = '<div class="detalhe-secoes">'
-          + ordem.map(function (secao) {
-            return '<div class="detalhe-secao"><h4>' + escapar(secao) + '</h4>'
-              + porSecao[secao].map(function (linha) {
-                return '<div class="par"><span>' + escapar(linha.rotulo) + '</span>'
-                  + '<strong>' + escapar(linha.valor) + '</strong></div>';
-              }).join('') + '</div>';
-          }).join('')
-          + '</div>';
-      })
-      .senao(function (erro) {
-        var caixa = elemento('detalhe-do-caso');
-        if (caixa) caixa.textContent = erro.message || String(erro);
-      });
+  function ligarCliques(seletor, oQueFazer) {
+    var botoes = document.querySelectorAll(seletor);
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () { oQueFazer(this); });
+    }
   }
 
   function ocultar(idDoCaso) {
-    // Ocultar não apaga, mas some da tela de todo mundo — vale perguntar.
-    if (!window.confirm('Tirar o caso ' + idDoCaso + ' da tela?\n\n'
-      + 'A linha permanece na planilha e pode voltar depois.')) return;
+    // Some da tela de todo mundo, e por isso vale perguntar. O texto diz a
+    // verdade: a linha permanece na planilha. Prometer "não poderá ser
+    // desfeito" quando dá para desfazer assusta à toa.
+    if (!window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
+      + 'Ele sai do sistema para todo mundo. A linha permanece na planilha e '
+      + 'pode ser trazida de volta por um administrador.')) return;
 
     Servidor.chamar('ocultarCaso', mesaEscolhida, idDoCaso)
-      .entao(function () { casoAberto = ''; carregar(); })
+      .entao(carregar)
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
   }
 
@@ -272,7 +273,6 @@ var TelaDashboard = (function () {
     SeletorDeMesa.ligar(function (idDaMesa) {
       mesaEscolhida = idDaMesa;
       filtrosEscolhidos = {};
-      casoAberto = '';
       Aplicacao.remontar();
     });
     carregar();

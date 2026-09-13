@@ -72,6 +72,7 @@ function resumoDaMesa(idDaMesa, filtros) {
     totalNoPeriodo: meus.length,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
     podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
   };
 }
@@ -163,30 +164,85 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
  * base: assim uma situação sem nenhum caso aparece com zero, em vez de sumir
  * do painel. Sumir esconde justamente a informação de que ela zerou.
  */
-function contarCartoes_(registros, anteriores, mesa) {
-  var cartoes = [montarCartao_('total', 'Total de casos', registros.length,
-    anteriores.length, 'destaque', '')];
-
-  if (mesa.colunaDoStatus) {
-    var agora = contarPorSituacao_(registros, mesa);
-    var antes = contarPorSituacao_(anteriores, mesa);
-
-    situacoesDoPainel_(mesa).forEach(function (situacao) {
-      cartoes.push(montarCartao_(situacao.chave, situacao.nome,
-        agora[situacao.chave] || 0, antes[situacao.chave] || 0,
-        situacao.tom, ''));
-    });
+/**
+ * A regra de contagem de um cartão, na forma canônica.
+ *
+ * Existe porque a comparação de textos do sistema ignora acento e caixa: sem
+ * este mapa, o servidor devolvia `nacelula` para a tela e recusava o mesmo
+ * `nacelula` de volta na hora de salvar. O que sai e o que entra têm de ser a
+ * mesma coisa.
+ */
+function dimensaoDoCartao_(valor) {
+  var canonicas = ['total', 'situacao', 'naCelula'];
+  var procurado = normalizarParaComparar_(valor);
+  for (var i = 0; i < canonicas.length; i++) {
+    if (normalizarParaComparar_(canonicas[i]) === procurado) return canonicas[i];
   }
-
-  var naCelula = contarFinalizadosNaCelula_(registros, mesa);
-  if (naCelula !== null) {
-    cartoes.push(montarCartao_('naCelula', 'Finalizados na célula', naCelula,
-      contarFinalizadosNaCelula_(anteriores, mesa), 'bom',
-      'Concluídos sem encaminhar para nenhuma área'));
-  }
-
-  return cartoes;
+  return '';
 }
+
+function contarCartoes_(registros, anteriores, mesa) {
+  var agora = mesa.colunaDoStatus ? contarPorSituacao_(registros, mesa) : {};
+  var antes = mesa.colunaDoStatus ? contarPorSituacao_(anteriores, mesa) : {};
+
+  var tons = {};
+  situacoesDaMesa_(mesa).forEach(function (situacao) {
+    tons[situacao.chave] = situacao.tom;
+  });
+
+  return cartoesDaMesa_(mesa).map(function (cartao) {
+    if (cartao.dimensao === 'total') {
+      return montarCartao_('total', cartao.titulo, registros.length,
+        anteriores.length, cartao.cor, '');
+    }
+    if (cartao.dimensao === 'naCelula') {
+      var naCelula = contarFinalizadosNaCelula_(registros, mesa);
+      if (naCelula === null) return null;
+      return montarCartao_('naCelula', cartao.titulo, naCelula,
+        contarFinalizadosNaCelula_(anteriores, mesa), cartao.cor,
+        'Concluídos sem encaminhar para nenhuma área');
+    }
+
+    var chave = normalizarParaComparar_(cartao.filtro);
+    return montarCartao_(chave, cartao.titulo, agora[chave] || 0,
+      antes[chave] || 0, cartao.cor || tons[chave] || 'neutro', '');
+  }).filter(function (cartao) { return cartao !== null; });
+}
+
+/**
+ * Os cartões declarados para o Dashboard desta mesa, na ordem escolhida.
+ *
+ * Cada cartão é uma linha de `PAINEIS`, e não um pedaço de texto dentro de
+ * `MESAS`: assim ele tem nome, cor e ordem próprios, e o administrador
+ * renomeia "Concluído" para "Resolvido no primeiro contato" sem que isso
+ * mexa no que está gravado nos casos.
+ *
+ * Desligar um cartão só o tira da tela — nenhum caso é tocado.
+ */
+function cartoesDaMesa_(mesa) {
+  var daMesa = converterParaIdentificador_(mesa.id);
+
+  return lerRegistros_('PAINEIS')
+    .filter(function (linha) {
+      if (normalizarParaComparar_(linha.Tela) !== 'dashboard') return false;
+      if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return false;
+      if (normalizarParaComparar_(linha.Ativo) !== 'sim') return false;
+      return converterParaIdentificador_(linha.MesaId) === daMesa;
+    })
+    .sort(function (um, outro) {
+      return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
+    })
+    .map(function (linha) {
+      return {
+        id: linha.__id,
+        titulo: String(linha.Titulo || ''),
+        dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
+        filtro: String(linha.Filtro || ''),
+        cor: tomValido_(linha.Cor)
+      };
+    });
+}
+
 
 function contarPorSituacao_(registros, mesa) {
   var contagem = {};
@@ -220,25 +276,6 @@ function montarCartao_(chave, rotulo, valor, valorAnterior, tom, explicacao) {
   };
 }
 
-/**
- * As situações que viram cartão.
- *
- * A mesa escolhe, na coluna CartoesDoPainel: vazia mostra todas. A Mesa
- * Diamante tem menos demanda que a RET, e sete cartões para poucos casos é
- * ruído — ali só interessam pendente e concluído.
- */
-function situacoesDoPainel_(mesa) {
-  var todas = situacoesDaMesa_(mesa);
-  var escolhidas = String(mesa.cartoesDoPainel || '')
-    .split(',')
-    .map(function (nome) { return normalizarParaComparar_(nome); })
-    .filter(function (nome) { return nome !== ''; });
-
-  if (!escolhidas.length) return todas;
-  return todas.filter(function (situacao) {
-    return escolhidas.indexOf(situacao.chave) >= 0;
-  });
-}
 
 function situacoesDaMesa_(mesa) {
   var daMesa = converterParaIdentificador_(mesa.id);
@@ -255,7 +292,11 @@ function situacoesDaMesa_(mesa) {
     .map(function (item) {
       return {
         chave: normalizarParaComparar_(item.Nome),
+        // O que a pessoa LÊ é o rótulo; o que está GRAVADO no caso é o nome.
+        // Um cartão que apontasse para o rótulo pararia de contar no dia em
+        // que alguém trocasse o texto da tela.
         nome: String(item.Rotulo || item.Nome),
+        gravadoComo: String(item.Nome),
         tom: tomValido_(item.Cor)
       };
     });
@@ -288,30 +329,79 @@ function contarFinalizadosNaCelula_(registros, mesa) {
 // ============================================================================
 
 /** As colunas que a mesa escolheu mostrar na fila. */
+/**
+ * As colunas da fila, agrupadas.
+ *
+ * `ColunasDaFila` aceita duas escritas, e a diferença é só o dois-pontos:
+ *
+ *   plana      Data de entrada, Status, Nome do segurado
+ *   agrupada   Situação: Data, Status; Dados cadastrais: Nome, CPF
+ *
+ * A agrupada existe porque um caso da RET tem trinta e cinco colunas. Seis
+ * lado a lado perdem o resto; trinta e cinco não cabem na tela. Juntar as que
+ * se leem de uma vez só — proposta com apólice, nome com CPF — resolve as
+ * duas coisas.
+ *
+ * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
+ * descuido: a fila é leitura, e derrubar o Dashboard inteiro porque alguém
+ * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
+ * na hora de salvar a mesa.
+ */
 function colunasDaFila_(mesa) {
-  var escolhidas = String(mesa.colunasDaFila || '')
-    .split(',')
-    .map(function (nome) { return nome.trim(); })
-    .filter(function (nome) { return nome !== ''; });
-
   var estrutura = estruturaDaAba_(mesa.aba);
-  return escolhidas
-    .filter(function (cabecalho) {
-      return posicaoDaColuna_(estrutura, cabecalho) >= 0;
+  var declarado = String(mesa.colunasDaFila || '');
+
+  // Sem nenhum dois-pontos, é a escrita plana: cada coluna vira um grupo com
+  // o próprio nome. É o que faz uma mesa antiga continuar funcionando igual,
+  // sem ninguém precisar reescrever a linha dela na planilha.
+  var pedacos = declarado.indexOf(':') < 0
+    ? declarado.split(',')
+    : declarado.split(';');
+
+  return pedacos
+    .map(function (pedaco) { return grupoDaFila_(pedaco, estrutura, mesa); })
+    .filter(function (grupo) { return grupo && grupo.colunas.length; });
+}
+
+/** Um pedaço de `ColunasDaFila` vira um grupo com o seu título. */
+function grupoDaFila_(pedaco, estrutura, mesa) {
+  var texto = String(pedaco || '').trim();
+  if (!texto) return null;
+
+  var titulo = '';
+  var lista = texto;
+  var doisPontos = texto.indexOf(':');
+  if (doisPontos > 0) {
+    titulo = texto.substring(0, doisPontos).trim();
+    lista = texto.substring(doisPontos + 1);
+  }
+
+  var colunas = lista.split(',')
+    .map(function (nome) { return nome.trim(); })
+    .filter(function (nome) {
+      return nome !== '' && posicaoDaColuna_(estrutura, nome) >= 0;
     })
-    .map(function (cabecalho) {
-      var posicao = posicaoDaColuna_(estrutura, cabecalho);
+    .map(function (nome) {
+      var posicao = posicaoDaColuna_(estrutura, nome);
       return {
         cabecalho: estrutura.cabecalhos[posicao],
         tipo: estrutura.tipos[posicao],
-        ehStatus: normalizarParaComparar_(cabecalho)
+        ehStatus: normalizarParaComparar_(nome)
           === normalizarParaComparar_(mesa.colunaDoStatus)
       };
     });
+
+  return {
+    // Sem título declarado, o grupo se chama como a sua única coluna — é o
+    // que faz a escrita plana continuar valendo, sem um segundo caminho.
+    titulo: titulo || (colunas.length ? colunas[0].cabecalho : ''),
+    colunas: colunas
+  };
 }
 
+
 function montarFila_(registros, mesa) {
-  var colunas = colunasDaFila_(mesa);
+  var grupos = colunasDaFila_(mesa);
 
   // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
   // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
@@ -321,19 +411,26 @@ function montarFila_(registros, mesa) {
   });
 
   return registros.slice().reverse().map(function (registro) {
-    var valores = colunas.map(function (coluna) {
-      return paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+    var celulas = grupos.map(function (grupo) {
+      return grupo.colunas.map(function (coluna) {
+        return {
+          cabecalho: coluna.cabecalho,
+          valor: paraTexto_(registro[coluna.cabecalho], coluna.tipo),
+          ehStatus: coluna.ehStatus
+        };
+      });
     });
     var situacao = mesa.colunaDoStatus
       ? String(registro[mesa.colunaDoStatus] || '') : '';
     return {
       id: registro.__id,
-      valores: valores,
+      celulas: celulas,
       situacao: situacao,
       tom: tons[normalizarParaComparar_(situacao)] || 'neutro'
     };
   });
 }
+
 
 /**
  * O valor pronto para a tela.
@@ -391,15 +488,81 @@ function detalhesDoCaso(idDaMesa, idDoCaso) {
     var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
     if (posicao < 0) return;
 
-    var valor = paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]);
-    if (valor === '') return;   // campo vazio não ocupa espaço no detalhe
-
+    // Campo vazio aparece com um travessão, e não sumindo. Sumir faria a
+    // pessoa achar que o campo não existe naquela mesa, quando na verdade
+    // ele existe e está em branco — que é uma informação.
     linhas.push({
+      chave: String(campo.ChaveTecnica),
       rotulo: String(campo.Rotulo || campo.Cabecalho),
-      valor: valor,
+      valor: paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]),
       secao: String(campo.Secao || 'Geral')
     });
   });
 
-  return { id: registro.__id, mesa: mesa.nome, linhas: linhas };
+  var situacao = mesa.colunaDoStatus
+    ? String(registro[mesa.colunaDoStatus] || '') : '';
+  var tom = 'neutro';
+  situacoesDaMesa_(mesa).forEach(function (uma) {
+    if (uma.chave === normalizarParaComparar_(situacao)) tom = uma.tom;
+  });
+
+  return {
+    id: registro.__id,
+    mesa: mesa.nome,
+    situacao: situacao,
+    tom: tom,
+    atualizadoEm: quandoFoiMexido_(mesa.aba, registro.__id),
+    linhas: linhas,
+    historico: historicoDoCaso_(mesa.aba, registro.__id),
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
+    podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
+  };
 }
+
+/**
+ * O que já aconteceu com este caso, do mais antigo para o mais recente.
+ *
+ * Sai da trilha de auditoria, e não de uma coluna de histórico na base: a
+ * trilha já registra quem fez o quê e quando, e uma segunda memória da mesma
+ * coisa é uma que um dia diverge da outra.
+ */
+function historicoDoCaso_(nomeDaAba, idDoCaso) {
+  var nomes = {};
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    nomes[usuario.__id] = String(usuario.Nome);
+  });
+
+  var comoSeChama = {
+    'caso.criar': 'Caso cadastrado',
+    'caso.editar': 'Caso alterado',
+    'caso.status': 'Situação alterada',
+    'caso.ocultar': 'Caso ocultado'
+  };
+
+  return lerRegistros_('AUDITORIA')
+    .filter(function (linha) {
+      if (normalizarParaComparar_(linha.Entidade)
+        !== normalizarParaComparar_(nomeDaAba)) return false;
+      return converterParaIdentificador_(linha.RegistroId)
+        === converterParaIdentificador_(idDoCaso);
+    })
+    .map(function (linha) {
+      var acao = String(linha.Acao || '');
+      return {
+        acao: comoSeChama[acao] || acao,
+        detalhe: String(linha.Detalhe || ''),
+        quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || 'Sem dados',
+        quando: linha.DataHora
+          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,
+            'dd/MM/yyyy, HH:mm')
+          : ''
+      };
+    });
+}
+
+/** Quando o caso foi mexido pela última vez, segundo a trilha. */
+function quandoFoiMexido_(nomeDaAba, idDoCaso) {
+  var passos = historicoDoCaso_(nomeDaAba, idDoCaso);
+  return passos.length ? passos[passos.length - 1].quando : '';
+}
+

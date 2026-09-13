@@ -3,7 +3,8 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 6 de 12 etapas construídas · 174 testes passando.
+**Estado geral:** 6 de 12 etapas construídas, mais o Dashboard reformado ·
+184 testes passando.
 
 ---
 
@@ -19,7 +20,7 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 2 | Acesso | ✅ pronta | 32 |
 | 3 | Casca | ✅ pronta | 28 |
 | 4 | Cadastrar Caso | ✅ pronta | 28 |
-| 5 | Dashboard | ✅ pronta | 19 |
+| 5 | Dashboard | ✅ pronta · reformado | 28 |
 | 6 | Configurações | ✅ pronta | 35 |
 | 7 | Buscar Caso | ⏳ | — |
 | 8 | Painel Analítico | ⏳ | — |
@@ -220,6 +221,71 @@ Criar coluna pede a senha e, quando ela vem, **executa o que estava
 pendente** — sem pedir o formulário de novo. Refazer tudo depois de digitar a
 senha é o tipo de detalhe que faz alguém desistir no meio.
 
+### A seção Painéis
+
+Os cards do Dashboard deixaram de ser um texto separado por vírgula dentro da
+mesa e viraram **linhas da aba `PAINEIS`**: cada um com nome, o que conta,
+cor, ordem e o interruptor de mostrar. Até 12 por operação. Remover um card
+não toca em caso nenhum — o card é uma forma de contar, e apagar a conta não
+apaga o que foi contado.
+
+### E o que ainda não é configurável
+
+A lista completa, sem maquiagem, está em
+[`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md): o que já se ajusta
+pela tela, o que ainda exige abrir a planilha, e o que não se ajusta em lugar
+nenhum — com o motivo de cada um.
+
+---
+
+## Dashboard, segunda passada 🔧
+
+**A fila deixou de ser uma tabela e virou uma tela de trabalho.**
+
+### A fila em grupos
+
+Um caso da RET tem trinta e cinco colunas. Seis lado a lado perdem o resto;
+trinta e cinco não cabem. A fila passou a aceitar **grupos**: várias colunas
+debaixo de um título só, com a primeira em destaque e as outras de apoio.
+
+```
+Situação: data de recepção do protocolo, status
+Dados da proposta: protocolo, número da proposta, Num_apolice, produto
+Dados cadastrais: nome do cliente, CPF, e-mail
+Motivo / assunto: motivo do cancelamento
+Responsável: analista
+```
+
+A escrita antiga, sem dois-pontos, continua valendo: cada coluna vira um grupo
+com o próprio nome. Nenhuma mesa precisou ser reescrita.
+
+### O caso num modal
+
+Clicar em **Ver detalhes** abre o caso por cima, e fechar devolve a fila
+exatamente como estava — mesma rolagem, mesmo filtro, mesma linha. Sair e
+voltar faria perder o lugar dezenas de vezes por dia.
+
+Dentro do modal: o caso inteiro em duas colunas, **campo em branco com um
+travessão** (sumir faria a pessoa achar que o campo não existe nesta mesa), o
+**histórico do caso** tirado da trilha de auditoria, e o botão de editar.
+
+A edição é o **mesmo formulário** de Cadastrar Caso — o `Formulario`, que
+agora mora num arquivo só e é usado pelas duas telas. Dentro do modal ele
+recebe um prefixo, porque a tela de cadastro pode estar atrás e os dois não
+podem disputar os mesmos identificadores.
+
+### As quatro ações da linha
+
+| Ação | O que faz |
+|---|---|
+| **Ver detalhes** | abre o modal em leitura |
+| **Editar** | abre o modal já em edição |
+| **Alterar situação** | um diálogo pequeno, só com a situação — é o gesto mais frequente da operação, e abrir 35 campos para mexer num só é atrito que se paga dezenas de vezes por dia |
+| **Excluir** | some do sistema para todo mundo; **a linha permanece na planilha** e pode voltar |
+
+Concluir um caso preenche a data de finalização sozinho, quando a mesa tem
+essa coluna e ela está vazia — é o que a operação faria à mão em seguida.
+
 ---
 
 ## O que ainda está em aberto
@@ -228,6 +294,6 @@ senha é o tipo de detalhe que faz alguém desistir no meio.
 |---|---|
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
-| **Editar um caso pela fila** | `editarCaso` já existe e está testado, mas ainda não há tela para isso — a fila abre o detalhe em leitura |
+| **Nome das telas, janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela |
 | **Criar e apagar mesa** | A tela ajusta as mesas que existem. Criar uma mesa nova é estrutura (cria aba), e ainda não passa por Configurações |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

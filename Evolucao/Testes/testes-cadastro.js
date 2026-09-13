@@ -334,18 +334,18 @@ function rodarTestesDeCadastro() {
 
   teste('a máscara desenha enquanto se digita, e só com dígitos', () => {
     const fonte = fs.readFileSync(
-      path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8')
+      path.join(__dirname, '..', '..', 'Front-End', 'Formulario.html'), 'utf8')
       .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
     const contexto = vm.createContext({ document: { getElementById: () => null },
-      Moldura: { escapar: (t) => String(t) }, Servidor: {}, Aplicacao: {}, console });
+      Moldura: { escapar: (t) => String(t) }, Servidor: {}, console });
     vm.runInContext(fonte, contexto);
-    const tela = contexto.TelaCadastrarCaso;
+    const form = contexto.Formulario;
 
-    igual(tela.aplicarMascara('12345678901', '000.000.000-00'), '123.456.789-01');
-    igual(tela.aplicarMascara('123', '000.000.000-00'), '123');
-    igual(tela.aplicarMascara('abc12x34', '000.000.000-00'), '123.4',
+    igual(form.aplicarMascara('12345678901', '000.000.000-00'), '123.456.789-01');
+    igual(form.aplicarMascara('123', '000.000.000-00'), '123');
+    igual(form.aplicarMascara('abc12x34', '000.000.000-00'), '123.4',
       'letra digitada é descartada, não vira caractere da máscara');
-    igual(tela.aplicarMascara('1234567890123456', '000.000.000-00'),
+    igual(form.aplicarMascara('1234567890123456', '000.000.000-00'),
       '123.456.789-01', 'digitar demais não estoura a máscara');
   });
 
@@ -354,7 +354,29 @@ function rodarTestesDeCadastro() {
       path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
     contem(fonte, "Servidor.chamar('formularioDaMesa'", 'o formulário vem do servidor');
     contem(fonte, "Servidor.chamar('cadastrarCaso'", 'quem grava é o servidor');
-    contem(fonte, "Servidor.chamar('consultarSusep'", 'o selo consulta o servidor');
+    contem(fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End',
+      'Formulario.html'), 'utf8'),
+      "Servidor.chamar('consultarSusep'", 'o selo consulta o servidor');
+  });
+
+  teste('o formulário é desenhado num lugar só, e as duas telas o usam', () => {
+    // Cadastrar Caso e o modal de edição do Dashboard montam o MESMO
+    // formulário. Duas cópias divergiriam no primeiro ajuste de máscara.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const cadastro = fs.readFileSync(path.join(pasta, 'CadastrarCaso.html'), 'utf8');
+    const modal = fs.readFileSync(path.join(pasta, 'CasoEmModal.html'), 'utf8');
+
+    [cadastro, modal].forEach((fonte) => {
+      contem(fonte, 'Formulario.desenhar(');
+      contem(fonte, 'Formulario.valores(');
+      verdadeiro(fonte.indexOf('function aplicarMascara') < 0,
+        'nenhuma tela pode ter a sua própria máscara');
+    });
+
+    // E o modal usa PREFIXO: com ele aberto por cima da tela de cadastro, os
+    // dois formulários existem ao mesmo tempo na página. Sem prefixo, os
+    // elementos teriam o mesmo id e editar escreveria no cadastro.
+    contem(modal, "Formulario.desenhar(formulario, 'editar-')");
   });
 }
 

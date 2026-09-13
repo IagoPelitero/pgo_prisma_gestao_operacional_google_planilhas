@@ -121,6 +121,7 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'niveis') return carregarNiveis();
     if (secaoAtual === 'catalogo') return carregarListas();
     if (secaoAtual === 'mesas') return carregarMesas();
+    if (secaoAtual === 'paineis') return carregarPaineis();
     if (secaoAtual === 'identidade') return desenharIdentidade();
     if (secaoAtual === 'estrutura') return carregarEstrutura();
   }
@@ -736,10 +737,6 @@ var TelaConfiguracoes = (function () {
         mesa.colunaDoStatus, 'É por ela que os cartões do painel contam.')
       + campoDeTexto('colunasDaFila', 'Colunas da fila', mesa.colunasDaFila,
         'Separadas por vírgula, na ordem em que aparecem na tabela.')
-      + campoDeTexto('cartoesDoPainel', 'Situações que viram cartão',
-        mesa.cartoesDoPainel,
-        'Separadas por vírgula. Vazio mostra todas — o que só faz sentido em '
-        + 'mesa de bastante volume.')
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         mesa.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -763,7 +760,6 @@ var TelaConfiguracoes = (function () {
         colunaDaHora: valorDe('colunaDaHora'),
         colunaDoStatus: valorDe('colunaDoStatus'),
         colunasDaFila: valorDe('colunasDaFila'),
-        cartoesDoPainel: valorDe('cartoesDoPainel'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
         ordem: valorDe('ordem'),
@@ -771,6 +767,177 @@ var TelaConfiguracoes = (function () {
       }).entao(function () { avisarSalvo(); carregarMesas(); })
         .senao(mostrarErroNoPainel);
     });
+  }
+
+  /* -------------------------------------------------------------- painéis */
+
+  var mesaDosCards = '';
+  var cardsEmEdicao = null;   // a lista sendo mexida, antes de salvar
+
+  function carregarPaineis() {
+    aguarde('Lendo os cards…');
+    if (!mesaDosCards) mesaDosCards = mesaEscolhida;
+
+    Servidor.chamar('listarCardsDoPainel', 'dashboard', mesaDosCards)
+      .entao(function (resposta) {
+        dados.painel = resposta;
+        cardsEmEdicao = resposta.cartoes.map(copiarCard);
+        desenharPaineis();
+      })
+      .senao(falhou);
+  }
+
+  function copiarCard(card) {
+    return {
+      id: card.id || '', titulo: card.titulo, dimensao: card.dimensao,
+      filtro: card.filtro, cor: card.cor, mostrar: card.mostrar !== false
+    };
+  }
+
+  function desenharPaineis() {
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">Cards da operação</span></div>'
+      + '<p class="config-explica">Escolha os cards do Dashboard. '
+      + 'Até ' + dados.painel.maximo + ' cards por operação. Remover ou '
+      + 'ocultar um card <strong>mantém os casos</strong> — o card é uma forma '
+      + 'de contar, e apagar a conta não apaga o que foi contado. As contagens '
+      + 'seguem o acesso de cada pessoa. Alterações só entram em vigor ao '
+      + 'salvar.</p>'
+      + '<div class="config-mesas-cartao">' + escolhaDeMesa() + '</div>'
+      + '<div id="lista-de-cards">' + desenharCards() + '</div>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="add-card">'
+      + '+ Adicionar card</button>'
+      + '<button type="button" class="botao" id="salvar-cards">'
+      + '✓ Salvar cards</button>'
+      + '<button type="button" class="botao-texto" id="descartar-cards">'
+      + '↺ Descartar alterações</button>'
+      + '</div>';
+
+    painelVazio('Os cards contam os casos que a pessoa pode ver. Quem enxerga '
+      + 'só os próprios casos vê os números dela, no mesmo card.');
+    ligarPaineis();
+  }
+
+  /** As mesas como dois blocos grandes, e não como uma caixa de seleção. */
+  function escolhaDeMesa() {
+    return pacoteDoSistema.mesas.map(function (mesa) {
+      return '<button type="button" class="mesa-cartao'
+        + (mesa.id === mesaDosCards ? ' atual' : '') + '"'
+        + ' data-mesa-dos-cards="' + escapar(mesa.id) + '">'
+        + SeletorDeMesa.icone(mesa.icone)
+        + '<span><strong>' + escapar(mesa.nome) + '</strong>'
+        + '<em>' + escapar(mesa.descricao || '') + '</em></span></button>';
+    }).join('');
+  }
+
+  function desenharCards() {
+    if (!cardsEmEdicao.length) {
+      return '<p class="config-vazio">Nenhum card nesta operação. O Dashboard '
+        + 'mostra a fila, e nenhum número em cima dela.</p>';
+    }
+    return cardsEmEdicao.map(function (card, posicao) {
+      return '<div class="card-editavel">'
+        + '<div class="card-linha">'
+        + '<label class="config-campo"><span>Nome do card</span>'
+        + '<input type="text" data-card="' + posicao + '" data-parte="titulo"'
+        + ' value="' + escapar(card.titulo) + '"></label>'
+        + '<label class="config-campo"><span>O que contar</span>'
+        + '<select data-card="' + posicao + '" data-parte="contar">'
+        + dados.painel.oQueContar.map(function (opcao, i) {
+          var escolhido = opcao.chave === card.dimensao
+            && (opcao.chave !== 'situacao'
+              || normalizarTexto(opcao.filtro) === normalizarTexto(card.filtro));
+          return '<option value="' + i + '"' + (escolhido ? ' selected' : '') + '>'
+            + escapar(opcao.rotulo) + '</option>';
+        }).join('') + '</select></label>'
+        + '</div>'
+        + '<div class="card-linha">'
+        + '<label class="config-campo"><span>Cor</span>'
+        + '<div class="tira-de-tons">'
+        + dados.painel.tons.map(function (tom) {
+          return '<button type="button" class="tom-escolha tom-' + escapar(tom) + '"'
+            + (tom === card.cor ? ' aria-pressed="true"' : ' aria-pressed="false"')
+            + ' data-card="' + posicao + '" data-parte="cor" data-tom="'
+            + escapar(tom) + '" title="' + escapar(tom) + '"></button>';
+        }).join('') + '</div></label>'
+        + '<label class="config-campo"><span>Ordem</span>'
+        + '<input type="text" value="' + (posicao + 1) + '" readonly></label>'
+        + '</div>'
+        + '<div class="card-linha rodape">'
+        + '<label class="config-chave">'
+        + '<input type="checkbox" data-card="' + posicao + '" data-parte="mostrar"'
+        + (card.mostrar ? ' checked' : '') + '><span>Mostrar</span></label>'
+        + '<button type="button" class="botao-texto perigo" data-remover-card="'
+        + posicao + '">✕ Remover</button>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  function normalizarTexto(valor) {
+    return String(valor === null || valor === undefined ? '' : valor)
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  function ligarPaineis() {
+    ligarCliques('[data-mesa-dos-cards]', function (botao) {
+      mesaDosCards = botao.getAttribute('data-mesa-dos-cards');
+      carregarPaineis();
+    });
+
+    ligarCliques('[data-remover-card]', function (botao) {
+      cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
+      redesenharCards();
+    });
+
+    ligarCliques('[data-parte="cor"]', function (botao) {
+      cardsEmEdicao[Number(botao.getAttribute('data-card'))].cor =
+        botao.getAttribute('data-tom');
+      redesenharCards();
+    });
+
+    var caixas = document.querySelectorAll(
+      '[data-parte="titulo"], [data-parte="contar"], [data-parte="mostrar"]');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        var card = cardsEmEdicao[Number(this.getAttribute('data-card'))];
+        var parte = this.getAttribute('data-parte');
+        if (parte === 'titulo') card.titulo = this.value;
+        if (parte === 'mostrar') card.mostrar = this.checked;
+        if (parte === 'contar') {
+          var opcao = dados.painel.oQueContar[Number(this.value)];
+          card.dimensao = opcao.chave;
+          card.filtro = opcao.filtro;
+        }
+      });
+    }
+
+    elemento('add-card').addEventListener('click', function () {
+      if (cardsEmEdicao.length >= dados.painel.maximo) {
+        return avisar('São no máximo ' + dados.painel.maximo + ' cards por '
+          + 'operação. Acima disso a tela vira uma parede de números.', 'ruim');
+      }
+      var primeira = dados.painel.oQueContar[0];
+      cardsEmEdicao.push({ id: '', titulo: 'Novo card',
+        dimensao: primeira.chave, filtro: primeira.filtro,
+        cor: 'neutro', mostrar: true });
+      redesenharCards();
+    });
+
+    elemento('descartar-cards').addEventListener('click', carregarPaineis);
+
+    elemento('salvar-cards').addEventListener('click', function () {
+      Servidor.chamar('salvarCardsDoPainel', 'dashboard', mesaDosCards,
+        cardsEmEdicao)
+        .entao(function () { avisarSalvo('Cards salvos.'); carregarPaineis(); })
+        .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+    });
+  }
+
+  /** Redesenha só a lista: a explicação e os botões não mudaram. */
+  function redesenharCards() {
+    elemento('lista-de-cards').innerHTML = desenharCards();
+    ligarPaineis();
   }
 
   /* --------------------------------------------------- identidade e senha */
@@ -799,9 +966,55 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('logo', 'Logo', identidade.logo,
         'Endereço https:// de uma imagem, ou a própria imagem em texto '
         + '(data:image/…). Vazio deixa o nome da operação assinar sozinho.')
+      + '<div class="escolher-arquivo">'
+      + '<input type="file" id="arquivo-da-logo" accept="image/png,image/jpeg,'
+      + 'image/svg+xml,image/webp">'
+      + '<button type="button" class="botao vazado" id="escolher-logo">'
+      + 'Escolher a imagem no computador</button>'
+      + '<span class="config-explica" style="margin:0">'
+      + 'A imagem é embutida no sistema, sem depender de nenhum site.</span>'
+      + '<div class="previa-da-logo" id="previa-da-logo"'
+      + (identidade.logo ? '' : ' hidden') + '>'
+      + (identidade.logo
+        ? '<img src="' + escapar(identidade.logo) + '" alt="Logo atual">' : '')
+      + '</div></div>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar identidade</button>'
       + '</div></form>';
+
+    // Escolher o arquivo converte a imagem para texto e enche o campo. Assim
+    // a logo não depende de nenhum site continuar no ar — ela passa a morar
+    // na própria planilha, junto do resto da identidade.
+    elemento('escolher-logo').addEventListener('click', function () {
+      elemento('arquivo-da-logo').click();
+    });
+    elemento('arquivo-da-logo').addEventListener('change', function () {
+      var arquivo = this.files && this.files[0];
+      if (!arquivo) return;
+
+      // Uma imagem grande demais estoura a célula da planilha (50 mil
+      // caracteres). Avisamos antes, em vez de deixar a gravação falhar.
+      if (arquivo.size > 32 * 1024) {
+        return avisar('A imagem tem ' + Math.round(arquivo.size / 1024)
+          + ' KB. A logo entra dentro da planilha, e ali cabem cerca de 32 KB. '
+          + 'Salve uma versão menor — uma logo de barra superior costuma ter '
+          + 'menos de 10 KB.', 'ruim');
+      }
+
+      var leitor = new FileReader();
+      leitor.onload = function () {
+        elemento('cfg-logo').value = leitor.result;
+        var previa = elemento('previa-da-logo');
+        previa.innerHTML = '<img src="' + escapar(leitor.result)
+          + '" alt="Logo escolhida">';
+        previa.hidden = false;
+        avisar('Imagem carregada. Aperte Salvar identidade para valer.', 'bom');
+      };
+      leitor.onerror = function () {
+        avisar('Não consegui ler esse arquivo.', 'ruim');
+      };
+      leitor.readAsDataURL(arquivo);
+    });
 
     elemento('form-identidade').addEventListener('submit', function (evento) {
       evento.preventDefault();

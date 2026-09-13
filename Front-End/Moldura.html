@@ -61,7 +61,33 @@ var Moldura = (function () {
       '<circle cx="12" cy="12" r="7.1"></circle>'
       + '<circle cx="12" cy="12" r="2.9"></circle>'
       + '<path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3'
-      + 'M5.3 5.3 6.9 6.9M17.1 17.1l1.6 1.6M18.7 5.3 17.1 6.9M6.9 17.1l-1.6 1.6"></path>'
+      + 'M5.3 5.3 6.9 6.9M17.1 17.1l1.6 1.6M18.7 5.3 17.1 6.9M6.9 17.1l-1.6 1.6"></path>',
+
+    // --- os desenhos das AÇÕES, na mesma grade e na mesma espessura -------
+
+    // ver: o olho
+    olho:
+      '<path d="M2.4 12S6.2 5.4 12 5.4 21.6 12 21.6 12 17.8 18.6 12 18.6 2.4 12 2.4 12z"></path>'
+      + '<circle cx="12" cy="12" r="3.1"></circle>',
+
+    // editar: o lápis
+    editar:
+      '<path d="M16.4 3.9a2 2 0 0 1 2.8 2.8L8.4 17.5l-3.9 1.1 1.1-3.9z"></path>'
+      + '<path d="M14.7 5.6 18.4 9.3"></path>',
+
+    // trocar situação: as duas setas em círculo
+    trocarSituacao:
+      '<path d="M20.4 11.2a8.4 8.4 0 0 0-14.3-4.6L3.6 9"></path>'
+      + '<path d="M3.6 4.6V9h4.4"></path>'
+      + '<path d="M3.6 12.8a8.4 8.4 0 0 0 14.3 4.6L20.4 15"></path>'
+      + '<path d="M20.4 19.4V15H16"></path>',
+
+    // ocultar: a lixeira, com a tampa
+    ocultar:
+      '<path d="M4.4 6.8h15.2"></path>'
+      + '<path d="M9.2 6.8V5.2a1.4 1.4 0 0 1 1.4-1.4h2.8a1.4 1.4 0 0 1 1.4 1.4v1.6"></path>'
+      + '<path d="M6.4 6.8v12.4a1.4 1.4 0 0 0 1.4 1.4h8.4a1.4 1.4 0 0 0 1.4-1.4V6.8"></path>'
+      + '<path d="M10.2 10.6v6M13.8 10.6v6"></path>'
   };
 
   var TEMAS = [
@@ -71,6 +97,12 @@ var Moldura = (function () {
     { chave: 'brasil', nome: 'Brasil' }
   ];
 
+  /**
+   * O desenho de um item do menu ou de uma ação.
+   *
+   * Nome desconhecido cai no painel, e não em nada: um botão sem ícone,
+   * ao lado de outros com ícone, parece um botão quebrado.
+   */
   function icone(tela) {
     var desenho = DESENHOS[tela] || DESENHOS.dashboard;
     // Traço fino: 1,7 deixava os desenhos pesados ao lado de texto normal.
@@ -223,6 +255,10 @@ var Moldura = (function () {
   return {
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
+    // Os desenhos são de todas as telas, e não só do menu: a fila usa o olho,
+    // o lápis e a lixeira, e eles precisam vir da mesma grade e da mesma
+    // espessura, senão a tela parece montada com peças de dois conjuntos.
+    icone: icone,
     escapar: escapar,
     iniciais: iniciais
   };

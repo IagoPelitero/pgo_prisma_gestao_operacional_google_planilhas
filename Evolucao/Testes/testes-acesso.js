@@ -381,8 +381,13 @@ function rodarTestesDeAcesso() {
     comoUsuario(ambiente, 'estranho@exemplo.com', () => {
       const html = chamar('doGet()').getContent();
       verdadeiro(html.indexOf('<img') < 0, 'não deveria haver imagem sem logo definida');
-      contem(html, '<div class="assinatura">Porto Seguro</div>',
-        'a operação assina a tela');
+      // A última palavra em negrito, como marcas de duas palavras se escrevem.
+      // É TIPOGRAFIA, e não um desenho da marca de outra empresa: para isso
+      // existe o campo da logo, com um botão que escolhe a imagem do
+      // computador e a embute na própria planilha.
+      contem(html, '<span class="leve">Porto</span>',
+        'a operação assina a tela, e a primeira palavra vai mais leve');
+      contem(html, 'Seguro', 'e a última em negrito');
       contem(html, 'Acesso ao RECC',
         'e o nome do sistema abre o recado, do outro lado');
     });

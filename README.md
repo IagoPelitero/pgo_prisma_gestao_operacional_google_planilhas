@@ -68,7 +68,8 @@ Dentro de `Evolucao/`:
 | [`03-manutencao.md`](Evolucao/03-manutencao.md) | Como mexer sem quebrar — leia antes de tocar em código |
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
-| `Testes/` | A suíte: 174 testes, que rodam no computador com `node` |
+| [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
+| `Testes/` | A suíte: 184 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -120,13 +121,13 @@ nascem vazios.
 node Evolucao/Testes/rodar.js
 ```
 
-174 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+184 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 173 não valeriam nada.
+realmente corrompe — sem ele, os outros 183 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -148,6 +149,20 @@ isso o número do cartão sempre bate com o que a fila mostra. Os filtros são o
 campos que já são lista: nada escrito em código.
 
 ![O Dashboard](Evolucao/imagens/tela-dashboard.png)
+
+A fila vem em **grupos**: várias colunas debaixo de um título só, com a
+primeira em destaque. Um caso da RET tem trinta e cinco colunas — seis lado a
+lado perdem o resto, e trinta e cinco não cabem.
+
+Clicar em **Ver detalhes** abre o caso por cima, e fechar devolve a fila
+exatamente como estava. Campo em branco aparece com um travessão: sumir faria
+a pessoa achar que o campo não existe naquela mesa.
+
+![O caso aberto](Evolucao/imagens/tela-caso-em-modal.png)
+
+Cada linha tem quatro ações: ver, editar, **alterar situação** — um diálogo só
+com a situação, porque é o gesto mais frequente da operação — e excluir, que
+tira o caso do sistema e **mantém a linha na planilha**.
 
 ---
 
@@ -186,6 +201,17 @@ tenha: trocar o cabeçalho de um campo (é o nome da coluna, e o Power BI aponta
 para ele), renomear um item de lista que já está gravado em casos, e tirar
 Configurações do último nível que ainda a tem — ninguém se tranca do lado de
 fora.
+
+Os **cards do Dashboard** são configuráveis um a um: nome, o que cada um
+conta, cor, ordem e mostrar ou ocultar. Até 12 por operação. Remover um card
+não toca em caso nenhum — o card é uma forma de contar, e apagar a conta não
+apaga o que foi contado.
+
+![Os cards do Dashboard](Evolucao/imagens/tela-configuracoes-paineis.png)
+
+**Configurações permite ajustar tudo?** Quase — e a lista completa, com o que
+ainda falta e por quê, está em
+[`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md).
 
 ---
 

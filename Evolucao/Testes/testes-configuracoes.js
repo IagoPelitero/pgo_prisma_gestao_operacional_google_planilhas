@@ -51,7 +51,7 @@ function rodarTestesDeConfiguracoes() {
     // Conferimos as CHAVES, e não só quantas são: contar 7 continuaria
     // passando se uma seção sumisse e outra nascesse no mesmo commit.
     igual(resumo.secoes.map((s) => s.chave).join(','),
-      'campos,usuarios,niveis,catalogo,mesas,identidade,estrutura');
+      'campos,usuarios,niveis,catalogo,mesas,identidade,paineis,estrutura');
     igual(resumo.podeMexerNaEstrutura, true);
     igual(resumo.senhaDefinida, false, 'instalação nova ainda não tem senha');
     verdadeiro(resumo.secoes.find((s) => s.chave === 'campos').quantidade >= 55);
@@ -389,21 +389,28 @@ function rodarTestesDeConfiguracoes() {
     chamar('salvarMesa')(Object.assign({}, comoEstava, { ativo: true }));
   });
 
-  teste('mudar os cartões da mesa muda o painel na hora seguinte', () => {
-    chamar('salvarMesa')({
-      id: mesa.id, nome: 'Mesa Diamante',
-      colunaDaData: 'Data de entrada', colunaDaHora: 'Horário',
-      colunaDoStatus: 'Status', colunasDaFila: 'Nome do segurado, Status',
-      cartoesDoPainel: 'Pendente'
-    });
-    const painel = chamar('resumoDaMesa')(mesa.id, {});
-    // Pela CHAVE, e não pelo rótulo: o rótulo é editável, e um teste anterior
-    // desta mesma suíte já trocou o de "Pendente".
-    const situacoes = painel.cartoes
-      .filter((c) => c.chave !== 'total' && c.chave !== 'naCelula')
-      .map((c) => c.chave);
-    igual(situacoes.join(','), 'pendente',
-      'a mesa declara quais situações viram cartão, e o painel obedece');
+  teste('mexer nos cartões muda o painel na hora seguinte', () => {
+    const painel = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+    // "O que contar" oferece o total, cada situação da mesa e, quando ela
+    // declara as colunas, os finalizados na célula.
+    verdadeiro(painel.oQueContar.some((o) => o.chave === 'total'));
+    verdadeiro(painel.oQueContar.some((o) => o.chave === 'naCelula'));
+
+    chamar('salvarCardsDoPainel')('dashboard', mesa.id, [
+      { titulo: 'Só o que falta fazer', dimensao: 'situacao',
+        filtro: 'Pendente', cor: 'ruim', mostrar: true }
+    ]);
+
+    const cartoes = chamar('resumoDaMesa')(mesa.id, {}).cartoes;
+    igual(cartoes.length, 1);
+    igual(cartoes[0].rotulo, 'Só o que falta fazer',
+      'o nome do cartão é livre — não precisa ser o nome da situação');
+    igual(cartoes[0].tom, 'ruim');
+
+    // E o que foi tirado da tela não sumiu da planilha: volta inteiro.
+    chamar('salvarCardsDoPainel')('dashboard', mesa.id, painel.cartoes);
+    igual(chamar('resumoDaMesa')(mesa.id, {}).cartoes.length,
+      painel.cartoes.length);
   });
 
   secao('A tela');

@@ -113,9 +113,10 @@
       font-weight: 700;
       letter-spacing: -.025em;
       line-height: 1.1;
-      color: var(--azul);
+      color: var(--tinta);
       white-space: nowrap;
     }
+    .marca .assinatura .leve { font-weight: 400; color: var(--azul); }
 
     .recado-da-marca {
       position: relative;
@@ -266,7 +267,23 @@
           <img src="<?= identidade.logo ?>"
                alt="<?= identidade.operacao || identidade.nome ?>">
         <? } else { ?>
-          <div class="assinatura"><?= identidade.operacao || identidade.nome ?></div>
+          <!--
+            Sem imagem configurada, a operação assina em tipografia. A última
+            palavra vai em negrito, que é como marcas de duas palavras se
+            escrevem. Isto é TEXTO, e não um desenho da marca: desenhar a
+            marca de outra empresa à mão sai errado e não é nosso lugar.
+            Assim que a imagem oficial for apontada em Configurações — e há um
+            botão lá para escolhê-la do computador —, ela toma este lugar.
+          -->
+          <? var nomeDaCasa = String(identidade.operacao || identidade.nome); ?>
+          <? var ultimoEspaco = nomeDaCasa.lastIndexOf(' '); ?>
+          <div class="assinatura">
+            <? if (ultimoEspaco > 0) { ?>
+              <span class="leve"><?= nomeDaCasa.substring(0, ultimoEspaco) ?></span><?= nomeDaCasa.substring(ultimoEspaco) ?>
+            <? } else { ?>
+              <?= nomeDaCasa ?>
+            <? } ?>
+          </div>
         <? } ?>
       </div>
 

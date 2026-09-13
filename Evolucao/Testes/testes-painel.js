@@ -8,7 +8,8 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
+  ehData } =
   require('./ferramentas');
 
 function rodarTestesDoPainel() {
@@ -29,6 +30,21 @@ function rodarTestesDoPainel() {
     return escrever(data);
   }
 
+  /**
+   * O valor de uma coluna, numa linha da fila, procurando pelo nome.
+   * Pela posição, cada mudança de agrupamento quebraria os testes sem que
+   * nada tivesse quebrado de verdade.
+   */
+  function valorNaFila(resumo, linha, cabecalho) {
+    let achado;
+    resumo.fila[linha].celulas.forEach((grupo) => {
+      grupo.forEach((celula) => {
+        if (celula.cabecalho === cabecalho) achado = celula.valor;
+      });
+    });
+    return achado;
+  }
+
   secao('Os cartões');
 
   teste('base vazia entrega zeros, não uma tela quebrada', () => {
@@ -39,18 +55,51 @@ function rodarTestesDoPainel() {
     igual(resumo.cartoes[0].valor, 0);
   });
 
-  teste('a mesa escolhe quais situações viram cartão', () => {
+  teste('cada mesa tem os seus cartões, declarados em PAINEIS', () => {
     // A Mesa Diamante tem menos demanda que a RET: sete cartões para poucos
-    // casos é ruído. Ela pede só pendente e concluído, na aba MESAS.
-    igual(mesa.cartoesDoPainel, 'Pendente, Concluído');
+    // casos é ruído. Cada cartão é uma LINHA de PAINEIS, com nome, cor e
+    // ordem próprios — não um texto separado por vírgula dentro da mesa.
     const rotulos = chamar('resumoDaMesa')(mesa.id, {}).cartoes.map((c) => c.rotulo);
     igual(rotulos.join(' | '),
       'Total de casos | Pendente | Concluído | Finalizados na célula');
 
     const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    igual(ret.cartoesDoPainel, '', 'a RET não escolheu, então mostra todas');
     igual(chamar('resumoDaMesa')(ret.id, {}).cartoes.length, 6,
       'total mais as cinco situações da RET');
+  });
+
+  teste('desligar um cartão tira ele da tela e não toca em caso nenhum', () => {
+    const painel = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+    igual(painel.cartoes.length, 4);
+
+    const antes = chamar('resumoDaMesa')(mesa.id, {}).total;
+    const sobrando = painel.cartoes.filter((c) => c.dimensao !== 'naCelula');
+    chamar('salvarCardsDoPainel')('dashboard', mesa.id, sobrando);
+
+    const depois = chamar('resumoDaMesa')(mesa.id, {});
+    igual(depois.cartoes.length, 3, 'o cartão sumiu da tela');
+    igual(depois.total, antes, 'e os casos continuam todos lá');
+
+    // E volta, porque a linha não foi apagada — foi desligada.
+    chamar('salvarCardsDoPainel')('dashboard', mesa.id, painel.cartoes);
+    igual(chamar('resumoDaMesa')(mesa.id, {}).cartoes.length, 4);
+  });
+
+  teste('cartão além do teto, sem nome ou de situação inventada é recusado', () => {
+    const painel = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+    igual(painel.maximo, 12);
+
+    const demais = [];
+    for (let i = 0; i < 13; i++) {
+      demais.push({ titulo: 'Card ' + i, dimensao: 'total', cor: 'neutro' });
+    }
+    lanca(() => chamar('salvarCardsDoPainel')('dashboard', mesa.id, demais),
+      'no máximo 12');
+    lanca(() => chamar('salvarCardsDoPainel')('dashboard', mesa.id,
+      [{ titulo: '', dimensao: 'total' }]), 'precisa de um nome');
+    lanca(() => chamar('salvarCardsDoPainel')('dashboard', mesa.id,
+      [{ titulo: 'X', dimensao: 'situacao', filtro: 'Inventada' }]),
+      'não existe na mesa');
   });
 
   teste('cor inventada na planilha vira neutro, e não quebra a tela', () => {
@@ -141,22 +190,53 @@ function rodarTestesDoPainel() {
     igual(resumo.periodo.dias, 30);
     verdadeiro(!JSON.stringify(resumo.fila).includes('Caso antigo'),
       'fora da janela não aparece na fila');
-    igual(resumo.fila[0].valores[2], 'Encaminhado',
+    igual(valorNaFila(resumo, 0, 'Nome do segurado'), 'Encaminhado',
       'o registro mais recente encabeça a fila');
   });
 
-  teste('as colunas da fila são as que a mesa declarou', () => {
+  teste('a fila vem em grupos, com várias colunas debaixo de um título', () => {
+    // Um caso da RET tem trinta e cinco colunas. Seis lado a lado perdem o
+    // resto; trinta e cinco não cabem. Juntar as que se leem de uma vez —
+    // proposta com apólice, nome com CPF — resolve as duas coisas.
     const resumo = chamar('resumoDaMesa')(mesa.id, {});
-    igual(resumo.colunas.map((c) => c.cabecalho).join(' | '),
-      'Data de entrada | Status | Nome do segurado | Documento (CPF) | '
-      + 'Corretora | Analista');
-    verdadeiro(resumo.colunas[1].ehStatus, 'a coluna de situação se identifica');
+    igual(resumo.colunas.map((g) => g.titulo).join(' | '),
+      'Situação | Dados do caso | Dados cadastrais | Corretora | Responsável');
+    igual(resumo.colunas[0].colunas.map((c) => c.cabecalho).join(', '),
+      'Data de entrada, Status');
+    verdadeiro(resumo.colunas[0].colunas[1].ehStatus,
+      'a coluna de situação se identifica dentro do grupo');
+  });
+
+  teste('a escrita plana continua valendo, e vira um grupo por coluna', () => {
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    chamar('salvarMesa')({ id: ret.id, nome: ret.nome,
+      colunaDaData: ret.colunaDaData, colunaDoStatus: ret.colunaDoStatus,
+      colunasDaFila: 'nome do cliente, status, protocolo' });
+
+    const grupos = chamar('resumoDaMesa')(ret.id, {}).colunas;
+    igual(grupos.map((g) => g.titulo).join(' | '),
+      'nome do cliente | status | protocolo',
+      'sem dois-pontos, cada coluna é um grupo com o próprio nome');
+    igual(grupos[0].colunas.length, 1);
+  });
+
+  teste('coluna que não existe some da fila em vez de derrubar a tela', () => {
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    // Direto na planilha, como alguém faria à mão — sem passar por salvarMesa,
+    // que recusaria. A fila é leitura: derrubar o Dashboard inteiro porque
+    // uma coluna foi renomeada seria pior do que mostrar o resto.
+    chamar('atualizarRegistro_')('MESAS', ret.id,
+      { ColunasDaFila: 'Cliente: nome do cliente, coluna que nao existe' });
+    const grupos = chamar('resumoDaMesa')(ret.id, {}).colunas;
+    igual(grupos.length, 1);
+    igual(grupos[0].colunas.map((c) => c.cabecalho).join(', '), 'nome do cliente');
   });
 
   teste('a data chega à tela como texto, e no formato brasileiro', () => {
     // Um objeto de data atravessando a ponte chega com o fuso de quem abriu,
     // e o mesmo caso apareceria com dias diferentes para pessoas diferentes.
-    const primeira = chamar('resumoDaMesa')(mesa.id, {}).fila[0].valores[0];
+    const primeira = valorNaFila(chamar('resumoDaMesa')(mesa.id, {}), 0,
+      'Data de entrada');
     igual(typeof primeira, 'string');
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(primeira), 'veio ' + primeira);
   });
@@ -176,6 +256,34 @@ function rodarTestesDoPainel() {
     const comBase = chamar('resumoDaMesa')(mesa.id, {}).cartoes[0];
     igual(comBase.anterior, 1);
     igual(comBase.variacao, 300, 'de 1 para 4 são +300%');
+  });
+
+  secao('A tela');
+
+  teste('a fila abre o caso num modal, e não em outra tela', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const dashboard = fs.readFileSync(path.join(pasta, 'Dashboard.html'), 'utf8');
+    const modal = fs.readFileSync(path.join(pasta, 'CasoEmModal.html'), 'utf8');
+
+    contem(dashboard, 'CasoEmModal.abrir(', 'ver detalhes abre o modal');
+    contem(dashboard, 'CasoEmModal.trocarSituacao(');
+    contem(dashboard, "Servidor.chamar('ocultarCaso'");
+    contem(modal, "Servidor.chamar('editarCaso'");
+
+    // O botão da linha NÃO pode dividir o atributo com o cartão: os cartões
+    // usam data-situacao para filtrar a fila, e com o mesmo nome clicar num
+    // cartão abriria a troca de situação de um caso que não existe.
+    contem(dashboard, 'data-trocar-situacao');
+    verdadeiro(dashboard.indexOf("ligarCliques('[data-situacao]'") < 0,
+      'o mesmo atributo em duas coisas diferentes já quebrou aqui uma vez');
+
+    // Quatro saídas do modal: Esc, o X, o botão e clicar fora. Modal que
+    // prende é modal que a pessoa aprende a não abrir.
+    contem(modal, "evento.key === 'Escape'");
+    contem(modal, "id=\"modal-x\"");
+    contem(modal, 'evento.target === caixa');
   });
 
   secao('Os filtros');
@@ -242,19 +350,80 @@ function rodarTestesDoPainel() {
 
   secao('Abrir e ocultar um caso');
 
-  teste('o detalhe mostra só o que tem valor, agrupado por seção', () => {
+  teste('o detalhe traz o caso inteiro, inclusive o que está em branco', () => {
+    // Campo vazio APARECE, com um travessão. Sumir faria a pessoa achar que
+    // aquele campo não existe nesta mesa, quando ele existe e está em branco
+    // — e "está em branco" é a informação que ela precisava.
     const primeiro = chamar('resumoDaMesa')(mesa.id, {}).fila[0];
     const detalhe = chamar('detalhesDoCaso')(mesa.id, primeiro.id);
 
     verdadeiro(detalhe.linhas.length > 0);
-    verdadeiro(detalhe.linhas.every((l) => l.valor !== ''),
-      'campo vazio não ocupa espaço no detalhe');
+    verdadeiro(detalhe.linhas.some((l) => l.valor === ''),
+      'o caso de exemplo tem campo em branco, e ele precisa constar');
     verdadeiro(detalhe.linhas.some((l) => l.secao === 'Cliente'));
+    verdadeiro(detalhe.linhas.every((l) => l.chave),
+      'toda linha diz de que campo veio');
+  });
+
+  teste('o detalhe conta a história do caso, tirada da auditoria', () => {
+    const primeiro = chamar('resumoDaMesa')(mesa.id, {}).fila[0];
+    const detalhe = chamar('detalhesDoCaso')(mesa.id, primeiro.id);
+
+    verdadeiro(Array.isArray(detalhe.historico));
+    verdadeiro(/^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}$/.test(detalhe.atualizadoEm)
+      || detalhe.atualizadoEm === '',
+      'a data de atualização vem formatada, veio ' + detalhe.atualizadoEm);
+  });
+
+  teste('trocar a situação é um gesto só, e fica na história do caso', () => {
+    const novo = chamar('cadastrarCaso')(mesa.id, {
+      analista: 'Ana Martins', status: 'Pendente',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso da troca'
+    });
+
+    const opcoes = chamar('situacoesParaTrocar')(mesa.id, novo.id);
+    igual(opcoes.atual, 'Pendente');
+    verdadeiro(opcoes.opcoes.some((o) => o.valor === 'Concluído'));
+
+    chamar('alterarSituacaoDoCaso')(mesa.id, novo.id, 'Concluído');
+
+    const detalhe = chamar('detalhesDoCaso')(mesa.id, novo.id);
+    igual(detalhe.situacao, 'Concluído');
+    verdadeiro(detalhe.historico.some((p) => p.acao === 'Situação alterada'
+      && p.detalhe.indexOf('de "Pendente" para "Concluído"') >= 0),
+      'a troca fica registrada com o de-para');
+
+    lanca(() => chamar('alterarSituacaoDoCaso')(mesa.id, novo.id, 'Inventada'),
+      'não existe na mesa');
+  });
+
+  teste('concluir preenche a finalização quando a mesa tem essa coluna', () => {
+    const novo = chamar('cadastrarCaso')(mesa.id, {
+      analista: 'Ana Martins', status: 'Pendente',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso que conclui'
+    });
+    chamar('alterarSituacaoDoCaso')(mesa.id, novo.id, 'Concluído');
+
+    const gravado = chamar('buscarRegistros_')('BASE_MESA', 'Id', novo.id, 1)[0];
+    // Sem `instanceof`: o objeto vem de dentro do simulador, que é outro
+    // contexto — e ali `instanceof Date` é falso para uma data de verdade.
+    verdadeiro(ehData(gravado['Data da finalização']),
+      'a data de finalização é preenchida sozinha, como a operação faria');
+  });
+
+  teste('o caso volta pronto para o formulário, pela chave do campo', () => {
+    const primeiro = chamar('resumoDaMesa')(mesa.id, {}).fila[0];
+    const paraEditar = chamar('casoParaEditar')(mesa.id, primeiro.id);
+
+    igual(paraEditar.id, primeiro.id);
+    verdadeiro(Object.keys(paraEditar.valores).length > 0);
+    verdadeiro(Object.prototype.hasOwnProperty.call(paraEditar.valores, 'status'),
+      'as chaves são as do formulário, não os cabeçalhos da planilha');
   });
 
   teste('o detalhe respeita o alcance do nível', () => {
     const doDiego = chamar('resumoDaMesa')(mesa.id, {}).fila
-      .find((caso) => JSON.stringify(caso.valores).includes('Diego Castilho'));
+      .find((caso) => JSON.stringify(caso.celulas).includes('Diego Castilho'));
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
       lanca(() => chamar('detalhesDoCaso')(mesa.id, doDiego.id), 'fora do seu alcance');

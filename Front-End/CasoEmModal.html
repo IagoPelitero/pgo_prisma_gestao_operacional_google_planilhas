@@ -1,0 +1,317 @@
+<script>
+/* ============================================================================
+   PGO — CasoEmModal.html · o caso aberto por cima da fila
+   ============================================================================
+   Clicar em "Ver detalhes" na fila não leva a pessoa para outra tela: abre o
+   caso por cima, e fechar devolve a fila exatamente como estava — mesma
+   rolagem, mesmo filtro, mesma linha. Sair e voltar faria perder o lugar
+   dezenas de vezes por dia.
+
+   O modal tem dois estados, e é o mesmo modal:
+
+     LEITURA  o caso inteiro, campo a campo, com a história embaixo. Campo em
+              branco aparece com um travessão — sumir faria a pessoa achar
+              que o campo não existe nesta mesa.
+
+     EDIÇÃO   o mesmo formulário de Cadastrar Caso, montado pelo Formulario,
+              já preenchido. Com PREFIXO, porque a tela de cadastro pode
+              estar atrás e os dois não podem disputar os mesmos ids.
+
+   Fechar com Esc, com o X, com o botão e clicando fora. Quatro saídas: modal
+   que prende é modal que a pessoa aprende a não abrir.
+   ============================================================================ */
+
+var CasoEmModal = (function () {
+
+  var mesaAtual = '';
+  var idAtual = '';
+  var detalhe = null;
+  var formulario = null;
+  var editando = false;
+  var salvando = false;
+  var aoFechar = null;        // o que a tela quer fazer quando algo mudou
+  var mudouAlgo = false;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+  function corpoDaEdicao() { return elemento('corpo-da-edicao'); }
+
+  /* ------------------------------------------------------------- abrir */
+
+  /**
+   * Abre o caso. `quandoMudar` é chamado no fim, e só se algo mudou — assim o
+   * Dashboard recarrega quando precisa, e fica quieto quando a pessoa só
+   * olhou e fechou.
+   */
+  function abrir(idDaMesa, idDoCaso, quandoMudar, jaEditando) {
+    mesaAtual = idDaMesa;
+    idAtual = idDoCaso;
+    aoFechar = quandoMudar || null;
+    editando = !!jaEditando;
+    mudouAlgo = false;
+    detalhe = null;
+
+    desenharCasca();
+    carregar();
+  }
+
+  function desenharCasca() {
+    fechar(true);
+
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'modal-do-caso';
+    caixa.innerHTML = '<div class="dialogo-caixa larga" role="dialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-do-caso">'
+      + '<header class="modal-cabeca">'
+      + '<div><h3 id="titulo-do-caso">Caso ' + escapar(idAtual) + '</h3>'
+      + '<p id="modal-subtitulo">Abrindo…</p></div>'
+      + '<button type="button" class="modal-fechar" id="modal-x"'
+      + ' aria-label="Fechar">✕</button>'
+      + '</header>'
+      + '<div class="modal-corpo" id="modal-corpo">'
+      + '<p class="carregando-campos">Abrindo o caso…</p></div>'
+      + '<footer class="modal-pe" id="modal-pe"></footer>'
+      + '</div>';
+    document.body.appendChild(caixa);
+
+    elemento('modal-x').addEventListener('click', function () { fechar(); });
+    caixa.addEventListener('mousedown', function (evento) {
+      // Só o véu fecha. Um arrasto que começa dentro e termina fora não é
+      // "clicar fora" — e fechar ali perderia o que a pessoa digitou.
+      if (evento.target === caixa) fechar();
+    });
+    document.addEventListener('keydown', aoTeclar);
+  }
+
+  function aoTeclar(evento) {
+    if (!elemento('modal-do-caso')) return;
+    if (evento.key === 'Escape') { evento.preventDefault(); fechar(); return; }
+    if (editando && (evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
+      evento.preventDefault();
+      salvar();
+    }
+  }
+
+  function fechar(semAvisar) {
+    var caixa = elemento('modal-do-caso');
+    if (caixa) caixa.parentNode.removeChild(caixa);
+    document.removeEventListener('keydown', aoTeclar);
+
+    if (!semAvisar && mudouAlgo && aoFechar) aoFechar();
+    if (!semAvisar) { aoFechar = null; mudouAlgo = false; editando = false; }
+  }
+
+  /* ----------------------------------------------------------- carregar */
+
+  function carregar() {
+    Servidor.chamar('detalhesDoCaso', mesaAtual, idAtual)
+      .entao(function (resposta) {
+        detalhe = resposta;
+        if (editando) abrirEdicao();
+        else desenharLeitura();
+      })
+      .senao(function (erro) {
+        var corpo = elemento('modal-corpo');
+        if (!corpo) return;
+        corpo.innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+        elemento('modal-pe').innerHTML = botaoFechar();
+        ligarPe();
+      });
+  }
+
+  /* ------------------------------------------------------------ leitura */
+
+  function desenharLeitura() {
+    editando = false;
+    elemento('modal-subtitulo').textContent = detalhe.atualizadoEm
+      ? 'Atualizado em ' + detalhe.atualizadoEm
+      : detalhe.mesa;
+
+    elemento('modal-corpo').innerHTML =
+      (detalhe.situacao
+        ? '<span class="situacao tom-' + escapar(detalhe.tom) + '">'
+          + escapar(detalhe.situacao) + '</span>'
+        : '')
+      + '<div class="modal-pares">'
+      + detalhe.linhas.map(function (linha) {
+        return '<div class="par-do-caso">'
+          + '<span>' + escapar(linha.rotulo) + '</span>'
+          // Travessão, e não vazio: "está em branco" é uma informação.
+          + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
+          + '</div>';
+      }).join('')
+      + '</div>'
+      + desenharHistorico();
+
+    elemento('modal-pe').innerHTML = botaoFechar()
+      + (detalhe.podeEditar
+        ? '<button type="button" class="botao" id="modal-editar">'
+          + Moldura.icone('editar') + ' Editar caso</button>' : '');
+    ligarPe();
+
+    var editar = elemento('modal-editar');
+    if (editar) editar.addEventListener('click', abrirEdicao);
+  }
+
+  function desenharHistorico() {
+    if (!detalhe.historico.length) return '';
+    return '<section class="historico">'
+      + '<h4>Histórico do caso</h4>'
+      + '<ul>' + detalhe.historico.map(function (passo) {
+        return '<li><strong>' + escapar(passo.acao) + '</strong>'
+          + (passo.detalhe ? '<em>' + escapar(passo.detalhe) + '</em>' : '')
+          + '<span>' + escapar(passo.quando) + ' · ' + escapar(passo.quem)
+          + '</span></li>';
+      }).join('') + '</ul></section>';
+  }
+
+  /* ------------------------------------------------------------- edição */
+
+  function abrirEdicao() {
+    editando = true;
+    elemento('modal-corpo').innerHTML =
+      '<form class="formulario no-modal" id="form-do-caso" novalidate>'
+      + '<div id="corpo-da-edicao"><p class="carregando-campos">'
+      + 'Montando o formulário…</p></div></form>';
+    elemento('modal-pe').innerHTML =
+      '<span class="recado" id="recado-do-modal" hidden></span>'
+      + '<button type="button" class="botao vazado" id="modal-desistir">'
+      + 'Desistir</button>'
+      + '<button type="button" class="botao" id="modal-salvar">'
+      + 'Salvar alterações</button>';
+
+    elemento('modal-desistir').addEventListener('click', desenharLeitura);
+    elemento('modal-salvar').addEventListener('click', salvar);
+
+    // O formulário e os valores vêm em duas chamadas, e as duas precisam ter
+    // chegado antes de preencher — preencher antes de desenhar não escreve
+    // em lugar nenhum, e é o tipo de erro que só aparece com a rede lenta.
+    Servidor.chamar('formularioDaMesa', mesaAtual)
+      .entao(function (definicao) {
+        formulario = definicao;
+        Servidor.chamar('casoParaEditar', mesaAtual, idAtual)
+          .entao(function (caso) {
+            var corpo = corpoDaEdicao();
+            if (!corpo) return;
+            corpo.innerHTML = Formulario.desenhar(formulario, 'editar-');
+            Formulario.ligar(corpo, 'editar-');
+            Formulario.preencher(corpo, caso.valores);
+          })
+          .senao(mostrarRecadoDeErro);
+      })
+      .senao(mostrarRecadoDeErro);
+  }
+
+  function mostrarRecadoDeErro(erro) {
+    recado(erro.message || String(erro), 'ruim');
+    var corpo = corpoDaEdicao();
+    if (corpo) corpo.innerHTML = '';
+  }
+
+  function recado(texto, tipo) {
+    var caixa = elemento('recado-do-modal');
+    if (!caixa) return;
+    caixa.className = 'recado ' + (tipo || '');
+    caixa.textContent = texto;
+    caixa.hidden = !texto;
+  }
+
+  function salvar() {
+    if (salvando) return;
+    var corpo = corpoDaEdicao();
+    if (!corpo) return;
+
+    salvando = true;
+    Formulario.limparErros(corpo);
+    recado('Gravando…', '');
+    elemento('modal-salvar').disabled = true;
+
+    Servidor.chamar('editarCaso', mesaAtual, idAtual, Formulario.valores(corpo))
+      .entao(function () {
+        salvando = false;
+        mudouAlgo = true;
+        var botao = elemento('modal-salvar');
+        if (botao) botao.disabled = false;
+        carregar();          // volta para a leitura, já com o que foi gravado
+      })
+      .senao(function (erro) {
+        salvando = false;
+        var botao = elemento('modal-salvar');
+        if (botao) botao.disabled = false;
+        recado(erro.message || String(erro), 'ruim');
+        if (erro.problemas) Formulario.mostrarProblemas(corpo, erro.problemas);
+      });
+  }
+
+  function botaoFechar() {
+    return '<button type="button" class="botao vazado" id="modal-fechar">'
+      + 'Fechar</button>';
+  }
+
+  function ligarPe() {
+    var botao = elemento('modal-fechar');
+    if (botao) botao.addEventListener('click', function () { fechar(); });
+  }
+
+  /* ================================================ trocar a situação */
+
+  /**
+   * O diálogo de trocar situação, que é o gesto mais frequente da operação.
+   *
+   * Separado do formulário inteiro de propósito: abrir trinta e cinco campos
+   * para mexer num só é atrito que se paga dezenas de vezes por dia.
+   */
+  function trocarSituacao(idDaMesa, idDoCaso, quandoMudar) {
+    Servidor.chamar('situacoesParaTrocar', idDaMesa, idDoCaso)
+      .entao(function (resposta) {
+        var caixa = document.createElement('div');
+        caixa.className = 'dialogo';
+        caixa.id = 'dialogo-situacao';
+        caixa.innerHTML = '<div class="dialogo-caixa" role="dialog"'
+          + ' aria-modal="true" aria-labelledby="titulo-situacao">'
+          + '<h3 id="titulo-situacao">Alterar situação</h3>'
+          + '<p>Caso ' + escapar(idDoCaso) + '</p>'
+          + '<form id="form-situacao">'
+          + '<label class="config-campo"><span>Situação</span>'
+          + '<select id="situacao-nova">'
+          + resposta.opcoes.map(function (opcao) {
+            return '<option value="' + escapar(opcao.valor) + '"'
+              + (opcao.valor === resposta.atual ? ' selected' : '') + '>'
+              + escapar(opcao.rotulo) + '</option>';
+          }).join('')
+          + '</select></label>'
+          + '<p class="dialogo-erro" id="erro-situacao" hidden></p>'
+          + '<div class="config-acoes">'
+          + '<button type="submit" class="botao">Salvar</button>'
+          + '<button type="button" class="botao vazado" id="cancelar-situacao">'
+          + 'Cancelar</button></div></form></div>';
+        document.body.appendChild(caixa);
+
+        function sair() {
+          if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+        }
+        elemento('cancelar-situacao').addEventListener('click', sair);
+        caixa.addEventListener('mousedown', function (evento) {
+          if (evento.target === caixa) sair();
+        });
+
+        elemento('form-situacao').addEventListener('submit', function (evento) {
+          evento.preventDefault();
+          Servidor.chamar('alterarSituacaoDoCaso', idDaMesa, idDoCaso,
+            elemento('situacao-nova').value)
+            .entao(function () { sair(); if (quandoMudar) quandoMudar(); })
+            .senao(function (erro) {
+              var aviso = elemento('erro-situacao');
+              aviso.textContent = erro.message || String(erro);
+              aviso.hidden = false;
+            });
+        });
+      })
+      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+  }
+
+  return { abrir: abrir, fechar: fechar, trocarSituacao: trocarSituacao };
+})();
+</script>

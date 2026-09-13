@@ -64,6 +64,11 @@ function resumoDasConfiguracoes() {
       { chave: 'identidade', titulo: 'Identidade e segurança',
         descricao: 'Nome, logo, cor e a senha de administrador',
         quantidade: 0 },
+      { chave: 'paineis', titulo: 'Painéis',
+        descricao: 'Os cards do Dashboard e dos painéis',
+        quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
+          return normalizarParaComparar_(linha.Ativo) === 'sim';
+        }).length },
       { chave: 'estrutura', titulo: 'Estrutura e auditoria',
         descricao: 'O laudo da planilha e o que foi feito no sistema',
         quantidade: 0 }
@@ -591,7 +596,6 @@ function listarMesasConfiguraveis() {
         colunaDaHora: String(mesa.ColunaDaHora || ''),
         colunaDoStatus: String(mesa.ColunaDoStatus || ''),
         colunasDaFila: String(mesa.ColunasDaFila || ''),
-        cartoesDoPainel: String(mesa.CartoesDoPainel || ''),
         colunaDaFinalizacao: String(mesa.ColunaDaFinalizacao || ''),
         colunaDaAreaResponsavel: String(mesa.ColunaDaAreaResponsavel || ''),
         icone: String(mesa.Icone || ''),
@@ -631,8 +635,15 @@ function salvarMesa(dados) {
     'colunaDaAreaResponsavel'].forEach(function (chave) {
     conferirQueAColunaExiste_(estrutura, dados[chave], atual.Aba);
   });
-  String(dados.colunasDaFila || '').split(',').forEach(function (pedaco) {
-    conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
+  // As colunas da fila podem vir agrupadas — "Título: col, col; Título: col".
+  // Conferimos coluna por coluna, ignorando os títulos: título é texto livre,
+  // e é a coluna que precisa existir.
+  String(dados.colunasDaFila || '').split(';').forEach(function (grupo) {
+    var lista = grupo.indexOf(':') > 0
+      ? grupo.substring(grupo.indexOf(':') + 1) : grupo;
+    lista.split(',').forEach(function (pedaco) {
+      conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
+    });
   });
 
   // Desligar a última mesa ativa deixaria o Dashboard sem nada para mostrar,
@@ -655,7 +666,6 @@ function salvarMesa(dados) {
     ColunaDaHora: String(dados.colunaDaHora || ''),
     ColunaDoStatus: String(dados.colunaDoStatus || ''),
     ColunasDaFila: String(dados.colunasDaFila || ''),
-    CartoesDoPainel: String(dados.cartoesDoPainel || ''),
     ColunaDaFinalizacao: String(dados.colunaDaFinalizacao || ''),
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
     Icone: String(dados.icone || atual.Icone || ''),
@@ -683,6 +693,171 @@ function conferirQueAColunaExiste_(estrutura, nomeDaColuna, nomeDaAba) {
     '. As colunas dela são: ' + estrutura.cabecalhos.filter(function (cabecalho) {
       return cabecalho && cabecalho.charAt(0) !== '_';
     }).join(', ') + '.');
+}
+
+// ============================================================================
+// CARTÕES DOS PAINÉIS
+// ============================================================================
+
+/** Quantos cartões uma operação aguenta antes de virar parede de números. */
+const RECC_MAXIMO_DE_CARTOES = 12;
+
+/**
+ * Os cartões de uma tela, para uma mesa, e as opções que a tela oferece.
+ *
+ * Vem tudo junto porque a tela abre mostrando as duas coisas: a lista de
+ * cartões e o que cada um pode contar.
+ */
+function listarCardsDoPainel(tela, idDaMesa) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var mesa = mesaPeloId_(idDaMesa);
+  var alvo = normalizarParaComparar_(tela) || 'dashboard';
+
+  var oQueContar = [
+    { chave: 'total', rotulo: 'Total de casos', filtro: '' }
+  ];
+  situacoesDaMesa_(mesa).forEach(function (situacao) {
+    // O cartão aponta para o que está GRAVADO no caso, e mostra o rótulo.
+    oQueContar.push({
+      chave: 'situacao', rotulo: situacao.nome, filtro: situacao.gravadoComo
+    });
+  });
+  if (mesa.colunaDaFinalizacao && mesa.colunaDaAreaResponsavel) {
+    oQueContar.push({
+      chave: 'naCelula', rotulo: 'Finalizados na célula', filtro: ''
+    });
+  }
+
+  var cartoes = lerRegistros_('PAINEIS')
+    .filter(function (linha) {
+      if (normalizarParaComparar_(linha.Tela) !== alvo) return false;
+      if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return false;
+      return converterParaIdentificador_(linha.MesaId)
+        === converterParaIdentificador_(mesa.id);
+    })
+    .sort(function (um, outro) {
+      return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
+    })
+    .map(function (linha) {
+      return {
+        id: linha.__id,
+        titulo: String(linha.Titulo || ''),
+        dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
+        filtro: String(linha.Filtro || ''),
+        cor: tomValido_(linha.Cor),
+        ordem: Number(linha.Ordem) || 0,
+        mostrar: normalizarParaComparar_(linha.Ativo) === 'sim'
+      };
+    });
+
+  return {
+    tela: alvo,
+    mesa: { id: mesa.id, nome: mesa.nome, icone: mesa.icone,
+      descricao: mesa.descricao },
+    maximo: RECC_MAXIMO_DE_CARTOES,
+    tons: RECC_TONS,
+    oQueContar: oQueContar,
+    cartoes: cartoes
+  };
+}
+
+/**
+ * Grava a lista inteira de cartões de uma vez.
+ *
+ * A tela edita todos juntos e aperta Salvar uma vez só — então o servidor
+ * recebe a lista inteira e a torna verdade. Gravar cartão por cartão deixaria
+ * a tela e a planilha em estados diferentes se a conexão caísse no meio.
+ *
+ * Remover um cartão NÃO toca em caso nenhum: o cartão é uma forma de contar,
+ * e apagar a conta não apaga o que foi contado.
+ */
+function salvarCardsDoPainel(tela, idDaMesa, cartoes) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var mesa = mesaPeloId_(idDaMesa);
+  var alvo = normalizarParaComparar_(tela) || 'dashboard';
+  var lista = Array.isArray(cartoes) ? cartoes : [];
+
+  if (lista.length > RECC_MAXIMO_DE_CARTOES) {
+    throw new Error('São no máximo ' + RECC_MAXIMO_DE_CARTOES + ' cartões por ' +
+      'operação, e você mandou ' + lista.length + '. Acima disso a tela vira ' +
+      'uma parede de números pequenos, que ninguém lê.');
+  }
+
+  var situacoes = situacoesDaMesa_(mesa).map(function (s) {
+    return s.gravadoComo;
+  });
+
+  lista.forEach(function (cartao) {
+    if (!String(cartao.titulo || '').trim()) {
+      throw new Error('Todo cartão precisa de um nome — é o que a pessoa lê ' +
+        'em cima do número.');
+    }
+    cartao.dimensao = dimensaoDoCartao_(cartao.dimensao);
+    if (!cartao.dimensao) {
+      throw new Error('Não sei contar isso. As contagens são: total, ' +
+        'situacao e naCelula.');
+    }
+    if (cartao.dimensao === 'situacao') {
+      var existe = situacoes.some(function (nome) {
+        return normalizarParaComparar_(nome) === normalizarParaComparar_(cartao.filtro);
+      });
+      if (!existe) {
+        throw new Error('A situação "' + cartao.filtro + '" não existe na mesa ' +
+          mesa.nome + '. As situações dela são: ' + situacoes.join(', ') + '.');
+      }
+    }
+  });
+
+  // O que estava lá antes, para saber o que sobrou de fora e desligar.
+  var jaGravados = lerRegistros_('PAINEIS').filter(function (linha) {
+    if (normalizarParaComparar_(linha.Tela) !== alvo) return false;
+    if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return false;
+    return converterParaIdentificador_(linha.MesaId)
+      === converterParaIdentificador_(mesa.id);
+  });
+  var continuam = {};
+
+  lista.forEach(function (cartao, posicao) {
+    var campos = {
+      Tela: alvo,
+      MesaId: mesa.id,
+      Titulo: String(cartao.titulo).trim(),
+      TipoWidget: 'cartao',
+      CampoDimensao: cartao.dimensao,
+      CampoMedida: '',
+      Agregacao: 'contagem',
+      Limite: 0,
+      Filtro: cartao.dimensao === 'situacao' ? String(cartao.filtro || '') : '',
+      Ordem: posicao + 1,
+      Largura: 1,
+      Cor: tomValido_(cartao.cor),
+      VisivelPara: String(cartao.visivelPara || ''),
+      Ativo: cartao.mostrar === false ? 'NAO' : 'SIM'
+    };
+
+    var id = converterParaIdentificador_(cartao.id);
+    if (id && buscarRegistros_('PAINEIS', 'Id', id, 1)[0]) {
+      atualizarRegistro_('PAINEIS', id, campos);
+      continuam[id] = true;
+      return;
+    }
+    continuam[inserirRegistro_('PAINEIS', campos).__id] = true;
+  });
+
+  // Cartão que a tela não mandou de volta foi removido lá. Ele é DESLIGADO,
+  // não apagado: a linha continua na planilha, e nenhum caso é tocado — um
+  // cartão é uma forma de contar, e apagar a conta não apaga o que foi
+  // contado. Em PAINEIS quem desliga é a coluna Ativo, porque a aba não tem
+  // exclusão lógica (ela não é base operacional).
+  jaGravados.forEach(function (linha) {
+    if (!continuam[linha.__id]) {
+      atualizarRegistro_('PAINEIS', linha.__id, { Ativo: 'NAO', Ordem: 0 });
+    }
+  });
+
+  registrarAuditoria_('painel.cartoes', 'PAINEIS', '',
+    mesa.nome + ' · ' + lista.length + ' cartões');
+  return true;
 }
 
 // ============================================================================

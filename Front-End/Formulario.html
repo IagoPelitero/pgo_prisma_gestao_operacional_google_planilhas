@@ -1,0 +1,288 @@
+<script>
+/* ============================================================================
+   PGO — Formulario.html · o formulário, desenhado num lugar só
+   ============================================================================
+   Duas telas montam o mesmo formulário: Cadastrar Caso e a edição dentro do
+   modal do Dashboard. Elas não têm duas cópias disto.
+
+   A razão é a mesma que já custou caro neste projeto: regra copiada em dois
+   lugares é regra que um dia diverge. A máscara do CPF, o seletor vazio que
+   vira caixa de texto, a marcação de erro campo a campo — tudo mora aqui, e
+   quem quiser um formulário pede um.
+
+   O PREFIXO existe porque o formulário pode aparecer DUAS VEZES na mesma
+   página — a tela de cadastro atrás e o modal de edição na frente. Sem ele,
+   os dois teriam elementos com o mesmo id, e o navegador entregaria sempre o
+   primeiro: editar um caso escreveria no formulário de cadastro.
+
+   A máscara vive aqui, e só aqui: é aparência. O que sai daqui para o
+   servidor é o que a pessoa digitou; quem limpa e confere é o servidor.
+   ============================================================================ */
+
+var Formulario = (function () {
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  function texto(valor) {
+    return String(valor === null || valor === undefined ? '' : valor);
+  }
+
+  /* ---------------------------------------------------------------- máscara */
+
+  /**
+   * Aplica a máscara enquanto a pessoa digita.
+   * Cada `0` da máscara é um dígito; o resto é enfeite que o servidor descarta.
+   */
+  function aplicarMascara(valor, mascara) {
+    var digitos = String(valor || '').replace(/\D/g, '');
+    if (!mascara) return digitos;
+
+    var saida = '';
+    var proximo = 0;
+    for (var i = 0; i < mascara.length && proximo < digitos.length; i++) {
+      if (mascara.charAt(i) === '0') {
+        saida += digitos.charAt(proximo);
+        proximo++;
+      } else {
+        saida += mascara.charAt(i);
+      }
+    }
+    return saida;
+  }
+
+  function usaMascara(campo) {
+    return !!campo.mascara
+      && (campo.tipo === 'documento' || campo.tipo === 'identificador'
+        || campo.tipo === 'telefone');
+  }
+
+  /* -------------------------------------------------------------- desenhar */
+
+  function desenharCampo(campo, prefixo) {
+    var id = prefixo + 'campo-' + campo.chave;
+    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
+    var travado = campo.somenteLeitura ? ' disabled' : '';
+    var controle;
+
+    // Seletor sem opção nenhuma vira caixa de texto: uma lista vazia na tela
+    // é um campo que não dá para preencher, e ninguém entenderia por quê.
+    if (campo.tipo === 'seletor' && !campo.opcoes.length) {
+      controle = '<input type="text" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '" autocomplete="off"'
+        + ' placeholder="A lista ainda está vazia — digite o valor"' + travado + '>';
+
+    } else if (campo.tipo === 'seletor') {
+      var opcoes = ['<option value="">Selecione uma opção</option>'];
+      campo.opcoes.forEach(function (opcao) {
+        opcoes.push('<option value="' + escapar(opcao.valor) + '">'
+          + escapar(opcao.rotulo) + '</option>');
+      });
+      controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
+        + travado + '>' + opcoes.join('') + '</select>';
+
+    } else if (campo.tipo === 'simOuNao') {
+      controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
+        + travado + '>'
+        + '<option value="">Selecione</option>'
+        + '<option value="SIM">Sim</option>'
+        + '<option value="NAO">Não</option></select>';
+
+    } else if (campo.tipo === 'textoLongo') {
+      controle = '<textarea id="' + id + '" rows="3"'
+        + ' data-chave="' + escapar(campo.chave) + '"' + travado + '></textarea>';
+
+    } else {
+      var htmlTipo = 'text';
+      if (campo.tipo === 'data') htmlTipo = 'date';
+      else if (campo.tipo === 'hora') htmlTipo = 'time';
+      else if (campo.tipo === 'email') htmlTipo = 'email';
+      else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
+        || campo.tipo === 'percentual') htmlTipo = 'text';
+
+      controle = '<input type="' + htmlTipo + '" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '"'
+        + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
+        + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
+        + ' autocomplete="off"' + travado + '>';
+    }
+
+    var ajuda = campo.descricao
+      ? '<small class="ajuda">' + escapar(campo.descricao) + '</small>' : '';
+    var selo = campo.chave === 'susep'
+      ? '<div class="selo-susep" id="' + prefixo + 'selo-susep" hidden></div>' : '';
+
+    return '<div class="campo largura-' + campo.largura + '" data-campo="'
+      + escapar(campo.chave) + '">'
+      + '<label for="' + id + '">' + escapar(campo.rotulo) + obrigatorio + '</label>'
+      + controle + ajuda + selo
+      + '<small class="erro" hidden></small>'
+      + '</div>';
+  }
+
+  /** Todas as seções do formulário, prontas para entrar num elemento. */
+  function desenhar(formulario, prefixo) {
+    return formulario.secoes.map(function (secao) {
+      return '<fieldset class="secao">'
+        + '<legend>' + escapar(secao.nome) + '</legend>'
+        + '<div class="grade">'
+        + secao.campos.map(function (campo) {
+          return desenharCampo(campo, prefixo || '');
+        }).join('')
+        + '</div></fieldset>';
+    }).join('');
+  }
+
+  /* --------------------------------------------------------- comportamento */
+
+  /**
+   * Liga as máscaras e o selo da SUSEP dentro de um pedaço da página.
+   *
+   * Recebe a RAIZ, e não procura na página inteira: com o modal aberto por
+   * cima da tela de cadastro, procurar na página inteira ligaria os dois.
+   */
+  function ligar(raiz, prefixo) {
+    var comMascara = raiz.querySelectorAll('[data-mascara]');
+    for (var i = 0; i < comMascara.length; i++) {
+      comMascara[i].addEventListener('input', function () {
+        var posicaoNoFim = this.selectionStart === this.value.length;
+        this.value = aplicarMascara(this.value, this.getAttribute('data-mascara'));
+        if (posicaoNoFim) {
+          this.selectionStart = this.selectionEnd = this.value.length;
+        }
+      });
+    }
+
+    var susep = raiz.querySelector('[data-chave="susep"]');
+    if (susep) {
+      var conferir = function () { consultarSusep(raiz, prefixo, susep.value); };
+      susep.addEventListener('change', conferir);
+      susep.addEventListener('blur', conferir);
+    }
+  }
+
+  /**
+   * O selo da SUSEP.
+   * "Não encontrada" é resposta, não erro: é uma corretora que o cadastro não
+   * conhece, e quem está atendendo precisa saber disso antes de seguir.
+   */
+  function consultarSusep(raiz, prefixo, valor) {
+    var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-susep');
+    if (!selo) return;
+
+    if (!String(valor || '').replace(/\D/g, '')) {
+      selo.hidden = true;
+      return;
+    }
+
+    selo.hidden = false;
+    selo.className = 'selo-susep conferindo';
+    selo.textContent = 'Conferindo…';
+
+    Servidor.chamar('consultarSusep', valor)
+      .entao(function (resposta) {
+        var aparencia = {
+          OK: 'liberada', BLOQUEADA: 'bloqueada',
+          NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
+        }[resposta.situacao] || 'conferindo';
+
+        selo.className = 'selo-susep ' + aparencia;
+        selo.textContent = resposta.mensagem
+          + (resposta.segmento && resposta.situacao === 'OK'
+            ? ' · ' + resposta.segmento : '');
+      })
+      .senao(function () {
+        selo.className = 'selo-susep conferindo';
+        selo.textContent = 'Não consegui conferir a SUSEP agora.';
+      });
+  }
+
+  /* -------------------------------------------------------------- valores */
+
+  function valores(raiz) {
+    var lidos = {};
+    var controles = raiz.querySelectorAll('[data-chave]');
+    for (var i = 0; i < controles.length; i++) {
+      if (controles[i].disabled) continue;
+      lidos[controles[i].getAttribute('data-chave')] = controles[i].value;
+    }
+    return lidos;
+  }
+
+  /**
+   * Preenche o formulário com o que o caso tem hoje.
+   *
+   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê; a caixa
+   * de data do navegador só entende aaaa-mm-dd. A conversão é aqui, e não no
+   * servidor, porque é uma exigência do controle e não do dado.
+   */
+  function preencher(raiz, valoresDoCaso) {
+    var controles = raiz.querySelectorAll('[data-chave]');
+    for (var i = 0; i < controles.length; i++) {
+      var chave = controles[i].getAttribute('data-chave');
+      var valor = texto(valoresDoCaso[chave]);
+
+      if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
+      controles[i].value = valor;
+
+      // Valor que não está entre as opções: o seletor ficaria em branco e a
+      // pessoa gravaria vazio sem perceber. Acrescentamos a opção, marcada.
+      if (controles[i].tagName === 'SELECT' && valor && controles[i].value !== valor) {
+        var solta = document.createElement('option');
+        solta.value = valor;
+        solta.textContent = valor + ' (fora da lista)';
+        controles[i].appendChild(solta);
+        controles[i].value = valor;
+      }
+    }
+  }
+
+  function paraCaixaDeData(valor) {
+    var brasileira = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valor || ''));
+    if (!brasileira) return valor;
+    return brasileira[3] + '-' + brasileira[2] + '-' + brasileira[1];
+  }
+
+  /* ---------------------------------------------------------------- erros */
+
+  function limparErros(raiz) {
+    var marcados = raiz.querySelectorAll('.campo.com-erro');
+    for (var i = 0; i < marcados.length; i++) {
+      marcados[i].classList.remove('com-erro');
+      var aviso = marcados[i].querySelector('.erro');
+      if (aviso) { aviso.hidden = true; aviso.textContent = ''; }
+    }
+  }
+
+  /**
+   * Marca cada campo com o problema dele.
+   *
+   * O servidor devolve TODOS os problemas de uma vez, e a tela mostra todos.
+   * Um erro por vez faria a pessoa corrigir, salvar, descobrir o segundo,
+   * corrigir e salvar de novo.
+   */
+  function mostrarProblemas(raiz, problemas) {
+    limparErros(raiz);
+    (problemas || []).forEach(function (problema) {
+      var caixa = raiz.querySelector('[data-campo="' + problema.campo + '"]');
+      if (!caixa) return;
+      caixa.classList.add('com-erro');
+      var aviso = caixa.querySelector('.erro');
+      aviso.textContent = problema.erro;
+      aviso.hidden = false;
+    });
+    var primeiro = raiz.querySelector('.campo.com-erro input, .campo.com-erro select');
+    if (primeiro) primeiro.focus();
+  }
+
+  return {
+    aplicarMascara: aplicarMascara,
+    usaMascara: usaMascara,
+    desenhar: desenhar,
+    ligar: ligar,
+    valores: valores,
+    preencher: preencher,
+    limparErros: limparErros,
+    mostrarProblemas: mostrarProblemas
+  };
+})();
+</script>

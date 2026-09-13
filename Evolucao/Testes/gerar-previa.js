@@ -99,6 +99,15 @@ function pontePreparada(respostas) {
     + '      detalhesDoCaso: function (idDaMesa, idDoCaso) {\n'
     + '        responder(respostas.paineis[idDaMesa].detalhes[idDoCaso]);\n'
     + '      },\n'
+    + '      casoParaEditar: function (idDaMesa, idDoCaso) {\n'
+    + '        responder(respostas.paineis[idDaMesa].paraEditar[idDoCaso]);\n'
+    + '      },\n'
+    + '      situacoesParaTrocar: function (idDaMesa, idDoCaso) {\n'
+    + '        responder(respostas.paineis[idDaMesa].situacoes[idDoCaso]);\n'
+    + '      },\n'
+    + '      listarCardsDoPainel: function (tela, idDaMesa) {\n'
+    + '        responder(respostas.configuracoes.cards[idDaMesa]);\n'
+    + '      },\n'
     + '      ocultarCaso: function () {\n'
     + '        setTimeout(function () {\n'
     + '          if (aoDarErrado) {\n'
@@ -151,7 +160,8 @@ function pontePreparada(respostas) {
     + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'reordenarCampos',
       'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarUsuario',
       'desativarUsuario', 'salvarMesa', 'salvarIdentidade', 'definirLogo',
-      'definirSenhaDeAdministrador', 'liberarComSenha'])
+      'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
+      'editarCaso', 'alterarSituacaoDoCaso'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -180,6 +190,9 @@ function gerar(pastaDeSaida) {
 
   // Alguns casos no período ANTERIOR, para os cartões terem com o que
   // comparar — senão a prévia mostraria a variação sempre em branco.
+  // ------------------------------------------------------------------ MESA
+  // A Mesa Diamante trata CORRETORA: transmissão de proposta, contato com o
+  // corretor, prioridade. Poucos casos, e cada um com nome e sobrenome.
   chamar('inserirVariosRegistros_')('BASE_MESA', [
     { Analista: 'Ana Martins', Status: 'Concluído', Canal: 'E-mail',
       'Data de entrada': diasAtras(44), 'Nome do segurado': 'Caso do mês passado',
@@ -193,31 +206,193 @@ function gerar(pastaDeSaida) {
       'Data de entrada': diasAtras(6), 'Horário': '09:14',
       'Nome do segurado': 'Vanessa Duarte Lima', 'Documento (CPF)': '00012345678',
       Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Vida',
-      Assunto: 'Cliente pediu revisão do prêmio na renovação' },
+      Assunto: 'Proposta parada na transmissão há três dias' },
     { Analista: 'Ana Martins', Status: 'Pendente', Canal: 'Chat',
       'Data de entrada': diasAtras(5), 'Horário': '11:02',
       'Nome do segurado': 'Otávio Bandeira', 'Documento (CPF)': '00098765432',
-      Corretora: 'Corretora XYZ', Ramo: 'Auto' },
+      Corretora: 'Corretora XYZ', Ramo: 'Auto',
+      Assunto: 'Corretor pede prioridade na análise' },
     { Analista: 'Diego Castilho', Status: '1º contato realizado', Canal: 'Telefone',
       'Data de entrada': diasAtras(4), 'Horário': '14:36',
-      'Nome do segurado': 'Luciana Prado', Corretora: 'Corretora ABC', Ramo: 'Vida' },
+      'Nome do segurado': 'Luciana Prado', 'Documento (CPF)': '00033344455',
+      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Vida',
+      Assunto: 'Retorno sobre documentação pendente' },
     { Analista: 'Diego Castilho', Status: '2º contato realizado', Canal: 'Telefone',
       'Data de entrada': diasAtras(3), 'Horário': '10:20',
-      'Nome do segurado': 'Beatriz Nogueira', Corretora: 'Corretora ABC',
-      Ramo: 'Residencial' },
+      'Nome do segurado': 'Beatriz Nogueira', 'Documento (CPF)': '00077788899',
+      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Residencial',
+      Assunto: 'Segunda tentativa — corretor não retornou' },
     { Analista: 'Ana Martins', Status: 'Não trabalhado', Canal: 'Site',
       'Data de entrada': diasAtras(2), 'Horário': '08:45',
-      'Nome do segurado': 'Gustavo Rezende', Corretora: 'Corretora XYZ', Ramo: 'Auto' },
+      'Nome do segurado': 'Gustavo Rezende', 'Documento (CPF)': '00011122233',
+      Corretora: 'Corretora XYZ', Ramo: 'Auto',
+      Assunto: 'Entrou hoje, ainda sem tratativa' },
     { Analista: 'Ana Martins', Status: 'Concluído', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '16:47',
-      'Nome do segurado': 'Ricardo Costa', Corretora: 'Corretora ABC', Ramo: 'Vida',
+      'Nome do segurado': 'Ricardo Costa', 'Documento (CPF)': '00055566677',
+      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Vida',
       'Data da finalização': diasAtras(1), 'horário da finalização': '17:30',
       Assunto: 'Resolvido no primeiro contato, sem encaminhar' },
     { Analista: 'Diego Castilho', Status: 'Concluído', Canal: 'Ouvidoria',
       'Data de entrada': diasAtras(1), 'Horário': '13:05',
-      'Nome do segurado': 'Juliana Prado', Corretora: 'Corretora XYZ', Ramo: 'Vida',
-      'Data da finalização': diasAtras(1), 'Área responsável': 'Sinistro' }
+      'Nome do segurado': 'Juliana Prado', 'Documento (CPF)': '00099900011',
+      Corretora: 'Corretora XYZ', Ramo: 'Vida',
+      'Data da finalização': diasAtras(1), 'Área responsável': 'Sinistro',
+      Assunto: 'Encaminhado para Sinistro' }
   ]);
+
+  // ------------------------------------------------------------------- RET
+  // A RET Vida trata RETENÇÃO: o cliente pediu para cancelar, e o analista
+  // tenta manter. A demanda é outra, e por isso as colunas são outras —
+  // proposta, apólice, prêmio, motivo do cancelamento, tentativas de contato.
+  chamar('inserirVariosRegistros_')('BASE_RET', [
+    { analista: 'Marcos Vieira', status: 'Concluído',
+      'data de recepção do protocolo': diasAtras(41),
+      'nome do cliente': 'Retenção do mês passado', protocolo: 'RET-2026-0891' },
+    { analista: 'Patrícia Nunes', status: 'Em tratativa',
+      'data de recepção do protocolo': diasAtras(36),
+      'nome do cliente': 'Outra do mês passado', protocolo: 'RET-2026-0892' }
+  ]);
+
+  chamar('inserirVariosRegistros_')('BASE_RET', [
+    {
+      'data de recepção do protocolo': diasAtras(7), analista: 'Marcos Vieira',
+      SUSEP: '1234567', segmento: 'Diamante',
+      'Código origem da proposta': '0000000101', 'número da proposta': '0000010024',
+      'nome do cliente': 'Cliente Fictício 024', 'cod produto': '0000000031',
+      produto: 'Prestamista', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 1284.9, 'valor do prêmio retido': 1284.9,
+      'prêmio mensal retido': 107.08, canal: 'Corretora',
+      protocolo: 'RET-2026-1024', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020024', CPF: '00900000001', status: 'Concluído',
+      'Forma de pagamento': 'Débito em conta',
+      'motivo do cancelamento': 'Outros', 'e-mail': 'cliente24@example.invalid',
+      'telefones de contato': '11900000024', 'tentativas de contato': 2,
+      'data da transmissão': diasAtras(2),
+      descrição: 'Cliente aceitou manter com desconto na renovação.'
+    },
+    {
+      'data de recepção do protocolo': diasAtras(6), analista: 'Patrícia Nunes',
+      SUSEP: '7654321', segmento: 'Demais corretoras',
+      'Código origem da proposta': '0000000102', 'número da proposta': '0000010023',
+      'nome do cliente': 'Cliente Fictício 023', 'cod produto': '0000000032',
+      produto: 'Vida Coletiva', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 3410.5, 'valor do prêmio retido': 0,
+      'prêmio mensal retido': 0, canal: 'Telefone',
+      protocolo: 'RET-2026-1023', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020023', CPF: '00900000002', status: 'Não tratado',
+      'Forma de pagamento': 'Boleto',
+      'motivo do cancelamento': 'Coberturas', 'e-mail': 'cliente23@example.invalid',
+      'telefones de contato': '11900000023', 'tentativas de contato': 0,
+      descrição: 'Entrou na fila hoje, sem contato ainda.'
+    },
+    {
+      'data de recepção do protocolo': diasAtras(5), analista: 'Marcos Vieira',
+      SUSEP: '1234567', segmento: 'Diamante',
+      'Código origem da proposta': '0000000103', 'número da proposta': '0000010022',
+      'nome do cliente': 'Cliente Fictício 022', 'cod produto': '0000000033',
+      produto: 'Vida Individual', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 890, 'valor do prêmio retido': 0,
+      'prêmio mensal retido': 0, canal: 'E-mail',
+      protocolo: 'RET-2026-1022', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020022', CPF: '00900000003', status: 'Retorno agendado',
+      'Forma de pagamento': 'Cartão de crédito',
+      'motivo do cancelamento': 'Dificuldade financeira',
+      'e-mail': 'cliente22@example.invalid',
+      'telefones de contato': '11900000022', 'tentativas de contato': 1,
+      descrição: 'Cliente pediu para retornar na segunda-feira.'
+    },
+    {
+      'data de recepção do protocolo': diasAtras(4), analista: 'Patrícia Nunes',
+      SUSEP: '1234567', segmento: 'Diamante',
+      'Código origem da proposta': '0000000104', 'número da proposta': '0000010021',
+      'nome do cliente': 'Cliente Fictício 021', 'cod produto': '0000000031',
+      produto: 'Prestamista', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 2140.75, 'valor do prêmio retido': 2140.75,
+      'prêmio mensal retido': 178.4, canal: 'Corretora',
+      protocolo: 'RET-2026-1021', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020021', CPF: '00900000004', status: 'Em tratativa',
+      'Forma de pagamento': 'PIX',
+      'motivo do cancelamento': 'Aumento do prêmio na renovação',
+      'e-mail': 'cliente21@example.invalid',
+      'telefones de contato': '11900000021', 'tentativas de contato': 3,
+      descrição: 'Negociação em andamento com a área comercial.'
+    },
+    {
+      'data de recepção do protocolo': diasAtras(3), analista: 'Marcos Vieira',
+      SUSEP: '7654321', segmento: 'Demais corretoras',
+      'Código origem da proposta': '0000000105', 'número da proposta': '0000010020',
+      'nome do cliente': 'Cliente Fictício 020', 'cod produto': '0000000032',
+      produto: 'Vida Coletiva', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 5620, 'valor do prêmio retido': 0,
+      'prêmio mensal retido': 0, canal: 'Ouvidoria',
+      protocolo: 'RET-2026-1020', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020020', CPF: '00900000005', status: 'Aguardando segurado',
+      'Forma de pagamento': 'Boleto',
+      'motivo do cancelamento': 'Proposta de concorrente',
+      'e-mail': 'cliente20@example.invalid',
+      'telefones de contato': '11900000020', 'tentativas de contato': 2,
+      descrição: 'Enviada proposta de contraoferta; aguardando resposta.'
+    },
+    {
+      'data de recepção do protocolo': diasAtras(2), analista: 'Patrícia Nunes',
+      SUSEP: '1234567', segmento: 'Diamante',
+      'Código origem da proposta': '0000000106', 'número da proposta': '0000010019',
+      'nome do cliente': 'Cliente Fictício 019', 'cod produto': '0000000033',
+      produto: 'Vida Individual', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 1180.4, 'valor do prêmio retido': 1180.4,
+      'prêmio mensal retido': 98.37, canal: 'Site',
+      protocolo: 'RET-2026-1019', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020019', CPF: '00900000006', status: 'Concluído',
+      'Forma de pagamento': 'Débito em conta',
+      'motivo do cancelamento': 'Portabilidade',
+      'e-mail': 'cliente19@example.invalid',
+      'telefones de contato': '11900000019', 'tentativas de contato': 1,
+      'data da transmissão': diasAtras(1),
+      'Novo cod origem proposta': '0000000201', 'novo numero da proposta': '0000010119',
+      descrição: 'Portabilidade revertida; nova proposta emitida.'
+    },
+    {
+      'data de recepção do protocolo': diasAtras(1), analista: 'Marcos Vieira',
+      SUSEP: '1234567', segmento: 'Diamante',
+      'Código origem da proposta': '0000000107', 'número da proposta': '0000010018',
+      'nome do cliente': 'Cliente Fictício 018', 'cod produto': '0000000031',
+      produto: 'Prestamista', grupo: 'Vida', sistema: 'SIVIDA',
+      'valor do prêmio': 760.2, 'valor do prêmio retido': 0,
+      'prêmio mensal retido': 0, canal: 'URA',
+      protocolo: 'RET-2026-1018', cod_sucursal: '0000000012', cod_ramo: '0000000993',
+      Num_apolice: '0000020018', CPF: '00900000007', status: 'Não tratado',
+      'Forma de pagamento': 'Boleto',
+      'motivo do cancelamento': 'Insatisfação com atendimento',
+      'e-mail': 'cliente18@example.invalid',
+      'telefones de contato': '11900000018', 'tentativas de contato': 0,
+      descrição: 'Chegou pela URA; sem tratativa até agora.'
+    }
+  ]);
+
+  // A história de cada caso. Na prévia os casos entram direto na base, sem
+  // passar pelo cadastro — então a trilha ficaria vazia, e o modal abriria
+  // sem histórico nenhum. Aqui escrevemos os passos que o cadastro teria
+  // escrito, para a prévia mostrar como a tela fica com um caso vivido.
+  const donos = chamar('lerRegistros_("USUARIOS")');
+  const porNome = {};
+  donos.forEach((usuario) => { porNome[usuario.Nome] = usuario.Id; });
+
+  [['BASE_RET', 'analista'], ['BASE_MESA', 'Analista']].forEach(([aba, coluna]) => {
+    chamar('lerRegistros_')(aba).forEach((caso) => {
+      chamar('inserirRegistro_')('AUDITORIA', {
+        DataHora: new Date(), UsuarioId: porNome[caso[coluna]] || '',
+        Acao: 'caso.criar', Entidade: aba, RegistroId: caso.__id, Detalhe: aba
+      });
+      if (String(caso.status || caso.Status || '').indexOf('Conclu') === 0) {
+        chamar('inserirRegistro_')('AUDITORIA', {
+          DataHora: new Date(), UsuarioId: porNome[caso[coluna]] || '',
+          Acao: 'caso.status', Entidade: aba, RegistroId: caso.__id,
+          Detalhe: 'de "Em tratativa" para "Concluído"'
+        });
+      }
+    });
+  });
 
   // Nome, cargo e canal de EXEMPLO, para a barra superior mostrar como fica
   // na operação. O instalador cria o primeiro administrador com o nome tirado
@@ -230,6 +405,21 @@ function gerar(pastaDeSaida) {
     CargoId: cargo.Id,
     'Canal que atende': 'Vida Individual'
   });
+
+  // Os outros analistas, para os seletores de responsável terem gente dentro.
+  // Só na prévia: o instalador de verdade cadastra um administrador e mais
+  // ninguém — quem cadastra o time é o administrador, em Configurações.
+  const nivelOperacao = chamar('lerRegistros_("CATALOGO")')
+    .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+  [['Diego Castilho', 'diego@exemplo.com', 'Corretoras Diamante'],
+   ['Marcos Vieira', 'marcos@exemplo.com', 'Vida Individual'],
+   ['Patrícia Nunes', 'patricia@exemplo.com', 'Vida Coletiva']]
+    .forEach(([nome, email, canal]) => {
+      chamar('salvarUsuario')({
+        nome, email, canalQueAtende: canal,
+        nivelAcessoId: nivelOperacao.Id, ativo: true
+      });
+    });
 
   const pacote = chamar('pacoteDePartida()');
 
@@ -265,11 +455,15 @@ function gerar(pastaDeSaida) {
     });
 
     const detalhes = {};
+    const paraEditar = {};
+    const situacoes = {};
     base.fila.forEach((caso) => {
       detalhes[caso.id] = chamar('detalhesDoCaso')(mesa.id, caso.id);
+      paraEditar[caso.id] = chamar('casoParaEditar')(mesa.id, caso.id);
+      situacoes[caso.id] = chamar('situacoesParaTrocar')(mesa.id, caso.id);
     });
 
-    paineis[mesa.id] = { base: base, variantes: variantes, detalhes: detalhes };
+    paineis[mesa.id] = { base, variantes, detalhes, paraEditar, situacoes };
   });
   const suseps = {
     '1234567': chamar('consultarSusep')('1234567'),
@@ -292,7 +486,13 @@ function gerar(pastaDeSaida) {
     listas[tipo] = chamar('listarCatalogo')(tipo, '');
   });
 
+  const cards = {};
+  pacote.mesas.forEach((mesa) => {
+    cards[mesa.id] = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+  });
+
   const configuracoes = {
+    cards: cards,
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,
     opcoesDeNivel: chamar('opcoesDeNivelDeAcesso()'),
