@@ -247,11 +247,43 @@ de verdade devolve um objeto novo a cada `withSuccessHandler`.
 escondia um defeito, aqui inventou um. Ferramenta que não imita a realidade
 custa confiança nas duas direções.
 
+### 15 · Sete cartões para uma mesa de poucos casos
+
+**Etapa 5, apontado pelo PO.** A Mesa Diamante tem menos demanda que a RET, e
+um cartão por situação virava parede de números quase todos em zero.
+
+**Não é bug de código, é de leitura** — e por isso entra aqui: painel que
+cansa deixa de ser olhado, e um painel que ninguém olha não serve para nada.
+
+**Defesa.** A mesa escolhe, na coluna `CartoesDoPainel`, quais situações viram
+cartão. Vazia mostra todas.
+
+### 16 · A fila era cinza inteira
+
+**Etapa 5, apontado pelo PO.** Toda etiqueta de situação saía da mesma cor.
+Numa fila de trinta linhas, "não trabalhado" não saltava aos olhos — era
+preciso ler linha por linha.
+
+**Defesa.** Cada situação tem a sua cor na coluna `Cor` do `CATALOGO`, gravada
+como **nome de tom** (`bom`, `atencao`, `ruim`, `violeta`, `destaque`,
+`neutro`) e não como código hexadecimal: cada tema pinta o seu verde. Gravar
+`#15794A` deixaria o verde do tema claro aparecendo no escuro. Cor
+desconhecida cai em `neutro`.
+
+### 17 · O menu cansava a vista
+
+**Etapa 5, apontado pelo PO.** Texto seminegrito e traço grosso nos ícones, em
+cima de um fundo saturado, lido de relance o dia inteiro.
+
+**Defesa.** Peso normal no item comum, seminegrito só no atual, traço dos
+ícones de 1,7 para 1,5. Um teste tranca os pesos — é fácil alguém "reforçar"
+o menu de novo sem perceber o custo.
+
 ---
 
 ## O que esta lista ensina
 
-**Treze dos dezessete eram silenciosos.** Não davam erro, não travavam, não
+**Treze dos vinte eram silenciosos.** Não davam erro, não travavam, não
 apareciam no log. Gravavam dado errado e seguiam em frente.
 
 Daí as duas práticas que o projeto não abre mão:
@@ -260,5 +292,8 @@ Daí as duas práticas que o projeto não abre mão:
    coluna, cabeçalho repetido e Id repetido interrompem a operação. Dado errado
    calado é pior que operação parada.
 2. **Olhar a tela.** Os itens 9, 10 e 13 nenhum teste pegaria sozinho — e o
-   13 só apareceu numa foto de página inteira. Teste não enxerga
+   13 só apareceu numa foto de página inteira.
+3. **Ouvir quem vai usar.** Os itens 15 a 17 não são defeitos de código: são
+   de leitura, e vieram do PO olhando a tela pronta. Painel que cansa deixa de
+   ser olhado, e painel que ninguém olha não serve para nada. Teste não enxerga
    "está feio" nem "essa cor não devia estar aqui".

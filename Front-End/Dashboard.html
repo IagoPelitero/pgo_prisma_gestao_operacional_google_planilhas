@@ -27,15 +27,52 @@ var TelaDashboard = (function () {
       + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
   }
 
+  /**
+   * A variação em relação ao período anterior.
+   * Quando não há base de comparação, o espaço fica vazio — inventar "+100%"
+   * porque saiu de zero é ruído que a operação aprende a ignorar.
+   */
+  function variacao(cartao) {
+    if (cartao.variacao === null || cartao.variacao === undefined) {
+      // Espaço reservado para os cartões ficarem da mesma altura, mas em
+      // branco: repetir "sem base" em cada um vira ruído e parece erro.
+      return '<span class="variacao vazia" aria-hidden="true">—</span>';
+    }
+    var subiu = cartao.variacao >= 0;
+    return '<span class="variacao ' + (subiu ? 'subiu' : 'desceu') + '">'
+      + (subiu ? '▲' : '▼') + ' ' + Math.abs(cartao.variacao) + '%'
+      + '<em>vs. período anterior</em></span>';
+  }
+
+  /**
+   * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
+   * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
+   */
   function desenharCartoes() {
     return '<div class="cartoes">'
       + resumo.cartoes.map(function (cartao) {
-        return '<div class="indicador tom-' + escapar(cartao.tom || 'neutro') + '"'
-          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"' : '')
+        var filtravel = cartao.chave !== 'total' && cartao.chave !== 'naCelula'
+          && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
+        var ligado = filtravel
+          && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);
+
+        return '<' + (filtravel ? 'button type="button"' : 'div')
+          + ' class="indicador tom-' + escapar(cartao.tom || 'neutro')
+          + (filtravel ? ' clicavel' : '') + (ligado ? ' ligado' : '') + '"'
+          + (filtravel ? ' data-situacao="' + escapar(cartao.rotulo) + '"' : '')
+          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"'
+            : (filtravel ? ' title="Filtrar a fila por ' + escapar(cartao.rotulo) + '"' : ''))
           + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
-          + '<strong class="numero">' + cartao.valor + '</strong></div>';
+          + '<strong class="numero">' + cartao.valor + '</strong>'
+          + variacao(cartao)
+          + '</' + (filtravel ? 'button' : 'div') + '>';
       }).join('')
       + '</div>';
+  }
+
+  function normalizarTexto(texto) {
+    return String(texto === null || texto === undefined ? '' : texto)
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
   function desenharFiltros() {
@@ -86,7 +123,8 @@ var TelaDashboard = (function () {
     var linhas = resumo.fila.map(function (caso) {
       var celulas = caso.valores.map(function (valor, i) {
         if (resumo.colunas[i].ehStatus) {
-          return '<td><span class="situacao">' + escapar(valor) + '</span></td>';
+          return '<td><span class="situacao tom-' + escapar(caso.tom || 'neutro')
+            + '">' + escapar(valor) + '</span></td>';
         }
         return '<td>' + escapar(valor) + '</td>';
       }).join('');
@@ -156,6 +194,18 @@ var TelaDashboard = (function () {
     if (limpar) {
       limpar.addEventListener('click', function () {
         filtrosEscolhidos = {};
+        casoAberto = '';
+        carregar();
+      });
+    }
+
+    var cartoes = document.querySelectorAll('.indicador.clicavel');
+    for (var c = 0; c < cartoes.length; c++) {
+      cartoes[c].addEventListener('click', function () {
+        var situacao = this.getAttribute('data-situacao');
+        // Clicar de novo no mesmo cartão desliga o filtro.
+        filtrosEscolhidos.status =
+          (filtrosEscolhidos.status === situacao) ? '' : situacao;
         casoAberto = '';
         carregar();
       });

@@ -39,6 +39,26 @@ function rodarTestesDoPainel() {
     igual(resumo.cartoes[0].valor, 0);
   });
 
+  teste('a mesa escolhe quais situações viram cartão', () => {
+    // A Mesa Diamante tem menos demanda que a RET: sete cartões para poucos
+    // casos é ruído. Ela pede só pendente e concluído, na aba MESAS.
+    igual(mesa.cartoesDoPainel, 'Pendente, Concluído');
+    const rotulos = chamar('resumoDaMesa')(mesa.id, {}).cartoes.map((c) => c.rotulo);
+    igual(rotulos.join(' | '),
+      'Total de casos | Pendente | Concluído | Finalizados na célula');
+
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    igual(ret.cartoesDoPainel, '', 'a RET não escolheu, então mostra todas');
+    igual(chamar('resumoDaMesa')(ret.id, {}).cartoes.length, 6,
+      'total mais as cinco situações da RET');
+  });
+
+  teste('cor inventada na planilha vira neutro, e não quebra a tela', () => {
+    igual(chamar('tomValido_')('arco-íris'), 'neutro');
+    igual(chamar('tomValido_')(''), 'neutro');
+    igual(chamar('tomValido_')('BOM'), 'bom', 'a comparação ignora caixa');
+  });
+
   teste('há um cartão por situação, e situação sem caso aparece zerada', () => {
     // Sumir do painel esconderia justamente a informação de que ela zerou.
     chamar('inserirVariosRegistros_')('BASE_MESA', [
@@ -58,7 +78,31 @@ function rodarTestesDoPainel() {
     igual(porRotulo['Total de casos'], 3);
     igual(porRotulo['Pendente'], 2);
     igual(porRotulo['Concluído'], 1);
-    igual(porRotulo['1º contato realizado'], 0, 'situação sem caso vale zero');
+
+    // Na RET, que mostra todas, dá para conferir a situação sem nenhum caso.
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const daRet = {};
+    chamar('resumoDaMesa')(ret.id, {}).cartoes
+      .forEach((c) => { daRet[c.rotulo] = c.valor; });
+    igual(daRet['Em tratativa'], 0, 'situação sem caso vale zero, não some');
+  });
+
+  teste('cada situação leva a sua cor para o cartão e para a fila', () => {
+    // A cor mora no CATALOGO como NOME de tom, e não como código: cada tema
+    // pinta o seu verde. Gravar #15794A deixaria o verde do tema claro
+    // aparecendo no escuro.
+    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const porRotulo = {};
+    resumo.cartoes.forEach((c) => { porRotulo[c.rotulo] = c.tom; });
+    igual(porRotulo['Pendente'], 'atencao');
+    igual(porRotulo['Concluído'], 'bom');
+
+    resumo.fila.forEach((caso) => {
+      verdadeiro(chamar('RECC_TONS').indexOf(caso.tom) >= 0,
+        'tom desconhecido na fila: ' + caso.tom);
+    });
+    igual(resumo.fila.find((c) => c.situacao === 'Pendente').tom, 'atencao');
+    igual(resumo.fila.find((c) => c.situacao === 'Concluído').tom, 'bom');
   });
 
   teste('"finalizado na célula" conta o que não foi encaminhado', () => {
@@ -115,6 +159,23 @@ function rodarTestesDoPainel() {
     const primeira = chamar('resumoDaMesa')(mesa.id, {}).fila[0].valores[0];
     igual(typeof primeira, 'string');
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(primeira), 'veio ' + primeira);
+  });
+
+  teste('a variação compara com o período anterior, e cala quando não dá', () => {
+    // Mostrar "+100%" porque saiu de zero é ruído que a operação aprende a
+    // ignorar — e junto com ele ignora a variação que importa.
+    const total = chamar('resumoDaMesa')(mesa.id, {}).cartoes[0];
+    igual(total.anterior, 0, 'não havia nada no período anterior');
+    igual(total.variacao, null, 'sem base de comparação, não há variação');
+
+    // Agora com base: um caso no período anterior, quatro no atual.
+    chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Ana Martins', Status: 'Pendente',
+      'Data de entrada': diasAtras(40), 'Nome do segurado': 'Do mês passado'
+    });
+    const comBase = chamar('resumoDaMesa')(mesa.id, {}).cartoes[0];
+    igual(comBase.anterior, 1);
+    igual(comBase.variacao, 300, 'de 1 para 4 são +300%');
   });
 
   secao('Os filtros');

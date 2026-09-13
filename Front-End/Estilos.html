@@ -60,6 +60,8 @@
   --lateral-linha: #47BAF0;
   --lateral-ativo: #FFFFFF;
   --lateral-ativo-texto: #0A2A3D;
+
+  --violeta: #6B4FD8;     --violeta-tenue: #EDE9FB;
 }
 
 /* ------------------------------------------------------------- tema ROSA -- */
@@ -85,6 +87,8 @@
   --lateral-linha: #F084BE;
   --lateral-ativo: #FFFFFF;
   --lateral-ativo-texto: #3A0A22;
+
+  --violeta: #6D28D9;     --violeta-tenue: #EDE7FB;
 }
 
 /* ------------------------------------------------------------- tema DARK -- */
@@ -110,6 +114,8 @@
   --lateral-linha: #202D42;
   --lateral-ativo: #1E3358;
   --lateral-ativo-texto: #FFFFFF;
+
+  --violeta: #A794F5;     --violeta-tenue: #241E45;
 
   --bom: #5CC894;         --bom-tenue: #123528;
   --atencao: #E0A253;     --atencao-tenue: #3A2A12;
@@ -139,6 +145,8 @@
   --lateral-linha: #4DC181;
   --lateral-ativo: #FFFFFF;
   --lateral-ativo-texto: #06301A;
+
+  --violeta: #5B41C4;     --violeta-tenue: #EAE6FA;
 
   --atencao: #8A6300;     --atencao-tenue: #FBF0CF;
 }
@@ -267,12 +275,17 @@ button { font: inherit; color: inherit; }
   display: flex; align-items: center; gap: 13px; width: 100%;
   padding: 12px 13px; border: 0; border-radius: var(--raio-pequeno);
   background: transparent; color: var(--lateral-texto);
-  cursor: pointer; text-align: left; font-size: 15px; font-weight: 500;
+  cursor: pointer; text-align: left; font-size: 15px;
+  /* Peso normal, e não seminegrito: o menu é lido de relance o dia inteiro.
+     Texto grosso em cima de fundo saturado cansa a vista em uma hora. */
+  font-weight: 400;
+  opacity: .88;
 }
-.lateral-item:hover { background: var(--lateral-linha); }
+.lateral-item:hover { background: var(--lateral-linha); opacity: 1; }
+/* Só o item atual ganha peso — é o único que precisa se destacar. */
 .lateral-item[aria-current="page"] {
   background: var(--lateral-ativo); color: var(--lateral-ativo-texto);
-  font-weight: 700;
+  font-weight: 600; opacity: 1;
 }
 .lateral-item svg { flex: 0 0 21px; width: 21px; height: 21px; }
 .lateral-item .rotulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -403,12 +416,22 @@ button { font: inherit; color: inherit; }
   display: grid; gap: 12px; margin-bottom: 18px;
   grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
 }
+/* Cada tom pinta a faixa de cima, o número e a etiqueta da fila. São NOMES
+   de cor, resolvidos aqui, porque cada tema tem o seu verde e o seu vermelho. */
+.tom-neutro   { --tom: var(--tenue);    --tom-tenue: var(--superficie-2); }
+.tom-destaque { --tom: var(--destaque); --tom-tenue: var(--destaque-tenue); }
+.tom-bom      { --tom: var(--bom);      --tom-tenue: var(--bom-tenue); }
+.tom-atencao  { --tom: var(--atencao);  --tom-tenue: var(--atencao-tenue); }
+.tom-ruim     { --tom: var(--ruim);     --tom-tenue: var(--ruim-tenue); }
+.tom-violeta  { --tom: var(--violeta);  --tom-tenue: var(--violeta-tenue); }
+
 .indicador {
   background: var(--superficie); border: 1px solid var(--linha);
-  border-top: 3px solid var(--linha-forte);
-  border-radius: var(--raio); padding: 14px 16px 15px;
+  border-top: 3px solid var(--tom, var(--linha-forte));
+  border-radius: var(--raio); padding: 14px 16px 13px;
   box-shadow: var(--sombra);
   display: flex; flex-direction: column; gap: 2px;
+  text-align: left; font: inherit; color: inherit;
 }
 .indicador .rotulo {
   font-size: 12.5px; color: var(--suave); line-height: 1.3;
@@ -416,15 +439,33 @@ button { font: inherit; color: inherit; }
 }
 .indicador .numero {
   font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; color: var(--tom, var(--texto));
 }
-.indicador.tom-destaque { border-top-color: var(--destaque); }
-.indicador.tom-destaque .numero { color: var(--destaque); }
-.indicador.tom-bom { border-top-color: var(--bom); }
-.indicador.tom-bom .numero { color: var(--bom); }
-.indicador.tom-atencao { border-top-color: var(--atencao); }
-.indicador.tom-ruim { border-top-color: var(--ruim); }
-.indicador.tom-ruim .numero { color: var(--ruim); }
+.indicador.tom-neutro .numero { color: var(--texto); }
+
+.indicador .variacao {
+  display: flex; align-items: baseline; gap: 5px;
+  font-size: 12px; font-weight: 600; margin-top: 3px;
+}
+.indicador .variacao em {
+  font-style: normal; font-weight: 400; font-size: 11px; color: var(--tenue);
+}
+.indicador .variacao.subiu { color: var(--bom); }
+.indicador .variacao.desceu { color: var(--ruim); }
+/* Sem base de comparação o espaço fica reservado e VAZIO: três linhas
+   dizendo "sem base" em cartões lado a lado viram ruído e parecem erro. */
+.indicador .variacao.vazia { visibility: hidden; }
+
+/* Clicar num cartão filtra a fila por aquela situação — é o gesto que a tela
+   existe para atender. Por isso ele precisa PARECER clicável. */
+.indicador.clicavel { cursor: pointer; }
+.indicador.clicavel:hover {
+  border-color: var(--tom); box-shadow: 0 2px 10px -4px var(--tom);
+}
+.indicador.ligado {
+  background: var(--tom-tenue);
+  box-shadow: inset 0 0 0 1px var(--tom);
+}
 
 .filtros {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
@@ -459,7 +500,9 @@ button { font: inherit; color: inherit; }
 .rolagem-tabela { overflow-x: auto; }
 table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
 table.fila th, table.fila td {
-  text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--linha);
+  /* Respiro menor que o resto da tela: a fila tem sete colunas e cada pixel
+     de folga aqui empurra a coluna de ações para fora do campo de visão. */
+  text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--linha);
   vertical-align: middle;
   /* Sem quebra de linha: "Corretora XYZ" partido em duas linhas deixa a fila
      desalinhada e mais alta. Quando não couber, a tabela rola. */
@@ -476,13 +519,32 @@ table.fila tr.aberta { background: var(--destaque-tenue); }
 table.fila tr.aberta:hover { background: var(--destaque-tenue); }
 
 .situacao {
-  display: inline-block; font-size: 12.5px; font-weight: 600;
-  padding: 3px 10px; border-radius: 999px;
-  background: var(--superficie-2); border: 1px solid var(--linha);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600;
+  padding: 3px 11px 3px 9px; border-radius: 999px;
+  background: var(--tom-tenue, var(--superficie-2));
+  color: var(--tom, var(--texto));
+  border: 1px solid color-mix(in srgb, var(--tom, var(--linha)) 30%, transparent);
   white-space: nowrap;
 }
+/* O ponto colorido faz a fila ser lida de relance, sem precisar ler o texto. */
+.situacao::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--tom, var(--tenue)); flex: 0 0 7px;
+}
+.situacao.tom-neutro { color: var(--suave); }
 
+/* A coluna de ações fica grudada na direita: quando a tabela rola, os botões
+   continuam ao alcance. Sem isso eles ficam cortados na borda da tela. */
 .acoes-coluna { white-space: nowrap; text-align: right; }
+table.fila th.acoes-coluna, table.fila td.acoes-coluna {
+  position: sticky; right: 0;
+  background: var(--superficie);
+  box-shadow: -10px 0 10px -10px rgba(0, 0, 0, .22);
+}
+table.fila thead th.acoes-coluna { background: var(--superficie-2); }
+table.fila tbody tr:hover td.acoes-coluna { background: var(--superficie-2); }
+table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
 .acao {
   border: 1px solid var(--linha); background: var(--superficie);
   color: var(--texto); border-radius: var(--raio-pequeno);

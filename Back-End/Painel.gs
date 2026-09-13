@@ -19,6 +19,20 @@
 const RECC_LINHAS_QUE_O_PAINEL_OLHA = 5000;
 
 /**
+ * As cores que uma situação pode ter, na coluna Cor da aba CATALOGO.
+ *
+ * São nomes, e não códigos hexadecimais, de propósito: cada tema pinta o seu
+ * "bom" e o seu "ruim". Gravar #15794A na planilha deixaria o verde do tema
+ * claro aparecendo no tema escuro.
+ */
+const RECC_TONS = ['neutro', 'destaque', 'bom', 'atencao', 'ruim', 'violeta'];
+
+function tomValido_(cor) {
+  var tom = normalizarParaComparar_(cor);
+  return RECC_TONS.indexOf(tom) >= 0 ? tom : 'neutro';
+}
+
+/**
  * Tudo que o Dashboard precisa, numa chamada.
  *
  * `filtros` é um objeto simples: { chaveDoCampo: valorEscolhido }. As chaves
@@ -36,16 +50,21 @@ function resumoDaMesa(idDaMesa, filtros) {
   var recentes = lerRegistros_(mesa.aba, { ultimas: RECC_LINHAS_QUE_O_PAINEL_OLHA });
   var truncada = recentes.length === RECC_LINHAS_QUE_O_PAINEL_OLHA;
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, dias);
+  var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, dias, 0);
   var meus = filtrarPeloAlcance_(noPeriodo, mesa.aba, quem);
+
+  // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
+  var anterior = filtrarPeloAlcance_(
+    filtrarPeloPeriodo_(recentes, mesa, dias, dias), mesa.aba, quem);
 
   var disponiveis = filtrosDaMesa_(mesa, quem);
   var filtrados = aplicarFiltros_(meus, disponiveis, filtros || {});
+  var anterioresFiltrados = aplicarFiltros_(anterior, disponiveis, filtros || {});
 
   return {
     mesa: mesa,
     periodo: { dias: dias, rotulo: 'últimos ' + dias + ' dias' },
-    cartoes: contarCartoes_(filtrados, mesa),
+    cartoes: contarCartoes_(filtrados, anterioresFiltrados, mesa),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(mesa),
     fila: montarFila_(filtrados, mesa),
@@ -57,18 +76,32 @@ function resumoDaMesa(idDaMesa, filtros) {
   };
 }
 
-/** Só o que entrou na janela. Registro sem data fica — não some por omissão. */
-function filtrarPeloPeriodo_(registros, mesa, dias) {
-  if (!mesa.colunaDaData) return registros;
+/**
+ * Só o que entrou na janela.
+ *
+ * `recuo` desloca a janela para trás: 0 é o período atual, `dias` é o período
+ * imediatamente anterior, do mesmo tamanho — é assim que sai a comparação
+ * "vs. período anterior" dos cartões.
+ *
+ * Registro sem data FICA no período atual. Some-lo por omissão esconderia
+ * justamente as linhas mal preenchidas, que são as que precisam de atenção.
+ */
+function filtrarPeloPeriodo_(registros, mesa, dias, recuo) {
+  if (!mesa.colunaDaData) return recuo ? [] : registros;
 
-  var limite = new Date();
-  limite.setDate(limite.getDate() - dias);
-  var corte = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var fim = new Date();
+  fim.setDate(fim.getDate() - recuo);
+  var inicio = new Date();
+  inicio.setDate(inicio.getDate() - recuo - dias);
+
+  var de = Utilities.formatDate(inicio, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
 
   return registros.filter(function (registro) {
     var data = converterParaData_(registro[mesa.colunaDaData]);
-    if (!data) return true;
-    return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') >= corte;
+    if (!data) return !recuo;
+    var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+    return dela >= de && dela <= ate;
   });
 }
 
@@ -130,40 +163,81 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
  * base: assim uma situação sem nenhum caso aparece com zero, em vez de sumir
  * do painel. Sumir esconde justamente a informação de que ela zerou.
  */
-function contarCartoes_(registros, mesa) {
-  var cartoes = [{
-    chave: 'total', rotulo: 'Total de casos', valor: registros.length, tom: 'destaque'
-  }];
+function contarCartoes_(registros, anteriores, mesa) {
+  var cartoes = [montarCartao_('total', 'Total de casos', registros.length,
+    anteriores.length, 'destaque', '')];
 
   if (mesa.colunaDoStatus) {
-    var contagem = {};
-    registros.forEach(function (registro) {
-      var chave = normalizarParaComparar_(registro[mesa.colunaDoStatus]);
-      contagem[chave] = (contagem[chave] || 0) + 1;
-    });
+    var agora = contarPorSituacao_(registros, mesa);
+    var antes = contarPorSituacao_(anteriores, mesa);
 
-    situacoesDaMesa_(mesa).forEach(function (situacao) {
-      cartoes.push({
-        chave: situacao.chave,
-        rotulo: situacao.nome,
-        valor: contagem[situacao.chave] || 0,
-        tom: situacao.tom
-      });
+    situacoesDoPainel_(mesa).forEach(function (situacao) {
+      cartoes.push(montarCartao_(situacao.chave, situacao.nome,
+        agora[situacao.chave] || 0, antes[situacao.chave] || 0,
+        situacao.tom, ''));
     });
   }
 
   var naCelula = contarFinalizadosNaCelula_(registros, mesa);
   if (naCelula !== null) {
-    cartoes.push({
-      chave: 'naCelula',
-      rotulo: 'Finalizados na célula',
-      valor: naCelula,
-      tom: 'bom',
-      explicacao: 'Concluídos sem encaminhar para nenhuma área'
-    });
+    cartoes.push(montarCartao_('naCelula', 'Finalizados na célula', naCelula,
+      contarFinalizadosNaCelula_(anteriores, mesa), 'bom',
+      'Concluídos sem encaminhar para nenhuma área'));
   }
 
   return cartoes;
+}
+
+function contarPorSituacao_(registros, mesa) {
+  var contagem = {};
+  registros.forEach(function (registro) {
+    var chave = normalizarParaComparar_(registro[mesa.colunaDoStatus]);
+    contagem[chave] = (contagem[chave] || 0) + 1;
+  });
+  return contagem;
+}
+
+/**
+ * A variação vem como número ou como null.
+ *
+ * Sem nada no período anterior, NÃO existe variação — mostrar "+100%" porque
+ * saiu de zero é ruído que a operação aprende a ignorar, e junto com ele
+ * ignora a variação que importa.
+ */
+function montarCartao_(chave, rotulo, valor, valorAnterior, tom, explicacao) {
+  var variacao = null;
+  if (valorAnterior > 0) {
+    variacao = Math.round(((valor - valorAnterior) / valorAnterior) * 100);
+  }
+  return {
+    chave: chave,
+    rotulo: rotulo,
+    valor: valor,
+    anterior: valorAnterior,
+    variacao: variacao,
+    tom: tom,
+    explicacao: explicacao || ''
+  };
+}
+
+/**
+ * As situações que viram cartão.
+ *
+ * A mesa escolhe, na coluna CartoesDoPainel: vazia mostra todas. A Mesa
+ * Diamante tem menos demanda que a RET, e sete cartões para poucos casos é
+ * ruído — ali só interessam pendente e concluído.
+ */
+function situacoesDoPainel_(mesa) {
+  var todas = situacoesDaMesa_(mesa);
+  var escolhidas = String(mesa.cartoesDoPainel || '')
+    .split(',')
+    .map(function (nome) { return normalizarParaComparar_(nome); })
+    .filter(function (nome) { return nome !== ''; });
+
+  if (!escolhidas.length) return todas;
+  return todas.filter(function (situacao) {
+    return escolhidas.indexOf(situacao.chave) >= 0;
+  });
 }
 
 function situacoesDaMesa_(mesa) {
@@ -182,7 +256,7 @@ function situacoesDaMesa_(mesa) {
       return {
         chave: normalizarParaComparar_(item.Nome),
         nome: String(item.Rotulo || item.Nome),
-        tom: String(item.Cor || '')
+        tom: tomValido_(item.Cor)
       };
     });
 }
@@ -239,15 +313,24 @@ function colunasDaFila_(mesa) {
 function montarFila_(registros, mesa) {
   var colunas = colunasDaFila_(mesa);
 
+  // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
+  // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
+  var tons = {};
+  situacoesDaMesa_(mesa).forEach(function (situacao) {
+    tons[situacao.chave] = situacao.tom;
+  });
+
   return registros.slice().reverse().map(function (registro) {
     var valores = colunas.map(function (coluna) {
       return paraTexto_(registro[coluna.cabecalho], coluna.tipo);
     });
+    var situacao = mesa.colunaDoStatus
+      ? String(registro[mesa.colunaDoStatus] || '') : '';
     return {
       id: registro.__id,
       valores: valores,
-      situacao: mesa.colunaDoStatus
-        ? String(registro[mesa.colunaDoStatus] || '') : ''
+      situacao: situacao,
+      tom: tons[normalizarParaComparar_(situacao)] || 'neutro'
     };
   });
 }

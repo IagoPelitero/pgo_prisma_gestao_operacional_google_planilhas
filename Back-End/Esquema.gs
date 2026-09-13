@@ -247,6 +247,9 @@ const RECC_ESQUEMA = {
       // adivinhar acerta hoje e erra na mesa que vier depois.
       { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunasDaFila', tipo: 'texto', protegido: false },
+      // Quais situações viram cartão. Vazio = todas. A Mesa Diamante tem
+      // menos demanda que a RET, e sete cartões para poucos casos é ruído.
+      { cabecalho: 'CartoesDoPainel', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },

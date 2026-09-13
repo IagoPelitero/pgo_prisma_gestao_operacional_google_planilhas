@@ -64,20 +64,25 @@
     .marca {
       display: grid;
       place-items: center;
-      gap: 12px;
+      gap: 10px;
       margin-bottom: 28px;
     }
-    .marca img { max-height: 46px; max-width: 200px; }
+    .marca img { max-height: 52px; max-width: 220px; }
 
-    /* Sem logo configurada, o nome do sistema faz as vezes dela — a tela
-       nunca fica com um espaço vazio ou um ícone quebrado. */
-    .marca .nome {
-      font-size: 30px;
+    /* Sem imagem configurada, quem assina a tela é o NOME DA OPERAÇÃO, em
+       tipografia — e não o nome do sistema. Quem chega aqui foi barrado antes
+       de entrar: precisa reconhecer a casa, não o software.
+
+       Isto é texto, não um desenho da marca. Assim que a imagem oficial for
+       apontada em Configurações, ela toma este lugar. */
+    .marca .assinatura {
+      font-size: 34px;
       font-weight: 700;
-      letter-spacing: -.02em;
+      letter-spacing: -.025em;
       color: var(--azul);
+      line-height: 1.1;
     }
-    .marca .operacao {
+    .marca .sistema {
       font-size: 12px;
       letter-spacing: .16em;
       text-transform: uppercase;
@@ -160,13 +165,12 @@
   <main class="cartao">
     <div class="marca">
       <? if (identidade.logo) { ?>
-        <img src="<?= identidade.logo ?>" alt="<?= identidade.operacao ?>">
+        <img src="<?= identidade.logo ?>"
+             alt="<?= identidade.operacao || identidade.nome ?>">
       <? } else { ?>
-        <div class="nome"><?= identidade.nome ?></div>
+        <div class="assinatura"><?= identidade.operacao || identidade.nome ?></div>
       <? } ?>
-      <? if (identidade.operacao) { ?>
-        <div class="operacao"><?= identidade.operacao ?></div>
-      <? } ?>
+      <div class="sistema"><?= identidade.nome ?></div>
     </div>
 
     <div class="selo" aria-hidden="true">

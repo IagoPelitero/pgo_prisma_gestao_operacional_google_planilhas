@@ -9,7 +9,7 @@
  */
 
 const {
-  carregar, secao, teste, igual, verdadeiro, contem, lanca
+  carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario
 } = require('./ferramentas');
 
 function rodarTestesDeAcesso() {
@@ -351,12 +351,17 @@ function rodarTestesDeAcesso() {
     ambiente.definirEmail('primeiro.adm@exemplo.com');
   });
 
-  teste('sem logo configurada a tela mostra o nome, e não um ícone quebrado', () => {
-    ambiente.definirEmail('estranho@exemplo.com');
-    const html = chamar('doGet()').getContent();
-    verdadeiro(html.indexOf('<img') < 0, 'não deveria haver imagem sem logo definida');
-    contem(html, 'class="nome"', 'o nome faz as vezes da logo');
-    ambiente.definirEmail('primeiro.adm@exemplo.com');
+  teste('sem imagem, quem assina a tela é a OPERAÇÃO, não o sistema', () => {
+    // Quem chega aqui foi barrado antes de entrar: precisa reconhecer a casa,
+    // não o software. E é tipografia, não um desenho da marca.
+    comoUsuario(ambiente, 'estranho@exemplo.com', () => {
+      const html = chamar('doGet()').getContent();
+      verdadeiro(html.indexOf('<img') < 0, 'não deveria haver imagem sem logo definida');
+      contem(html, '<div class="assinatura">Porto Seguro</div>',
+        'a operação assina a tela');
+      contem(html, '<div class="sistema">RECC</div>',
+        'e o nome do sistema fica embaixo, discreto');
+    });
   });
 
   teste('com logo configurada a tela usa a imagem', () => {

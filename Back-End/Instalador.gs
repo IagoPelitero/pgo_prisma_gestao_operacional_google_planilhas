@@ -214,6 +214,7 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDoStatus: 'status',
       ColunasDaFila: 'data de recepção do protocolo, status, nome do cliente, '
         + 'protocolo, produto, analista',
+      CartoesDoPainel: '',
       ColunaDaFinalizacao: '',
       ColunaDaAreaResponsavel: '',
       Icone: 'escudo',
@@ -229,6 +230,7 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDoStatus: 'Status',
       ColunasDaFila: 'Data de entrada, Status, Nome do segurado, '
         + 'Documento (CPF), Corretora, Analista',
+      CartoesDoPainel: 'Pendente, Concluído',
       ColunaDaFinalizacao: 'Data da finalização',
       ColunaDaAreaResponsavel: 'Área responsável',
       Icone: 'diamante',
@@ -242,13 +244,18 @@ function semearDadosIniciais_(emailDoInstalador) {
 
   // --- catálogo por mesa ----------------------------------------------------
   var itens = [];
-  ['Em tratativa', 'Aguardando segurado', 'Não tratado', 'Retorno agendado',
-   'Concluído'].forEach(function (nome, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idRet, nome, i + 1));
+  // Cada situação com a sua cor. A cor não é enfeite: numa fila de trinta
+  // linhas, ela é o que faz "não trabalhado" saltar aos olhos sem ninguém
+  // precisar ler. As cores válidas estão em RECC_TONS.
+  [['Em tratativa', 'destaque'], ['Aguardando segurado', 'atencao'],
+   ['Não tratado', 'violeta'], ['Retorno agendado', 'bom'],
+   ['Concluído', 'neutro']].forEach(function (par, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idRet, par[0], i + 1, par[1]));
   });
-  ['Transmissão pendente', 'Pendente', '1º contato realizado',
-   '2º contato realizado', 'Não trabalhado', 'Concluído'].forEach(function (nome, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idMesa, nome, i + 1));
+  [['Transmissão pendente', 'destaque'], ['Pendente', 'atencao'],
+   ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
+   ['Não trabalhado', 'ruim'], ['Concluído', 'bom']].forEach(function (par, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idMesa, par[0], i + 1, par[1]));
   });
   ['Diamante', 'Demais corretoras', 'Não encontrado'].forEach(function (nome, i) {
     itens.push(novoItemDeCatalogo_('SEGMENTO', '', nome, i + 1));
@@ -354,7 +361,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
   };
 }
 
-function novoItemDeCatalogo_(tipo, mesaId, nome, ordem) {
+function novoItemDeCatalogo_(tipo, mesaId, nome, ordem, cor) {
   return {
     MesaId: mesaId,
     Tipo: tipo,
@@ -362,7 +369,7 @@ function novoItemDeCatalogo_(tipo, mesaId, nome, ordem) {
     Nome: nome,
     Rotulo: nome,
     PaiId: '',
-    Cor: '',
+    Cor: cor || '',
     Ordem: ordem,
     Ativo: true,
     Configuracao: ''

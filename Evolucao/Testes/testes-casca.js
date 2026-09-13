@@ -97,8 +97,21 @@ function rodarTestesDaCasca() {
       'dois itens com o mesmo desenho deixam o menu ilegível');
     doMenu.forEach((d) => {
       contem(d, 'viewBox="0 0 24 24"', 'todos na mesma grade');
-      contem(d, 'stroke-width="1.7"', 'todos com a mesma espessura');
+      contem(d, 'stroke-width="1.5"', 'todos com a mesma espessura, e fina');
     });
+  });
+
+  teste('o menu não usa peso de fonte que canse a vista', () => {
+    // Texto grosso em cima de fundo saturado, lido de relance o dia inteiro,
+    // cansa. Só o item atual ganha peso.
+    const estilos = lerTela('Estilos.html');
+    const item = estilos.substring(estilos.indexOf('.lateral-item {'),
+      estilos.indexOf('.lateral-item:hover'));
+    contem(item, 'font-weight: 400', 'o item comum vai em peso normal');
+    const atual = estilos.substring(
+      estilos.indexOf('.lateral-item[aria-current="page"]'),
+      estilos.indexOf('.lateral-item svg'));
+    contem(atual, 'font-weight: 600', 'e o atual em seminegrito, não em negrito');
   });
 
   secao('Os quatro temas');

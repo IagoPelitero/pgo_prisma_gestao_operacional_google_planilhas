@@ -120,6 +120,16 @@ function gerar(pastaDeSaida) {
       + '/' + data.getFullYear();
   };
 
+  // Alguns casos no período ANTERIOR, para os cartões terem com o que
+  // comparar — senão a prévia mostraria a variação sempre em branco.
+  chamar('inserirVariosRegistros_')('BASE_MESA', [
+    { Analista: 'Ana Martins', Status: 'Concluído', Canal: 'E-mail',
+      'Data de entrada': diasAtras(44), 'Nome do segurado': 'Caso do mês passado',
+      'Data da finalização': diasAtras(43) },
+    { Analista: 'Diego Castilho', Status: 'Pendente', Canal: 'Chat',
+      'Data de entrada': diasAtras(38), 'Nome do segurado': 'Outro do mês passado' }
+  ]);
+
   chamar('inserirVariosRegistros_')('BASE_MESA', [
     { Analista: 'Ana Martins', Status: 'Transmissão pendente', Canal: 'E-mail',
       'Data de entrada': diasAtras(6), 'Horário': '09:14',

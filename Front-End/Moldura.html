@@ -75,8 +75,9 @@ var Moldura = (function () {
 
   function icone(tela) {
     var desenho = DESENHOS[tela] || DESENHOS.dashboard;
+    // Traço fino: 1,7 deixava os desenhos pesados ao lado de texto normal.
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-      + ' stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"'
+      + ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
       + ' aria-hidden="true">' + desenho + '</svg>';
   }
 
