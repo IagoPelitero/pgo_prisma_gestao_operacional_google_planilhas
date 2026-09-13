@@ -1,0 +1,335 @@
+<script>
+/* ============================================================================
+   PGO — CadastrarCaso.html · a tela que grava
+   ============================================================================
+   A tela não sabe quais campos existem. Ela pergunta ao servidor, recebe a
+   definição e desenha. Campo criado em Configurações aparece aqui sozinho;
+   campo escondido para o nível nem chega a ser enviado.
+
+   A máscara vive aqui, e só aqui: é aparência. O que sai daqui para o
+   servidor é o que a pessoa digitou; quem limpa e confere é o servidor.
+   ============================================================================ */
+
+var TelaCadastrarCaso = (function () {
+
+  var formulario = null;      // a definição vinda do servidor
+  var mesaEscolhida = '';
+  var salvando = false;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  /* ---------------------------------------------------------------- máscara */
+
+  /**
+   * Aplica a máscara enquanto a pessoa digita.
+   * Cada `0` da máscara é um dígito; o resto é enfeite que o servidor descarta.
+   */
+  function aplicarMascara(valor, mascara) {
+    var digitos = String(valor || '').replace(/\D/g, '');
+    if (!mascara) return digitos;
+
+    var saida = '';
+    var proximo = 0;
+    for (var i = 0; i < mascara.length && proximo < digitos.length; i++) {
+      if (mascara.charAt(i) === '0') {
+        saida += digitos.charAt(proximo);
+        proximo++;
+      } else {
+        saida += mascara.charAt(i);
+      }
+    }
+    return saida;
+  }
+
+  function usaMascara(campo) {
+    return !!campo.mascara
+      && (campo.tipo === 'documento' || campo.tipo === 'identificador'
+        || campo.tipo === 'telefone');
+  }
+
+  /* ------------------------------------------------------------- desenhar */
+
+  function desenharCampo(campo) {
+    var id = 'campo-' + campo.chave;
+    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
+    var travado = campo.somenteLeitura ? ' disabled' : '';
+    var controle;
+
+    if (campo.tipo === 'seletor') {
+      var opcoes = ['<option value="">Selecione uma opção</option>'];
+      campo.opcoes.forEach(function (opcao) {
+        opcoes.push('<option value="' + escapar(opcao.valor) + '">'
+          + escapar(opcao.rotulo) + '</option>');
+      });
+      controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
+        + travado + '>' + opcoes.join('') + '</select>';
+
+    } else if (campo.tipo === 'simOuNao') {
+      controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
+        + travado + '>'
+        + '<option value="">Selecione</option>'
+        + '<option value="SIM">Sim</option>'
+        + '<option value="NAO">Não</option></select>';
+
+    } else if (campo.tipo === 'textoLongo') {
+      controle = '<textarea id="' + id + '" rows="3"'
+        + ' data-chave="' + escapar(campo.chave) + '"' + travado + '></textarea>';
+
+    } else {
+      var htmlTipo = 'text';
+      if (campo.tipo === 'data') htmlTipo = 'date';
+      else if (campo.tipo === 'hora') htmlTipo = 'time';
+      else if (campo.tipo === 'email') htmlTipo = 'email';
+      else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
+        || campo.tipo === 'percentual') htmlTipo = 'text';
+
+      controle = '<input type="' + htmlTipo + '" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '"'
+        + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
+        + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
+        + ' autocomplete="off"' + travado + '>';
+    }
+
+    var ajuda = campo.descricao
+      ? '<small class="ajuda">' + escapar(campo.descricao) + '</small>' : '';
+    var selo = campo.chave === 'susep'
+      ? '<div class="selo-susep" id="selo-susep" hidden></div>' : '';
+
+    return '<div class="campo largura-' + campo.largura + '" data-campo="'
+      + escapar(campo.chave) + '">'
+      + '<label for="' + id + '">' + escapar(campo.rotulo) + obrigatorio + '</label>'
+      + controle + ajuda + selo
+      + '<small class="erro" hidden></small>'
+      + '</div>';
+  }
+
+  function desenharSecao(secao) {
+    return '<fieldset class="secao">'
+      + '<legend>' + escapar(secao.nome) + '</legend>'
+      + '<div class="grade">'
+      + secao.campos.map(desenharCampo).join('')
+      + '</div></fieldset>';
+  }
+
+  function seletorDeMesa(mesas) {
+    return '<div class="mesas" role="group" aria-label="Mesa de trabalho">'
+      + mesas.map(function (mesa) {
+        var atual = mesa.id === mesaEscolhida;
+        return '<button type="button" class="mesa' + (atual ? ' atual' : '') + '"'
+          + ' data-mesa="' + escapar(mesa.id) + '"'
+          + ' aria-pressed="' + (atual ? 'true' : 'false') + '">'
+          + '<strong>' + escapar(mesa.nome) + '</strong>'
+          + '<span>' + escapar(mesa.descricao) + '</span>'
+          + '</button>';
+      }).join('')
+      + '</div>';
+  }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+
+    return seletorDeMesa(pacote.mesas)
+      + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
+      + '<div id="corpo-do-formulario"><p class="carregando-campos">'
+      + 'Montando o formulário…</p></div>'
+      + '<div class="acoes">'
+      + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
+      + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
+      + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
+      + '<span class="recado" id="recado-do-caso" hidden></span>'
+      + '</div></form>';
+  }
+
+  /* ----------------------------------------------------------- comportamento */
+
+  function elemento(id) { return document.getElementById(id); }
+
+  function carregarFormulario() {
+    var corpo = elemento('corpo-do-formulario');
+    corpo.innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
+
+    Servidor.chamar('formularioDaMesa', mesaEscolhida)
+      .entao(function (resposta) {
+        formulario = resposta;
+        corpo.innerHTML = resposta.secoes.map(desenharSecao).join('');
+        ligarCampos();
+        var primeiro = corpo.querySelector('input:not([disabled]), select:not([disabled])');
+        if (primeiro) primeiro.focus();
+      })
+      .senao(function (erro) {
+        corpo.innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function ligarCampos() {
+    var comMascara = document.querySelectorAll('[data-mascara]');
+    for (var i = 0; i < comMascara.length; i++) {
+      comMascara[i].addEventListener('input', function () {
+        var posicaoNoFim = this.selectionStart === this.value.length;
+        this.value = aplicarMascara(this.value, this.getAttribute('data-mascara'));
+        if (posicaoNoFim) {
+          this.selectionStart = this.selectionEnd = this.value.length;
+        }
+      });
+    }
+
+    var susep = document.querySelector('[data-chave="susep"]');
+    if (susep) {
+      susep.addEventListener('change', function () { consultarSusep(this.value); });
+      susep.addEventListener('blur', function () { consultarSusep(this.value); });
+    }
+  }
+
+  /**
+   * O selo da SUSEP.
+   * "Não encontrada" é resposta, não erro: é uma corretora que o cadastro não
+   * conhece, e quem está atendendo precisa saber disso antes de seguir.
+   */
+  function consultarSusep(valor) {
+    var selo = elemento('selo-susep');
+    if (!selo) return;
+
+    if (!String(valor || '').replace(/\D/g, '')) {
+      selo.hidden = true;
+      return;
+    }
+
+    selo.hidden = false;
+    selo.className = 'selo-susep conferindo';
+    selo.textContent = 'Conferindo…';
+
+    Servidor.chamar('consultarSusep', valor)
+      .entao(function (resposta) {
+        var aparencia = {
+          OK: 'liberada', BLOQUEADA: 'bloqueada',
+          NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
+        }[resposta.situacao] || 'conferindo';
+
+        selo.className = 'selo-susep ' + aparencia;
+        selo.textContent = resposta.mensagem
+          + (resposta.segmento && resposta.situacao === 'OK'
+            ? ' · ' + resposta.segmento : '');
+      })
+      .senao(function () {
+        selo.className = 'selo-susep conferindo';
+        selo.textContent = 'Não consegui conferir a SUSEP agora.';
+      });
+  }
+
+  function valoresDoFormulario() {
+    var valores = {};
+    var controles = document.querySelectorAll('[data-chave]');
+    for (var i = 0; i < controles.length; i++) {
+      if (controles[i].disabled) continue;
+      valores[controles[i].getAttribute('data-chave')] = controles[i].value;
+    }
+    return valores;
+  }
+
+  function limparErros() {
+    var marcados = document.querySelectorAll('.campo.com-erro');
+    for (var i = 0; i < marcados.length; i++) {
+      marcados[i].classList.remove('com-erro');
+      var aviso = marcados[i].querySelector('.erro');
+      if (aviso) { aviso.hidden = true; aviso.textContent = ''; }
+    }
+  }
+
+  /**
+   * Marca cada campo com o problema dele.
+   *
+   * O servidor devolve TODOS os problemas de uma vez, e a tela mostra todos.
+   * Um erro por vez faria a pessoa corrigir, salvar, descobrir o segundo,
+   * corrigir e salvar de novo.
+   */
+  function mostrarProblemas(problemas) {
+    limparErros();
+    (problemas || []).forEach(function (problema) {
+      var caixa = document.querySelector('[data-campo="' + problema.campo + '"]');
+      if (!caixa) return;
+      caixa.classList.add('com-erro');
+      var aviso = caixa.querySelector('.erro');
+      aviso.textContent = problema.erro;
+      aviso.hidden = false;
+    });
+    var primeiro = document.querySelector('.campo.com-erro input, .campo.com-erro select');
+    if (primeiro) primeiro.focus();
+  }
+
+  function recado(texto, tipo) {
+    var caixa = elemento('recado-do-caso');
+    caixa.className = 'recado ' + (tipo || '');
+    caixa.textContent = texto;
+    caixa.hidden = !texto;
+  }
+
+  function salvar() {
+    if (salvando) return;
+    salvando = true;
+    limparErros();
+    recado('Gravando…', '');
+    elemento('salvar-caso').disabled = true;
+
+    Servidor.chamar('cadastrarCaso', mesaEscolhida, valoresDoFormulario())
+      .entao(function (resposta) {
+        salvando = false;
+        elemento('salvar-caso').disabled = false;
+        recado('Caso ' + resposta.id + ' cadastrado em ' + resposta.mesa + '.', 'bom');
+        carregarFormulario();
+      })
+      .senao(function (erro) {
+        salvando = false;
+        elemento('salvar-caso').disabled = false;
+        recado(erro.message || String(erro), 'ruim');
+        if (erro.problemas) mostrarProblemas(erro.problemas);
+      });
+  }
+
+  function ligar(pacote) {
+    var mesas = document.querySelectorAll('.mesa');
+    for (var i = 0; i < mesas.length; i++) {
+      mesas[i].addEventListener('click', function () {
+        mesaEscolhida = this.getAttribute('data-mesa');
+        Aplicacao.remontar();
+      });
+    }
+
+    elemento('formulario-do-caso').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      salvar();
+    });
+    elemento('limpar-caso').addEventListener('click', function () {
+      recado('', '');
+      carregarFormulario();
+    });
+    document.addEventListener('keydown', atalhoDeSalvar);
+
+    carregarFormulario();
+  }
+
+  function atalhoDeSalvar(evento) {
+    if ((evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
+      if (elemento('formulario-do-caso')) {
+        evento.preventDefault();
+        salvar();
+      }
+    }
+  }
+
+  /** Chamado ao sair da tela, para o atalho não continuar valendo nas outras. */
+  function desligar() {
+    document.removeEventListener('keydown', atalhoDeSalvar);
+  }
+
+  return {
+    montar: montar,
+    ligar: ligar,
+    desligar: desligar,
+    aplicarMascara: aplicarMascara,
+    usaMascara: usaMascara
+  };
+})();
+</script>

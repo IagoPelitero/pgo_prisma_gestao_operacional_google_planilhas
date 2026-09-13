@@ -254,6 +254,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     registros,
     /** Troca quem está "logado", para testar cada perfil de acesso. */
     definirEmail(novo) { emailAtual = novo; },
+    emailAtual() { return emailAtual; },
     globais: {
       SpreadsheetApp: {
         getActive: () => planilha,

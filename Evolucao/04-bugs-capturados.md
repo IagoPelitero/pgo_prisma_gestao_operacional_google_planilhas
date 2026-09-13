@@ -196,11 +196,62 @@ era injetada direto em `--destaque` — e valia nos **quatro** temas.
 teste confere que ninguém volte a escrever em `--destaque` e que os outros
 temas não leiam a cor da operação.
 
+### 11 · O identificador do registro era ilegível para quem o recebia
+
+**Etapa 4.** `cadastrarCaso` devolvia `id: undefined`, e a tela mostrava
+"Caso undefined cadastrado".
+
+**Causa.** A coluna de identificador não tem o mesmo nome em toda aba: é `ID`
+na Mesa Diamante, `id` na RET Vida e `Id` nas abas de sistema. Quem lia
+`registro.Id` acertava numas abas e lia `undefined` nas outras — em silêncio.
+
+**Defesa.** Todo registro carrega `__id`, sempre, qualquer que seja a grafia
+do cabeçalho.
+
+### 12 · Um nível chamado "Consulta" podia criar caso
+
+**Etapa 4.** O nome dizia uma coisa e a permissão fazia outra.
+
+**Causa.** A semente dava a MESMA lista de ações a todo nível que não fosse
+administrador.
+
+**Defesa.** Cada nível traz a sua lista, e um teste confere item a item que
+Consulta não cria nem edita, que Operação não oculta e que só o administrador
+mexe em estrutura.
+
+### 13 · O sistema abria com duas telas mortas acima dele
+
+**Etapa 4. Encontrado numa foto de página inteira** — as fotos anteriores, do
+tamanho da janela, escondiam o problema.
+
+**Causa.** O atributo `hidden` esconde por padrão do navegador, e **qualquer**
+`display` escrito por nós ganha dele. As telas de abertura usam
+`display: grid`, então continuavam ocupando 100vh cada uma depois de
+escondidas. A página tinha 2.700px onde deveria ter 900.
+
+**Defesa.** `[hidden] { display: none !important; }`, e um teste que confere
+essa linha.
+
+### 14 · O substituto do google.script.run inventou um erro
+
+**Etapa 4. Não era bug do produto — era da ferramenta.** A prévia acusava
+`Cannot read properties of undefined` ao consultar a SUSEP e montar o
+formulário ao mesmo tempo.
+
+**Causa.** O substituto guardava **um único par de retornos**, compartilhado
+por todas as chamadas. Duas chamadas simultâneas se atropelavam: a resposta da
+SUSEP chegava na mão de quem tinha pedido o formulário. O `google.script.run`
+de verdade devolve um objeto novo a cada `withSuccessHandler`.
+
+**Por que entra nesta lista.** É o mesmo erro do H8, invertido: lá o simulador
+escondia um defeito, aqui inventou um. Ferramenta que não imita a realidade
+custa confiança nas duas direções.
+
 ---
 
 ## O que esta lista ensina
 
-**Onze dos treze eram silenciosos.** Não davam erro, não travavam, não
+**Treze dos dezessete eram silenciosos.** Não davam erro, não travavam, não
 apareciam no log. Gravavam dado errado e seguiam em frente.
 
 Daí as duas práticas que o projeto não abre mão:
@@ -208,5 +259,6 @@ Daí as duas práticas que o projeto não abre mão:
 1. **Erro alto em vez de padrão silencioso.** Tipo desconhecido, campo sem
    coluna, cabeçalho repetido e Id repetido interrompem a operação. Dado errado
    calado é pior que operação parada.
-2. **Olhar a tela.** Os itens 9 e 10 nenhum teste pegaria. Teste não enxerga
+2. **Olhar a tela.** Os itens 9, 10 e 13 nenhum teste pegaria sozinho — e o
+   13 só apareceu numa foto de página inteira. Teste não enxerga
    "está feio" nem "essa cor não devia estar aqui".

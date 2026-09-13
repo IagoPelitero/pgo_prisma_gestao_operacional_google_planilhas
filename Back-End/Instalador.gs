@@ -169,17 +169,24 @@ function semearDadosIniciais_(emailDoInstalador) {
   // --- níveis de acesso -----------------------------------------------------
   // O nível é a unidade de permissão: telas, campos, widgets, ações e escopo
   // saem DAQUI. O cargo é só o rótulo organizacional.
+  // Cada nível traz a SUA lista de ações. Dar a mesma lista a todo mundo que
+  // não é administrador já deixou um nível chamado "Consulta" podendo criar
+  // caso — o nome dizia uma coisa e a permissão fazia outra.
   var niveis = inserirVariosRegistros_('CATALOGO', [
-    novoNivelDeAcesso_('Administrador', 1, 'TODOS', true,
+    novoNivelDeAcesso_('Administrador', 1, 'TODOS',
+      ['criar', 'editar', 'ocultar', 'exportar', 'configurar', 'estrutura'],
       ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
        'tabelaCorretoras', 'painelAnalitico', 'configuracoes']),
-    novoNivelDeAcesso_('Coordenação', 2, 'TODOS', false,
+    novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
+      ['criar', 'editar', 'ocultar', 'exportar'],
       ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
        'tabelaCorretoras', 'painelAnalitico']),
-    novoNivelDeAcesso_('Operação', 3, 'PROPRIOS', false,
+    novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
+      ['criar', 'editar', 'exportar'],
       ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
        'tabelaCorretoras']),
-    novoNivelDeAcesso_('Consulta', 4, 'TODOS', false,
+    novoNivelDeAcesso_('Consulta', 4, 'TODOS',
+      ['exportar'],
       ['dashboard', 'buscarCaso', 'painelAnalitico'])
   ]);
   contagem.niveis = niveis.length;
@@ -235,6 +242,26 @@ function semearDadosIniciais_(emailDoInstalador) {
   });
   ['Diamante', 'Demais corretoras', 'Não encontrado'].forEach(function (nome, i) {
     itens.push(novoItemDeCatalogo_('SEGMENTO', '', nome, i + 1));
+  });
+
+  // Listas que o formulário oferece. Padrão, não fixado: o administrador
+  // renomeia, reordena, desliga e cria quantas quiser em Configurações.
+  var listasGlobais = {
+    CANAL: ['E-mail', 'Chat', 'Telefone', 'Site', 'Corretora', 'Ouvidoria', 'URA'],
+    TIPO: ['Reclamação', 'Dúvida', 'Solicitação', 'Elogio'],
+    RAMO: ['Vida', 'Auto', 'Residencial', 'Prestamista'],
+    AREA: ['Subscrição', 'Sinistro', 'Cobrança', 'Comercial', 'Jurídico'],
+    MOTIVO: ['Aumento do prêmio na renovação', 'Dificuldade financeira',
+      'Portabilidade', 'Proposta de concorrente', 'Insatisfação com atendimento',
+      'Coberturas', 'Outros'],
+    FORMA_PAGAMENTO: ['Boleto', 'Débito em conta', 'Cartão de crédito', 'PIX'],
+    ORIGEM: ['Base de inadimplência', 'Central: Pessoa', 'URA', 'Site', 'Chat',
+      'Telefone', 'Corretora']
+  };
+  Object.keys(listasGlobais).forEach(function (tipo) {
+    listasGlobais[tipo].forEach(function (nome, i) {
+      itens.push(novoItemDeCatalogo_(tipo, '', nome, i + 1));
+    });
   });
   contagem.catalogo = inserirVariosRegistros_('CATALOGO', itens).length +
     contagem.niveis + contagem.cargos;
@@ -296,7 +323,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   return contagem;
 }
 
-function novoNivelDeAcesso_(nome, ordem, escopo, tudoLiberado, telas) {
+function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
   return {
     MesaId: '',
     Tipo: 'NIVEL_ACESSO',
@@ -310,9 +337,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, tudoLiberado, telas) {
     Configuracao: JSON.stringify({
       escopo: escopo,
       telas: telas,
-      acoes: tudoLiberado
-        ? ['criar', 'editar', 'ocultar', 'exportar', 'configurar', 'estrutura']
-        : ['criar', 'editar', 'exportar'],
+      acoes: acoes,
       campos: {},
       widgets: {}
     })
@@ -345,6 +370,61 @@ function novaConfiguracao_(chave, valor, descricao) {
 }
 
 /**
+ * Como cada campo NASCE no formulário: em que seção, se é obrigatório, se é
+ * uma lista, com que máscara e ocupando quantas colunas da grade.
+ *
+ * Isto é semente, não regra: tudo aqui é editável em Configurações depois. Só
+ * existe para o cadastro já nascer utilizável, em vez de virar uma parede de
+ * caixas de texto soltas que alguém teria de organizar à mão.
+ *
+ * A chave é a ChaveTecnica — o cabeçalho normalizado, sem acento nem espaço.
+ */
+const RECC_PADRAO_DO_FORMULARIO = {
+  // ---------------------------------------------------------- Mesa Diamante
+  analista: { secao: 'Atendimento' },
+  status: { tipoCampo: 'seletor', catalogo: 'STATUS', obrigatorio: true, secao: 'Situação' },
+  canal: { tipoCampo: 'seletor', catalogo: 'CANAL', secao: 'Situação' },
+  datadeentrada: { secao: 'Situação' },
+  horario: { secao: 'Situação' },
+  tipo: { tipoCampo: 'seletor', catalogo: 'TIPO', secao: 'Situação' },
+  aberturaindevida: { secao: 'Situação' },
+  titulodoemail: { secao: 'Atendimento', largura: 2 },
+  nomedosegurado: { obrigatorio: true, secao: 'Cliente', largura: 2 },
+  documentocpf: { tipoCampo: 'documento', mascara: '000.000.000-00', secao: 'Cliente' },
+  corretora: { secao: 'Corretora' },
+  susep: { secao: 'Corretora' },
+  ramo: { tipoCampo: 'seletor', catalogo: 'RAMO', secao: 'Corretora' },
+  assunto: { secao: 'Atendimento', largura: 2 },
+  arearesponsavel: { tipoCampo: 'seletor', catalogo: 'AREA', secao: 'Encaminhamento' },
+  dataresposta: { secao: 'Encaminhamento' },
+  horaresposta: { secao: 'Encaminhamento' },
+  datadafinalizacao: { secao: 'Encaminhamento' },
+  horariodafinalizacao: { secao: 'Encaminhamento' },
+
+  // -------------------------------------------------------------- RET Vida
+  dataderecepcaodoprotocolo: { secao: 'Protocolo' },
+  protocolo: { obrigatorio: true, secao: 'Protocolo' },
+  segmento: { tipoCampo: 'seletor', catalogo: 'SEGMENTO', secao: 'Corretora' },
+  nomedocliente: { obrigatorio: true, secao: 'Cliente', largura: 2 },
+  cpf: { tipoCampo: 'documento', mascara: '000.000.000-00', secao: 'Cliente' },
+  telefonesdecontato: { tipoCampo: 'telefone', secao: 'Cliente' },
+  email: { tipoCampo: 'email', secao: 'Cliente' },
+  produto: { secao: 'Proposta' },
+  codproduto: { secao: 'Proposta' },
+  numerodaproposta: { secao: 'Proposta' },
+  codigoorigemdaproposta: { secao: 'Proposta' },
+  numapolice: { secao: 'Proposta' },
+  valordopremio: { secao: 'Valores' },
+  valordopremioretido: { secao: 'Valores' },
+  premiomensalretido: { secao: 'Valores' },
+  formadepagamento: { tipoCampo: 'seletor', catalogo: 'FORMA_PAGAMENTO', secao: 'Valores' },
+  motivodocancelamento: { tipoCampo: 'seletor', catalogo: 'MOTIVO', secao: 'Retenção' },
+  tentativasdecontato: { secao: 'Retenção' },
+  datadatransmissao: { secao: 'Retenção' },
+  descricao: { secao: 'Retenção', largura: 3 }
+};
+
+/**
  * Um campo de formulário para cada coluna da base.
  *
  * As colunas de controle (_Visivel e companhia) ficam de fora: elas são do
@@ -361,8 +441,12 @@ function camposDoFormularioDaBase_(nomeDaAba, mesaId) {
 
     var chave = normalizarParaComparar_(coluna.cabecalho);
     var ehId = (chave === 'id');
-    var ehCpf = chave.indexOf('cpf') >= 0 || chave.indexOf('documento') >= 0;
+    var padrao = RECC_PADRAO_DO_FORMULARIO[chave] || {};
     ordem++;
+
+    var configuracao = {};
+    if (padrao.catalogo) configuracao.catalogo = padrao.catalogo;
+    if (padrao.largura) configuracao.largura = padrao.largura;
 
     campos.push({
       MesaId: mesaId,
@@ -371,16 +455,16 @@ function camposDoFormularioDaBase_(nomeDaAba, mesaId) {
       Cabecalho: coluna.cabecalho,
       Rotulo: coluna.cabecalho,
       Descricao: '',
-      TipoCampo: RECC_DO_DADO_PARA_O_CAMPO[coluna.tipo] || 'texto',
-      Secao: 'Geral',
-      Mascara: ehCpf ? '000.000.000-00' : '',
-      Obrigatorio: false,
+      TipoCampo: padrao.tipoCampo || RECC_DO_DADO_PARA_O_CAMPO[coluna.tipo] || 'texto',
+      Secao: padrao.secao || 'Geral',
+      Mascara: padrao.mascara || '',
+      Obrigatorio: padrao.obrigatorio === true,
       Protegido: coluna.protegido === true,
       Ativo: !ehId,
       Ordem: ordem,
       VisivelPara: '',
       ValorPadrao: '',
-      Configuracao: ''
+      Configuracao: Object.keys(configuracao).length ? JSON.stringify(configuracao) : ''
     });
   });
 

@@ -170,6 +170,25 @@ function rodarTestesDeAcesso() {
       'campo novo precisa nascer visível, senão some sem ninguém entender');
   });
 
+  teste('cada nível traz a sua lista de ações, não uma lista comum', () => {
+    // Um nível chamado "Consulta" que pode criar caso é um nome mentindo
+    // sobre a permissão. Já aconteceu: todo nível não-administrador recebia
+    // a mesma lista.
+    const porNome = {};
+    chamar('lerRegistros_("CATALOGO")')
+      .filter((item) => item.Tipo === 'NIVEL_ACESSO')
+      .forEach((item) => { porNome[item.Nome] = JSON.parse(item.Configuracao).acoes; });
+
+    verdadeiro(porNome['Consulta'].indexOf('criar') < 0, 'Consulta não cria');
+    verdadeiro(porNome['Consulta'].indexOf('editar') < 0, 'Consulta não edita');
+    verdadeiro(porNome['Operação'].indexOf('criar') >= 0, 'Operação cria');
+    verdadeiro(porNome['Operação'].indexOf('ocultar') < 0, 'Operação não oculta');
+    verdadeiro(porNome['Coordenação'].indexOf('ocultar') >= 0, 'Coordenação oculta');
+    verdadeiro(porNome['Coordenação'].indexOf('estrutura') < 0,
+      'só o administrador mexe em estrutura');
+    verdadeiro(porNome['Administrador'].indexOf('estrutura') >= 0);
+  });
+
   secao('Alcance sobre os dados');
 
   teste('escopo PROPRIOS mostra só os casos da própria pessoa', () => {

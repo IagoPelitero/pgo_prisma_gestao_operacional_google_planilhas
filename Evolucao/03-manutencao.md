@@ -8,7 +8,22 @@ sistema é assim. Este arquivo explica **como** mexer nele sem quebrar.
 
 ---
 
-## 1. A regra de ouro
+## 1. Definição de pronto
+
+Uma etapa só está concluída quando as três coisas valem ao mesmo tempo:
+
+1. **Funciona.** Não é código escrito — é tela que abre, botão que responde e
+   dado que chega na célula certa. Conferido rodando, não lendo.
+2. **A suíte passa**, cinco execuções seguidas.
+3. **Está no GitHub.** Commitada e enviada, com a documentação da pasta
+   `Evolucao/` atualizada junto.
+
+Etapa que fica só na máquina de alguém não existe. Etapa que passa no teste
+mas nunca foi aberta no navegador também não.
+
+---
+
+## 2. A regra de ouro
 
 **Rode a suíte antes e depois de qualquer mudança.**
 
@@ -25,7 +40,7 @@ o contrário.** Cada teste ali nasceu de um problema real.
 
 ---
 
-## 2. As tarefas que aparecem toda semana
+## 3. As tarefas que aparecem toda semana
 
 ### Preciso de uma coluna nova numa base
 
@@ -87,7 +102,7 @@ com o Google é substituída.
 
 ---
 
-## 3. Onde mexer, por tipo de mudança
+## 4. Onde mexer, por tipo de mudança
 
 | Quero mudar | Mexo em |
 |---|---|
@@ -108,7 +123,7 @@ cargos, níveis, mesas e campos do formulário vivem na planilha.
 
 ---
 
-## 4. Publicar no Apps Script
+## 5. Publicar no Apps Script
 
 O projeto do Apps Script **não tem pastas**. As pastas aqui são organização do
 repositório.
@@ -130,7 +145,7 @@ rodado fora do Apps Script pega um arquivo que ficou para trás na cópia.
 
 ---
 
-## 5. As armadilhas que já custaram caro
+## 6. As armadilhas que já custaram caro
 
 Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
 [`04-bugs-capturados.md`](04-bugs-capturados.md).
@@ -148,7 +163,7 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
 
 ---
 
-## 6. Nunca commite
+## 7. Nunca commite
 
 CPF, nome de cliente, protocolo real, e-mail corporativo, Id de planilha,
 senha, token, URL privada ou caminho de máquina local.

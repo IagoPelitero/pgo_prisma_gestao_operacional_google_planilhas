@@ -10,24 +10,60 @@
 
 var Moldura = (function () {
 
-  /* Os desenhos de cada item. SVG escrito à mão para não depender de nenhuma
-     biblioteca de fora — o Apps Script serve a página num quadro isolado e
-     toda dependência externa é um ponto a mais que pode não carregar. */
+  /**
+   * O desenho de cada item do menu.
+   *
+   * SVG escrito à mão, sem biblioteca de fora: o Apps Script serve a página
+   * num quadro isolado, e cada dependência externa é mais um ponto que pode
+   * não carregar — e um menu sem ícone nenhum é um menu quebrado.
+   *
+   * Todos partem da mesma grade de 24 por 24, com a mesma espessura de
+   * traço. É o que faz sete desenhos diferentes parecerem um conjunto.
+   */
   var DESENHOS = {
-    dashboard: 'M3 10.5 12 3l9 7.5M5.5 9.5V20h13V9.5',
-    cadastrarCaso: 'M12 5v14M5 12h14',
-    minhaPerformance: 'M5 20V10M12 20V4M19 20v-7',
-    buscarCaso: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4.2-4.2',
-    tabelaCorretoras: 'M4 5h16v14H4zM4 10h16M10 10v9',
-    painelAnalitico: 'M4 17.5 10 11l3.5 3.5L20 7M20 7h-4.5M20 7v4.5',
-    configuracoes: 'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z'
-      + 'M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1'
-      + 'v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1'
-      + 'A1.6 1.6 0 0 0 4.5 15a2 2 0 0 1-1.8 1.2h-.2a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 4.1 9.4'
-      + 'L4 9.3a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1A1.6 1.6 0 0 0 9.8 5.4v-.2'
-      + 'a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1'
-      + 'a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1'
-      + 'a1.6 1.6 0 0 0-1.4 1z'
+    // painel: quatro áreas, como os cartões da tela
+    dashboard:
+      '<rect x="3.2" y="3.2" width="7.6" height="8.6" rx="1.6"></rect>'
+      + '<rect x="13.2" y="3.2" width="7.6" height="5.4" rx="1.6"></rect>'
+      + '<rect x="3.2" y="14.2" width="7.6" height="6.6" rx="1.6"></rect>'
+      + '<rect x="13.2" y="11" width="7.6" height="9.8" rx="1.6"></rect>',
+
+    // registrar: a folha nova, com o mais
+    cadastrarCaso:
+      '<path d="M13.5 3.2H6.8A1.6 1.6 0 0 0 5.2 4.8v14.4a1.6 1.6 0 0 0 1.6 1.6h10.4a1.6 1.6 0 0 0 1.6-1.6V8.4z"></path>'
+      + '<path d="M13.5 3.2v5.2h5.3"></path>'
+      + '<path d="M12 12v5M9.5 14.5h5"></path>',
+
+    // desempenho: as barras crescendo, com a régua embaixo
+    minhaPerformance:
+      '<path d="M4 20.2h16"></path>'
+      + '<rect x="5.6" y="12.4" width="3.4" height="5.4" rx="1"></rect>'
+      + '<rect x="10.3" y="8.6" width="3.4" height="9.2" rx="1"></rect>'
+      + '<rect x="15" y="4.6" width="3.4" height="13.2" rx="1"></rect>',
+
+    // buscar: a lupa
+    buscarCaso:
+      '<circle cx="10.8" cy="10.8" r="6.6"></circle>'
+      + '<path d="M15.6 15.6 20.4 20.4"></path>',
+
+    // tabela: o cabeçalho e as linhas
+    tabelaCorretoras:
+      '<rect x="3.2" y="4.4" width="17.6" height="15.2" rx="1.8"></rect>'
+      + '<path d="M3.2 9.2h17.6M3.2 14.4h17.6M9.6 9.2v10.4"></path>',
+
+    // análise: a tendência, com o ponto onde ela chega
+    painelAnalitico:
+      '<path d="M4 19.6 9.4 13l3.6 3.4L20 8.4"></path>'
+      + '<path d="M15.4 8.4H20v4.6"></path>'
+      + '<circle cx="9.4" cy="13" r="1.5"></circle>',
+
+    // configurações: a engrenagem, feita de dentes em volta do eixo em vez de
+    // um contorno gigante — mesmo efeito, e legível para quem for mexer.
+    // Os dentes ENCOSTAM no círculo: afastados, o desenho vira um sol.
+    configuracoes:
+      '<circle cx="12" cy="12" r="3.4"></circle>'
+      + '<path d="M12 4.6v3.2M12 16.2v3.2M4.6 12h3.2M16.2 12h3.2'
+      + 'M6.8 6.8 9 9M15 15l2.2 2.2M17.2 6.8 15 9M9 15l-2.2 2.2"></path>'
   };
 
   var TEMAS = [
@@ -38,10 +74,10 @@ var Moldura = (function () {
   ];
 
   function icone(tela) {
-    var caminho = DESENHOS[tela] || DESENHOS.dashboard;
+    var desenho = DESENHOS[tela] || DESENHOS.dashboard;
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"'
-      + ' aria-hidden="true"><path d="' + caminho + '"></path></svg>';
+      + ' aria-hidden="true">' + desenho + '</svg>';
   }
 
   /** As iniciais do nome, para o círculo da barra superior. */

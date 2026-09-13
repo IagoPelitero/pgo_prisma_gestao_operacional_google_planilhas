@@ -107,11 +107,28 @@ function formatoDaCelula(planilha, aba, linha, cabecalho) {
   return folha.getRange(linha, c + 1).getNumberFormats()[0][0];
 }
 
+/**
+ * Roda um trecho como outra pessoa, e devolve o crachá no fim.
+ *
+ * Sem o `finally`, um teste que estoura deixa a sessão logada como o usuário
+ * dele — e os testes seguintes falham por um motivo que não é o deles. Já
+ * aconteceu aqui: quatro falhas, uma causa.
+ */
+function comoUsuario(ambiente, email, corpo) {
+  const anterior = ambiente.emailAtual();
+  ambiente.definirEmail(email);
+  try {
+    return corpo();
+  } finally {
+    ambiente.definirEmail(anterior);
+  }
+}
+
 function resumo() {
   return { passaram, falhas };
 }
 
 module.exports = {
   carregar, secao, teste, igual, verdadeiro, contem, lanca, ehData,
-  celula, formatoDaCelula, resumo
+  celula, formatoDaCelula, comoUsuario, resumo
 };

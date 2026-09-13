@@ -58,7 +58,9 @@ function rodarTestesDaFundacao() {
     igual(campos.length, 55, 'campos semeados (35 de RET + 20 da Mesa)');
     const cpf = campos.find((c) => c.Cabecalho === 'Documento (CPF)');
     igual(cpf.Mascara, '000.000.000-00', 'máscara do CPF');
-    igual(cpf.TipoCampo, 'identificador');
+    igual(cpf.TipoCampo, 'documento', 'na tela é campo com máscara');
+    igual(chamar('RECC_DO_CAMPO_PARA_O_DADO')[cpf.TipoCampo], 'identificador',
+      'e na célula continua sendo identificador — texto, só dígitos');
     const id = campos.find((c) => c.Cabecalho === 'ID');
     igual(id.Ativo, 'NAO', 'a coluna Id existe no mapa mas não é campo de tela');
   });

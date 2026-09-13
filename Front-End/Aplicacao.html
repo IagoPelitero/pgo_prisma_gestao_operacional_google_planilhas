@@ -99,14 +99,10 @@ var Rotas = (function () {
     },
     cadastrarCaso: {
       titulo: 'Cadastrar Caso',
-      subtitulo: 'Registro e edição, com o formulário montado pelo canal.',
-      montar: function () {
-        return emConstrucao(4, [
-          'Formulário montado a partir da aba CAMPOS, campo a campo',
-          'Máscaras de CPF, protocolo e apólice — a planilha recebe só dígitos',
-          'Selo de SUSEP OK ou bloqueada no momento em que a SUSEP é digitada'
-        ]);
-      }
+      subtitulo: 'Registro de um caso novo, com o formulário montado pela mesa.',
+      montar: function (pacote) { return TelaCadastrarCaso.montar(pacote); },
+      ligar: function (pacote) { TelaCadastrarCaso.ligar(pacote); },
+      desligar: function () { TelaCadastrarCaso.desligar(); }
     },
     minhaPerformance: {
       titulo: 'Minha Performance',
@@ -217,6 +213,14 @@ var Aplicacao = (function () {
     if (!Rotas.existe(tela) || !podeVer(tela)) {
       tela = pacote.menu.length ? pacote.menu[0].tela : 'dashboard';
     }
+
+    // A tela que sai precisa poder se despedir: quem registrou atalho de
+    // teclado tem de removê-lo, senão o Ctrl+Enter do cadastro continuaria
+    // valendo dentro do Painel Analítico.
+    if (telaAtual && Rotas.existe(telaAtual)) {
+      var anterior = Rotas.pegar(telaAtual);
+      if (anterior.desligar) anterior.desligar();
+    }
     telaAtual = tela;
 
     var definicao = Rotas.pegar(tela);
@@ -226,10 +230,11 @@ var Aplicacao = (function () {
       + '<h2>' + Moldura.escapar(definicao.titulo) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
       + '</div>'
-      + definicao.montar();
+      + definicao.montar(pacote);
     document.title = pacote.identidade.nome + ' — ' + definicao.titulo;
 
     ligarMoldura();
+    if (definicao.ligar) definicao.ligar(pacote);
     fecharMenu();
     elemento('miolo').focus();
 
@@ -343,7 +348,17 @@ var Aplicacao = (function () {
       });
   }
 
-  return { iniciar: iniciar, irPara: irPara, trocarTema: trocarTema };
+  /** Redesenha a tela atual — usada quando ela mesma muda de estado. */
+  function remontar() {
+    if (telaAtual) irPara(telaAtual, true);
+  }
+
+  return {
+    iniciar: iniciar,
+    irPara: irPara,
+    remontar: remontar,
+    trocarTema: trocarTema
+  };
 })();
 
 document.addEventListener('DOMContentLoaded', Aplicacao.iniciar);

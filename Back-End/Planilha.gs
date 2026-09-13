@@ -368,13 +368,25 @@ function linhaEstaVazia_(valores) {
   return true;
 }
 
-/** Uma linha da planilha vira objeto, com as chaves iguais aos cabeçalhos. */
+/**
+ * Uma linha da planilha vira objeto, com as chaves iguais aos cabeçalhos.
+ *
+ * Além dos cabeçalhos, todo registro carrega `__id` e `__linha`.
+ *
+ * O `__id` existe porque a coluna de identificador NÃO tem o mesmo nome em
+ * toda aba: é `ID` na Mesa Diamante, `id` na RET Vida e `Id` nas abas de
+ * sistema. Quem consome o registro não deveria precisar saber a grafia de
+ * cada aba para achar o identificador — e quando precisava, lia `undefined`
+ * em silêncio e seguia adiante com ele.
+ */
 function montarRegistro_(estrutura, valores, numeroDaLinha) {
   var reg = {};
   for (var i = 0; i < estrutura.cabecalhos.length; i++) {
     if (!estrutura.cabecalhos[i]) continue;
     reg[estrutura.cabecalhos[i]] = valores[i];
   }
+  var iId = posicaoDaColuna_(estrutura, 'Id');
+  reg.__id = iId >= 0 ? converterParaIdentificador_(valores[iId]) : '';
   reg.__linha = numeroDaLinha;
   return reg;
 }
@@ -508,7 +520,8 @@ function montarLinhaParaGravar_(estrutura, dados, valoresAtuais) {
   var porChave = {};
   var nomeInformado = {};
   Object.keys(dados).forEach(function (chaveInformada) {
-    if (chaveInformada === '__linha') return;
+    // As chaves internas (__id, __linha) descrevem o registro, não são dele.
+    if (chaveInformada.indexOf('__') === 0) return;
     var chave = normalizarParaComparar_(chaveInformada);
     porChave[chave] = dados[chaveInformada];
     nomeInformado[chave] = chaveInformada;
@@ -603,7 +616,12 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
     garantirLinhasNaGrade_(estrutura.aba, primeira + linhas.length - 1);
     formatarEGravar_(estrutura, primeira, linhas);
 
-    for (var j = 0; j < gravados.length; j++) gravados[j].__linha = primeira + j;
+    for (var j = 0; j < gravados.length; j++) {
+      gravados[j].__linha = primeira + j;
+      gravados[j].__id = iId >= 0
+        ? converterParaIdentificador_(gravados[j][estrutura.cabecalhos[iId]])
+        : '';
+    }
     return gravados;
   } finally {
     trava.releaseLock();

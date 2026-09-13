@@ -93,9 +93,9 @@ function salvarUsuario(dados) {
     campos.DataCadastro = new Date();
     campos.UltimoAcesso = '';
     gravado = inserirRegistro_('USUARIOS', campos);
-    registrarAuditoria_('usuario.criar', 'USUARIOS', gravado.Id, '');
+    registrarAuditoria_('usuario.criar', 'USUARIOS', gravado.__id, '');
   }
-  return gravado.Id;
+  return gravado.__id;
 }
 
 /**

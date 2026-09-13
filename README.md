@@ -7,6 +7,9 @@ Desenvolvido por **Pelitero Labs**.
 
 ![O sistema em operação](Evolucao/imagens/sistema-tema-padrao.png)
 
+> **Uma etapa só está pronta quando funciona, a suíte passa cinco vezes e
+> está publicada aqui.** Etapa que fica na máquina de alguém não existe.
+
 ---
 
 ## O que é
@@ -65,7 +68,7 @@ Dentro de `Evolucao/`:
 | [`03-manutencao.md`](Evolucao/03-manutencao.md) | Como mexer sem quebrar — leia antes de tocar em código |
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
-| `Testes/` | A suíte: 87 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 112 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -117,13 +120,13 @@ nascem vazios.
 node Evolucao/Testes/rodar.js
 ```
 
-87 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+112 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 86 não valeriam nada.
+realmente corrompe — sem ele, os outros 111 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -135,6 +138,20 @@ Escreve `previa/sistema.html` e `previa/sem-acesso.html`, que abrem em qualquer
 navegador. São montados pelo **mesmo código do servidor**; só a ponte com o
 Google é substituída. Serve para conferir menu, temas e navegação sem publicar
 a cada mudança.
+
+---
+
+## O cadastro de casos
+
+O formulário **não está escrito no código**. Ele é montado a partir da aba
+`CAMPOS` toda vez que a tela abre — campo criado em Configurações aparece
+sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
+
+![A tela de cadastro](Evolucao/imagens/tela-cadastrar-caso.png)
+
+O selo da SUSEP responde três coisas, e as três são informação: **liberada**
+com o segmento, **bloqueada** com o motivo, ou **não encontrada** — que não é
+erro, é uma corretora que o cadastro ainda não conhece.
 
 ---
 
@@ -161,13 +178,13 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**3 de 12 etapas construídas.** O detalhe de cada uma está em
+**4 de 12 etapas construídas.** O detalhe de cada uma está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
 
-| ✅ | Fundação · Acesso · Casca |
+| ✅ | Fundação · Acesso · Casca · Cadastrar Caso |
 |---|---|
-| 🔨 | Cadastrar Caso |
-| ⏳ | Dashboard · Configurações · Buscar Caso · Painel Analítico · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico |
+| 🔨 | Dashboard |
+| ⏳ | Configurações · Buscar Caso · Painel Analítico · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico |
 
 ---
 

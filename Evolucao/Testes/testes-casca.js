@@ -73,6 +73,34 @@ function rodarTestesDaCasca() {
       'nenhum scriptlet pode sobrar sem ser executado');
   });
 
+  teste('o atributo hidden vence o display do CSS', () => {
+    // As telas de abertura usam display:grid, que ganha do `hidden` do
+    // navegador. Sem esta regra elas continuavam ocupando 100vh cada uma
+    // depois de escondidas, e o sistema abria com duas telas mortas acima.
+    contem(lerTela('Estilos.html'), '[hidden] { display: none !important; }');
+  });
+
+  teste('cada item do menu tem o seu próprio desenho', () => {
+    const { Moldura } = carregarScriptDaTela('Moldura.html');
+    const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'dashboard');
+
+    // Só os desenhos dos ITENS: o botão de encolher também tem um svg, e ele
+    // não faz parte do conjunto.
+    const listaDeItens = lateral.substring(
+      lateral.indexOf('lateral-itens'), lateral.indexOf('</ul>'));
+    const doMenu = listaDeItens.match(/<svg[\s\S]*?<\/svg>/g) || [];
+    igual(doMenu.length, 7, 'um desenho por item do menu');
+
+    const unicos = {};
+    doMenu.forEach((d) => { unicos[d] = true; });
+    igual(Object.keys(unicos).length, 7,
+      'dois itens com o mesmo desenho deixam o menu ilegível');
+    doMenu.forEach((d) => {
+      contem(d, 'viewBox="0 0 24 24"', 'todos na mesma grade');
+      contem(d, 'stroke-width="1.7"', 'todos com a mesma espessura');
+    });
+  });
+
   secao('Os quatro temas');
 
   teste('os quatro temas existem e definem as mesmas variáveis', () => {

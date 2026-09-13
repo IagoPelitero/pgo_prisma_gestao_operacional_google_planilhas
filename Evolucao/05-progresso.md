@@ -3,8 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 3 de 12 etapas construídas · 87 testes passando ·
-5.642 linhas.
+**Estado geral:** 4 de 12 etapas construídas · 112 testes passando.
 
 ---
 
@@ -18,9 +17,9 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 |---|---|---|---|
 | 1 | Fundação | ✅ pronta | 32 |
 | 2 | Acesso | ✅ pronta | 30 |
-| 3 | Casca | ✅ pronta | 25 |
-| 4 | Cadastrar Caso | 🔨 em construção | — |
-| 5 | Dashboard | ⏳ | — |
+| 3 | Casca | ✅ pronta | 27 |
+| 4 | Cadastrar Caso | ✅ pronta | 21 |
+| 5 | Dashboard | 🔨 próxima | — |
 | 6 | Configurações | ⏳ | — |
 | 7 | Buscar Caso | ⏳ | — |
 | 8 | Painel Analítico | ⏳ | — |
@@ -91,15 +90,47 @@ que teste nenhum pegaria.
 
 ---
 
-## Etapa 4 — Cadastrar Caso 🔨
+## Etapa 4 — Cadastrar Caso ✅
 
-A primeira tela que grava dado de verdade.
+**A primeira tela que grava dado de verdade.**
 
-- Formulário montado a partir da aba `CAMPOS`, campo a campo
-- Máscaras de CPF, protocolo e apólice — a planilha recebe **só dígitos**
-- Validação no navegador **e** no servidor, porque a do navegador não conta
-- Selo de SUSEP OK ou bloqueada no instante em que a SUSEP é digitada
-- Visibilidade por nível: oculto, só leitura ou edição, campo a campo
+| Arquivo | Entrega |
+|---|---|
+| `Back-End/Campos.gs` | O motor: monta o formulário a partir de `CAMPOS` e valida o que volta |
+| `Back-End/Casos.gs` | Registrar, editar, ocultar e o selo da SUSEP |
+| `Front-End/CadastrarCaso.html` | A tela, com máscara, seleção de mesa e o selo |
+
+O formulário **não está escrito em lugar nenhum do código**: é montado a
+partir da aba `CAMPOS` toda vez que a tela abre. Campo criado em Configurações
+aparece sozinho; campo oculto para o nível **nem chega ao navegador**.
+
+E porque o formulário é dado, o que volta da tela também é — então o servidor
+revalida tudo:
+
+- todos os problemas de uma vez, e não um por vez
+- valor de campo oculto mandado pela tela é **ignorado**, não gravado
+- data no futuro é recusada: o caso descreve algo que já aconteceu
+- seletor só aceita valor que está na lista
+- o escopo do nível vale para **escrever**, não só para ler
+
+A máscara vive só na tela. `000.123.456-78` chega à célula como
+`00012345678`, em texto.
+
+O selo da SUSEP tem três respostas, e as três são informação: **liberada**
+(com o segmento), **bloqueada** (com o motivo) e **não encontrada** — que não
+é erro, é uma corretora que o cadastro não conhece.
+
+**Bugs pegos:** 4 (itens 11 a 14), sendo um encontrado numa foto de página
+inteira e um que era defeito da própria ferramenta de prévia.
+
+---
+
+## Etapa 5 — Dashboard 🔨
+
+- Seletor de mesa e os cards do dia
+- Fila de trabalho com filtros de status, motivo, origem e próximo contato
+- O indicador de "finalizado na célula": finalização preenchida e área
+  responsável vazia
 
 ---
 
