@@ -679,6 +679,99 @@ rótulo para fora da tela.
 
 ---
 
+## Etapa 12 — Diagnóstico ✅
+
+A suíte prova que o **código** está certo. Ela não prova que **esta
+instalação** está certa: a planilha é editável à mão, e o que a suíte conferiu
+numa planilha de mentira pode não valer na de verdade seis meses depois.
+
+`Back-End/Diagnostico.gs` é a outra metade. Dez blocos, 49 verificações numa
+instalação de partida, e uma pergunta só: *este sistema, aqui, agora, está
+inteiro?*
+
+### A regra que manda no arquivo
+
+**Bloco que não consegue rodar é FALHA, nunca "pulado".**
+
+Está nas armadilhas herdadas do PGO 5.x, e custou caro lá: o diagnóstico
+antigo, quando um arquivo faltava, pulava o bloco que dependia dele — e
+terminava aprovando o build. Um verificador que aprova o que não conseguiu
+verificar é pior que verificador nenhum: dá confiança sem base.
+
+`rodarBloco_` embrulha cada bloco. Qualquer erro dentro dele vira um item de
+falha com o erro escrito, e bloco que devolve lista vazia também. Dois testes
+trancam isso — um apaga uma função de que o bloco depende, outro faz um bloco
+devolver nada.
+
+### O que cada bloco confere
+
+| bloco | o que pega |
+|---|---|
+| **Ambiente** | Fuso da planilha diferente do fuso da operação — um caso registrado depois das 21 h cai no dia seguinte. Senha de ADM não definida. Quanto do teto de 10 milhões de células a planilha já ocupa |
+| **Estrutura** | Aba do contrato apagada, coluna do contrato faltando (falha), coluna a mais (atenção — o sistema ignora o que não conhece) |
+| **Sequências** | Sequência ABAIXO do maior Id gravado, que é como o sistema anterior reemitiu Id em uso. E sequência com lixo |
+| **Identificadores** | Id repetido, dizendo em quais linhas. Coluna de Id fora do formato texto — a causa das 4.328 colisões. Linha sem Id (atenção) |
+| **Mesas** | Mesa apontando para aba que não existe, ou citando coluna que a aba não tem. Todas as mesas desligadas |
+| **Campos** | Campo apontando para coluna que não existe. Campo obrigatório desligado (atenção: desligado, a obrigatoriedade deixa de valer) |
+| **Painéis** | Card ou gráfico apontando para mesa ou coluna que não existe |
+| **Análises** | Receita apontando para mesa ou coluna que não existe |
+| **Acesso** | Usuário ativo com nível que sumiu, nível com JSON quebrado, e — a mais importante — **ninguém mais conseguindo abrir Configurações** |
+| **Tela** | Toda função que a tela chama existe no servidor; toda tela do menu tem rota |
+
+### O bloco da tela é o "build" desta etapa
+
+A tela chama o servidor pelo **nome da função, em texto**. Renomear uma função
+no servidor não quebra nada na hora: quebra quando alguém clica no botão,
+semanas depois, e a mensagem que aparece é a do Apps Script, que não diz qual
+função faltou.
+
+O bloco lê os arquivos de tela com `getRawContent()`, junta todo
+`Servidor.chamar('...')` e confere `typeof globalThis[nome] === 'function'`.
+São 66 funções hoje. O teste apaga uma de propósito e cobra a falha, com o
+nome da função e a tela em que ela é usada.
+
+### Duas portas, e a do editor não pede nada
+
+`diagnosticoRECC()` roda no editor do Apps Script, sem abrir o sistema — é a
+porta que importa justamente quando o sistema **não abre**. Ela não exige
+permissão nem senha, e não precisa: quem consegue abrir o editor já tem acesso
+a tudo, e negar ali só atrapalharia quem foi consertar. Escreve o laudo no log
+em texto, porque um JSON de trezentas linhas no log é ilegível, e ilegível é
+o mesmo que ausente.
+
+`diagnosticoDoSistema()` é a mesma coisa pela tela, em Configurações ›
+Estrutura. Exige `configurar` e deixa rastro na auditoria.
+
+### O laudo na tela esconde o que está certo
+
+Bloco todo verde nasce **fechado**, com a contagem ao lado ("13 conferidos").
+Bloco com atenção ou falha nasce aberto. Um laudo bom tem cinquenta linhas
+verdes, e ler cinquenta linhas verdes para achar as três vermelhas é o mesmo
+que não ter laudo. É `<details>` nativo — sem JavaScript, e já com o teclado
+funcionando.
+
+O "como arrumar" só aparece quando há o que arrumar. Repetir a instrução ao
+lado de tudo que está certo faria o olho parar de ver as três que importam.
+
+| Arquivo | Entrega |
+|---|---|
+| `Back-End/Diagnostico.gs` | Os dez blocos, as duas portas e o laudo em texto |
+| `Front-End/Configuracoes.html` | O laudo na tela, em Configurações › Estrutura |
+
+### Uma conferência curta e uma completa, não duas regras
+
+`verificarEstruturaRECC()`, do Instalador, continua sendo a de dois segundos
+para logo depois de copiar os arquivos. As duas leem o mesmo
+`conferirEstrutura_` — e tem teste cobrando que concordem. Duas versões da
+mesma regra sempre acabam discordando, e aí uma das duas está mentindo.
+
+**346 testes** — 33 desta etapa, e quase todos QUEBRAM alguma coisa de
+propósito numa planilha nova para cobrar a falha correspondente. Provar que o
+diagnóstico aprova uma instalação boa é o teste fácil e o menos útil: um
+verificador que sempre responde "aprovado" também passaria nele.
+
+---
+
 ## Responsividade
 
 Uma conferência à parte, num navegador de verdade:

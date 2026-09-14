@@ -260,6 +260,9 @@ function pontePreparada(respostas) {
     + '      conferirEstruturaDaPlanilha: function () {\n'
     + '        responder(respostas.configuracoes.laudo);\n'
     + '      },\n'
+    + '      diagnosticoDoSistema: function () {\n'
+    + '        responder(respostas.configuracoes.diagnostico);\n'
+    + '      },\n'
     + '      listarAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.trilha);\n'
     + '      },\n'
@@ -635,7 +638,8 @@ function gerar(pastaDeSaida) {
     laudo: chamar('conferirEstruturaDaPlanilha()'),
     trilha: chamar('listarAuditoria')(40),
     opcoesDeAnalise: chamar('opcoesDeAnalise()'),
-    analises: chamar('listarAnalises()')
+    analises: chamar('listarAnalises()'),
+    diagnostico: chamar('diagnosticoDoSistema()')
   };
 
   // A busca, com alguns termos já procurados de verdade. A prévia é estática:

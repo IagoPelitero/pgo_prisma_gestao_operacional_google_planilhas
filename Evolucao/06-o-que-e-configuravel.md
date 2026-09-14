@@ -36,6 +36,7 @@ abaixo com o motivo.
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
 | **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: mesa, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
+| **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, mesas, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
 
 ---
 

@@ -315,10 +315,16 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
           const fonte = fs.readFileSync(
             path.join(PASTA_DAS_TELAS, nome + '.html'), 'utf8');
           const template = {
+            /* O Apps Script devolve o arquivo cru, sem avaliar os scriptlets.
+               É por aqui que o Diagnostico lê as telas para conferir se toda
+               função que elas chamam existe no servidor. */
+            getRawContent() { return fonte; },
             evaluate() {
               const variaveis = {};
               Object.keys(template).forEach((chave) => {
-                if (chave !== 'evaluate') variaveis[chave] = template[chave];
+                if (chave !== 'evaluate' && chave !== 'getRawContent') {
+                  variaveis[chave] = template[chave];
+                }
               });
               return saidaHtml(montarTemplate(fonte, variaveis, ambiente.globais));
             }

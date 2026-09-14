@@ -483,7 +483,7 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 | 9 | Minha Performance | Indicadores individuais, meta, ranking | |
 | 10 | Tabela de Corretoras | `CANAIS` + segmento + SUSEP bloqueada | |
 | 11 | Abas de análise | Gerador `ANALISE_*` | **pronta** |
-| 12 | Diagnóstico | Verificação de build e de contrato | |
+| 12 | Diagnóstico | Verificação de build e de contrato | **pronta** |
 
 ---
 
@@ -627,7 +627,7 @@ produção no sistema anterior.
 | Menu vazio confundido com falta de permissão | Falha de acesso se anuncia com o motivo técnico |
 | Três cópias da regra de permissão, fora de sincronia | Uma fonte só, no servidor |
 | Código de topo dependendo de outro arquivo derrubava o projeto inteiro | Nenhum arquivo tem código de topo que dependa de outro |
-| Diagnóstico que pulava bloco quando o arquivo faltava, e aprovava o build | Função ausente é **falha** |
+| Diagnóstico que pulava bloco quando o arquivo faltava, e aprovava o build | `rodarBloco_` embrulha cada bloco: qualquer erro dentro dele vira item de **falha**, com o erro escrito. Bloco que não devolve item nenhum também é falha. Tem teste para os dois |
 | Simulador de teste que gravava texto como texto — nenhum teste via o bug real | O simulador converte igual ao Sheets |
 | Grade fixa em formulário variável deixava linha pela metade | Formulário em flex, com base por campo |
 

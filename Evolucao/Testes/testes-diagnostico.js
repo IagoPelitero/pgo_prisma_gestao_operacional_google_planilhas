@@ -1,0 +1,465 @@
+/**
+ * ============================================================================
+ * PGO — testes-diagnostico.js · a Etapa 12
+ * ============================================================================
+ * Um diagnóstico só vale pelo que ele PEGA. Provar que ele aprova uma
+ * instalação boa é o teste fácil e o menos útil: um verificador que sempre
+ * responde "aprovado" também passaria nele.
+ *
+ * Por isso quase todo teste daqui QUEBRA alguma coisa de propósito, numa
+ * planilha nova, e cobra a falha correspondente. Cada um deles é uma
+ * armadilha real — a maioria custou caro no PGO 5.x.
+ *
+ * O teste mais importante do arquivo é o do bloco que não consegue rodar. O
+ * diagnóstico anterior, quando um arquivo faltava, pulava o bloco e terminava
+ * aprovando o build. Verificador que aprova o que não conseguiu verificar é
+ * pior que verificador nenhum.
+ * ============================================================================
+ */
+
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
+  require('./ferramentas');
+
+function rodarTestesDeDiagnostico() {
+  console.log('\nEtapa 12 — Diagnóstico');
+
+  /** Uma planilha nova, instalada, para cada teste que vai quebrar algo. */
+  function instalacaoNova() {
+    const tudo = carregar('primeiro.adm@exemplo.com');
+    tudo.chamar('instalarRECC()');
+    return tudo;
+  }
+
+  /** O bloco pedido, pelo nome curto dele. */
+  function bloco(laudo, chave) {
+    return laudo.blocos.find((um) => um.chave === chave);
+  }
+
+  /** Todos os itens de falha do laudo inteiro, em texto, para procurar neles. */
+  function falhasEmTexto(laudo) {
+    const texto = [];
+    laudo.blocos.forEach((b) => b.itens.forEach((item) => {
+      if (item.situacao === 'falha') {
+        texto.push(item.oQue + ' | ' + item.detalhe + ' | ' + item.comoArrumar);
+      }
+    }));
+    return texto.join('\n');
+  }
+
+  secao('A instalação recém-nascida');
+
+  teste('uma instalação nova passa, com a senha de ADM como única pendência', () => {
+    const { chamar } = instalacaoNova();
+    const laudo = chamar('diagnosticoRECC()');
+
+    igual(laudo.aprovado, true, 'nenhuma falha numa planilha recém-instalada');
+    igual(laudo.resumo.falhas, 0);
+    igual(laudo.resumo.atencoes, 1, 'só a senha de administrador');
+    verdadeiro(laudo.resumo.total > 40,
+      'o laudo confere muita coisa, achei ' + laudo.resumo.total);
+  });
+
+  teste('os dez blocos aparecem sempre, na mesma ordem', () => {
+    const { chamar } = instalacaoNova();
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.blocos.map((b) => b.chave).join(','),
+      'ambiente,estrutura,sequencias,identificadores,mesas,campos,paineis,'
+      + 'analises,acesso,tela');
+  });
+
+  teste('definir a senha zera a única atenção', () => {
+    const { chamar } = instalacaoNova();
+    chamar('definirSenhaDeAdministrador')('segredo123', '');
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.resumo.atencoes, 0);
+    igual(laudo.aprovado, true);
+  });
+
+  teste('o laudo diz quanto do teto de células a planilha já ocupa', () => {
+    // É o único limite duro da plataforma, e o único que não avisa antes: no
+    // teto, a planilha simplesmente para de aceitar linha nova.
+    const { chamar } = instalacaoNova();
+    const item = bloco(chamar('diagnosticoRECC()'), 'ambiente').itens
+      .find((u) => u.oQue.indexOf('Células') === 0);
+    verdadeiro(!!item, 'o orçamento de células está no laudo');
+    igual(item.situacao, 'ok', 'uma instalação nova ocupa quase nada');
+    contem(item.detalhe, '10.000.000');
+  });
+
+  teste('a conferência curta e a completa concordam', () => {
+    // verificarEstruturaRECC() é a de dois segundos, para logo depois de
+    // copiar os arquivos. As duas leem o mesmo conferirEstrutura_ — não há
+    // duas versões da regra, há uma curta e uma completa. Se elas pudessem
+    // discordar, uma das duas estaria mentindo.
+    const { ambiente, chamar } = instalacaoNova();
+    const produtos = ambiente.planilha.getSheetByName('PRODUTOS');
+    ambiente.planilha.abas.splice(ambiente.planilha.abas.indexOf(produtos), 1);
+
+    contem(chamar('verificarEstruturaRECC()'), 'FALTA A ABA  PRODUTOS');
+    igual(bloco(chamar('diagnosticoRECC()'), 'estrutura').situacao, 'falha');
+  });
+
+  secao('O bloco que não consegue rodar');
+
+  teste('função que sumiu derruba o bloco — e vira FALHA, não bloco pulado', () => {
+    // A armadilha herdada do PGO 5.x, escrita como teste. Lá, quando um
+    // arquivo faltava, o diagnóstico pulava o bloco que dependia dele — e
+    // terminava APROVANDO o build.
+    //
+    // Atribuir undefined, e não delete: função declarada no topo vira
+    // propriedade não-configurável do global, e delete devolve false sem
+    // fazer nada. O teste passaria sem provar coisa alguma.
+    const { chamar } = instalacaoNova();
+    chamar("globalThis['conferirEstrutura_'] = undefined");
+
+    const laudo = chamar('diagnosticoRECC()');
+
+    igual(laudo.blocos.length, 10, 'o bloco continua no laudo');
+    const oDaEstrutura = bloco(laudo, 'estrutura');
+    igual(oDaEstrutura.situacao, 'falha');
+    contem(oDaEstrutura.itens[0].oQue, 'não conseguiu rodar');
+    contem(oDaEstrutura.itens[0].comoArrumar, 'confiança sem base');
+    igual(laudo.aprovado, false, 'e o laudo inteiro reprova');
+  });
+
+  teste('bloco que não conferiu nada também é falha', () => {
+    // Um bloco que roda e devolve lista vazia é tão suspeito quanto um que
+    // estoura: ou não rodou, ou não tem o que conferir.
+    const { chamar } = instalacaoNova();
+    chamar("globalThis['blocoDosCampos_'] = function () { return []; }");
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(bloco(laudo, 'campos').situacao, 'falha');
+    contem(bloco(laudo, 'campos').itens[0].oQue, 'não conferiu nada');
+  });
+
+  teste('aba do contrato apagada é falha, e o laudo diz como voltar', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    const produtos = ambiente.planilha.getSheetByName('PRODUTOS');
+    ambiente.planilha.abas.splice(ambiente.planilha.abas.indexOf(produtos), 1);
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'A aba PRODUTOS não existe');
+    contem(falhasEmTexto(laudo), 'instalarRECC',
+      'e diz que rodar de novo cria o que falta sem mexer no resto');
+  });
+
+  secao('A estrutura da planilha');
+
+  teste('coluna do contrato que sumiu é falha', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    const aba = ambiente.planilha.getSheetByName('BASE_MESA');
+    aba.deleteColumns(3, 1);              // some com "Status"
+    chamar('esquecerEstruturaLida_')('BASE_MESA');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'coluna(s) do contrato faltando');
+    contem(falhasEmTexto(laudo), 'Status');
+  });
+
+  teste('coluna a mais é atenção, e não falha', () => {
+    // Coluna que alguém acrescentou à mão não quebra nada: o sistema ignora
+    // o que não conhece. Reprovar por isso ensinaria a operação a ignorar o
+    // laudo inteiro.
+    const { chamar } = instalacaoNova();
+    const aba = chamar('planilhaAtiva_()').getSheetByName('PRODUTOS');
+    aba.insertColumnsAfter(aba.getMaxColumns(), 1);
+    aba.getRange(1, aba.getMaxColumns(), 1, 1).setValues([['Anotação minha']]);
+    chamar('esquecerEstruturaLida_')('PRODUTOS');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, true, 'coluna a mais não reprova a instalação');
+    const oDaEstrutura = bloco(laudo, 'estrutura');
+    igual(oDaEstrutura.situacao, 'atencao');
+    const item = oDaEstrutura.itens.find((u) => u.situacao === 'atencao');
+    contem(item.detalhe, 'Anotação minha');
+  });
+
+  secao('Os identificadores — a armadilha mais cara do PGO 5.x');
+
+  teste('Id repetido é falha, e o laudo diz em quais linhas', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    const aba = ambiente.planilha.getSheetByName('MESAS');
+    const primeiro = aba.getRange(2, 1, 1, 1).getValues()[0][0];
+    aba.getRange(3, 1, 1, 1).setValues([[primeiro]]);
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'Id(s) repetido(s)');
+    contem(falhasEmTexto(laudo), 'linhas 2 e 3');
+  });
+
+  teste('coluna de Id em formato Geral é falha', () => {
+    // A causa das 4.328 colisões: em Geral, o Sheets lê "0000000010" como 10.
+    const { ambiente, chamar } = instalacaoNova();
+    const aba = ambiente.planilha.getSheetByName('CANAIS');
+    chamar('inserirVariosRegistros_')('CANAIS', [
+      { Nome: 'Uma', Canal: 'Corretora', SUSEP: '1234567', Corretora: 'Uma' }
+    ]);
+    aba.getRange(2, 1, 1, 1).setNumberFormat('0');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'fora do formato texto');
+    contem(falhasEmTexto(laudo), '4.328');
+  });
+
+  teste('linha sem Id é atenção — ela existe, só não dá para editar', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    const aba = ambiente.planilha.getSheetByName('PRODUTOS');
+    aba.getRange(2, 2, 1, 1).setValues([['Digitado na mão']]);
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, true, 'linha sem Id não é motivo para reprovar');
+    const item = bloco(laudo, 'identificadores').itens
+      .find((u) => u.situacao === 'atencao');
+    contem(item.oQue, 'linha(s) sem Id');
+    contem(item.comoArrumar, 'Normalizar base');
+  });
+
+  secao('As sequências');
+
+  teste('sequência abaixo do maior Id gravado é falha', () => {
+    // Foi assim que o sistema anterior reemitiu Id em uso.
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.propriedades.set('RECC_SEQ_CAMPOS', '3');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'ABAIXO do maior Id gravado');
+    contem(falhasEmTexto(laudo), 'reemitir');
+  });
+
+  teste('sequência com lixo é falha, e não zero em silêncio', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.propriedades.set('RECC_SEQ_MESAS', 'sei lá');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'está com lixo');
+  });
+
+  secao('A configuração apontando para o vazio');
+
+  teste('mesa apontando para aba que não existe é falha', () => {
+    const { chamar } = instalacaoNova();
+    const mesa = chamar('lerRegistros_("MESAS")')[0];
+    chamar('atualizarRegistro_')('MESAS', mesa.Id, { Aba: 'BASE_QUE_NAO_TEM' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'aponta para uma aba que não existe');
+  });
+
+  teste('mesa citando coluna que a aba não tem é falha', () => {
+    const { chamar } = instalacaoNova();
+    const mesa = chamar('lerRegistros_("MESAS")')[0];
+    chamar('atualizarRegistro_')('MESAS', mesa.Id,
+      { ColunaDoStatus: 'coluna inventada' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'cita coluna que a aba não tem');
+    contem(falhasEmTexto(laudo), 'coluna inventada');
+  });
+
+  teste('a fila em GRUPOS é lida certo — e não acusada de coluna inventada', () => {
+    // ColunasDaFila aceita duas escritas: plana e em grupos. Ler só a plana
+    // faria o diagnóstico reprovar uma mesa perfeitamente configurada — e um
+    // laudo que reclama do que está certo é um laudo que ninguém lê.
+    const { chamar } = instalacaoNova();
+    const laudo = chamar('diagnosticoRECC()');
+    igual(bloco(laudo, 'mesas').situacao, 'ok');
+
+    const mesas = chamar('lerRegistros_("MESAS")');
+    const comGrupos = mesas.filter(
+      (m) => String(m.ColunasDaFila).indexOf(':') >= 0);
+    verdadeiro(comGrupos.length > 0,
+      'pelo menos uma mesa de partida usa a escrita em grupos');
+  });
+
+  teste('todas as mesas desligadas é falha', () => {
+    const { chamar } = instalacaoNova();
+    chamar('lerRegistros_("MESAS")').forEach((mesa) => {
+      chamar('atualizarRegistro_')('MESAS', mesa.Id, { Ativo: false });
+    });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'Nenhuma mesa está ligada');
+  });
+
+  teste('campo apontando para coluna que não existe é falha', () => {
+    const { chamar } = instalacaoNova();
+    const campo = chamar('lerRegistros_("CAMPOS")')[0];
+    chamar('atualizarRegistro_')('CAMPOS', campo.Id,
+      { Cabecalho: 'coluna que sumiu' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'apontam para coluna que não existe');
+  });
+
+  teste('gráfico apontando para mesa que não existe é falha', () => {
+    const { chamar } = instalacaoNova();
+    const componente = chamar('lerRegistros_("PAINEIS")')[0];
+    chamar('atualizarRegistro_')('PAINEIS', componente.Id,
+      { MesaId: '9999999999' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'apontam para mesa que não existe');
+  });
+
+  teste('análise apontando para mesa que não existe é falha', () => {
+    const { chamar } = instalacaoNova();
+    const receita = chamar('lerRegistros_("ANALISES")')[0];
+    chamar('atualizarRegistro_')('ANALISES', receita.Id, { MesaId: '9999999999' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'aponta para mesa que não existe');
+  });
+
+  secao('O sistema precisa continuar tendo dono');
+
+  teste('ninguém podendo configurar é falha, e o laudo ensina a sair', () => {
+    // O jeito mais fácil de isto acontecer é aos poucos: alguém desativa um
+    // usuário, alguém tira uma permissão, e um dia não sobra ninguém que
+    // consiga abrir Configurações para desfazer.
+    const { chamar } = instalacaoNova();
+    chamar('lerRegistros_("CATALOGO")')
+      .filter((linha) => String(linha.Tipo) === 'NIVEL_ACESSO')
+      .forEach((nivel) => {
+        chamar('atualizarRegistro_')('CATALOGO', nivel.Id,
+          { Configuracao: JSON.stringify({
+            escopo: 'PROPRIOS', telas: ['dashboard'], acoes: [],
+            campos: {}, widgets: {} }) });
+      });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'Ninguém consegue mais abrir Configurações');
+    contem(falhasEmTexto(laudo), 'CATALOGO',
+      'o laudo diz como sair pela planilha, que é o único caminho que sobra');
+  });
+
+  teste('nível com configuração quebrada é falha, e não menu vazio', () => {
+    const { chamar } = instalacaoNova();
+    const nivel = chamar('lerRegistros_("CATALOGO")')
+      .find((linha) => String(linha.Tipo) === 'NIVEL_ACESSO');
+    chamar('atualizarRegistro_')('CATALOGO', nivel.Id,
+      { Configuracao: '{isto não é json' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'configuração quebrada');
+  });
+
+  teste('usuário ativo com nível inexistente é falha', () => {
+    const { chamar } = instalacaoNova();
+    const usuario = chamar('lerRegistros_("USUARIOS")')[0];
+    chamar('atualizarRegistro_')('USUARIOS', usuario.Id,
+      { NivelAcessoId: '9999999999' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'nível que não existe');
+  });
+
+  secao('A ligação entre a tela e o servidor');
+
+  teste('toda função que a tela chama existe no servidor', () => {
+    const { chamar } = instalacaoNova();
+    const item = bloco(chamar('diagnosticoRECC()'), 'tela').itens[0];
+    igual(item.situacao, 'ok');
+    contem(item.oQue, 'existem no servidor');
+  });
+
+  teste('função renomeada no servidor é pega antes do clique', () => {
+    // O caso real: alguém renomeia uma função no servidor, a tela continua
+    // chamando o nome velho, e nada quebra — até alguém apertar o botão,
+    // semanas depois, e receber a mensagem do Apps Script, que não diz qual
+    // função faltou.
+    const { chamar } = instalacaoNova();
+    chamar("globalThis['buscarCasos'] = undefined");
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), 'buscarCasos');
+    contem(falhasEmTexto(laudo), 'não existem no servidor');
+    contem(falhasEmTexto(laudo), 'BuscarCaso',
+      'e diz em qual tela ela é usada');
+  });
+
+  teste('todas as telas do menu têm rota no roteador', () => {
+    const { chamar } = instalacaoNova();
+    const itens = bloco(chamar('diagnosticoRECC()'), 'tela').itens;
+    const oDaRota = itens[itens.length - 1];
+    igual(oDaRota.situacao, 'ok');
+    contem(oDaRota.oQue, 'têm rota');
+  });
+
+  secao('As duas portas');
+
+  teste('a porta do editor não exige permissão nem login', () => {
+    // Quando doGet está quebrado, a tela não serve para diagnosticar nada —
+    // e quem abre o editor do Apps Script já tem acesso a tudo mesmo.
+    const { ambiente, chamar } = instalacaoNova();
+    comoUsuario(ambiente, 'ninguem@exemplo.com', () => {
+      const laudo = chamar('diagnosticoRECC()');
+      verdadeiro(laudo.resumo.total > 40, 'rodou mesmo sem usuário cadastrado');
+    });
+  });
+
+  teste('a porta da tela exige permissão de configurar', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    const operacao = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => String(i.Tipo) === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+    chamar('salvarUsuario')({
+      nome: 'Ana Operação', email: 'ana@exemplo.com',
+      nivelAcessoId: operacao.Id, ativo: true
+    });
+
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('diagnosticoDoSistema()'), 'não permite configurar');
+    });
+  });
+
+  teste('rodar pela tela deixa rastro na auditoria', () => {
+    const { chamar } = instalacaoNova();
+    chamar('diagnosticoDoSistema()');
+    const trilha = chamar('listarAuditoria')(5);
+    verdadeiro(trilha.some((linha) => linha.acao === 'diagnostico.rodar'),
+      'quem rodou e quando fica registrado');
+  });
+
+  secao('O laudo em texto');
+
+  teste('o log do editor sai legível, e não um JSON de trezentas linhas', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    chamar('diagnosticoRECC()');
+    const escrito = ambiente.registros.join('\n');
+
+    contem(escrito, 'DIAGNOSTICO DO RECC');
+    contem(escrito, 'APROVADO');
+    contem(escrito, '[OK] A estrutura da planilha');
+    contem(escrito, '  ! Não há senha de administrador');
+    verdadeiro(escrito.indexOf('{"') < 0, 'nada de JSON cru no log');
+  });
+
+  teste('reprovado aparece com a contagem de falhas', () => {
+    const { chamar } = instalacaoNova();
+    const mesa = chamar('lerRegistros_("MESAS")')[0];
+    chamar('atualizarRegistro_')('MESAS', mesa.Id, { Aba: 'NAO_EXISTE' });
+
+    const laudo = chamar('diagnosticoRECC()');
+    const texto = chamar('laudoEmTexto_')(laudo);
+    contem(texto, 'REPROVADO');
+    contem(texto, '  X ');
+  });
+}
+
+module.exports = { rodarTestesDeDiagnostico };

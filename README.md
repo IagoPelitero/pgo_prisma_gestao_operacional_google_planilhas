@@ -104,7 +104,16 @@ Dentro de `Evolucao/`:
    algum arquivo ficou para trás na cópia. Nenhum teste rodado fora do Apps
    Script pega isso.
 
-6. Abra o sistema e defina a senha de administrador.
+6. Para a conferência completa, execute **`diagnosticoRECC()`**. São dez
+   blocos — fuso, estrutura, sequências de Id, Ids repetidos, mesas, campos,
+   painéis, análises, quem consegue configurar, e se toda função que a tela
+   chama existe no servidor. Também só lê, e escreve o laudo no log.
+
+   > Ela roda no editor de propósito: é a porta que importa quando o sistema
+   > **não abre**. A mesma conferência está em Configurações › Estrutura,
+   > atrás de um botão.
+
+7. Abra o sistema e defina a senha de administrador.
 
 **A instalação recusa rodar sobre uma planilha que já tenha dado.** É a única
 rotina do sistema que cria estrutura; depois dela, nenhum caminho do produto
