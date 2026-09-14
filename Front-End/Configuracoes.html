@@ -742,6 +742,10 @@ var TelaConfiguracoes = (function () {
         mesa.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
         + 'a busca não estourar numa base grande.')
+      + campoDeTexto('metaMensalPorPessoa', 'Meta de casos por pessoa, no mês',
+        mesa.metaMensalPorPessoa,
+        'Aparece em Minha Performance como barra de progresso. Zero desliga: '
+        + 'mesa sem meta não inventa uma.')
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         mesa.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -766,6 +770,7 @@ var TelaConfiguracoes = (function () {
         colunaDoStatus: valorDe('colunaDoStatus'),
         colunasDaFila: valorDe('colunasDaFila'),
         colunasDaBusca: valorDe('colunasDaBusca'),
+        metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
         ordem: valorDe('ordem'),

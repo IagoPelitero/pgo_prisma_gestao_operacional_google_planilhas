@@ -69,7 +69,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 228 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 247 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -139,13 +139,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-228 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+247 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 227 não valeriam nada.
+realmente corrompe — sem ele, os outros 246 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -241,6 +241,26 @@ separação mínima sob daltonismo, 19,6 na visão normal. Um sétimo valor vira
 "Demais valores", nunca uma cor nova. E como três dos seis ficam abaixo de
 3:1 de contraste, todo gráfico traz o **número visível**, a **tabela** a um
 clique e a dica no passar do mouse — cor é a segunda leitura, nunca a única.
+
+---
+
+## A tela em que o analista se vê
+
+![Minha Performance](Evolucao/imagens/tela-minha-performance.png)
+
+As outras telas mostram a operação; esta mostra **uma pessoa**, e o cuidado é
+de outra natureza. Um número mal escolhido no Dashboard atrapalha uma decisão;
+aqui, atrapalha alguém.
+
+- **O ranking segue o alcance do nível.** Quem só enxerga os próprios casos não
+  vê nome de colega — vê a própria posição contra a média. E quem pode ver
+  recebe os **vizinhos**, não o pódio: um pódio diz pouco a quem está no meio e
+  demais sobre quem está embaixo
+- **Todo número vem com a sua base**, e a média da equipe aparece sempre
+- **No tempo médio, menos é melhor** — cair é verde. A mesma seta para baixo em
+  "concluídos" é o contrário
+- **O que não dá para calcular some**, em vez de aparecer zerado
+- **A meta é declarada, nunca inventada.** Mesa sem meta não ganha barra
 
 ---
 

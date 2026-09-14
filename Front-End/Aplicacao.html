@@ -102,13 +102,9 @@ var Rotas = (function () {
     minhaPerformance: {
       titulo: 'Minha Performance',
       subtitulo: 'Acompanhe seus resultados, evolução e principais indicadores.',
-      montar: function () {
-        return emConstrucao(9, [
-          'Casos trabalhados, concluídos, pendentes, tempo médio e taxa de retorno',
-          'Evolução da produtividade e distribuição por canal e status',
-          'Progresso da meta, ranking da equipe e atividades recentes'
-        ]);
-      }
+      montar: function (pacote) { return TelaMinhaPerformance.montar(pacote); },
+      ligar: function (pacote) { TelaMinhaPerformance.ligar(pacote); },
+      desligar: function () { TelaMinhaPerformance.desligar(); }
     },
     buscarCaso: {
       titulo: 'Buscar Caso',

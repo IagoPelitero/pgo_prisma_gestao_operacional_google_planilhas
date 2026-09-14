@@ -262,6 +262,10 @@ const RECC_ESQUEMA = {
       // sistema lê a base inteira — ler as 35 colunas de 200 mil linhas são
       // 7 milhões de células, e ler cinco são um milhão.
       { cabecalho: 'ColunasDaBusca', tipo: 'texto', protegido: false },
+      // Quantos casos por mês se espera de uma pessoa nesta mesa. Zero
+      // desliga a meta: mesa sem meta declarada não inventa uma, e a tela
+      // simplesmente não mostra a barra de progresso.
+      { cabecalho: 'MetaMensalPorPessoa', tipo: 'numero', protegido: false },
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },

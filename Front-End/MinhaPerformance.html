@@ -1,0 +1,268 @@
+<script>
+/* ============================================================================
+   PGO — MinhaPerformance.html · a tela em que o analista se vê
+   ============================================================================
+   As outras telas mostram a operação. Esta mostra UMA PESSOA, e o cuidado
+   aqui é de outra natureza: um número mal escolhido no Dashboard atrapalha
+   uma decisão; um número mal escolhido aqui atrapalha alguém.
+
+   O QUE ISSO MUDOU NO DESENHO:
+
+     Todo número vem com a base dele — "8 casos" sozinho não diz nada, "8
+     contra 6 no período anterior" diz. Comparação sem referência é o jeito
+     mais rápido de transformar um painel em ansiedade.
+
+     No tempo médio, MENOS é melhor: cair 20% é boa notícia, e a tela pinta de
+     verde. A mesma seta para baixo em "concluídos" é o contrário.
+
+     O ranking mostra os VIZINHOS, não o pódio. Um pódio completo diz muito
+     pouco a quem está no meio e diz demais sobre quem está embaixo. E quem só
+     enxerga os próprios casos não vê nome de colega nenhum — vê a própria
+     posição contra a média.
+
+     A média da equipe aparece sempre. "Abaixo da média" sem saber qual é a
+     média não é informação, é só desconforto.
+
+   Quem desenha os gráficos é o Graficos — o mesmo do Painel Analítico.
+   ============================================================================ */
+
+var TelaMinhaPerformance = (function () {
+
+  var mesaEscolhida = '';
+  var dias = 0;
+  var dados = null;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+      + '<div id="performance"><p class="carregando-campos">'
+      + 'Somando os seus números…</p></div>';
+  }
+
+  function carregar() {
+    var caixa = elemento('performance');
+    if (caixa) {
+      caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
+    }
+
+    Servidor.chamar('minhaPerformance', mesaEscolhida, dias)
+      .entao(function (resposta) { dados = resposta; desenhar(); })
+      .senao(function (erro) {
+        elemento('performance').innerHTML =
+          '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function desenhar() {
+    if (!dados.temResponsavel) {
+      elemento('performance').innerHTML = '<div class="cartao vazio">'
+        + '<strong>Esta mesa não diz quem é o responsável por cada caso.</strong>'
+        + '<p>Sem uma coluna de responsável não há "os meus casos" para somar. '
+        + 'Um administrador aponta essa coluna em Configurações → Mesas de '
+        + 'trabalho.</p></div>';
+      return;
+    }
+
+    elemento('performance').innerHTML = desenharCabeca()
+      + desenharIndicadores()
+      + desenharMeta()
+      + '<div class="graficos">'
+      + (dados.porDia ? cartaoDeGrafico(dados.porDia) : '')
+      + (dados.porSituacao ? cartaoDeGrafico(dados.porSituacao) : '')
+      + (dados.porCanal ? cartaoDeGrafico(dados.porCanal) : '')
+      + '</div>'
+      + '<div class="performance-baixo">'
+      + desenharEquipe() + desenharRecentes() + '</div>';
+
+    ligar();
+  }
+
+  function desenharCabeca() {
+    var periodos = [7, 15, 30, 60, 90].map(function (quantos) {
+      return '<option value="' + quantos + '"'
+        + (dados.periodo.dias === quantos ? ' selected' : '') + '>'
+        + 'Últimos ' + quantos + ' dias</option>';
+    }).join('');
+
+    return '<div class="filtros">'
+      + '<select class="filtro" id="periodo-da-performance" aria-label="Período">'
+      + periodos + '</select>'
+      + '<span class="contagem">' + escapar(dados.pessoa.nome)
+      + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
+      + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : '')
+      + '</span></div>';
+  }
+
+  /* --------------------------------------------------------- indicadores */
+
+  function desenharIndicadores() {
+    return '<div class="cartoes">' + dados.indicadores.map(function (um) {
+      return '<div class="indicador" title="' + escapar(um.explicacao) + '">'
+        + '<span class="rotulo">' + escapar(um.rotulo) + '</span>'
+        + '<strong class="numero">' + escapar(comUnidade(um)) + '</strong>'
+        + variacao(um) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function comUnidade(indicador) {
+    if (indicador.unidade === 'dias') {
+      return String(indicador.valor).replace('.', ',') + ' dias';
+    }
+    return String(indicador.valor);
+  }
+
+  /**
+   * A variação, e o que ela significa.
+   *
+   * No tempo médio, MENOS é melhor: cair 20% é boa notícia. A mesma seta para
+   * baixo em "concluídos" é o contrário — e pintar as duas da mesma cor faria
+   * a tela dar a notícia errada.
+   */
+  function variacao(indicador) {
+    if (indicador.variacao === null || indicador.variacao === undefined) {
+      // Sem base de comparação, o espaço fica em branco. Inventar "+100%"
+      // porque saiu de zero é ruído que a operação aprende a ignorar.
+      return '<span class="variacao vazia" aria-hidden="true">—</span>';
+    }
+    var subiu = indicador.variacao >= 0;
+    var boaNoticia = indicador.menorEhMelhor ? !subiu : subiu;
+    if (indicador.variacao === 0) boaNoticia = null;
+
+    return '<span class="variacao ' + (boaNoticia === null ? 'igual'
+      : (boaNoticia ? 'subiu' : 'desceu')) + '">'
+      + (subiu ? '▲' : '▼') + ' ' + Math.abs(indicador.variacao) + '%'
+      + '<em>vs. período anterior</em></span>';
+  }
+
+  /* ---------------------------------------------------------------- meta */
+
+  function desenharMeta() {
+    if (!dados.meta) return '';
+    var meta = dados.meta;
+    var bateu = meta.percentualReal >= 100;
+
+    return '<section class="cartao meta">'
+      + '<header><h3>Meta do período</h3>'
+      + '<span class="meta-numero' + (bateu ? ' bateu' : '') + '">'
+      + meta.feito + ' <em>de ' + meta.alvo + '</em></span></header>'
+      + '<div class="barra-da-meta" role="progressbar" aria-valuenow="'
+      + meta.percentualReal + '" aria-valuemin="0" aria-valuemax="100"'
+      + ' aria-label="Progresso da meta">'
+      + '<span style="width:' + meta.percentual + '%"></span></div>'
+      + '<p class="meta-explica">' + escapar(meta.rotulo)
+      + (bateu ? ' · <strong>meta batida</strong>' : '') + '</p>'
+      + '</section>';
+  }
+
+  /* ------------------------------------------------------------- gráficos */
+
+  function cartaoDeGrafico(componente) {
+    return '<section class="cartao grafico largura-' + componente.largura + '">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
+      + '</h3></header>'
+      + Graficos.desenhar(componente) + '</section>';
+  }
+
+  /* -------------------------------------------------------------- equipe */
+
+  function desenharEquipe() {
+    var equipe = dados.equipe;
+    if (!equipe.disponivel) return '';
+
+    var meuLugar = equipe.minhaPosicao
+      ? '<p class="equipe-lugar"><strong>' + equipe.meuValor + ' caso(s)</strong>'
+        + ' · a média da equipe é <strong>' + String(equipe.media).replace('.', ',')
+        + '</strong> entre ' + equipe.quantasPessoas + ' pessoas</p>'
+      : '<p class="equipe-lugar">Você ainda não tem casos neste período.</p>';
+
+    if (!equipe.podeVerNomes) {
+      // Quem só enxerga os próprios casos não vê nome de colega. Mostrar a
+      // lista aqui seria uma porta dos fundos — e a mais constrangedora que
+      // existe num sistema de trabalho.
+      return '<section class="cartao equipe">'
+        + '<h3>Você e a equipe</h3>' + meuLugar
+        + '<p class="equipe-nota">O seu nível de acesso mostra os seus casos, '
+        + 'então aqui você se compara com a <strong>média</strong> — e não com '
+        + 'uma lista de nomes.</p></section>';
+    }
+
+    var linhas = equipe.lista.map(function (pessoa) {
+      var acimaDaMedia = pessoa.valor >= equipe.media;
+      return '<li class="' + (pessoa.souEu ? 'sou-eu' : '') + '">'
+        + '<span class="posicao">' + pessoa.posicao + 'º</span>'
+        + '<span class="nome">' + escapar(pessoa.nome)
+        + (pessoa.souEu ? ' <em>você</em>' : '') + '</span>'
+        + '<span class="valor tom-' + (acimaDaMedia ? 'bom' : 'neutro') + '">'
+        + pessoa.valor + '</span></li>';
+    }).join('');
+
+    return '<section class="cartao equipe">'
+      + '<h3>Você e a equipe</h3>' + meuLugar
+      + '<ul class="ranking">' + linhas + '</ul>'
+      + '<p class="equipe-nota">A lista mostra quem está <strong>em volta de '
+      + 'você</strong>, e não o pódio: um pódio completo diz pouco a quem está '
+      + 'no meio e diz demais sobre quem está embaixo.</p></section>';
+  }
+
+  /* ------------------------------------------------------------ recentes */
+
+  function desenharRecentes() {
+    if (!dados.recentes.length) {
+      return '<section class="cartao equipe"><h3>O que você fez</h3>'
+        + '<p class="equipe-nota">Nada registrado ainda neste sistema.</p>'
+        + '</section>';
+    }
+
+    return '<section class="cartao equipe"><h3>O que você fez</h3>'
+      + '<ul class="trilha">' + dados.recentes.map(function (passo) {
+        var texto = '<strong>' + escapar(passo.acao) + '</strong>'
+          + (passo.detalhe ? '<em>' + escapar(passo.detalhe) + '</em>' : '')
+          + '<span>' + escapar(passo.quando) + '</span>';
+        return '<li>' + (passo.abre
+          ? '<button type="button" class="passo-abre" data-caso-recente="'
+            + escapar(passo.registro) + '">' + texto + '</button>'
+          : texto) + '</li>';
+      }).join('') + '</ul></section>';
+  }
+
+  /* ---------------------------------------------------------------- ligar */
+
+  function ligar() {
+    var periodo = elemento('periodo-da-performance');
+    if (periodo) {
+      periodo.addEventListener('change', function () {
+        dias = Number(this.value);
+        carregar();
+      });
+    }
+
+    var abrir = document.querySelectorAll('[data-caso-recente]');
+    for (var i = 0; i < abrir.length; i++) {
+      abrir[i].addEventListener('click', function () {
+        CasoEmModal.abrir(mesaEscolhida,
+          this.getAttribute('data-caso-recente'), carregar);
+      });
+    }
+
+    Graficos.ligarDica(elemento('performance'));
+  }
+
+  function ligarTela() {
+    SeletorDeMesa.ligar(function (idDaMesa) {
+      mesaEscolhida = idDaMesa;
+      Aplicacao.remontar();
+    });
+    carregar();
+  }
+
+  function desligar() { Graficos.tirarDica(); }
+
+  return { montar: montar, ligar: ligarTela, desligar: desligar };
+})();
+</script>

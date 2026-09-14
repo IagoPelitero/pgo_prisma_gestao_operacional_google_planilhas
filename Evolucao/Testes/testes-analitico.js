@@ -348,26 +348,44 @@ function rodarTestesDoAnalitico() {
     // O Apps Script serve a página num quadro isolado: cada dependência
     // externa é mais um ponto que pode não carregar, e gráfico que não
     // carrega é pior que gráfico nenhum — deixa um buraco na tela.
-    const tela = fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End',
-      'PainelAnalitico.html'), 'utf8');
-    verdadeiro(tela.indexOf('<script src') < 0 && tela.indexOf('cdn.') < 0,
-      'nenhum arquivo de fora');
-    contem(tela, '<svg viewBox=', 'o desenho é nosso');
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const desenho = fs.readFileSync(path.join(pasta, 'Graficos.html'), 'utf8');
+    const tela = fs.readFileSync(path.join(pasta, 'PainelAnalitico.html'), 'utf8');
+
+    [desenho, tela].forEach((fonte) => {
+      verdadeiro(fonte.indexOf('<script src') < 0 && fonte.indexOf('cdn.') < 0,
+        'nenhum arquivo de fora');
+    });
+    contem(desenho, '<svg viewBox=', 'o desenho é nosso');
     contem(tela, 'CasoEmModal.abrir(', 'e o caso abre no mesmo modal das outras telas');
+  });
+
+  teste('quem desenha é um módulo só, usado pelas duas telas', () => {
+    // Regra copiada em dois lugares é regra que um dia diverge — e num
+    // gráfico a divergência não dá erro: vira uma barra um pouco mais alta
+    // do que devia, e alguém decide alguma coisa com base nela.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    ['PainelAnalitico.html', 'MinhaPerformance.html'].forEach((nome) => {
+      const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
+      contem(fonte, 'Graficos.desenhar(', nome + ' pede o desenho ao módulo');
+      verdadeiro(fonte.indexOf('function desenharPizza') < 0
+        && fonte.indexOf('function arcoDaRosca') < 0,
+        nome + ' não pode ter a sua própria cópia do desenho');
+    });
   });
 
   teste('todo gráfico tem rótulo direto e uma tabela por baixo', () => {
     // Três dos seis tons da paleta ficam abaixo de 3:1 de contraste com o
     // fundo claro. A regra que compensa isso é esta: o número sempre visível,
     // e uma leitura sem cor nenhuma a um clique de distância.
-    const tela = fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End',
-      'PainelAnalitico.html'), 'utf8');
-    contem(tela, 'valor-da-barra', 'a barra em pé mostra o número');
-    contem(tela, 'valor-deitado', 'a deitada também');
-    contem(tela, 'class="valor"', 'e a legenda da pizza');
-    contem(tela, 'desenharTabela', 'e existe a tabela de números');
-    contem(tela, 'data-dica', 'com dica no passar do mouse');
-    contem(tela, 'tabindex="0"', 'e alcançável pelo teclado');
+    const desenho = fs.readFileSync(path.join(__dirname, '..', '..',
+      'Front-End', 'Graficos.html'), 'utf8');
+    contem(desenho, 'valor-da-barra', 'a barra em pé mostra o número');
+    contem(desenho, 'valor-deitado', 'a deitada também');
+    contem(desenho, 'class="valor"', 'e a legenda da pizza');
+    contem(desenho, 'function tabela(', 'e existe a tabela de números');
+    contem(desenho, 'data-dica', 'com dica no passar do mouse');
+    contem(desenho, 'tabindex="0"', 'e alcançável pelo teclado');
   });
 
   teste('a paleta dos gráficos é a mesma em todos os quatro temas', () => {

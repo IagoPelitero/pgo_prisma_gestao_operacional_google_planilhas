@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 8 de 12 etapas construídas · 228 testes passando.
+**Estado geral:** 9 de 12 etapas construídas · 247 testes passando.
 
 ---
 
@@ -23,7 +23,7 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 6 | Configurações | ✅ pronta | 35 |
 | 7 | Buscar Caso | ✅ pronta | 17 |
 | 8 | Painel Analítico | ✅ pronta | 24 |
-| 9 | Minha Performance | ⏳ | — |
+| 9 | Minha Performance | ✅ pronta | 19 |
 | 10 | Tabela de Corretoras | ⏳ | — |
 | 11 | Abas de análise | ⏳ | — |
 | 12 | Diagnóstico | ⏳ | — |
@@ -402,6 +402,72 @@ caso nenhum.
 
 Ponto e vírgula e vírgula decimal — que é como o Excel em português abre sem
 perguntar nada. Segue a permissão de `exportar`.
+
+---
+
+## Etapa 9 — Minha Performance ✅
+
+**As outras telas mostram a operação. Esta mostra uma pessoa — e o cuidado
+aqui é de outra natureza.**
+
+`Back-End/Performance.gs` e `Front-End/MinhaPerformance.html`, 19 testes.
+
+Um número mal escolhido no Dashboard atrapalha uma decisão. Um número mal
+escolhido aqui atrapalha alguém. Quatro decisões saíram disso:
+
+### 1. O ranking segue o alcance do nível
+
+Quem só enxerga os próprios casos **não vê nome de colega nenhum** — vê a
+própria posição contra a média da equipe. Mostrar a lista a quem não pode ver
+os casos dos outros seria uma porta dos fundos, e ainda por cima a mais
+constrangedora que existe num sistema de trabalho.
+
+Quem pode ver recebe a lista — mas dos **vizinhos**, não o pódio. Um pódio
+completo diz muito pouco a quem está no meio e diz demais sobre quem está
+embaixo.
+
+### 2. Todo número vem com a sua base
+
+"8 casos" sozinho não diz nada; "8 contra 6 no período anterior" diz. E a
+média da equipe aparece **sempre**: "abaixo da média" sem saber qual é a média
+não é informação, é só desconforto.
+
+Sem base de comparação a variação fica **em branco** — inventar "+100%" porque
+saiu de zero é ruído que a operação aprende a ignorar, junto com a variação
+que importa.
+
+### 3. Menos é melhor, às vezes
+
+No **tempo médio até concluir**, cair 20% é boa notícia — e a tela pinta de
+verde. A mesma seta para baixo em "concluídos" é o contrário. Pintar as duas
+da mesma cor faria a tela dar a notícia errada.
+
+### 4. O que não dá para calcular não aparece
+
+Tempo médio exige que a mesa declare a coluna de finalização. Sem ela, o
+indicador **some** — não aparece zerado, que pareceria desempenho ruim. Mesa
+sem coluna de responsável não mostra zero: mostra o que falta configurar.
+
+### A meta é declarada, nunca inventada
+
+`MESAS.MetaMensalPorPessoa`, e zero desliga. Alvo tirado do nada é pior que
+alvo nenhum: ele parece oficial, e ninguém sabe de onde saiu. A barra é
+proporcional ao período escolhido, e passar da meta **enche a barra** — o
+número diz o resto. Barra estourando a caixa é defeito, não conquista.
+
+### "O que você fez"
+
+A trilha da própria pessoa, e **só o que é trabalho**: cadastrou, alterou,
+mudou situação, procurou. Mexer numa configuração é ação de quem administra, e
+essa trilha completa vive em Configurações — aqui é a memória de quem atende,
+e ela não pode virar log de sistema.
+
+### E o desenho dos gráficos virou um módulo
+
+`Front-End/Graficos.html`. Duas telas desenham gráficos e agora não têm duas
+cópias — pela razão que já custou caro aqui: regra copiada em dois lugares é
+regra que um dia diverge, e num gráfico a divergência não dá erro. Vira uma
+barra um pouco mais alta do que devia.
 
 ---
 

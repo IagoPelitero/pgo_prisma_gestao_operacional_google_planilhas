@@ -1438,6 +1438,75 @@ table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-n
   .grafico-corpo.pizza .desenho { flex-basis: 160px; }
 }
 
+/* ================================================== minha performance === */
+.meta { padding: 16px 18px; margin-top: 14px; }
+.meta header {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
+  margin-bottom: 12px;
+}
+.meta h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.meta-numero {
+  margin-left: auto; font-size: 22px; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--texto);
+}
+.meta-numero.bateu { color: var(--bom); }
+.meta-numero em { font-style: normal; font-size: 14px; font-weight: 400; color: var(--tenue); }
+
+.barra-da-meta {
+  height: 10px; border-radius: 999px; background: var(--superficie-2);
+  overflow: hidden;
+}
+.barra-da-meta span {
+  display: block; height: 100%; border-radius: 999px;
+  background: var(--destaque); transition: width var(--transicao);
+}
+.meta-explica { margin: 10px 0 0; font-size: 12.5px; color: var(--tenue); }
+
+/* A variação sabe quando "para baixo" é boa notícia: no tempo médio, cair é
+   bom, e pintar de vermelho ali daria a notícia errada. */
+.variacao.igual { color: var(--tenue); }
+
+.performance-baixo {
+  display: grid; gap: 14px; margin-top: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: start;
+}
+.equipe { padding: 16px 18px; }
+.equipe h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: -.01em; }
+.equipe-lugar { margin: 0 0 12px; font-size: 13.5px; color: var(--suave); }
+.equipe-nota {
+  margin: 12px 0 0; font-size: 12px; color: var(--tenue); line-height: 1.45;
+}
+
+.ranking { list-style: none; margin: 0; padding: 0; }
+.ranking li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--raio-pequeno); font-size: 13.5px;
+}
+.ranking li.sou-eu { background: var(--destaque-tenue); font-weight: 600; }
+.ranking .posicao {
+  font-family: var(--fonte-dado); font-size: 12px; color: var(--tenue);
+  min-width: 26px;
+}
+.ranking li.sou-eu .posicao { color: var(--destaque); }
+.ranking .nome {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ranking .nome em {
+  font-style: normal; font-size: 11px; color: var(--destaque);
+  text-transform: uppercase; letter-spacing: .06em; margin-left: 4px;
+}
+.ranking .valor {
+  font-variant-numeric: tabular-nums; font-weight: 600; color: var(--tom, var(--texto));
+}
+
+.passo-abre {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 0; padding: 0; font: inherit; color: inherit;
+}
+.passo-abre:hover strong { color: var(--destaque); }
+
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
   .lateral {

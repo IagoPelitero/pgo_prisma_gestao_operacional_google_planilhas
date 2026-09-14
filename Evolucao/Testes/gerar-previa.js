@@ -114,6 +114,9 @@ function pontePreparada(respostas) {
     + '      opcoesDaBusca: function () {\n'
     + '        responder(respostas.busca.opcoes);\n'
     + '      },\n'
+    + '      minhaPerformance: function (idDaMesa) {\n'
+    + '        responder(respostas.performance[idDaMesa]);\n'
+    + '      },\n'
     + '      painelAnalitico: function (idDaMesa) {\n'
     + '        responder(respostas.analitico.paineis[idDaMesa]);\n'
     + '      },\n'
@@ -282,7 +285,7 @@ function gerar(pastaDeSaida) {
 
   chamar('inserirVariosRegistros_')('BASE_RET', [
     {
-      'data de recepção do protocolo': diasAtras(7), analista: 'Marcos Vieira',
+      'data de recepção do protocolo': diasAtras(7), analista: 'Ana Martins',
       SUSEP: '1234567', segmento: 'Diamante',
       'Código origem da proposta': '0000000101', 'número da proposta': '0000010024',
       'nome do cliente': 'Cliente Fictício 024', 'cod produto': '0000000031',
@@ -329,7 +332,7 @@ function gerar(pastaDeSaida) {
       descrição: 'Cliente pediu para retornar na segunda-feira.'
     },
     {
-      'data de recepção do protocolo': diasAtras(4), analista: 'Patrícia Nunes',
+      'data de recepção do protocolo': diasAtras(4), analista: 'Ana Martins',
       SUSEP: '1234567', segmento: 'Diamante',
       'Código origem da proposta': '0000000104', 'número da proposta': '0000010021',
       'nome do cliente': 'Cliente Fictício 021', 'cod produto': '0000000031',
@@ -361,7 +364,7 @@ function gerar(pastaDeSaida) {
       descrição: 'Enviada proposta de contraoferta; aguardando resposta.'
     },
     {
-      'data de recepção do protocolo': diasAtras(2), analista: 'Patrícia Nunes',
+      'data de recepção do protocolo': diasAtras(2), analista: 'Ana Martins',
       SUSEP: '1234567', segmento: 'Diamante',
       'Código origem da proposta': '0000000106', 'número da proposta': '0000010019',
       'nome do cliente': 'Cliente Fictício 019', 'cod produto': '0000000033',
@@ -574,6 +577,19 @@ function gerar(pastaDeSaida) {
     exportados: exportados
   };
 
+  // Uma meta na RET, só na prévia, para a barra de progresso ter o que
+  // mostrar. O instalador de verdade deixa a meta em zero — mesa sem meta
+  // declarada não inventa uma.
+  chamar('salvarMesa')(Object.assign(
+    {}, chamar('listarMesasConfiguraveis()').find((m) => m.aba === 'BASE_RET'),
+    { metaMensalPorPessoa: 40 }));
+
+  // Minha Performance, de quem está entrando na prévia.
+  const performance = {};
+  pacote.mesas.forEach((mesa) => {
+    performance[mesa.id] = chamar('minhaPerformance')(mesa.id, 30);
+  });
+
   // E a mesma instalação vista por quem não está cadastrado.
   ambiente.definirEmail('nao.cadastrado@exemplo.com');
   const telaSemAcesso = chamar('doGet()').getContent();
@@ -583,7 +599,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
-      busca, analitico
+      busca, analitico, performance
     })
       + '</head>');
 

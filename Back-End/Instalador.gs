@@ -222,6 +222,7 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Responsável: analista',
       ColunasDaBusca: 'protocolo, CPF, Num_apolice, número da proposta, '
         + 'nome do cliente',
+      MetaMensalPorPessoa: 0,
       ColunaDaFinalizacao: 'data da transmissão',
       ColunaDaAreaResponsavel: '',
       Icone: 'escudo',
@@ -241,6 +242,7 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Corretora: Corretora, SUSEP'
         + '; Responsável: Analista',
       ColunasDaBusca: 'Nome do segurado, Documento (CPF), SUSEP, Corretora',
+      MetaMensalPorPessoa: 0,
       ColunaDaFinalizacao: 'Data da finalização',
       ColunaDaAreaResponsavel: 'Área responsável',
       Icone: 'diamante',

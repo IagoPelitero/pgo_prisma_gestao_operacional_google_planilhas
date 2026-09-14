@@ -197,6 +197,7 @@ function mesasVisiveis_() {
         colunaDoStatus: mesa.ColunaDoStatus,
         colunasDaFila: mesa.ColunasDaFila,
         colunasDaBusca: mesa.ColunasDaBusca,
+        metaMensalPorPessoa: Number(mesa.MetaMensalPorPessoa) || 0,
         colunaDaFinalizacao: mesa.ColunaDaFinalizacao,
         colunaDaAreaResponsavel: mesa.ColunaDaAreaResponsavel,
         icone: mesa.Icone

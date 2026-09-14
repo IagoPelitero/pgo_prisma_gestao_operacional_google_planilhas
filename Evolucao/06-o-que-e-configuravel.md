@@ -25,6 +25,7 @@ abaixo com o motivo.
 | **Mesas de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Mesas de trabalho |
 | **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis → Cards |
 | **Gráficos do Painel Analítico** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
+| **Meta por pessoa** | Quantos casos por mês se espera de alguém na mesa. Zero desliga a barra de progresso | Mesas de trabalho |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
 | **Busca** | Em quais colunas cada mesa procura | Mesas de trabalho |

@@ -19,6 +19,7 @@ const { rodarTestesDoPainel } = require('./testes-painel');
 const { rodarTestesDeConfiguracoes } = require('./testes-configuracoes');
 const { rodarTestesDeBusca } = require('./testes-busca');
 const { rodarTestesDoAnalitico } = require('./testes-analitico');
+const { rodarTestesDePerformance } = require('./testes-performance');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -28,6 +29,7 @@ rodarTestesDoPainel();
 rodarTestesDeConfiguracoes();
 rodarTestesDeBusca();
 rodarTestesDoAnalitico();
+rodarTestesDePerformance();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));
