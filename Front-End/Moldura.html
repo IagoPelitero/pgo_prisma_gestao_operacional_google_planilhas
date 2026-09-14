@@ -63,6 +63,59 @@ var Moldura = (function () {
       + '<path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3'
       + 'M5.3 5.3 6.9 6.9M17.1 17.1l1.6 1.6M18.7 5.3 17.1 6.9M6.9 17.1l-1.6 1.6"></path>',
 
+    // --- os desenhos das SEÇÕES de Configurações --------------------------
+    // Um por seção, na mesma grade e na mesma espessura dos outros. O menu de
+    // Configurações é a única lista longa do sistema: sem ícone, oito linhas
+    // de texto viram um bloco só, e a pessoa lê todas para achar uma.
+
+    // campos do formulário: a etiqueta em cima, a caixa de digitar, a dica
+    campos:
+      '<path d="M4.2 6.2h7.6"></path>'
+      + '<rect x="3.4" y="9.4" width="17.2" height="5.6" rx="1.6"></rect>'
+      + '<path d="M4.2 18.6h11.4"></path>',
+
+    // usuários: duas pessoas, a de trás pela metade
+    usuarios:
+      '<circle cx="9.4" cy="8.4" r="3.4"></circle>'
+      + '<path d="M3.4 19.8a6 6 0 0 1 12 0"></path>'
+      + '<path d="M16.2 5.4a3.4 3.4 0 0 1 0 6"></path>'
+      + '<path d="M17.8 14.2a6 6 0 0 1 2.8 5.6"></path>',
+
+    // níveis de acesso: o escudo com o visto — o que passa e o que não passa
+    niveis:
+      '<path d="M12 3.2 19.4 6v6.1c0 4.3-3 7.5-7.4 8.7-4.4-1.2-7.4-4.4-7.4-8.7V6z"></path>'
+      + '<path d="m8.9 11.9 2.3 2.3L15.4 10"></path>',
+
+    // listas: os marcadores e as linhas
+    catalogo:
+      '<circle cx="4.7" cy="6.6" r="1.1"></circle>'
+      + '<circle cx="4.7" cy="12" r="1.1"></circle>'
+      + '<circle cx="4.7" cy="17.4" r="1.1"></circle>'
+      + '<path d="M9 6.6h11.3M9 12h11.3M9 17.4h11.3"></path>',
+
+    // mesas de trabalho: a bancada, com o tampo e as duas pernas
+    mesas:
+      '<rect x="2.9" y="6.2" width="18.2" height="4.2" rx="1.4"></rect>'
+      + '<path d="M5.9 10.4v7.4M18.1 10.4v7.4"></path>'
+      + '<path d="M5.9 14.1h12.2"></path>',
+
+    // identidade: a gota de tinta — nome, logo e cor são a aparência do PGO
+    identidade:
+      '<path d="M12 3.2c3.5 4.1 5.6 6.8 5.6 9.5a5.6 5.6 0 0 1-11.2 0c0-2.7 2.1-5.4 5.6-9.5z"></path>'
+      + '<path d="M9.2 13.4a2.8 2.8 0 0 0 2.8 2.8"></path>',
+
+    // painéis: o recorte da tela — a faixa de cima e a coluna da esquerda
+    paineis:
+      '<rect x="3.4" y="3.9" width="17.2" height="16.2" rx="2"></rect>'
+      + '<path d="M3.4 9.1h17.2"></path>'
+      + '<path d="M10.2 9.1v11"></path>',
+
+    // estrutura e auditoria: a prancheta do laudo, com o visto
+    estrutura:
+      '<path d="M9 4.4H7.4A1.6 1.6 0 0 0 5.8 6v13.2a1.6 1.6 0 0 0 1.6 1.6h9.2a1.6 1.6 0 0 0 1.6-1.6V6a1.6 1.6 0 0 0-1.6-1.6H15"></path>'
+      + '<rect x="9" y="2.8" width="6" height="3.2" rx="1"></rect>'
+      + '<path d="m9.2 13.2 2 2 3.8-3.8"></path>',
+
     // --- os desenhos das AÇÕES, na mesma grade e na mesma espessura -------
 
     // ver: o olho

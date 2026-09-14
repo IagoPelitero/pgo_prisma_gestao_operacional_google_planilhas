@@ -45,8 +45,14 @@ function resumoDasConfiguracoes() {
     podeMexerNaEstrutura: podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA),
     senhaDefinida: existeSenhaDeAdministrador_(),
     identidade: lerIdentidadeVisual_(),
+    /*
+      Os títulos são CURTOS de propósito: o menu tem uma coluna só, e um
+      título que quebra em duas linhas desalinha a contagem do lado direito.
+      O que o título deixou de dizer, a descrição diz — ela aparece inteira
+      assim que a seção é escolhida.
+    */
     secoes: [
-      { chave: 'campos', titulo: 'Campos do formulário',
+      { chave: 'campos', titulo: 'Campos',
         descricao: 'O que o cadastro pergunta, em cada mesa',
         quantidade: lerRegistros_('CAMPOS').length },
       { chave: 'usuarios', titulo: 'Usuários',
@@ -61,7 +67,7 @@ function resumoDasConfiguracoes() {
       { chave: 'mesas', titulo: 'Mesas de trabalho',
         descricao: 'As bases e o que cada painel mostra',
         quantidade: lerRegistros_('MESAS').length },
-      { chave: 'identidade', titulo: 'Identidade e segurança',
+      { chave: 'identidade', titulo: 'Identidade',
         descricao: 'Nome, logo, cor e a senha de administrador',
         quantidade: 0 },
       { chave: 'paineis', titulo: 'Painéis',
@@ -69,8 +75,8 @@ function resumoDasConfiguracoes() {
         quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
           return normalizarParaComparar_(linha.Ativo) === 'sim';
         }).length },
-      { chave: 'estrutura', titulo: 'Estrutura e auditoria',
-        descricao: 'O laudo da planilha e o que foi feito no sistema',
+      { chave: 'estrutura', titulo: 'Estrutura',
+        descricao: 'O laudo da planilha, a auditoria e a base antiga',
         quantidade: 0 }
     ],
     estrutura: {

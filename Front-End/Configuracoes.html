@@ -31,7 +31,6 @@ var TelaConfiguracoes = (function () {
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
-  var acaoPendente = null;     // guardada enquanto a senha não vem
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -53,7 +52,10 @@ var TelaConfiguracoes = (function () {
   function desenharTudo() {
     elemento('config').innerHTML =
       '<nav class="config-secoes" id="config-secoes">' + desenharSecoes() + '</nav>'
+      + '<div class="config-meio">'
+      + '<p class="config-descricao" id="config-descricao"></p>'
       + '<div class="config-lista" id="config-lista"></div>'
+      + '</div>'
       + '<aside class="config-painel" id="config-painel"></aside>';
     ligarSecoes();
     carregarSecao();
@@ -73,12 +75,30 @@ var TelaConfiguracoes = (function () {
       return '<button type="button" class="config-secao'
         + (secao.chave === secaoAtual ? ' atual' : '') + '"'
         + ' data-secao="' + escapar(secao.chave) + '">'
+        + Moldura.icone(secao.chave)
         + '<span class="titulo">' + escapar(secao.titulo) + '</span>'
-        + '<span class="descricao">' + escapar(secao.descricao) + '</span>'
         + (secao.quantidade
-          ? '<span class="quantos">' + secao.quantidade + '</span>' : '')
+          ? '<span class="quantos">' + secao.quantidade + '</span>'
+          : '<span></span>')
         + '</button>';
     }).join('') + aviso;
+  }
+
+  /**
+   * A descrição da seção escolhida, na primeira linha da coluna do meio.
+   *
+   * Fica aqui, e não dentro de cada desenho de seção, porque cada seção
+   * reescreve a lista inteira quando carrega: um texto escrito lá dentro
+   * teria de ser repetido nas oito, e bastaria esquecer uma para a tela
+   * ficar sem explicação.
+   */
+  function atualizarDescricao() {
+    var onde = elemento('config-descricao');
+    if (!onde) return;
+    var achada = resumo.secoes.filter(function (secao) {
+      return secao.chave === secaoAtual;
+    })[0];
+    onde.textContent = achada ? achada.descricao : '';
   }
 
   function ligarSecoes() {
@@ -115,6 +135,7 @@ var TelaConfiguracoes = (function () {
    */
   function carregarSecao() {
     dados = {};
+    atualizarDescricao();
 
     if (secaoAtual === 'campos') return carregarCampos();
     if (secaoAtual === 'usuarios') return carregarUsuarios();
@@ -1391,63 +1412,12 @@ var TelaConfiguracoes = (function () {
    * pessoa ter de preencher tudo de novo. Refazer o formulário depois de
    * digitar a senha é o tipo de coisa que faz alguém desistir no meio.
    */
+  /**
+   * Pede a senha e roda a ação. O diálogo em si mora em
+   * SenhaDeAdministrador.html — é o mesmo que a Importação usa.
+   */
   function comSenhaDeAdministrador(acao) {
-    acaoPendente = acao;
-
-    if (!resumo.senhaDefinida) {
-      window.alert('Ainda não existe senha de administrador. Defina uma em '
-        + '"Identidade e segurança" antes de mexer na estrutura.');
-      acaoPendente = null;
-      return;
-    }
-    abrirDialogoDaSenha();
-  }
-
-  function abrirDialogoDaSenha() {
-    var caixa = document.createElement('div');
-    caixa.className = 'dialogo';
-    caixa.id = 'dialogo-senha';
-    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true"'
-      + ' aria-labelledby="dialogo-titulo">'
-      + '<h3 id="dialogo-titulo">Ação sem desfazer</h3>'
-      + '<p>Isto escreve na planilha de produção. Confirme com a senha de '
-      + 'administrador — ela libera as ações de estrutura por 5 minutos.</p>'
-      + '<form id="form-dialogo">'
-      + '<input type="password" id="senha-do-dialogo" autocomplete="off"'
-      + ' placeholder="Senha de administrador" aria-label="Senha de administrador">'
-      + '<p class="dialogo-erro" id="dialogo-erro" hidden></p>'
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Confirmar</button>'
-      + '<button type="button" class="botao vazado" id="dialogo-desistir">'
-      + 'Desistir</button></div></form></div>';
-    document.body.appendChild(caixa);
-
-    var campo = elemento('senha-do-dialogo');
-    campo.focus();
-
-    elemento('dialogo-desistir').addEventListener('click', fecharDialogoDaSenha);
-    elemento('form-dialogo').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('liberarComSenha', campo.value)
-        .entao(function () {
-          var acao = acaoPendente;
-          fecharDialogoDaSenha();
-          if (acao) acao();
-        })
-        .senao(function (erro) {
-          var aviso = elemento('dialogo-erro');
-          aviso.textContent = erro.message || String(erro);
-          aviso.hidden = false;
-          campo.value = '';
-          campo.focus();
-        });
-    });
-  }
-
-  function fecharDialogoDaSenha() {
-    var caixa = elemento('dialogo-senha');
-    if (caixa) caixa.parentNode.removeChild(caixa);
-    acaoPendente = null;
+    SenhaDeAdministrador.pedir(acao, !resumo.senhaDefinida);
   }
 
   /* ======================================================== peças da tela */
@@ -1592,7 +1562,7 @@ var TelaConfiguracoes = (function () {
       });
   }
 
-  function desligar() { fecharDialogoDaSenha(); }
+  function desligar() { SenhaDeAdministrador.fechar(); }
 
   return { montar: montar, ligar: ligar, desligar: desligar };
 })();

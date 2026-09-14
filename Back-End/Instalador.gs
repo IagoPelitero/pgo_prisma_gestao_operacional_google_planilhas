@@ -466,6 +466,12 @@ function cartoesIniciaisDoPainel_(idRet, idMesa) {
     'barras', 'produto', 'soma', 'valor do prêmio retido', 6, 1, 4));
   cartoes.push(novoGrafico(idRet, 'Casos por canal de entrada',
     'barras', 'canal', 'contagem', '', 6, 1, 5));
+  // Por analista: a mesma pergunta do "por área", uma camada abaixo. O
+  // recorte por área já existe sem gráfico nenhum — é o seletor de mesa no
+  // alto da tela, e cada mesa tem os gráficos dela. O que faltava era ver a
+  // distribuição DENTRO da área, e é isto.
+  cartoes.push(novoGrafico(idRet, 'Casos por analista',
+    'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
 
   cartoes.push(novoGrafico(idMesa, 'Entradas por dia, e a tendência',
     'barrasComLinha', 'Data de entrada', 'contagem', '', 0, 2, 1));
@@ -475,6 +481,8 @@ function cartoesIniciaisDoPainel_(idRet, idMesa) {
     'barrasDeitadas', 'Corretora', 'contagem', '', 6, 1, 3));
   cartoes.push(novoGrafico(idMesa, 'Casos por canal de entrada',
     'barras', 'Canal', 'contagem', '', 6, 1, 4));
+  cartoes.push(novoGrafico(idMesa, 'Casos por analista',
+    'barrasDeitadas', 'Analista', 'contagem', '', 6, 1, 5));
 
   return cartoes;
 }

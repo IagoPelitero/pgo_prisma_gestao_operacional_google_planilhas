@@ -260,6 +260,190 @@ function rodarTestesDeCorretoras() {
     });
   });
 
+  secao('A importação');
+
+  teste('cola do Excel: separado por TAB, com o cabeçalho junto', () => {
+    // É exatamente o que a área de transferência traz quando alguém seleciona
+    // um pedaço da planilha e aperta Ctrl+C.
+    const colado = [
+      'SUSEP\tCorretora\tCanal\tSegmento',
+      '7654321\tCorretora Nova\tCorretora\tDiamante',
+      '1234567\tCorretora ABC\tCorretora\tDiamante'
+    ].join('\n');
+
+    const conferido = chamar('conferirImportacao')('corretoras', colado);
+    verdadeiro(conferido.tinhaCabecalho, 'o cabeçalho foi reconhecido');
+    igual(conferido.resumo.total, 2, 'e não entrou na conta como corretora');
+    igual(conferido.resumo.novas, 1);
+    igual(conferido.resumo.iguais, 1, 'a ABC já está assim no cadastro');
+  });
+
+  teste('sem cabeçalho, vale a ordem declarada', () => {
+    const conferido = chamar('conferirImportacao')('corretoras',
+      '8888888;Corretora Sem Cabeçalho;Corretora;Demais corretoras');
+    igual(conferido.tinhaCabecalho, false);
+    igual(conferido.resumo.novas, 1);
+    igual(conferido.linhas[0].campos.corretora, 'Corretora Sem Cabeçalho');
+  });
+
+  teste('com cabeçalho, a ordem das colunas pode ser qualquer uma', () => {
+    // Quem exporta de outro sistema não recebe as colunas na ordem do PGO.
+    // Exigir a ordem certa faria a pessoa reorganizar a planilha antes —
+    // e é justamente o trabalho manual que esta tela veio tirar.
+    const conferido = chamar('conferirImportacao')('corretoras', [
+      'Segmento;Corretora;SUSEP',
+      'Diamante;Fora de Ordem;7777777'
+    ].join('\n'));
+    igual(conferido.linhas[0].campos.susep, '7777777');
+    igual(conferido.linhas[0].campos.corretora, 'Fora de Ordem');
+    igual(conferido.linhas[0].campos.segmento, 'Diamante');
+  });
+
+  teste('conferir não grava nada', () => {
+    const antes = chamar('tabelaDeCorretoras')('', '').corretoras.length;
+    chamar('conferirImportacao')('corretoras', '5555555;Fantasma');
+    igual(chamar('tabelaDeCorretoras')('', '').corretoras.length, antes,
+      'o passo do meio é só para ver — se gravasse, não haveria como desistir');
+  });
+
+  teste('linha sem o obrigatório é recusada, e diz por quê', () => {
+    const conferido = chamar('conferirImportacao')('corretoras', [
+      ';Sem SUSEP;Corretora;Diamante',
+      'ABC;Susep sem dígito;Corretora;Diamante',
+      '4444444;;Corretora;Diamante'
+    ].join('\n'));
+    igual(conferido.resumo.recusadas, 3);
+    contem(conferido.linhas[0].porque, 'SUSEP em branco');
+    contem(conferido.linhas[1].porque, 'sem nenhum dígito',
+      'SUSEP é identificador: texto sem dígito não vira SUSEP');
+    contem(conferido.linhas[2].porque, 'Corretora em branco');
+  });
+
+  teste('coluna vazia no começo não desloca a linha inteira', () => {
+    // Bug 23. A linha era aparada ANTES de ser partida, e com TAB o corte
+    // comia a primeira coluna quando ela vinha vazia: a corretora ia parar
+    // na SUSEP, o canal na corretora, e a recusa apontava para o campo
+    // errado. Quem apara é cada célula, depois de partida.
+    const conferido = chamar('conferirImportacao')('corretoras', [
+      'SUSEP\tCorretora\tCanal\tSegmento',
+      '\tSem SUSEP nenhuma\tCorretora\tDiamante'
+    ].join('\n'));
+
+    igual(conferido.linhas[0].campos.susep, '');
+    igual(conferido.linhas[0].campos.corretora, 'Sem SUSEP nenhuma',
+      'a corretora continua na coluna dela');
+    igual(conferido.linhas[0].campos.canal, 'Corretora');
+    igual(conferido.linhas[0].campos.segmento, 'Diamante');
+    contem(conferido.linhas[0].porque, 'SUSEP em branco',
+      'e a recusa aponta o campo certo');
+  });
+
+  teste('a mesma SUSEP duas vezes no texto colado é recusada na segunda', () => {
+    const conferido = chamar('conferirImportacao')('corretoras', [
+      '3333333;Primeira',
+      '3333333;Segunda'
+    ].join('\n'));
+    igual(conferido.resumo.novas, 1);
+    igual(conferido.resumo.recusadas, 1);
+    contem(conferido.linhas[1].porque, 'repetida');
+  });
+
+  teste('aplicar exige a senha de administrador', () => {
+    lanca(() => chamar('aplicarImportacao')('corretoras', '9876543;Qualquer'),
+      'exige a senha de administrador');
+  });
+
+  teste('com a senha liberada, aplicar cadastra e atualiza', () => {
+    chamar('definirSenhaDeAdministrador')('segredo123', '');
+    chamar('liberarComSenha')('segredo123');
+
+    const feito = chamar('aplicarImportacao')('corretoras', [
+      'SUSEP\tCorretora\tCanal\tSegmento',
+      '7654321\tCorretora Nova\tCorretora\tDiamante',
+      '2345678\tAgência Central\tAgente\tDiamante'
+    ].join('\n'));
+
+    igual(feito.criadas, 1);
+    igual(feito.atualizadas, 1, 'a Central passou de Demais para Diamante');
+
+    const tabela = chamar('tabelaDeCorretoras')('', '');
+    igual(tabela.corretoras.find((u) => u.susep === '7654321').corretora,
+      'Corretora Nova');
+    igual(tabela.corretoras.find((u) => u.susep === '2345678').segmento,
+      'Diamante');
+  });
+
+  teste('campo vazio no texto colado não apaga o que já existe', () => {
+    // Quem cola só SUSEP e Segmento para reclassificar um lote não quer
+    // perder o canal cadastrado — e isso não teria desfazer.
+    chamar('liberarComSenha')('segredo123');
+    chamar('aplicarImportacao')('corretoras', 'SUSEP;Corretora;Canal;Segmento\n'
+      + '7654321;Corretora Nova;;Demais corretoras');
+
+    const canal = chamar('lerRegistros_("CANAIS")')
+      .find((linha) => String(linha.SUSEP) === '7654321');
+    igual(canal.Canal, 'Corretora', 'o canal que já estava lá continua lá');
+    igual(canal.Segmento, 'Demais corretoras', 'e o que veio preenchido mudou');
+  });
+
+  teste('quem está no cadastro e não veio no texto continua no cadastro', () => {
+    // O texto colado é uma correção, não a verdade inteira. Sumir com o que
+    // não veio transformaria "colei metade da planilha" num apagamento.
+    const antes = chamar('tabelaDeCorretoras')('', '').corretoras.length;
+    chamar('liberarComSenha')('segredo123');
+    chamar('aplicarImportacao')('corretoras', '1234567;Corretora ABC');
+    igual(chamar('tabelaDeCorretoras')('', '').corretoras.length, antes);
+  });
+
+  teste('importar SUSEPs bloqueadas exige o motivo, linha a linha', () => {
+    const conferido = chamar('conferirImportacao')('susepsBloqueadas', [
+      'SUSEP;Motivo;Corretora',
+      '6666666;Fraude comprovada;Corretora Ruim',
+      '5555555;;Sem motivo'
+    ].join('\n'));
+    igual(conferido.resumo.novas, 1);
+    igual(conferido.resumo.recusadas, 1);
+    contem(conferido.linhas[1].porque, 'Motivo em branco');
+  });
+
+  teste('a SUSEP importada como bloqueada aparece com o selo', () => {
+    chamar('liberarComSenha')('segredo123');
+    chamar('aplicarImportacao')('susepsBloqueadas',
+      'SUSEP;Motivo;Corretora\n1234567;Fraude comprovada;Corretora ABC');
+
+    const bloqueadas = chamar('listarSusepsBloqueadas')();
+    const uma = bloqueadas.find((b) => b.susep === '1234567');
+    verdadeiro(!!uma, 'entrou na lista de bloqueadas');
+    igual(uma.motivo, 'Fraude comprovada');
+    verdadeiro(!!uma.bloqueadaEm, 'e nasceu com a data do bloqueio');
+
+    const tabela = chamar('tabelaDeCorretoras')('', '');
+    igual(tabela.corretoras.find((c) => c.susep === '1234567').bloqueada, true);
+  });
+
+  teste('acima do teto, recusa antes de gravar metade', () => {
+    // Apps Script tem tempo máximo de execução. Uma importação interrompida
+    // no meio grava metade, e ninguém sabe qual metade.
+    const muitas = [];
+    for (let i = 0; i < 2100; i++) muitas.push((1000000 + i) + ';Corretora ' + i);
+    lanca(() => chamar('conferirImportacao')('corretoras', muitas.join('\n')),
+      'o limite por vez');
+  });
+
+  teste('tipo desconhecido diz quais existem', () => {
+    lanca(() => chamar('conferirImportacao')('inventado', 'x;y'),
+      'Não sei importar');
+  });
+
+  teste('quem não configura não importa', () => {
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('conferirImportacao')('corretoras', '1;a'),
+        'não permite configurar');
+      lanca(() => chamar('aplicarImportacao')('corretoras', '1;a'),
+        'não permite configurar');
+    });
+  });
+
   secao('A tela');
 
   teste('a página inclui a tela, e a rota chama ela', () => {

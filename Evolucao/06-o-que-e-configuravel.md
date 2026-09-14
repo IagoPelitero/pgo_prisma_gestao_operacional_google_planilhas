@@ -29,6 +29,7 @@ abaixo com o motivo.
 | **Corretoras e canais** | Cadastrar, editar o segmento, tirar do cadastro — e cadastrar direto as SUSEPs que os casos citam | Tabela de Corretoras |
 | **Produtos** | Nome e código, que é único | Tabela de Corretoras |
 | **SUSEPs bloqueadas** | Bloquear com motivo, liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
+| **Importar em lote** | Colar a planilha de corretoras (SUSEP, corretora, canal, segmento) ou a de SUSEPs bloqueadas, conferir o que vai acontecer linha a linha, e só então gravar | Tabela de Corretoras → Importar · **pede senha** |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
 | **Busca** | Em quais colunas cada mesa procura | Mesas de trabalho |
@@ -62,6 +63,49 @@ Isto não é omissão: cada um tem uma razão para ainda não existir.
 | **Trocar o TIPO de uma coluna existente** | Mudar `texto` para `data` numa coluna com 30 mil linhas reinterpreta tudo o que já está gravado. Precisa de conversão e conferência, não de um seletor |
 | **Renomear o cabeçalho de uma coluna** | É o nome que amarra o dado ao Power BI. Renomear na planilha e reconciliar aqui é o caminho seguro; um botão que fizesse isso quebraria relatório em silêncio |
 | **A ordem das cores da paleta** | Os seis tons foram conferidos por régua — separação mínima sob daltonismo e em visão normal. Trocar um por gosto quebraria a garantia, então eles são do sistema, não da operação |
+
+---
+
+## As três perguntas que a operação fez, respondidas
+
+**"As configurações ajustam tudo que o sistema possui?"** — as três tabelas
+acima são a resposta inteira. Resumindo: tudo o que a operação muda no dia a
+dia está na primeira. O que sobrou na segunda são quatro ajustes que se fazem
+uma vez e quase nunca se repetem. O que está na terceira está fora de
+propósito, cada um com o motivo escrito.
+
+**"No Painel Analítico tem tanto por área quanto por analista?"** — tem os
+dois, e por caminhos diferentes, o que é de propósito:
+
+- **Por área** é o seletor de mesa no alto da tela. Não é um gráfico: RET Vida
+  e Mesa Diamante têm colunas diferentes, situações diferentes e volumes que
+  não se comparam. Um gráfico "casos por área" com duas barras dessas ao lado
+  responderia à pergunta errada — a Mesa sempre pareceria pequena, e nunca foi
+  para ser grande.
+- **Por analista** é um gráfico, e agora nasce junto com o sistema: *Casos por
+  analista*, em barras deitadas, nas duas mesas. Barra deitada porque nome de
+  pessoa é comprido; em pé, os rótulos viram uma escadinha ilegível.
+
+Além desses dois, qualquer coluna da mesa pode virar eixo de um gráfico novo
+em Configurações → Painéis, sem programador.
+
+**"Temos uma lista de SUSEPs bloqueadas e quais corretoras são Diamante. Eu
+teria que fazer manual?"** — não. Três coisas acontecem, e vale separar:
+
+1. **O que o sistema descobre sozinho:** quais SUSEPs aparecem nos casos, o
+   volume de cada uma e quais delas ainda não estão no cadastro. A Tabela de
+   Corretoras abre com esse aviso — é a informação mais útil da tela.
+2. **O que o sistema não tem como adivinhar:** que a corretora X é Diamante e
+   que a SUSEP Y está bloqueada por fraude. Isso é conhecimento da operação, e
+   nenhum sistema deduz do dado.
+3. **Como isso entra sem digitação:** a aba **Importar**. Copia da planilha
+   que a operação já tem, cola, confere o que vai acontecer com cada linha —
+   cadastra, atualiza, já igual, recusada e por quê — e aplica. Depois disso,
+   manter é uma linha aqui e outra ali.
+
+A importação nunca apaga: uma corretora que está no cadastro e não veio no
+texto colado continua onde estava, e um campo vazio no texto não limpa o que
+já existe. O texto colado é uma correção, não a verdade inteira.
 
 ---
 

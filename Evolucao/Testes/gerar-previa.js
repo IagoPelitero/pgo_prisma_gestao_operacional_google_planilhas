@@ -54,6 +54,39 @@ function gravacoesRecusadas(nomes) {
   }).join('');
 }
 
+/**
+ * As conferências de importação que a prévia sabe responder.
+ *
+ * Cada uma é chamada no servidor de verdade, com o mesmo texto que a tela vai
+ * mandar — a prévia guarda a RESPOSTA, não uma imitação dela. É a mesma ideia
+ * do resto do arquivo: o que aparece na prévia saiu do sistema, e não de um
+ * JSON escrito à mão que envelhece sozinho.
+ */
+function conferenciasDeExemplo(chamar) {
+  const exemplos = {
+    corretoras: [
+      'SUSEP\tCorretora\tCanal\tSegmento',
+      '9012345\tCorretora Aurora\tCorretora\tDiamante',
+      '9012346\tSouza & Filhos Seguros\tCorretora\tDiamante',
+      '9012347\tAgência Litoral\tAgente\tDemais corretoras',
+      '\tSem SUSEP nenhuma\tCorretora\tDiamante'
+    ].join('\n'),
+    susepsBloqueadas: [
+      'SUSEP;Motivo;Corretora',
+      '9012348;Fraude comprovada em 3 propostas;Corretora Meridiano',
+      '9012349;Documentação reincidente;Corretora Sul',
+      '9012350;;Sem motivo declarado'
+    ].join('\n')
+  };
+
+  const conferidos = {};
+  Object.keys(exemplos).forEach((tipo) => {
+    conferidos[tipo + '|' + exemplos[tipo]] =
+      chamar('conferirImportacao')(tipo, exemplos[tipo]);
+  });
+  return conferidos;
+}
+
 function pontePreparada(respostas) {
   return '<script>\n'
     + '/* Substituto do google.script.run, só para a prévia. No Apps Script\n'
@@ -64,6 +97,11 @@ function pontePreparada(respostas) {
     + '  function novaChamada(aoDarCerto, aoDarErrado) {\n'
     + '    function responder(valor) {\n'
     + '      setTimeout(function () { if (aoDarCerto) aoDarCerto(valor); }, 90);\n'
+    + '    }\n'
+    + '    function recusar(mensagem) {\n'
+    + '      setTimeout(function () {\n'
+    + '        if (aoDarErrado) aoDarErrado(new Error(mensagem));\n'
+    + '      }, 90);\n'
     + '    }\n'
     + '    return {\n'
     + '      withSuccessHandler: function (f) { return novaChamada(f, aoDarErrado); },\n'
@@ -127,6 +165,25 @@ function pontePreparada(respostas) {
     + '      },\n'
     + '      exportarCorretoras: function () {\n'
     + '        responder(respostas.corretoras.exportado);\n'
+    + '      },\n'
+    + '      opcoesDaImportacao: function () {\n'
+    + '        responder(respostas.corretoras.importacoes);\n'
+    + '      },\n'
+    // A prévia confere de verdade: o texto colado vai para a MESMA função do
+    // servidor que confere na produção, gravada aqui com as respostas de
+    // alguns textos de exemplo. Colar outra coisa responde honestamente que a
+    // prévia não tem essa resposta, em vez de inventar uma.
+    + '      conferirImportacao: function (tipo, texto) {\n'
+    + '        var chave = tipo + "|" + String(texto || "").trim();\n'
+    + '        var achado = respostas.corretoras.conferidos[chave];\n'
+    + '        if (achado) return responder(achado);\n'
+    + '        return recusar("Esta é uma prévia: ela responde pelos exemplos "\n'
+    + '          + "gravados. No sistema de verdade, qualquer texto colado é "\n'
+    + '          + "conferido na hora.");\n'
+    + '      },\n'
+    + '      aplicarImportacao: function () {\n'
+    + '        return recusar("A prévia não grava — ela é uma cópia estática "\n'
+    + '          + "do sistema, sem planilha por trás.");\n'
     + '      },\n'
     + '      minhaPerformance: function (idDaMesa) {\n'
     + '        responder(respostas.performance[idDaMesa]);\n'
@@ -637,7 +694,9 @@ function gerar(pastaDeSaida) {
     tabelas: tabelasDeCorretoras,
     produtos: chamar('listarProdutos()'),
     bloqueadas: chamar('listarSusepsBloqueadas()'),
-    exportado: chamar('exportarCorretoras')('', '')
+    exportado: chamar('exportarCorretoras')('', ''),
+    importacoes: chamar('opcoesDaImportacao()'),
+    conferidos: conferenciasDeExemplo(chamar)
   };
 
   // E a mesma instalação vista por quem não está cadastrado.

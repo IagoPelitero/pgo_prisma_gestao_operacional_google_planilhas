@@ -830,32 +830,140 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 */
 .config {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr) 340px;
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
   gap: 16px;
   align-items: start;
 }
 
-.config-secoes { display: flex; flex-direction: column; gap: 4px; }
+/*
+  O menu das seções é um cartão só, com os oito itens dentro — e não oito
+  cartões soltos. Cada item é uma grade de três colunas fixas:
+
+      22px      1fr        auto
+      ícone     título     quantos
+
+  As três colunas são o motivo de a coluna do meio ser "1fr" e não "auto": com
+  "auto" o título manda na largura, e os números do lado direito ficam
+  desalinhados de linha para linha, cada um parando onde o texto acabou.
+*/
+.config-secoes {
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: var(--raio); box-shadow: var(--sombra);
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 2px;
+  align-self: start;
+}
 .config-secao {
-  display: grid; gap: 1px;
-  text-align: left; cursor: pointer;
-  background: none; border: 1px solid transparent;
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center; gap: 10px;
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 0;
   border-radius: var(--raio-pequeno);
-  padding: 9px 11px;
-  position: relative;
+  padding: 10px 12px;
+  color: var(--suave);
+  transition: background .15s ease, color .15s ease;
 }
-.config-secao:hover { background: var(--superficie-2); }
+.config-secao svg { width: 19px; height: 19px; }
+.config-secao .titulo { font-weight: 600; font-size: 13.5px; }
+.config-secao:hover { background: var(--destaque-tenue); color: var(--destaque); }
+
+/*
+  Item escolhido: fundo no tom ESCURO da paleta, e não no tom cheio.
+  Medido nos quatro temas, com o texto em --destaque-sobre:
+
+      tema      tom cheio          tom escuro
+      padrão    #0B77CE  4,62      #095CA1  6,87
+      rosa      #C2185B  5,87      #8E1145  9,07
+      brasil    #0E7A3C  5,43      #0A5A2C  8,36
+      dark      #5C9DFF  6,55      #7FB4FF  8,37
+
+  No tema Dark o "escuro" é mais CLARO que o tom cheio — lá o texto por cima é
+  quase preto. É por isso que o par certo é sempre --destaque-escuro com
+  --destaque-sobre: os dois viram juntos, tema a tema, e nenhum dos quatro cai
+  abaixo do mínimo de 4,5 exigido para texto.
+*/
 .config-secao.atual {
-  background: var(--superficie); border-color: var(--linha);
-  box-shadow: var(--sombra);
+  background: var(--destaque-escuro); color: var(--destaque-sobre);
 }
-.config-secao .titulo { font-weight: 600; font-size: 14px; }
-.config-secao.atual .titulo { color: var(--destaque); }
-.config-secao .descricao { font-size: 12px; color: var(--tenue); line-height: 1.35; }
+
 .config-secao .quantos {
-  position: absolute; top: 9px; right: 10px;
-  font-family: var(--fonte-dado); font-size: 11px; color: var(--tenue);
+  min-width: 22px; padding: 1px 7px; border-radius: 12px;
+  background: var(--superficie-2); color: var(--tenue);
+  font-family: var(--fonte-dado); font-size: 11px; text-align: center;
 }
+.config-secao:hover .quantos {
+  background: color-mix(in srgb, var(--destaque) 18%, transparent);
+  color: var(--destaque);
+}
+.config-secao.atual .quantos {
+  background: color-mix(in srgb, var(--destaque-sobre) 22%, transparent);
+  color: var(--destaque-sobre);
+}
+
+/*
+  A descrição da seção saiu do menu e virou a primeira linha da coluna do
+  meio. No menu ela repetia oito vezes um texto que só interessa depois de
+  escolher — e era o que empurrava o menu para 236px de altura por item.
+*/
+.config-meio { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.config-descricao {
+  margin: 0; font-size: 13px; color: var(--tenue); line-height: 1.4;
+  padding-left: 2px;
+}
+.config-descricao:empty { display: none; }
+
+/* ------------------------------------------------------ a importação ---- */
+/*
+  A área de colar é a peça central desta aba, e por isso é grande: uma caixa
+  de três linhas faz a pessoa colar às cegas e não ver o que colou. Fonte de
+  dado, porque o conteúdo é colunar — com fonte proporcional as colunas de um
+  texto separado por TAB não se alinham, e conferir de olho fica impossível.
+*/
+.importar-area {
+  width: 100%; box-sizing: border-box;
+  font-family: var(--fonte-dado); font-size: 12.5px; line-height: 1.5;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto);
+  padding: 10px 12px; resize: vertical;
+  white-space: pre; overflow-wrap: normal; overflow-x: auto;
+}
+.importar-area:focus {
+  outline: none; border-color: var(--destaque);
+  box-shadow: 0 0 0 3px var(--destaque-tenue);
+}
+
+.importar-colunas {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 8px 0 10px; font-size: 12.5px; color: var(--tenue);
+}
+.importar-colunas code {
+  font-family: var(--fonte-dado); font-size: 12px;
+  background: var(--superficie-2); color: var(--texto);
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  padding: 2px 7px;
+}
+.importar-colunas em {
+  font-style: normal; font-size: 11px; color: var(--ruim);
+  margin-left: -3px; margin-right: 4px;
+}
+
+.importar-resumo {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 14px 0 10px;
+}
+.importar-pastilha {
+  font-size: 12.5px; padding: 5px 12px; border-radius: 999px;
+  background: var(--tom-tenue); color: var(--tom);
+  border: 1px solid color-mix(in srgb, var(--tom) 30%, transparent);
+}
+.importar-pastilha strong { font-family: var(--fonte-dado); font-size: 13.5px; }
+
+/* A linha recusada fica marcada na tabela inteira, e não só na última coluna:
+   numa lista de duzentas, procurar a pastilha vermelha coluna a coluna é
+   trabalho que a cor podia poupar. */
+table.fila tr.importar-recusada { background: var(--ruim-tenue); }
+table.fila tr.importar-recusada:hover { background: var(--ruim-tenue); }
+table.fila tr.importar-igual { color: var(--tenue); }
 
 .config-alerta {
   margin-top: 10px; text-align: left; cursor: pointer;
@@ -1587,8 +1695,7 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
     grid-column: 1 / -1;
     flex-direction: row; flex-wrap: wrap; gap: 6px;
   }
-  .config-secao { flex: 1 1 160px; }
-  .config-secao .descricao { display: none; }
+  .config-secao { flex: 1 1 170px; }
   .config-alerta { flex-basis: 100%; margin-top: 0; }
   .config-painel { position: static; max-height: none; }
   .config-mesas-cartao { grid-template-columns: 1fr; }

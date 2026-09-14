@@ -519,6 +519,92 @@ produto.
 
 ---
 
+## Configurações, segunda passada 🔧
+
+Três perguntas da operação e um pedido de estilo, respondidos juntos.
+
+### O menu ficou como o do PGO 5
+
+Um cartão só, com os oito assuntos dentro, cada linha numa grade de três
+colunas fixas — **ícone, título, quantidade**. As três colunas são o motivo de
+a do meio ser `1fr` e não `auto`: com `auto`, o título manda na largura e os
+números do lado direito param cada um num lugar.
+
+Os títulos encurtaram (*Campos*, *Identidade*, *Estrutura*) porque não cabiam
+em uma linha, e título que quebra em duas desalinha a contagem. O que eles
+deixaram de dizer, a descrição diz — que saiu do menu, onde se repetia oito
+vezes, e virou a primeira linha da coluna do meio.
+
+**O item escolhido foi medido, não escolhido a olho.** Com o texto em
+`--destaque-sobre`:
+
+| tema | tom cheio | tom escuro |
+|---|---|---|
+| padrão | `#0B77CE` · 4,62 | `#095CA1` · **6,87** |
+| rosa | `#C2185B` · 5,87 | `#8E1145` · **9,07** |
+| brasil | `#0E7A3C` · 5,43 | `#0A5A2C` · **8,36** |
+| dark | `#5C9DFF` · 6,55 | `#7FB4FF` · **8,37** |
+
+No tema Dark o "escuro" é mais CLARO que o tom cheio, e o texto por cima é
+quase preto. É por isso que o par certo é sempre `--destaque-escuro` com
+`--destaque-sobre`: os dois viram juntos, tema a tema.
+
+### Por analista virou gráfico
+
+A operação perguntou se o Painel Analítico tinha os dois recortes. **Por área**
+sempre teve, e não como gráfico: é o seletor de mesa. Um gráfico "casos por
+área" com duas barras compararia RET Vida com Mesa Diamante, que têm colunas,
+situações e volumes incomparáveis — a Mesa sempre pareceria pequena, e nunca
+foi para ser grande.
+
+**Por analista** faltava, e agora nasce junto com o sistema nas duas mesas, em
+barras deitadas: nome de pessoa é comprido, e em pé o rótulo vira escadinha.
+
+### A aba Importar
+
+A pergunta era: *"temos uma lista de SUSEPs bloqueadas e quais corretoras são
+Diamante — eu teria que fazer manual?"*
+
+Não. Três passos, e o do meio é o que importa:
+
+| passo | o que faz |
+|---|---|
+| **Colar** | Copia da planilha que a operação já tem. TAB (o que o Excel põe na área de transferência) ou ponto e vírgula, com ou sem cabeçalho |
+| **Conferir** | O servidor diz o que vai acontecer com CADA linha — cadastra, atualiza, já igual, recusada e por quê. **Não grava nada** |
+| **Aplicar** | Só então grava, e pede a senha de administrador |
+
+**Aplicar não confia em Conferir.** Manda o TEXTO de novo, e o servidor refaz a
+conferência inteira antes de escrever. Receber do navegador a lista já
+conferida seria gravar o que o servidor aprovou — mas depois de passar por um
+lugar onde qualquer coisa pode ter mudado.
+
+**Nada apaga.** Uma corretora que está no cadastro e não veio no texto colado
+continua onde estava; um campo vazio no texto não limpa o que já existe. O
+texto colado é uma correção, não a verdade inteira.
+
+Com cabeçalho, a ordem das colunas pode ser qualquer uma: quem exporta de
+outro sistema não recebe as colunas na ordem do PGO, e exigir a ordem certa
+devolveria à pessoa exatamente o trabalho manual que a tela veio tirar.
+
+### O diálogo de senha saiu de Configurações
+
+Virou `SenhaDeAdministrador.html`, porque a Importação passou a precisar do
+mesmo pedido. Dois diálogos escritos separados viram duas regras: um dia um
+libera por 5 minutos e o outro por 30, e ninguém percebe.
+
+### E um bug que só a tela mostrou
+
+O [23](04-bugs-capturados.md): a linha colada era aparada ANTES de ser partida
+em colunas, e com TAB isso comia a primeira coluna quando ela vinha vazia. A
+linha inteira andava uma casa, e a recusa apontava o campo errado. Os quinze
+testes da importação passavam — nenhum deles tinha primeira coluna vazia, e
+escrever esse caso não teria ocorrido a ninguém antes de ver a linha torta na
+tela.
+
+**285 testes.**
+
+---
+
 ## Responsividade
 
 Uma conferência à parte, num navegador de verdade:

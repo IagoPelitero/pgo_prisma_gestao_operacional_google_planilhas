@@ -62,7 +62,7 @@ function rodarTestesDoAnalitico() {
   teste('a mesa abre com os gráficos que ela declarou, na ordem', () => {
     const painel = painelDaRet();
     igual(painel.componentes.map((c) => c.tipo).join(' | '),
-      'barrasComLinha | pizza | barrasDeitadas | barras | barras');
+      'barrasComLinha | pizza | barrasDeitadas | barras | barras | barrasDeitadas');
     igual(painel.total, 3);
     igual(painel.periodo.dias, 30);
   });

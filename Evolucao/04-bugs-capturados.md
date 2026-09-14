@@ -345,6 +345,44 @@ declarar o tipo errado, e só se enxergou com dado de verdade na tela.
 
 ---
 
+### 23 · A linha aparada perdia a primeira coluna
+
+**Sintoma.** Na tela de importação, uma linha colada do Excel com a primeira
+coluna VAZIA aparecia inteira deslocada: o nome da corretora ia parar na
+SUSEP, o canal na corretora, o segmento no canal. A recusa vinha certa —
+"SUSEP sem nenhum dígito" — mas apontando para o campo errado, e dizendo que o
+problema era um valor que a pessoa nunca digitou.
+
+**Causa.** A função que lê o texto colado aparava cada LINHA antes de parti-la
+em colunas:
+
+```javascript
+.map(function (linha) { return linha.trim(); })
+```
+
+Parece inofensivo, e é — até o separador ser TAB. `"\tCorretora Alfa\tAgente"`
+aparado vira `"Corretora Alfa\tAgente"`, e a coluna vazia do começo
+simplesmente deixou de existir. Todas as outras andaram uma casa para a
+esquerda.
+
+**Defesa.** A linha não é mais aparada. Quem apara é cada CÉLULA, depois de
+partida — que era o único lugar em que aparar sempre foi seguro. A linha em
+branco continua sendo descartada, mas por uma cópia aparada, sem mexer na
+original.
+
+**Por que importa mais do que parece.** Este é o caso em que a mensagem de erro
+MENTE. O sistema recusou a linha, o que está certo, e explicou o motivo, o que
+também está certo — mas explicou o motivo errado. Quem estivesse conferindo
+duzentas linhas iria procurar o defeito na coluna que a tela apontou, e não na
+que estava vazia.
+
+**Como apareceu.** Não foi teste: foi olhar a tela com o dado colado nela. Os
+quinze testes da importação passavam, porque nenhum deles tinha uma primeira
+coluna vazia — e escrever esse caso não teria ocorrido a ninguém antes de ver
+a linha torta na tela.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
@@ -369,3 +407,7 @@ Daí as duas práticas que o projeto não abre mão:
    servidor pegaria: nos dois, cada lado estava certo sozinho e o encontro
    entre eles é que estava errado. Só apareceram com o sistema aberto e dado
    de verdade na tela.
+6. **Mensagem de erro também tem bug.** O item 23 recusava a linha certa pelo
+   motivo errado. Sistema que aponta o campo errado é pior que sistema que só
+   diz "deu erro": manda quem está conferindo procurar no lugar errado, com a
+   confiança de quem foi informado.

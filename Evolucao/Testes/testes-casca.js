@@ -200,7 +200,11 @@ function rodarTestesDaCasca() {
     // num componente sobrevive à troca de tema, e o rosa fica com um pedaço
     // azul. As bolinhas do seletor são a exceção declarada: elas SÃO as
     // amostras das cores, então precisam da cor literal.
-    const estilos = lerTela('Estilos.html');
+    // Os comentários saem ANTES de procurar. Um "#095CA1" escrito num
+    // comentário não pinta nada — e é justamente assim que se registra a
+    // medição de contraste que levou à escolha da variável. A trava é para
+    // cor que a regra usa, não para cor que o comentário cita.
+    const estilos = lerTela('Estilos.html').replace(/\/\*[\s\S]*?\*\//g, '');
     const semTokens = estilos.replace(/:root[^{]*\{[\s\S]*?\}/g, '');
     const regras = semTokens.split('}');
     const infratores = [];

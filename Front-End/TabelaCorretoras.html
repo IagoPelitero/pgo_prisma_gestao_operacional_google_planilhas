@@ -20,6 +20,8 @@ var TelaTabelaCorretoras = (function () {
   var segmento = '';
   var dados = null;
   var editando = null;      // o item aberto no formulário lateral
+  var tipoDaImportacao = '';  // qual lista está sendo importada
+  var conferido = null;       // o resultado do passo 2, enquanto não se aplica
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -30,7 +32,8 @@ var TelaTabelaCorretoras = (function () {
     return '<div class="config-abas" id="abas-das-corretoras">'
       + [['corretoras', 'Corretoras e canais'],
          ['produtos', 'Produtos'],
-         ['bloqueadas', 'SUSEPs bloqueadas']].map(function (par) {
+         ['bloqueadas', 'SUSEPs bloqueadas'],
+         ['importar', 'Importar']].map(function (par) {
         return '<button type="button" class="config-aba'
           + (abaAtual === par[0] ? ' atual' : '') + '"'
           + ' data-aba-corretoras="' + par[0] + '">' + escapar(par[1])
@@ -55,6 +58,15 @@ var TelaTabelaCorretoras = (function () {
     if (abaAtual === 'produtos') {
       return Servidor.chamar('listarProdutos')
         .entao(function (lista) { dados = { produtos: lista }; desenharProdutos(); })
+        .senao(falhou);
+    }
+    if (abaAtual === 'importar') {
+      return Servidor.chamar('opcoesDaImportacao')
+        .entao(function (lista) {
+          dados = { importacoes: lista };
+          if (!tipoDaImportacao && lista.length) tipoDaImportacao = lista[0].tipo;
+          desenharImportacao();
+        })
         .senao(falhou);
     }
     return Servidor.chamar('tabelaDeCorretoras', '', '')
@@ -498,6 +510,204 @@ var TelaTabelaCorretoras = (function () {
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
   }
 
+  /* ----------------------------------------------------------- importação */
+  /*
+    Três passos, e o do meio é o que importa: CONFERIR mostra o que vai
+    acontecer com cada linha antes de qualquer coisa ser gravada. Importar é a
+    ação de maior alcance do sistema — um erro escreve em quinhentas linhas de
+    uma vez —, e ver antes transforma "colei a coluna errada" num susto em vez
+    de num estrago.
+  */
+
+  function receitaEscolhida() {
+    return acharPorTipo(dados.importacoes, tipoDaImportacao)
+      || dados.importacoes[0];
+  }
+
+  function acharPorTipo(lista, tipo) {
+    for (var i = 0; i < lista.length; i++) {
+      if (lista[i].tipo === tipo) return lista[i];
+    }
+    return null;
+  }
+
+  function desenharImportacao() {
+    var receita = receitaEscolhida();
+    if (!receita) {
+      elemento('corretoras-lista').innerHTML =
+        '<p class="config-vazio">Nada para importar.</p>';
+      return;
+    }
+
+    var abas = dados.importacoes.map(function (uma) {
+      return '<option value="' + escapar(uma.tipo) + '"'
+        + (uma.tipo === receita.tipo ? ' selected' : '') + '>'
+        + escapar(uma.titulo) + '</option>';
+    }).join('');
+
+    var cabecalho = receita.colunas.map(function (coluna) {
+      return coluna.titulo;
+    }).join('\t');
+
+    elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">Importar</span>'
+      + '<select id="tipo-da-importacao" aria-label="O que importar">'
+      + abas + '</select></div>'
+      + '<p class="config-explica">' + escapar(receita.explicacao) + '</p>'
+      + '<div class="importar-colunas"><span>Colunas, nesta ordem:</span> '
+      + receita.colunas.map(function (coluna) {
+        return '<code>' + escapar(coluna.titulo) + '</code>'
+          + (coluna.obrigatoria ? '<em>obrigatória</em>' : '');
+      }).join('') + '</div>'
+      + '<p class="config-explica">Copie da sua planilha e cole aqui — com ou '
+      + 'sem a linha de cabeçalho, tanto faz. Se vier com cabeçalho, a ordem '
+      + 'das colunas pode ser outra: o sistema lê pelos nomes. Até '
+      + receita.maximo + ' linhas por vez.</p>'
+      + '<textarea id="texto-da-importacao" class="importar-area" rows="10"'
+      + ' spellcheck="false" aria-label="Cole aqui as linhas"'
+      + ' placeholder="' + escapar(cabecalho) + '"></textarea>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="conferir-importacao">'
+      + 'Conferir</button>'
+      + '<button type="button" class="botao vazado" id="limpar-importacao">'
+      + 'Limpar</button></div>'
+      + '<div id="resultado-da-importacao"></div>';
+
+    elemento('tipo-da-importacao').addEventListener('change', function () {
+      tipoDaImportacao = this.value;
+      conferido = null;
+      desenharImportacao();
+    });
+    elemento('conferir-importacao').addEventListener('click', conferir);
+    elemento('limpar-importacao').addEventListener('click', function () {
+      elemento('texto-da-importacao').value = '';
+      elemento('resultado-da-importacao').innerHTML = '';
+      conferido = null;
+    });
+
+    painelVazio('Cole as linhas e aperte Conferir. Nada é gravado até você '
+      + 'apertar Aplicar — e Aplicar pede a senha de administrador.');
+  }
+
+  function conferir() {
+    var texto = elemento('texto-da-importacao').value;
+    if (!texto.trim()) {
+      avisar('Cole alguma coisa antes de conferir.', 'atencao');
+      return;
+    }
+    var onde = elemento('resultado-da-importacao');
+    onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
+
+    Servidor.chamar('conferirImportacao', tipoDaImportacao, texto)
+      .entao(function (resposta) {
+        conferido = resposta;
+        desenharConferencia();
+      })
+      .senao(function (erro) {
+        conferido = null;
+        onde.innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function desenharConferencia() {
+    var resumo = conferido.resumo;
+    var colunas = conferido.colunas;
+
+    var linhas = conferido.linhas.map(function (linha) {
+      var celulas = colunas.map(function (coluna) {
+        return '<td>' + escapar(linha.campos[coluna.chave] || '—') + '</td>';
+      }).join('');
+      return '<tr class="importar-' + linha.situacao + '">'
+        + '<td class="direita">' + linha.numero + '</td>'
+        + celulas
+        + '<td><span class="situacao ' + tomDaSituacao(linha.situacao) + '">'
+        + escapar(nomeDaSituacao(linha.situacao)) + '</span>'
+        + (linha.porque
+          ? '<span class="apoio">' + escapar(linha.porque) + '</span>' : '')
+        + '</td></tr>';
+    }).join('');
+
+    elemento('resultado-da-importacao').innerHTML =
+      '<div class="importar-resumo">'
+      + pastilha('novas', resumo.novas, 'bom')
+      + pastilha('atualizam', resumo.atualizadas, 'destaque')
+      + pastilha('já iguais', resumo.iguais, 'neutro')
+      + pastilha('recusadas', resumo.recusadas, 'ruim')
+      + '</div>'
+      + (conferido.tinhaCabecalho
+        ? '<p class="config-explica">A primeira linha era o cabeçalho, e não '
+          + 'entrou na conta.</p>' : '')
+      + '<p class="config-explica">Nada aqui apaga: uma linha que está no '
+        + 'cadastro e não veio no texto colado <strong>fica onde está</strong>, '
+        + 'e um campo vazio no texto não limpa o que já existe.</p>'
+      + '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
+      + '<thead><tr><th class="direita">Linha</th>'
+      + colunas.map(function (coluna) {
+        return '<th>' + escapar(coluna.titulo) + '</th>';
+      }).join('')
+      + '<th>O que vai acontecer</th></tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div>'
+      + (conferido.naoMostradas
+        ? '<p class="config-explica">e mais ' + conferido.naoMostradas
+          + ' linha(s) não mostradas aqui — todas serão gravadas do mesmo '
+          + 'jeito.</p>' : '')
+      + '<div class="config-acoes">'
+      + (resumo.novas + resumo.atualizadas
+        ? '<button type="button" class="botao" id="aplicar-importacao">Aplicar '
+          + (resumo.novas + resumo.atualizadas) + ' alteração(ões)</button>'
+        : '<p class="config-vazio">Não há nada a gravar.</p>')
+      + '</div>';
+
+    var aplicar = elemento('aplicar-importacao');
+    if (aplicar) aplicar.addEventListener('click', pedirSenhaEAplicar);
+  }
+
+  function pastilha(rotulo, quantos, tom) {
+    return '<span class="importar-pastilha tom-' + tom + '">'
+      + '<strong>' + quantos + '</strong> ' + escapar(rotulo) + '</span>';
+  }
+
+  function nomeDaSituacao(situacao) {
+    if (situacao === 'nova') return 'cadastra';
+    if (situacao === 'atualiza') return 'atualiza';
+    if (situacao === 'igual') return 'sem mudança';
+    return 'recusada';
+  }
+
+  function tomDaSituacao(situacao) {
+    if (situacao === 'nova') return 'bom';
+    if (situacao === 'atualiza') return 'destaque';
+    if (situacao === 'igual') return 'neutro';
+    return 'ruim';
+  }
+
+  /*
+    O texto vai INTEIRO de novo para o servidor, e não a lista já conferida.
+    Mandar a lista conferida seria mandar o servidor gravar o que ele mesmo
+    aprovou — mas passando pelo navegador no caminho, onde qualquer coisa
+    pode ter mudado. O servidor confere tudo outra vez antes de escrever.
+  */
+  function pedirSenhaEAplicar() {
+    var texto = elemento('texto-da-importacao').value;
+    SenhaDeAdministrador.pedir(function () {
+      elemento('resultado-da-importacao').innerHTML =
+        '<p class="carregando-campos">Gravando…</p>';
+      Servidor.chamar('aplicarImportacao', tipoDaImportacao, texto)
+        .entao(function (feito) {
+          avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
+            + ' atualizada(s) em ' + feito.titulo + '.', 'bom');
+          elemento('texto-da-importacao').value = '';
+          conferido = null;
+          carregar();
+        })
+        .senao(function (erro) {
+          mostrarErro(erro);
+          desenharConferencia();
+        });
+    });
+  }
+
   /* ------------------------------------------------------------ utilidades */
 
   function tituloDoPainel(titulo, subtitulo) {
@@ -597,6 +807,9 @@ var TelaTabelaCorretoras = (function () {
     carregar();
   }
 
-  return { montar: montar, ligar: ligar };
+  /* Sair da tela fecha o diálogo de senha, se ele tiver ficado aberto. */
+  function desligar() { SenhaDeAdministrador.fechar(); }
+
+  return { montar: montar, ligar: ligar, desligar: desligar };
 })();
 </script>
