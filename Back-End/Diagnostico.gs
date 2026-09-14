@@ -1,4 +1,5 @@
 /**
+ * ============================================================================
  * RECC — Diagnostico.gs · o laudo que roda DENTRO do Apps Script
  * ============================================================================
  * A suíte de testes prova que o código está certo. Ela não prova que ESTA
