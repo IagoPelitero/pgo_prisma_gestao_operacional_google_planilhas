@@ -94,7 +94,8 @@ function rodarDiagnostico_() {
     rodarBloco_('paineis', 'Os cards e os gráficos', blocoDosPaineis_),
     rodarBloco_('analises', 'As análises', blocoDasAnalises_),
     rodarBloco_('acesso', 'Quem entra e o que pode', blocoDoAcesso_),
-    rodarBloco_('tela', 'A ligação entre a tela e o servidor', blocoDaTela_)
+    rodarBloco_('tela', 'A ligação entre a tela e o servidor', blocoDaTela_),
+    rodarBloco_('estilos', 'A folha de estilos', blocoDosEstilos_)
   ];
 
   var resumo = { total: 0, oks: 0, atencoes: 0, falhas: 0 };
@@ -878,6 +879,106 @@ function existeArquivoDeTela_(nome) {
   } catch (erro) {
     return false;
   }
+}
+
+/**
+ * A folha de estilos está inteira, e cobre o que as telas usam?
+ *
+ * NASCEU DE UMA PERGUNTA DA OPERAÇÃO: "desconfigurou a estilização, o que pode
+ * ser?". O sistema abria, o conteúdo estava lá, e a aparência não. Desse lado
+ * não dava para ver nada: o arquivo aqui estava certo. O que estava
+ * desatualizado era a CÓPIA no projeto do Apps Script.
+ *
+ * É o caso mais comum de todos numa cópia manual: o `Estilos` fica para trás
+ * enquanto as telas avançam, e o resultado é uma página que carrega e fica
+ * feia — sem erro nenhum no console, porque CSS que não existe não reclama,
+ * só não pinta.
+ *
+ * Então o bloco compara o que as telas USAM com o que o Estilos DEFINE, e diz
+ * os nomes que faltam. Com a lista na mão, "está desconfigurado" vira "o
+ * Estilos do projeto é mais antigo que as telas".
+ */
+function blocoDosEstilos_() {
+  var itens = [];
+
+  var folha;
+  try {
+    folha = HtmlService.createTemplateFromFile('Estilos').getRawContent();
+  } catch (erro) {
+    return [item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+      'O arquivo Estilos não está no projeto',
+      'Sem ele a página carrega sem aparência nenhuma.',
+      'Copie Front-End/Estilos.html do repositório e crie aqui um arquivo HTML '
+        + 'chamado exatamente "Estilos".')];
+  }
+
+  // Truncada no meio é o que acontece quando a colagem de 70 KB não vai
+  // inteira. As chaves desequilibradas denunciam isso na hora.
+  var semComentario = folha.replace(/\/\*[\s\S]*?\*\//g, '');
+  var abre = (semComentario.match(/\{/g) || []).length;
+  var fecha = (semComentario.match(/\}/g) || []).length;
+
+  if (folha.indexOf('<style>') < 0 || folha.indexOf('</style>') < 0 || abre !== fecha) {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+      'A folha de estilos está incompleta',
+      abre + ' chaves abertas para ' + fecha + ' fechadas'
+        + (folha.indexOf('</style>') < 0 ? ', e sem o </style> no fim' : '') + '.',
+      'A colagem não foi inteira. Apague o conteúdo do arquivo Estilos e cole '
+        + 'de novo, do começo ao fim.'));
+  } else {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
+      'A folha de estilos está inteira',
+      Math.round(folha.length / 1024) + ' KB, ' + abre + ' blocos de regras.'));
+  }
+
+  var faltando = classesSemEstilo_(folha);
+  itens.push(faltando.length
+    ? item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+      faltando.length + ' classe(s) que as telas usam e o Estilos não define',
+      algunsExemplos_(faltando),
+      'É quase sempre o mesmo motivo: o Estilos deste projeto é mais antigo '
+        + 'que as telas. Copie Front-End/Estilos.html de novo, inteiro.')
+    : item_(RECC_SITUACOES_DO_LAUDO.OK,
+      'Toda classe que as telas usam está definida'));
+
+  return itens;
+}
+
+/**
+ * As classes escritas nas telas que a folha não define.
+ *
+ * Só as ESTÁTICAS — as que aparecem como class="alguma-coisa" no HTML. Classe
+ * montada em tempo de execução não dá para conferir daqui, e chutar geraria
+ * alarme falso, que é pior que não conferir.
+ *
+ * A tela de acesso negado fica de fora: ela é servida sozinha, sem o Estilos,
+ * e carrega o próprio <style> dentro.
+ */
+function classesSemEstilo_(folha) {
+  var definidas = {};
+  (folha.match(/\.[a-z][a-z0-9-]*/g) || []).forEach(function (achado) {
+    definidas[achado.substring(1)] = true;
+  });
+
+  var faltando = [];
+  telasIncluidasNoIndex_().forEach(function (nomeDaTela) {
+    if (nomeDaTela === 'Estilos') return;
+    if (!existeArquivoDeTela_(nomeDaTela)) return;
+
+    var fonte = HtmlService.createTemplateFromFile(nomeDaTela).getRawContent();
+    // Uma tela com <style> próprio define as suas: não são do Estilos.
+    var temEstiloProprio = fonte.indexOf('<style>') >= 0;
+
+    (fonte.match(/class="[a-z0-9 _-]+"/g) || []).forEach(function (achado) {
+      achado.substring(7, achado.length - 1).split(/\s+/).forEach(function (classe) {
+        if (!classe || definidas[classe]) return;
+        if (temEstiloProprio && fonte.indexOf('.' + classe) >= 0) return;
+        var recado = nomeDaTela + ': .' + classe;
+        if (faltando.indexOf(recado) < 0) faltando.push(recado);
+      });
+    });
+  });
+  return faltando;
 }
 
 /** Os nomes das telas que o Index.html manda incluir. */

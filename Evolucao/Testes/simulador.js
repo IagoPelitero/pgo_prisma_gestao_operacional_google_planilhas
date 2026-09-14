@@ -322,6 +322,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   // projeto do Apps Script. Sem poder simular isso, o caminho de erro mais
   // comum de uma instalação nova ficaria sem teste.
   const telasEscondidas = new Set();
+  const telasTrocadas = new Map();
 
   function exigirTelaCopiada(nome) {
     if (telasEscondidas.has(nome)) {
@@ -340,6 +341,12 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     definirEmail(novo) { emailAtual = novo; },
     /** Finge que este arquivo de tela não foi copiado para o projeto. */
     esconderTela(nome) { telasEscondidas.add(nome); },
+    /**
+     * Finge que a cópia deste arquivo no projeto é OUTRA — mais velha, ou
+     * cortada no meio. É o caso mais comum de uma cópia manual, e o que a
+     * operação relatou como "desconfigurou a estilização".
+     */
+    trocarTelaPor(nome, conteudo) { telasTrocadas.set(nome, conteudo); },
     emailAtual() { return emailAtual; },
     /**
      * Cria uma planilha "de fora", com uma aba já preenchida, e devolve o Id.
@@ -389,8 +396,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       HtmlService: {
         createTemplateFromFile(nome) {
           exigirTelaCopiada(nome);
-          const fonte = fs.readFileSync(
-            path.join(PASTA_DAS_TELAS, nome + '.html'), 'utf8');
+          const fonte = telasTrocadas.has(nome) ? telasTrocadas.get(nome)
+            : fs.readFileSync(path.join(PASTA_DAS_TELAS, nome + '.html'), 'utf8');
           const template = {
             /* O Apps Script devolve o arquivo cru, sem avaliar os scriptlets.
                É por aqui que o Diagnostico lê as telas para conferir se toda

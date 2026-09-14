@@ -947,6 +947,29 @@ legada, que a busca já lê.
 
 ---
 
+## O bloco que nasceu de uma pergunta da operação
+
+*"Desconfigurou a estilização da página, o que pode ser?"*
+
+CSS que não existe não reclama — só não pinta. Sem erro, sem exceção, sem log.
+E do lado do repositório estava tudo certo: a prévia renderizava. O que estava
+desatualizado era a **cópia do `Estilos` no projeto do Apps Script**.
+
+O diagnóstico ganhou o bloco **A folha de estilos**, que responde três coisas
+de dentro do Apps Script: o arquivo está no projeto; ele está **inteiro**
+(chave desequilibrada denuncia a colagem de 70 KB que não foi até o fim); e
+toda classe que as telas usam está **definida** — se não, o laudo lista os
+nomes. "Está desconfigurado" vira "o Estilos deste projeto é mais antigo que
+as telas, e faltam estas sete classes".
+
+A investigação achou de quebra [três buracos](04-bugs-capturados.md) no próprio
+repositório: `.ver` era classe morta em três telas, e `.config-mesas` e
+`.config-legado` eram usadas sem nunca terem sido escritas.
+
+**370 testes.**
+
+---
+
 ## Responsividade
 
 Uma conferência à parte, num navegador de verdade:

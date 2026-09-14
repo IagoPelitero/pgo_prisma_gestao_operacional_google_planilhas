@@ -1105,6 +1105,26 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .botao.vazado.perigo { color: var(--ruim); border-color: color-mix(in srgb, var(--ruim) 32%, transparent); }
 .botao.vazado.perigo:hover { background: var(--ruim-tenue); border-color: var(--ruim); }
 
+/*
+  A caixa da mesa dentro do cabeçalho da lista. Sem ela, o seletor encostava
+  no botão "Criar campo" — o cabeçalho é flex e não separa sozinho quem não
+  tem largura própria.
+*/
+.config-mesas { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/*
+  Um bloco à parte dentro da lista: a planilha legada e o diagnóstico. Os dois
+  são assunto SEPARADO do que a lista mostra, e sem a linha em cima eles
+  pareciam a continuação dela.
+*/
+.config-legado {
+  margin-top: 18px; padding-top: 16px;
+  border-top: 1px solid var(--linha);
+}
+.config-legado h4 {
+  margin: 0 0 4px; font-size: 14px; font-weight: 600;
+}
+
 .config-explica {
   font-size: 12.5px; color: var(--suave); line-height: 1.45;
   margin: 6px 0 12px;

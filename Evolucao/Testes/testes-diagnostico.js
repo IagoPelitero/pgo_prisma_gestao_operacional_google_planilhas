@@ -62,12 +62,12 @@ function rodarTestesDeDiagnostico() {
       'o laudo confere muita coisa, achei ' + laudo.resumo.total);
   });
 
-  teste('os dez blocos aparecem sempre, na mesma ordem', () => {
+  teste('os onze blocos aparecem sempre, na mesma ordem', () => {
     const { chamar } = instalacaoNova();
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.blocos.map((b) => b.chave).join(','),
       'ambiente,estrutura,sequencias,identificadores,mesas,campos,paineis,'
-      + 'analises,acesso,tela');
+      + 'analises,acesso,tela,estilos');
   });
 
   teste('definir a senha zera a única atenção', () => {
@@ -117,7 +117,7 @@ function rodarTestesDeDiagnostico() {
 
     const laudo = chamar('diagnosticoRECC()');
 
-    igual(laudo.blocos.length, 10, 'o bloco continua no laudo');
+    igual(laudo.blocos.length, 11, 'o bloco continua no laudo');
     const oDaEstrutura = bloco(laudo, 'estrutura');
     igual(oDaEstrutura.situacao, 'falha');
     contem(oDaEstrutura.itens[0].oQue, 'não conseguiu rodar');
@@ -595,6 +595,58 @@ function rodarTestesDeDiagnostico() {
       });
     });
     igual(quebrados.join(' | '), '', 'telas com erro de sintaxe');
+  });
+
+  secao('Quando a estilização "desconfigura"');
+
+  teste('Estilos antigo no projeto: o laudo diz as classes que faltam', () => {
+    // Relatado pela operação: "desconfigurou a estilização, o que pode ser?".
+    // O sistema abre, o conteúdo está lá e a aparência não — e não há erro
+    // nenhum no console, porque CSS que não existe não reclama, só não pinta.
+    // É o caso mais comum de uma cópia manual: o Estilos fica para trás
+    // enquanto as telas avançam.
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.trocarTelaPor('Estilos',
+      '<style>\n.aplicacao { display: flex; }\n.lateral { width: 248px; }\n</style>');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+
+    const bloco = laudo.blocos.find((b) => b.chave === 'estilos');
+    igual(bloco.situacao, 'falha');
+    contem(falhasEmTexto(laudo), 'o Estilos não define');
+    contem(falhasEmTexto(laudo), 'mais antigo que as telas',
+      'e diz a causa provável, que é quase sempre a mesma');
+  });
+
+  teste('Estilos cortado no meio da colagem é falha', () => {
+    // 70 KB colados à mão nem sempre vão inteiros. Chave aberta sem fechar
+    // denuncia isso na hora.
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.trocarTelaPor('Estilos', '<style>\n.aplicacao { display: flex;');
+
+    const laudo = chamar('diagnosticoRECC()');
+    contem(falhasEmTexto(laudo), 'folha de estilos está incompleta');
+    contem(falhasEmTexto(laudo), 'cole de novo, do começo ao fim');
+  });
+
+  teste('com o Estilos certo, o bloco passa', () => {
+    const { chamar } = instalacaoNova();
+    const bloco = chamar('diagnosticoRECC()').blocos
+      .find((b) => b.chave === 'estilos');
+    igual(bloco.situacao, 'ok');
+  });
+
+  teste('toda classe que as telas usam existe na folha — aqui e agora', () => {
+    // A mesma conferência do laudo, rodando contra o repositório. Sem isto,
+    // uma classe nova escrita numa tela e esquecida no Estilos passaria, e
+    // só apareceria como "desconfigurado" na máquina de alguém.
+    const { chamar } = instalacaoNova();
+    const bloco = chamar('diagnosticoRECC()').blocos
+      .find((b) => b.chave === 'estilos');
+    const semEstilo = bloco.itens.find((i) => i.oQue.indexOf('classe(s)') >= 0);
+    igual(semEstilo, undefined,
+      'há classe usada sem estilo: ' + (semEstilo ? semEstilo.detalhe : ''));
   });
 
   secao('Quando a função não existe no servidor');

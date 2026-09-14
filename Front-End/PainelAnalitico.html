@@ -208,7 +208,7 @@ var TelaPainelAnalitico = (function () {
         }).join('') + '</td>';
       }).join('');
       return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao ver" data-caso-do-painel="'
+        + '<button type="button" class="acao" data-caso-do-painel="'
         + escapar(caso.id) + '">' + Moldura.icone('olho')
         + ' Ver detalhes</button></td></tr>';
     }).join('');

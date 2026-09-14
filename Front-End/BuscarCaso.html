@@ -186,7 +186,7 @@ var TelaBuscarCaso = (function () {
       }).join('');
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao ver" data-achado="'
+        + '<button type="button" class="acao" data-achado="'
         + escapar(caso.id) + '" data-mesa="' + escapar(origem.id) + '">'
         + Moldura.icone('olho') + ' Ver detalhes</button></td></tr>';
     }).join('');

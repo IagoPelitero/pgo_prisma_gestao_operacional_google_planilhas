@@ -588,6 +588,48 @@ começo — e a tela continuava mentindo por omissão.
 
 ---
 
+### 31 · "Desconfigurou a estilização" — e daqui não dava para ver nada
+
+**Sintoma.** Relatado pela operação, exatamente assim: *"desconfigurou a
+estilização da página, o que pode ser?"*. O sistema abria, o conteúdo estava
+lá, e a aparência não.
+
+**Por que é difícil.** CSS que não existe **não reclama** — só não pinta. Não
+há erro no console, não há exceção, não há nada no log. E do lado do
+repositório estava tudo certo: a prévia renderizava perfeitamente. O que estava
+desatualizado era a **cópia no projeto do Apps Script** — o caso mais comum de
+uma cópia manual, com o `Estilos` ficando para trás enquanto as telas avançam.
+
+**O que a investigação achou de quebra.** Comparando as classes que as telas
+escrevem com as que a folha define, apareceram **três buracos no próprio
+repositório**:
+
+| classe | situação |
+|---|---|
+| `.ver` | Usada em três telas e definida em lugar nenhum. Quem pinta o botão "Ver detalhes" é o `.acao` — `.ver` era **classe morta**. Removida |
+| `.config-mesas` | O seletor de mesa encostava no botão "Criar campo": o cabeçalho é flex e não separa sozinho quem não tem largura própria |
+| `.config-legado` | A caixa da planilha legada e a do diagnóstico não tinham a linha que as separa da lista — pareciam a continuação dela |
+
+**Defesa.** Um bloco novo no diagnóstico, **A folha de estilos**, que roda
+dentro do Apps Script e responde três coisas:
+
+1. O `Estilos` está no projeto?
+2. Ele está **inteiro**? Chaves desequilibradas ou `</style>` ausente
+   denunciam a colagem de 70 KB que não foi até o fim.
+3. Toda classe que as telas usam está **definida**? Se não, o laudo lista os
+   nomes — e diz a causa provável, que é quase sempre a mesma.
+
+Com isso, "está desconfigurado" vira "o `Estilos` deste projeto é mais antigo
+que as telas, e faltam estas sete classes".
+
+**O que ele ensina.** O defeito silencioso não é o que não tem erro: é o que
+não tem **sintoma que aponte para a causa**. Aqui o sintoma ("está feio") e a
+causa ("um arquivo ficou para trás") não têm nenhuma relação aparente, e
+nenhuma ferramenta do lado do desenvolvedor enxergava o problema. A saída foi
+levar a conferência para onde o problema mora.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
@@ -636,7 +678,10 @@ Daí as duas práticas que o projeto não abre mão:
     aparecido no primeiro dia ruim. O 30 era NÚMERO ERRADO, e não apareceria
     nunca: a tela mostrava um terço do período com a cara de quem mostra
     tudo. Um sistema que fica lento avisa sozinho; um que fica errado, não.
-12. **Medir o relógio errado não mede nada.** No Apps Script o custo é a IDA
+12. **CSS que não existe não reclama.** O item 31 não tinha erro, não tinha
+    exceção, não tinha log — só ficava feio. Defeito silencioso não é o que
+    não dá erro: é o que não tem sintoma apontando para a causa.
+13. **Medir o relógio errado não mede nada.** No Apps Script o custo é a IDA
     ao serviço, não a conta em JavaScript. Os itens 28 e 29 eram invisíveis no
     relógio do Node — o Node não paga pedágio. Contar as idas mostrou os dois
     na primeira execução.
