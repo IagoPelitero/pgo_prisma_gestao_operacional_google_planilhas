@@ -110,7 +110,17 @@ Dentro de `Evolucao/`:
    > No Apps Script o arquivo se chama `Formulario`, e não `Formulario.html`:
    > sem extensão no nome, sem acento, e com as maiúsculas iguais.
 
-6. Para a conferência completa, execute **`diagnosticoRECC()`**. São dez
+6. Se alguma tela ficar **parada numa mensagem de carregamento** — "Lendo o
+   cadastro…", "Somando os casos…" —, é arquivo `.gs` que ficou para trás.
+   Cole `Evolucao/conferir-projeto.gs` num arquivo novo e execute
+   **`oQueFaltaNoProjeto`**: ela não depende de nenhum outro arquivo do PGO e
+   diz quais copiar. Depois é só apagá-la.
+
+   > Quando a função não existe no servidor, a chamada estoura antes de sair
+   > do navegador, num ponto em que o tratamento de erro da tela ainda nem foi
+   > registrado. Nada aparece — a tela só congela.
+
+7. Para a conferência completa, execute **`diagnosticoRECC()`**. São dez
    blocos — fuso, estrutura, sequências de Id, Ids repetidos, mesas, campos,
    painéis, análises, quem consegue configurar, e se toda função que a tela
    chama existe no servidor. Também só lê, e escreve o laudo no log.
@@ -119,7 +129,7 @@ Dentro de `Evolucao/`:
    > **não abre**. A mesma conferência está em Configurações › Estrutura,
    > atrás de um botão.
 
-7. Abra o sistema e defina a senha de administrador.
+8. Abra o sistema e defina a senha de administrador.
 
 **A instalação recusa rodar sobre uma planilha que já tenha dado.** É a única
 rotina do sistema que cria estrutura; depois dela, nenhum caminho do produto
