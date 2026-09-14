@@ -632,12 +632,29 @@ function camposDoFormularioDaBase_(nomeDaAba, mesaId) {
 // ============================================================================
 
 /**
- * Confere a estrutura encontrada contra o contrato. Só LÊ.
- * Nenhum teste rodado fora do Apps Script pega uma aba que ficou para trás.
+ * Confere o que foi copiado, contra o contrato. Só LÊ.
+ *
+ * É a conferência de DOIS SEGUNDOS, para rodar logo depois de copiar os
+ * arquivos. Duas metades, e as duas importam:
+ *
+ *   as ABAS      contra o contrato do Esquema;
+ *   os ARQUIVOS  de tela que o Index manda incluir.
+ *
+ * A segunda metade nasceu de um caso real: o `Formulario.html` ficou para trás
+ * na cópia, e o sistema só disse "nenhum arquivo html com o nome Formulario
+ * foi encontrado", com um número de linha. Nenhum teste rodado fora do Apps
+ * Script pega isso — os testes leem a PASTA do repositório, onde o arquivo
+ * está; quem não tem o arquivo é o PROJETO.
+ *
+ * Para a conferência completa — sequências, Ids, mesas, campos, permissões —
+ * existe `diagnosticoRECC()`. As duas leem o mesmo `conferirEstrutura_`: não
+ * há duas versões da regra, há uma curta e uma completa.
  */
 function verificarEstruturaRECC() {
   var laudo = conferirEstrutura_();
-  var linhas = [laudo.ok ? 'ESTRUTURA OK' : 'ESTRUTURA INCOMPLETA', ''];
+  var faltamArquivos = arquivosDeTelaQueFaltam_();
+  var tudoCerto = laudo.ok && !faltamArquivos.length;
+  var linhas = [tudoCerto ? 'ESTRUTURA OK' : 'ESTRUTURA INCOMPLETA', ''];
 
   laudo.abas.forEach(function (item) {
     if (!item.existe) {
@@ -655,10 +672,24 @@ function verificarEstruturaRECC() {
     }
   });
 
+  linhas.push('');
+  if (faltamArquivos.length) {
+    linhas.push('FALTAM ' + faltamArquivos.length + ' ARQUIVO(S) DE TELA:');
+    faltamArquivos.forEach(function (nome) {
+      linhas.push('             ' + nome + '   (copie Front-End/' + nome
+        + '.html, e nomeie aqui como "' + nome + '")');
+    });
+    linhas.push('             Sem eles a página não carrega.');
+  } else {
+    linhas.push('ok           os arquivos de tela do Index estão todos aqui');
+  }
+
   var orcamento = orcamentoDeCelulas_(planilhaAtiva_());
   linhas.push('');
   linhas.push('Células: ' + orcamento.usadas.toLocaleString('pt-BR') + ' de ' +
     RECC_TETO_DE_CELULAS.toLocaleString('pt-BR') + ' (' + orcamento.percentual + '%)');
+  linhas.push('');
+  linhas.push('Para a conferência completa, rode diagnosticoRECC().');
 
   var texto = linhas.join('\n');
   Logger.log(texto);

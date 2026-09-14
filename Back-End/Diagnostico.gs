@@ -778,16 +778,11 @@ function blocoDaTela_() {
   }
 
   var chamadas = {};
-  var naoLidas = [];
+  var naoLidas = arquivosDeTelaQueFaltam_();
 
   telas.forEach(function (nomeDaTela) {
-    var fonte;
-    try {
-      fonte = HtmlService.createTemplateFromFile(nomeDaTela).getRawContent();
-    } catch (erro) {
-      naoLidas.push(nomeDaTela);
-      return;
-    }
+    if (naoLidas.indexOf(nomeDaTela) >= 0) return;
+    var fonte = HtmlService.createTemplateFromFile(nomeDaTela).getRawContent();
     var achados = fonte.match(/Servidor\.chamar\('([A-Za-z0-9_]+)'/g) || [];
     achados.forEach(function (achado) {
       var nome = achado.replace("Servidor.chamar('", '').replace("'", '');
@@ -799,9 +794,12 @@ function blocoDaTela_() {
   if (naoLidas.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
       naoLidas.length + ' arquivo(s) de tela incluídos e ausentes',
-      algunsExemplos_(naoLidas),
-      'O Index.html inclui esses arquivos e eles não existem no projeto. A '
-        + 'página não vai carregar.'));
+      naoLidas.join(', '),
+      'O Index.html inclui esses arquivos e eles não estão no projeto: a '
+        + 'página não carrega, e o Apps Script só diz o nome do primeiro. '
+        + 'Copie Front-End/<Nome>.html do repositório para cá, criando cada '
+        + 'um como arquivo HTML com o nome exato — sem ".html", sem acento e '
+        + 'com as maiúsculas iguais.'));
   }
 
   var faltando = [];
@@ -856,6 +854,30 @@ function blocoDaTela_() {
       'As ' + RECC_TELAS_DO_SISTEMA.length + ' telas do menu têm rota'));
 
   return itens;
+}
+
+/**
+ * Os arquivos de tela que o Index manda incluir e que NÃO estão no projeto.
+ *
+ * Mora aqui, e não no Principal, porque é a mesma conferência que o bloco da
+ * tela faz — e duas versões dela acabariam discordando. É usada por três
+ * lugares: o bloco do diagnóstico, o recado de erro do `incluir_` e a
+ * conferência rápida do Instalador.
+ */
+function arquivosDeTelaQueFaltam_() {
+  return telasIncluidasNoIndex_().filter(function (nome) {
+    return !existeArquivoDeTela_(nome);
+  });
+}
+
+/** O arquivo HTML existe no projeto do Apps Script? */
+function existeArquivoDeTela_(nome) {
+  try {
+    HtmlService.createTemplateFromFile(nome).getRawContent();
+    return true;
+  } catch (erro) {
+    return false;
+  }
 }
 
 /** Os nomes das telas que o Index.html manda incluir. */

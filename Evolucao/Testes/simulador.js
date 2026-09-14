@@ -263,6 +263,19 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   // fora do ar passaria sem provar nada.
   const planilhasExternas = new Map();
 
+  // Arquivos de tela "não copiados" para o projeto. O caso real: o arquivo
+  // está na pasta do repositório — então os testes o enxergam — e não está no
+  // projeto do Apps Script. Sem poder simular isso, o caminho de erro mais
+  // comum de uma instalação nova ficaria sem teste.
+  const telasEscondidas = new Set();
+
+  function exigirTelaCopiada(nome) {
+    if (telasEscondidas.has(nome)) {
+      throw new Error('Nenhum arquivo HTML com o nome ' + nome
+        + ' foi encontrado.');
+    }
+  }
+
   const ambiente = {
     planilha,
     propriedades,
@@ -270,6 +283,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     registros,
     /** Troca quem está "logado", para testar cada perfil de acesso. */
     definirEmail(novo) { emailAtual = novo; },
+    /** Finge que este arquivo de tela não foi copiado para o projeto. */
+    esconderTela(nome) { telasEscondidas.add(nome); },
     emailAtual() { return emailAtual; },
     /**
      * Cria uma planilha "de fora", com uma aba já preenchida, e devolve o Id.
@@ -312,6 +327,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       },
       HtmlService: {
         createTemplateFromFile(nome) {
+          exigirTelaCopiada(nome);
           const fonte = fs.readFileSync(
             path.join(PASTA_DAS_TELAS, nome + '.html'), 'utf8');
           const template = {
@@ -332,6 +348,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
           return template;
         },
         createHtmlOutputFromFile(nome) {
+          exigirTelaCopiada(nome);
           return saidaHtml(
             fs.readFileSync(path.join(PASTA_DAS_TELAS, nome + '.html'), 'utf8'));
         }

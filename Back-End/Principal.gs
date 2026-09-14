@@ -48,9 +48,48 @@ function doGet() {
 /**
  * Cola um arquivo .html dentro de outro.
  * É assim que o Apps Script faz "incluir": não existe import de HTML.
+ *
+ * QUANDO O ARQUIVO NÃO ESTÁ NO PROJETO, o Apps Script diz apenas
+ * "nenhum arquivo html com o nome X foi encontrado", com o número da linha —
+ * e mais nada. Quem recebe isso não sabe se o nome está errado, se o arquivo
+ * ficou para trás na cópia, ou se é defeito do sistema.
+ *
+ * Então trocamos a mensagem por uma que diz as três coisas que resolvem: o
+ * nome EXATO que o projeto espera, a regra de nomenclatura (sem .html, sem
+ * acento) e — o que mais poupa tempo — TODOS os arquivos que faltam, e não só
+ * o primeiro. Sem isso a pessoa copia um, recarrega, descobre o próximo, e
+ * repete quinze vezes.
  */
 function incluir_(nomeDoArquivo) {
-  return HtmlService.createHtmlOutputFromFile(nomeDoArquivo).getContent();
+  try {
+    return HtmlService.createHtmlOutputFromFile(nomeDoArquivo).getContent();
+  } catch (erro) {
+    throw new Error(recadoDoArquivoQueFalta_(nomeDoArquivo));
+  }
+}
+
+function recadoDoArquivoQueFalta_(nomeDoArquivo) {
+  var recado = 'Falta o arquivo HTML "' + nomeDoArquivo + '" no projeto do '
+    + 'Apps Script.\n\n'
+    + 'Copie Front-End/' + nomeDoArquivo + '.html do repositório e crie aqui '
+    + 'um arquivo HTML chamado exatamente "' + nomeDoArquivo + '" — sem '
+    + '".html" no nome, sem acento e com as maiúsculas iguais. O Apps Script '
+    + 'diferencia maiúsculas de minúsculas.';
+
+  // A lista completa é o que evita descobrir um arquivo por vez. Vai num try
+  // próprio: se o Diagnostico.gs também tiver ficado para trás na cópia, o
+  // recado principal continua saindo em vez de virar um segundo erro.
+  try {
+    var faltando = arquivosDeTelaQueFaltam_();
+    if (faltando.length > 1) {
+      recado += '\n\nNo total faltam ' + faltando.length + ' arquivos: '
+        + faltando.join(', ') + '. Copie todos de uma vez.';
+    }
+  } catch (erro) {
+    recado += '\n\n(Não consegui listar os outros que faltam — confira se '
+      + 'Diagnostico.gs está no projeto.)';
+  }
+  return recado;
 }
 
 /** Atalho para os templates escreverem <?!= incluir('Estilos') ?> */

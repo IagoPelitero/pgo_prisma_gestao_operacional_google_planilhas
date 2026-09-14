@@ -765,7 +765,23 @@ para logo depois de copiar os arquivos. As duas leem o mesmo
 `conferirEstrutura_` — e tem teste cobrando que concordem. Duas versões da
 mesma regra sempre acabam discordando, e aí uma das duas está mentindo.
 
-**346 testes** — 33 desta etapa, e quase todos QUEBRAM alguma coisa de
+### E o caso que chegou da operação enquanto isto era escrito
+
+O sistema publicado não abria, e tudo o que dizia era *"nenhum arquivo html
+com o nome formulario foi encontrado — linha 53"*. Verdade, e inútil: o
+`Formulario.html` tinha ficado para trás na cópia, mas a mensagem não dizia de
+onde tirar o arquivo, como nomeá-lo no Apps Script (sem `.html`, sem acento,
+maiúsculas iguais) nem — o pior — **quantos outros faltavam**. Um por vez, com
+uma recarga entre cada.
+
+Virou o [bug 25](04-bugs-capturados.md), com três defesas: o `incluir_` agora
+devolve um recado que resolve, `verificarEstruturaRECC()` passou a conferir os
+arquivos de tela além das abas (o README já prometia isso e ela não fazia), e
+o simulador ganhou `esconderTela(nome)` — um arquivo que está na pasta e não
+está no projeto. Sem poder simular isso, o caminho de erro mais comum de uma
+instalação nova continuaria sem teste.
+
+**351 testes** — 38 desta etapa, e quase todos QUEBRAM alguma coisa de
 propósito numa planilha nova para cobrar a falha correspondente. Provar que o
 diagnóstico aprova uma instalação boa é o teste fácil e o menos útil: um
 verificador que sempre responde "aprovado" também passaria nele.

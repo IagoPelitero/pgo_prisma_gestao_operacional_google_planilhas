@@ -409,6 +409,45 @@ que estava errado.
 
 ---
 
+### 25 · O erro que sabia tudo e não contava nada
+
+**Sintoma.** Publicado no Apps Script, o sistema não abria. A única coisa que
+aparecia era:
+
+> nenhum arquivo html com o nome formulario foi encontrado — linha 53
+
+**Causa.** Verdadeira, e insuficiente. O `Formulario.html` tinha ficado para
+trás na cópia dos arquivos para o projeto. Mas a mensagem é do Apps Script, e
+ela não diz nada do que resolve:
+
+- **de onde tirar o arquivo** — quem recebe isso não sabe se o nome está
+  errado, se o arquivo não foi copiado, ou se é defeito do sistema;
+- **como nomear** — no Apps Script o arquivo se chama `Formulario`, sem
+  `.html`, sem acento, com as maiúsculas iguais. Metade dos casos é isto;
+- **quantos mais faltam** — e este é o pior. Ela nomeia UM. A pessoa copia
+  esse, recarrega, descobre o próximo, e repete quinze vezes.
+
+E nenhum teste pegava, porque **os testes leem a pasta do repositório, onde o
+arquivo está**. Quem não tinha o arquivo era o projeto do Apps Script.
+
+**Defesa.** Três, e as três vieram juntas:
+
+1. `incluir_` embrulha a falha e devolve um recado que diz o nome exato, a
+   regra de nomenclatura e **todos** os arquivos que faltam, de uma vez.
+2. `verificarEstruturaRECC()` passou a conferir os arquivos de tela, e não só
+   as abas. Ela sempre prometeu isso no README — *"diz em segundos se algum
+   arquivo ficou para trás na cópia"* — e conferia só a planilha.
+3. O simulador ganhou `esconderTela(nome)`: um arquivo que está na pasta e
+   não está no projeto. Sem poder simular isso, o caminho de erro mais comum
+   de uma instalação nova continuaria sem teste. São cinco testes novos.
+
+**O que ela ensina.** Uma mensagem de erro tem um trabalho: encurtar o
+caminho até o conserto. Esta dizia a verdade e deixava a pessoa exatamente
+onde estava — e a única informação que faltava (a lista completa) o sistema
+tinha à mão o tempo todo.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
@@ -437,3 +476,11 @@ Daí as duas práticas que o projeto não abre mão:
    motivo errado. Sistema que aponta o campo errado é pior que sistema que só
    diz "deu erro": manda quem está conferindo procurar no lugar errado, com a
    confiança de quem foi informado.
+7. **Estar certo não basta: a mensagem tem de encurtar o caminho até o
+   conserto.** O item 25 dizia a verdade — o arquivo faltava mesmo — e deixava
+   a pessoa exatamente onde estava. A informação que faltava, o sistema tinha
+   à mão o tempo todo.
+8. **O teste que roda fora do Apps Script não vê o projeto do Apps Script.**
+   Os itens 25 e o laudo da Etapa 12 são a mesma lição: a suíte lê a PASTA do
+   repositório, e a instalação é outra coisa. É por isso que existe um
+   diagnóstico que roda lá dentro.

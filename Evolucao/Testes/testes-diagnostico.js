@@ -402,6 +402,70 @@ function rodarTestesDeDiagnostico() {
     contem(oDaRota.oQue, 'têm rota');
   });
 
+  secao('O arquivo que ficou para trás na cópia');
+
+  teste('arquivo de tela ausente é falha, com a lista inteira', () => {
+    // Caso real, relatado pela operação: o Formulario.html ficou para trás na
+    // cópia para o Apps Script, e tudo o que o sistema disse foi "nenhum
+    // arquivo html com o nome Formulario foi encontrado", com um número de
+    // linha. Nenhum teste pegava isto: os testes leem a PASTA, onde o arquivo
+    // está — quem não tinha o arquivo era o PROJETO.
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.esconderTela('Formulario');
+    ambiente.esconderTela('Graficos');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(laudo.aprovado, false);
+    contem(falhasEmTexto(laudo), '2 arquivo(s) de tela incluídos e ausentes');
+    contem(falhasEmTexto(laudo), 'Formulario, Graficos',
+      'a lista inteira, e não só o primeiro');
+    contem(falhasEmTexto(laudo), 'sem acento',
+      'e a regra de nomenclatura, que é metade dos casos');
+  });
+
+  teste('o recado do incluir diz o nome, a regra e TODOS que faltam', () => {
+    // Descobrir um arquivo por vez é copiar, recarregar, descobrir o próximo,
+    // quinze vezes.
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.esconderTela('Formulario');
+    ambiente.esconderTela('CasoEmModal');
+    ambiente.esconderTela('SenhaDeAdministrador');
+
+    const recado = chamar('recadoDoArquivoQueFalta_')('Formulario');
+    contem(recado, 'Falta o arquivo HTML "Formulario"');
+    contem(recado, 'Front-End/Formulario.html');
+    contem(recado, 'sem acento');
+    contem(recado, 'No total faltam 3 arquivos');
+    contem(recado, 'CasoEmModal');
+    contem(recado, 'SenhaDeAdministrador');
+  });
+
+  teste('abrir o sistema sem o arquivo estoura com o recado, não com o do Apps Script', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.esconderTela('Formulario');
+    lanca(() => chamar('doGet()'), 'Falta o arquivo HTML "Formulario"');
+  });
+
+  teste('a conferência rápida também pega o arquivo que ficou para trás', () => {
+    // É o que o README promete dela: "diz em segundos se algum arquivo ficou
+    // para trás na cópia". Antes deste caso ela só olhava as abas.
+    const { ambiente, chamar } = instalacaoNova();
+    ambiente.esconderTela('Formulario');
+
+    const texto = chamar('verificarEstruturaRECC()');
+    contem(texto, 'ESTRUTURA INCOMPLETA');
+    contem(texto, 'FALTAM 1 ARQUIVO(S) DE TELA');
+    contem(texto, 'copie Front-End/Formulario.html');
+    contem(texto, 'diagnosticoRECC', 'e aponta para a conferência completa');
+  });
+
+  teste('com tudo copiado, a conferência rápida diz que está tudo aqui', () => {
+    const { chamar } = instalacaoNova();
+    const texto = chamar('verificarEstruturaRECC()');
+    contem(texto, 'ESTRUTURA OK');
+    contem(texto, 'os arquivos de tela do Index estão todos aqui');
+  });
+
   secao('As duas portas');
 
   teste('a porta do editor não exige permissão nem login', () => {

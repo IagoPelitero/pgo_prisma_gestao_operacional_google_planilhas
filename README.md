@@ -100,9 +100,15 @@ Dentro de `Evolucao/`:
    > conferido contra a aba `USUARIOS`, e uma base nova tem essa aba vazia. Sem
    > ninguém dentro, ninguém entra — e sem entrar, ninguém cadastra.
 
-5. Confira com **`verificarEstruturaRECC()`**. Ela só lê, e diz em segundos se
-   algum arquivo ficou para trás na cópia. Nenhum teste rodado fora do Apps
-   Script pega isso.
+5. Confira com **`verificarEstruturaRECC()`**. Ela só lê, e diz em segundos
+   duas coisas: se alguma **aba** do contrato ficou faltando, e se algum
+   **arquivo de tela** ficou para trás na cópia — com o nome de cada um.
+
+   > Nenhum teste rodado fora do Apps Script pega isso: a suíte lê a pasta do
+   > repositório, onde os arquivos estão. Quem pode não tê-los é o projeto.
+   >
+   > No Apps Script o arquivo se chama `Formulario`, e não `Formulario.html`:
+   > sem extensão no nome, sem acento, e com as maiúsculas iguais.
 
 6. Para a conferência completa, execute **`diagnosticoRECC()`**. São dez
    blocos — fuso, estrutura, sequências de Id, Ids repetidos, mesas, campos,
