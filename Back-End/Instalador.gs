@@ -10,7 +10,7 @@
  *
  * O que a instalação faz:
  *   1. acerta o fuso da planilha para America/Sao_Paulo;
- *   2. cria as 12 abas, com cabeçalho, formato de coluna e linha 1 congelada;
+ *   2. cria as 13 abas, com cabeçalho, formato de coluna e linha 1 congelada;
  *   3. CORTA cada aba para o tamanho do contrato — célula vazia também consome
  *      o teto de 10 milhões da planilha;
  *   4. semeia catálogo, mesas, campos e configuração — tudo editável depois;
@@ -121,7 +121,7 @@ function quantasLinhasPreenchidas_(aba) {
  * contrato.
  *
  * O corte importa: uma aba nova nasce com 1.000 linhas × 26 colunas, ou seja
- * 26.000 células do orçamento, todas em branco. Multiplicado por 12 abas isso
+ * 26.000 células do orçamento, todas em branco. Multiplicado por 13 abas isso
  * já seria 312 mil células guardando nada.
  */
 function criarAbaDoContrato_(planilha, esquema) {
@@ -302,6 +302,18 @@ function semearDadosIniciais_(emailDoInstalador) {
   // QUAIS, e de mais nada — não de renomear um, nem de trocar a cor.
   contagem.paineis = inserirVariosRegistros_('PAINEIS',
     cartoesIniciaisDoPainel_(idRet, idMesa)).length;
+
+  // --- análises de partida --------------------------------------------------
+  // Duas, uma por mesa, para a operação ver a ideia funcionando antes de
+  // montar as dela. Nascem LIGADAS mas NÃO GERADAS: criar aba na instalação
+  // custaria o dobro do tempo, e ninguém pediu a aba ainda.
+  contagem.analises = inserirVariosRegistros_('ANALISES', [
+    { Nome: 'RetVida', Descricao: 'Tudo da RET Vida dos últimos 90 dias',
+      MesaId: idRet, Colunas: '', Filtros: '', Dias: 90, Ordem: 1, Ativo: true },
+    { Nome: 'Diamante',
+      Descricao: 'Casos da Mesa Diamante dos últimos 90 dias',
+      MesaId: idMesa, Colunas: '', Filtros: '', Dias: 90, Ordem: 2, Ativo: true }
+  ]).length;
 
   // --- campos do formulário -------------------------------------------------
   // Gerados a partir do contrato: é isto que faz CAMPOS ser o mapa

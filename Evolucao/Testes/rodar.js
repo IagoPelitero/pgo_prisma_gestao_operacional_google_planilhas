@@ -21,6 +21,7 @@ const { rodarTestesDeBusca } = require('./testes-busca');
 const { rodarTestesDoAnalitico } = require('./testes-analitico');
 const { rodarTestesDePerformance } = require('./testes-performance');
 const { rodarTestesDeCorretoras } = require('./testes-corretoras');
+const { rodarTestesDeAnalise } = require('./testes-analise');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -32,6 +33,7 @@ rodarTestesDeBusca();
 rodarTestesDoAnalitico();
 rodarTestesDePerformance();
 rodarTestesDeCorretoras();
+rodarTestesDeAnalise();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

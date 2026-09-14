@@ -383,6 +383,32 @@ a linha torta na tela.
 
 ---
 
+### 24 · A regra do campo de digitar esticou a caixa de marcar
+
+**Sintoma.** Na lista de colunas de uma análise, as caixas de marcar
+apareciam — e os nomes das colunas, não. Os rótulos estavam no HTML, com o
+texto certo, e mesmo assim invisíveis na tela.
+
+**Causa.** Uma linha escrita meses antes, para os campos de digitar:
+
+```css
+.config-campo input, .config-campo select { …  width: 100%; }
+```
+
+A lista de colunas foi a PRIMEIRA caixa de marcar a morar dentro de um
+`.config-campo`. A regra a pegou junto, esticou a caixinha até a largura
+inteira do painel, e empurrou o rótulo para 1405px — fora da tela.
+
+**Defesa.** `:not([type="checkbox"])` na regra, com o motivo escrito ao lado.
+
+**O que ela ensina.** É o item [21](#21--um-atributo-servindo-a-duas-coisas-diferentes)
+outra vez, em CSS: uma regra escrita para uma coisa passa a valer para uma
+segunda que ainda não existia quando ela foi escrita. Nos dois casos o código
+antigo estava certo, o código novo estava certo, e o encontro entre eles é
+que estava errado.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não

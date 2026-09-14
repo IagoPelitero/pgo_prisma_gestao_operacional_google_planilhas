@@ -51,7 +51,7 @@ function rodarTestesDeConfiguracoes() {
     // Conferimos as CHAVES, e não só quantas são: contar 7 continuaria
     // passando se uma seção sumisse e outra nascesse no mesmo commit.
     igual(resumo.secoes.map((s) => s.chave).join(','),
-      'campos,usuarios,niveis,catalogo,mesas,identidade,paineis,estrutura');
+      'campos,usuarios,niveis,catalogo,mesas,identidade,paineis,analises,estrutura');
     igual(resumo.podeMexerNaEstrutura, true);
     igual(resumo.senhaDefinida, false, 'instalação nova ainda não tem senha');
     verdadeiro(resumo.secoes.find((s) => s.chave === 'campos').quantidade >= 55);

@@ -169,7 +169,7 @@ o que ignorar.
 
 ## 3. O modelo no Google Planilhas
 
-**Uma planilha, 12 abas fixas** + as abas de análise que o próprio sistema gera.
+**Uma planilha, 13 abas fixas** + as abas de análise que o próprio sistema gera.
 Nenhuma aba de dados nasce preenchida: os dados entram quando a operação
 começar.
 
@@ -250,6 +250,7 @@ formulário (no momento em que a SUSEP é digitada) e no dashboard.
 | `PAINEIS` | `Id` · `Tela` · `MesaId` · `Titulo` · `TipoComponente` · `CampoDimensao` · `CampoMedida` · `Agregacao` · `Limite` · `Filtro` · `Ordem` · `Largura` · `VisivelPara` · `Ativo` | Os cards e gráficos de cada tela, configuráveis |
 | `CONFIG` | `Id` · `Chave` · `Valor` · `Descricao` · `AtualizadoPor` · `Data` | Parâmetros gerais (nome do sistema, janela de dias, metas…) |
 | `AUDITORIA` | `Id` · `DataHora` · `UsuarioId` · `Acao` · `Entidade` · `RegistroId` · `Detalhe` | Trilha das ações relevantes. Sem dado pessoal |
+| `ANALISES` | `Id` · `Nome` · `Descricao` · `MesaId` · `Colunas` · `Filtros` · `Dias` · `Ordem` · `Ativo` · `GeradaEm` · `GeradaPor` · `Linhas` | A **receita** de cada aba `ANALISE_*`. A aba gerada é outra coisa, e não está no contrato |
 
 ### 3.4 Abas de análise (geradas pelo sistema)
 
@@ -261,9 +262,22 @@ sistema cria/atualiza uma aba chamada `ANALISE_<nome>` com os dados achatados,
 prontos para tabela dinâmica ou Power BI.
 
 - **Retrato** (padrão): valores gravados de uma vez, atualizados por botão ou por gatilho
-  de horário. Estável, não pesa a planilha.
-- Nunca sobrescreve uma aba que não tenha o prefixo `ANALISE_`.
-- Recriar uma aba de análise existente exige senha de ADM.
+  de horário. Estável, não pesa a planilha. Uma aba de `=FILTER(...)` seria
+  "sempre atualizada", e recalcularia 30 mil linhas a cada abertura da
+  planilha — com três dessas, a planilha inteira fica lenta o dia todo.
+- Nunca sobrescreve uma aba que não tenha o prefixo `ANALISE_`. É a trava mais
+  importante do arquivo: uma análise chamada "BASE_RET" apagaria a base, e
+  nenhuma outra proteção pegaria, porque apagar seria exatamente o que o
+  código se propôs a fazer.
+- Recriar uma aba de análise existente exige senha de ADM. Criar pela primeira
+  vez não pede: criar não destrói nada.
+- A aba é **reaproveitada**, nunca apagada e recriada. Apagar mudaria o
+  identificador interno dela, e todo Power BI apontado para aquela aba
+  perderia o alvo em silêncio.
+- Para atualizar sem clicar, aponte um acionador de tempo para
+  `atualizarAnalisesAgendadas`. Ela é a única função do arquivo que não pede
+  senha nem permissão — um gatilho de horário roda sem ninguém logado, e não
+  haveria quem digitasse a senha.
 
 ### 3.5 Regras do ID
 
@@ -311,11 +325,12 @@ APPS SCRIPT
   Indicadores.gs ..... agregações (Dashboard, Painel, Performance)
   Paineis.gs ......... a disposição dos componentes de cada tela
   Analise.gs ......... gerador das abas ANALISE_*
+  Importacao.gs ...... colar / conferir / aplicar listas em lote
   Auditoria.gs ....... trilha
   Diagnostico.gs ..... verificação de build e de contrato
         │
         ▼
-GOOGLE PLANILHAS  (12 abas + ANALISE_*)
+GOOGLE PLANILHAS  (13 abas + ANALISE_*)
 ```
 
 **`Planilha.gs` é o coração.** Nenhum outro arquivo chama `SpreadsheetApp`
@@ -457,7 +472,7 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 
 | # | Etapa | Entrega | Estado |
 |---|---|---|---|
-| 1 | Fundação | `Esquema.gs`, `Planilha.gs`, `Sequencia.gs`, `Instalador.gs`, as 12 abas, Id de 10 casas, formato texto | **pronta** |
+| 1 | Fundação | `Esquema.gs`, `Planilha.gs`, `Sequencia.gs`, `Instalador.gs`, as 13 abas, Id de 10 casas, formato texto | **pronta** |
 | 2 | Acesso | Login pelo e-mail, `USUARIOS`, cargos, níveis, tela de não cadastrado | **pronta** |
 | 3 | Casca | Menu lateral, barra superior, 4 temas, roteador | **pronta** |
 | 4 | Cadastrar Caso | Formulário dirigido por `CAMPOS`, máscaras, validação, selo de SUSEP | |
@@ -467,7 +482,7 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 | 8 | Painel Analítico | Componentes configuráveis, exportação | |
 | 9 | Minha Performance | Indicadores individuais, meta, ranking | |
 | 10 | Tabela de Corretoras | `CANAIS` + segmento + SUSEP bloqueada | |
-| 11 | Abas de análise | Gerador `ANALISE_*` | |
+| 11 | Abas de análise | Gerador `ANALISE_*` | **pronta** |
 | 12 | Diagnóstico | Verificação de build e de contrato | |
 
 ---

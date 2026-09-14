@@ -120,6 +120,16 @@ class Faixa {
     return this;
   }
   setValue(v) { return this.setValues([[v]]); }
+  /* Só o conteúdo, sem mexer no formato — é o que o gerador das abas de
+     análise usa antes de reescrever a aba inteira. */
+  clearContent() {
+    for (let i = 0; i < this.nLinhas; i++) {
+      for (let j = 0; j < this.nColunas; j++) {
+        this.aba.valores[this.linha - 1 + i][this.coluna - 1 + j] = '';
+      }
+    }
+    return this;
+  }
   setNumberFormat(formato) {
     for (let i = 0; i < this.nLinhas; i++) {
       for (let j = 0; j < this.nColunas; j++) {

@@ -20,7 +20,7 @@ function rodarTestesDaFundacao() {
 
   secao('Instalação');
 
-  teste('instalarRECC cria as 12 abas do contrato', () => {
+  teste('instalarRECC cria as 13 abas do contrato', () => {
     chamar('instalarRECC()');
     const nomes = planilha.getSheets().map((a) => a.getName()).sort();
     const esperadas = chamar('nomesDasAbasDoContrato_()').slice().sort();

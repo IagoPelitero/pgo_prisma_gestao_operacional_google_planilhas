@@ -93,7 +93,7 @@ Dentro de `Evolucao/`:
 
 3. Publique como **aplicativo da web** (executar como você).
 
-4. No editor, execute **`instalarRECC()`** uma vez. Ela cria as 12 abas, semeia
+4. No editor, execute **`instalarRECC()`** uma vez. Ela cria as 13 abas, semeia
    o catálogo e **cadastra você como o primeiro administrador**.
 
    > Esse último passo não é conveniência: o acesso é pelo e-mail autenticado

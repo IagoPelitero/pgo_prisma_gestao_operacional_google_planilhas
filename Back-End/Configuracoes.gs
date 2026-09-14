@@ -75,6 +75,11 @@ function resumoDasConfiguracoes() {
         quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
           return normalizarParaComparar_(linha.Ativo) === 'sim';
         }).length },
+      { chave: 'analises', titulo: 'Análises',
+        descricao: 'As abas ANALISE_* que o sistema gera na planilha',
+        quantidade: lerRegistros_('ANALISES').filter(function (linha) {
+          return normalizarParaComparar_(linha.Ativo) === 'sim';
+        }).length },
       { chave: 'estrutura', titulo: 'Estrutura',
         descricao: 'O laudo da planilha, a auditoria e a base antiga',
         quantidade: 0 }

@@ -36,7 +36,7 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 
 | Arquivo | Entrega |
 |---|---|
-| `Back-End/Esquema.gs` | O contrato das 12 abas: cabeçalhos exatos e tipo de cada coluna |
+| `Back-End/Esquema.gs` | O contrato das 13 abas: cabeçalhos exatos e tipo de cada coluna |
 | `Back-End/Planilha.gs` | A porta única para o Planilhas — nenhum outro arquivo chama `SpreadsheetApp` |
 | `Back-End/Sequencia.gs` | Id decimal de 10 casas, que nunca anda para trás |
 | `Back-End/Instalador.gs` | Cria as abas numa planilha vazia e cadastra o primeiro administrador |
@@ -602,6 +602,80 @@ escrever esse caso não teria ocorrido a ninguém antes de ver a linha torta na
 tela.
 
 **285 testes.**
+
+---
+
+## Etapa 11 — Abas de análise ✅
+
+O pedido original: *"permitir criar uma aba exclusiva que irá criar uma aba no
+planilhas para análise de dados."*
+
+O administrador monta uma RECEITA — mesa, colunas, filtros, janela de dias — e
+o sistema escreve o resultado numa aba `ANALISE_<Nome>`, achatada, pronta para
+tabela dinâmica ou para o Power BI apontar.
+
+### A trava que justifica o arquivo
+
+`escreverAbaDeAnalise_` recusa qualquer nome que não comece com `ANALISE_`, e
+essa é a primeira linha da função, antes de qualquer outra coisa. Sem ela, uma
+análise chamada "BASE_RET" apagaria a base de produção — e nenhuma outra
+proteção do sistema pegaria, porque apagar seria exatamente o que o código se
+propôs a fazer.
+
+O teste que prova isso tenta escrever em `BASE_MESA`, em `CONFIG` e em `''`, e
+depois confere que a base continua inteira.
+
+### Retrato, e não fórmula
+
+A aba recebe VALORES gravados de uma vez. Poderia ser uma aba de
+`=FILTER(...)`, "sempre atualizada" — mas uma fórmula que varre 30 mil linhas
+recalcula a cada abertura da planilha, e com três abas dessas a planilha fica
+lenta para todo mundo, o dia inteiro. Retrato pesa uma vez, quando alguém pede.
+
+### Cinco decisões pequenas que mudam o dia a dia
+
+| decisão | por quê |
+|---|---|
+| **Salvar ≠ gerar** | Montar a receita é ajuste, e ajuste não pode custar trinta segundos de espera a cada campo mexido |
+| **Regerar pede senha; criar, não** | Criar não destrói nada. Regerar apaga o retrato anterior, e quem tinha uma tabela dinâmica apontada para ele vê os números mudarem embaixo |
+| **A aba é reaproveitada** | Apagar e recriar mudaria o identificador dela, e todo Power BI apontado para aquela aba perderia o alvo em silêncio |
+| **A grade encolhe junto** | Célula vazia também consome o teto de 10 milhões. Uma aba deixada em 1000 × 26 gasta 26 mil células para mostrar três linhas |
+| **Nenhuma coluna marcada = todas** | Guardar a lista inteira congelaria as colunas de hoje, e uma coluna nova na base nunca apareceria na análise |
+
+### O alcance não se aplica aqui
+
+E é decisão, não esquecimento. A aba gerada mora na MESMA planilha que a base:
+quem abre `ANALISE_Diamante` abre `BASE_RET` ao lado, e recortar por alcance
+não esconderia nada — só deixaria a análise incompleta. Além disso, o gatilho
+de horário roda sem ninguém logado; se o recorte dependesse de quem gerou, a
+mesma análise teria conteúdos diferentes conforme o botão ou o horário a
+tivesse gerado, e ninguém saberia qual dos dois está na aba naquele momento.
+
+Quem pode gerar é controlado onde tem de ser: `gerarAnalise` exige a permissão
+de **estrutura**, e montar a receita exige só **configurar**.
+
+### O gatilho de horário
+
+`atualizarAnalisesAgendadas` é a função para apontar um acionador de tempo no
+editor do Apps Script. É a única do arquivo que não pede senha nem permissão —
+um gatilho roda sem ninguém logado, e uma senha ali falharia toda madrugada, em
+silêncio. Uma análise que estoura não derruba as outras: o erro é anotado e a
+próxima segue.
+
+### A aba gerada não está no contrato
+
+`conferirEstrutura_` não a conhece e o instalador não a cria. É saída, não é
+base: pode ser apagada à mão a qualquer momento, e a próxima geração a refaz —
+tem teste para isso.
+
+O que está no contrato é a **receita**, na aba `ANALISES` — a décima terceira.
+Uma aba, e não um JSON dentro de `CONFIG`, pela mesma razão que os cartões do
+Dashboard saíram de `MESAS`: é uma lista de coisas configuráveis, cada uma com
+nome, mesa, colunas e filtro próprios.
+
+**313 testes**, e o [bug 24](04-bugs-capturados.md) pelo caminho: a regra de
+CSS escrita para campo de digitar esticou a caixa de marcar até empurrar o
+rótulo para fora da tela.
 
 ---
 

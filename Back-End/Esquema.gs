@@ -78,7 +78,7 @@ const RECC_ORIGEM_SISTEMA = 'SISTEMA';
 const RECC_ORIGEM_PLANILHA = 'PLANILHA';
 
 /**
- * As 12 abas.
+ * As 13 abas.
  *
  * `controle: true`  → recebe as colunas _Visivel / _ExcluidoEm / _ExcluidoPor /
  *                     _Origem, e exclusão vira ocultação.
@@ -346,6 +346,44 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Cor', tipo: 'texto', protegido: false },
       { cabecalho: 'VisivelPara', tipo: 'texto', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
+  /*
+    As análises que o administrador montou.
+    Uma ABA, e não um JSON dentro de CONFIG, pela mesma razão que os cartões do
+    Dashboard saíram de MESAS: é uma LISTA de coisas configuráveis, cada uma
+    com nome, mesa, colunas e filtro próprios. Guardada como texto numa célula,
+    dava para escolher "quais" e para mais nada.
+
+    ATENÇÃO: esta aba guarda a RECEITA. A aba gerada — ANALISE_<Nome> — é outra
+    coisa, não está no contrato e é recriada a cada geração.
+  */
+  ANALISES: {
+    aba: 'ANALISES',
+    titulo: 'Análises',
+    controle: true,
+    reserva: 100,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      // Vira o nome da aba: 'Diamante' gera ANALISE_Diamante. Só letras,
+      // números e _ — é o que o Google Planilhas aceita sem aspas em fórmula.
+      { cabecalho: 'Nome', tipo: 'texto', protegido: false },
+      { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      // Cabeçalhos separados por vírgula. Vazio = todas as colunas da mesa.
+      { cabecalho: 'Colunas', tipo: 'textoLongo', protegido: false },
+      // 'Coluna=valor' separados por ponto e vírgula. Vazio = sem filtro.
+      { cabecalho: 'Filtros', tipo: 'textoLongo', protegido: false },
+      // Janela em dias, contada da coluna de data da mesa. 0 = tudo.
+      { cabecalho: 'Dias', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
+      // O retrato: quando foi gerado e quantas linhas saíram. É o que faz a
+      // tela dizer "gerada ontem, 1.204 linhas" em vez de só "existe".
+      { cabecalho: 'GeradaEm', tipo: 'dataHora', protegido: true },
+      { cabecalho: 'GeradaPor', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Linhas', tipo: 'numero', protegido: true }
     ]
   },
 

@@ -143,6 +143,7 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'catalogo') return carregarListas();
     if (secaoAtual === 'mesas') return carregarMesas();
     if (secaoAtual === 'paineis') return carregarPaineis();
+    if (secaoAtual === 'analises') return carregarAnalises();
     if (secaoAtual === 'identidade') return desenharIdentidade();
     if (secaoAtual === 'estrutura') return carregarEstrutura();
   }
@@ -1293,6 +1294,249 @@ var TelaConfiguracoes = (function () {
   }
 
   /* ------------------------------------------------- estrutura e auditoria */
+
+  /* ---------------------------------------------------------- análises */
+  /*
+    A receita e a aba são coisas separadas, e a tela mostra as duas: à
+    esquerda o que foi montado, e ao lado de cada uma o estado da aba gerada
+    — "nunca gerada", ou "gerada ontem às 14h, 1.204 linhas". Só "existe" não
+    responde a pergunta que a operação faz, que é se o número está velho.
+  */
+
+  function carregarAnalises() {
+    aguarde('Lendo as análises…');
+    Servidor.chamar('opcoesDeAnalise')
+      .entao(function (opcoes) {
+        dados.opcoes = opcoes;
+        Servidor.chamar('listarAnalises')
+          .entao(function (lista) {
+            dados.analises = lista;
+            desenharAnalises();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharAnalises() {
+    var linhas = dados.analises.map(function (uma) {
+      return '<li class="config-item'
+        + (escolhido && escolhido.id === uma.id ? ' atual' : '')
+        + (uma.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-analise="'
+        + escapar(uma.id) + '">'
+        + '<span class="nome">' + escapar(uma.aba) + '</span>'
+        + '<span class="detalhe">' + escapar(uma.mesaNome)
+        + (uma.abaExiste
+          ? ' · gerada em ' + escapar(uma.geradaEm) + ' · '
+            + uma.linhasGeradas + ' linha(s)'
+          : ' · nunca gerada')
+        + (uma.ativo ? '' : ' · desligada')
+        + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.analises.length
+      + ' análise(s)</span>'
+      + '<button type="button" class="botao pequeno" id="nova-analise">'
+      + 'Montar análise</button></div>'
+      + '<p class="config-explica">Cada análise vira uma aba <code>'
+      + escapar(dados.opcoes.prefixo) + '&lt;Nome&gt;</code> na planilha, com '
+      + 'os dados achatados — pronta para tabela dinâmica ou para o Power BI '
+      + 'apontar. É um <strong>retrato</strong>: vale o que valia na hora em '
+      + 'que foi gerada, e não se atualiza sozinha.</p>'
+      + '<p class="config-explica">Para atualizar sem clicar, aponte um '
+      + 'acionador de tempo no editor do Apps Script para a função '
+      + '<code>atualizarAnalisesAgendadas</code>.</p>'
+      + (dados.analises.length
+        ? '<ul class="config-itens">' + linhas + '</ul>'
+        : '<p class="config-vazio">Nenhuma análise montada.</p>');
+
+    elemento('nova-analise').addEventListener('click', function () {
+      escolhido = null;
+      desenharPainelDaAnalise(null);
+    });
+    ligarCliques('[data-analise]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-analise') };
+      desenharAnalises();
+    });
+
+    if (escolhido) {
+      desenharPainelDaAnalise(acharNaLista(dados.analises, escolhido.id));
+    } else {
+      painelVazio('Escolha uma análise, ou monte uma nova.');
+    }
+  }
+
+  function mesaDaAnalise(idDaMesa) {
+    var achada = dados.opcoes.mesas.filter(function (uma) {
+      return String(uma.id) === String(idDaMesa);
+    })[0];
+    return achada || dados.opcoes.mesas[0];
+  }
+
+  function desenharPainelDaAnalise(analise) {
+    var atual = analise || {
+      id: '', nome: '', descricao: '', mesaId: dados.opcoes.mesas[0].id,
+      colunas: [], filtros: [], dias: 0, ativo: true, abaExiste: false
+    };
+    var mesa = mesaDaAnalise(atual.mesaId);
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-analise">'
+      + tituloDoPainel(atual.id ? atual.aba : 'Nova análise',
+        atual.id ? 'A aba é reescrita a cada geração' : 'O nome vira o nome da aba')
+      + campoDeTexto('an-nome', 'Nome', atual.nome,
+        'Só letras sem acento, números e _. Vira ' + dados.opcoes.prefixo + 'Nome.')
+      + campoDeTexto('an-descricao', 'Para que serve', atual.descricao, '')
+      + caixaDeItens('an-mesa', 'Mesa', dados.opcoes.mesas, atual.mesaId,
+        'Trocar a mesa limpa as colunas e os filtros.')
+      + campoDeTexto('an-dias', 'Últimos N dias', atual.dias,
+        mesa.temColunaDeData
+          ? '0 traz tudo. Conta pela coluna "' + mesa.colunaDaData + '".'
+          : 'Esta mesa não tem coluna de data, então a janela não se aplica.')
+      + '<div class="config-campo"><span>Colunas</span>'
+      + '<div class="config-marcadores" id="colunas-da-analise">'
+      + mesa.colunas.map(function (coluna, i) {
+        var marcada = !atual.colunas.length || atual.colunas.indexOf(coluna) >= 0;
+        return '<label class="config-chave"><input type="checkbox"'
+          + ' data-coluna-analise="' + i + '" value="' + escapar(coluna) + '"'
+          + (marcada ? ' checked' : '') + '><span>' + escapar(coluna)
+          + '</span></label>';
+      }).join('')
+      + '</div><em>Nenhuma marcada é o mesmo que todas.</em></div>'
+      + '<div class="config-campo"><span>Filtros</span>'
+      + '<div id="filtros-da-analise">' + desenharFiltrosDaAnalise(mesa, atual.filtros)
+      + '</div><em>Cada filtro corta as linhas. Dois filtros se somam.</em></div>'
+      + caixaDeSimNao('an-ativo', 'Ligada', atual.ativo !== false)
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar receita</button>'
+      + (atual.id
+        ? '<button type="button" class="botao vazado" id="gerar-analise">'
+          + (atual.abaExiste ? 'Regerar a aba' : 'Gerar a aba') + '</button>'
+          + '<button type="button" class="botao vazado perigo" id="tirar-analise">'
+          + 'Tirar da lista</button>'
+        : '')
+      + '</div>'
+      + (atual.abaExiste
+        ? '<p class="config-explica">Regerar apaga o retrato de agora, e por '
+          + 'isso pede a senha de administrador. A aba é reaproveitada, nunca '
+          + 'apagada e recriada: apagar mudaria o identificador dela, e todo '
+          + 'Power BI apontado para essa aba perderia o alvo em silêncio.</p>'
+        : '')
+      + '</form>';
+
+    elemento('cfg-an-mesa').addEventListener('change', function () {
+      escolhido = atual.id ? { id: atual.id } : null;
+      var trocada = Object.assign({}, atual, {
+        mesaId: this.value, colunas: [], filtros: []
+      });
+      desenharPainelDaAnalise(trocada);
+    });
+
+    elemento('form-analise').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarAnalise', {
+        id: atual.id, nome: valorDe('an-nome'),
+        descricao: valorDe('an-descricao'), mesaId: valorDe('an-mesa'),
+        colunas: colunasMarcadasDaAnalise(mesa).join(','),
+        filtros: filtrosEscolhidosDaAnalise(),
+        dias: Number(valorDe('an-dias')) || 0,
+        ativo: elemento('cfg-an-ativo').checked
+      }).entao(function (id) {
+        escolhido = { id: id };
+        avisarSalvo('Receita salva. A aba só muda quando você gerar.');
+        carregarAnalises();
+      }).senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+    });
+
+    var gerar = elemento('gerar-analise');
+    if (gerar) {
+      gerar.addEventListener('click', function () {
+        // Só a REgeração pede senha, e quem decide isso é o servidor. A tela
+        // pede antes só quando sabe que a aba existe, para não abrir um
+        // diálogo desnecessário na primeira geração.
+        if (atual.abaExiste) {
+          SenhaDeAdministrador.pedir(function () { gerarAgora(atual.id); });
+        } else {
+          gerarAgora(atual.id);
+        }
+      });
+    }
+
+    var tirar = elemento('tirar-analise');
+    if (tirar) {
+      tirar.addEventListener('click', function () {
+        if (!window.confirm('Tirar "' + atual.nome + '" da lista? A aba '
+          + atual.aba + ' continua na planilha.')) return;
+        Servidor.chamar('ocultarAnalise', atual.id)
+          .entao(function () {
+            escolhido = null;
+            avisarSalvo('Análise tirada da lista.');
+            carregarAnalises();
+          })
+          .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+      });
+    }
+  }
+
+  function gerarAgora(id) {
+    avisar('Gerando a aba…', 'neutro');
+    Servidor.chamar('gerarAnalise', id)
+      .entao(function (feito) {
+        avisarSalvo(feito.aba + ': ' + feito.linhas + ' linha(s) e '
+          + feito.colunas + ' coluna(s).'
+          + (feito.truncada ? ' A análise passou do teto e foi cortada.' : ''));
+        carregarAnalises();
+      })
+      .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+  }
+
+  function desenharFiltrosDaAnalise(mesa, filtros) {
+    if (!mesa.filtros.length) {
+      return '<p class="config-vazio">Esta mesa não tem nenhum campo em '
+        + 'formato de lista, então não há por onde filtrar.</p>';
+    }
+    return mesa.filtros.map(function (filtro) {
+      var escolhida = (filtros || []).filter(function (um) {
+        return um.coluna === filtro.cabecalho;
+      })[0];
+      return '<label class="config-campo"><span>' + escapar(filtro.rotulo)
+        + '</span><select data-filtro-analise="' + escapar(filtro.cabecalho) + '">'
+        + '<option value="">— todos —</option>'
+        + filtro.opcoes.map(function (opcao) {
+          var valor = opcao.valor === undefined ? opcao : opcao.valor;
+          var rotulo = opcao.rotulo === undefined ? valor : opcao.rotulo;
+          return '<option value="' + escapar(valor) + '"'
+            + (escolhida && escolhida.valor === valor ? ' selected' : '') + '>'
+            + escapar(rotulo) + '</option>';
+        }).join('') + '</select></label>';
+    }).join('');
+  }
+
+  function colunasMarcadasDaAnalise(mesa) {
+    var marcadas = [];
+    var caixas = document.querySelectorAll('[data-coluna-analise]');
+    for (var i = 0; i < caixas.length; i++) {
+      if (caixas[i].checked) marcadas.push(caixas[i].value);
+    }
+    // Todas marcadas é o mesmo que nenhuma escolha: guardar a lista inteira
+    // congelaria as colunas de hoje, e uma coluna nova na base nunca
+    // apareceria na análise.
+    return marcadas.length === mesa.colunas.length ? [] : marcadas;
+  }
+
+  function filtrosEscolhidosDaAnalise() {
+    var escolhidos = [];
+    var caixas = document.querySelectorAll('[data-filtro-analise]');
+    for (var i = 0; i < caixas.length; i++) {
+      if (!caixas[i].value) continue;
+      escolhidos.push({
+        coluna: caixas[i].getAttribute('data-filtro-analise'),
+        valor: caixas[i].value
+      });
+    }
+    return escolhidos;
+  }
 
   function carregarEstrutura() {
     aguarde('Conferindo a planilha…');

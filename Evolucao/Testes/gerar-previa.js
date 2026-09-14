@@ -251,6 +251,12 @@ function pontePreparada(respostas) {
     + '      listarMesasConfiguraveis: function () {\n'
     + '        responder(respostas.configuracoes.mesas);\n'
     + '      },\n'
+    + '      opcoesDeAnalise: function () {\n'
+    + '        responder(respostas.configuracoes.opcoesDeAnalise);\n'
+    + '      },\n'
+    + '      listarAnalises: function () {\n'
+    + '        responder(respostas.configuracoes.analises);\n'
+    + '      },\n'
     + '      conferirEstruturaDaPlanilha: function () {\n'
     + '        responder(respostas.configuracoes.laudo);\n'
     + '      },\n'
@@ -263,7 +269,8 @@ function pontePreparada(respostas) {
       'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
       'editarCaso', 'alterarSituacaoDoCaso', 'salvarComponentesDoPainel',
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
-      'desbloquearSusep', 'salvarProduto', 'ocultarProduto'])
+      'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
+      'salvarAnalise', 'gerarAnalise', 'ocultarAnalise'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -626,7 +633,9 @@ function gerar(pastaDeSaida) {
     listas: listas,
     mesas: chamar('listarMesasConfiguraveis()'),
     laudo: chamar('conferirEstruturaDaPlanilha()'),
-    trilha: chamar('listarAuditoria')(40)
+    trilha: chamar('listarAuditoria')(40),
+    opcoesDeAnalise: chamar('opcoesDeAnalise()'),
+    analises: chamar('listarAnalises()')
   };
 
   // A busca, com alguns termos já procurados de verdade. A prévia é estática:

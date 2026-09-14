@@ -965,6 +965,21 @@ table.fila tr.importar-recusada { background: var(--ruim-tenue); }
 table.fila tr.importar-recusada:hover { background: var(--ruim-tenue); }
 table.fila tr.importar-igual { color: var(--tenue); }
 
+/*
+  A lista de colunas de uma análise: BASE_RET tem 35, e trinta e cinco caixas
+  empilhadas empurrariam o botão de salvar para fora da tela. Uma caixa que
+  rola, com altura fixa, deixa o formulário do mesmo tamanho independentemente
+  do número de colunas da mesa.
+*/
+.config-marcadores {
+  max-height: 210px; overflow-y: auto;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie-2);
+  padding: 6px 8px; margin-top: 2px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.config-marcadores .config-chave { padding: 3px 0; font-size: 12.5px; }
+
 .config-alerta {
   margin-top: 10px; text-align: left; cursor: pointer;
   font-size: 12.5px; font-weight: 600; line-height: 1.35;
@@ -1057,12 +1072,20 @@ table.fila tr.importar-igual { color: var(--tenue); }
 
 .config-campo { display: grid; gap: 4px; }
 .config-campo > span { font-size: 12.5px; font-weight: 600; color: var(--suave); }
-.config-campo input, .config-campo select {
+/*
+  O :not() não é firula. Esta regra foi escrita para campo de digitar, e
+  "width: 100%" numa CAIXA DE MARCAR estica a caixinha até a largura do painel
+  — o rótulo do lado é empurrado para fora e some. Aconteceu na lista de
+  colunas das Análises, a primeira caixa de marcar a morar dentro de um
+  .config-campo.
+*/
+.config-campo input:not([type="checkbox"]), .config-campo select {
   border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
   background: var(--superficie); color: var(--texto);
   padding: 8px 10px; font: inherit; font-size: 13.5px; width: 100%;
 }
-.config-campo input:focus, .config-campo select:focus { border-color: var(--destaque); }
+.config-campo input:not([type="checkbox"]):focus,
+.config-campo select:focus { border-color: var(--destaque); }
 .config-campo em {
   font-style: normal; font-size: 11.5px; color: var(--tenue); line-height: 1.4;
 }
