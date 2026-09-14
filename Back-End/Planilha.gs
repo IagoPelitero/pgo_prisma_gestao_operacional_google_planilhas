@@ -340,6 +340,29 @@ function formatosDaLinha_(estrutura) {
 // ============================================================================
 
 /**
+ * Abre uma planilha DE FORA, pelo Id.
+ *
+ * Mora aqui pela mesma razão que todo o resto: `SpreadsheetApp` é chamado num
+ * lugar só. Antes disto, dois pontos da Busca abriam a planilha legada por
+ * conta própria, cada um com o seu texto de erro — e o texto de erro é
+ * justamente o que importa aqui, porque a causa é quase sempre a mesma e
+ * quase nunca óbvia: a conta que roda o sistema não tem acesso à planilha.
+ *
+ * Nenhum contrato é aplicado ao que vem de fora. Ela é lida como está.
+ */
+function abrirPlanilhaDeFora_(idDaPlanilha) {
+  var id = String(idDaPlanilha || '').trim();
+  if (!id) throw new Error('Informe o Id da planilha.');
+  try {
+    return SpreadsheetApp.openById(id);
+  } catch (erro) {
+    throw new Error('Não consegui abrir a planilha: ' + (erro.message || erro)
+      + ' Confira o Id — ele é o pedaço do endereço entre /d/ e /edit — e se '
+      + 'esta conta tem acesso a ela.');
+  }
+}
+
+/**
  * A última linha com CONTEÚDO na aba.
  *
  * getLastRow() olha conteúdo, não formatação — então a área de reserva que o

@@ -35,6 +35,23 @@ var TelaConfiguracoes = (function () {
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
 
+  /**
+   * A resposta chegou tarde, para uma seção que não é mais a da vez?
+   *
+   * Trocar de TELA já é tratado pela ponte, no Aplicacao. Trocar de SEÇÃO
+   * dentro de Configurações não é: a tela continua a mesma, os elementos
+   * continuam existindo, mas `carregarSecao` zerou o `dados` — e a resposta
+   * atrasada da seção anterior tenta desenhar com um `dados` que não é o dela.
+   * O sintoma é "Cannot read properties of undefined", num lugar do código que
+   * não tem nada a ver com o que a pessoa clicou.
+   *
+   * Desenhar é a única coisa que precisa da guarda. Uma gravação atrasada em
+   * `dados` é inerte: a seção nova preenche o que ela mesma usa.
+   */
+  function respostaAtrasada(secaoDaResposta) {
+    return secaoAtual !== secaoDaResposta;
+  }
+
   function texto(valor) {
     return String(valor === null || valor === undefined ? '' : valor);
   }
@@ -166,6 +183,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharCampos() {
+    if (respostaAtrasada('campos')) return;
     var linhas = dados.campos.map(function (campo, posicao) {
       return '<li class="config-item' + (escolhido && escolhido.id === campo.id
         ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '">'
@@ -407,6 +425,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharUsuarios() {
+    if (respostaAtrasada('usuarios')) return;
     var linhas = dados.usuarios.map(function (usuario) {
       return '<li class="config-item' + (escolhido && escolhido.id === usuario.id
         ? ' atual' : '') + (usuario.ativo ? '' : ' desligado') + '">'
@@ -513,6 +532,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharNiveis() {
+    if (respostaAtrasada('niveis')) return;
     var linhas = dados.niveis.map(function (nivel) {
       return '<li class="config-item' + (escolhido && escolhido.id === nivel.id
         ? ' atual' : '') + (nivel.ativo ? '' : ' desligado') + '">'
@@ -626,6 +646,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharListas() {
+    if (respostaAtrasada('catalogo')) return;
     var linhas = dados.itens.map(function (item) {
       return '<li class="config-item' + (escolhido && escolhido.id === item.id
         ? ' atual' : '') + (item.ativo ? '' : ' desligado') + '">'
@@ -718,6 +739,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharMesas() {
+    if (respostaAtrasada('mesas')) return;
     var linhas = dados.mesas.map(function (mesa) {
       return '<li class="config-item' + (escolhido && escolhido.id === mesa.id
         ? ' atual' : '') + (mesa.ativo ? '' : ' desligado') + '">'
@@ -859,7 +881,15 @@ var TelaConfiguracoes = (function () {
         }).join('') + '</div>';
   }
 
+  /*
+    Os ids daqui são "-graficos", e os do editor de cards são "-cards", ainda
+    que os dois nunca apareçam juntos: um substitui o outro dentro do mesmo
+    config-lista. É o achado 21 outra vez, prevenido em vez de consertado —
+    dois editores compartilhando id é elemento('salvar-cards') encontrando o
+    do outro no dia em que alguém colocar os dois na tela.
+  */
   function desenharGraficos() {
+    if (respostaAtrasada('paineis')) return;
     var opcoes = dados.opcoesDoGrafico;
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
@@ -871,13 +901,13 @@ var TelaConfiguracoes = (function () {
       + 'tipo são", de relance e com poucas fatias; para comparar valores '
       + 'próximos, barras. Nome comprido pede barra deitada.</p>'
       + '<div class="config-mesas-cartao">' + escolhaDeMesa() + '</div>'
-      + '<div id="lista-de-cards">' + desenharCardsDeGrafico() + '</div>'
+      + '<div id="lista-de-graficos">' + desenharCardsDeGrafico() + '</div>'
       + '<div class="config-acoes">'
-      + '<button type="button" class="botao vazado" id="add-card">'
+      + '<button type="button" class="botao vazado" id="add-grafico">'
       + '+ Adicionar gráfico</button>'
-      + '<button type="button" class="botao" id="salvar-cards">'
+      + '<button type="button" class="botao" id="salvar-graficos">'
       + '✓ Salvar gráficos</button>'
-      + '<button type="button" class="botao-texto" id="descartar-cards">'
+      + '<button type="button" class="botao-texto" id="descartar-graficos">'
       + '↺ Descartar alterações</button>'
       + '</div>';
 
@@ -960,11 +990,11 @@ var TelaConfiguracoes = (function () {
 
     ligarCliques('[data-remover-card]', function (botao) {
       cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
-      elemento('lista-de-cards').innerHTML = desenharCardsDeGrafico();
+      elemento('lista-de-graficos').innerHTML = desenharCardsDeGrafico();
       ligarGraficos();
     });
 
-    var caixas = document.querySelectorAll('#lista-de-cards [data-parte]');
+    var caixas = document.querySelectorAll('#lista-de-graficos [data-parte]');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
         var grafico = cardsEmEdicao[Number(this.getAttribute('data-card'))];
@@ -976,26 +1006,26 @@ var TelaConfiguracoes = (function () {
         // Trocar a medição faz aparecer ou sumir a coluna do valor, e trocar
         // o tipo muda a dica do limite: redesenhamos para a tela não mentir.
         if (parte === 'agregacao' || parte === 'tipo') {
-          elemento('lista-de-cards').innerHTML = desenharCardsDeGrafico();
+          elemento('lista-de-graficos').innerHTML = desenharCardsDeGrafico();
           ligarGraficos();
         }
       });
     }
 
-    elemento('add-card').addEventListener('click', function () {
+    elemento('add-grafico').addEventListener('click', function () {
       var opcoes = dados.opcoesDoGrafico;
       cardsEmEdicao.push({
         id: '', titulo: 'Novo gráfico', tipo: 'barras',
         dimensao: opcoes.dimensoes[0] || '', medida: '',
         agregacao: 'contagem', limite: 6, largura: 1, mostrar: true
       });
-      elemento('lista-de-cards').innerHTML = desenharCardsDeGrafico();
+      elemento('lista-de-graficos').innerHTML = desenharCardsDeGrafico();
       ligarGraficos();
     });
 
-    elemento('descartar-cards').addEventListener('click', carregarPaineis);
+    elemento('descartar-graficos').addEventListener('click', carregarPaineis);
 
-    elemento('salvar-cards').addEventListener('click', function () {
+    elemento('salvar-graficos').addEventListener('click', function () {
       Servidor.chamar('salvarComponentesDoPainel', mesaDosCards, cardsEmEdicao)
         .entao(function () { avisarSalvo('Gráficos salvos.'); carregarPaineis(); })
         .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
@@ -1021,6 +1051,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharPaineis() {
+    if (respostaAtrasada('paineis')) return;
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Cards da operação</span></div>'
       + escolhaDeTela()
@@ -1319,6 +1350,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharAnalises() {
+    if (respostaAtrasada('analises')) return;
     var linhas = dados.analises.map(function (uma) {
       return '<li class="config-item'
         + (escolhido && escolhido.id === uma.id ? ' atual' : '')
@@ -1427,10 +1459,22 @@ var TelaConfiguracoes = (function () {
 
     elemento('cfg-an-mesa').addEventListener('change', function () {
       escolhido = atual.id ? { id: atual.id } : null;
-      var trocada = Object.assign({}, atual, {
-        mesaId: this.value, colunas: [], filtros: []
+      // Escrito campo a campo, e não com Object.assign: assim dá para ver de
+      // relance o que SOBREVIVE à troca de mesa e o que é zerado. Colunas e
+      // filtros são de uma mesa só — carregá-los para outra deixaria a receita
+      // apontando para colunas que a nova mesa não tem.
+      desenharPainelDaAnalise({
+        id: atual.id,
+        nome: atual.nome,
+        descricao: atual.descricao,
+        dias: atual.dias,
+        ativo: atual.ativo,
+        aba: atual.aba,
+        abaExiste: atual.abaExiste,
+        mesaId: this.value,
+        colunas: [],
+        filtros: []
       });
-      desenharPainelDaAnalise(trocada);
     });
 
     elemento('form-analise').addEventListener('submit', function (evento) {
@@ -1559,6 +1603,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharEstrutura() {
+    if (respostaAtrasada('estrutura')) return;
     var laudo = dados.laudo;
 
     var abas = laudo.abas.map(function (aba) {

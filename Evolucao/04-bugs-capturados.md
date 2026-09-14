@@ -448,6 +448,71 @@ tinha à mão o tempo todo.
 
 ---
 
+### 26 · Dois arquivos com o mesmo nome, e o Apps Script só aceita um
+
+**Sintoma.** Reportado pela operação: `Configuracoes.gs` não podia ser criado
+no projeto do Apps Script.
+
+**Causa.** No repositório, `Back-End/Configuracoes.gs` e
+`Front-End/Configuracoes.html` moram em pastas diferentes e convivem em paz.
+No Apps Script **não existe pasta**: todos os arquivos ficam num projeto só, e
+o nome é único **independente da extensão**. Com o `Configuracoes.html` já lá,
+o `.gs` simplesmente não entra.
+
+A colisão era invisível de onde estávamos olhando. Ela não aparece no
+repositório, não aparece na suíte, e não aparece em nenhuma leitura do código:
+aparece na hora de colar, quando já é tarde.
+
+**Defesa.** O servidor virou `Config.gs`, e um teste confere que nenhum `.gs`
+tenha o mesmo nome de um `.html` — e, de quebra, que nenhum nome se repita
+ignorando maiúsculas, porque o Apps Script diferencia a caixa e quem copia à
+mão não.
+
+---
+
+### 27 · A tela travada em "Lendo o cadastro…"
+
+**Sintoma.** A aba Usuários de Configurações ficava parada na mensagem de
+carregamento. Para sempre. Sem erro na tela.
+
+**Causa.** Duas, e a primeira é o que torna a segunda tão difícil de achar.
+
+**A primeira:** quando a função **não existe no servidor**,
+`google.script.run.nomeDela` é `undefined`, e o `.apply` estoura *na hora* —
+dentro de `chamar()`, antes de a chamada sair do navegador. Nesse instante o
+`.senao` ainda **nem foi registrado**: ele é chamado logo depois, no
+encadeamento. O erro escapava por fora do caminho de falha inteiro, e o único
+vestígio era uma linha no console.
+
+O sintoma não tem nada a ver com a causa. "A tela não carrega" não sugere
+"faltou um arquivo `.gs`" a ninguém.
+
+**A segunda:** a resposta que chega **depois de a pessoa trocar de tela**. O
+Apps Script responde quando responde, e dá tempo de sobra para desistir e ir
+para outro lugar. Quando a resposta chegava, quem ia desenhá-la procurava um
+elemento que não existe mais: `Cannot set properties of null`. Dentro de
+Configurações havia a versão irmã disso — trocar de **seção** zera o `dados`,
+e a resposta atrasada tentava desenhar com um `dados` que não era o dela.
+
+**Defesa.** Três:
+
+1. `chamar()` embrulha o disparo. Função ausente vira uma mensagem que diz o
+   nome dela, a causa provável e onde ver a lista inteira — entregue pelo
+   `.senao`, adiada com `setTimeout` porque o `.senao` só existe depois que
+   `chamar()` retorna.
+2. A ponte conta as trocas de tela. A resposta só é entregue se a tela que
+   perguntou ainda for a da vez. Não é erro engolido: é resposta para uma
+   pergunta que ninguém está mais fazendo.
+3. Em Configurações, cada função de desenho começa conferindo se a seção ainda
+   é a dela.
+
+**Como apareceu.** Clicando em tudo. Um roteiro que percorre as sete telas e
+clica em 112 elementos, ouvindo `pageerror` — os dois erros de resposta
+atrasada só aparecem quando se clica rápido, e nenhum teste de servidor
+chegaria perto deles.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
@@ -481,6 +546,14 @@ Daí as duas práticas que o projeto não abre mão:
    a pessoa exatamente onde estava. A informação que faltava, o sistema tinha
    à mão o tempo todo.
 8. **O teste que roda fora do Apps Script não vê o projeto do Apps Script.**
-   Os itens 25 e o laudo da Etapa 12 são a mesma lição: a suíte lê a PASTA do
-   repositório, e a instalação é outra coisa. É por isso que existe um
-   diagnóstico que roda lá dentro.
+   Os itens 25, 26 e o laudo da Etapa 12 são a mesma lição: a suíte lê a PASTA
+   do repositório, e a instalação é outra coisa — no repositório há pastas, no
+   Apps Script não. É por isso que existe um diagnóstico que roda lá dentro.
+9. **O erro que escapa por fora do caminho de erro é o pior de todos.** No
+   item 27 havia `.senao` em todas as 73 chamadas, e mesmo assim a tela
+   travava: a falha acontecia *antes* de o `.senao` existir. Ter tratamento de
+   erro em todo lugar não garante que o erro passe por ele.
+10. **Clicar rápido é um teste.** Os dois defeitos de resposta atrasada só
+    aparecem quando alguém desiste no meio — e é o que as pessoas fazem o dia
+    inteiro. Um roteiro que percorre as telas clicando em tudo achou os dois
+    em dois minutos.

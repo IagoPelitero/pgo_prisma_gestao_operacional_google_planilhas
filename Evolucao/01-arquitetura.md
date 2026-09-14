@@ -328,6 +328,11 @@ APPS SCRIPT
   Importacao.gs ...... colar / conferir / aplicar listas em lote
   Auditoria.gs ....... trilha
   Diagnostico.gs ..... verificação de build e de contrato
+
+  ATENÇÃO AOS NOMES: no Apps Script não existe pasta. Todos os arquivos ficam
+  num projeto só, e o nome é único INDEPENDENTE da extensão — por isso o
+  servidor de Configurações se chama Config.gs: Configuracoes.html já ocupa
+  esse nome.
         │
         ▼
 GOOGLE PLANILHAS  (13 abas + ANALISE_*)

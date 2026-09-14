@@ -244,7 +244,7 @@ function procurarNoLegado_(termo) {
   var id = String(valorDaConfiguracao_('LEGADO.PLANILHA_ID', '')).trim();
   var aba;
   try {
-    var planilha = SpreadsheetApp.openById(id);
+    var planilha = abrirPlanilhaDeFora_(id);
     aba = configurado.aba
       ? planilha.getSheetByName(configurado.aba)
       : planilha.getSheets()[0];
@@ -253,8 +253,11 @@ function procurarNoLegado_(termo) {
         '" não existe na planilha legada.');
     }
   } catch (erro) {
-    return recadoDoLegado_(configurado, 'Não consegui abrir a planilha legada: ' +
-      (erro.message || erro) + ' Confira o Id e se a conta tem acesso a ela.');
+    // Aqui a falha NÃO derruba a busca: a base própria já respondeu, e perder
+    // o histórico antigo é melhor que perder a busca inteira. O recado sai
+    // junto do resultado, na origem "legado".
+    return recadoDoLegado_(configurado, 'Não consegui abrir a planilha legada. '
+      + (erro.message || erro));
   }
 
   var totalDeLinhas = aba.getLastRow();
@@ -356,14 +359,10 @@ function salvarConfiguracaoDoLegado(dados) {
   var aba = String(dados.aba || '').trim();
 
   if (id) {
-    var planilha;
-    try {
-      planilha = SpreadsheetApp.openById(id);
-    } catch (erro) {
-      throw new Error('Não consegui abrir essa planilha: ' + (erro.message || erro) +
-        ' Confira o Id — ele é o pedaço do endereço entre /d/ e /edit — e se ' +
-        'esta conta tem acesso a ela.');
-    }
+    // Aqui a falha DERRUBA, e é de propósito: guardar um Id que não abre
+    // deixaria a busca com um recado de erro para sempre, sem ninguém saber
+    // se o Id estava errado ou se a planilha sumiu depois.
+    var planilha = abrirPlanilhaDeFora_(id);
     if (aba && !planilha.getSheetByName(aba)) {
       throw new Error('A planilha abriu, mas não tem uma aba chamada "' + aba +
         '". As abas dela são: ' + planilha.getSheets().map(function (uma) {

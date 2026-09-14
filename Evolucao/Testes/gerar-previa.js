@@ -251,6 +251,12 @@ function pontePreparada(respostas) {
     + '      listarMesasConfiguraveis: function () {\n'
     + '        responder(respostas.configuracoes.mesas);\n'
     + '      },\n'
+    + '      opcoesDoPainelAnalitico: function (idDaMesa) {\n'
+    + '        responder(respostas.configuracoes.opcoesDoGrafico[idDaMesa]);\n'
+    + '      },\n'
+    + '      listarComponentesDoPainel: function (idDaMesa) {\n'
+    + '        responder(respostas.configuracoes.componentes[idDaMesa]);\n'
+    + '      },\n'
     + '      opcoesDeAnalise: function () {\n'
     + '        responder(respostas.configuracoes.opcoesDeAnalise);\n'
     + '      },\n'
@@ -273,7 +279,8 @@ function pontePreparada(respostas) {
       'editarCaso', 'alterarSituacaoDoCaso', 'salvarComponentesDoPainel',
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
-      'salvarAnalise', 'gerarAnalise', 'ocultarAnalise'])
+      'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
+      'salvarConfiguracaoDoLegado'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -621,8 +628,12 @@ function gerar(pastaDeSaida) {
   });
 
   const cards = {};
+  const opcoesDoGrafico = {};
+  const componentes = {};
   pacote.mesas.forEach((mesa) => {
     cards[mesa.id] = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+    opcoesDoGrafico[mesa.id] = chamar('opcoesDoPainelAnalitico')(mesa.id);
+    componentes[mesa.id] = chamar('listarComponentesDoPainel')(mesa.id);
   });
 
   const configuracoes = {
@@ -637,6 +648,8 @@ function gerar(pastaDeSaida) {
     mesas: chamar('listarMesasConfiguraveis()'),
     laudo: chamar('conferirEstruturaDaPlanilha()'),
     trilha: chamar('listarAuditoria')(40),
+    opcoesDoGrafico: opcoesDoGrafico,
+    componentes: componentes,
     opcoesDeAnalise: chamar('opcoesDeAnalise()'),
     analises: chamar('listarAnalises()'),
     diagnostico: chamar('diagnosticoDoSistema()')

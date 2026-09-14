@@ -164,7 +164,14 @@ acerta hoje e erra na mesa que vier depois.
 
 **A tela mais importante do produto: tudo o que as outras fazem sai daqui.**
 
-`Back-End/Configuracoes.gs` e `Front-End/Configuracoes.html`, 35 testes.
+`Back-End/Config.gs` e `Front-End/Configuracoes.html`, 35 testes.
+
+> **Por que o servidor se chama `Config.gs` e não `Configuracoes.gs`.** No Apps
+> Script os arquivos moram todos num projeto só, sem pasta, e o nome é único
+> **independente da extensão**: com um `Configuracoes.html` já lá, o
+> `Configuracoes.gs` não pode ser criado. No repositório eles ficam em pastas
+> diferentes e a colisão não aparece — ela só aparece na hora de colar. Hoje um
+> teste da suíte confere que nenhum `.gs` tenha o mesmo nome de um `.html`.
 
 ### Três colunas
 
@@ -785,6 +792,71 @@ instalação nova continuaria sem teste.
 propósito numa planilha nova para cobrar a falha correspondente. Provar que o
 diagnóstico aprova uma instalação boa é o teste fácil e o menos útil: um
 verificador que sempre responde "aprovado" também passaria nele.
+
+---
+
+## Pente-fino, antes do teste de estresse
+
+Uma varredura arquivo por arquivo, procurando erro em vez de esperar que ele
+apareça. O que ela achou:
+
+### O que estava impedindo o sistema de rodar
+
+**`Configuracoes.gs` e `Configuracoes.html` não podem existir juntos no Apps
+Script.** No repositório eles moram em pastas diferentes e convivem em paz; no
+Apps Script não existe pasta, e o nome é único **independente da extensão**.
+O servidor virou **`Config.gs`**, e um teste confere que nenhum `.gs` tenha o
+nome de um `.html` — nem ignorando maiúsculas, porque a plataforma diferencia
+a caixa e quem copia à mão não.
+
+### Por que a tela ficava em "Lendo o cadastro…"
+
+Três defeitos empilhados, e o primeiro é o que escondia os outros:
+
+| defeito | o que acontecia |
+|---|---|
+| **Função ausente estourava por fora do erro** | Com a função faltando no servidor, `google.script.run.nomeDela` é `undefined` e o `.apply` estoura *dentro* de `chamar()` — quando o `.senao` ainda nem foi registrado. As 73 chamadas tinham tratamento de falha e nenhuma delas era alcançada |
+| **Resposta que chega depois de trocar de tela** | Ela procurava um elemento que não existe mais: `Cannot set properties of null` |
+| **Resposta que chega depois de trocar de seção** | Dentro de Configurações, `carregarSecao` zera o `dados`, e a resposta atrasada tentava desenhar com um `dados` que não era o dela |
+
+As três defesas: `chamar()` embrulha o disparo e diz **qual** função falta e
+por quê; a ponte conta as trocas de tela e não entrega resposta para uma tela
+que já saiu; e cada desenho de seção confere se ainda é a seção da vez.
+
+> **Ter `.senao` em todo lugar não garante que o erro passe por ele.** É a
+> lição do achado 27, e a mais cara desta rodada.
+
+### O que a varredura confirmou
+
+| conferência | resultado |
+|---|---|
+| Funções que as telas chamam | **66**, todas existem no servidor e todas conferem quem chama |
+| Chamadas ao servidor com tratamento de falha | **73 de 73** |
+| Funções `.gs` com nome repetido | nenhuma |
+| Constantes globais repetidas | nenhuma |
+| Funções nunca usadas | nenhuma |
+| `SpreadsheetApp` fora do `Planilha.gs` | 2 → **0** (viraram `abrirPlanilhaDeFora_`) |
+| ES6 fora do padrão nos `.gs` | nenhum |
+| Ids de HTML repetidos | 4 → **0** |
+| Arquivos de tela órfãos | nenhum |
+| `<script>` que não compila | nenhum |
+| Funções que a prévia não sabia responder | 3 → **0** |
+
+Tudo isso virou teste. Não adianta conferir uma vez.
+
+### E uma ferramenta nova
+
+```bash
+node Evolucao/Testes/clicar-em-tudo.js
+```
+
+Percorre as sete telas e **clica em 112 elementos**, ouvindo `pageerror` e
+`console.error`, e procurando três textos que nunca deveriam chegar à tela:
+`undefined`, `[object Object]` e o recado de função ausente. Os dois defeitos
+de resposta atrasada só aparecem quando alguém clica rápido e desiste no meio
+— que é o que as pessoas fazem o dia inteiro.
+
+**362 testes.**
 
 ---
 

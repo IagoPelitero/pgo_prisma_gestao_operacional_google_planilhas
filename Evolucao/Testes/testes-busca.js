@@ -167,7 +167,7 @@ function rodarTestesDeBusca() {
     // Guardar um Id quebrado deixaria a busca com um recado de erro para
     // sempre, sem ninguém saber se era o Id ou a planilha que sumiu.
     lanca(() => chamar('salvarConfiguracaoDoLegado')({ planilhaId: 'nao-existe' }),
-      'Não consegui abrir essa planilha');
+      'Não consegui abrir a planilha');
   });
 
   teste('a busca também olha a planilha legada, e diz de onde veio', () => {

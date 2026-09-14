@@ -18,6 +18,27 @@
 
 /* ------------------------------------------------------------- o servidor */
 var Servidor = (function () {
+
+  /*
+    QUANTAS VEZES A TELA JÁ TROCOU.
+
+    O Apps Script responde quando responde, e ninguém espera parado: dá tempo
+    de sobra para clicar em Configurações, achar que demorou, e ir para o
+    Dashboard antes de a resposta chegar. Quando ela chega, o código que ia
+    desenhá-la procura um elemento que não existe mais e estoura com
+    "Cannot set properties of null" — um erro que não diz nada sobre o que a
+    pessoa fez, e que só aparece para quem está com o console aberto.
+
+    O contador resolve isso sem ninguém precisar lembrar: a resposta só é
+    entregue se a tela que perguntou ainda for a tela da vez. Descartar aqui
+    não esconde erro nenhum — é uma resposta para uma pergunta que ninguém
+    está mais fazendo.
+  */
+  var geracaoDaTela = 0;
+
+  /** Chamada pelo roteador, toda vez que o miolo é remontado. */
+  function trocouDeTela() { geracaoDaTela++; }
+
   /**
    * Chama uma função do Apps Script.
    *
@@ -32,6 +53,14 @@ var Servidor = (function () {
     var argumentos = Array.prototype.slice.call(arguments, 1);
     var aoDarCerto = null;
     var aoDarErrado = null;
+    var minhaGeracao = geracaoDaTela;
+
+    function aTelaAindaEAMesma() {
+      if (geracaoDaTela === minhaGeracao) return true;
+      console.info('Resposta de ' + nomeDaFuncao + ' descartada: a tela que '
+        + 'perguntou já saiu.');
+      return false;
+    }
 
     var acompanhamento = {
       entao: function (funcao) { aoDarCerto = funcao; return acompanhamento; },
@@ -50,18 +79,52 @@ var Servidor = (function () {
 
     var corrida = google.script.run
       .withSuccessHandler(function (resposta) {
+        if (!aTelaAindaEAMesma()) return;
         if (aoDarCerto) aoDarCerto(resposta);
       })
       .withFailureHandler(function (erro) {
+        if (!aTelaAindaEAMesma()) return;
         if (aoDarErrado) aoDarErrado(erro);
         else console.error(erro);
       });
 
-    corrida[nomeDaFuncao].apply(corrida, argumentos);
+    /*
+      O DISPARO PRECISA DE TRY, e não é zelo excessivo.
+
+      Quando a função NÃO EXISTE no servidor — o arquivo .gs ficou para trás na
+      cópia, ou alguém renomeou a função e a tela não acompanhou —,
+      `corrida[nomeDaFuncao]` é undefined e o `.apply` estoura AQUI, na hora,
+      antes de o navegador falar com o servidor.
+
+      Sem este try o erro escapa por fora do caminho de falha: o `.senao` nem
+      chegou a ser registrado ainda (ele é chamado depois, no encadeamento), a
+      tela fica parada no "Lendo o cadastro…" para sempre, e o único vestígio
+      é uma linha no console que ninguém abre. Foi exatamente assim que
+      apareceu, e o sintoma não tem nada a ver com a causa.
+
+      O setTimeout é obrigatório pelo mesmo motivo: chamar aoDarErrado agora
+      não adiantaria, porque `.senao` só vai ser chamado quando esta função
+      retornar.
+    */
+    try {
+      if (typeof corrida[nomeDaFuncao] !== 'function') {
+        throw new Error('A função "' + nomeDaFuncao + '" não existe no '
+          + 'servidor. Ou o arquivo .gs dela não foi copiado para o projeto '
+          + 'do Apps Script, ou ela foi renomeada lá e a tela continua '
+          + 'chamando o nome antigo. Configurações › Estrutura › Rodar '
+          + 'diagnóstico lista todas de uma vez.');
+      }
+      corrida[nomeDaFuncao].apply(corrida, argumentos);
+    } catch (erro) {
+      setTimeout(function () {
+        if (aoDarErrado) aoDarErrado(erro);
+        else console.error(erro);
+      }, 0);
+    }
     return acompanhamento;
   }
 
-  return { chamar: chamar };
+  return { chamar: chamar, trocouDeTela: trocouDeTela };
 })();
 
 /* ----------------------------------------------------------------- rotas */
@@ -184,6 +247,9 @@ var Aplicacao = (function () {
    * cada função — esconder botão nunca foi segurança.
    */
   function irPara(tela, semHistorico) {
+    // Antes de qualquer coisa: o que estava a caminho era para a tela antiga.
+    Servidor.trocouDeTela();
+
     if (!Rotas.existe(tela) || !podeVer(tela)) {
       tela = pacote.menu.length ? pacote.menu[0].tela : 'dashboard';
     }

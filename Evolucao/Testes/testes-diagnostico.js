@@ -17,6 +17,9 @@
  * ============================================================================
  */
 
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
   require('./ferramentas');
 
@@ -400,6 +403,260 @@ function rodarTestesDeDiagnostico() {
     const oDaRota = itens[itens.length - 1];
     igual(oDaRota.situacao, 'ok');
     contem(oDaRota.oQue, 'têm rota');
+  });
+
+  secao('O projeto do Apps Script');
+
+  teste('nenhum .gs tem o mesmo nome de um .html', () => {
+    // No Apps Script os arquivos moram todos num projeto só, sem pasta, e o
+    // nome é único INDEPENDENTE da extensão: com um Configuracoes.html já lá,
+    // um Configuracoes.gs não pode ser criado. No repositório eles ficam em
+    // pastas diferentes e a colisão não aparece — ela só aparece na hora de
+    // colar, quando já é tarde.
+    const raiz = path.join(__dirname, '..', '..');
+    const semExtensao = (pasta, ext) => fs.readdirSync(path.join(raiz, pasta))
+      .filter((nome) => nome.endsWith(ext))
+      .map((nome) => nome.slice(0, -ext.length));
+
+    const servidor = semExtensao('Back-End', '.gs');
+    const telas = semExtensao('Front-End', '.html');
+    const colidem = servidor.filter((nome) => telas.indexOf(nome) >= 0);
+
+    igual(colidem.join(', '), '',
+      'estes nomes existem nas duas pastas e o Apps Script só aceita um: '
+      + colidem.join(', '));
+  });
+
+  teste('e nenhum nome se repete dentro da mesma pasta ignorando maiúsculas', () => {
+    // O Apps Script diferencia maiúsculas, mas quem copia à mão não. Dois
+    // arquivos que só diferem na caixa são um convite a copiar por cima.
+    const raiz = path.join(__dirname, '..', '..');
+    const todos = []
+      .concat(fs.readdirSync(path.join(raiz, 'Back-End')))
+      .concat(fs.readdirSync(path.join(raiz, 'Front-End')))
+      .map((nome) => nome.replace(/\.(gs|html)$/, '').toLowerCase());
+
+    const repetidos = todos.filter((nome, i) => todos.indexOf(nome) !== i);
+    igual(repetidos.join(', '), '', 'nomes repetidos ignorando a caixa');
+  });
+
+  teste('nenhuma tela repete um id de HTML', () => {
+    // Dois trechos escrevendo o mesmo id é elemento('salvar') achando o do
+    // outro — o achado 21, que já custou uma vez. Aqui não é ativo (um
+    // substitui o outro na tela), e a trava existe para continuar não sendo.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const repetidos = [];
+    fs.readdirSync(pasta).filter((n) => n.endsWith('.html')).forEach((arquivo) => {
+      const tela = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
+      const conta = {};
+      (tela.match(/\bid="[a-zA-Z0-9_-]+"/g) || []).forEach((achado) => {
+        conta[achado] = (conta[achado] || 0) + 1;
+      });
+      Object.keys(conta).forEach((id) => {
+        if (conta[id] > 1) repetidos.push(arquivo + ' ' + id + ' (' + conta[id] + 'x)');
+      });
+    });
+    igual(repetidos.join(' | '), '', 'ids repetidos dentro do mesmo arquivo');
+  });
+
+  teste('todo arquivo de tela é incluído por alguém', () => {
+    // Arquivo órfão é trabalho que ninguém vê e código que ninguém mantém.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const index = fs.readFileSync(path.join(pasta, 'Index.html'), 'utf8');
+    const incluidos = (index.match(/incluir\('([A-Za-z0-9_]+)'\)/g) || [])
+      .map((m) => m.replace("incluir('", '').replace("')", ''));
+    // Index e SemAcesso são servidos direto pelo doGet, sem incluir.
+    const servidosDireto = ['Index', 'SemAcesso'];
+
+    const orfaos = fs.readdirSync(pasta)
+      .filter((n) => n.endsWith('.html'))
+      .map((n) => n.replace('.html', ''))
+      .filter((n) => incluidos.indexOf(n) < 0 && servidosDireto.indexOf(n) < 0);
+
+    igual(orfaos.join(', '), '', 'arquivos de tela que ninguém inclui');
+  });
+
+  teste('a prévia responde por TODA função que as telas chamam', () => {
+    // A prévia é o que a operação clica para acompanhar a obra. Buraco nela
+    // aparece como tela quebrada, e a pessoa não tem como saber que o buraco
+    // é da prévia e não do sistema. Foi assim que apareceu: trocar para o
+    // editor de gráficos caía num erro que era só falta de resposta gravada.
+    const raiz = path.join(__dirname, '..', '..');
+    const previa = fs.readFileSync(
+      path.join(raiz, 'Evolucao', 'Testes', 'gerar-previa.js'), 'utf8');
+
+    const pasta = path.join(raiz, 'Front-End');
+    const chamadas = [];
+    fs.readdirSync(pasta).filter((n) => n.endsWith('.html')).forEach((arquivo) => {
+      const tela = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
+      (tela.match(/Servidor\.chamar\('([a-zA-Z0-9_]+)'/g) || []).forEach((achado) => {
+        const nome = achado.replace("Servidor.chamar('", '').replace("'", '');
+        if (chamadas.indexOf(nome) < 0) chamadas.push(nome);
+      });
+    });
+
+    // A prévia responde de dois jeitos: gravando a resposta (o nome aparece
+    // como chave) ou recusando com uma frase (o nome entra na lista de
+    // gravações recusadas). Os dois valem.
+    const semResposta = chamadas.filter(function (nome) {
+      return previa.indexOf("'" + nome + "'") < 0
+        && previa.indexOf(nome + ': function') < 0;
+    });
+    igual(semResposta.join(', '), '', 'funções que a prévia não sabe responder');
+  });
+
+  teste('todo <script> de tela compila', () => {
+    // O Apps Script não avisa: ele serve a página, o script morre no
+    // navegador, e a tela fica em branco.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const quebrados = [];
+    fs.readdirSync(pasta).filter((n) => n.endsWith('.html')).forEach((arquivo) => {
+      const bruto = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
+      (bruto.match(/<script>[\s\S]*?<\/script>/g) || []).forEach((bloco) => {
+        const js = bloco.replace(/^<script>/, '').replace(/<\/script>$/, '');
+        try {
+          new vm.Script(js, { filename: arquivo });
+        } catch (erro) {
+          quebrados.push(arquivo + ': ' + erro.message);
+        }
+      });
+    });
+    igual(quebrados.join(' | '), '', 'telas com erro de sintaxe');
+  });
+
+  secao('Quando a função não existe no servidor');
+
+  teste('a ponte avisa em vez de travar a tela no "carregando"', () => {
+    // O caso real, e o sintoma não tinha nada a ver com a causa: a tela ficava
+    // parada em "Lendo o cadastro…" para sempre. Quando a função não existe no
+    // servidor, google.script.run.nomeDela é undefined e o .apply estoura NA
+    // HORA — antes de o .senao chegar a ser registrado. O erro escapava por
+    // fora do caminho de falha e sobrava uma linha no console que ninguém abre.
+    // Uma fila no lugar do setTimeout, esvaziada depois. Rodar na hora
+    // quebraria justamente o que está sendo testado: o adiamento existe
+    // porque o .senao só é registrado DEPOIS que chamar() retorna.
+    const fila = [];
+    const contexto = vm.createContext({
+      console: { error: function () {} },
+      setTimeout: function (funcao) { fila.push(funcao); },
+      document: { addEventListener: function () {} },
+      // Um google.script.run que só conhece uma função, como o de verdade.
+      google: { script: { run: {
+        withSuccessHandler: function () { return this; },
+        withFailureHandler: function () { return this; },
+        umaQueExiste: function () {}
+      } } }
+    });
+    const fonte = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'Aplicacao.html'), 'utf8')
+      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    vm.runInContext(fonte, contexto, { filename: 'Aplicacao.html' });
+
+    let estourou = '';
+    try {
+      vm.runInContext(
+        "Servidor.chamar('naoExisteNoServidor')"
+        + ".entao(function () {}).senao(function (e) { globalThis.__r = e.message; });",
+        contexto);
+    } catch (erro) {
+      estourou = erro.message;
+    }
+    igual(estourou, '', 'chamar não pode estourar na cara de quem chamou');
+
+    igual(fila.length, 1, 'a falha foi adiada, e não disparada no meio da chamada');
+    fila.forEach(function (funcao) { funcao(); });
+
+    const recado = vm.runInContext('globalThis.__r || ""', contexto);
+    contem(recado, 'naoExisteNoServidor', 'o .senao roda, e diz qual função');
+    contem(recado, 'não foi copiado', 'e diz a causa mais provável');
+    contem(recado, 'diagnóstico', 'e para onde ir ver a lista inteira');
+  });
+
+  teste('a resposta que chega depois de trocar de tela é descartada', () => {
+    // O Apps Script responde quando responde, e dá tempo de sobra para a
+    // pessoa desistir e ir para outra tela. Quando a resposta chegava, quem
+    // ia desenhá-la procurava um elemento que não existe mais e estourava
+    // com "Cannot set properties of null" — um erro que não diz nada sobre
+    // o que a pessoa fez.
+    let responder = null;
+    const contexto = vm.createContext({
+      console: { error: function () {}, info: function () {} },
+      setTimeout: function (funcao) { funcao(); },
+      document: { addEventListener: function () {} },
+      google: { script: { run: {
+        withSuccessHandler: function (f) { responder = f; return this; },
+        withFailureHandler: function () { return this; },
+        umaQueExiste: function () {}
+      } } }
+    });
+    const fonte = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'Aplicacao.html'), 'utf8')
+      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    vm.runInContext(fonte, contexto, { filename: 'Aplicacao.html' });
+
+    vm.runInContext(
+      "globalThis.__desenhou = 0;"
+      + "Servidor.chamar('umaQueExiste').entao(function () { globalThis.__desenhou++; });",
+      contexto);
+
+    responder('a resposta');
+    igual(vm.runInContext('globalThis.__desenhou', contexto), 1,
+      'sem troca de tela, a resposta é entregue normalmente');
+
+    vm.runInContext(
+      "Servidor.chamar('umaQueExiste').entao(function () { globalThis.__desenhou++; });",
+      contexto);
+    vm.runInContext('Servidor.trocouDeTela();', contexto);
+    responder('a resposta atrasada');
+
+    igual(vm.runInContext('globalThis.__desenhou', contexto), 1,
+      'depois de trocar de tela, a resposta antiga não é entregue');
+  });
+
+  teste('a função que existe é chamada normalmente', () => {
+    // A trava não pode ter custado o caminho feliz.
+    let chamou = null;
+    const contexto = vm.createContext({
+      console: { error: function () {} },
+      setTimeout: function (funcao) { funcao(); },
+      document: { addEventListener: function () {} },
+      google: { script: { run: {
+        withSuccessHandler: function () { return this; },
+        withFailureHandler: function () { return this; },
+        umaQueExiste: function (um, dois) { chamou = [um, dois]; }
+      } } }
+    });
+    const fonte = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'Aplicacao.html'), 'utf8')
+      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    vm.runInContext(fonte, contexto, { filename: 'Aplicacao.html' });
+
+    vm.runInContext(
+      "Servidor.chamar('umaQueExiste', 'primeiro', 42).entao(function () {});",
+      contexto);
+    igual(JSON.stringify(chamou), '["primeiro",42]',
+      'os argumentos chegam na ordem, e do jeito que saíram');
+  });
+
+  teste('cada seção de Configurações só desenha se ainda for a seção da vez', () => {
+    // Trocar de TELA a ponte já resolve. Trocar de SEÇÃO dentro de
+    // Configurações não: a tela continua a mesma e os elementos continuam
+    // existindo, mas carregarSecao zerou o `dados` — e a resposta atrasada
+    // tentava desenhar com um `dados` que não era o dela.
+    const tela = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'Configuracoes.html'), 'utf8');
+
+    const desenhos = ['desenharCampos', 'desenharUsuarios', 'desenharNiveis',
+      'desenharListas', 'desenharMesas', 'desenharGraficos', 'desenharPaineis',
+      'desenharAnalises', 'desenharEstrutura'];
+
+    const semGuarda = desenhos.filter(function (nome) {
+      const inicio = tela.indexOf('function ' + nome + '() {');
+      if (inicio < 0) return true;
+      return tela.substring(inicio, inicio + 200).indexOf('respostaAtrasada(') < 0;
+    });
+    igual(semGuarda.join(', '), '',
+      'funções de desenho sem a guarda da seção atrasada');
   });
 
   secao('O arquivo que ficou para trás na cópia');

@@ -1,6 +1,15 @@
 /**
  * ============================================================================
- * PGO — Configuracoes.gs · onde o sistema é ajustado sem programador
+ * PGO — Config.gs · onde o sistema é ajustado sem programador
+ *
+ * O nome é "Config", e não "Configuracoes", por um motivo da plataforma: no
+ * Apps Script os arquivos moram todos num projeto só, sem pasta, e o nome é
+ * único INDEPENDENTE da extensão. Já existe um `Configuracoes.html` — a tela
+ * —, então um `Configuracoes.gs` simplesmente não pode ser criado ali.
+ *
+ * No repositório eles ficam em pastas diferentes e a colisão não aparece; no
+ * Apps Script, aparece na hora de colar. Um teste da suíte confere que nenhum
+ * .gs tenha o mesmo nome de um .html.
  * ============================================================================
  * Esta é a tela mais importante do produto. Tudo o que as outras fazem sai
  * daqui: quais campos o formulário pergunta, quais listas ele oferece, quem

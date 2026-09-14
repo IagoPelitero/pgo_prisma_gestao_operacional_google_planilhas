@@ -432,36 +432,105 @@ function rodarTestesDeConfiguracoes() {
       'a tela avisa que está carregando em vez de ficar branca');
   });
 
-  teste('toda gravação da tela passa por uma função que confere permissão', () => {
-    // A lista de chamadas que a tela faz ao servidor, tirada do próprio
-    // arquivo. Uma função nova que esquecesse exigirPermissao_ apareceria
-    // aqui, e não meses depois.
-    const tela = lerTela('Configuracoes.html');
-    // TODOS os arquivos do servidor, e não uma lista escrita à mão: a lista
-    // fica desatualizada no dia em que nasce um arquivo novo, e o teste passa
-    // a reclamar de função que existe.
+  teste('toda função que QUALQUER tela chama existe e confere quem chama', () => {
+    // Antes esta conferência olhava só a Configuracoes.html, e a razão de ela
+    // ter crescido é simples: o risco não é dessa tela, é do ACOPLAMENTO — a
+    // tela chama o servidor pelo NOME, em texto. Renomear no servidor não
+    // quebra nada até alguém clicar no botão, semanas depois.
+    const pastaDasTelas = path.join(__dirname, '..', '..', 'Front-End');
     const pastaDoServidor = path.join(__dirname, '..', '..', 'Back-End');
+
+    // TODOS os arquivos do servidor, e não uma lista escrita à mão: a lista
+    // fica desatualizada no dia em que nasce um arquivo novo.
     const servidor = fs.readdirSync(pastaDoServidor)
       .filter((nome) => nome.endsWith('.gs'))
       .map((nome) => fs.readFileSync(path.join(pastaDoServidor, nome), 'utf8'))
       .join('\n');
 
     const chamadas = {};
-    (tela.match(/Servidor\.chamar\('([a-zA-Z]+)'/g) || []).forEach((achado) => {
-      chamadas[achado.replace(/[^a-zA-Z]/g, '').replace('Servidorchamar', '')] = true;
-    });
-    verdadeiro(Object.keys(chamadas).length >= 15,
-      'a tela conversa com o servidor em muitas frentes, achei '
-      + Object.keys(chamadas).length);
+    fs.readdirSync(pastaDasTelas)
+      .filter((nome) => nome.endsWith('.html'))
+      .forEach((arquivo) => {
+        const tela = fs.readFileSync(path.join(pastaDasTelas, arquivo), 'utf8');
+        (tela.match(/Servidor\.chamar\('([a-zA-Z0-9_]+)'/g) || []).forEach((achado) => {
+          const nome = achado.replace("Servidor.chamar('", '').replace("'", '');
+          if (!chamadas[nome]) chamadas[nome] = [];
+          if (chamadas[nome].indexOf(arquivo) < 0) chamadas[nome].push(arquivo);
+        });
+      });
 
-    Object.keys(chamadas).forEach((nome) => {
+    const nomes = Object.keys(chamadas);
+    verdadeiro(nomes.length >= 60,
+      'as telas conversam com o servidor em muitas frentes, achei ' + nomes.length);
+
+    const semFuncao = [];
+    const semGuarda = [];
+    nomes.forEach((nome) => {
       const inicio = servidor.indexOf('function ' + nome + '(');
-      verdadeiro(inicio >= 0, 'a tela chama ' + nome + ', que não existe no servidor');
+      if (inicio < 0) {
+        semFuncao.push(nome + ' (em ' + chamadas[nome].join(', ') + ')');
+        return;
+      }
       const corpo = servidor.substring(inicio, inicio + 900);
-      verdadeiro(corpo.indexOf('exigirPermissao_') >= 0
-        || corpo.indexOf('usuarioAtual_') >= 0,
-        nome + ' não confere quem está chamando');
+      if (corpo.indexOf('exigirPermissao_') < 0
+        && corpo.indexOf('exigirTela_') < 0
+        && corpo.indexOf('usuarioAtual_') < 0) {
+        semGuarda.push(nome);
+      }
     });
+
+    igual(semFuncao.join(' | '), '', 'a tela chama função que não existe');
+    igual(semGuarda.join(' | '), '', 'função chamada pela tela sem conferir quem chama');
+  });
+
+  teste('toda chamada ao servidor trata a falha — senão a tela trava no "carregando"', () => {
+    // Sem .senao, o erro vai só para o console e a tela fica parada na
+    // mensagem de carregamento para sempre. O sintoma não tem nada a ver com
+    // a causa, e é o pior tipo de defeito para diagnosticar de longe.
+    const pastaDasTelas = path.join(__dirname, '..', '..', 'Front-End');
+
+    // Da palavra 'Servidor.chamar' até o ';' que fecha a instrução, contando
+    // parênteses e chaves — a chamada quase sempre ocupa várias linhas.
+    function instrucaoInteira(texto, comeco) {
+      let prof = 0;
+      for (let i = comeco; i < texto.length; i++) {
+        const c = texto[i];
+        if (c === "'" || c === '"') {
+          const aspa = c;
+          i++;
+          while (i < texto.length && texto[i] !== aspa) {
+            if (texto[i] === '\\') i++;
+            i++;
+          }
+        } else if ('([{'.indexOf(c) >= 0) prof++;
+        else if (')]}'.indexOf(c) >= 0) {
+          prof--;
+          if (prof < 0) return texto.substring(comeco, i);
+        } else if (c === ';' && prof === 0) return texto.substring(comeco, i + 1);
+      }
+      return texto.substring(comeco);
+    }
+
+    const semTratamento = [];
+    let total = 0;
+    fs.readdirSync(pastaDasTelas)
+      .filter((nome) => nome.endsWith('.html'))
+      .forEach((arquivo) => {
+        const tela = fs.readFileSync(path.join(pastaDasTelas, arquivo), 'utf8');
+        const busca = /Servidor\.chamar\('([a-zA-Z0-9_]+)'/g;
+        let achado;
+        while ((achado = busca.exec(tela)) !== null) {
+          total++;
+          const instrucao = instrucaoInteira(tela, achado.index);
+          if (instrucao.indexOf('.senao(') < 0) {
+            const linha = tela.substring(0, achado.index).split('\n').length;
+            semTratamento.push(arquivo + ':' + linha + ' ' + achado[1]);
+          }
+        }
+      });
+
+    verdadeiro(total >= 60, 'achei ' + total + ' chamadas ao servidor');
+    igual(semTratamento.join(' | '), '', 'chamadas sem .senao');
   });
 
   teste('o menu da lateral vai em branco, como a operação aprovou', () => {
