@@ -114,6 +114,20 @@ function pontePreparada(respostas) {
     + '      opcoesDaBusca: function () {\n'
     + '        responder(respostas.busca.opcoes);\n'
     + '      },\n'
+    + '      tabelaDeCorretoras: function (procurar, segmento) {\n'
+    + '        var chave = String(procurar || "") + "|" + String(segmento || "");\n'
+    + '        responder(respostas.corretoras.tabelas[chave]\n'
+    + '          || respostas.corretoras.tabelas["|"]);\n'
+    + '      },\n'
+    + '      listarProdutos: function () {\n'
+    + '        responder(respostas.corretoras.produtos);\n'
+    + '      },\n'
+    + '      listarSusepsBloqueadas: function () {\n'
+    + '        responder(respostas.corretoras.bloqueadas);\n'
+    + '      },\n'
+    + '      exportarCorretoras: function () {\n'
+    + '        responder(respostas.corretoras.exportado);\n'
+    + '      },\n'
     + '      minhaPerformance: function (idDaMesa) {\n'
     + '        responder(respostas.performance[idDaMesa]);\n'
     + '      },\n'
@@ -190,7 +204,9 @@ function pontePreparada(respostas) {
       'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarUsuario',
       'desativarUsuario', 'salvarMesa', 'salvarIdentidade', 'definirLogo',
       'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
-      'editarCaso', 'alterarSituacaoDoCaso'])
+      'editarCaso', 'alterarSituacaoDoCaso', 'salvarComponentesDoPainel',
+      'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
+      'desbloquearSusep', 'salvarProduto', 'ocultarProduto'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -256,6 +272,13 @@ function gerar(pastaDeSaida) {
       'Nome do segurado': 'Gustavo Rezende', 'Documento (CPF)': '00011122233',
       Corretora: 'Corretora XYZ', Ramo: 'Auto',
       Assunto: 'Entrou hoje, ainda sem tratativa' },
+    // De propósito com uma SUSEP que NÃO está no cadastro de canais: é o
+    // achado da Tabela de Corretoras, e a prévia precisa mostrá-lo.
+    { Analista: 'Diego Castilho', Status: 'Pendente', Canal: 'Corretora',
+      'Data de entrada': diasAtras(2), 'Horário': '15:10',
+      'Nome do segurado': 'Helena Braga', 'Documento (CPF)': '00044455566',
+      Corretora: 'Corretora Sul Atlântico', SUSEP: '8123456', Ramo: 'Vida',
+      Assunto: 'Corretora que ainda não está no cadastro' },
     { Analista: 'Ana Martins', Status: 'Concluído', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '16:47',
       'Nome do segurado': 'Ricardo Costa', 'Documento (CPF)': '00055566677',
@@ -458,8 +481,23 @@ function gerar(pastaDeSaida) {
     Nome: 'Corretora ABC', Canal: 'Corretora', SUSEP: '1234567',
     Corretora: 'Corretora ABC', Segmento: 'Diamante'
   });
+  chamar('inserirVariosRegistros_')('CANAIS', [
+    { Nome: 'Marina Alencar', Canal: 'Corretora', SUSEP: '2345678',
+      Corretora: 'Corretora Horizonte', Segmento: 'Diamante' },
+    { Nome: 'Posto Central', Canal: 'Agente', SUSEP: '3456789',
+      Corretora: 'Agência Central', Segmento: 'Demais corretoras' },
+    { Nome: '', Canal: 'Corretora', SUSEP: '4567890',
+      Corretora: 'Corretora Novo Norte', Segmento: 'Demais corretoras' }
+  ]);
+  chamar('inserirVariosRegistros_')('PRODUTOS', [
+    { Produto: 'Prestamista', CodigoProduto: '0000000031' },
+    { Produto: 'Vida Individual', CodigoProduto: '0000000033' },
+    { Produto: 'Vida Coletiva', CodigoProduto: '0000000032' }
+  ]);
   chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
-    SUSEP: '7654321', NomeCorretora: 'Corretora XYZ', Motivo: 'CPF reincidente'
+    SUSEP: '7654321', NomeCorretora: 'Corretora XYZ',
+    Motivo: 'CPF reincidente em três propostas no mesmo mês',
+    CpfReincidente: '00011122233', BloqueadaEm: new Date()
   });
 
   const formularios = {};
@@ -590,6 +628,18 @@ function gerar(pastaDeSaida) {
     performance[mesa.id] = chamar('minhaPerformance')(mesa.id, 30);
   });
 
+  // A Tabela de Corretoras, com alguns filtros já respondidos.
+  const tabelasDeCorretoras = { '|': chamar('tabelaDeCorretoras')('', '') };
+  tabelasDeCorretoras['|'].segmentos.forEach((seg) => {
+    tabelasDeCorretoras['|' + seg] = chamar('tabelaDeCorretoras')('', seg);
+  });
+  const corretoras = {
+    tabelas: tabelasDeCorretoras,
+    produtos: chamar('listarProdutos()'),
+    bloqueadas: chamar('listarSusepsBloqueadas()'),
+    exportado: chamar('exportarCorretoras')('', '')
+  };
+
   // E a mesma instalação vista por quem não está cadastrado.
   ambiente.definirEmail('nao.cadastrado@exemplo.com');
   const telaSemAcesso = chamar('doGet()').getContent();
@@ -599,7 +649,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
-      busca, analitico, performance
+      busca, analitico, performance, corretoras
     })
       + '</head>');
 

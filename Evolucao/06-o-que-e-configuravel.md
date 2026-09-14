@@ -26,6 +26,9 @@ abaixo com o motivo.
 | **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis → Cards |
 | **Gráficos do Painel Analítico** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
 | **Meta por pessoa** | Quantos casos por mês se espera de alguém na mesa. Zero desliga a barra de progresso | Mesas de trabalho |
+| **Corretoras e canais** | Cadastrar, editar o segmento, tirar do cadastro — e cadastrar direto as SUSEPs que os casos citam | Tabela de Corretoras |
+| **Produtos** | Nome e código, que é único | Tabela de Corretoras |
+| **SUSEPs bloqueadas** | Bloquear com motivo, liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
 | **Busca** | Em quais colunas cada mesa procura | Mesas de trabalho |
@@ -44,9 +47,6 @@ Funciona, e é editável — mas exige abrir a aba e digitar na célula, o que n
 | **Nome das telas no menu** | `CONFIG` → `MENU.TITULOS` | Um JSON numa célula. Merece uma tela, e é o próximo a ganhar uma |
 | **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; entra junto com os títulos do menu |
 | **Tema padrão da operação** | `CONFIG` → `OPERACAO.TEMA_PADRAO` | Idem |
-| **Corretoras e canais** | aba `CANAIS` | Ganha tela própria na **etapa 10**, Tabela de Corretoras |
-| **Produtos** | aba `PRODUTOS` | Mesma etapa |
-| **SUSEPs bloqueadas** | aba `SUSEP_BLOQUEADAS` | Mesma etapa |
 | **Visibilidade de campo por nível** | `CATALOGO` → `Configuracao.campos` | O servidor já respeita (oculto, leitura, edição). Falta a tela — hoje é um JSON |
 
 ---

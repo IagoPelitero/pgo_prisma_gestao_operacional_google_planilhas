@@ -69,7 +69,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 247 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 269 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -139,13 +139,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-247 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+269 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 246 não valeriam nada.
+realmente corrompe — sem ele, os outros 268 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -261,6 +261,25 @@ aqui, atrapalha alguém.
   "concluídos" é o contrário
 - **O que não dá para calcular some**, em vez de aparecer zerado
 - **A meta é declarada, nunca inventada.** Mesa sem meta não ganha barra
+
+---
+
+## Quem traz o caso para dentro
+
+![A Tabela de Corretoras](Evolucao/imagens/tela-tabela-corretoras.png)
+
+Corretoras, produtos e SUSEPs bloqueadas — três cadastros que até aqui só se
+ajustavam abrindo a planilha.
+
+O que faz a tela valer mais que uma lista é o **cruzamento com os casos**: o
+volume ao lado de cada corretora, e o aviso das **SUSEPs que aparecem nos casos
+e não estão cadastradas**. Enquanto uma delas fica de fora, o selo do
+formulário diz "não encontrada" toda vez — e o sintoma aparece em outra tela,
+uma pessoa de cada vez, sem ninguém ligar à causa.
+
+**Bloquear não impede cadastrar**: o formulário mostra o selo vermelho com o
+motivo, e quem atende decide. Bloqueio que impedisse faria a pessoa registrar o
+caso num caderno, e o sistema perderia o caso de vista.
 
 ---
 

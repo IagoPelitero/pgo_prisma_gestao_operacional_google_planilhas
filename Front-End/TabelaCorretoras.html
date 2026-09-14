@@ -1,0 +1,602 @@
+<script>
+/* ============================================================================
+   PGO — TabelaCorretoras.html · quem traz o caso para dentro
+   ============================================================================
+   Três cadastros numa tela só, em abas: corretoras e canais, produtos e as
+   SUSEPs bloqueadas. Até aqui, os três só se ajustavam abrindo a planilha.
+
+   O QUE FAZ ESTA TELA VALER MAIS QUE UMA LISTA: o volume ao lado de cada
+   corretora, e o aviso das SUSEPs que aparecem nos casos e não estão
+   cadastradas. Essa segunda é a informação mais útil daqui — enquanto uma
+   SUSEP está fora do cadastro, o selo do formulário diz "não encontrada" toda
+   vez, e ninguém liga uma coisa à outra porque o sintoma aparece em outra
+   tela, uma pessoa de cada vez.
+   ============================================================================ */
+
+var TelaTabelaCorretoras = (function () {
+
+  var abaAtual = 'corretoras';
+  var procurar = '';
+  var segmento = '';
+  var dados = null;
+  var editando = null;      // o item aberto no formulário lateral
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar() {
+    return '<div class="config-abas" id="abas-das-corretoras">'
+      + [['corretoras', 'Corretoras e canais'],
+         ['produtos', 'Produtos'],
+         ['bloqueadas', 'SUSEPs bloqueadas']].map(function (par) {
+        return '<button type="button" class="config-aba'
+          + (abaAtual === par[0] ? ' atual' : '') + '"'
+          + ' data-aba-corretoras="' + par[0] + '">' + escapar(par[1])
+          + '</button>';
+      }).join('') + '</div>'
+      + '<div class="config" id="corretoras">'
+      + '<div class="config-lista" id="corretoras-lista">'
+      + '<p class="carregando-campos">Lendo o cadastro…</p></div>'
+      + '<aside class="config-painel" id="corretoras-painel"></aside>'
+      + '</div>';
+  }
+
+  function carregar() {
+    var lista = elemento('corretoras-lista');
+    if (lista) lista.innerHTML = '<p class="carregando-campos">Lendo o cadastro…</p>';
+
+    if (abaAtual === 'corretoras') {
+      return Servidor.chamar('tabelaDeCorretoras', procurar, segmento)
+        .entao(function (resposta) { dados = resposta; desenharCorretoras(); })
+        .senao(falhou);
+    }
+    if (abaAtual === 'produtos') {
+      return Servidor.chamar('listarProdutos')
+        .entao(function (lista) { dados = { produtos: lista }; desenharProdutos(); })
+        .senao(falhou);
+    }
+    return Servidor.chamar('tabelaDeCorretoras', '', '')
+      .entao(function (resposta) {
+        var podeMexer = resposta.podeMexer;
+        Servidor.chamar('listarSusepsBloqueadas')
+          .entao(function (lista) {
+            dados = { bloqueadas: lista, podeMexer: podeMexer };
+            desenharBloqueadas();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function falhou(erro) {
+    elemento('corretoras-lista').innerHTML =
+      '<p class="carregando-campos erro-carga">'
+      + escapar(erro.message || String(erro)) + '</p>';
+  }
+
+  /* ---------------------------------------------------------- corretoras */
+
+  function desenharCorretoras() {
+    var opcoes = ['<option value="">Todos os segmentos</option>']
+      .concat(dados.segmentos.map(function (um) {
+        return '<option value="' + escapar(um) + '"'
+          + (um === segmento ? ' selected' : '') + '>' + escapar(um) + '</option>';
+      })).join('');
+
+    elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
+      + '<input type="search" id="procurar-corretora" class="busca-do-cadastro"'
+      + ' value="' + escapar(procurar) + '" autocomplete="off"'
+      + ' placeholder="Corretora, canal ou SUSEP" aria-label="Procurar corretora">'
+      + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
+      + (dados.podeMexer
+        ? '<button type="button" class="botao pequeno" id="nova-corretora">'
+          + 'Cadastrar corretora</button>' : '')
+      + (dados.podeExportar
+        ? '<button type="button" class="botao-texto" id="exportar-corretoras">'
+          + 'Exportar</button>' : '')
+      + '</div>'
+      + avisoDasNaoCadastradas()
+      + '<p class="config-explica">' + dados.quantasFiltradas + ' de '
+      + dados.quantasNoTotal + ' corretoras · a lista vem de quem mais traz '
+      + 'caso, e não em ordem alfabética.</p>'
+      + tabelaDasCorretoras()
+      + (dados.truncada
+        ? '<p class="aviso-fila">Mostrando as ' + dados.corretoras.length
+          + ' primeiras. Procure para chegar mais perto.</p>' : '');
+
+    ligarCorretoras();
+    if (!editando) {
+      painelVazio('Escolha uma corretora para ver e mudar o cadastro dela.');
+    }
+  }
+
+  /**
+   * O aviso das SUSEPs que os casos citam e o cadastro não conhece.
+   *
+   * É o achado desta tela. Cada uma delas faz o selo do formulário dizer
+   * "não encontrada" toda vez que alguém digita — e o sintoma aparece lá,
+   * uma pessoa de cada vez, sem ninguém ligar à causa.
+   */
+  function avisoDasNaoCadastradas() {
+    if (!dados.foraDoCadastro.length) return '';
+
+    var primeiras = dados.foraDoCadastro.slice(0, 6);
+    return '<div class="aviso-cadastro">'
+      + '<strong>' + dados.foraDoCadastro.length + ' SUSEP(s) aparecem nos '
+      + 'casos e não estão no cadastro.</strong>'
+      + '<p>Enquanto elas ficarem de fora, o selo do formulário vai dizer '
+      + '"não encontrada" toda vez que alguém as digitar.</p>'
+      + '<ul>' + primeiras.map(function (uma) {
+        return '<li>'
+          + (dados.podeMexer
+            ? '<button type="button" class="botao-texto" data-cadastrar-susep="'
+              + escapar(uma.susep) + '" data-nome-nos-casos="'
+              + escapar(uma.nomeNosCasos) + '">' + escapar(uma.susep)
+              + '</button>'
+            : '<span class="susep">' + escapar(uma.susep) + '</span>')
+          + '<span class="nos-casos">'
+          + (uma.nomeNosCasos
+            ? 'nos casos aparece como “' + escapar(uma.nomeNosCasos) + '”'
+            : 'sem nome nos casos')
+          + '</span>'
+          + '<span class="quantos">' + uma.casos + ' caso(s)</span></li>';
+      }).join('') + '</ul>'
+      + (dados.foraDoCadastro.length > primeiras.length
+        ? '<p class="config-explica" style="margin:8px 0 0">E mais '
+          + (dados.foraDoCadastro.length - primeiras.length) + '.</p>' : '')
+      + '</div>';
+  }
+
+  function tabelaDasCorretoras() {
+    if (!dados.corretoras.length) {
+      return '<p class="config-vazio">Nenhuma corretora com esse filtro.</p>';
+    }
+
+    var linhas = dados.corretoras.map(function (uma) {
+      return '<tr' + (editando && editando.id === uma.id ? ' class="aberta"' : '')
+        + '>'
+        + '<td><span class="principal">' + escapar(uma.corretora) + '</span>'
+        + '<span class="apoio">' + escapar(uma.susep) + '</span></td>'
+        + '<td><span class="principal">' + escapar(uma.canal || '—') + '</span>'
+        + '<span class="apoio">' + escapar(uma.nome || '—') + '</span></td>'
+        + '<td><span class="situacao ' + classeDoSegmento(uma.segmento) + '">'
+        + escapar(uma.segmento) + '</span></td>'
+        + '<td><span class="situacao ' + (uma.bloqueada ? 'tom-ruim' : 'tom-bom')
+        + '" title="' + escapar(uma.motivoDoBloqueio) + '">'
+        + (uma.bloqueada ? 'Bloqueada' : 'Liberada') + '</span></td>'
+        + '<td class="direita">' + uma.casos + '</td>'
+        + '<td class="acoes-coluna">'
+        + (dados.podeMexer
+          ? '<button type="button" class="acao-icone" data-corretora="'
+            + escapar(uma.id) + '" title="Editar" aria-label="Editar corretora">'
+            + Moldura.icone('editar') + '</button>' : '')
+        + '</td></tr>';
+    }).join('');
+
+    return '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
+      + '<thead><tr><th>Corretora</th><th>Canal</th><th>Segmento</th>'
+      + '<th>Situação</th><th class="direita">Casos</th>'
+      + '<th class="acoes-coluna"></th></tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div>';
+  }
+
+  /**
+   * O tom do segmento.
+   *
+   * "Não encontrado" é atenção, e não erro: é um cadastro incompleto, não uma
+   * corretora irregular. Pintar de vermelho faria a operação achar que há um
+   * problema com quem trouxe o caso.
+   */
+  function classeDoSegmento(segmentoDaLinha) {
+    // "Não encontrado" é ATENÇÃO: cadastro incompleto não é corretora
+    // irregular, e pintar de vermelho faria a operação achar que há um
+    // problema com quem trouxe o caso.
+    var comparavel = String(segmentoDaLinha || '').toLowerCase();
+    if (comparavel.indexOf('diamante') >= 0) return 'tom-destaque';
+    if (comparavel.indexOf('não encontrado') >= 0
+      || comparavel.indexOf('nao encontrado') >= 0) return 'tom-atencao';
+    return 'tom-neutro';
+  }
+
+  function ligarCorretoras() {
+    var busca = elemento('procurar-corretora');
+    busca.addEventListener('change', function () {
+      procurar = this.value;
+      editando = null;
+      carregar();
+    });
+
+    elemento('segmento-da-corretora').addEventListener('change', function () {
+      segmento = this.value;
+      editando = null;
+      carregar();
+    });
+
+    var nova = elemento('nova-corretora');
+    if (nova) {
+      nova.addEventListener('click', function () {
+        editando = { id: '' };
+        desenharFormularioDaCorretora(null);
+      });
+    }
+
+    var exportar = elemento('exportar-corretoras');
+    if (exportar) {
+      exportar.addEventListener('click', function () {
+        Servidor.chamar('exportarCorretoras', procurar, segmento)
+          .entao(abrirCaixaDeExportar)
+          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      });
+    }
+
+    ligarCliques('[data-corretora]', function (botao) {
+      var id = botao.getAttribute('data-corretora');
+      editando = { id: id };
+      desenharCorretoras();
+      desenharFormularioDaCorretora(acharCorretora(id));
+    });
+
+    ligarCliques('[data-cadastrar-susep]', function (botao) {
+      // Já vem com a SUSEP e o nome que os casos usam — mas o nome é um
+      // palpite, e o formulário deixa claro que é.
+      editando = { id: '' };
+      desenharFormularioDaCorretora({
+        id: '', susep: botao.getAttribute('data-cadastrar-susep'),
+        corretora: botao.getAttribute('data-nome-nos-casos'),
+        nome: '', canal: '', segmento: ''
+      }, true);
+    });
+  }
+
+  function acharCorretora(id) {
+    for (var i = 0; i < dados.corretoras.length; i++) {
+      if (dados.corretoras[i].id === id) return dados.corretoras[i];
+    }
+    return null;
+  }
+
+  function desenharFormularioDaCorretora(corretora, veioDosCasos) {
+    var atual = corretora || { id: '', nome: '', canal: '', susep: '',
+      corretora: '', segmento: '' };
+
+    elemento('corretoras-painel').innerHTML =
+      '<form class="config-form" id="form-corretora">'
+      + tituloDoPainel(atual.id ? atual.corretora : 'Corretora nova',
+        atual.id ? 'Cadastro de canal' : 'Cadastrar no canal')
+      + (veioDosCasos
+        ? '<p class="config-aviso">O nome veio dos casos que já citam esta '
+          + 'SUSEP — confira antes de salvar. É um palpite, não um cadastro.</p>'
+        : '')
+      + campoDeTexto('susep', 'SUSEP', atual.susep,
+        'Só dígitos. É ela que liga a corretora ao caso.')
+      + campoDeTexto('corretora', 'Corretora', atual.corretora, '')
+      + campoDeTexto('canal', 'Canal', atual.canal,
+        'Corretora, agente, central… como a operação chama.')
+      + campoDeTexto('nome', 'Nome do contato', atual.nome, '')
+      + caixaDeSegmento(atual.segmento)
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (atual.id
+        ? '<button type="button" class="botao vazado perigo" id="tirar-corretora">'
+          + 'Tirar do cadastro</button>' : '')
+      + '</div></form>';
+
+    elemento('form-corretora').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarCorretora', {
+        id: atual.id,
+        susep: valorDe('susep'),
+        corretora: valorDe('corretora'),
+        canal: valorDe('canal'),
+        nome: valorDe('nome'),
+        segmento: valorDe('segmento')
+      }).entao(function () {
+        avisar('Corretora salva.', 'bom');
+        editando = null;
+        carregar();
+      }).senao(mostrarErro);
+    });
+
+    var tirar = elemento('tirar-corretora');
+    if (tirar) {
+      tirar.addEventListener('click', function () {
+        if (!window.confirm('Tirar "' + atual.corretora + '" do cadastro?\n\n'
+          + 'Ela some da tela e do selo do formulário. A linha permanece na '
+          + 'planilha, e os casos dela continuam intactos.')) return;
+        Servidor.chamar('ocultarCorretora', atual.id)
+          .entao(function () {
+            avisar('Corretora tirada do cadastro.', 'bom');
+            editando = null;
+            carregar();
+          }).senao(mostrarErro);
+      });
+    }
+  }
+
+  function caixaDeSegmento(escolhido) {
+    var conhecidos = ['Diamante', 'Demais corretoras', 'Não encontrado'];
+    (dados.segmentos || []).forEach(function (um) {
+      if (conhecidos.indexOf(um) < 0) conhecidos.push(um);
+    });
+
+    return '<label class="config-campo"><span>Segmento</span>'
+      + '<select id="cfg-segmento">'
+      + conhecidos.map(function (um) {
+        return '<option value="' + escapar(um) + '"'
+          + (um === escolhido ? ' selected' : '') + '>' + escapar(um) + '</option>';
+      }).join('') + '</select>'
+      + '<em>Diamante muda o atendimento; "Não encontrado" quer dizer cadastro '
+      + 'incompleto, e não corretora irregular.</em></label>';
+  }
+
+  /* ------------------------------------------------------------- produtos */
+
+  function desenharProdutos() {
+    var linhas = dados.produtos.map(function (um) {
+      return '<li class="config-item' + (editando && editando.id === um.id
+        ? ' atual' : '') + '">'
+        + '<button type="button" class="abrir" data-produto="' + escapar(um.id) + '">'
+        + '<span class="nome">' + escapar(um.produto) + '</span>'
+        + '<span class="detalhe">código ' + escapar(um.codigo || '—')
+        + '</span></button></li>';
+    }).join('');
+
+    elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.produtos.length + ' produtos</span>'
+      + '<button type="button" class="botao pequeno" id="novo-produto">'
+      + 'Cadastrar produto</button></div>'
+      + '<p class="config-explica">O <strong>código</strong> é o que liga o '
+      + 'produto ao caso — por isso ele é único, e o sistema recusa repetir.</p>'
+      + (dados.produtos.length
+        ? '<ul class="config-itens">' + linhas + '</ul>'
+        : '<p class="config-vazio">Nenhum produto cadastrado. Sem eles, o '
+          + 'campo de produto do formulário fica como caixa de texto livre.</p>');
+
+    elemento('novo-produto').addEventListener('click', function () {
+      editando = { id: '' };
+      desenharFormularioDoProduto(null);
+    });
+    ligarCliques('[data-produto]', function (botao) {
+      var id = botao.getAttribute('data-produto');
+      editando = { id: id };
+      desenharProdutos();
+      desenharFormularioDoProduto(acharNaLista(dados.produtos, id));
+    });
+
+    if (!editando) painelVazio('Escolha um produto, ou cadastre um novo.');
+  }
+
+  function desenharFormularioDoProduto(produto) {
+    var atual = produto || { id: '', produto: '', codigo: '' };
+
+    elemento('corretoras-painel').innerHTML =
+      '<form class="config-form" id="form-produto">'
+      + tituloDoPainel(atual.id ? atual.produto : 'Produto novo', 'Cadastro de produto')
+      + campoDeTexto('produto', 'Produto', atual.produto, '')
+      + campoDeTexto('codigo', 'Código', atual.codigo,
+        'Só dígitos. É o que liga o produto ao caso, e ele é único.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (atual.id
+        ? '<button type="button" class="botao vazado perigo" id="tirar-produto">'
+          + 'Tirar do cadastro</button>' : '')
+      + '</div></form>';
+
+    elemento('form-produto').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarProduto', {
+        id: atual.id, produto: valorDe('produto'), codigo: valorDe('codigo')
+      }).entao(function () {
+        avisar('Produto salvo.', 'bom');
+        editando = null;
+        carregar();
+      }).senao(mostrarErro);
+    });
+
+    var tirar = elemento('tirar-produto');
+    if (tirar) {
+      tirar.addEventListener('click', function () {
+        if (!window.confirm('Tirar "' + atual.produto + '" do cadastro?\n\n'
+          + 'A linha permanece na planilha, e os casos continuam intactos.')) return;
+        Servidor.chamar('ocultarProduto', atual.id)
+          .entao(function () {
+            avisar('Produto tirado do cadastro.', 'bom');
+            editando = null;
+            carregar();
+          }).senao(mostrarErro);
+      });
+    }
+  }
+
+  /* ----------------------------------------------------------- bloqueadas */
+
+  function desenharBloqueadas() {
+    var linhas = dados.bloqueadas.map(function (uma) {
+      return '<tr>'
+        + '<td><span class="principal">' + escapar(uma.susep) + '</span>'
+        + '<span class="apoio">' + escapar(uma.corretora || 'sem nome') + '</span></td>'
+        + '<td>' + escapar(uma.motivo || '—') + '</td>'
+        + '<td>' + escapar(uma.cpfReincidente || '—') + '</td>'
+        + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
+        + '<td class="direita">' + uma.casos + '</td>'
+        + '<td class="acoes-coluna">'
+        + (dados.podeMexer
+          ? '<button type="button" class="botao-texto" data-liberar="'
+            + escapar(uma.id) + '">Liberar</button>' : '')
+        + '</td></tr>';
+    }).join('');
+
+    elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.bloqueadas.length
+      + ' SUSEP(s) bloqueada(s)</span>'
+      + (dados.podeMexer
+        ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
+          + 'Bloquear SUSEP</button>' : '')
+      + '</div>'
+      + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
+      + 'o formulário passa a mostrar o selo vermelho com o motivo, e quem está '
+      + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa '
+      + 'registrar o caso num caderno, e o sistema perderia o caso de vista.</p>'
+      + (dados.bloqueadas.length
+        ? '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
+          + '<thead><tr><th>SUSEP</th><th>Motivo</th><th>CPF reincidente</th>'
+          + '<th>Desde</th><th class="direita">Casos</th>'
+          + '<th class="acoes-coluna"></th></tr></thead>'
+          + '<tbody>' + linhas + '</tbody></table></div>'
+        : '<p class="config-vazio">Nenhuma SUSEP bloqueada.</p>');
+
+    var nova = elemento('nova-bloqueada');
+    if (nova) {
+      nova.addEventListener('click', function () {
+        desenharFormularioDoBloqueio();
+      });
+    }
+    ligarCliques('[data-liberar]', function (botao) {
+      liberar(botao.getAttribute('data-liberar'));
+    });
+
+    painelVazio(dados.podeMexer
+      ? 'Bloquear uma SUSEP marca o selo do formulário, e não impede nada.'
+      : 'O seu nível de acesso vê a lista, mas não mexe nela.');
+  }
+
+  function desenharFormularioDoBloqueio() {
+    elemento('corretoras-painel').innerHTML =
+      '<form class="config-form" id="form-bloqueio">'
+      + tituloDoPainel('Bloquear SUSEP', 'Marca o selo do formulário')
+      + campoDeTexto('susep', 'SUSEP', '', 'Só dígitos.')
+      + campoDeTexto('corretora', 'Nome da corretora', '', '')
+      + campoDeTexto('cpf', 'CPF reincidente', '',
+        'Quando o bloqueio vem de um CPF que se repete.')
+      + campoDeTexto('motivo', 'Motivo', '',
+        'Obrigatório. Quem vir o selo vermelho daqui a seis meses precisa '
+        + 'saber o que fazer com a informação.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Bloquear</button></div></form>';
+
+    elemento('form-bloqueio').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('bloquearSusep', {
+        susep: valorDe('susep'), corretora: valorDe('corretora'),
+        cpfReincidente: valorDe('cpf'), motivo: valorDe('motivo')
+      }).entao(function () {
+        avisar('SUSEP bloqueada.', 'bom');
+        carregar();
+      }).senao(mostrarErro);
+    });
+  }
+
+  function liberar(id) {
+    if (!window.confirm('Liberar esta SUSEP?\n\n'
+      + 'O selo do formulário volta a aceitá-la. O registro do bloqueio '
+      + 'permanece na planilha, com a data.')) return;
+
+    Servidor.chamar('desbloquearSusep', id)
+      .entao(function () { avisar('SUSEP liberada.', 'bom'); carregar(); })
+      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+  }
+
+  /* ------------------------------------------------------------ utilidades */
+
+  function tituloDoPainel(titulo, subtitulo) {
+    return '<header class="config-painel-cabeca">'
+      + '<h3>' + escapar(titulo) + '</h3>'
+      + '<p>' + escapar(subtitulo) + '</p></header>';
+  }
+
+  function painelVazio(mensagem) {
+    elemento('corretoras-painel').innerHTML =
+      '<p class="config-vazio">' + escapar(mensagem) + '</p>';
+  }
+
+  function campoDeTexto(nome, rotulo, valor, dica) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<input type="text" id="cfg-' + nome + '" value="'
+      + escapar(valor === null || valor === undefined ? '' : valor) + '">'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  function valorDe(nome) {
+    var campo = elemento('cfg-' + nome);
+    return campo ? campo.value : '';
+  }
+
+  function acharNaLista(lista, id) {
+    for (var i = 0; i < lista.length; i++) {
+      if (String(lista[i].id) === String(id)) return lista[i];
+    }
+    return null;
+  }
+
+  function ligarCliques(seletor, oQueFazer) {
+    var achados = document.querySelectorAll(seletor);
+    for (var i = 0; i < achados.length; i++) {
+      achados[i].addEventListener('click', function () { oQueFazer(this); });
+    }
+  }
+
+  function mostrarErro(erro) {
+    avisar(erro.message || String(erro), 'ruim');
+  }
+
+  function avisar(mensagem, tom) {
+    var aviso = document.createElement('div');
+    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
+    aviso.setAttribute('role', 'status');
+    aviso.textContent = mensagem;
+    document.body.appendChild(aviso);
+    window.setTimeout(function () {
+      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
+    }, tom === 'ruim' ? 6000 : 3200);
+  }
+
+  function abrirCaixaDeExportar(arquivo) {
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true">'
+      + '<h3>Exportar</h3>'
+      + '<p>Separado por ponto e vírgula, que é como o Excel em português abre '
+      + 'sem perguntar nada.</p>'
+      + '<textarea rows="8" readonly>' + escapar(arquivo.conteudo) + '</textarea>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" data-copiar>Copiar</button>'
+      + '<button type="button" class="botao vazado" data-fechar>Fechar</button>'
+      + '</div></div>';
+    document.body.appendChild(caixa);
+
+    function sair() { if (caixa.parentNode) caixa.parentNode.removeChild(caixa); }
+    caixa.querySelector('[data-fechar]').addEventListener('click', sair);
+    caixa.addEventListener('mousedown', function (evento) {
+      if (evento.target === caixa) sair();
+    });
+
+    var area = caixa.querySelector('textarea');
+    area.focus();
+    area.select();
+    caixa.querySelector('[data-copiar]').addEventListener('click', function () {
+      area.select();
+      var deuCerto = false;
+      try { deuCerto = document.execCommand('copy'); } catch (erro) { deuCerto = false; }
+      this.textContent = deuCerto ? 'Copiado' : 'Aperte Ctrl+C';
+    });
+  }
+
+  /* ---------------------------------------------------------------- ligar */
+
+  function ligar() {
+    var abas = document.querySelectorAll('[data-aba-corretoras]');
+    for (var i = 0; i < abas.length; i++) {
+      abas[i].addEventListener('click', function () {
+        abaAtual = this.getAttribute('data-aba-corretoras');
+        editando = null;
+        Aplicacao.remontar();
+      });
+    }
+    carregar();
+  }
+
+  return { montar: montar, ligar: ligar };
+})();
+</script>

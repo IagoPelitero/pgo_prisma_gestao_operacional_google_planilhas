@@ -115,13 +115,8 @@ var Rotas = (function () {
     tabelaCorretoras: {
       titulo: 'Tabela de Corretoras',
       subtitulo: 'Canais, corretores e agentes, com segmento e situação da SUSEP.',
-      montar: function () {
-        return emConstrucao(10, [
-          'Lista de canais, corretores e agentes com o segmento de cada um',
-          'Diamante, demais corretoras ou não encontrado',
-          'Situação da SUSEP: liberada ou bloqueada'
-        ]);
-      }
+      montar: function (pacote) { return TelaTabelaCorretoras.montar(pacote); },
+      ligar: function (pacote) { TelaTabelaCorretoras.ligar(pacote); }
     },
     painelAnalitico: {
       titulo: 'Painel Analítico',

@@ -1507,6 +1507,54 @@ table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-n
 }
 .passo-abre:hover strong { color: var(--destaque); }
 
+/* ================================================ tabela de corretoras === */
+.busca-do-cadastro {
+  flex: 1 1 220px; min-width: 0;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto);
+  padding: 8px 11px; font: inherit; font-size: 13.5px;
+}
+.busca-do-cadastro:focus { border-color: var(--destaque); }
+
+table.fila.cadastro { min-width: 720px; }
+table.fila.cadastro .direita { text-align: right; font-variant-numeric: tabular-nums; }
+table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
+
+/*
+  O aviso das SUSEPs fora do cadastro. Tom de ATENÇÃO, e não de erro: cadastro
+  incompleto não é corretora irregular, e pintar de vermelho faria a operação
+  achar que há um problema com quem trouxe o caso.
+*/
+.aviso-cadastro {
+  margin: 12px 0; padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--atencao) 30%, transparent);
+  border-radius: var(--raio); background: var(--atencao-tenue);
+}
+.aviso-cadastro strong { display: block; font-size: 14px; color: var(--atencao); }
+.aviso-cadastro > p {
+  margin: 4px 0 10px; font-size: 12.5px; color: var(--suave); max-width: 64ch;
+}
+.aviso-cadastro ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.aviso-cadastro li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  font-size: 13px;
+}
+.aviso-cadastro li .botao-texto,
+.aviso-cadastro li .susep {
+  font-family: var(--fonte-dado); font-weight: 600; padding: 0;
+}
+.aviso-cadastro li .nos-casos { color: var(--suave); font-size: 12.5px; }
+.aviso-cadastro li .quantos {
+  margin-left: auto; color: var(--tenue); font-size: 12px; white-space: nowrap;
+}
+
+/* A tela de corretoras usa a moldura de Configurações, mas sem o submenu:
+   a lista ocupa as duas primeiras colunas e o painel fica na terceira. */
+#corretoras { grid-template-columns: minmax(0, 1fr) 340px; }
+@media (max-width: 900px) {
+  #corretoras { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
   .lateral {

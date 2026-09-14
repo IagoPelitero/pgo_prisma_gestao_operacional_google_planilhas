@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 9 de 12 etapas construídas · 247 testes passando.
+**Estado geral:** 10 de 12 etapas construídas · 269 testes passando.
 
 ---
 
@@ -24,7 +24,7 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 7 | Buscar Caso | ✅ pronta | 17 |
 | 8 | Painel Analítico | ✅ pronta | 24 |
 | 9 | Minha Performance | ✅ pronta | 19 |
-| 10 | Tabela de Corretoras | ⏳ | — |
+| 10 | Tabela de Corretoras | ✅ pronta | 22 |
 | 11 | Abas de análise | ⏳ | — |
 | 12 | Diagnóstico | ⏳ | — |
 
@@ -468,6 +468,54 @@ e ela não pode virar log de sistema.
 cópias — pela razão que já custou caro aqui: regra copiada em dois lugares é
 regra que um dia diverge, e num gráfico a divergência não dá erro. Vira uma
 barra um pouco mais alta do que devia.
+
+---
+
+## Etapa 10 — Tabela de Corretoras ✅
+
+**Três cadastros que sustentam o resto do sistema e que, até aqui, só se
+ajustavam abrindo a planilha.**
+
+`Back-End/Corretoras.gs` e `Front-End/TabelaCorretoras.html`, 22 testes.
+
+| Aba | O que é |
+|---|---|
+| **Corretoras e canais** | `CANAIS` — quem traz o caso, com o segmento |
+| **Produtos** | `PRODUTOS` — o código é único, porque é ele que liga ao caso |
+| **SUSEPs bloqueadas** | `SUSEP_BLOQUEADAS` — com o motivo, obrigatório |
+
+### O que faz a tela valer mais que uma lista
+
+**O volume ao lado de cada corretora.** Uma tabela de corretoras sem volume é
+uma agenda telefônica; com ele, responde "quem me dá trabalho" — e a lista vem
+ordenada por isso, não por ordem alfabética.
+
+**E o aviso das SUSEPs fora do cadastro.** Esse é o achado. Enquanto uma SUSEP
+não está em `CANAIS`, o selo do formulário diz "não encontrada" toda vez que
+alguém a digita — e o sintoma aparece *na outra tela*, uma pessoa de cada vez,
+sem ninguém ligar à causa. Aqui elas aparecem juntas, com quantos casos cada
+uma já trouxe e o nome que os próprios casos usam, e cadastrar é um clique.
+
+Uma SUSEP **bloqueada** não entra nessa lista: ela é conhecida, e o selo mostra
+o bloqueio, não "não encontrada". Aviso que não bate com o que a pessoa vê na
+outra tela é aviso que a operação aprende a ignorar.
+
+### Três decisões
+
+- **"Não encontrado" é atenção, não erro.** Cadastro incompleto não é corretora
+  irregular; pintar de vermelho faria a operação achar que há problema com quem
+  trouxe o caso
+- **Bloquear não impede cadastrar.** O formulário mostra o selo vermelho com o
+  motivo, e quem atende decide. Bloqueio que impedisse faria a pessoa registrar
+  o caso num caderno, e o sistema perderia o caso de vista
+- **O motivo do bloqueio é obrigatório.** Quem vir o selo vermelho daqui a seis
+  meses precisa saber o que fazer com a informação
+
+### A trava do cadastro
+
+Duas corretoras com a mesma SUSEP são recusadas: o selo escolheria uma delas
+pela ordem da planilha, que ninguém controla. O mesmo vale para o código do
+produto.
 
 ---
 
