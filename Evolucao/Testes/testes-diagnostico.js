@@ -597,6 +597,60 @@ function rodarTestesDeDiagnostico() {
     igual(quebrados.join(' | '), '', 'telas com erro de sintaxe');
   });
 
+  secao('O pacote de três arquivos');
+
+  teste('o pacote junta tudo, e nada fica de fora', () => {
+    // 35 arquivos para criar à mão no Apps Script, e basta UM ficar para trás
+    // para a tela congelar num "Lendo o cadastro…" que não explica nada. Já
+    // aconteceu duas vezes aqui — os achados 25 e 27.
+    const raiz = path.join(__dirname, '..', '..');
+    const destino = path.join(raiz, 'Evolucao', 'pacote');
+    require('./gerar-pacote').gerar(destino);
+
+    const codigo = fs.readFileSync(path.join(destino, 'Codigo.gs'), 'utf8');
+    const index = fs.readFileSync(path.join(destino, 'Index.html'), 'utf8');
+
+    // Toda função do servidor está no Codigo.gs.
+    fs.readdirSync(path.join(raiz, 'Back-End'))
+      .filter((n) => n.endsWith('.gs'))
+      .forEach((arquivo) => {
+        const fonte = fs.readFileSync(path.join(raiz, 'Back-End', arquivo), 'utf8');
+        (fonte.match(/^function ([A-Za-z0-9_]+)\s*\(/gm) || []).forEach((achado) => {
+          const nome = achado.replace(/^function /, '').replace(/\s*\($/, '');
+          verdadeiro(codigo.indexOf('function ' + nome + '(') >= 0,
+            arquivo + ': a função ' + nome + ' não entrou no pacote');
+        });
+      });
+
+    // Toda tela que o Index incluía está colada dentro dele.
+    const original = fs.readFileSync(path.join(raiz, 'Front-End', 'Index.html'), 'utf8');
+    (original.match(/incluir\('([A-Za-z0-9_]+)'\)/g) || []).forEach((achado) => {
+      const nome = achado.replace("incluir('", '').replace("')", '');
+      const tela = fs.readFileSync(
+        path.join(raiz, 'Front-End', nome + '.html'), 'utf8').trim();
+      // Um pedaço do meio, para não casar por acaso com o comentário do nome.
+      const meio = tela.substring(Math.floor(tela.length / 2),
+        Math.floor(tela.length / 2) + 80);
+      verdadeiro(index.indexOf(meio) >= 0, nome + ' não foi colado no Index');
+    });
+
+    // E não sobrou nenhum incluir() sem resolver.
+    igual((index.match(/incluir\('/g) || []).length, 0,
+      'sobrou inclusão no Index do pacote');
+
+    // Os scriptlets de identidade FICAM: o Apps Script os avalia ao servir.
+    contem(index, '<?= identidade.nome ?>');
+  });
+
+  teste('o pacote traz o passo a passo, com o aviso dos nomes', () => {
+    const destino = path.join(__dirname, '..', 'pacote');
+    const comoUsar = fs.readFileSync(path.join(destino, 'COMO-USAR.txt'), 'utf8');
+    contem(comoUsar, 'sem extensão',
+      'o erro de nomear "Index.html" em vez de "Index" é metade dos casos');
+    contem(comoUsar, 'instalarRECC');
+    contem(comoUsar, 'diagnosticoRECC');
+  });
+
   secao('Quando a estilização "desconfigura"');
 
   teste('Estilos antigo no projeto: o laudo diz as classes que faltam', () => {

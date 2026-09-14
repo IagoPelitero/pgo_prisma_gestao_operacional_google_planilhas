@@ -80,7 +80,31 @@ Dentro de `Evolucao/`:
    Apps Script vinculado a ela.
 
 2. Copie os arquivos. **O projeto do Apps Script não tem pastas** — as daqui
-   são organização do repositório:
+   são organização do repositório. Há dois caminhos:
+
+   ### O caminho curto: três arquivos
+
+   A pasta **[`Evolucao/pacote/`](Evolucao/pacote/)** tem o sistema inteiro
+   junto, pronto para colar:
+
+   | Cole este | Num arquivo chamado | Que é |
+   |---|---|---|
+   | `Codigo.gs` | `Codigo` (arquivo **.gs**) | os 18 arquivos do servidor |
+   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto com as 15 telas dentro |
+   | `SemAcesso.html` | `SemAcesso` (arquivo **HTML**) | a tela de acesso negado |
+
+   **Atenção ao nome:** no Apps Script o arquivo se chama `Index`, e não
+   `Index.html` — sem extensão, sem acento, com as maiúsculas iguais.
+
+   > O pacote é **gerado**, não escrito à mão: `node
+   > Evolucao/Testes/gerar-pacote.js`. O teste ponta a ponta roda contra ele e
+   > contra os 35 arquivos, e cobra que os dois se comportem igual — senão
+   > haveria duas verdades, e a que a operação usa seria a que ninguém testa.
+
+   ### O caminho longo: arquivo por arquivo
+
+   Vale quando você vai mexer no código: cada arquivo fica separado por
+   assunto, como no repositório.
 
    | Aqui | No editor do Apps Script |
    |---|---|
@@ -88,8 +112,22 @@ Dentro de `Evolucao/`:
    | `Front-End/Index.html` | `Index.html` |
    | `Evolucao/` | **não vai** |
 
-   A ordem da cópia não importa: o Apps Script avalia os `.gs` em ordem
-   alfabética, e nenhum arquivo tem código de topo que dependa de outro.
+   São 35 arquivos, e basta **um** ficar para trás para uma tela congelar
+   numa mensagem de carregamento. A ordem não importa: o Apps Script avalia os
+   `.gs` em ordem alfabética, e nenhum tem código de topo que dependa de outro.
+
+   ### O caminho de quem tem terminal: `clasp`
+
+   O `clasp` é a ferramenta oficial do Google e evita a cópia manual por
+   completo — os 35 arquivos sobem de uma vez, e sobem de novo a cada mudança:
+
+   ```bash
+   npm install -g @google/clasp
+   clasp login
+   clasp clone <id-do-projeto>   # o id está em Configurações do projeto
+   # copie Back-End/*.gs e Front-End/*.html para a pasta clonada
+   clasp push
+   ```
 
 3. Publique como **aplicativo da web** (executar como você).
 

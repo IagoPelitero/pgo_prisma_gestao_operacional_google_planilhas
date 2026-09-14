@@ -19,7 +19,13 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
+/*
+  De onde o HtmlService lê as telas. Normalmente é a pasta do repositório; o
+  teste ponta a ponta aponta para o PACOTE, e assim as mesmas conferências
+  rodam contra os 3 arquivos que a operação vai colar no Apps Script.
+*/
+const PASTA_DAS_TELAS = process.env.PGO_PASTA_DAS_TELAS
+  || path.join(__dirname, '..', '..', 'Front-End');
 const PARECE_NUMERO = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
 /**

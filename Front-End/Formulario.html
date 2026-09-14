@@ -61,6 +61,17 @@ var Formulario = (function () {
   function desenharCampo(campo, prefixo) {
     var id = prefixo + 'campo-' + campo.chave;
     var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
+    /*
+      O asterisco é VISUAL. Quem usa leitor de tela não o ouve como "campo
+      obrigatório" — ouve "asterisco", ou nada. `aria-required` é o que diz
+      isso de verdade, e custa um atributo.
+
+      Não é `required` do HTML: o formulário é `novalidate` de propósito,
+      porque quem valida é o servidor, e o balão nativo do navegador
+      atropelaria a nossa mensagem — que é mais específica e diz o que fazer.
+      `aria-required` anuncia sem impedir o envio.
+    */
+    var exigido = campo.obrigatorio ? ' aria-required="true"' : '';
     var travado = campo.somenteLeitura ? ' disabled' : '';
     var controle;
 
@@ -69,7 +80,8 @@ var Formulario = (function () {
     if (campo.tipo === 'seletor' && !campo.opcoes.length) {
       controle = '<input type="text" id="' + id + '"'
         + ' data-chave="' + escapar(campo.chave) + '" autocomplete="off"'
-        + ' placeholder="A lista ainda está vazia — digite o valor"' + travado + '>';
+        + ' placeholder="A lista ainda está vazia — digite o valor"'
+        + exigido + travado + '>';
 
     } else if (campo.tipo === 'seletor') {
       var opcoes = ['<option value="">Selecione uma opção</option>'];
@@ -78,17 +90,17 @@ var Formulario = (function () {
           + escapar(opcao.rotulo) + '</option>');
       });
       controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
-        + travado + '>' + opcoes.join('') + '</select>';
+        + exigido + travado + '>' + opcoes.join('') + '</select>';
 
     } else if (campo.tipo === 'simOuNao') {
       controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
-        + travado + '>'
+        + exigido + travado + '>'
         + '<option value="">Selecione</option>'
         + '<option value="SIM">Sim</option>'
         + '<option value="NAO">Não</option></select>';
 
     } else if (campo.tipo === 'textoLongo') {
-      controle = '<textarea id="' + id + '" rows="3"'
+      controle = '<textarea id="' + id + '" rows="3"' + exigido
         + ' data-chave="' + escapar(campo.chave) + '"' + travado + '></textarea>';
 
     } else {
@@ -103,7 +115,7 @@ var Formulario = (function () {
         + ' data-chave="' + escapar(campo.chave) + '"'
         + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
         + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
-        + ' autocomplete="off"' + travado + '>';
+        + ' autocomplete="off"' + exigido + travado + '>';
     }
 
     var ajuda = campo.descricao

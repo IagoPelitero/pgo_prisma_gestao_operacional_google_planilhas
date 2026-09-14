@@ -970,6 +970,64 @@ repositório: `.ver` era classe morta em três telas, e `.config-mesas` e
 
 ---
 
+## Ponta a ponta, e o pacote de três arquivos
+
+### O buraco que faltava
+
+A suíte provava o **servidor**. A prévia mostrava a **tela** — mas recusa toda
+gravação, de propósito, para não fingir ter gravado o que não gravou.
+Resultado: o caminho mais importante do sistema nunca era exercitado inteiro:
+
+> formulário preenchido → servidor grava → planilha muda → tela recarrega
+
+E é ali que moram os defeitos que nenhum dos dois lados enxerga: o campo que a
+tela chama de `nivel` e o servidor espera como `nivelAcessoId`, a caixa de
+marcar que volta como texto, o id que mudou num lado e não no outro.
+
+```bash
+node Evolucao/Testes/ponta-a-ponta.js
+```
+
+A página é gerada pelo `doGet` **de verdade**. No navegador,
+`google.script.run` é substituído por uma ponte que devolve a chamada para o
+Node, onde o servidor roda no simulador. Os valores atravessam em JSON, que é
+exatamente o que o Apps Script faz — `Date` vira texto, `undefined` some.
+
+DOM de verdade, servidor de verdade, planilha que se comporta como a de
+verdade. Seis percursos: a aba Usuários carregando, cadastrar, editar,
+desativar, e-mail repetido recusado, e cadastrar um caso.
+
+**Achado de passagem:** o asterisco do campo obrigatório era só visual. Quem
+usa leitor de tela ouvia "asterisco", ou nada. Agora os campos levam
+`aria-required` — não `required`, porque o formulário é `novalidate` de
+propósito: quem valida é o servidor, com mensagem melhor que o balão nativo.
+
+### Os 35 arquivos viraram 3
+
+```bash
+node Evolucao/Testes/gerar-pacote.js
+```
+
+O repositório tem 18 `.gs` e 17 `.html`, separados por assunto — e é assim que
+tem de ser para alguém conseguir ler e consertar. Mas o Apps Script não tem
+"importar pasta": cada um vira um arquivo criado à mão, com o nome digitado
+certo. Trinta e cinco vezes. E o custo não é o tempo: **basta um ficar para
+trás** para a tela congelar num "Lendo o cadastro…" que não explica nada — já
+aconteceu duas vezes aqui, nos [achados 25 e 27](04-bugs-capturados.md).
+
+`Evolucao/pacote/` tem três arquivos: `Codigo.gs` (os 18 do servidor),
+`Index.html` (o esqueleto com as 15 telas coladas dentro), `SemAcesso.html`.
+Mais um `COMO-USAR.txt`.
+
+> **O pacote é testado como o original.** O ponta a ponta roda duas vezes —
+> contra os 35 arquivos e contra os 3 — e cobra que se comportem igual. Se
+> divergissem, haveria duas verdades, e a que a operação usa seria a que
+> ninguém testa.
+
+**372 testes.**
+
+---
+
 ## Responsividade
 
 Uma conferência à parte, num navegador de verdade:
