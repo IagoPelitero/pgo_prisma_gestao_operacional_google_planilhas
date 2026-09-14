@@ -513,6 +513,81 @@ chegaria perto deles.
 
 ---
 
+### 28 · Dois mil idas ao PropertiesService para gravar cinco mil linhas
+
+**Sintoma.** No teste de estresse, gravar 5.000 casos de uma vez custava
+**10.003 idas ao serviço** — duas por linha — e uns **dois minutos** dentro de
+uma execução que tem seis. A importação de 2.000 corretoras levava 48 segundos.
+
+**Causa.** `proximoIdentificador_` era chamada **por linha**, e cada chamada
+fazia uma leitura e uma gravação no `PropertiesService`. No Apps Script cada
+ida dessas custa dezenas de milissegundos: o trabalho de verdade era rápido, e
+o pedágio consumia tudo.
+
+**Defesa.** `proximosIdentificadores_(aba, quantos)` reserva o **bloco
+inteiro** numa ida só: uma leitura, uma gravação, para cinco mil linhas ou para
+uma. `proximoIdentificador_` virou o bloco de tamanho um — não existem duas
+regras. Gravar 5.000 casos passou de 10.003 idas para **5**; a importação de
+2.000, de 48 segundos para **445 ms**.
+
+Se a gravação estourar no meio, os Ids reservados se perdem e a numeração fica
+com buraco. É o que tem de acontecer: buraco não quebra nada, Id reemitido
+quebra tudo — e foi o que aconteceu no PGO 5.x.
+
+---
+
+### 29 · Cem idas ao serviço para uma busca de cem resultados
+
+**Sintoma.** `lerLinhasEspecificas_` — a segunda metade da busca, que lê as
+linhas inteiras depois de a primeira ter achado em quais elas estão — fazia
+**uma ida por linha**. Com o teto de 100 resultados, uma busca comum custava
+cem idas: dois segundos e meio de pedágio na tela que a operação mais usa.
+
+**Defesa.** Agrupar. Os números de linha viram BLOCOS contínuos, tolerando
+buracos de até 50 linhas — porque ler cinquenta linhas à toa custa menos de um
+décimo de milissegundo, e outra ida custa 25. Uma busca cujos resultados caem
+perto sai numa leitura só.
+
+A ordem de saída continua sendo a **pedida**, e não a da planilha: quem chamou
+já ordenou por relevância, e reordenar aqui desfaria isso em silêncio.
+
+---
+
+### 30 · O painel mostrava um pedaço e parecia o total
+
+**Sintoma.** Este não é lentidão: é **número errado**, e é o achado mais grave
+do teste de estresse.
+
+Os painéis leem só as últimas 5.000 linhas da base — de propósito, e está
+documentado. Com 200 mil casos espalhados em um ano, uma janela de 30 dias tem
+umas **15 mil linhas**: o painel mostrava **um terço do período**.
+
+O Dashboard avisava — mas o aviso estava colado na FILA, dizendo "a fila mostra
+as N mais recentes", o que dá a entender que os **cartões** em cima estavam
+completos. E eles não estavam: saem do mesmo recorte.
+
+O **Painel Analítico** calculava `truncada` e **nunca mostrava**. A **Minha
+Performance** nem calculava — e é a tela sobre uma PESSOA, onde número
+incompleto vira julgamento errado sobre alguém.
+
+**Defesa.** Quatro:
+
+1. `minhaPerformance` passou a calcular `truncada`, e as três telas devolvem
+   também **quantas linhas leram**, para o aviso ser concreto.
+2. Um aviso só, em `Moldura.avisoDeJanela`, usado pelas três. Três frases
+   diferentes para o mesmo fato é como a operação aprende que uma delas não é
+   séria.
+3. Ele fica **no alto**, antes dos números. Depois, ele explicaria um número
+   que a pessoa já leu como se fosse o total.
+4. A janela virou configurável — `OPERACAO.LINHAS_DO_PAINEL` —, e o aviso diz
+   onde mexer. "Os números podem estar incompletos" sozinho não ajuda ninguém.
+
+**O que ele ensina.** Um recorte documentado no código não é um recorte
+comunicado a quem lê o número. O comentário estava lá, correto, desde o
+começo — e a tela continuava mentindo por omissão.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
@@ -557,3 +632,11 @@ Daí as duas práticas que o projeto não abre mão:
     aparecem quando alguém desiste no meio — e é o que as pessoas fazem o dia
     inteiro. Um roteiro que percorre as telas clicando em tudo achou os dois
     em dois minutos.
+11. **Volume não é só lentidão.** Os itens 28 e 29 eram tempo, e teriam
+    aparecido no primeiro dia ruim. O 30 era NÚMERO ERRADO, e não apareceria
+    nunca: a tela mostrava um terço do período com a cara de quem mostra
+    tudo. Um sistema que fica lento avisa sozinho; um que fica errado, não.
+12. **Medir o relógio errado não mede nada.** No Apps Script o custo é a IDA
+    ao serviço, não a conta em JavaScript. Os itens 28 e 29 eram invisíveis no
+    relógio do Node — o Node não paga pedágio. Contar as idas mostrou os dois
+    na primeira execução.

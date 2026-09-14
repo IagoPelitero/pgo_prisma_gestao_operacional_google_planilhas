@@ -60,7 +60,10 @@ var TelaPainelAnalitico = (function () {
   }
 
   function desenhar() {
+    // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
+    // número que a pessoa já leu como se fosse o total.
     elemento('analitico').innerHTML = desenharFiltros()
+      + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
           + painel.componentes.map(desenharComponente).join('') + '</div>'

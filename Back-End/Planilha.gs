@@ -468,13 +468,73 @@ function lerColunaInteira_(nomeDaAba, cabecalho) {
 }
 
 /** Lê só as linhas indicadas (números de linha da planilha). */
+/**
+ * Até quantas linhas sem interesse vale a pena ler para não pagar outra ida.
+ *
+ * A conta é direta: uma ida ao serviço de planilha custa uns 25 ms, e ler uma
+ * linha a mais custa a transferência de umas 39 células — menos de um décimo
+ * de milissegundo. Ler cinquenta linhas à toa sai muito mais barato do que
+ * atravessar a fronteira de novo.
+ */
+var RECC_BURACO_QUE_VALE_PULAR = 50;
+
+/**
+ * Junta os números de linha em BLOCOS contínuos, tolerando buracos pequenos.
+ *
+ * [12, 13, 14, 900, 901] com tolerância 50 vira dois blocos: 12–14 e 900–901.
+ * [12, 30, 40] vira um só: 12–40, porque ler as 27 linhas do meio é mais
+ * barato que duas idas a mais.
+ */
+function blocosDeLinhas_(numerosDeLinha) {
+  var ordenados = numerosDeLinha.slice().sort(function (um, outro) {
+    return um - outro;
+  });
+  var blocos = [];
+  for (var i = 0; i < ordenados.length; i++) {
+    var ultimo = blocos.length ? blocos[blocos.length - 1] : null;
+    if (ultimo && ordenados[i] - ultimo.fim <= RECC_BURACO_QUE_VALE_PULAR) {
+      ultimo.fim = ordenados[i];
+    } else {
+      blocos.push({ inicio: ordenados[i], fim: ordenados[i] });
+    }
+  }
+  return blocos;
+}
+
+/**
+ * Lê linhas escolhidas, agrupadas em blocos.
+ *
+ * É a segunda metade da busca: a primeira leu só as colunas de procura e
+ * anotou em QUAIS linhas o termo apareceu; esta lê essas linhas inteiras.
+ *
+ * Uma ida por linha era o que fazia antes, e com o limite de 100 resultados
+ * isso eram cem idas ao serviço — dois segundos e meio de pedágio numa tela
+ * que a operação usa o dia inteiro. Agrupando, uma busca de cem resultados
+ * que caem perto costuma sair numa ida só.
+ *
+ * A ordem de saída é a ordem PEDIDA, e não a da planilha: quem chamou já
+ * ordenou por relevância, e reordenar aqui desfaria isso em silêncio.
+ */
 function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
+  if (!numerosDeLinha || !numerosDeLinha.length) return [];
+
   var estrutura = estruturaDaAba_(nomeDaAba);
+  var largura = estrutura.cabecalhos.length;
+  var porLinha = {};
+
+  blocosDeLinhas_(numerosDeLinha).forEach(function (bloco) {
+    var quantas = bloco.fim - bloco.inicio + 1;
+    var valores = estrutura.aba
+      .getRange(bloco.inicio, 1, quantas, largura).getValues();
+    for (var i = 0; i < valores.length; i++) {
+      porLinha[bloco.inicio + i] = valores[i];
+    }
+  });
+
   var saida = [];
-  for (var i = 0; i < numerosDeLinha.length; i++) {
-    var n = numerosDeLinha[i];
-    var valores = estrutura.aba.getRange(n, 1, 1, estrutura.cabecalhos.length).getValues()[0];
-    saida.push(montarRegistro_(estrutura, valores, n));
+  for (var j = 0; j < numerosDeLinha.length; j++) {
+    var n = numerosDeLinha[j];
+    if (porLinha[n]) saida.push(montarRegistro_(estrutura, porLinha[n], n));
   }
   return saida;
 }
@@ -612,6 +672,21 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
     var temControle = posicaoDaColuna_(estrutura, '_Visivel') >= 0;
     var iId = posicaoDaColuna_(estrutura, 'Id');
 
+    // Quantas linhas precisam de Id novo — algumas já vêm com um. O bloco é
+    // reservado numa ida só ao PropertiesService, e não uma por linha: com uma
+    // por linha, gravar cinco mil casos eram dez mil idas e dois minutos de
+    // pedágio dentro de uma execução que tem seis.
+    var precisamDeId = 0;
+    if (iId >= 0) {
+      for (var p = 0; p < lista.length; p++) {
+        if (!converterParaIdentificador_(lista[p][estrutura.cabecalhos[iId]])) {
+          precisamDeId++;
+        }
+      }
+    }
+    var idsReservados = proximosIdentificadores_(nomeDaAba, precisamDeId);
+    var proximoDoBloco = 0;
+
     var linhas = [];
     var gravados = [];
     for (var i = 0; i < lista.length; i++) {
@@ -621,7 +696,8 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
       if (iId >= 0) {
         var idInformado = converterParaIdentificador_(dados[estrutura.cabecalhos[iId]]);
         if (!idInformado) {
-          dados[estrutura.cabecalhos[iId]] = proximoIdentificador_(nomeDaAba);
+          dados[estrutura.cabecalhos[iId]] = idsReservados[proximoDoBloco];
+          proximoDoBloco++;
         }
       }
       if (temControle) {

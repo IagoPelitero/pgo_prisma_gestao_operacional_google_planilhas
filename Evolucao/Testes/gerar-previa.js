@@ -711,6 +711,16 @@ function gerar(pastaDeSaida) {
     performance[mesa.id] = chamar('minhaPerformance')(mesa.id, 30);
   });
 
+  // Uma das mesas da prévia mostra o aviso de janela parcial, para ele poder
+  // ser VISTO. Sem isto, o aviso mais importante do sistema em volume alto
+  // seria o único pedaço que ninguém consegue olhar antes de a base crescer.
+  const mesaDoAviso = pacote.mesas[0].id;
+  [paineis, analitico.paineis, performance].forEach(() => {});
+  performance[mesaDoAviso].truncada = true;
+  performance[mesaDoAviso].linhasLidas = 5000;
+  analitico.paineis[mesaDoAviso].truncada = true;
+  analitico.paineis[mesaDoAviso].linhasLidas = 5000;
+
   // A Tabela de Corretoras, com alguns filtros já respondidos.
   const tabelasDeCorretoras = { '|': chamar('tabelaDeCorretoras')('', '') };
   tabelasDeCorretoras['|'].segmentos.forEach((seg) => {

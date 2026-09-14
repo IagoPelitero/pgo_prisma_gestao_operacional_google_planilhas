@@ -98,6 +98,8 @@ class Faixa {
   getRow() { return this.linha; }
   getColumn() { return this.coluna; }
   getValues() {
+    medidor.idasParaLer++;
+    medidor.celulasLidas += this.nLinhas * this.nColunas;
     const saida = [];
     for (let i = 0; i < this.nLinhas; i++) {
       const linha = [];
@@ -110,6 +112,8 @@ class Faixa {
   }
   getValue() { return this.getValues()[0][0]; }
   setValues(matriz) {
+    medidor.idasParaGravar++;
+    medidor.celulasGravadas += this.nLinhas * this.nColunas;
     for (let i = 0; i < this.nLinhas; i++) {
       for (let j = 0; j < this.nColunas; j++) {
         const l = this.linha - 1 + i;
@@ -139,6 +143,7 @@ class Faixa {
     return this;
   }
   setNumberFormats(matriz) {
+    medidor.idasParaGravar++;
     for (let i = 0; i < this.nLinhas; i++) {
       for (let j = 0; j < this.nColunas; j++) {
         this.aba.formatos[this.linha - 1 + i][this.coluna - 1 + j] = matriz[i][j];
@@ -147,6 +152,8 @@ class Faixa {
     return this;
   }
   getNumberFormats() {
+    medidor.idasParaLer++;
+    medidor.celulasLidas += this.nLinhas * this.nColunas;
     const saida = [];
     for (let i = 0; i < this.nLinhas; i++) {
       const linha = [];
@@ -182,6 +189,7 @@ class Aba {
   getMaxRows() { return this.valores.length; }
   getMaxColumns() { return this.valores[0] ? this.valores[0].length : 0; }
   getRange(l, c, nl = 1, nc = 1) {
+    medidor.faixasPedidas++;
     if (l + nl - 1 > this.getMaxRows() || c + nc - 1 > this.getMaxColumns()) {
       throw new Error('Fora da grade: ' + this.nome + ' (' + l + ',' + c +
         ' por ' + nl + 'x' + nc + ') — grade ' + this.getMaxRows() + 'x' +
@@ -210,10 +218,14 @@ class Aba {
   setFrozenRows(n) { this.congeladas = n; return this; }
   insertRowsAfter(depois, quantas) {
     const largura = this.getMaxColumns();
-    for (let i = 0; i < quantas; i++) {
-      this.valores.splice(depois + i, 0, new Array(largura).fill(''));
-      this.formatos.splice(depois + i, 0, new Array(largura).fill(''));
-    }
+    // Um splice só, e não `quantas` splices: inserir 200 mil linhas uma a uma
+    // é O(n²) e travaria o teste de estresse sem dizer nada sobre o produto.
+    const novasValores = Array.from({ length: quantas },
+      () => new Array(largura).fill(''));
+    const novasFormatos = Array.from({ length: quantas },
+      () => new Array(largura).fill(''));
+    this.valores.splice(depois, 0, ...novasValores);
+    this.formatos.splice(depois, 0, ...novasFormatos);
     return this;
   }
   deleteRows(inicio, quantas) {
@@ -239,6 +251,48 @@ class Aba {
     return this;
   }
 }
+
+/**
+ * O MEDIDOR.
+ *
+ * No Apps Script o que custa não é a conta em JavaScript: é cada ida ao
+ * serviço de planilha e ao de propriedades. Uma chamada dessas leva dezenas de
+ * milissegundos, e a execução inteira tem seis minutos. Medir o RELÓGIO do
+ * Node não diz nada sobre isso — medir as IDAS diz tudo.
+ *
+ * Fica sempre ligado: um contador que só incrementa não pesa, e ligar só no
+ * teste de estresse daria números diferentes dos do dia a dia.
+ */
+const medidor = {
+  celulasLidas: 0,
+  celulasGravadas: 0,
+  idasParaLer: 0,
+  idasParaGravar: 0,
+  faixasPedidas: 0,
+  propriedadesLidas: 0,
+  propriedadesGravadas: 0,
+  travasPedidas: 0,
+  zerar() {
+    this.celulasLidas = 0; this.celulasGravadas = 0;
+    this.idasParaLer = 0; this.idasParaGravar = 0; this.faixasPedidas = 0;
+    this.propriedadesLidas = 0; this.propriedadesGravadas = 0;
+    this.travasPedidas = 0;
+    return this;
+  },
+  retrato() {
+    return {
+      celulasLidas: this.celulasLidas, celulasGravadas: this.celulasGravadas,
+      idasParaLer: this.idasParaLer, idasParaGravar: this.idasParaGravar,
+      faixasPedidas: this.faixasPedidas,
+      propriedadesLidas: this.propriedadesLidas,
+      propriedadesGravadas: this.propriedadesGravadas,
+      travasPedidas: this.travasPedidas,
+      // O que o Apps Script realmente cobra: cada ida ao serviço.
+      idasNoTotal: this.idasParaLer + this.idasParaGravar
+        + this.propriedadesLidas + this.propriedadesGravadas
+    };
+  }
+};
 
 class Planilha {
   constructor() { this.abas = []; this.fuso = 'Etc/GMT'; }
@@ -277,6 +331,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   }
 
   const ambiente = {
+    medidor,
     planilha,
     propriedades,
     propriedadesDoUsuario,
@@ -314,8 +369,14 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       },
       PropertiesService: {
         getScriptProperties: () => ({
-          getProperty: (k) => (propriedades.has(k) ? propriedades.get(k) : null),
-          setProperty: (k, v) => { propriedades.set(k, String(v)); },
+          getProperty: (k) => {
+            medidor.propriedadesLidas++;
+            return propriedades.has(k) ? propriedades.get(k) : null;
+          },
+          setProperty: (k, v) => {
+            medidor.propriedadesGravadas++;
+            propriedades.set(k, String(v));
+          },
           deleteProperty: (k) => { propriedades.delete(k); }
         }),
         getUserProperties: () => ({
@@ -355,7 +416,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       },
       LockService: {
         getScriptLock: () => ({
-          tryLock: () => true,
+          tryLock: () => { medidor.travasPedidas++; return true; },
           waitLock: () => true,
           releaseLock: () => {}
         })
@@ -406,4 +467,4 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   return ambiente;
 }
 
-module.exports = { criarAmbienteFalso, converterComoOPlanilhas };
+module.exports = { medidor, criarAmbienteFalso, converterComoOPlanilhas };

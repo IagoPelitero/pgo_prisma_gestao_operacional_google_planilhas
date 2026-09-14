@@ -70,6 +70,7 @@ var TelaMinhaPerformance = (function () {
     }
 
     elemento('performance').innerHTML = desenharCabeca()
+      + Moldura.avisoDeJanela(dados, 'Estes números')
       + desenharIndicadores()
       + desenharMeta()
       + '<div class="graficos">'

@@ -405,6 +405,79 @@ function rodarTestesDeDiagnostico() {
     contem(oDaRota.oQue, 'têm rota');
   });
 
+  secao('Quando o painel lê só uma parte da base');
+
+  teste('as três telas dizem que leram só uma parte, e não deixam calado', () => {
+    // Achado do teste de estresse. Com muito volume, os painéis leem só as
+    // últimas N linhas — e o Painel Analítico calculava esse "truncada" e
+    // NUNCA mostrava, enquanto Minha Performance nem calculava. Numa base de
+    // 200 mil casos, o gráfico mostrava um pedaço e parecia o total.
+    const { chamar } = instalacaoNova();
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+
+    // Uma janela minúscula, para caber no teste: o efeito é o mesmo que 5.000
+    // numa base de 200 mil.
+    chamar('gravarConfiguracao_')('OPERACAO.LINHAS_DO_PAINEL', '3');
+
+    const hoje = new Date();
+    const data = ('0' + hoje.getDate()).slice(-2) + '/'
+      + ('0' + (hoje.getMonth() + 1)).slice(-2) + '/' + hoje.getFullYear();
+    const casos = [];
+    for (let i = 0; i < 8; i++) {
+      casos.push({
+        'data de recepção do protocolo': data,
+        'analista': 'Primeiro Adm',
+        'status': 'Pendente',
+        'nome do cliente': 'Cliente ' + i
+      });
+    }
+    chamar('inserirVariosRegistros_')('BASE_RET', casos);
+
+    igual(chamar('resumoDaMesa')(ret.id, {}).truncada, true, 'Dashboard');
+    igual(chamar('painelAnalitico')(ret.id, {}, 30).truncada, true,
+      'Painel Analítico');
+    igual(chamar('minhaPerformance')(ret.id, 30).truncada, true,
+      'Minha Performance');
+
+    // E cada uma diz QUANTAS leu, para o aviso ser concreto em vez de vago.
+    igual(chamar('painelAnalitico')(ret.id, {}, 30).linhasLidas, 3);
+    igual(chamar('minhaPerformance')(ret.id, 30).linhasLidas, 3);
+  });
+
+  teste('com a base pequena, nenhuma tela avisa nada', () => {
+    // Aviso que aparece sempre é aviso que ninguém lê.
+    const { chamar } = instalacaoNova();
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    igual(chamar('resumoDaMesa')(ret.id, {}).truncada, false);
+    igual(chamar('painelAnalitico')(ret.id, {}, 30).truncada, false);
+    igual(chamar('minhaPerformance')(ret.id, 30).truncada, false);
+  });
+
+  teste('as três telas mostram o aviso, e pelo mesmo texto', () => {
+    // Três frases diferentes para o mesmo fato é como a operação aprende que
+    // uma delas não é séria.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    ['Dashboard.html', 'PainelAnalitico.html', 'MinhaPerformance.html']
+      .forEach((arquivo) => {
+        const tela = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
+        verdadeiro(tela.indexOf('Moldura.avisoDeJanela(') >= 0,
+          arquivo + ' não mostra o aviso de janela parcial');
+      });
+    const moldura = fs.readFileSync(path.join(pasta, 'Moldura.html'), 'utf8');
+    contem(moldura, 'OPERACAO.LINHAS_DO_PAINEL',
+      'o aviso diz onde aumentar a janela, e não só que o número é parcial');
+  });
+
+  teste('a janela é configurável, e o padrão continua 5.000', () => {
+    const { chamar } = instalacaoNova();
+    igual(chamar('linhasQueOPainelOlha_()'), 5000);
+    chamar('gravarConfiguracao_')('OPERACAO.LINHAS_DO_PAINEL', '25000');
+    igual(chamar('linhasQueOPainelOlha_()'), 25000);
+    // Lixo na chave não pode zerar o painel: cai no padrão.
+    chamar('gravarConfiguracao_')('OPERACAO.LINHAS_DO_PAINEL', 'sei lá');
+    igual(chamar('linhasQueOPainelOlha_()'), 5000);
+  });
+
   secao('O projeto do Apps Script');
 
   teste('nenhum .gs tem o mesmo nome de um .html', () => {

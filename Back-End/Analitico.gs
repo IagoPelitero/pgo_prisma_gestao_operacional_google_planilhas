@@ -60,8 +60,8 @@ function painelAnalitico(idDaMesa, filtros, dias) {
   var mesa = mesaPeloId_(idDaMesa);
 
   var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
-  var recentes = lerRegistros_(mesa.aba, { ultimas: RECC_LINHAS_QUE_O_PAINEL_OLHA });
-  var truncada = recentes.length === RECC_LINHAS_QUE_O_PAINEL_OLHA;
+  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  var truncada = recentes.length >= linhasQueOPainelOlha_();
 
   var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, janela, 0);
   var meus = filtrarPeloAlcance_(noPeriodo, mesa.aba, quem);
@@ -78,6 +78,7 @@ function painelAnalitico(idDaMesa, filtros, dias) {
     periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
     total: casos.length,
     truncada: truncada,
+    linhasLidas: recentes.length,
     filtrosDisponiveis: disponiveis,
     componentes: componentes,
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
@@ -411,7 +412,7 @@ function detalharComponente(idDaMesa, idDoComponente, chaveDoPonto, filtros, dia
   }
 
   var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
-  var recentes = lerRegistros_(mesa.aba, { ultimas: RECC_LINHAS_QUE_O_PAINEL_OLHA });
+  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
   var meus = filtrarPeloAlcance_(
     filtrarPeloPeriodo_(recentes, mesa, janela, 0), mesa.aba, quem);
   var casos = aplicarFiltros_(meus, filtrosDaMesa_(mesa, quem), filtros || {});

@@ -15,8 +15,27 @@
  * ============================================================================
  */
 
-/** Quantas linhas do fim da aba o painel olha antes de filtrar por data. */
-const RECC_LINHAS_QUE_O_PAINEL_OLHA = 5000;
+/**
+ * Quantas linhas do FIM da aba os painéis leem antes de filtrar por data.
+ *
+ * A base só acrescenta no fim, então o recente está nas últimas linhas: ler o
+ * fim e filtrar por data custa uma leitura só, em vez de percorrer tudo.
+ *
+ * O NÚMERO IMPORTA, E MUDA COM O VOLUME. Com 200 mil casos espalhados em um
+ * ano, uma janela de 30 dias tem umas 15 mil linhas — e 5.000 mostrariam um
+ * terço do período, calados. Por isso é configurável, e por isso toda tela que
+ * usa esta janela devolve `truncada` quando bate no teto.
+ *
+ * Ler 50 mil linhas por 39 colunas são 1,95 milhão de células, cerca de dois
+ * segundos: cabe. O que não cabe é ler a base inteira a cada abertura de tela.
+ */
+const RECC_LINHAS_DO_PAINEL_PADRAO = 5000;
+
+function linhasQueOPainelOlha_() {
+  var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
+  if (isFinite(declarado) && declarado > 0) return Math.floor(declarado);
+  return RECC_LINHAS_DO_PAINEL_PADRAO;
+}
 
 /**
  * As cores que uma situação pode ter, na coluna Cor da aba CATALOGO.
@@ -47,8 +66,8 @@ function resumoDaMesa(idDaMesa, filtros) {
   // A base só acrescenta no fim, então o recente está nas últimas linhas.
   // Ler por data exigiria percorrer tudo; ler o fim e depois filtrar por data
   // custa uma leitura só, e o `truncada` avisa quando a janela não coube.
-  var recentes = lerRegistros_(mesa.aba, { ultimas: RECC_LINHAS_QUE_O_PAINEL_OLHA });
-  var truncada = recentes.length === RECC_LINHAS_QUE_O_PAINEL_OLHA;
+  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  var truncada = recentes.length >= linhasQueOPainelOlha_();
 
   var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, dias, 0);
   var meus = filtrarPeloAlcance_(noPeriodo, mesa.aba, quem);

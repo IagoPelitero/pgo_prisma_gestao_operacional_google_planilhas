@@ -129,10 +129,6 @@ var TelaDashboard = (function () {
     }).join('');
 
     return '<div class="cartao sem-forro">'
-      + (resumo.truncada
-        ? '<p class="aviso-fila">A fila mostra as ' + resumo.fila.length
-          + ' mais recentes. Para o histórico completo, use Buscar Caso.</p>'
-        : '')
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
       + '<tbody>' + linhas + '</tbody></table></div></div>';
@@ -178,8 +174,12 @@ var TelaDashboard = (function () {
   }
 
   function desenharPainel() {
+    // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
+    // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
+    // na fila, dava a entender que os números em cima estavam completos.
     elemento('painel').innerHTML =
-      desenharCartoes() + desenharFiltros() + desenharFila();
+      Moldura.avisoDeJanela(resumo, 'Estes números e esta fila')
+      + desenharCartoes() + desenharFiltros() + desenharFila();
     ligarPainel();
   }
 

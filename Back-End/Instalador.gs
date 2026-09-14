@@ -351,6 +351,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       'Como a origem legada aparece nos resultados da busca.'),
     novaConfiguracao_('OPERACAO.JANELA_DIAS', '30',
       'Quantos dias a fila de trabalho carrega. Acima disso, use Buscar Caso.'),
+    novaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', '5000',
+      'Quantas linhas do fim da base os painéis leem antes de filtrar por '
+      + 'data. Com muito volume, 5.000 podem não cobrir a janela de dias — as '
+      + 'telas avisam quando isso acontece.'),
     novaConfiguracao_('OPERACAO.TEMA_PADRAO', 'padrao',
       'padrao | rosa | dark | brasil'),
     novaConfiguracao_('MENU.TITULOS', JSON.stringify({

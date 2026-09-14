@@ -860,6 +860,93 @@ de resposta atrasada só aparecem quando alguém clica rápido e desiste no meio
 
 ---
 
+## Teste de estresse — 200 mil casos
+
+```bash
+node Evolucao/Testes/estresse.js            # até 50 mil
+node Evolucao/Testes/estresse.js 200000     # o volume que a RET terá
+```
+
+### O que ele mede, e por que não é o relógio
+
+No Apps Script o que custa não é a conta em JavaScript: é cada **ida ao
+serviço** de planilha e de propriedades. Uma ida leva dezenas de
+milissegundos, e a execução inteira tem **seis minutos**. Medir o relógio do
+Node não diz nada sobre isso, porque o Node não paga o pedágio.
+
+Então o simulador conta idas, células lidas e gravadas, e o teste converte
+isso em tempo por uma régua conservadora: 25 ms por ida, 900 ms por milhão de
+células, 12 ms por propriedade. Não é exata, e não precisa ser — serve para
+dizer "cabe com folga", "apertado" ou "não cabe".
+
+### O que ele achou
+
+Três defeitos, e o terceiro não é lentidão.
+
+| achado | antes | depois |
+|---|---|---|
+| **[28](04-bugs-capturados.md)** Um Id por vez, e cada um uma ida ao PropertiesService | gravar 5.000 casos: **10.003 idas, 2 min** | **5 idas, 275 ms** |
+| **[29](04-bugs-capturados.md)** Uma ida por linha na segunda metade da busca | busca de 100 resultados: **100 idas** | agrupadas em blocos: **1 a 20** |
+| **[30](04-bugs-capturados.md)** O painel mostrava um pedaço e **parecia o total** | silêncio | as três telas avisam |
+
+O 30 é o grave. Os painéis leem só as últimas 5.000 linhas — de propósito, e
+documentado. Com 200 mil casos em um ano, uma janela de 30 dias tem umas 15
+mil: **o painel mostrava um terço do período**. O Dashboard avisava, mas o
+aviso estava colado na fila e dava a entender que os cartões estavam completos;
+o Painel Analítico calculava `truncada` e nunca mostrava; a Minha Performance
+nem calculava — e é a tela sobre uma pessoa.
+
+> Um sistema que fica lento avisa sozinho. Um que fica errado, não.
+
+### O placar em 200 mil casos
+
+| operação | idas | células | tempo est. |
+|---|---:|---:|---:|
+| Gravar 5.000 casos de uma vez | 5 | 195 mil | 275 ms |
+| Dashboard: abrir a RET Vida | 16 | 202 mil | 581 ms |
+| Buscar por protocolo | 21 | 1,0 mi | 1,4 s |
+| Buscar termo que casa com milhares | 20 | 1,0 mi | 1,4 s |
+| Painel Analítico: os 6 gráficos | 16 | 202 mil | 582 ms |
+| Minha Performance | 14 | 201 mil | 531 ms |
+| Cadastrar um caso | 25 | 7,6 mil | 580 ms |
+| Diagnóstico completo | 59 | 403 mil | 1,7 s |
+| Gerar `ANALISE_RetVida` | 23 | 9,6 mi | 9,1 s |
+| Importar 2.000 corretoras | 19 | 24 mil | 445 ms |
+
+**Todas cabem com folga** no teto de seis minutos. A mais cara — gerar a aba de
+análise — usa 2,5% dele.
+
+### O limite de verdade não é tempo: é espaço
+
+| | células | % do teto |
+|---|---:|---:|
+| `BASE_RET` com 200 mil casos | 7.800.468 | **78%** |
+| `ANALISE_RetVida` (cortada em 50 mil) | 1.750.035 | 18% |
+| tudo somado | **9.672.905** | **96,7%** |
+
+Com 200 mil casos a planilha está **cheia**. Não sobra espaço para a Mesa
+Diamante crescer nem para uma segunda aba de análise. O diagnóstico já acusa
+isso como FALHA acima de 95%, com o caminho escrito no laudo.
+
+O teto real desta arquitetura, então, é da ordem de **200 mil casos por
+planilha** — e o que decide não é a velocidade, é a célula. Passar disso pede
+mover o histórico antigo para uma planilha de arquivo e apontá-la como planilha
+legada, que a busca já lê.
+
+### O que também foi testado
+
+- **Dez cadastros em sequência imediata** — nenhum Id repetido. É a trava que
+  o PGO 5.x não tinha, e que lá custou 4.328 colisões.
+- **Linha suja digitada direto na planilha** — data que não é data, SUSEP
+  inválida, linha sem Id. Dashboard, busca e diagnóstico seguem funcionando, e
+  o diagnóstico aponta a linha.
+- **Importação no teto** de 2.000 linhas.
+- **Análise sobre a base inteira**, que bate no corte de 50 mil e o informa.
+
+**366 testes.**
+
+---
+
 ## Responsividade
 
 Uma conferência à parte, num navegador de verdade:

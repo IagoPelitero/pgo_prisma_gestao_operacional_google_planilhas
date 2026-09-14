@@ -494,6 +494,15 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 
 ## 8. O teto do Google Planilhas
 
+> **Medido, não estimado.** `node Evolucao/Testes/estresse.js 200000` carrega
+> 200 mil casos e mede cada operação. Resultado: tudo cabe nos seis minutos de
+> uma execução com folga grande — a operação mais cara usa 2,5% do teto. O que
+> não cabe é o ESPAÇO: `BASE_RET` com 200 mil casos ocupa 78% do teto de
+> células sozinha, e com uma aba de análise a planilha chega a 96,7%. O limite
+> desta arquitetura é da ordem de **200 mil casos por planilha**, e quem decide
+> é a célula, não o relógio.
+
+
 **O limite do Google Planilhas não é em linhas. É em células: 10 milhões por
 planilha**, somando todas as abas. Quantas linhas cabem depende de quantas
 colunas a aba tem:

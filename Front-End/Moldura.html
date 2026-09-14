@@ -312,7 +312,32 @@ var Moldura = (function () {
       + '</div>';
   }
 
+  /**
+   * O aviso de que a tela leu só uma parte da base.
+   *
+   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Dashboard,
+   * Painel Analítico e Minha Performance —, e três textos diferentes para o
+   * mesmo fato é como a operação aprende que um deles não é sério.
+   *
+   * A frase diz o que foi lido e o que fazer, nessa ordem. "Os números podem
+   * estar incompletos" sozinho não ajuda ninguém: a pessoa precisa saber que
+   * dá para aumentar a janela, e onde.
+   */
+  function avisoDeJanela(resposta, oQueEssaTelaMostra) {
+    if (!resposta || !resposta.truncada) return '';
+    var lidas = resposta.linhasLidas
+      ? Number(resposta.linhasLidas).toLocaleString('pt-BR') : 'algumas';
+    return '<p class="aviso-janela" role="status">'
+      + '<strong>' + oQueEssaTelaMostra + ' vêm das ' + lidas + ' linhas mais '
+      + 'recentes da base</strong>, que é o que o painel lê de uma vez. A mesa '
+      + 'tem mais que isso, então casos antigos do período podem ter ficado de '
+      + 'fora. Para o histórico inteiro, use Buscar Caso; para aumentar a '
+      + 'janela, ajuste <code>OPERACAO.LINHAS_DO_PAINEL</code> na aba CONFIG.'
+      + '</p>';
+  }
+
   return {
+    avisoDeJanela: avisoDeJanela,
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
     // Os desenhos são de todas as telas, e não só do menu: a fila usa o olho,

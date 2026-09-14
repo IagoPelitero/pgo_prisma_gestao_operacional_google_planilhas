@@ -553,6 +553,25 @@ button { font: inherit; color: inherit; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
 .cartao.vazio p { margin: 0 auto; max-width: 46ch; color: var(--suave); }
 
+/*
+  O aviso de janela parcial. Fica no alto da tela, em tom de atenção — não de
+  erro: nada está quebrado, o número é que não é o total. Vermelho aqui faria
+  a operação achar que há um problema, e o problema é só de recorte.
+*/
+.aviso-janela {
+  margin: 0 0 14px; padding: 10px 14px;
+  border-radius: var(--raio-pequeno);
+  border: 1px solid color-mix(in srgb, var(--atencao) 30%, transparent);
+  background: var(--atencao-tenue); color: var(--texto);
+  font-size: 13px; line-height: 1.45;
+}
+.aviso-janela strong { color: var(--atencao); }
+.aviso-janela code {
+  font-family: var(--fonte-dado); font-size: 12px;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 3px; padding: 1px 5px;
+}
+
 .aviso-fila {
   margin: 0; padding: 11px 16px; font-size: 13px; color: var(--atencao);
   background: var(--atencao-tenue); border-bottom: 1px solid var(--linha);

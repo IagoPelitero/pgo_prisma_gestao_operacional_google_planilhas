@@ -38,7 +38,11 @@ function minhaPerformance(idDaMesa, dias) {
   var mesa = mesaPeloId_(idDaMesa);
 
   var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
-  var recentes = lerRegistros_(mesa.aba, { ultimas: RECC_LINHAS_QUE_O_PAINEL_OLHA });
+  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  // Bateu no teto de leitura: pode haver caso do período que ficou de fora.
+  // Aqui isto pesa mais que nas outras telas — esta é a tela sobre UMA PESSOA,
+  // e número incompleto vira julgamento errado sobre alguém.
+  var truncada = recentes.length >= linhasQueOPainelOlha_();
   var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, janela, 0);
   var anterior = filtrarPeloPeriodo_(recentes, mesa, janela, janela);
 
@@ -57,6 +61,8 @@ function minhaPerformance(idDaMesa, dias) {
       canal: String(quem.usuario['Canal que atende'] || '')
     },
     periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
+    truncada: truncada,
+    linhasLidas: recentes.length,
     // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez
     // de mostrar zero — zero pareceria que a pessoa não trabalhou.
     temResponsavel: !!coluna,

@@ -57,10 +57,27 @@ function maiorIdentificadorDaAba_(nomeDaAba) {
 }
 
 /**
- * O próximo Id da aba.
- * DEVE ser chamada dentro de uma trava — inserirVariosRegistros_ já segura a dela.
+ * RESERVA UM BLOCO de Ids de uma vez, e devolve todos.
+ *
+ * DEVE ser chamada dentro de uma trava — inserirVariosRegistros_ já segura a
+ * dela.
+ *
+ * POR QUE EM BLOCO, E NÃO UM POR VEZ. Esta função é a única do sistema que
+ * fala com o PropertiesService durante uma gravação, e cada ida lá custa
+ * dezenas de milissegundos no Apps Script. Emitindo um Id por vez, gravar
+ * cinco mil casos eram DEZ MIL idas — dois minutos só de pedágio, dentro de
+ * uma execução que tem seis. Reservando o bloco inteiro são DUAS: uma leitura
+ * e uma gravação, para cinco mil linhas ou para uma.
+ *
+ * O bloco é reservado ANTES de qualquer linha ser escrita na planilha, e a
+ * sequência já sai gravada no fim dele. Se a gravação estourar no meio, os
+ * Ids reservados se perdem — e é o que tem de acontecer: a sequência nunca
+ * anda para trás, mesmo que isso deixe buracos. Buraco na numeração não
+ * quebra nada; Id reemitido quebra tudo, e foi o que aconteceu no PGO 5.x.
  */
-function proximoIdentificador_(nomeDaAba) {
+function proximosIdentificadores_(nomeDaAba, quantos) {
+  if (quantos <= 0) return [];
+
   var props = PropertiesService.getScriptProperties();
   var chave = RECC_PREFIXO_DA_SEQUENCIA + nomeDaAba;
   var guardado = props.getProperty(chave);
@@ -75,14 +92,22 @@ function proximoIdentificador_(nomeDaAba) {
     if (!isFinite(ultimo)) ultimo = maiorIdentificadorDaAba_(nomeDaAba);
   }
 
-  var proximo = ultimo + 1;
-  if (proximo > RECC_MAIOR_IDENTIFICADOR) {
+  var ultimoDoBloco = ultimo + quantos;
+  if (ultimoDoBloco > RECC_MAIOR_IDENTIFICADOR) {
     throw new Error('A sequência da aba "' + nomeDaAba + '" chegou ao teto de 10 ' +
       'casas decimais (' + RECC_MAIOR_IDENTIFICADOR + ').');
   }
 
-  props.setProperty(chave, String(proximo));
-  return formatarIdentificador_(proximo);
+  props.setProperty(chave, String(ultimoDoBloco));
+
+  var bloco = [];
+  for (var i = 1; i <= quantos; i++) bloco.push(formatarIdentificador_(ultimo + i));
+  return bloco;
+}
+
+/** Um Id só. É o bloco de tamanho um — não existe segunda regra. */
+function proximoIdentificador_(nomeDaAba) {
+  return proximosIdentificadores_(nomeDaAba, 1)[0];
 }
 
 /**
