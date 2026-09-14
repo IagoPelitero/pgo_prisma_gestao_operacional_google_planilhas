@@ -1129,6 +1129,63 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 }
 .previa-da-logo img { max-height: 30px; max-width: 150px; display: block; }
 
+/* ========================================================= buscar caso === */
+.busca-caixa { padding: 20px 22px; }
+.busca-linha { display: flex; gap: 10px; }
+.busca-linha input[type="search"] {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto);
+  padding: 12px 14px; font: inherit; font-size: 15px;
+}
+.busca-linha input[type="search"]:focus { border-color: var(--destaque); }
+.busca-linha .botao {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+}
+.busca-linha .botao svg { width: 17px; height: 17px; }
+
+.busca-onde {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px 20px;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--linha);
+}
+.busca-rotulo {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--tenue); padding-top: 3px;
+}
+.busca-dica { font-size: 12.5px; color: var(--tenue); }
+.busca-dica.erro-carga { color: var(--ruim); font-weight: 600; }
+
+.busca-contagem {
+  margin: 18px 0 10px; font-size: 13px; color: var(--suave);
+}
+
+.origem { margin-bottom: 14px; }
+.origem-cabeca {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--linha);
+}
+.origem.vazia .origem-cabeca { border-bottom: 0; padding-bottom: 4px; }
+.origem.vazia p { margin: 0 0 4px; font-size: 13.5px; color: var(--tenue); }
+.origem-cabeca svg { width: 22px; height: 22px; color: var(--destaque); flex: none; }
+.origem-cabeca h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.origem-cabeca .quantos {
+  font-family: var(--fonte-dado); font-size: 12px; color: var(--suave);
+  background: var(--superficie-2); border-radius: 999px; padding: 2px 9px;
+}
+.etiqueta-leitura {
+  margin-left: auto;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--tenue);
+  border: 1px solid var(--linha); border-radius: 3px; padding: 2px 7px;
+}
+table.fila.legado { min-width: 720px; font-size: 13px; }
+table.fila.legado td { color: var(--suave); }
+
+@media (max-width: 560px) {
+  .busca-linha { flex-wrap: wrap; }
+  .busca-linha .botao { width: 100%; justify-content: center; }
+}
+
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
   .lateral {

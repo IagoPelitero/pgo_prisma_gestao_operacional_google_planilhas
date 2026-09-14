@@ -3,8 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 6 de 12 etapas construídas, mais o Dashboard reformado ·
-184 testes passando.
+**Estado geral:** 7 de 12 etapas construídas · 201 testes passando.
 
 ---
 
@@ -22,7 +21,7 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 4 | Cadastrar Caso | ✅ pronta | 28 |
 | 5 | Dashboard | ✅ pronta · reformado | 28 |
 | 6 | Configurações | ✅ pronta | 35 |
-| 7 | Buscar Caso | ⏳ | — |
+| 7 | Buscar Caso | ✅ pronta | 17 |
 | 8 | Painel Analítico | ⏳ | — |
 | 9 | Minha Performance | ⏳ | — |
 | 10 | Tabela de Corretoras | ⏳ | — |
@@ -285,6 +284,58 @@ podem disputar os mesmos identificadores.
 
 Concluir um caso preenche a data de finalização sozinho, quando a mesa tem
 essa coluna e ela está vazia — é o que a operação faria à mão em seguida.
+
+---
+
+## Etapa 7 — Buscar Caso ✅
+
+**O Dashboard mostra 30 dias. Aqui se acha o resto.**
+
+`Back-End/Busca.gs` e `Front-End/BuscarCaso.html`, 17 testes.
+
+### A regra que sustenta a tela
+
+**Ler a coluna antes de ler as linhas.** Uma base da RET com 200 mil linhas
+por 39 colunas são 7,8 milhões de células: ler tudo para procurar um
+protocolo estoura o tempo do Apps Script e a cota da conta.
+
+| Passo | Custo |
+|---|---|
+| 1. Ler só as **colunas de busca** e anotar em quais linhas o termo aparece | 5 colunas × 200 mil = 1 milhão de células |
+| 2. Ler **inteiras** só as linhas que casaram | quase sempre uma ou duas |
+
+Quais colunas cada mesa lê está em `MESAS.ColunasDaBusca`, e se ajusta em
+Configurações. Mesa que não declara nenhuma **avisa** em vez de ler a base
+toda.
+
+### A comparação ignora máscara
+
+`123.456.789-01` acha `12345678901`, e o contrário também. Nos dois sentidos,
+porque a máscara pode estar de qualquer lado — no que a pessoa digitou ou no
+que está gravado. Exigir o formato exato transformaria a busca em adivinhação.
+
+Texto compara sem acento e sem caixa, procurando o termo **dentro** do valor:
+`otavio` acha `Otávio Bandeira`.
+
+### A planilha legada
+
+O histórico que ficou no sistema anterior. Ela é lida **como está** — a
+primeira linha é cabeçalho, e nada mais é assumido: nem tipo de coluna, nem
+nome, nem ordem. Por isso procura em todas as colunas dela.
+
+- O **Id é conferido na hora de apontar**. Guardar um Id que não abre deixaria
+  a busca com um recado de erro para sempre, sem ninguém saber se era o Id ou
+  a planilha que tinha sumido
+- Uma linha do legado **não abre no modal**: ela não é um caso do sistema, é
+  histórico. Prometer edição ali seria mentira
+- A planilha fora do ar **não derruba** a busca na base própria: vira um
+  recado ao lado dos resultados de verdade
+
+### E o que a busca não faz
+
+Não fura o alcance do nível. Quem só enxerga os próprios casos na fila também
+só os acha na busca — esconder na fila e mostrar aqui seria uma porta dos
+fundos. Caso ocultado também não volta.
 
 ---
 

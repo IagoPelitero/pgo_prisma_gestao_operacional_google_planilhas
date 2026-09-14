@@ -596,6 +596,7 @@ function listarMesasConfiguraveis() {
         colunaDaHora: String(mesa.ColunaDaHora || ''),
         colunaDoStatus: String(mesa.ColunaDoStatus || ''),
         colunasDaFila: String(mesa.ColunasDaFila || ''),
+        colunasDaBusca: String(mesa.ColunasDaBusca || ''),
         colunaDaFinalizacao: String(mesa.ColunaDaFinalizacao || ''),
         colunaDaAreaResponsavel: String(mesa.ColunaDaAreaResponsavel || ''),
         icone: String(mesa.Icone || ''),
@@ -638,6 +639,9 @@ function salvarMesa(dados) {
   // As colunas da fila podem vir agrupadas — "Título: col, col; Título: col".
   // Conferimos coluna por coluna, ignorando os títulos: título é texto livre,
   // e é a coluna que precisa existir.
+  String(dados.colunasDaBusca || '').split(',').forEach(function (pedaco) {
+    conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
+  });
   String(dados.colunasDaFila || '').split(';').forEach(function (grupo) {
     var lista = grupo.indexOf(':') > 0
       ? grupo.substring(grupo.indexOf(':') + 1) : grupo;
@@ -666,6 +670,7 @@ function salvarMesa(dados) {
     ColunaDaHora: String(dados.colunaDaHora || ''),
     ColunaDoStatus: String(dados.colunaDoStatus || ''),
     ColunasDaFila: String(dados.colunasDaFila || ''),
+    ColunasDaBusca: String(dados.colunasDaBusca || ''),
     ColunaDaFinalizacao: String(dados.colunaDaFinalizacao || ''),
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
     Icone: String(dados.icone || atual.Icone || ''),

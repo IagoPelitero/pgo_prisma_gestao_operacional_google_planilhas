@@ -437,8 +437,14 @@ function rodarTestesDeConfiguracoes() {
     // arquivo. Uma função nova que esquecesse exigirPermissao_ apareceria
     // aqui, e não meses depois.
     const tela = lerTela('Configuracoes.html');
-    const servidor = lerTela('../Back-End/Configuracoes.gs')
-      + lerTela('../Back-End/Usuarios.gs') + lerTela('../Back-End/Principal.gs');
+    // TODOS os arquivos do servidor, e não uma lista escrita à mão: a lista
+    // fica desatualizada no dia em que nasce um arquivo novo, e o teste passa
+    // a reclamar de função que existe.
+    const pastaDoServidor = path.join(__dirname, '..', '..', 'Back-End');
+    const servidor = fs.readdirSync(pastaDoServidor)
+      .filter((nome) => nome.endsWith('.gs'))
+      .map((nome) => fs.readFileSync(path.join(pastaDoServidor, nome), 'utf8'))
+      .join('\n');
 
     const chamadas = {};
     (tela.match(/Servidor\.chamar\('([a-zA-Z]+)'/g) || []).forEach((achado) => {

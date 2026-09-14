@@ -220,6 +220,8 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Dados cadastrais: nome do cliente, CPF, e-mail'
         + '; Motivo / assunto: motivo do cancelamento'
         + '; Responsável: analista',
+      ColunasDaBusca: 'protocolo, CPF, Num_apolice, número da proposta, '
+        + 'nome do cliente',
       ColunaDaFinalizacao: 'data da transmissão',
       ColunaDaAreaResponsavel: '',
       Icone: 'escudo',
@@ -238,6 +240,7 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Dados cadastrais: Nome do segurado, Documento (CPF)'
         + '; Corretora: Corretora, SUSEP'
         + '; Responsável: Analista',
+      ColunasDaBusca: 'Nome do segurado, Documento (CPF), SUSEP, Corretora',
       ColunaDaFinalizacao: 'Data da finalização',
       ColunaDaAreaResponsavel: 'Área responsável',
       Icone: 'diamante',
@@ -326,6 +329,12 @@ function semearDadosIniciais_(emailDoInstalador) {
       'A plataforma, exibida no rodapé do menu lateral.'),
     novaConfiguracao_('IDENTIDADE.FABRICANTE', 'by Pelitero labs',
       'Quem construiu, exibido no rodapé do menu lateral.'),
+    novaConfiguracao_('LEGADO.PLANILHA_ID', '',
+      'Id da planilha antiga, para a busca também olhar lá. Vazio desliga.'),
+    novaConfiguracao_('LEGADO.ABA', '',
+      'Nome da aba da planilha antiga. Vazio usa a primeira aba dela.'),
+    novaConfiguracao_('LEGADO.ROTULO', 'Base legada',
+      'Como a origem legada aparece nos resultados da busca.'),
     novaConfiguracao_('OPERACAO.JANELA_DIAS', '30',
       'Quantos dias a fila de trabalho carrega. Acima disso, use Buscar Caso.'),
     novaConfiguracao_('OPERACAO.TEMA_PADRAO', 'padrao',

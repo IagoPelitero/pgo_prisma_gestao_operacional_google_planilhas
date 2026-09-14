@@ -258,6 +258,10 @@ const RECC_ESQUEMA = {
       // deixa a fila legível quando o caso tem trinta e cinco campos e a
       // pessoa precisa achar o dele de relance.
       { cabecalho: 'ColunasDaFila', tipo: 'textoLongo', protegido: false },
+      // Em quais colunas a busca procura. É por elas, e só por elas, que o
+      // sistema lê a base inteira — ler as 35 colunas de 200 mil linhas são
+      // 7 milhões de células, e ler cinco são um milhão.
+      { cabecalho: 'ColunasDaBusca', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },

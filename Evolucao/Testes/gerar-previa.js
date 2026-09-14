@@ -108,6 +108,21 @@ function pontePreparada(respostas) {
     + '      listarCardsDoPainel: function (tela, idDaMesa) {\n'
     + '        responder(respostas.configuracoes.cards[idDaMesa]);\n'
     + '      },\n'
+    + '      configuracaoDoLegado: function () {\n'
+    + '        responder(respostas.busca.legado);\n'
+    + '      },\n'
+    + '      opcoesDaBusca: function () {\n'
+    + '        responder(respostas.busca.opcoes);\n'
+    + '      },\n'
+    // A busca da prévia procura nos resultados que o servidor de verdade
+    // devolveu para alguns termos. Termo que não foi gravado responde vazio,
+    // e a tela diz honestamente que não achou — em vez de fingir.
+    + '      buscarCasos: function (termo) {\n'
+    + '        var chave = String(termo || "").toLowerCase().trim();\n'
+    + '        responder(respostas.busca.resultados[chave]\n'
+    + '          || { termo: termo, total: 0,\n'
+    + '               origens: respostas.busca.origensVazias });\n'
+    + '      },\n'
     + '      ocultarCaso: function () {\n'
     + '        setTimeout(function () {\n'
     + '          if (aoDarErrado) {\n'
@@ -505,6 +520,26 @@ function gerar(pastaDeSaida) {
     trilha: chamar('listarAuditoria')(40)
   };
 
+  // A busca, com alguns termos já procurados de verdade. A prévia é estática:
+  // guardamos a resposta que o servidor deu para cada um.
+  const termosDeExemplo = ['ret-2026', 'cliente fictício 021', '00900000001',
+    'vanessa', 'corretora abc', '1234567'];
+  const resultadosDaBusca = {};
+  termosDeExemplo.forEach((termo) => {
+    resultadosDaBusca[termo] = chamar('buscarCasos')(termo, [], false);
+  });
+  const opcoesDaBusca = chamar('opcoesDaBusca()');
+
+  const busca = {
+    opcoes: opcoesDaBusca,
+    legado: chamar('configuracaoDoLegado()'),
+    resultados: resultadosDaBusca,
+    origensVazias: opcoesDaBusca.mesas.map((mesa) => ({
+      tipo: 'mesa', id: mesa.id, nome: mesa.nome, icone: mesa.icone,
+      colunas: [], casos: [], aviso: ''
+    }))
+  };
+
   // E a mesma instalação vista por quem não está cadastrado.
   ambiente.definirEmail('nao.cadastrado@exemplo.com');
   const telaSemAcesso = chamar('doGet()').getContent();
@@ -513,7 +548,8 @@ function gerar(pastaDeSaida) {
   const paginaDoSistema = chamar('doGet()').getContent().replace(
     '</head>',
     pontePreparada({
-      pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes
+      pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
+      busca
     })
       + '</head>');
 

@@ -736,7 +736,12 @@ var TelaConfiguracoes = (function () {
       + caixaDeOpcoes('colunaDoStatus', 'Coluna da situação', colunas,
         mesa.colunaDoStatus, 'É por ela que os cartões do painel contam.')
       + campoDeTexto('colunasDaFila', 'Colunas da fila', mesa.colunasDaFila,
-        'Separadas por vírgula, na ordem em que aparecem na tabela.')
+        'Grupos separados por ponto e vírgula: "Título: coluna, coluna". '
+        + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela.')
+      + campoDeTexto('colunasDaBusca', 'Colunas em que a busca procura',
+        mesa.colunasDaBusca,
+        'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
+        + 'a busca não estourar numa base grande.')
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         mesa.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -760,6 +765,7 @@ var TelaConfiguracoes = (function () {
         colunaDaHora: valorDe('colunaDaHora'),
         colunaDoStatus: valorDe('colunaDoStatus'),
         colunasDaFila: valorDe('colunasDaFila'),
+        colunasDaBusca: valorDe('colunasDaBusca'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
         ordem: valorDe('ordem'),
@@ -1076,10 +1082,15 @@ var TelaConfiguracoes = (function () {
     Servidor.chamar('conferirEstruturaDaPlanilha')
       .entao(function (laudo) {
         dados.laudo = laudo;
-        Servidor.chamar('listarAuditoria', 40)
-          .entao(function (trilha) {
-            dados.trilha = trilha;
-            desenharEstrutura();
+        Servidor.chamar('configuracaoDoLegado')
+          .entao(function (legado) {
+            dados.legado = legado;
+            Servidor.chamar('listarAuditoria', 40)
+              .entao(function (trilha) {
+                dados.trilha = trilha;
+                desenharEstrutura();
+              })
+              .senao(falhou);
           })
           .senao(falhou);
       })
@@ -1114,6 +1125,9 @@ var TelaConfiguracoes = (function () {
       + 'para a coluna errada.</p>'
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
+    elemento('config-lista').innerHTML += desenharLegado();
+    ligarLegado();
+
     elemento('config-painel').innerHTML = '<div class="config-form">'
       + tituloDoPainel('O que foi feito', 'As 40 ações mais recentes')
       + (dados.trilha.length
@@ -1127,6 +1141,49 @@ var TelaConfiguracoes = (function () {
         : '<p class="config-vazio">Nada foi alterado ainda. A trilha começa a '
           + 'encher no primeiro ajuste — e guarda quem fez, o quê e quando.</p>')
       + '</div>';
+  }
+
+  /**
+   * A planilha do sistema anterior, que a busca também olha.
+   *
+   * Mora aqui, junto do laudo, porque é a mesma pergunta: onde estão as
+   * planilhas que este sistema lê. O Id é conferido na hora de salvar —
+   * guardar um Id que não abre deixaria a busca com um recado de erro para
+   * sempre, sem ninguém saber se o Id estava errado ou se a planilha sumiu.
+   */
+  function desenharLegado() {
+    var legado = dados.legado;
+    return '<div class="config-legado">'
+      + '<h4>Planilha legada</h4>'
+      + '<p class="config-explica">O histórico que ficou no sistema anterior. '
+      + 'Quando apontada, a tela de Buscar Caso passa a oferecê-la como uma '
+      + 'origem a mais — em leitura, sem editar nada. Vazio desliga.</p>'
+      + '<form class="config-form" id="form-legado">'
+      + campoDeTexto('legadoId', 'Id da planilha', legado.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
+        + 'precisa ter acesso a ela.')
+      + campoDeTexto('legadoAba', 'Aba', legado.aba,
+        'Vazio usa a primeira aba. A primeira linha é lida como cabeçalho.')
+      + campoDeTexto('legadoRotulo', 'Como aparece na busca', legado.rotulo, '')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar planilha legada</button>'
+      + '</div></form></div>';
+  }
+
+  function ligarLegado() {
+    elemento('form-legado').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarConfiguracaoDoLegado', {
+        planilhaId: valorDe('legadoId'),
+        aba: valorDe('legadoAba'),
+        rotulo: valorDe('legadoRotulo')
+      }).entao(function (nova) {
+        dados.legado = nova;
+        avisarSalvo(nova.planilhaId
+          ? 'Planilha legada apontada e conferida.'
+          : 'Planilha legada desligada.');
+      }).senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+    });
   }
 
   /* ================================================ o diálogo de senha */

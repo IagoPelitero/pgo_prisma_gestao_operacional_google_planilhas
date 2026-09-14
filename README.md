@@ -69,7 +69,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 184 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 201 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -121,13 +121,13 @@ nascem vazios.
 node Evolucao/Testes/rodar.js
 ```
 
-184 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+201 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 183 não valeriam nada.
+realmente corrompe — sem ele, os outros 200 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -177,6 +177,26 @@ sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
 O selo da SUSEP responde três coisas, e as três são informação: **liberada**
 com o segmento, **bloqueada** com o motivo, ou **não encontrada** — que não é
 erro, é uma corretora que o cadastro ainda não conhece.
+
+---
+
+## Achar um caso que a fila não mostra mais
+
+O Dashboard mostra os últimos 30 dias, de propósito. Quando o cliente liga
+citando um protocolo de abril, é aqui que se procura.
+
+![A busca](Evolucao/imagens/tela-buscar-caso.png)
+
+A tela existe sobre uma regra: **ler a coluna antes de ler as linhas**. Uma
+base de 200 mil linhas por 39 colunas são 7,8 milhões de células — ler tudo
+estoura o tempo do Apps Script. Lemos só as **colunas de busca** que a mesa
+declarou, anotamos em quais linhas o termo aparece, e só então lemos inteiras
+as poucas que casaram.
+
+A comparação **ignora máscara nos dois sentidos**: `123.456.789-01` acha
+`12345678901` e vice-versa. E quando há uma **planilha legada** apontada, ela
+entra como uma origem a mais — lida como está, em leitura, sem prometer
+edição do que não é caso do sistema.
 
 ---
 

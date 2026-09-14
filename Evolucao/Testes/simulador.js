@@ -247,6 +247,12 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   const registros = [];
   let emailAtual = email;
 
+  // Outras planilhas, abertas por Id — é assim que o sistema lê a base do
+  // sistema anterior. Uma que não existe tem de ESTOURAR, como estoura no
+  // Apps Script de verdade: se aqui ela devolvesse null, o teste da planilha
+  // fora do ar passaria sem provar nada.
+  const planilhasExternas = new Map();
+
   const ambiente = {
     planilha,
     propriedades,
@@ -255,9 +261,30 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     /** Troca quem está "logado", para testar cada perfil de acesso. */
     definirEmail(novo) { emailAtual = novo; },
     emailAtual() { return emailAtual; },
+    /**
+     * Cria uma planilha "de fora", com uma aba já preenchida, e devolve o Id.
+     * Serve para testar a leitura da base legada sem contrato nenhum.
+     */
+    criarPlanilhaExterna(nomeDaAba, linhas) {
+      const outra = new Planilha();
+      const aba = outra.insertSheet(nomeDaAba || 'Página1');
+      if (linhas && linhas.length) {
+        aba.getRange(1, 1, linhas.length, linhas[0].length).setValues(linhas);
+      }
+      const id = 'planilha-externa-' + (planilhasExternas.size + 1);
+      planilhasExternas.set(id, outra);
+      return id;
+    },
     globais: {
       SpreadsheetApp: {
         getActive: () => planilha,
+        openById: (id) => {
+          if (!planilhasExternas.has(id)) {
+            throw new Error('Unexpected error while getting the method or '
+              + 'property openById on object SpreadsheetApp.');
+          }
+          return planilhasExternas.get(id);
+        },
         Direction: { UP: 'UP', DOWN: 'DOWN' }
       },
       PropertiesService: {

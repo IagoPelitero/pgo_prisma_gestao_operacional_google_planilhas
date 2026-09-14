@@ -196,6 +196,7 @@ function mesasVisiveis_() {
         colunaDaHora: mesa.ColunaDaHora,
         colunaDoStatus: mesa.ColunaDoStatus,
         colunasDaFila: mesa.ColunasDaFila,
+        colunasDaBusca: mesa.ColunasDaBusca,
         colunaDaFinalizacao: mesa.ColunaDaFinalizacao,
         colunaDaAreaResponsavel: mesa.ColunaDaAreaResponsavel,
         icone: mesa.Icone

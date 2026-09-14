@@ -113,13 +113,8 @@ var Rotas = (function () {
     buscarCaso: {
       titulo: 'Buscar Caso',
       subtitulo: 'Encontre um caso pelo protocolo, pela apólice ou pelo segurado.',
-      montar: function () {
-        return emConstrucao(7, [
-          'Busca na base própria, lendo só a coluna antes de ler as linhas',
-          'Busca em planilha legada, com a primeira linha entendida como cabeçalho',
-          'A comparação ignora máscara: 1-2345678901 acha 12345678901'
-        ]);
-      }
+      montar: function (pacote) { return TelaBuscarCaso.montar(pacote); },
+      ligar: function (pacote) { TelaBuscarCaso.ligar(pacote); }
     },
     tabelaCorretoras: {
       titulo: 'Tabela de Corretoras',

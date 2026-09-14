@@ -26,6 +26,8 @@ abaixo com o motivo.
 | **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
+| **Busca** | Em quais colunas cada mesa procura | Mesas de trabalho |
+| **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
 
 ---
