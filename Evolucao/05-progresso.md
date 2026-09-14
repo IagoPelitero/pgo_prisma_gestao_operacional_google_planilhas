@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 7 de 12 etapas construídas · 201 testes passando.
+**Estado geral:** 8 de 12 etapas construídas · 228 testes passando.
 
 ---
 
@@ -22,7 +22,7 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 5 | Dashboard | ✅ pronta · reformado | 28 |
 | 6 | Configurações | ✅ pronta | 35 |
 | 7 | Buscar Caso | ✅ pronta | 17 |
-| 8 | Painel Analítico | ⏳ | — |
+| 8 | Painel Analítico | ✅ pronta | 24 |
 | 9 | Minha Performance | ⏳ | — |
 | 10 | Tabela de Corretoras | ⏳ | — |
 | 11 | Abas de análise | ⏳ | — |
@@ -336,6 +336,91 @@ nome, nem ordem. Por isso procura em todas as colunas dela.
 Não fura o alcance do nível. Quem só enxerga os próprios casos na fila também
 só os acha na busca — esconder na fila e mostrar aqui seria uma porta dos
 fundos. Caso ocultado também não volta.
+
+---
+
+## Etapa 8 — Painel Analítico ✅
+
+**O Dashboard responde "o que eu tenho que trabalhar hoje". Aqui a pergunta é
+outra: "o que está acontecendo na operação".**
+
+`Back-End/Analitico.gs` e `Front-End/PainelAnalitico.html`, 24 testes.
+
+Cada gráfico é uma linha da aba `PAINEIS` — tipo, campo que vira eixo, o que
+se mede, o TOP N e a ordem. Acrescentar um gráfico é acrescentar uma linha,
+em Configurações → Painéis → Gráficos.
+
+### Cinco formas, cada uma para um trabalho
+
+| Forma | Para quê |
+|---|---|
+| **Pizza** (rosca) | "de que tipo são", de relance. No máximo 6 fatias; o total no meio |
+| **Barras em pé** | comparar "quanto de cada", com nomes curtos |
+| **Barras deitadas** | o mesmo, com nomes compridos — em pé, "Aumento do prêmio na renovação" vira escadinha |
+| **Linha** | como variou no tempo |
+| **Barras com linha** | o dia a dia, com a tendência por cima |
+
+### Três regras de leitura, e o motivo de cada uma
+
+**Um eixo só.** "Barras com linha" não são duas escalas: a linha é a **média
+móvel de 7 dias da própria barra**, na mesma altura. Dois eixos fazem a mesma
+altura significar duas coisas — é o erro de gráfico mais comum que existe, e
+um teste confere que a linha nunca ultrapassa a maior barra.
+
+**Cor para identidade, tom único para magnitude.** A pizza responde "de que
+tipo" e usa cores; as barras respondem "quanto" e usam um tom só. Seis cores
+para dizer *quanto* fazem o olho comparar cores em vez de alturas.
+
+**Cor segue a entidade, nunca a posição.** "Concluído" é verde porque o
+catálogo diz que é, e continua verde quando um filtro o joga do primeiro para
+o quarto lugar. Cor por posição repintaria o gráfico a cada filtro, e ninguém
+compararia duas telas.
+
+### A paleta
+
+Seis tons em ordem fixa, **conferidos por régua e não por gosto**: separação
+mínima entre vizinhos de ΔE 9,1 para quem não distingue vermelho e verde, e
+19,6 para visão normal. Um sétimo valor vira **"Demais valores"** — nunca uma
+cor nova, porque cor gerada na hora fica indistinguível das outras sob
+daltonismo.
+
+Três dos seis ficam abaixo de 3:1 de contraste com o fundo claro. A regra que
+compensa isso está em todo gráfico: **o número sempre visível** (rótulo
+direto), uma **tabela de números** a um clique e a **dica** no passar do
+mouse. Cor é a segunda leitura, nunca a única.
+
+O tema escuro tem os seus próprios passos, conferidos contra o fundo escuro —
+não é a paleta clara reaproveitada.
+
+### Clicar leva ao caso
+
+Clicar numa fatia ou numa barra abre a lista dos casos que a formam, e dali o
+mesmo modal do Dashboard. Sem isso o painel só informa, e informar não resolve
+caso nenhum.
+
+### Exportar
+
+Ponto e vírgula e vírgula decimal — que é como o Excel em português abre sem
+perguntar nada. Segue a permissão de `exportar`.
+
+---
+
+## Responsividade
+
+Uma conferência à parte, num navegador de verdade:
+
+```bash
+node Evolucao/Testes/conferir-responsividade.js
+```
+
+**7 telas × 12 larguras**, de 1600px a 320px, procurando a página rolar na
+horizontal e o elemento que escapou da janela. Tabela dentro de uma caixa que
+rola de propósito não conta — rolar a tabela é a solução, não o problema.
+
+Na suíte ficam as regras estáticas que sustentam isso: nenhuma largura fixa
+acima de 320px no CSS, toda tabela dentro de uma caixa que rola, e a grade dos
+gráficos com `minmax(min(100%, 340px), 1fr)`, que encolhe sozinha sem media
+query nenhuma.
 
 ---
 

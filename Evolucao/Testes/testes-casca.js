@@ -114,6 +114,56 @@ function rodarTestesDaCasca() {
     contem(atual, 'font-weight: 600', 'e o atual em seminegrito, não em negrito');
   });
 
+  secao('Tela estreita');
+
+  teste('nenhuma largura fixa prende a tela num tamanho', () => {
+    // O sintoma de tela quebrada no celular é quase sempre o mesmo: alguém
+    // escreveu uma largura em pixels que não cabe. Aqui procuramos por isso
+    // no CSS inteiro — e as exceções são só as peças que TÊM tamanho próprio
+    // (o menu lateral, um ícone, uma bolinha de tema).
+    const estilos = lerTela('Estilos.html');
+    const largurasFixas = estilos.match(/(?<!max-|min-)width:\s*(\d{3,})px/g) || [];
+    const grandesDemais = largurasFixas.filter((achado) => {
+      return Number(achado.match(/(\d+)px/)[1]) > 320;
+    });
+    igual(grandesDemais.length, 0,
+      'largura fixa acima de 320px no CSS: ' + grandesDemais.join(', '));
+  });
+
+  teste('toda tabela mora dentro de uma caixa que rola', () => {
+    // Tabela é a única coisa que legitimamente não cabe num celular. A saída
+    // é ela rolar sozinha, dentro da caixa — e nunca a PÁGINA rolar, que
+    // arrasta o menu e o cabeçalho junto.
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    ['Dashboard.html', 'BuscarCaso.html', 'PainelAnalitico.html',
+      'Configuracoes.html'].forEach((nome) => {
+      const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
+      const tabelas = (fonte.match(/<table/g) || []).length;
+      const caixas = (fonte.match(/rolagem-tabela|rolagem/g) || []).length;
+      verdadeiro(tabelas === 0 || caixas >= tabelas,
+        nome + ' tem ' + tabelas + ' tabela(s) e ' + caixas + ' caixa(s) de rolagem');
+    });
+    contem(lerTela('Estilos.html'), '.rolagem-tabela');
+  });
+
+  teste('a grade dos gráficos encolhe sozinha, sem media query', () => {
+    // `minmax(min(100%, 340px), 1fr)`: numa tela larga cabem dois gráficos
+    // lado a lado; numa estreita eles empilham sem ninguém escrever regra.
+    // O `min(100%, ...)` é o que impede a coluna de ficar maior que a tela.
+    contem(lerTela('Estilos.html'), 'minmax(min(100%, 340px), 1fr)');
+  });
+
+  teste('existe uma conferência de responsividade, e ela é um comando', () => {
+    // Fora da suíte de propósito: `rodar.js` roda com node puro, sem
+    // instalar nada, e essa promessa vale mais que ter tudo num comando só.
+    const conferencia = fs.readFileSync(path.join(__dirname,
+      'conferir-responsividade.js'), 'utf8');
+    contem(conferencia, '320');
+    contem(conferencia, 'overflowX', 'ela ignora o que rola de propósito');
+    contem(lerTela('../README.md'), 'conferir-responsividade',
+      'e o README diz como rodar');
+  });
+
   secao('Os quatro temas');
 
   teste('os quatro temas existem e definem as mesmas variáveis', () => {

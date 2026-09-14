@@ -434,6 +434,46 @@ function cartoesIniciaisDoPainel_(idRet, idMesa) {
   cartoes.push(novoCartao(idMesa, 'Concluído', 'situacao', 'Concluído', 'bom', 3));
   cartoes.push(novoCartao(idMesa, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
 
+  // ---- os gráficos do Painel Analítico ------------------------------------
+  // Cada um responde a UMA pergunta. Gráfico que não responde pergunta
+  // nenhuma é enfeite, e enfeite numa tela de trabalho é ruído.
+  function novoGrafico(mesaId, titulo, tipo, dimensao, agregacao, medida,
+    limite, largura, ordem) {
+    return {
+      Tela: 'painelAnalitico', MesaId: mesaId, Titulo: titulo,
+      TipoWidget: tipo, CampoDimensao: dimensao, CampoMedida: medida || '',
+      Agregacao: agregacao, Limite: limite || 0, Filtro: '',
+      Ordem: ordem, Largura: largura, Cor: '', VisivelPara: '', Ativo: true
+    };
+  }
+
+  // Barras COM LINHA: a linha é a média móvel da própria barra, na mesma
+  // escala. Não são dois eixos — dois eixos fazem a mesma altura significar
+  // duas coisas, e é o erro de gráfico mais comum que existe.
+  cartoes.push(novoGrafico(idRet, 'Entradas por dia, e a tendência',
+    'barrasComLinha', 'data de recepção do protocolo', 'contagem', '', 0, 2, 1));
+  // Pizza é parte-do-todo, de relance, com poucas fatias. Para comparar
+  // valores próximos ela é péssima — para isso existem as barras abaixo.
+  cartoes.push(novoGrafico(idRet, 'Situação dos casos',
+    'pizza', 'status', 'contagem', '', 6, 1, 2));
+  // Nome comprido pede barra DEITADA: em pé, o rótulo vira uma escadinha
+  // ilegível ou é cortado.
+  cartoes.push(novoGrafico(idRet, 'Por que pediram o cancelamento',
+    'barrasDeitadas', 'motivo do cancelamento', 'contagem', '', 6, 1, 3));
+  cartoes.push(novoGrafico(idRet, 'Prêmio retido por produto',
+    'barras', 'produto', 'soma', 'valor do prêmio retido', 6, 1, 4));
+  cartoes.push(novoGrafico(idRet, 'Casos por canal de entrada',
+    'barras', 'canal', 'contagem', '', 6, 1, 5));
+
+  cartoes.push(novoGrafico(idMesa, 'Entradas por dia, e a tendência',
+    'barrasComLinha', 'Data de entrada', 'contagem', '', 0, 2, 1));
+  cartoes.push(novoGrafico(idMesa, 'Situação dos casos',
+    'pizza', 'Status', 'contagem', '', 6, 1, 2));
+  cartoes.push(novoGrafico(idMesa, 'Casos por corretora',
+    'barrasDeitadas', 'Corretora', 'contagem', '', 6, 1, 3));
+  cartoes.push(novoGrafico(idMesa, 'Casos por canal de entrada',
+    'barras', 'Canal', 'contagem', '', 6, 1, 4));
+
   return cartoes;
 }
 

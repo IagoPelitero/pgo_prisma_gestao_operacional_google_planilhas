@@ -69,7 +69,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 201 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 228 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -115,19 +115,37 @@ nascem vazios.
 
 ---
 
+## Conferir a responsividade
+
+```bash
+node Evolucao/Testes/conferir-responsividade.js
+```
+
+Abre a prévia num navegador de verdade e percorre **as 7 telas em 12
+larguras** — do monitor de 1600px ao celular de 320px —, procurando a página
+rolar na horizontal e o elemento que escapou da janela. Tabela dentro de uma
+caixa que rola de propósito não conta: rolar a tabela é a solução, não o
+problema.
+
+Precisa do Playwright, e por isso fica **fora** da suíte: `rodar.js` roda com
+`node` puro, sem instalar nada, e essa promessa vale mais do que ter tudo num
+comando só.
+
+---
+
 ## Rodar os testes
 
 ```bash
 node Evolucao/Testes/rodar.js
 ```
 
-201 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+228 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 200 não valeriam nada.
+realmente corrompe — sem ele, os outros 227 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -197,6 +215,32 @@ A comparação **ignora máscara nos dois sentidos**: `123.456.789-01` acha
 `12345678901` e vice-versa. E quando há uma **planilha legada** apontada, ela
 entra como uma origem a mais — lida como está, em leitura, sem prometer
 edição do que não é caso do sistema.
+
+---
+
+## O que está acontecendo na operação
+
+![O Painel Analítico](Evolucao/imagens/tela-painel-analitico.png)
+
+Cada gráfico é uma linha da aba `PAINEIS` — nada aqui está escrito no código.
+Cinco formas: pizza, barras em pé, barras deitadas, linha e barras com linha.
+Clicar numa fatia abre a lista dos casos que a formam.
+
+Três regras sustentam a leitura, e cada uma existe por um motivo:
+
+- **Um eixo só.** "Barras com linha" não são duas escalas — a linha é a
+  **média móvel de 7 dias da própria barra**, na mesma altura. Dois eixos
+  fazem a mesma altura significar duas coisas
+- **Cor para identidade, tom único para magnitude.** A pizza responde "de que
+  tipo são" e usa cores; as barras respondem "quanto" e usam um tom só
+- **Cor segue a entidade, nunca a posição.** "Concluído" é verde porque o
+  catálogo diz que é, e continua verde depois de qualquer filtro
+
+A paleta é de seis tons em ordem fixa, **conferidos por régua**: ΔE 9,1 de
+separação mínima sob daltonismo, 19,6 na visão normal. Um sétimo valor vira
+"Demais valores", nunca uma cor nova. E como três dos seis ficam abaixo de
+3:1 de contraste, todo gráfico traz o **número visível**, a **tabela** a um
+clique e a dica no passar do mouse — cor é a segunda leitura, nunca a única.
 
 ---
 

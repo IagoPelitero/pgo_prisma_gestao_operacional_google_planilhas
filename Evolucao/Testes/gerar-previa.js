@@ -114,6 +114,17 @@ function pontePreparada(respostas) {
     + '      opcoesDaBusca: function () {\n'
     + '        responder(respostas.busca.opcoes);\n'
     + '      },\n'
+    + '      painelAnalitico: function (idDaMesa) {\n'
+    + '        responder(respostas.analitico.paineis[idDaMesa]);\n'
+    + '      },\n'
+    + '      detalharComponente: function (idDaMesa, idDoComponente, ponto) {\n'
+    + '        var chave = idDaMesa + "|" + idDoComponente + "|" + ponto;\n'
+    + '        responder(respostas.analitico.detalhes[chave]\n'
+    + '          || { titulo: "", ponto: ponto, colunas: [], casos: [], total: 0 });\n'
+    + '      },\n'
+    + '      exportarComponente: function (idDaMesa, idDoComponente) {\n'
+    + '        responder(respostas.analitico.exportados[idDoComponente]);\n'
+    + '      },\n'
     // A busca da prévia procura nos resultados que o servidor de verdade
     // devolveu para alguns termos. Termo que não foi gravado responde vazio,
     // e a tela diz honestamente que não achou — em vez de fingir.
@@ -540,6 +551,29 @@ function gerar(pastaDeSaida) {
     }))
   };
 
+  // O Painel Analítico, calculado de verdade para cada mesa — e o
+  // detalhamento de cada ponto de cada gráfico, para os cliques funcionarem.
+  const paineisAnaliticos = {};
+  const detalhesDoPainel = {};
+  const exportados = {};
+  pacote.mesas.forEach((mesa) => {
+    const analitico = chamar('painelAnalitico')(mesa.id, {}, 30);
+    paineisAnaliticos[mesa.id] = analitico;
+    analitico.componentes.forEach((componente) => {
+      exportados[componente.id] =
+        chamar('exportarComponente')(mesa.id, componente.id, {}, 30);
+      componente.pontos.forEach((ponto) => {
+        detalhesDoPainel[mesa.id + '|' + componente.id + '|' + ponto.chave] =
+          chamar('detalharComponente')(mesa.id, componente.id, ponto.chave, {}, 30);
+      });
+    });
+  });
+  const analitico = {
+    paineis: paineisAnaliticos,
+    detalhes: detalhesDoPainel,
+    exportados: exportados
+  };
+
   // E a mesma instalação vista por quem não está cadastrado.
   ambiente.definirEmail('nao.cadastrado@exemplo.com');
   const telaSemAcesso = chamar('doGet()').getContent();
@@ -549,7 +583,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
-      busca
+      busca, analitico
     })
       + '</head>');
 

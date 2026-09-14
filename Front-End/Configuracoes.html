@@ -778,12 +778,14 @@ var TelaConfiguracoes = (function () {
   /* -------------------------------------------------------------- painéis */
 
   var mesaDosCards = '';
-  var cardsEmEdicao = null;   // a lista sendo mexida, antes de salvar
+  var telaDosPaineis = 'dashboard';   // 'dashboard' ou 'painelAnalitico'
+  var cardsEmEdicao = null;           // a lista sendo mexida, antes de salvar
 
   function carregarPaineis() {
-    aguarde('Lendo os cards…');
     if (!mesaDosCards) mesaDosCards = mesaEscolhida;
+    if (telaDosPaineis === 'painelAnalitico') return carregarGraficos();
 
+    aguarde('Lendo os cards…');
     Servidor.chamar('listarCardsDoPainel', 'dashboard', mesaDosCards)
       .entao(function (resposta) {
         dados.painel = resposta;
@@ -791,6 +793,197 @@ var TelaConfiguracoes = (function () {
         desenharPaineis();
       })
       .senao(falhou);
+  }
+
+  function carregarGraficos() {
+    aguarde('Lendo os gráficos…');
+    Servidor.chamar('opcoesDoPainelAnalitico', mesaDosCards)
+      .entao(function (opcoes) {
+        dados.opcoesDoGrafico = opcoes;
+        Servidor.chamar('listarComponentesDoPainel', mesaDosCards)
+          .entao(function (lista) {
+            cardsEmEdicao = lista.map(copiarGrafico);
+            desenharGraficos();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function copiarGrafico(grafico) {
+    return {
+      id: grafico.id || '', titulo: grafico.titulo, tipo: grafico.tipo,
+      dimensao: grafico.dimensao, medida: grafico.medida,
+      agregacao: grafico.agregacao, limite: grafico.limite,
+      largura: grafico.largura, mostrar: grafico.mostrar !== false
+    };
+  }
+
+  /** As duas telas que têm componentes configuráveis. */
+  function escolhaDeTela() {
+    return '<div class="config-abas">'
+      + [['dashboard', 'Cards do Dashboard'],
+         ['painelAnalitico', 'Gráficos do Painel Analítico']]
+        .map(function (par) {
+          return '<button type="button" class="config-aba'
+            + (telaDosPaineis === par[0] ? ' atual' : '') + '"'
+            + ' data-tela-do-painel="' + par[0] + '">'
+            + escapar(par[1]) + '</button>';
+        }).join('') + '</div>';
+  }
+
+  function desenharGraficos() {
+    var opcoes = dados.opcoesDoGrafico;
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">Gráficos do Painel Analítico</span></div>'
+      + escolhaDeTela()
+      + '<p class="config-explica">Cada gráfico responde a <strong>uma</strong> '
+      + 'pergunta. Gráfico que não responde pergunta nenhuma é enfeite, e '
+      + 'enfeite numa tela de trabalho é ruído. A pizza é boa para "de que '
+      + 'tipo são", de relance e com poucas fatias; para comparar valores '
+      + 'próximos, barras. Nome comprido pede barra deitada.</p>'
+      + '<div class="config-mesas-cartao">' + escolhaDeMesa() + '</div>'
+      + '<div id="lista-de-cards">' + desenharCardsDeGrafico() + '</div>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="add-card">'
+      + '+ Adicionar gráfico</button>'
+      + '<button type="button" class="botao" id="salvar-cards">'
+      + '✓ Salvar gráficos</button>'
+      + '<button type="button" class="botao-texto" id="descartar-cards">'
+      + '↺ Descartar alterações</button>'
+      + '</div>';
+
+    painelVazio('Os gráficos somam só os casos que a pessoa pode ver. Quem '
+      + 'enxerga apenas os próprios casos vê os números dela, no mesmo gráfico.');
+    ligarGraficos();
+  }
+
+  function desenharCardsDeGrafico() {
+    var opcoes = dados.opcoesDoGrafico;
+    if (!cardsEmEdicao.length) {
+      return '<p class="config-vazio">Nenhum gráfico nesta mesa. O Painel '
+        + 'Analítico abre dizendo isso, em vez de abrir vazio.</p>';
+    }
+
+    return cardsEmEdicao.map(function (grafico, posicao) {
+      var precisaDeMedida = grafico.agregacao !== 'contagem';
+      return '<div class="card-editavel">'
+        + '<div class="card-linha">'
+        + '<label class="config-campo"><span>Título</span>'
+        + '<input type="text" data-card="' + posicao + '" data-parte="titulo"'
+        + ' value="' + escapar(grafico.titulo) + '"></label>'
+        + caixaSimples(posicao, 'tipo', 'Tipo de gráfico',
+          opcoes.tipos.map(function (tipo) {
+            return { valor: tipo.chave, rotulo: tipo.rotulo };
+          }), grafico.tipo)
+        + '</div>'
+        + '<div class="card-linha">'
+        + caixaSimples(posicao, 'dimensao', 'Agrupar por',
+          opcoes.dimensoes.map(function (nome) {
+            return { valor: nome, rotulo: nome };
+          }), grafico.dimensao)
+        + caixaSimples(posicao, 'agregacao', 'O que medir',
+          opcoes.agregacoes.map(function (uma) {
+            return { valor: uma.chave, rotulo: uma.rotulo };
+          }), grafico.agregacao)
+        + '</div>'
+        + (precisaDeMedida
+          ? '<div class="card-linha">'
+            + caixaSimples(posicao, 'medida', 'Coluna do valor',
+              opcoes.medidas.map(function (nome) {
+                return { valor: nome, rotulo: nome };
+              }), grafico.medida)
+            + '<span></span></div>'
+          : '')
+        + '<div class="card-linha">'
+        + '<label class="config-campo"><span>Mostrar no máximo</span>'
+        + '<input type="text" data-card="' + posicao + '" data-parte="limite"'
+        + ' value="' + (grafico.limite || '') + '" placeholder="todos">'
+        + '<em>O resto vira uma fatia só, "Demais valores"'
+        + (grafico.tipo === 'pizza'
+          ? '. A pizza aceita no máximo ' + opcoes.maximoDeFatias + '.' : '.')
+        + '</em></label>'
+        + caixaSimples(posicao, 'largura', 'Tamanho na tela',
+          [{ valor: '1', rotulo: 'Metade da linha' },
+           { valor: '2', rotulo: 'Linha inteira' }], String(grafico.largura))
+        + '</div>'
+        + '<div class="card-linha rodape">'
+        + '<label class="config-chave">'
+        + '<input type="checkbox" data-card="' + posicao + '" data-parte="mostrar"'
+        + (grafico.mostrar ? ' checked' : '') + '><span>Mostrar</span></label>'
+        + '<button type="button" class="botao-texto perigo" data-remover-card="'
+        + posicao + '">✕ Remover</button>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  function caixaSimples(posicao, parte, rotulo, opcoes, escolhido) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<select data-card="' + posicao + '" data-parte="' + parte + '">'
+      + opcoes.map(function (opcao) {
+        return '<option value="' + escapar(opcao.valor) + '"'
+          + (String(opcao.valor) === String(escolhido) ? ' selected' : '') + '>'
+          + escapar(opcao.rotulo) + '</option>';
+      }).join('') + '</select></label>';
+  }
+
+  function ligarGraficos() {
+    ligarTrocaDeTelaEDeMesa();
+
+    ligarCliques('[data-remover-card]', function (botao) {
+      cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
+      elemento('lista-de-cards').innerHTML = desenharCardsDeGrafico();
+      ligarGraficos();
+    });
+
+    var caixas = document.querySelectorAll('#lista-de-cards [data-parte]');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        var grafico = cardsEmEdicao[Number(this.getAttribute('data-card'))];
+        var parte = this.getAttribute('data-parte');
+        if (parte === 'mostrar') grafico.mostrar = this.checked;
+        else if (parte === 'limite') grafico.limite = Number(this.value) || 0;
+        else if (parte === 'largura') grafico.largura = Number(this.value);
+        else grafico[parte] = this.value;
+        // Trocar a medição faz aparecer ou sumir a coluna do valor, e trocar
+        // o tipo muda a dica do limite: redesenhamos para a tela não mentir.
+        if (parte === 'agregacao' || parte === 'tipo') {
+          elemento('lista-de-cards').innerHTML = desenharCardsDeGrafico();
+          ligarGraficos();
+        }
+      });
+    }
+
+    elemento('add-card').addEventListener('click', function () {
+      var opcoes = dados.opcoesDoGrafico;
+      cardsEmEdicao.push({
+        id: '', titulo: 'Novo gráfico', tipo: 'barras',
+        dimensao: opcoes.dimensoes[0] || '', medida: '',
+        agregacao: 'contagem', limite: 6, largura: 1, mostrar: true
+      });
+      elemento('lista-de-cards').innerHTML = desenharCardsDeGrafico();
+      ligarGraficos();
+    });
+
+    elemento('descartar-cards').addEventListener('click', carregarPaineis);
+
+    elemento('salvar-cards').addEventListener('click', function () {
+      Servidor.chamar('salvarComponentesDoPainel', mesaDosCards, cardsEmEdicao)
+        .entao(function () { avisarSalvo('Gráficos salvos.'); carregarPaineis(); })
+        .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+    });
+  }
+
+  function ligarTrocaDeTelaEDeMesa() {
+    ligarCliques('[data-tela-do-painel]', function (botao) {
+      telaDosPaineis = botao.getAttribute('data-tela-do-painel');
+      carregarPaineis();
+    });
+    ligarCliques('[data-mesa-dos-cards]', function (botao) {
+      mesaDosCards = botao.getAttribute('data-mesa-dos-cards');
+      carregarPaineis();
+    });
   }
 
   function copiarCard(card) {
@@ -803,6 +996,7 @@ var TelaConfiguracoes = (function () {
   function desenharPaineis() {
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Cards da operação</span></div>'
+      + escolhaDeTela()
       + '<p class="config-explica">Escolha os cards do Dashboard. '
       + 'Até ' + dados.painel.maximo + ' cards por operação. Remover ou '
       + 'ocultar um card <strong>mantém os casos</strong> — o card é uma forma '
@@ -886,10 +1080,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function ligarPaineis() {
-    ligarCliques('[data-mesa-dos-cards]', function (botao) {
-      mesaDosCards = botao.getAttribute('data-mesa-dos-cards');
-      carregarPaineis();
-    });
+    ligarTrocaDeTelaEDeMesa();
 
     ligarCliques('[data-remover-card]', function (botao) {
       cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);

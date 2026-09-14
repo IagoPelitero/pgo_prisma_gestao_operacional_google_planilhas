@@ -130,13 +130,9 @@ var Rotas = (function () {
     painelAnalitico: {
       titulo: 'Painel Analítico',
       subtitulo: 'Explore dados e identifique oportunidades para a operação.',
-      montar: function () {
-        return emConstrucao(8, [
-          'Componentes configuráveis: pizza, linha, barras em pé e deitadas',
-          'Limite de TOP 5, TOP 10 ou o que for definido em PAINEIS',
-          'Detalhamento dos protocolos e exportação'
-        ]);
-      }
+      montar: function (pacote) { return TelaPainelAnalitico.montar(pacote); },
+      ligar: function (pacote) { TelaPainelAnalitico.ligar(pacote); },
+      desligar: function () { TelaPainelAnalitico.desligar(); }
     },
     configuracoes: {
       titulo: 'Configurações',

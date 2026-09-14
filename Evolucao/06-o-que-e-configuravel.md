@@ -23,7 +23,8 @@ abaixo com o motivo.
 | **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga | Níveis de acesso |
 | **Listas** | Situações, canais, motivos, ramos, áreas, cargos, formas de pagamento, origens: criar, renomear o rótulo, recolorir, reordenar, desligar | Listas |
 | **Mesas de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Mesas de trabalho |
-| **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis |
+| **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis → Cards |
+| **Gráficos do Painel Analítico** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
 | **Busca** | Em quais colunas cada mesa procura | Mesas de trabalho |
@@ -59,7 +60,7 @@ Isto não é omissão: cada um tem uma razão para ainda não existir.
 | **Apagar mesa, campo ou lista** | Por decisão, o sistema **desliga** em vez de apagar. Apagar de verdade sairia do princípio de que nenhuma linha se perde |
 | **Trocar o TIPO de uma coluna existente** | Mudar `texto` para `data` numa coluna com 30 mil linhas reinterpreta tudo o que já está gravado. Precisa de conversão e conferência, não de um seletor |
 | **Renomear o cabeçalho de uma coluna** | É o nome que amarra o dado ao Power BI. Renomear na planilha e reconciliar aqui é o caminho seguro; um botão que fizesse isso quebraria relatório em silêncio |
-| **Gráficos do Painel Analítico** | A aba `PAINEIS` já guarda tipo, dimensão, medida e limite. A tela chega na **etapa 8** |
+| **A ordem das cores da paleta** | Os seis tons foram conferidos por régua — separação mínima sob daltonismo e em visão normal. Trocar um por gosto quebraria a garantia, então eles são do sistema, não da operação |
 
 ---
 

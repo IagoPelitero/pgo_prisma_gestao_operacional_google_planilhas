@@ -1,0 +1,659 @@
+<script>
+/* ============================================================================
+   PGO — PainelAnalitico.html · o que está acontecendo na operação
+   ============================================================================
+   Os gráficos são SVG escrito à mão, sem biblioteca de fora — pelo mesmo
+   motivo dos ícones: o Apps Script serve a página num quadro isolado, e cada
+   dependência externa é mais um ponto que pode não carregar. Gráfico que não
+   carrega é pior que gráfico nenhum, porque a tela fica com um buraco.
+
+   TRÊS REGRAS DE LEITURA, e todas têm motivo:
+
+     UM EIXO SÓ. "Barras com linha" não são duas escalas. A linha é a média
+     móvel da própria barra, na mesma altura: ela mostra a tendência por cima
+     do ruído do dia a dia. Dois eixos fariam a mesma altura significar duas
+     coisas — é o erro de gráfico mais comum que existe.
+
+     COR PARA IDENTIDADE, TOM ÚNICO PARA MAGNITUDE. A pizza responde "de que
+     tipo são" e usa cores; as barras respondem "quanto de cada" e usam um tom
+     só. Oito cores para dizer "quanto" enterra a informação.
+
+     O NÚMERO SEMPRE VISÍVEL. Todo gráfico tem rótulo direto e uma tabela por
+     baixo. Cor é a segunda leitura, nunca a única — nem todo mundo enxerga
+     cor, e nenhuma tela de trabalho pode depender disso.
+   ============================================================================ */
+
+var TelaPainelAnalitico = (function () {
+
+  var mesaEscolhida = '';
+  var filtros = {};
+  var dias = 0;
+  var painel = null;
+  var tabelasAbertas = {};
+  var pacoteDoSistema = null;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- números */
+
+  function numero(valor, unidade) {
+    if (unidade === 'dinheiro') {
+      return 'R$ ' + (Math.round(valor * 100) / 100)
+        .toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    var arredondado = Math.round(valor * 100) / 100;
+    return String(arredondado).replace('.', ',');
+  }
+
+  function porcento(parte, todo) {
+    if (!todo) return '0%';
+    return Math.round((parte / todo) * 100) + '%';
+  }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    pacoteDoSistema = pacote;
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+      + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
+  }
+
+  function carregar() {
+    var caixa = elemento('analitico');
+    if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
+
+    Servidor.chamar('painelAnalitico', mesaEscolhida, filtros, dias)
+      .entao(function (resposta) {
+        painel = resposta;
+        desenhar();
+      })
+      .senao(function (erro) {
+        elemento('analitico').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function desenhar() {
+    elemento('analitico').innerHTML = desenharFiltros()
+      + (painel.componentes.length
+        ? '<div class="graficos">'
+          + painel.componentes.map(desenharComponente).join('') + '</div>'
+        : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
+          + 'mesa.</strong><p>Um administrador monta os gráficos em '
+          + 'Configurações → Painéis.</p></div>')
+      + '<div id="detalhe-do-painel"></div>';
+    ligarPainel();
+  }
+
+  function desenharFiltros() {
+    var caixas = painel.filtrosDisponiveis.map(function (filtro) {
+      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      filtro.opcoes.forEach(function (opcao) {
+        opcoes.push('<option value="' + escapar(opcao.valor) + '"'
+          + (filtros[filtro.chave] === opcao.valor ? ' selected' : '') + '>'
+          + escapar(opcao.rotulo) + '</option>');
+      });
+      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
+        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
+        + opcoes.join('') + '</select>';
+    });
+
+    var periodos = [30, 60, 90, 180, 365].map(function (quantos) {
+      return '<option value="' + quantos + '"'
+        + (painel.periodo.dias === quantos ? ' selected' : '') + '>'
+        + 'Últimos ' + quantos + ' dias</option>';
+    }).join('');
+
+    return '<div class="filtros">'
+      + '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
+      + periodos + '</select>'
+      + caixas.join('')
+      + '<span class="contagem">' + painel.total + ' casos · '
+      + escapar(painel.periodo.rotulo) + '</span></div>';
+  }
+
+  /* ------------------------------------------------------------- gráficos */
+
+  function desenharComponente(componente) {
+    var corpo;
+    if (componente.aviso) {
+      corpo = '<p class="grafico-aviso">' + escapar(componente.aviso) + '</p>';
+    } else if (!componente.pontos.length) {
+      corpo = '<p class="grafico-vazio">Nenhum caso no período para somar aqui.</p>';
+    } else if (componente.tipo === 'pizza') {
+      corpo = desenharPizza(componente);
+    } else if (componente.tipo === 'barrasDeitadas') {
+      corpo = desenharBarrasDeitadas(componente);
+    } else if (componente.tipo === 'linha') {
+      corpo = desenharLinha(componente, false);
+    } else if (componente.tipo === 'barrasComLinha') {
+      corpo = desenharLinha(componente, true);
+    } else {
+      corpo = desenharBarras(componente);
+    }
+
+    return '<section class="cartao grafico largura-' + componente.largura + '"'
+      + ' data-grafico="' + escapar(componente.id) + '">'
+      + '<header class="grafico-cabeca">'
+      + '<h3>' + escapar(componente.titulo) + '</h3>'
+      + '<div class="grafico-acoes">'
+      + '<button type="button" class="botao-texto" data-tabela="'
+      + escapar(componente.id) + '">'
+      + (tabelasAbertas[componente.id] ? 'Ver o gráfico' : 'Ver os números') + '</button>'
+      + (painel.podeExportar
+        ? '<button type="button" class="botao-texto" data-exportar="'
+          + escapar(componente.id) + '">Exportar</button>' : '')
+      + '</div></header>'
+      + (tabelasAbertas[componente.id] ? desenharTabela(componente) : corpo)
+      + rodapeDoGrafico(componente)
+      + '</section>';
+  }
+
+  function rodapeDoGrafico(componente) {
+    if (componente.aviso || !componente.pontos.length) return '';
+    return '<p class="grafico-pe">'
+      + (componente.dobradosEmOutros
+        ? 'Mais ' + componente.dobradosEmOutros + ' valor(es) somados em '
+          + '<strong>Demais valores</strong>. '
+        : '')
+      + 'Clique para ver os casos.</p>';
+  }
+
+  /** A tabela é a leitura de reserva: cor nunca é a única forma de ler. */
+  function desenharTabela(componente) {
+    return '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>' + escapar(componente.dimensao) + '</th>'
+      + '<th class="direita">' + (componente.agregacao === 'contagem'
+        ? 'Casos' : escapar(componente.medida)) + '</th>'
+      + '<th class="direita">Casos</th></tr></thead><tbody>'
+      + componente.pontos.map(function (ponto) {
+        return '<tr><td>' + escapar(ponto.rotulo) + '</td>'
+          + '<td class="direita">' + escapar(numero(ponto.valor, componente.unidade))
+          + '</td><td class="direita">' + ponto.casos + '</td></tr>';
+      }).join('')
+      + '</tbody></table></div>';
+  }
+
+  /** A classe de cor de um ponto: o tom do catálogo, ou o slot da paleta. */
+  function classeDoPonto(ponto) {
+    if (ponto.tom) return 'tom-' + ponto.tom;
+    if (ponto.serie) return 'serie-' + ponto.serie;
+    return 'serie-magnitude';
+  }
+
+  function dica(componente, ponto) {
+    return escapar(ponto.rotulo) + ': '
+      + escapar(numero(ponto.valor, componente.unidade))
+      + (componente.agregacao === 'contagem' ? ' caso(s)'
+        : ' · ' + ponto.casos + ' caso(s)');
+  }
+
+  /* -- pizza --------------------------------------------------------------- */
+
+  /**
+   * Rosca, e não pizza cheia: o buraco do meio recebe o total, que é o número
+   * que a pessoa procura primeiro. Cada fatia tem um anel da cor do fundo em
+   * volta, para duas fatias vizinhas nunca se fundirem numa só mancha.
+   */
+  function desenharPizza(componente) {
+    var total = componente.pontos.reduce(function (soma, ponto) {
+      return soma + ponto.valor;
+    }, 0);
+    if (!total) return '<p class="grafico-vazio">Tudo zerado no período.</p>';
+
+    var centro = 92;
+    var raio = 76;
+    var buraco = 46;
+    var anguloAtual = -Math.PI / 2;   // começa no topo
+
+    var fatias = componente.pontos.map(function (ponto) {
+      var fracao = ponto.valor / total;
+      var angulo = fracao * Math.PI * 2;
+      var caminho = arcoDaRosca(centro, centro, raio, buraco, anguloAtual,
+        anguloAtual + angulo);
+      anguloAtual += angulo;
+
+      return '<path d="' + caminho + '" class="fatia ' + classeDoPonto(ponto) + '"'
+        + ' data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '"></path>';
+    }).join('');
+
+    var legenda = componente.pontos.map(function (ponto) {
+      return '<button type="button" class="legenda-item" data-ponto="'
+        + escapar(ponto.chave) + '">'
+        + '<span class="marca ' + classeDoPonto(ponto) + '"></span>'
+        + '<span class="nome">' + escapar(ponto.rotulo) + '</span>'
+        + '<span class="valor">' + escapar(numero(ponto.valor, componente.unidade))
+        + '<em>' + porcento(ponto.valor, total) + '</em></span></button>';
+    }).join('');
+
+    return '<div class="grafico-corpo pizza">'
+      + '<svg viewBox="0 0 184 184" class="desenho" role="img"'
+      + ' aria-label="' + escapar(componente.titulo) + '">'
+      + fatias
+      + '<text x="92" y="86" class="rosca-numero">' + total + '</text>'
+      + '<text x="92" y="104" class="rosca-rotulo">no total</text>'
+      + '</svg>'
+      + '<div class="legenda">' + legenda + '</div></div>';
+  }
+
+  /** O caminho de uma fatia de rosca, em coordenadas de SVG. */
+  function arcoDaRosca(cx, cy, raio, buraco, de, ate) {
+    // Uma fatia que é o círculo inteiro não pode fechar em si mesma, ou o
+    // navegador não desenha nada. Tiramos um fio de grau dela.
+    if (ate - de >= Math.PI * 2) ate = de + Math.PI * 2 - 0.001;
+
+    var grande = (ate - de) > Math.PI ? 1 : 0;
+    var x1 = cx + raio * Math.cos(de), y1 = cy + raio * Math.sin(de);
+    var x2 = cx + raio * Math.cos(ate), y2 = cy + raio * Math.sin(ate);
+    var x3 = cx + buraco * Math.cos(ate), y3 = cy + buraco * Math.sin(ate);
+    var x4 = cx + buraco * Math.cos(de), y4 = cy + buraco * Math.sin(de);
+
+    return 'M ' + x1.toFixed(2) + ' ' + y1.toFixed(2)
+      + ' A ' + raio + ' ' + raio + ' 0 ' + grande + ' 1 '
+      + x2.toFixed(2) + ' ' + y2.toFixed(2)
+      + ' L ' + x3.toFixed(2) + ' ' + y3.toFixed(2)
+      + ' A ' + buraco + ' ' + buraco + ' 0 ' + grande + ' 0 '
+      + x4.toFixed(2) + ' ' + y4.toFixed(2) + ' Z';
+  }
+
+  /* -- barras em pé -------------------------------------------------------- */
+
+  function desenharBarras(componente) {
+    var maior = maiorValor(componente.pontos);
+    var largura = larguraDoDesenho(componente);
+    var altura = 240;
+    var pe = 46;          // espaço do rótulo embaixo
+    var topo = 22;        // espaço do número em cima
+    var faixa = largura / componente.pontos.length;
+    var grossura = Math.min(faixa - 10, 64);
+
+    var barras = componente.pontos.map(function (ponto, i) {
+      var alto = maior ? (ponto.valor / maior) * (altura - pe - topo) : 0;
+      var x = i * faixa + (faixa - grossura) / 2;
+      var y = altura - pe - alto;
+
+      return '<g class="barra ' + classeDoPonto(ponto) + '"'
+        + ' data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '">'
+        + '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '"'
+        + ' width="' + grossura.toFixed(1) + '" height="'
+        + Math.max(alto, 2).toFixed(1) + '" rx="4"></rect>'
+        + '<text x="' + (x + grossura / 2).toFixed(1) + '" y="'
+        + (y - 7).toFixed(1) + '" class="valor-da-barra">'
+        + escapar(numero(ponto.valor, componente.unidade)) + '</text>'
+        + '<text x="' + (x + grossura / 2).toFixed(1) + '" y="'
+        + (altura - pe + 18) + '" class="rotulo-da-barra">'
+        + escapar(encurtar(ponto.rotulo, 14)) + '</text>'
+        + '</g>';
+    }).join('');
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(componente.titulo) + '">'
+      + '<line x1="0" y1="' + (altura - pe) + '" x2="' + largura + '" y2="'
+      + (altura - pe) + '" class="regua"></line>'
+      + barras + '</svg></div>';
+  }
+
+  /* -- barras deitadas ----------------------------------------------------- */
+
+  /**
+   * Deitadas porque o rótulo é comprido. Em pé, "Aumento do prêmio na
+   * renovação" vira uma escadinha ilegível ou é cortado no meio.
+   */
+  function desenharBarrasDeitadas(componente) {
+    var maior = maiorValor(componente.pontos);
+    var largura = larguraDoDesenho(componente);
+    var alturaDaLinha = 34;
+    var altura = componente.pontos.length * alturaDaLinha + 8;
+    var areaDoRotulo = componente.largura === 2 ? 240 : 152;
+    var areaDoValor = 62;
+    var comprimentoMaximo = largura - areaDoRotulo - areaDoValor;
+
+    var barras = componente.pontos.map(function (ponto, i) {
+      var comprimento = maior ? (ponto.valor / maior) * comprimentoMaximo : 0;
+      var y = i * alturaDaLinha + 8;
+
+      return '<g class="barra deitada ' + classeDoPonto(ponto) + '"'
+        + ' data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '">'
+        + '<text x="' + (areaDoRotulo - 10) + '" y="' + (y + 14)
+        + '" class="rotulo-deitado">'
+        + escapar(encurtar(ponto.rotulo, componente.largura === 2 ? 38 : 22))
+        + '</text>'
+        + '<rect x="' + areaDoRotulo + '" y="' + y + '" width="'
+        + Math.max(comprimento, 2).toFixed(1) + '" height="18" rx="4"></rect>'
+        + '<text x="' + (areaDoRotulo + Math.max(comprimento, 2) + 8).toFixed(1)
+        + '" y="' + (y + 14) + '" class="valor-deitado">'
+        + escapar(numero(ponto.valor, componente.unidade)) + '</text>'
+        + '</g>';
+    }).join('');
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(componente.titulo) + '">'
+      + barras + '</svg></div>';
+  }
+
+  /* -- linha, e barras com linha ------------------------------------------- */
+
+  function desenharLinha(componente, comBarras) {
+    var pontos = componente.pontos;
+    var maior = maiorValor(pontos);
+    var largura = larguraDoDesenho(componente);
+    var altura = componente.largura === 2 ? 300 : 240;
+    var pe = 40;
+    var topo = 20;
+    var faixa = pontos.length > 1 ? largura / pontos.length : largura;
+
+    function xDe(i) { return i * faixa + faixa / 2; }
+    function yDe(valor) {
+      return altura - pe - (maior ? (valor / maior) * (altura - pe - topo) : 0);
+    }
+
+    var barras = '';
+    if (comBarras) {
+      var grossura = Math.min(faixa - 6, 34);
+      barras = pontos.map(function (ponto, i) {
+        var y = yDe(ponto.valor);
+        return '<rect class="barra-de-fundo" x="'
+          + (xDe(i) - grossura / 2).toFixed(1) + '" y="' + y.toFixed(1)
+          + '" width="' + grossura.toFixed(1) + '" height="'
+          + Math.max(altura - pe - y, 2).toFixed(1) + '" rx="4"></rect>';
+      }).join('');
+    }
+
+    var serie = comBarras ? componente.tendencia : pontos;
+    var caminho = serie.map(function (ponto, i) {
+      return (i ? 'L' : 'M') + xDe(i).toFixed(1) + ' ' + yDe(ponto.valor).toFixed(1);
+    }).join(' ');
+
+    // Só alguns rótulos no eixo: um por ponto vira uma parede de texto em 30
+    // dias, e nenhum deles é lido.
+    var deQuantosEm = Math.max(1, Math.ceil(pontos.length / 8));
+    var rotulos = pontos.map(function (ponto, i) {
+      if (i % deQuantosEm !== 0 && i !== pontos.length - 1) return '';
+      return '<text x="' + xDe(i).toFixed(1) + '" y="' + (altura - pe + 18)
+        + '" class="rotulo-da-barra">' + escapar(ponto.rotulo) + '</text>';
+    }).join('');
+
+    var marcas = pontos.map(function (ponto, i) {
+      return '<g class="ponto-da-linha" data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '">'
+        // Alvo invisível e largo: acertar um círculo de 5px com o mouse é
+        // uma tarefa, e ninguém deveria ter de mirar num gráfico.
+        + '<rect class="alvo" x="' + (xDe(i) - faixa / 2).toFixed(1) + '" y="0"'
+        + ' width="' + faixa.toFixed(1) + '" height="' + (altura - pe) + '"></rect>'
+        + '<circle cx="' + xDe(i).toFixed(1) + '" cy="'
+        + yDe(ponto.valor).toFixed(1) + '" r="5" class="marcador"></circle>'
+        + '</g>';
+    }).join('');
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(componente.titulo) + '">'
+      + '<line x1="0" y1="' + (altura - pe) + '" x2="' + largura + '" y2="'
+      + (altura - pe) + '" class="regua"></line>'
+      + barras
+      + '<path d="' + caminho + '" class="linha-do-grafico"></path>'
+      + marcas + rotulos + '</svg>'
+      + (comBarras
+        ? '<p class="grafico-legenda-linha">As barras são o dia; a linha é a '
+          + '<strong>média dos 7 dias anteriores</strong>, na mesma escala — '
+          + 'ela mostra a tendência por cima do sobe e desce do dia a dia.</p>'
+        : '')
+      + '</div>';
+  }
+
+  /**
+   * A largura do desenho, em unidades do viewBox.
+   *
+   * O cartão largo recebe um desenho largo, e não o mesmo desenho esticado:
+   * esticado, um gráfico de 480 por 240 num cartão de 1200px fica com 600px
+   * de altura e letras do tamanho de um título. A proporção tem de nascer
+   * certa, não ser corrigida depois.
+   */
+  function larguraDoDesenho(componente) {
+    return componente.largura === 2 ? 960 : 480;
+  }
+
+  function maiorValor(pontos) {
+    return pontos.reduce(function (maior, ponto) {
+      return Math.max(maior, ponto.valor);
+    }, 0);
+  }
+
+  function encurtar(texto, quantos) {
+    var limpo = String(texto || '');
+    return limpo.length > quantos ? limpo.substring(0, quantos - 1) + '…' : limpo;
+  }
+
+  /* --------------------------------------------------------- comportamento */
+
+  function ligarPainel() {
+    var caixas = document.querySelectorAll('#analitico .filtro');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        if (this.id === 'periodo-do-painel') dias = Number(this.value);
+        else filtros[this.getAttribute('data-filtro')] = this.value;
+        carregar();
+      });
+    }
+
+    ligarCliques('[data-tabela]', function (botao) {
+      var id = botao.getAttribute('data-tabela');
+      tabelasAbertas[id] = !tabelasAbertas[id];
+      desenhar();
+    });
+
+    ligarCliques('[data-exportar]', function (botao) {
+      exportar(botao.getAttribute('data-exportar'));
+    });
+
+    ligarCliques('[data-ponto]', function (elementoClicado) {
+      var grafico = elementoClicado.closest('.grafico');
+      if (!grafico) return;
+      detalhar(grafico.getAttribute('data-grafico'),
+        elementoClicado.getAttribute('data-ponto'));
+    });
+
+    ligarDica();
+  }
+
+  function ligarCliques(seletor, oQueFazer) {
+    var achados = document.querySelectorAll('#analitico ' + seletor);
+    for (var i = 0; i < achados.length; i++) {
+      achados[i].addEventListener('click', function () { oQueFazer(this); });
+      achados[i].addEventListener('keydown', function (evento) {
+        if (evento.key === 'Enter' || evento.key === ' ') {
+          evento.preventDefault();
+          oQueFazer(this);
+        }
+      });
+    }
+  }
+
+  /** Uma dica só, reaproveitada por todos os gráficos. */
+  function ligarDica() {
+    var dicaNaTela = document.createElement('div');
+    dicaNaTela.className = 'dica-do-grafico';
+    dicaNaTela.hidden = true;
+    document.body.appendChild(dicaNaTela);
+
+    var comDica = document.querySelectorAll('#analitico [data-dica]');
+    for (var i = 0; i < comDica.length; i++) {
+      comDica[i].addEventListener('mouseenter', function (evento) {
+        dicaNaTela.innerHTML = this.getAttribute('data-dica');
+        dicaNaTela.hidden = false;
+        posicionarDica(dicaNaTela, evento);
+      });
+      comDica[i].addEventListener('mousemove', function (evento) {
+        posicionarDica(dicaNaTela, evento);
+      });
+      comDica[i].addEventListener('mouseleave', function () {
+        dicaNaTela.hidden = true;
+      });
+      comDica[i].addEventListener('focus', function () {
+        dicaNaTela.innerHTML = this.getAttribute('data-dica');
+        dicaNaTela.hidden = false;
+        var caixa = this.getBoundingClientRect();
+        dicaNaTela.style.left = (caixa.left + caixa.width / 2) + 'px';
+        dicaNaTela.style.top = (caixa.top - 10) + 'px';
+      });
+      comDica[i].addEventListener('blur', function () { dicaNaTela.hidden = true; });
+    }
+  }
+
+  function posicionarDica(dicaNaTela, evento) {
+    // Presa à janela, para nunca escapar pela borda numa tela estreita.
+    var largura = dicaNaTela.offsetWidth || 160;
+    var x = Math.min(Math.max(evento.clientX, largura / 2 + 8),
+      window.innerWidth - largura / 2 - 8);
+    dicaNaTela.style.left = x + 'px';
+    dicaNaTela.style.top = (evento.clientY - 14) + 'px';
+  }
+
+  function detalhar(idDoComponente, chaveDoPonto) {
+    var caixa = elemento('detalhe-do-painel');
+    caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
+    caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    Servidor.chamar('detalharComponente', mesaEscolhida, idDoComponente,
+      chaveDoPonto, filtros, dias)
+      .entao(function (resposta) { desenharDetalhe(resposta); })
+      .senao(function (erro) {
+        caixa.innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function desenharDetalhe(detalhe) {
+    var cabecalho = detalhe.colunas.map(function (grupo) {
+      return '<th>' + escapar(grupo.titulo) + '</th>';
+    }).join('') + '<th class="acoes-coluna">Ações</th>';
+
+    var linhas = detalhe.casos.map(function (caso) {
+      var celulas = caso.celulas.map(function (grupo, i) {
+        return '<td>' + grupo.map(function (celula, j) {
+          if (celula.ehStatus) {
+            return '<span class="situacao tom-' + escapar(caso.tom || 'neutro')
+              + '">' + escapar(celula.valor || '—') + '</span>';
+          }
+          return '<span class="' + ((j === 0 && i !== 0) ? 'principal' : 'apoio')
+            + '">' + escapar(celula.valor || '—') + '</span>';
+        }).join('') + '</td>';
+      }).join('');
+      return '<tr>' + celulas + '<td class="acoes-coluna">'
+        + '<button type="button" class="acao ver" data-caso-do-painel="'
+        + escapar(caso.id) + '">' + Moldura.icone('olho')
+        + ' Ver detalhes</button></td></tr>';
+    }).join('');
+
+    elemento('detalhe-do-painel').innerHTML = '<section class="cartao sem-forro origem">'
+      + '<header class="origem-cabeca"><h3>' + escapar(detalhe.titulo) + ' · '
+      + escapar(detalhe.ponto) + '</h3>'
+      + '<span class="quantos">' + detalhe.total + '</span>'
+      + '<button type="button" class="botao-texto" id="fechar-detalhe">'
+      + 'Fechar</button></header>'
+      + (detalhe.casos.length
+        ? '<div class="rolagem-tabela"><table class="fila agrupada">'
+          + '<thead><tr>' + cabecalho + '</tr></thead>'
+          + '<tbody>' + linhas + '</tbody></table></div>'
+        : '<p class="grafico-vazio">Nenhum caso aqui.</p>')
+      + '</section>';
+
+    elemento('fechar-detalhe').addEventListener('click', function () {
+      elemento('detalhe-do-painel').innerHTML = '';
+    });
+
+    var abrir = document.querySelectorAll('[data-caso-do-painel]');
+    for (var i = 0; i < abrir.length; i++) {
+      abrir[i].addEventListener('click', function () {
+        CasoEmModal.abrir(mesaEscolhida, this.getAttribute('data-caso-do-painel'),
+          carregar);
+      });
+    }
+  }
+
+  /**
+   * Exportar.
+   *
+   * O Apps Script serve a página num quadro isolado, e ali o navegador barra
+   * download que a própria página começa. Então mostramos o texto pronto para
+   * copiar — que funciona em qualquer lugar — e oferecemos o download por
+   * cima, para quem estiver num contexto que o aceite.
+   */
+  function exportar(idDoComponente) {
+    Servidor.chamar('exportarComponente', mesaEscolhida, idDoComponente,
+      filtros, dias)
+      .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
+      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+  }
+
+  function abrirCaixaDeExportar(arquivo) {
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-exportar';
+    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="titulo-exportar">'
+      + '<h3 id="titulo-exportar">Exportar</h3>'
+      + '<p>Separado por ponto e vírgula, que é como o Excel em português abre '
+      + 'sem perguntar nada.</p>'
+      + '<textarea id="texto-exportado" rows="8" readonly>'
+      + escapar(arquivo.conteudo) + '</textarea>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="copiar-exportado">Copiar</button>'
+      + '<button type="button" class="botao vazado" id="fechar-exportar">'
+      + 'Fechar</button></div></div>';
+    document.body.appendChild(caixa);
+
+    function sair() { if (caixa.parentNode) caixa.parentNode.removeChild(caixa); }
+    elemento('fechar-exportar').addEventListener('click', sair);
+    caixa.addEventListener('mousedown', function (evento) {
+      if (evento.target === caixa) sair();
+    });
+
+    var area = elemento('texto-exportado');
+    area.focus();
+    area.select();
+
+    elemento('copiar-exportado').addEventListener('click', function () {
+      area.select();
+      var deuCerto = false;
+      try { deuCerto = document.execCommand('copy'); } catch (erro) { deuCerto = false; }
+      this.textContent = deuCerto ? 'Copiado' : 'Aperte Ctrl+C';
+    });
+  }
+
+  /* ---------------------------------------------------------------- ligar */
+
+  function ligar(pacote) {
+    if (pacote) pacoteDoSistema = pacote;
+    SeletorDeMesa.ligar(function (idDaMesa) {
+      mesaEscolhida = idDaMesa;
+      filtros = {};
+      tabelasAbertas = {};
+      Aplicacao.remontar();
+    });
+    carregar();
+  }
+
+  function desligar() {
+    var dicaNaTela = document.querySelector('.dica-do-grafico');
+    if (dicaNaTela) dicaNaTela.parentNode.removeChild(dicaNaTela);
+  }
+
+  return { montar: montar, ligar: ligar, desligar: desligar };
+})();
+</script>

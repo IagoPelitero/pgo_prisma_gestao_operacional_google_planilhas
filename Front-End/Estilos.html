@@ -63,6 +63,22 @@
   --lateral-ativo-texto: #0A2A3D;
 
   --violeta: #6B4FD8;     --violeta-tenue: #EDE9FB;
+
+  /* A paleta dos gráficos. Seis tons em ORDEM FIXA, nunca girados: um sétimo
+     valor vira "Outros", e não uma cor nova — cor gerada na hora fica
+     indistinguível das outras para quem não enxerga cor.
+
+     Estes seis passaram na conferência de daltonismo (menor separação entre
+     vizinhos ΔE 9,1) e de visão normal (ΔE 19,6) sobre fundo claro. Três
+     deles ficam abaixo de 3:1 de contraste com o fundo, e é por isso que
+     todo gráfico tem rótulo direto e uma tabela por baixo: cor é a segunda
+     leitura, nunca a única. */
+  --serie-1: #2A78D6;
+  --serie-2: #EB6834;
+  --serie-3: #1BAF7A;
+  --serie-4: #EDA100;
+  --serie-5: #E87BA4;
+  --serie-6: #008300;
 }
 
 /* ------------------------------------------------------------- tema ROSA -- */
@@ -90,6 +106,22 @@
   --lateral-ativo-texto: #3A0A22;
 
   --violeta: #6D28D9;     --violeta-tenue: #EDE7FB;
+
+  /* A paleta dos gráficos. Seis tons em ORDEM FIXA, nunca girados: um sétimo
+     valor vira "Outros", e não uma cor nova — cor gerada na hora fica
+     indistinguível das outras para quem não enxerga cor.
+
+     Estes seis passaram na conferência de daltonismo (menor separação entre
+     vizinhos ΔE 9,1) e de visão normal (ΔE 19,6) sobre fundo claro. Três
+     deles ficam abaixo de 3:1 de contraste com o fundo, e é por isso que
+     todo gráfico tem rótulo direto e uma tabela por baixo: cor é a segunda
+     leitura, nunca a única. */
+  --serie-1: #2A78D6;
+  --serie-2: #EB6834;
+  --serie-3: #1BAF7A;
+  --serie-4: #EDA100;
+  --serie-5: #E87BA4;
+  --serie-6: #008300;
 }
 
 /* ------------------------------------------------------------- tema DARK -- */
@@ -107,6 +139,16 @@
   --texto: #E7EDF7;
   --suave: #9AAAC2;
   --tenue: #75879F;
+
+
+  /* Os mesmos seis tons, repassados para o fundo escuro — e não a paleta
+     clara girada. Aqui todos passam de 3:1 de contraste. */
+  --serie-1: #3987E5;
+  --serie-2: #D95926;
+  --serie-3: #199E70;
+  --serie-4: #C98500;
+  --serie-5: #D55181;
+  --serie-6: #008300;
 
   --lateral-fundo: #0E1725;
   --lateral-texto: #9EB0C9;
@@ -148,6 +190,22 @@
   --lateral-ativo-texto: #06301A;
 
   --violeta: #5B41C4;     --violeta-tenue: #EAE6FA;
+
+  /* A paleta dos gráficos. Seis tons em ORDEM FIXA, nunca girados: um sétimo
+     valor vira "Outros", e não uma cor nova — cor gerada na hora fica
+     indistinguível das outras para quem não enxerga cor.
+
+     Estes seis passaram na conferência de daltonismo (menor separação entre
+     vizinhos ΔE 9,1) e de visão normal (ΔE 19,6) sobre fundo claro. Três
+     deles ficam abaixo de 3:1 de contraste com o fundo, e é por isso que
+     todo gráfico tem rótulo direto e uma tabela por baixo: cor é a segunda
+     leitura, nunca a única. */
+  --serie-1: #2A78D6;
+  --serie-2: #EB6834;
+  --serie-3: #1BAF7A;
+  --serie-4: #EDA100;
+  --serie-5: #E87BA4;
+  --serie-6: #008300;
 
   --atencao: #8A6300;     --atencao-tenue: #FBF0CF;
 }
@@ -1086,6 +1144,21 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   display: block; font-style: normal; font-size: 12px; opacity: .75;
 }
 
+/* As abas de dentro de uma seção: Dashboard e Painel Analítico têm cada um
+   os seus componentes, e são a mesma pergunta — "o que esta tela mostra". */
+.config-abas {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--linha);
+}
+.config-aba {
+  background: none; border: 0; cursor: pointer;
+  padding: 9px 12px; margin-bottom: -1px;
+  font-size: 13.5px; font-weight: 600; color: var(--suave);
+  border-bottom: 2px solid transparent;
+}
+.config-aba:hover { color: var(--texto); }
+.config-aba.atual { color: var(--destaque); border-bottom-color: var(--destaque); }
+
 .card-editavel {
   border: 1px solid var(--linha); border-radius: var(--raio);
   padding: 14px 16px; margin-bottom: 10px; background: var(--superficie);
@@ -1184,6 +1257,185 @@ table.fila.legado td { color: var(--suave); }
 @media (max-width: 560px) {
   .busca-linha { flex-wrap: wrap; }
   .busca-linha .botao { width: 100%; justify-content: center; }
+}
+
+/* ==================================================== painel analítico === */
+/*
+  A grade dos gráficos. `auto-fit` com um mínimo generoso: numa tela larga
+  cabem dois lado a lado, e numa estreita eles empilham sozinhos, sem media
+  query nenhuma. Gráfico espremido não é gráfico pequeno — é gráfico ilegível.
+*/
+.graficos {
+  display: grid; gap: 14px; margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  /* Cada cartão com a sua altura: esticado para acompanhar o vizinho mais
+     alto, um gráfico de três barras fica com meio metro de espaço em branco
+     embaixo. */
+  align-items: start;
+}
+.grafico { padding: 16px 18px 12px; margin: 0; min-width: 0; }
+/* O gráfico largo ocupa a linha inteira — mas só quando há mais de uma
+   coluna, senão o `span 2` cria uma coluna fantasma numa tela estreita. */
+@media (min-width: 720px) {
+  .grafico.largura-2 { grid-column: 1 / -1; }
+}
+
+.grafico-cabeca {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
+  margin-bottom: 12px;
+}
+.grafico-cabeca h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.grafico-acoes { margin-left: auto; display: flex; gap: 12px; }
+.grafico-pe { margin: 10px 0 0; font-size: 12px; color: var(--tenue); }
+.grafico-vazio, .grafico-aviso {
+  margin: 0; padding: 26px 0; text-align: center;
+  font-size: 13.5px; color: var(--tenue);
+}
+.grafico-aviso { color: var(--atencao); }
+.grafico-legenda-linha {
+  margin: 10px 0 0; font-size: 12px; color: var(--tenue); line-height: 1.45;
+}
+
+/* O SVG escala com a largura do cartão: viewBox fixo, largura 100%. */
+.desenho { display: block; width: 100%; height: auto; overflow: visible; }
+.grafico-corpo { min-width: 0; }
+.grafico-corpo.pizza {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+}
+.grafico-corpo.pizza .desenho { flex: 0 1 184px; max-width: 184px; }
+.grafico-corpo.pizza .legenda { flex: 1 1 180px; min-width: 0; }
+
+/* ---- as cores das séries, por PAPEL ------------------------------------- */
+/* Magnitude ("quanto de cada") vai num tom só: seis cores para dizer quanto
+   é o jeito mais rápido de enterrar a informação. */
+.serie-magnitude { --serie: var(--destaque); }
+.serie-1 { --serie: var(--serie-1); }
+.serie-2 { --serie: var(--serie-2); }
+.serie-3 { --serie: var(--serie-3); }
+.serie-4 { --serie: var(--serie-4); }
+.serie-5 { --serie: var(--serie-5); }
+.serie-6 { --serie: var(--serie-6); }
+/* Quando o catálogo já declarou o tom do valor, ele manda: "Concluído" é
+   verde porque o catálogo diz, e continua verde depois de qualquer filtro. */
+.tom-neutro   { --serie: var(--tenue); }
+.tom-destaque { --serie: var(--destaque); }
+.tom-bom      { --serie: var(--bom); }
+.tom-atencao  { --serie: var(--atencao); }
+.tom-ruim     { --serie: var(--ruim); }
+.tom-violeta  { --serie: var(--violeta); }
+
+/* ---- as marcas ---------------------------------------------------------- */
+.regua { stroke: var(--linha); stroke-width: 1; }
+
+.barra rect, .barra-de-fundo {
+  fill: var(--serie, var(--destaque));
+  transition: opacity var(--transicao);
+}
+.barra-de-fundo { fill: var(--destaque); opacity: .22; }
+.barra { cursor: pointer; }
+.barra:hover rect, .barra:focus-visible rect { opacity: .78; }
+.barra:focus-visible { outline: none; }
+.barra:focus-visible rect { stroke: var(--texto); stroke-width: 2; }
+
+.valor-da-barra, .valor-deitado {
+  font-size: 12px; font-weight: 600; fill: var(--texto);
+  text-anchor: middle; font-family: var(--fonte);
+}
+.valor-deitado { text-anchor: start; }
+.rotulo-da-barra, .rotulo-deitado {
+  font-size: 11.5px; fill: var(--suave); text-anchor: middle;
+  font-family: var(--fonte);
+}
+.rotulo-deitado { text-anchor: end; }
+
+/* A fatia leva um anel da cor do fundo: sem ele, duas fatias vizinhas de
+   tons próximos se fundem numa mancha só. */
+.fatia {
+  fill: var(--serie, var(--destaque));
+  stroke: var(--superficie); stroke-width: 2;
+  cursor: pointer; transition: opacity var(--transicao);
+}
+.fatia:hover, .fatia:focus-visible { opacity: .78; outline: none; }
+.fatia:focus-visible { stroke: var(--texto); }
+
+.rosca-numero {
+  font-size: 26px; font-weight: 700; fill: var(--texto);
+  text-anchor: middle; font-family: var(--fonte);
+}
+.rosca-rotulo {
+  font-size: 11px; fill: var(--tenue); text-anchor: middle;
+  font-family: var(--fonte);
+}
+
+.linha-do-grafico {
+  fill: none; stroke: var(--destaque); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ponto-da-linha { cursor: pointer; }
+.ponto-da-linha .alvo { fill: transparent; }
+.ponto-da-linha .marcador {
+  fill: var(--destaque); stroke: var(--superficie); stroke-width: 2;
+  opacity: 0; transition: opacity var(--transicao);
+}
+.ponto-da-linha:hover .marcador,
+.ponto-da-linha:focus-visible .marcador { opacity: 1; }
+.ponto-da-linha:focus-visible { outline: none; }
+
+/* ---- a legenda ---------------------------------------------------------- */
+/* `minmax(0, 1fr)` e não `1fr`: um item de grade tem largura mínima
+   automática, e um valor que não quebra (o "R$ 12.480,00") empurrava a
+   legenda para fora do cartão em telas por volta de 480px. */
+.legenda { display: grid; gap: 2px; grid-template-columns: minmax(0, 1fr); }
+.legenda-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0;
+  background: none; border: 0; cursor: pointer; text-align: left;
+  padding: 6px 8px; border-radius: var(--raio-pequeno);
+  font-size: 13px; color: var(--texto);
+}
+.legenda-item:hover { background: var(--superficie-2); }
+.legenda-item .marca {
+  width: 11px; height: 11px; border-radius: 3px; flex: none;
+  background: var(--serie, var(--tenue));
+}
+.legenda-item .nome {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legenda-item .valor {
+  font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap;
+  flex: none;
+}
+.legenda-item .valor em {
+  font-style: normal; font-weight: 400; color: var(--tenue); margin-left: 6px;
+}
+
+/* ---- a dica ------------------------------------------------------------- */
+.dica-do-grafico {
+  position: fixed; z-index: 80; transform: translate(-50%, -100%);
+  pointer-events: none;
+  background: var(--texto); color: var(--superficie);
+  border-radius: var(--raio-pequeno); padding: 6px 10px;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 8px 24px -12px rgba(6, 14, 28, .6);
+}
+
+table.fila.numeros { min-width: 320px; }
+table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-nums; }
+
+#dialogo-exportar textarea {
+  width: 100%; border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie-2); color: var(--texto);
+  padding: 10px 12px; font-family: var(--fonte-dado); font-size: 12.5px;
+  resize: vertical;
+}
+
+@media (max-width: 560px) {
+  .grafico { padding: 14px 14px 10px; }
+  .grafico-corpo.pizza { justify-content: center; }
+  .grafico-acoes { margin-left: 0; }
+  /* Numa tela de celular o gráfico ganha altura em vez de espremer: o SVG
+     tem viewBox, então cresce sem distorcer. */
+  .grafico-corpo.pizza .desenho { flex-basis: 160px; }
 }
 
 /* ============================================== telas estreitas ========== */
