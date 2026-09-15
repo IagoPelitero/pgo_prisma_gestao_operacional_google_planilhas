@@ -1,7 +1,7 @@
 COMO USAR ESTE PACOTE
 =====================
 
-São três arquivos, em vez dos 35 do repositório. No editor do Apps Script:
+São três arquivos, em vez dos 19 do repositório. No editor do Apps Script:
 
   1. Apague os arquivos que já estiverem lá (menu de cada um > Excluir).
      Sobra o Codigo.gs que o Apps Script cria sozinho — use ele no passo 2.
@@ -14,8 +14,30 @@ ATENÇÃO AOS NOMES: no Apps Script o arquivo se chama "Index", e não
 "Index.html" — sem extensão, sem acento, com as maiúsculas iguais.
 
   5. Publique como aplicativo da web (executar como você).
-  6. Execute instalarRECC() UMA vez, sobre uma planilha vazia.
+  6. Execute instalarRECC() UMA vez, sobre uma planilha VAZIA.
   7. Execute diagnosticoRECC() para conferir tudo.
+
+SE A PLANILHA JÁ FOI USADA
+--------------------------
+O instalarRECC() RECUSA rodar sobre planilha com dado, de propósito — ele
+criaria abas por cima do que já existe. Escolha um dos dois caminhos:
+
+  COMEÇAR DO ZERO (o mais simples)
+  Apague as abas do sistema na planilha: BASE_RET, BASE_MESA, USUARIOS,
+  CORRETORAS, PRODUTOS, SUSEP_BLOQUEADAS, CANAIS, CAMPOS, CATALOGO,
+  PAINEIS, ANALISES, CONFIG, AUDITORIA — e as ANALISE_* que houver.
+  Deixe UMA aba qualquer (o Sheets não aceita planilha sem aba nenhuma).
+  Depois rode instalarRECC().
+
+  Pelo editor: Arquivo > Configurações do projeto > e também limpe as
+  propriedades do script, onde moram as sequências de Id. Sem isso, a
+  contagem de Id continua de onde parou — o que não quebra nada, mas
+  faz o primeiro caso novo nascer com Id 47 em vez de 0.
+
+  MANTER O QUE JÁ ESTÁ LÁ
+  Rode migrarParaCanais() UMA vez. Ela renomeia as abas que mudaram de
+  nome, acrescenta as colunas novas e leva as sequências de Id junto.
+  Não apaga nada, e pode rodar duas vezes sem estragar.
 
 O QUE TEM DENTRO
 ----------------

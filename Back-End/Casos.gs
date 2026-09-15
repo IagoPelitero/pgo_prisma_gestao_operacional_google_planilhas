@@ -178,9 +178,21 @@ function campoTravadoParaMim_(configuracao, quem) {
     return false;
   }
 
+  // COMPARA POR COMEÇO, não por igualdade.
+  //
+  // Os cargos da operação são "Analista RET" e "Analista Mesa Diamante", não
+  // "Analista" seco. Uma comparação exata não travaria ninguém — e não daria
+  // erro nenhum: o campo simplesmente ficaria editável, e só se descobriria
+  // quando alguém cadastrasse em nome de outra pessoa.
+  //
+  // Por começo, "Analista" pega os três cargos de analista de hoje e pegará
+  // o "Analista Pleno" que vier amanhã, sem ninguém precisar lembrar de
+  // acrescentá-lo aqui.
   var meuCargo = normalizarParaComparar_(quem.cargo);
+  if (!meuCargo) return false;
   return cargos.some(function (cargo) {
-    return normalizarParaComparar_(cargo) === meuCargo;
+    var alvo = normalizarParaComparar_(cargo);
+    return alvo !== '' && meuCargo.indexOf(alvo) === 0;
   });
 }
 

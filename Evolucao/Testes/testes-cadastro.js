@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula, lerPeca, scriptDaPeca } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula, lerPeca, scriptDaPeca, comoUsuario } =
   require('./ferramentas');
 
 function rodarTestesDeCadastro() {
@@ -415,6 +415,45 @@ function rodarTestesDeCadastro() {
     igual(chamar('separarCodigoENome_')('VIDA - PLANO A').nome, 'VIDA - PLANO A');
     igual(chamar('separarCodigoENome_')('1101 - VIDA - OURO').codigo, '1101');
     igual(chamar('separarCodigoENome_')('1101 - VIDA - OURO').nome, 'VIDA - OURO');
+  });
+
+  teste('o analista NÃO troca o nome de quem cadastra', () => {
+    // Pedido do PO: "se o cargo for analista deve estar preenchido com o nome
+    // e não deve ser possível alterar".
+    //
+    // A trava compara o cargo POR COMEÇO. Os cargos da operação são "Analista
+    // RET" e "Analista Mesa Diamante", não "Analista" seco — comparar por
+    // igualdade não travaria ninguém, e não daria erro nenhum: o campo
+    // ficaria editável, e só se descobriria quando alguém cadastrasse em nome
+    // de outra pessoa. Foi assim que este teste nasceu.
+    const cargos = chamar('lerRegistros_("CATALOGO")').filter((i) => i.Tipo === 'CARGO');
+    const niveis = chamar('lerRegistros_("CATALOGO")').filter((i) => i.Tipo === 'NIVEL_ACESSO');
+    const analistaRet = cargos.find((c) => c.Nome === 'Analista RET');
+    const operacao = niveis.find((n) => n.Nome === 'Operação');
+    verdadeiro(!!analistaRet, 'o cargo Analista RET tem de existir');
+
+    chamar('salvarUsuario')({ nome: 'Marta Lopes', email: 'marta@exemplo.com',
+      cargoId: analistaRet.Id, nivelAcessoId: operacao.Id, ativo: true });
+
+    comoUsuario(ambiente, 'marta@exemplo.com', () => {
+      const todos = chamar('formularioDoCanal')(canalDiamante.id).secoes
+        .reduce((soma, s) => soma.concat(s.campos), []);
+      const analista = todos.find((c) => c.chave === 'analista');
+      igual(analista.travadoPeloCargo, true, 'quem é analista não troca o campo');
+      igual(analista.somenteLeitura, true, 'e a tela recebe ele bloqueado');
+      igual(analista.valorPadrao, 'Marta Lopes', 'já vem com o nome dela');
+    });
+  });
+
+  teste('quem coordena continua podendo cadastrar para a equipe', () => {
+    // A trava é do CARGO, e quem a desfaz é uma AÇÃO do nível. São coisas
+    // diferentes de proposito: cargo diz o que a pessoa faz, nível diz o que
+    // ela pode. Quem administra nunca é travado.
+    const todos = chamar('formularioDoCanal')(canalDiamante.id).secoes
+      .reduce((soma, s) => soma.concat(s.campos), []);
+    const analista = todos.find((c) => c.chave === 'analista');
+    igual(analista.travadoPeloCargo, false,
+      'o administrador cadastra em nome de quem for');
   });
 
   secao('O selo da SUSEP');
