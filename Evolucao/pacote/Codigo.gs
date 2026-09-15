@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-15 00:34
+   Gerado em 2026-09-15 00:37
    ========================================================================== */
 
 
@@ -4148,6 +4148,7 @@ function exportarCorretoras(procurar, segmento) {
 /* ==== Diagnostico.gs ====================================================== */
 
 /**
+ * ============================================================================
  * RECC — Diagnostico.gs · o laudo que roda DENTRO do Apps Script
  * ============================================================================
  * A suíte de testes prova que o código está certo. Ela não prova que ESTA
