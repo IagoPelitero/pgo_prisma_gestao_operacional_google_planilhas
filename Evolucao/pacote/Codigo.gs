@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-15 14:45
+   Gerado em 2026-09-15 15:15
    ========================================================================== */
 
 
@@ -9452,6 +9452,159 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
  * existe `diagnosticoRECC()`. As duas leem o mesmo `conferirEstrutura_`: não
  * há duas versões da regra, há uma curta e uma completa.
  */
+/**
+ * ----------------------------------------------------------------------------
+ * A MIGRAÇÃO DE QUEM JÁ TEM O PGO INSTALADO
+ * ----------------------------------------------------------------------------
+ * Rode `migrarParaCanais()` UMA vez, no editor do Apps Script, sobre uma
+ * planilha que já tem dado. Ela NÃO apaga nada.
+ *
+ * POR QUE ELA EXISTE. Numa rodada, "mesa" virou "canal" em todo o sistema, e
+ * a aba CANAIS — que guardava CORRETORAS — cedeu o nome. Uma instalação feita
+ * antes disso continua com as abas antigas, e o código novo procura as novas:
+ * o sistema abre, mas sem canal nenhum, e o Dashboard nasce vazio.
+ *
+ * O `instalarRECC()` não serve aqui: ele recusa rodar sobre planilha com dado,
+ * de propósito. Sem esta função, a única saída seria apagar tudo e recomeçar —
+ * e quem já cadastrou usuários e casos perderia os dois.
+ *
+ * O QUE ELA FAZ, e só isso: renomeia as duas abas, renomeia a coluna que
+ * mudou de nome e acrescenta as colunas novas do contrato.
+ *
+ * O QUE ELA NÃO FAZ, de propósito: não mexe em CAMPOS, PAINEIS nem CATALOGO
+ * além do nome da coluna. O formulário, os cartões e as listas ganharam
+ * padrões novos, mas a sua instalação pode ter sido ajustada à mão — e
+ * sobrescrever ajuste de configuração é perder trabalho em silêncio. Para
+ * pegar os padrões novos, use Configurações, ou reinstale numa planilha vazia.
+ *
+ * É SEGURO RODAR DE NOVO: cada passo confere antes de agir, e uma segunda
+ * execução não faz nada.
+ * ----------------------------------------------------------------------------
+ */
+function migrarParaCanais() {
+  var planilha = planilhaAtiva_();
+  var feito = [];
+  var pulados = [];
+
+  // --- 1. as abas, NESTA ORDEM -------------------------------------------
+  // CANAIS (corretoras) tem de sair do caminho ANTES de MESAS assumir o nome.
+  // Invertendo, a segunda renomeação encontraria o nome ocupado — e o Sheets
+  // aceitaria criar "CANAIS 2", deixando duas abas parecidas e nenhuma certa.
+  var corretoras = planilha.getSheetByName('CANAIS');
+  var canaisNovo = planilha.getSheetByName('CANAIS');
+  var mesas = planilha.getSheetByName('MESAS');
+
+  // Só é a aba de corretoras se tiver a cara dela: uma instalação já migrada
+  // tem uma CANAIS que é de canais, e renomeá-la seria desfazer a migração.
+  if (corretoras && !planilha.getSheetByName('CORRETORAS')
+    && ehAAbaDeCorretoras_(corretoras)) {
+    corretoras.setName('CORRETORAS');
+    feito.push('aba CANAIS (corretoras) renomeada para CORRETORAS');
+  } else if (planilha.getSheetByName('CORRETORAS')) {
+    pulados.push('CORRETORAS já existe');
+  }
+
+  if (mesas && !planilha.getSheetByName('CANAIS')) {
+    mesas.setName('CANAIS');
+    feito.push('aba MESAS renomeada para CANAIS');
+  } else if (!mesas) {
+    pulados.push('MESAS não existe (já migrada?)');
+  }
+
+  esquecerEstruturaLida_();
+
+  // --- 2. a coluna que mudou de nome -------------------------------------
+  ['USUARIOS', 'CAMPOS', 'PAINEIS', 'ANALISES', 'CATALOGO'].forEach(function (nome) {
+    var aba = planilha.getSheetByName(nome);
+    if (!aba) return;
+    var cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+    for (var i = 0; i < cabecalhos.length; i++) {
+      if (normalizarParaComparar_(cabecalhos[i]) === 'mesaid') {
+        // Só o CABEÇALHO muda. Os Ids gravados nas linhas continuam os
+        // mesmos — é a mesma coluna, com outro nome.
+        aba.getRange(1, i + 1).setValue('CanalId');
+        feito.push(nome + '.MesaId renomeada para CanalId');
+        return;
+      }
+    }
+  });
+
+  esquecerEstruturaLida_();
+
+  // --- 3. AS SEQUÊNCIAS DE Id, que carregam o nome da aba ----------------
+  //
+  // Este é o passo que não pode faltar, e é o menos óbvio de todos.
+  //
+  // A sequência de cada aba mora no PropertiesService sob a chave
+  // RECC_SEQ_<NOME DA ABA>. Ao renomear a aba, a chave antiga fica órfã e a
+  // nova não existe — então a sequência recomeça do zero e a próxima gravação
+  // REEMITE UM Id JÁ EM USO.
+  //
+  // Foi exatamente isso que custou 4.328 colisões no PGO 5.x. Aqui o
+  // diagnóstico pega ("a sequência está ABAIXO do maior Id gravado"), mas
+  // pegar depois de gravar é tarde: o Id duplicado já está na planilha.
+  //
+  // A ordem é a mesma das abas, e pelo mesmo motivo: CANAIS precisa ceder a
+  // chave antes de MESAS assumi-la.
+  var propriedades = PropertiesService.getScriptProperties();
+  [['CANAIS', 'CORRETORAS'], ['MESAS', 'CANAIS']].forEach(function (par) {
+    var chaveVelha = RECC_PREFIXO_DA_SEQUENCIA + par[0];
+    var chaveNova = RECC_PREFIXO_DA_SEQUENCIA + par[1];
+    var valor = propriedades.getProperty(chaveVelha);
+    if (valor === null || valor === undefined) {
+      pulados.push('sequência ' + chaveVelha + ' não existe');
+      return;
+    }
+    propriedades.setProperty(chaveNova, valor);
+    propriedades.deleteProperty(chaveVelha);
+    feito.push('sequência ' + chaveVelha + ' virou ' + chaveNova
+      + ' (em ' + valor + ')');
+  });
+
+  // --- 4. as colunas novas do contrato -----------------------------------
+  [['CORRETORAS', 'Consultor', 'texto'],
+   ['CATALOGO', 'ColunaDeCarimbo', 'texto'],
+   ['BASE_RET', 'nome de quem transferiu', 'texto']].forEach(function (par) {
+    var aba = planilha.getSheetByName(par[0]);
+    if (!aba) { pulados.push('aba ' + par[0] + ' não existe'); return; }
+    if (posicaoDaColuna_(estruturaDaAba_(par[0]), par[1]) >= 0) {
+      pulados.push(par[0] + '.' + par[1] + ' já existe');
+      return;
+    }
+    adicionarColuna_(par[0], par[1], par[2]);
+    feito.push(par[0] + '.' + par[1] + ' criada');
+  });
+
+  esquecerEstruturaLida_();
+
+  var recado = 'MIGRAÇÃO PARA CANAIS\n\n'
+    + (feito.length ? 'FEITO:\n  ' + feito.join('\n  ') : 'Nada a fazer.')
+    + (pulados.length ? '\n\nJÁ ESTAVA ASSIM:\n  ' + pulados.join('\n  ') : '')
+    + '\n\nAgora rode diagnosticoRECC() para conferir o que sobrou.';
+  Logger.log(recado);
+  return recado;
+}
+
+/**
+ * Esta aba é o cadastro de corretoras, e não o de canais?
+ *
+ * As duas se chamaram CANAIS em momentos diferentes. O que as distingue é a
+ * coluna SUSEP: corretora tem, canal de atendimento não. Decidir pelo nome
+ * seria decidir pelo que é ambíguo — e renomear a aba errada trocaria o
+ * cadastro de canais pelo de corretoras, sem erro nenhum na hora.
+ */
+function ehAAbaDeCorretoras_(aba) {
+  var cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+  var temSusep = false;
+  var temAba = false;
+  cabecalhos.forEach(function (texto) {
+    var chave = normalizarParaComparar_(texto);
+    if (chave === 'susep') temSusep = true;
+    if (chave === 'aba') temAba = true;
+  });
+  return temSusep && !temAba;
+}
+
 function verificarEstruturaRECC() {
   var laudo = conferirEstrutura_();
   var faltamArquivos = arquivosDeTelaQueFaltam_();
@@ -9995,8 +10148,8 @@ function blocoDasCanais_() {
 
   if (!ativas) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-      'Nenhum canal está ligada',
-      'Existem ' + canais.length + ' canal(s) cadastrada(s), e todas desligadas.',
+      'Nenhum canal está ligado',
+      'Existem ' + canais.length + ' canal(is) cadastrado(s), e todos desligados.',
       'Ligue pelo menos uma em Configurações › Canais. Sem canal ligada o '
         + 'Dashboard abre vazio.'));
   }
@@ -10133,7 +10286,7 @@ function blocoDosPaineis_() {
 
   if (semCanal.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-      semCanal.length + ' componente(s) apontam paro canal que não existe',
+      semCanal.length + ' componente(s) apontam para um canal que não existe',
       algunsExemplos_(semCanal),
       'Eles não aparecem em tela nenhuma. Acerte o canal ou remova em '
         + 'Configurações › Painéis.'));
@@ -10147,7 +10300,7 @@ function blocoDosPaineis_() {
   }
   if (!semCanal.length && !semColuna.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
-      'Os ' + componentes.length + ' componentes apontam paro canals e colunas '
+      'Os ' + componentes.length + ' componentes apontam para canais e colunas '
         + 'que existem'));
   }
 
@@ -10172,7 +10325,7 @@ function blocoDasAnalises_() {
 
     if (!canal) {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-        'A análise "' + nome + '" aponta paro canal que não existe',
+        'A análise "' + nome + '" aponta para um canal que não existe',
         'Gerar esta análise vai estourar.',
         'Acerte o canal em Configurações › Análises, ou tire a análise da lista.'));
       return;

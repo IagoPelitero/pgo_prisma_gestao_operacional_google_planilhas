@@ -82,6 +82,35 @@ Dentro de `Evolucao/`:
 2. Copie os arquivos. **O projeto do Apps Script não tem pastas** — as daqui
    são organização do repositório. Há dois caminhos:
 
+   ### Já tem o PGO instalado? Migre, não reinstale
+
+   Numa rodada, "mesa" virou **canal** em todo o sistema, e a aba `CANAIS` —
+   que guardava corretoras — cedeu o nome. Uma planilha instalada antes disso
+   continua com as abas antigas: o sistema abre, mas **sem canal nenhum**, e o
+   Dashboard nasce vazio.
+
+   Depois de copiar os arquivos novos, rode **uma vez** no editor do Apps
+   Script:
+
+   ```
+   migrarParaCanais()
+   ```
+
+   Ela renomeia as duas abas, renomeia a coluna `MesaId`, acrescenta as
+   colunas novas do contrato e — o passo menos óbvio — **leva a sequência de
+   Id junto com a aba**. Sem isso a contagem recomeçaria do zero e o sistema
+   reemitiria um Id já gravado, que é o defeito que custou 4.328 colisões no
+   PGO 5.x.
+
+   **Não apaga nada, e pode rodar duas vezes sem estragar.** Depois dela,
+   `diagnosticoRECC()` para conferir.
+
+   > O que ela NÃO faz, de propósito: não mexe no formulário, nos cartões nem
+   > nas listas. Eles ganharam padrões novos, mas a sua instalação pode ter
+   > sido ajustada à mão — e sobrescrever configuração é perder trabalho em
+   > silêncio. Para pegar os padrões novos, ajuste em Configurações, ou
+   > instale numa planilha vazia.
+
    ### O caminho curto: três arquivos
 
    A pasta **[`Evolucao/pacote/`](Evolucao/pacote/)** tem o sistema inteiro

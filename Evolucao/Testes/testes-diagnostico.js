@@ -284,7 +284,7 @@ function rodarTestesDeDiagnostico() {
       'pelo menos um canal de partida usa a escrita em grupos');
   });
 
-  teste('todas os canais desligadas é falha', () => {
+  teste('todos os canais desligados é falha', () => {
     const { chamar } = instalacaoNova();
     chamar('lerRegistros_("CANAIS")').forEach((canal) => {
       chamar('atualizarRegistro_')('CANAIS', canal.Id, { Ativo: false });
@@ -292,7 +292,7 @@ function rodarTestesDeDiagnostico() {
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'Nenhum canal está ligada');
+    contem(falhasEmTexto(laudo), 'Nenhum canal está ligado');
   });
 
   teste('campo apontando para coluna que não existe é falha', () => {
@@ -306,7 +306,7 @@ function rodarTestesDeDiagnostico() {
     contem(falhasEmTexto(laudo), 'apontam para coluna que não existe');
   });
 
-  teste('gráfico apontando paro canal que não existe é falha', () => {
+  teste('gráfico apontando para um canal que não existe é falha', () => {
     const { chamar } = instalacaoNova();
     const componente = chamar('lerRegistros_("PAINEIS")')[0];
     chamar('atualizarRegistro_')('PAINEIS', componente.Id,
@@ -314,17 +314,17 @@ function rodarTestesDeDiagnostico() {
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'apontam paro canal que não existe');
+    contem(falhasEmTexto(laudo), 'apontam para um canal que não existe');
   });
 
-  teste('análise apontando paro canal que não existe é falha', () => {
+  teste('análise apontando para um canal que não existe é falha', () => {
     const { chamar } = instalacaoNova();
     const receita = chamar('lerRegistros_("ANALISES")')[0];
     chamar('atualizarRegistro_')('ANALISES', receita.Id, { CanalId: '9999999999' });
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'aponta paro canal que não existe');
+    contem(falhasEmTexto(laudo), 'aponta para um canal que não existe');
   });
 
   secao('O sistema precisa continuar tendo dono');
@@ -1050,6 +1050,133 @@ function rodarTestesDeDiagnostico() {
     const texto = chamar('verificarEstruturaRECC()');
     contem(texto, 'ESTRUTURA OK');
     contem(texto, 'os arquivos de tela do Index estão todos aqui');
+  });
+
+  secao('A migração de quem já tem o PGO instalado');
+
+  /**
+   * Finge uma instalação feita ANTES de mesa virar canal.
+   *
+   * Desfaz na planilha o que a migração vai refazer: as abas voltam a se
+   * chamar MESAS e CANAIS (esta guardando corretoras), a coluna volta a
+   * MesaId, as colunas novas somem e as sequências voltam para as chaves
+   * antigas. É mais fiel que montar uma planilha à mão, porque parte de uma
+   * instalação de verdade.
+   */
+  function comoEraAntesDosCanais() {
+    const tudo = instalacaoNova();
+    const planilha = tudo.ambiente.planilha;
+
+    // As colunas novas saem de cena.
+    [['CORRETORAS', 'Consultor'], ['CATALOGO', 'ColunaDeCarimbo'],
+     ['BASE_RET', 'nome de quem transferiu']].forEach(([nome, coluna]) => {
+      const aba = planilha.getSheetByName(nome);
+      const cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+      const i = cabecalhos.findIndex((c) => String(c) === coluna);
+      if (i >= 0) aba.getRange(1, i + 1).setValue('');
+    });
+
+    // CanalId volta a ser MesaId.
+    ['USUARIOS', 'CAMPOS', 'PAINEIS', 'ANALISES', 'CATALOGO'].forEach((nome) => {
+      const aba = planilha.getSheetByName(nome);
+      const cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+      const i = cabecalhos.findIndex((c) => String(c) === 'CanalId');
+      if (i >= 0) aba.getRange(1, i + 1).setValue('MesaId');
+    });
+
+    // As abas voltam aos nomes antigos, na ordem inversa da migração.
+    planilha.getSheetByName('CORRETORAS').setName('CANAIS_CORRETORAS_TEMP');
+    planilha.getSheetByName('CANAIS').setName('MESAS');
+    planilha.getSheetByName('CANAIS_CORRETORAS_TEMP').setName('CANAIS');
+
+    // E as sequências voltam para as chaves antigas.
+    const props = tudo.ambiente.propriedades;
+    const mover = (de, para) => {
+      if (props.has('RECC_SEQ_' + de)) {
+        props.set('RECC_SEQ_' + para, props.get('RECC_SEQ_' + de));
+        props.delete('RECC_SEQ_' + de);
+      }
+    };
+    mover('CANAIS', 'MESAS');
+    mover('CORRETORAS', 'CANAIS');
+
+    tudo.chamar('esquecerEstruturaLida_()');
+    return tudo;
+  }
+
+  teste('sem migrar, o sistema abre sem canal nenhum', () => {
+    // O sintoma que a operação veria: o Dashboard vazio, sem erro nenhum.
+    // Este teste existe para provar que a migração é NECESSÁRIA — sem ele,
+    // ninguém saberia dizer se ela resolve algo.
+    const { chamar } = comoEraAntesDosCanais();
+    igual(chamar('canaisVisiveis_()').length, 0,
+      'a aba CANAIS antiga guarda corretoras, não canais');
+  });
+
+  teste('migrar devolve os canais sem perder dado', () => {
+    const { ambiente, chamar } = comoEraAntesDosCanais();
+
+    // Dado de verdade na planilha antiga.
+    chamar('inserirRegistro_')('CANAIS', { Nome: 'Corretora ABC',
+      SUSEP: '1234567', Corretora: 'Corretora ABC', Segmento: 'Diamante' });
+    chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana',
+      'nome do cliente': 'Cliente Antigo' });
+
+    chamar('migrarParaCanais()');
+
+    const canais = chamar('canaisVisiveis_()');
+    igual(canais.length, 2, 'os dois canais voltaram');
+    igual(canais.map((c) => c.aba).join(','), 'BASE_RET,BASE_MESA');
+
+    igual(chamar('lerRegistros_')('BASE_RET')[0]['nome do cliente'],
+      'Cliente Antigo', 'o caso antigo continua lá');
+    igual(chamar('lerRegistros_')('CORRETORAS')[0].SUSEP, '1234567',
+      'a corretora mudou de aba, não sumiu');
+    igual(chamar('consultarSusep')('1234567').situacao, 'OK',
+      'e o selo volta a achá-la');
+  });
+
+  teste('migrar leva a SEQUÊNCIA de Id junto com a aba', () => {
+    // A armadilha mais cara do PGO 5.x, e a menos óbvia desta migração: a
+    // sequência mora sob RECC_SEQ_<ABA>. Renomear a aba sem levar a chave
+    // faria a contagem recomeçar do zero e REEMITIR um Id já gravado.
+    const { ambiente, chamar } = comoEraAntesDosCanais();
+    chamar('migrarParaCanais()');
+
+    verdadeiro(ambiente.propriedades.has('RECC_SEQ_CANAIS'),
+      'a sequência dos canais tem de existir sob o nome novo');
+    verdadeiro(!ambiente.propriedades.has('RECC_SEQ_MESAS'),
+      'e a chave antiga não pode ficar para trás');
+
+    const laudo = chamar('diagnosticoRECC()');
+    igual(falhasEmTexto(laudo).indexOf('ABAIXO do maior Id'), -1,
+      'nenhuma sequência pode ficar abaixo do maior Id gravado');
+  });
+
+  teste('a migração aprova no diagnóstico', () => {
+    const { chamar } = comoEraAntesDosCanais();
+    chamar('migrarParaCanais()');
+    igual(chamar('diagnosticoRECC()').aprovado, true,
+      falhasEmTexto(chamar('diagnosticoRECC()')));
+  });
+
+  teste('rodar a migração duas vezes não estraga nada', () => {
+    // Ninguém tem certeza se já rodou. Uma migração que só funciona uma vez
+    // obriga a lembrar — e quem não lembra, roda de novo.
+    const { chamar } = comoEraAntesDosCanais();
+    chamar('migrarParaCanais()');
+    const recado = chamar('migrarParaCanais()');
+
+    contem(recado, 'JÁ ESTAVA ASSIM', 'a segunda vez não faz nada');
+    igual(chamar('canaisVisiveis_()').length, 2, 'e os canais continuam de pé');
+    igual(chamar('diagnosticoRECC()').aprovado, true);
+  });
+
+  teste('numa instalação nova, migrar não faz nada', () => {
+    const { chamar } = instalacaoNova();
+    chamar('migrarParaCanais()');
+    igual(chamar('canaisVisiveis_()').length, 2);
+    igual(chamar('diagnosticoRECC()').aprovado, true);
   });
 
   secao('As duas portas');

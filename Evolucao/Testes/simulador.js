@@ -192,6 +192,11 @@ class Aba {
     this.congeladas = 0;
   }
   getName() { return this.nome; }
+  /* O Sheets de verdade renomeia aba, e a migração de uma instalação
+     existente depende disso. Sem este método, o teste da migração não teria
+     como rodar — e migração sem teste é a que ninguém confere antes de usar
+     na planilha de produção. */
+  setName(novo) { this.nome = novo; return this; }
   getMaxRows() { return this.valores.length; }
   getMaxColumns() { return this.valores[0] ? this.valores[0].length : 0; }
   getRange(l, c, nl = 1, nc = 1) {
