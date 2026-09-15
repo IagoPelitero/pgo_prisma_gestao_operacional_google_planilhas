@@ -27,10 +27,10 @@
 function oQueFaltaNoProjeto() {
   var esperado = {
     'Cadastros.gs': ['aplicarImportacao', 'bloquearSusep', 'conferirImportacao', 'desbloquearSusep', 'exportarCorretoras', 'listarProdutos', 'listarSusepsBloqueadas', 'ocultarCorretora', 'ocultarProduto', 'opcoesDaImportacao', 'salvarCorretora', 'salvarProduto', 'tabelaDeCorretoras'],
-    'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'formularioDaMesa', 'ocultarCaso', 'opcoesDaBusca', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
-    'Config.gs': ['conferirEstruturaDaPlanilha', 'criarCampo', 'definirSenhaDeAdministrador', 'gerarAnalise', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDaMesa', 'listarCardsDoPainel', 'listarCatalogo', 'listarMesasConfiguraveis', 'listarNiveisDeAcesso', 'ocultarAnalise', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarCampo', 'salvarCardsDoPainel', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarMesa', 'salvarNivelDeAcesso'],
+    'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'formularioDoCanal', 'ocultarCaso', 'opcoesDaBusca', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
+    'Config.gs': ['conferirEstruturaDaPlanilha', 'criarCampo', 'definirSenhaDeAdministrador', 'gerarAnalise', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'ocultarAnalise', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
-    'Indicadores.gs': ['detalharComponente', 'detalhesDoCaso', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDoPainelAnalitico', 'painelAnalitico', 'resumoDaMesa', 'salvarComponentesDoPainel'],
+    'Indicadores.gs': ['detalharComponente', 'detalhesDoCaso', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDoPainelAnalitico', 'painelAnalitico', 'resumoDoCanal', 'salvarComponentesDoPainel'],
     'Instalacao.gs': ['diagnosticoDoSistema']
   };
 

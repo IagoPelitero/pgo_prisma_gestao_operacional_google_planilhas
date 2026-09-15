@@ -22,9 +22,9 @@ function rodarTestesDeCorretoras() {
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
 
-  const mesa = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
 
-  chamar('inserirVariosRegistros_')('CANAIS', [
+  chamar('inserirVariosRegistros_')('CORRETORAS', [
     { Nome: 'Marina Alencar', Canal: 'Corretora', SUSEP: '1234567',
       Corretora: 'Corretora ABC', Segmento: 'Diamante' },
     { Nome: 'Posto Central', Canal: 'Agente', SUSEP: '2345678',
@@ -32,11 +32,11 @@ function rodarTestesDeCorretoras() {
   ]);
 
   chamar('inserirVariosRegistros_')('BASE_MESA', [
-    { Analista: 'Ana', Status: 'Pendente', 'Data de entrada': '10/09/2026',
+    { Analista: 'Ana', Status: 'Em andamento', 'Data de entrada': '10/09/2026',
       SUSEP: '1234567', Corretora: 'Corretora ABC', 'Nome do segurado': 'c1' },
-    { Analista: 'Ana', Status: 'Pendente', 'Data de entrada': '10/09/2026',
+    { Analista: 'Ana', Status: 'Em andamento', 'Data de entrada': '10/09/2026',
       SUSEP: '1234567', Corretora: 'Corretora ABC', 'Nome do segurado': 'c2' },
-    { Analista: 'Ana', Status: 'Pendente', 'Data de entrada': '10/09/2026',
+    { Analista: 'Ana', Status: 'Em andamento', 'Data de entrada': '10/09/2026',
       SUSEP: '9999999', Corretora: 'Nunca Vista', 'Nome do segurado': 'c3' }
   ]);
 
@@ -100,7 +100,7 @@ function rodarTestesDeCorretoras() {
     // aqui daria um recado que não corresponde ao que a pessoa vê na outra
     // tela — e aviso que não bate com a realidade a operação aprende a ignorar.
     chamar('inserirRegistro_')('BASE_MESA', {
-      Analista: 'Ana', Status: 'Pendente', 'Data de entrada': '10/09/2026',
+      Analista: 'Ana', Status: 'Em andamento', 'Data de entrada': '10/09/2026',
       SUSEP: '8765432', Corretora: 'Bloqueada Ltda', 'Nome do segurado': 'c9'
     });
     verdadeiro(chamar('tabelaDeCorretoras')('', '').foraDoCadastro
@@ -149,7 +149,7 @@ function rodarTestesDeCorretoras() {
     chamar('ocultarCorretora')(id);
     igual(chamar('tabelaDeCorretoras')('some daqui', '').quantasFiltradas, 0);
 
-    const naPlanilha = chamar('lerRegistros_')('CANAIS', { incluirOcultos: true })
+    const naPlanilha = chamar('lerRegistros_')('CORRETORAS', { incluirOcultos: true })
       .find((linha) => linha.__id === id);
     verdadeiro(!!naPlanilha, 'a linha continua lá, como em todo o resto do sistema');
   });
@@ -175,8 +175,8 @@ function rodarTestesDeCorretoras() {
 
     // E o caso continua podendo ser cadastrado: bloqueio que impedisse faria
     // a pessoa registrar num caderno, e o sistema perderia o caso de vista.
-    const novo = chamar('cadastrarCaso')(mesa.id, {
-      status: 'Pendente', nomedosegurado: 'Caso de bloqueada',
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      status: 'Em andamento', nomedosegurado: 'Caso de bloqueada',
       datadeentrada: '10/09/2026', susep: '2345678'
     });
     verdadeiro(!!novo.id);
@@ -403,7 +403,7 @@ function rodarTestesDeCorretoras() {
     chamar('aplicarImportacao')('corretoras', 'SUSEP;Corretora;Canal;Segmento\n'
       + '7654321;Corretora Nova;;Demais corretoras');
 
-    const canal = chamar('lerRegistros_("CANAIS")')
+    const canal = chamar('lerRegistros_("CORRETORAS")')
       .find((linha) => String(linha.SUSEP) === '7654321');
     igual(canal.Canal, 'Corretora', 'o canal que já estava lá continua lá');
     igual(canal.Segmento, 'Demais corretoras', 'e o que veio preenchido mudou');
@@ -465,6 +465,48 @@ function rodarTestesDeCorretoras() {
       lanca(() => chamar('aplicarImportacao')('corretoras', '1;a'),
         'não permite configurar');
     });
+  });
+
+  secao('O selo da SUSEP em escala');
+
+  teste('consultar uma SUSEP lê a COLUNA, nunca a tabela inteira', () => {
+    // O selo responde a cada SUSEP digitada no formulário. A operação tem
+    // mais de 7 mil SUSEPs cadastradas e mais de 16 mil bloqueadas: ler as
+    // duas tabelas inteiras a cada digitação era mandar centenas de milhares
+    // de células pela rede, e o campo travava enquanto isso.
+    //
+    // Este teste não mede o relógio — mede o que foi LIDO. É a mesma regra
+    // que sustenta a busca de casos: ler a coluna antes de ler as linhas.
+    const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
+    chamar('instalarRECC()');
+
+    const corretoras = [];
+    for (let i = 0; i < 400; i++) {
+      corretoras.push({ Nome: 'Corretora ' + i, SUSEP: String(2000000 + i),
+        Corretora: 'Corretora ' + i, Segmento: 'Demais corretoras' });
+    }
+    const bloqueadas = [];
+    for (let i = 0; i < 400; i++) {
+      bloqueadas.push({ SUSEP: String(8000000 + i), Motivo: 'fraude' });
+    }
+    chamar('inserirVariosRegistros_')('CORRETORAS', corretoras);
+    chamar('inserirVariosRegistros_')('SUSEP_BLOQUEADAS', bloqueadas);
+
+    chamar('esquecerEstruturaLida_')();
+    ambiente.medidor.celulasLidas = 0;
+    const selo = chamar('consultarSusep')('2000399');
+    const lidas = ambiente.medidor.celulasLidas;
+
+    igual(selo.situacao, 'OK', 'achou a última corretora da lista');
+
+    // As duas tabelas inteiras seriam 400x11 + 400x10 = 8.400 células só
+    // delas. Lendo por coluna, são 800 — mais o que a checagem de permissão
+    // lê, que é fixo e pequeno. O limite é folgado de propósito: ele pega a
+    // volta da leitura de tabela inteira, não variações de uma coluna a mais.
+    verdadeiro(lidas < 4000,
+      'consultar uma SUSEP leu ' + lidas + ' células — isso é leitura de '
+      + 'tabela inteira voltando. Deve ler a coluna da SUSEP e só a linha '
+      + 'que casar (buscarRegistroVisivel_).');
   });
 
   secao('A tela');

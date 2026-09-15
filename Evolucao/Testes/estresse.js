@@ -125,8 +125,8 @@ const SITUACOES = ['Aguardando transmissão', 'Pendente', '1º contato realizado
   '2º contato realizado', 'Não trabalhado', 'Concluído'];
 // Os valores TÊM de ser os do catálogo: o cadastro recusa o que não está na
 // lista, e um teste de estresse com dado que o sistema recusaria não mede
-// nada. Vieram de chamar('formularioDaMesa'), não de memória.
-const CANAIS = ['E-mail', 'Chat', 'Telefone', 'Site', 'Corretora', 'Ouvidoria', 'URA'];
+// nada. Vieram de chamar('formularioDoCanal'), não de memória.
+const CORRETORAS = ['E-mail', 'Chat', 'Telefone', 'Site', 'Corretora', 'Ouvidoria', 'URA'];
 const PRODUTOS = ['Vida Individual', 'Vida em Grupo', 'Prestamista', 'Acidentes'];
 const ANALISTAS = ['Ana Martins', 'Bruno Dias', 'Carla Souza', 'Diego Castilho',
   'Elisa Prado', 'Fábio Nunes', 'Gisele Antunes', 'Hugo Barros'];
@@ -148,7 +148,7 @@ function casoDaRet(i) {
     'número da proposta': String(70000000 + i),
     'nome do cliente': 'Cliente ' + i,
     'produto': PRODUTOS[i % PRODUTOS.length],
-    'canal': CANAIS[i % CANAIS.length],
+    'canal': CORRETORAS[i % CORRETORAS.length],
     'status': SITUACOES[i % SITUACOES.length],
     'protocolo': 'RET-2026-' + (100000 + i),
     'valor do prêmio retido': (i % 900) * 13.7,
@@ -169,7 +169,7 @@ function rodar(alvo) {
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
-  const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
 
   // Os analistas precisam existir: o campo "analista" é um seletor cujas
   // opções são as pessoas cadastradas, e cadastrar um caso com um nome que
@@ -180,7 +180,7 @@ function rodar(alvo) {
     Nome: nome,
     Email: nome.toLowerCase().replace(/[^a-z]/g, '.') + '@exemplo.com',
     NivelAcessoId: nivelOperacao.Id,
-    'Canal que atende': CANAIS[i % CANAIS.length],
+    'Canal que atende': CORRETORAS[i % CORRETORAS.length],
     Ativo: true
   })));
 
@@ -204,10 +204,10 @@ function rodar(alvo) {
 
   /* -- as telas ---------------------------------------------------------- */
   medir('Dashboard: abrir a RET Vida', 0.5,
-    () => chamar('resumoDaMesa')(ret.id, {}));
+    () => chamar('resumoDoCanal')(ret.id, {}));
 
   medir('Dashboard: filtrar por situação', 0.5,
-    () => chamar('resumoDaMesa')(ret.id, { status: 'Pendente' }));
+    () => chamar('resumoDoCanal')(ret.id, { status: 'Pendente' }));
 
   medir('Buscar: por protocolo (só dígitos)', 0.5,
     () => chamar('buscarCasos')('RET-2026-100777', [], false));
@@ -287,7 +287,7 @@ function rodar(alvo) {
     'SUSEP inválida', 'Diamante']]);
 
   medir('Dashboard com linha suja na base', 0.5,
-    () => chamar('resumoDaMesa')(ret.id, {}));
+    () => chamar('resumoDoCanal')(ret.id, {}));
   medir('Buscar com linha suja na base', 0.5,
     () => chamar('buscarCasos')('Ana Martins', [], false));
   const laudoComSujeira = medir('Diagnóstico com linha suja na base', 1,

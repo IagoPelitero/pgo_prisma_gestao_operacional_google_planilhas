@@ -35,11 +35,11 @@ const TELAS = ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
  * um elemento clicável — a lista sai do próprio código, não de um chute.
  */
 const CLICAVEIS = [
-  '[data-tela]', '[data-secao]', '[data-mesa]', '[data-cartao]',
+  '[data-tela]', '[data-secao]', '[data-canal]', '[data-cartao]',
   '[data-corretora]', '[data-produto]', '[data-usuario]', '[data-nivel]',
   '[data-item]', '[data-campo-config]', '[data-analise]',
-  '[data-tela-do-painel]', '[data-mesa-dos-cards]', '[data-aba-corretoras]',
-  '[data-tipo-de-lista]', '[data-mesa-config]', '[data-ver]', '[data-ponto]',
+  '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-aba-corretoras]',
+  '[data-tipo-de-lista]', '[data-canal-config]', '[data-ver]', '[data-ponto]',
   '[data-componente]', '[data-trocar-situacao]'
 ];
 

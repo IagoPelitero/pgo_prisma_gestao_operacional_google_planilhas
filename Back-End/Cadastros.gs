@@ -31,7 +31,7 @@
  * Três cadastros que sustentam o resto do sistema e que, até aqui, só se
  * ajustavam abrindo a planilha:
  *
- *   CANAIS             corretoras, corretores e agentes, com o segmento
+ *   CORRETORAS             corretoras, corretores e agentes, com o segmento
  *   PRODUTOS           o que a operação vende
  *   SUSEP_BLOQUEADAS   quem está impedido, e por quê
  *
@@ -65,7 +65,7 @@ function tabelaDeCorretoras(procurar, segmento) {
   var digitos = apenasDigitos_(procurar);
   var segmentoProcurado = normalizarParaComparar_(segmento);
 
-  var todas = lerRegistros_('CANAIS').map(function (linha) {
+  var todas = lerRegistros_('CORRETORAS').map(function (linha) {
     var susep = converterParaIdentificador_(linha.SUSEP);
     var bloqueio = bloqueadas[susep];
     return {
@@ -113,15 +113,15 @@ function tabelaDeCorretoras(procurar, segmento) {
   };
 }
 
-/** Quantos casos cada SUSEP trouxe, somando as mesas. */
+/** Quantos casos cada SUSEP trouxe, somando os canais. */
 function volumePorSusep_() {
   var porSusep = {};
   var nomePorSusep = {};
 
-  mesasVisiveis_().forEach(function (mesa) {
+  canaisVisiveis_().forEach(function (canal) {
     var estrutura;
     try {
-      estrutura = estruturaDaAba_(mesa.aba);
+      estrutura = estruturaDaAba_(canal.aba);
     } catch (erro) {
       return;   // aba que sumiu não derruba a tela
     }
@@ -137,9 +137,9 @@ function volumePorSusep_() {
 
     // Só a coluna da SUSEP, e a da corretora: a mesma regra da busca — ler as
     // 39 colunas de todas as linhas para contar uma coisa não se paga.
-    var suseps = lerColunaInteira_(mesa.aba, colunaDaSusep);
+    var suseps = lerColunaInteira_(canal.aba, colunaDaSusep);
     var corretoras = colunaDaCorretora
-      ? lerColunaInteira_(mesa.aba, colunaDaCorretora) : [];
+      ? lerColunaInteira_(canal.aba, colunaDaCorretora) : [];
 
     for (var i = 0; i < suseps.length; i++) {
       var susep = converterParaIdentificador_(suseps[i]);
@@ -227,7 +227,7 @@ function salvarCorretora(dados) {
   if (!corretora) throw new Error('Informe o nome da corretora.');
 
   var id = converterParaIdentificador_(dados.id);
-  var repetida = lerRegistros_('CANAIS').filter(function (linha) {
+  var repetida = lerRegistros_('CORRETORAS').filter(function (linha) {
     return converterParaIdentificador_(linha.SUSEP) === susep
       && converterParaIdentificador_(linha.Id) !== id;
   })[0];
@@ -246,12 +246,12 @@ function salvarCorretora(dados) {
   };
 
   if (id) {
-    atualizarRegistro_('CANAIS', id, campos);
-    registrarAuditoria_('corretora.editar', 'CANAIS', id, corretora);
+    atualizarRegistro_('CORRETORAS', id, campos);
+    registrarAuditoria_('corretora.editar', 'CORRETORAS', id, corretora);
     return id;
   }
-  var criada = inserirRegistro_('CANAIS', campos);
-  registrarAuditoria_('corretora.criar', 'CANAIS', criada.__id, corretora);
+  var criada = inserirRegistro_('CORRETORAS', campos);
+  registrarAuditoria_('corretora.criar', 'CORRETORAS', criada.__id, corretora);
   return criada.__id;
 }
 
@@ -261,11 +261,11 @@ function ocultarCorretora(idDaCorretora) {
   exigirTela_('tabelaCorretoras');
 
   var alvo = converterParaIdentificador_(idDaCorretora);
-  var atual = buscarRegistros_('CANAIS', 'Id', alvo, 1)[0];
+  var atual = buscarRegistros_('CORRETORAS', 'Id', alvo, 1)[0];
   if (!atual) throw new Error('A corretora ' + alvo + ' não existe.');
 
-  ocultarRegistro_('CANAIS', alvo, quem.usuario.Id);
-  registrarAuditoria_('corretora.ocultar', 'CANAIS', alvo, String(atual.Corretora));
+  ocultarRegistro_('CORRETORAS', alvo, quem.usuario.Id);
+  registrarAuditoria_('corretora.ocultar', 'CORRETORAS', alvo, String(atual.Corretora));
   return true;
 }
 
@@ -438,7 +438,7 @@ function exportarCorretoras(procurar, segmento) {
       uma.bloqueada ? 'Bloqueada' : 'Liberada', uma.casos].join(';'));
   });
 
-  registrarAuditoria_('corretoras.exportar', 'CANAIS', '',
+  registrarAuditoria_('corretoras.exportar', 'CORRETORAS', '',
     tabela.corretoras.length + ' linhas');
   return { nome: 'corretoras.csv', conteudo: linhas.join('\n') };
 }
@@ -506,7 +506,7 @@ var RECC_MAXIMO_DA_IMPORTACAO = 2000;
 var RECC_IMPORTACOES = {
   corretoras: {
     titulo: 'Corretoras',
-    aba: 'CANAIS',
+    aba: 'CORRETORAS',
     chave: 'susep',
     explicacao: 'Uma linha por corretora. A SUSEP é o que liga a corretora ao '
       + 'caso, e é por ela que o sistema sabe se a linha é nova ou já existe.',
@@ -903,7 +903,7 @@ function camposParaAAba_(campos, receita, ehNova) {
   });
 
   // As colunas que a importação não pergunta, mas a aba espera.
-  if (ehNova && receita.aba === 'CANAIS' && !linha.Nome) {
+  if (ehNova && receita.aba === 'CORRETORAS' && !linha.Nome) {
     linha.Nome = campos.corretora || '';
   }
   if (ehNova && receita.aba === 'SUSEP_BLOQUEADAS') {

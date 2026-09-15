@@ -29,15 +29,15 @@ function rodarTestesDaFundacao() {
 
   teste('cada aba é cortada ao tamanho do contrato', () => {
     const base = planilha.getSheetByName('BASE_RET');
-    igual(base.getMaxColumns(), 39, 'colunas de BASE_RET (35 + 4 de controle)');
+    igual(base.getMaxColumns(), 40, 'colunas de BASE_RET (36 + 4 de controle)');
     igual(base.getMaxRows(), 2001, 'linhas de BASE_RET (reserva 2000 + cabeçalho)');
-    const mesa = planilha.getSheetByName('BASE_MESA');
-    igual(mesa.getMaxColumns(), 24, 'colunas de BASE_MESA (20 + 4 de controle)');
+    const canal = planilha.getSheetByName('BASE_MESA');
+    igual(canal.getMaxColumns(), 24, 'colunas de BASE_MESA (20 + 4 de controle)');
   });
 
   teste('os cabeçalhos saem na ordem e na grafia do contrato', () => {
-    const mesa = planilha.getSheetByName('BASE_MESA');
-    const cabecalhos = mesa.getRange(1, 1, 1, 24).getValues()[0];
+    const canal = planilha.getSheetByName('BASE_MESA');
+    const cabecalhos = canal.getRange(1, 1, 1, 24).getValues()[0];
     igual(cabecalhos[0], 'ID');
     igual(cabecalhos[7], 'Abertura indevida');
     igual(cabecalhos[15], 'Área responsável');
@@ -55,7 +55,7 @@ function rodarTestesDaFundacao() {
 
   teste('o formulário nasce mapeado coluna a coluna', () => {
     const campos = chamar('lerRegistros_("CAMPOS")');
-    igual(campos.length, 55, 'campos semeados (35 de RET + 20 da Mesa)');
+    igual(campos.length, 56, 'campos semeados (36 de RET + 20 da Mesa Diamante)');
     const cpf = campos.find((c) => c.Cabecalho === 'Documento (CPF)');
     igual(cpf.Mascara, '000.000.000-00', 'máscara do CPF');
     igual(cpf.TipoCampo, 'documento', 'na tela é campo com máscara');
@@ -193,7 +193,7 @@ function rodarTestesDaFundacao() {
 
     aba.insertColumnsBefore(3, 1);                  // coluna nova entre ID e Status
     aba.getRange(1, 3).setNumberFormat('@');
-    aba.getRange(1, 3).setValue('Observação da mesa');
+    aba.getRange(1, 3).setValue('Observação do canal');
     chamar('esquecerEstruturaLida_()');
 
     const depois = chamar('lerRegistros_("BASE_MESA")');
@@ -203,9 +203,9 @@ function rodarTestesDaFundacao() {
   });
 
   teste('coluna acrescentada à mão é respeitada, não ignorada', () => {
-    chamar('atualizarRegistro_("BASE_MESA", "0000000000", { "Observação da mesa": "veio da planilha" })');
+    chamar('atualizarRegistro_("BASE_MESA", "0000000000", { "Observação do canal": "veio da planilha" })');
     const registro = chamar('buscarRegistros_("BASE_MESA", "ID", "0000000000")')[0];
-    igual(registro['Observação da mesa'], 'veio da planilha');
+    igual(registro['Observação do canal'], 'veio da planilha');
   });
 
   teste('cabeçalho repetido interrompe em vez de escolher um', () => {
@@ -214,12 +214,12 @@ function rodarTestesDaFundacao() {
     chamar('esquecerEstruturaLida_()');
     lanca(() => chamar('lerRegistros_("BASE_MESA")'), 'cabeçalho repetido',
       'coluna ambígua deveria parar a operação');
-    aba.getRange(1, 3).setValue('Observação da mesa');
+    aba.getRange(1, 3).setValue('Observação do canal');
     chamar('esquecerEstruturaLida_()');
   });
 
   teste('adicionar coluna pelo sistema recusa duplicata equivalente', () => {
-    lanca(() => chamar('adicionarColuna_("BASE_MESA", "OBSERVACAO DA MESA", "texto")'),
+    lanca(() => chamar('adicionarColuna_("BASE_MESA", "OBSERVACAO DO CANAL", "texto")'),
       'já tem uma coluna equivalente', 'acento e caixa não criam coluna nova');
   });
 
@@ -312,16 +312,25 @@ function rodarTestesDaFundacao() {
 
   teste('a conferência reconhece coluna fora do contrato sem reprovar por isso', () => {
     const laudo = chamar('conferirEstrutura_()');
-    const mesa = laudo.abas.find((a) => a.aba === 'BASE_MESA');
-    verdadeiro(mesa.aMais.indexOf('Observação da mesa') >= 0,
+    const canal = laudo.abas.find((a) => a.aba === 'BASE_MESA');
+    verdadeiro(canal.aMais.indexOf('Observação do canal') >= 0,
       'coluna criada à mão deveria aparecer como respeitada');
-    igual(mesa.faltando.length, 0, 'nenhuma coluna do contrato falta');
+    igual(canal.faltando.length, 0, 'nenhuma coluna do contrato falta');
   });
 
   teste('o orçamento de células fica bem abaixo do teto', () => {
+    // O que este número guarda é uma coisa só: que uma instalação VAZIA nasce
+    // longe do teto de 10 milhões de células, deixando espaço para o dado de
+    // verdade. Ele sobe um pouco a cada coluna nova do contrato — foi o que
+    // aconteceu quando CORRETORAS ganhou o Consultor —, e isso é crescimento
+    // legítimo, não regressão.
+    //
+    // Quem vigia o teto de perto é o diagnóstico, que marca atenção acima de
+    // 80% e falha acima de 95%, sobre a planilha de verdade. Aqui só se cobra
+    // que o ponto de partida seja folgado.
     const orcamento = chamar('orcamentoDeCelulas_(planilhaAtiva_())');
-    verdadeiro(orcamento.percentual < 2,
-      'a instalação vazia deveria ocupar menos de 2% — ocupou ' +
+    verdadeiro(orcamento.percentual < 3,
+      'a instalação vazia deveria ocupar menos de 3% — ocupou ' +
       orcamento.percentual + '%');
   });
 

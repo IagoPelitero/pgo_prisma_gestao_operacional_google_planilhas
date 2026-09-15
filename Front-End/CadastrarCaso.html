@@ -13,7 +13,7 @@
 
 var TelaCadastrarCaso = (function () {
 
-  var mesaEscolhida = '';
+  var canalEscolhida = '';
   var salvando = false;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -23,9 +23,9 @@ var TelaCadastrarCaso = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
 
-    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
@@ -42,10 +42,13 @@ var TelaCadastrarCaso = (function () {
   function carregarFormulario() {
     corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
 
-    Servidor.chamar('formularioDaMesa', mesaEscolhida)
+    Servidor.chamar('formularioDoCanal', canalEscolhida)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
         Formulario.ligar(corpo(), '');
+        // Só no cadastro NOVO. No caso já gravado quem manda é o valor da
+        // planilha — um padrão por cima dele seria perda silenciosa de dado.
+        Formulario.aplicarPadroes(corpo(), resposta);
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -70,11 +73,11 @@ var TelaCadastrarCaso = (function () {
     recado('Gravando…', '');
     elemento('salvar-caso').disabled = true;
 
-    Servidor.chamar('cadastrarCaso', mesaEscolhida, Formulario.valores(corpo()))
+    Servidor.chamar('cadastrarCaso', canalEscolhida, Formulario.valores(corpo()))
       .entao(function (resposta) {
         salvando = false;
         elemento('salvar-caso').disabled = false;
-        recado('Caso ' + resposta.id + ' cadastrado em ' + resposta.mesa + '.', 'bom');
+        recado('Caso ' + resposta.id + ' cadastrado em ' + resposta.canal + '.', 'bom');
         carregarFormulario();
       })
       .senao(function (erro) {
@@ -86,8 +89,8 @@ var TelaCadastrarCaso = (function () {
   }
 
   function ligar(pacote) {
-    SeletorDeMesa.ligar(function (idDaMesa) {
-      mesaEscolhida = idDaMesa;
+    SeletorDeCanal.ligar(function (idDoCanal) {
+      canalEscolhida = idDoCanal;
       Aplicacao.remontar();
     });
 

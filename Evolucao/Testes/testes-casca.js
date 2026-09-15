@@ -386,16 +386,16 @@ function rodarTestesDaCasca() {
     const informacao = chamar('dataDoUltimoRegistro_()');
     igual(informacao.existe, true);
     igual(informacao.texto, '13/09/2026 14:32');
-    igual(informacao.mesa, 'Mesa Diamante');
+    igual(informacao.canal, 'Mesa Diamante');
   });
 
-  teste('vence o registro mais recente entre as mesas', () => {
+  teste('vence o registro mais recente entre os canais', () => {
     chamar('inserirRegistro_')('BASE_RET', {
       analista: 'Diego Castilho',
       'data de recepção do protocolo': '20/09/2026'
     });
     const informacao = chamar('dataDoUltimoRegistro_()');
-    igual(informacao.mesa, 'RET Vida', 'a RET tem o registro mais novo');
+    igual(informacao.canal, 'RET Vida', 'a RET tem o registro mais novo');
     igual(informacao.texto, '20/09/2026', 'sem hora, mostra só o dia');
   });
 

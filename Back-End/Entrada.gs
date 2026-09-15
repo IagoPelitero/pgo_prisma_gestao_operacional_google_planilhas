@@ -67,9 +67,42 @@ function doGet() {
   // na marca de abertura. Sem isso a página nem chega a ser montada.
   var pagina = HtmlService.createTemplateFromFile('Index');
   pagina.identidade = identidade;
+
+  // E o pacote de partida vai JUNTO, dentro da própria página.
+  //
+  // Antes, abrir o sistema eram DUAS viagens ao servidor em fila: o doGet
+  // trazia a página, e só então o navegador pedia o pacoteDePartida. A
+  // segunda recomeçava do zero — outra execução, outro login, outra leitura
+  // das mesmas abas — para devolver o que esta execução aqui JÁ TEM na mão.
+  //
+  // O que a operação sentia disso era a tela de "Conferindo o seu acesso…"
+  // parada. Não era a planilha sendo lenta: era uma viagem inteira, com o
+  // custo fixo de uma chamada do Apps Script, para repetir trabalho feito.
+  //
+  // A tela continua sabendo pedir o pacote pelo caminho antigo (ver
+  // Aplicacao.html): se a injeção falhar, ela pergunta ao servidor como
+  // sempre fez. Atalho que não tem volta vira um jeito novo de quebrar.
+  pagina.pacoteDePartida = comoTextoParaDentroDeScript_(montarPacoteDePartida_(quem));
+
   return pagina.evaluate()
     .setTitle(identidade.nome)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * JSON pronto para morar dentro de uma tag <script> da página.
+ *
+ * O `<` vira `\u003c` — e isso não é capricho. Um valor de configuração que
+ * contivesse o texto de fechamento de script encerraria a tag ali, no meio do
+ * JSON, e o resto do pacote viraria HTML solto na página. Escapando o `<`, não
+ * existe sequência que feche a tag, e o JSON continua válido: `\u003c` é
+ * exatamente o mesmo caractere para quem faz JSON.parse.
+ */
+function comoTextoParaDentroDeScript_(valor) {
+  return JSON.stringify(valor)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
 }
 
 /**
@@ -137,8 +170,18 @@ function incluir(nomeDoArquivo) {
  * outro. Já aconteceu no sistema anterior e custou uma tarde.
  */
 function pacoteDePartida() {
-  var quem = usuarioAtual_();
+  return montarPacoteDePartida_(usuarioAtual_());
+}
 
+/**
+ * O pacote de verdade, a partir de um usuário que JÁ foi lido.
+ *
+ * Existe separado da função acima por um motivo só: o doGet já leu o usuário
+ * para decidir qual página servir, e passar esse resultado adiante evita ler
+ * tudo de novo. A função pública continua onde estava, com o nome que a tela
+ * conhece — quem chama de fora não precisa saber dessa divisão.
+ */
+function montarPacoteDePartida_(quem) {
   if (!quem.cadastrado) {
     return {
       disponivel: false,
@@ -173,11 +216,12 @@ function pacoteDePartida() {
     permissoes: {
       telas: quem.permissoes.telas,
       acoes: quem.permissoes.acoes,
-      escopo: quem.permissoes.escopo
+      escopo: quem.permissoes.escopo,
+      canais: quem.permissoes.canais
     },
     menu: montarMenu_(quem.permissoes),
-    mesas: mesasVisiveis_(),
-    ultimoRegistro: dataDoUltimoRegistro_(),
+    canais: canaisQueEuVejo_(quem),
+    ultimoRegistro: dataDoUltimoRegistro_(quem),
     tema: temaDoUsuario_(),
     senhaDeAdministradorDefinida: existeSenhaDeAdministrador_()
   };
@@ -243,30 +287,51 @@ function montarMenu_(permissoes) {
     });
 }
 
-/** As mesas ativas, na ordem definida na aba MESAS. */
-function mesasVisiveis_() {
-  return lerRegistros_('MESAS')
-    .filter(function (mesa) {
-      return normalizarParaComparar_(mesa.Ativo) === 'sim';
+/** Os canais ativas, na ordem definida na aba CANAIS. */
+/**
+ * Os canais que ESTA pessoa enxerga.
+ *
+ * canaisVisiveis_ responde "quais canais existem e estão ligados". Esta aqui
+ * responde outra coisa: "quais deles são desta pessoa". Confundir as duas é o
+ * erro que faz um analista da RET abrir a fila da Mesa Diamante.
+ *
+ * Nível sem canal declarado vê todos — ver lerPermissoesDoNivel_.
+ */
+function canaisQueEuVejo_(quem) {
+  var todos = canaisVisiveis_();
+  if (!quem || !quem.cadastrado) return [];
+
+  var escolhidos = (quem.permissoes && quem.permissoes.canais) || [];
+  if (!escolhidos.length) return todos;
+
+  return todos.filter(function (canal) {
+    return escolhidos.indexOf(converterParaIdentificador_(canal.id)) >= 0;
+  });
+}
+
+function canaisVisiveis_() {
+  return lerRegistros_('CANAIS')
+    .filter(function (canal) {
+      return normalizarParaComparar_(canal.Ativo) === 'sim';
     })
     .sort(function (uma, outra) {
       return (Number(uma.Ordem) || 0) - (Number(outra.Ordem) || 0);
     })
-    .map(function (mesa) {
+    .map(function (canal) {
       return {
-        id: mesa.Id,
-        nome: mesa.Nome,
-        descricao: mesa.Descricao,
-        aba: mesa.Aba,
-        colunaDaData: mesa.ColunaDaData,
-        colunaDaHora: mesa.ColunaDaHora,
-        colunaDoStatus: mesa.ColunaDoStatus,
-        colunasDaFila: mesa.ColunasDaFila,
-        colunasDaBusca: mesa.ColunasDaBusca,
-        metaMensalPorPessoa: Number(mesa.MetaMensalPorPessoa) || 0,
-        colunaDaFinalizacao: mesa.ColunaDaFinalizacao,
-        colunaDaAreaResponsavel: mesa.ColunaDaAreaResponsavel,
-        icone: mesa.Icone
+        id: canal.Id,
+        nome: canal.Nome,
+        descricao: canal.Descricao,
+        aba: canal.Aba,
+        colunaDaData: canal.ColunaDaData,
+        colunaDaHora: canal.ColunaDaHora,
+        colunaDoStatus: canal.ColunaDoStatus,
+        colunasDaFila: canal.ColunasDaFila,
+        colunasDaBusca: canal.ColunasDaBusca,
+        metaMensalPorPessoa: Number(canal.MetaMensalPorPessoa) || 0,
+        colunaDaFinalizacao: canal.ColunaDaFinalizacao,
+        colunaDaAreaResponsavel: canal.ColunaDaAreaResponsavel,
+        icone: canal.Icone
       };
     });
 }
@@ -276,25 +341,34 @@ function mesasVisiveis_() {
 // ============================================================================
 
 /**
- * Quando entrou o caso mais recente, entre todas as mesas ativas.
+ * Quando entrou o caso mais recente, entre todas os canais ativas.
  *
  * Fica na barra superior e responde a uma pergunta que a operação faz o dia
  * inteiro: "a base está atualizada?". Data velha ali é aviso de que alguma
  * carga não rodou.
  *
  * Custa pouco: a base só acrescenta no fim, então basta olhar as últimas
- * linhas de cada mesa — não se percorre a base para descobrir isso.
+ * linhas de cado canal — não se percorre a base para descobrir isso.
  */
-function dataDoUltimoRegistro_() {
-  var maisRecente = null;
-  var deQualMesa = '';
+function dataDoUltimoRegistro_(quem) {
+  // Sem quem, pergunta. Chamar sem argumento e receber "nenhum canal" seria o
+  // pior dos dois mundos: a barra ficaria vazia sem ninguém entender por quê,
+  // e pareceria base desatualizada — que é exatamente o alarme que ela existe
+  // para dar.
+  quem = quem || usuarioAtual_();
 
-  mesasVisiveis_().forEach(function (mesa) {
-    if (!mesa.aba || !mesa.colunaDaData) return;
+  var maisRecente = null;
+  var deQualCanal = '';
+
+  // Só os canais de quem está olhando. A barra superior responde "a minha
+  // base está atualizada?" — trazer a data de um canal que a pessoa nem
+  // enxerga responderia a pergunta de outra pessoa.
+  canaisQueEuVejo_(quem).forEach(function (canal) {
+    if (!canal.aba || !canal.colunaDaData) return;
 
     var ultimos;
     try {
-      ultimos = lerRegistros_(mesa.aba, { ultimas: 5 });
+      ultimos = lerRegistros_(canal.aba, { ultimas: 5 });
     } catch (erro) {
       return;   // aba fora do contrato não pode derrubar a barra superior
     }
@@ -302,29 +376,29 @@ function dataDoUltimoRegistro_() {
 
     var registro = ultimos[ultimos.length - 1];
     var momento = juntarDataEHora_(
-      registro[mesa.colunaDaData],
-      mesa.colunaDaHora ? registro[mesa.colunaDaHora] : '');
+      registro[canal.colunaDaData],
+      canal.colunaDaHora ? registro[canal.colunaDaHora] : '');
     if (!momento) return;
 
     if (!maisRecente || momento.getTime() > maisRecente.getTime()) {
       maisRecente = momento;
-      deQualMesa = mesa.nome;
+      deQualCanal = canal.nome;
     }
   });
 
   if (!maisRecente) {
-    return { texto: 'Nenhum registro ainda', mesa: '', existe: false };
+    return { texto: 'Nenhum registro ainda', canal: '', existe: false };
   }
 
-  var padrao = deQualMesa && !temHora_(maisRecente) ? 'dd/MM/yyyy' : 'dd/MM/yyyy HH:mm';
+  var padrao = deQualCanal && !temHora_(maisRecente) ? 'dd/MM/yyyy' : 'dd/MM/yyyy HH:mm';
   return {
     texto: Utilities.formatDate(maisRecente, RECC_FUSO_HORARIO, padrao),
-    mesa: deQualMesa,
+    canal: deQualCanal,
     existe: true
   };
 }
 
-/** Junta a coluna de data com a de hora, quando a mesa tem as duas. */
+/** Junta a coluna de data com a de hora, quando o canal tem as duas. */
 function juntarDataEHora_(valorDaData, valorDaHora) {
   var data = converterParaData_(valorDaData);
   if (!data) return null;
@@ -465,7 +539,7 @@ const RECC_ACOES = {
 const RECC_ESCOPOS = {
   PROPRIOS: 'PROPRIOS',
   EQUIPE: 'EQUIPE',
-  MESA: 'MESA',
+  CANAL: 'CANAL',
   TODOS: 'TODOS'
 };
 
@@ -609,6 +683,7 @@ function itemDoCatalogo_(idDoItem) {
 function lerPermissoesDoNivel_(nivel) {
   var permissoes = {
     escopo: RECC_ESCOPOS.PROPRIOS,
+    canais: [],
     telas: [],
     acoes: [],
     campos: {},
@@ -632,6 +707,21 @@ function lerPermissoesDoNivel_(nivel) {
   }
 
   permissoes.escopo = RECC_ESCOPOS[lido.escopo] || RECC_ESCOPOS.PROPRIOS;
+
+  // QUAIS CANAIS ESTE NÍVEL ENXERGA.
+  //
+  // RET Vida e Mesa Diamante são operações distintas: tratativas diferentes,
+  // colunas diferentes, gente diferente. Quem atende a RET não tem o que
+  // fazer com a fila da Mesa, e o contrário também vale.
+  //
+  // LISTA VAZIA QUER DIZER TODOS, e isso é decisão, não descuido. É o caso de
+  // quem administra — e é também o que mantém de pé todo nível criado antes
+  // desta regra existir: nível antigo continua enxergando o que enxergava, em
+  // vez de amanhecer sem canal nenhum e sem ninguém entender por quê.
+  permissoes.canais = Array.isArray(lido.canais)
+    ? lido.canais.map(function (id) { return converterParaIdentificador_(id); })
+      .filter(function (id) { return id !== ''; })
+    : [];
   permissoes.telas = Array.isArray(lido.telas) ? lido.telas : [];
   permissoes.acoes = Array.isArray(lido.acoes) ? lido.acoes : [];
   permissoes.campos = lido.campos && typeof lido.campos === 'object' ? lido.campos : {};
@@ -731,7 +821,7 @@ function colunaDoResponsavel_(estrutura) {
  */
 function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
   if (quem.permissoes.escopo === RECC_ESCOPOS.TODOS) return registros;
-  if (quem.permissoes.escopo === RECC_ESCOPOS.MESA) return registros;
+  if (quem.permissoes.escopo === RECC_ESCOPOS.CANAL) return registros;
 
   var estrutura = estruturaDaAba_(nomeDaAba);
   var coluna = colunaDoResponsavel_(estrutura);
@@ -876,7 +966,7 @@ function gravarTentativasDeSenha_(tentativas) {
 }
 
 /**
- * A guarda das ações sem volta: criar ou remover coluna, apagar mesa, mexer
+ * A guarda das ações sem volta: criar ou remover coluna, apagar canal, mexer
  * em nível de acesso, gerar aba de análise sobre uma existente, normalizar
  * base, ocultar em massa.
  *
@@ -969,7 +1059,7 @@ function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
  */
 
 /**
- * A lista de usuários, com cargo, nível e mesa já traduzidos para nome.
+ * A lista de usuários, com cargo, nível e canal já traduzidos para nome.
  *
  * Tudo sai como TEXTO — inclusive as datas. Elas atravessam a fronteira do
  * `google.script.run` em JSON, e um `Date` atravessa como um texto ISO que a
@@ -984,21 +1074,21 @@ function listarUsuarios() {
     catalogo[converterParaIdentificador_(item.Id)] = String(item.Nome || '');
   });
 
-  var mesas = {};
-  lerRegistros_('MESAS').forEach(function (mesa) {
-    mesas[converterParaIdentificador_(mesa.Id)] = String(mesa.Nome || '');
+  var canais = {};
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    canais[converterParaIdentificador_(canal.Id)] = String(canal.Nome || '');
   });
 
   return lerRegistros_('USUARIOS').map(function (usuario) {
-    var mesaId = converterParaIdentificador_(usuario.MesaId);
+    var canalId = converterParaIdentificador_(usuario.CanalId);
     return {
       id: String(usuario.Id || ''),
       nome: String(usuario.Nome || ''),
       email: String(usuario.Email || ''),
       canalQueAtende: String(usuario['Canal que atende'] || ''),
-      mesaId: mesaId,
-      // Sem mesa NÃO é falta de dado: é o administrador, que atende todas.
-      mesa: mesaId ? (mesas[mesaId] || 'Mesa desligada') : '',
+      canalId: canalId,
+      // Sem canal NÃO é falta de dado: é o administrador, que atende todas.
+      canal: canalId ? (canais[canalId] || 'Canal desligada') : '',
       cargoId: converterParaIdentificador_(usuario.CargoId),
       cargo: catalogo[converterParaIdentificador_(usuario.CargoId)] || 'Sem cargo',
       nivelAcessoId: converterParaIdentificador_(usuario.NivelAcessoId),
@@ -1043,17 +1133,17 @@ function salvarUsuario(dados) {
       'Sem nível válido a pessoa fica cadastrada e não consegue entrar.');
   }
 
-  // A mesa é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
-  // preenchida, tem de existir: uma mesa que sumiu deixaria a pessoa apontando
+  // O canal é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
+  // preenchida, tem de existir: um canal que sumiu deixaria a pessoa apontando
   // para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
-  var mesaEscolhida = converterParaIdentificador_(dados.mesaId);
-  if (mesaEscolhida) {
-    var existe = lerRegistros_('MESAS').filter(function (mesa) {
-      return converterParaIdentificador_(mesa.Id) === mesaEscolhida;
+  var canalEscolhida = converterParaIdentificador_(dados.canalId);
+  if (canalEscolhida) {
+    var existe = lerRegistros_('CANAIS').filter(function (canal) {
+      return converterParaIdentificador_(canal.Id) === canalEscolhida;
     })[0];
     if (!existe) {
-      throw new Error('A mesa escolhida não existe mais. Escolha outra, ou ' +
-        'deixe em branco — quem administra não pertence a uma mesa.');
+      throw new Error('O canal escolhida não existe mais. Escolha outra, ou ' +
+        'deixe em branco — quem administra não pertence a um canal.');
     }
   }
 
@@ -1074,8 +1164,8 @@ function salvarUsuario(dados) {
     Nome: String(dados.nome).trim(),
     Email: email,
     'Canal que atende': String(dados.canalQueAtende || '').trim(),
-    // Mesa VAZIA é válida: é o administrador, que atende todas e delega.
-    MesaId: converterParaIdentificador_(dados.mesaId),
+    // Canal VAZIA é válida: é o administrador, que atende todas e delega.
+    CanalId: converterParaIdentificador_(dados.canalId),
     CargoId: converterParaIdentificador_(dados.cargoId),
     NivelAcessoId: converterParaIdentificador_(dados.nivelAcessoId),
     Matricula: converterParaIdentificador_(dados.matricula),

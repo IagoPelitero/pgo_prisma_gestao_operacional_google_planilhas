@@ -40,7 +40,7 @@ function rodarTestesDeConfiguracoes() {
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
-  const mesa = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
 
   secao('O panorama');
 
@@ -49,7 +49,7 @@ function rodarTestesDeConfiguracoes() {
     // Conferimos as CHAVES, e não só quantas são: contar 7 continuaria
     // passando se uma seção sumisse e outra nascesse no mesmo commit.
     igual(resumo.secoes.map((s) => s.chave).join(','),
-      'campos,usuarios,niveis,catalogo,mesas,identidade,paineis,analises,estrutura');
+      'campos,usuarios,niveis,catalogo,canais,identidade,paineis,analises,estrutura');
     igual(resumo.podeMexerNaEstrutura, true);
     igual(resumo.senhaDefinida, false, 'instalação nova ainda não tem senha');
     verdadeiro(resumo.secoes.find((s) => s.chave === 'campos').quantidade >= 55);
@@ -71,8 +71,8 @@ function rodarTestesDeConfiguracoes() {
   secao('Campos do formulário');
 
   teste('a lista traz protegidos, desligados e o estado da coluna', () => {
-    const campos = chamar('listarCamposDaMesa')(mesa.id);
-    igual(campos.length, 20, 'os 20 cabeçalhos da mesa, inclusive o Id');
+    const campos = chamar('listarCamposDoCanal')(canal.id);
+    igual(campos.length, 20, 'os 20 cabeçalhos do canal, inclusive o Id');
     verdadeiro(campos.every((c) => c.colunaExiste), 'todas as colunas existem');
     verdadeiro(campos.find((c) => c.chave === 'id').protegido);
     igual(campos.find((c) => c.chave === 'id').ativo, false);
@@ -85,7 +85,7 @@ function rodarTestesDeConfiguracoes() {
     aba.getRange(1, 15).setValue('');
     chamar('esquecerEstruturaLida_()');
 
-    const campo = chamar('listarCamposDaMesa')(mesa.id)
+    const campo = chamar('listarCamposDoCanal')(canal.id)
       .find((c) => c.chave === 'assunto');
     igual(campo.colunaExiste, false,
       'o campo precisa avisar que perdeu a coluna, em vez de parar de funcionar');
@@ -96,13 +96,13 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('mudar rótulo, seção e máscara não pede senha — é aparência', () => {
-    const campo = chamar('listarCamposDaMesa')(mesa.id)
+    const campo = chamar('listarCamposDoCanal')(canal.id)
       .find((c) => c.chave === 'assunto');
     chamar('salvarCampo')({
       id: campo.id, rotulo: 'Assunto do contato', secao: 'Atendimento',
       tipo: 'texto', obrigatorio: true, ativo: true
     });
-    const depois = chamar('listarCamposDaMesa')(mesa.id)
+    const depois = chamar('listarCamposDoCanal')(canal.id)
       .find((c) => c.chave === 'assunto');
     igual(depois.rotulo, 'Assunto do contato');
     igual(depois.obrigatorio, true);
@@ -110,7 +110,7 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('trocar o cabeçalho por aqui é recusado — é mexer na coluna', () => {
-    const campo = chamar('listarCamposDaMesa')(mesa.id)
+    const campo = chamar('listarCamposDoCanal')(canal.id)
       .find((c) => c.chave === 'assunto');
     lanca(() => chamar('salvarCampo')({
       id: campo.id, cabecalho: 'Outro nome', rotulo: 'x', tipo: 'texto'
@@ -118,7 +118,7 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('tipo de campo inventado é recusado, e diz quais existem', () => {
-    const campo = chamar('listarCamposDaMesa')(mesa.id)[1];
+    const campo = chamar('listarCamposDoCanal')(canal.id)[1];
     lanca(() => chamar('salvarCampo')({
       id: campo.id, rotulo: 'x', tipo: 'telepatia'
     }), 'Tipo de campo desconhecido');
@@ -129,7 +129,7 @@ function rodarTestesDeConfiguracoes() {
     // a ação já exige a permissão de ESTRUTURA, que só o administrador tem.
     // Pedir a ele um segredo que ele mesmo escolheu é atrito sem ganho: o
     // sistema já sabe quem está chamando, pela conta Google.
-    const criado = chamar('criarCampo')(mesa.id, { rotulo: 'Observação interna' });
+    const criado = chamar('criarCampo')(canal.id, { rotulo: 'Observação interna' });
     igual(criado.cabecalho, 'Observação interna');
   });
 
@@ -141,7 +141,7 @@ function rodarTestesDeConfiguracoes() {
     // dependem de cada nível, e um usuário a mais aqui o quebraria sem que
     // nada tivesse quebrado de verdade.
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('criarCampo')(mesa.id, { rotulo: 'Pela porta dos fundos' }),
+      lanca(() => chamar('criarCampo')(canal.id, { rotulo: 'Pela porta dos fundos' }),
         'não permite');
     });
   });
@@ -150,7 +150,7 @@ function rodarTestesDeConfiguracoes() {
     chamar('definirSenhaDeAdministrador')('segredo123', '');
     chamar('liberarComSenha')('segredo123');
 
-    const criado = chamar('criarCampo')(mesa.id, {
+    const criado = chamar('criarCampo')(canal.id, {
       rotulo: 'Valor negociado', tipo: 'moeda', secao: 'Encaminhamento'
     });
     igual(criado.cabecalho, 'Valor negociado');
@@ -170,23 +170,23 @@ function rodarTestesDeConfiguracoes() {
   teste('reordenar muda a tela, e não a planilha', () => {
     // Foi reordenando coluna que o sistema anterior corrompeu dado.
     const antes = chamar('estruturaDaAba_')('BASE_MESA').cabecalhos.join('|');
-    const campos = chamar('listarCamposDaMesa')(mesa.id);
+    const campos = chamar('listarCamposDoCanal')(canal.id);
     const invertidos = campos.map((c) => c.id).reverse();
 
-    chamar('reordenarCampos')(mesa.id, invertidos);
+    chamar('reordenarCampos')(canal.id, invertidos);
     igual(chamar('estruturaDaAba_')('BASE_MESA').cabecalhos.join('|'), antes,
       'a planilha não pode ter sido tocada');
-    igual(chamar('listarCamposDaMesa')(mesa.id)[0].id, invertidos[0],
+    igual(chamar('listarCamposDoCanal')(canal.id)[0].id, invertidos[0],
       'mas a ordem da tela mudou');
 
-    chamar('reordenarCampos')(mesa.id, invertidos.reverse());
+    chamar('reordenarCampos')(canal.id, invertidos.reverse());
   });
 
-  teste('reordenar com campo de outra mesa é recusado', () => {
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    const daRet = chamar('listarCamposDaMesa')(ret.id)[0];
-    lanca(() => chamar('reordenarCampos')(mesa.id, [daRet.id]),
-      'não é da mesa Mesa Diamante');
+  teste('reordenar com campo de outro canal é recusado', () => {
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const daRet = chamar('listarCamposDoCanal')(ret.id)[0];
+    lanca(() => chamar('reordenarCampos')(canal.id, [daRet.id]),
+      'não é do canal Mesa Diamante');
   });
 
   secao('As listas');
@@ -195,34 +195,34 @@ function rodarTestesDeConfiguracoes() {
     // Trocar o Nome não renomeia o que já foi gravado: os casos ficariam
     // apontando para um item que não existe mais.
     chamar('inserirRegistro_')('BASE_MESA', {
-      Analista: 'Ana Martins', Status: 'Pendente', 'Nome do segurado': 'Alguém'
+      Analista: 'Ana Martins', Status: 'Em andamento', 'Nome do segurado': 'Alguém'
     });
-    const pendente = chamar('listarCatalogo')('STATUS', mesa.id)
-      .find((i) => i.nome === 'Pendente');
+    const pendente = chamar('listarCatalogo')('STATUS', canal.id)
+      .find((i) => i.nome === 'Em andamento');
 
     const erro = lanca(() => chamar('salvarItemDoCatalogo')({
-      id: pendente.id, tipo: 'STATUS', mesaId: mesa.id, nome: 'Em aberto'
+      id: pendente.id, tipo: 'STATUS', canalId: canal.id, nome: 'Em aberto'
     }), 'está gravado em');
     contem(erro.message, 'troque o rótulo', 'a saída precisa ser oferecida');
   });
 
   teste('trocar só o rótulo é livre — é o que aparece na tela', () => {
-    const pendente = chamar('listarCatalogo')('STATUS', mesa.id)
-      .find((i) => i.nome === 'Pendente');
+    const pendente = chamar('listarCatalogo')('STATUS', canal.id)
+      .find((i) => i.nome === 'Em andamento');
     chamar('salvarItemDoCatalogo')({
-      id: pendente.id, tipo: 'STATUS', mesaId: mesa.id,
-      nome: 'Pendente', rotulo: 'Aguardando ação', cor: 'atencao'
+      id: pendente.id, tipo: 'STATUS', canalId: canal.id,
+      nome: 'Em andamento', rotulo: 'Aguardando ação', cor: 'atencao'
     });
-    igual(chamar('listarCatalogo')('STATUS', mesa.id)
-      .find((i) => i.nome === 'Pendente').rotulo, 'Aguardando ação');
+    igual(chamar('listarCatalogo')('STATUS', canal.id)
+      .find((i) => i.nome === 'Em andamento').rotulo, 'Aguardando ação');
   });
 
   teste('item novo entra na lista e aparece no formulário', () => {
     chamar('salvarItemDoCatalogo')({
-      tipo: 'STATUS', mesaId: mesa.id, nome: 'Em análise jurídica',
+      tipo: 'STATUS', canalId: canal.id, nome: 'Em análise jurídica',
       cor: 'violeta', ordem: 7, ativo: true
     });
-    const status = chamar('formularioDaMesa')(mesa.id)
+    const status = chamar('formularioDoCanal')(canal.id)
       .secoes.reduce((soma, s) => soma.concat(s.campos), [])
       .find((c) => c.chave === 'status');
     verdadeiro(status.opcoes.some((o) => o.valor === 'Em análise jurídica'),
@@ -239,45 +239,45 @@ function rodarTestesDeConfiguracoes() {
     igual(niveis.find((n) => n.nome === 'Consulta').pessoas, 0);
   });
 
-  teste('a pessoa pode não ter mesa — é o caso de quem administra', () => {
-    // O primeiro usuário, o que instala o sistema, não pertence a mesa
-    // nenhuma: ele atende as duas e delega. Exigir mesa dele obrigaria a
+  teste('a pessoa pode não ter canal — é o caso de quem administra', () => {
+    // O primeiro usuário, o que instala o sistema, não pertence o canal
+    // nenhuma: ele atende as duas e delega. Exigir canal dele obrigaria a
     // inventar uma resposta para uma pergunta que não se aplica.
     const eu = chamar('listarUsuarios()')
       .find((u) => u.email === 'primeiro.adm@exemplo.com');
-    igual(eu.mesaId, '', 'nasce sem mesa');
-    igual(eu.mesa, '', 'e a tela mostra isso como "todas as mesas"');
+    igual(eu.canalId, '', 'nasce sem canal');
+    igual(eu.canal, '', 'e a tela mostra isso como "todas os canais"');
     igual(eu.administrador, true);
   });
 
-  teste('quem tem mesa vem com o nome dela, e não com o Id', () => {
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  teste('quem tem canal vem com o nome dela, e não com o Id', () => {
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
     const id = chamar('salvarUsuario')({
       nome: 'Analista da RET', email: 'analista.ret@exemplo.com',
       nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
         .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
-      mesaId: ret.id, ativo: true
+      canalId: ret.id, ativo: true
     });
     const pessoa = chamar('listarUsuarios()').find((u) => u.id === id);
-    igual(pessoa.mesaId, ret.id);
-    igual(pessoa.mesa, 'RET Vida', 'o Id não diz nada a quem lê a tela');
+    igual(pessoa.canalId, ret.id);
+    igual(pessoa.canal, 'RET Vida', 'o Id não diz nada a quem lê a tela');
     igual(pessoa.administrador, false);
 
-    // E dá para voltar a não ter mesa: a pessoa foi promovida, ou passou a
+    // E dá para voltar a não ter canal: a pessoa foi promovida, ou passou a
     // atender as duas.
     chamar('salvarUsuario')({
       id: id, nome: 'Analista da RET', email: 'analista.ret@exemplo.com',
-      nivelAcessoId: pessoa.nivelAcessoId, mesaId: '', ativo: true
+      nivelAcessoId: pessoa.nivelAcessoId, canalId: '', ativo: true
     });
-    igual(chamar('listarUsuarios()').find((u) => u.id === id).mesa, '');
+    igual(chamar('listarUsuarios()').find((u) => u.id === id).canal, '');
   });
 
-  teste('mesa que não existe é recusada, e diz que dá para deixar em branco', () => {
+  teste('canal que não existe é recusada, e diz que dá para deixar em branco', () => {
     lanca(() => chamar('salvarUsuario')({
-      nome: 'Mesa Fantasma', email: 'fantasma@exemplo.com',
+      nome: 'Canal Fantasma', email: 'fantasma@exemplo.com',
       nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
         .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
-      mesaId: '9999999999', ativo: true
+      canalId: '9999999999', ativo: true
     }), 'não existe mais');
   });
 
@@ -298,13 +298,13 @@ function rodarTestesDeConfiguracoes() {
     [["campoDeTexto('nome'", 'Nome'],
      ["campoDeTexto('email'", 'E-mail'],
      ["caixaDeItens('cargo'", 'Cargo'],
-     ['caixaDeMesaDaPessoa(', 'Mesa'],
+     ['caixaDeCanalDaPessoa(', 'Canal'],
      ["caixaDeItens('nivel'", 'Nível de acesso']
     ].forEach((par) => {
       contem(tela, par[0], 'falta o campo "' + par[1] + '" no formulário');
     });
-    contem(tela, 'todas as mesas',
-      'e a opção de não ter mesa aparece por escrito');
+    contem(tela, 'todas os canais',
+      'e a opção de não ter canal aparece por escrito');
   });
 
   teste('tirar Configurações do único nível que a tem é recusado', () => {
@@ -350,7 +350,7 @@ function rodarTestesDeConfiguracoes() {
     });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      const campos = chamar('formularioDaMesa')(mesa.id)
+      const campos = chamar('formularioDoCanal')(canal.id)
         .secoes.reduce((soma, s) => soma.concat(s.campos), []);
       verdadeiro(!campos.some((c) => c.chave === 'documentocpf'),
         'o campo escondido não pode chegar ao navegador');
@@ -404,11 +404,11 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('a coluna criada pelo administrador consta como fora do contrato', () => {
-    const mesa4 = chamar('conferirEstruturaDaPlanilha()').abas
+    const canal4 = chamar('conferirEstruturaDaPlanilha()').abas
       .find((a) => a.aba === 'BASE_MESA');
-    verdadeiro(mesa4.aMais.indexOf('Valor negociado') >= 0,
+    verdadeiro(canal4.aMais.indexOf('Valor negociado') >= 0,
       'coluna nova é respeitada, e o laudo diz que ela não é do contrato');
-    igual(mesa4.faltando.length, 0);
+    igual(canal4.faltando.length, 0);
   });
 
   secao('Níveis — o que a tela oferece');
@@ -427,12 +427,12 @@ function rodarTestesDeConfiguracoes() {
     });
   });
 
-  secao('Mesas de trabalho');
+  secao('Canais de trabalho');
 
-  teste('a mesa vem com as colunas da base, para não digitar nome à mão', () => {
-    const mesas = chamar('listarMesasConfiguraveis()');
-    igual(mesas.length, 2);
-    const diamante = mesas.find((m) => m.aba === 'BASE_MESA');
+  teste('o canal vem com as colunas da base, para não digitar nome à mão', () => {
+    const canais = chamar('listarCanaisConfiguraveis()');
+    igual(canais.length, 2);
+    const diamante = canais.find((m) => m.aba === 'BASE_MESA');
     verdadeiro(diamante.abaExiste);
     verdadeiro(diamante.colunasDaBase.indexOf('Status') >= 0);
     verdadeiro(diamante.colunasDaBase.every((c) => c.charAt(0) !== '_'),
@@ -441,20 +441,20 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('coluna que não existe é recusada, dizendo quais existem', () => {
-    const erro = lanca(() => chamar('salvarMesa')({
-      id: mesa.id, nome: 'Mesa Diamante', colunaDoStatus: 'Sittuação'
+    const erro = lanca(() => chamar('salvarCanal')({
+      id: canal.id, nome: 'Mesa Diamante', colunaDoStatus: 'Sittuação'
     }), 'não existe na aba');
     contem(erro, 'Status', 'o recado lista as colunas de verdade');
   });
 
-  teste('trocar a aba de uma mesa é recusado — os casos moram nela', () => {
-    lanca(() => chamar('salvarMesa')({
-      id: mesa.id, nome: 'Mesa Diamante', aba: 'BASE_RET'
+  teste('trocar a aba de um canal é recusado — os casos moram nela', () => {
+    lanca(() => chamar('salvarCanal')({
+      id: canal.id, nome: 'Mesa Diamante', aba: 'BASE_RET'
     }), 'não muda por aqui');
   });
 
-  teste('desligar a última mesa ativa é recusado', () => {
-    const ret = chamar('listarMesasConfiguraveis()').find((m) => m.aba === 'BASE_RET');
+  teste('desligar a último canal ativa é recusado', () => {
+    const ret = chamar('listarCanaisConfiguraveis()').find((m) => m.aba === 'BASE_RET');
     const comoEstava = { id: ret.id, nome: ret.nome, ordem: ret.ordem,
       colunaDaData: ret.colunaDaData, colunaDaHora: ret.colunaDaHora,
       colunaDoStatus: ret.colunaDoStatus, colunasDaFila: ret.colunasDaFila,
@@ -462,36 +462,36 @@ function rodarTestesDeConfiguracoes() {
       colunaDaFinalizacao: ret.colunaDaFinalizacao,
       colunaDaAreaResponsavel: ret.colunaDaAreaResponsavel };
 
-    chamar('salvarMesa')(Object.assign({}, comoEstava, { ativo: false }));
+    chamar('salvarCanal')(Object.assign({}, comoEstava, { ativo: false }));
 
-    lanca(() => chamar('salvarMesa')({
-      id: mesa.id, nome: 'Mesa Diamante', ativo: false
-    }), 'última mesa ativa');
+    lanca(() => chamar('salvarCanal')({
+      id: canal.id, nome: 'Mesa Diamante', ativo: false
+    }), 'último canal ativa');
 
-    chamar('salvarMesa')(Object.assign({}, comoEstava, { ativo: true }));
+    chamar('salvarCanal')(Object.assign({}, comoEstava, { ativo: true }));
   });
 
   teste('mexer nos cartões muda o painel na hora seguinte', () => {
-    const painel = chamar('listarCardsDoPainel')('dashboard', mesa.id);
-    // "O que contar" oferece o total, cada situação da mesa e, quando ela
+    const painel = chamar('listarCardsDoPainel')('dashboard', canal.id);
+    // "O que contar" oferece o total, cada situação do canal e, quando ela
     // declara as colunas, os finalizados na célula.
     verdadeiro(painel.oQueContar.some((o) => o.chave === 'total'));
     verdadeiro(painel.oQueContar.some((o) => o.chave === 'naCelula'));
 
-    chamar('salvarCardsDoPainel')('dashboard', mesa.id, [
+    chamar('salvarCardsDoPainel')('dashboard', canal.id, [
       { titulo: 'Só o que falta fazer', dimensao: 'situacao',
-        filtro: 'Pendente', cor: 'ruim', mostrar: true }
+        filtro: 'Em andamento', cor: 'ruim', mostrar: true }
     ]);
 
-    const cartoes = chamar('resumoDaMesa')(mesa.id, {}).cartoes;
+    const cartoes = chamar('resumoDoCanal')(canal.id, {}).cartoes;
     igual(cartoes.length, 1);
     igual(cartoes[0].rotulo, 'Só o que falta fazer',
       'o nome do cartão é livre — não precisa ser o nome da situação');
     igual(cartoes[0].tom, 'ruim');
 
     // E o que foi tirado da tela não sumiu da planilha: volta inteiro.
-    chamar('salvarCardsDoPainel')('dashboard', mesa.id, painel.cartoes);
-    igual(chamar('resumoDaMesa')(mesa.id, {}).cartoes.length,
+    chamar('salvarCardsDoPainel')('dashboard', canal.id, painel.cartoes);
+    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length,
       painel.cartoes.length);
   });
 
@@ -506,7 +506,7 @@ function rodarTestesDeConfiguracoes() {
       'sair da tela precisa fechar o diálogo da senha');
   });
 
-  teste('a tela monta as três colunas e escolhe a primeira mesa sozinha', () => {
+  teste('a tela monta as três colunas e escolhe a primeiro canal sozinha', () => {
     const { TelaConfiguracoes } = carregarTelas(['Moldura', 'Configuracoes']);
     const casca = TelaConfiguracoes.montar(chamar('pacoteDePartida()'));
     contem(casca, 'id="config"');

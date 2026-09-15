@@ -25,9 +25,9 @@
 var TelaConfiguracoes = (function () {
 
   var resumo = null;
-  var pacoteDoSistema = null;   // o pacote de partida, para as mesas
+  var pacoteDoSistema = null;   // o pacote de partida, para os canais
   var secaoAtual = 'campos';
-  var mesaEscolhida = '';
+  var canalEscolhida = '';
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
@@ -60,7 +60,7 @@ var TelaConfiguracoes = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
     return '<div class="config" id="config">'
       + '<p class="carregando-campos">Abrindo as configurações…</p>'
       + '</div>';
@@ -158,7 +158,7 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'usuarios') return carregarUsuarios();
     if (secaoAtual === 'niveis') return carregarNiveis();
     if (secaoAtual === 'catalogo') return carregarListas();
-    if (secaoAtual === 'mesas') return carregarMesas();
+    if (secaoAtual === 'canais') return carregarCanais();
     if (secaoAtual === 'paineis') return carregarPaineis();
     if (secaoAtual === 'analises') return carregarAnalises();
     if (secaoAtual === 'identidade') return desenharIdentidade();
@@ -168,11 +168,11 @@ var TelaConfiguracoes = (function () {
   /* --------------------------------------------------- campos do formulário */
 
   function carregarCampos() {
-    aguarde('Lendo os campos da mesa…');
+    aguarde('Lendo os campos do canal…');
     Servidor.chamar('opcoesDeConfiguracaoDeCampo')
       .entao(function (opcoes) {
         dados.opcoes = opcoes;
-        Servidor.chamar('listarCamposDaMesa', mesaEscolhida)
+        Servidor.chamar('listarCamposDoCanal', canalEscolhida)
           .entao(function (campos) {
             dados.campos = campos;
             desenharCampos();
@@ -207,7 +207,7 @@ var TelaConfiguracoes = (function () {
 
     elemento('config-lista').innerHTML =
       '<div class="config-cabeca">'
-      + '<div class="config-mesas">' + caixaDeMesas() + '</div>'
+      + '<div class="config-canais">' + caixaDeCanais() + '</div>'
       + (resumo.podeMexerNaEstrutura
         ? '<button type="button" class="botao pequeno" id="novo-campo">'
           + 'Criar campo</button>' : '')
@@ -228,20 +228,20 @@ var TelaConfiguracoes = (function () {
     return null;
   }
 
-  function caixaDeMesas() {
-    return '<select id="mesa-da-config" aria-label="Mesa">'
-      + pacoteDoSistema.mesas.map(function (mesa) {
-        return '<option value="' + escapar(mesa.id) + '"'
-          + (mesa.id === mesaEscolhida ? ' selected' : '') + '>'
-          + escapar(mesa.nome) + '</option>';
+  function caixaDeCanais() {
+    return '<select id="canal-da-config" aria-label="Canal">'
+      + pacoteDoSistema.canais.map(function (canal) {
+        return '<option value="' + escapar(canal.id) + '"'
+          + (canal.id === canalEscolhida ? ' selected' : '') + '>'
+          + escapar(canal.nome) + '</option>';
       }).join('') + '</select>';
   }
 
   function ligarListaDeCampos() {
-    var seletor = elemento('mesa-da-config');
+    var seletor = elemento('canal-da-config');
     if (seletor) {
       seletor.addEventListener('change', function () {
-        mesaEscolhida = this.value;
+        canalEscolhida = this.value;
         escolhido = null;
         carregarCampos();
       });
@@ -277,7 +277,7 @@ var TelaConfiguracoes = (function () {
     // A ordem já mudou na tela — se o servidor recusar, a lista volta ao que
     // era e o motivo aparece no painel. Nunca deixamos a tela mostrando uma
     // ordem que a planilha não tem.
-    Servidor.chamar('reordenarCampos', mesaEscolhida, lista.map(function (campo) {
+    Servidor.chamar('reordenarCampos', canalEscolhida, lista.map(function (campo) {
       return campo.id;
     })).senao(function (erro) {
       // O recado flutua, e não mora no painel: recarregar a lista redesenha o
@@ -391,10 +391,10 @@ var TelaConfiguracoes = (function () {
         obrigatorio: marcado('obrigatorio')
       };
       comSenhaDeAdministrador(function () {
-        Servidor.chamar('criarCampo', mesaEscolhida, envio)
+        Servidor.chamar('criarCampo', canalEscolhida, envio)
           .entao(function (criada) {
             avisarSalvo('Coluna "' + criada.cabecalho + '" criada em '
-              + criada.mesa + '.');
+              + criada.canal + '.');
             carregarCampos();
           })
           .senao(mostrarErroNoPainel);
@@ -436,9 +436,9 @@ var TelaConfiguracoes = (function () {
         + escapar(usuario.nivelAcesso)
         + (usuario.cargo && usuario.cargo !== 'Sem cargo'
           ? ' · ' + escapar(usuario.cargo) : '')
-        // Sem mesa é o administrador, e dizer isso é melhor que deixar em
+        // Sem canal é o administrador, e dizer isso é melhor que deixar em
         // branco: em branco parece cadastro pela metade.
-        + ' · ' + escapar(usuario.mesa || 'todas as mesas')
+        + ' · ' + escapar(usuario.canal || 'todas os canais')
         + (usuario.ativo ? '' : ' · sem acesso') + '</span></button></li>';
     }).join('');
 
@@ -466,33 +466,33 @@ var TelaConfiguracoes = (function () {
   }
 
   /**
-   * A mesa em que a pessoa trabalha — e a opção de não ter nenhuma.
+   * O canal em que a pessoa trabalha — e a opção de não ter nenhuma.
    *
-   * "Todas as mesas" é a PRIMEIRA opção, e é o padrão, porque é o caso de
-   * quem administra: quem cuida do sistema não pertence a uma mesa, atende as
+   * "Todas os canais" é a PRIMEIRA opção, e é o padrão, porque é o caso de
+   * quem administra: quem cuida do sistema não pertence a um canal, atende as
    * duas e delega para quem for. Deixar esse caso como uma exceção escondida
    * no fim da lista faria parecer cadastro incompleto.
    */
-  function caixaDeMesaDaPessoa(escolhida) {
-    var mesas = pacoteDoSistema.mesas || [];
-    return '<label class="config-campo"><span>Mesa</span>'
-      + '<select id="cfg-mesa-da-pessoa">'
+  function caixaDeCanalDaPessoa(escolhida) {
+    var canais = pacoteDoSistema.canais || [];
+    return '<label class="config-campo"><span>Canal</span>'
+      + '<select id="cfg-canal-da-pessoa">'
       + '<option value=""' + (escolhida ? '' : ' selected') + '>'
-      + '— todas as mesas —</option>'
-      + mesas.map(function (mesa) {
-        return '<option value="' + escapar(mesa.id) + '"'
-          + (texto(mesa.id) === texto(escolhida) ? ' selected' : '') + '>'
-          + escapar(mesa.nome) + '</option>';
+      + '— todas os canais —</option>'
+      + canais.map(function (canal) {
+        return '<option value="' + escapar(canal.id) + '"'
+          + (texto(canal.id) === texto(escolhida) ? ' selected' : '') + '>'
+          + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
-      + '<em>Quem administra fica em "todas as mesas": pode cadastrar em '
-      + 'qualquer uma e delegar. Escolher uma mesa é para quem trabalha nela.'
+      + '<em>Quem administra fica em "todas os canais": pode cadastrar em '
+      + 'qualquer uma e delegar. Escolher um canal é para quem trabalha nela.'
       + '</em></label>';
   }
 
   function desenharPainelDoUsuario(usuario) {
     var ehNovo = !usuario;
     var pessoa = usuario || {
-      id: '', nome: '', email: '', canalQueAtende: '', mesaId: '', cargoId: '',
+      id: '', nome: '', email: '', canalQueAtende: '', canalId: '', cargoId: '',
       nivelAcessoId: '', matricula: '', ativo: true
     };
 
@@ -504,7 +504,7 @@ var TelaConfiguracoes = (function () {
         'É por ele que a pessoa entra. Tem de ser a conta que ela usa.')
       + campoDeTexto('canal', 'Canal que atende', pessoa.canalQueAtende,
         'Usado pelo alcance EQUIPE: quem atende o mesmo canal vê os mesmos casos.')
-      + caixaDeMesaDaPessoa(pessoa.mesaId)
+      + caixaDeCanalDaPessoa(pessoa.canalId)
       + campoDeTexto('matricula', 'Matrícula', pessoa.matricula, '')
       + caixaDeItens('cargo', 'Cargo', dados.cargos, pessoa.cargoId,
         'O cargo é só descrição — quem decide o acesso é o nível abaixo.')
@@ -524,7 +524,7 @@ var TelaConfiguracoes = (function () {
         nome: valorDe('nome'),
         email: valorDe('email'),
         canalQueAtende: valorDe('canal'),
-        mesaId: valorDe('mesa-da-pessoa'),
+        canalId: valorDe('canal-da-pessoa'),
         matricula: valorDe('matricula'),
         cargoId: valorDe('cargo'),
         nivelAcessoId: valorDe('nivel'),
@@ -607,6 +607,15 @@ var TelaConfiguracoes = (function () {
         nivel.acoes.indexOf(acao.chave) >= 0, acao.descricao);
     }).join('');
 
+    // Os canais deste nível. Lista vazia no servidor quer dizer TODOS, então
+    // aqui nada vem marcado — e a dica ao lado explica isso, porque uma lista
+    // toda desmarcada se lê naturalmente como "nenhum".
+    var escolhidos = nivel.canais || [];
+    var canaisDoNivel = (opcoes.canais || []).map(function (canal) {
+      return caixaDeMarcar('canal-' + canal.id, canal.nome,
+        escolhidos.indexOf(canal.id) >= 0, canal.descricao);
+    }).join('');
+
     var escopos = opcoes.escopos.map(function (escopo) {
       return '<label class="config-radio">'
         + '<input type="radio" name="escopo" value="' + escapar(escopo.chave) + '"'
@@ -625,6 +634,11 @@ var TelaConfiguracoes = (function () {
       + acoes + '</fieldset>'
       + '<fieldset class="config-grupo"><legend>Até onde enxerga</legend>'
       + escopos + '</fieldset>'
+      + '<fieldset class="config-grupo"><legend>Quais canais enxerga</legend>'
+      + '<p class="config-dica">RET Vida e Mesa Diamante são operações '
+      + 'distintas. Marque os canais deste nível — <strong>nenhum marcado '
+      + 'quer dizer todos</strong>, que é o caso de quem administra.</p>'
+      + canaisDoNivel + '</fieldset>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button></div></form>';
 
@@ -640,12 +654,18 @@ var TelaConfiguracoes = (function () {
         if (marcado('acao-' + acao.chave)) acoesMarcadas.push(acao.chave);
       });
 
+      var canaisMarcados = [];
+      (opcoes.canais || []).forEach(function (canal) {
+        if (marcado('canal-' + canal.id)) canaisMarcados.push(canal.id);
+      });
+
       var escolhidoEscopo = document.querySelector('input[name="escopo"]:checked');
 
       Servidor.chamar('salvarNivelDeAcesso', {
         id: nivel.id,
         nome: valorDe('nome'),
         ativo: marcado('ativo'),
+        canais: canaisMarcados,
         telas: telasMarcadas,
         acoes: acoesMarcadas,
         escopo: escolhidoEscopo ? escolhidoEscopo.value : nivel.escopo,
@@ -726,8 +746,31 @@ var TelaConfiguracoes = (function () {
     var ehNovo = !item;
     var atual = item || {
       id: '', nome: '', rotulo: '', cor: 'neutro', ordem: dados.itens.length + 1,
-      ativo: true, codigo: ''
+      ativo: true, codigo: '', colunaDeCarimbo: ''
     };
+
+    /** Só a lista de STATUS carimba data e hora. */
+    function ehStatus() {
+      return String(tipoDeListaEscolhido || '').toUpperCase() === 'STATUS';
+    }
+
+    /**
+     * O campo que diz onde este status grava a data e a hora.
+     *
+     * Só aparece para status, porque só status carimba. Oferecer o campo num
+     * motivo ou num cargo convidaria a preenchê-lo e esperar efeito.
+     */
+    function carimboDoStatus(item) {
+      if (!ehStatus()) return '';
+      return campoDeTexto('coluna-de-carimbo',
+        'Coluna que recebe data e hora', item.colunaDeCarimbo || '',
+        'Quando o caso chegar neste status, o sistema grava data e hora nessa '
+        + 'coluna da base do canal — é o que mede produtividade. Escreva o '
+        + 'cabeçalho exatamente como está na planilha (por exemplo "Data do '
+        + '1º contato"). Deixe em branco se este status não carimba nada. '
+        + 'O carimbo só é escrito se a célula estiver vazia: um caso que '
+        + 'volta a este status guarda a data da primeira vez.');
+    }
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-item">'
       + tituloDoPainel(ehNovo ? 'Item novo' : atual.rotulo,
@@ -739,6 +782,7 @@ var TelaConfiguracoes = (function () {
       + caixaDeOpcoes('cor', 'Tom', dados.tons, atual.cor,
         'O tom acompanha o tema: escolher "ruim" fica vermelho no claro e no '
         + 'escuro, sem ninguém precisar mexer.')
+      + carimboDoStatus(atual)
       + campoDeTexto('ordem', 'Ordem', atual.ordem, '')
       + caixaDeSimNao('ativo', 'Aparece nas listas', atual.ativo)
       + '<div class="config-acoes">'
@@ -753,6 +797,7 @@ var TelaConfiguracoes = (function () {
         rotulo: valorDe('rotulo'),
         codigo: valorDe('codigo'),
         cor: valorDe('cor'),
+        colunaDeCarimbo: ehStatus() ? valorDe('coluna-de-carimbo') : '',
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarListas(); })
@@ -760,84 +805,84 @@ var TelaConfiguracoes = (function () {
     });
   }
 
-  /* ---------------------------------------------------------------- mesas */
+  /* ---------------------------------------------------------------- canais */
 
-  function carregarMesas() {
-    aguarde('Lendo as mesas…');
-    Servidor.chamar('listarMesasConfiguraveis')
-      .entao(function (mesas) { dados.mesas = mesas; desenharMesas(); })
+  function carregarCanais() {
+    aguarde('Lendo os canais…');
+    Servidor.chamar('listarCanaisConfiguraveis')
+      .entao(function (canais) { dados.canais = canais; desenharCanais(); })
       .senao(falhou);
   }
 
-  function desenharMesas() {
-    if (respostaAtrasada('mesas')) return;
-    var linhas = dados.mesas.map(function (mesa) {
-      return '<li class="config-item' + (escolhido && escolhido.id === mesa.id
-        ? ' atual' : '') + (mesa.ativo ? '' : ' desligado') + '">'
-        + '<button type="button" class="abrir" data-mesa="' + escapar(mesa.id) + '">'
-        + '<span class="nome">' + escapar(mesa.nome) + '</span>'
-        + '<span class="detalhe">aba ' + escapar(mesa.aba)
-        + (mesa.abaExiste ? '' : ' · <strong class="alerta">aba ausente</strong>')
-        + (mesa.ativo ? '' : ' · desligada') + '</span></button></li>';
+  function desenharCanais() {
+    if (respostaAtrasada('canais')) return;
+    var linhas = dados.canais.map(function (canal) {
+      return '<li class="config-item' + (escolhido && escolhido.id === canal.id
+        ? ' atual' : '') + (canal.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-canal="' + escapar(canal.id) + '">'
+        + '<span class="nome">' + escapar(canal.nome) + '</span>'
+        + '<span class="detalhe">aba ' + escapar(canal.aba)
+        + (canal.abaExiste ? '' : ' · <strong class="alerta">aba ausente</strong>')
+        + (canal.ativo ? '' : ' · desligada') + '</span></button></li>';
     }).join('');
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.mesas.length + ' mesas</span></div>'
-      + '<p class="config-explica">Aqui se ajusta o que a mesa MOSTRA. Onde ela '
+      + '<span class="config-titulo">' + dados.canais.length + ' canais</span></div>'
+      + '<p class="config-explica">Aqui se ajusta o que o canal MOSTRA. Onde ela '
       + 'mora — a aba da planilha — não muda: os casos já gravados estão lá.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
-    ligarCliques('[data-mesa]', function (botao) {
-      escolhido = { id: botao.getAttribute('data-mesa') };
-      desenharMesas();
+    ligarCliques('[data-canal]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-canal') };
+      desenharCanais();
     });
 
-    if (escolhido) desenharPainelDaMesa(acharNaLista(dados.mesas, escolhido.id));
-    else painelVazio('Escolha uma mesa.');
+    if (escolhido) desenharPainelDoCanal(acharNaLista(dados.canais, escolhido.id));
+    else painelVazio('Escolha um canal.');
   }
 
-  function desenharPainelDaMesa(mesa) {
-    if (!mesa) return painelVazio('Escolha uma mesa.');
-    var colunas = [''].concat(mesa.colunasDaBase);
+  function desenharPainelDoCanal(canal) {
+    if (!canal) return painelVazio('Escolha um canal.');
+    var colunas = [''].concat(canal.colunasDaBase);
 
-    elemento('config-painel').innerHTML = '<form class="config-form" id="form-mesa">'
-      + tituloDoPainel(mesa.nome, 'Aba ' + mesa.aba)
-      + campoDeTexto('nome', 'Nome da mesa', mesa.nome, '')
-      + campoDeTexto('descricao', 'Descrição', mesa.descricao, '')
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-canal">'
+      + tituloDoPainel(canal.nome, 'Aba ' + canal.aba)
+      + campoDeTexto('nome', 'Nome do canal', canal.nome, '')
+      + campoDeTexto('descricao', 'Descrição', canal.descricao, '')
       + caixaDeOpcoes('colunaDaData', 'Coluna da data de entrada', colunas,
-        mesa.colunaDaData,
+        canal.colunaDaData,
         'É daqui que sai a "data do último registro" da barra superior.')
-      + caixaDeOpcoes('colunaDaHora', 'Coluna da hora', colunas, mesa.colunaDaHora, '')
+      + caixaDeOpcoes('colunaDaHora', 'Coluna da hora', colunas, canal.colunaDaHora, '')
       + caixaDeOpcoes('colunaDoStatus', 'Coluna da situação', colunas,
-        mesa.colunaDoStatus, 'É por ela que os cartões do painel contam.')
-      + campoDeTexto('colunasDaFila', 'Colunas da fila', mesa.colunasDaFila,
+        canal.colunaDoStatus, 'É por ela que os cartões do painel contam.')
+      + campoDeTexto('colunasDaFila', 'Colunas da fila', canal.colunasDaFila,
         'Grupos separados por ponto e vírgula: "Título: coluna, coluna". '
         + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela.')
       + campoDeTexto('colunasDaBusca', 'Colunas em que a busca procura',
-        mesa.colunasDaBusca,
+        canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
         + 'a busca não estourar numa base grande.')
       + campoDeTexto('metaMensalPorPessoa', 'Meta de casos por pessoa, no mês',
-        mesa.metaMensalPorPessoa,
+        canal.metaMensalPorPessoa,
         'Aparece em Minha Performance como barra de progresso. Zero desliga: '
-        + 'mesa sem meta não inventa uma.')
+        + 'canal sem meta não inventa uma.')
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
-        mesa.colunaDaFinalizacao, '')
+        canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
-        colunas, mesa.colunaDaAreaResponsavel, '')
-      + campoDeTexto('ordem', 'Ordem no seletor', mesa.ordem, '')
-      + caixaDeSimNao('ativo', 'Mesa em uso', mesa.ativo)
-      + (mesa.situacoes.length
-        ? '<p class="config-explica">Situações cadastradas nesta mesa: '
-          + escapar(mesa.situacoes.join(', ')) + '.</p>'
+        colunas, canal.colunaDaAreaResponsavel, '')
+      + campoDeTexto('ordem', 'Ordem no seletor', canal.ordem, '')
+      + caixaDeSimNao('ativo', 'Canal em uso', canal.ativo)
+      + (canal.situacoes.length
+        ? '<p class="config-explica">Situações cadastradas neste canal: '
+          + escapar(canal.situacoes.join(', ')) + '.</p>'
         : '')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button></div></form>';
 
-    elemento('form-mesa').addEventListener('submit', function (evento) {
+    elemento('form-canal').addEventListener('submit', function (evento) {
       evento.preventDefault();
-      Servidor.chamar('salvarMesa', {
-        id: mesa.id,
+      Servidor.chamar('salvarCanal', {
+        id: canal.id,
         nome: valorDe('nome'),
         descricao: valorDe('descricao'),
         colunaDaData: valorDe('colunaDaData'),
@@ -850,23 +895,23 @@ var TelaConfiguracoes = (function () {
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
-      }).entao(function () { avisarSalvo(); carregarMesas(); })
+      }).entao(function () { avisarSalvo(); carregarCanais(); })
         .senao(mostrarErroNoPainel);
     });
   }
 
   /* -------------------------------------------------------------- painéis */
 
-  var mesaDosCards = '';
+  var canalDosCards = '';
   var telaDosPaineis = 'dashboard';   // 'dashboard' ou 'painelAnalitico'
   var cardsEmEdicao = null;           // a lista sendo mexida, antes de salvar
 
   function carregarPaineis() {
-    if (!mesaDosCards) mesaDosCards = mesaEscolhida;
+    if (!canalDosCards) canalDosCards = canalEscolhida;
     if (telaDosPaineis === 'painelAnalitico') return carregarGraficos();
 
     aguarde('Lendo os cards…');
-    Servidor.chamar('listarCardsDoPainel', 'dashboard', mesaDosCards)
+    Servidor.chamar('listarCardsDoPainel', 'dashboard', canalDosCards)
       .entao(function (resposta) {
         dados.painel = resposta;
         cardsEmEdicao = resposta.cartoes.map(copiarCard);
@@ -877,10 +922,10 @@ var TelaConfiguracoes = (function () {
 
   function carregarGraficos() {
     aguarde('Lendo os gráficos…');
-    Servidor.chamar('opcoesDoPainelAnalitico', mesaDosCards)
+    Servidor.chamar('opcoesDoPainelAnalitico', canalDosCards)
       .entao(function (opcoes) {
         dados.opcoesDoGrafico = opcoes;
-        Servidor.chamar('listarComponentesDoPainel', mesaDosCards)
+        Servidor.chamar('listarComponentesDoPainel', canalDosCards)
           .entao(function (lista) {
             cardsEmEdicao = lista.map(copiarGrafico);
             desenharGraficos();
@@ -931,7 +976,7 @@ var TelaConfiguracoes = (function () {
       + 'enfeite numa tela de trabalho é ruído. A pizza é boa para "de que '
       + 'tipo são", de relance e com poucas fatias; para comparar valores '
       + 'próximos, barras. Nome comprido pede barra deitada.</p>'
-      + '<div class="config-mesas-cartao">' + escolhaDeMesa() + '</div>'
+      + '<div class="config-canais-cartao">' + escolhaDeCanal() + '</div>'
       + '<div id="lista-de-graficos">' + desenharCardsDeGrafico() + '</div>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao vazado" id="add-grafico">'
@@ -950,7 +995,7 @@ var TelaConfiguracoes = (function () {
   function desenharCardsDeGrafico() {
     var opcoes = dados.opcoesDoGrafico;
     if (!cardsEmEdicao.length) {
-      return '<p class="config-vazio">Nenhum gráfico nesta mesa. O Painel '
+      return '<p class="config-vazio">Nenhum gráfico neste canal. O Painel '
         + 'Analítico abre dizendo isso, em vez de abrir vazio.</p>';
     }
 
@@ -1017,7 +1062,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function ligarGraficos() {
-    ligarTrocaDeTelaEDeMesa();
+    ligarTrocaDeTelaEDeCanal();
 
     ligarCliques('[data-remover-card]', function (botao) {
       cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
@@ -1057,19 +1102,19 @@ var TelaConfiguracoes = (function () {
     elemento('descartar-graficos').addEventListener('click', carregarPaineis);
 
     elemento('salvar-graficos').addEventListener('click', function () {
-      Servidor.chamar('salvarComponentesDoPainel', mesaDosCards, cardsEmEdicao)
+      Servidor.chamar('salvarComponentesDoPainel', canalDosCards, cardsEmEdicao)
         .entao(function () { avisarSalvo('Gráficos salvos.'); carregarPaineis(); })
         .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
     });
   }
 
-  function ligarTrocaDeTelaEDeMesa() {
+  function ligarTrocaDeTelaEDeCanal() {
     ligarCliques('[data-tela-do-painel]', function (botao) {
       telaDosPaineis = botao.getAttribute('data-tela-do-painel');
       carregarPaineis();
     });
-    ligarCliques('[data-mesa-dos-cards]', function (botao) {
-      mesaDosCards = botao.getAttribute('data-mesa-dos-cards');
+    ligarCliques('[data-canal-dos-cards]', function (botao) {
+      canalDosCards = botao.getAttribute('data-canal-dos-cards');
       carregarPaineis();
     });
   }
@@ -1092,7 +1137,7 @@ var TelaConfiguracoes = (function () {
       + 'de contar, e apagar a conta não apaga o que foi contado. As contagens '
       + 'seguem o acesso de cada pessoa. Alterações só entram em vigor ao '
       + 'salvar.</p>'
-      + '<div class="config-mesas-cartao">' + escolhaDeMesa() + '</div>'
+      + '<div class="config-canais-cartao">' + escolhaDeCanal() + '</div>'
       + '<div id="lista-de-cards">' + desenharCards() + '</div>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao vazado" id="add-card">'
@@ -1108,15 +1153,15 @@ var TelaConfiguracoes = (function () {
     ligarPaineis();
   }
 
-  /** As mesas como dois blocos grandes, e não como uma caixa de seleção. */
-  function escolhaDeMesa() {
-    return pacoteDoSistema.mesas.map(function (mesa) {
-      return '<button type="button" class="mesa-cartao'
-        + (mesa.id === mesaDosCards ? ' atual' : '') + '"'
-        + ' data-mesa-dos-cards="' + escapar(mesa.id) + '">'
-        + SeletorDeMesa.icone(mesa.icone)
-        + '<span><strong>' + escapar(mesa.nome) + '</strong>'
-        + '<em>' + escapar(mesa.descricao || '') + '</em></span></button>';
+  /** Os canais como dois blocos grandes, e não como uma caixa de seleção. */
+  function escolhaDeCanal() {
+    return pacoteDoSistema.canais.map(function (canal) {
+      return '<button type="button" class="canal-cartao'
+        + (canal.id === canalDosCards ? ' atual' : '') + '"'
+        + ' data-canal-dos-cards="' + escapar(canal.id) + '">'
+        + SeletorDeCanal.icone(canal.icone)
+        + '<span><strong>' + escapar(canal.nome) + '</strong>'
+        + '<em>' + escapar(canal.descricao || '') + '</em></span></button>';
     }).join('');
   }
 
@@ -1169,7 +1214,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function ligarPaineis() {
-    ligarTrocaDeTelaEDeMesa();
+    ligarTrocaDeTelaEDeCanal();
 
     ligarCliques('[data-remover-card]', function (botao) {
       cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
@@ -1213,7 +1258,7 @@ var TelaConfiguracoes = (function () {
     elemento('descartar-cards').addEventListener('click', carregarPaineis);
 
     elemento('salvar-cards').addEventListener('click', function () {
-      Servidor.chamar('salvarCardsDoPainel', 'dashboard', mesaDosCards,
+      Servidor.chamar('salvarCardsDoPainel', 'dashboard', canalDosCards,
         cardsEmEdicao)
         .entao(function () { avisarSalvo('Cards salvos.'); carregarPaineis(); })
         .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
@@ -1389,7 +1434,7 @@ var TelaConfiguracoes = (function () {
         + '<button type="button" class="abrir" data-analise="'
         + escapar(uma.id) + '">'
         + '<span class="nome">' + escapar(uma.aba) + '</span>'
-        + '<span class="detalhe">' + escapar(uma.mesaNome)
+        + '<span class="detalhe">' + escapar(uma.canalNome)
         + (uma.abaExiste
           ? ' · gerada em ' + escapar(uma.geradaEm) + ' · '
             + uma.linhasGeradas + ' linha(s)'
@@ -1431,19 +1476,19 @@ var TelaConfiguracoes = (function () {
     }
   }
 
-  function mesaDaAnalise(idDaMesa) {
-    var achada = dados.opcoes.mesas.filter(function (uma) {
-      return String(uma.id) === String(idDaMesa);
+  function canalDaAnalise(idDoCanal) {
+    var achada = dados.opcoes.canais.filter(function (uma) {
+      return String(uma.id) === String(idDoCanal);
     })[0];
-    return achada || dados.opcoes.mesas[0];
+    return achada || dados.opcoes.canais[0];
   }
 
   function desenharPainelDaAnalise(analise) {
     var atual = analise || {
-      id: '', nome: '', descricao: '', mesaId: dados.opcoes.mesas[0].id,
+      id: '', nome: '', descricao: '', canalId: dados.opcoes.canais[0].id,
       colunas: [], filtros: [], dias: 0, ativo: true, abaExiste: false
     };
-    var mesa = mesaDaAnalise(atual.mesaId);
+    var canal = canalDaAnalise(atual.canalId);
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-analise">'
       + tituloDoPainel(atual.id ? atual.aba : 'Nova análise',
@@ -1451,15 +1496,15 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('an-nome', 'Nome', atual.nome,
         'Só letras sem acento, números e _. Vira ' + dados.opcoes.prefixo + 'Nome.')
       + campoDeTexto('an-descricao', 'Para que serve', atual.descricao, '')
-      + caixaDeItens('an-mesa', 'Mesa', dados.opcoes.mesas, atual.mesaId,
-        'Trocar a mesa limpa as colunas e os filtros.')
+      + caixaDeItens('an-canal', 'Canal', dados.opcoes.canais, atual.canalId,
+        'Trocar o canal limpa as colunas e os filtros.')
       + campoDeTexto('an-dias', 'Últimos N dias', atual.dias,
-        mesa.temColunaDeData
-          ? '0 traz tudo. Conta pela coluna "' + mesa.colunaDaData + '".'
-          : 'Esta mesa não tem coluna de data, então a janela não se aplica.')
+        canal.temColunaDeData
+          ? '0 traz tudo. Conta pela coluna "' + canal.colunaDaData + '".'
+          : 'Esto canal não tem coluna de data, então a janela não se aplica.')
       + '<div class="config-campo"><span>Colunas</span>'
       + '<div class="config-marcadores" id="colunas-da-analise">'
-      + mesa.colunas.map(function (coluna, i) {
+      + canal.colunas.map(function (coluna, i) {
         var marcada = !atual.colunas.length || atual.colunas.indexOf(coluna) >= 0;
         return '<label class="config-chave"><input type="checkbox"'
           + ' data-coluna-analise="' + i + '" value="' + escapar(coluna) + '"'
@@ -1468,7 +1513,7 @@ var TelaConfiguracoes = (function () {
       }).join('')
       + '</div><em>Nenhuma marcada é o mesmo que todas.</em></div>'
       + '<div class="config-campo"><span>Filtros</span>'
-      + '<div id="filtros-da-analise">' + desenharFiltrosDaAnalise(mesa, atual.filtros)
+      + '<div id="filtros-da-analise">' + desenharFiltrosDaAnalise(canal, atual.filtros)
       + '</div><em>Cada filtro corta as linhas. Dois filtros se somam.</em></div>'
       + caixaDeSimNao('an-ativo', 'Ligada', atual.ativo !== false)
       + '<div class="config-acoes">'
@@ -1488,12 +1533,12 @@ var TelaConfiguracoes = (function () {
         : '')
       + '</form>';
 
-    elemento('cfg-an-mesa').addEventListener('change', function () {
+    elemento('cfg-an-canal').addEventListener('change', function () {
       escolhido = atual.id ? { id: atual.id } : null;
       // Escrito campo a campo, e não com Object.assign: assim dá para ver de
-      // relance o que SOBREVIVE à troca de mesa e o que é zerado. Colunas e
-      // filtros são de uma mesa só — carregá-los para outra deixaria a receita
-      // apontando para colunas que a nova mesa não tem.
+      // relance o que SOBREVIVE à troca de canal e o que é zerado. Colunas e
+      // filtros são de um canal só — carregá-los para outra deixaria a receita
+      // apontando para colunas que a novo canal não tem.
       desenharPainelDaAnalise({
         id: atual.id,
         nome: atual.nome,
@@ -1502,7 +1547,7 @@ var TelaConfiguracoes = (function () {
         ativo: atual.ativo,
         aba: atual.aba,
         abaExiste: atual.abaExiste,
-        mesaId: this.value,
+        canalId: this.value,
         colunas: [],
         filtros: []
       });
@@ -1512,8 +1557,8 @@ var TelaConfiguracoes = (function () {
       evento.preventDefault();
       Servidor.chamar('salvarAnalise', {
         id: atual.id, nome: valorDe('an-nome'),
-        descricao: valorDe('an-descricao'), mesaId: valorDe('an-mesa'),
-        colunas: colunasMarcadasDaAnalise(mesa).join(','),
+        descricao: valorDe('an-descricao'), canalId: valorDe('an-canal'),
+        colunas: colunasMarcadasDaAnalise(canal).join(','),
         filtros: filtrosEscolhidosDaAnalise(),
         dias: Number(valorDe('an-dias')) || 0,
         ativo: elemento('cfg-an-ativo').checked
@@ -1566,12 +1611,12 @@ var TelaConfiguracoes = (function () {
       .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
   }
 
-  function desenharFiltrosDaAnalise(mesa, filtros) {
-    if (!mesa.filtros.length) {
-      return '<p class="config-vazio">Esta mesa não tem nenhum campo em '
+  function desenharFiltrosDaAnalise(canal, filtros) {
+    if (!canal.filtros.length) {
+      return '<p class="config-vazio">Esto canal não tem nenhum campo em '
         + 'formato de lista, então não há por onde filtrar.</p>';
     }
-    return mesa.filtros.map(function (filtro) {
+    return canal.filtros.map(function (filtro) {
       var escolhida = (filtros || []).filter(function (um) {
         return um.coluna === filtro.cabecalho;
       })[0];
@@ -1588,7 +1633,7 @@ var TelaConfiguracoes = (function () {
     }).join('');
   }
 
-  function colunasMarcadasDaAnalise(mesa) {
+  function colunasMarcadasDaAnalise(canal) {
     var marcadas = [];
     var caixas = document.querySelectorAll('[data-coluna-analise]');
     for (var i = 0; i < caixas.length; i++) {
@@ -1597,7 +1642,7 @@ var TelaConfiguracoes = (function () {
     // Todas marcadas é o mesmo que nenhuma escolha: guardar a lista inteira
     // congelaria as colunas de hoje, e uma coluna nova na base nunca
     // apareceria na análise.
-    return marcadas.length === mesa.colunas.length ? [] : marcadas;
+    return marcadas.length === canal.colunas.length ? [] : marcadas;
   }
 
   function filtrosEscolhidosDaAnalise() {
@@ -1696,7 +1741,7 @@ var TelaConfiguracoes = (function () {
     return '<div class="config-legado" id="caixa-do-diagnostico">'
       + '<h4>Diagnóstico do sistema</h4>'
       + '<p class="config-explica">Confere o sistema inteiro: fuso, estrutura, '
-      + 'sequências de Id, Ids repetidos, mesas, campos, painéis, análises, '
+      + 'sequências de Id, Ids repetidos, canais, campos, painéis, análises, '
       + 'quem consegue configurar, e se toda função que a tela chama existe no '
       + 'servidor. <strong>Só lê</strong> — não muda nada.</p>'
       + '<div class="config-acoes">'

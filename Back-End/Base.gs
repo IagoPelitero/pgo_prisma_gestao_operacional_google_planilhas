@@ -2,7 +2,7 @@
  * ============================================================================
  * PGO — Base.gs · como o sistema fala com a planilha
  * ============================================================================
- * A fundação. Nada aqui sabe o que é um caso, uma mesa ou um usuário:
+ * A fundação. Nada aqui sabe o que é um caso, um canal ou um usuário:
  * são as três peças que todo o resto usa para chegar à planilha.
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
@@ -138,6 +138,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'prêmio mensal retido', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'agente da central', tipo: 'texto', protegido: true },
+      // Quem passou o caso adiante. Só aparece no formulário quando o canal
+      // de origem é a Central — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO.
+      { cabecalho: 'nome de quem transferiu', tipo: 'texto', protegido: false },
       { cabecalho: 'canal', tipo: 'texto', protegido: true },
       { cabecalho: 'relacionamento', tipo: 'texto', protegido: true },
       { cabecalho: 'contato', tipo: 'texto', protegido: true },
@@ -203,11 +206,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Email', tipo: 'texto', protegido: true },
       { cabecalho: 'Canal que atende', tipo: 'texto', protegido: false },
-      // A mesa em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
-      // administrador: quem administra não pertence a uma mesa, atende as
-      // duas e delega para quem for. Exigir mesa dele obrigaria a inventar
+      // O canal em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
+      // administrador: quem administra não pertence a um canal, atende as
+      // duas e delega para quem for. Exigir canal dele obrigaria a inventar
       // uma resposta para uma pergunta que não se aplica.
-      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
@@ -217,8 +220,8 @@ const RECC_ESQUEMA = {
     ]
   },
 
-  CANAIS: {
-    aba: 'CANAIS',
+  CORRETORAS: {
+    aba: 'CORRETORAS',
     titulo: 'Canais, corretores e agentes',
     controle: true,
     reserva: 1000,
@@ -228,7 +231,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Canal', tipo: 'texto', protegido: true },
       { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
       { cabecalho: 'Corretora', tipo: 'texto', protegido: true },
-      { cabecalho: 'Segmento', tipo: 'texto', protegido: true }
+      { cabecalho: 'Segmento', tipo: 'texto', protegido: true },
+      // Quem atende a corretora. Vem na mesma lista que a operação já mantém
+      // fora do sistema — 145 corretoras e mais de 7 mil SUSEPs —, e por isso
+      // entra pela importação em lote, não digitado uma linha por vez.
+      { cabecalho: 'Consultor', tipo: 'texto', protegido: false }
     ]
   },
 
@@ -262,9 +269,9 @@ const RECC_ESQUEMA = {
   },
 
   // ---------------------------------------------------------------- sistema
-  MESAS: {
-    aba: 'MESAS',
-    titulo: 'Mesas de trabalho',
+  CANAIS: {
+    aba: 'CANAIS',
+    titulo: 'Canais de trabalho',
     controle: false,
     reserva: 50,
     colunas: [
@@ -274,12 +281,12 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Aba', tipo: 'texto', protegido: true },
       // Quais colunas da base guardam quando o caso entrou. É daqui que sai a
       // "data do último registro" da barra superior. Ficam declaradas, e não
-      // adivinhadas, porque cada mesa nomeia essa coluna do seu jeito.
+      // adivinhadas, porque cado canal nomeia essa coluna do seu jeito.
       { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
-      // O painel precisa saber onde a mesa guarda cada coisa. Declarado, e
-      // não adivinhado pelo nome: cada mesa batiza a coluna do seu jeito, e
-      // adivinhar acerta hoje e erra na mesa que vier depois.
+      // O painel precisa saber onde o canal guarda cada coisa. Declarado, e
+      // não adivinhado pelo nome: cado canal batiza a coluna do seu jeito, e
+      // adivinhar acerta hoje e erra no canal que vier depois.
       { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
       // As colunas da fila. Aceita duas escritas:
       //
@@ -294,8 +301,8 @@ const RECC_ESQUEMA = {
       // sistema lê a base inteira — ler as 35 colunas de 200 mil linhas são
       // 7 milhões de células, e ler cinco são um milhão.
       { cabecalho: 'ColunasDaBusca', tipo: 'texto', protegido: false },
-      // Quantos casos por mês se espera de uma pessoa nesta mesa. Zero
-      // desliga a meta: mesa sem meta declarada não inventa uma, e a tela
+      // Quantos casos por mês se espera de uma pessoa neste canal. Zero
+      // desliga a meta: canal sem meta declarada não inventa uma, e a tela
       // simplesmente não mostra a barra de progresso.
       { cabecalho: 'MetaMensalPorPessoa', tipo: 'numero', protegido: false },
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
@@ -313,7 +320,7 @@ const RECC_ESQUEMA = {
     reserva: 500,
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'MesaId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Aba', tipo: 'texto', protegido: true },
       { cabecalho: 'ChaveTecnica', tipo: 'texto', protegido: true },
       { cabecalho: 'Cabecalho', tipo: 'texto', protegido: true },
@@ -339,13 +346,25 @@ const RECC_ESQUEMA = {
     reserva: 1000,
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Tipo', tipo: 'texto', protegido: true },
       { cabecalho: 'Codigo', tipo: 'identificador', protegido: false },
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Rotulo', tipo: 'texto', protegido: false },
       { cabecalho: 'PaiId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Cor', tipo: 'texto', protegido: false },
+      // SÓ PARA ITENS DE STATUS: em qual coluna da base gravar a data e a
+      // hora em que o caso CHEGOU a este status.
+      //
+      // É o que mede produtividade. Na RET interessa quando o 1º contato
+      // aconteceu; na Mesa Diamante, quando o caso foi concluído. Antes isso
+      // ficava na auditoria, longe do caso — e ninguém cruza auditoria com
+      // base para montar um relatório. Aqui o carimbo mora na MESMA linha do
+      // caso, na aba do próprio canal, e sai direto para o Power BI.
+      //
+      // Vazio quer dizer "este status não carimba nada", que é o normal para
+      // a maioria deles.
+      { cabecalho: 'ColunaDeCarimbo', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Configuracao', tipo: 'textoLongo', protegido: false }
@@ -360,7 +379,7 @@ const RECC_ESQUEMA = {
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
       { cabecalho: 'Tela', tipo: 'texto', protegido: true },
-      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
       // 'cartao' no Dashboard; pizza, linha e barras no Painel Analítico.
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
@@ -384,8 +403,8 @@ const RECC_ESQUEMA = {
   /*
     As análises que o administrador montou.
     Uma ABA, e não um JSON dentro de CONFIG, pela mesma razão que os cartões do
-    Dashboard saíram de MESAS: é uma LISTA de coisas configuráveis, cada uma
-    com nome, mesa, colunas e filtro próprios. Guardada como texto numa célula,
+    Dashboard saíram de CANAIS: é uma LISTA de coisas configuráveis, cada uma
+    com nome, canal, colunas e filtro próprios. Guardada como texto numa célula,
     dava para escolher "quais" e para mais nada.
 
     ATENÇÃO: esta aba guarda a RECEITA. A aba gerada — ANALISE_<Nome> — é outra
@@ -402,12 +421,12 @@ const RECC_ESQUEMA = {
       // números e _ — é o que o Google Planilhas aceita sem aspas em fórmula.
       { cabecalho: 'Nome', tipo: 'texto', protegido: false },
       { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
-      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
-      // Cabeçalhos separados por vírgula. Vazio = todas as colunas da mesa.
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
+      // Cabeçalhos separados por vírgula. Vazio = todas as colunas do canal.
       { cabecalho: 'Colunas', tipo: 'textoLongo', protegido: false },
       // 'Coluna=valor' separados por ponto e vírgula. Vazio = sem filtro.
       { cabecalho: 'Filtros', tipo: 'textoLongo', protegido: false },
-      // Janela em dias, contada da coluna de data da mesa. 0 = tudo.
+      // Janela em dias, contada da coluna de data do canal. 0 = tudo.
       { cabecalho: 'Dias', tipo: 'numero', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
@@ -766,6 +785,63 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
 /** A estrutura já lida de cada aba, válida só durante esta execução. */
 var estruturasJaLidas = {};
 
+/**
+ * ----------------------------------------------------------------------------
+ * O MEMO DAS ABAS DE SISTEMA
+ * ----------------------------------------------------------------------------
+ * Abrir o Dashboard custava 48 idas ao Planilhas, e a maioria era a MESMA aba
+ * lida de novo: num pacoteDePartida só, CONFIG era lido 10 vezes; num
+ * resumoDoCanal, CATALOGO era lido 7. Ninguém escreveu isso de propósito — são
+ * funções pequenas e corretas, cada uma lendo o que precisa, e o custo só
+ * aparece quando se conta o total.
+ *
+ * Como cada chamada da tela é uma EXECUÇÃO NOVA no Apps Script, uma variável
+ * de topo dura exatamente uma requisição. É o tempo certo: não há como servir
+ * dado velho para a próxima chamada, porque não existe próxima chamada nesta
+ * execução.
+ *
+ * SÓ ABAS DE SISTEMA ENTRAM. As bases operacionais ficam de fora, e não é
+ * detalhe: BASE_RET com 200 mil linhas na memória estouraria a execução. A
+ * lista é explícita para que ninguém precise adivinhar a regra.
+ */
+var RECC_ABAS_QUE_VALE_GUARDAR = [
+  'CONFIG', 'CATALOGO', 'CORRETORAS', 'CAMPOS', 'PAINEIS', 'ANALISES',
+  'NIVEIS_ACESSO', 'USUARIOS', 'PRODUTOS'
+];
+
+var registrosJaLidos = {};
+
+/** A chave leva as opções junto: "as últimas 500" não é a mesma coisa que tudo. */
+function chaveDoMemo_(nomeDaAba, opcoes) {
+  return nomeDaAba + '|' + (Number(opcoes.ultimas) || 0)
+    + '|' + (opcoes.incluirOcultos ? 1 : 0);
+}
+
+function valeGuardarNaMemoria_(nomeDaAba) {
+  return RECC_ABAS_QUE_VALE_GUARDAR.indexOf(nomeDaAba) >= 0;
+}
+
+/**
+ * Uma cópia rasa de cada registro.
+ *
+ * Sem isso, duas partes do sistema que pedissem a mesma aba receberiam o
+ * MESMO objeto — e uma que mexesse num campo mudaria o que a outra lê, num
+ * defeito que só aparece na ordem certa de chamadas. Registro é um mapa
+ * chato de valores, então cópia rasa basta, e copiar trezentas linhas custa
+ * microssegundos contra os 25 ms de uma ida ao serviço.
+ */
+function copiarRegistros_(lista) {
+  return lista.map(function (registro) {
+    var copia = {};
+    for (var chave in registro) {
+      if (Object.prototype.hasOwnProperty.call(registro, chave)) {
+        copia[chave] = registro[chave];
+      }
+    }
+    return copia;
+  });
+}
+
 /** O tipo das colunas que NÃO estão no contrato, declarado na aba CAMPOS. */
 var tiposDeclaradosJaLidos = null;
 var lendoTiposDeclarados = false;
@@ -773,11 +849,29 @@ var lendoTiposDeclarados = false;
 function esquecerEstruturaLida_(nomeDaAba) {
   if (nomeDaAba) {
     delete estruturasJaLidas[nomeDaAba];
+    esquecerRegistrosLidos_(nomeDaAba);
     if (nomeDaAba === 'CAMPOS') tiposDeclaradosJaLidos = null;
   } else {
     estruturasJaLidas = {};
+    esquecerRegistrosLidos_();
     tiposDeclaradosJaLidos = null;
   }
+}
+
+/**
+ * Joga fora o memo dos registros.
+ *
+ * Vive colado no esquecerEstruturaLida_ de propósito: TODO caminho de
+ * gravação já chamava aquele, então este passa a ser chamado nos mesmos
+ * lugares, sem ninguém precisar lembrar de um segundo. Memo que se esquece
+ * num lugar e não no outro serve dado velho — e dado velho de configuração é
+ * pior que lentidão, porque parece certo.
+ */
+function esquecerRegistrosLidos_(nomeDaAba) {
+  if (!nomeDaAba) { registrosJaLidos = {}; return; }
+  Object.keys(registrosJaLidos).forEach(function (chave) {
+    if (chave.indexOf(nomeDaAba + '|') === 0) delete registrosJaLidos[chave];
+  });
 }
 
 /**
@@ -1169,6 +1263,13 @@ function montarRegistro_(estrutura, valores, numeroDaLinha) {
  */
 function lerRegistros_(nomeDaAba, opcoes) {
   opcoes = opcoes || {};
+
+  var chave = chaveDoMemo_(nomeDaAba, opcoes);
+  var guardar = valeGuardarNaMemoria_(nomeDaAba);
+  if (guardar && registrosJaLidos[chave]) {
+    return copiarRegistros_(registrosJaLidos[chave]);
+  }
+
   var estrutura = estruturaDaAba_(nomeDaAba);
   var totalDados = quantidadeDeRegistros_(estrutura);
   if (totalDados <= 0) return [];
@@ -1193,7 +1294,9 @@ function lerRegistros_(nomeDaAba, opcoes) {
     }
     saida.push(montarRegistro_(estrutura, valores[i], primeira + i));
   }
-  return saida;
+
+  if (guardar) registrosJaLidos[chave] = saida;
+  return guardar ? copiarRegistros_(saida) : saida;
 }
 
 /**
@@ -1311,6 +1414,28 @@ function buscarRegistros_(nomeDaAba, cabecalho, valor, limite) {
     }
   }
   return lerLinhasEspecificas_(nomeDaAba, linhas);
+}
+
+/**
+ * Como buscarRegistros_, mas devolvendo só o que está VISÍVEL.
+ *
+ * buscarRegistros_ devolve a linha esteja ela oculta ou não — e tem de ser
+ * assim, porque quem edita um registro precisa achá-lo mesmo depois de
+ * excluído. Mas quem PERGUNTA sobre o estado de hoje não quer a linha
+ * apagada: uma SUSEP desbloqueada continua na planilha, com _Visivel = NAO, e
+ * responder "bloqueada" a partir dela seria ressuscitar o bloqueio.
+ *
+ * A mesma SUSEP pode ter várias linhas — bloqueada, desbloqueada, bloqueada de
+ * novo. A última visível é a que vale, e é por isso que esta função não pede
+ * limite: parar na primeira acharia justamente a mais antiga.
+ */
+function buscarRegistroVisivel_(nomeDaAba, cabecalho, valor) {
+  var achados = buscarRegistros_(nomeDaAba, cabecalho, valor)
+    .filter(function (registro) {
+      if (!('_Visivel' in registro)) return true;   // aba sem exclusão lógica
+      return normalizarParaComparar_(registro._Visivel) !== 'nao';
+    });
+  return achados.length ? achados[achados.length - 1] : null;
 }
 
 /** Encontra a linha de um Id. Id repetido é erro, nunca "usa a primeira". */
@@ -1589,16 +1714,16 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
 function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
   if (!planilhaAtiva_().getSheetByName('CAMPOS')) return null;
 
-  var mesaId = '';
-  if (planilhaAtiva_().getSheetByName('MESAS')) {
-    var mesa = lerRegistros_('MESAS').filter(function (m) {
+  var canalId = '';
+  if (planilhaAtiva_().getSheetByName('CANAIS')) {
+    var canal = lerRegistros_('CANAIS').filter(function (m) {
       return normalizarParaComparar_(m.Aba) === normalizarParaComparar_(nomeDaAba);
     })[0];
-    if (mesa) mesaId = mesa.Id;
+    if (canal) canalId = canal.Id;
   }
 
   return inserirRegistro_('CAMPOS', {
-    MesaId: mesaId,
+    CanalId: canalId,
     Aba: nomeDaAba,
     ChaveTecnica: normalizarParaComparar_(cabecalho),
     Cabecalho: cabecalho,

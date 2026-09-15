@@ -17,7 +17,7 @@ function rodarTestesDoPainel() {
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
 
-  const mesa = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
   const hoje = new Date();
   const comZero = (n) => (n < 10 ? '0' : '') + n;
   const escrever = (data) => comZero(data.getDate()) + '/'
@@ -47,23 +47,23 @@ function rodarTestesDoPainel() {
   secao('Os cartões');
 
   teste('base vazia entrega zeros, não uma tela quebrada', () => {
-    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
     igual(resumo.total, 0);
     igual(resumo.fila.length, 0);
     igual(resumo.cartoes[0].rotulo, 'Total de casos');
     igual(resumo.cartoes[0].valor, 0);
   });
 
-  teste('cada mesa tem os seus cartões, declarados em PAINEIS', () => {
+  teste('cado canal tem os seus cartões, declarados em PAINEIS', () => {
     // A Mesa Diamante tem menos demanda que a RET: sete cartões para poucos
     // casos é ruído. Cada cartão é uma LINHA de PAINEIS, com nome, cor e
-    // ordem próprios — não um texto separado por vírgula dentro da mesa.
-    const rotulos = chamar('resumoDaMesa')(mesa.id, {}).cartoes.map((c) => c.rotulo);
+    // ordem próprios — não um texto separado por vírgula dentro do canal.
+    const rotulos = chamar('resumoDoCanal')(canal.id, {}).cartoes.map((c) => c.rotulo);
     igual(rotulos.join(' | '),
-      'Total de casos | Pendente | Concluído | Finalizados na célula');
+      'Total de casos | Em andamento | Concluído | Finalizados na célula');
 
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    const daRet = chamar('resumoDaMesa')(ret.id, {}).cartoes.map((c) => c.rotulo);
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const daRet = chamar('resumoDoCanal')(ret.id, {}).cartoes.map((c) => c.rotulo);
     igual(daRet.join(' | '),
       'Total de casos | Aguardando transmissão | Pendente | 1º contato realizado'
       + ' | 2º contato realizado | Não trabalhado',
@@ -71,37 +71,37 @@ function rodarTestesDoPainel() {
   });
 
   teste('desligar um cartão tira ele da tela e não toca em caso nenhum', () => {
-    const painel = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+    const painel = chamar('listarCardsDoPainel')('dashboard', canal.id);
     igual(painel.cartoes.length, 4);
 
-    const antes = chamar('resumoDaMesa')(mesa.id, {}).total;
+    const antes = chamar('resumoDoCanal')(canal.id, {}).total;
     const sobrando = painel.cartoes.filter((c) => c.dimensao !== 'naCelula');
-    chamar('salvarCardsDoPainel')('dashboard', mesa.id, sobrando);
+    chamar('salvarCardsDoPainel')('dashboard', canal.id, sobrando);
 
-    const depois = chamar('resumoDaMesa')(mesa.id, {});
+    const depois = chamar('resumoDoCanal')(canal.id, {});
     igual(depois.cartoes.length, 3, 'o cartão sumiu da tela');
     igual(depois.total, antes, 'e os casos continuam todos lá');
 
     // E volta, porque a linha não foi apagada — foi desligada.
-    chamar('salvarCardsDoPainel')('dashboard', mesa.id, painel.cartoes);
-    igual(chamar('resumoDaMesa')(mesa.id, {}).cartoes.length, 4);
+    chamar('salvarCardsDoPainel')('dashboard', canal.id, painel.cartoes);
+    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length, 4);
   });
 
   teste('cartão além do teto, sem nome ou de situação inventada é recusado', () => {
-    const painel = chamar('listarCardsDoPainel')('dashboard', mesa.id);
+    const painel = chamar('listarCardsDoPainel')('dashboard', canal.id);
     igual(painel.maximo, 12);
 
     const demais = [];
     for (let i = 0; i < 13; i++) {
       demais.push({ titulo: 'Card ' + i, dimensao: 'total', cor: 'neutro' });
     }
-    lanca(() => chamar('salvarCardsDoPainel')('dashboard', mesa.id, demais),
+    lanca(() => chamar('salvarCardsDoPainel')('dashboard', canal.id, demais),
       'no máximo 12');
-    lanca(() => chamar('salvarCardsDoPainel')('dashboard', mesa.id,
+    lanca(() => chamar('salvarCardsDoPainel')('dashboard', canal.id,
       [{ titulo: '', dimensao: 'total' }]), 'precisa de um nome');
-    lanca(() => chamar('salvarCardsDoPainel')('dashboard', mesa.id,
+    lanca(() => chamar('salvarCardsDoPainel')('dashboard', canal.id,
       [{ titulo: 'X', dimensao: 'situacao', filtro: 'Inventada' }]),
-      'não existe na mesa');
+      'não existe no canal');
   });
 
   teste('cor inventada na planilha vira neutro, e não quebra a tela', () => {
@@ -113,27 +113,27 @@ function rodarTestesDoPainel() {
   teste('há um cartão por situação, e situação sem caso aparece zerada', () => {
     // Sumir do painel esconderia justamente a informação de que ela zerou.
     chamar('inserirVariosRegistros_')('BASE_MESA', [
-      { Analista: 'Ana Martins', Status: 'Pendente',
+      { Analista: 'Ana Martins', Status: 'Em andamento',
         'Data de entrada': escrever(hoje), 'Nome do segurado': 'Cliente 1' },
-      { Analista: 'Ana Martins', Status: 'Pendente',
+      { Analista: 'Ana Martins', Status: 'Em andamento',
         'Data de entrada': escrever(hoje), 'Nome do segurado': 'Cliente 2' },
       { Analista: 'Diego Castilho', Status: 'Concluído',
         'Data de entrada': escrever(hoje), 'Nome do segurado': 'Cliente 3',
         'Data da finalização': escrever(hoje) }
     ]);
 
-    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
     const porRotulo = {};
     resumo.cartoes.forEach((c) => { porRotulo[c.rotulo] = c.valor; });
 
     igual(porRotulo['Total de casos'], 3);
-    igual(porRotulo['Pendente'], 2);
+    igual(porRotulo['Em andamento'], 2);
     igual(porRotulo['Concluído'], 1);
 
     // Na RET, que mostra todas, dá para conferir a situação sem nenhum caso.
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
     const daRet = {};
-    chamar('resumoDaMesa')(ret.id, {}).cartoes
+    chamar('resumoDoCanal')(ret.id, {}).cartoes
       .forEach((c) => { daRet[c.rotulo] = c.valor; });
     igual(daRet['Aguardando transmissão'], 0,
       'situação sem caso vale zero, não some');
@@ -145,24 +145,24 @@ function rodarTestesDoPainel() {
     // A cor mora no CATALOGO como NOME de tom, e não como código: cada tema
     // pinta o seu verde. Gravar #15794A deixaria o verde do tema claro
     // aparecendo no escuro.
-    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
     const porRotulo = {};
     resumo.cartoes.forEach((c) => { porRotulo[c.rotulo] = c.tom; });
-    igual(porRotulo['Pendente'], 'atencao');
+    igual(porRotulo['Em andamento'], 'atencao');
     igual(porRotulo['Concluído'], 'bom');
 
     resumo.fila.forEach((caso) => {
       verdadeiro(chamar('RECC_TONS').indexOf(caso.tom) >= 0,
         'tom desconhecido na fila: ' + caso.tom);
     });
-    igual(resumo.fila.find((c) => c.situacao === 'Pendente').tom, 'atencao');
+    igual(resumo.fila.find((c) => c.situacao === 'Em andamento').tom, 'atencao');
     igual(resumo.fila.find((c) => c.situacao === 'Concluído').tom, 'bom');
   });
 
   teste('"finalizado na célula" conta o que não foi encaminhado', () => {
     // Finalização preenchida E área responsável vazia. É conta, não coluna:
     // assim não mente quando alguém edita a área direto na planilha.
-    igual(chamar('resumoDaMesa')(mesa.id, {}).cartoes
+    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes
       .find((c) => c.chave === 'naCelula').valor, 1);
 
     chamar('inserirRegistro_')('BASE_MESA', {
@@ -171,14 +171,14 @@ function rodarTestesDoPainel() {
       'Data da finalização': escrever(hoje), 'Área responsável': 'Sinistro'
     });
 
-    igual(chamar('resumoDaMesa')(mesa.id, {}).cartoes
+    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes
       .find((c) => c.chave === 'naCelula').valor, 1,
       'o encaminhado não conta como resolvido na célula');
   });
 
-  teste('a mesa que não declara as colunas não ganha o cartão', () => {
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    const resumo = chamar('resumoDaMesa')(ret.id, {});
+  teste('o canal que não declara as colunas não ganha o cartão', () => {
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const resumo = chamar('resumoDoCanal')(ret.id, {});
     verdadeiro(!resumo.cartoes.some((c) => c.chave === 'naCelula'),
       'cartão sempre zerado pareceria um problema — melhor não existir');
   });
@@ -187,11 +187,11 @@ function rodarTestesDoPainel() {
 
   teste('a fila mostra só a janela recente, e o mais novo primeiro', () => {
     chamar('inserirRegistro_')('BASE_MESA', {
-      Analista: 'Ana Martins', Status: 'Pendente',
+      Analista: 'Ana Martins', Status: 'Em andamento',
       'Data de entrada': diasAtras(90), 'Nome do segurado': 'Caso antigo'
     });
 
-    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
     igual(resumo.periodo.dias, 30);
     verdadeiro(!JSON.stringify(resumo.fila).includes('Caso antigo'),
       'fora da janela não aparece na fila');
@@ -203,7 +203,7 @@ function rodarTestesDoPainel() {
     // Um caso da RET tem trinta e cinco colunas. Seis lado a lado perdem o
     // resto; trinta e cinco não cabem. Juntar as que se leem de uma vez —
     // proposta com apólice, nome com CPF — resolve as duas coisas.
-    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
     igual(resumo.colunas.map((g) => g.titulo).join(' | '),
       'Situação | Dados do caso | Dados cadastrais | Corretora | Responsável');
     igual(resumo.colunas[0].colunas.map((c) => c.cabecalho).join(', '),
@@ -213,12 +213,12 @@ function rodarTestesDoPainel() {
   });
 
   teste('a escrita plana continua valendo, e vira um grupo por coluna', () => {
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    chamar('salvarMesa')({ id: ret.id, nome: ret.nome,
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    chamar('salvarCanal')({ id: ret.id, nome: ret.nome,
       colunaDaData: ret.colunaDaData, colunaDoStatus: ret.colunaDoStatus,
       colunasDaFila: 'nome do cliente, status, protocolo' });
 
-    const grupos = chamar('resumoDaMesa')(ret.id, {}).colunas;
+    const grupos = chamar('resumoDoCanal')(ret.id, {}).colunas;
     igual(grupos.map((g) => g.titulo).join(' | '),
       'nome do cliente | status | protocolo',
       'sem dois-pontos, cada coluna é um grupo com o próprio nome');
@@ -226,13 +226,13 @@ function rodarTestesDoPainel() {
   });
 
   teste('coluna que não existe some da fila em vez de derrubar a tela', () => {
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    // Direto na planilha, como alguém faria à mão — sem passar por salvarMesa,
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    // Direto na planilha, como alguém faria à mão — sem passar por salvarCanal,
     // que recusaria. A fila é leitura: derrubar o Dashboard inteiro porque
     // uma coluna foi renomeada seria pior do que mostrar o resto.
-    chamar('atualizarRegistro_')('MESAS', ret.id,
+    chamar('atualizarRegistro_')('CANAIS', ret.id,
       { ColunasDaFila: 'Cliente: nome do cliente, coluna que nao existe' });
-    const grupos = chamar('resumoDaMesa')(ret.id, {}).colunas;
+    const grupos = chamar('resumoDoCanal')(ret.id, {}).colunas;
     igual(grupos.length, 1);
     igual(grupos[0].colunas.map((c) => c.cabecalho).join(', '), 'nome do cliente');
   });
@@ -240,7 +240,7 @@ function rodarTestesDoPainel() {
   teste('a data chega à tela como texto, e no formato brasileiro', () => {
     // Um objeto de data atravessando a ponte chega com o fuso de quem abriu,
     // e o mesmo caso apareceria com dias diferentes para pessoas diferentes.
-    const primeira = valorNaFila(chamar('resumoDaMesa')(mesa.id, {}), 0,
+    const primeira = valorNaFila(chamar('resumoDoCanal')(canal.id, {}), 0,
       'Data de entrada');
     igual(typeof primeira, 'string');
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(primeira), 'veio ' + primeira);
@@ -249,16 +249,16 @@ function rodarTestesDoPainel() {
   teste('a variação compara com o período anterior, e cala quando não dá', () => {
     // Mostrar "+100%" porque saiu de zero é ruído que a operação aprende a
     // ignorar — e junto com ele ignora a variação que importa.
-    const total = chamar('resumoDaMesa')(mesa.id, {}).cartoes[0];
+    const total = chamar('resumoDoCanal')(canal.id, {}).cartoes[0];
     igual(total.anterior, 0, 'não havia nada no período anterior');
     igual(total.variacao, null, 'sem base de comparação, não há variação');
 
     // Agora com base: um caso no período anterior, quatro no atual.
     chamar('inserirRegistro_')('BASE_MESA', {
-      Analista: 'Ana Martins', Status: 'Pendente',
+      Analista: 'Ana Martins', Status: 'Em andamento',
       'Data de entrada': diasAtras(40), 'Nome do segurado': 'Do mês passado'
     });
-    const comBase = chamar('resumoDaMesa')(mesa.id, {}).cartoes[0];
+    const comBase = chamar('resumoDoCanal')(canal.id, {}).cartoes[0];
     igual(comBase.anterior, 1);
     igual(comBase.variacao, 300, 'de 1 para 4 são +300%');
   });
@@ -295,14 +295,14 @@ function rodarTestesDoPainel() {
   secao('Os filtros');
 
   teste('os filtros são os campos que já são lista — nada escrito em código', () => {
-    const resumo = chamar('resumoDaMesa')(mesa.id, {});
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
     verdadeiro(resumo.filtrosDisponiveis.length > 0);
     verdadeiro(resumo.filtrosDisponiveis.length <= 4, 'no máximo quatro na tela');
     verdadeiro(resumo.filtrosDisponiveis.some((f) => f.chave === 'status'));
   });
 
   teste('filtrar muda o cartão e a fila juntos', () => {
-    const resumo = chamar('resumoDaMesa')(mesa.id, { status: 'Pendente' });
+    const resumo = chamar('resumoDoCanal')(canal.id, { status: 'Em andamento' });
     igual(resumo.total, 2);
     igual(resumo.fila.length, 2);
     igual(resumo.cartoes[0].valor, 2, 'o total acompanha o filtro');
@@ -310,7 +310,7 @@ function rodarTestesDoPainel() {
   });
 
   teste('filtro sem valor não filtra nada', () => {
-    igual(chamar('resumoDaMesa')(mesa.id, { status: '' }).total, 4);
+    igual(chamar('resumoDoCanal')(canal.id, { status: '' }).total, 4);
   });
 
   secao('O alcance vale no painel');
@@ -326,7 +326,7 @@ function rodarTestesDoPainel() {
     });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      const resumo = chamar('resumoDaMesa')(mesa.id, {});
+      const resumo = chamar('resumoDoCanal')(canal.id, {});
       igual(resumo.escopo, 'PROPRIOS');
       igual(resumo.cartoes[0].valor, 3, 'os três casos da Ana no período');
       igual(resumo.fila.length, 3, 'e a fila mostra exatamente os mesmos');
@@ -345,7 +345,7 @@ function rodarTestesDoPainel() {
     });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('resumoDaMesa')(mesa.id, {}), 'não abre a tela dashboard');
+      lanca(() => chamar('resumoDoCanal')(canal.id, {}), 'não abre a tela dashboard');
     });
 
     configuracao.telas = guardadas;
@@ -358,10 +358,10 @@ function rodarTestesDoPainel() {
 
   teste('o detalhe traz o caso inteiro, inclusive o que está em branco', () => {
     // Campo vazio APARECE, com um travessão. Sumir faria a pessoa achar que
-    // aquele campo não existe nesta mesa, quando ele existe e está em branco
+    // aquele campo não existe neste canal, quando ele existe e está em branco
     // — e "está em branco" é a informação que ela precisava.
-    const primeiro = chamar('resumoDaMesa')(mesa.id, {}).fila[0];
-    const detalhe = chamar('detalhesDoCaso')(mesa.id, primeiro.id);
+    const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
+    const detalhe = chamar('detalhesDoCaso')(canal.id, primeiro.id);
 
     verdadeiro(detalhe.linhas.length > 0);
     verdadeiro(detalhe.linhas.some((l) => l.valor === ''),
@@ -372,8 +372,8 @@ function rodarTestesDoPainel() {
   });
 
   teste('o detalhe conta a história do caso, tirada da auditoria', () => {
-    const primeiro = chamar('resumoDaMesa')(mesa.id, {}).fila[0];
-    const detalhe = chamar('detalhesDoCaso')(mesa.id, primeiro.id);
+    const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
+    const detalhe = chamar('detalhesDoCaso')(canal.id, primeiro.id);
 
     verdadeiro(Array.isArray(detalhe.historico));
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}$/.test(detalhe.atualizadoEm)
@@ -381,34 +381,80 @@ function rodarTestesDoPainel() {
       'a data de atualização vem formatada, veio ' + detalhe.atualizadoEm);
   });
 
-  teste('trocar a situação é um gesto só, e fica na história do caso', () => {
-    const novo = chamar('cadastrarCaso')(mesa.id, {
-      analista: 'Ana Martins', status: 'Pendente',
+  teste('trocar a situação é um gesto só, e NÃO vai para a auditoria', () => {
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'Ana Martins', status: 'Em andamento',
       datadeentrada: escrever(hoje), nomedosegurado: 'Caso da troca'
     });
 
-    const opcoes = chamar('situacoesParaTrocar')(mesa.id, novo.id);
-    igual(opcoes.atual, 'Pendente');
+    const opcoes = chamar('situacoesParaTrocar')(canal.id, novo.id);
+    igual(opcoes.atual, 'Em andamento');
     verdadeiro(opcoes.opcoes.some((o) => o.valor === 'Concluído'));
 
-    chamar('alterarSituacaoDoCaso')(mesa.id, novo.id, 'Concluído');
+    chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Concluído');
 
-    const detalhe = chamar('detalhesDoCaso')(mesa.id, novo.id);
+    const detalhe = chamar('detalhesDoCaso')(canal.id, novo.id);
     igual(detalhe.situacao, 'Concluído');
-    verdadeiro(detalhe.historico.some((p) => p.acao === 'Situação alterada'
-      && p.detalhe.indexOf('de "Pendente" para "Concluído"') >= 0),
-      'a troca fica registrada com o de-para');
 
-    lanca(() => chamar('alterarSituacaoDoCaso')(mesa.id, novo.id, 'Inventada'),
-      'não existe na mesa');
+    // Troca de status é o evento mais frequente do sistema: um caso passa por
+    // quatro ou cinco antes de fechar. Guardar cada uma na auditoria são
+    // quase um milhão de linhas numa base de 200 mil casos, numa aba da qual
+    // ninguém tira relatório. O que interessa — QUANDO cada etapa aconteceu —
+    // passou a ser carimbado na própria linha do caso.
+    verdadeiro(!detalhe.historico.some((p) => p.acao === 'Situação alterada'),
+      'a troca de status não deve mais entrar na auditoria');
+
+    lanca(() => chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Inventada'),
+      'não existe no canal');
   });
 
-  teste('concluir preenche a finalização quando a mesa tem essa coluna', () => {
-    const novo = chamar('cadastrarCaso')(mesa.id, {
-      analista: 'Ana Martins', status: 'Pendente',
+  teste('o status carimba data e hora na coluna que ele declarou', () => {
+    // É o que mede produtividade: na RET interessa quando o 1º contato
+    // aconteceu; na Mesa Diamante, quando o caso foi concluído.
+    chamar('adicionarColuna_')(canal.aba, 'Data do 1o contato', 'dataHora');
+
+    const concluido = chamar('lerRegistros_("CATALOGO")').find((item) =>
+      item.Tipo === 'STATUS' && item.Nome === 'Concluído'
+      && String(item.CanalId) === String(canal.id));
+    chamar('atualizarRegistro_')('CATALOGO', concluido.Id,
+      { ColunaDeCarimbo: 'Data do 1o contato' });
+
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'primeiro.adm', status: 'Em andamento',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso do carimbo'
+    });
+    chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Concluído');
+
+    const gravado = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0];
+    // ehData, e não instanceof: o valor atravessa o vm do simulador, e um
+    // Date de outro contexto não é instanceof Date aqui. Já mordeu antes.
+    verdadeiro(ehData(gravado['Data do 1o contato']),
+      'o carimbo tem de ser data de verdade, não texto — o Power BI soma data');
+  });
+
+  teste('voltar ao mesmo status NÃO reescreve o carimbo', () => {
+    // O que interessa é quando aquilo aconteceu pela PRIMEIRA vez.
+    // Reescrever apagaria justamente o dado que se quer medir, em silêncio.
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'primeiro.adm', status: 'Em andamento',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso do recarimbo'
+    });
+    chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Concluído');
+    const primeiro = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0]['Data do 1o contato'];
+
+    chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Em andamento');
+    chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Concluído');
+    const depois = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0]['Data do 1o contato'];
+
+    igual(String(depois), String(primeiro), 'o primeiro carimbo tem de sobreviver');
+  });
+
+  teste('concluir preenche a finalização quando o canal tem essa coluna', () => {
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'Ana Martins', status: 'Em andamento',
       datadeentrada: escrever(hoje), nomedosegurado: 'Caso que conclui'
     });
-    chamar('alterarSituacaoDoCaso')(mesa.id, novo.id, 'Concluído');
+    chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Concluído');
 
     const gravado = chamar('buscarRegistros_')('BASE_MESA', 'Id', novo.id, 1)[0];
     // Sem `instanceof`: o objeto vem de dentro do simulador, que é outro
@@ -418,8 +464,8 @@ function rodarTestesDoPainel() {
   });
 
   teste('o caso volta pronto para o formulário, pela chave do campo', () => {
-    const primeiro = chamar('resumoDaMesa')(mesa.id, {}).fila[0];
-    const paraEditar = chamar('casoParaEditar')(mesa.id, primeiro.id);
+    const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
+    const paraEditar = chamar('casoParaEditar')(canal.id, primeiro.id);
 
     igual(paraEditar.id, primeiro.id);
     verdadeiro(Object.keys(paraEditar.valores).length > 0);
@@ -428,19 +474,19 @@ function rodarTestesDoPainel() {
   });
 
   teste('o detalhe respeita o alcance do nível', () => {
-    const doDiego = chamar('resumoDaMesa')(mesa.id, {}).fila
+    const doDiego = chamar('resumoDoCanal')(canal.id, {}).fila
       .find((caso) => JSON.stringify(caso.celulas).includes('Diego Castilho'));
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('detalhesDoCaso')(mesa.id, doDiego.id), 'fora do seu alcance');
+      lanca(() => chamar('detalhesDoCaso')(canal.id, doDiego.id), 'Este caso é de Diego Castilho');
     });
   });
 
   teste('ocultar tira da fila e do cartão ao mesmo tempo', () => {
-    const antes = chamar('resumoDaMesa')(mesa.id, {});
-    chamar('ocultarCaso')(mesa.id, antes.fila[0].id);
+    const antes = chamar('resumoDoCanal')(canal.id, {});
+    chamar('ocultarCaso')(canal.id, antes.fila[0].id);
 
-    const depois = chamar('resumoDaMesa')(mesa.id, {});
+    const depois = chamar('resumoDoCanal')(canal.id, {});
     igual(depois.total, antes.total - 1);
     igual(depois.fila.length, antes.fila.length - 1);
     igual(depois.cartoes[0].valor, antes.cartoes[0].valor - 1);

@@ -85,37 +85,37 @@ function tomValido_(cor) {
  *
  * `filtros` é um objeto simples: { chaveDoCampo: valorEscolhido }. As chaves
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
- * inventa filtro, ela oferece o que a mesa tem.
+ * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDaMesa(idDaMesa, filtros) {
+function resumoDoCanal(idDoCanal, filtros) {
   var quem = exigirTela_('dashboard');
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var dias = Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
 
   // A base só acrescenta no fim, então o recente está nas últimas linhas.
   // Ler por data exigiria percorrer tudo; ler o fim e depois filtrar por data
   // custa uma leitura só, e o `truncada` avisa quando a janela não coube.
-  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, dias, 0);
-  var meus = filtrarPeloAlcance_(noPeriodo, mesa.aba, quem);
+  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, dias, 0);
+  var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
 
   // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
   var anterior = filtrarPeloAlcance_(
-    filtrarPeloPeriodo_(recentes, mesa, dias, dias), mesa.aba, quem);
+    filtrarPeloPeriodo_(recentes, canal, dias, dias), canal.aba, quem);
 
-  var disponiveis = filtrosDaMesa_(mesa, quem);
+  var disponiveis = filtrosDoCanal_(canal, quem);
   var filtrados = aplicarFiltros_(meus, disponiveis, filtros || {});
   var anterioresFiltrados = aplicarFiltros_(anterior, disponiveis, filtros || {});
 
   return {
-    mesa: mesa,
+    canal: canal,
     periodo: { dias: dias, rotulo: 'últimos ' + dias + ' dias' },
-    cartoes: contarCartoes_(filtrados, anterioresFiltrados, mesa),
+    cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
-    colunas: colunasDaFila_(mesa),
-    fila: montarFila_(filtrados, mesa),
+    colunas: colunasDaFila_(canal),
+    fila: montarFila_(filtrados, canal),
     total: filtrados.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,
@@ -135,8 +135,8 @@ function resumoDaMesa(idDaMesa, filtros) {
  * Registro sem data FICA no período atual. Some-lo por omissão esconderia
  * justamente as linhas mal preenchidas, que são as que precisam de atenção.
  */
-function filtrarPeloPeriodo_(registros, mesa, dias, recuo) {
-  if (!mesa.colunaDaData) return recuo ? [] : registros;
+function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
+  if (!canal.colunaDaData) return recuo ? [] : registros;
 
   var fim = new Date();
   fim.setDate(fim.getDate() - recuo);
@@ -147,7 +147,7 @@ function filtrarPeloPeriodo_(registros, mesa, dias, recuo) {
   var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
 
   return registros.filter(function (registro) {
-    var data = converterParaData_(registro[mesa.colunaDaData]);
+    var data = converterParaData_(registro[canal.colunaDaData]);
     if (!data) return !recuo;
     var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
@@ -155,21 +155,39 @@ function filtrarPeloPeriodo_(registros, mesa, dias, recuo) {
 }
 
 /**
- * Os filtros que a mesa oferece: os campos que já são lista.
+ * Os filtros que o canal oferece: os campos que já são lista.
  *
  * Não há lista de filtros escrita em código. Se o administrador transformar
  * um campo em seletor, ele vira filtro sozinho; se desligar o campo, o filtro
  * some junto.
  */
-function filtrosDaMesa_(mesa, quem) {
+function filtrosDoCanal_(canal, quem) {
   var disponiveis = [];
 
-  camposAtivosDaMesa_(mesa.id).forEach(function (campo) {
+  // O STATUS VEM PRIMEIRO, sempre.
+  //
+  // O teto de quatro filtros pegava os quatro primeiros seletores na ordem em
+  // que os campos aparecem no formulário. Quando a operação reordenou o
+  // formulário e o Status foi para o fim — ele é a última coisa que se
+  // preenche no atendimento —, ele caiu fora do corte. Sem erro nenhum: o
+  // filtro mais usado do sistema simplesmente deixou de existir na tela.
+  //
+  // A ordem do FORMULÁRIO segue o caminho de quem atende; a ordem dos FILTROS
+  // segue o que a operação recorta. Amarrar uma na outra foi o defeito.
+  var colunaDoStatus = normalizarParaComparar_(canal.colunaDoStatus || '');
+  var campos = camposAtivosDoCanal_(canal.id).slice().sort(function (um, outro) {
+    var umEhStatus = normalizarParaComparar_(um.Cabecalho) === colunaDoStatus;
+    var outroEhStatus = normalizarParaComparar_(outro.Cabecalho) === colunaDoStatus;
+    if (umEhStatus === outroEhStatus) return 0;
+    return umEhStatus ? -1 : 1;
+  });
+
+  campos.forEach(function (campo) {
     if (disponiveis.length >= 4) return;   // mais que isso vira parede de caixas
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 
-    var descricao = campoParaATela_(campo, mesa.id, visibilidade);
+    var descricao = campoParaATela_(campo, canal.id, visibilidade, quem);
     if (descricao.tipo !== 'seletor' || !descricao.opcoes.length) return;
 
     disponiveis.push({
@@ -205,7 +223,7 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
 // ============================================================================
 
 /**
- * Total, um cartão por situação, e — quando a mesa tem as colunas para isso —
+ * Total, um cartão por situação, e — quando o canal tem as colunas para isso —
  * quantos foram finalizados na própria célula.
  *
  * A contagem por situação sai do CATÁLOGO, e não dos valores encontrados na
@@ -229,25 +247,25 @@ function dimensaoDoCartao_(valor) {
   return '';
 }
 
-function contarCartoes_(registros, anteriores, mesa) {
-  var agora = mesa.colunaDoStatus ? contarPorSituacao_(registros, mesa) : {};
-  var antes = mesa.colunaDoStatus ? contarPorSituacao_(anteriores, mesa) : {};
+function contarCartoes_(registros, anteriores, canal) {
+  var agora = canal.colunaDoStatus ? contarPorSituacao_(registros, canal) : {};
+  var antes = canal.colunaDoStatus ? contarPorSituacao_(anteriores, canal) : {};
 
   var tons = {};
-  situacoesDaMesa_(mesa).forEach(function (situacao) {
+  situacoesDoCanal_(canal).forEach(function (situacao) {
     tons[situacao.chave] = situacao.tom;
   });
 
-  return cartoesDaMesa_(mesa).map(function (cartao) {
+  return cartoesDoCanal_(canal).map(function (cartao) {
     if (cartao.dimensao === 'total') {
       return montarCartao_('total', cartao.titulo, registros.length,
         anteriores.length, cartao.cor, '');
     }
     if (cartao.dimensao === 'naCelula') {
-      var naCelula = contarFinalizadosNaCelula_(registros, mesa);
+      var naCelula = contarFinalizadosNaCelula_(registros, canal);
       if (naCelula === null) return null;
       return montarCartao_('naCelula', cartao.titulo, naCelula,
-        contarFinalizadosNaCelula_(anteriores, mesa), cartao.cor,
+        contarFinalizadosNaCelula_(anteriores, canal), cartao.cor,
         'Concluídos sem encaminhar para nenhuma área');
     }
 
@@ -258,24 +276,24 @@ function contarCartoes_(registros, anteriores, mesa) {
 }
 
 /**
- * Os cartões declarados para o Dashboard desta mesa, na ordem escolhida.
+ * Os cartões declarados para o Dashboard deste canal, na ordem escolhida.
  *
  * Cada cartão é uma linha de `PAINEIS`, e não um pedaço de texto dentro de
- * `MESAS`: assim ele tem nome, cor e ordem próprios, e o administrador
+ * `CANAIS`: assim ele tem nome, cor e ordem próprios, e o administrador
  * renomeia "Concluído" para "Resolvido no primeiro contato" sem que isso
  * mexa no que está gravado nos casos.
  *
  * Desligar um cartão só o tira da tela — nenhum caso é tocado.
  */
-function cartoesDaMesa_(mesa) {
-  var daMesa = converterParaIdentificador_(mesa.id);
+function cartoesDoCanal_(canal) {
+  var doCanal = converterParaIdentificador_(canal.id);
 
   return lerRegistros_('PAINEIS')
     .filter(function (linha) {
       if (normalizarParaComparar_(linha.Tela) !== 'dashboard') return false;
       if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return false;
       if (normalizarParaComparar_(linha.Ativo) !== 'sim') return false;
-      return converterParaIdentificador_(linha.MesaId) === daMesa;
+      return converterParaIdentificador_(linha.CanalId) === doCanal;
     })
     .sort(function (um, outro) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
@@ -292,10 +310,10 @@ function cartoesDaMesa_(mesa) {
 }
 
 
-function contarPorSituacao_(registros, mesa) {
+function contarPorSituacao_(registros, canal) {
   var contagem = {};
   registros.forEach(function (registro) {
-    var chave = normalizarParaComparar_(registro[mesa.colunaDoStatus]);
+    var chave = normalizarParaComparar_(registro[canal.colunaDoStatus]);
     contagem[chave] = (contagem[chave] || 0) + 1;
   });
   return contagem;
@@ -325,14 +343,14 @@ function montarCartao_(chave, rotulo, valor, valorAnterior, tom, explicacao) {
 }
 
 
-function situacoesDaMesa_(mesa) {
-  var daMesa = converterParaIdentificador_(mesa.id);
+function situacoesDoCanal_(canal) {
+  var doCanal = converterParaIdentificador_(canal.id);
   return lerRegistros_('CATALOGO')
     .filter(function (item) {
       if (normalizarParaComparar_(item.Tipo) !== 'status') return false;
       if (normalizarParaComparar_(item.Ativo) !== 'sim') return false;
-      var mesaDoItem = converterParaIdentificador_(item.MesaId);
-      return !mesaDoItem || mesaDoItem === daMesa;
+      var canalDoItem = converterParaIdentificador_(item.CanalId);
+      return !canalDoItem || canalDoItem === doCanal;
     })
     .sort(function (um, outro) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
@@ -345,7 +363,8 @@ function situacoesDaMesa_(mesa) {
         // que alguém trocasse o texto da tela.
         nome: String(item.Rotulo || item.Nome),
         gravadoComo: String(item.Nome),
-        tom: tomValido_(item.Cor)
+        tom: tomValido_(item.Cor),
+        colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim()
       };
     });
 }
@@ -357,16 +376,16 @@ function situacoesDaMesa_(mesa) {
  * gravada, é conta — assim ela não mente quando alguém edita a área
  * responsável direto na planilha.
  *
- * Devolve null quando a mesa não declarou as duas colunas: o cartão não
+ * Devolve null quando o canal não declarou as duas colunas: o cartão não
  * aparece, em vez de aparecer sempre zerado e parecer um problema.
  */
-function contarFinalizadosNaCelula_(registros, mesa) {
-  if (!mesa.colunaDaFinalizacao || !mesa.colunaDaAreaResponsavel) return null;
+function contarFinalizadosNaCelula_(registros, canal) {
+  if (!canal.colunaDaFinalizacao || !canal.colunaDaAreaResponsavel) return null;
 
   var quantos = 0;
   registros.forEach(function (registro) {
-    var finalizado = String(registro[mesa.colunaDaFinalizacao] || '').trim() !== '';
-    var semArea = String(registro[mesa.colunaDaAreaResponsavel] || '').trim() === '';
+    var finalizado = String(registro[canal.colunaDaFinalizacao] || '').trim() !== '';
+    var semArea = String(registro[canal.colunaDaAreaResponsavel] || '').trim() === '';
     if (finalizado && semArea) quantos++;
   });
   return quantos;
@@ -376,7 +395,7 @@ function contarFinalizadosNaCelula_(registros, mesa) {
 // A FILA
 // ============================================================================
 
-/** As colunas que a mesa escolheu mostrar na fila. */
+/** As colunas que o canal escolheu mostrar na fila. */
 /**
  * As colunas da fila, agrupadas.
  *
@@ -393,26 +412,26 @@ function contarFinalizadosNaCelula_(registros, mesa) {
  * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
  * descuido: a fila é leitura, e derrubar o Dashboard inteiro porque alguém
  * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
- * na hora de salvar a mesa.
+ * na hora de salvar o canal.
  */
-function colunasDaFila_(mesa) {
-  var estrutura = estruturaDaAba_(mesa.aba);
-  var declarado = String(mesa.colunasDaFila || '');
+function colunasDaFila_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var declarado = String(canal.colunasDaFila || '');
 
   // Sem nenhum dois-pontos, é a escrita plana: cada coluna vira um grupo com
-  // o próprio nome. É o que faz uma mesa antiga continuar funcionando igual,
+  // o próprio nome. É o que faz um canal antiga continuar funcionando igual,
   // sem ninguém precisar reescrever a linha dela na planilha.
   var pedacos = declarado.indexOf(':') < 0
     ? declarado.split(',')
     : declarado.split(';');
 
   return pedacos
-    .map(function (pedaco) { return grupoDaFila_(pedaco, estrutura, mesa); })
+    .map(function (pedaco) { return grupoDaFila_(pedaco, estrutura, canal); })
     .filter(function (grupo) { return grupo && grupo.colunas.length; });
 }
 
 /** Um pedaço de `ColunasDaFila` vira um grupo com o seu título. */
-function grupoDaFila_(pedaco, estrutura, mesa) {
+function grupoDaFila_(pedaco, estrutura, canal) {
   var texto = String(pedaco || '').trim();
   if (!texto) return null;
 
@@ -435,7 +454,7 @@ function grupoDaFila_(pedaco, estrutura, mesa) {
         cabecalho: estrutura.cabecalhos[posicao],
         tipo: estrutura.tipos[posicao],
         ehStatus: normalizarParaComparar_(nome)
-          === normalizarParaComparar_(mesa.colunaDoStatus)
+          === normalizarParaComparar_(canal.colunaDoStatus)
       };
     });
 
@@ -448,13 +467,13 @@ function grupoDaFila_(pedaco, estrutura, mesa) {
 }
 
 
-function montarFila_(registros, mesa) {
-  var grupos = colunasDaFila_(mesa);
+function montarFila_(registros, canal) {
+  var grupos = colunasDaFila_(canal);
 
   // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
   // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
   var tons = {};
-  situacoesDaMesa_(mesa).forEach(function (situacao) {
+  situacoesDoCanal_(canal).forEach(function (situacao) {
     tons[situacao.chave] = situacao.tom;
   });
 
@@ -468,8 +487,8 @@ function montarFila_(registros, mesa) {
         };
       });
     });
-    var situacao = mesa.colunaDoStatus
-      ? String(registro[mesa.colunaDoStatus] || '') : '';
+    var situacao = canal.colunaDoStatus
+      ? String(registro[canal.colunaDoStatus] || '') : '';
     return {
       id: registro.__id,
       celulas: celulas,
@@ -516,20 +535,20 @@ function paraTexto_(valor, tipo) {
  * Um caso inteiro, para a fila abrir sem recarregar a tela.
  * Devolve só o que o nível pode ver — a mesma regra do formulário.
  */
-function detalhesDoCaso(idDaMesa, idDoCaso) {
+function detalhesDoCaso(idDoCanal, idDoCaso) {
   var quem = exigirTela_('dashboard');
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var registro = buscarRegistros_(mesa.aba, 'Id', idDoCaso, 1)[0];
+  var registro = buscarRegistros_(canal.aba, 'Id', idDoCaso, 1)[0];
   if (!registro) {
-    throw new Error('O caso ' + idDoCaso + ' não existe na mesa ' + mesa.nome + '.');
+    throw new Error('O caso ' + idDoCaso + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(registro, mesa, quem);
+  exigirAlcanceSobre_(registro, canal, quem);
 
-  var estrutura = estruturaDaAba_(mesa.aba);
+  var estrutura = estruturaDaAba_(canal.aba);
   var linhas = [];
 
-  camposAtivosDaMesa_(mesa.id).forEach(function (campo) {
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
     if (visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica)
       === RECC_VISIBILIDADE.OCULTO) return;
 
@@ -537,7 +556,7 @@ function detalhesDoCaso(idDaMesa, idDoCaso) {
     if (posicao < 0) return;
 
     // Campo vazio aparece com um travessão, e não sumindo. Sumir faria a
-    // pessoa achar que o campo não existe naquela mesa, quando na verdade
+    // pessoa achar que o campo não existe naquelo canal, quando na verdade
     // ele existe e está em branco — que é uma informação.
     linhas.push({
       chave: String(campo.ChaveTecnica),
@@ -547,21 +566,21 @@ function detalhesDoCaso(idDaMesa, idDoCaso) {
     });
   });
 
-  var situacao = mesa.colunaDoStatus
-    ? String(registro[mesa.colunaDoStatus] || '') : '';
+  var situacao = canal.colunaDoStatus
+    ? String(registro[canal.colunaDoStatus] || '') : '';
   var tom = 'neutro';
-  situacoesDaMesa_(mesa).forEach(function (uma) {
+  situacoesDoCanal_(canal).forEach(function (uma) {
     if (uma.chave === normalizarParaComparar_(situacao)) tom = uma.tom;
   });
 
   return {
     id: registro.__id,
-    mesa: mesa.nome,
+    canal: canal.nome,
     situacao: situacao,
     tom: tom,
-    atualizadoEm: quandoFoiMexido_(mesa.aba, registro.__id),
+    atualizadoEm: quandoFoiMexido_(canal.aba, registro.__id),
     linhas: linhas,
-    historico: historicoDoCaso_(mesa.aba, registro.__id),
+    historico: historicoDoCaso_(canal.aba, registro.__id),
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
     podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
   };
@@ -676,31 +695,31 @@ const RECC_AGREGACOES = {
 const RECC_MAXIMO_DE_FATIAS = 6;
 
 /**
- * O painel inteiro: todos os gráficos da mesa, já calculados.
+ * O painel inteiro: todos os gráficos do canal, já calculados.
  *
  * Vem numa chamada só porque a tela abre mostrando todos ao mesmo tempo —
  * seis idas ao servidor fariam a tela montar aos pedaços.
  */
-function painelAnalitico(idDaMesa, filtros, dias) {
+function painelAnalitico(idDoCanal, filtros, dias) {
   var quem = exigirTela_('painelAnalitico');
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
-  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, janela, 0);
-  var meus = filtrarPeloAlcance_(noPeriodo, mesa.aba, quem);
+  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, janela, 0);
+  var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
 
-  var disponiveis = filtrosDaMesa_(mesa, quem);
+  var disponiveis = filtrosDoCanal_(canal, quem);
   var casos = aplicarFiltros_(meus, disponiveis, filtros || {});
 
-  var componentes = componentesDaMesa_(mesa).map(function (componente) {
-    return calcularComponente_(componente, casos, mesa);
+  var componentes = componentesDoCanal_(canal).map(function (componente) {
+    return calcularComponente_(componente, casos, canal);
   });
 
   return {
-    mesa: { id: mesa.id, nome: mesa.nome, icone: mesa.icone },
+    canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
     periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
     total: casos.length,
     truncada: truncada,
@@ -711,16 +730,16 @@ function painelAnalitico(idDaMesa, filtros, dias) {
   };
 }
 
-/** Os gráficos declarados para esta mesa, na ordem escolhida. */
-function componentesDaMesa_(mesa) {
-  var daMesa = converterParaIdentificador_(mesa.id);
+/** Os gráficos declarados para este canal, na ordem escolhida. */
+function componentesDoCanal_(canal) {
+  var doCanal = converterParaIdentificador_(canal.id);
 
   return lerRegistros_('PAINEIS')
     .filter(function (linha) {
       if (normalizarParaComparar_(linha.Tela) !== 'painelanalitico') return false;
       if (normalizarParaComparar_(linha.Ativo) !== 'sim') return false;
-      var mesaDaLinha = converterParaIdentificador_(linha.MesaId);
-      return !mesaDaLinha || mesaDaLinha === daMesa;
+      var canalDaLinha = converterParaIdentificador_(linha.CanalId);
+      return !canalDaLinha || canalDaLinha === doCanal;
     })
     .sort(function (um, outro) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
@@ -768,13 +787,13 @@ function agregacaoValida_(valor) {
  * quem dobra o resto em "Outros" e quem calcula a média móvel é aqui. Assim a
  * mesma conta vale para a tela, para a exportação e para o detalhamento.
  */
-function calcularComponente_(componente, casos, mesa) {
-  var estrutura = estruturaDaAba_(mesa.aba);
+function calcularComponente_(componente, casos, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
   var posicaoDaDimensao = posicaoDaColuna_(estrutura, componente.dimensao);
 
   if (posicaoDaDimensao < 0) {
     return semDados_(componente, 'A coluna "' + componente.dimensao +
-      '" não existe na aba ' + mesa.aba + '. Ajuste em Configurações → Painéis.');
+      '" não existe na aba ' + canal.aba + '. Ajuste em Configurações → Painéis.');
   }
 
   var tipoDaDimensao = estrutura.tipos[posicaoDaDimensao];
@@ -854,7 +873,7 @@ function calcularComponente_(componente, casos, mesa) {
     }
   }
 
-  var pintado = pintarPontos_(pontos, componente, mesa, ehTempo);
+  var pintado = pintarPontos_(pontos, componente, canal, ehTempo);
 
   return {
     id: componente.id,
@@ -905,7 +924,7 @@ function semDados_(componente, aviso) {
  * Fora do catálogo, a cor sai da paleta categórica pela posição do valor na
  * lista COMPLETA da dimensão — que também não muda com o filtro.
  */
-function pintarPontos_(pontos, componente, mesa, ehTempo) {
+function pintarPontos_(pontos, componente, canal, ehTempo) {
   // Magnitude ao longo do tempo, ou barra simples: um tom só. Oito cores para
   // dizer "quanto" é o jeito mais rápido de enterrar a informação.
   if (ehTempo || componente.tipo === 'barras'
@@ -920,8 +939,8 @@ function pintarPontos_(pontos, componente, mesa, ehTempo) {
     });
   }
 
-  var doCatalogo = coresDoCatalogo_(mesa);
-  var ordemEstavel = ordemEstavelDaDimensao_(mesa, componente.dimensao);
+  var doCatalogo = coresDoCatalogo_(canal);
+  var ordemEstavel = ordemEstavelDaDimensao_(canal, componente.dimensao);
 
   return pontos.map(function (ponto) {
     if (ponto.ehOutros) {
@@ -946,13 +965,13 @@ function pintarPontos_(pontos, componente, mesa, ehTempo) {
   });
 }
 
-/** O tom que o catálogo já declarou para cada valor desta mesa. */
-function coresDoCatalogo_(mesa) {
-  var daMesa = converterParaIdentificador_(mesa.id);
+/** O tom que o catálogo já declarou para cada valor deste canal. */
+function coresDoCatalogo_(canal) {
+  var doCanal = converterParaIdentificador_(canal.id);
   var cores = {};
   lerRegistros_('CATALOGO').forEach(function (item) {
-    var mesaDoItem = converterParaIdentificador_(item.MesaId);
-    if (mesaDoItem && mesaDoItem !== daMesa) return;
+    var canalDoItem = converterParaIdentificador_(item.CanalId);
+    if (canalDoItem && canalDoItem !== doCanal) return;
     if (!item.Cor) return;
     cores[normalizarParaComparar_(item.Nome)] = tomValido_(item.Cor);
   });
@@ -965,15 +984,15 @@ function coresDoCatalogo_(mesa) {
  * Sai do catálogo, e não dos casos que sobraram no filtro: é isso que faz a
  * cor de um valor ser sempre a mesma, esteja ele em primeiro ou em último.
  */
-function ordemEstavelDaDimensao_(mesa, cabecalho) {
+function ordemEstavelDaDimensao_(canal, cabecalho) {
   var campo = null;
-  camposAtivosDaMesa_(mesa.id).forEach(function (umCampo) {
+  camposAtivosDoCanal_(canal.id).forEach(function (umCampo) {
     if (normalizarParaComparar_(umCampo.Cabecalho)
       === normalizarParaComparar_(cabecalho)) campo = umCampo;
   });
   if (!campo) return [];
 
-  return opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), mesa.id)
+  return opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), canal.id)
     .map(function (opcao) { return normalizarParaComparar_(opcao.valor); });
 }
 
@@ -1024,12 +1043,12 @@ function mediaMovel_(pontos, janela) {
  * É o que transforma um número numa lista de protocolos para trabalhar — sem
  * isso, o painel só informa, e informar não resolve caso nenhum.
  */
-function detalharComponente(idDaMesa, idDoComponente, chaveDoPonto, filtros, dias) {
+function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, dias) {
   var quem = exigirTela_('painelAnalitico');
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var componente = null;
-  componentesDaMesa_(mesa).forEach(function (um) {
+  componentesDoCanal_(canal).forEach(function (um) {
     if (converterParaIdentificador_(um.id)
       === converterParaIdentificador_(idDoComponente)) componente = um;
   });
@@ -1038,12 +1057,12 @@ function detalharComponente(idDaMesa, idDoComponente, chaveDoPonto, filtros, dia
   }
 
   var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
-  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var meus = filtrarPeloAlcance_(
-    filtrarPeloPeriodo_(recentes, mesa, janela, 0), mesa.aba, quem);
-  var casos = aplicarFiltros_(meus, filtrosDaMesa_(mesa, quem), filtros || {});
+    filtrarPeloPeriodo_(recentes, canal, janela, 0), canal.aba, quem);
+  var casos = aplicarFiltros_(meus, filtrosDoCanal_(canal, quem), filtros || {});
 
-  var estrutura = estruturaDaAba_(mesa.aba);
+  var estrutura = estruturaDaAba_(canal.aba);
   var posicao = posicaoDaColuna_(estrutura, componente.dimensao);
   var ehTempo = posicao >= 0 && (estrutura.tipos[posicao] === RECC_TIPO_DE_DADO.DATA
     || estrutura.tipos[posicao] === RECC_TIPO_DE_DADO.DATA_HORA);
@@ -1055,7 +1074,7 @@ function detalharComponente(idDaMesa, idDoComponente, chaveDoPonto, filtros, dia
     // "Outros" é o resto: os casos que NÃO estão em nenhuma das fatias
     // mostradas. Calculamos de novo quais são elas, para a conta bater com o
     // gráfico — e não com uma segunda regra que um dia diverge.
-    var mostradas = calcularComponente_(componente, casos, mesa).pontos
+    var mostradas = calcularComponente_(componente, casos, canal).pontos
       .filter(function (ponto) { return !ponto.ehOutros; })
       .map(function (ponto) { return normalizarParaComparar_(ponto.chave); });
 
@@ -1076,8 +1095,8 @@ function detalharComponente(idDaMesa, idDoComponente, chaveDoPonto, filtros, dia
     titulo: componente.titulo,
     ponto: ehTempo ? rotuloDoDia_(procurado)
       : (procurado === '__outros' ? 'Demais valores' : procurado),
-    colunas: colunasDaFila_(mesa),
-    casos: montarFila_(escolhidos, mesa),
+    colunas: colunasDaFila_(canal),
+    casos: montarFila_(escolhidos, canal),
     total: escolhidos.length
   };
 }
@@ -1092,11 +1111,11 @@ function detalharComponente(idDaMesa, idDoComponente, chaveDoPonto, filtros, dia
  * Ponto e vírgula, e não vírgula: o Excel em português abre assim sem pedir
  * nada. Vírgula abriria tudo numa coluna só, e a pessoa desistiria no meio.
  */
-function exportarComponente(idDaMesa, idDoComponente, filtros, dias) {
+function exportarComponente(idDoCanal, idDoComponente, filtros, dias) {
   var quem = exigirPermissao_(RECC_ACOES.EXPORTAR);
   exigirTela_('painelAnalitico');
 
-  var painel = painelAnalitico(idDaMesa, filtros, dias);
+  var painel = painelAnalitico(idDoCanal, filtros, dias);
   var componente = null;
   painel.componentes.forEach(function (um) {
     if (converterParaIdentificador_(um.id)
@@ -1135,10 +1154,10 @@ function nomeDeArquivo_(titulo) {
 // ============================================================================
 
 /** O que a tela de Configurações oferece ao montar um gráfico. */
-function opcoesDoPainelAnalitico(idDaMesa) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var mesa = mesaPeloId_(idDaMesa);
-  var estrutura = estruturaDaAba_(mesa.aba);
+function opcoesDoPainelAnalitico(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var estrutura = estruturaDaAba_(canal.aba);
 
   var dimensoes = [];
   var medidas = [];
@@ -1154,7 +1173,7 @@ function opcoesDoPainelAnalitico(idDaMesa) {
   });
 
   return {
-    mesa: { id: mesa.id, nome: mesa.nome },
+    canal: { id: canal.id, nome: canal.nome },
     tipos: Object.keys(RECC_TIPOS_DE_GRAFICO).map(function (chave) {
       return { chave: chave, rotulo: RECC_TIPOS_DE_GRAFICO[chave] };
     }),
@@ -1167,16 +1186,16 @@ function opcoesDoPainelAnalitico(idDaMesa) {
   };
 }
 
-/** Os gráficos de uma mesa, para a tela de Configurações editar. */
-function listarComponentesDoPainel(idDaMesa) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var mesa = mesaPeloId_(idDaMesa);
+/** Os gráficos de um canal, para a tela de Configurações editar. */
+function listarComponentesDoPainel(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   return lerRegistros_('PAINEIS')
     .filter(function (linha) {
       if (normalizarParaComparar_(linha.Tela) !== 'painelanalitico') return false;
-      return converterParaIdentificador_(linha.MesaId)
-        === converterParaIdentificador_(mesa.id);
+      return converterParaIdentificador_(linha.CanalId)
+        === converterParaIdentificador_(canal.id);
     })
     .sort(function (um, outro) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
@@ -1196,11 +1215,11 @@ function listarComponentesDoPainel(idDaMesa) {
     });
 }
 
-/** Grava a lista inteira de gráficos de uma mesa, como os cards do Dashboard. */
-function salvarComponentesDoPainel(idDaMesa, componentes) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var mesa = mesaPeloId_(idDaMesa);
-  var estrutura = estruturaDaAba_(mesa.aba);
+/** Grava a lista inteira de gráficos de um canal, como os cards do Dashboard. */
+function salvarComponentesDoPainel(idDoCanal, componentes) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var estrutura = estruturaDaAba_(canal.aba);
   var lista = Array.isArray(componentes) ? componentes : [];
 
   if (lista.length > RECC_MAXIMO_DE_CARTOES) {
@@ -1213,27 +1232,27 @@ function salvarComponentesDoPainel(idDaMesa, componentes) {
       throw new Error('Todo gráfico precisa de um título — é o que diz o que ' +
         'ele responde.');
     }
-    conferirQueAColunaExiste_(estrutura, componente.dimensao, mesa.aba);
+    conferirQueAColunaExiste_(estrutura, componente.dimensao, canal.aba);
     if (agregacaoValida_(componente.agregacao) !== 'contagem') {
       if (!String(componente.medida || '').trim()) {
         throw new Error('"' + componente.titulo + '" soma um valor, mas não diz ' +
           'qual. Escolha a coluna da medida.');
       }
-      conferirQueAColunaExiste_(estrutura, componente.medida, mesa.aba);
+      conferirQueAColunaExiste_(estrutura, componente.medida, canal.aba);
     }
   });
 
   var jaGravados = lerRegistros_('PAINEIS').filter(function (linha) {
     if (normalizarParaComparar_(linha.Tela) !== 'painelanalitico') return false;
-    return converterParaIdentificador_(linha.MesaId)
-      === converterParaIdentificador_(mesa.id);
+    return converterParaIdentificador_(linha.CanalId)
+      === converterParaIdentificador_(canal.id);
   });
   var continuam = {};
 
   lista.forEach(function (componente, posicao) {
     var campos = {
       Tela: 'painelAnalitico',
-      MesaId: mesa.id,
+      CanalId: canal.id,
       Titulo: String(componente.titulo).trim(),
       TipoWidget: tipoDeGraficoValido_(componente.tipo),
       CampoDimensao: String(componente.dimensao || ''),
@@ -1265,7 +1284,7 @@ function salvarComponentesDoPainel(idDaMesa, componentes) {
   });
 
   registrarAuditoria_('painel.graficos', 'PAINEIS', '',
-    mesa.nome + ' · ' + lista.length + ' gráficos');
+    canal.nome + ' · ' + lista.length + ' gráficos');
   return true;
 }
 
@@ -1298,11 +1317,11 @@ function salvarComponentesDoPainel(idDaMesa, componentes) {
  *      uma média de 6" diz. Comparação sem referência é o jeito mais rápido
  *      de transformar um painel em ansiedade.
  *
- *   3. O QUE NÃO DÁ PARA CALCULAR NÃO APARECE. Tempo médio exige que a mesa
+ *   3. O QUE NÃO DÁ PARA CALCULAR NÃO APARECE. Tempo médio exige que o canal
  *      declare a coluna de finalização. Sem ela, o indicador some — e não
  *      aparece zerado, que pareceria um desempenho ruim.
  *
- *   4. A META É DECLARADA, NUNCA INVENTADA. Mesa sem meta em `MESAS` não
+ *   4. A META É DECLARADA, NUNCA INVENTADA. Canal sem meta em `CANAIS` não
  *      ganha barra de progresso. Um alvo tirado do nada é pior que alvo
  *      nenhum: ele parece oficial.
  * ============================================================================
@@ -1312,29 +1331,29 @@ function salvarComponentesDoPainel(idDaMesa, componentes) {
 const RECC_VIZINHOS_NO_RANKING = 2;
 
 /**
- * Os números de quem está olhando, na mesa e no período escolhidos.
+ * Os números de quem está olhando, no canal e no período escolhidos.
  */
-function minhaPerformance(idDaMesa, dias) {
+function minhaPerformance(idDoCanal, dias) {
   var quem = exigirTela_('minhaPerformance');
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
-  var recentes = lerRegistros_(mesa.aba, { ultimas: linhasQueOPainelOlha_() });
+  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   // Bateu no teto de leitura: pode haver caso do período que ficou de fora.
   // Aqui isto pesa mais que nas outras telas — esta é a tela sobre UMA PESSOA,
   // e número incompleto vira julgamento errado sobre alguém.
   var truncada = recentes.length >= linhasQueOPainelOlha_();
-  var noPeriodo = filtrarPeloPeriodo_(recentes, mesa, janela, 0);
-  var anterior = filtrarPeloPeriodo_(recentes, mesa, janela, janela);
+  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, janela, 0);
+  var anterior = filtrarPeloPeriodo_(recentes, canal, janela, janela);
 
-  var coluna = colunaDoResponsavel_(estruturaDaAba_(mesa.aba));
+  var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var meuNome = String(quem.usuario.Nome || '');
 
   var meus = casosDaPessoa_(noPeriodo, coluna, meuNome);
   var meusAntes = casosDaPessoa_(anterior, coluna, meuNome);
 
   return {
-    mesa: { id: mesa.id, nome: mesa.nome, icone: mesa.icone },
+    canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
     pessoa: {
       nome: meuNome,
       cargo: quem.cargo,
@@ -1347,13 +1366,13 @@ function minhaPerformance(idDaMesa, dias) {
     // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez
     // de mostrar zero — zero pareceria que a pessoa não trabalhou.
     temResponsavel: !!coluna,
-    indicadores: indicadoresDaPessoa_(meus, meusAntes, mesa),
-    meta: metaDaPessoa_(meus, mesa, janela),
-    porDia: serieDoPeriodo_(meus, mesa, janela),
-    porSituacao: distribuicao_(meus, mesa, mesa.colunaDoStatus, 'Situação'),
-    porCanal: distribuicao_(meus, mesa, colunaDoCanal_(mesa), 'Canal'),
-    equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, mesa),
-    recentes: oQueEuFiz_(quem, mesa)
+    indicadores: indicadoresDaPessoa_(meus, meusAntes, canal),
+    meta: metaDaPessoa_(meus, canal, janela),
+    porDia: serieDoPeriodo_(meus, canal, janela),
+    porSituacao: distribuicao_(meus, canal, canal.colunaDoStatus, 'Situação'),
+    porCanal: distribuicao_(meus, canal, colunaDoCanal_(canal), 'Canal'),
+    equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal),
+    recentes: oQueEuFiz_(quem, canal)
   };
 }
 
@@ -1366,9 +1385,9 @@ function casosDaPessoa_(registros, coluna, nome) {
   });
 }
 
-/** A coluna de canal da mesa, quando ela tem uma. */
-function colunaDoCanal_(mesa) {
-  var estrutura = estruturaDaAba_(mesa.aba);
+/** A coluna de canal do canal, quando ela tem uma. */
+function colunaDoCanal_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
   var achada = '';
   estrutura.cabecalhos.forEach(function (cabecalho) {
     if (achada) return;
@@ -1385,41 +1404,41 @@ function colunaDoCanal_(mesa) {
  * Os números da pessoa, cada um com o do período anterior ao lado.
  *
  * Todo indicador carrega a comparação: "8 casos" sozinho não diz nada, "8
- * contra 6 no período anterior" diz. E o que não dá para calcular nesta mesa
+ * contra 6 no período anterior" diz. E o que não dá para calcular neste canal
  * simplesmente não entra na lista.
  */
-function indicadoresDaPessoa_(meus, meusAntes, mesa) {
+function indicadoresDaPessoa_(meus, meusAntes, canal) {
   var lista = [];
 
   lista.push(indicador_('trabalhados', 'Casos trabalhados',
     meus.length, meusAntes.length, 'casos',
     'Todos os casos em que você é a pessoa responsável no período.'));
 
-  if (mesa.colunaDoStatus) {
-    var concluidos = contarConcluidos_(meus, mesa);
+  if (canal.colunaDoStatus) {
+    var concluidos = contarConcluidos_(meus, canal);
     lista.push(indicador_('concluidos', 'Concluídos',
-      concluidos, contarConcluidos_(meusAntes, mesa), 'casos',
+      concluidos, contarConcluidos_(meusAntes, canal), 'casos',
       'Casos que chegaram a uma situação de conclusão.'));
 
     lista.push(indicador_('emAberto', 'Ainda em aberto',
-      meus.length - concluidos, meusAntes.length - contarConcluidos_(meusAntes, mesa),
+      meus.length - concluidos, meusAntes.length - contarConcluidos_(meusAntes, canal),
       'casos', 'O que continua esperando alguma tratativa sua.'));
   }
 
-  var tempo = tempoMedioDeTratativa_(meus, mesa);
+  var tempo = tempoMedioDeTratativa_(meus, canal);
   if (tempo !== null) {
     lista.push(indicador_('tempoMedio', 'Tempo médio até concluir',
-      tempo, tempoMedioDeTratativa_(meusAntes, mesa), 'dias',
+      tempo, tempoMedioDeTratativa_(meusAntes, canal), 'dias',
       'Da entrada do caso até a finalização, nos que você concluiu.',
       // Aqui, MENOS é melhor: a tela precisa saber disso para não pintar de
       // vermelho uma queda que é boa notícia.
       true));
   }
 
-  var naCelula = resolvidosSemEncaminhar_(meus, mesa);
+  var naCelula = resolvidosSemEncaminhar_(meus, canal);
   if (naCelula !== null) {
     lista.push(indicador_('naCelula', 'Resolvidos sem encaminhar',
-      naCelula, resolvidosSemEncaminhar_(meusAntes, mesa), 'casos',
+      naCelula, resolvidosSemEncaminhar_(meusAntes, canal), 'casos',
       'Concluídos por você, sem passar para outra área.'));
   }
 
@@ -1447,28 +1466,28 @@ function indicador_(chave, rotulo, valor, anterior, unidade, explicacao, menorEh
 }
 
 /** Uma situação conta como conclusão quando o nome dela começa com "conclu". */
-function contarConcluidos_(casos, mesa) {
-  if (!mesa.colunaDoStatus) return 0;
+function contarConcluidos_(casos, canal) {
+  if (!canal.colunaDoStatus) return 0;
   return casos.filter(function (caso) {
-    return normalizarParaComparar_(caso[mesa.colunaDoStatus]).indexOf('conclu') === 0;
+    return normalizarParaComparar_(caso[canal.colunaDoStatus]).indexOf('conclu') === 0;
   }).length;
 }
 
 /**
  * Quantos dias, em média, entre a entrada do caso e a finalização.
  *
- * Devolve null quando a mesa não declara a coluna de finalização, ou quando
+ * Devolve null quando o canal não declara a coluna de finalização, ou quando
  * ninguém concluiu nada no período: um "0 dias" ali pareceria um desempenho
  * excelente, e é só ausência de dado.
  */
-function tempoMedioDeTratativa_(casos, mesa) {
-  if (!mesa.colunaDaData || !mesa.colunaDaFinalizacao) return null;
+function tempoMedioDeTratativa_(casos, canal) {
+  if (!canal.colunaDaData || !canal.colunaDaFinalizacao) return null;
 
   var soma = 0;
   var quantos = 0;
   casos.forEach(function (caso) {
-    var entrada = converterParaData_(caso[mesa.colunaDaData]);
-    var fim = converterParaData_(caso[mesa.colunaDaFinalizacao]);
+    var entrada = converterParaData_(caso[canal.colunaDaData]);
+    var fim = converterParaData_(caso[canal.colunaDaFinalizacao]);
     if (!entrada || !fim) return;
     var dias = (fim.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24);
     if (dias < 0) return;   // data invertida na planilha não vira média negativa
@@ -1481,8 +1500,8 @@ function tempoMedioDeTratativa_(casos, mesa) {
 }
 
 /** Concluídos sem encaminhar para outra área. Null quando não dá para saber. */
-function resolvidosSemEncaminhar_(casos, mesa) {
-  return contarFinalizadosNaCelula_(casos, mesa);
+function resolvidosSemEncaminhar_(casos, canal) {
+  return contarFinalizadosNaCelula_(casos, canal);
 }
 
 // ============================================================================
@@ -1490,17 +1509,17 @@ function resolvidosSemEncaminhar_(casos, mesa) {
 // ============================================================================
 
 /**
- * O progresso contra a meta da mesa, proporcional ao período escolhido.
+ * O progresso contra a meta do canal, proporcional ao período escolhido.
  *
- * Devolve null quando a mesa não declarou meta. Alvo tirado do nada é pior
+ * Devolve null quando o canal não declarou meta. Alvo tirado do nada é pior
  * que alvo nenhum: ele parece oficial, e ninguém sabe de onde saiu.
  */
-function metaDaPessoa_(meus, mesa, dias) {
-  var mensal = Number(mesa.metaMensalPorPessoa) || 0;
+function metaDaPessoa_(meus, canal, dias) {
+  var mensal = Number(canal.metaMensalPorPessoa) || 0;
   if (!mensal) return null;
 
   var alvo = Math.round((mensal / 30) * dias);
-  var feito = contarConcluidos_(meus, mesa);
+  var feito = contarConcluidos_(meus, canal);
 
   return {
     alvo: alvo,
@@ -1526,12 +1545,12 @@ function metaDaPessoa_(meus, mesa, dias) {
  * mente sobre o ritmo — dois casos em dois dias seguidos e dois casos com
  * uma semana de intervalo desenhariam a mesma linha.
  */
-function serieDoPeriodo_(meus, mesa, dias) {
-  if (!mesa.colunaDaData) return null;
+function serieDoPeriodo_(meus, canal, dias) {
+  if (!canal.colunaDaData) return null;
 
   var porDia = {};
   meus.forEach(function (caso) {
-    var data = converterParaData_(caso[mesa.colunaDaData]);
+    var data = converterParaData_(caso[canal.colunaDaData]);
     if (!data) return;
     var chave = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
     porDia[chave] = (porDia[chave] || 0) + 1;
@@ -1570,11 +1589,11 @@ function serieDoPeriodo_(meus, mesa, dias) {
 }
 
 /** Uma pizza dos casos da pessoa, por uma coluna qualquer. */
-function distribuicao_(meus, mesa, coluna, titulo) {
+function distribuicao_(meus, canal, coluna, titulo) {
   if (!coluna) return null;
 
-  var cores = coresDoCatalogo_(mesa);
-  var ordem = ordemEstavelDaDimensao_(mesa, coluna);
+  var cores = coresDoCatalogo_(canal);
+  var ordem = ordemEstavelDaDimensao_(canal, coluna);
   var soma = {};
   var chaves = [];
 
@@ -1623,7 +1642,7 @@ function distribuicao_(meus, mesa, coluna, titulo) {
  * Quem pode ver recebe a lista, mas com a MÉDIA marcada: "abaixo da média"
  * sem saber qual é a média não é informação, é só desconforto.
  */
-function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, mesa) {
+function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal) {
   if (!coluna) return { podeVerNomes: false, disponivel: false };
 
   var porPessoa = {};
@@ -1652,7 +1671,7 @@ function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, mesa) {
   var eu = lista.filter(function (um) { return um.souEu; })[0] || null;
 
   var podeVerNomes = quem.permissoes.escopo === RECC_ESCOPOS.TODOS
-    || quem.permissoes.escopo === RECC_ESCOPOS.MESA
+    || quem.permissoes.escopo === RECC_ESCOPOS.CANAL
     || quem.permissoes.escopo === RECC_ESCOPOS.EQUIPE;
 
   return {
@@ -1689,7 +1708,7 @@ function vizinhosNoRanking_(lista, eu) {
  * Só as dela: a trilha completa é da tela de Configurações, para quem
  * administra. Aqui é a memória de quem está olhando.
  */
-function oQueEuFiz_(quem, mesa) {
+function oQueEuFiz_(quem, canal) {
   var comoSeChama = {
     'caso.criar': 'Cadastrou um caso',
     'caso.editar': 'Alterou um caso',
@@ -1716,10 +1735,10 @@ function oQueEuFiz_(quem, mesa) {
         detalhe: String(linha.Detalhe || ''),
         registro: String(linha.RegistroId || ''),
         entidade: String(linha.Entidade || ''),
-        // O caso só abre quando é desta mesa: um Id da outra base abriria a
+        // O caso só abre quando é deste canal: um Id da outra base abriria a
         // tela errada, ou nada.
         abre: normalizarParaComparar_(linha.Entidade)
-          === normalizarParaComparar_(mesa.aba) && !!linha.RegistroId,
+          === normalizarParaComparar_(canal.aba) && !!linha.RegistroId,
         quando: linha.DataHora
           ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,
             'dd/MM/yyyy, HH:mm')

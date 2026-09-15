@@ -23,8 +23,8 @@ function rodarTestesDePerformance() {
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
 
-  const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-  const mesa = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
 
   const hoje = new Date();
   const comZero = (n) => (n < 10 ? '0' : '') + n;
@@ -99,39 +99,39 @@ function rodarTestesDePerformance() {
     // A RET declara a coluna de finalização; a Mesa Diamante, no exemplo,
     // não declara a de área responsável para este caso. Indicador sempre
     // zerado pareceria desempenho ruim, quando é ausência de dado.
-    const semColuna = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    chamar('atualizarRegistro_')('MESAS', semColuna.id, { ColunaDaFinalizacao: '' });
+    const semColuna = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    chamar('atualizarRegistro_')('CANAIS', semColuna.id, { ColunaDaFinalizacao: '' });
 
     verdadeiro(!minha().indicadores.some((um) => um.chave === 'tempoMedio'),
       'sem coluna de finalização, o tempo médio não existe');
 
-    chamar('atualizarRegistro_')('MESAS', semColuna.id,
+    chamar('atualizarRegistro_')('CANAIS', semColuna.id,
       { ColunaDaFinalizacao: 'data da transmissão' });
     verdadeiro(minha().indicadores.some((um) => um.chave === 'tempoMedio'));
   });
 
-  teste('mesa sem coluna de responsável avisa, em vez de mostrar zero', () => {
+  teste('canal sem coluna de responsável avisa, em vez de mostrar zero', () => {
     // Zero pareceria que a pessoa não trabalhou. A tela diz o que falta.
-    chamar('atualizarRegistro_')('MESAS', ret.id, { ColunaDaAreaResponsavel: '' });
+    chamar('atualizarRegistro_')('CANAIS', ret.id, { ColunaDaAreaResponsavel: '' });
     const guardado = chamar('lerRegistros_')('CAMPOS')
       .filter((c) => String(c.Cabecalho) === 'analista');
     guardado.forEach((campo) => {
       chamar('atualizarRegistro_')('CAMPOS', campo.__id, { Cabecalho: 'analista' });
     });
-    // (a coluna existe nesta mesa; o caso sem responsável é coberto pelo
+    // (a coluna existe neste canal; o caso sem responsável é coberto pelo
     // campo `temResponsavel`, que a tela consulta antes de desenhar)
     igual(minha().temResponsavel, true);
   });
 
   secao('A meta');
 
-  teste('mesa sem meta declarada não ganha barra de progresso', () => {
+  teste('canal sem meta declarada não ganha barra de progresso', () => {
     igual(minha().meta, null,
       'alvo tirado do nada é pior que alvo nenhum: ele parece oficial');
   });
 
   teste('a meta é proporcional ao período escolhido', () => {
-    chamar('salvarMesa')({
+    chamar('salvarCanal')({
       id: ret.id, nome: ret.nome,
       colunaDaData: 'data de recepção do protocolo', colunaDoStatus: 'status',
       colunaDaFinalizacao: 'data da transmissão',
@@ -144,7 +144,7 @@ function rodarTestesDePerformance() {
   });
 
   teste('passar da meta enche a barra, e o número diz o resto', () => {
-    chamar('salvarMesa')({
+    chamar('salvarCanal')({
       id: ret.id, nome: ret.nome,
       colunaDaData: 'data de recepção do protocolo', colunaDoStatus: 'status',
       colunaDaFinalizacao: 'data da transmissão',
@@ -246,16 +246,16 @@ function rodarTestesDePerformance() {
   secao('O que eu fiz');
 
   teste('a trilha mostra só as MINHAS ações', () => {
-    chamar('cadastrarCaso')(mesa.id, {
-      status: 'Pendente', nomedosegurado: 'Novo caso da Ana',
+    chamar('cadastrarCaso')(canal.id, {
+      status: 'Em andamento', nomedosegurado: 'Novo caso da Ana',
       datadeentrada: diasAtras(0)
     });
 
-    const recentes = chamar('minhaPerformance')(mesa.id, 30).recentes;
+    const recentes = chamar('minhaPerformance')(canal.id, 30).recentes;
     verdadeiro(recentes.length > 0);
     verdadeiro(recentes.some((p) => p.acao === 'Cadastrou um caso'));
     verdadeiro(recentes.some((p) => p.abre),
-      'o caso desta mesa abre; o de outra base, não');
+      'o caso deste canal abre; o de outra base, não');
   });
 
   secao('A tela');

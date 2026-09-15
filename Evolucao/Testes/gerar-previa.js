@@ -108,8 +108,8 @@ function pontePreparada(respostas) {
     + '      withFailureHandler: function (f) { return novaChamada(aoDarCerto, f); },\n'
     + '      pacoteDePartida: function () { responder(respostas.pacoteDePartida); },\n'
     + '      salvarTemaDoUsuario: function (tema) { responder(tema); },\n'
-    + '      formularioDaMesa: function (idDaMesa) {\n'
-    + '        responder(respostas.formularios[idDaMesa]);\n'
+    + '      formularioDoCanal: function (idDoCanal) {\n'
+    + '        responder(respostas.formularios[idDoCanal]);\n'
     + '      },\n'
     + '      consultarSusep: function (susep) {\n'
     + '        var digitos = String(susep || "").replace(/\\D/g, "");\n'
@@ -118,8 +118,8 @@ function pontePreparada(respostas) {
     + '          mensagem: "SUSEP não encontrada no cadastro de canais"\n'
     + '        });\n'
     + '      },\n'
-    + '      resumoDaMesa: function (idDaMesa, filtros) {\n'
-    + '        var painel = respostas.paineis[idDaMesa];\n'
+    + '      resumoDoCanal: function (idDoCanal, filtros) {\n'
+    + '        var painel = respostas.paineis[idDoCanal];\n'
     + '        var chave = "";\n'
     + '        Object.keys(filtros || {}).forEach(function (campo) {\n'
     + '          if (filtros[campo]) chave = campo + "=" + filtros[campo];\n'
@@ -134,17 +134,17 @@ function pontePreparada(respostas) {
     + '        }\n'
     + '        responder(resumo);\n'
     + '      },\n'
-    + '      detalhesDoCaso: function (idDaMesa, idDoCaso) {\n'
-    + '        responder(respostas.paineis[idDaMesa].detalhes[idDoCaso]);\n'
+    + '      detalhesDoCaso: function (idDoCanal, idDoCaso) {\n'
+    + '        responder(respostas.paineis[idDoCanal].detalhes[idDoCaso]);\n'
     + '      },\n'
-    + '      casoParaEditar: function (idDaMesa, idDoCaso) {\n'
-    + '        responder(respostas.paineis[idDaMesa].paraEditar[idDoCaso]);\n'
+    + '      casoParaEditar: function (idDoCanal, idDoCaso) {\n'
+    + '        responder(respostas.paineis[idDoCanal].paraEditar[idDoCaso]);\n'
     + '      },\n'
-    + '      situacoesParaTrocar: function (idDaMesa, idDoCaso) {\n'
-    + '        responder(respostas.paineis[idDaMesa].situacoes[idDoCaso]);\n'
+    + '      situacoesParaTrocar: function (idDoCanal, idDoCaso) {\n'
+    + '        responder(respostas.paineis[idDoCanal].situacoes[idDoCaso]);\n'
     + '      },\n'
-    + '      listarCardsDoPainel: function (tela, idDaMesa) {\n'
-    + '        responder(respostas.configuracoes.cards[idDaMesa]);\n'
+    + '      listarCardsDoPainel: function (tela, idDoCanal) {\n'
+    + '        responder(respostas.configuracoes.cards[idDoCanal]);\n'
     + '      },\n'
     + '      configuracaoDoLegado: function () {\n'
     + '        responder(respostas.busca.legado);\n'
@@ -185,18 +185,18 @@ function pontePreparada(respostas) {
     + '        return recusar("A prévia não grava — ela é uma cópia estática "\n'
     + '          + "do sistema, sem planilha por trás.");\n'
     + '      },\n'
-    + '      minhaPerformance: function (idDaMesa) {\n'
-    + '        responder(respostas.performance[idDaMesa]);\n'
+    + '      minhaPerformance: function (idDoCanal) {\n'
+    + '        responder(respostas.performance[idDoCanal]);\n'
     + '      },\n'
-    + '      painelAnalitico: function (idDaMesa) {\n'
-    + '        responder(respostas.analitico.paineis[idDaMesa]);\n'
+    + '      painelAnalitico: function (idDoCanal) {\n'
+    + '        responder(respostas.analitico.paineis[idDoCanal]);\n'
     + '      },\n'
-    + '      detalharComponente: function (idDaMesa, idDoComponente, ponto) {\n'
-    + '        var chave = idDaMesa + "|" + idDoComponente + "|" + ponto;\n'
+    + '      detalharComponente: function (idDoCanal, idDoComponente, ponto) {\n'
+    + '        var chave = idDoCanal + "|" + idDoComponente + "|" + ponto;\n'
     + '        responder(respostas.analitico.detalhes[chave]\n'
     + '          || { titulo: "", ponto: ponto, colunas: [], casos: [], total: 0 });\n'
     + '      },\n'
-    + '      exportarComponente: function (idDaMesa, idDoComponente) {\n'
+    + '      exportarComponente: function (idDoCanal, idDoComponente) {\n'
     + '        responder(respostas.analitico.exportados[idDoComponente]);\n'
     + '      },\n'
     // A busca da prévia procura nos resultados que o servidor de verdade
@@ -236,8 +236,8 @@ function pontePreparada(respostas) {
     + '      opcoesDeNivelDeAcesso: function () {\n'
     + '        responder(respostas.configuracoes.opcoesDeNivel);\n'
     + '      },\n'
-    + '      listarCamposDaMesa: function (idDaMesa) {\n'
-    + '        responder(respostas.configuracoes.campos[idDaMesa]);\n'
+    + '      listarCamposDoCanal: function (idDoCanal) {\n'
+    + '        responder(respostas.configuracoes.campos[idDoCanal]);\n'
     + '      },\n'
     + '      listarUsuarios: function () {\n'
     + '        responder(respostas.configuracoes.usuarios);\n'
@@ -248,14 +248,14 @@ function pontePreparada(respostas) {
     + '      listarCatalogo: function (tipo) {\n'
     + '        responder(respostas.configuracoes.listas[tipo] || []);\n'
     + '      },\n'
-    + '      listarMesasConfiguraveis: function () {\n'
-    + '        responder(respostas.configuracoes.mesas);\n'
+    + '      listarCanaisConfiguraveis: function () {\n'
+    + '        responder(respostas.configuracoes.canais);\n'
     + '      },\n'
-    + '      opcoesDoPainelAnalitico: function (idDaMesa) {\n'
-    + '        responder(respostas.configuracoes.opcoesDoGrafico[idDaMesa]);\n'
+    + '      opcoesDoPainelAnalitico: function (idDoCanal) {\n'
+    + '        responder(respostas.configuracoes.opcoesDoGrafico[idDoCanal]);\n'
     + '      },\n'
-    + '      listarComponentesDoPainel: function (idDaMesa) {\n'
-    + '        responder(respostas.configuracoes.componentes[idDaMesa]);\n'
+    + '      listarComponentesDoPainel: function (idDoCanal) {\n'
+    + '        responder(respostas.configuracoes.componentes[idDoCanal]);\n'
     + '      },\n'
     + '      opcoesDeAnalise: function () {\n'
     + '        responder(respostas.configuracoes.opcoesDeAnalise);\n'
@@ -274,7 +274,7 @@ function pontePreparada(respostas) {
     + '      },\n'
     + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'reordenarCampos',
       'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarUsuario',
-      'desativarUsuario', 'salvarMesa', 'salvarIdentidade', 'definirLogo',
+      'desativarUsuario', 'salvarCanal', 'salvarIdentidade', 'definirLogo',
       'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
       'editarCaso', 'alterarSituacaoDoCaso', 'salvarComponentesDoPainel',
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
@@ -309,7 +309,7 @@ function gerar(pastaDeSaida) {
 
   // Alguns casos no período ANTERIOR, para os cartões terem com o que
   // comparar — senão a prévia mostraria a variação sempre em branco.
-  // ------------------------------------------------------------------ MESA
+  // ------------------------------------------------------------------ CANAL
   // A Mesa Diamante trata CORRETORA: transmissão de proposta, contato com o
   // corretor, prioridade. Poucos casos, e cada um com nome e sobrenome.
   chamar('inserirVariosRegistros_')('BASE_MESA', [
@@ -549,13 +549,13 @@ function gerar(pastaDeSaida) {
 
   const pacote = chamar('pacoteDePartida()');
 
-  // O formulário de cada mesa e alguns exemplos de SUSEP, para a tela de
+  // O formulário de cado canal e alguns exemplos de SUSEP, para a tela de
   // cadastro funcionar de verdade dentro da prévia.
-  chamar('inserirRegistro_')('CANAIS', {
+  chamar('inserirRegistro_')('CORRETORAS', {
     Nome: 'Corretora ABC', Canal: 'Corretora', SUSEP: '1234567',
     Corretora: 'Corretora ABC', Segmento: 'Diamante'
   });
-  chamar('inserirVariosRegistros_')('CANAIS', [
+  chamar('inserirVariosRegistros_')('CORRETORAS', [
     { Nome: 'Marina Alencar', Canal: 'Corretora', SUSEP: '2345678',
       Corretora: 'Corretora Horizonte', Segmento: 'Diamante' },
     { Nome: 'Posto Central', Canal: 'Agente', SUSEP: '3456789',
@@ -576,19 +576,19 @@ function gerar(pastaDeSaida) {
 
   const formularios = {};
   const paineis = {};
-  pacote.mesas.forEach((mesa) => {
-    formularios[mesa.id] = chamar('formularioDaMesa')(mesa.id);
+  pacote.canais.forEach((canal) => {
+    formularios[canal.id] = chamar('formularioDoCanal')(canal.id);
 
     // O painel sem filtro, e uma variação por opção de cada filtro. Guardar
     // só o que muda (cartões, fila e totais) evita repetir as listas de
     // opções em dezenas de cópias.
-    const base = chamar('resumoDaMesa')(mesa.id, {});
+    const base = chamar('resumoDoCanal')(canal.id, {});
     const variantes = {};
     base.filtrosDisponiveis.forEach((filtro) => {
       filtro.opcoes.forEach((opcao) => {
         const escolha = {};
         escolha[filtro.chave] = opcao.valor;
-        const resumo = chamar('resumoDaMesa')(mesa.id, escolha);
+        const resumo = chamar('resumoDoCanal')(canal.id, escolha);
         variantes[filtro.chave + '=' + opcao.valor] = {
           cartoes: resumo.cartoes, fila: resumo.fila, total: resumo.total
         };
@@ -599,12 +599,12 @@ function gerar(pastaDeSaida) {
     const paraEditar = {};
     const situacoes = {};
     base.fila.forEach((caso) => {
-      detalhes[caso.id] = chamar('detalhesDoCaso')(mesa.id, caso.id);
-      paraEditar[caso.id] = chamar('casoParaEditar')(mesa.id, caso.id);
-      situacoes[caso.id] = chamar('situacoesParaTrocar')(mesa.id, caso.id);
+      detalhes[caso.id] = chamar('detalhesDoCaso')(canal.id, caso.id);
+      paraEditar[caso.id] = chamar('casoParaEditar')(canal.id, caso.id);
+      situacoes[caso.id] = chamar('situacoesParaTrocar')(canal.id, caso.id);
     });
 
-    paineis[mesa.id] = { base, variantes, detalhes, paraEditar, situacoes };
+    paineis[canal.id] = { base, variantes, detalhes, paraEditar, situacoes };
   });
   const suseps = {
     '1234567': chamar('consultarSusep')('1234567'),
@@ -618,9 +618,9 @@ function gerar(pastaDeSaida) {
 
   // A tela de Configurações, respondida pelo servidor de verdade.
   const opcoesDeCampo = chamar('opcoesDeConfiguracaoDeCampo()');
-  const camposPorMesa = {};
-  pacote.mesas.forEach((mesa) => {
-    camposPorMesa[mesa.id] = chamar('listarCamposDaMesa')(mesa.id);
+  const camposPorCanal = {};
+  pacote.canais.forEach((canal) => {
+    camposPorCanal[canal.id] = chamar('listarCamposDoCanal')(canal.id);
   });
   const listas = {};
   opcoesDeCampo.tiposDeCatalogo.forEach((tipo) => {
@@ -630,10 +630,10 @@ function gerar(pastaDeSaida) {
   const cards = {};
   const opcoesDoGrafico = {};
   const componentes = {};
-  pacote.mesas.forEach((mesa) => {
-    cards[mesa.id] = chamar('listarCardsDoPainel')('dashboard', mesa.id);
-    opcoesDoGrafico[mesa.id] = chamar('opcoesDoPainelAnalitico')(mesa.id);
-    componentes[mesa.id] = chamar('listarComponentesDoPainel')(mesa.id);
+  pacote.canais.forEach((canal) => {
+    cards[canal.id] = chamar('listarCardsDoPainel')('dashboard', canal.id);
+    opcoesDoGrafico[canal.id] = chamar('opcoesDoPainelAnalitico')(canal.id);
+    componentes[canal.id] = chamar('listarComponentesDoPainel')(canal.id);
   });
 
   const configuracoes = {
@@ -641,11 +641,11 @@ function gerar(pastaDeSaida) {
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,
     opcoesDeNivel: chamar('opcoesDeNivelDeAcesso()'),
-    campos: camposPorMesa,
+    campos: camposPorCanal,
     usuarios: chamar('listarUsuarios()'),
     niveis: chamar('listarNiveisDeAcesso()'),
     listas: listas,
-    mesas: chamar('listarMesasConfiguraveis()'),
+    canais: chamar('listarCanaisConfiguraveis()'),
     laudo: chamar('conferirEstruturaDaPlanilha()'),
     trilha: chamar('listarAuditoria')(40),
     opcoesDoGrafico: opcoesDoGrafico,
@@ -669,26 +669,26 @@ function gerar(pastaDeSaida) {
     opcoes: opcoesDaBusca,
     legado: chamar('configuracaoDoLegado()'),
     resultados: resultadosDaBusca,
-    origensVazias: opcoesDaBusca.mesas.map((mesa) => ({
-      tipo: 'mesa', id: mesa.id, nome: mesa.nome, icone: mesa.icone,
+    origensVazias: opcoesDaBusca.canais.map((canal) => ({
+      tipo: 'canal', id: canal.id, nome: canal.nome, icone: canal.icone,
       colunas: [], casos: [], aviso: ''
     }))
   };
 
-  // O Painel Analítico, calculado de verdade para cada mesa — e o
+  // O Painel Analítico, calculado de verdade para cado canal — e o
   // detalhamento de cada ponto de cada gráfico, para os cliques funcionarem.
   const paineisAnaliticos = {};
   const detalhesDoPainel = {};
   const exportados = {};
-  pacote.mesas.forEach((mesa) => {
-    const analitico = chamar('painelAnalitico')(mesa.id, {}, 30);
-    paineisAnaliticos[mesa.id] = analitico;
+  pacote.canais.forEach((canal) => {
+    const analitico = chamar('painelAnalitico')(canal.id, {}, 30);
+    paineisAnaliticos[canal.id] = analitico;
     analitico.componentes.forEach((componente) => {
       exportados[componente.id] =
-        chamar('exportarComponente')(mesa.id, componente.id, {}, 30);
+        chamar('exportarComponente')(canal.id, componente.id, {}, 30);
       componente.pontos.forEach((ponto) => {
-        detalhesDoPainel[mesa.id + '|' + componente.id + '|' + ponto.chave] =
-          chamar('detalharComponente')(mesa.id, componente.id, ponto.chave, {}, 30);
+        detalhesDoPainel[canal.id + '|' + componente.id + '|' + ponto.chave] =
+          chamar('detalharComponente')(canal.id, componente.id, ponto.chave, {}, 30);
       });
     });
   });
@@ -699,27 +699,27 @@ function gerar(pastaDeSaida) {
   };
 
   // Uma meta na RET, só na prévia, para a barra de progresso ter o que
-  // mostrar. O instalador de verdade deixa a meta em zero — mesa sem meta
+  // mostrar. O instalador de verdade deixa a meta em zero — canal sem meta
   // declarada não inventa uma.
-  chamar('salvarMesa')(Object.assign(
-    {}, chamar('listarMesasConfiguraveis()').find((m) => m.aba === 'BASE_RET'),
+  chamar('salvarCanal')(Object.assign(
+    {}, chamar('listarCanaisConfiguraveis()').find((m) => m.aba === 'BASE_RET'),
     { metaMensalPorPessoa: 40 }));
 
   // Minha Performance, de quem está entrando na prévia.
   const performance = {};
-  pacote.mesas.forEach((mesa) => {
-    performance[mesa.id] = chamar('minhaPerformance')(mesa.id, 30);
+  pacote.canais.forEach((canal) => {
+    performance[canal.id] = chamar('minhaPerformance')(canal.id, 30);
   });
 
-  // Uma das mesas da prévia mostra o aviso de janela parcial, para ele poder
+  // Uma dos canais da prévia mostra o aviso de janela parcial, para ele poder
   // ser VISTO. Sem isto, o aviso mais importante do sistema em volume alto
   // seria o único pedaço que ninguém consegue olhar antes de a base crescer.
-  const mesaDoAviso = pacote.mesas[0].id;
+  const canalDoAviso = pacote.canais[0].id;
   [paineis, analitico.paineis, performance].forEach(() => {});
-  performance[mesaDoAviso].truncada = true;
-  performance[mesaDoAviso].linhasLidas = 5000;
-  analitico.paineis[mesaDoAviso].truncada = true;
-  analitico.paineis[mesaDoAviso].linhasLidas = 5000;
+  performance[canalDoAviso].truncada = true;
+  performance[canalDoAviso].linhasLidas = 5000;
+  analitico.paineis[canalDoAviso].truncada = true;
+  analitico.paineis[canalDoAviso].linhasLidas = 5000;
 
   // A Tabela de Corretoras, com alguns filtros já respondidos.
   const tabelasDeCorretoras = { '|': chamar('tabelaDeCorretoras')('', '') };

@@ -21,10 +21,10 @@ operação montada sobre ela, em Porto Seguro.
 Nome, subtítulo, logo, cor e até os títulos do menu vivem na **aba `CONFIG` da
 planilha**. Servir outra operação é trocar essas linhas, não é mexer em código.
 
-O sistema atende duas mesas de trabalho, e aceita uma terceira sem tocar em
+O sistema atende dois canais de trabalho, e aceita uma terceira sem tocar em
 código:
 
-| Mesa | Base | O que é |
+| Canal | Base | O que é |
 |---|---|---|
 | **RET Vida** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
 | **Mesa Diamante** | `BASE_MESA` | Atendimento a casos prioritários |
@@ -179,7 +179,7 @@ Dentro de `Evolucao/`:
    > registrado. Nada aparece — a tela só congela.
 
 7. Para a conferência completa, execute **`diagnosticoRECC()`**. São dez
-   blocos — fuso, estrutura, sequências de Id, Ids repetidos, mesas, campos,
+   blocos — fuso, estrutura, sequências de Id, Ids repetidos, canais, campos,
    painéis, análises, quem consegue configurar, e se toda função que a tela
    chama existe no servidor. Também só lê, e escreve o laudo no log.
 
@@ -257,7 +257,7 @@ lado perdem o resto, e trinta e cinco não cabem.
 
 Clicar em **Ver detalhes** abre o caso por cima, e fechar devolve a fila
 exatamente como estava. Campo em branco aparece com um travessão: sumir faria
-a pessoa achar que o campo não existe naquela mesa.
+a pessoa achar que o campo não existe naquelo canal.
 
 ![O caso aberto](Evolucao/imagens/tela-caso-em-modal.png)
 
@@ -290,7 +290,7 @@ citando um protocolo de abril, é aqui que se procura.
 
 A tela existe sobre uma regra: **ler a coluna antes de ler as linhas**. Uma
 base de 200 mil linhas por 39 colunas são 7,8 milhões de células — ler tudo
-estoura o tempo do Apps Script. Lemos só as **colunas de busca** que a mesa
+estoura o tempo do Apps Script. Lemos só as **colunas de busca** que o canal
 declarou, anotamos em quais linhas o termo aparece, e só então lemos inteiras
 as poucas que casaram.
 
@@ -343,7 +343,7 @@ aqui, atrapalha alguém.
 - **No tempo médio, menos é melhor** — cair é verde. A mesma seta para baixo em
   "concluídos" é o contrário
 - **O que não dá para calcular some**, em vez de aparecer zerado
-- **A meta é declarada, nunca inventada.** Mesa sem meta não ganha barra
+- **A meta é declarada, nunca inventada.** Canal sem meta não ganha barra
 
 ---
 

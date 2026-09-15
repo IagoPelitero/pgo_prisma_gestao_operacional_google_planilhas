@@ -724,31 +724,31 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 
 /* ====================================================== cadastrar caso === */
 
-/* A escolha da mesa vem antes do formulário porque é ela que decide quais
+/* A escolha do canal vem antes do formulário porque é ela que decide quais
    campos existem. */
-.mesas { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.mesa {
+.canais { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.canal {
   flex: 1 1 240px; cursor: pointer;
   display: flex; align-items: center; gap: 13px; text-align: left;
   padding: 13px 16px; border-radius: var(--raio);
   border: 1px solid var(--linha); background: var(--superficie);
   box-shadow: var(--sombra);
 }
-.mesa svg { flex: 0 0 26px; width: 26px; height: 26px; color: var(--destaque); }
-.mesa .dizeres { min-width: 0; }
-.mesa strong { display: block; font-size: 15.5px; }
-.mesa .dizeres span { font-size: 13px; color: var(--suave); }
-.mesa:hover { border-color: var(--linha-forte); }
+.canal svg { flex: 0 0 26px; width: 26px; height: 26px; color: var(--destaque); }
+.canal .dizeres { min-width: 0; }
+.canal strong { display: block; font-size: 15.5px; }
+.canal .dizeres span { font-size: 13px; color: var(--suave); }
+.canal:hover { border-color: var(--linha-forte); }
 
-/* A mesa escolhida usa o azul do menu, escurecido — é o mesmo azul da casa,
+/* O canal escolhida usa o azul do menu, escurecido — é o mesmo azul da casa,
    e escuro o bastante para a letra branca ficar legível em cima dele. */
-.mesa.atual {
+.canal.atual {
   background: color-mix(in srgb, var(--lateral-fundo) 68%, black);
   border-color: color-mix(in srgb, var(--lateral-fundo) 68%, black);
   color: var(--lateral-titulo);
 }
-.mesa.atual svg { color: var(--lateral-titulo); }
-.mesa.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
+.canal.atual svg { color: var(--lateral-titulo); }
+.canal.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
 
 .formulario { max-width: 1080px; }
 
@@ -760,7 +760,7 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   text-transform: uppercase; color: var(--tenue);
 }
 
-/* Grade em flex, e não em colunas fixas: cada mesa pergunta um conjunto
+/* Grade em flex, e não em colunas fixas: cado canal pergunta um conjunto
    diferente de campos, e span fixo deixaria a linha pela metade. */
 .grade { display: flex; flex-wrap: wrap; gap: 14px; }
 .campo { display: flex; flex-direction: column; gap: 5px; flex: 1 1 220px; }
@@ -988,7 +988,7 @@ table.fila tr.importar-igual { color: var(--tenue); }
   A lista de colunas de uma análise: BASE_RET tem 35, e trinta e cinco caixas
   empilhadas empurrariam o botão de salvar para fora da tela. Uma caixa que
   rola, com altura fixa, deixa o formulário do mesmo tamanho independentemente
-  do número de colunas da mesa.
+  do número de colunas do canal.
 */
 .config-marcadores {
   max-height: 210px; overflow-y: auto;
@@ -1106,11 +1106,11 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .botao.vazado.perigo:hover { background: var(--ruim-tenue); border-color: var(--ruim); }
 
 /*
-  A caixa da mesa dentro do cabeçalho da lista. Sem ela, o seletor encostava
+  A caixa do canal dentro do cabeçalho da lista. Sem ela, o seletor encostava
   no botão "Criar campo" — o cabeçalho é flex e não separa sozinho quem não
   tem largura própria.
 */
-.config-mesas { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.config-canais { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
 /*
   Um bloco à parte dentro da lista: a planilha legada e o diagnóstico. Os dois
@@ -1215,6 +1215,15 @@ table.fila tr.importar-igual { color: var(--tenue); }
   border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
   padding: 10px 12px; margin: 0;
   display: grid; gap: 7px;
+}
+
+/* A frase que explica o grupo, antes das opções. Existe para o caso em que
+   uma lista toda desmarcada NÃO quer dizer "nenhum" — como nos canais que um
+   nível enxerga, em que nada marcado quer dizer todos. Regra que contraria a
+   leitura natural precisa estar escrita ao lado dela. */
+.config-dica {
+  margin: 0; font-size: var(--fonte-pequena); color: var(--texto-suave);
+  line-height: 1.45;
 }
 .config-grupo legend {
   font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
@@ -1359,24 +1368,24 @@ table.fila tr.importar-igual { color: var(--tenue); }
 }
 
 /* ------------------------------------------------- os cards dos painéis -- */
-.config-mesas-cartao {
+.config-canais-cartao {
   display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr);
   margin-bottom: 16px;
 }
-.mesa-cartao {
+.canal-cartao {
   display: flex; align-items: center; gap: 12px; text-align: left;
   cursor: pointer; padding: 13px 15px;
   border: 1px solid var(--linha); border-radius: var(--raio);
   background: var(--superficie); color: var(--texto);
 }
-.mesa-cartao:hover { border-color: var(--linha-forte); }
-.mesa-cartao.atual {
+.canal-cartao:hover { border-color: var(--linha-forte); }
+.canal-cartao.atual {
   background: var(--destaque); border-color: var(--destaque);
   color: var(--destaque-sobre);
 }
-.mesa-cartao svg { width: 24px; height: 24px; flex: none; }
-.mesa-cartao strong { display: block; font-size: 14px; }
-.mesa-cartao em {
+.canal-cartao svg { width: 24px; height: 24px; flex: none; }
+.canal-cartao strong { display: block; font-size: 14px; }
+.canal-cartao em {
   display: block; font-style: normal; font-size: 12px; opacity: .75;
 }
 
@@ -1826,7 +1835,7 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
   .config-secao { flex: 1 1 170px; }
   .config-alerta { flex-basis: 100%; margin-top: 0; }
   .config-painel { position: static; max-height: none; }
-  .config-mesas-cartao { grid-template-columns: 1fr; }
+  .config-canais-cartao { grid-template-columns: 1fr; }
   .card-linha { grid-template-columns: 1fr; }
 }
 

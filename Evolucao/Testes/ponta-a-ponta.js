@@ -175,8 +175,14 @@ async function rodar() {
   });
   pagina.on('dialog', (caixa) => caixa.accept());
 
+  // Quem o navegador chamou, e quantas vezes. É por aqui que se prova que uma
+  // viagem ao servidor deixou de acontecer — contar é a única forma, porque
+  // uma otimização que silenciosamente não pega continua passando nos testes.
+  const chamadasDoNavegador = {};
+
   // A PONTE. O navegador chama aqui, e aqui roda o servidor de verdade.
   await pagina.exposeFunction('__servidorDoPGO', (nome, argumentos) => {
+    chamadasDoNavegador[nome] = (chamadasDoNavegador[nome] || 0) + 1;
     try {
       const chamada = vm.runInContext('(' + nome + ')', contexto);
       const valor = chamada.apply(null, argumentos);
@@ -215,6 +221,25 @@ async function rodar() {
 
   const naPlanilha = (aba) => vm.runInContext('lerRegistros_("' + aba + '")', contexto);
 
+  /* ------------------------------------------------------------ abertura -- */
+
+  console.log('\nA abertura do sistema');
+
+  await teste('a página já vem com o pacote de partida dentro', async () => {
+    const pronto = await pagina.evaluate(() => window.PGO_PACOTE_DE_PARTIDA);
+    verdadeiro(pronto && pronto.disponivel === true,
+      'o doGet não injetou o pacote na página');
+    verdadeiro(Array.isArray(pronto.menu) && pronto.menu.length > 0,
+      'o pacote injetado veio sem menu');
+  });
+
+  await teste('abrir o sistema não pede o pacote ao servidor', async () => {
+    // Era a segunda viagem em fila: a página chegava, e só então o navegador
+    // perguntava quem é você. Agora a resposta vem junto com a página.
+    igual(chamadasDoNavegador.pacoteDePartida || 0, 0,
+      'a tela ainda está pedindo o pacoteDePartida ao servidor');
+  });
+
   /* ---------------------------------------------------- cadastrar pessoa -- */
 
   console.log('\nO cadastro de pessoas');
@@ -251,14 +276,14 @@ async function rodar() {
     const cargos = await pagina.$$eval('#cfg-cargo option', (os) => os.map((o) => o.value));
     await pagina.selectOption('#cfg-cargo', cargos[1]);
 
-    // A mesa: a primeira opção é "todas as mesas" (o administrador), e as
-    // seguintes são as mesas de verdade.
-    const mesas = await pagina.$$eval('#cfg-mesa-da-pessoa option',
+    // O canal: a primeira opção é "todas os canais" (o administrador), e as
+    // seguintes são os canais de verdade.
+    const canais = await pagina.$$eval('#cfg-canal-da-pessoa option',
       (os) => os.map((o) => ({ valor: o.value, nome: o.textContent })));
-    verdadeiro(mesas.length >= 3, 'o seletor traz "todas as mesas" e as mesas');
-    igual(mesas[0].valor, '', 'a primeira opção é não ter mesa');
-    contem(mesas[0].nome, 'todas as mesas');
-    await pagina.selectOption('#cfg-mesa-da-pessoa', mesas[1].valor);
+    verdadeiro(canais.length >= 3, 'o seletor traz "todas os canais" e os canais');
+    igual(canais[0].valor, '', 'a primeira opção é não ter canal');
+    contem(canais[0].nome, 'todas os canais');
+    await pagina.selectOption('#cfg-canal-da-pessoa', canais[1].valor);
 
     await pagina.click('#form-usuario button[type="submit"]');
     await pagina.waitForTimeout(900);
@@ -272,19 +297,19 @@ async function rodar() {
     igual(String(gravado['Canal que atende']), 'Corretora');
     igual(String(gravado.Matricula), '778899');
     verdadeiro(String(gravado.NivelAcessoId).length > 0, 'o nível foi gravado');
-    verdadeiro(String(gravado.MesaId).length > 0, 'a mesa foi gravada');
+    verdadeiro(String(gravado.CanalId).length > 0, 'o canal foi gravada');
     igual(String(gravado.Ativo), 'SIM', 'nasce podendo entrar');
 
     const lista = await pagina.textContent('#config-lista');
     contem(lista, 'Iago Pelitero', 'a lista recarregou e mostra a pessoa nova');
     contem(lista, 'p.iago.ip@exemplo.com', 'com o e-mail');
-    contem(lista, mesas[1].nome.trim(), 'e com a mesa');
+    contem(lista, canais[1].nome.trim(), 'e com o canal');
   });
 
-  await teste('quem administra aparece como "todas as mesas"', async () => {
-    // O primeiro usuário, o que instala tudo, não pertence a mesa nenhuma.
+  await teste('quem administra aparece como "todas os canais"', async () => {
+    // O primeiro usuário, o que instala tudo, não pertence o canal nenhuma.
     // Em branco pareceria cadastro pela metade; dizer é melhor.
-    contem(await pagina.textContent('#config-lista'), 'todas as mesas');
+    contem(await pagina.textContent('#config-lista'), 'todas os canais');
   });
 
   await teste('editar a pessoa muda a linha, e não cria outra', async () => {

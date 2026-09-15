@@ -11,7 +11,7 @@
 
 var TelaDashboard = (function () {
 
-  var mesaEscolhida = '';
+  var canalEscolhida = '';
   var filtrosEscolhidos = {};
   var resumo = null;
 
@@ -21,8 +21,8 @@ var TelaDashboard = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
-    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
       + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
   }
 
@@ -189,7 +189,7 @@ var TelaDashboard = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDaMesa', mesaEscolhida, filtrosEscolhidos)
+    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -229,10 +229,10 @@ var TelaDashboard = (function () {
     }
 
     ligarCliques('[data-caso]', function (botao) {
-      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-caso'), carregar);
+      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-caso'), carregar);
     });
     ligarCliques('[data-editar]', function (botao) {
-      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-editar'),
+      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-editar'),
         carregar, true);
     });
   }
@@ -244,22 +244,18 @@ var TelaDashboard = (function () {
     }
   }
 
-  function ocultar(idDoCaso) {
-    // Some da tela de todo mundo, e por isso vale perguntar. O texto diz a
-    // verdade: a linha permanece na planilha. Prometer "não poderá ser
-    // desfeito" quando dá para desfazer assusta à toa.
-    if (!window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
-      + 'Ele sai do sistema para todo mundo. A linha permanece na planilha e '
-      + 'pode ser trazida de volta por um administrador.')) return;
-
-    Servidor.chamar('ocultarCaso', mesaEscolhida, idDoCaso)
-      .entao(carregar)
-      .senao(function (erro) { window.alert(erro.message || String(erro)); });
-  }
+  // NÃO existe excluir aqui na fila, e isso é decisão: na fila só cabem duas
+  // ações sem comer uma coluna de dado, e excluir não é uma delas. Ela vive
+  // no caso aberto, junto das outras três — ver a peça CasoEmModal.
+  //
+  // Havia uma função `ocultar` aqui, escrita antes dessa decisão e nunca
+  // chamada por ninguém. Código morto num arquivo de tela é pior que em
+  // outros lugares: quem vem depois lê o nome, conclui que a fila já sabe
+  // excluir, e vai procurar o defeito no lugar errado.
 
   function ligar(pacote) {
-    SeletorDeMesa.ligar(function (idDaMesa) {
-      mesaEscolhida = idDaMesa;
+    SeletorDeCanal.ligar(function (idDoCanal) {
+      canalEscolhida = idDoCanal;
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });

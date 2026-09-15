@@ -9,7 +9,7 @@
    carrega lista, não pré-carrega base: abrir esta tela não custa nada, e é
    por isso que dá para deixá-la aberta o dia inteiro.
 
-   O resultado vem separado POR ORIGEM — cada mesa, e a base legada — porque
+   O resultado vem separado POR ORIGEM — cado canal, e a base legada — porque
    um caso da Mesa Diamante e uma linha do sistema antigo não são a mesma
    coisa e não devem aparecer misturados numa lista só.
    ============================================================================ */
@@ -17,7 +17,7 @@
 var TelaBuscarCaso = (function () {
 
   var opcoes = null;
-  var mesasEscolhidas = {};     // id → true
+  var canaisEscolhidas = {};     // id → true
   var incluirLegado = false;
   var procurando = false;
   var ultimoTermo = '';
@@ -43,12 +43,12 @@ var TelaBuscarCaso = (function () {
   }
 
   function desenharOnde() {
-    var caixas = opcoes.mesas.map(function (mesa) {
+    var caixas = opcoes.canais.map(function (canal) {
       return '<label class="config-chave">'
-        + '<input type="checkbox" data-mesa-da-busca="' + escapar(mesa.id) + '"'
-        + (mesasEscolhidas[mesa.id] ? ' checked' : '') + '>'
-        + '<span>' + escapar(mesa.nome)
-        + '<em>procura em: ' + escapar(mesa.procuraEm.join(', ') || 'nada declarado')
+        + '<input type="checkbox" data-canal-da-busca="' + escapar(canal.id) + '"'
+        + (canaisEscolhidas[canal.id] ? ' checked' : '') + '>'
+        + '<span>' + escapar(canal.nome)
+        + '<em>procura em: ' + escapar(canal.procuraEm.join(', ') || 'nada declarado')
         + '</em></span></label>';
     });
 
@@ -70,10 +70,10 @@ var TelaBuscarCaso = (function () {
   }
 
   function ligarOnde() {
-    var caixas = document.querySelectorAll('[data-mesa-da-busca]');
+    var caixas = document.querySelectorAll('[data-canal-da-busca]');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
-        mesasEscolhidas[this.getAttribute('data-mesa-da-busca')] = this.checked;
+        canaisEscolhidas[this.getAttribute('data-canal-da-busca')] = this.checked;
       });
     }
     var legado = elemento('incluir-legado');
@@ -90,8 +90,8 @@ var TelaBuscarCaso = (function () {
     ultimoTermo = termo;
 
     var onde = [];
-    Object.keys(mesasEscolhidas).forEach(function (id) {
-      if (mesasEscolhidas[id]) onde.push(id);
+    Object.keys(canaisEscolhidas).forEach(function (id) {
+      if (canaisEscolhidas[id]) onde.push(id);
     });
 
     procurando = true;
@@ -145,7 +145,7 @@ var TelaBuscarCaso = (function () {
 
   function desenharOrigem(origem) {
     var cabeca = '<header class="origem-cabeca">'
-      + (origem.icone ? SeletorDeMesa.icone(origem.icone) : '')
+      + (origem.icone ? SeletorDeCanal.icone(origem.icone) : '')
       + '<h3>' + escapar(origem.nome) + '</h3>'
       + '<span class="quantos">' + origem.casos.length + '</span>'
       + (origem.somenteLeitura
@@ -163,11 +163,11 @@ var TelaBuscarCaso = (function () {
       + (origem.aviso
         ? '<p class="aviso-fila">' + escapar(origem.aviso) + '</p>' : '')
       + (origem.tipo === 'legado'
-        ? tabelaDoLegado(origem) : tabelaDaMesa(origem))
+        ? tabelaDoLegado(origem) : tabelaDoCanal(origem))
       + '</section>';
   }
 
-  function tabelaDaMesa(origem) {
+  function tabelaDoCanal(origem) {
     var cabecalho = origem.colunas.map(function (grupo) {
       return '<th>' + escapar(grupo.titulo) + '</th>';
     }).join('') + '<th class="acoes-coluna">Ações</th>';
@@ -187,7 +187,7 @@ var TelaBuscarCaso = (function () {
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
         + '<button type="button" class="acao" data-achado="'
-        + escapar(caso.id) + '" data-mesa="' + escapar(origem.id) + '">'
+        + escapar(caso.id) + '" data-canal="' + escapar(origem.id) + '">'
         + Moldura.icone('olho') + ' Ver detalhes</button></td></tr>';
     }).join('');
 
@@ -224,12 +224,12 @@ var TelaBuscarCaso = (function () {
     var botoes = document.querySelectorAll('[data-achado]');
     for (var i = 0; i < botoes.length; i++) {
       botoes[i].addEventListener('click', function () {
-        var mesa = this.getAttribute('data-mesa');
+        var canal = this.getAttribute('data-canal');
         var caso = this.getAttribute('data-achado');
         // O mesmo modal do Dashboard: quem acha um caso aqui quer as mesmas
         // ações que teria lá, e aprender duas telas para o mesmo caso é uma
         // a mais do que o necessário.
-        CasoEmModal.abrir(mesa, caso, function () {
+        CasoEmModal.abrir(canal, caso, function () {
           if (ultimoTermo) procurar();
         });
       });
@@ -247,9 +247,9 @@ var TelaBuscarCaso = (function () {
     Servidor.chamar('opcoesDaBusca')
       .entao(function (resposta) {
         opcoes = resposta;
-        // Todas as mesas marcadas por padrão: quem procura um protocolo
-        // raramente sabe de antemão em qual mesa ele está.
-        opcoes.mesas.forEach(function (mesa) { mesasEscolhidas[mesa.id] = true; });
+        // Todas os canais marcadas por padrão: quem procura um protocolo
+        // raramente sabe de antemão em qual canal ele está.
+        opcoes.canais.forEach(function (canal) { canaisEscolhidas[canal.id] = true; });
         desenharOnde();
         elemento('termo-da-busca').focus();
       })

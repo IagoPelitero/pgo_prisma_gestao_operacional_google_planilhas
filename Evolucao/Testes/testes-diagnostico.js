@@ -67,7 +67,7 @@ function rodarTestesDeDiagnostico() {
     const { chamar } = instalacaoNova();
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.blocos.map((b) => b.chave).join(','),
-      'ambiente,estrutura,sequencias,identificadores,mesas,campos,paineis,'
+      'ambiente,estrutura,sequencias,identificadores,canais,campos,paineis,'
       + 'analises,acesso,tela,estilos');
   });
 
@@ -185,7 +185,7 @@ function rodarTestesDeDiagnostico() {
 
   teste('Id repetido é falha, e o laudo diz em quais linhas', () => {
     const { ambiente, chamar } = instalacaoNova();
-    const aba = ambiente.planilha.getSheetByName('MESAS');
+    const aba = ambiente.planilha.getSheetByName('CANAIS');
     const primeiro = aba.getRange(2, 1, 1, 1).getValues()[0][0];
     aba.getRange(3, 1, 1, 1).setValues([[primeiro]]);
 
@@ -198,8 +198,8 @@ function rodarTestesDeDiagnostico() {
   teste('coluna de Id em formato Geral é falha', () => {
     // A causa das 4.328 colisões: em Geral, o Sheets lê "0000000010" como 10.
     const { ambiente, chamar } = instalacaoNova();
-    const aba = ambiente.planilha.getSheetByName('CANAIS');
-    chamar('inserirVariosRegistros_')('CANAIS', [
+    const aba = ambiente.planilha.getSheetByName('CORRETORAS');
+    chamar('inserirVariosRegistros_')('CORRETORAS', [
       { Nome: 'Uma', Canal: 'Corretora', SUSEP: '1234567', Corretora: 'Uma' }
     ]);
     aba.getRange(2, 1, 1, 1).setNumberFormat('0');
@@ -238,7 +238,7 @@ function rodarTestesDeDiagnostico() {
 
   teste('sequência com lixo é falha, e não zero em silêncio', () => {
     const { ambiente, chamar } = instalacaoNova();
-    ambiente.propriedades.set('RECC_SEQ_MESAS', 'sei lá');
+    ambiente.propriedades.set('RECC_SEQ_CANAIS', 'sei lá');
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
@@ -247,20 +247,20 @@ function rodarTestesDeDiagnostico() {
 
   secao('A configuração apontando para o vazio');
 
-  teste('mesa apontando para aba que não existe é falha', () => {
+  teste('canal apontando para aba que não existe é falha', () => {
     const { chamar } = instalacaoNova();
-    const mesa = chamar('lerRegistros_("MESAS")')[0];
-    chamar('atualizarRegistro_')('MESAS', mesa.Id, { Aba: 'BASE_QUE_NAO_TEM' });
+    const canal = chamar('lerRegistros_("CANAIS")')[0];
+    chamar('atualizarRegistro_')('CANAIS', canal.Id, { Aba: 'BASE_QUE_NAO_TEM' });
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
     contem(falhasEmTexto(laudo), 'aponta para uma aba que não existe');
   });
 
-  teste('mesa citando coluna que a aba não tem é falha', () => {
+  teste('canal citando coluna que a aba não tem é falha', () => {
     const { chamar } = instalacaoNova();
-    const mesa = chamar('lerRegistros_("MESAS")')[0];
-    chamar('atualizarRegistro_')('MESAS', mesa.Id,
+    const canal = chamar('lerRegistros_("CANAIS")')[0];
+    chamar('atualizarRegistro_')('CANAIS', canal.Id,
       { ColunaDoStatus: 'coluna inventada' });
 
     const laudo = chamar('diagnosticoRECC()');
@@ -271,28 +271,28 @@ function rodarTestesDeDiagnostico() {
 
   teste('a fila em GRUPOS é lida certo — e não acusada de coluna inventada', () => {
     // ColunasDaFila aceita duas escritas: plana e em grupos. Ler só a plana
-    // faria o diagnóstico reprovar uma mesa perfeitamente configurada — e um
+    // faria o diagnóstico reprovar um canal perfeitamente configurada — e um
     // laudo que reclama do que está certo é um laudo que ninguém lê.
     const { chamar } = instalacaoNova();
     const laudo = chamar('diagnosticoRECC()');
-    igual(bloco(laudo, 'mesas').situacao, 'ok');
+    igual(bloco(laudo, 'canais').situacao, 'ok');
 
-    const mesas = chamar('lerRegistros_("MESAS")');
-    const comGrupos = mesas.filter(
+    const canais = chamar('lerRegistros_("CANAIS")');
+    const comGrupos = canais.filter(
       (m) => String(m.ColunasDaFila).indexOf(':') >= 0);
     verdadeiro(comGrupos.length > 0,
-      'pelo menos uma mesa de partida usa a escrita em grupos');
+      'pelo menos um canal de partida usa a escrita em grupos');
   });
 
-  teste('todas as mesas desligadas é falha', () => {
+  teste('todas os canais desligadas é falha', () => {
     const { chamar } = instalacaoNova();
-    chamar('lerRegistros_("MESAS")').forEach((mesa) => {
-      chamar('atualizarRegistro_')('MESAS', mesa.Id, { Ativo: false });
+    chamar('lerRegistros_("CANAIS")').forEach((canal) => {
+      chamar('atualizarRegistro_')('CANAIS', canal.Id, { Ativo: false });
     });
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'Nenhuma mesa está ligada');
+    contem(falhasEmTexto(laudo), 'Nenhum canal está ligada');
   });
 
   teste('campo apontando para coluna que não existe é falha', () => {
@@ -306,25 +306,25 @@ function rodarTestesDeDiagnostico() {
     contem(falhasEmTexto(laudo), 'apontam para coluna que não existe');
   });
 
-  teste('gráfico apontando para mesa que não existe é falha', () => {
+  teste('gráfico apontando paro canal que não existe é falha', () => {
     const { chamar } = instalacaoNova();
     const componente = chamar('lerRegistros_("PAINEIS")')[0];
     chamar('atualizarRegistro_')('PAINEIS', componente.Id,
-      { MesaId: '9999999999' });
+      { CanalId: '9999999999' });
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'apontam para mesa que não existe');
+    contem(falhasEmTexto(laudo), 'apontam paro canal que não existe');
   });
 
-  teste('análise apontando para mesa que não existe é falha', () => {
+  teste('análise apontando paro canal que não existe é falha', () => {
     const { chamar } = instalacaoNova();
     const receita = chamar('lerRegistros_("ANALISES")')[0];
-    chamar('atualizarRegistro_')('ANALISES', receita.Id, { MesaId: '9999999999' });
+    chamar('atualizarRegistro_')('ANALISES', receita.Id, { CanalId: '9999999999' });
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'aponta para mesa que não existe');
+    contem(falhasEmTexto(laudo), 'aponta paro canal que não existe');
   });
 
   secao('O sistema precisa continuar tendo dono');
@@ -414,7 +414,7 @@ function rodarTestesDeDiagnostico() {
     // NUNCA mostrava, enquanto Minha Performance nem calculava. Numa base de
     // 200 mil casos, o gráfico mostrava um pedaço e parecia o total.
     const { chamar } = instalacaoNova();
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
 
     // Uma janela minúscula, para caber no teste: o efeito é o mesmo que 5.000
     // numa base de 200 mil.
@@ -434,7 +434,7 @@ function rodarTestesDeDiagnostico() {
     }
     chamar('inserirVariosRegistros_')('BASE_RET', casos);
 
-    igual(chamar('resumoDaMesa')(ret.id, {}).truncada, true, 'Dashboard');
+    igual(chamar('resumoDoCanal')(ret.id, {}).truncada, true, 'Dashboard');
     igual(chamar('painelAnalitico')(ret.id, {}, 30).truncada, true,
       'Painel Analítico');
     igual(chamar('minhaPerformance')(ret.id, 30).truncada, true,
@@ -448,8 +448,8 @@ function rodarTestesDeDiagnostico() {
   teste('com a base pequena, nenhuma tela avisa nada', () => {
     // Aviso que aparece sempre é aviso que ninguém lê.
     const { chamar } = instalacaoNova();
-    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    igual(chamar('resumoDaMesa')(ret.id, {}).truncada, false);
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    igual(chamar('resumoDoCanal')(ret.id, {}).truncada, false);
     igual(chamar('painelAnalitico')(ret.id, {}, 30).truncada, false);
     igual(chamar('minhaPerformance')(ret.id, 30).truncada, false);
   });
@@ -587,7 +587,14 @@ function rodarTestesDeDiagnostico() {
     fs.readdirSync(pasta).filter((n) => n.endsWith('.html')).forEach((arquivo) => {
       const bruto = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
       (bruto.match(/<script>[\s\S]*?<\/script>/g) || []).forEach((bloco) => {
-        const js = bloco.replace(/^<script>/, '').replace(/<\/script>$/, '');
+        const js = bloco.replace(/^<script>/, '').replace(/<\/script>$/, '')
+          // Um scriptlet do Apps Script — <?= algo ?> ou <?!= algo ?> — não é
+          // JavaScript: é um buraco que o SERVIDOR preenche antes de a página
+          // existir. Aqui ele vira `null`, que é JS válido e de qualquer tipo,
+          // para que o resto do bloco possa ser conferido de verdade. Pular o
+          // arquivo inteiro por causa de um scriptlet deixaria o Index sem
+          // nenhuma conferência — e é justamente ele que monta tudo.
+          .replace(/<\?!?=?[\s\S]*?\?>/g, 'null');
         try {
           new vm.Script(js, { filename: arquivo });
         } catch (erro) {
@@ -926,7 +933,7 @@ function rodarTestesDeDiagnostico() {
       path.join(__dirname, '..', '..', 'Front-End', 'Configuracoes.html'), 'utf8');
 
     const desenhos = ['desenharCampos', 'desenharUsuarios', 'desenharNiveis',
-      'desenharListas', 'desenharMesas', 'desenharGraficos', 'desenharPaineis',
+      'desenharListas', 'desenharCanais', 'desenharGraficos', 'desenharPaineis',
       'desenharAnalises', 'desenharEstrutura'];
 
     const semGuarda = desenhos.filter(function (nome) {
@@ -1095,8 +1102,8 @@ function rodarTestesDeDiagnostico() {
 
   teste('reprovado aparece com a contagem de falhas', () => {
     const { chamar } = instalacaoNova();
-    const mesa = chamar('lerRegistros_("MESAS")')[0];
-    chamar('atualizarRegistro_')('MESAS', mesa.Id, { Aba: 'NAO_EXISTE' });
+    const canal = chamar('lerRegistros_("CANAIS")')[0];
+    chamar('atualizarRegistro_')('CANAIS', canal.Id, { Aba: 'NAO_EXISTE' });
 
     const laudo = chamar('diagnosticoRECC()');
     const texto = chamar('laudoEmTexto_')(laudo);

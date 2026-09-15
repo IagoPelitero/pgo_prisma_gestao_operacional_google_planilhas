@@ -21,15 +21,15 @@ function rodarTestesDeCadastro() {
   chamar('instalarRECC()');
   const planilha = ambiente.planilha;
 
-  const mesas = chamar('mesasVisiveis_()');
-  const mesaDiamante = mesas.find((mesa) => mesa.aba === 'BASE_MESA');
-  const mesaRet = mesas.find((mesa) => mesa.aba === 'BASE_RET');
+  const canais = chamar('canaisVisiveis_()');
+  const canalDiamante = canais.find((canal) => canal.aba === 'BASE_MESA');
+  const canalRet = canais.find((canal) => canal.aba === 'BASE_RET');
 
   secao('O formulário vem do servidor, não do código');
 
-  teste('a mesa entrega seções com campos, na ordem do administrador', () => {
-    const formulario = chamar('formularioDaMesa')(mesaDiamante.id);
-    igual(formulario.mesa.nome, 'Mesa Diamante');
+  teste('o canal entrega seções com campos, na ordem do administrador', () => {
+    const formulario = chamar('formularioDoCanal')(canalDiamante.id);
+    igual(formulario.canal.nome, 'Mesa Diamante');
     verdadeiro(formulario.secoes.length >= 4,
       'esperava várias seções, veio ' + formulario.secoes.length);
 
@@ -39,23 +39,31 @@ function rodarTestesDeCadastro() {
       'o Id não é campo de tela');
   });
 
-  teste('o seletor traz as opções do catálogo, e só as da mesa', () => {
-    const formulario = chamar('formularioDaMesa')(mesaDiamante.id);
+  teste('o seletor traz as opções do catálogo, e só as do canal', () => {
+    const formulario = chamar('formularioDoCanal')(canalDiamante.id);
     const todos = formulario.secoes.reduce((soma, s) => soma.concat(s.campos), []);
 
     const status = todos.find((campo) => campo.chave === 'status');
     igual(status.tipo, 'seletor');
-    igual(status.opcoes.length, 6, 'os seis status da Mesa Diamante');
-    igual(status.opcoes[0].valor, 'Transmissão pendente');
+    igual(status.opcoes.length, 3, 'os três status da Mesa Diamante');
+    igual(status.opcoes[0].valor, 'Em andamento');
+    igual(status.valorPadrao, 'Em andamento',
+      'o caso começa em andamento, sem ninguém escolher o óbvio');
     verdadeiro(!status.opcoes.some((o) => o.valor === 'Aguardando transmissão'),
-      'status da RET não pode aparecer na Mesa');
+      'status da RET não pode aparecer na Mesa Diamante');
 
+    // Canal de origem é de CADA canal, não uma lista só: a Mesa Diamante
+    // recebe por chat e e-mail; a RET, por URA e Central.
     const canal = todos.find((campo) => campo.chave === 'canal');
-    verdadeiro(canal.opcoes.length >= 5, 'canal é lista global, serve às duas mesas');
+    igual(canal.rotulo, 'Canal de origem');
+    verdadeiro(canal.opcoes.some((o) => o.valor === 'Chat'),
+      'a Mesa Diamante recebe por chat');
+    verdadeiro(!canal.opcoes.some((o) => o.valor === 'URA'),
+      'URA é da RET, não da Mesa Diamante');
   });
 
   teste('o CPF nasce com máscara, e a máscara diz quantos dígitos ele quer', () => {
-    const formulario = chamar('formularioDaMesa')(mesaDiamante.id);
+    const formulario = chamar('formularioDoCanal')(canalDiamante.id);
     const todos = formulario.secoes.reduce((soma, s) => soma.concat(s.campos), []);
     const cpf = todos.find((campo) => campo.chave === 'documentocpf');
     igual(cpf.mascara, '000.000.000-00');
@@ -77,7 +85,7 @@ function rodarTestesDeCadastro() {
     });
     chamar('desativarUsuario')(desativado);
 
-    const analista = chamar('formularioDaMesa')(mesaDiamante.id)
+    const analista = chamar('formularioDoCanal')(canalDiamante.id)
       .secoes.reduce((soma, s) => soma.concat(s.campos), [])
       .find((campo) => campo.chave === 'analista');
 
@@ -112,29 +120,29 @@ function rodarTestesDeCadastro() {
       'Os cadastros são usuarios, produtos e canais');
   });
 
-  teste('cada mesa aparece com o seu desenho, vindo da aba MESAS', () => {
-    const fonte = scriptDaPeca('SeletorDeMesa');
+  teste('cado canal aparece com o seu desenho, vindo da aba CANAIS', () => {
+    const fonte = scriptDaPeca('SeletorDeCanal');
     const contexto = vm.createContext({
       Moldura: { escapar: (t) => String(t) }, document: {}, console });
     vm.runInContext(fonte, contexto);
 
-    const botoes = contexto.SeletorDeMesa.montar(mesas, mesas[0].id);
-    igual((botoes.match(/<svg/g) || []).length, 2, 'um desenho por mesa');
+    const botoes = contexto.SeletorDeCanal.montar(canais, canais[0].id);
+    igual((botoes.match(/<svg/g) || []).length, 2, 'um desenho por canal');
     verdadeiro(botoes.indexOf('M12 15.4c-2-1.3') >= 0, 'o escudo com coração da RET');
-    verdadeiro(botoes.indexOf('M7.4 3.6h9.2') >= 0, 'o diamante da Mesa');
-    verdadeiro(botoes.indexOf('class="mesa atual"') >= 0, 'a mesa escolhida se marca');
+    verdadeiro(botoes.indexOf('M7.4 3.6h9.2') >= 0, 'o diamante da Mesa Diamante');
+    verdadeiro(botoes.indexOf('class="canal atual"') >= 0, 'o canal escolhida se marca');
   });
 
-  teste('o seletor de mesa é uma peça só, usada pelas duas telas', () => {
+  teste('o seletor de canal é uma peça só, usada pelas duas telas', () => {
     // Duas cópias divergiriam na primeira mudança.
     const cadastro = fs.readFileSync(
       path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
     const painel = fs.readFileSync(
       path.join(__dirname, '..', '..', 'Front-End', 'Dashboard.html'), 'utf8');
-    contem(cadastro, 'SeletorDeMesa.montar');
-    contem(painel, 'SeletorDeMesa.montar');
-    verdadeiro(cadastro.indexOf('DESENHOS_DAS_MESAS') < 0,
-      'o desenho das mesas não pode estar duplicado na tela de cadastro');
+    contem(cadastro, 'SeletorDeCanal.montar');
+    contem(painel, 'SeletorDeCanal.montar');
+    verdadeiro(cadastro.indexOf('DESENHOS_DAS_CANAIS') < 0,
+      'o desenho dos canais não pode estar duplicado na tela de cadastro');
   });
 
   teste('campo oculto para o nível NÃO chega ao navegador', () => {
@@ -152,7 +160,7 @@ function rodarTestesDeCadastro() {
     });
 
     ambiente.definirEmail('ana@exemplo.com');
-    const todos = chamar('formularioDaMesa')(mesaDiamante.id)
+    const todos = chamar('formularioDoCanal')(canalDiamante.id)
       .secoes.reduce((soma, s) => soma.concat(s.campos), []);
 
     verdadeiro(!todos.some((campo) => campo.chave === 'documentocpf'),
@@ -164,13 +172,13 @@ function rodarTestesDeCadastro() {
   secao('Gravar');
 
   teste('um caso é gravado e devolve o Id', () => {
-    const resposta = chamar('cadastrarCaso')(mesaDiamante.id, {
-      status: 'Pendente',
+    const resposta = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento',
       nomedosegurado: 'Vanessa Duarte Lima',
       documentocpf: '000.123.456-78'
     });
     igual(resposta.id, '0000000000', 'o primeiro caso da aba');
-    igual(resposta.mesa, 'Mesa Diamante');
+    igual(resposta.canal, 'Mesa Diamante');
   });
 
   teste('o CPF chega à célula só com dígitos, e como texto', () => {
@@ -194,7 +202,7 @@ function rodarTestesDeCadastro() {
   secao('O servidor não acredita no navegador');
 
   teste('campo obrigatório vazio é recusado, dizendo qual', () => {
-    const erro = lanca(() => chamar('cadastrarCaso')(mesaDiamante.id, {
+    const erro = lanca(() => chamar('cadastrarCaso')(canalDiamante.id, {
       nomedosegurado: 'Sem status'
     }), 'Status');
     igual(erro.problemas.length, 1);
@@ -203,7 +211,7 @@ function rodarTestesDeCadastro() {
   });
 
   teste('todos os problemas vêm de uma vez, não um por vez', () => {
-    const erro = lanca(() => chamar('cadastrarCaso')(mesaDiamante.id, {
+    const erro = lanca(() => chamar('cadastrarCaso')(canalDiamante.id, {
       documentocpf: '123',
       dataresposta: '31/12/2099'
     }), 'Confira');
@@ -223,13 +231,13 @@ function rodarTestesDeCadastro() {
     const escrita = comZero(ontem.getDate()) + '/' + comZero(ontem.getMonth() + 1)
       + '/' + ontem.getFullYear();
 
-    igual(chamar('cadastrarCaso')(mesaDiamante.id, {
-      status: 'Pendente', nomedosegurado: 'Caso de ontem', dataresposta: escrita
-    }).mesa, 'Mesa Diamante');
+    igual(chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Caso de ontem', dataresposta: escrita
+    }).canal, 'Mesa Diamante');
   });
 
   teste('seletor com valor fora da lista é recusado', () => {
-    const erro = lanca(() => chamar('cadastrarCaso')(mesaDiamante.id, {
+    const erro = lanca(() => chamar('cadastrarCaso')(canalDiamante.id, {
       status: 'Inventado', nomedosegurado: 'Alguém'
     }), 'Confira');
     igual(erro.problemas[0].erro, 'não é uma das opções da lista');
@@ -239,8 +247,8 @@ function rodarTestesDeCadastro() {
     // A tela é do lado de lá. Mesmo que alguém monte a chamada à mão com o
     // campo escondido preenchido, o servidor não grava.
     ambiente.definirEmail('ana@exemplo.com');
-    const resposta = chamar('cadastrarCaso')(mesaDiamante.id, {
-      status: 'Pendente',
+    const resposta = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento',
       nomedosegurado: 'Cliente da Ana',
       documentocpf: '99999999999'
     });
@@ -258,7 +266,7 @@ function rodarTestesDeCadastro() {
       nivelAcessoId: consulta.Id, ativo: true
     });
     ambiente.definirEmail('leitura@exemplo.com');
-    lanca(() => chamar('cadastrarCaso')(mesaDiamante.id, { status: 'Pendente' }),
+    lanca(() => chamar('cadastrarCaso')(canalDiamante.id, { status: 'Em andamento' }),
       'não permite criar');
     ambiente.definirEmail('primeiro.adm@exemplo.com');
   });
@@ -267,7 +275,7 @@ function rodarTestesDeCadastro() {
 
   teste('editar não reescreve a data de entrada', () => {
     const antes = celula(planilha, 'BASE_MESA', 2, 'Data de entrada');
-    chamar('editarCaso')(mesaDiamante.id, '0000000000', {
+    chamar('editarCaso')(canalDiamante.id, '0000000000', {
       status: 'Concluído', nomedosegurado: 'Vanessa Duarte Lima'
     });
     igual(celula(planilha, 'BASE_MESA', 2, 'Data de entrada'), antes,
@@ -282,26 +290,137 @@ function rodarTestesDeCadastro() {
       .find((item) => item.Tipo === 'NIVEL_ACESSO' && item.Nome === 'Operação');
     igual(JSON.parse(operacao.Configuracao).escopo, 'PROPRIOS');
 
+    // O try/finally não é enfeite: sem ele, uma asserção que falha deixa a
+    // suíte inteira logada como a Ana, e os testes seguintes quebram por um
+    // motivo que não é o deles. Aconteceu aqui.
     ambiente.definirEmail('ana@exemplo.com');
-    lanca(() => chamar('editarCaso')(mesaDiamante.id, '0000000000', {
-      status: 'Pendente', nomedosegurado: 'Tentativa'
-    }), 'fora do seu alcance');
-    ambiente.definirEmail('primeiro.adm@exemplo.com');
+    try {
+      lanca(() => chamar('editarCaso')(canalDiamante.id, '0000000000', {
+        status: 'Em andamento', nomedosegurado: 'Tentativa'
+      }), 'e o seu nível (escopo PROPRIOS)');
+    } finally {
+      ambiente.definirEmail('primeiro.adm@exemplo.com');
+    }
+  });
+
+  teste('a recusa diz de QUEM é o caso, e que não é regra do canal', () => {
+    // A operação leu "fora do seu alcance" como "este canal não deixa
+    // excluir", porque na Mesa Diamante conseguia e na RET não — e a
+    // diferença era o caso ser de outra pessoa, não o canal. A mensagem
+    // precisa fechar essa porta.
+    ambiente.definirEmail('ana@exemplo.com');
+    try {
+      lanca(() => chamar('editarCaso')(canalDiamante.id, '0000000000', {
+        status: 'Em andamento'
+      }), 'Este caso é de', 'nomeia o responsável');
+      lanca(() => chamar('editarCaso')(canalDiamante.id, '0000000000', {
+        status: 'Em andamento'
+      }), 'não é uma regra do', 'e diz que o canal não tem culpa');
+    } finally {
+      ambiente.definirEmail('primeiro.adm@exemplo.com');
+    }
   });
 
   teste('ocultar tira da tela e mantém a linha na planilha', () => {
     const antes = chamar('lerRegistros_("BASE_MESA")').length;
-    chamar('ocultarCaso')(mesaDiamante.id, '0000000000');
+    chamar('ocultarCaso')(canalDiamante.id, '0000000000');
     igual(chamar('lerRegistros_("BASE_MESA")').length, antes - 1);
     igual(celula(planilha, 'BASE_MESA', 2, 'Nome do segurado'), 'Vanessa Duarte Lima',
       'o dado continua lá');
     igual(celula(planilha, 'BASE_MESA', 2, '_Visivel'), 'NAO');
   });
 
+  secao('O formulário que a operação pediu');
+
+  teste('a RET vem na sequência e nas seções pedidas', () => {
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const formulario = chamar('formularioDoCanal')(ret.id);
+    const secoes = formulario.secoes.map((s) => s.nome);
+    igual(secoes.slice(0, 5).join(' | '),
+      'Caso | Cliente | Seguro | Corretora | Situação',
+      'as seções na ordem do atendimento');
+
+    const caso = formulario.secoes[0].campos.map((c) => c.rotulo);
+    igual(caso.join(', '),
+      'Data, Protocolo, Analista, Canal de origem, Nome de quem transferiu');
+  });
+
+  teste('a Mesa Diamante tem as seções dela, não as da RET', () => {
+    const formulario = chamar('formularioDoCanal')(canalDiamante.id);
+    igual(formulario.secoes.map((s) => s.nome).join(' | '),
+      'Caso | Situação | Cliente | Corretora | Encaminhamento');
+  });
+
+  teste('a data já vem preenchida com hoje, e o analista com quem cadastra', () => {
+    // O valor padrão é resolvido pelo SERVIDOR. O relógio do navegador é o da
+    // máquina de quem está olhando, e uma data com o fuso errado só aparece
+    // semanas depois, num relatório que não fecha.
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const todos = chamar('formularioDoCanal')(ret.id).secoes
+      .reduce((soma, s) => soma.concat(s.campos), []);
+
+    const data = todos.find((c) => c.chave === 'dataderecepcaodoprotocolo');
+    verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(data.valorPadrao),
+      'a data de hoje, em dd/mm/aaaa — veio "' + data.valorPadrao + '"');
+
+    const analista = todos.find((c) => c.chave === 'analista');
+    igual(analista.valorPadrao, 'primeiro.adm',
+      'o nome de quem está cadastrando');
+  });
+
+  teste('o protocolo deixou de ser obrigatório', () => {
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const todos = chamar('formularioDoCanal')(ret.id).secoes
+      .reduce((soma, s) => soma.concat(s.campos), []);
+    igual(todos.find((c) => c.chave === 'protocolo').obrigatorio, false);
+  });
+
+  teste('o campo condicional viaja com a condição dele', () => {
+    // Quem mostra e esconde é a tela, mas a REGRA vem do servidor: escrevê-la
+    // no JavaScript da tela a deixaria fora do alcance de Configurações.
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const todos = chamar('formularioDoCanal')(ret.id).secoes
+      .reduce((soma, s) => soma.concat(s.campos), []);
+
+    const transferiu = todos.find((c) => c.chave === 'nomedequemtransferiu');
+    igual(transferiu.mostrarSe.campo, 'canal');
+    igual(transferiu.mostrarSe.valor, 'Central');
+
+    const dados = todos.find((c) => c.chave === 'dadosdopagamento');
+    igual(dados.mostrarSe.campo, 'formadepagamento');
+    igual(dados.mostrarSe.valor, 'ADC - TODAS PARCELAS');
+
+    // E a opção que dispara existe na lista. Sem esta linha, renomear o item
+    // desligaria a regra em silêncio.
+    const forma = todos.find((c) => c.chave === 'formadepagamento');
+    verdadeiro(forma.opcoes.some((o) => o.valor === 'ADC - TODAS PARCELAS'),
+      'a opção que faz o campo aparecer precisa existir na lista');
+  });
+
+  teste('o produto é um seletor só, e a planilha recebe código e nome', () => {
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const novo = chamar('cadastrarCaso')(ret.id, {
+      status: 'Pendente', nomedocliente: 'Cliente do produto',
+      codproduto: '1101 - VIDA INDIVIDUAL'
+    });
+    const gravado = chamar('buscarRegistros_')('BASE_RET', 'id', novo.id, 1)[0];
+    igual(gravado['cod produto'], '1101', 'o código foi para a coluna dele');
+    igual(gravado['produto'], 'VIDA INDIVIDUAL', 'e o nome para a dele');
+  });
+
+  teste('nome de produto com hífen dentro não é partido ao meio', () => {
+    // "VIDA - PLANO A" não tem código: partir no primeiro hífen guardaria
+    // "VIDA" como código e perderia metade do nome.
+    igual(chamar('separarCodigoENome_')('VIDA - PLANO A').codigo, '');
+    igual(chamar('separarCodigoENome_')('VIDA - PLANO A').nome, 'VIDA - PLANO A');
+    igual(chamar('separarCodigoENome_')('1101 - VIDA - OURO').codigo, '1101');
+    igual(chamar('separarCodigoENome_')('1101 - VIDA - OURO').nome, 'VIDA - OURO');
+  });
+
   secao('O selo da SUSEP');
 
   teste('SUSEP no cadastro de canais volta liberada, com o segmento', () => {
-    chamar('inserirRegistro_')('CANAIS', {
+    chamar('inserirRegistro_')('CORRETORAS', {
       Nome: 'Corretora ABC', Canal: 'Corretora', SUSEP: '1234567',
       Corretora: 'Corretora ABC', Segmento: 'Diamante'
     });
@@ -348,7 +467,7 @@ function rodarTestesDeCadastro() {
   teste('a tela pede ao servidor em vez de desenhar campo fixo', () => {
     const fonte = fs.readFileSync(
       path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
-    contem(fonte, "Servidor.chamar('formularioDaMesa'", 'o formulário vem do servidor');
+    contem(fonte, "Servidor.chamar('formularioDoCanal'", 'o formulário vem do servidor');
     contem(fonte, "Servidor.chamar('cadastrarCaso'", 'quem grava é o servidor');
     contem(lerPeca('Formulario'),
       "Servidor.chamar('consultarSusep'", 'o selo consulta o servidor');

@@ -27,7 +27,7 @@ function rodarTestesDoAnalitico() {
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
 
-  const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
   const hoje = new Date();
   const comZero = (n) => (n < 10 ? '0' : '') + n;
   const diasAtras = (dias) => {
@@ -59,7 +59,7 @@ function rodarTestesDoAnalitico() {
 
   secao('O painel');
 
-  teste('a mesa abre com os gráficos que ela declarou, na ordem', () => {
+  teste('o canal abre com os gráficos que ela declarou, na ordem', () => {
     const painel = painelDaRet();
     igual(painel.componentes.map((c) => c.tipo).join(' | '),
       'barrasComLinha | pizza | barrasDeitadas | barras | barras | barrasDeitadas');
@@ -101,7 +101,7 @@ function rodarTestesDoAnalitico() {
 
     const medio = acharGrafico('Prêmio médio');
     igual(medio.pontos.find((p) => p.rotulo === 'Prestamista').valor, 200,
-      '(100 + 300) / 2, e não dividido pelos três casos da mesa');
+      '(100 + 300) / 2, e não dividido pelos três casos do canal');
     chamar('salvarComponentesDoPainel')(ret.id, lista);
   });
 

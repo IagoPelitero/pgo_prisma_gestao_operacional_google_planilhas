@@ -233,6 +233,95 @@ function rodarTestesDeAcesso() {
     ambiente.definirEmail('primeiro.adm@exemplo.com');
   });
 
+  secao('Quais canais o nível enxerga');
+
+  /** Põe a lista de canais na configuração do nível "Operação". */
+  function nivelDaOperacaoVendo(canais) {
+    const niveis = chamar('lerRegistros_("CATALOGO")')
+      .filter((item) => item.Tipo === 'NIVEL_ACESSO');
+    const operacao = niveis.find((item) => item.Nome === 'Operação');
+    const configuracao = JSON.parse(operacao.Configuracao);
+    configuracao.canais = canais;
+    chamar('atualizarRegistro_')('CATALOGO', operacao.Id, {
+      Configuracao: JSON.stringify(configuracao)
+    });
+  }
+
+  teste('nível sem canal declarado enxerga todos', () => {
+    // É o caso de quem administra, e é também o que mantém de pé todo nível
+    // criado antes desta regra existir. Lista vazia quer dizer TODOS.
+    nivelDaOperacaoVendo([]);
+    ambiente.definirEmail('ana@exemplo.com');
+    const quem = chamar('usuarioAtual_()');
+    igual(chamar('canaisQueEuVejo_')(quem).length,
+      chamar('canaisVisiveis_()').length, 'vê os dois canais');
+    ambiente.definirEmail('primeiro.adm@exemplo.com');
+  });
+
+  teste('nível preso à RET não enxerga a Mesa Diamante', () => {
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    nivelDaOperacaoVendo([ret.id]);
+
+    ambiente.definirEmail('ana@exemplo.com');
+    const quem = chamar('usuarioAtual_()');
+    const meus = chamar('canaisQueEuVejo_')(quem);
+    igual(meus.length, 1, 'enxerga um canal só');
+    igual(meus[0].aba, 'BASE_RET', 'e é a RET');
+    ambiente.definirEmail('primeiro.adm@exemplo.com');
+  });
+
+  teste('pedir o canal do outro é recusado pelo SERVIDOR', () => {
+    // A tela não oferecer o canal na lista não protege nada: a chamada
+    // existe, e basta mandar outro Id. Quem decide é o servidor.
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const diamante = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    nivelDaOperacaoVendo([ret.id]);
+
+    ambiente.definirEmail('ana@exemplo.com');
+    lanca(() => chamar('resumoDoCanal')(diamante.id, {}),
+      'não enxerga o canal', 'o Dashboard do canal alheio é recusado');
+    lanca(() => chamar('formularioDoCanal')(diamante.id),
+      'não enxerga o canal', 'e o formulário dele também');
+    ambiente.definirEmail('primeiro.adm@exemplo.com');
+  });
+
+  teste('a recusa diz quais canais a pessoa TEM', () => {
+    // "Sem acesso" sozinho manda procurar no lugar errado: quase sempre é o
+    // nível que ficou com o canal errado marcado.
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const diamante = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    nivelDaOperacaoVendo([ret.id]);
+
+    ambiente.definirEmail('ana@exemplo.com');
+    lanca(() => chamar('resumoDoCanal')(diamante.id, {}), 'RET Vida',
+      'a mensagem nomeia o canal que ela enxerga');
+    ambiente.definirEmail('primeiro.adm@exemplo.com');
+  });
+
+  teste('a busca só procura nos canais da pessoa', () => {
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    nivelDaOperacaoVendo([ret.id]);
+
+    ambiente.definirEmail('ana@exemplo.com');
+    const opcoes = chamar('opcoesDaBusca()');
+    igual(opcoes.canais.length, 1, 'a tela só oferece a RET');
+    igual(opcoes.canais[0].nome, 'RET Vida');
+    ambiente.definirEmail('primeiro.adm@exemplo.com');
+  });
+
+  teste('o pacote de partida entrega só os canais da pessoa', () => {
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    nivelDaOperacaoVendo([ret.id]);
+
+    ambiente.definirEmail('ana@exemplo.com');
+    const pacote = chamar('pacoteDePartida()');
+    igual(pacote.canais.length, 1, 'o seletor de canal nasce com um só');
+    igual(pacote.canais[0].aba, 'BASE_RET');
+    ambiente.definirEmail('primeiro.adm@exemplo.com');
+
+    nivelDaOperacaoVendo([]);   // devolve como estava, para os testes seguintes
+  });
+
   secao('Cadastro de usuários');
 
   teste('e-mail repetido é recusado com o nome de quem já usa', () => {

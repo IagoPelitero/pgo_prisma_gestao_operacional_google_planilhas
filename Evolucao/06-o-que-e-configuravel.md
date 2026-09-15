@@ -22,21 +22,21 @@ abaixo com o motivo.
 | **Usuários** | Cadastrar, editar, trocar cargo e nível, canal que atende, tirar o acesso | Usuários |
 | **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga | Níveis de acesso |
 | **Listas** | Situações, canais, motivos, ramos, áreas, cargos, formas de pagamento, origens: criar, renomear o rótulo, recolorir, reordenar, desligar | Listas |
-| **Mesas de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Mesas de trabalho |
+| **Canais de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Canais de trabalho |
 | **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis → Cards |
 | **Gráficos do Painel Analítico** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
-| **Meta por pessoa** | Quantos casos por mês se espera de alguém na mesa. Zero desliga a barra de progresso | Mesas de trabalho |
+| **Meta por pessoa** | Quantos casos por mês se espera de alguém no canal. Zero desliga a barra de progresso | Canais de trabalho |
 | **Corretoras e canais** | Cadastrar, editar o segmento, tirar do cadastro — e cadastrar direto as SUSEPs que os casos citam | Tabela de Corretoras |
 | **Produtos** | Nome e código, que é único | Tabela de Corretoras |
 | **SUSEPs bloqueadas** | Bloquear com motivo, liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
 | **Importar em lote** | Colar a planilha de corretoras (SUSEP, corretora, canal, segmento) ou a de SUSEPs bloqueadas, conferir o que vai acontecer linha a linha, e só então gravar | Tabela de Corretoras → Importar · **pede senha** |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
-| **Busca** | Em quais colunas cada mesa procura | Mesas de trabalho |
+| **Busca** | Em quais colunas cado canal procura | Canais de trabalho |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
-| **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: mesa, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
-| **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, mesas, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
+| **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: canal, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
+| **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, canais, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
 
 ---
 
@@ -60,8 +60,8 @@ Isto não é omissão: cada um tem uma razão para ainda não existir.
 
 | Assunto | Por quê |
 |---|---|
-| **Criar mesa nova** | Criar mesa é criar aba na planilha. É a ação mais cara do sistema, e a única do contrato que ainda não passou por uma tela com senha |
-| **Apagar mesa, campo ou lista** | Por decisão, o sistema **desliga** em vez de apagar. Apagar de verdade sairia do princípio de que nenhuma linha se perde |
+| **Criar canal nova** | Criar canal é criar aba na planilha. É a ação mais cara do sistema, e a única do contrato que ainda não passou por uma tela com senha |
+| **Apagar canal, campo ou lista** | Por decisão, o sistema **desliga** em vez de apagar. Apagar de verdade sairia do princípio de que nenhuma linha se perde |
 | **Trocar o TIPO de uma coluna existente** | Mudar `texto` para `data` numa coluna com 30 mil linhas reinterpreta tudo o que já está gravado. Precisa de conversão e conferência, não de um seletor |
 | **Renomear o cabeçalho de uma coluna** | É o nome que amarra o dado ao Power BI. Renomear na planilha e reconciliar aqui é o caminho seguro; um botão que fizesse isso quebraria relatório em silêncio |
 | **A ordem das cores da paleta** | Os seis tons foram conferidos por régua — separação mínima sob daltonismo e em visão normal. Trocar um por gosto quebraria a garantia, então eles são do sistema, não da operação |
@@ -79,16 +79,16 @@ propósito, cada um com o motivo escrito.
 **"No Painel Analítico tem tanto por área quanto por analista?"** — tem os
 dois, e por caminhos diferentes, o que é de propósito:
 
-- **Por área** é o seletor de mesa no alto da tela. Não é um gráfico: RET Vida
+- **Por área** é o seletor de canal no alto da tela. Não é um gráfico: RET Vida
   e Mesa Diamante têm colunas diferentes, situações diferentes e volumes que
   não se comparam. Um gráfico "casos por área" com duas barras dessas ao lado
-  responderia à pergunta errada — a Mesa sempre pareceria pequena, e nunca foi
+  responderia à pergunta errada — a Canal sempre pareceria pequena, e nunca foi
   para ser grande.
 - **Por analista** é um gráfico, e agora nasce junto com o sistema: *Casos por
-  analista*, em barras deitadas, nas duas mesas. Barra deitada porque nome de
+  analista*, em barras deitadas, nos dois canais. Barra deitada porque nome de
   pessoa é comprido; em pé, os rótulos viram uma escadinha ilegível.
 
-Além desses dois, qualquer coluna da mesa pode virar eixo de um gráfico novo
+Além desses dois, qualquer coluna do canal pode virar eixo de um gráfico novo
 em Configurações → Painéis, sem programador.
 
 **"Temos uma lista de SUSEPs bloqueadas e quais corretoras são Diamante. Eu

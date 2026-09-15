@@ -23,22 +23,22 @@ function rodarTestesDeAnalise() {
   chamar('instalarRECC()');
 
   const planilha = ambiente.planilha;
-  const mesa = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
 
   chamar('inserirVariosRegistros_')('BASE_MESA', [
-    { Analista: 'Ana', Status: 'Pendente', Canal: 'Chat',
+    { Analista: 'Ana', Status: 'Em andamento', Canal: 'Chat',
       'Data de entrada': '10/09/2026', SUSEP: '1234567',
       Corretora: 'Corretora ABC', 'Nome do segurado': 'Um' },
     { Analista: 'Bruno', Status: 'Concluído', Canal: 'E-mail',
       'Data de entrada': '11/09/2026', SUSEP: '2345678',
       Corretora: 'Agência Central', 'Nome do segurado': 'Dois' },
-    { Analista: 'Ana', Status: 'Pendente', Canal: 'E-mail',
+    { Analista: 'Ana', Status: 'Em andamento', Canal: 'E-mail',
       'Data de entrada': '12/09/2026', SUSEP: '1234567',
       Corretora: 'Corretora ABC', 'Nome do segurado': 'Três' }
   ]);
 
   const criar = (dados) => chamar('salvarAnalise')(Object.assign({
-    nome: 'Teste', mesaId: mesa.id, colunas: '', filtros: [], dias: 0
+    nome: 'Teste', canalId: canal.id, colunas: '', filtros: [], dias: 0
   }, dados));
 
   secao('A trava do prefixo');
@@ -68,18 +68,18 @@ function rodarTestesDeAnalise() {
   secao('A receita');
 
   teste('salvar não gera nada — só guarda a receita', () => {
-    const id = criar({ nome: 'MesaToda', descricao: 'Casos da mesa' });
+    const id = criar({ nome: 'CanalToda', descricao: 'Casos do canal' });
     verdadeiro(!!id);
-    igual(planilha.getSheetByName('ANALISE_MesaToda'), null,
+    igual(planilha.getSheetByName('ANALISE_CanalToda'), null,
       'montar a receita não pode custar a espera de gerar');
 
     const analise = chamar('listarAnalises')().find((u) => u.id === id);
-    igual(analise.aba, 'ANALISE_MesaToda');
+    igual(analise.aba, 'ANALISE_CanalToda');
     igual(analise.abaExiste, false);
     igual(analise.linhasGeradas, 0);
   });
 
-  teste('coluna que a mesa não tem é recusada, e diz quais existem', () => {
+  teste('coluna que o canal não tem é recusada, e diz quais existem', () => {
     lanca(() => criar({ nome: 'Errada', colunas: 'Analista,Coluna Inventada' }),
       'não tem a coluna');
   });
@@ -92,7 +92,7 @@ function rodarTestesDeAnalise() {
   });
 
   teste('duas análises com o mesmo nome escreveriam na mesma aba', () => {
-    lanca(() => criar({ nome: 'MesaToda' }), 'Já existe uma análise');
+    lanca(() => criar({ nome: 'CanalToda' }), 'Já existe uma análise');
     // inclusive contra as que o instalador já semeou
     lanca(() => criar({ nome: 'Diamante' }), 'Já existe uma análise');
   });
@@ -109,7 +109,7 @@ function rodarTestesDeAnalise() {
     const aba = planilha.getSheetByName('ANALISE_Tudo');
     verdadeiro(!!aba, 'a aba nasceu');
     igual(aba.getRange(1, 1, 1, 3).getValues()[0].join(','), 'ID,Analista,Status',
-      'a primeira linha é o cabeçalho, na ordem da mesa');
+      'a primeira linha é o cabeçalho, na ordem do canal');
     igual(aba.getMaxRows(), 4, 'a grade tem exatamente cabeçalho + 3 linhas');
   });
 
@@ -139,13 +139,13 @@ function rodarTestesDeAnalise() {
     igual(aba.getRange(1, 1, 1, 3).getValues()[0].join(','),
       'Analista,Status,Corretora');
     igual(aba.getRange(2, 1, 1, 3).getValues()[0].join(','),
-      'Ana,Pendente,Corretora ABC');
+      'Ana,Em andamento,Corretora ABC');
   });
 
   teste('o filtro recorta as linhas', () => {
     const id = criar({
       nome: 'SoPendente', colunas: 'Analista,Status',
-      filtros: [{ coluna: 'Status', valor: 'Pendente' }]
+      filtros: [{ coluna: 'Status', valor: 'Em andamento' }]
     });
     const feito = chamar('gerarAnalise')(id);
     igual(feito.linhas, 2);
@@ -153,13 +153,13 @@ function rodarTestesDeAnalise() {
     const aba = planilha.getSheetByName('ANALISE_SoPendente');
     igual(aba.getMaxRows(), 3);
     igual(aba.getRange(2, 2, 2, 1).getValues().map((l) => l[0]).join(','),
-      'Pendente,Pendente');
+      'Em andamento,Em andamento');
   });
 
   teste('dois filtros se somam', () => {
     const id = criar({
       nome: 'PendenteNoChat', colunas: 'Analista',
-      filtros: [{ coluna: 'Status', valor: 'Pendente' },
+      filtros: [{ coluna: 'Status', valor: 'Em andamento' },
         { coluna: 'Canal', valor: 'Chat' }]
     });
     igual(chamar('gerarAnalise')(id).linhas, 1);
@@ -207,7 +207,7 @@ function rodarTestesDeAnalise() {
     chamar('liberarComSenha')('segredo123');
     const id = chamar('listarAnalises')().find((u) => u.nome === 'Tudo').id;
     chamar('salvarAnalise')({
-      id: id, nome: 'Tudo', mesaId: mesa.id, colunas: 'Analista',
+      id: id, nome: 'Tudo', canalId: canal.id, colunas: 'Analista',
       filtros: [{ coluna: 'Canal', valor: 'Chat' }], dias: 0
     });
     chamar('gerarAnalise')(id);
@@ -245,7 +245,7 @@ function rodarTestesDeAnalise() {
   teste('análise desligada não é gerada pelo gatilho', () => {
     const id = criar({ nome: 'Desligada', colunas: 'Analista' });
     chamar('salvarAnalise')({
-      id: id, nome: 'Desligada', mesaId: mesa.id, colunas: 'Analista',
+      id: id, nome: 'Desligada', canalId: canal.id, colunas: 'Analista',
       filtros: [], dias: 0, ativo: false
     });
 
@@ -260,10 +260,10 @@ function rodarTestesDeAnalise() {
   });
 
   teste('uma análise quebrada não derruba as outras', () => {
-    // Uma receita apontando para uma mesa que foi desligada. Sem o try, ela
+    // Uma receita apontando para um canal que foi desligada. Sem o try, ela
     // deixaria as outras cinco sem atualizar naquela madrugada.
     chamar('inserirRegistro_')('ANALISES', {
-      Nome: 'Orfa', MesaId: '9999999999', Colunas: '', Filtros: '',
+      Nome: 'Orfa', CanalId: '9999999999', Colunas: '', Filtros: '',
       Dias: 0, Ordem: 99, Ativo: true
     });
 
@@ -307,7 +307,7 @@ function rodarTestesDeAnalise() {
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
       lanca(() => chamar('listarAnalises')(), 'não permite configurar');
-      lanca(() => chamar('salvarAnalise')({ nome: 'X', mesaId: mesa.id }),
+      lanca(() => chamar('salvarAnalise')({ nome: 'X', canalId: canal.id }),
         'não permite configurar');
     });
   });

@@ -25,7 +25,7 @@
 
 var TelaPainelAnalitico = (function () {
 
-  var mesaEscolhida = '';
+  var canalEscolhida = '';
   var filtros = {};
   var dias = 0;
   var painel = null;
@@ -39,8 +39,8 @@ var TelaPainelAnalitico = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
-    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
       + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
   }
 
@@ -48,7 +48,7 @@ var TelaPainelAnalitico = (function () {
     var caixa = elemento('analitico');
     if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
 
-    Servidor.chamar('painelAnalitico', mesaEscolhida, filtros, dias)
+    Servidor.chamar('painelAnalitico', canalEscolhida, filtros, dias)
       .entao(function (resposta) {
         painel = resposta;
         desenhar();
@@ -68,7 +68,7 @@ var TelaPainelAnalitico = (function () {
         ? '<div class="graficos">'
           + painel.componentes.map(desenharComponente).join('') + '</div>'
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
-          + 'mesa.</strong><p>Um administrador monta os gráficos em '
+          + 'canal.</strong><p>Um administrador monta os gráficos em '
           + 'Configurações → Painéis.</p></div>')
       + '<div id="detalhe-do-painel"></div>';
     ligarPainel();
@@ -182,7 +182,7 @@ var TelaPainelAnalitico = (function () {
     caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    Servidor.chamar('detalharComponente', mesaEscolhida, idDoComponente,
+    Servidor.chamar('detalharComponente', canalEscolhida, idDoComponente,
       chaveDoPonto, filtros, dias)
       .entao(function (resposta) { desenharDetalhe(resposta); })
       .senao(function (erro) {
@@ -233,7 +233,7 @@ var TelaPainelAnalitico = (function () {
     var abrir = document.querySelectorAll('[data-caso-do-painel]');
     for (var i = 0; i < abrir.length; i++) {
       abrir[i].addEventListener('click', function () {
-        CasoEmModal.abrir(mesaEscolhida, this.getAttribute('data-caso-do-painel'),
+        CasoEmModal.abrir(canalEscolhida, this.getAttribute('data-caso-do-painel'),
           carregar);
       });
     }
@@ -248,7 +248,7 @@ var TelaPainelAnalitico = (function () {
    * cima, para quem estiver num contexto que o aceite.
    */
   function exportar(idDoComponente) {
-    Servidor.chamar('exportarComponente', mesaEscolhida, idDoComponente,
+    Servidor.chamar('exportarComponente', canalEscolhida, idDoComponente,
       filtros, dias)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
@@ -293,8 +293,8 @@ var TelaPainelAnalitico = (function () {
 
   function ligar(pacote) {
     if (pacote) pacoteDoSistema = pacote;
-    SeletorDeMesa.ligar(function (idDaMesa) {
-      mesaEscolhida = idDaMesa;
+    SeletorDeCanal.ligar(function (idDoCanal) {
+      canalEscolhida = idDoCanal;
       filtros = {};
       tabelasAbertas = {};
       Aplicacao.remontar();

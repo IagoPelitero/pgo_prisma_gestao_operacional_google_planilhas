@@ -40,7 +40,7 @@
  *   2. cria as 13 abas, com cabeçalho, formato de coluna e linha 1 congelada;
  *   3. CORTA cada aba para o tamanho do contrato — célula vazia também consome
  *      o teto de 10 milhões da planilha;
- *   4. semeia catálogo, mesas, campos e configuração — tudo editável depois;
+ *   4. semeia catálogo, canais, campos e configuração — tudo editável depois;
  *   5. cadastra QUEM EXECUTOU como o primeiro Administrador.
  *
  * O passo 5 não é conveniência. O acesso é pelo e-mail autenticado conferido
@@ -89,7 +89,7 @@ function instalarRECC() {
     '  níveis de acesso ..... ' + semente.niveis,
     '  cargos ............... ' + semente.cargos,
     '  itens de catálogo .... ' + semente.catalogo,
-    '  mesas ................ ' + semente.mesas,
+    '  canais ................ ' + semente.canais,
     '  campos do formulário . ' + semente.campos,
     '  chaves de configuração ' + semente.config,
     '',
@@ -191,7 +191,7 @@ function criarAbaDoContrato_(planilha, esquema) {
 // ============================================================================
 
 function semearDadosIniciais_(emailDoInstalador) {
-  var contagem = { niveis: 0, cargos: 0, catalogo: 0, mesas: 0, campos: 0, config: 0 };
+  var contagem = { niveis: 0, cargos: 0, catalogo: 0, canais: 0, campos: 0, config: 0 };
 
   // --- níveis de acesso -----------------------------------------------------
   // O nível é a unidade de permissão: telas, campos, widgets, ações e escopo
@@ -230,8 +230,8 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.cargos = cargos.length;
   var idCargoAdm = cargos[2]['Id'];
 
-  // --- mesas ----------------------------------------------------------------
-  var mesas = inserirVariosRegistros_('MESAS', [
+  // --- canais ----------------------------------------------------------------
+  var canais = inserirVariosRegistros_('CANAIS', [
     {
       Nome: 'RET Vida',
       Descricao: 'Relacionamento estratégico de clientes',
@@ -277,11 +277,11 @@ function semearDadosIniciais_(emailDoInstalador) {
       Ativo: true
     }
   ]);
-  contagem.mesas = mesas.length;
-  var idRet = mesas[0]['Id'];
-  var idMesa = mesas[1]['Id'];
+  contagem.canais = canais.length;
+  var idRet = canais[0]['Id'];
+  var idCanal = canais[1]['Id'];
 
-  // --- catálogo por mesa ----------------------------------------------------
+  // --- catálogo por canal ----------------------------------------------------
   var itens = [];
   // Cada situação com a sua cor. A cor não é enfeite: numa fila de trinta
   // linhas, ela é o que faz "não trabalhado" saltar aos olhos sem ninguém
@@ -291,10 +291,15 @@ function semearDadosIniciais_(emailDoInstalador) {
    ['Não trabalhado', 'ruim'], ['Concluído', 'bom']].forEach(function (par, i) {
     itens.push(novoItemDeCatalogo_('STATUS', idRet, par[0], i + 1, par[1]));
   });
-  [['Transmissão pendente', 'destaque'], ['Pendente', 'atencao'],
-   ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
-   ['Não trabalhado', 'ruim'], ['Concluído', 'bom']].forEach(function (par, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idMesa, par[0], i + 1, par[1]));
+  // A Mesa Diamante tem três status, e só três. O formulário nasce com
+  // "Em andamento" já escolhido — é o estado em que todo caso começa, e
+  // deixar em branco obrigaria a escolher o óbvio em toda abertura.
+  //
+  // "Concluído na célula" é diferente de "Concluído": a célula resolveu sem
+  // devolver para a área. A operação mede os dois separados.
+  [['Em andamento', 'atencao'], ['Concluído', 'bom'],
+   ['Concluído na célula', 'destaque']].forEach(function (par, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idCanal, par[0], i + 1, par[1]));
   });
   ['Diamante', 'Demais corretoras', 'Não encontrado'].forEach(function (nome, i) {
     itens.push(novoItemDeCatalogo_('SEGMENTO', '', nome, i + 1));
@@ -303,14 +308,32 @@ function semearDadosIniciais_(emailDoInstalador) {
   // Listas que o formulário oferece. Padrão, não fixado: o administrador
   // renomeia, reordena, desliga e cria quantas quiser em Configurações.
   var listasGlobais = {
-    CANAL: ['E-mail', 'Chat', 'Telefone', 'Site', 'Corretora', 'Ouvidoria', 'URA'],
-    TIPO: ['Reclamação', 'Dúvida', 'Solicitação', 'Elogio'],
-    RAMO: ['Vida', 'Auto', 'Residencial', 'Prestamista'],
+    // Por onde o caso chegou na RET. A operação pediu estes quatro.
+    CANAL_ORIGEM: ['URA', 'Central', 'Base de Inadimplentes',
+      'Piloto Formulário - Cancelamento'],
+    // Por onde o caso chegou na Mesa Diamante.
+    CANAL: ['Chat', 'Retorno | chat', 'E-mail'],
+    TIPO: ['Consultas', 'Problemas', 'Solicitações'],
+    RAMO: ['Vida em grupo', 'Vida individual'],
+    ASSUNTO: ['Cancelamento', 'Cobrança', 'Alteração cadastral', 'Sinistro',
+      'Segunda via', 'Outros'],
     AREA: ['Subscrição', 'Sinistro', 'Cobrança', 'Comercial', 'Jurídico'],
     MOTIVO: ['Aumento do prêmio na renovação', 'Dificuldade financeira',
       'Portabilidade', 'Proposta de concorrente', 'Insatisfação com atendimento',
       'Coberturas', 'Outros'],
-    FORMA_PAGAMENTO: ['Boleto', 'Débito em conta', 'Cartão de crédito', 'PIX'],
+    // "ADC - TODAS PARCELAS" é a opção que faz aparecer o campo "Dados de
+    // pagamento" — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO. Renomear
+    // este item aqui sem ajustar lá desligaria a regra em silêncio.
+    FORMA_PAGAMENTO: ['ADC - TODAS PARCELAS', 'Boleto', 'Débito em conta',
+      'Cartão de crédito', 'PIX'],
+    // Quantas vezes já se tentou falar com o cliente. É seletor, e não número
+    // digitado, porque a operação vai pendurar regra nisso mais para a frente.
+    TENTATIVA: ['1ª tentativa', '2ª tentativa', '3ª tentativa',
+      'Contato efetivado', 'Sem contato'],
+    // O produto vem no formato "código - nome", num seletor só. O sistema
+    // separa os dois ao gravar, para o painel agrupar por código.
+    PRODUTO: ['1101 - VIDA INDIVIDUAL', '1102 - VIDA EM GRUPO',
+      '1103 - PRESTAMISTA', '1104 - ACIDENTES PESSOAIS'],
     ORIGEM: ['Base de inadimplência', 'Central: Pessoa', 'URA', 'Site', 'Chat',
       'Telefone', 'Corretora']
   };
@@ -323,23 +346,23 @@ function semearDadosIniciais_(emailDoInstalador) {
     contagem.niveis + contagem.cargos;
 
   // --- cartões do Dashboard -------------------------------------------------
-  // Os cartões moram em PAINEIS, e não em MESAS: são uma LISTA de coisas
+  // Os cartões moram em PAINEIS, e não em CANAIS: são uma LISTA de coisas
   // configuráveis, cada uma com nome, cor e ordem próprios. Guardá-los como
-  // um texto separado por vírgula dentro da mesa dava conta de escolher
+  // um texto separado por vírgula dentro do canal dava conta de escolher
   // QUAIS, e de mais nada — não de renomear um, nem de trocar a cor.
   contagem.paineis = inserirVariosRegistros_('PAINEIS',
-    cartoesIniciaisDoPainel_(idRet, idMesa)).length;
+    cartoesIniciaisDoPainel_(idRet, idCanal)).length;
 
   // --- análises de partida --------------------------------------------------
-  // Duas, uma por mesa, para a operação ver a ideia funcionando antes de
+  // Duas, uma por canal, para a operação ver a ideia funcionando antes de
   // montar as dela. Nascem LIGADAS mas NÃO GERADAS: criar aba na instalação
   // custaria o dobro do tempo, e ninguém pediu a aba ainda.
   contagem.analises = inserirVariosRegistros_('ANALISES', [
     { Nome: 'RetVida', Descricao: 'Tudo da RET Vida dos últimos 90 dias',
-      MesaId: idRet, Colunas: '', Filtros: '', Dias: 90, Ordem: 1, Ativo: true },
+      CanalId: idRet, Colunas: '', Filtros: '', Dias: 90, Ordem: 1, Ativo: true },
     { Nome: 'Diamante',
       Descricao: 'Casos da Mesa Diamante dos últimos 90 dias',
-      MesaId: idMesa, Colunas: '', Filtros: '', Dias: 90, Ordem: 2, Ativo: true }
+      CanalId: idCanal, Colunas: '', Filtros: '', Dias: 90, Ordem: 2, Ativo: true }
   ]).length;
 
   // --- campos do formulário -------------------------------------------------
@@ -347,7 +370,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   // campo ↔ coluna, e não uma segunda verdade que diverge da planilha.
   var campos = []
     .concat(camposDoFormularioDaBase_('BASE_RET', idRet))
-    .concat(camposDoFormularioDaBase_('BASE_MESA', idMesa));
+    .concat(camposDoFormularioDaBase_('BASE_MESA', idCanal));
   contagem.campos = inserirVariosRegistros_('CAMPOS', campos).length;
 
   // --- configuração ---------------------------------------------------------
@@ -414,7 +437,7 @@ function semearDadosIniciais_(emailDoInstalador) {
 
 function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
   return {
-    MesaId: '',
+    CanalId: '',
     Tipo: 'NIVEL_ACESSO',
     Codigo: '',
     Nome: nome,
@@ -437,17 +460,17 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
  * Os cartões que o Dashboard mostra quando o sistema nasce.
  *
  * A RET Vida mostra todas as situações; a Mesa Diamante mostra duas. Não é
- * capricho: a Mesa tem muito menos volume, e sete cartões de números pequenos
+ * capricho: a Canal tem muito menos volume, e sete cartões de números pequenos
  * viram uma parede que ninguém lê. Tudo isso é editável em Configurações —
  * este é o ponto de partida, não a regra.
  */
-function cartoesIniciaisDoPainel_(idRet, idMesa) {
+function cartoesIniciaisDoPainel_(idRet, idCanal) {
   var cartoes = [];
 
-  function novoCartao(mesaId, titulo, dimensao, filtro, cor, ordem) {
+  function novoCartao(canalId, titulo, dimensao, filtro, cor, ordem) {
     return {
       Tela: 'dashboard',
-      MesaId: mesaId,
+      CanalId: canalId,
       Titulo: titulo,
       TipoWidget: 'cartao',
       CampoDimensao: dimensao,
@@ -474,18 +497,24 @@ function cartoesIniciaisDoPainel_(idRet, idMesa) {
     cartoes.push(novoCartao(idRet, par[0], 'situacao', par[0], par[1], i + 2));
   });
 
-  cartoes.push(novoCartao(idMesa, 'Total de casos', 'total', '', 'destaque', 1));
-  cartoes.push(novoCartao(idMesa, 'Pendente', 'situacao', 'Pendente', 'atencao', 2));
-  cartoes.push(novoCartao(idMesa, 'Concluído', 'situacao', 'Concluído', 'bom', 3));
-  cartoes.push(novoCartao(idMesa, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
+  // A Mesa Diamante tem menos volume: quatro cartões bastam, e sete seriam
+  // ruído. Os nomes acompanham os três status que ela usa.
+  cartoes.push(novoCartao(idCanal, 'Total de casos', 'total', '', 'destaque', 1));
+  cartoes.push(novoCartao(idCanal, 'Em andamento', 'situacao', 'Em andamento', 'atencao', 2));
+  cartoes.push(novoCartao(idCanal, 'Concluído', 'situacao', 'Concluído', 'bom', 3));
+  // "Finalizados na célula" é CALCULADO — conta o que fechou sem passar por
+  // outra área —, e por isso vale mais que um cartão preso ao status de mesmo
+  // nome: ele continua certo se alguém renomear o status. O status existe
+  // para quem atende marcar; o cartão, para a operação medir.
+  cartoes.push(novoCartao(idCanal, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
 
   // ---- os gráficos do Painel Analítico ------------------------------------
   // Cada um responde a UMA pergunta. Gráfico que não responde pergunta
   // nenhuma é enfeite, e enfeite numa tela de trabalho é ruído.
-  function novoGrafico(mesaId, titulo, tipo, dimensao, agregacao, medida,
+  function novoGrafico(canalId, titulo, tipo, dimensao, agregacao, medida,
     limite, largura, ordem) {
     return {
-      Tela: 'painelAnalitico', MesaId: mesaId, Titulo: titulo,
+      Tela: 'painelAnalitico', CanalId: canalId, Titulo: titulo,
       TipoWidget: tipo, CampoDimensao: dimensao, CampoMedida: medida || '',
       Agregacao: agregacao, Limite: limite || 0, Filtro: '',
       Ordem: ordem, Largura: largura, Cor: '', VisivelPara: '', Ativo: true
@@ -510,29 +539,29 @@ function cartoesIniciaisDoPainel_(idRet, idMesa) {
   cartoes.push(novoGrafico(idRet, 'Casos por canal de entrada',
     'barras', 'canal', 'contagem', '', 6, 1, 5));
   // Por analista: a mesma pergunta do "por área", uma camada abaixo. O
-  // recorte por área já existe sem gráfico nenhum — é o seletor de mesa no
-  // alto da tela, e cada mesa tem os gráficos dela. O que faltava era ver a
+  // recorte por área já existe sem gráfico nenhum — é o seletor de canal no
+  // alto da tela, e cado canal tem os gráficos dela. O que faltava era ver a
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
 
-  cartoes.push(novoGrafico(idMesa, 'Entradas por dia, e a tendência',
+  cartoes.push(novoGrafico(idCanal, 'Entradas por dia, e a tendência',
     'barrasComLinha', 'Data de entrada', 'contagem', '', 0, 2, 1));
-  cartoes.push(novoGrafico(idMesa, 'Situação dos casos',
+  cartoes.push(novoGrafico(idCanal, 'Situação dos casos',
     'pizza', 'Status', 'contagem', '', 6, 1, 2));
-  cartoes.push(novoGrafico(idMesa, 'Casos por corretora',
+  cartoes.push(novoGrafico(idCanal, 'Casos por corretora',
     'barrasDeitadas', 'Corretora', 'contagem', '', 6, 1, 3));
-  cartoes.push(novoGrafico(idMesa, 'Casos por canal de entrada',
+  cartoes.push(novoGrafico(idCanal, 'Casos por canal de entrada',
     'barras', 'Canal', 'contagem', '', 6, 1, 4));
-  cartoes.push(novoGrafico(idMesa, 'Casos por analista',
+  cartoes.push(novoGrafico(idCanal, 'Casos por analista',
     'barrasDeitadas', 'Analista', 'contagem', '', 6, 1, 5));
 
   return cartoes;
 }
 
-function novoItemDeCatalogo_(tipo, mesaId, nome, ordem, cor) {
+function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor) {
   return {
-    MesaId: mesaId,
+    CanalId: canalId,
     Tipo: tipo,
     Codigo: '',
     Nome: nome,
@@ -566,48 +595,167 @@ function novaConfiguracao_(chave, valor, descricao) {
  * A chave é a ChaveTecnica — o cabeçalho normalizado, sem acento nem espaço.
  */
 const RECC_PADRAO_DO_FORMULARIO = {
-  // ---------------------------------------------------------- Mesa Diamante
-  analista: { tipoCampo: 'seletor', listaDe: 'usuarios', secao: 'Atendimento' },
-  status: { tipoCampo: 'seletor', catalogo: 'STATUS', obrigatorio: true, secao: 'Situação' },
-  canal: { tipoCampo: 'seletor', catalogo: 'CANAL', secao: 'Situação' },
-  datadeentrada: { secao: 'Situação' },
-  horario: { secao: 'Situação' },
-  tipo: { tipoCampo: 'seletor', catalogo: 'TIPO', secao: 'Situação' },
-  aberturaindevida: { secao: 'Situação' },
-  titulodoemail: { secao: 'Atendimento', largura: 2 },
-  nomedosegurado: { obrigatorio: true, secao: 'Cliente', largura: 2 },
-  documentocpf: { tipoCampo: 'documento', mascara: '000.000.000-00', secao: 'Cliente' },
-  corretora: { secao: 'Corretora' },
-  susep: { secao: 'Corretora' },
-  ramo: { tipoCampo: 'seletor', catalogo: 'RAMO', secao: 'Corretora' },
-  assunto: { secao: 'Atendimento', largura: 2 },
-  arearesponsavel: { tipoCampo: 'seletor', catalogo: 'AREA', secao: 'Encaminhamento' },
-  dataresposta: { secao: 'Encaminhamento' },
-  horaresposta: { secao: 'Encaminhamento' },
-  datadafinalizacao: { secao: 'Encaminhamento' },
-  horariodafinalizacao: { secao: 'Encaminhamento' },
+  /*
+   * A SEQUÊNCIA E AS SEÇÕES SÃO AS QUE A OPERAÇÃO PEDIU, campo a campo.
+   *
+   * `ordem` manda na posição na tela — não a ordem das colunas na planilha.
+   * São coisas diferentes de propósito: a coluna nasce onde o histórico a
+   * deixou, e o formulário segue o caminho que quem atende percorre ao
+   * telefone. Amarrar um ao outro obrigaria a mexer na base para mudar a tela.
+   *
+   * Campo da base que a operação não listou não é apagado: vai para a seção
+   * "Outros" no fim, ligado. Apagar perderia dado já gravado, e desligar
+   * calado esconderia o que alguém ainda usa. Tudo isso é editável em
+   * Configurações › Campos — aqui é só o ponto de partida.
+   */
 
-  // -------------------------------------------------------------- RET Vida
-  dataderecepcaodoprotocolo: { secao: 'Protocolo' },
-  protocolo: { obrigatorio: true, secao: 'Protocolo' },
-  segmento: { tipoCampo: 'seletor', catalogo: 'SEGMENTO', secao: 'Corretora' },
-  nomedocliente: { obrigatorio: true, secao: 'Cliente', largura: 2 },
-  cpf: { tipoCampo: 'documento', mascara: '000.000.000-00', secao: 'Cliente' },
-  telefonesdecontato: { tipoCampo: 'telefone', secao: 'Cliente' },
-  email: { tipoCampo: 'email', secao: 'Cliente' },
-  produto: { secao: 'Proposta' },
-  codproduto: { secao: 'Proposta' },
-  numerodaproposta: { secao: 'Proposta' },
-  codigoorigemdaproposta: { secao: 'Proposta' },
-  numapolice: { secao: 'Proposta' },
-  valordopremio: { secao: 'Valores' },
-  valordopremioretido: { secao: 'Valores' },
-  premiomensalretido: { secao: 'Valores' },
-  formadepagamento: { tipoCampo: 'seletor', catalogo: 'FORMA_PAGAMENTO', secao: 'Valores' },
-  motivodocancelamento: { tipoCampo: 'seletor', catalogo: 'MOTIVO', secao: 'Retenção' },
-  tentativasdecontato: { secao: 'Retenção' },
-  datadatransmissao: { secao: 'Retenção' },
-  descricao: { secao: 'Retenção', largura: 3 }
+  // ==========================================================================
+  // RET VIDA
+  // ==========================================================================
+
+  // --- Caso
+  dataderecepcaodoprotocolo: { secao: 'Caso', ordem: 1, rotulo: 'Data',
+    valorPadrao: '@HOJE' },
+  protocolo: { secao: 'Caso', ordem: 2, rotulo: 'Protocolo', obrigatorio: false },
+  analista: { secao: 'Caso', ordem: 3, rotulo: 'Analista', tipoCampo: 'seletor',
+    listaDe: 'usuarios', valorPadrao: '@EU', travaPara: ['Analista'] },
+  canal: { secao: 'Caso', ordem: 4, rotulo: 'Canal de origem',
+    tipoCampo: 'seletor', catalogo: 'CANAL_ORIGEM' },
+  nomedequemtransferiu: { secao: 'Caso', ordem: 5,
+    rotulo: 'Nome de quem transferiu', obrigatorio: false,
+    mostrarSe: { campo: 'canal', valor: 'Central' } },
+
+  // --- Cliente
+  nomedocliente: { secao: 'Cliente', ordem: 10, rotulo: 'Nome do cliente',
+    obrigatorio: true, largura: 2 },
+  cpf: { secao: 'Cliente', ordem: 11, rotulo: 'CPF', tipoCampo: 'documento',
+    mascara: '000.000.000-00' },
+  telefonesdecontato: { secao: 'Cliente', ordem: 12,
+    rotulo: 'Telefone de contato', tipoCampo: 'telefone' },
+  email: { secao: 'Cliente', ordem: 13, rotulo: 'E-mail', tipoCampo: 'email' },
+
+  // --- Seguro
+  codigoorigemdaproposta: { secao: 'Seguro', ordem: 20,
+    rotulo: 'Código origem da proposta' },
+  numerodaproposta: { secao: 'Seguro', ordem: 21, rotulo: 'Número da proposta' },
+  // Um seletor só para código e nome do produto, no formato "1234 - VIDA
+  // INDIVIDUAL". Quem atende escolhe uma coisa; a planilha recebe duas, em
+  // colunas separadas, porque o painel agrupa por código e o relatório mostra
+  // o nome. Quem separa é o servidor, ao gravar — ver separarCodigoENome_.
+  codproduto: { secao: 'Seguro', ordem: 22, rotulo: 'Cód. do produto e produto',
+    tipoCampo: 'seletor', catalogo: 'PRODUTO', largura: 2,
+    separaEm: { codigo: 'cod produto', nome: 'produto' } },
+  produto: { secao: 'Seguro', ordem: 23, ativo: false },
+  // Sem o underscore: a chave técnica sai de normalizarParaComparar_, que
+  // tira acento, caixa e pontuação. "cod_sucursal" na planilha vira
+  // "codsucursal" aqui — escrever com underscore faria o campo cair em
+  // "Outros" sem nenhum erro, que foi o que aconteceu na primeira tentativa.
+  codsucursal: { secao: 'Seguro', ordem: 24, rotulo: 'Cod_sucursal' },
+  codramo: { secao: 'Seguro', ordem: 25, rotulo: 'Cod_ramo' },
+  numapolice: { secao: 'Seguro', ordem: 26, rotulo: 'Número da apólice' },
+  valordopremio: { secao: 'Seguro', ordem: 27, rotulo: 'Valor do prêmio anual' },
+  premiomensalretido: { secao: 'Seguro', ordem: 28,
+    rotulo: 'Valor do prêmio mensal' },
+  valordopremioretido: { secao: 'Seguro', ordem: 29,
+    rotulo: 'Valor do prêmio retido' },
+  formadepagamento: { secao: 'Seguro', ordem: 30, rotulo: 'Forma de pagamento',
+    tipoCampo: 'seletor', catalogo: 'FORMA_PAGAMENTO' },
+  dadosdopagamento: { secao: 'Seguro', ordem: 31, rotulo: 'Dados de pagamento',
+    mostrarSe: { campo: 'formadepagamento', valor: 'ADC - TODAS PARCELAS' } },
+
+  // --- Corretora
+  // A SUSEP não tem campo "bloqueada?" para digitar, e isso é decisão: a
+  // resposta está na base de SUSEPs bloqueadas, e o selo ao lado do campo já
+  // a mostra no instante em que a SUSEP é digitada — verde para liberada,
+  // vermelho para bloqueada. Um campo digitado ao lado de um selo automático
+  // seria a mesma informação em dois lugares, divergindo no primeiro dia.
+  susep: { secao: 'Corretora', ordem: 40, rotulo: 'SUSEP' },
+  segmento: { secao: 'Corretora', ordem: 41, rotulo: 'Segmento',
+    tipoCampo: 'seletor', catalogo: 'SEGMENTO' },
+
+  // --- Situação
+  motivodocancelamento: { secao: 'Situação', ordem: 50,
+    rotulo: 'Motivo do cancelamento', tipoCampo: 'seletor', catalogo: 'MOTIVO' },
+  status: { secao: 'Situação', ordem: 51, rotulo: 'Status', tipoCampo: 'seletor',
+    catalogo: 'STATUS', obrigatorio: true },
+  tentativasdecontato: { secao: 'Situação', ordem: 52,
+    rotulo: 'Tentativas de contato', tipoCampo: 'seletor', catalogo: 'TENTATIVA' },
+  datadatransmissao: { secao: 'Situação', ordem: 53,
+    rotulo: 'Data da transmissão' },
+  novocodorigemproposta: { secao: 'Situação', ordem: 54,
+    rotulo: 'Cód. origem da nova proposta' },
+  novonumerodaproposta: { secao: 'Situação', ordem: 55,
+    rotulo: 'Nº da nova proposta' },
+
+  // --- Outros: da base, fora da lista da operação. Ficam ligados.
+  grupo: { secao: 'Outros', ordem: 90 },
+  sistema: { secao: 'Outros', ordem: 91 },
+  agentedacentral: { secao: 'Outros', ordem: 92 },
+  relacionamento: { secao: 'Outros', ordem: 93 },
+  contato: { secao: 'Outros', ordem: 94 },
+  descricao: { secao: 'Outros', ordem: 95, largura: 3 },
+
+  // ==========================================================================
+  // MESA DIAMANTE
+  // ==========================================================================
+
+  // --- Caso
+  datadeentrada: { secao: 'Caso', ordem: 1,
+    rotulo: 'Data de recepção do caso', valorPadrao: '@HOJE' },
+  horario: { secao: 'Caso', ordem: 2, rotulo: 'Horário de recepção' },
+  titulodoemail: { secao: 'Caso', ordem: 4, rotulo: 'Título do e-mail',
+    largura: 2 },
+  assunto: { secao: 'Caso', ordem: 5, tipoCampo: 'seletor',
+    catalogo: 'ASSUNTO', largura: 2 },
+
+  // --- Situação
+  aberturaindevida: { secao: 'Situação', ordem: 13,
+    rotulo: 'Abertura indevida?' },
+
+  // --- Cliente
+  nomedosegurado: { secao: 'Cliente', ordem: 20, rotulo: 'Nome',
+    obrigatorio: true, largura: 2 },
+  documentocpf: { secao: 'Cliente', ordem: 21, rotulo: 'CPF',
+    tipoCampo: 'documento', mascara: '000.000.000-00' },
+
+  // --- Corretora
+  corretora: { secao: 'Corretora', ordem: 31, rotulo: 'Nome da corretora' },
+  ramo: { secao: 'Corretora', ordem: 32, tipoCampo: 'seletor', catalogo: 'RAMO' },
+
+  // --- Encaminhamento
+  arearesponsavel: { secao: 'Encaminhamento', ordem: 40, tipoCampo: 'seletor',
+    catalogo: 'AREA' },
+  dataresposta: { secao: 'Encaminhamento', ordem: 41,
+    rotulo: 'Data da resposta' },
+  horaresposta: { secao: 'Encaminhamento', ordem: 42,
+    rotulo: 'Horário da resposta' },
+  datadafinalizacao: { secao: 'Encaminhamento', ordem: 43,
+    rotulo: 'Data da finalização' },
+  horariodafinalizacao: { secao: 'Encaminhamento', ordem: 44,
+    rotulo: 'Horário da finalização' }
+};
+
+/*
+ * Os campos que as DUAS bases têm com o mesmo nome técnico, e que precisam de
+ * seção e ordem diferentes em cada uma.
+ *
+ * `analista`, `status`, `canal`, `susep` e `tipo` existem nos dois canais. O
+ * mapa acima guarda um valor por chave, então o que difere mora aqui, por
+ * aba. Sem isto, a Mesa Diamante herdaria as seções da RET — e o Status
+ * apareceria numa seção "Situação" que na Mesa vem antes do Cliente.
+ */
+const RECC_PADRAO_POR_ABA = {
+  BASE_MESA: {
+    analista: { secao: 'Caso', ordem: 3, tipoCampo: 'seletor',
+      listaDe: 'usuarios', valorPadrao: '@EU', travaPara: ['Analista'] },
+    status: { secao: 'Situação', ordem: 10, tipoCampo: 'seletor',
+      catalogo: 'STATUS', obrigatorio: true, valorPadrao: 'Em andamento' },
+    canal: { secao: 'Situação', ordem: 11, rotulo: 'Canal de origem',
+      tipoCampo: 'seletor', catalogo: 'CANAL' },
+    tipo: { secao: 'Situação', ordem: 12, tipoCampo: 'seletor',
+      catalogo: 'TIPO' },
+    susep: { secao: 'Corretora', ordem: 30, rotulo: 'SUSEP' }
+  }
 };
 
 /**
@@ -617,40 +765,51 @@ const RECC_PADRAO_DO_FORMULARIO = {
  * sistema, não do formulário. A coluna Id entra desativada — precisa estar no
  * mapa, mas ninguém digita um Id.
  */
-function camposDoFormularioDaBase_(nomeDaAba, mesaId) {
+function camposDoFormularioDaBase_(nomeDaAba, canalId) {
   var esquema = esquemaDaAba_(nomeDaAba);
   var campos = [];
-  var ordem = 0;
+  var daAba = RECC_PADRAO_POR_ABA[nomeDaAba] || {};
+  var semLugarNaLista = 900;
 
   esquema.colunas.forEach(function (coluna) {
     if (coluna.cabecalho.charAt(0) === '_') return;
 
     var chave = normalizarParaComparar_(coluna.cabecalho);
     var ehId = (chave === 'id');
-    var padrao = RECC_PADRAO_DO_FORMULARIO[chave] || {};
-    ordem++;
+
+    // O que vale para ESTA aba vence o que vale para todas: `status` e
+    // `canal` existem nos dois canais, em seções diferentes.
+    var padrao = daAba[chave] || RECC_PADRAO_DO_FORMULARIO[chave] || {};
 
     var configuracao = {};
     if (padrao.catalogo) configuracao.catalogo = padrao.catalogo;
     if (padrao.listaDe) configuracao.listaDe = padrao.listaDe;
     if (padrao.largura) configuracao.largura = padrao.largura;
+    if (padrao.mostrarSe) configuracao.mostrarSe = padrao.mostrarSe;
+    if (padrao.travaPara) configuracao.travaPara = padrao.travaPara;
+    if (padrao.separaEm) configuracao.separaEm = padrao.separaEm;
 
     campos.push({
-      MesaId: mesaId,
+      CanalId: canalId,
       Aba: nomeDaAba,
       ChaveTecnica: chave,
       Cabecalho: coluna.cabecalho,
-      Rotulo: coluna.cabecalho,
+      // O rótulo é o que a pessoa LÊ; o cabeçalho é o que está gravado. Poder
+      // trocar um sem mexer no outro é o que permite escrever "Valor do
+      // prêmio anual" na tela sem renomear uma coluna com dado dentro.
+      Rotulo: padrao.rotulo || coluna.cabecalho,
       Descricao: '',
       TipoCampo: padrao.tipoCampo || RECC_DO_DADO_PARA_O_CAMPO[coluna.tipo] || 'texto',
-      Secao: padrao.secao || 'Geral',
+      Secao: padrao.secao || 'Outros',
       Mascara: padrao.mascara || '',
       Obrigatorio: padrao.obrigatorio === true,
       Protegido: coluna.protegido === true,
-      Ativo: !ehId,
-      Ordem: ordem,
+      Ativo: !ehId && padrao.ativo !== false,
+      // A ordem vem da LISTA da operação, não da posição da coluna na
+      // planilha. Coluna sem lugar declarado cai no fim, junto das outras.
+      Ordem: padrao.ordem || (semLugarNaLista++),
       VisivelPara: '',
-      ValorPadrao: '',
+      ValorPadrao: padrao.valorPadrao || '',
       Configuracao: Object.keys(configuracao).length ? JSON.stringify(configuracao) : ''
     });
   });
@@ -677,7 +836,7 @@ function camposDoFormularioDaBase_(nomeDaAba, mesaId) {
  * Script pega isso — os testes leem a PASTA do repositório, onde o arquivo
  * está; quem não tem o arquivo é o PROJETO.
  *
- * Para a conferência completa — sequências, Ids, mesas, campos, permissões —
+ * Para a conferência completa — sequências, Ids, canais, campos, permissões —
  * existe `diagnosticoRECC()`. As duas leem o mesmo `conferirEstrutura_`: não
  * há duas versões da regra, há uma curta e uma completa.
  */
@@ -795,7 +954,7 @@ function orcamentoDeCelulas_(planilha) {
  *   atencao  funciona, mas alguém precisa olhar. Coluna a mais na planilha,
  *            campo obrigatório desligado. Nada quebra hoje.
  *   falha    alguma coisa vai dar errado, ou já está dando. Aba faltando,
- *            Id repetido, mesa apontando para coluna que não existe.
+ *            Id repetido, canal apontando para coluna que não existe.
  * ============================================================================
  */
 
@@ -844,7 +1003,7 @@ function rodarDiagnostico_() {
     rodarBloco_('estrutura', 'A estrutura da planilha', blocoDaEstrutura_),
     rodarBloco_('sequencias', 'As sequências de Id', blocoDasSequencias_),
     rodarBloco_('identificadores', 'Os identificadores gravados', blocoDosIds_),
-    rodarBloco_('mesas', 'As mesas', blocoDasMesas_),
+    rodarBloco_('canais', 'Os canais', blocoDasCanais_),
     rodarBloco_('campos', 'Os campos do formulário', blocoDosCampos_),
     rodarBloco_('paineis', 'Os cards e os gráficos', blocoDosPaineis_),
     rodarBloco_('analises', 'As análises', blocoDasAnalises_),
@@ -1155,21 +1314,21 @@ function blocoDosIds_() {
   return itens;
 }
 
-/** Toda coluna que uma mesa declara precisa existir na aba dela. */
-function blocoDasMesas_() {
+/** Toda coluna que um canal declara precisa existir na aba dela. */
+function blocoDasCanais_() {
   var itens = [];
-  var mesas = lerRegistros_('MESAS');
+  var canais = lerRegistros_('CANAIS');
 
-  if (!mesas.length) {
+  if (!canais.length) {
     return [item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-      'Não há nenhuma mesa cadastrada',
-      'Sem mesa, o Dashboard, o cadastro e a busca não têm onde procurar.',
-      'Rode instalarRECC() ou cadastre em Configurações › Mesas.')];
+      'Não há nenhum canal cadastrada',
+      'Sem canal, o Dashboard, o cadastro e a busca não têm onde procurar.',
+      'Rode instalarRECC() ou cadastre em Configurações › Canais.')];
   }
 
   var ativas = 0;
 
-  mesas.forEach(function (linha) {
+  canais.forEach(function (linha) {
     var nome = String(linha.Nome || linha.Id);
     var ligada = normalizarParaComparar_(linha.Ativo) === 'sim';
     if (ligada) ativas++;
@@ -1177,9 +1336,9 @@ function blocoDasMesas_() {
     var nomeDaAba = String(linha.Aba || '');
     if (!planilhaAtiva_().getSheetByName(nomeDaAba)) {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-        'A mesa "' + nome + '" aponta para uma aba que não existe',
+        'O canal "' + nome + '" aponta para uma aba que não existe',
         'Aba declarada: "' + nomeDaAba + '".',
-        'Ou a aba foi renomeada na planilha, ou o nome está errado em MESAS. '
+        'Ou a aba foi renomeada na planilha, ou o nome está errado em CANAIS. '
           + 'Os dois se resolvem acertando a coluna Aba.'));
       return;
     }
@@ -1210,23 +1369,23 @@ function blocoDasMesas_() {
 
     if (problemas.length) {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-        'A mesa "' + nome + '" cita coluna que a aba não tem',
+        'O canal "' + nome + '" cita coluna que a aba não tem',
         algunsExemplos_(problemas),
-        'Acerte em Configurações › Mesas, ou acrescente a coluna em '
+        'Acerte em Configurações › Canais, ou acrescente a coluna em '
           + nomeDaAba + '. A aba tem: ' + estrutura.cabecalhos.join(', ') + '.'));
       return;
     }
 
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
-      'A mesa "' + nome + '" está coerente com ' + nomeDaAba
+      'O canal "' + nome + '" está coerente com ' + nomeDaAba
         + (ligada ? '' : ' (desligada)')));
   });
 
   if (!ativas) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-      'Nenhuma mesa está ligada',
-      'Existem ' + mesas.length + ' mesa(s) cadastrada(s), e todas desligadas.',
-      'Ligue pelo menos uma em Configurações › Mesas. Sem mesa ligada o '
+      'Nenhum canal está ligada',
+      'Existem ' + canais.length + ' canal(s) cadastrada(s), e todas desligadas.',
+      'Ligue pelo menos uma em Configurações › Canais. Sem canal ligada o '
         + 'Dashboard abre vazio.'));
   }
 
@@ -1237,7 +1396,7 @@ function blocoDasMesas_() {
  * As colunas citadas num texto de configuração, seja ele plano ou em grupos.
  *
  * ColunasDaFila aceita as duas escritas: "a,b,c" e "Grupo: a,b; Outro: c".
- * Ler só uma delas faria o diagnóstico acusar coluna inexistente numa mesa
+ * Ler só uma delas faria o diagnóstico acusar coluna inexistente num canal
  * perfeitamente configurada.
  */
 function colunasCitadas_(texto) {
@@ -1330,19 +1489,19 @@ function blocoDosPaineis_() {
       'Monte em Configurações › Painéis.')];
   }
 
-  var mesasPorId = {};
-  lerRegistros_('MESAS').forEach(function (mesa) {
-    mesasPorId[converterParaIdentificador_(mesa.Id)] = mesa;
+  var canaisPorId = {};
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    canaisPorId[converterParaIdentificador_(canal.Id)] = canal;
   });
 
-  var semMesa = [];
+  var semCanal = [];
   var semColuna = [];
 
   componentes.forEach(function (componente) {
     var titulo = String(componente.Titulo || componente.Id);
-    var mesa = mesasPorId[converterParaIdentificador_(componente.MesaId)];
-    if (!mesa) {
-      semMesa.push(titulo);
+    var canal = canaisPorId[converterParaIdentificador_(componente.CanalId)];
+    if (!canal) {
+      semCanal.push(titulo);
       return;
     }
 
@@ -1350,7 +1509,7 @@ function blocoDosPaineis_() {
     // contagem ('total', 'situacao', 'naCelula'), e não um cabeçalho.
     if (normalizarParaComparar_(componente.TipoWidget) === 'cartao') return;
 
-    var estrutura = estruturaDaAba_(String(mesa.Aba || ''));
+    var estrutura = estruturaDaAba_(String(canal.Aba || ''));
     [componente.CampoDimensao, componente.CampoMedida].forEach(function (bruto) {
       var cabecalho = String(bruto || '').trim();
       if (!cabecalho) return;
@@ -1360,11 +1519,11 @@ function blocoDosPaineis_() {
     });
   });
 
-  if (semMesa.length) {
+  if (semCanal.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-      semMesa.length + ' componente(s) apontam para mesa que não existe',
-      algunsExemplos_(semMesa),
-      'Eles não aparecem em tela nenhuma. Acerte a mesa ou remova em '
+      semCanal.length + ' componente(s) apontam paro canal que não existe',
+      algunsExemplos_(semCanal),
+      'Eles não aparecem em tela nenhuma. Acerte o canal ou remova em '
         + 'Configurações › Painéis.'));
   }
   if (semColuna.length) {
@@ -1374,9 +1533,9 @@ function blocoDosPaineis_() {
       'O gráfico abre vazio, sem dizer por quê. Acerte em Configurações › '
         + 'Painéis › Gráficos.'));
   }
-  if (!semMesa.length && !semColuna.length) {
+  if (!semCanal.length && !semColuna.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
-      'Os ' + componentes.length + ' componentes apontam para mesas e colunas '
+      'Os ' + componentes.length + ' componentes apontam paro canals e colunas '
         + 'que existem'));
   }
 
@@ -1390,31 +1549,31 @@ function blocoDasAnalises_() {
   }
 
   var itens = [];
-  var mesasPorId = {};
-  lerRegistros_('MESAS').forEach(function (mesa) {
-    mesasPorId[converterParaIdentificador_(mesa.Id)] = mesa;
+  var canaisPorId = {};
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    canaisPorId[converterParaIdentificador_(canal.Id)] = canal;
   });
 
   receitas.forEach(function (receita) {
     var nome = String(receita.Nome || receita.Id);
-    var mesa = mesasPorId[converterParaIdentificador_(receita.MesaId)];
+    var canal = canaisPorId[converterParaIdentificador_(receita.CanalId)];
 
-    if (!mesa) {
+    if (!canal) {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-        'A análise "' + nome + '" aponta para mesa que não existe',
+        'A análise "' + nome + '" aponta paro canal que não existe',
         'Gerar esta análise vai estourar.',
-        'Acerte a mesa em Configurações › Análises, ou tire a análise da lista.'));
+        'Acerte o canal em Configurações › Análises, ou tire a análise da lista.'));
       return;
     }
 
-    var estrutura = estruturaDaAba_(String(mesa.Aba || ''));
+    var estrutura = estruturaDaAba_(String(canal.Aba || ''));
     var perdidas = colunasCitadas_(receita.Colunas).filter(function (cabecalho) {
       return posicaoDaColuna_(estrutura, cabecalho) < 0;
     });
 
     if (perdidas.length) {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-        'A análise "' + nome + '" cita coluna que a mesa não tem',
+        'A análise "' + nome + '" cita coluna que o canal não tem',
         algunsExemplos_(perdidas),
         'A coluna sai vazia na aba gerada. Acerte em Configurações › Análises.'));
       return;

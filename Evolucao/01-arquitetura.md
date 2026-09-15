@@ -30,10 +30,10 @@ outra operação é trocar essas linhas, não é mexer em código.
 | `IDENTIDADE.LOGO_URL` | (definido em Configurações) |
 | `IDENTIDADE.COR_PRIMARIA` | azul Porto Seguro |
 
-O sistema atende **duas mesas de trabalho** hoje, e precisa aceitar uma terceira
+O sistema atende **dois canais de trabalho** hoje, e precisa aceitar uma terceira
 sem tocar em código:
 
-| Mesa | Base | O que é |
+| Canal | Base | O que é |
 |---|---|---|
 | **RET Vida** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
 | **Mesa Diamante** | `BASE_MESA` | Atendimento a casos prioritários |
@@ -85,7 +85,7 @@ O sistema anterior guardava campo dinâmico como linha numa tabela de valores
 integração: o Power BI recebe um emaranhado, não uma tabela.
 
 **Aqui: um caso = uma linha. Sempre.** Campo novo criado em Configurações vira
-uma coluna nova no fim da aba da mesa.
+uma coluna nova no fim da aba do canal.
 
 | Ação em Configurações | O que acontece na planilha |
 |---|---|
@@ -208,7 +208,7 @@ Hora resposta | Data da finalização | horário da finalização
 
 **Indicador "finalizado na célula"** (pedido explícito): não é coluna gravada, é
 métrica calculada — `Data da finalização` preenchida **E** `Área responsável`
-vazia. Vira card no Dashboard da Mesa. Calcular em vez de gravar evita o campo
+vazia. Vira card no Dashboard da Mesa Diamante. Calcular em vez de gravar evita o campo
 mentir quando alguém edita a área responsável direto na planilha.
 
 **`Abertura indevida`**: `SIM` / `NAO`, também vira indicador.
@@ -218,7 +218,7 @@ mentir quando alguém edita a área responsável direto na planilha.
 | Aba | Colunas |
 |---|---|
 | `USUARIOS` | `Id` · `Nome` · `Email` · `Canal que atende` · `CargoId` · `NivelAcessoId` · `Ativo` · `Matricula` · `DataCadastro` · `UltimoAcesso` |
-| `CANAIS` | `Id` · `Nome` · `Canal` · `SUSEP` · `Corretora` · `Segmento` |
+| `CORRETORAS` | `Id` · `Nome` · `Canal` · `SUSEP` · `Corretora` · `Segmento` |
 | `PRODUTOS` | `Id` · `Produto` · `CodigoProduto` |
 | `SUSEP_BLOQUEADAS` | `Id` · `SUSEP` · `NomeCorretora` · `CpfReincidente` · `Motivo` · `BloqueadaEm` |
 
@@ -233,7 +233,7 @@ código sem depender do texto, que muda.
 acesso decide o que a pessoa pode fazer. Sem `Email`, `NivelAcessoId` e `Ativo`
 não existe login nem permissão. As três colunas são obrigatórias.
 
-**`CANAIS`** responde a pergunta do segmento no formulário e no dashboard:
+**`CORRETORAS`** responde a pergunta do segmento no formulário e no dashboard:
 `Diamante` · `Demais corretoras` · `Não encontrado` (quando a SUSEP não está na
 aba). "Não encontrado" é resposta legítima, diferente de vazio.
 
@@ -244,20 +244,20 @@ formulário (no momento em que a SUSEP é digitada) e no dashboard.
 
 | Aba | Colunas | Para quê |
 |---|---|---|
-| `MESAS` | `Id` · `Nome` · `Descricao` · `Aba` · `Icone` · `Ordem` · `Ativo` | Registro das mesas. Mesa nova = linha nova, sem código |
-| `CAMPOS` | `Id` · `MesaId` · `Aba` · `ChaveTecnica` · `Cabecalho` · `Rotulo` · `Descricao` · `TipoCampo` · `Secao` · `Mascara` · `Obrigatorio` · `Protegido` · `Ativo` · `Ordem` · `VisivelPara` · `ValorPadrao` · `Configuracao` | O catálogo do formulário e o mapa coluna↔campo |
-| `CATALOGO` | `Id` · `MesaId` · `Tipo` · `Codigo` · `Nome` · `Rotulo` · `PaiId` · `Cor` · `Ordem` · `Ativo` · `Configuracao` | Status, motivos, origens, tipos, ramos, áreas responsáveis, cargos, níveis de acesso, segmentos |
-| `PAINEIS` | `Id` · `Tela` · `MesaId` · `Titulo` · `TipoComponente` · `CampoDimensao` · `CampoMedida` · `Agregacao` · `Limite` · `Filtro` · `Ordem` · `Largura` · `VisivelPara` · `Ativo` | Os cards e gráficos de cada tela, configuráveis |
+| `CANAIS` | `Id` · `Nome` · `Descricao` · `Aba` · `Icone` · `Ordem` · `Ativo` | Registro dos canais. Canal nova = linha nova, sem código |
+| `CAMPOS` | `Id` · `CanalId` · `Aba` · `ChaveTecnica` · `Cabecalho` · `Rotulo` · `Descricao` · `TipoCampo` · `Secao` · `Mascara` · `Obrigatorio` · `Protegido` · `Ativo` · `Ordem` · `VisivelPara` · `ValorPadrao` · `Configuracao` | O catálogo do formulário e o mapa coluna↔campo |
+| `CATALOGO` | `Id` · `CanalId` · `Tipo` · `Codigo` · `Nome` · `Rotulo` · `PaiId` · `Cor` · `Ordem` · `Ativo` · `Configuracao` | Status, motivos, origens, tipos, ramos, áreas responsáveis, cargos, níveis de acesso, segmentos |
+| `PAINEIS` | `Id` · `Tela` · `CanalId` · `Titulo` · `TipoComponente` · `CampoDimensao` · `CampoMedida` · `Agregacao` · `Limite` · `Filtro` · `Ordem` · `Largura` · `VisivelPara` · `Ativo` | Os cards e gráficos de cada tela, configuráveis |
 | `CONFIG` | `Id` · `Chave` · `Valor` · `Descricao` · `AtualizadoPor` · `Data` | Parâmetros gerais (nome do sistema, janela de dias, metas…) |
 | `AUDITORIA` | `Id` · `DataHora` · `UsuarioId` · `Acao` · `Entidade` · `RegistroId` · `Detalhe` | Trilha das ações relevantes. Sem dado pessoal |
-| `ANALISES` | `Id` · `Nome` · `Descricao` · `MesaId` · `Colunas` · `Filtros` · `Dias` · `Ordem` · `Ativo` · `GeradaEm` · `GeradaPor` · `Linhas` | A **receita** de cada aba `ANALISE_*`. A aba gerada é outra coisa, e não está no contrato |
+| `ANALISES` | `Id` · `Nome` · `Descricao` · `CanalId` · `Colunas` · `Filtros` · `Dias` · `Ordem` · `Ativo` · `GeradaEm` · `GeradaPor` · `Linhas` | A **receita** de cada aba `ANALISE_*`. A aba gerada é outra coisa, e não está no contrato |
 
 ### 3.4 Abas de análise (geradas pelo sistema)
 
 Pedido: *"permitir criar uma aba exclusiva que irá criar uma aba no planilhas
 para análise de dados."*
 
-Em Configurações › Análise, o ADM define: mesa, colunas, filtros, período. O
+Em Configurações › Análise, o ADM define: canal, colunas, filtros, período. O
 sistema cria/atualiza uma aba chamada `ANALISE_<nome>` com os dados achatados,
 prontos para tabela dinâmica ou Power BI.
 
@@ -313,7 +313,7 @@ NAVEGADOR (uma página só, servida por HtmlService)
   Comuns.html ........ as peças que MAIS DE UMA tela usa:
                          Moldura ............. menu lateral e barra superior
                          SenhaDeAdministrador  o diálogo das ações sem desfazer
-                         SeletorDeMesa ....... RET Vida ou Mesa Diamante
+                         SeletorDeCanal ....... RET Vida ou Mesa Diamante
                          Formulario .......... o formulário montado por CAMPOS
                          CasoEmModal ......... o caso aberto por cima da fila
                          Graficos ............ os desenhos em SVG
@@ -389,7 +389,7 @@ certo. Juntos, a regra é uma só porque está à vista.
    mensagem de usuário não cadastrado e como pedir acesso. Nenhum dado é
    carregado.
 4. **Encontrou** → serve a página e devolve, **numa única chamada**, o pacote de
-   partida: usuário, permissões, mesas, catálogo, campos, painéis e tema.
+   partida: usuário, permissões, canais, catálogo, campos, painéis e tema.
    Uma ida ao servidor, não sete.
 5. `ensureEstrutura()` só **confere** as abas obrigatórias. Faltando algo, para
    com mensagem dizendo exatamente o que falta — não cria nada sozinho.
@@ -405,7 +405,7 @@ O Apps Script tem ~6 minutos por execução e cada chamada ao Sheets é rede.
 | A fila de trabalho lê só a **janela recente** (30 dias, configurável) | Não se lê 200 mil linhas para mostrar 40 |
 | A base **só acrescenta no fim**, nunca reordena | O recente é sempre o fim da aba — leitura barata |
 | Catálogo guardado em memória (`CacheService`), renovado por versão | O catálogo muda uma vez por semana, é lido a cada clique |
-| Totais guardados em memória, com chave formada por mesa + filtros + período | Dez pessoas abrindo o mesmo painel = um cálculo |
+| Totais guardados em memória, com chave formada por canal + filtros + período | Dez pessoas abrindo o mesmo painel = um cálculo |
 | `LockService` em toda gravação | Sheets não tem transação. Dois salvamentos simultâneos se atropelam |
 
 ### 4.4 Busca
@@ -445,7 +445,7 @@ são 200 mil, e depois só as linhas que interessam.
 | Limite dos rankings (TOP 5, TOP 10, TOP N) | `PAINEIS.Limite` | Não |
 | Status, motivos, origens, ramos, áreas | `CATALOGO` | Não |
 | Cargos e níveis de acesso | `CATALOGO` | Sim |
-| Mesas | `MESAS` | Sim |
+| Canais | `CANAIS` | Sim |
 | Tema | Por usuário | Não |
 | Metas individuais | `CONFIG` | Sim |
 
@@ -461,7 +461,7 @@ são 200 mil, e depois só as linhas que interessam.
 `barras + linha (dois eixos)` · `card indicador com minigráfico` ·
 `barra de progresso` · `ranking` · `tabela`
 
-Cada componente em `PAINEIS` é: **fonte** (mesa) + **dimensão** (agrupa por) +
+Cada componente em `PAINEIS` é: **fonte** (canal) + **dimensão** (agrupa por) +
 **medida** (o que conta/soma) + **agregação** + **filtro** + **limite** +
 **quem vê**. Um gráfico novo é uma linha nova na aba, sem código.
 
@@ -489,7 +489,7 @@ faz**. Quatro coisas saem dele, e nenhuma sai do cargo:
 | **Quais campos** do formulário a pessoa vê | Campo a campo: `oculto` · `só leitura` · `edição` |
 | **Quais cards e gráficos** aparecem em cada painel | Um a um |
 | **Quais ações** pode executar | Criar · editar · ocultar · exportar · configurar |
-| **Que dados alcança** (escopo) | `PRÓPRIOS` · `EQUIPE` · `MESA` · `TODOS` |
+| **Que dados alcança** (escopo) | `PRÓPRIOS` · `EQUIPE` · `CANAL` · `TODOS` |
 
 Por isso `CAMPOS.VisivelPara` e `PAINEIS.VisivelPara` guardam **níveis de
 acesso**, nunca cargos. Duas pessoas com o mesmo cargo podem enxergar telas
@@ -501,12 +501,12 @@ superior.
 > aquela lista é de **níveis de acesso**, e é o mesmo controle usado para telas,
 > campos e componentes.
 - **Ação de alto impacto exige senha de ADM**: criar/remover coluna, criar ou
-  apagar mesa, mexer em níveis de acesso, gerar aba de análise sobre uma
+  apagar canal, mexer em níveis de acesso, gerar aba de análise sobre uma
   existente, normalizar base, ocultar dados em massa.
   Senha em SHA-256 com *salt*, guardada em Script Properties — **nunca na
   planilha**. Sessão liberada por poucos minutos; erro seguido bloqueia.
 - **Esconder botão não é segurança.** Toda função sensível revalida no servidor.
-- **Escopo de dados** por nível: `PRÓPRIOS` · `EQUIPE` · `MESA` · `TODOS`.
+- **Escopo de dados** por nível: `PRÓPRIOS` · `EQUIPE` · `CANAL` · `TODOS`.
 
 ---
 
@@ -520,12 +520,12 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 | 2 | Acesso | Login pelo e-mail, `USUARIOS`, cargos, níveis, tela de não cadastrado | **pronta** |
 | 3 | Casca | Menu lateral, barra superior, 4 temas, roteador | **pronta** |
 | 4 | Cadastrar Caso | Formulário dirigido por `CAMPOS`, máscaras, validação, selo de SUSEP | **pronta** |
-| 5 | Dashboard | Seletor de mesa, cards, fila de trabalho com filtros | **pronta** |
+| 5 | Dashboard | Seletor de canal, cards, fila de trabalho com filtros | **pronta** |
 | 6 | Configurações | Campos, catálogo, usuários, níveis, senha de ADM, reconciliação de colunas | **pronta** |
 | 7 | Buscar Caso | Base própria + planilha legada | **pronta** |
 | 8 | Painel Analítico | Componentes configuráveis, exportação | **pronta** |
 | 9 | Minha Performance | Indicadores individuais, meta, ranking | **pronta** |
-| 10 | Tabela de Corretoras | `CANAIS` + segmento + SUSEP bloqueada | **pronta** |
+| 10 | Tabela de Corretoras | `CORRETORAS` + segmento + SUSEP bloqueada | **pronta** |
 | 11 | Abas de análise | Gerador `ANALISE_*` | **pronta** |
 | 12 | Diagnóstico | Verificação de build e de contrato | **pronta** |
 

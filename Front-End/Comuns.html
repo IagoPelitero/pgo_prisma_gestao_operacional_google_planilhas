@@ -13,7 +13,7 @@
 
       1. Moldura
       2. SenhaDeAdministrador
-      3. SeletorDeMesa
+      3. SeletorDeCanal
       4. Formulario
       5. CasoEmModal
       6. Graficos
@@ -122,8 +122,8 @@ var Moldura = (function () {
       + '<circle cx="4.7" cy="17.4" r="1.1"></circle>'
       + '<path d="M9 6.6h11.3M9 12h11.3M9 17.4h11.3"></path>',
 
-    // mesas de trabalho: a bancada, com o tampo e as duas pernas
-    mesas:
+    // canais de trabalho: a bancada, com o tampo e as duas pernas
+    canais:
       '<rect x="2.9" y="6.2" width="18.2" height="4.2" rx="1.4"></rect>'
       + '<path d="M5.9 10.4v7.4M18.1 10.4v7.4"></path>'
       + '<path d="M5.9 14.1h12.2"></path>',
@@ -327,9 +327,9 @@ var Moldura = (function () {
   /** A data do último registro, ou o aviso de que ainda não há nenhum. */
   function ultimoRegistro(dados) {
     var informacao = dados || { texto: 'Nenhum registro ainda', existe: false };
-    var explicacao = informacao.existe && informacao.mesa
-      ? 'Último registro em ' + informacao.mesa
-      : 'Ainda não há registros nas mesas';
+    var explicacao = informacao.existe && informacao.canal
+      ? 'Último registro em ' + informacao.canal
+      : 'Ainda não há registros nos canais';
 
     return '<div class="ultimo-registro' + (informacao.existe ? '' : ' vazio') + '"'
       + ' title="' + escapar(explicacao) + '">'
@@ -358,7 +358,7 @@ var Moldura = (function () {
       ? Number(resposta.linhasLidas).toLocaleString('pt-BR') : 'algumas';
     return '<p class="aviso-janela" role="status">'
       + '<strong>' + oQueEssaTelaMostra + ' vêm das ' + lidas + ' linhas mais '
-      + 'recentes da base</strong>, que é o que o painel lê de uma vez. A mesa '
+      + 'recentes da base</strong>, que é o que o painel lê de uma vez. O canal '
       + 'tem mais que isso, então casos antigos do período podem ter ficado de '
       + 'fora. Para o histórico inteiro, use Buscar Caso; para aumentar a '
       + 'janela, ajuste <code>OPERACAO.LINHAS_DO_PAINEL</code> na aba CONFIG.'
@@ -494,24 +494,24 @@ var SenhaDeAdministrador = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 3 de 6 · SeletorDeMesa
-     Era o arquivo Front-End/SeletorDeMesa.html antes de as peças
+     PEÇA 3 de 6 · SeletorDeCanal
+     Era o arquivo Front-End/SeletorDeCanal.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — SeletorDeMesa.html · a escolha da mesa de trabalho
+   PGO — SeletorDeCanal.html · a escolha do canal de trabalho
    ============================================================================
    Aparece no Dashboard e no Cadastrar Caso, e é a mesma peça nos dois. Duas
-   cópias divergiriam na primeira mudança — bastaria uma mesa nova ganhar
+   cópias divergiriam na primeira mudança — bastaria um canal nova ganhar
    ícone só num dos lugares.
 
-   O desenho de cada mesa vem da coluna `Icone`, na aba MESAS: mesa nova
+   O desenho de cado canal vem da coluna `Icone`, na aba CANAIS: canal nova
    escolhe o dela sem passar por código.
    ============================================================================ */
 
-var SeletorDeMesa = (function () {
+var SeletorDeCanal = (function () {
 
   var DESENHOS = {
     // escudo com coração: proteger a vida de quem já é cliente
@@ -519,7 +519,7 @@ var SeletorDeMesa = (function () {
       '<path d="M12 3.2 4.8 6v6.2c0 4.4 3 7.6 7.2 8.9 4.2-1.3 7.2-4.5 7.2-8.9V6z"></path>'
       + '<path d="M12 15.4c-2-1.3-3.2-2.4-3.2-3.8a1.7 1.7 0 0 1 3.2-.9 1.7 1.7 0 0 1 3.2.9'
       + 'c0 1.4-1.2 2.5-3.2 3.8z"></path>',
-    // diamante: a mesa prioritária
+    // diamante: o canal prioritária
     diamante:
       '<path d="M7.4 3.6h9.2l4 5.4L12 20.6 3.4 9z"></path>'
       + '<path d="M3.4 9h17.2M7.4 3.6 12 9l4.6-5.4M12 9v11.6"></path>'
@@ -533,27 +533,27 @@ var SeletorDeMesa = (function () {
       + ' aria-hidden="true">' + desenho + '</svg>';
   }
 
-  function montar(mesas, idEscolhido) {
-    return '<div class="mesas" role="group" aria-label="Mesa de trabalho">'
-      + mesas.map(function (mesa) {
-        var atual = mesa.id === idEscolhido;
-        return '<button type="button" class="mesa' + (atual ? ' atual' : '') + '"'
-          + ' data-mesa="' + Moldura.escapar(mesa.id) + '"'
+  function montar(canais, idEscolhido) {
+    return '<div class="canais" role="group" aria-label="Canal de trabalho">'
+      + canais.map(function (canal) {
+        var atual = canal.id === idEscolhido;
+        return '<button type="button" class="canal' + (atual ? ' atual' : '') + '"'
+          + ' data-canal="' + Moldura.escapar(canal.id) + '"'
           + ' aria-pressed="' + (atual ? 'true' : 'false') + '">'
-          + icone(mesa.icone)
+          + icone(canal.icone)
           + '<span class="dizeres">'
-          + '<strong>' + Moldura.escapar(mesa.nome) + '</strong>'
-          + '<span>' + Moldura.escapar(mesa.descricao) + '</span>'
+          + '<strong>' + Moldura.escapar(canal.nome) + '</strong>'
+          + '<span>' + Moldura.escapar(canal.descricao) + '</span>'
           + '</span></button>';
       }).join('')
       + '</div>';
   }
 
   function ligar(aoEscolher) {
-    var botoes = document.querySelectorAll('.mesa');
+    var botoes = document.querySelectorAll('.canal');
     for (var i = 0; i < botoes.length; i++) {
       botoes[i].addEventListener('click', function () {
-        aoEscolher(this.getAttribute('data-mesa'));
+        aoEscolher(this.getAttribute('data-canal'));
       });
     }
   }
@@ -693,12 +693,89 @@ var Formulario = (function () {
     var selo = campo.chave === 'susep'
       ? '<div class="selo-susep" id="' + prefixo + 'selo-susep" hidden></div>' : '';
 
+    // A condição de visibilidade viaja no HTML, e não numa variável do
+    // módulo: o formulário é desenhado em dois lugares — a tela de cadastro e
+    // o caso aberto por cima — e o que estiver só na memória de um não vale
+    // para o outro.
+    var condicao = campo.mostrarSe
+      ? ' data-mostrar-se-campo="' + escapar(campo.mostrarSe.campo) + '"'
+        + ' data-mostrar-se-valor="' + escapar(campo.mostrarSe.valor) + '"'
+      : '';
+
+    // Travado pelo cargo não é o mesmo que somente leitura do nível, e a
+    // pessoa merece saber qual dos dois é. Sem essa frase, um analista lê o
+    // campo cinza como defeito da tela.
+    var porQueTravado = campo.travadoPeloCargo
+      ? '<small class="ajuda">Preenchido com o seu nome. Cadastrar em nome de '
+        + 'outra pessoa depende do seu nível de acesso.</small>' : '';
+
     return '<div class="campo largura-' + campo.largura + '" data-campo="'
-      + escapar(campo.chave) + '">'
+      + escapar(campo.chave) + '"' + condicao + '>'
       + '<label for="' + id + '">' + escapar(campo.rotulo) + obrigatorio + '</label>'
-      + controle + ajuda + selo
+      + controle + ajuda + porQueTravado + selo
       + '<small class="erro" hidden></small>'
       + '</div>';
+  }
+
+  /**
+   * Põe os valores padrão e acende/apaga os campos condicionais.
+   *
+   * Roda ao desenhar o formulário vazio. No caso já gravado quem manda é o
+   * valor do caso — ver preencher —, porque um padrão sobrescrevendo o que
+   * está na planilha seria perda silenciosa de dado.
+   */
+  function aplicarPadroes(raiz, formulario) {
+    formulario.secoes.forEach(function (secao) {
+      secao.campos.forEach(function (campo) {
+        if (!campo.valorPadrao) return;
+        var caixa = raiz.querySelector('[data-chave="' + campo.chave + '"]');
+        if (caixa && !caixa.value) caixa.value = campo.valorPadrao;
+      });
+    });
+    aplicarCondicoes(raiz);
+  }
+
+  /**
+   * Mostra cada campo condicional só quando o campo de que ele depende
+   * estiver com o valor combinado.
+   *
+   * "Nome de quem transferiu" só faz sentido quando o canal de origem é a
+   * Central; "dados do pagamento", só para uma forma específica. Deixar os
+   * dois sempre visíveis enche o formulário de campos que quase nunca se
+   * preenche — e campo que quase nunca se preenche ensina a pular campo.
+   */
+  /**
+   * Dois textos são o mesmo, ignorando acento e caixa.
+   *
+   * A condição é escrita por quem configura ("CENTRAL"), e o valor vem de uma
+   * lista que alguém pode ter cadastrado como "Central". Comparar cru faria a
+   * regra funcionar hoje e parar de funcionar no dia em que a lista fosse
+   * reescrita — sem erro nenhum, só o campo que nunca mais aparece.
+   */
+  function mesmoTexto(um, outro) {
+    function limpar(texto) {
+      return String(texto || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+    return limpar(um) === limpar(outro);
+  }
+
+  function aplicarCondicoes(raiz) {
+    var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
+    for (var i = 0; i < condicionais.length; i++) {
+      var bloco = condicionais[i];
+      var deQuem = bloco.getAttribute('data-mostrar-se-campo');
+      var esperado = bloco.getAttribute('data-mostrar-se-valor');
+      var caixa = raiz.querySelector('[data-chave="' + deQuem + '"]');
+      var valor = caixa ? String(caixa.value || '') : '';
+      var mostrar = mesmoTexto(valor, esperado);
+      bloco.hidden = !mostrar;
+      if (!mostrar) {
+        // Esconder sem limpar deixaria um valor invisível ser gravado.
+        var dentro = bloco.querySelector('[data-chave]');
+        if (dentro) dentro.value = '';
+      }
+    }
   }
 
   /** Todas as seções do formulário, prontas para entrar num elemento. */
@@ -740,6 +817,22 @@ var Formulario = (function () {
       susep.addEventListener('change', conferir);
       susep.addEventListener('blur', conferir);
     }
+
+    // Os campos condicionais reagem ao campo de que dependem. O ouvinte fica
+    // no campo que MANDA, e não no que obedece: quem obedece pode estar
+    // escondido, e elemento escondido não recebe evento.
+    var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
+    var jaOuvidos = {};
+    for (var k = 0; k < condicionais.length; k++) {
+      var deQuem = condicionais[k].getAttribute('data-mostrar-se-campo');
+      if (jaOuvidos[deQuem]) continue;
+      jaOuvidos[deQuem] = true;
+      var manda = raiz.querySelector('[data-chave="' + deQuem + '"]');
+      if (!manda) continue;
+      manda.addEventListener('change', function () { aplicarCondicoes(raiz); });
+      manda.addEventListener('input', function () { aplicarCondicoes(raiz); });
+    }
+    aplicarCondicoes(raiz);
   }
 
   /**
@@ -861,6 +954,7 @@ var Formulario = (function () {
     usaMascara: usaMascara,
     desenhar: desenhar,
     ligar: ligar,
+    aplicarPadroes: aplicarPadroes,
     valores: valores,
     preencher: preencher,
     limparErros: limparErros,
@@ -888,7 +982,7 @@ var Formulario = (function () {
 
      LEITURA  o caso inteiro, campo a campo, com a história embaixo. Campo em
               branco aparece com um travessão — sumir faria a pessoa achar
-              que o campo não existe nesta mesa.
+              que o campo não existe neste canal.
 
      EDIÇÃO   o mesmo formulário de Cadastrar Caso, montado pelo Formulario,
               já preenchido. Com PREFIXO, porque a tela de cadastro pode
@@ -900,7 +994,7 @@ var Formulario = (function () {
 
 var CasoEmModal = (function () {
 
-  var mesaAtual = '';
+  var canalAtual = '';
   var idAtual = '';
   var detalhe = null;
   var formulario = null;
@@ -920,8 +1014,8 @@ var CasoEmModal = (function () {
    * Dashboard recarrega quando precisa, e fica quieto quando a pessoa só
    * olhou e fechou.
    */
-  function abrir(idDaMesa, idDoCaso, quandoMudar, jaEditando) {
-    mesaAtual = idDaMesa;
+  function abrir(idDoCanal, idDoCaso, quandoMudar, jaEditando) {
+    canalAtual = idDoCanal;
     idAtual = idDoCaso;
     aoFechar = quandoMudar || null;
     editando = !!jaEditando;
@@ -982,7 +1076,7 @@ var CasoEmModal = (function () {
   /* ----------------------------------------------------------- carregar */
 
   function carregar() {
-    Servidor.chamar('detalhesDoCaso', mesaAtual, idAtual)
+    Servidor.chamar('detalhesDoCaso', canalAtual, idAtual)
       .entao(function (resposta) {
         detalhe = resposta;
         if (editando) abrirEdicao();
@@ -1004,7 +1098,7 @@ var CasoEmModal = (function () {
     editando = false;
     elemento('modal-subtitulo').textContent = detalhe.atualizadoEm
       ? 'Atualizado em ' + detalhe.atualizadoEm
-      : detalhe.mesa;
+      : detalhe.canal;
 
     elemento('modal-corpo').innerHTML =
       (detalhe.situacao
@@ -1042,7 +1136,7 @@ var CasoEmModal = (function () {
     var situacao = elemento('modal-situacao');
     if (situacao) {
       situacao.addEventListener('click', function () {
-        trocarSituacao(mesaAtual, idAtual, function () {
+        trocarSituacao(canalAtual, idAtual, function () {
           mudouAlgo = true;
           carregar();
         });
@@ -1057,7 +1151,7 @@ var CasoEmModal = (function () {
         + 'Ele sai do sistema para todo mundo. A linha permanece na planilha '
         + 'e pode ser trazida de volta por um administrador.')) return;
 
-      Servidor.chamar('ocultarCaso', mesaAtual, idAtual)
+      Servidor.chamar('ocultarCaso', canalAtual, idAtual)
         .entao(function () { mudouAlgo = true; fechar(); })
         .senao(function (erro) { window.alert(erro.message || String(erro)); });
     });
@@ -1096,10 +1190,10 @@ var CasoEmModal = (function () {
     // O formulário e os valores vêm em duas chamadas, e as duas precisam ter
     // chegado antes de preencher — preencher antes de desenhar não escreve
     // em lugar nenhum, e é o tipo de erro que só aparece com a rede lenta.
-    Servidor.chamar('formularioDaMesa', mesaAtual)
+    Servidor.chamar('formularioDoCanal', canalAtual)
       .entao(function (definicao) {
         formulario = definicao;
-        Servidor.chamar('casoParaEditar', mesaAtual, idAtual)
+        Servidor.chamar('casoParaEditar', canalAtual, idAtual)
           .entao(function (caso) {
             var corpo = corpoDaEdicao();
             if (!corpo) return;
@@ -1136,7 +1230,7 @@ var CasoEmModal = (function () {
     recado('Gravando…', '');
     elemento('modal-salvar').disabled = true;
 
-    Servidor.chamar('editarCaso', mesaAtual, idAtual, Formulario.valores(corpo))
+    Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo))
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
@@ -1171,8 +1265,8 @@ var CasoEmModal = (function () {
    * Separado do formulário inteiro de propósito: abrir trinta e cinco campos
    * para mexer num só é atrito que se paga dezenas de vezes por dia.
    */
-  function trocarSituacao(idDaMesa, idDoCaso, quandoMudar) {
-    Servidor.chamar('situacoesParaTrocar', idDaMesa, idDoCaso)
+  function trocarSituacao(idDoCanal, idDoCaso, quandoMudar) {
+    Servidor.chamar('situacoesParaTrocar', idDoCanal, idDoCaso)
       .entao(function (resposta) {
         var caixa = document.createElement('div');
         caixa.className = 'dialogo';
@@ -1207,7 +1301,7 @@ var CasoEmModal = (function () {
 
         elemento('form-situacao').addEventListener('submit', function (evento) {
           evento.preventDefault();
-          Servidor.chamar('alterarSituacaoDoCaso', idDaMesa, idDoCaso,
+          Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
             elemento('situacao-nova').value)
             .entao(function () { sair(); if (quandoMudar) quandoMudar(); })
             .senao(function (erro) {

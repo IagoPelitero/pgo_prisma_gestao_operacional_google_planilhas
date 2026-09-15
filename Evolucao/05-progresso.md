@@ -98,7 +98,7 @@ que teste nenhum pegaria.
 |---|---|
 | `Back-End/Casos.gs` | O motor: monta o formulário a partir de `CAMPOS` e valida o que volta |
 | `Back-End/Casos.gs` | Registrar, editar, ocultar e o selo da SUSEP |
-| `Front-End/CadastrarCaso.html` | A tela, com máscara, seleção de mesa e o selo |
+| `Front-End/CadastrarCaso.html` | A tela, com máscara, seleção de canal e o selo |
 
 O formulário **não está escrito em lugar nenhum do código**: é montado a
 partir da aba `CAMPOS` toda vez que a tela abre. Campo criado em Configurações
@@ -133,7 +133,7 @@ inteira e um que era defeito da própria ferramenta de prévia.
 |---|---|
 | `Back-End/Indicadores.gs` | Cartões, fila, filtros e o detalhe de um caso |
 | `Front-End/Dashboard.html` | A tela |
-| `Front-End/Comuns.html` | A escolha da mesa, usada aqui e no cadastro |
+| `Front-End/Comuns.html` | A escolha do canal, usada aqui e no cadastro |
 
 **Cartão e fila saem da mesma lista.** Contar de um lado e listar de outro
 deixaria o cartão dizendo 12 e a fila mostrando 7, sem ninguém saber qual está
@@ -143,7 +143,7 @@ certo.
   painel esconderia justamente a informação de que ela zerou
 - **"Finalizados na célula"**: finalização preenchida e área responsável
   vazia. É conta, não coluna, então não mente quando alguém edita a área
-  direto na planilha. A mesa que não declara essas colunas não ganha o cartão
+  direto na planilha. O canal que não declara essas colunas não ganha o cartão
 - Os filtros **são os campos que já são lista**: nada escrito em código. Campo
   que virar seletor vira filtro sozinho
 - O alcance do nível vale no painel: quem enxerga só os próprios casos tem
@@ -151,10 +151,10 @@ certo.
 - A fila abre o caso inteiro sem recarregar a tela, e o detalhe respeita a
   mesma regra de visibilidade do formulário
 
-A mesa passou a declarar, na aba `MESAS`, onde guarda cada coisa:
+O canal passou a declarar, na aba `CANAIS`, onde guarda cada coisa:
 `ColunaDoStatus`, `ColunasDaFila`, `ColunaDaFinalizacao` e
 `ColunaDaAreaResponsavel`. Declarado, e não adivinhado pelo nome — adivinhar
-acerta hoje e erra na mesa que vier depois.
+acerta hoje e erra no canal que vier depois.
 
 ![O Dashboard](imagens/tela-dashboard.png)
 
@@ -182,7 +182,7 @@ acerta hoje e erra na mesa que vier depois.
 | **Propriedades** | o item escolhido, aberto para edição. Nada grava sem Salvar |
 
 As sete seções: campos do formulário, usuários, níveis de acesso, listas,
-mesas de trabalho, identidade e segurança, estrutura e auditoria.
+canais de trabalho, identidade e segurança, estrutura e auditoria.
 
 ### Três níveis de risco, três guardas
 
@@ -190,7 +190,7 @@ mesas de trabalho, identidade e segurança, estrutura e auditoria.
 |---|---|---|
 | **Conteúdo** | permissão `configurar` | renomear uma situação, cadastrar usuário |
 | **Regra** | permissão `configurar` | o que um nível pode, quem vê qual campo |
-| **Estrutura** | **+ senha de administrador** | criar coluna, apagar mesa |
+| **Estrutura** | **+ senha de administrador** | criar coluna, apagar canal |
 
 A senha não é burocracia: criar coluna escreve na planilha de produção, e ali
 não existe desfazer.
@@ -211,11 +211,11 @@ não existe desfazer.
 
 ### E as travas que a tela acrescentou
 
-- **A aba de uma mesa não muda por aqui** — os casos já gravados moram nela
+- **A aba de um canal não muda por aqui** — os casos já gravados moram nela
 - **Nome de coluna é escolhido numa lista**, nunca digitado: o nome que não
   existe é recusado dizendo quais existem, em vez de deixar o painel em branco
   dias depois
-- **Desligar a última mesa ativa é recusado** — o Dashboard e o cadastro
+- **Desligar a último canal ativa é recusado** — o Dashboard e o cadastro
   ficariam sem base nenhuma
 - **A lista de telas é uma só.** `RECC_TELAS_DO_SISTEMA` alimenta o menu e a
   tela de níveis ao mesmo tempo; duas listas divergiriam, e a tela nova
@@ -230,7 +230,7 @@ senha é o tipo de detalhe que faz alguém desistir no meio.
 ### A seção Painéis
 
 Os cards do Dashboard deixaram de ser um texto separado por vírgula dentro da
-mesa e viraram **linhas da aba `PAINEIS`**: cada um com nome, o que conta,
+canal e viraram **linhas da aba `PAINEIS`**: cada um com nome, o que conta,
 cor, ordem e o interruptor de mostrar. Até 12 por operação. Remover um card
 não toca em caso nenhum — o card é uma forma de contar, e apagar a conta não
 apaga o que foi contado.
@@ -263,7 +263,7 @@ Responsável: analista
 ```
 
 A escrita antiga, sem dois-pontos, continua valendo: cada coluna vira um grupo
-com o próprio nome. Nenhuma mesa precisou ser reescrita.
+com o próprio nome. Nenhum canal precisou ser reescrita.
 
 ### O caso num modal
 
@@ -272,7 +272,7 @@ exatamente como estava — mesma rolagem, mesmo filtro, mesma linha. Sair e
 voltar faria perder o lugar dezenas de vezes por dia.
 
 Dentro do modal: o caso inteiro em duas colunas, **campo em branco com um
-travessão** (sumir faria a pessoa achar que o campo não existe nesta mesa), o
+travessão** (sumir faria a pessoa achar que o campo não existe neste canal), o
 **histórico do caso** tirado da trilha de auditoria, e o botão de editar.
 
 A edição é o **mesmo formulário** de Cadastrar Caso — o `Formulario`, que
@@ -289,7 +289,7 @@ podem disputar os mesmos identificadores.
 | **Alterar situação** | um diálogo pequeno, só com a situação — é o gesto mais frequente da operação, e abrir 35 campos para mexer num só é atrito que se paga dezenas de vezes por dia |
 | **Excluir** | some do sistema para todo mundo; **a linha permanece na planilha** e pode voltar |
 
-Concluir um caso preenche a data de finalização sozinho, quando a mesa tem
+Concluir um caso preenche a data de finalização sozinho, quando o canal tem
 essa coluna e ela está vazia — é o que a operação faria à mão em seguida.
 
 ---
@@ -311,8 +311,8 @@ protocolo estoura o tempo do Apps Script e a cota da conta.
 | 1. Ler só as **colunas de busca** e anotar em quais linhas o termo aparece | 5 colunas × 200 mil = 1 milhão de células |
 | 2. Ler **inteiras** só as linhas que casaram | quase sempre uma ou duas |
 
-Quais colunas cada mesa lê está em `MESAS.ColunasDaBusca`, e se ajusta em
-Configurações. Mesa que não declara nenhuma **avisa** em vez de ler a base
+Quais colunas cado canal lê está em `CANAIS.ColunasDaBusca`, e se ajusta em
+Configurações. Canal que não declara nenhuma **avisa** em vez de ler a base
 toda.
 
 ### A comparação ignora máscara
@@ -451,13 +451,13 @@ da mesma cor faria a tela dar a notícia errada.
 
 ### 4. O que não dá para calcular não aparece
 
-Tempo médio exige que a mesa declare a coluna de finalização. Sem ela, o
-indicador **some** — não aparece zerado, que pareceria desempenho ruim. Mesa
+Tempo médio exige que o canal declare a coluna de finalização. Sem ela, o
+indicador **some** — não aparece zerado, que pareceria desempenho ruim. Canal
 sem coluna de responsável não mostra zero: mostra o que falta configurar.
 
 ### A meta é declarada, nunca inventada
 
-`MESAS.MetaMensalPorPessoa`, e zero desliga. Alvo tirado do nada é pior que
+`CANAIS.MetaMensalPorPessoa`, e zero desliga. Alvo tirado do nada é pior que
 alvo nenhum: ele parece oficial, e ninguém sabe de onde saiu. A barra é
 proporcional ao período escolhido, e passar da meta **enche a barra** — o
 número diz o resto. Barra estourando a caixa é defeito, não conquista.
@@ -487,7 +487,7 @@ ajustavam abrindo a planilha.**
 
 | Aba | O que é |
 |---|---|
-| **Corretoras e canais** | `CANAIS` — quem traz o caso, com o segmento |
+| **Corretoras e canais** | `CORRETORAS` — quem traz o caso, com o segmento |
 | **Produtos** | `PRODUTOS` — o código é único, porque é ele que liga ao caso |
 | **SUSEPs bloqueadas** | `SUSEP_BLOQUEADAS` — com o motivo, obrigatório |
 
@@ -498,7 +498,7 @@ uma agenda telefônica; com ele, responde "quem me dá trabalho" — e a lista v
 ordenada por isso, não por ordem alfabética.
 
 **E o aviso das SUSEPs fora do cadastro.** Esse é o achado. Enquanto uma SUSEP
-não está em `CANAIS`, o selo do formulário diz "não encontrada" toda vez que
+não está em `CORRETORAS`, o selo do formulário diz "não encontrada" toda vez que
 alguém a digita — e o sintoma aparece *na outra tela*, uma pessoa de cada vez,
 sem ninguém ligar à causa. Aqui elas aparecem juntas, com quantos casos cada
 uma já trouxe e o nome que os próprios casos usam, e cadastrar é um clique.
@@ -559,12 +559,12 @@ quase preto. É por isso que o par certo é sempre `--destaque-escuro` com
 ### Por analista virou gráfico
 
 A operação perguntou se o Painel Analítico tinha os dois recortes. **Por área**
-sempre teve, e não como gráfico: é o seletor de mesa. Um gráfico "casos por
+sempre teve, e não como gráfico: é o seletor de canal. Um gráfico "casos por
 área" com duas barras compararia RET Vida com Mesa Diamante, que têm colunas,
-situações e volumes incomparáveis — a Mesa sempre pareceria pequena, e nunca
+situações e volumes incomparáveis — a Canal sempre pareceria pequena, e nunca
 foi para ser grande.
 
-**Por analista** faltava, e agora nasce junto com o sistema nas duas mesas, em
+**Por analista** faltava, e agora nasce junto com o sistema nos dois canais, em
 barras deitadas: nome de pessoa é comprido, e em pé o rótulo vira escadinha.
 
 ### A aba Importar
@@ -617,7 +617,7 @@ tela.
 O pedido original: *"permitir criar uma aba exclusiva que irá criar uma aba no
 planilhas para análise de dados."*
 
-O administrador monta uma RECEITA — mesa, colunas, filtros, janela de dias — e
+O administrador monta uma RECEITA — canal, colunas, filtros, janela de dias — e
 o sistema escreve o resultado numa aba `ANALISE_<Nome>`, achatada, pronta para
 tabela dinâmica ou para o Power BI apontar.
 
@@ -677,8 +677,8 @@ tem teste para isso.
 
 O que está no contrato é a **receita**, na aba `ANALISES` — a décima terceira.
 Uma aba, e não um JSON dentro de `CONFIG`, pela mesma razão que os cartões do
-Dashboard saíram de `MESAS`: é uma lista de coisas configuráveis, cada uma com
-nome, mesa, colunas e filtro próprios.
+Dashboard saíram de `CANAIS`: é uma lista de coisas configuráveis, cada uma com
+nome, canal, colunas e filtro próprios.
 
 **313 testes**, e o [bug 24](04-bugs-capturados.md) pelo caminho: a regra de
 CSS escrita para campo de digitar esticou a caixa de marcar até empurrar o
@@ -718,10 +718,10 @@ devolver nada.
 | **Estrutura** | Aba do contrato apagada, coluna do contrato faltando (falha), coluna a mais (atenção — o sistema ignora o que não conhece) |
 | **Sequências** | Sequência ABAIXO do maior Id gravado, que é como o sistema anterior reemitiu Id em uso. E sequência com lixo |
 | **Identificadores** | Id repetido, dizendo em quais linhas. Coluna de Id fora do formato texto — a causa das 4.328 colisões. Linha sem Id (atenção) |
-| **Mesas** | Mesa apontando para aba que não existe, ou citando coluna que a aba não tem. Todas as mesas desligadas |
+| **Canais** | Canal apontando para aba que não existe, ou citando coluna que a aba não tem. Todas os canais desligadas |
 | **Campos** | Campo apontando para coluna que não existe. Campo obrigatório desligado (atenção: desligado, a obrigatoriedade deixa de valer) |
-| **Painéis** | Card ou gráfico apontando para mesa ou coluna que não existe |
-| **Análises** | Receita apontando para mesa ou coluna que não existe |
+| **Painéis** | Card ou gráfico apontando paro canal ou coluna que não existe |
+| **Análises** | Receita apontando paro canal ou coluna que não existe |
 | **Acesso** | Usuário ativo com nível que sumiu, nível com JSON quebrado, e — a mais importante — **ninguém mais conseguindo abrir Configurações** |
 | **Tela** | Toda função que a tela chama existe no servidor; toda tela do menu tem rota |
 
@@ -924,7 +924,7 @@ análise — usa 2,5% dele.
 | `ANALISE_RetVida` (cortada em 50 mil) | 1.750.035 | 18% |
 | tudo somado | **9.672.905** | **96,7%** |
 
-Com 200 mil casos a planilha está **cheia**. Não sobra espaço para a Mesa
+Com 200 mil casos a planilha está **cheia**. Não sobra espaço para a Canal
 Diamante crescer nem para uma segunda aba de análise. O diagnóstico já acusa
 isso como FALHA acima de 95%, com o caminho escrito no laudo.
 
@@ -963,7 +963,7 @@ nomes. "Está desconfigurado" vira "o Estilos deste projeto é mais antigo que
 as telas, e faltam estas sete classes".
 
 A investigação achou de quebra [três buracos](04-bugs-capturados.md) no próprio
-repositório: `.ver` era classe morta em três telas, e `.config-mesas` e
+repositório: `.ver` era classe morta em três telas, e `.config-canais` e
 `.config-legado` eram usadas sem nunca terem sido escritas.
 
 **370 testes.**
@@ -1046,18 +1046,18 @@ linha do carimbo dos dois lados e compara.
 
 Três mudanças pedidas pela operação, e uma que veio junto.
 
-### A mesa da pessoa
+### O canal da pessoa
 
-`USUARIOS` ganhou a coluna **`MesaId`** — a décima quarta do contrato — e o
+`USUARIOS` ganhou a coluna **`CanalId`** — a décima quarta do contrato — e o
 formulário ganhou o campo. **Vazio é válido**, e é o caso de quem administra:
-quem cuida do sistema não pertence a uma mesa, atende as duas e delega. Na
-lista isso aparece como *"todas as mesas"*, e não em branco — em branco parece
+quem cuida do sistema não pertence a um canal, atende as duas e delega. Na
+lista isso aparece como *"todas os canais"*, e não em branco — em branco parece
 cadastro pela metade.
 
-Mesa preenchida tem de existir. Uma mesa que sumiu deixaria a pessoa apontando
+Canal preenchida tem de existir. Um canal que sumiu deixaria a pessoa apontando
 para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
 
-A lista passou a mostrar **e-mail · nível · cargo · mesa**, em vez de só
+A lista passou a mostrar **e-mail · nível · cargo · canal**, em vez de só
 e-mail e nível.
 
 ### A senha de administrador só vale para quem não é administrador
@@ -1169,7 +1169,7 @@ Uma por item do menu (são 7), mais quatro de infraestrutura e a de bloqueio:
 - `SemAcesso.html` — servida sozinha, a quem não está cadastrado
 
 O `Comuns.html` guarda seis peças: Moldura, SenhaDeAdministrador,
-SeletorDeMesa, Formulario, CasoEmModal e Graficos. Nenhuma é tela do menu, e
+SeletorDeCanal, Formulario, CasoEmModal e Graficos. Nenhuma é tela do menu, e
 todas são usadas por mais de uma — o critério para morar ali é esse, escrito
 no cabeçalho do arquivo.
 
@@ -1206,6 +1206,165 @@ repete informação do código não se digita, se gera — e se compara num test
 
 ---
 
+## A rodada da operação: velocidade, canais e os formulários de verdade
+
+Sete pedidos do PO de uma vez. Cada um com a decisão que ele obrigou a tomar.
+
+### 1. As telas demoravam a abrir
+
+Medido antes de mexer, contando **idas ao serviço**, que é o que custa no
+Apps Script:
+
+| | antes | depois |
+|---|---|---|
+| Abrir o Dashboard | 48 idas, **3 chamadas** | 32 idas, **2 chamadas** |
+| Abrir Cadastrar Caso | 44 idas, **3 chamadas** | 27 idas, **2 chamadas** |
+
+Duas causas, e a segunda vale mais que a primeira.
+
+**A mesma aba, lida muitas vezes.** Num `pacoteDePartida` só, `CONFIG` era
+lido 10 vezes; num `resumoDoCanal`, `CATALOGO` 7. Ninguém escreveu isso de
+propósito — são funções pequenas e corretas, cada uma lendo o que precisa, e o
+custo só aparece somando. Agora há um memo por execução para as abas de
+sistema. Ele dura exatamente uma requisição, que é o tempo certo: no Apps
+Script cada chamada da tela é uma execução nova, então não existe como servir
+dado velho para a próxima.
+
+> **As bases operacionais ficam de fora do memo**, e não é detalhe: BASE_RET
+> com 200 mil linhas na memória estouraria a execução. A lista é explícita.
+
+**Uma viagem inteira para repetir trabalho feito.** O `doGet` já lia quem você
+é e a identidade visual para decidir qual página servir — e então a página
+chegava ao navegador e pedia `pacoteDePartida`, que recomeçava do zero para
+devolver o que a primeira execução já tinha na mão. Agora o pacote vai
+**dentro da página**, em JSON escapado.
+
+> **A tela continua sabendo pedir pelo caminho antigo.** Se a injeção falhar —
+> arquivo velho no Apps Script, qualquer coisa —, ela pergunta ao servidor como
+> sempre fez. Atalho sem volta vira um jeito novo de quebrar.
+
+E há um teste ponta a ponta que **conta as chamadas do navegador** e cobra que
+`pacoteDePartida` não seja pedido. Sem contar, uma otimização que silenciosamente
+não pega continua passando em todos os testes.
+
+### 2. O selo da SUSEP com os números de verdade
+
+A operação tem 7.127 SUSEPs cadastradas e mais de 16 mil bloqueadas. O selo
+lia as **duas tabelas inteiras a cada digitação** — 239 mil células. Agora lê a
+coluna da SUSEP e só a linha que casar: **24 mil**, dez vezes menos.
+
+> Ao trocar, um teste pegou um defeito que eu tinha acabado de introduzir:
+> `buscarRegistros_` devolve a linha esteja ela oculta ou não, e desbloquear
+> uma SUSEP é exclusão lógica — o selo voltou a dizer "bloqueada" para uma
+> SUSEP liberada. Daí nasceu `buscarRegistroVisivel_`.
+
+### 3. Mesas viraram canais
+
+RET Vida e Mesa Diamante são **canais**, não mesas. O vocabulário do código
+inteiro mudou junto — 1.351 linhas.
+
+A aba `CANAIS` existia e guardava **corretoras**. Virou `CORRETORAS`, que é o
+que ela sempre teve dentro, e ganhou a coluna `Consultor`. Sem isso, "canal"
+significaria duas coisas no mesmo sistema.
+
+> `BASE_MESA` e "Mesa Diamante" ficaram como estão: um é nome de aba com dado
+> dentro, o outro é nome próprio.
+
+### 4. O motor de escopo por canal
+
+O pedido: *"quando o nível de acesso for RET deve mostrar apenas o dashboard
+da RET… Os únicos que podem ver tudo são níveis ADM"*.
+
+Cada nível declara quais canais enxerga. **Lista vazia quer dizer TODOS** — é o
+caso de quem administra, e é o que mantém de pé todo nível criado antes desta
+regra: nível antigo continua enxergando o que enxergava, em vez de amanhecer
+sem canal nenhum.
+
+Vale no menu, no Dashboard, no cadastro, na busca, no painel e na performance.
+E vale **no servidor**: as 24 portas que recebem um canal passaram a conferir.
+A tela não oferecer o canal na lista não protege nada — a chamada existe, e
+basta mandar outro Id.
+
+> A recusa **nomeia os canais que a pessoa tem**. "Sem acesso" sozinho manda
+> procurar no lugar errado: quase sempre é o nível que ficou com o canal
+> errado marcado.
+
+### 5. Excluir caso em qualquer canal
+
+Investiguei antes de mexer: **os dois canais sempre permitiram**, e
+`podeOcultar` nunca dependeu do canal. O que barrava era outra coisa — o caso
+ser de outra pessoa, e o nível alcançar só os próprios.
+
+A mensagem é que estava errada. "Fora do seu alcance" foi lido como "este
+canal não deixa excluir", porque na Mesa Diamante a pessoa conseguia e na RET
+não. Agora ela nomeia o responsável pelo caso e diz, em letras: *"isso vale
+para qualquer canal, e não é uma regra do RET Vida"*.
+
+> De quebra, achei uma função `ocultar` no Dashboard escrita antes da decisão
+> de pôr excluir no caso aberto, e **nunca chamada**. Código morto num arquivo
+> de tela é pior que em outros lugares: quem vem depois lê o nome, conclui que
+> a fila já sabe excluir, e procura o defeito no lugar errado.
+
+### 6. O carimbo de status, na base e não na auditoria
+
+Troca de status **saiu da auditoria**. É o evento mais frequente do sistema —
+um caso passa por quatro ou cinco antes de fechar —, e numa base de 200 mil
+casos seriam quase um milhão de linhas numa aba da qual ninguém tira relatório.
+
+No lugar: cada status declara, no catálogo, **em qual coluna da base** gravar
+data e hora. "1º contato realizado" na RET, "Concluído" na Mesa. Mesma
+informação, na linha do próprio caso, onde o Power BI a lê.
+
+> **Carimba só se estiver vazio.** Um caso que volta a um status por onde já
+> passou guarda a data da primeira vez. Reescrever apagaria justamente o dado
+> que se quer medir, em silêncio.
+
+### 7. Os formulários que a operação pediu
+
+A sequência e as seções, campo a campo, para os dois canais. `ordem` manda na
+posição na tela — não a ordem das colunas na planilha. São coisas diferentes
+de propósito: a coluna nasce onde o histórico a deixou, e o formulário segue o
+caminho que quem atende percorre ao telefone.
+
+Quatro mecanismos novos:
+
+- **Valor padrão que sabe o dia e a pessoa** — `@HOJE`, `@AGORA`, `@EU`,
+  resolvidos pelo **servidor**. O relógio do navegador é o da máquina de quem
+  está olhando, e uma data com fuso errado só aparece semanas depois.
+- **Campo travado por cargo** — o Analista vem com o seu nome e um analista não
+  o troca. Quem desfaz a trava é uma ação do nível, não o cargo: cargo diz o
+  que a pessoa faz, nível diz o que ela pode.
+- **Campo condicional** — "nome de quem transferiu" só aparece com canal de
+  origem = Central; "dados de pagamento", só com "ADC - TODAS PARCELAS". A
+  regra vem do servidor, para ficar ao alcance de Configurações.
+- **Um seletor, duas colunas** — o produto é escolhido como
+  "1101 - VIDA INDIVIDUAL" e gravado separado. Só o **primeiro** hífen separa,
+  e só quando o que vem antes **tem dígito**: senão "VIDA - PLANO A" guardaria
+  "VIDA" como código.
+
+> **Campo da base que a operação não listou não foi apagado**: foi para a seção
+> "Outros", ligado. Apagar perderia dado gravado; desligar calado esconderia o
+> que alguém ainda usa.
+
+### O defeito que o reordenamento criou
+
+Reordenar o formulário **quebrou o filtro de Status** — e sem erro nenhum.
+
+O painel monta os filtros a partir dos campos que são seletor, com teto de
+quatro para não virar parede de caixas. Ele pegava os quatro **primeiros**. Com
+o Status indo para o fim do formulário — ele é a última coisa que se preenche
+no atendimento —, caiu fora do corte. O filtro mais usado do sistema
+simplesmente deixou de existir na tela.
+
+A ordem do **formulário** segue o caminho de quem atende; a ordem dos
+**filtros** segue o que a operação recorta. Amarrar uma na outra era o defeito.
+Agora o status vem sempre primeiro.
+
+**392 testes**, e a planilha das mudanças passou a ser gerada à parte: quem já
+tem o PGO rodando recola só o que mudou.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
@@ -1213,5 +1372,5 @@ repete informação do código não se digita, se gera — e se compara num test
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Nome das telas, janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela |
-| **Criar e apagar mesa** | A tela ajusta as mesas que existem. Criar uma mesa nova é estrutura (cria aba), e ainda não passa por Configurações |
+| **Criar e apagar canal** | A tela ajusta os canais que existem. Criar um canal nova é estrutura (cria aba), e ainda não passa por Configurações |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

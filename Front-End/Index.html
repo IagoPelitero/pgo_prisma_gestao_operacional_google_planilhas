@@ -49,6 +49,20 @@
       • Aplicacao vem por último. É ela que liga o sistema, e ligar antes de
         todas as telas existirem seria pedir por uma que ainda não nasceu.
   -->
+  <!--
+    O pacote de partida, entregue pelo servidor JUNTO com a página.
+
+    Sem isto, abrir o sistema eram duas viagens em fila: uma para trazer a
+    página, outra para perguntar quem é você e o que pode ver. A segunda
+    recomeçava do zero e devolvia o que a primeira já tinha calculado.
+
+    O valor sai do doGet já em JSON, com o sinal de menor escapado — assim
+    nenhum texto de configuração consegue fechar esta tag por acidente.
+  -->
+  <script>
+    window.PGO_PACOTE_DE_PARTIDA = <?!= pacoteDePartida ?>;
+  </script>
+
   <?!= incluir('Comuns') ?>
 
   <?!= incluir('Dashboard') ?>

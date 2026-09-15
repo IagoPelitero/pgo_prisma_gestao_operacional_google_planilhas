@@ -47,21 +47,21 @@
  */
 
 /**
- * O formulário de uma mesa, pronto para a tela desenhar.
+ * O formulário de um canal, pronto para a tela desenhar.
  *
  * Já vem filtrado pelo nível de acesso de quem pediu: campo marcado como
  * oculto para o nível não aparece na resposta — e não aparecer na resposta é
  * diferente de vir escondido no HTML. Esconder no HTML é enfeite; quem não
  * pode ver, não recebe.
  */
-function formularioDaMesa(idDaMesa) {
+function formularioDoCanal(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var porSecao = {};
   var ordemDasSecoes = [];
 
-  camposAtivosDaMesa_(mesa.id).forEach(function (campo) {
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 
@@ -70,23 +70,23 @@ function formularioDaMesa(idDaMesa) {
       porSecao[secao] = [];
       ordemDasSecoes.push(secao);
     }
-    porSecao[secao].push(campoParaATela_(campo, mesa.id, visibilidade));
+    porSecao[secao].push(campoParaATela_(campo, canal.id, visibilidade, quem));
   });
 
   return {
-    mesa: mesa,
+    canal: canal,
     secoes: ordemDasSecoes.map(function (nome) {
       return { nome: nome, campos: porSecao[nome] };
     })
   };
 }
 
-/** Os campos ativos de uma mesa, na ordem escolhida pelo administrador. */
-function camposAtivosDaMesa_(idDaMesa) {
-  var alvo = converterParaIdentificador_(idDaMesa);
+/** Os campos ativos de um canal, na ordem escolhida pelo administrador. */
+function camposAtivosDoCanal_(idDoCanal) {
+  var alvo = converterParaIdentificador_(idDoCanal);
   return lerRegistros_('CAMPOS')
     .filter(function (campo) {
-      return converterParaIdentificador_(campo.MesaId) === alvo
+      return converterParaIdentificador_(campo.CanalId) === alvo
         && normalizarParaComparar_(campo.Ativo) === 'sim';
     })
     .sort(function (um, outro) {
@@ -95,8 +95,15 @@ function camposAtivosDaMesa_(idDaMesa) {
 }
 
 /** Uma linha de CAMPOS vira a descrição que a tela sabe desenhar. */
-function campoParaATela_(campo, idDaMesa, visibilidade) {
+function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
   var configuracao = lerConfiguracaoDoCampo_(campo);
+
+  // O campo pode vir TRAVADO por dois motivos diferentes, e vale distinguir:
+  // o nível pode dar só leitura (visibilidade), ou o campo pode ser de quem
+  // não tem autorização para mexer nele — é o caso do Analista, que um
+  // analista não troca para o nome de outra pessoa.
+  var travadoPeloCargo = campoTravadoParaMim_(configuracao, quem);
+
   return {
     chave: String(campo.ChaveTecnica),
     cabecalho: String(campo.Cabecalho),
@@ -106,11 +113,75 @@ function campoParaATela_(campo, idDaMesa, visibilidade) {
     secao: String(campo.Secao || 'Geral'),
     mascara: String(campo.Mascara || ''),
     obrigatorio: normalizarParaComparar_(campo.Obrigatorio) === 'sim',
-    somenteLeitura: visibilidade === RECC_VISIBILIDADE.LEITURA,
-    valorPadrao: String(campo.ValorPadrao || ''),
+    somenteLeitura: visibilidade === RECC_VISIBILIDADE.LEITURA || travadoPeloCargo,
+    travadoPeloCargo: travadoPeloCargo,
+    valorPadrao: valorPadraoResolvido_(campo.ValorPadrao, quem),
+    // Aparece só quando outro campo estiver com um valor específico. Guardado
+    // como { campo: 'chave', valor: 'TEXTO' } — ver o formulário na tela.
+    mostrarSe: configuracao.mostrarSe || null,
     largura: Number(configuracao.largura) || 1,
-    opcoes: opcoesDoCampo_(configuracao, idDaMesa)
+    opcoes: opcoesDoCampo_(configuracao, idDoCanal)
   };
+}
+
+/**
+ * O valor padrão, com os atalhos que dependem de QUEM e de QUANDO resolvidos.
+ *
+ * Um valor padrão escrito à mão não sabe que dia é hoje. Estes três atalhos
+ * sabem, e o servidor é quem os resolve — não a tela. O relógio do navegador
+ * é o da máquina de quem está olhando, e uma data de recepção com o fuso
+ * errado só aparece semanas depois, num relatório que não fecha.
+ *
+ *   @HOJE   a data de hoje          (dd/MM/yyyy)
+ *   @AGORA  a data e a hora de agora (dd/MM/yyyy HH:mm)
+ *   @EU     o nome de quem está cadastrando
+ *
+ * Qualquer outro texto passa inteiro, como sempre passou.
+ */
+function valorPadraoResolvido_(valorPadrao, quem) {
+  var texto = String(valorPadrao || '').trim();
+  if (texto.charAt(0) !== '@') return texto;
+
+  var agora = new Date();
+  switch (texto.toUpperCase()) {
+    case '@HOJE':
+      return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+    case '@AGORA':
+      return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+    case '@EU':
+      return quem && quem.usuario ? String(quem.usuario.Nome || '') : '';
+    default:
+      return texto;
+  }
+}
+
+/**
+ * Este campo está travado para esta pessoa?
+ *
+ * O pedido da operação: o Analista já vem preenchido com o nome de quem está
+ * cadastrando e, se o cargo for analista, não pode ser trocado — cadastrar em
+ * nome de outra pessoa é coisa de quem coordena.
+ *
+ * A trava olha o CARGO, e quem a desfaz é uma AÇÃO do nível (editar). São
+ * coisas diferentes de propósito: cargo diz o que a pessoa faz, nível diz o
+ * que ela pode. Um analista que precise cadastrar para a equipe ganha a ação,
+ * sem precisar trocar de cargo.
+ */
+function campoTravadoParaMim_(configuracao, quem) {
+  var cargos = configuracao.travaPara;
+  if (!Array.isArray(cargos) || !cargos.length) return false;
+  if (!quem || !quem.cadastrado) return false;
+
+  // Quem pode editar caso dos outros não é travado por cargo nenhum.
+  if (podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
+    && quem.permissoes.escopo !== RECC_ESCOPOS.PROPRIOS) {
+    return false;
+  }
+
+  var meuCargo = normalizarParaComparar_(quem.cargo);
+  return cargos.some(function (cargo) {
+    return normalizarParaComparar_(cargo) === meuCargo;
+  });
 }
 
 /**
@@ -134,11 +205,11 @@ function lerConfiguracaoDoCampo_(campo) {
 /**
  * As opções de um seletor. Três origens possíveis:
  *
- *   { "catalogo": "STATUS" }      da aba CATALOGO, da mesa ou global
+ *   { "catalogo": "STATUS" }      da aba CATALOGO, do canal ou global
  *   { "listaDe": "usuarios" }     de um cadastro: usuários, produtos, canais
  *   { "opcoes": ["Sim", "Não"] }  lista escrita à mão na configuração
  */
-function opcoesDoCampo_(configuracao, idDaMesa) {
+function opcoesDoCampo_(configuracao, idDoCanal) {
   if (Array.isArray(configuracao.opcoes)) {
     return configuracao.opcoes.map(function (opcao) {
       return { valor: String(opcao), rotulo: String(opcao) };
@@ -148,15 +219,15 @@ function opcoesDoCampo_(configuracao, idDaMesa) {
   if (!configuracao.catalogo) return [];
 
   var tipo = normalizarParaComparar_(configuracao.catalogo);
-  var daMesa = converterParaIdentificador_(idDaMesa);
+  var doCanal = converterParaIdentificador_(idDoCanal);
 
   return lerRegistros_('CATALOGO')
     .filter(function (item) {
       if (normalizarParaComparar_(item.Tipo) !== tipo) return false;
       if (normalizarParaComparar_(item.Ativo) !== 'sim') return false;
-      // Item sem mesa é global e serve a todas; com mesa, só à dela.
-      var mesaDoItem = converterParaIdentificador_(item.MesaId);
-      return !mesaDoItem || mesaDoItem === daMesa;
+      // Item sem canal é global e serve a todas; com canal, só à dela.
+      var canalDoItem = converterParaIdentificador_(item.CanalId);
+      return !canalDoItem || canalDoItem === doCanal;
     })
     .sort(function (um, outro) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
@@ -202,7 +273,7 @@ function opcoesDeUmCadastro_(qualCadastro) {
   }
 
   if (cadastro === 'canais') {
-    return lerRegistros_('CANAIS').map(function (canal) {
+    return lerRegistros_('CORRETORAS').map(function (canal) {
       return { valor: String(canal.Nome), rotulo: String(canal.Nome) };
     });
   }
@@ -211,13 +282,40 @@ function opcoesDeUmCadastro_(qualCadastro) {
     'Os cadastros são usuarios, produtos e canais.');
 }
 
-function mesaPeloId_(idDaMesa) {
-  var alvo = converterParaIdentificador_(idDaMesa);
-  var mesas = mesasVisiveis_();
-  for (var i = 0; i < mesas.length; i++) {
-    if (converterParaIdentificador_(mesas[i].id) === alvo) return mesas[i];
+function canalPeloId_(idDoCanal) {
+  var alvo = converterParaIdentificador_(idDoCanal);
+  var canais = canaisVisiveis_();
+  for (var i = 0; i < canais.length; i++) {
+    if (converterParaIdentificador_(canais[i].id) === alvo) return canais[i];
   }
-  throw new Error('Mesa "' + idDaMesa + '" não existe ou está desativada.');
+  throw new Error('Canal "' + idDoCanal + '" não existe ou está desativado.');
+}
+
+/**
+ * O canal pedido, SE esta pessoa puder vê-lo.
+ *
+ * É esta que as telas usam, e não a de cima. A tela não oferecer o canal na
+ * lista não protege nada: a chamada ao servidor existe, e basta mandar outro
+ * Id. Quem decide é o servidor, sempre — a tela só escolhe o que mostrar.
+ *
+ * A recusa diz quais canais a pessoa TEM, porque "sem acesso" sozinho manda
+ * procurar no lugar errado: quase sempre é o nível que ficou com o canal
+ * errado marcado, e quem lê a mensagem precisa saber disso.
+ */
+function canalQueEuPossoVer_(idDoCanal, quem) {
+  var canal = canalPeloId_(idDoCanal);
+  var meus = canaisQueEuVejo_(quem);
+  var alcanca = meus.some(function (um) {
+    return converterParaIdentificador_(um.id)
+      === converterParaIdentificador_(canal.id);
+  });
+  if (alcanca) return canal;
+
+  throw new Error('O seu nível de acesso não enxerga o canal "' + canal.nome
+    + '". ' + (meus.length
+      ? 'Ele enxerga: ' + meus.map(function (um) { return um.nome; }).join(', ') + '.'
+      : 'Ele não enxerga canal nenhum — peça a um administrador para ajustar '
+        + 'o nível em Configurações › Níveis de acesso.'));
 }
 
 // ============================================================================
@@ -231,19 +329,19 @@ function mesaPeloId_(idDaMesa) {
  * Junta todos os problemas antes de reclamar. Devolver um erro por vez faria a
  * pessoa corrigir, salvar, descobrir o segundo, corrigir, salvar de novo.
  */
-function validarValores_(idDaMesa, valoresDaTela, quem) {
-  var mesa = mesaPeloId_(idDaMesa);
+function validarValores_(idDoCanal, valoresDaTela, quem) {
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var problemas = [];
   var paraGravar = {};
 
-  camposAtivosDaMesa_(mesa.id).forEach(function (campo) {
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
 
     // Campo que a pessoa não pode ver ou não pode editar é IGNORADO, mesmo
     // que a tela mande um valor. A tela é do lado de lá; ela não decide.
     if (visibilidade !== RECC_VISIBILIDADE.EDICAO) return;
 
-    var descricao = campoParaATela_(campo, mesa.id, visibilidade);
+    var descricao = campoParaATela_(campo, canal.id, visibilidade, quem);
     var bruto = valoresDaTela[descricao.chave];
     if (bruto === undefined) bruto = valoresDaTela[descricao.cabecalho];
     if (bruto === undefined || bruto === null) bruto = '';
@@ -253,7 +351,25 @@ function validarValores_(idDaMesa, valoresDaTela, quem) {
       problemas.push({ campo: descricao.chave, rotulo: descricao.rotulo, erro: problema });
       return;
     }
-    if (String(bruto).trim() !== '') paraGravar[descricao.cabecalho] = bruto;
+    if (String(bruto).trim() === '') return;
+
+    // Um seletor pode alimentar DUAS colunas. É o caso do produto, que a
+    // operação escolhe como "1101 - VIDA INDIVIDUAL" e a planilha guarda
+    // separado: o código numa coluna, o nome na outra.
+    //
+    // Escolher uma coisa e gravar duas é de propósito. Uma caixa só é menos
+    // uma chance de digitar o código de um produto e o nome de outro; e as
+    // colunas separadas são o que deixa o painel agrupar por código e o
+    // relatório mostrar o nome.
+    var separa = lerConfiguracaoDoCampo_(campo).separaEm;
+    if (separa && separa.codigo && separa.nome) {
+      var partes = separarCodigoENome_(bruto);
+      paraGravar[separa.codigo] = partes.codigo;
+      paraGravar[separa.nome] = partes.nome;
+      return;
+    }
+
+    paraGravar[descricao.cabecalho] = bruto;
   });
 
   if (problemas.length) {
@@ -373,22 +489,22 @@ function dataEstaNoFuturo_(data) {
  * Registra um caso novo.
  *
  * Devolve o Id gerado. A data e a hora de entrada são preenchidas pelo
- * SERVIDOR quando a mesa declara essas colunas e a tela não mandou nada —
+ * SERVIDOR quando o canal declara essas colunas e a tela não mandou nada —
  * deixar o relógio do navegador decidir daria horários de fusos diferentes na
  * mesma base.
  */
-function cadastrarCaso(idDaMesa, valores) {
+function cadastrarCaso(idDoCanal, valores) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var paraGravar = validarValores_(mesa.id, valores || {}, quem);
-  preencherEntradaAutomatica_(mesa, paraGravar);
-  preencherResponsavelAutomatico_(mesa, paraGravar, quem);
+  var paraGravar = validarValores_(canal.id, valores || {}, quem);
+  preencherEntradaAutomatica_(canal, paraGravar);
+  preencherResponsavelAutomatico_(canal, paraGravar, quem);
 
-  var gravado = inserirRegistro_(mesa.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
-  registrarAuditoria_('caso.criar', mesa.aba, gravado.__id, mesa.nome);
+  var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
+  registrarAuditoria_('caso.criar', canal.aba, gravado.__id, canal.nome);
 
-  return { id: gravado.__id, mesa: mesa.nome, aba: mesa.aba };
+  return { id: gravado.__id, canal: canal.nome, aba: canal.aba };
 }
 
 /**
@@ -398,24 +514,24 @@ function cadastrarCaso(idDaMesa, valores) {
  * vier na alteração, ele é respeitado — mas o preenchimento automático só age
  * na criação.
  */
-function editarCaso(idDaMesa, idDoCaso, valores) {
+function editarCaso(idDoCanal, idDoCaso, valores) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var alvo = converterParaIdentificador_(idDoCaso);
   if (!alvo) throw new Error('Informe qual caso deve ser alterado.');
 
-  var atual = buscarRegistros_(mesa.aba, 'Id', alvo, 1)[0];
+  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
   if (!atual) {
-    throw new Error('O caso ' + alvo + ' não existe na mesa ' + mesa.nome + '.');
+    throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(atual, mesa, quem);
+  exigirAlcanceSobre_(atual, canal, quem);
 
-  var paraGravar = validarValores_(mesa.id, valores || {}, quem);
-  atualizarRegistro_(mesa.aba, alvo, paraGravar);
-  registrarAuditoria_('caso.editar', mesa.aba, alvo, mesa.nome);
+  var paraGravar = validarValores_(canal.id, valores || {}, quem);
+  atualizarRegistro_(canal.aba, alvo, paraGravar);
+  registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
-  return { id: alvo, mesa: mesa.nome };
+  return { id: alvo, canal: canal.nome };
 }
 
 /**
@@ -428,75 +544,118 @@ function editarCaso(idDaMesa, idDoCaso, valores) {
  *
  * Segue a permissão de EDITAR: trocar a situação é editar o caso.
  */
-function alterarSituacaoDoCaso(idDaMesa, idDoCaso, situacaoNova) {
+function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = converterParaIdentificador_(idDoCaso);
 
-  if (!mesa.colunaDoStatus) {
-    throw new Error('A mesa ' + mesa.nome + ' não declarou qual coluna guarda ' +
+  if (!canal.colunaDoStatus) {
+    throw new Error('O canal ' + canal.nome + ' não declarou qual coluna guarda ' +
       'a situação, então não há o que trocar. Isso se ajusta em Configurações.');
   }
 
-  var atual = buscarRegistros_(mesa.aba, 'Id', alvo, 1)[0];
+  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
   if (!atual) {
-    throw new Error('O caso ' + alvo + ' não existe na mesa ' + mesa.nome + '.');
+    throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(atual, mesa, quem);
+  exigirAlcanceSobre_(atual, canal, quem);
 
   var escolhida = String(situacaoNova || '').trim();
-  var conhecidas = situacoesDaMesa_(mesa);
+  var conhecidas = situacoesDoCanal_(canal);
   var achada = null;
   conhecidas.forEach(function (uma) {
     if (normalizarParaComparar_(uma.gravadoComo)
       === normalizarParaComparar_(escolhida)) achada = uma;
   });
   if (!achada) {
-    throw new Error('A situação "' + escolhida + '" não existe na mesa ' +
-      mesa.nome + '. As situações dela são: ' + conhecidas.map(function (uma) {
+    throw new Error('A situação "' + escolhida + '" não existe no canal ' +
+      canal.nome + '. As situações dela são: ' + conhecidas.map(function (uma) {
         return uma.gravadoComo;
       }).join(', ') + '.');
   }
 
-  var antes = String(atual[mesa.colunaDoStatus] || '') || 'sem situação';
   var alteracao = {};
-  alteracao[mesa.colunaDoStatus] = achada.gravadoComo;
+  alteracao[canal.colunaDoStatus] = achada.gravadoComo;
 
-  // Concluir preenche a data de finalização quando a mesa tem essa coluna e
+  // Concluir preenche a data de finalização quando o canal tem essa coluna e
   // ela ainda está vazia — é o que a operação faria à mão logo em seguida.
-  if (mesa.colunaDaFinalizacao && !atual[mesa.colunaDaFinalizacao]
+  if (canal.colunaDaFinalizacao && !atual[canal.colunaDaFinalizacao]
     && normalizarParaComparar_(achada.gravadoComo).indexOf('conclu') === 0) {
-    alteracao[mesa.colunaDaFinalizacao] = new Date();
+    alteracao[canal.colunaDaFinalizacao] = new Date();
   }
 
-  atualizarRegistro_(mesa.aba, alvo, alteracao);
-  registrarAuditoria_('caso.status', mesa.aba, alvo,
-    'de "' + antes + '" para "' + achada.gravadoComo + '"');
+  carimbarOStatus_(canal, achada, atual, alteracao);
+
+  atualizarRegistro_(canal.aba, alvo, alteracao);
+
+  // NÃO registra na auditoria, e isso é decisão da operação.
+  //
+  // Troca de status é o evento mais frequente do sistema: um caso passa por
+  // quatro ou cinco antes de fechar. Numa base de 200 mil casos isso são
+  // quase um milhão de linhas de auditoria — uma aba enorme, que empurra a
+  // planilha para o teto de células, e da qual ninguém tira relatório.
+  //
+  // O que a operação precisa saber é QUANDO cada etapa aconteceu, e isso
+  // agora fica carimbado na própria linha do caso, na aba do canal (ver
+  // carimbarOStatus_). Mesma informação, no lugar em que ela é usada.
+  //
+  // A auditoria continua guardando o que é raro e sem volta: criar, editar,
+  // ocultar, mexer em configuração.
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
 }
 
 /**
- * As situações que a mesa oferece, para o diálogo de troca.
+ * Carimba data e hora na coluna que ESTE status declarou.
+ *
+ * Cada status diz, no catálogo, em qual coluna da base ele grava o momento em
+ * que o caso chegou nele — "Data do 1º contato" na RET, "Data e horário de
+ * finalização" na Mesa Diamante. É o que permite medir produtividade sem
+ * cruzar duas abas.
+ *
+ * CARIMBA SÓ SE ESTIVER VAZIO. Um caso que volta para um status por onde já
+ * passou não reescreve a data: o que interessa é quando aquilo aconteceu pela
+ * primeira vez. Reescrever apagaria justamente o dado que se quer medir, e
+ * apagaria em silêncio.
+ *
+ * Coluna declarada que não existe na base é ignorada, sem estourar: o caso
+ * precisa ser salvo de qualquer jeito. Quem cobra isso é o diagnóstico, que
+ * enxerga a instalação inteira e sabe explicar.
+ */
+function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
+  var coluna = String(situacao.colunaDeCarimbo || '').trim();
+  if (!coluna) return;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, coluna) < 0) return;
+
+  var jaTem = String(registroAtual[coluna] || '').trim();
+  if (jaTem) return;
+
+  alteracao[coluna] = new Date();
+}
+
+/**
+ * As situações que o canal oferece, para o diálogo de troca.
  *
  * A situação que o caso tem hoje vem marcada. Se ela tiver sido desligada
  * depois, continua aparecendo — a pessoa precisa entender o que o caso tem,
  * mesmo que não possa escolher aquilo de novo.
  */
-function situacoesParaTrocar(idDaMesa, idDoCaso) {
+function situacoesParaTrocar(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var atual = buscarRegistros_(mesa.aba, 'Id',
+  var atual = buscarRegistros_(canal.aba, 'Id',
     converterParaIdentificador_(idDoCaso), 1)[0];
   if (!atual) {
-    throw new Error('O caso ' + idDoCaso + ' não existe na mesa ' + mesa.nome + '.');
+    throw new Error('O caso ' + idDoCaso + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(atual, mesa, quem);
+  exigirAlcanceSobre_(atual, canal, quem);
 
-  var hoje = mesa.colunaDoStatus
-    ? String(atual[mesa.colunaDoStatus] || '') : '';
-  var opcoes = situacoesDaMesa_(mesa).map(function (uma) {
+  var hoje = canal.colunaDoStatus
+    ? String(atual[canal.colunaDoStatus] || '') : '';
+  var opcoes = situacoesDoCanal_(canal).map(function (uma) {
     return { valor: uma.gravadoComo, rotulo: uma.nome, tom: uma.tom };
   });
 
@@ -516,44 +675,44 @@ function situacoesParaTrocar(idDaMesa, idDoCaso) {
  * Devolve pelo CHAVE TÉCNICA do campo, que é como o formulário identifica
  * cada caixa — o mesmo formato que `cadastrarCaso` recebe de volta.
  */
-function casoParaEditar(idDaMesa, idDoCaso) {
+function casoParaEditar(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var registro = buscarRegistros_(mesa.aba, 'Id',
+  var registro = buscarRegistros_(canal.aba, 'Id',
     converterParaIdentificador_(idDoCaso), 1)[0];
   if (!registro) {
-    throw new Error('O caso ' + idDoCaso + ' não existe na mesa ' + mesa.nome + '.');
+    throw new Error('O caso ' + idDoCaso + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(registro, mesa, quem);
+  exigirAlcanceSobre_(registro, canal, quem);
 
-  var estrutura = estruturaDaAba_(mesa.aba);
+  var estrutura = estruturaDaAba_(canal.aba);
   var valores = {};
 
-  camposAtivosDaMesa_(mesa.id).forEach(function (campo) {
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
     var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
     if (posicao < 0) return;
     valores[String(campo.ChaveTecnica)] =
       paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]);
   });
 
-  return { id: registro.__id, mesa: mesa.nome, valores: valores };
+  return { id: registro.__id, canal: canal.nome, valores: valores };
 }
 
 /** Tira o caso da tela. A linha permanece na planilha, e volta editando _Visivel. */
-function ocultarCaso(idDaMesa, idDoCaso) {
+function ocultarCaso(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.OCULTAR);
-  var mesa = mesaPeloId_(idDaMesa);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = converterParaIdentificador_(idDoCaso);
 
-  var atual = buscarRegistros_(mesa.aba, 'Id', alvo, 1)[0];
+  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
   if (!atual) {
-    throw new Error('O caso ' + alvo + ' não existe na mesa ' + mesa.nome + '.');
+    throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(atual, mesa, quem);
+  exigirAlcanceSobre_(atual, canal, quem);
 
-  ocultarRegistro_(mesa.aba, alvo, quem.usuario.Id);
-  registrarAuditoria_('caso.ocultar', mesa.aba, alvo, mesa.nome);
+  ocultarRegistro_(canal.aba, alvo, quem.usuario.Id);
+  registrarAuditoria_('caso.ocultar', canal.aba, alvo, canal.nome);
   return true;
 }
 
@@ -563,30 +722,75 @@ function ocultarCaso(idDaMesa, idDoCaso) {
  * Quem enxerga só os próprios casos não pode editar o caso de outra pessoa
  * mandando o Id direto — a tela não ofereceria o botão, mas a chamada existe.
  */
-function exigirAlcanceSobre_(registro, mesa, quem) {
-  var alcance = filtrarPeloAlcance_([registro], mesa.aba, quem);
-  if (!alcance.length) {
-    throw new Error('Este caso está fora do seu alcance. Seu nível enxerga ' +
-      'apenas os casos com escopo ' + quem.permissoes.escopo + '.');
-  }
+function exigirAlcanceSobre_(registro, canal, quem) {
+  var alcance = filtrarPeloAlcance_([registro], canal.aba, quem);
+  if (alcance.length) return;
+
+  // A recusa nomeia o RESPONSÁVEL pelo caso, e não só o escopo.
+  //
+  // "Fora do seu alcance" sozinho manda a pessoa achar que o canal não
+  // permite aquela ação — foi exatamente assim que a operação leu, ao tentar
+  // excluir um caso da RET e conseguir na Mesa Diamante. Os dois canais
+  // sempre permitiram; o que barrava era o caso ser de outra pessoa.
+  var estrutura = estruturaDaAba_(canal.aba);
+  var coluna = colunaDoResponsavel_(estrutura);
+  var dono = coluna ? String(registro[coluna] || '').trim() : '';
+
+  throw new Error('Este caso é de ' + (dono || 'outra pessoa')
+    + ', e o seu nível (escopo ' + quem.permissoes.escopo + ') alcança '
+    + (quem.permissoes.escopo === RECC_ESCOPOS.PROPRIOS
+      ? 'apenas os casos em que você é a responsável. '
+      : 'apenas parte dos casos. ')
+    + 'Isso vale para qualquer canal, e não é uma regra do ' + canal.nome
+    + '. Para alcançar os casos de outras pessoas, um administrador ajusta o '
+    + 'escopo do seu nível em Configurações › Níveis de acesso.');
+}
+
+/**
+ * Parte "1101 - VIDA INDIVIDUAL" em código e nome.
+ *
+ * O hífen separa, e só o PRIMEIRO separa: nome de produto pode ter hífen
+ * dentro ("VIDA - PLANO A - OURO"), e partir em todos deixaria o nome pela
+ * metade. Sem hífen nenhum, o texto inteiro é o nome e o código fica vazio —
+ * é o que acontece com um produto antigo, cadastrado antes desta regra.
+ */
+function separarCodigoENome_(valor) {
+  var texto = String(valor || '').trim();
+  var corte = texto.indexOf('-');
+  if (corte < 0) return { codigo: '', nome: texto };
+
+  var codigo = texto.substring(0, corte).trim();
+  var nome = texto.substring(corte + 1).trim();
+
+  // Se o que veio antes do hífen não for um código, não há o que separar:
+  // era um nome com hífen, e parti-lo perderia metade dele.
+  //
+  // O que distingue um código de uma palavra é TER DÍGITO. "1101" e "A12" são
+  // códigos; "VIDA", em "VIDA - PLANO A", é o começo do nome. Aceitar
+  // qualquer coisa curta guardaria "VIDA" como código do produto, calado.
+  var pareceCodigo = codigo.length <= 10
+    && /^[0-9A-Za-z.]+$/.test(codigo)
+    && /[0-9]/.test(codigo);
+  if (!pareceCodigo) return { codigo: '', nome: texto };
+  return { codigo: codigo, nome: nome };
 }
 
 /** Data e hora de entrada, decididas pelo servidor, só quando faltam. */
-function preencherEntradaAutomatica_(mesa, paraGravar) {
+function preencherEntradaAutomatica_(canal, paraGravar) {
   var agora = new Date();
-  if (mesa.colunaDaData && !paraGravar[mesa.colunaDaData]) {
-    paraGravar[mesa.colunaDaData] =
+  if (canal.colunaDaData && !paraGravar[canal.colunaDaData]) {
+    paraGravar[canal.colunaDaData] =
       Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
   }
-  if (mesa.colunaDaHora && !paraGravar[mesa.colunaDaHora]) {
-    paraGravar[mesa.colunaDaHora] =
+  if (canal.colunaDaHora && !paraGravar[canal.colunaDaHora]) {
+    paraGravar[canal.colunaDaHora] =
       Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'HH:mm');
   }
 }
 
 /** O analista do caso é quem o registrou, quando a tela não disse outro. */
-function preencherResponsavelAutomatico_(mesa, paraGravar, quem) {
-  var estrutura = estruturaDaAba_(mesa.aba);
+function preencherResponsavelAutomatico_(canal, paraGravar, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
   var coluna = colunaDoResponsavel_(estrutura);
   if (coluna && !paraGravar[coluna]) paraGravar[coluna] = quem.usuario.Nome;
 }
@@ -615,9 +819,18 @@ function consultarSusep(susep) {
     return { situacao: 'VAZIA', mensagem: 'Digite a SUSEP.' };
   }
 
-  var bloqueada = lerRegistros_('SUSEP_BLOQUEADAS').filter(function (linha) {
-    return converterParaIdentificador_(linha.SUSEP) === procurada;
-  })[0];
+  // Procura pela COLUNA, não lendo a tabela inteira.
+  //
+  // Isto é digitado: o selo responde a cada SUSEP que alguém escreve no
+  // formulário. Ler as duas tabelas inteiras a cada digitação era ler mais de
+  // 140 mil células — com as 16 mil SUSEPs bloqueadas e as 7 mil do cadastro
+  // que a operação vai importar, o formulário travaria a cada campo
+  // preenchido, e travaria mais a cada corretora nova cadastrada.
+  //
+  // buscarRegistros_ lê só a coluna da SUSEP, acha em qual linha ela está, e
+  // só então lê aquela linha inteira. É a mesma regra que sustenta a busca de
+  // casos: ler a coluna antes de ler as linhas.
+  var bloqueada = buscarRegistroVisivel_('SUSEP_BLOQUEADAS', 'SUSEP', procurada);
 
   if (bloqueada) {
     return {
@@ -630,9 +843,7 @@ function consultarSusep(susep) {
     };
   }
 
-  var canal = lerRegistros_('CANAIS').filter(function (linha) {
-    return converterParaIdentificador_(linha.SUSEP) === procurada;
-  })[0];
+  var canal = buscarRegistroVisivel_('CORRETORAS', 'SUSEP', procurada);
 
   if (!canal) {
     return {
@@ -649,6 +860,7 @@ function consultarSusep(susep) {
     corretora: String(canal.Corretora || ''),
     canal: String(canal.Canal || ''),
     segmento: String(canal.Segmento || 'Não encontrado'),
+    consultor: String(canal.Consultor || ''),
     mensagem: 'SUSEP liberada'
   };
 }
@@ -703,12 +915,14 @@ function opcoesDaBusca() {
   var quem = exigirTela_('buscarCaso');
 
   return {
-    mesas: mesasVisiveis_().map(function (mesa) {
+    // Só os canais desta pessoa. Oferecer os outros seria convidar a procurar
+    // onde a busca depois vai recusar.
+    canais: canaisQueEuVejo_(quem).map(function (canal) {
       return {
-        id: mesa.id,
-        nome: mesa.nome,
-        icone: mesa.icone,
-        procuraEm: colunasDaBusca_(mesa).map(function (coluna) {
+        id: canal.id,
+        nome: canal.nome,
+        icone: canal.icone,
+        procuraEm: colunasDaBusca_(canal).map(function (coluna) {
           return coluna.cabecalho;
         })
       };
@@ -721,9 +935,9 @@ function opcoesDaBusca() {
 }
 
 /**
- * Procura o termo nas mesas escolhidas e, se estiver ligada, na base legada.
+ * Procura o termo nos canais escolhidas e, se estiver ligada, na base legada.
  *
- * `ondeProcurar` é a lista de ids de mesa; vazio procura em todas as que a
+ * `ondeProcurar` é a lista de ids de canal; vazio procura em todas as que a
  * pessoa enxerga. `incluirLegado` diz se a planilha antiga entra.
  */
 function buscarCasos(termo, ondeProcurar, incluirLegado) {
@@ -739,11 +953,13 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
   var escolhidas = (ondeProcurar || []).map(converterParaIdentificador_);
   var resultados = [];
 
-  mesasVisiveis_().forEach(function (mesa) {
-    if (escolhidas.length && escolhidas.indexOf(converterParaIdentificador_(mesa.id)) < 0) {
+  // E procura SÓ nos canais desta pessoa. A tela não oferecer os outros não
+  // basta: a chamada existe, e nada impede mandar o Id de um canal alheio.
+  canaisQueEuVejo_(quem).forEach(function (canal) {
+    if (escolhidas.length && escolhidas.indexOf(converterParaIdentificador_(canal.id)) < 0) {
       return;
     }
-    resultados.push(procurarNaMesa_(mesa, procurado, quem));
+    resultados.push(procurarNoCanal_(canal, procurado, quem));
   });
 
   if (incluirLegado) {
@@ -764,16 +980,16 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
 // ============================================================================
 
 /**
- * As colunas em que a mesa procura.
+ * As colunas em que o canal procura.
  *
- * Declaradas em `MESAS.ColunasDaBusca`, e não adivinhadas: adivinhar acerta
- * na mesa de hoje e erra na próxima. Sem nada declarado, procura na coluna
+ * Declaradas em `CANAIS.ColunasDaBusca`, e não adivinhadas: adivinhar acerta
+ * no canal de hoje e erra na próxima. Sem nada declarado, procura na coluna
  * da situação e na da data — pouco, mas nunca na base inteira.
  */
-function colunasDaBusca_(mesa) {
-  var estrutura = estruturaDaAba_(mesa.aba);
+function colunasDaBusca_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
 
-  return String(mesa.colunasDaBusca || '')
+  return String(canal.colunasDaBusca || '')
     .split(',')
     .map(function (nome) { return nome.trim(); })
     .filter(function (nome) {
@@ -789,22 +1005,22 @@ function colunasDaBusca_(mesa) {
 }
 
 /**
- * Procura numa mesa, lendo coluna por coluna e só depois as linhas que casam.
+ * Procura num canal, lendo coluna por coluna e só depois as linhas que casam.
  */
-function procurarNaMesa_(mesa, termo, quem) {
-  var colunas = colunasDaBusca_(mesa);
+function procurarNoCanal_(canal, termo, quem) {
+  var colunas = colunasDaBusca_(canal);
   var aviso = '';
 
   if (!colunas.length) {
     return {
-      tipo: 'mesa',
-      id: mesa.id,
-      nome: mesa.nome,
-      icone: mesa.icone,
+      tipo: 'canal',
+      id: canal.id,
+      nome: canal.nome,
+      icone: canal.icone,
       colunas: [],
       casos: [],
-      aviso: 'Esta mesa não declarou em quais colunas procurar. ' +
-        'Isso se ajusta em Configurações → Mesas de trabalho.'
+      aviso: 'Esto canal não declarou em quais colunas procurar. ' +
+        'Isso se ajusta em Configurações → Canais de trabalho.'
     };
   }
 
@@ -814,7 +1030,7 @@ function procurarNaMesa_(mesa, termo, quem) {
   var ordemDasLinhas = [];
 
   colunas.forEach(function (coluna) {
-    var valores = lerColunaInteira_(mesa.aba, coluna.cabecalho);
+    var valores = lerColunaInteira_(canal.aba, coluna.cabecalho);
     for (var i = 0; i < valores.length; i++) {
       var numeroDaLinha = i + 2;   // a linha 1 é o cabeçalho
       if (linhasQueCasam[numeroDaLinha]) continue;
@@ -835,22 +1051,22 @@ function procurarNaMesa_(mesa, termo, quem) {
 
   // Passo 2: agora sim, ler as linhas inteiras — só essas.
   ordemDasLinhas.sort(function (uma, outra) { return outra - uma; });
-  var registros = lerLinhasEspecificas_(mesa.aba, ordemDasLinhas)
+  var registros = lerLinhasEspecificas_(canal.aba, ordemDasLinhas)
     .filter(function (registro) {
       // Caso ocultado não volta na busca. A linha continua na planilha, e
       // um administrador ainda a enxerga por lá.
       return normalizarParaComparar_(registro._Visivel) !== 'nao';
     });
 
-  var meus = filtrarPeloAlcance_(registros, mesa.aba, quem);
+  var meus = filtrarPeloAlcance_(registros, canal.aba, quem);
 
   return {
-    tipo: 'mesa',
-    id: mesa.id,
-    nome: mesa.nome,
-    icone: mesa.icone,
-    colunas: colunasDaFila_(mesa),
-    casos: montarFila_(meus.slice().reverse(), mesa),
+    tipo: 'canal',
+    id: canal.id,
+    nome: canal.nome,
+    icone: canal.icone,
+    colunas: colunasDaFila_(canal),
+    casos: montarFila_(meus.slice().reverse(), canal),
     ondeAchou: linhasQueCasam,
     procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
     aviso: aviso

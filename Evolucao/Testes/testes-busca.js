@@ -23,8 +23,8 @@ function rodarTestesDeBusca() {
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
 
-  const mesa = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_MESA');
-  const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
 
   // Casos velhos de propósito: a busca existe justamente para o que a fila
   // dos 30 dias não mostra mais.
@@ -47,13 +47,13 @@ function rodarTestesDeBusca() {
 
   teste('a tela abre sabendo onde dá para procurar', () => {
     const opcoes = chamar('opcoesDaBusca()');
-    igual(opcoes.mesas.length, 2);
+    igual(opcoes.canais.length, 2);
     igual(opcoes.minimo, 3);
     igual(opcoes.legado.ligado, false, 'instalação nova não tem base legada');
 
-    const daRet = opcoes.mesas.find((m) => m.nome === 'RET Vida');
+    const daRet = opcoes.canais.find((m) => m.nome === 'RET Vida');
     verdadeiro(daRet.procuraEm.indexOf('protocolo') >= 0,
-      'a mesa diz em quais colunas procura — quem procura precisa saber');
+      'o canal diz em quais colunas procura — quem procura precisa saber');
   });
 
   teste('termo curto demais é recusado, com o motivo', () => {
@@ -62,7 +62,7 @@ function rodarTestesDeBusca() {
 
   secao('Achar');
 
-  teste('acha pelo protocolo, na mesa certa', () => {
+  teste('acha pelo protocolo, no canal certa', () => {
     const achado = chamar('buscarCasos')('RET-2026-0042', [], false);
     igual(achado.total, 1);
     const daRet = achado.origens.find((o) => o.nome === 'RET Vida');
@@ -85,24 +85,24 @@ function rodarTestesDeBusca() {
   });
 
   teste('a busca alcança o que a fila dos 30 dias já não mostra', () => {
-    const noPainel = chamar('resumoDaMesa')(mesa.id, {}).total;
+    const noPainel = chamar('resumoDoCanal')(canal.id, {}).total;
     igual(noPainel, 0, 'os casos de exemplo são de janeiro e fevereiro');
     verdadeiro(chamar('buscarCasos')('Vanessa', [], false).total > 0,
       'e a busca acha os mesmos casos — é para isso que ela existe');
   });
 
-  teste('dá para procurar só numa mesa', () => {
-    const so = chamar('buscarCasos')('12345678901', [mesa.id], false);
+  teste('dá para procurar só num canal', () => {
+    const so = chamar('buscarCasos')('12345678901', [canal.id], false);
     igual(so.origens.length, 1);
     igual(so.origens[0].nome, 'Mesa Diamante');
     igual(so.total, 1);
   });
 
   teste('caso ocultado não volta na busca', () => {
-    const achado = chamar('buscarCasos')('Vanessa', [mesa.id], false);
+    const achado = chamar('buscarCasos')('Vanessa', [canal.id], false);
     const id = achado.origens[0].casos[0].id;
-    chamar('ocultarCaso')(mesa.id, id);
-    igual(chamar('buscarCasos')('Vanessa', [mesa.id], false).total, 0);
+    chamar('ocultarCaso')(canal.id, id);
+    igual(chamar('buscarCasos')('Vanessa', [canal.id], false).total, 0);
     chamar('reexibirRegistro_')('BASE_MESA', id);
   });
 
@@ -117,15 +117,15 @@ function rodarTestesDeBusca() {
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
       // A Ana só enxerga os casos dela: acha a Vanessa, que é dela, e não o
       // Otávio, que é do Diego.
-      igual(chamar('buscarCasos')('Vanessa', [mesa.id], false).total, 1);
-      igual(chamar('buscarCasos')('Otávio', [mesa.id], false).total, 0,
+      igual(chamar('buscarCasos')('Vanessa', [canal.id], false).total, 1);
+      igual(chamar('buscarCasos')('Otávio', [canal.id], false).total, 0,
         'esconder na fila e mostrar na busca seria uma porta dos fundos');
     });
   });
 
   secao('Só as colunas declaradas');
 
-  teste('a busca procura SÓ nas colunas que a mesa declarou', () => {
+  teste('a busca procura SÓ nas colunas que o canal declarou', () => {
     // O "sistema" da RET é SIVIDA em todos os casos. Ele não está entre as
     // colunas de busca, então procurar por ele não acha nada — e é assim que
     // a tela não lê a base inteira.
@@ -136,7 +136,7 @@ function rodarTestesDeBusca() {
       'coluna fora da lista de busca não é lida');
 
     // E declarando a coluna, passa a achar. Sem programador no meio.
-    chamar('salvarMesa')({
+    chamar('salvarCanal')({
       id: ret.id, nome: ret.nome,
       colunaDaData: 'data de recepção do protocolo', colunaDoStatus: 'status',
       colunasDaBusca: 'protocolo, sistema'
@@ -144,8 +144,8 @@ function rodarTestesDeBusca() {
     igual(chamar('buscarCasos')('SIVIDA', [ret.id], false).total, 1);
   });
 
-  teste('mesa sem coluna de busca declarada avisa, em vez de ler tudo', () => {
-    chamar('salvarMesa')({
+  teste('canal sem coluna de busca declarada avisa, em vez de ler tudo', () => {
+    chamar('salvarCanal')({
       id: ret.id, nome: ret.nome,
       colunaDaData: 'data de recepção do protocolo', colunaDoStatus: 'status',
       colunasDaBusca: ''

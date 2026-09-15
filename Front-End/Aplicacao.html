@@ -195,7 +195,7 @@ var Rotas = (function () {
     },
     cadastrarCaso: {
       titulo: 'Cadastrar Caso',
-      subtitulo: 'Registro de um caso novo, com o formulário montado pela mesa.',
+      subtitulo: 'Registro de um caso novo, com o formulário montado pelo canal.',
       montar: function (pacote) { return TelaCadastrarCaso.montar(pacote); },
       ligar: function (pacote) { TelaCadastrarCaso.ligar(pacote); },
       desligar: function () { TelaCadastrarCaso.desligar(); }
@@ -396,7 +396,31 @@ var Aplicacao = (function () {
     elemento('recusado-motivo').textContent = motivo;
   }
 
+  /**
+   * O pacote que veio dentro da página, se veio.
+   *
+   * O doGet o entrega junto com o HTML, e é o que evita uma viagem inteira ao
+   * servidor só para repetir o que ele acabou de calcular. Mas a tela NÃO
+   * depende disso: se a injeção falhar — arquivo antigo no Apps Script, um
+   * JSON que não fecha, qualquer coisa —, ela pergunta ao servidor como
+   * sempre fez. Atalho sem volta vira um jeito novo de quebrar.
+   */
+  function pacoteQueVeioNaPagina() {
+    try {
+      var pronto = window.PGO_PACOTE_DE_PARTIDA;
+      if (pronto && typeof pronto === 'object' && 'disponivel' in pronto) {
+        return pronto;
+      }
+    } catch (erro) {
+      // Página servida sem a injeção. Segue pelo caminho longo.
+    }
+    return null;
+  }
+
   function iniciar() {
+    var pronto = pacoteQueVeioNaPagina();
+    if (pronto) { abrirCom(pronto); return; }
+
     Servidor.chamar('pacoteDePartida')
       .entao(function (resposta) {
         if (!resposta || !resposta.disponivel) {
@@ -406,24 +430,36 @@ var Aplicacao = (function () {
             || 'O servidor não explicou o motivo.');
           return;
         }
-        pacote = resposta;
-        if (pacote.identidade.corPrimaria) {
-          // Em --cor-da-operacao, e não em --destaque: escrever direto no
-          // destaque pintaria os quatro temas com a cor da operação, e o
-          // rosa ficaria com botões azuis.
-          document.documentElement.style.setProperty(
-            '--cor-da-operacao', pacote.identidade.corPrimaria);
-        }
-        elemento('carregando').hidden = true;
-        elemento('aplicacao').hidden = false;
-        restaurarEncolhido();
-        aplicarTema(pacote.tema || 'padrao');
-        irPara(telaDoEndereco() || 'dashboard', true);
-        ligarTeclado();
+        abrirCom(resposta);
       })
       .senao(function (erro) {
         recusar(erro && erro.message ? erro.message : String(erro));
       });
+  }
+
+  /** Monta a casca a partir do pacote, tenha ele vindo por onde tiver vindo. */
+  function abrirCom(resposta) {
+    if (!resposta || !resposta.disponivel) {
+      // Nunca deixar a falha virar um menu vazio: menu vazio é lido como
+      // "não tenho acesso" e manda a pessoa procurar no lugar errado.
+      recusar((resposta && resposta.motivo)
+        || 'O servidor não explicou o motivo.');
+      return;
+    }
+    pacote = resposta;
+    if (pacote.identidade && pacote.identidade.corPrimaria) {
+      // Em --cor-da-operacao, e não em --destaque: escrever direto no
+      // destaque pintaria os quatro temas com a cor da operação, e o
+      // rosa ficaria com botões azuis.
+      document.documentElement.style.setProperty(
+        '--cor-da-operacao', pacote.identidade.corPrimaria);
+    }
+    elemento('carregando').hidden = true;
+    elemento('aplicacao').hidden = false;
+    restaurarEncolhido();
+    aplicarTema(pacote.tema || 'padrao');
+    irPara(telaDoEndereco() || 'dashboard', true);
+    ligarTeclado();
   }
 
   /** Redesenha a tela atual — usada quando ela mesma muda de estado. */

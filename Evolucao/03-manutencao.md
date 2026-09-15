@@ -136,7 +136,7 @@ você. Abra uma questão.
 
 A última linha é a mais importante. Boa parte do que parece código é
 configuração: nome do sistema, logo, cor, títulos do menu, status, motivos,
-cargos, níveis, mesas e campos do formulário vivem na planilha.
+cargos, níveis, canais e campos do formulário vivem na planilha.
 
 ---
 

@@ -28,7 +28,7 @@
 
 var TelaMinhaPerformance = (function () {
 
-  var mesaEscolhida = '';
+  var canalEscolhida = '';
   var dias = 0;
   var dados = null;
 
@@ -38,8 +38,8 @@ var TelaMinhaPerformance = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
-    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
       + '<div id="performance"><p class="carregando-campos">'
       + 'Somando os seus números…</p></div>';
   }
@@ -50,7 +50,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', mesaEscolhida, dias)
+    Servidor.chamar('minhaPerformance', canalEscolhida, dias)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -62,9 +62,9 @@ var TelaMinhaPerformance = (function () {
   function desenhar() {
     if (!dados.temResponsavel) {
       elemento('performance').innerHTML = '<div class="cartao vazio">'
-        + '<strong>Esta mesa não diz quem é o responsável por cada caso.</strong>'
+        + '<strong>Esto canal não diz quem é o responsável por cada caso.</strong>'
         + '<p>Sem uma coluna de responsável não há "os meus casos" para somar. '
-        + 'Um administrador aponta essa coluna em Configurações → Mesas de '
+        + 'Um administrador aponta essa coluna em Configurações → Canais de '
         + 'trabalho.</p></div>';
       return;
     }
@@ -246,7 +246,7 @@ var TelaMinhaPerformance = (function () {
     var abrir = document.querySelectorAll('[data-caso-recente]');
     for (var i = 0; i < abrir.length; i++) {
       abrir[i].addEventListener('click', function () {
-        CasoEmModal.abrir(mesaEscolhida,
+        CasoEmModal.abrir(canalEscolhida,
           this.getAttribute('data-caso-recente'), carregar);
       });
     }
@@ -255,8 +255,8 @@ var TelaMinhaPerformance = (function () {
   }
 
   function ligarTela() {
-    SeletorDeMesa.ligar(function (idDaMesa) {
-      mesaEscolhida = idDaMesa;
+    SeletorDeCanal.ligar(function (idDoCanal) {
+      canalEscolhida = idDoCanal;
       Aplicacao.remontar();
     });
     carregar();
