@@ -630,6 +630,31 @@ levar a conferência para onde o problema mora.
 
 ---
 
+### 32 · A tela que espera para sempre
+
+**Sintoma.** A aba Usuários fica em "Lendo o cadastro…" e não sai. Sem erro,
+sem mensagem, sem nada no console.
+
+**Causa.** Há falha que **não chega ao `withFailureHandler`**. Quando a função
+não existe no servidor, quando a execução morre do outro lado, quando a
+resposta não atravessa a fronteira — em alguns desses casos nada volta: nem
+sucesso, nem erro. O `.senao` nunca é chamado, porque não há o que chamar.
+
+O sistema já sabia dizer quando a função não existe (achado 27). O que ele não
+sabia era **desistir**.
+
+**Defesa.** Um relógio. Se em quarenta segundos nada voltou, a ponte desiste e
+chama o `.senao` ela mesma, com um recado que nomeia a função e aponta o
+`diagnosticoRECC()`. Quarenta é folga enorme: a operação mais cara do sistema,
+medida com 200 mil casos, leva nove segundos.
+
+**O que ele ensina.** Uma tela parada é o pior estado possível — ela não
+funciona **e não avisa**. Entre esperar para sempre e desistir explicando,
+desistir é sempre melhor. Tratar o erro em todo lugar não basta se existe um
+caminho em que o erro nunca acontece: só o silêncio.
+
+---
+
 ## O que esta lista ensina
 
 **Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
@@ -681,7 +706,10 @@ Daí as duas práticas que o projeto não abre mão:
 12. **CSS que não existe não reclama.** O item 31 não tinha erro, não tinha
     exceção, não tinha log — só ficava feio. Defeito silencioso não é o que
     não dá erro: é o que não tem sintoma apontando para a causa.
-13. **Medir o relógio errado não mede nada.** No Apps Script o custo é a IDA
+13. **Entre esperar para sempre e desistir explicando, desistir ganha.** O
+    item 32 fecha a série dos silêncios: ter tratamento de erro não adianta
+    quando o caminho é "nada volta". Só um relógio resolve isso.
+14. **Medir o relógio errado não mede nada.** No Apps Script o custo é a IDA
     ao serviço, não a conta em JavaScript. Os itens 28 e 29 eram invisíveis no
     relógio do Node — o Node não paga pedágio. Contar as idas mostrou os dois
     na primeira execução.

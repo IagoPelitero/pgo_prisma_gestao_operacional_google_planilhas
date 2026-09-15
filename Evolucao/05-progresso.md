@@ -1028,6 +1028,68 @@ Mais um `COMO-USAR.txt`.
 
 ---
 
+## O cadastro de usuários, revisto
+
+Três mudanças pedidas pela operação, e uma que veio junto.
+
+### A mesa da pessoa
+
+`USUARIOS` ganhou a coluna **`MesaId`** — a décima quarta do contrato — e o
+formulário ganhou o campo. **Vazio é válido**, e é o caso de quem administra:
+quem cuida do sistema não pertence a uma mesa, atende as duas e delega. Na
+lista isso aparece como *"todas as mesas"*, e não em branco — em branco parece
+cadastro pela metade.
+
+Mesa preenchida tem de existir. Uma mesa que sumiu deixaria a pessoa apontando
+para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
+
+A lista passou a mostrar **e-mail · nível · cargo · mesa**, em vez de só
+e-mail e nível.
+
+### A senha de administrador só vale para quem não é administrador
+
+A senha nunca foi uma segunda identidade: o sistema já sabe quem está
+chamando, pela conta Google, e já conferiu a permissão. Ela é um **freio** —
+um segundo de parada antes de uma ação sem desfazer. Para quem tem a permissão
+de estrutura, esse freio é atrito sem ganho: a pessoa que pode mexer na
+estrutura é a mesma que define a senha.
+
+O efeito, por ação:
+
+| ação | exige | quem é pedido |
+|---|---|---|
+| Criar campo (coluna nova) | `estrutura` | ninguém — só administrador chega lá |
+| Regerar aba de análise | `estrutura` | ninguém, pelo mesmo motivo |
+| **Importar em lote** | `configurar` | **quem configura sem administrar** |
+
+A importação é onde o freio continua servindo: é a ação mais provável de ser
+delegada, e escreve em centenas de linhas de uma vez.
+
+Instalação **sem senha definida não libera ninguém** — continua barrando, e
+dizendo onde definir. Do contrário, não definir senha viraria o jeito mais
+fácil de desligar a guarda.
+
+### As datas saem como texto
+
+`listarUsuarios` devolvia `Date`; as irmãs dela já devolviam texto formatado.
+Elas atravessam a fronteira do `google.script.run` em JSON, e um `Date`
+atravessa como texto ISO que a tela teria de reinterpretar. Formatar no
+servidor deixa uma regra só, do lado que conhece o fuso.
+
+### E o relógio de desistência
+
+O [achado 32](04-bugs-capturados.md): há falha que **não chega ao
+`withFailureHandler`** — nada volta, nem sucesso nem erro, e a tela espera para
+sempre. Agora a ponte desiste em quarenta segundos e diz qual função não
+respondeu. Quarenta é folga enorme: a operação mais cara do sistema leva nove
+segundos.
+
+> Uma tela parada é o pior estado possível: não funciona **e não avisa**.
+
+**383 testes**, e o ponta a ponta subiu para sete percursos.
+
+---
+
 ## Responsividade
 
 Uma conferência à parte, num navegador de verdade:

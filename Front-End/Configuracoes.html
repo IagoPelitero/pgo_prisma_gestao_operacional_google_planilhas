@@ -434,6 +434,11 @@ var TelaConfiguracoes = (function () {
         + '<span class="nome">' + escapar(usuario.nome) + '</span>'
         + '<span class="detalhe">' + escapar(usuario.email) + ' · '
         + escapar(usuario.nivelAcesso)
+        + (usuario.cargo && usuario.cargo !== 'Sem cargo'
+          ? ' · ' + escapar(usuario.cargo) : '')
+        // Sem mesa é o administrador, e dizer isso é melhor que deixar em
+        // branco: em branco parece cadastro pela metade.
+        + ' · ' + escapar(usuario.mesa || 'todas as mesas')
         + (usuario.ativo ? '' : ' · sem acesso') + '</span></button></li>';
     }).join('');
 
@@ -460,10 +465,34 @@ var TelaConfiguracoes = (function () {
     } else painelVazio('Escolha uma pessoa, ou cadastre uma nova.');
   }
 
+  /**
+   * A mesa em que a pessoa trabalha — e a opção de não ter nenhuma.
+   *
+   * "Todas as mesas" é a PRIMEIRA opção, e é o padrão, porque é o caso de
+   * quem administra: quem cuida do sistema não pertence a uma mesa, atende as
+   * duas e delega para quem for. Deixar esse caso como uma exceção escondida
+   * no fim da lista faria parecer cadastro incompleto.
+   */
+  function caixaDeMesaDaPessoa(escolhida) {
+    var mesas = pacoteDoSistema.mesas || [];
+    return '<label class="config-campo"><span>Mesa</span>'
+      + '<select id="cfg-mesa-da-pessoa">'
+      + '<option value=""' + (escolhida ? '' : ' selected') + '>'
+      + '— todas as mesas —</option>'
+      + mesas.map(function (mesa) {
+        return '<option value="' + escapar(mesa.id) + '"'
+          + (texto(mesa.id) === texto(escolhida) ? ' selected' : '') + '>'
+          + escapar(mesa.nome) + '</option>';
+      }).join('') + '</select>'
+      + '<em>Quem administra fica em "todas as mesas": pode cadastrar em '
+      + 'qualquer uma e delegar. Escolher uma mesa é para quem trabalha nela.'
+      + '</em></label>';
+  }
+
   function desenharPainelDoUsuario(usuario) {
     var ehNovo = !usuario;
     var pessoa = usuario || {
-      id: '', nome: '', email: '', canalQueAtende: '', cargoId: '',
+      id: '', nome: '', email: '', canalQueAtende: '', mesaId: '', cargoId: '',
       nivelAcessoId: '', matricula: '', ativo: true
     };
 
@@ -475,6 +504,7 @@ var TelaConfiguracoes = (function () {
         'É por ele que a pessoa entra. Tem de ser a conta que ela usa.')
       + campoDeTexto('canal', 'Canal que atende', pessoa.canalQueAtende,
         'Usado pelo alcance EQUIPE: quem atende o mesmo canal vê os mesmos casos.')
+      + caixaDeMesaDaPessoa(pessoa.mesaId)
       + campoDeTexto('matricula', 'Matrícula', pessoa.matricula, '')
       + caixaDeItens('cargo', 'Cargo', dados.cargos, pessoa.cargoId,
         'O cargo é só descrição — quem decide o acesso é o nível abaixo.')
@@ -494,6 +524,7 @@ var TelaConfiguracoes = (function () {
         nome: valorDe('nome'),
         email: valorDe('email'),
         canalQueAtende: valorDe('canal'),
+        mesaId: valorDe('mesa-da-pessoa'),
         matricula: valorDe('matricula'),
         cargoId: valorDe('cargo'),
         nivelAcessoId: valorDe('nivel'),

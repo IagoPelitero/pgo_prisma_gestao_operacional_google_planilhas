@@ -176,6 +176,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Email', tipo: 'texto', protegido: true },
       { cabecalho: 'Canal que atende', tipo: 'texto', protegido: false },
+      // A mesa em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
+      // administrador: quem administra não pertence a uma mesa, atende as
+      // duas e delega para quem for. Exigir mesa dele obrigaria a inventar
+      // uma resposta para uma pergunta que não se aplica.
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },

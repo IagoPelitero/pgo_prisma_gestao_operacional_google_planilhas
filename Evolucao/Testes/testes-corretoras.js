@@ -348,9 +348,32 @@ function rodarTestesDeCorretoras() {
     contem(conferido.linhas[1].porque, 'repetida');
   });
 
-  teste('aplicar exige a senha de administrador', () => {
-    lanca(() => chamar('aplicarImportacao')('corretoras', '9876543;Qualquer'),
-      'exige a senha de administrador');
+  teste('aplicar NÃO pede senha ao administrador', () => {
+    const feito = chamar('aplicarImportacao')('corretoras', '9876543;Qualquer');
+    igual(feito.criadas, 1);
+  });
+
+  teste('mas quem configura sem administrar continua parando na senha', () => {
+    // Esta é a ação em que o freio ainda serve: importar exige CONFIGURAR, e
+    // não ESTRUTURA — então é a mais provável de ser delegada a alguém que
+    // não cuida do sistema. E ela escreve em centenas de linhas de uma vez.
+    const consulta = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
+    chamar('salvarNivelDeAcesso')({
+      id: consulta.Id, escopo: 'TODOS',
+      acoes: ['exportar', 'configurar'],
+      telas: ['dashboard', 'buscarCaso', 'painelAnalitico', 'configuracoes',
+        'tabelaCorretoras']
+    });
+    chamar('salvarUsuario')({
+      nome: 'Configura Sem Estrutura', email: 'configura.sem@exemplo.com',
+      nivelAcessoId: consulta.Id, ativo: true
+    });
+
+    comoUsuario(ambiente, 'configura.sem@exemplo.com', () => {
+      lanca(() => chamar('aplicarImportacao')('corretoras', '9876544;Outra'),
+        'senha de administrador');
+    });
   });
 
   teste('com a senha liberada, aplicar cadastra e atualiza', () => {

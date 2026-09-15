@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-14 22:04
+   Gerado em 2026-09-15 00:34
    ========================================================================== */
 
 
@@ -468,8 +468,38 @@ function gravarTentativasDeSenha_(tentativas) {
  * A guarda das ações sem volta: criar ou remover coluna, apagar mesa, mexer
  * em nível de acesso, gerar aba de análise sobre uma existente, normalizar
  * base, ocultar em massa.
+ *
+ * QUEM É ADMINISTRADOR NÃO PRECISA DIGITAR A SENHA. É decisão, e vale a pena
+ * estar escrita.
+ *
+ * A senha nunca foi uma segunda identidade: o sistema já sabe quem está
+ * chamando, pela conta Google, e já conferiu a permissão. O que ela é, e
+ * sempre foi, é um FREIO — um segundo de parada antes de uma ação que não tem
+ * desfazer. Para quem tem a permissão de estrutura, esse freio é atrito sem
+ * ganho: a pessoa que pode mexer na estrutura é a mesma que define a senha, e
+ * pedir a ela um segredo que ela mesma escolheu não protege nada.
+ *
+ * Para quem NÃO é administrador e mesmo assim recebeu a ação — porque alguém
+ * montou um nível assim —, o freio continua valendo inteiro. É justamente aí
+ * que ele serve: a ação é cara, e quem a está fazendo não é quem cuida do
+ * sistema.
+ *
+ * Instalação sem senha definida NÃO libera ninguém: continua barrando, e
+ * dizendo onde definir. Do contrário, não definir senha viraria o jeito mais
+ * fácil de desligar a guarda.
  */
 function exigirSenhaDeAdministrador_() {
+  var quem = usuarioAtual_();
+  if (quem.cadastrado && podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA)) {
+    return true;
+  }
+
+  if (!existeSenhaDeAdministrador_()) {
+    throw new Error('Esta ação exige a senha de administrador, e nenhuma foi '
+      + 'definida ainda. Peça a um administrador que defina em '
+      + 'Configurações › Identidade.');
+  }
+
   var ate = Number(PropertiesService.getUserProperties()
     .getProperty(RECC_CHAVE_DA_LIBERACAO) || 0);
   if (new Date().getTime() > ate) {
@@ -5338,6 +5368,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Email', tipo: 'texto', protegido: true },
       { cabecalho: 'Canal que atende', tipo: 'texto', protegido: false },
+      // A mesa em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
+      // administrador: quem administra não pertence a uma mesa, atende as
+      // duas e delega para quem for. Exigir mesa dele obrigaria a inventar
+      // uma resposta para uma pergunta que não se aplica.
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
@@ -9423,32 +9458,57 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
  * ============================================================================
  */
 
-/** A lista de usuários, com cargo e nível já traduzidos para nome. */
+/**
+ * A lista de usuários, com cargo, nível e mesa já traduzidos para nome.
+ *
+ * Tudo sai como TEXTO — inclusive as datas. Elas atravessam a fronteira do
+ * `google.script.run` em JSON, e um `Date` atravessa como um texto ISO que a
+ * tela teria de reinterpretar; formatar aqui deixa uma regra só, do lado que
+ * conhece o fuso da operação.
+ */
 function listarUsuarios() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
   var catalogo = {};
   lerRegistros_('CATALOGO').forEach(function (item) {
-    catalogo[converterParaIdentificador_(item.Id)] = item.Nome;
+    catalogo[converterParaIdentificador_(item.Id)] = String(item.Nome || '');
+  });
+
+  var mesas = {};
+  lerRegistros_('MESAS').forEach(function (mesa) {
+    mesas[converterParaIdentificador_(mesa.Id)] = String(mesa.Nome || '');
   });
 
   return lerRegistros_('USUARIOS').map(function (usuario) {
+    var mesaId = converterParaIdentificador_(usuario.MesaId);
     return {
-      id: usuario.Id,
-      nome: usuario.Nome,
-      email: usuario.Email,
-      canalQueAtende: usuario['Canal que atende'],
-      cargoId: usuario.CargoId,
-      cargo: catalogo[converterParaIdentificador_(usuario.CargoId)] || 'Sem dados',
-      nivelAcessoId: usuario.NivelAcessoId,
+      id: String(usuario.Id || ''),
+      nome: String(usuario.Nome || ''),
+      email: String(usuario.Email || ''),
+      canalQueAtende: String(usuario['Canal que atende'] || ''),
+      mesaId: mesaId,
+      // Sem mesa NÃO é falta de dado: é o administrador, que atende todas.
+      mesa: mesaId ? (mesas[mesaId] || 'Mesa desligada') : '',
+      cargoId: converterParaIdentificador_(usuario.CargoId),
+      cargo: catalogo[converterParaIdentificador_(usuario.CargoId)] || 'Sem cargo',
+      nivelAcessoId: converterParaIdentificador_(usuario.NivelAcessoId),
       nivelAcesso:
         catalogo[converterParaIdentificador_(usuario.NivelAcessoId)] || 'Sem dados',
-      matricula: usuario.Matricula,
+      matricula: converterParaIdentificador_(usuario.Matricula),
       ativo: normalizarParaComparar_(usuario.Ativo) === 'sim',
-      dataCadastro: usuario.DataCadastro,
-      ultimoAcesso: usuario.UltimoAcesso
+      administrador: ehAdministrador_(usuario.Id),
+      dataCadastro: comoDataEHora_(usuario.DataCadastro),
+      ultimoAcesso: comoDataEHora_(usuario.UltimoAcesso)
     };
   });
+}
+
+/** Uma data da planilha vira texto legível. Vazio continua vazio. */
+function comoDataEHora_(valor) {
+  if (!valor) return '';
+  var data = converterParaData_(valor);
+  if (!data) return '';
+  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
 }
 
 /**
@@ -9473,6 +9533,20 @@ function salvarUsuario(dados) {
       'Sem nível válido a pessoa fica cadastrada e não consegue entrar.');
   }
 
+  // A mesa é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
+  // preenchida, tem de existir: uma mesa que sumiu deixaria a pessoa apontando
+  // para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
+  var mesaEscolhida = converterParaIdentificador_(dados.mesaId);
+  if (mesaEscolhida) {
+    var existe = lerRegistros_('MESAS').filter(function (mesa) {
+      return converterParaIdentificador_(mesa.Id) === mesaEscolhida;
+    })[0];
+    if (!existe) {
+      throw new Error('A mesa escolhida não existe mais. Escolha outra, ou ' +
+        'deixe em branco — quem administra não pertence a uma mesa.');
+    }
+  }
+
   var idInformado = converterParaIdentificador_(dados.id);
   var jaCadastrados = lerRegistros_('USUARIOS');
   for (var i = 0; i < jaCadastrados.length; i++) {
@@ -9490,6 +9564,8 @@ function salvarUsuario(dados) {
     Nome: String(dados.nome).trim(),
     Email: email,
     'Canal que atende': String(dados.canalQueAtende || '').trim(),
+    // Mesa VAZIA é válida: é o administrador, que atende todas e delega.
+    MesaId: converterParaIdentificador_(dados.mesaId),
     CargoId: converterParaIdentificador_(dados.cargoId),
     NivelAcessoId: converterParaIdentificador_(dados.nivelAcessoId),
     Matricula: converterParaIdentificador_(dados.matricula),

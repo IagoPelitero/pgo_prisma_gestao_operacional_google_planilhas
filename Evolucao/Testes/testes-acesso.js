@@ -314,12 +314,53 @@ function rodarTestesDeAcesso() {
     lanca(() => chamar('conferirSenhaDeAdministrador_')('errada'), 'Senha incorreta');
   });
 
-  teste('a ação sem volta exige a liberação, e ela expira', () => {
-    chamar('conferirSenhaDeAdministrador_')('segredo123');
-    igual(chamar('exigirSenhaDeAdministrador_')(), true, 'liberada agora');
-
+  teste('quem administra não precisa digitar a senha', () => {
+    // A senha nunca foi uma segunda identidade: o sistema já sabe quem está
+    // chamando, pela conta Google, e já conferiu a permissão. Ela é um FREIO
+    // antes de uma ação sem desfazer — e pedir a quem CUIDA do sistema um
+    // segredo que ela mesma escolheu é atrito sem ganho.
     ambiente.propriedadesDoUsuario.set('RECC_SENHA_LIBERADA_ATE', '1');
-    lanca(() => chamar('exigirSenhaDeAdministrador_')(), 'liberação anterior expirou');
+    igual(chamar('exigirSenhaDeAdministrador_')(), true,
+      'o administrador passa mesmo com a liberação expirada');
+  });
+
+  teste('quem NÃO administra continua parando na senha, e ela expira', () => {
+    // Aqui o freio serve para o que foi feito: a ação é cara, e quem a está
+    // fazendo não é quem cuida do sistema.
+    const consulta = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
+    chamar('salvarUsuario')({
+      nome: 'Sem Estrutura', email: 'sem.estrutura@exemplo.com',
+      nivelAcessoId: consulta.Id, ativo: true
+    });
+
+    comoUsuario(ambiente, 'sem.estrutura@exemplo.com', () => {
+      ambiente.propriedadesDoUsuario.set('RECC_SENHA_LIBERADA_ATE', '1');
+      lanca(() => chamar('exigirSenhaDeAdministrador_')(),
+        'liberação anterior expirou');
+
+      chamar('conferirSenhaDeAdministrador_')('segredo123');
+      igual(chamar('exigirSenhaDeAdministrador_')(), true,
+        'com a senha na mão, passa');
+    });
+  });
+
+  teste('sem senha definida, quem não administra continua barrado', () => {
+    // Do contrário, não definir senha viraria o jeito mais fácil de desligar
+    // a guarda.
+    const { ambiente: outro, chamar: chamarOutro } = carregar('primeiro.adm@exemplo.com');
+    chamarOutro('instalarRECC()');
+    const consulta = chamarOutro('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
+    chamarOutro('salvarUsuario')({
+      nome: 'Sem Nada', email: 'sem.nada@exemplo.com',
+      nivelAcessoId: consulta.Id, ativo: true
+    });
+
+    comoUsuario(outro, 'sem.nada@exemplo.com', () => {
+      lanca(() => chamarOutro('exigirSenhaDeAdministrador_')(),
+        'nenhuma foi definida');
+    });
   });
 
   teste('três tentativas erradas bloqueiam', () => {

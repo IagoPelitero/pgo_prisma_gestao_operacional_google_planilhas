@@ -126,10 +126,26 @@ function rodarTestesDeConfiguracoes() {
     }), 'Tipo de campo desconhecido');
   });
 
-  teste('criar campo exige senha de administrador, não só permissão', () => {
-    // Criar coluna escreve na planilha de produção e não tem desfazer.
-    lanca(() => chamar('criarCampo')(mesa.id, { rotulo: 'Observação interna' }),
-      'exige a senha de administrador');
+  teste('criar campo NÃO pede senha ao administrador', () => {
+    // Criar coluna escreve na planilha de produção e não tem desfazer — mas
+    // a ação já exige a permissão de ESTRUTURA, que só o administrador tem.
+    // Pedir a ele um segredo que ele mesmo escolheu é atrito sem ganho: o
+    // sistema já sabe quem está chamando, pela conta Google.
+    const criado = chamar('criarCampo')(mesa.id, { rotulo: 'Observação interna' });
+    igual(criado.cabecalho, 'Observação interna');
+  });
+
+  teste('e quem não administra não chega nem perto dela', () => {
+    // O freio de verdade desta ação não é a senha: é a permissão.
+    //
+    // A Ana já existe, no nível Operação — reaproveitá-la em vez de cadastrar
+    // mais alguém é de propósito: um teste adiante conta quantas pessoas
+    // dependem de cada nível, e um usuário a mais aqui o quebraria sem que
+    // nada tivesse quebrado de verdade.
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('criarCampo')(mesa.id, { rotulo: 'Pela porta dos fundos' }),
+        'não permite');
+    });
   });
 
   teste('com a senha liberada, o campo novo vira coluna de verdade', () => {
@@ -223,6 +239,74 @@ function rodarTestesDeConfiguracoes() {
     igual(niveis.find((n) => n.nome === 'Administrador').pessoas, 1);
     igual(niveis.find((n) => n.nome === 'Operação').pessoas, 1);
     igual(niveis.find((n) => n.nome === 'Consulta').pessoas, 0);
+  });
+
+  teste('a pessoa pode não ter mesa — é o caso de quem administra', () => {
+    // O primeiro usuário, o que instala o sistema, não pertence a mesa
+    // nenhuma: ele atende as duas e delega. Exigir mesa dele obrigaria a
+    // inventar uma resposta para uma pergunta que não se aplica.
+    const eu = chamar('listarUsuarios()')
+      .find((u) => u.email === 'primeiro.adm@exemplo.com');
+    igual(eu.mesaId, '', 'nasce sem mesa');
+    igual(eu.mesa, '', 'e a tela mostra isso como "todas as mesas"');
+    igual(eu.administrador, true);
+  });
+
+  teste('quem tem mesa vem com o nome dela, e não com o Id', () => {
+    const ret = chamar('mesasVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    const id = chamar('salvarUsuario')({
+      nome: 'Analista da RET', email: 'analista.ret@exemplo.com',
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
+      mesaId: ret.id, ativo: true
+    });
+    const pessoa = chamar('listarUsuarios()').find((u) => u.id === id);
+    igual(pessoa.mesaId, ret.id);
+    igual(pessoa.mesa, 'RET Vida', 'o Id não diz nada a quem lê a tela');
+    igual(pessoa.administrador, false);
+
+    // E dá para voltar a não ter mesa: a pessoa foi promovida, ou passou a
+    // atender as duas.
+    chamar('salvarUsuario')({
+      id: id, nome: 'Analista da RET', email: 'analista.ret@exemplo.com',
+      nivelAcessoId: pessoa.nivelAcessoId, mesaId: '', ativo: true
+    });
+    igual(chamar('listarUsuarios()').find((u) => u.id === id).mesa, '');
+  });
+
+  teste('mesa que não existe é recusada, e diz que dá para deixar em branco', () => {
+    lanca(() => chamar('salvarUsuario')({
+      nome: 'Mesa Fantasma', email: 'fantasma@exemplo.com',
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
+      mesaId: '9999999999', ativo: true
+    }), 'não existe mais');
+  });
+
+  teste('as datas saem como texto, e não como objeto de data', () => {
+    // Elas atravessam a fronteira do google.script.run em JSON. Formatar aqui
+    // deixa uma regra só, do lado que conhece o fuso da operação.
+    const eu = chamar('listarUsuarios()')
+      .find((u) => u.email === 'primeiro.adm@exemplo.com');
+    igual(typeof eu.dataCadastro, 'string');
+    verdadeiro(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/.test(eu.dataCadastro),
+      'formato dd/MM/yyyy HH:mm, achei "' + eu.dataCadastro + '"');
+  });
+
+  teste('a tela do cadastro tem os cinco campos que a operação pediu', () => {
+    // Os ids são MONTADOS ('cfg-' + nome), então o que se procura é a chamada
+    // que os monta — procurar o id pronto passaria sem provar nada.
+    const tela = lerTela('Configuracoes.html');
+    [["campoDeTexto('nome'", 'Nome'],
+     ["campoDeTexto('email'", 'E-mail'],
+     ["caixaDeItens('cargo'", 'Cargo'],
+     ['caixaDeMesaDaPessoa(', 'Mesa'],
+     ["caixaDeItens('nivel'", 'Nível de acesso']
+    ].forEach((par) => {
+      contem(tela, par[0], 'falta o campo "' + par[1] + '" no formulário');
+    });
+    contem(tela, 'todas as mesas',
+      'e a opção de não ter mesa aparece por escrito');
   });
 
   teste('tirar Configurações do único nível que a tem é recusado', () => {

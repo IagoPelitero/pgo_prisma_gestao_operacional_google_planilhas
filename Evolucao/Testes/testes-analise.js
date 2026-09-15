@@ -180,11 +180,14 @@ function rodarTestesDeAnalise() {
 
   secao('Regerar');
 
-  teste('regerar uma aba que já existe pede senha de administrador', () => {
-    // Criar não destrói nada. Regerar apaga o retrato anterior, e quem tinha
-    // uma tabela dinâmica apontada para ele vê os números mudarem embaixo.
+  teste('regerar NÃO pede senha ao administrador', () => {
+    // Regerar apaga o retrato anterior, e quem tinha uma tabela dinâmica
+    // apontada para ele vê os números mudarem embaixo. Mas gerar já exige a
+    // permissão de ESTRUTURA: quem chega aqui é quem cuida do sistema, e a
+    // senha seria um segredo que ela mesma escolheu.
     const id = chamar('listarAnalises')().find((u) => u.nome === 'Tudo').id;
-    lanca(() => chamar('gerarAnalise')(id), 'exige a senha de administrador');
+    const feito = chamar('gerarAnalise')(id);
+    igual(feito.aba, 'ANALISE_Tudo');
   });
 
   teste('com a senha liberada, regerar reaproveita a MESMA aba', () => {

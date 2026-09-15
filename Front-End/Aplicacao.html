@@ -36,6 +36,25 @@ var Servidor = (function () {
   */
   var geracaoDaTela = 0;
 
+  /*
+    QUANTO TEMPO ESPERAR ANTES DE DESISTIR.
+
+    O Apps Script tem seis minutos de teto por execução, mas nenhuma chamada
+    deste sistema chega perto: a mais cara, medida com 200 mil casos, leva
+    nove segundos. Quarenta segundos é folga de sobra — e é o que separa
+    "está demorando" de "não vem mais".
+
+    ISTO EXISTE PORQUE HÁ FALHA QUE NÃO CHEGA AO withFailureHandler. Quando a
+    função não existe, quando a resposta não consegue atravessar a fronteira,
+    quando a execução morre do outro lado — em alguns desses casos nada volta,
+    nem sucesso nem erro. A tela fica no "Lendo o cadastro…" para sempre, sem
+    uma linha no console, e o sintoma não diz nada sobre a causa.
+
+    Uma tela parada é o pior estado possível: ela não funciona e não avisa.
+    Desistir e explicar é melhor do que esperar para sempre.
+  */
+  var SEGUNDOS_ATE_DESISTIR = 40;
+
   /** Chamada pelo roteador, toda vez que o miolo é remontado. */
   function trocouDeTela() { geracaoDaTela++; }
 
@@ -77,16 +96,34 @@ var Servidor = (function () {
       return acompanhamento;
     }
 
+    // O relógio de desistência. Quem responder primeiro — servidor ou relógio
+    // — vence; o segundo é ignorado, para a tela não receber duas respostas.
+    var jaRespondeu = false;
+    var relogio = setTimeout(function () {
+      if (jaRespondeu) return;
+      jaRespondeu = true;
+      if (!aTelaAindaEAMesma()) return;
+      var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
+        + SEGUNDOS_ATE_DESISTIR + ' segundos.\n\n'
+        + 'Em geral é um arquivo .gs que não foi copiado para o projeto do '
+        + 'Apps Script: a função não existe lá, e a chamada morre sem dizer '
+        + 'nada. Execute diagnosticoRECC() no editor — ele lista o que falta.');
+      if (aoDarErrado) aoDarErrado(erro);
+      else console.error(erro);
+    }, SEGUNDOS_ATE_DESISTIR * 1000);
+
+    function responder(oQueFazer, valor) {
+      if (jaRespondeu) return;
+      jaRespondeu = true;
+      clearTimeout(relogio);
+      if (!aTelaAindaEAMesma()) return;
+      if (oQueFazer) oQueFazer(valor);
+      else if (valor instanceof Error) console.error(valor);
+    }
+
     var corrida = google.script.run
-      .withSuccessHandler(function (resposta) {
-        if (!aTelaAindaEAMesma()) return;
-        if (aoDarCerto) aoDarCerto(resposta);
-      })
-      .withFailureHandler(function (erro) {
-        if (!aTelaAindaEAMesma()) return;
-        if (aoDarErrado) aoDarErrado(erro);
-        else console.error(erro);
-      });
+      .withSuccessHandler(function (resposta) { responder(aoDarCerto, resposta); })
+      .withFailureHandler(function (erro) { responder(aoDarErrado, erro); });
 
     /*
       O DISPARO PRECISA DE TRY, e não é zelo excessivo.
@@ -108,6 +145,7 @@ var Servidor = (function () {
     */
     try {
       if (typeof corrida[nomeDaFuncao] !== 'function') {
+        clearTimeout(relogio);
         throw new Error('A função "' + nomeDaFuncao + '" não existe no '
           + 'servidor. Ou o arquivo .gs dela não foi copiado para o projeto '
           + 'do Apps Script, ou ela foi renomeada lá e a tela continua '

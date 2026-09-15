@@ -642,6 +642,33 @@ function rodarTestesDeDiagnostico() {
     contem(index, '<?= identidade.nome ?>');
   });
 
+  teste('a planilha de código não está mais velha que o código', () => {
+    // Ela é gerada por python3 Evolucao/Testes/gerar-excel.py — a única
+    // ferramenta em Python do projeto, porque openpyxl é quem sabe escrever
+    // .xlsx. Como não roda na suíte, o que se confere é a DATA: uma planilha
+    // desatualizada é pior que nenhuma, porque parece atual.
+    const raiz = path.join(__dirname, '..', '..');
+    const planilha = path.join(raiz, 'Evolucao', 'pacote',
+      'PGO-codigo-completo.xlsx');
+    if (!fs.existsSync(planilha)) return;   // ainda não foi gerada: tudo bem
+
+    const quando = fs.statSync(planilha).mtimeMs;
+    const maisNovos = [];
+    [['Back-End', '.gs'], ['Front-End', '.html']].forEach((par) => {
+      fs.readdirSync(path.join(raiz, par[0]))
+        .filter((n) => n.endsWith(par[1]))
+        .forEach((nome) => {
+          const arquivo = path.join(raiz, par[0], nome);
+          // Um segundo de tolerância: gerar tudo na mesma rodada pode deixar
+          // o código carimbado um instante depois da planilha.
+          if (fs.statSync(arquivo).mtimeMs > quando + 1000) maisNovos.push(nome);
+        });
+    });
+
+    igual(maisNovos.join(', '), '',
+      'estes mudaram depois da planilha — rode gerar-excel.py de novo');
+  });
+
   teste('o pacote traz o passo a passo, com o aviso dos nomes', () => {
     const destino = path.join(__dirname, '..', 'pacote');
     const comoUsar = fs.readFileSync(path.join(destino, 'COMO-USAR.txt'), 'utf8');
@@ -717,7 +744,15 @@ function rodarTestesDeDiagnostico() {
     const fila = [];
     const contexto = vm.createContext({
       console: { error: function () {} },
-      setTimeout: function (funcao) { fila.push(funcao); },
+      // O ATRASO IMPORTA. A ponte marca DOIS relógios: o adiamento de zero,
+      // que entrega a falha, e o de quarenta segundos, que desiste de
+      // esperar. Uma fila que ignorasse o atraso dispararia a desistência na
+      // hora, e o teste mediria a coisa errada.
+      setTimeout: function (funcao, atraso) {
+        fila.push({ funcao: funcao, atraso: atraso });
+        return fila.length;
+      },
+      clearTimeout: function () {},
       document: { addEventListener: function () {} },
       // Um google.script.run que só conhece uma função, como o de verdade.
       google: { script: { run: {
@@ -742,8 +777,10 @@ function rodarTestesDeDiagnostico() {
     }
     igual(estourou, '', 'chamar não pode estourar na cara de quem chamou');
 
-    igual(fila.length, 1, 'a falha foi adiada, e não disparada no meio da chamada');
-    fila.forEach(function (funcao) { funcao(); });
+    const imediatos = fila.filter(function (m) { return !m.atraso; });
+    igual(imediatos.length, 1,
+      'a falha foi adiada, e não disparada no meio da chamada');
+    imediatos.forEach(function (m) { m.funcao(); });
 
     const recado = vm.runInContext('globalThis.__r || ""', contexto);
     contem(recado, 'naoExisteNoServidor', 'o .senao roda, e diz qual função');
@@ -760,7 +797,10 @@ function rodarTestesDeDiagnostico() {
     let responder = null;
     const contexto = vm.createContext({
       console: { error: function () {}, info: function () {} },
-      setTimeout: function (funcao) { funcao(); },
+      // Só o adiamento de zero roda na hora; o relógio de desistência fica
+      // parado, como ficaria de verdade.
+      setTimeout: function (funcao, atraso) { if (!atraso) funcao(); return 1; },
+      clearTimeout: function () {},
       document: { addEventListener: function () {} },
       google: { script: { run: {
         withSuccessHandler: function (f) { responder = f; return this; },
@@ -797,7 +837,10 @@ function rodarTestesDeDiagnostico() {
     let chamou = null;
     const contexto = vm.createContext({
       console: { error: function () {} },
-      setTimeout: function (funcao) { funcao(); },
+      // Só o adiamento de zero roda na hora; o relógio de desistência fica
+      // parado, como ficaria de verdade.
+      setTimeout: function (funcao, atraso) { if (!atraso) funcao(); return 1; },
+      clearTimeout: function () {},
       document: { addEventListener: function () {} },
       google: { script: { run: {
         withSuccessHandler: function () { return this; },
@@ -836,6 +879,49 @@ function rodarTestesDeDiagnostico() {
     });
     igual(semGuarda.join(', '), '',
       'funções de desenho sem a guarda da seção atrasada');
+  });
+
+  teste('quando nada volta, a tela desiste e explica em vez de esperar', () => {
+    // Há falha que NÃO chega ao withFailureHandler: a execução morre do outro
+    // lado, ou a resposta não atravessa a fronteira. Nada volta — nem sucesso
+    // nem erro. A tela ficava no "Lendo o cadastro…" para sempre, sem uma
+    // linha no console. É o pior estado possível: não funciona e não avisa.
+    const marcados = [];
+    const contexto = vm.createContext({
+      console: { error: function () {}, info: function () {} },
+      setTimeout: function (funcao, atraso) {
+        marcados.push({ funcao: funcao, atraso: atraso });
+        return marcados.length;
+      },
+      clearTimeout: function () {},
+      document: { addEventListener: function () {} },
+      google: { script: { run: {
+        withSuccessHandler: function () { return this; },
+        withFailureHandler: function () { return this; },
+        // Esta nunca responde. É exatamente o caso relatado.
+        umaQueSomeNoAr: function () {}
+      } } }
+    });
+    const fonte = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'Aplicacao.html'), 'utf8')
+      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    vm.runInContext(fonte, contexto, { filename: 'Aplicacao.html' });
+
+    vm.runInContext(
+      "Servidor.chamar('umaQueSomeNoAr')"
+      + ".entao(function () {}).senao(function (e) { globalThis.__d = e.message; });",
+      contexto);
+
+    const desistencia = marcados.find(function (m) { return m.atraso >= 10000; });
+    verdadeiro(!!desistencia, 'a ponte marca um relógio de desistência');
+    igual(desistencia.atraso, 40000,
+      'quarenta segundos — a chamada mais cara do sistema leva nove');
+
+    desistencia.funcao();
+    const recado = vm.runInContext('globalThis.__d || ""', contexto);
+    contem(recado, 'umaQueSomeNoAr', 'diz qual função não respondeu');
+    contem(recado, 'não foi copiado', 'e a causa mais provável');
+    contem(recado, 'diagnosticoRECC', 'e onde ver a lista do que falta');
   });
 
   secao('O arquivo que ficou para trás na cópia');

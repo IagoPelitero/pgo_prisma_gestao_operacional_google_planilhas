@@ -450,8 +450,38 @@ function gravarTentativasDeSenha_(tentativas) {
  * A guarda das ações sem volta: criar ou remover coluna, apagar mesa, mexer
  * em nível de acesso, gerar aba de análise sobre uma existente, normalizar
  * base, ocultar em massa.
+ *
+ * QUEM É ADMINISTRADOR NÃO PRECISA DIGITAR A SENHA. É decisão, e vale a pena
+ * estar escrita.
+ *
+ * A senha nunca foi uma segunda identidade: o sistema já sabe quem está
+ * chamando, pela conta Google, e já conferiu a permissão. O que ela é, e
+ * sempre foi, é um FREIO — um segundo de parada antes de uma ação que não tem
+ * desfazer. Para quem tem a permissão de estrutura, esse freio é atrito sem
+ * ganho: a pessoa que pode mexer na estrutura é a mesma que define a senha, e
+ * pedir a ela um segredo que ela mesma escolheu não protege nada.
+ *
+ * Para quem NÃO é administrador e mesmo assim recebeu a ação — porque alguém
+ * montou um nível assim —, o freio continua valendo inteiro. É justamente aí
+ * que ele serve: a ação é cara, e quem a está fazendo não é quem cuida do
+ * sistema.
+ *
+ * Instalação sem senha definida NÃO libera ninguém: continua barrando, e
+ * dizendo onde definir. Do contrário, não definir senha viraria o jeito mais
+ * fácil de desligar a guarda.
  */
 function exigirSenhaDeAdministrador_() {
+  var quem = usuarioAtual_();
+  if (quem.cadastrado && podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA)) {
+    return true;
+  }
+
+  if (!existeSenhaDeAdministrador_()) {
+    throw new Error('Esta ação exige a senha de administrador, e nenhuma foi '
+      + 'definida ainda. Peça a um administrador que defina em '
+      + 'Configurações › Identidade.');
+  }
+
   var ate = Number(PropertiesService.getUserProperties()
     .getProperty(RECC_CHAVE_DA_LIBERACAO) || 0);
   if (new Date().getTime() > ate) {

@@ -251,6 +251,15 @@ async function rodar() {
     const cargos = await pagina.$$eval('#cfg-cargo option', (os) => os.map((o) => o.value));
     await pagina.selectOption('#cfg-cargo', cargos[1]);
 
+    // A mesa: a primeira opção é "todas as mesas" (o administrador), e as
+    // seguintes são as mesas de verdade.
+    const mesas = await pagina.$$eval('#cfg-mesa-da-pessoa option',
+      (os) => os.map((o) => ({ valor: o.value, nome: o.textContent })));
+    verdadeiro(mesas.length >= 3, 'o seletor traz "todas as mesas" e as mesas');
+    igual(mesas[0].valor, '', 'a primeira opção é não ter mesa');
+    contem(mesas[0].nome, 'todas as mesas');
+    await pagina.selectOption('#cfg-mesa-da-pessoa', mesas[1].valor);
+
     await pagina.click('#form-usuario button[type="submit"]');
     await pagina.waitForTimeout(900);
 
@@ -263,10 +272,19 @@ async function rodar() {
     igual(String(gravado['Canal que atende']), 'Corretora');
     igual(String(gravado.Matricula), '778899');
     verdadeiro(String(gravado.NivelAcessoId).length > 0, 'o nível foi gravado');
+    verdadeiro(String(gravado.MesaId).length > 0, 'a mesa foi gravada');
     igual(String(gravado.Ativo), 'SIM', 'nasce podendo entrar');
 
-    contem(await pagina.textContent('#config-lista'), 'Iago Pelitero',
-      'a lista recarregou e mostra a pessoa nova');
+    const lista = await pagina.textContent('#config-lista');
+    contem(lista, 'Iago Pelitero', 'a lista recarregou e mostra a pessoa nova');
+    contem(lista, 'p.iago.ip@exemplo.com', 'com o e-mail');
+    contem(lista, mesas[1].nome.trim(), 'e com a mesa');
+  });
+
+  await teste('quem administra aparece como "todas as mesas"', async () => {
+    // O primeiro usuário, o que instala tudo, não pertence a mesa nenhuma.
+    // Em branco pareceria cadastro pela metade; dizer é melhor.
+    contem(await pagina.textContent('#config-lista'), 'todas as mesas');
   });
 
   await teste('editar a pessoa muda a linha, e não cria outra', async () => {
