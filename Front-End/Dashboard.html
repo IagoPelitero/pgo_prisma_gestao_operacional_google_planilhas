@@ -170,6 +170,20 @@ var TelaDashboard = (function () {
         + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
         + Moldura.icone('editar') + '</button>';
     }
+
+    // Excluir na PRÓPRIA FILA, como no PGO 5 — pedido do PO.
+    //
+    // A decisão anterior era outra: excluir vivia só no caso aberto, para não
+    // comer a largura da coluna "Responsável". Cabe agora porque é um ícone,
+    // e não um botão com texto — os três juntos ocupam menos que "Ver
+    // detalhes" sozinho ocupava antes.
+    //
+    // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
+    // qualquer canal. É o que o PO pediu, e o servidor combina com isto.
+    botoes += '<button type="button" class="acao-icone perigo" data-excluir="'
+      + escapar(caso.id) + '" title="Excluir caso" aria-label="Excluir caso">'
+      + Moldura.icone('ocultar') + '</button>';
+
     return botoes;
   }
 
@@ -231,6 +245,15 @@ var TelaDashboard = (function () {
     ligarCliques('[data-caso]', function (botao) {
       CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-caso'), carregar);
     });
+    ligarCliques('[data-excluir]', function (botao) {
+      var idDoCaso = botao.getAttribute('data-excluir');
+      if (!Formulario.confirmarExclusao(idDoCaso)) return;
+
+      Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
+        .entao(carregar)
+        .senao(function (erro) { window.alert(erro.message || String(erro)); });
+    });
+
     ligarCliques('[data-editar]', function (botao) {
       CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-editar'),
         carregar, true);
@@ -243,15 +266,6 @@ var TelaDashboard = (function () {
       botoes[i].addEventListener('click', function () { oQueFazer(this); });
     }
   }
-
-  // NÃO existe excluir aqui na fila, e isso é decisão: na fila só cabem duas
-  // ações sem comer uma coluna de dado, e excluir não é uma delas. Ela vive
-  // no caso aberto, junto das outras três — ver a peça CasoEmModal.
-  //
-  // Havia uma função `ocultar` aqui, escrita antes dessa decisão e nunca
-  // chamada por ninguém. Código morto num arquivo de tela é pior que em
-  // outros lugares: quem vem depois lê o nome, conclui que a fila já sabe
-  // excluir, e vai procurar o defeito no lugar errado.
 
   function ligar(pacote) {
     SeletorDeCanal.ligar(function (idDoCanal) {

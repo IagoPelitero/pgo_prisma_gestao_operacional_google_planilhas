@@ -321,13 +321,47 @@ function rodarTestesDeCadastro() {
     }
   });
 
-  teste('ocultar tira da tela e mantém a linha na planilha', () => {
+  teste('excluir APAGA a linha da planilha, não só esconde', () => {
+    // O sistema inteiro usa exclusão lógica — a linha fica, _Visivel vira NAO.
+    // O CASO é a exceção, por decisão do PO: "o caso deve ser excluído
+    // definitivamente da planilha". Este teste é o que garante que a exceção
+    // continua sendo exceção, e que ela de fato apaga.
     const antes = chamar('lerRegistros_("BASE_MESA")').length;
-    chamar('ocultarCaso')(canalDiamante.id, '0000000000');
+    const naLinha2 = celula(planilha, 'BASE_MESA', 2, 'Nome do segurado');
+    igual(naLinha2, 'Vanessa Duarte Lima', 'a linha 2 é a que vamos apagar');
+
+    chamar('excluirCaso')(canalDiamante.id, '0000000000');
+
     igual(chamar('lerRegistros_("BASE_MESA")').length, antes - 1);
-    igual(celula(planilha, 'BASE_MESA', 2, 'Nome do segurado'), 'Vanessa Duarte Lima',
-      'o dado continua lá');
-    igual(celula(planilha, 'BASE_MESA', 2, '_Visivel'), 'NAO');
+    verdadeiro(celula(planilha, 'BASE_MESA', 2, 'Nome do segurado')
+      !== 'Vanessa Duarte Lima',
+      'a linha saiu da planilha — a de baixo subiu para o lugar dela');
+  });
+
+  teste('o que foi apagado fica na auditoria, com o conteúdo', () => {
+    // Não há desfazer. Se a auditoria não guardar o que havia, um caso
+    // apagado por engano não deixa nem rastro de que existiu.
+    const trilha = chamar('lerRegistros_("AUDITORIA")')
+      .filter((linha) => String(linha.Acao) === 'caso.excluir');
+    verdadeiro(trilha.length > 0, 'a exclusão precisa deixar rastro');
+    const ultima = trilha[trilha.length - 1];
+    contem(String(ultima.Detalhe), 'Mesa Diamante', 'diz de qual canal era');
+    contem(String(ultima.Detalhe), 'Vanessa Duarte Lima',
+      'e guarda o conteúdo, porque a linha não existe mais');
+  });
+
+  teste('qualquer nível exclui, em qualquer canal', () => {
+    // Pedido do PO: "todos os canais e níveis de acesso podem excluir".
+    // A Ana é do nível Operação, escopo PROPRIOS — o que antes a barrava.
+    const novo = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Caso de outra pessoa',
+      analista: 'primeiro.adm'
+    });
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      chamar('excluirCaso')(canalDiamante.id, novo.id);
+    });
+    igual(chamar('buscarRegistros_')('BASE_MESA', 'Id', novo.id, 1).length, 0,
+      'o caso de outra pessoa foi apagado pela Ana');
   });
 
   secao('O formulário que a operação pediu');

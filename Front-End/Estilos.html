@@ -265,7 +265,7 @@ button { font: inherit; color: inherit; }
   font-size: 30px; font-weight: 700; letter-spacing: -.02em; color: var(--destaque);
 }
 .carregando-barra {
-  width: 190px; height: 4px; border-radius: 3px;
+  width: 235px; height: 4px; border-radius: 3px;
   background: var(--superficie-2); overflow: hidden;
 }
 .carregando-barra span {
@@ -420,6 +420,32 @@ button { font: inherit; color: inherit; }
 }
 .ultimo-registro svg { width: 16px; height: 16px; color: var(--tenue); }
 .ultimo-registro.vazio { color: var(--tenue); font-weight: 400; }
+
+/* ------------------------------------------------ o botão de atualizar -- */
+/* Redondo e do tamanho de um alvo de toque (36px), porque na barra superior
+   ele divide espaço com as bolinhas de tema, que são pequenas de propósito.
+   Um ícone solto de 16px ali seria difícil de acertar no celular. */
+.recarregar {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--linha); border-radius: 50%;
+  background: var(--superficie); color: var(--texto-suave); cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.recarregar:hover { color: var(--destaque); border-color: var(--destaque); }
+.recarregar svg { width: 18px; height: 18px; }
+
+/* A volta ao clicar. Ela é CONFIRMAÇÃO, não enfeite: quando a tela vem igual
+   — porque nada mudou mesmo —, sem o giro a pessoa fica sem saber se o
+   clique pegou, e clica de novo. Uma volta só, e some. */
+.recarregar.girando svg { animation: dar-a-volta .6s ease; }
+@keyframes dar-a-volta {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recarregar.girando svg { animation: none; }
+}
 
 /* -------------------------------------------------- as quatro bolinhas -- */
 .temas { display: flex; align-items: center; gap: 7px; }
@@ -592,7 +618,12 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 */
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
 table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
-  width: 190px;
+  /* 235px, e o número foi MEDIDO no navegador, não estimado: "Ver detalhes"
+     ocupa 143, mais dois ícones de 34 com 6 de folga cada, mais o respiro da
+     célula. Com os 190px de antes — de quando eram duas ações —, o terceiro
+     botão ficava cortado pela borda da tabela. Aparecia inteiro no HTML e
+     pela metade na tela, que é o pior dos dois mundos: o teste passava. */
+  width: 235px;
 }
 /* Na agrupada o texto PODE quebrar: cada célula já tem várias linhas, então
    quebrar mais uma não desalinha nada — e é o que faz as cinco colunas
@@ -1529,9 +1560,9 @@ table.fila.legado td { color: var(--suave); }
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
   margin-bottom: 12px;
 }
-.grafico-cabeca h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.grafico-cabeca h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
 .grafico-acoes { margin-left: auto; display: flex; gap: 12px; }
-.grafico-pe { margin: 10px 0 0; font-size: 12px; color: var(--tenue); }
+.grafico-pe { margin: 10px 0 0; font-size: 13.5px; color: var(--tenue); }
 .grafico-vazio, .grafico-aviso {
   margin: 0; padding: 26px 0; text-align: center;
   font-size: 13.5px; color: var(--tenue);
@@ -1582,13 +1613,18 @@ table.fila.legado td { color: var(--suave); }
 .barra:focus-visible { outline: none; }
 .barra:focus-visible rect { stroke: var(--texto); stroke-width: 2; }
 
+/* O PAINEL ANALÍTICO LÊ DE LONGE.
+   Ele não é preenchido, é olhado — muitas vezes projetado numa reunião, ou de
+   pé ao lado da mesa de alguém. Os tamanhos aqui são maiores que os do resto
+   do sistema de propósito, a pedido da operação. Os rótulos do eixo ficam um
+   degrau abaixo dos números: quem lê um gráfico procura o valor primeiro. */
 .valor-da-barra, .valor-deitado {
-  font-size: 12px; font-weight: 600; fill: var(--texto);
+  font-size: 14px; font-weight: 600; fill: var(--texto);
   text-anchor: middle; font-family: var(--fonte);
 }
 .valor-deitado { text-anchor: start; }
 .rotulo-da-barra, .rotulo-deitado {
-  font-size: 11.5px; fill: var(--suave); text-anchor: middle;
+  font-size: 13px; fill: var(--suave); text-anchor: middle;
   font-family: var(--fonte);
 }
 .rotulo-deitado { text-anchor: end; }
@@ -1634,12 +1670,12 @@ table.fila.legado td { color: var(--suave); }
 .legenda-item {
   display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0;
   background: none; border: 0; cursor: pointer; text-align: left;
-  padding: 6px 8px; border-radius: var(--raio-pequeno);
-  font-size: 13px; color: var(--texto);
+  padding: 7px 8px; border-radius: var(--raio-pequeno);
+  font-size: 14.5px; color: var(--texto);
 }
 .legenda-item:hover { background: var(--superficie-2); }
 .legenda-item .marca {
-  width: 11px; height: 11px; border-radius: 3px; flex: none;
+  width: 13px; height: 13px; border-radius: 3px; flex: none;
   background: var(--serie, var(--tenue));
 }
 .legenda-item .nome {
@@ -1660,7 +1696,7 @@ table.fila.legado td { color: var(--suave); }
   pointer-events: none;
   background: var(--texto); color: var(--superficie);
   border-radius: var(--raio-pequeno); padding: 6px 10px;
-  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  font-size: 14px; font-weight: 600; white-space: nowrap;
   box-shadow: 0 8px 24px -12px rgba(6, 14, 28, .6);
 }
 

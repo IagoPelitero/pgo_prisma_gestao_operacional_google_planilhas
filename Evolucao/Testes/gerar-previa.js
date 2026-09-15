@@ -208,7 +208,7 @@ function pontePreparada(respostas) {
     + '          || { termo: termo, total: 0,\n'
     + '               origens: respostas.busca.origensVazias });\n'
     + '      },\n'
-    + '      ocultarCaso: function () {\n'
+    + '      excluirCaso: function () {\n'
     + '        setTimeout(function () {\n'
     + '          if (aoDarErrado) {\n'
     + '            aoDarErrado(new Error("Esta é uma prévia: nada é alterado."));\n'

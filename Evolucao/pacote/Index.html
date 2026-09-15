@@ -274,7 +274,7 @@ button { font: inherit; color: inherit; }
   font-size: 30px; font-weight: 700; letter-spacing: -.02em; color: var(--destaque);
 }
 .carregando-barra {
-  width: 190px; height: 4px; border-radius: 3px;
+  width: 235px; height: 4px; border-radius: 3px;
   background: var(--superficie-2); overflow: hidden;
 }
 .carregando-barra span {
@@ -429,6 +429,32 @@ button { font: inherit; color: inherit; }
 }
 .ultimo-registro svg { width: 16px; height: 16px; color: var(--tenue); }
 .ultimo-registro.vazio { color: var(--tenue); font-weight: 400; }
+
+/* ------------------------------------------------ o botão de atualizar -- */
+/* Redondo e do tamanho de um alvo de toque (36px), porque na barra superior
+   ele divide espaço com as bolinhas de tema, que são pequenas de propósito.
+   Um ícone solto de 16px ali seria difícil de acertar no celular. */
+.recarregar {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0;
+  border: 1px solid var(--linha); border-radius: 50%;
+  background: var(--superficie); color: var(--texto-suave); cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.recarregar:hover { color: var(--destaque); border-color: var(--destaque); }
+.recarregar svg { width: 18px; height: 18px; }
+
+/* A volta ao clicar. Ela é CONFIRMAÇÃO, não enfeite: quando a tela vem igual
+   — porque nada mudou mesmo —, sem o giro a pessoa fica sem saber se o
+   clique pegou, e clica de novo. Uma volta só, e some. */
+.recarregar.girando svg { animation: dar-a-volta .6s ease; }
+@keyframes dar-a-volta {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recarregar.girando svg { animation: none; }
+}
 
 /* -------------------------------------------------- as quatro bolinhas -- */
 .temas { display: flex; align-items: center; gap: 7px; }
@@ -601,7 +627,12 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 */
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
 table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
-  width: 190px;
+  /* 235px, e o número foi MEDIDO no navegador, não estimado: "Ver detalhes"
+     ocupa 143, mais dois ícones de 34 com 6 de folga cada, mais o respiro da
+     célula. Com os 190px de antes — de quando eram duas ações —, o terceiro
+     botão ficava cortado pela borda da tabela. Aparecia inteiro no HTML e
+     pela metade na tela, que é o pior dos dois mundos: o teste passava. */
+  width: 235px;
 }
 /* Na agrupada o texto PODE quebrar: cada célula já tem várias linhas, então
    quebrar mais uma não desalinha nada — e é o que faz as cinco colunas
@@ -1538,9 +1569,9 @@ table.fila.legado td { color: var(--suave); }
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
   margin-bottom: 12px;
 }
-.grafico-cabeca h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
+.grafico-cabeca h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
 .grafico-acoes { margin-left: auto; display: flex; gap: 12px; }
-.grafico-pe { margin: 10px 0 0; font-size: 12px; color: var(--tenue); }
+.grafico-pe { margin: 10px 0 0; font-size: 13.5px; color: var(--tenue); }
 .grafico-vazio, .grafico-aviso {
   margin: 0; padding: 26px 0; text-align: center;
   font-size: 13.5px; color: var(--tenue);
@@ -1591,13 +1622,18 @@ table.fila.legado td { color: var(--suave); }
 .barra:focus-visible { outline: none; }
 .barra:focus-visible rect { stroke: var(--texto); stroke-width: 2; }
 
+/* O PAINEL ANALÍTICO LÊ DE LONGE.
+   Ele não é preenchido, é olhado — muitas vezes projetado numa reunião, ou de
+   pé ao lado da mesa de alguém. Os tamanhos aqui são maiores que os do resto
+   do sistema de propósito, a pedido da operação. Os rótulos do eixo ficam um
+   degrau abaixo dos números: quem lê um gráfico procura o valor primeiro. */
 .valor-da-barra, .valor-deitado {
-  font-size: 12px; font-weight: 600; fill: var(--texto);
+  font-size: 14px; font-weight: 600; fill: var(--texto);
   text-anchor: middle; font-family: var(--fonte);
 }
 .valor-deitado { text-anchor: start; }
 .rotulo-da-barra, .rotulo-deitado {
-  font-size: 11.5px; fill: var(--suave); text-anchor: middle;
+  font-size: 13px; fill: var(--suave); text-anchor: middle;
   font-family: var(--fonte);
 }
 .rotulo-deitado { text-anchor: end; }
@@ -1643,12 +1679,12 @@ table.fila.legado td { color: var(--suave); }
 .legenda-item {
   display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0;
   background: none; border: 0; cursor: pointer; text-align: left;
-  padding: 6px 8px; border-radius: var(--raio-pequeno);
-  font-size: 13px; color: var(--texto);
+  padding: 7px 8px; border-radius: var(--raio-pequeno);
+  font-size: 14.5px; color: var(--texto);
 }
 .legenda-item:hover { background: var(--superficie-2); }
 .legenda-item .marca {
-  width: 11px; height: 11px; border-radius: 3px; flex: none;
+  width: 13px; height: 13px; border-radius: 3px; flex: none;
   background: var(--serie, var(--tenue));
 }
 .legenda-item .nome {
@@ -1669,7 +1705,7 @@ table.fila.legado td { color: var(--suave); }
   pointer-events: none;
   background: var(--texto); color: var(--superficie);
   border-radius: var(--raio-pequeno); padding: 6px 10px;
-  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  font-size: 14px; font-weight: 600; white-space: nowrap;
   box-shadow: 0 8px 24px -12px rgba(6, 14, 28, .6);
 }
 
@@ -1983,6 +2019,13 @@ var Moldura = (function () {
       + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="13.5" y="13.5" width="7" height="7" rx="1.6"></rect>',
 
+    // recarregar: um arco de QUASE uma volta, com a ponta de seta no fim.
+    // Quase, e não a volta inteira: círculo fechado não tem começo nem fim, e
+    // deixa de dizer "de novo".
+    recarregar:
+      '<path d="M20.4 12a8.4 8.4 0 1 1-2.46-5.94"></path>'
+      + '<path d="M20.4 4.4v5.6h-5.6"></path>',
+
     // registrar: o mais, sem moldura. Acrescentar é o gesto mais simples do
     // sistema, e o desenho mais simples é o que se reconhece de relance.
     cadastrarCaso:
@@ -2230,6 +2273,20 @@ var Moldura = (function () {
       + ' aria-label="Busca geral">'
       + '<kbd>Ctrl K</kbd>'
       + '</div>'
+
+      // Recarregar a TELA, não a página.
+      //
+      // Recarregar a página num aplicativo do Apps Script custa o doGet
+      // inteiro outra vez: nova execução, novo login, a página de 320 KB
+      // descendo de novo. Este botão refaz só a chamada da tela em que a
+      // pessoa está — que é o que ela quer ao pensar "atualiza aí".
+      //
+      // Fica em TODAS as telas porque a pergunta "isto está atualizado?"
+      // aparece em todas: a planilha é editável à mão, e outra pessoa pode
+      // ter mexido enquanto esta olhava.
+      + '<button type="button" class="recarregar" id="recarregar"'
+      + ' title="Atualizar esta tela" aria-label="Atualizar esta tela">'
+      + icone('recarregar') + '</button>'
 
       + '<div class="temas" role="group" aria-label="Cor do sistema">' + bolinhas + '</div>'
 
@@ -2644,6 +2701,24 @@ var Formulario = (function () {
   }
 
   /**
+   * A pergunta antes de apagar, escrita num lugar só.
+   *
+   * O texto mudou quando a exclusão passou a apagar a linha de verdade. Ele
+   * DIZ ISSO, em letras: prometer que dá para desfazer quando não dá é pior
+   * que não avisar nada — a pessoa confirma tranquila e descobre depois.
+   *
+   * Mora aqui porque dois lugares perguntam: a fila e o caso aberto. Duas
+   * cópias divergiriam no dia em que só uma fosse corrigida.
+   */
+  function confirmarExclusao(idDoCaso) {
+    return window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
+      + 'A LINHA SAI DA PLANILHA. Não dá para desfazer, nem por um '
+      + 'administrador.\n\n'
+      + 'O que foi apagado fica registrado na auditoria — quem, quando, e o '
+      + 'que havia no caso.');
+  }
+
+  /**
    * Põe os valores padrão e acende/apaga os campos condicionais.
    *
    * Roda ao desenhar o formulário vazio. No caso já gravado quem manda é o
@@ -2881,6 +2956,7 @@ var Formulario = (function () {
     desenhar: desenhar,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
+    confirmarExclusao: confirmarExclusao,
     valores: valores,
     preencher: preencher,
     limparErros: limparErros,
@@ -3042,12 +3118,16 @@ var CasoEmModal = (function () {
       + '</div>'
       + desenharHistorico();
 
-    // As quatro ações do caso vivem aqui: as duas da linha, mais alterar
-    // situação e excluir. Na fila só cabem duas sem comer uma coluna de dado.
+    // As quatro ações do caso vivem aqui. Excluir também está na fila, desde
+    // que o PO pediu — aqui ela fica junto das outras, para quem abriu o caso
+    // e decidiu no meio da leitura.
+    //
+    // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
+    // qualquer canal. O servidor combina com isto, e a fila também — as três
+    // pontas precisam concordar, senão o botão aparece e a chamada recusa.
     elemento('modal-pe').innerHTML = botaoFechar()
-      + (detalhe.podeOcultar
-        ? '<button type="button" class="botao vazado perigo" id="modal-excluir">'
-          + Moldura.icone('ocultar') + ' Excluir</button>' : '')
+      + '<button type="button" class="botao vazado perigo" id="modal-excluir">'
+      + Moldura.icone('ocultar') + ' Excluir</button>'
       + (detalhe.podeEditar
         ? '<button type="button" class="botao vazado" id="modal-situacao">'
           + Moldura.icone('trocarSituacao') + ' Alterar situação</button>' : '')
@@ -3071,13 +3151,9 @@ var CasoEmModal = (function () {
 
     var excluir = elemento('modal-excluir');
     if (excluir) excluir.addEventListener('click', function () {
-      // O texto diz a verdade: a linha permanece na planilha. Prometer "não
-      // poderá ser desfeito" quando dá para desfazer assusta à toa.
-      if (!window.confirm('Excluir o caso ' + idAtual + '?\n\n'
-        + 'Ele sai do sistema para todo mundo. A linha permanece na planilha '
-        + 'e pode ser trazida de volta por um administrador.')) return;
+      if (!Formulario.confirmarExclusao(idAtual)) return;
 
-      Servidor.chamar('ocultarCaso', canalAtual, idAtual)
+      Servidor.chamar('excluirCaso', canalAtual, idAtual)
         .entao(function () { mudouAlgo = true; fechar(); })
         .senao(function (erro) { window.alert(erro.message || String(erro)); });
     });
@@ -3847,6 +3923,20 @@ var TelaDashboard = (function () {
         + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
         + Moldura.icone('editar') + '</button>';
     }
+
+    // Excluir na PRÓPRIA FILA, como no PGO 5 — pedido do PO.
+    //
+    // A decisão anterior era outra: excluir vivia só no caso aberto, para não
+    // comer a largura da coluna "Responsável". Cabe agora porque é um ícone,
+    // e não um botão com texto — os três juntos ocupam menos que "Ver
+    // detalhes" sozinho ocupava antes.
+    //
+    // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
+    // qualquer canal. É o que o PO pediu, e o servidor combina com isto.
+    botoes += '<button type="button" class="acao-icone perigo" data-excluir="'
+      + escapar(caso.id) + '" title="Excluir caso" aria-label="Excluir caso">'
+      + Moldura.icone('ocultar') + '</button>';
+
     return botoes;
   }
 
@@ -3908,6 +3998,15 @@ var TelaDashboard = (function () {
     ligarCliques('[data-caso]', function (botao) {
       CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-caso'), carregar);
     });
+    ligarCliques('[data-excluir]', function (botao) {
+      var idDoCaso = botao.getAttribute('data-excluir');
+      if (!Formulario.confirmarExclusao(idDoCaso)) return;
+
+      Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
+        .entao(carregar)
+        .senao(function (erro) { window.alert(erro.message || String(erro)); });
+    });
+
     ligarCliques('[data-editar]', function (botao) {
       CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-editar'),
         carregar, true);
@@ -3920,15 +4019,6 @@ var TelaDashboard = (function () {
       botoes[i].addEventListener('click', function () { oQueFazer(this); });
     }
   }
-
-  // NÃO existe excluir aqui na fila, e isso é decisão: na fila só cabem duas
-  // ações sem comer uma coluna de dado, e excluir não é uma delas. Ela vive
-  // no caso aberto, junto das outras três — ver a peça CasoEmModal.
-  //
-  // Havia uma função `ocultar` aqui, escrita antes dessa decisão e nunca
-  // chamada por ninguém. Código morto num arquivo de tela é pior que em
-  // outros lugares: quem vem depois lê o nome, conclui que a fila já sabe
-  // excluir, e vai procurar o defeito no lugar errado.
 
   function ligar(pacote) {
     SeletorDeCanal.ligar(function (idDoCanal) {
@@ -8145,6 +8235,15 @@ var Aplicacao = (function () {
 
     var abrir = elemento('abrir-menu');
     if (abrir) abrir.addEventListener('click', abrirMenu);
+
+    var recarregar = elemento('recarregar');
+    if (recarregar) recarregar.addEventListener('click', function () {
+      // remontar() refaz a tela atual pelo mesmo caminho de sempre: a tela
+      // pede os dados dela ao servidor outra vez. Não é location.reload(),
+      // que recomeçaria pelo doGet e custaria uma viagem inteira a mais.
+      this.classList.add('girando');
+      Aplicacao.remontar();
+    });
 
     var veu = elemento('veu');
     if (veu) veu.addEventListener('click', fecharMenu);

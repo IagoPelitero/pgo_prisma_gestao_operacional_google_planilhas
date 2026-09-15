@@ -98,12 +98,18 @@ function rodarTestesDeBusca() {
     igual(so.total, 1);
   });
 
-  teste('caso ocultado não volta na busca', () => {
-    const achado = chamar('buscarCasos')('Vanessa', [canal.id], false);
-    const id = achado.origens[0].casos[0].id;
-    chamar('ocultarCaso')(canal.id, id);
-    igual(chamar('buscarCasos')('Vanessa', [canal.id], false).total, 0);
-    chamar('reexibirRegistro_')('BASE_MESA', id);
+  teste('caso excluído não volta na busca', () => {
+    // Antes a exclusão era lógica e dava para trazer de volta. Agora a linha
+    // sai da planilha: por isso este teste cadastra um caso só para apagar,
+    // em vez de apagar um que os testes seguintes ainda usam.
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      status: 'Em andamento', nomedosegurado: 'Apagavel Silva',
+      analista: 'primeiro.adm'
+    });
+    igual(chamar('buscarCasos')('Apagavel', [canal.id], false).total, 1);
+
+    chamar('excluirCaso')(canal.id, novo.id);
+    igual(chamar('buscarCasos')('Apagavel', [canal.id], false).total, 0);
   });
 
   teste('a busca respeita o alcance do nível', () => {

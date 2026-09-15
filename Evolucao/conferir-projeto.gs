@@ -27,7 +27,7 @@
 function oQueFaltaNoProjeto() {
   var esperado = {
     'Cadastros.gs': ['aplicarImportacao', 'bloquearSusep', 'conferirImportacao', 'desbloquearSusep', 'exportarCorretoras', 'listarProdutos', 'listarSusepsBloqueadas', 'ocultarCorretora', 'ocultarProduto', 'opcoesDaImportacao', 'salvarCorretora', 'salvarProduto', 'tabelaDeCorretoras'],
-    'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'formularioDoCanal', 'ocultarCaso', 'opcoesDaBusca', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
+    'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'opcoesDaBusca', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
     'Config.gs': ['conferirEstruturaDaPlanilha', 'criarCampo', 'definirSenhaDeAdministrador', 'gerarAnalise', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'ocultarAnalise', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
     'Indicadores.gs': ['detalharComponente', 'detalhesDoCaso', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDoPainelAnalitico', 'painelAnalitico', 'resumoDoCanal', 'salvarComponentesDoPainel'],

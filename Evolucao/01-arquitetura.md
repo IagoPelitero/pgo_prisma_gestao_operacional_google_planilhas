@@ -165,6 +165,30 @@ O `_Visivel` é editável **na mão, direto na planilha** — é assim que uma l
 volta a aparecer. O prefixo `_` marca coluna de sistema e sinaliza ao Power BI
 o que ignorar.
 
+> **A EXCEÇÃO: o CASO é apagado de verdade.**
+>
+> Esta decisão vale para corretora, produto, SUSEP bloqueada e usuário. Para o
+> **caso**, o PO decidiu o contrário: *"o caso deve ser excluído
+> definitivamente da planilha"*. A linha sai, e não há como trazer de volta.
+>
+> A razão é de operação: caso oculto continua ocupando linha, e a base da RET
+> caminha para 200 mil — onde cada linha conta contra o teto de 10 milhões de
+> células.
+>
+> Duas coisas compensam a falta de desfazer:
+>
+> 1. **A auditoria guarda o conteúdo da linha antes de apagar** — quem, quando,
+>    e o que havia no caso. Sem isso, um caso apagado por engano não deixaria
+>    nem rastro de que existiu, e alguém iria jurar que cadastrou.
+> 2. **A pergunta na tela diz a verdade**: "A LINHA SAI DA PLANILHA. Não dá
+>    para desfazer, nem por um administrador." Prometer desfazer quando não dá
+>    é pior que não avisar — a pessoa confirma tranquila e descobre depois.
+>
+> E **qualquer pessoa cadastrada exclui, em qualquer canal**, também por
+> decisão do PO. É o único ponto do sistema sem trava de nível nem de escopo,
+> e está escrito assim de propósito em `excluirCaso` — para ninguém
+> "consertar" achando que foi esquecimento.
+
 ---
 
 ## 3. O modelo no Google Planilhas

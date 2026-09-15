@@ -1640,6 +1640,57 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
   });
 }
 
+/**
+ * APAGA A LINHA DA PLANILHA. Não tem volta.
+ *
+ * O sistema inteiro é construído em cima de exclusão LÓGICA: `_Visivel` vira
+ * NAO, a linha fica, e um administrador traz de volta. É a regra que protege
+ * contra o clique errado, e ela continua valendo para corretora, produto,
+ * SUSEP bloqueada e usuário.
+ *
+ * O CASO é a exceção, e foi decisão do PO: "o caso deve ser excluído
+ * definitivamente da planilha". A razão é de operação — caso oculto continua
+ * ocupando linha, e a base da RET caminha para 200 mil.
+ *
+ * Como não há desfazer, duas coisas compensam:
+ *
+ *   1. Quem chama registra na AUDITORIA o que havia na linha, antes de
+ *      apagar. Sem isso, um caso excluído por engano não deixa nem rastro de
+ *      que existiu — e alguém vai jurar que cadastrou.
+ *   2. A tela pergunta antes, e o texto diz a verdade: não promete desfazer.
+ *
+ * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
+ */
+function apagarRegistroDeVez_(nomeDaAba, id) {
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(25000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(nomeDaAba);
+    var estrutura = estruturaDaAba_(nomeDaAba, true);
+    var linha = linhaDoRegistro_(estrutura, id);
+    if (linha < 0) {
+      throw new Error('Registro ' + converterParaIdentificador_(id)
+        + ' não encontrado na aba "' + nomeDaAba + '".');
+    }
+
+    // Lido ANTES de apagar: depois não há de onde ler.
+    var valores = estrutura.aba
+      .getRange(linha, 1, 1, estrutura.cabecalhos.length).getValues()[0];
+    var apagado = montarRegistro_(estrutura, valores, linha);
+
+    estrutura.aba.deleteRows(linha, 1);
+
+    // A grade encolheu: toda posição de linha guardada em memória agora
+    // aponta para a linha de baixo. Esquecer é obrigatório, não higiene.
+    esquecerEstruturaLida_(nomeDaAba);
+    return apagado;
+  } finally {
+    trava.releaseLock();
+  }
+}
+
 function reexibirRegistro_(nomeDaAba, id) {
   return atualizarRegistro_(nomeDaAba, id, {
     _Visivel: RECC_VISIVEL_SIM,

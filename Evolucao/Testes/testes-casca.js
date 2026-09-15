@@ -369,6 +369,42 @@ function rodarTestesDaCasca() {
     contem(lateral, 'aria-current="page"', 'o item atual precisa se marcar');
   });
 
+  secao('O botão de atualizar');
+
+  teste('a barra superior traz o botão de atualizar, em toda tela', () => {
+    const { Moldura } = carregarScriptDaTela('Moldura');
+    const barra = Moldura.montarSuperior(chamar('pacoteDePartida()'));
+    contem(barra, 'id="recarregar"');
+    contem(barra, 'Atualizar esta tela', 'com o que ele faz escrito');
+  });
+
+  teste('o desenho é a seta circular, e não um círculo fechado', () => {
+    // Círculo fechado não tem começo nem fim, e deixa de dizer "de novo".
+    // O que faz o desenho ser lido como recarregar é a ponta de seta.
+    const { Moldura } = carregarScriptDaTela('Moldura');
+    const desenho = Moldura.icone('recarregar');
+    contem(desenho, 'M20.4 4.4v5.6h-5.6', 'a ponta de seta tem de estar lá');
+    verdadeiro(desenho.indexOf('<circle') < 0,
+      'um círculo fechado não seria lido como "atualizar"');
+  });
+
+  teste('atualizar refaz a TELA, e não a página inteira', () => {
+    // location.reload() recomeçaria pelo doGet: nova execução, novo login, a
+    // página inteira descendo de novo. remontar() refaz só a chamada da tela.
+    const ponte = lerTela('Aplicacao');
+    contem(ponte, "elemento('recarregar')");
+    contem(ponte, 'Aplicacao.remontar()');
+
+    // SEM OS COMENTÁRIOS. Este mesmo teste já falhou uma vez apontando para
+    // a própria explicação de por que não se usa location.reload — o guard
+    // de tema aprendeu isso antes, com um hexadecimal escrito num comentário
+    // de CSS. Procurar texto em código exige tirar o que é prosa.
+    const soCodigo = ponte.replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').filter((linha) => linha.trim().indexOf('//') !== 0).join('\n');
+    verdadeiro(soCodigo.indexOf('location.reload') < 0,
+      'recarregar a página custa uma viagem inteira a mais');
+  });
+
   secao('A data do último registro');
 
   teste('base vazia avisa que ainda não há registro, sem inventar data', () => {

@@ -370,6 +370,15 @@ var Aplicacao = (function () {
     var abrir = elemento('abrir-menu');
     if (abrir) abrir.addEventListener('click', abrirMenu);
 
+    var recarregar = elemento('recarregar');
+    if (recarregar) recarregar.addEventListener('click', function () {
+      // remontar() refaz a tela atual pelo mesmo caminho de sempre: a tela
+      // pede os dados dela ao servidor outra vez. Não é location.reload(),
+      // que recomeçaria pelo doGet e custaria uma viagem inteira a mais.
+      this.classList.add('girando');
+      Aplicacao.remontar();
+    });
+
     var veu = elemento('veu');
     if (veu) veu.addEventListener('click', fecharMenu);
   }

@@ -110,18 +110,42 @@ async function conferir() {
           }
           return caixa.right > window.innerWidth + 1 || caixa.left < -1;
         });
+        // E os BOTÕES CORTADOS PELA PRÓPRIA CÉLULA.
+        //
+        // A conferência acima ignora, de propósito, o que está dentro de uma
+        // caixa que rola — rolar a tabela é a solução. Só que um botão pode
+        // ficar cortado sem que nada role: a coluna de ações tem largura fixa,
+        // e um botão a mais simplesmente passa da borda dela.
+        //
+        // Aconteceu ao acrescentar o excluir na fila: o botão existia no HTML,
+        // o teste que procurava por ele passava, e na tela aparecia pela
+        // metade. É o pior dos dois mundos — verde no teste, quebrado no olho.
+        const cortados = Array.from(document.querySelectorAll('td.acoes-coluna'))
+          .flatMap((celula) => {
+            const borda = celula.getBoundingClientRect().right;
+            return Array.from(celula.children).filter((botao) => {
+              const caixa = botao.getBoundingClientRect();
+              return caixa.width > 0 && caixa.right > borda + 1;
+            });
+          });
+
         return {
           rola: document.body.scrollWidth > window.innerWidth,
           fora: escapou.slice(0, 3).map((el) => el.tagName.toLowerCase() + '.'
             + String(el.className.baseVal !== undefined
-              ? el.className.baseVal : el.className).split(' ')[0])
+              ? el.className.baseVal : el.className).split(' ')[0]),
+          cortados: cortados.slice(0, 3).map((el) => String(el.className)
+            .split(' ')[0] + ' (' + (el.getAttribute('title') || el.textContent)
+            .trim().slice(0, 22) + ')')
         };
       });
 
-      if (medida.rola || medida.fora.length) {
+      if (medida.rola || medida.fora.length || medida.cortados.length) {
         problemas.push(largura + 'px · ' + tela
           + (medida.rola ? ' · a página rola na horizontal' : '')
-          + (medida.fora.length ? ' · escapa: ' + medida.fora.join(', ') : ''));
+          + (medida.fora.length ? ' · escapa: ' + medida.fora.join(', ') : '')
+          + (medida.cortados.length
+            ? ' · botão cortado pela coluna: ' + medida.cortados.join(', ') : ''));
         linha.push('✗ ' + tela);
       } else {
         linha.push('· ' + tela);

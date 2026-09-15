@@ -57,6 +57,13 @@ var Moldura = (function () {
       + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="13.5" y="13.5" width="7" height="7" rx="1.6"></rect>',
 
+    // recarregar: um arco de QUASE uma volta, com a ponta de seta no fim.
+    // Quase, e não a volta inteira: círculo fechado não tem começo nem fim, e
+    // deixa de dizer "de novo".
+    recarregar:
+      '<path d="M20.4 12a8.4 8.4 0 1 1-2.46-5.94"></path>'
+      + '<path d="M20.4 4.4v5.6h-5.6"></path>',
+
     // registrar: o mais, sem moldura. Acrescentar é o gesto mais simples do
     // sistema, e o desenho mais simples é o que se reconhece de relance.
     cadastrarCaso:
@@ -304,6 +311,20 @@ var Moldura = (function () {
       + ' aria-label="Busca geral">'
       + '<kbd>Ctrl K</kbd>'
       + '</div>'
+
+      // Recarregar a TELA, não a página.
+      //
+      // Recarregar a página num aplicativo do Apps Script custa o doGet
+      // inteiro outra vez: nova execução, novo login, a página de 320 KB
+      // descendo de novo. Este botão refaz só a chamada da tela em que a
+      // pessoa está — que é o que ela quer ao pensar "atualiza aí".
+      //
+      // Fica em TODAS as telas porque a pergunta "isto está atualizado?"
+      // aparece em todas: a planilha é editável à mão, e outra pessoa pode
+      // ter mexido enquanto esta olhava.
+      + '<button type="button" class="recarregar" id="recarregar"'
+      + ' title="Atualizar esta tela" aria-label="Atualizar esta tela">'
+      + icone('recarregar') + '</button>'
 
       + '<div class="temas" role="group" aria-label="Cor do sistema">' + bolinhas + '</div>'
 
@@ -718,6 +739,24 @@ var Formulario = (function () {
   }
 
   /**
+   * A pergunta antes de apagar, escrita num lugar só.
+   *
+   * O texto mudou quando a exclusão passou a apagar a linha de verdade. Ele
+   * DIZ ISSO, em letras: prometer que dá para desfazer quando não dá é pior
+   * que não avisar nada — a pessoa confirma tranquila e descobre depois.
+   *
+   * Mora aqui porque dois lugares perguntam: a fila e o caso aberto. Duas
+   * cópias divergiriam no dia em que só uma fosse corrigida.
+   */
+  function confirmarExclusao(idDoCaso) {
+    return window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
+      + 'A LINHA SAI DA PLANILHA. Não dá para desfazer, nem por um '
+      + 'administrador.\n\n'
+      + 'O que foi apagado fica registrado na auditoria — quem, quando, e o '
+      + 'que havia no caso.');
+  }
+
+  /**
    * Põe os valores padrão e acende/apaga os campos condicionais.
    *
    * Roda ao desenhar o formulário vazio. No caso já gravado quem manda é o
@@ -955,6 +994,7 @@ var Formulario = (function () {
     desenhar: desenhar,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
+    confirmarExclusao: confirmarExclusao,
     valores: valores,
     preencher: preencher,
     limparErros: limparErros,
@@ -1116,12 +1156,16 @@ var CasoEmModal = (function () {
       + '</div>'
       + desenharHistorico();
 
-    // As quatro ações do caso vivem aqui: as duas da linha, mais alterar
-    // situação e excluir. Na fila só cabem duas sem comer uma coluna de dado.
+    // As quatro ações do caso vivem aqui. Excluir também está na fila, desde
+    // que o PO pediu — aqui ela fica junto das outras, para quem abriu o caso
+    // e decidiu no meio da leitura.
+    //
+    // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
+    // qualquer canal. O servidor combina com isto, e a fila também — as três
+    // pontas precisam concordar, senão o botão aparece e a chamada recusa.
     elemento('modal-pe').innerHTML = botaoFechar()
-      + (detalhe.podeOcultar
-        ? '<button type="button" class="botao vazado perigo" id="modal-excluir">'
-          + Moldura.icone('ocultar') + ' Excluir</button>' : '')
+      + '<button type="button" class="botao vazado perigo" id="modal-excluir">'
+      + Moldura.icone('ocultar') + ' Excluir</button>'
       + (detalhe.podeEditar
         ? '<button type="button" class="botao vazado" id="modal-situacao">'
           + Moldura.icone('trocarSituacao') + ' Alterar situação</button>' : '')
@@ -1145,13 +1189,9 @@ var CasoEmModal = (function () {
 
     var excluir = elemento('modal-excluir');
     if (excluir) excluir.addEventListener('click', function () {
-      // O texto diz a verdade: a linha permanece na planilha. Prometer "não
-      // poderá ser desfeito" quando dá para desfazer assusta à toa.
-      if (!window.confirm('Excluir o caso ' + idAtual + '?\n\n'
-        + 'Ele sai do sistema para todo mundo. A linha permanece na planilha '
-        + 'e pode ser trazida de volta por um administrador.')) return;
+      if (!Formulario.confirmarExclusao(idAtual)) return;
 
-      Servidor.chamar('ocultarCaso', canalAtual, idAtual)
+      Servidor.chamar('excluirCaso', canalAtual, idAtual)
         .entao(function () { mudouAlgo = true; fechar(); })
         .senao(function (erro) { window.alert(erro.message || String(erro)); });
     });

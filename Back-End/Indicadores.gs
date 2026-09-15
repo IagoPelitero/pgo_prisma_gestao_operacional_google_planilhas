@@ -120,8 +120,7 @@ function resumoDoCanal(idDoCanal, filtros) {
     totalNoPeriodo: meus.length,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
-    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
-    podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 
@@ -581,8 +580,7 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
     atualizadoEm: quandoFoiMexido_(canal.aba, registro.__id),
     linhas: linhas,
     historico: historicoDoCaso_(canal.aba, registro.__id),
-    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
-    podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 

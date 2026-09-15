@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-15 21:16
+   Gerado em 2026-09-15 21:37
    ========================================================================== */
 
 
@@ -1656,6 +1656,57 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
     _ExcluidoEm: new Date(),
     _ExcluidoPor: usuarioId || ''
   });
+}
+
+/**
+ * APAGA A LINHA DA PLANILHA. Não tem volta.
+ *
+ * O sistema inteiro é construído em cima de exclusão LÓGICA: `_Visivel` vira
+ * NAO, a linha fica, e um administrador traz de volta. É a regra que protege
+ * contra o clique errado, e ela continua valendo para corretora, produto,
+ * SUSEP bloqueada e usuário.
+ *
+ * O CASO é a exceção, e foi decisão do PO: "o caso deve ser excluído
+ * definitivamente da planilha". A razão é de operação — caso oculto continua
+ * ocupando linha, e a base da RET caminha para 200 mil.
+ *
+ * Como não há desfazer, duas coisas compensam:
+ *
+ *   1. Quem chama registra na AUDITORIA o que havia na linha, antes de
+ *      apagar. Sem isso, um caso excluído por engano não deixa nem rastro de
+ *      que existiu — e alguém vai jurar que cadastrou.
+ *   2. A tela pergunta antes, e o texto diz a verdade: não promete desfazer.
+ *
+ * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
+ */
+function apagarRegistroDeVez_(nomeDaAba, id) {
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(25000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(nomeDaAba);
+    var estrutura = estruturaDaAba_(nomeDaAba, true);
+    var linha = linhaDoRegistro_(estrutura, id);
+    if (linha < 0) {
+      throw new Error('Registro ' + converterParaIdentificador_(id)
+        + ' não encontrado na aba "' + nomeDaAba + '".');
+    }
+
+    // Lido ANTES de apagar: depois não há de onde ler.
+    var valores = estrutura.aba
+      .getRange(linha, 1, 1, estrutura.cabecalhos.length).getValues()[0];
+    var apagado = montarRegistro_(estrutura, valores, linha);
+
+    estrutura.aba.deleteRows(linha, 1);
+
+    // A grade encolheu: toda posição de linha guardada em memória agora
+    // aponta para a linha de baixo. Esquecer é obrigatório, não higiene.
+    esquecerEstruturaLida_(nomeDaAba);
+    return apagado;
+  } finally {
+    trava.releaseLock();
+  }
 }
 
 function reexibirRegistro_(nomeDaAba, id) {
@@ -3448,20 +3499,61 @@ function casoParaEditar(idDoCanal, idDoCaso) {
 }
 
 /** Tira o caso da tela. A linha permanece na planilha, e volta editando _Visivel. */
-function ocultarCaso(idDoCanal, idDoCaso) {
-  var quem = exigirPermissao_(RECC_ACOES.OCULTAR);
-  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+function excluirCaso(idDoCanal, idDoCaso) {
+  // QUALQUER pessoa cadastrada exclui, em QUALQUER canal. Decisão do PO:
+  // "todos os canais e níveis de acesso podem excluir um caso criado".
+  //
+  // É o único ponto do sistema sem trava de nível nem de escopo, e está
+  // escrito assim de propósito, para ninguém "consertar" isso achando que foi
+  // esquecimento. Continua exigindo estar CADASTRADO: quem não entra no
+  // sistema não apaga nada.
+  var quem = usuarioAtual_();
+  if (!quem.cadastrado) throw new Error(quem.motivo);
+
+  var canal = canalPeloId_(idDoCanal);
   var alvo = converterParaIdentificador_(idDoCaso);
 
   var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
   if (!atual) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
-  exigirAlcanceSobre_(atual, canal, quem);
 
-  ocultarRegistro_(canal.aba, alvo, quem.usuario.Id);
-  registrarAuditoria_('caso.ocultar', canal.aba, alvo, canal.nome);
+  // A auditoria PRIMEIRO, com o conteúdo da linha — porque depois não existe
+  // mais de onde tirar. Sem isto, um caso apagado por engano não deixa nem
+  // rastro de que existiu, e alguém vai jurar que cadastrou.
+  registrarAuditoria_('caso.excluir', canal.aba, alvo,
+    canal.nome + ' — ' + resumoDoCasoParaAuditoria_(atual, canal));
+
+  apagarRegistroDeVez_(canal.aba, alvo);
   return true;
+}
+
+/**
+ * O caso em uma linha de texto, para a auditoria guardar antes de apagar.
+ *
+ * Não é o registro inteiro: uma linha da RET tem 36 colunas, e despejá-las
+ * numa célula de auditoria daria um texto que ninguém lê. São os campos pelos
+ * quais alguém procuraria o caso depois — quem era, de quem, e como estava.
+ */
+function resumoDoCasoParaAuditoria_(registro, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var pedacos = [];
+
+  var colunaDoDono = colunaDoResponsavel_(estrutura);
+  if (colunaDoDono && registro[colunaDoDono]) {
+    pedacos.push('analista ' + registro[colunaDoDono]);
+  }
+  if (canal.colunaDoStatus && registro[canal.colunaDoStatus]) {
+    pedacos.push('status ' + registro[canal.colunaDoStatus]);
+  }
+  (canal.colunasDaBusca || '').split(',').forEach(function (cabecalho) {
+    var nome = String(cabecalho).trim();
+    if (!nome || !registro[nome]) return;
+    if (pedacos.length >= 5) return;
+    pedacos.push(nome + ': ' + registro[nome]);
+  });
+
+  return pedacos.length ? pedacos.join(' · ') : 'linha sem conteúdo';
 }
 
 /**
@@ -6992,8 +7084,7 @@ function resumoDoCanal(idDoCanal, filtros) {
     totalNoPeriodo: meus.length,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
-    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
-    podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 
@@ -7453,8 +7544,7 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
     atualizadoEm: quandoFoiMexido_(canal.aba, registro.__id),
     linhas: linhas,
     historico: historicoDoCaso_(canal.aba, registro.__id),
-    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR),
-    podeOcultar: podeFazer_(quem.permissoes, RECC_ACOES.OCULTAR)
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 

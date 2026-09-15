@@ -279,7 +279,7 @@ function rodarTestesDoPainel() {
     // linha (ver e editar) e as outras duas no rodapé dele. Quatro botões por
     // linha comiam a largura da coluna "Responsável".
     contem(modal, "Servidor.chamar('editarCaso'");
-    contem(modal, "Servidor.chamar('ocultarCaso'");
+    contem(modal, "Servidor.chamar('excluirCaso'");
     contem(modal, "Servidor.chamar('alterarSituacaoDoCaso'");
     verdadeiro(dashboard.indexOf('data-trocar-situacao') < 0
       && dashboard.indexOf('data-ocultar') < 0,
@@ -330,7 +330,12 @@ function rodarTestesDoPainel() {
       igual(resumo.escopo, 'PROPRIOS');
       igual(resumo.cartoes[0].valor, 3, 'os três casos da Ana no período');
       igual(resumo.fila.length, 3, 'e a fila mostra exatamente os mesmos');
-      igual(resumo.podeOcultar, false, 'a Operação não oculta');
+      // Excluir não tem mais bandeira de permissão: qualquer pessoa
+      // cadastrada exclui, em qualquer canal, por decisão do PO. Mandar um
+      // `podeOcultar` que a tela não usa e o servidor não checa seria uma
+      // bandeira que mente — pior que bandeira nenhuma.
+      igual(resumo.podeOcultar, undefined,
+        'excluir não depende mais de permissão');
     });
   });
 
@@ -482,9 +487,30 @@ function rodarTestesDoPainel() {
     });
   });
 
-  teste('ocultar tira da fila e do cartão ao mesmo tempo', () => {
+  teste('a fila traz o botão de excluir, ao lado de ver e editar', () => {
+    // Pedido do PO: excluir na própria fila, como no PGO 5. A decisão
+    // anterior era outra — excluir vivia só no caso aberto —, e cabe agora
+    // porque é um ícone, não um botão com texto.
+    const fila = lerPeca('Dashboard');
+    contem(fila, "data-excluir=", 'o botão tem de existir na linha');
+    contem(fila, "Servidor.chamar('excluirCaso'", 'e chamar a exclusão');
+    contem(fila, 'Formulario.confirmarExclusao', 'perguntando antes');
+  });
+
+  teste('a pergunta antes de excluir NÃO promete desfazer', () => {
+    // Ela promete o contrário, e tem de prometer: a linha sai da planilha.
+    // Dizer "pode ser trazida de volta" faria a pessoa confirmar tranquila e
+    // descobrir depois — que é o pior jeito de descobrir.
+    const peca = lerPeca('Formulario');
+    contem(peca, 'A LINHA SAI DA PLANILHA');
+    contem(peca, 'Não dá para desfazer');
+    verdadeiro(peca.indexOf('pode ser trazida de volta') < 0,
+      'a promessa antiga não pode ter sobrado');
+  });
+
+  teste('excluir tira da fila e do cartão ao mesmo tempo', () => {
     const antes = chamar('resumoDoCanal')(canal.id, {});
-    chamar('ocultarCaso')(canal.id, antes.fila[0].id);
+    chamar('excluirCaso')(canal.id, antes.fila[0].id);
 
     const depois = chamar('resumoDoCanal')(canal.id, {});
     igual(depois.total, antes.total - 1);
