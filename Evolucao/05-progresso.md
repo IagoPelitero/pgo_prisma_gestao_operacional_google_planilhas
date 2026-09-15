@@ -1024,6 +1024,20 @@ Mais um `COMO-USAR.txt`.
 > divergissem, haveria duas verdades, e a que a operação usa seria a que
 > ninguém testa.
 
+E há dois testes, não um. O primeiro prova que o **gerador** funciona: ele gera
+numa pasta descartável e confere que nenhuma função e nenhuma tela ficou de
+fora. O segundo prova que o **arquivo guardado no repositório** — o que alguém
+vai baixar e colar — ainda é o código de hoje: gera uma cópia fresca, tira a
+linha do carimbo dos dois lados e compara.
+
+> **Por que dois.** Na primeira versão havia um só, e ele regerava o pacote por
+> cima do repositório antes de conferi-lo. Provava que o gerador funciona e
+> nada sobre o arquivo guardado, que podia estar semanas atrasado passando
+> verde. É a armadilha do bloco que se aprova sozinho, da Etapa 12, dentro da
+> própria suíte — o [achado 33](04-bugs-capturados.md). **Conferir o que você
+> acabou de fabricar não é conferir nada.** O segundo teste nasceu depois, junto
+> com a correção do cadastro, e está descrito aqui porque é aqui que ele mora.
+
 **372 testes.**
 
 ---
@@ -1086,7 +1100,7 @@ segundos.
 
 > Uma tela parada é o pior estado possível: não funciona **e não avisa**.
 
-**383 testes**, e o ponta a ponta subiu para sete percursos.
+**384 testes**, e o ponta a ponta subiu para sete percursos.
 
 ---
 

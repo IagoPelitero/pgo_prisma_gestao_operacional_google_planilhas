@@ -653,12 +653,48 @@ funciona **e não avisa**. Entre esperar para sempre e desistir explicando,
 desistir é sempre melhor. Tratar o erro em todo lugar não basta se existe um
 caminho em que o erro nunca acontece: só o silêncio.
 
+### 33 · O teste que fabricava o que ia conferir
+
+**Sintoma.** Nenhum. E é esse o ponto.
+
+**Causa.** O teste `o pacote junta tudo, e nada fica de fora` começava assim:
+
+```js
+const destino = path.join(raiz, 'Evolucao', 'pacote');
+require('./gerar-pacote').gerar(destino);      // <- regera
+const codigo = fs.readFileSync(path.join(destino, 'Codigo.gs'), 'utf8');
+```
+
+Ele **gerava o pacote por cima do que estava no repositório** e conferia o que
+tinha acabado de gerar. Então provava uma coisa só: que o gerador funciona.
+Sobre o arquivo que alguém vai baixar e colar, não provava nada — o pacote
+commitado podia estar semanas atrasado e o teste passaria igual, verdinho.
+
+Havia ainda um segundo efeito, menor e visível: depois de toda rodada de
+teste o `git status` ficava sujo, com um arquivo versionado alterado só no
+carimbo "Gerado em". Foi esse sintoma bobo que fez olhar para o teste — o
+defeito de verdade estava atrás dele.
+
+**Defesa.** Duas mudanças. O teste do gerador passou a escrever numa pasta
+**descartável** (`fs.mkdtempSync`), nunca por cima do repositório. E nasceu um
+segundo teste, `o pacote guardado no repositório ainda é o código de hoje`,
+que gera uma cópia fresca, tira a linha do carimbo dos dois lados e compara:
+se divergirem, ele falha dizendo o comando que resolve.
+
+**O que ele ensina.** É a armadilha do bloco que se aprova sozinho, da Etapa
+12, aparecendo de novo — desta vez dentro da própria suíte. **Conferir o que
+você acabou de fabricar não é conferir nada.** O teste tem de olhar para o
+artefato que vai ser usado, não para um gêmeo recém-nascido dele.
+
+---
+
 ---
 
 ## O que esta lista ensina
 
-**Quinze dos vinte e cinco eram silenciosos.** Não davam erro, não travavam, não
-apareciam no log. Gravavam dado errado e seguiam em frente.
+**São trinta e três achados, e a maioria era silenciosa.** Não davam erro, não
+travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
+errada — e seguiam em frente.
 
 Daí as duas práticas que o projeto não abre mão:
 
@@ -713,3 +749,7 @@ Daí as duas práticas que o projeto não abre mão:
     ao serviço, não a conta em JavaScript. Os itens 28 e 29 eram invisíveis no
     relógio do Node — o Node não paga pedágio. Contar as idas mostrou os dois
     na primeira execução.
+15. **Conferir o que você acabou de fabricar não é conferir nada.** O item 33
+    é a armadilha do verificador que se aprova sozinho, da Etapa 12, aparecendo
+    dentro da própria suíte. O teste tem de olhar para o artefato que vai ser
+    usado — não para uma cópia que ele mesmo gerou na linha anterior.

@@ -18,6 +18,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
@@ -603,8 +604,17 @@ function rodarTestesDeDiagnostico() {
     // 35 arquivos para criar à mão no Apps Script, e basta UM ficar para trás
     // para a tela congelar num "Lendo o cadastro…" que não explica nada. Já
     // aconteceu duas vezes aqui — os achados 25 e 27.
+    //
+    // O pacote é gerado numa pasta DESCARTÁVEL, nunca por cima do que está
+    // no repositório. Duas razões, e a segunda é a que importa: escrever num
+    // arquivo versionado deixa o `git status` sujo depois de toda rodada de
+    // teste, e — pior — regerar antes de conferir faria o teste examinar
+    // sempre um pacote novinho. O pacote commitado poderia estar meses
+    // atrasado e este teste passaria assim mesmo. É a mesma armadilha do
+    // bloco que se aprova sozinho: conferir o que você acabou de fabricar
+    // não é conferir nada.
     const raiz = path.join(__dirname, '..', '..');
-    const destino = path.join(raiz, 'Evolucao', 'pacote');
+    const destino = fs.mkdtempSync(path.join(os.tmpdir(), 'pgo-pacote-'));
     require('./gerar-pacote').gerar(destino);
 
     const codigo = fs.readFileSync(path.join(destino, 'Codigo.gs'), 'utf8');
@@ -640,6 +650,36 @@ function rodarTestesDeDiagnostico() {
 
     // Os scriptlets de identidade FICAM: o Apps Script os avalia ao servir.
     contem(index, '<?= identidade.nome ?>');
+  });
+
+  teste('o pacote guardado no repositório ainda é o código de hoje', () => {
+    // O teste acima prova que o GERADOR funciona. Este prova que o pacote
+    // que está no repositório — o que alguém vai baixar e colar — foi gerado
+    // depois da última mudança no código. Sem ele, o gerador poderia estar
+    // perfeito e o arquivo guardado, velho: quem colasse levaria o sistema
+    // de duas semanas atrás sem nenhum aviso.
+    //
+    // A linha "Gerado em" muda a cada geração e não diz nada sobre o
+    // conteúdo, então ela sai dos dois lados antes da comparação.
+    const raiz = path.join(__dirname, '..', '..');
+    const guardado = path.join(raiz, 'Evolucao', 'pacote');
+    if (!fs.existsSync(path.join(guardado, 'Codigo.gs'))) return;  // ainda não gerado
+
+    const fresco = fs.mkdtempSync(path.join(os.tmpdir(), 'pgo-pacote-hoje-'));
+    require('./gerar-pacote').gerar(fresco);
+
+    function semOCarimbo(texto) {
+      return texto.split('\n')
+        .filter((linha) => linha.indexOf('Gerado em ') < 0)
+        .join('\n');
+    }
+
+    ['Codigo.gs', 'Index.html', 'SemAcesso.html'].forEach((arquivo) => {
+      const a = semOCarimbo(fs.readFileSync(path.join(guardado, arquivo), 'utf8'));
+      const b = semOCarimbo(fs.readFileSync(path.join(fresco, arquivo), 'utf8'));
+      verdadeiro(a === b, 'Evolucao/pacote/' + arquivo + ' está desatualizado — '
+        + 'rode: node Evolucao/Testes/gerar-pacote.js');
+    });
   });
 
   teste('a planilha de código não está mais velha que o código', () => {
