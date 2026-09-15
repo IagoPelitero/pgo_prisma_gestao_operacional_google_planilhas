@@ -350,7 +350,7 @@ async function rodar() {
     await pagina.click('[data-tela="cadastrarCaso"]');
     await pagina.waitForTimeout(900);
 
-    // Os ids saem de Formulario.html: prefixo + 'campo-' + chave. O
+    // Os ids saem da peça Formulario: prefixo + 'campo-' + chave. O
     // CadastrarCaso não usa prefixo, então são 'campo-*'.
     const campos = await pagina.$$eval(
       '#formulario-do-caso input[id^="campo-"], #formulario-do-caso select[id^="campo-"],'

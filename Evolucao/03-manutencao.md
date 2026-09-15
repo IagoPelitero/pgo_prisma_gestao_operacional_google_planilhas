@@ -50,7 +50,7 @@ Não edite o cabeçalho na planilha à mão. Use:
 adicionarColuna_('BASE_MESA', 'Nome da coluna', 'texto');
 ```
 
-Os tipos válidos estão em `RECC_TIPO_DE_DADO`, no `Back-End/Esquema.gs`.
+Os tipos válidos estão em `RECC_TIPO_DE_DADO`, no `Back-End/Base.gs`.
 A função cria a coluna no **fim** da aba, aplica o formato de célula certo e
 registra o tipo em `CAMPOS`. Sem esse registro, na próxima execução a coluna
 voltaria a ser lida como texto — e uma coluna de moeda guardaria
@@ -76,7 +76,7 @@ verificarEstruturaRECC();
 
 Só lê. Mostra o que sumiu e o que apareceu, sem consertar nada. O conserto é
 decisão de gente: ou renomeia de volta na planilha, ou ajusta o contrato no
-`Back-End/Esquema.gs`.
+`Back-End/Base.gs`.
 
 ### Preciso esconder um registro sem perdê-lo
 
@@ -104,17 +104,34 @@ com o Google é substituída.
 
 ## 4. Onde mexer, por tipo de mudança
 
+São **19 arquivos**, agrupados por assunto: 7 do servidor e 12 de tela. Se
+você não souber em qual está o que procura, o agrupamento está errado — não
+você. Abra uma questão.
+
 | Quero mudar | Mexo em |
 |---|---|
-| Uma coluna, um tipo de dado, uma aba | `Back-End/Esquema.gs` |
-| Como o sistema lê ou grava na planilha | `Back-End/Planilha.gs` |
-| A regra do Id | `Back-End/Sequencia.gs` |
-| O que cada nível de acesso pode | `Back-End/Acesso.gs` |
-| Quem pode entrar | `Back-End/Usuarios.gs` |
-| O que a tela recebe ao abrir | `Back-End/Principal.gs` |
+| Uma coluna, um tipo de dado, uma aba | `Back-End/Base.gs` |
+| Como o sistema lê ou grava na planilha | `Back-End/Base.gs` |
+| A regra do Id | `Back-End/Base.gs` |
+| O que cada nível de acesso pode | `Back-End/Entrada.gs` |
+| Quem pode entrar | `Back-End/Entrada.gs` |
+| O que a tela recebe ao abrir (o `doGet`) | `Back-End/Entrada.gs` |
+| As perguntas do formulário, a validação | `Back-End/Casos.gs` |
+| Gravar, editar ou ocultar um caso | `Back-End/Casos.gs` |
+| Como a busca procura | `Back-End/Casos.gs` |
+| Os cartões do Dashboard e a fila | `Back-End/Indicadores.gs` |
+| As contas dos gráficos | `Back-End/Indicadores.gs` |
+| Os números de uma pessoa, a meta, o ranking | `Back-End/Indicadores.gs` |
+| Corretoras, produtos, SUSEPs bloqueadas | `Back-End/Cadastros.gs` |
+| A importação em lote | `Back-End/Cadastros.gs` |
+| Uma seção da tela de Configurações | `Back-End/Config.gs` |
+| O gerador das abas `ANALISE_*` | `Back-End/Config.gs` |
+| O que o instalador cria numa planilha nova | `Back-End/Instalacao.gs` |
+| O que o diagnóstico confere | `Back-End/Instalacao.gs` |
 | A aparência, as cores, os temas | `Front-End/Estilos.html` |
-| O menu e a barra superior | `Front-End/Moldura.html` |
-| As telas e a navegação | `Front-End/Aplicacao.html` |
+| O menu, a barra superior, o formulário, os gráficos | `Front-End/Comuns.html` |
+| A ponte com o servidor e a navegação | `Front-End/Aplicacao.html` |
+| Uma tela do menu | `Front-End/<NomeDaTela>.html` |
 | Nome, logo, cor, nomes das telas | **a aba `CONFIG` da planilha** — não o código |
 
 A última linha é a mais importante. Boa parte do que parece código é
@@ -130,7 +147,7 @@ repositório.
 
 | Aqui | No editor do Apps Script |
 |---|---|
-| `Back-End/Acesso.gs` | `Acesso.gs` |
+| `Back-End/Entrada.gs` | `Entrada.gs` |
 | `Front-End/Index.html` | `Index.html` |
 | `Evolucao/` | **não vai** — roda no seu computador |
 

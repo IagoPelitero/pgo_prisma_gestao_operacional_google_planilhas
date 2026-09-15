@@ -1890,8 +1890,46 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
     </div>
   </div>
 
+  <!--
+    A ordem importa pouco, porque cada tela e cada peça é um módulo fechado
+    (var Nome = (function () { … })()), e nenhum lê o outro na hora de nascer.
+    Duas exceções, e por isso esta ordem:
 
-<!-- ==== Moldura.html ==== -->
+      • Comuns vem primeiro. É a casca e as peças que as telas usam.
+      • Aplicacao vem por último. É ela que liga o sistema, e ligar antes de
+        todas as telas existirem seria pedir por uma que ainda não nasceu.
+  -->
+
+<!-- ==== Comuns.html ==== -->
+<!-- ========================================================================
+     PGO — Comuns.html · as peças que mais de uma tela usa
+     ========================================================================
+    Nenhuma destas é uma tela do menu. São as peças compartilhadas: a casca
+    que aparece em todas, os dois diálogos que qualquer tela pode levantar,
+    o formulário, o caso aberto por cima e os desenhos dos gráficos.
+
+    Cada uma continua sendo um módulo fechado (var Nome = (function(){…})()),
+    entao morar no mesmo arquivo não mistura o estado de nenhuma com o da
+    outra — é exatamente o mesmo código, só que em um arquivo em vez de seis.
+
+    O QUE TEM AQUI DENTRO, nesta ordem:
+
+      1. Moldura
+      2. SenhaDeAdministrador
+      3. SeletorDeMesa
+      4. Formulario
+      5. CasoEmModal
+      6. Graficos
+
+    Procure pelo banner "PEÇA n de m" para pular de uma à outra.
+     ======================================================================== -->
+
+<!-- ========================================================================
+     PEÇA 1 de 6 · Moldura
+     Era o arquivo Front-End/Moldura.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
 <script>
 /* ============================================================================
    RECC — Moldura.html · o menu lateral e a barra superior
@@ -2244,8 +2282,12 @@ var Moldura = (function () {
 })();
 </script>
 
+<!-- ========================================================================
+     PEÇA 2 de 6 · SenhaDeAdministrador
+     Era o arquivo Front-End/SenhaDeAdministrador.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
 
-<!-- ==== SenhaDeAdministrador.html ==== -->
 <script>
 /* ============================================================================
    PGO — SenhaDeAdministrador.html · a guarda das ações sem desfazer
@@ -2354,8 +2396,12 @@ var SenhaDeAdministrador = (function () {
 })();
 </script>
 
+<!-- ========================================================================
+     PEÇA 3 de 6 · SeletorDeMesa
+     Era o arquivo Front-End/SeletorDeMesa.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
 
-<!-- ==== SeletorDeMesa.html ==== -->
 <script>
 /* ============================================================================
    PGO — SeletorDeMesa.html · a escolha da mesa de trabalho
@@ -2419,8 +2465,12 @@ var SeletorDeMesa = (function () {
 })();
 </script>
 
+<!-- ========================================================================
+     PEÇA 4 de 6 · Formulario
+     Era o arquivo Front-End/Formulario.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
 
-<!-- ==== Formulario.html ==== -->
 <script>
 /* ============================================================================
    PGO — Formulario.html · o formulário, desenhado num lugar só
@@ -2722,8 +2772,12 @@ var Formulario = (function () {
 })();
 </script>
 
+<!-- ========================================================================
+     PEÇA 5 de 6 · CasoEmModal
+     Era o arquivo Front-End/CasoEmModal.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
 
-<!-- ==== CasoEmModal.html ==== -->
 <script>
 /* ============================================================================
    PGO — CasoEmModal.html · o caso aberto por cima da fila
@@ -3073,550 +3127,12 @@ var CasoEmModal = (function () {
 })();
 </script>
 
+<!-- ========================================================================
+     PEÇA 6 de 6 · Graficos
+     Era o arquivo Front-End/Graficos.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
 
-<!-- ==== Dashboard.html ==== -->
-<script>
-/* ============================================================================
-   PGO — Dashboard.html · a visão do dia
-   ============================================================================
-   Cartões em cima, fila embaixo. Os dois vêm da MESMA resposta do servidor,
-   já filtrados pelo alcance do nível — e por isso o número do cartão sempre
-   bate com o que a fila mostra. Contar de um lado e listar de outro deixaria
-   o cartão dizendo 12 e a fila mostrando 7, sem ninguém entender qual está
-   certo.
-   ============================================================================ */
-
-var TelaDashboard = (function () {
-
-  var mesaEscolhida = '';
-  var filtrosEscolhidos = {};
-  var resumo = null;
-
-  function escapar(texto) { return Moldura.escapar(texto); }
-  function elemento(id) { return document.getElementById(id); }
-
-  /* --------------------------------------------------------------- montar */
-
-  function montar(pacote) {
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
-    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
-      + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
-  }
-
-  /**
-   * A variação em relação ao período anterior.
-   * Quando não há base de comparação, o espaço fica vazio — inventar "+100%"
-   * porque saiu de zero é ruído que a operação aprende a ignorar.
-   */
-  function variacao(cartao) {
-    if (cartao.variacao === null || cartao.variacao === undefined) {
-      // Espaço reservado para os cartões ficarem da mesma altura, mas em
-      // branco: repetir "sem base" em cada um vira ruído e parece erro.
-      return '<span class="variacao vazia" aria-hidden="true">—</span>';
-    }
-    var subiu = cartao.variacao >= 0;
-    return '<span class="variacao ' + (subiu ? 'subiu' : 'desceu') + '">'
-      + (subiu ? '▲' : '▼') + ' ' + Math.abs(cartao.variacao) + '%'
-      + '<em>vs. período anterior</em></span>';
-  }
-
-  /**
-   * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
-   * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
-   */
-  function desenharCartoes() {
-    return '<div class="cartoes">'
-      + resumo.cartoes.map(function (cartao) {
-        var filtravel = cartao.chave !== 'total' && cartao.chave !== 'naCelula'
-          && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
-        var ligado = filtravel
-          && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);
-
-        return '<' + (filtravel ? 'button type="button"' : 'div')
-          + ' class="indicador tom-' + escapar(cartao.tom || 'neutro')
-          + (filtravel ? ' clicavel' : '') + (ligado ? ' ligado' : '') + '"'
-          + (filtravel ? ' data-situacao="' + escapar(cartao.rotulo) + '"' : '')
-          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"'
-            : (filtravel ? ' title="Filtrar a fila por ' + escapar(cartao.rotulo) + '"' : ''))
-          + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
-          + '<strong class="numero">' + cartao.valor + '</strong>'
-          + variacao(cartao)
-          + '</' + (filtravel ? 'button' : 'div') + '>';
-      }).join('')
-      + '</div>';
-  }
-
-  function normalizarTexto(texto) {
-    return String(texto === null || texto === undefined ? '' : texto)
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  }
-
-  function desenharFiltros() {
-    if (!resumo.filtrosDisponiveis.length) return '';
-
-    var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
-      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
-      filtro.opcoes.forEach(function (opcao) {
-        var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
-          ? ' selected' : '';
-        opcoes.push('<option value="' + escapar(opcao.valor) + '"' + marcado + '>'
-          + escapar(opcao.rotulo) + '</option>');
-      });
-      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
-        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
-        + opcoes.join('') + '</select>';
-    });
-
-    var algumAtivo = Object.keys(filtrosEscolhidos).some(function (chave) {
-      return filtrosEscolhidos[chave];
-    });
-
-    return '<div class="filtros">' + caixas.join('')
-      + (algumAtivo
-        ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
-          + 'Limpar filtros</button>'
-        : '')
-      + '<span class="contagem">' + resumo.total + ' de ' + resumo.totalNoPeriodo
-      + ' casos · ' + escapar(resumo.periodo.rotulo) + '</span>'
-      + '</div>';
-  }
-
-  function desenharFila() {
-    if (!resumo.fila.length) {
-      return '<div class="cartao vazio">'
-        + '<strong>Nenhum caso para mostrar aqui.</strong>'
-        + '<p>' + (resumo.totalNoPeriodo
-          ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
-            + 'pelos filtros escolhidos.'
-          : 'Nada foi registrado nos ' + resumo.periodo.dias + ' dias mais recentes. '
-            + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
-    }
-
-    var cabecalho = resumo.colunas.map(function (grupo) {
-      return '<th>' + escapar(grupo.titulo) + '</th>';
-    }).join('') + '<th class="acoes-coluna">Ações</th>';
-
-    var linhas = resumo.fila.map(function (caso) {
-      var celulas = caso.celulas.map(function (grupo, i) {
-        return '<td>' + desenharGrupo(grupo, caso, i === 0) + '</td>';
-      }).join('');
-
-      return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + acoesDaLinha(caso) + '</td></tr>';
-    }).join('');
-
-    return '<div class="cartao sem-forro">'
-      + '<div class="rolagem-tabela"><table class="fila agrupada">'
-      + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div></div>';
-  }
-
-  /**
-   * Um grupo de colunas dentro de uma célula.
-   *
-   * A primeira linha do grupo é a que salta — é o que a pessoa procura ao
-   * varrer a fila: o protocolo, o nome do cliente. As de baixo vêm menores,
-   * porque são o que ela confere depois de já ter achado a linha.
-   */
-  function desenharGrupo(grupo, caso, ehOPrimeiro) {
-    return grupo.map(function (celula, i) {
-      if (celula.ehStatus) {
-        return '<span class="situacao tom-' + escapar(caso.tom || 'neutro') + '">'
-          + escapar(celula.valor || '—') + '</span>';
-      }
-      var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
-      return '<span class="' + classe + '" title="' + escapar(celula.cabecalho)
-        + '">' + escapar(celula.valor || '—') + '</span>';
-    }).join('');
-  }
-
-  /**
-   * As ações da linha: ver e editar, e só.
-   *
-   * Alterar situação e excluir moram no rodapé do modal. Quatro botões por
-   * linha, repetidos trinta vezes, tomavam a largura de uma coluna inteira de
-   * dado — e a coluna que sumia era "Responsável". Duas ações na linha, as
-   * outras a um clique, cabem e continuam à mão.
-   */
-  function acoesDaLinha(caso) {
-    var botoes = '<button type="button" class="acao" data-caso="'
-      + escapar(caso.id) + '">' + Moldura.icone('olho') + ' Ver detalhes</button>';
-
-    if (resumo.podeEditar) {
-      botoes += '<button type="button" class="acao-icone" data-editar="'
-        + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
-        + Moldura.icone('editar') + '</button>';
-    }
-    return botoes;
-  }
-
-  function desenharPainel() {
-    // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
-    // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
-    // na fila, dava a entender que os números em cima estavam completos.
-    elemento('painel').innerHTML =
-      Moldura.avisoDeJanela(resumo, 'Estes números e esta fila')
-      + desenharCartoes() + desenharFiltros() + desenharFila();
-    ligarPainel();
-  }
-
-  /* ---------------------------------------------------------- comportamento */
-
-  function carregar() {
-    var painel = elemento('painel');
-    if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
-
-    Servidor.chamar('resumoDaMesa', mesaEscolhida, filtrosEscolhidos)
-      .entao(function (resposta) {
-        resumo = resposta;
-        desenharPainel();
-      })
-      .senao(function (erro) {
-        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
-          + escapar(erro.message || String(erro)) + '</p>';
-      });
-  }
-
-  function ligarPainel() {
-    var caixas = document.querySelectorAll('.filtro');
-    for (var i = 0; i < caixas.length; i++) {
-      caixas[i].addEventListener('change', function () {
-        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
-        carregar();
-      });
-    }
-
-    var limpar = elemento('limpar-filtros');
-    if (limpar) {
-      limpar.addEventListener('click', function () {
-        filtrosEscolhidos = {};
-        carregar();
-      });
-    }
-
-    var cartoes = document.querySelectorAll('.indicador.clicavel');
-    for (var c = 0; c < cartoes.length; c++) {
-      cartoes[c].addEventListener('click', function () {
-        var situacao = this.getAttribute('data-situacao');
-        // Clicar de novo no mesmo cartão desliga o filtro.
-        filtrosEscolhidos.status =
-          (filtrosEscolhidos.status === situacao) ? '' : situacao;
-        carregar();
-      });
-    }
-
-    ligarCliques('[data-caso]', function (botao) {
-      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-caso'), carregar);
-    });
-    ligarCliques('[data-editar]', function (botao) {
-      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-editar'),
-        carregar, true);
-    });
-  }
-
-  function ligarCliques(seletor, oQueFazer) {
-    var botoes = document.querySelectorAll(seletor);
-    for (var i = 0; i < botoes.length; i++) {
-      botoes[i].addEventListener('click', function () { oQueFazer(this); });
-    }
-  }
-
-  function ocultar(idDoCaso) {
-    // Some da tela de todo mundo, e por isso vale perguntar. O texto diz a
-    // verdade: a linha permanece na planilha. Prometer "não poderá ser
-    // desfeito" quando dá para desfazer assusta à toa.
-    if (!window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
-      + 'Ele sai do sistema para todo mundo. A linha permanece na planilha e '
-      + 'pode ser trazida de volta por um administrador.')) return;
-
-    Servidor.chamar('ocultarCaso', mesaEscolhida, idDoCaso)
-      .entao(carregar)
-      .senao(function (erro) { window.alert(erro.message || String(erro)); });
-  }
-
-  function ligar(pacote) {
-    SeletorDeMesa.ligar(function (idDaMesa) {
-      mesaEscolhida = idDaMesa;
-      filtrosEscolhidos = {};
-      Aplicacao.remontar();
-    });
-    carregar();
-  }
-
-  return { montar: montar, ligar: ligar };
-})();
-</script>
-
-
-<!-- ==== BuscarCaso.html ==== -->
-<script>
-/* ============================================================================
-   PGO — BuscarCaso.html · achar um caso que a fila não mostra mais
-   ============================================================================
-   O Dashboard mostra os últimos 30 dias, de propósito. Quando o cliente liga
-   citando um protocolo de abril, é aqui que se procura.
-
-   A tela é uma caixa de busca e nada mais até alguém procurar algo. Não
-   carrega lista, não pré-carrega base: abrir esta tela não custa nada, e é
-   por isso que dá para deixá-la aberta o dia inteiro.
-
-   O resultado vem separado POR ORIGEM — cada mesa, e a base legada — porque
-   um caso da Mesa Diamante e uma linha do sistema antigo não são a mesma
-   coisa e não devem aparecer misturados numa lista só.
-   ============================================================================ */
-
-var TelaBuscarCaso = (function () {
-
-  var opcoes = null;
-  var mesasEscolhidas = {};     // id → true
-  var incluirLegado = false;
-  var procurando = false;
-  var ultimoTermo = '';
-
-  function escapar(texto) { return Moldura.escapar(texto); }
-  function elemento(id) { return document.getElementById(id); }
-
-  /* --------------------------------------------------------------- montar */
-
-  function montar() {
-    return '<div class="cartao busca-caixa">'
-      + '<form id="form-da-busca" novalidate>'
-      + '<div class="busca-linha">'
-      + '<input type="search" id="termo-da-busca" autocomplete="off"'
-      + ' placeholder="Protocolo, apólice, proposta, CPF ou nome"'
-      + ' aria-label="O que procurar">'
-      + '<button type="submit" class="botao" id="botao-buscar">'
-      + Moldura.icone('buscarCaso') + ' Buscar</button>'
-      + '</div>'
-      + '<div id="onde-procurar" class="busca-onde"></div>'
-      + '</form></div>'
-      + '<div id="resultado-da-busca"></div>';
-  }
-
-  function desenharOnde() {
-    var caixas = opcoes.mesas.map(function (mesa) {
-      return '<label class="config-chave">'
-        + '<input type="checkbox" data-mesa-da-busca="' + escapar(mesa.id) + '"'
-        + (mesasEscolhidas[mesa.id] ? ' checked' : '') + '>'
-        + '<span>' + escapar(mesa.nome)
-        + '<em>procura em: ' + escapar(mesa.procuraEm.join(', ') || 'nada declarado')
-        + '</em></span></label>';
-    });
-
-    if (opcoes.legado.ligado) {
-      caixas.push('<label class="config-chave">'
-        + '<input type="checkbox" id="incluir-legado"'
-        + (incluirLegado ? ' checked' : '') + '>'
-        + '<span>' + escapar(opcoes.legado.rotulo)
-        + '<em>a planilha do sistema anterior, em leitura</em></span></label>');
-    }
-
-    elemento('onde-procurar').innerHTML = '<span class="busca-rotulo">'
-      + 'Onde procurar</span>' + caixas.join('')
-      + (opcoes.legado.ligado ? ''
-        : '<span class="busca-dica">Não há base legada apontada. '
-          + 'Um administrador aponta em Configurações → Estrutura.</span>');
-
-    ligarOnde();
-  }
-
-  function ligarOnde() {
-    var caixas = document.querySelectorAll('[data-mesa-da-busca]');
-    for (var i = 0; i < caixas.length; i++) {
-      caixas[i].addEventListener('change', function () {
-        mesasEscolhidas[this.getAttribute('data-mesa-da-busca')] = this.checked;
-      });
-    }
-    var legado = elemento('incluir-legado');
-    if (legado) {
-      legado.addEventListener('change', function () { incluirLegado = this.checked; });
-    }
-  }
-
-  /* -------------------------------------------------------------- procurar */
-
-  function procurar() {
-    if (procurando) return;
-    var termo = elemento('termo-da-busca').value.trim();
-    ultimoTermo = termo;
-
-    var onde = [];
-    Object.keys(mesasEscolhidas).forEach(function (id) {
-      if (mesasEscolhidas[id]) onde.push(id);
-    });
-
-    procurando = true;
-    elemento('botao-buscar').disabled = true;
-    elemento('resultado-da-busca').innerHTML =
-      '<p class="carregando-campos">Procurando…</p>';
-
-    Servidor.chamar('buscarCasos', termo, onde, incluirLegado)
-      .entao(function (resposta) {
-        procurando = false;
-        elemento('botao-buscar').disabled = false;
-        desenharResultado(resposta);
-      })
-      .senao(function (erro) {
-        procurando = false;
-        elemento('botao-buscar').disabled = false;
-        elemento('resultado-da-busca').innerHTML =
-          '<div class="cartao vazio"><strong>'
-          + escapar(erro.message || String(erro)) + '</strong></div>';
-      });
-  }
-
-  function desenharResultado(resposta) {
-    if (!resposta.total) {
-      elemento('resultado-da-busca').innerHTML = '<div class="cartao vazio">'
-        + '<strong>Nada encontrado para "' + escapar(resposta.termo) + '".</strong>'
-        + '<p>Procurei em: ' + escapar(resposta.origens.map(function (origem) {
-          return origem.nome;
-        }).join(', ')) + '. A comparação ignora pontos e traços, então '
-        + '<code>123.456.789-01</code> e <code>12345678901</code> acham a mesma '
-        + 'coisa. Se o caso é antigo e não está aqui, ele pode estar na base '
-        + 'legada — marque-a acima.</p>'
-        + avisosDe(resposta.origens) + '</div>';
-      return;
-    }
-
-    elemento('resultado-da-busca').innerHTML =
-      '<p class="busca-contagem">' + resposta.total + ' caso(s) para "'
-      + escapar(resposta.termo) + '"</p>'
-      + resposta.origens.map(desenharOrigem).join('');
-    ligarResultado();
-  }
-
-  function avisosDe(origens) {
-    return origens.filter(function (origem) { return origem.aviso; })
-      .map(function (origem) {
-        return '<p class="aviso-fila">' + escapar(origem.nome) + ': '
-          + escapar(origem.aviso) + '</p>';
-      }).join('');
-  }
-
-  function desenharOrigem(origem) {
-    var cabeca = '<header class="origem-cabeca">'
-      + (origem.icone ? SeletorDeMesa.icone(origem.icone) : '')
-      + '<h3>' + escapar(origem.nome) + '</h3>'
-      + '<span class="quantos">' + origem.casos.length + '</span>'
-      + (origem.somenteLeitura
-        ? '<span class="etiqueta-leitura">só leitura</span>' : '')
-      + '</header>';
-
-    if (!origem.casos.length) {
-      return '<section class="cartao origem vazia">' + cabeca
-        + '<p>' + (origem.aviso
-          ? escapar(origem.aviso)
-          : 'Nada encontrado aqui.') + '</p></section>';
-    }
-
-    return '<section class="cartao sem-forro origem">' + cabeca
-      + (origem.aviso
-        ? '<p class="aviso-fila">' + escapar(origem.aviso) + '</p>' : '')
-      + (origem.tipo === 'legado'
-        ? tabelaDoLegado(origem) : tabelaDaMesa(origem))
-      + '</section>';
-  }
-
-  function tabelaDaMesa(origem) {
-    var cabecalho = origem.colunas.map(function (grupo) {
-      return '<th>' + escapar(grupo.titulo) + '</th>';
-    }).join('') + '<th class="acoes-coluna">Ações</th>';
-
-    var linhas = origem.casos.map(function (caso) {
-      var celulas = caso.celulas.map(function (grupo, i) {
-        return '<td>' + grupo.map(function (celula, j) {
-          if (celula.ehStatus) {
-            return '<span class="situacao tom-' + escapar(caso.tom || 'neutro')
-              + '">' + escapar(celula.valor || '—') + '</span>';
-          }
-          var classe = (j === 0 && i !== 0) ? 'principal' : 'apoio';
-          return '<span class="' + classe + '">'
-            + escapar(celula.valor || '—') + '</span>';
-        }).join('') + '</td>';
-      }).join('');
-
-      return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao" data-achado="'
-        + escapar(caso.id) + '" data-mesa="' + escapar(origem.id) + '">'
-        + Moldura.icone('olho') + ' Ver detalhes</button></td></tr>';
-    }).join('');
-
-    return '<div class="rolagem-tabela"><table class="fila agrupada">'
-      + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div>';
-  }
-
-  /**
-   * A tabela do legado é outra coisa: não temos contrato sobre aquela
-   * planilha, então mostramos as colunas que ela tiver, com os nomes que ela
-   * usa. E sem botão de abrir — uma linha de histórico não é um caso do
-   * sistema, e prometer edição ali seria mentira.
-   */
-  function tabelaDoLegado(origem) {
-    var cabecalho = origem.cabecalhos.map(function (nome) {
-      return '<th>' + escapar(nome) + '</th>';
-    }).join('');
-
-    var linhas = origem.casos.map(function (caso) {
-      return '<tr>' + caso.celulas[0].map(function (celula) {
-        return '<td>' + escapar(celula.valor || '—') + '</td>';
-      }).join('') + '</tr>';
-    }).join('');
-
-    return '<p class="aviso-fila">Estas linhas vêm da planilha do sistema '
-      + 'anterior, como ela está. Elas não abrem nem se editam por aqui.</p>'
-      + '<div class="rolagem-tabela"><table class="fila legado">'
-      + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div>';
-  }
-
-  function ligarResultado() {
-    var botoes = document.querySelectorAll('[data-achado]');
-    for (var i = 0; i < botoes.length; i++) {
-      botoes[i].addEventListener('click', function () {
-        var mesa = this.getAttribute('data-mesa');
-        var caso = this.getAttribute('data-achado');
-        // O mesmo modal do Dashboard: quem acha um caso aqui quer as mesmas
-        // ações que teria lá, e aprender duas telas para o mesmo caso é uma
-        // a mais do que o necessário.
-        CasoEmModal.abrir(mesa, caso, function () {
-          if (ultimoTermo) procurar();
-        });
-      });
-    }
-  }
-
-  /* ---------------------------------------------------------------- ligar */
-
-  function ligar() {
-    elemento('form-da-busca').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      procurar();
-    });
-
-    Servidor.chamar('opcoesDaBusca')
-      .entao(function (resposta) {
-        opcoes = resposta;
-        // Todas as mesas marcadas por padrão: quem procura um protocolo
-        // raramente sabe de antemão em qual mesa ele está.
-        opcoes.mesas.forEach(function (mesa) { mesasEscolhidas[mesa.id] = true; });
-        desenharOnde();
-        elemento('termo-da-busca').focus();
-      })
-      .senao(function (erro) {
-        elemento('onde-procurar').innerHTML =
-          '<span class="busca-dica erro-carga">'
-          + escapar(erro.message || String(erro)) + '</span>';
-      });
-  }
-
-  return { montar: montar, ligar: ligar };
-})();
-</script>
-
-
-<!-- ==== Graficos.html ==== -->
 <script>
 /* ============================================================================
    PGO — Graficos.html · os desenhos, num lugar só
@@ -4040,6 +3556,409 @@ var Graficos = (function () {
 </script>
 
 
+
+<!-- ==== Dashboard.html ==== -->
+<script>
+/* ============================================================================
+   PGO — Dashboard.html · a visão do dia
+   ============================================================================
+   Cartões em cima, fila embaixo. Os dois vêm da MESMA resposta do servidor,
+   já filtrados pelo alcance do nível — e por isso o número do cartão sempre
+   bate com o que a fila mostra. Contar de um lado e listar de outro deixaria
+   o cartão dizendo 12 e a fila mostrando 7, sem ninguém entender qual está
+   certo.
+   ============================================================================ */
+
+var TelaDashboard = (function () {
+
+  var mesaEscolhida = '';
+  var filtrosEscolhidos = {};
+  var resumo = null;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+      + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
+  }
+
+  /**
+   * A variação em relação ao período anterior.
+   * Quando não há base de comparação, o espaço fica vazio — inventar "+100%"
+   * porque saiu de zero é ruído que a operação aprende a ignorar.
+   */
+  function variacao(cartao) {
+    if (cartao.variacao === null || cartao.variacao === undefined) {
+      // Espaço reservado para os cartões ficarem da mesma altura, mas em
+      // branco: repetir "sem base" em cada um vira ruído e parece erro.
+      return '<span class="variacao vazia" aria-hidden="true">—</span>';
+    }
+    var subiu = cartao.variacao >= 0;
+    return '<span class="variacao ' + (subiu ? 'subiu' : 'desceu') + '">'
+      + (subiu ? '▲' : '▼') + ' ' + Math.abs(cartao.variacao) + '%'
+      + '<em>vs. período anterior</em></span>';
+  }
+
+  /**
+   * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
+   * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
+   */
+  function desenharCartoes() {
+    return '<div class="cartoes">'
+      + resumo.cartoes.map(function (cartao) {
+        var filtravel = cartao.chave !== 'total' && cartao.chave !== 'naCelula'
+          && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
+        var ligado = filtravel
+          && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);
+
+        return '<' + (filtravel ? 'button type="button"' : 'div')
+          + ' class="indicador tom-' + escapar(cartao.tom || 'neutro')
+          + (filtravel ? ' clicavel' : '') + (ligado ? ' ligado' : '') + '"'
+          + (filtravel ? ' data-situacao="' + escapar(cartao.rotulo) + '"' : '')
+          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"'
+            : (filtravel ? ' title="Filtrar a fila por ' + escapar(cartao.rotulo) + '"' : ''))
+          + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
+          + '<strong class="numero">' + cartao.valor + '</strong>'
+          + variacao(cartao)
+          + '</' + (filtravel ? 'button' : 'div') + '>';
+      }).join('')
+      + '</div>';
+  }
+
+  function normalizarTexto(texto) {
+    return String(texto === null || texto === undefined ? '' : texto)
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  function desenharFiltros() {
+    if (!resumo.filtrosDisponiveis.length) return '';
+
+    var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
+      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      filtro.opcoes.forEach(function (opcao) {
+        var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
+          ? ' selected' : '';
+        opcoes.push('<option value="' + escapar(opcao.valor) + '"' + marcado + '>'
+          + escapar(opcao.rotulo) + '</option>');
+      });
+      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
+        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
+        + opcoes.join('') + '</select>';
+    });
+
+    var algumAtivo = Object.keys(filtrosEscolhidos).some(function (chave) {
+      return filtrosEscolhidos[chave];
+    });
+
+    return '<div class="filtros">' + caixas.join('')
+      + (algumAtivo
+        ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
+          + 'Limpar filtros</button>'
+        : '')
+      + '<span class="contagem">' + resumo.total + ' de ' + resumo.totalNoPeriodo
+      + ' casos · ' + escapar(resumo.periodo.rotulo) + '</span>'
+      + '</div>';
+  }
+
+  function desenharFila() {
+    if (!resumo.fila.length) {
+      return '<div class="cartao vazio">'
+        + '<strong>Nenhum caso para mostrar aqui.</strong>'
+        + '<p>' + (resumo.totalNoPeriodo
+          ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
+            + 'pelos filtros escolhidos.'
+          : 'Nada foi registrado nos ' + resumo.periodo.dias + ' dias mais recentes. '
+            + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
+    }
+
+    var cabecalho = resumo.colunas.map(function (grupo) {
+      return '<th>' + escapar(grupo.titulo) + '</th>';
+    }).join('') + '<th class="acoes-coluna">Ações</th>';
+
+    var linhas = resumo.fila.map(function (caso) {
+      var celulas = caso.celulas.map(function (grupo, i) {
+        return '<td>' + desenharGrupo(grupo, caso, i === 0) + '</td>';
+      }).join('');
+
+      return '<tr>' + celulas + '<td class="acoes-coluna">'
+        + acoesDaLinha(caso) + '</td></tr>';
+    }).join('');
+
+    return '<div class="cartao sem-forro">'
+      + '<div class="rolagem-tabela"><table class="fila agrupada">'
+      + '<thead><tr>' + cabecalho + '</tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div></div>';
+  }
+
+  /**
+   * Um grupo de colunas dentro de uma célula.
+   *
+   * A primeira linha do grupo é a que salta — é o que a pessoa procura ao
+   * varrer a fila: o protocolo, o nome do cliente. As de baixo vêm menores,
+   * porque são o que ela confere depois de já ter achado a linha.
+   */
+  function desenharGrupo(grupo, caso, ehOPrimeiro) {
+    return grupo.map(function (celula, i) {
+      if (celula.ehStatus) {
+        return '<span class="situacao tom-' + escapar(caso.tom || 'neutro') + '">'
+          + escapar(celula.valor || '—') + '</span>';
+      }
+      var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
+      return '<span class="' + classe + '" title="' + escapar(celula.cabecalho)
+        + '">' + escapar(celula.valor || '—') + '</span>';
+    }).join('');
+  }
+
+  /**
+   * As ações da linha: ver e editar, e só.
+   *
+   * Alterar situação e excluir moram no rodapé do modal. Quatro botões por
+   * linha, repetidos trinta vezes, tomavam a largura de uma coluna inteira de
+   * dado — e a coluna que sumia era "Responsável". Duas ações na linha, as
+   * outras a um clique, cabem e continuam à mão.
+   */
+  function acoesDaLinha(caso) {
+    var botoes = '<button type="button" class="acao" data-caso="'
+      + escapar(caso.id) + '">' + Moldura.icone('olho') + ' Ver detalhes</button>';
+
+    if (resumo.podeEditar) {
+      botoes += '<button type="button" class="acao-icone" data-editar="'
+        + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
+        + Moldura.icone('editar') + '</button>';
+    }
+    return botoes;
+  }
+
+  function desenharPainel() {
+    // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
+    // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
+    // na fila, dava a entender que os números em cima estavam completos.
+    elemento('painel').innerHTML =
+      Moldura.avisoDeJanela(resumo, 'Estes números e esta fila')
+      + desenharCartoes() + desenharFiltros() + desenharFila();
+    ligarPainel();
+  }
+
+  /* ---------------------------------------------------------- comportamento */
+
+  function carregar() {
+    var painel = elemento('painel');
+    if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
+
+    Servidor.chamar('resumoDaMesa', mesaEscolhida, filtrosEscolhidos)
+      .entao(function (resposta) {
+        resumo = resposta;
+        desenharPainel();
+      })
+      .senao(function (erro) {
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function ligarPainel() {
+    var caixas = document.querySelectorAll('.filtro');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
+        carregar();
+      });
+    }
+
+    var limpar = elemento('limpar-filtros');
+    if (limpar) {
+      limpar.addEventListener('click', function () {
+        filtrosEscolhidos = {};
+        carregar();
+      });
+    }
+
+    var cartoes = document.querySelectorAll('.indicador.clicavel');
+    for (var c = 0; c < cartoes.length; c++) {
+      cartoes[c].addEventListener('click', function () {
+        var situacao = this.getAttribute('data-situacao');
+        // Clicar de novo no mesmo cartão desliga o filtro.
+        filtrosEscolhidos.status =
+          (filtrosEscolhidos.status === situacao) ? '' : situacao;
+        carregar();
+      });
+    }
+
+    ligarCliques('[data-caso]', function (botao) {
+      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-caso'), carregar);
+    });
+    ligarCliques('[data-editar]', function (botao) {
+      CasoEmModal.abrir(mesaEscolhida, botao.getAttribute('data-editar'),
+        carregar, true);
+    });
+  }
+
+  function ligarCliques(seletor, oQueFazer) {
+    var botoes = document.querySelectorAll(seletor);
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () { oQueFazer(this); });
+    }
+  }
+
+  function ocultar(idDoCaso) {
+    // Some da tela de todo mundo, e por isso vale perguntar. O texto diz a
+    // verdade: a linha permanece na planilha. Prometer "não poderá ser
+    // desfeito" quando dá para desfazer assusta à toa.
+    if (!window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
+      + 'Ele sai do sistema para todo mundo. A linha permanece na planilha e '
+      + 'pode ser trazida de volta por um administrador.')) return;
+
+    Servidor.chamar('ocultarCaso', mesaEscolhida, idDoCaso)
+      .entao(carregar)
+      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+  }
+
+  function ligar(pacote) {
+    SeletorDeMesa.ligar(function (idDaMesa) {
+      mesaEscolhida = idDaMesa;
+      filtrosEscolhidos = {};
+      Aplicacao.remontar();
+    });
+    carregar();
+  }
+
+  return { montar: montar, ligar: ligar };
+})();
+</script>
+
+
+<!-- ==== CadastrarCaso.html ==== -->
+<script>
+/* ============================================================================
+   PGO — CadastrarCaso.html · a tela que grava
+   ============================================================================
+   A tela não sabe quais campos existem. Ela pergunta ao servidor, recebe a
+   definição e pede ao Formulario que desenhe. Campo criado em Configurações
+   aparece aqui sozinho; campo escondido para o nível nem chega a ser enviado.
+
+   Quem desenha, mascara e marca erro é o Formulario — o mesmo que o modal de
+   edição do Dashboard usa. Duas cópias do mesmo formulário divergiriam no
+   primeiro ajuste.
+   ============================================================================ */
+
+var TelaCadastrarCaso = (function () {
+
+  var mesaEscolhida = '';
+  var salvando = false;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+  function corpo() { return elemento('corpo-do-formulario'); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
+
+    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
+      + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
+      + '<div id="corpo-do-formulario"><p class="carregando-campos">'
+      + 'Montando o formulário…</p></div>'
+      + '<div class="acoes">'
+      + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
+      + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
+      + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
+      + '<span class="recado" id="recado-do-caso" hidden></span>'
+      + '</div></form>';
+  }
+
+  /* ----------------------------------------------------------- comportamento */
+
+  function carregarFormulario() {
+    corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
+
+    Servidor.chamar('formularioDaMesa', mesaEscolhida)
+      .entao(function (resposta) {
+        corpo().innerHTML = Formulario.desenhar(resposta, '');
+        Formulario.ligar(corpo(), '');
+        var primeiro = corpo().querySelector(
+          'input:not([disabled]), select:not([disabled])');
+        if (primeiro) primeiro.focus();
+      })
+      .senao(function (erro) {
+        corpo().innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  function recado(texto, tipo) {
+    var caixa = elemento('recado-do-caso');
+    caixa.className = 'recado ' + (tipo || '');
+    caixa.textContent = texto;
+    caixa.hidden = !texto;
+  }
+
+  function salvar() {
+    if (salvando) return;
+    salvando = true;
+    Formulario.limparErros(corpo());
+    recado('Gravando…', '');
+    elemento('salvar-caso').disabled = true;
+
+    Servidor.chamar('cadastrarCaso', mesaEscolhida, Formulario.valores(corpo()))
+      .entao(function (resposta) {
+        salvando = false;
+        elemento('salvar-caso').disabled = false;
+        recado('Caso ' + resposta.id + ' cadastrado em ' + resposta.mesa + '.', 'bom');
+        carregarFormulario();
+      })
+      .senao(function (erro) {
+        salvando = false;
+        elemento('salvar-caso').disabled = false;
+        recado(erro.message || String(erro), 'ruim');
+        if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
+      });
+  }
+
+  function ligar(pacote) {
+    SeletorDeMesa.ligar(function (idDaMesa) {
+      mesaEscolhida = idDaMesa;
+      Aplicacao.remontar();
+    });
+
+    elemento('formulario-do-caso').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      salvar();
+    });
+    elemento('limpar-caso').addEventListener('click', function () {
+      recado('', '');
+      carregarFormulario();
+    });
+    document.addEventListener('keydown', atalhoDeSalvar);
+
+    carregarFormulario();
+  }
+
+  function atalhoDeSalvar(evento) {
+    if ((evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
+      // Com o modal aberto, o Ctrl+Enter é dele — quem está na frente manda.
+      if (document.querySelector('.dialogo')) return;
+      if (elemento('formulario-do-caso')) {
+        evento.preventDefault();
+        salvar();
+      }
+    }
+  }
+
+  /** Chamado ao sair da tela, para o atalho não continuar valendo nas outras. */
+  function desligar() {
+    document.removeEventListener('keydown', atalhoDeSalvar);
+  }
+
+  return { montar: montar, ligar: ligar, desligar: desligar };
+})();
+</script>
+
+
 <!-- ==== MinhaPerformance.html ==== -->
 <script>
 /* ============================================================================
@@ -4308,6 +4227,274 @@ var TelaMinhaPerformance = (function () {
   function desligar() { Graficos.tirarDica(); }
 
   return { montar: montar, ligar: ligarTela, desligar: desligar };
+})();
+</script>
+
+
+<!-- ==== BuscarCaso.html ==== -->
+<script>
+/* ============================================================================
+   PGO — BuscarCaso.html · achar um caso que a fila não mostra mais
+   ============================================================================
+   O Dashboard mostra os últimos 30 dias, de propósito. Quando o cliente liga
+   citando um protocolo de abril, é aqui que se procura.
+
+   A tela é uma caixa de busca e nada mais até alguém procurar algo. Não
+   carrega lista, não pré-carrega base: abrir esta tela não custa nada, e é
+   por isso que dá para deixá-la aberta o dia inteiro.
+
+   O resultado vem separado POR ORIGEM — cada mesa, e a base legada — porque
+   um caso da Mesa Diamante e uma linha do sistema antigo não são a mesma
+   coisa e não devem aparecer misturados numa lista só.
+   ============================================================================ */
+
+var TelaBuscarCaso = (function () {
+
+  var opcoes = null;
+  var mesasEscolhidas = {};     // id → true
+  var incluirLegado = false;
+  var procurando = false;
+  var ultimoTermo = '';
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar() {
+    return '<div class="cartao busca-caixa">'
+      + '<form id="form-da-busca" novalidate>'
+      + '<div class="busca-linha">'
+      + '<input type="search" id="termo-da-busca" autocomplete="off"'
+      + ' placeholder="Protocolo, apólice, proposta, CPF ou nome"'
+      + ' aria-label="O que procurar">'
+      + '<button type="submit" class="botao" id="botao-buscar">'
+      + Moldura.icone('buscarCaso') + ' Buscar</button>'
+      + '</div>'
+      + '<div id="onde-procurar" class="busca-onde"></div>'
+      + '</form></div>'
+      + '<div id="resultado-da-busca"></div>';
+  }
+
+  function desenharOnde() {
+    var caixas = opcoes.mesas.map(function (mesa) {
+      return '<label class="config-chave">'
+        + '<input type="checkbox" data-mesa-da-busca="' + escapar(mesa.id) + '"'
+        + (mesasEscolhidas[mesa.id] ? ' checked' : '') + '>'
+        + '<span>' + escapar(mesa.nome)
+        + '<em>procura em: ' + escapar(mesa.procuraEm.join(', ') || 'nada declarado')
+        + '</em></span></label>';
+    });
+
+    if (opcoes.legado.ligado) {
+      caixas.push('<label class="config-chave">'
+        + '<input type="checkbox" id="incluir-legado"'
+        + (incluirLegado ? ' checked' : '') + '>'
+        + '<span>' + escapar(opcoes.legado.rotulo)
+        + '<em>a planilha do sistema anterior, em leitura</em></span></label>');
+    }
+
+    elemento('onde-procurar').innerHTML = '<span class="busca-rotulo">'
+      + 'Onde procurar</span>' + caixas.join('')
+      + (opcoes.legado.ligado ? ''
+        : '<span class="busca-dica">Não há base legada apontada. '
+          + 'Um administrador aponta em Configurações → Estrutura.</span>');
+
+    ligarOnde();
+  }
+
+  function ligarOnde() {
+    var caixas = document.querySelectorAll('[data-mesa-da-busca]');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        mesasEscolhidas[this.getAttribute('data-mesa-da-busca')] = this.checked;
+      });
+    }
+    var legado = elemento('incluir-legado');
+    if (legado) {
+      legado.addEventListener('change', function () { incluirLegado = this.checked; });
+    }
+  }
+
+  /* -------------------------------------------------------------- procurar */
+
+  function procurar() {
+    if (procurando) return;
+    var termo = elemento('termo-da-busca').value.trim();
+    ultimoTermo = termo;
+
+    var onde = [];
+    Object.keys(mesasEscolhidas).forEach(function (id) {
+      if (mesasEscolhidas[id]) onde.push(id);
+    });
+
+    procurando = true;
+    elemento('botao-buscar').disabled = true;
+    elemento('resultado-da-busca').innerHTML =
+      '<p class="carregando-campos">Procurando…</p>';
+
+    Servidor.chamar('buscarCasos', termo, onde, incluirLegado)
+      .entao(function (resposta) {
+        procurando = false;
+        elemento('botao-buscar').disabled = false;
+        desenharResultado(resposta);
+      })
+      .senao(function (erro) {
+        procurando = false;
+        elemento('botao-buscar').disabled = false;
+        elemento('resultado-da-busca').innerHTML =
+          '<div class="cartao vazio"><strong>'
+          + escapar(erro.message || String(erro)) + '</strong></div>';
+      });
+  }
+
+  function desenharResultado(resposta) {
+    if (!resposta.total) {
+      elemento('resultado-da-busca').innerHTML = '<div class="cartao vazio">'
+        + '<strong>Nada encontrado para "' + escapar(resposta.termo) + '".</strong>'
+        + '<p>Procurei em: ' + escapar(resposta.origens.map(function (origem) {
+          return origem.nome;
+        }).join(', ')) + '. A comparação ignora pontos e traços, então '
+        + '<code>123.456.789-01</code> e <code>12345678901</code> acham a mesma '
+        + 'coisa. Se o caso é antigo e não está aqui, ele pode estar na base '
+        + 'legada — marque-a acima.</p>'
+        + avisosDe(resposta.origens) + '</div>';
+      return;
+    }
+
+    elemento('resultado-da-busca').innerHTML =
+      '<p class="busca-contagem">' + resposta.total + ' caso(s) para "'
+      + escapar(resposta.termo) + '"</p>'
+      + resposta.origens.map(desenharOrigem).join('');
+    ligarResultado();
+  }
+
+  function avisosDe(origens) {
+    return origens.filter(function (origem) { return origem.aviso; })
+      .map(function (origem) {
+        return '<p class="aviso-fila">' + escapar(origem.nome) + ': '
+          + escapar(origem.aviso) + '</p>';
+      }).join('');
+  }
+
+  function desenharOrigem(origem) {
+    var cabeca = '<header class="origem-cabeca">'
+      + (origem.icone ? SeletorDeMesa.icone(origem.icone) : '')
+      + '<h3>' + escapar(origem.nome) + '</h3>'
+      + '<span class="quantos">' + origem.casos.length + '</span>'
+      + (origem.somenteLeitura
+        ? '<span class="etiqueta-leitura">só leitura</span>' : '')
+      + '</header>';
+
+    if (!origem.casos.length) {
+      return '<section class="cartao origem vazia">' + cabeca
+        + '<p>' + (origem.aviso
+          ? escapar(origem.aviso)
+          : 'Nada encontrado aqui.') + '</p></section>';
+    }
+
+    return '<section class="cartao sem-forro origem">' + cabeca
+      + (origem.aviso
+        ? '<p class="aviso-fila">' + escapar(origem.aviso) + '</p>' : '')
+      + (origem.tipo === 'legado'
+        ? tabelaDoLegado(origem) : tabelaDaMesa(origem))
+      + '</section>';
+  }
+
+  function tabelaDaMesa(origem) {
+    var cabecalho = origem.colunas.map(function (grupo) {
+      return '<th>' + escapar(grupo.titulo) + '</th>';
+    }).join('') + '<th class="acoes-coluna">Ações</th>';
+
+    var linhas = origem.casos.map(function (caso) {
+      var celulas = caso.celulas.map(function (grupo, i) {
+        return '<td>' + grupo.map(function (celula, j) {
+          if (celula.ehStatus) {
+            return '<span class="situacao tom-' + escapar(caso.tom || 'neutro')
+              + '">' + escapar(celula.valor || '—') + '</span>';
+          }
+          var classe = (j === 0 && i !== 0) ? 'principal' : 'apoio';
+          return '<span class="' + classe + '">'
+            + escapar(celula.valor || '—') + '</span>';
+        }).join('') + '</td>';
+      }).join('');
+
+      return '<tr>' + celulas + '<td class="acoes-coluna">'
+        + '<button type="button" class="acao" data-achado="'
+        + escapar(caso.id) + '" data-mesa="' + escapar(origem.id) + '">'
+        + Moldura.icone('olho') + ' Ver detalhes</button></td></tr>';
+    }).join('');
+
+    return '<div class="rolagem-tabela"><table class="fila agrupada">'
+      + '<thead><tr>' + cabecalho + '</tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div>';
+  }
+
+  /**
+   * A tabela do legado é outra coisa: não temos contrato sobre aquela
+   * planilha, então mostramos as colunas que ela tiver, com os nomes que ela
+   * usa. E sem botão de abrir — uma linha de histórico não é um caso do
+   * sistema, e prometer edição ali seria mentira.
+   */
+  function tabelaDoLegado(origem) {
+    var cabecalho = origem.cabecalhos.map(function (nome) {
+      return '<th>' + escapar(nome) + '</th>';
+    }).join('');
+
+    var linhas = origem.casos.map(function (caso) {
+      return '<tr>' + caso.celulas[0].map(function (celula) {
+        return '<td>' + escapar(celula.valor || '—') + '</td>';
+      }).join('') + '</tr>';
+    }).join('');
+
+    return '<p class="aviso-fila">Estas linhas vêm da planilha do sistema '
+      + 'anterior, como ela está. Elas não abrem nem se editam por aqui.</p>'
+      + '<div class="rolagem-tabela"><table class="fila legado">'
+      + '<thead><tr>' + cabecalho + '</tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div>';
+  }
+
+  function ligarResultado() {
+    var botoes = document.querySelectorAll('[data-achado]');
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () {
+        var mesa = this.getAttribute('data-mesa');
+        var caso = this.getAttribute('data-achado');
+        // O mesmo modal do Dashboard: quem acha um caso aqui quer as mesmas
+        // ações que teria lá, e aprender duas telas para o mesmo caso é uma
+        // a mais do que o necessário.
+        CasoEmModal.abrir(mesa, caso, function () {
+          if (ultimoTermo) procurar();
+        });
+      });
+    }
+  }
+
+  /* ---------------------------------------------------------------- ligar */
+
+  function ligar() {
+    elemento('form-da-busca').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      procurar();
+    });
+
+    Servidor.chamar('opcoesDaBusca')
+      .entao(function (resposta) {
+        opcoes = resposta;
+        // Todas as mesas marcadas por padrão: quem procura um protocolo
+        // raramente sabe de antemão em qual mesa ele está.
+        opcoes.mesas.forEach(function (mesa) { mesasEscolhidas[mesa.id] = true; });
+        desenharOnde();
+        elemento('termo-da-busca').focus();
+      })
+      .senao(function (erro) {
+        elemento('onde-procurar').innerHTML =
+          '<span class="busca-dica erro-carga">'
+          + escapar(erro.message || String(erro)) + '</span>';
+      });
+  }
+
+  return { montar: montar, ligar: ligar };
 })();
 </script>
 
@@ -5436,134 +5623,6 @@ var TelaPainelAnalitico = (function () {
   }
 
   function desligar() { Graficos.tirarDica(); }
-
-  return { montar: montar, ligar: ligar, desligar: desligar };
-})();
-</script>
-
-
-<!-- ==== CadastrarCaso.html ==== -->
-<script>
-/* ============================================================================
-   PGO — CadastrarCaso.html · a tela que grava
-   ============================================================================
-   A tela não sabe quais campos existem. Ela pergunta ao servidor, recebe a
-   definição e pede ao Formulario que desenhe. Campo criado em Configurações
-   aparece aqui sozinho; campo escondido para o nível nem chega a ser enviado.
-
-   Quem desenha, mascara e marca erro é o Formulario — o mesmo que o modal de
-   edição do Dashboard usa. Duas cópias do mesmo formulário divergiriam no
-   primeiro ajuste.
-   ============================================================================ */
-
-var TelaCadastrarCaso = (function () {
-
-  var mesaEscolhida = '';
-  var salvando = false;
-
-  function escapar(texto) { return Moldura.escapar(texto); }
-  function elemento(id) { return document.getElementById(id); }
-  function corpo() { return elemento('corpo-do-formulario'); }
-
-  /* --------------------------------------------------------------- montar */
-
-  function montar(pacote) {
-    if (!mesaEscolhida && pacote.mesas.length) mesaEscolhida = pacote.mesas[0].id;
-
-    return SeletorDeMesa.montar(pacote.mesas, mesaEscolhida)
-      + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
-      + '<div id="corpo-do-formulario"><p class="carregando-campos">'
-      + 'Montando o formulário…</p></div>'
-      + '<div class="acoes">'
-      + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
-      + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
-      + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
-      + '<span class="recado" id="recado-do-caso" hidden></span>'
-      + '</div></form>';
-  }
-
-  /* ----------------------------------------------------------- comportamento */
-
-  function carregarFormulario() {
-    corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
-
-    Servidor.chamar('formularioDaMesa', mesaEscolhida)
-      .entao(function (resposta) {
-        corpo().innerHTML = Formulario.desenhar(resposta, '');
-        Formulario.ligar(corpo(), '');
-        var primeiro = corpo().querySelector(
-          'input:not([disabled]), select:not([disabled])');
-        if (primeiro) primeiro.focus();
-      })
-      .senao(function (erro) {
-        corpo().innerHTML = '<p class="carregando-campos erro-carga">'
-          + escapar(erro.message || String(erro)) + '</p>';
-      });
-  }
-
-  function recado(texto, tipo) {
-    var caixa = elemento('recado-do-caso');
-    caixa.className = 'recado ' + (tipo || '');
-    caixa.textContent = texto;
-    caixa.hidden = !texto;
-  }
-
-  function salvar() {
-    if (salvando) return;
-    salvando = true;
-    Formulario.limparErros(corpo());
-    recado('Gravando…', '');
-    elemento('salvar-caso').disabled = true;
-
-    Servidor.chamar('cadastrarCaso', mesaEscolhida, Formulario.valores(corpo()))
-      .entao(function (resposta) {
-        salvando = false;
-        elemento('salvar-caso').disabled = false;
-        recado('Caso ' + resposta.id + ' cadastrado em ' + resposta.mesa + '.', 'bom');
-        carregarFormulario();
-      })
-      .senao(function (erro) {
-        salvando = false;
-        elemento('salvar-caso').disabled = false;
-        recado(erro.message || String(erro), 'ruim');
-        if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
-      });
-  }
-
-  function ligar(pacote) {
-    SeletorDeMesa.ligar(function (idDaMesa) {
-      mesaEscolhida = idDaMesa;
-      Aplicacao.remontar();
-    });
-
-    elemento('formulario-do-caso').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      salvar();
-    });
-    elemento('limpar-caso').addEventListener('click', function () {
-      recado('', '');
-      carregarFormulario();
-    });
-    document.addEventListener('keydown', atalhoDeSalvar);
-
-    carregarFormulario();
-  }
-
-  function atalhoDeSalvar(evento) {
-    if ((evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
-      // Com o modal aberto, o Ctrl+Enter é dele — quem está na frente manda.
-      if (document.querySelector('.dialogo')) return;
-      if (elemento('formulario-do-caso')) {
-        evento.preventDefault();
-        salvar();
-      }
-    }
-  }
-
-  /** Chamado ao sair da tela, para o atalho não continuar valendo nas outras. */
-  function desligar() {
-    document.removeEventListener('keydown', atalhoDeSalvar);
-  }
 
   return { montar: montar, ligar: ligar, desligar: desligar };
 })();
@@ -7397,7 +7456,7 @@ var TelaConfiguracoes = (function () {
    */
   /**
    * Pede a senha e roda a ação. O diálogo em si mora em
-   * SenhaDeAdministrador.html — é o mesmo que a Importação usa.
+   * Comuns.html — é o mesmo que a Importação usa.
    */
   function comSenhaDeAdministrador(acao) {
     SenhaDeAdministrador.pedir(acao, !resumo.senhaDefinida);
@@ -7550,6 +7609,7 @@ var TelaConfiguracoes = (function () {
   return { montar: montar, ligar: ligar, desligar: desligar };
 })();
 </script>
+
 
 
 <!-- ==== Aplicacao.html ==== -->

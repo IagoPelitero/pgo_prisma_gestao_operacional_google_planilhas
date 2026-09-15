@@ -18,7 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca } =
   require('./ferramentas');
 
 function rodarTestesDoAnalitico() {
@@ -349,7 +349,7 @@ function rodarTestesDoAnalitico() {
     // externa é mais um ponto que pode não carregar, e gráfico que não
     // carrega é pior que gráfico nenhum — deixa um buraco na tela.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    const desenho = fs.readFileSync(path.join(pasta, 'Graficos.html'), 'utf8');
+    const desenho = lerPeca('Graficos');
     const tela = fs.readFileSync(path.join(pasta, 'PainelAnalitico.html'), 'utf8');
 
     [desenho, tela].forEach((fonte) => {
@@ -378,8 +378,7 @@ function rodarTestesDoAnalitico() {
     // Três dos seis tons da paleta ficam abaixo de 3:1 de contraste com o
     // fundo claro. A regra que compensa isso é esta: o número sempre visível,
     // e uma leitura sem cor nenhuma a um clique de distância.
-    const desenho = fs.readFileSync(path.join(__dirname, '..', '..',
-      'Front-End', 'Graficos.html'), 'utf8');
+    const desenho = lerPeca('Graficos');
     contem(desenho, 'valor-da-barra', 'a barra em pé mostra o número');
     contem(desenho, 'valor-deitado', 'a deitada também');
     contem(desenho, 'class="valor"', 'e a legenda da pizza');

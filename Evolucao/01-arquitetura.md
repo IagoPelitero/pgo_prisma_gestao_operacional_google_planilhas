@@ -300,34 +300,67 @@ prontos para tabela dinâmica ou Power BI.
 
 ### 4.1 Camadas
 
+Os arquivos são **agrupados por assunto**, e cada um responde a uma pergunta.
+São 19 no total: 7 do servidor, 12 de tela. O agrupamento é o que decide onde
+mexer — se você não sabe em qual arquivo está o que procura, é porque o
+agrupamento está errado, não porque você não conhece o sistema.
+
 ```
 NAVEGADOR (uma página só, servida por HtmlService)
-  Index.html ......... casca, roteador, injeção dos parciais
-  Moldura.html ....... menu lateral + barra superior (todas as telas)
-  Tema.html .......... 4 paletas em CSS custom properties
-  Telas .............. Dashboard · CadastrarCaso · MinhaPerformance
-                       BuscarCaso · TabelaCorretoras · PainelAnalitico
-                       Configuracoes · SemAcesso
+
+  Index.html ......... o esqueleto; manda incluir todos os outros
+  Estilos.html ....... toda a aparência e as 4 paletas, em CSS custom properties
+  Comuns.html ........ as peças que MAIS DE UMA tela usa:
+                         Moldura ............. menu lateral e barra superior
+                         SenhaDeAdministrador  o diálogo das ações sem desfazer
+                         SeletorDeMesa ....... RET Vida ou Mesa Diamante
+                         Formulario .......... o formulário montado por CAMPOS
+                         CasoEmModal ......... o caso aberto por cima da fila
+                         Graficos ............ os desenhos em SVG
+  Aplicacao.html ..... a ponte com o servidor e o roteador entre telas
+
+  Uma por item do menu (7):
+    Dashboard · CadastrarCaso · MinhaPerformance · BuscarCaso
+    TabelaCorretoras · PainelAnalitico · Configuracoes
+
+  SemAcesso.html ..... servida sozinha, a quem não está cadastrado
         │
         │  google.script.run  (assíncrono, sem transação)
         ▼
 APPS SCRIPT
-  Main.gs ............ doGet, include, bootstrap
-  Auth.gs ............ identidade e cadastro do usuário
-  Acesso.gs .......... cargos, níveis, permissões, senha de ADM
-  Planilha.gs ........ ►► vínculo por cabeçalho, leitura em bloco,
-                          gravação com formato texto  ◄◄
-  Sequencia.gs ....... ID decimal de 10 casas + LockService
-  Mesas.gs ........... registro das mesas
-  Campos.gs .......... catálogo de campos, tipos, máscaras, validação
-  Casos.gs ........... criar, editar, ocultar caso
-  Busca.gs ........... busca na base própria e em planilha legada
-  Indicadores.gs ..... agregações (Dashboard, Painel, Performance)
-  Paineis.gs ......... a disposição dos componentes de cada tela
-  Analise.gs ......... gerador das abas ANALISE_*
-  Importacao.gs ...... colar / conferir / aplicar listas em lote
-  Auditoria.gs ....... trilha
-  Diagnostico.gs ..... verificação de build e de contrato
+
+  Base.gs ......... ►► COMO O SISTEMA FALA COM A PLANILHA ◄◄
+                       o contrato das abas e o tipo de cada coluna
+                       o Id decimal de 10 casas, com LockService
+                       a porta única: vínculo por cabeçalho, leitura em
+                       bloco, formato texto antes de gravar
+
+  Entrada.gs ...... QUEM ENTRA E O QUE PODE
+                       doGet e o pacote de partida
+                       níveis, escopo, senha de administrador, auditoria
+                       o cadastro de quem pode entrar
+
+  Casos.gs ........ O CASO, DO FORMULÁRIO À BUSCA
+                       o motor do formulário (a aba CAMPOS)
+                       criar, editar, trocar situação, ocultar
+                       busca na base própria e em planilha legada
+
+  Indicadores.gs .. OS NÚMEROS
+                       os cartões do dia e a fila (Dashboard)
+                       os gráficos da operação (Painel Analítico)
+                       a tela em que o analista se vê (Performance)
+
+  Cadastros.gs .... QUEM TRAZ O CASO PARA DENTRO
+                       corretoras, produtos, SUSEPs bloqueadas
+                       colar / conferir / aplicar listas em lote
+
+  Config.gs ....... O QUE SE AJUSTA SEM PROGRAMADOR
+                       as nove seções da tela de Configurações
+                       o gerador das abas ANALISE_*
+
+  Instalacao.gs ... CRIAR E CONFERIR A INSTALAÇÃO
+                       instalarRECC() — a única rotina que cria estrutura
+                       diagnosticoRECC() — o laudo desta instalação
 
   ATENÇÃO AOS NOMES: no Apps Script não existe pasta. Todos os arquivos ficam
   num projeto só, e o nome é único INDEPENDENTE da extensão — por isso o
@@ -338,9 +371,15 @@ APPS SCRIPT
 GOOGLE PLANILHAS  (13 abas + ANALISE_*)
 ```
 
-**`Planilha.gs` é o coração.** Nenhum outro arquivo chama `SpreadsheetApp`
+**`Base.gs` é o coração.** Nenhum outro arquivo chama `SpreadsheetApp`
 diretamente. Toda leitura e gravação passa por ele — é o que garante, num lugar
 só, o vínculo por cabeçalho e o formato texto antes da gravação.
+
+**Por que `Indicadores.gs` junta três telas.** Dashboard, Painel Analítico e
+Minha Performance contam os MESMOS casos e respondem perguntas diferentes.
+Separá-los convida ao erro de mudar a regra de contagem num e esquecer dos
+outros dois — e aí o cartão diz 12, o gráfico diz 9, e ninguém sabe qual está
+certo. Juntos, a regra é uma só porque está à vista.
 
 ### 4.2 O que acontece ao abrir o sistema
 
@@ -477,16 +516,16 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 
 | # | Etapa | Entrega | Estado |
 |---|---|---|---|
-| 1 | Fundação | `Esquema.gs`, `Planilha.gs`, `Sequencia.gs`, `Instalador.gs`, as 13 abas, Id de 10 casas, formato texto | **pronta** |
+| 1 | Fundação | `Base.gs` e `Instalacao.gs`, as 13 abas, Id de 10 casas, formato texto | **pronta** |
 | 2 | Acesso | Login pelo e-mail, `USUARIOS`, cargos, níveis, tela de não cadastrado | **pronta** |
 | 3 | Casca | Menu lateral, barra superior, 4 temas, roteador | **pronta** |
-| 4 | Cadastrar Caso | Formulário dirigido por `CAMPOS`, máscaras, validação, selo de SUSEP | |
-| 5 | Dashboard | Seletor de mesa, cards, fila de trabalho com filtros | |
-| 6 | Configurações | Campos, catálogo, usuários, níveis, senha de ADM, reconciliação de colunas | |
-| 7 | Buscar Caso | Base própria + planilha legada | |
-| 8 | Painel Analítico | Componentes configuráveis, exportação | |
-| 9 | Minha Performance | Indicadores individuais, meta, ranking | |
-| 10 | Tabela de Corretoras | `CANAIS` + segmento + SUSEP bloqueada | |
+| 4 | Cadastrar Caso | Formulário dirigido por `CAMPOS`, máscaras, validação, selo de SUSEP | **pronta** |
+| 5 | Dashboard | Seletor de mesa, cards, fila de trabalho com filtros | **pronta** |
+| 6 | Configurações | Campos, catálogo, usuários, níveis, senha de ADM, reconciliação de colunas | **pronta** |
+| 7 | Buscar Caso | Base própria + planilha legada | **pronta** |
+| 8 | Painel Analítico | Componentes configuráveis, exportação | **pronta** |
+| 9 | Minha Performance | Indicadores individuais, meta, ranking | **pronta** |
+| 10 | Tabela de Corretoras | `CANAIS` + segmento + SUSEP bloqueada | **pronta** |
 | 11 | Abas de análise | Gerador `ANALISE_*` | **pronta** |
 | 12 | Diagnóstico | Verificação de build e de contrato | **pronta** |
 

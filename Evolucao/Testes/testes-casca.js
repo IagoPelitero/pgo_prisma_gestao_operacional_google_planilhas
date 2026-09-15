@@ -14,14 +14,21 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, lerPeca } =
   require('./ferramentas');
 const { gerar } = require('./gerar-previa');
 
 const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
 
+/**
+ * O texto de uma tela ou de uma peça, pelo nome do arquivo ou da peça.
+ *
+ * Passa o serviço para lerPeca, das ferramentas: as peças que mais de uma
+ * tela usa moram todas no Comuns.html, e nenhum teste daqui precisa saber
+ * disso. Aceita 'Moldura' e 'Moldura.html' — os dois.
+ */
 function lerTela(nome) {
-  return fs.readFileSync(path.join(PASTA_DAS_TELAS, nome), 'utf8');
+  return lerPeca(nome.replace(/\.html$/, ''));
 }
 
 /**
@@ -31,9 +38,12 @@ function lerTela(nome) {
  * o que ela devolve prova o que o usuário vai ver.
  */
 function carregarScriptDaTela(nome) {
-  const fonte = lerTela(nome)
-    .replace(/^<script>/, '')
-    .replace(/<\/script>\s*$/, '');
+  // Pega do primeiro <script> ao último </script>: quando a peça vem de
+  // dentro do Comuns.html, ela chega com o banner de comentário em volta.
+  const bruto = lerTela(nome);
+  const fonte = bruto.substring(
+    bruto.indexOf('<script>') + '<script>'.length,
+    bruto.lastIndexOf('</script>'));
   const contexto = vm.createContext({ console });
   vm.runInContext(fonte, contexto, { filename: nome });
   return contexto;
@@ -81,7 +91,7 @@ function rodarTestesDaCasca() {
   });
 
   teste('cada item do menu tem o seu próprio desenho', () => {
-    const { Moldura } = carregarScriptDaTela('Moldura.html');
+    const { Moldura } = carregarScriptDaTela('Moldura');
     const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'dashboard');
 
     // Só os desenhos dos ITENS: o botão de encolher também tem um svg, e ele
@@ -160,7 +170,8 @@ function rodarTestesDaCasca() {
       'conferir-responsividade.js'), 'utf8');
     contem(conferencia, '320');
     contem(conferencia, 'overflowX', 'ela ignora o que rola de propósito');
-    contem(lerTela('../README.md'), 'conferir-responsividade',
+    contem(fs.readFileSync(path.join(__dirname, '..', '..', 'README.md'), 'utf8'),
+      'conferir-responsividade',
       'e o README diz como rodar');
   });
 
@@ -241,7 +252,7 @@ function rodarTestesDaCasca() {
   });
 
   teste('a marca do menu usa a logo quando ela existe', () => {
-    const moldura = lerTela('Moldura.html');
+    const moldura = lerTela('Moldura');
     contem(moldura, 'if (identidade.logo)', 'a logo de CONFIG tem prioridade');
     contem(moldura, 'class="escrito"', 'sem logo, o nome faz as vezes dela');
   });
@@ -301,7 +312,7 @@ function rodarTestesDaCasca() {
   secao('A barra superior e o menu');
 
   teste('a barra superior traz as peças na ordem pedida', () => {
-    const { Moldura } = carregarScriptDaTela('Moldura.html');
+    const { Moldura } = carregarScriptDaTela('Moldura');
     const barra = Moldura.montarSuperior(chamar('pacoteDePartida()'));
 
     const ordem = [
@@ -322,7 +333,7 @@ function rodarTestesDaCasca() {
   });
 
   teste('a barra mostra a identidade do sistema, não o nome da tela', () => {
-    const { Moldura } = carregarScriptDaTela('Moldura.html');
+    const { Moldura } = carregarScriptDaTela('Moldura');
     const barra = Moldura.montarSuperior(chamar('pacoteDePartida()'));
     contem(barra, 'RECC — Relacionamento Estratégico de Clientes e Corretores');
     contem(barra, 'Porto Seguro', 'a operação vem embaixo');
@@ -337,7 +348,7 @@ function rodarTestesDaCasca() {
   });
 
   teste('a pessoa aparece com nome e cargo, e o canal quando existe', () => {
-    const { Moldura } = carregarScriptDaTela('Moldura.html');
+    const { Moldura } = carregarScriptDaTela('Moldura');
     const pacote = chamar('pacoteDePartida()');
     pacote.usuario.nome = 'Ana Martins';
     pacote.usuario.cargo = 'Analista RET';
@@ -350,7 +361,7 @@ function rodarTestesDaCasca() {
   });
 
   teste('o menu traz o rodapé da plataforma, que vem de CONFIG', () => {
-    const { Moldura } = carregarScriptDaTela('Moldura.html');
+    const { Moldura } = carregarScriptDaTela('Moldura');
     const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'dashboard');
     contem(lateral, 'PGO — Prisma Gestão Operacional');
     contem(lateral, 'by Pelitero labs');

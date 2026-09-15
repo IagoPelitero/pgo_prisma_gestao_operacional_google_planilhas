@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula, lerPeca, scriptDaPeca } =
   require('./ferramentas');
 
 function rodarTestesDeCadastro() {
@@ -113,9 +113,7 @@ function rodarTestesDeCadastro() {
   });
 
   teste('cada mesa aparece com o seu desenho, vindo da aba MESAS', () => {
-    const fonte = fs.readFileSync(
-      path.join(__dirname, '..', '..', 'Front-End', 'SeletorDeMesa.html'), 'utf8')
-      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    const fonte = scriptDaPeca('SeletorDeMesa');
     const contexto = vm.createContext({
       Moldura: { escapar: (t) => String(t) }, document: {}, console });
     vm.runInContext(fonte, contexto);
@@ -333,9 +331,7 @@ function rodarTestesDeCadastro() {
   secao('A máscara, do lado da tela');
 
   teste('a máscara desenha enquanto se digita, e só com dígitos', () => {
-    const fonte = fs.readFileSync(
-      path.join(__dirname, '..', '..', 'Front-End', 'Formulario.html'), 'utf8')
-      .replace(/^<script>/, '').replace(/<\/script>\s*$/, '');
+    const fonte = scriptDaPeca('Formulario');
     const contexto = vm.createContext({ document: { getElementById: () => null },
       Moldura: { escapar: (t) => String(t) }, Servidor: {}, console });
     vm.runInContext(fonte, contexto);
@@ -354,8 +350,7 @@ function rodarTestesDeCadastro() {
       path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
     contem(fonte, "Servidor.chamar('formularioDaMesa'", 'o formulário vem do servidor');
     contem(fonte, "Servidor.chamar('cadastrarCaso'", 'quem grava é o servidor');
-    contem(fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End',
-      'Formulario.html'), 'utf8'),
+    contem(lerPeca('Formulario'),
       "Servidor.chamar('consultarSusep'", 'o selo consulta o servidor');
   });
 
@@ -364,7 +359,7 @@ function rodarTestesDeCadastro() {
     // formulário. Duas cópias divergiriam no primeiro ajuste de máscara.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
     const cadastro = fs.readFileSync(path.join(pasta, 'CadastrarCaso.html'), 'utf8');
-    const modal = fs.readFileSync(path.join(pasta, 'CasoEmModal.html'), 'utf8');
+    const modal = lerPeca('CasoEmModal');
 
     [cadastro, modal].forEach((fonte) => {
       contem(fonte, 'Formulario.desenhar(');

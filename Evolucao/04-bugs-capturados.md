@@ -12,6 +12,14 @@ grava dado errado sem reclamar é pior do que um que para. Documentar o sintoma
 produção e o RECC nasceu já protegido contra eles. Os demais foram encontrados
 durante a construção, pela suíte ou olhando a tela.
 
+**Sobre os nomes de arquivo daqui:** eles são os da época. Em 2026-09-15 os 35
+arquivos foram agrupados em 19 — `Planilha.gs` virou uma seção do `Base.gs`,
+`Moldura.html` uma peça do `Comuns.html`, e assim por diante. Esta lista não
+foi reescrita de propósito: ela conta o que aconteceu, e trocar os nomes faria
+o registro mentir sobre onde o defeito morava. O mapa de hoje está no
+[01-arquitetura.md](01-arquitetura.md); o banner de cada seção diz de qual
+arquivo ela veio.
+
 ---
 
 ## Herdados do PGO 5.x

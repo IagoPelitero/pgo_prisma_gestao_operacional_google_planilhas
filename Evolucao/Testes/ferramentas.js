@@ -12,6 +12,57 @@ const vm = require('vm');
 const { criarAmbienteFalso } = require('./simulador');
 
 const PASTA_DO_SERVIDOR = path.join(__dirname, '..', '..', 'Back-End');
+const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
+
+/**
+ * O texto de UMA peça de tela, ache ela onde estiver.
+ *
+ * As peças que mais de uma tela usa moram juntas no Comuns.html, cada uma
+ * atrás de um banner "PEÇA n de m · Nome". Um teste que quer conferir só a
+ * Moldura não deveria precisar saber disso: se amanhã as peças se separarem
+ * de novo, ou mudarem de vizinho, o teste continua valendo.
+ *
+ * Então: se existir um arquivo com o nome da peça, é ele. Se não, procura o
+ * banner dela dentro dos outros arquivos e devolve só o trecho dela, até o
+ * banner seguinte.
+ */
+function lerPeca(nome) {
+  const proprio = path.join(PASTA_DAS_TELAS, nome + '.html');
+  if (fs.existsSync(proprio)) return fs.readFileSync(proprio, 'utf8');
+
+  const marca = 'PEÇA ';
+  const arquivos = fs.readdirSync(PASTA_DAS_TELAS).filter((n) => n.endsWith('.html'));
+  for (const arquivo of arquivos) {
+    const texto = fs.readFileSync(path.join(PASTA_DAS_TELAS, arquivo), 'utf8');
+    const pedacos = texto.split(marca);
+    for (let i = 1; i < pedacos.length; i += 1) {
+      // O banner é "PEÇA 1 de 6 · Moldura\n" — o nome vem depois do ponto.
+      const primeiraLinha = pedacos[i].split('\n')[0];
+      const partes = primeiraLinha.split('· ');
+      if (partes.length < 2 || partes[1].trim() !== nome) continue;
+      return pedacos[i];
+    }
+  }
+  throw new Error('não achei a peça "' + nome + '" em Front-End/ — '
+    + 'nem como arquivo próprio, nem como trecho de outro');
+}
+
+/**
+ * Só o JavaScript de uma peça, pronto para rodar numa vm.
+ *
+ * Recorta do primeiro <script> ao último </script>. Tem de ser assim, e não
+ * um replace no começo e no fim do texto: quando a peça vem de dentro de um
+ * arquivo com outras, ela chega com o banner de comentário em volta.
+ */
+function scriptDaPeca(nome) {
+  const bruto = lerPeca(nome);
+  const abre = bruto.indexOf('<script>');
+  const fecha = bruto.lastIndexOf('</script>');
+  if (abre < 0 || fecha < 0) {
+    throw new Error('a peça "' + nome + '" não tem um bloco <script>');
+  }
+  return bruto.substring(abre + '<script>'.length, fecha);
+}
 
 /**
  * Carrega os arquivos .gs num ambiente falso, na MESMA ordem em que o Apps
@@ -130,5 +181,5 @@ function resumo() {
 
 module.exports = {
   carregar, secao, teste, igual, verdadeiro, contem, lanca, ehData,
-  celula, formatoDaCelula, comoUsuario, resumo
+  celula, formatoDaCelula, comoUsuario, resumo, lerPeca, scriptDaPeca
 };

@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, scriptDaPeca } =
   require('./ferramentas');
 
 const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
@@ -29,10 +29,8 @@ function lerTela(nome) {
 function carregarTelas(nomes) {
   const contexto = vm.createContext({ console });
   nomes.forEach((nome) => {
-    const fonte = lerTela(nome)
-      .replace(/^<script>/, '')
-      .replace(/<\/script>\s*$/, '');
-    vm.runInContext(fonte, contexto, { filename: nome });
+    const curto = nome.replace(/\.html$/, '');
+    vm.runInContext(scriptDaPeca(curto), contexto, { filename: curto });
   });
   return contexto;
 }
@@ -509,7 +507,7 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('a tela monta as três colunas e escolhe a primeira mesa sozinha', () => {
-    const { TelaConfiguracoes } = carregarTelas(['Moldura.html', 'Configuracoes.html']);
+    const { TelaConfiguracoes } = carregarTelas(['Moldura', 'Configuracoes']);
     const casca = TelaConfiguracoes.montar(chamar('pacoteDePartida()'));
     contem(casca, 'id="config"');
     contem(casca, 'Abrindo as configurações',

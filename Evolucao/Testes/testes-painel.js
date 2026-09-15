@@ -8,8 +8,7 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
-  ehData } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, ehData, lerPeca } =
   require('./ferramentas');
 
 function rodarTestesDoPainel() {
@@ -271,7 +270,7 @@ function rodarTestesDoPainel() {
     const path = require('path');
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
     const dashboard = fs.readFileSync(path.join(pasta, 'Dashboard.html'), 'utf8');
-    const modal = fs.readFileSync(path.join(pasta, 'CasoEmModal.html'), 'utf8');
+    const modal = lerPeca('CasoEmModal');
 
     contem(dashboard, 'CasoEmModal.abrir(', 'ver detalhes abre o modal');
     contem(dashboard, 'data-editar', 'e o lápis abre o mesmo modal, já em edição');

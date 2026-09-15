@@ -36,10 +36,10 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 
 | Arquivo | Entrega |
 |---|---|
-| `Back-End/Esquema.gs` | O contrato das 13 abas: cabeçalhos exatos e tipo de cada coluna |
-| `Back-End/Planilha.gs` | A porta única para o Planilhas — nenhum outro arquivo chama `SpreadsheetApp` |
-| `Back-End/Sequencia.gs` | Id decimal de 10 casas, que nunca anda para trás |
-| `Back-End/Instalador.gs` | Cria as abas numa planilha vazia e cadastra o primeiro administrador |
+| `Back-End/Base.gs` | O contrato das 13 abas: cabeçalhos exatos e tipo de cada coluna |
+| `Back-End/Base.gs` | A porta única para o Planilhas — nenhum outro arquivo chama `SpreadsheetApp` |
+| `Back-End/Base.gs` | Id decimal de 10 casas, que nunca anda para trás |
+| `Back-End/Instalacao.gs` | Cria as abas numa planilha vazia e cadastra o primeiro administrador |
 
 As duas regras que nasceram aqui e valem para sempre: a coluna é encontrada
 pelo **nome do cabeçalho**, nunca pela posição; e a faixa é **formatada antes**
@@ -53,9 +53,9 @@ de receber o valor.
 
 | Arquivo | Entrega |
 |---|---|
-| `Back-End/Acesso.gs` | Níveis, escopo, senha de administrador, auditoria |
-| `Back-End/Usuarios.gs` | Cadastro de quem pode entrar |
-| `Back-End/Principal.gs` | `doGet`, pacote de partida, identidade visual |
+| `Back-End/Entrada.gs` | Níveis, escopo, senha de administrador, auditoria |
+| `Back-End/Entrada.gs` | Cadastro de quem pode entrar |
+| `Back-End/Entrada.gs` | `doGet`, pacote de partida, identidade visual |
 | `Front-End/SemAcesso.html` | A tela de quem não está cadastrado |
 
 Cargo e nível de acesso ficaram separados de verdade: o cargo é rótulo
@@ -72,7 +72,7 @@ motivos distintos, cada um levando a um lugar diferente.
 |---|---|
 | `Front-End/Index.html` | O esqueleto, que cola os outros dentro de si |
 | `Front-End/Estilos.html` | Toda a aparência e os quatro temas |
-| `Front-End/Moldura.html` | Menu lateral e barra superior |
+| `Front-End/Comuns.html` | Menu lateral e barra superior |
 | `Front-End/Aplicacao.html` | Ponte com o servidor, roteador e telas |
 
 Menu lateral azul da marca com pastilha branca no item atual. Barra superior na
@@ -96,7 +96,7 @@ que teste nenhum pegaria.
 
 | Arquivo | Entrega |
 |---|---|
-| `Back-End/Campos.gs` | O motor: monta o formulário a partir de `CAMPOS` e valida o que volta |
+| `Back-End/Casos.gs` | O motor: monta o formulário a partir de `CAMPOS` e valida o que volta |
 | `Back-End/Casos.gs` | Registrar, editar, ocultar e o selo da SUSEP |
 | `Front-End/CadastrarCaso.html` | A tela, com máscara, seleção de mesa e o selo |
 
@@ -131,9 +131,9 @@ inteira e um que era defeito da própria ferramenta de prévia.
 
 | Arquivo | Entrega |
 |---|---|
-| `Back-End/Painel.gs` | Cartões, fila, filtros e o detalhe de um caso |
+| `Back-End/Indicadores.gs` | Cartões, fila, filtros e o detalhe de um caso |
 | `Front-End/Dashboard.html` | A tela |
-| `Front-End/SeletorDeMesa.html` | A escolha da mesa, usada aqui e no cadastro |
+| `Front-End/Comuns.html` | A escolha da mesa, usada aqui e no cadastro |
 
 **Cartão e fila saem da mesma lista.** Contar de um lado e listar de outro
 deixaria o cartão dizendo 12 e a fila mostrando 7, sem ninguém saber qual está
@@ -298,7 +298,7 @@ essa coluna e ela está vazia — é o que a operação faria à mão em seguida
 
 **O Dashboard mostra 30 dias. Aqui se acha o resto.**
 
-`Back-End/Busca.gs` e `Front-End/BuscarCaso.html`, 17 testes.
+`Back-End/Casos.gs` e `Front-End/BuscarCaso.html`, 17 testes.
 
 ### A regra que sustenta a tela
 
@@ -351,7 +351,7 @@ fundos. Caso ocultado também não volta.
 **O Dashboard responde "o que eu tenho que trabalhar hoje". Aqui a pergunta é
 outra: "o que está acontecendo na operação".**
 
-`Back-End/Analitico.gs` e `Front-End/PainelAnalitico.html`, 24 testes.
+`Back-End/Indicadores.gs` e `Front-End/PainelAnalitico.html`, 24 testes.
 
 Cada gráfico é uma linha da aba `PAINEIS` — tipo, campo que vira eixo, o que
 se mede, o TOP N e a ordem. Acrescentar um gráfico é acrescentar uma linha,
@@ -417,7 +417,7 @@ perguntar nada. Segue a permissão de `exportar`.
 **As outras telas mostram a operação. Esta mostra uma pessoa — e o cuidado
 aqui é de outra natureza.**
 
-`Back-End/Performance.gs` e `Front-End/MinhaPerformance.html`, 19 testes.
+`Back-End/Indicadores.gs` e `Front-End/MinhaPerformance.html`, 19 testes.
 
 Um número mal escolhido no Dashboard atrapalha uma decisão. Um número mal
 escolhido aqui atrapalha alguém. Quatro decisões saíram disso:
@@ -471,7 +471,7 @@ e ela não pode virar log de sistema.
 
 ### E o desenho dos gráficos virou um módulo
 
-`Front-End/Graficos.html`. Duas telas desenham gráficos e agora não têm duas
+`Front-End/Comuns.html`. Duas telas desenham gráficos e agora não têm duas
 cópias — pela razão que já custou caro aqui: regra copiada em dois lugares é
 regra que um dia diverge, e num gráfico a divergência não dá erro. Vira uma
 barra um pouco mais alta do que devia.
@@ -483,7 +483,7 @@ barra um pouco mais alta do que devia.
 **Três cadastros que sustentam o resto do sistema e que, até aqui, só se
 ajustavam abrindo a planilha.**
 
-`Back-End/Corretoras.gs` e `Front-End/TabelaCorretoras.html`, 22 testes.
+`Back-End/Cadastros.gs` e `Front-End/TabelaCorretoras.html`, 22 testes.
 
 | Aba | O que é |
 |---|---|
@@ -595,7 +595,7 @@ devolveria à pessoa exatamente o trabalho manual que a tela veio tirar.
 
 ### O diálogo de senha saiu de Configurações
 
-Virou `SenhaDeAdministrador.html`, porque a Importação passou a precisar do
+Virou `Comuns.html`, porque a Importação passou a precisar do
 mesmo pedido. Dois diálogos escritos separados viram duas regras: um dia um
 libera por 5 minutos e o outro por 30, e ninguém percebe.
 
@@ -692,7 +692,7 @@ A suíte prova que o **código** está certo. Ela não prova que **esta
 instalação** está certa: a planilha é editável à mão, e o que a suíte conferiu
 numa planilha de mentira pode não valer na de verdade seis meses depois.
 
-`Back-End/Diagnostico.gs` é a outra metade. Dez blocos, 49 verificações numa
+`Back-End/Instalacao.gs` é a outra metade. Dez blocos, 49 verificações numa
 instalação de partida, e uma pergunta só: *este sistema, aqui, agora, está
 inteiro?*
 
@@ -762,7 +762,7 @@ lado de tudo que está certo faria o olho parar de ver as três que importam.
 
 | Arquivo | Entrega |
 |---|---|
-| `Back-End/Diagnostico.gs` | Os dez blocos, as duas portas e o laudo em texto |
+| `Back-End/Instalacao.gs` | Os dez blocos, as duas portas e o laudo em texto |
 | `Front-End/Configuracoes.html` | O laudo na tela, em Configurações › Estrutura |
 
 ### Uma conferência curta e uma completa, não duas regras
@@ -776,7 +776,7 @@ mesma regra sempre acabam discordando, e aí uma das duas está mentindo.
 
 O sistema publicado não abria, e tudo o que dizia era *"nenhum arquivo html
 com o nome formulario foi encontrado — linha 53"*. Verdade, e inútil: o
-`Formulario.html` tinha ficado para trás na cópia, mas a mensagem não dizia de
+`Comuns.html` tinha ficado para trás na cópia, mas a mensagem não dizia de
 onde tirar o arquivo, como nomeá-lo no Apps Script (sem `.html`, sem acento,
 maiúsculas iguais) nem — o pior — **quantos outros faltavam**. Um por vez, com
 uma recarga entre cada.
@@ -835,7 +835,7 @@ que já saiu; e cada desenho de seção confere se ainda é a seção da vez.
 | Funções `.gs` com nome repetido | nenhuma |
 | Constantes globais repetidas | nenhuma |
 | Funções nunca usadas | nenhuma |
-| `SpreadsheetApp` fora do `Planilha.gs` | 2 → **0** (viraram `abrirPlanilhaDeFora_`) |
+| `SpreadsheetApp` fora do `Base.gs` | 2 → **0** (viraram `abrirPlanilhaDeFora_`) |
 | ES6 fora do padrão nos `.gs` | nenhum |
 | Ids de HTML repetidos | 4 → **0** |
 | Arquivos de tela órfãos | nenhum |
@@ -1002,25 +1002,25 @@ usa leitor de tela ouvia "asterisco", ou nada. Agora os campos levam
 `aria-required` — não `required`, porque o formulário é `novalidate` de
 propósito: quem valida é o servidor, com mensagem melhor que o balão nativo.
 
-### Os 35 arquivos viraram 3
+### Os arquivos soltos viraram 3
 
 ```bash
 node Evolucao/Testes/gerar-pacote.js
 ```
 
-O repositório tem 18 `.gs` e 17 `.html`, separados por assunto — e é assim que
+O repositório separa o código por assunto, um arquivo por assunto — e é assim que
 tem de ser para alguém conseguir ler e consertar. Mas o Apps Script não tem
 "importar pasta": cada um vira um arquivo criado à mão, com o nome digitado
 certo. Trinta e cinco vezes. E o custo não é o tempo: **basta um ficar para
 trás** para a tela congelar num "Lendo o cadastro…" que não explica nada — já
 aconteceu duas vezes aqui, nos [achados 25 e 27](04-bugs-capturados.md).
 
-`Evolucao/pacote/` tem três arquivos: `Codigo.gs` (os 18 do servidor),
-`Index.html` (o esqueleto com as 15 telas coladas dentro), `SemAcesso.html`.
+`Evolucao/pacote/` tem três arquivos: `Codigo.gs` (todos os do servidor),
+`Index.html` (o esqueleto com as telas coladas dentro), `SemAcesso.html`.
 Mais um `COMO-USAR.txt`.
 
 > **O pacote é testado como o original.** O ponta a ponta roda duas vezes —
-> contra os 35 arquivos e contra os 3 — e cobra que se comportem igual. Se
+> contra os arquivos soltos e contra os 3 — e cobra que se comportem igual. Se
 > divergissem, haveria duas verdades, e a que a operação usa seria a que
 > ninguém testa.
 
@@ -1120,6 +1120,89 @@ Na suíte ficam as regras estáticas que sustentam isso: nenhuma largura fixa
 acima de 320px no CSS, toda tabela dentro de uma caixa que rola, e a grade dos
 gráficos com `minmax(min(100%, 340px), 1fr)`, que encolhe sozinha sem media
 query nenhuma.
+
+---
+
+## Menos arquivos, agrupados por assunto
+
+Pedido do PO, e a razão dele é de manutenção, não de cópia: *"queria diminuir…
+agrupe algumas funções do .gs que tem lógica estarem juntas em um arquivo"*.
+
+Eram **35 arquivos** — 18 `.gs` e 17 `.html`. Agora são **19**: 7 e 12.
+
+### Os sete do servidor
+
+Cada um responde a UMA pergunta. É esse o critério, e não o tamanho: um
+arquivo existe para que alguém que não conhece o sistema saiba onde procurar.
+
+| Arquivo | Responde | Juntou |
+|---|---|---|
+| `Base.gs` | como o sistema fala com a planilha | Esquema, Sequencia, Planilha |
+| `Cadastros.gs` | quem traz o caso para dentro | Corretoras, Importacao |
+| `Casos.gs` | o caso, do formulário à busca | Campos, Casos, Busca |
+| `Config.gs` | o que se ajusta sem programador | Config, Analise |
+| `Entrada.gs` | quem entra e o que pode | Principal, Acesso, Usuarios |
+| `Indicadores.gs` | os números | Painel, Analitico, Performance |
+| `Instalacao.gs` | criar e conferir a instalação | Instalador, Diagnostico |
+
+> **Por que `Indicadores.gs` junta três telas.** Dashboard, Painel Analítico e
+> Minha Performance contam os MESMOS casos. Separados, convidam ao erro de
+> mudar a regra de contagem num e esquecer dos outros dois — e aí o cartão diz
+> 12, o gráfico diz 9, e ninguém sabe qual está certo. Juntos, a regra é uma
+> só porque está à vista.
+
+> **Por que `Base.gs` não levou o formulário junto.** A sugestão era juntar
+> "criação de formulários e ajustes no Google Planilhas". São níveis
+> diferentes: um é infraestrutura (como falamos com o Sheets), o outro é
+> domínio (o que um caso pergunta). Misturar os dois faz a infraestrutura
+> parecer que sabe o que é um caso — e é justamente o que `Base.gs` não pode
+> saber, porque é ele que serve a todas as abas.
+
+### Os doze de tela
+
+Uma por item do menu (são 7), mais quatro de infraestrutura e a de bloqueio:
+
+- `Index.html` — o esqueleto, que manda incluir os outros
+- `Estilos.html` — toda a aparência e os quatro temas
+- `Comuns.html` — as peças que mais de uma tela usa
+- `Aplicacao.html` — a ponte com o servidor e o roteador
+- `SemAcesso.html` — servida sozinha, a quem não está cadastrado
+
+O `Comuns.html` guarda seis peças: Moldura, SenhaDeAdministrador,
+SeletorDeMesa, Formulario, CasoEmModal e Graficos. Nenhuma é tela do menu, e
+todas são usadas por mais de uma — o critério para morar ali é esse, escrito
+no cabeçalho do arquivo.
+
+> **Juntar não misturou nada.** Cada peça já era um módulo fechado
+> (`var Nome = (function () { … })()`), com o estado dela dentro. Morar no
+> mesmo arquivo não dá a uma acesso à outra: é exatamente o mesmo código, só
+> que em um arquivo em vez de seis. Foi por isso que dava para juntar sem
+> reescrever uma linha.
+
+### O que o agrupamento quebrou, e como apareceu
+
+Vinte e dois testes falharam de cara, todos com `ENOENT` — eles liam arquivos
+de tela pelo nome. **Falhar alto assim é o resultado bom**: o risco de uma
+mudança dessas é a que passa despercebida.
+
+A correção não foi trocar nome por nome. Os testes ganharam `lerPeca(nome)` e
+`scriptDaPeca(nome)`, nas ferramentas: procuram a peça onde ela estiver — como
+arquivo próprio, ou como trecho de um arquivo maior, achando pelo banner. Se
+amanhã as peças se separarem de novo, nenhum teste precisa mudar.
+
+### E uma ferramenta que teria mentido
+
+O `Evolucao/conferir-projeto.gs` carregava, escrito à mão, o mapa "arquivo →
+funções que as telas chamam". Depois do agrupamento ele apontaria para sete
+arquivos que não existem mais — e não como erro: com confiança, mandando
+copiar o `Analitico.gs`.
+
+Agora ele é **gerado** por `node Evolucao/Testes/gerar-conferidor.js`, a partir
+do código de verdade, e um teste compara o gerado com o guardado. É o achado
+33 pela segunda vez no mesmo mês, e é por isso que virou regra: **artefato que
+repete informação do código não se digita, se gera — e se compara num teste.**
+
+**385 testes.**
 
 ---
 

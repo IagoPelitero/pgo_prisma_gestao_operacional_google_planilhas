@@ -1,0 +1,1653 @@
+<!-- ========================================================================
+     PGO — Comuns.html · as peças que mais de uma tela usa
+     ========================================================================
+    Nenhuma destas é uma tela do menu. São as peças compartilhadas: a casca
+    que aparece em todas, os dois diálogos que qualquer tela pode levantar,
+    o formulário, o caso aberto por cima e os desenhos dos gráficos.
+
+    Cada uma continua sendo um módulo fechado (var Nome = (function(){…})()),
+    entao morar no mesmo arquivo não mistura o estado de nenhuma com o da
+    outra — é exatamente o mesmo código, só que em um arquivo em vez de seis.
+
+    O QUE TEM AQUI DENTRO, nesta ordem:
+
+      1. Moldura
+      2. SenhaDeAdministrador
+      3. SeletorDeMesa
+      4. Formulario
+      5. CasoEmModal
+      6. Graficos
+
+    Procure pelo banner "PEÇA n de m" para pular de uma à outra.
+     ======================================================================== -->
+
+<!-- ========================================================================
+     PEÇA 1 de 6 · Moldura
+     Era o arquivo Front-End/Moldura.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   RECC — Moldura.html · o menu lateral e a barra superior
+   ============================================================================
+   A moldura aparece em TODAS as telas e é a mesma em todas. Ela não é escrita
+   à mão no HTML: é montada a partir do pacote de partida, porque o menu
+   depende do nível de acesso de quem entrou. Menu fixo no HTML ficaria fora
+   de sincronia com as permissões no primeiro dia.
+   ============================================================================ */
+
+var Moldura = (function () {
+
+  /**
+   * O desenho de cada item do menu.
+   *
+   * SVG escrito à mão, sem biblioteca de fora: o Apps Script serve a página
+   * num quadro isolado, e cada dependência externa é mais um ponto que pode
+   * não carregar — e um menu sem ícone nenhum é um menu quebrado.
+   *
+   * Todos partem da mesma grade de 24 por 24, com a mesma espessura de
+   * traço. É o que faz sete desenhos diferentes parecerem um conjunto.
+   */
+  var DESENHOS = {
+    // painel: quatro áreas iguais, como os cartões da tela
+    dashboard:
+      '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
+      + '<rect x="13.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
+      + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>'
+      + '<rect x="13.5" y="13.5" width="7" height="7" rx="1.6"></rect>',
+
+    // registrar: o mais, sem moldura. Acrescentar é o gesto mais simples do
+    // sistema, e o desenho mais simples é o que se reconhece de relance.
+    cadastrarCaso:
+      '<path d="M12 4.6v14.8M4.6 12h14.8"></path>',
+
+    // desempenho: a linha de pulso, que sobe e desce como o dia da operação
+    minhaPerformance:
+      '<path d="M3.2 12.4h3.6l2.4-7 4 14.2 2.6-7.2h5"></path>',
+
+    // buscar: a lupa
+    buscarCaso:
+      '<circle cx="10.8" cy="10.8" r="6.4"></circle>'
+      + '<path d="M15.5 15.5 20.4 20.4"></path>',
+
+    // corretoras: o prédio, com as janelas e a porta
+    tabelaCorretoras:
+      '<path d="M4.4 20.6V4.9a1.5 1.5 0 0 1 1.5-1.5h6.8a1.5 1.5 0 0 1 1.5 1.5v15.7"></path>'
+      + '<path d="M14.2 10.4h4a1.5 1.5 0 0 1 1.5 1.5v8.7"></path>'
+      + '<path d="M2.9 20.6h18.2"></path>'
+      + '<path d="M7.4 7.4h1.3M11 7.4h1.3M7.4 11.2h1.3M11 11.2h1.3"></path>'
+      + '<path d="M9.2 20.6v-4.2h1.6v4.2"></path>',
+
+    // análise: as barras em pé, sobre a régua
+    painelAnalitico:
+      '<path d="M3.6 20.4h16.8"></path>'
+      + '<path d="M7.4 20.4v-6.2M12 20.4V6.8M16.6 20.4v-9.6"></path>',
+
+    // configurações: a engrenagem — anel, dentes por fora e o eixo no meio.
+    // Os dentes ENCOSTAM no anel: afastados, o desenho vira um sol.
+    configuracoes:
+      '<circle cx="12" cy="12" r="7.1"></circle>'
+      + '<circle cx="12" cy="12" r="2.9"></circle>'
+      + '<path d="M12 2.6v2.3M12 19.1v2.3M2.6 12h2.3M19.1 12h2.3'
+      + 'M5.3 5.3 6.9 6.9M17.1 17.1l1.6 1.6M18.7 5.3 17.1 6.9M6.9 17.1l-1.6 1.6"></path>',
+
+    // --- os desenhos das SEÇÕES de Configurações --------------------------
+    // Um por seção, na mesma grade e na mesma espessura dos outros. O menu de
+    // Configurações é a única lista longa do sistema: sem ícone, oito linhas
+    // de texto viram um bloco só, e a pessoa lê todas para achar uma.
+
+    // campos do formulário: a etiqueta em cima, a caixa de digitar, a dica
+    campos:
+      '<path d="M4.2 6.2h7.6"></path>'
+      + '<rect x="3.4" y="9.4" width="17.2" height="5.6" rx="1.6"></rect>'
+      + '<path d="M4.2 18.6h11.4"></path>',
+
+    // usuários: duas pessoas, a de trás pela metade
+    usuarios:
+      '<circle cx="9.4" cy="8.4" r="3.4"></circle>'
+      + '<path d="M3.4 19.8a6 6 0 0 1 12 0"></path>'
+      + '<path d="M16.2 5.4a3.4 3.4 0 0 1 0 6"></path>'
+      + '<path d="M17.8 14.2a6 6 0 0 1 2.8 5.6"></path>',
+
+    // níveis de acesso: o escudo com o visto — o que passa e o que não passa
+    niveis:
+      '<path d="M12 3.2 19.4 6v6.1c0 4.3-3 7.5-7.4 8.7-4.4-1.2-7.4-4.4-7.4-8.7V6z"></path>'
+      + '<path d="m8.9 11.9 2.3 2.3L15.4 10"></path>',
+
+    // listas: os marcadores e as linhas
+    catalogo:
+      '<circle cx="4.7" cy="6.6" r="1.1"></circle>'
+      + '<circle cx="4.7" cy="12" r="1.1"></circle>'
+      + '<circle cx="4.7" cy="17.4" r="1.1"></circle>'
+      + '<path d="M9 6.6h11.3M9 12h11.3M9 17.4h11.3"></path>',
+
+    // mesas de trabalho: a bancada, com o tampo e as duas pernas
+    mesas:
+      '<rect x="2.9" y="6.2" width="18.2" height="4.2" rx="1.4"></rect>'
+      + '<path d="M5.9 10.4v7.4M18.1 10.4v7.4"></path>'
+      + '<path d="M5.9 14.1h12.2"></path>',
+
+    // identidade: a gota de tinta — nome, logo e cor são a aparência do PGO
+    identidade:
+      '<path d="M12 3.2c3.5 4.1 5.6 6.8 5.6 9.5a5.6 5.6 0 0 1-11.2 0c0-2.7 2.1-5.4 5.6-9.5z"></path>'
+      + '<path d="M9.2 13.4a2.8 2.8 0 0 0 2.8 2.8"></path>',
+
+    // painéis: o recorte da tela — a faixa de cima e a coluna da esquerda
+    paineis:
+      '<rect x="3.4" y="3.9" width="17.2" height="16.2" rx="2"></rect>'
+      + '<path d="M3.4 9.1h17.2"></path>'
+      + '<path d="M10.2 9.1v11"></path>',
+
+    // análises: a tabela dinâmica — a grade com a faixa de cima destacada
+    analises:
+      '<rect x="3.4" y="4.4" width="17.2" height="15.2" rx="1.8"></rect>'
+      + '<path d="M3.4 9.2h17.2"></path>'
+      + '<path d="M3.4 14.4h17.2"></path>'
+      + '<path d="M9.4 9.2v10.4M15 9.2v10.4"></path>',
+
+    // estrutura e auditoria: a prancheta do laudo, com o visto
+    estrutura:
+      '<path d="M9 4.4H7.4A1.6 1.6 0 0 0 5.8 6v13.2a1.6 1.6 0 0 0 1.6 1.6h9.2a1.6 1.6 0 0 0 1.6-1.6V6a1.6 1.6 0 0 0-1.6-1.6H15"></path>'
+      + '<rect x="9" y="2.8" width="6" height="3.2" rx="1"></rect>'
+      + '<path d="m9.2 13.2 2 2 3.8-3.8"></path>',
+
+    // --- os desenhos das AÇÕES, na mesma grade e na mesma espessura -------
+
+    // ver: o olho
+    olho:
+      '<path d="M2.4 12S6.2 5.4 12 5.4 21.6 12 21.6 12 17.8 18.6 12 18.6 2.4 12 2.4 12z"></path>'
+      + '<circle cx="12" cy="12" r="3.1"></circle>',
+
+    // editar: o lápis
+    editar:
+      '<path d="M16.4 3.9a2 2 0 0 1 2.8 2.8L8.4 17.5l-3.9 1.1 1.1-3.9z"></path>'
+      + '<path d="M14.7 5.6 18.4 9.3"></path>',
+
+    // trocar situação: as duas setas em círculo
+    trocarSituacao:
+      '<path d="M20.4 11.2a8.4 8.4 0 0 0-14.3-4.6L3.6 9"></path>'
+      + '<path d="M3.6 4.6V9h4.4"></path>'
+      + '<path d="M3.6 12.8a8.4 8.4 0 0 0 14.3 4.6L20.4 15"></path>'
+      + '<path d="M20.4 19.4V15H16"></path>',
+
+    // ocultar: a lixeira, com a tampa
+    ocultar:
+      '<path d="M4.4 6.8h15.2"></path>'
+      + '<path d="M9.2 6.8V5.2a1.4 1.4 0 0 1 1.4-1.4h2.8a1.4 1.4 0 0 1 1.4 1.4v1.6"></path>'
+      + '<path d="M6.4 6.8v12.4a1.4 1.4 0 0 0 1.4 1.4h8.4a1.4 1.4 0 0 0 1.4-1.4V6.8"></path>'
+      + '<path d="M10.2 10.6v6M13.8 10.6v6"></path>'
+  };
+
+  var TEMAS = [
+    { chave: 'padrao', nome: 'Padrão — azul Porto Seguro' },
+    { chave: 'rosa', nome: 'Rosa' },
+    { chave: 'dark', nome: 'Escuro' },
+    { chave: 'brasil', nome: 'Brasil' }
+  ];
+
+  /**
+   * O desenho de um item do menu ou de uma ação.
+   *
+   * Nome desconhecido cai no painel, e não em nada: um botão sem ícone,
+   * ao lado de outros com ícone, parece um botão quebrado.
+   */
+  function icone(tela) {
+    var desenho = DESENHOS[tela] || DESENHOS.dashboard;
+    // Traço fino: 1,7 deixava os desenhos pesados ao lado de texto normal.
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
+      + ' aria-hidden="true">' + desenho + '</svg>';
+  }
+
+  /** As iniciais do nome, para o círculo da barra superior. */
+  function iniciais(nome) {
+    var partes = String(nome || '').trim().split(/\s+/);
+    if (!partes[0]) return '?';
+    if (partes.length === 1) return partes[0].substring(0, 2).toUpperCase();
+    return (partes[0].charAt(0) + partes[partes.length - 1].charAt(0)).toUpperCase();
+  }
+
+  function escapar(texto) {
+    return String(texto === null || texto === undefined ? '' : texto)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** A marca do topo do menu: a logo de CONFIG, ou o nome quando não há logo. */
+  function marca(identidade) {
+    if (identidade.logo) {
+      return '<img src="' + escapar(identidade.logo) + '" alt="'
+        + escapar(identidade.operacao || identidade.nome) + '">';
+    }
+    // Sem logo, o nome vira a marca. As duas últimas letras ganham a cor de
+    // destaque — é o mesmo tratamento do "PGO" dos desenhos da tela.
+    var nome = String(identidade.nome || 'RECC');
+    var corte = Math.max(nome.length - 2, 1);
+    return '<span class="escrito">' + escapar(nome.substring(0, corte))
+      + '<em>' + escapar(nome.substring(corte)) + '</em></span>';
+  }
+
+  function montarLateral(pacote, telaAtual) {
+    var itens = pacote.menu.map(function (item) {
+      var atual = item.tela === telaAtual ? ' aria-current="page"' : '';
+      return '<li><button type="button" class="lateral-item"'
+        + ' data-tela="' + escapar(item.tela) + '"' + atual + '>'
+        + icone(item.tela)
+        + '<span class="rotulo">' + escapar(item.titulo) + '</span>'
+        + '</button></li>';
+    }).join('');
+
+    var rodape = '';
+    if (pacote.identidade.plataforma || pacote.identidade.fabricante) {
+      rodape = '<div class="lateral-pe">'
+        + '<div>' + escapar(pacote.identidade.plataforma) + '</div>'
+        + '<div class="fabricante">' + escapar(pacote.identidade.fabricante) + '</div>'
+        + '</div>';
+    }
+
+    return '<div class="lateral-marca">'
+      + marca(pacote.identidade)
+      + '<button type="button" class="lateral-encolher" id="encolher"'
+      + ' title="Encolher o menu" aria-label="Encolher o menu">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+      + ' stroke-linecap="round" aria-hidden="true">'
+      + '<path d="M4 7h16M4 12h16M4 17h16"></path></svg>'
+      + '</button>'
+      + '</div>'
+      + '<ul class="lateral-itens">' + itens + '</ul>'
+      + rodape;
+  }
+
+  /**
+   * A barra superior.
+   *
+   * A ordem foi pedida assim, e cada peça responde a uma pergunta diferente:
+   *   identidade        que sistema é este, de que operação
+   *   busca             achar um caso sem sair de onde se está
+   *   bolinhas          a cor da tela, escolha de quem usa
+   *   último registro   a base está atualizada?
+   *   pessoa            quem sou eu aqui dentro, e com que cargo
+   *
+   * O nome da TELA não fica aqui: ele fica no topo do conteúdo, junto do que
+   * ele nomeia.
+   */
+  function montarSuperior(pacote) {
+    var bolinhas = TEMAS.map(function (tema) {
+      var marcado = tema.chave === pacote.tema ? 'true' : 'false';
+      return '<button type="button" class="tema tema-' + tema.chave + '"'
+        + ' data-tema="' + tema.chave + '" aria-pressed="' + marcado + '"'
+        + ' title="' + escapar(tema.nome) + '"'
+        + ' aria-label="Tema ' + escapar(tema.nome) + '"></button>';
+    }).join('');
+
+    return ''
+      + '<button type="button" class="abrir-menu" id="abrir-menu" aria-label="Abrir o menu">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+      + ' stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>'
+      + '</button>'
+
+      + '<div class="identidade">'
+      + '<h1>' + escapar(pacote.identidade.nome)
+      + (pacote.identidade.nomeLongo
+        ? ' — ' + escapar(pacote.identidade.nomeLongo) : '')
+      + '</h1>'
+      + '<p>' + escapar(pacote.identidade.operacao) + '</p>'
+      + '</div>'
+
+      + '<div class="busca">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+      + ' stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle>'
+      + '<path d="M20 20l-4.2-4.2"></path></svg>'
+      + '<input type="search" id="busca-global" autocomplete="off"'
+      + ' placeholder="Buscar por apólice, segurado ou protocolo…"'
+      + ' aria-label="Busca geral">'
+      + '<kbd>Ctrl K</kbd>'
+      + '</div>'
+
+      + '<div class="temas" role="group" aria-label="Cor do sistema">' + bolinhas + '</div>'
+
+      + ultimoRegistro(pacote.ultimoRegistro)
+
+      + '<div class="pessoa">'
+      + '<div class="iniciais" aria-hidden="true">'
+      + escapar(iniciais(pacote.usuario.nome)) + '</div>'
+      + '<div class="quem"><strong>' + escapar(pacote.usuario.nome) + '</strong>'
+      + '<span>' + escapar(descricaoDaPessoa(pacote.usuario)) + '</span>'
+      + '</div></div>';
+  }
+
+  /** "Analista RET · Vida Individual" — o cargo, e o canal quando existe. */
+  function descricaoDaPessoa(usuario) {
+    var cargo = usuario.cargo || usuario.nivelAcesso || '';
+    if (usuario.canalQueAtende) return cargo + ' · ' + usuario.canalQueAtende;
+    return cargo;
+  }
+
+  /** A data do último registro, ou o aviso de que ainda não há nenhum. */
+  function ultimoRegistro(dados) {
+    var informacao = dados || { texto: 'Nenhum registro ainda', existe: false };
+    var explicacao = informacao.existe && informacao.mesa
+      ? 'Último registro em ' + informacao.mesa
+      : 'Ainda não há registros nas mesas';
+
+    return '<div class="ultimo-registro' + (informacao.existe ? '' : ' vazio') + '"'
+      + ' title="' + escapar(explicacao) + '">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"'
+      + ' stroke-linecap="round" aria-hidden="true">'
+      + '<rect x="3.5" y="5" width="17" height="15" rx="2"></rect>'
+      + '<path d="M3.5 10h17M8 3.5v3M16 3.5v3"></path></svg>'
+      + '<span class="rotulo-data">' + escapar(informacao.texto) + '</span>'
+      + '</div>';
+  }
+
+  /**
+   * O aviso de que a tela leu só uma parte da base.
+   *
+   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Dashboard,
+   * Painel Analítico e Minha Performance —, e três textos diferentes para o
+   * mesmo fato é como a operação aprende que um deles não é sério.
+   *
+   * A frase diz o que foi lido e o que fazer, nessa ordem. "Os números podem
+   * estar incompletos" sozinho não ajuda ninguém: a pessoa precisa saber que
+   * dá para aumentar a janela, e onde.
+   */
+  function avisoDeJanela(resposta, oQueEssaTelaMostra) {
+    if (!resposta || !resposta.truncada) return '';
+    var lidas = resposta.linhasLidas
+      ? Number(resposta.linhasLidas).toLocaleString('pt-BR') : 'algumas';
+    return '<p class="aviso-janela" role="status">'
+      + '<strong>' + oQueEssaTelaMostra + ' vêm das ' + lidas + ' linhas mais '
+      + 'recentes da base</strong>, que é o que o painel lê de uma vez. A mesa '
+      + 'tem mais que isso, então casos antigos do período podem ter ficado de '
+      + 'fora. Para o histórico inteiro, use Buscar Caso; para aumentar a '
+      + 'janela, ajuste <code>OPERACAO.LINHAS_DO_PAINEL</code> na aba CONFIG.'
+      + '</p>';
+  }
+
+  return {
+    avisoDeJanela: avisoDeJanela,
+    montarLateral: montarLateral,
+    montarSuperior: montarSuperior,
+    // Os desenhos são de todas as telas, e não só do menu: a fila usa o olho,
+    // o lápis e a lixeira, e eles precisam vir da mesma grade e da mesma
+    // espessura, senão a tela parece montada com peças de dois conjuntos.
+    icone: icone,
+    escapar: escapar,
+    iniciais: iniciais
+  };
+})();
+</script>
+
+<!-- ========================================================================
+     PEÇA 2 de 6 · SenhaDeAdministrador
+     Era o arquivo Front-End/SenhaDeAdministrador.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — SenhaDeAdministrador.html · a guarda das ações sem desfazer
+   ============================================================================
+   Um diálogo só, usado por todas as telas que fazem alguma coisa de alcance
+   grande: criar coluna na planilha, mexer em nível de acesso, importar um
+   lote de corretoras.
+
+   Ele nasceu dentro de Configurações e saiu de lá quando a Importação passou
+   a precisar do mesmo pedido. Dois diálogos de senha, escritos separados,
+   viram duas regras: um dia um passa a liberar por 5 minutos e o outro por
+   30, e ninguém percebe até alguém reclamar.
+
+   COMO USAR:
+
+       SenhaDeAdministrador.pedir(function () {
+         // ... o que fazer DEPOIS que a senha foi aceita
+       });
+
+   A ação fica guardada enquanto a senha não vem, e só roda se ela for aceita.
+   É isso que evita o pior atrito possível: preencher um formulário inteiro,
+   apertar salvar, digitar a senha — e ter de preencher tudo de novo.
+   ============================================================================ */
+
+var SenhaDeAdministrador = (function () {
+
+  var acaoPendente = null;
+
+  function elemento(id) { return document.getElementById(id); }
+
+  /**
+   * Pede a senha e, se ela for aceita, roda a ação.
+   *
+   * `avisarSeNaoDefinida` é para quem JÁ SABE que não existe senha cadastrada
+   * — a tela de Configurações sabe, porque o resumo dela diz. Aí o recado sai
+   * antes, dizendo onde definir, em vez de a pessoa descobrir digitando uma
+   * senha que não existe.
+   */
+  function pedir(acao, avisarSeNaoDefinida) {
+    if (avisarSeNaoDefinida) {
+      window.alert('Ainda não existe senha de administrador. Defina uma em '
+        + 'Configurações › Identidade antes de fazer isto.');
+      return;
+    }
+    acaoPendente = acao;
+    abrir();
+  }
+
+  function abrir() {
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-senha';
+    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="dialogo-titulo">'
+      + '<h3 id="dialogo-titulo">Ação sem desfazer</h3>'
+      + '<p>Isto escreve na planilha de produção. Confirme com a senha de '
+      + 'administrador — ela libera as ações de estrutura por 5 minutos.</p>'
+      + '<form id="form-dialogo">'
+      + '<input type="password" id="senha-do-dialogo" autocomplete="off"'
+      + ' placeholder="Senha de administrador" aria-label="Senha de administrador">'
+      + '<p class="dialogo-erro" id="dialogo-erro" hidden></p>'
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Confirmar</button>'
+      + '<button type="button" class="botao vazado" id="dialogo-desistir">'
+      + 'Desistir</button></div></form></div>';
+    document.body.appendChild(caixa);
+
+    var campo = elemento('senha-do-dialogo');
+    campo.focus();
+
+    elemento('dialogo-desistir').addEventListener('click', fechar);
+    elemento('form-dialogo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('liberarComSenha', campo.value)
+        .entao(function () {
+          // A ação sai da gaveta ANTES de fechar: fechar limpa a gaveta.
+          var acao = acaoPendente;
+          fechar();
+          if (acao) acao();
+        })
+        .senao(function (erro) {
+          var aviso = elemento('dialogo-erro');
+          aviso.textContent = erro.message || String(erro);
+          aviso.hidden = false;
+          campo.value = '';
+          campo.focus();
+        });
+    });
+  }
+
+  function fechar() {
+    var caixa = elemento('dialogo-senha');
+    if (caixa) caixa.parentNode.removeChild(caixa);
+    acaoPendente = null;
+  }
+
+  /**
+   * Fecha o diálogo se ele estiver aberto.
+   *
+   * Quem troca de tela chama isto. Sem isso, o diálogo de senha ficaria
+   * flutuando por cima da tela seguinte, esperando confirmar uma ação que
+   * pertencia a uma tela que já não está mais lá.
+   */
+  return { pedir: pedir, fechar: fechar };
+
+})();
+</script>
+
+<!-- ========================================================================
+     PEÇA 3 de 6 · SeletorDeMesa
+     Era o arquivo Front-End/SeletorDeMesa.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — SeletorDeMesa.html · a escolha da mesa de trabalho
+   ============================================================================
+   Aparece no Dashboard e no Cadastrar Caso, e é a mesma peça nos dois. Duas
+   cópias divergiriam na primeira mudança — bastaria uma mesa nova ganhar
+   ícone só num dos lugares.
+
+   O desenho de cada mesa vem da coluna `Icone`, na aba MESAS: mesa nova
+   escolhe o dela sem passar por código.
+   ============================================================================ */
+
+var SeletorDeMesa = (function () {
+
+  var DESENHOS = {
+    // escudo com coração: proteger a vida de quem já é cliente
+    escudo:
+      '<path d="M12 3.2 4.8 6v6.2c0 4.4 3 7.6 7.2 8.9 4.2-1.3 7.2-4.5 7.2-8.9V6z"></path>'
+      + '<path d="M12 15.4c-2-1.3-3.2-2.4-3.2-3.8a1.7 1.7 0 0 1 3.2-.9 1.7 1.7 0 0 1 3.2.9'
+      + 'c0 1.4-1.2 2.5-3.2 3.8z"></path>',
+    // diamante: a mesa prioritária
+    diamante:
+      '<path d="M7.4 3.6h9.2l4 5.4L12 20.6 3.4 9z"></path>'
+      + '<path d="M3.4 9h17.2M7.4 3.6 12 9l4.6-5.4M12 9v11.6"></path>'
+  };
+
+  /** Nome desconhecido cai no losango: melhor que botão sem desenho. */
+  function icone(nome) {
+    var desenho = DESENHOS[String(nome || '').toLowerCase()] || DESENHOS.diamante;
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"'
+      + ' aria-hidden="true">' + desenho + '</svg>';
+  }
+
+  function montar(mesas, idEscolhido) {
+    return '<div class="mesas" role="group" aria-label="Mesa de trabalho">'
+      + mesas.map(function (mesa) {
+        var atual = mesa.id === idEscolhido;
+        return '<button type="button" class="mesa' + (atual ? ' atual' : '') + '"'
+          + ' data-mesa="' + Moldura.escapar(mesa.id) + '"'
+          + ' aria-pressed="' + (atual ? 'true' : 'false') + '">'
+          + icone(mesa.icone)
+          + '<span class="dizeres">'
+          + '<strong>' + Moldura.escapar(mesa.nome) + '</strong>'
+          + '<span>' + Moldura.escapar(mesa.descricao) + '</span>'
+          + '</span></button>';
+      }).join('')
+      + '</div>';
+  }
+
+  function ligar(aoEscolher) {
+    var botoes = document.querySelectorAll('.mesa');
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () {
+        aoEscolher(this.getAttribute('data-mesa'));
+      });
+    }
+  }
+
+  return { montar: montar, ligar: ligar, icone: icone };
+})();
+</script>
+
+<!-- ========================================================================
+     PEÇA 4 de 6 · Formulario
+     Era o arquivo Front-End/Formulario.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — Formulario.html · o formulário, desenhado num lugar só
+   ============================================================================
+   Duas telas montam o mesmo formulário: Cadastrar Caso e a edição dentro do
+   modal do Dashboard. Elas não têm duas cópias disto.
+
+   A razão é a mesma que já custou caro neste projeto: regra copiada em dois
+   lugares é regra que um dia diverge. A máscara do CPF, o seletor vazio que
+   vira caixa de texto, a marcação de erro campo a campo — tudo mora aqui, e
+   quem quiser um formulário pede um.
+
+   O PREFIXO existe porque o formulário pode aparecer DUAS VEZES na mesma
+   página — a tela de cadastro atrás e o modal de edição na frente. Sem ele,
+   os dois teriam elementos com o mesmo id, e o navegador entregaria sempre o
+   primeiro: editar um caso escreveria no formulário de cadastro.
+
+   A máscara vive aqui, e só aqui: é aparência. O que sai daqui para o
+   servidor é o que a pessoa digitou; quem limpa e confere é o servidor.
+   ============================================================================ */
+
+var Formulario = (function () {
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  function texto(valor) {
+    return String(valor === null || valor === undefined ? '' : valor);
+  }
+
+  /* ---------------------------------------------------------------- máscara */
+
+  /**
+   * Aplica a máscara enquanto a pessoa digita.
+   * Cada `0` da máscara é um dígito; o resto é enfeite que o servidor descarta.
+   */
+  function aplicarMascara(valor, mascara) {
+    var digitos = String(valor || '').replace(/\D/g, '');
+    if (!mascara) return digitos;
+
+    var saida = '';
+    var proximo = 0;
+    for (var i = 0; i < mascara.length && proximo < digitos.length; i++) {
+      if (mascara.charAt(i) === '0') {
+        saida += digitos.charAt(proximo);
+        proximo++;
+      } else {
+        saida += mascara.charAt(i);
+      }
+    }
+    return saida;
+  }
+
+  function usaMascara(campo) {
+    return !!campo.mascara
+      && (campo.tipo === 'documento' || campo.tipo === 'identificador'
+        || campo.tipo === 'telefone');
+  }
+
+  /* -------------------------------------------------------------- desenhar */
+
+  function desenharCampo(campo, prefixo) {
+    var id = prefixo + 'campo-' + campo.chave;
+    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
+    /*
+      O asterisco é VISUAL. Quem usa leitor de tela não o ouve como "campo
+      obrigatório" — ouve "asterisco", ou nada. `aria-required` é o que diz
+      isso de verdade, e custa um atributo.
+
+      Não é `required` do HTML: o formulário é `novalidate` de propósito,
+      porque quem valida é o servidor, e o balão nativo do navegador
+      atropelaria a nossa mensagem — que é mais específica e diz o que fazer.
+      `aria-required` anuncia sem impedir o envio.
+    */
+    var exigido = campo.obrigatorio ? ' aria-required="true"' : '';
+    var travado = campo.somenteLeitura ? ' disabled' : '';
+    var controle;
+
+    // Seletor sem opção nenhuma vira caixa de texto: uma lista vazia na tela
+    // é um campo que não dá para preencher, e ninguém entenderia por quê.
+    if (campo.tipo === 'seletor' && !campo.opcoes.length) {
+      controle = '<input type="text" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '" autocomplete="off"'
+        + ' placeholder="A lista ainda está vazia — digite o valor"'
+        + exigido + travado + '>';
+
+    } else if (campo.tipo === 'seletor') {
+      var opcoes = ['<option value="">Selecione uma opção</option>'];
+      campo.opcoes.forEach(function (opcao) {
+        opcoes.push('<option value="' + escapar(opcao.valor) + '">'
+          + escapar(opcao.rotulo) + '</option>');
+      });
+      controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
+        + exigido + travado + '>' + opcoes.join('') + '</select>';
+
+    } else if (campo.tipo === 'simOuNao') {
+      controle = '<select id="' + id + '" data-chave="' + escapar(campo.chave) + '"'
+        + exigido + travado + '>'
+        + '<option value="">Selecione</option>'
+        + '<option value="SIM">Sim</option>'
+        + '<option value="NAO">Não</option></select>';
+
+    } else if (campo.tipo === 'textoLongo') {
+      controle = '<textarea id="' + id + '" rows="3"' + exigido
+        + ' data-chave="' + escapar(campo.chave) + '"' + travado + '></textarea>';
+
+    } else {
+      var htmlTipo = 'text';
+      if (campo.tipo === 'data') htmlTipo = 'date';
+      else if (campo.tipo === 'hora') htmlTipo = 'time';
+      else if (campo.tipo === 'email') htmlTipo = 'email';
+      else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
+        || campo.tipo === 'percentual') htmlTipo = 'text';
+
+      controle = '<input type="' + htmlTipo + '" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '"'
+        + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
+        + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
+        + ' autocomplete="off"' + exigido + travado + '>';
+    }
+
+    var ajuda = campo.descricao
+      ? '<small class="ajuda">' + escapar(campo.descricao) + '</small>' : '';
+    var selo = campo.chave === 'susep'
+      ? '<div class="selo-susep" id="' + prefixo + 'selo-susep" hidden></div>' : '';
+
+    return '<div class="campo largura-' + campo.largura + '" data-campo="'
+      + escapar(campo.chave) + '">'
+      + '<label for="' + id + '">' + escapar(campo.rotulo) + obrigatorio + '</label>'
+      + controle + ajuda + selo
+      + '<small class="erro" hidden></small>'
+      + '</div>';
+  }
+
+  /** Todas as seções do formulário, prontas para entrar num elemento. */
+  function desenhar(formulario, prefixo) {
+    return formulario.secoes.map(function (secao) {
+      return '<fieldset class="secao">'
+        + '<legend>' + escapar(secao.nome) + '</legend>'
+        + '<div class="grade">'
+        + secao.campos.map(function (campo) {
+          return desenharCampo(campo, prefixo || '');
+        }).join('')
+        + '</div></fieldset>';
+    }).join('');
+  }
+
+  /* --------------------------------------------------------- comportamento */
+
+  /**
+   * Liga as máscaras e o selo da SUSEP dentro de um pedaço da página.
+   *
+   * Recebe a RAIZ, e não procura na página inteira: com o modal aberto por
+   * cima da tela de cadastro, procurar na página inteira ligaria os dois.
+   */
+  function ligar(raiz, prefixo) {
+    var comMascara = raiz.querySelectorAll('[data-mascara]');
+    for (var i = 0; i < comMascara.length; i++) {
+      comMascara[i].addEventListener('input', function () {
+        var posicaoNoFim = this.selectionStart === this.value.length;
+        this.value = aplicarMascara(this.value, this.getAttribute('data-mascara'));
+        if (posicaoNoFim) {
+          this.selectionStart = this.selectionEnd = this.value.length;
+        }
+      });
+    }
+
+    var susep = raiz.querySelector('[data-chave="susep"]');
+    if (susep) {
+      var conferir = function () { consultarSusep(raiz, prefixo, susep.value); };
+      susep.addEventListener('change', conferir);
+      susep.addEventListener('blur', conferir);
+    }
+  }
+
+  /**
+   * O selo da SUSEP.
+   * "Não encontrada" é resposta, não erro: é uma corretora que o cadastro não
+   * conhece, e quem está atendendo precisa saber disso antes de seguir.
+   */
+  function consultarSusep(raiz, prefixo, valor) {
+    var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-susep');
+    if (!selo) return;
+
+    if (!String(valor || '').replace(/\D/g, '')) {
+      selo.hidden = true;
+      return;
+    }
+
+    selo.hidden = false;
+    selo.className = 'selo-susep conferindo';
+    selo.textContent = 'Conferindo…';
+
+    Servidor.chamar('consultarSusep', valor)
+      .entao(function (resposta) {
+        var aparencia = {
+          OK: 'liberada', BLOQUEADA: 'bloqueada',
+          NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
+        }[resposta.situacao] || 'conferindo';
+
+        selo.className = 'selo-susep ' + aparencia;
+        selo.textContent = resposta.mensagem
+          + (resposta.segmento && resposta.situacao === 'OK'
+            ? ' · ' + resposta.segmento : '');
+      })
+      .senao(function () {
+        selo.className = 'selo-susep conferindo';
+        selo.textContent = 'Não consegui conferir a SUSEP agora.';
+      });
+  }
+
+  /* -------------------------------------------------------------- valores */
+
+  function valores(raiz) {
+    var lidos = {};
+    var controles = raiz.querySelectorAll('[data-chave]');
+    for (var i = 0; i < controles.length; i++) {
+      if (controles[i].disabled) continue;
+      lidos[controles[i].getAttribute('data-chave')] = controles[i].value;
+    }
+    return lidos;
+  }
+
+  /**
+   * Preenche o formulário com o que o caso tem hoje.
+   *
+   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê; a caixa
+   * de data do navegador só entende aaaa-mm-dd. A conversão é aqui, e não no
+   * servidor, porque é uma exigência do controle e não do dado.
+   */
+  function preencher(raiz, valoresDoCaso) {
+    var controles = raiz.querySelectorAll('[data-chave]');
+    for (var i = 0; i < controles.length; i++) {
+      var chave = controles[i].getAttribute('data-chave');
+      var valor = texto(valoresDoCaso[chave]);
+
+      if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
+      controles[i].value = valor;
+
+      // Valor que não está entre as opções: o seletor ficaria em branco e a
+      // pessoa gravaria vazio sem perceber. Acrescentamos a opção, marcada.
+      if (controles[i].tagName === 'SELECT' && valor && controles[i].value !== valor) {
+        var solta = document.createElement('option');
+        solta.value = valor;
+        solta.textContent = valor + ' (fora da lista)';
+        controles[i].appendChild(solta);
+        controles[i].value = valor;
+      }
+    }
+  }
+
+  function paraCaixaDeData(valor) {
+    var brasileira = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valor || ''));
+    if (!brasileira) return valor;
+    return brasileira[3] + '-' + brasileira[2] + '-' + brasileira[1];
+  }
+
+  /* ---------------------------------------------------------------- erros */
+
+  function limparErros(raiz) {
+    var marcados = raiz.querySelectorAll('.campo.com-erro');
+    for (var i = 0; i < marcados.length; i++) {
+      marcados[i].classList.remove('com-erro');
+      var aviso = marcados[i].querySelector('.erro');
+      if (aviso) { aviso.hidden = true; aviso.textContent = ''; }
+    }
+  }
+
+  /**
+   * Marca cada campo com o problema dele.
+   *
+   * O servidor devolve TODOS os problemas de uma vez, e a tela mostra todos.
+   * Um erro por vez faria a pessoa corrigir, salvar, descobrir o segundo,
+   * corrigir e salvar de novo.
+   */
+  function mostrarProblemas(raiz, problemas) {
+    limparErros(raiz);
+    (problemas || []).forEach(function (problema) {
+      var caixa = raiz.querySelector('[data-campo="' + problema.campo + '"]');
+      if (!caixa) return;
+      caixa.classList.add('com-erro');
+      var aviso = caixa.querySelector('.erro');
+      aviso.textContent = problema.erro;
+      aviso.hidden = false;
+    });
+    var primeiro = raiz.querySelector('.campo.com-erro input, .campo.com-erro select');
+    if (primeiro) primeiro.focus();
+  }
+
+  return {
+    aplicarMascara: aplicarMascara,
+    usaMascara: usaMascara,
+    desenhar: desenhar,
+    ligar: ligar,
+    valores: valores,
+    preencher: preencher,
+    limparErros: limparErros,
+    mostrarProblemas: mostrarProblemas
+  };
+})();
+</script>
+
+<!-- ========================================================================
+     PEÇA 5 de 6 · CasoEmModal
+     Era o arquivo Front-End/CasoEmModal.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — CasoEmModal.html · o caso aberto por cima da fila
+   ============================================================================
+   Clicar em "Ver detalhes" na fila não leva a pessoa para outra tela: abre o
+   caso por cima, e fechar devolve a fila exatamente como estava — mesma
+   rolagem, mesmo filtro, mesma linha. Sair e voltar faria perder o lugar
+   dezenas de vezes por dia.
+
+   O modal tem dois estados, e é o mesmo modal:
+
+     LEITURA  o caso inteiro, campo a campo, com a história embaixo. Campo em
+              branco aparece com um travessão — sumir faria a pessoa achar
+              que o campo não existe nesta mesa.
+
+     EDIÇÃO   o mesmo formulário de Cadastrar Caso, montado pelo Formulario,
+              já preenchido. Com PREFIXO, porque a tela de cadastro pode
+              estar atrás e os dois não podem disputar os mesmos ids.
+
+   Fechar com Esc, com o X, com o botão e clicando fora. Quatro saídas: modal
+   que prende é modal que a pessoa aprende a não abrir.
+   ============================================================================ */
+
+var CasoEmModal = (function () {
+
+  var mesaAtual = '';
+  var idAtual = '';
+  var detalhe = null;
+  var formulario = null;
+  var editando = false;
+  var salvando = false;
+  var aoFechar = null;        // o que a tela quer fazer quando algo mudou
+  var mudouAlgo = false;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+  function corpoDaEdicao() { return elemento('corpo-da-edicao'); }
+
+  /* ------------------------------------------------------------- abrir */
+
+  /**
+   * Abre o caso. `quandoMudar` é chamado no fim, e só se algo mudou — assim o
+   * Dashboard recarrega quando precisa, e fica quieto quando a pessoa só
+   * olhou e fechou.
+   */
+  function abrir(idDaMesa, idDoCaso, quandoMudar, jaEditando) {
+    mesaAtual = idDaMesa;
+    idAtual = idDoCaso;
+    aoFechar = quandoMudar || null;
+    editando = !!jaEditando;
+    mudouAlgo = false;
+    detalhe = null;
+
+    desenharCasca();
+    carregar();
+  }
+
+  function desenharCasca() {
+    fechar(true);
+
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'modal-do-caso';
+    caixa.innerHTML = '<div class="dialogo-caixa larga" role="dialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-do-caso">'
+      + '<header class="modal-cabeca">'
+      + '<div><h3 id="titulo-do-caso">Caso ' + escapar(idAtual) + '</h3>'
+      + '<p id="modal-subtitulo">Abrindo…</p></div>'
+      + '<button type="button" class="modal-fechar" id="modal-x"'
+      + ' aria-label="Fechar">✕</button>'
+      + '</header>'
+      + '<div class="modal-corpo" id="modal-corpo">'
+      + '<p class="carregando-campos">Abrindo o caso…</p></div>'
+      + '<footer class="modal-pe" id="modal-pe"></footer>'
+      + '</div>';
+    document.body.appendChild(caixa);
+
+    elemento('modal-x').addEventListener('click', function () { fechar(); });
+    caixa.addEventListener('mousedown', function (evento) {
+      // Só o véu fecha. Um arrasto que começa dentro e termina fora não é
+      // "clicar fora" — e fechar ali perderia o que a pessoa digitou.
+      if (evento.target === caixa) fechar();
+    });
+    document.addEventListener('keydown', aoTeclar);
+  }
+
+  function aoTeclar(evento) {
+    if (!elemento('modal-do-caso')) return;
+    if (evento.key === 'Escape') { evento.preventDefault(); fechar(); return; }
+    if (editando && (evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
+      evento.preventDefault();
+      salvar();
+    }
+  }
+
+  function fechar(semAvisar) {
+    var caixa = elemento('modal-do-caso');
+    if (caixa) caixa.parentNode.removeChild(caixa);
+    document.removeEventListener('keydown', aoTeclar);
+
+    if (!semAvisar && mudouAlgo && aoFechar) aoFechar();
+    if (!semAvisar) { aoFechar = null; mudouAlgo = false; editando = false; }
+  }
+
+  /* ----------------------------------------------------------- carregar */
+
+  function carregar() {
+    Servidor.chamar('detalhesDoCaso', mesaAtual, idAtual)
+      .entao(function (resposta) {
+        detalhe = resposta;
+        if (editando) abrirEdicao();
+        else desenharLeitura();
+      })
+      .senao(function (erro) {
+        var corpo = elemento('modal-corpo');
+        if (!corpo) return;
+        corpo.innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+        elemento('modal-pe').innerHTML = botaoFechar();
+        ligarPe();
+      });
+  }
+
+  /* ------------------------------------------------------------ leitura */
+
+  function desenharLeitura() {
+    editando = false;
+    elemento('modal-subtitulo').textContent = detalhe.atualizadoEm
+      ? 'Atualizado em ' + detalhe.atualizadoEm
+      : detalhe.mesa;
+
+    elemento('modal-corpo').innerHTML =
+      (detalhe.situacao
+        ? '<span class="situacao tom-' + escapar(detalhe.tom) + '">'
+          + escapar(detalhe.situacao) + '</span>'
+        : '')
+      + '<div class="modal-pares">'
+      + detalhe.linhas.map(function (linha) {
+        return '<div class="par-do-caso">'
+          + '<span>' + escapar(linha.rotulo) + '</span>'
+          // Travessão, e não vazio: "está em branco" é uma informação.
+          + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
+          + '</div>';
+      }).join('')
+      + '</div>'
+      + desenharHistorico();
+
+    // As quatro ações do caso vivem aqui: as duas da linha, mais alterar
+    // situação e excluir. Na fila só cabem duas sem comer uma coluna de dado.
+    elemento('modal-pe').innerHTML = botaoFechar()
+      + (detalhe.podeOcultar
+        ? '<button type="button" class="botao vazado perigo" id="modal-excluir">'
+          + Moldura.icone('ocultar') + ' Excluir</button>' : '')
+      + (detalhe.podeEditar
+        ? '<button type="button" class="botao vazado" id="modal-situacao">'
+          + Moldura.icone('trocarSituacao') + ' Alterar situação</button>' : '')
+      + (detalhe.podeEditar
+        ? '<button type="button" class="botao" id="modal-editar">'
+          + Moldura.icone('editar') + ' Editar caso</button>' : '');
+    ligarPe();
+
+    var editar = elemento('modal-editar');
+    if (editar) editar.addEventListener('click', abrirEdicao);
+
+    var situacao = elemento('modal-situacao');
+    if (situacao) {
+      situacao.addEventListener('click', function () {
+        trocarSituacao(mesaAtual, idAtual, function () {
+          mudouAlgo = true;
+          carregar();
+        });
+      });
+    }
+
+    var excluir = elemento('modal-excluir');
+    if (excluir) excluir.addEventListener('click', function () {
+      // O texto diz a verdade: a linha permanece na planilha. Prometer "não
+      // poderá ser desfeito" quando dá para desfazer assusta à toa.
+      if (!window.confirm('Excluir o caso ' + idAtual + '?\n\n'
+        + 'Ele sai do sistema para todo mundo. A linha permanece na planilha '
+        + 'e pode ser trazida de volta por um administrador.')) return;
+
+      Servidor.chamar('ocultarCaso', mesaAtual, idAtual)
+        .entao(function () { mudouAlgo = true; fechar(); })
+        .senao(function (erro) { window.alert(erro.message || String(erro)); });
+    });
+  }
+
+  function desenharHistorico() {
+    if (!detalhe.historico.length) return '';
+    return '<section class="historico">'
+      + '<h4>Histórico do caso</h4>'
+      + '<ul>' + detalhe.historico.map(function (passo) {
+        return '<li><strong>' + escapar(passo.acao) + '</strong>'
+          + (passo.detalhe ? '<em>' + escapar(passo.detalhe) + '</em>' : '')
+          + '<span>' + escapar(passo.quando) + ' · ' + escapar(passo.quem)
+          + '</span></li>';
+      }).join('') + '</ul></section>';
+  }
+
+  /* ------------------------------------------------------------- edição */
+
+  function abrirEdicao() {
+    editando = true;
+    elemento('modal-corpo').innerHTML =
+      '<form class="formulario no-modal" id="form-do-caso" novalidate>'
+      + '<div id="corpo-da-edicao"><p class="carregando-campos">'
+      + 'Montando o formulário…</p></div></form>';
+    elemento('modal-pe').innerHTML =
+      '<span class="recado" id="recado-do-modal" hidden></span>'
+      + '<button type="button" class="botao vazado" id="modal-desistir">'
+      + 'Desistir</button>'
+      + '<button type="button" class="botao" id="modal-salvar">'
+      + 'Salvar alterações</button>';
+
+    elemento('modal-desistir').addEventListener('click', desenharLeitura);
+    elemento('modal-salvar').addEventListener('click', salvar);
+
+    // O formulário e os valores vêm em duas chamadas, e as duas precisam ter
+    // chegado antes de preencher — preencher antes de desenhar não escreve
+    // em lugar nenhum, e é o tipo de erro que só aparece com a rede lenta.
+    Servidor.chamar('formularioDaMesa', mesaAtual)
+      .entao(function (definicao) {
+        formulario = definicao;
+        Servidor.chamar('casoParaEditar', mesaAtual, idAtual)
+          .entao(function (caso) {
+            var corpo = corpoDaEdicao();
+            if (!corpo) return;
+            corpo.innerHTML = Formulario.desenhar(formulario, 'editar-');
+            Formulario.ligar(corpo, 'editar-');
+            Formulario.preencher(corpo, caso.valores);
+          })
+          .senao(mostrarRecadoDeErro);
+      })
+      .senao(mostrarRecadoDeErro);
+  }
+
+  function mostrarRecadoDeErro(erro) {
+    recado(erro.message || String(erro), 'ruim');
+    var corpo = corpoDaEdicao();
+    if (corpo) corpo.innerHTML = '';
+  }
+
+  function recado(texto, tipo) {
+    var caixa = elemento('recado-do-modal');
+    if (!caixa) return;
+    caixa.className = 'recado ' + (tipo || '');
+    caixa.textContent = texto;
+    caixa.hidden = !texto;
+  }
+
+  function salvar() {
+    if (salvando) return;
+    var corpo = corpoDaEdicao();
+    if (!corpo) return;
+
+    salvando = true;
+    Formulario.limparErros(corpo);
+    recado('Gravando…', '');
+    elemento('modal-salvar').disabled = true;
+
+    Servidor.chamar('editarCaso', mesaAtual, idAtual, Formulario.valores(corpo))
+      .entao(function () {
+        salvando = false;
+        mudouAlgo = true;
+        var botao = elemento('modal-salvar');
+        if (botao) botao.disabled = false;
+        carregar();          // volta para a leitura, já com o que foi gravado
+      })
+      .senao(function (erro) {
+        salvando = false;
+        var botao = elemento('modal-salvar');
+        if (botao) botao.disabled = false;
+        recado(erro.message || String(erro), 'ruim');
+        if (erro.problemas) Formulario.mostrarProblemas(corpo, erro.problemas);
+      });
+  }
+
+  function botaoFechar() {
+    return '<button type="button" class="botao vazado" id="modal-fechar">'
+      + 'Fechar</button>';
+  }
+
+  function ligarPe() {
+    var botao = elemento('modal-fechar');
+    if (botao) botao.addEventListener('click', function () { fechar(); });
+  }
+
+  /* ================================================ trocar a situação */
+
+  /**
+   * O diálogo de trocar situação, que é o gesto mais frequente da operação.
+   *
+   * Separado do formulário inteiro de propósito: abrir trinta e cinco campos
+   * para mexer num só é atrito que se paga dezenas de vezes por dia.
+   */
+  function trocarSituacao(idDaMesa, idDoCaso, quandoMudar) {
+    Servidor.chamar('situacoesParaTrocar', idDaMesa, idDoCaso)
+      .entao(function (resposta) {
+        var caixa = document.createElement('div');
+        caixa.className = 'dialogo';
+        caixa.id = 'dialogo-situacao';
+        caixa.innerHTML = '<div class="dialogo-caixa" role="dialog"'
+          + ' aria-modal="true" aria-labelledby="titulo-situacao">'
+          + '<h3 id="titulo-situacao">Alterar situação</h3>'
+          + '<p>Caso ' + escapar(idDoCaso) + '</p>'
+          + '<form id="form-situacao">'
+          + '<label class="config-campo"><span>Situação</span>'
+          + '<select id="situacao-nova">'
+          + resposta.opcoes.map(function (opcao) {
+            return '<option value="' + escapar(opcao.valor) + '"'
+              + (opcao.valor === resposta.atual ? ' selected' : '') + '>'
+              + escapar(opcao.rotulo) + '</option>';
+          }).join('')
+          + '</select></label>'
+          + '<p class="dialogo-erro" id="erro-situacao" hidden></p>'
+          + '<div class="config-acoes">'
+          + '<button type="submit" class="botao">Salvar</button>'
+          + '<button type="button" class="botao vazado" id="cancelar-situacao">'
+          + 'Cancelar</button></div></form></div>';
+        document.body.appendChild(caixa);
+
+        function sair() {
+          if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+        }
+        elemento('cancelar-situacao').addEventListener('click', sair);
+        caixa.addEventListener('mousedown', function (evento) {
+          if (evento.target === caixa) sair();
+        });
+
+        elemento('form-situacao').addEventListener('submit', function (evento) {
+          evento.preventDefault();
+          Servidor.chamar('alterarSituacaoDoCaso', idDaMesa, idDoCaso,
+            elemento('situacao-nova').value)
+            .entao(function () { sair(); if (quandoMudar) quandoMudar(); })
+            .senao(function (erro) {
+              var aviso = elemento('erro-situacao');
+              aviso.textContent = erro.message || String(erro);
+              aviso.hidden = false;
+            });
+        });
+      })
+      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+  }
+
+  return { abrir: abrir, fechar: fechar, trocarSituacao: trocarSituacao };
+})();
+</script>
+
+<!-- ========================================================================
+     PEÇA 6 de 6 · Graficos
+     Era o arquivo Front-End/Graficos.html antes de as peças
+     compartilhadas serem agrupadas num arquivo só.
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — Graficos.html · os desenhos, num lugar só
+   ============================================================================
+   Duas telas desenham gráficos: o Painel Analítico e Minha Performance. Elas
+   não têm duas cópias disto — pela mesma razão que já custou caro aqui:
+   regra copiada em dois lugares é regra que um dia diverge, e num gráfico a
+   divergência não dá erro. Vira uma barra um pouco mais alta do que devia, e
+   alguém decide alguma coisa com base nela.
+
+   SVG escrito à mão, sem biblioteca de fora: o Apps Script serve a página num
+   quadro isolado, e cada dependência externa é mais um ponto que pode não
+   carregar. Gráfico que não carrega é pior que gráfico nenhum — deixa um
+   buraco na tela.
+
+   TRÊS REGRAS DE LEITURA, e todas têm motivo:
+
+     UM EIXO SÓ. "Barras com linha" não são duas escalas. A linha é a média
+     móvel da própria barra, na mesma altura: ela mostra a tendência por cima
+     do ruído do dia a dia. Dois eixos fariam a mesma altura significar duas
+     coisas — é o erro de gráfico mais comum que existe.
+
+     COR PARA IDENTIDADE, TOM ÚNICO PARA MAGNITUDE. A pizza responde "de que
+     tipo são" e usa cores; as barras respondem "quanto de cada" e usam um tom
+     só. Seis cores para dizer "quanto" enterra a informação.
+
+     O NÚMERO SEMPRE VISÍVEL. Todo desenho traz rótulo direto, e quem chama
+     oferece a tabela por baixo. Cor é a segunda leitura, nunca a única — nem
+     todo mundo enxerga cor, e nenhuma tela de trabalho pode depender disso.
+
+   O QUE ENTRA: um "componente" no formato que o servidor devolve —
+   { titulo, tipo, largura, unidade, agregacao, pontos:[{chave, rotulo, valor,
+   casos, tom, serie, ehOutros}], tendencia }.
+   ============================================================================ */
+
+var Graficos = (function () {
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  function numero(valor, unidade) {
+    if (unidade === 'dinheiro') {
+      return 'R$ ' + (Math.round(valor * 100) / 100)
+        .toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+    var arredondado = Math.round(valor * 100) / 100;
+    return String(arredondado).replace('.', ',');
+  }
+
+  function porcento(parte, todo) {
+    if (!todo) return '0%';
+    return Math.round((parte / todo) * 100) + '%';
+  }
+
+  /* --------------------------------------------------------------- montar */
+
+  function classeDoPonto(ponto) {
+    if (ponto.tom) return 'tom-' + ponto.tom;
+    if (ponto.serie) return 'serie-' + ponto.serie;
+    return 'serie-magnitude';
+  }
+
+  function dica(componente, ponto) {
+    return escapar(ponto.rotulo) + ': '
+      + escapar(numero(ponto.valor, componente.unidade))
+      + (componente.agregacao === 'contagem' ? ' caso(s)'
+        : ' · ' + ponto.casos + ' caso(s)');
+  }
+
+  /* -- pizza --------------------------------------------------------------- */
+
+  /**
+   * Rosca, e não pizza cheia: o buraco do meio recebe o total, que é o número
+   * que a pessoa procura primeiro. Cada fatia tem um anel da cor do fundo em
+   * volta, para duas fatias vizinhas nunca se fundirem numa só mancha.
+   */
+  function desenharPizza(componente) {
+    var total = componente.pontos.reduce(function (soma, ponto) {
+      return soma + ponto.valor;
+    }, 0);
+    if (!total) return '<p class="grafico-vazio">Tudo zerado no período.</p>';
+
+    var centro = 92;
+    var raio = 76;
+    var buraco = 46;
+    var anguloAtual = -Math.PI / 2;   // começa no topo
+
+    var fatias = componente.pontos.map(function (ponto) {
+      var fracao = ponto.valor / total;
+      var angulo = fracao * Math.PI * 2;
+      var caminho = arcoDaRosca(centro, centro, raio, buraco, anguloAtual,
+        anguloAtual + angulo);
+      anguloAtual += angulo;
+
+      return '<path d="' + caminho + '" class="fatia ' + classeDoPonto(ponto) + '"'
+        + ' data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '"></path>';
+    }).join('');
+
+    var legenda = componente.pontos.map(function (ponto) {
+      return '<button type="button" class="legenda-item" data-ponto="'
+        + escapar(ponto.chave) + '">'
+        + '<span class="marca ' + classeDoPonto(ponto) + '"></span>'
+        + '<span class="nome">' + escapar(ponto.rotulo) + '</span>'
+        + '<span class="valor">' + escapar(numero(ponto.valor, componente.unidade))
+        + '<em>' + porcento(ponto.valor, total) + '</em></span></button>';
+    }).join('');
+
+    return '<div class="grafico-corpo pizza">'
+      + '<svg viewBox="0 0 184 184" class="desenho" role="img"'
+      + ' aria-label="' + escapar(componente.titulo) + '">'
+      + fatias
+      + '<text x="92" y="86" class="rosca-numero">' + total + '</text>'
+      + '<text x="92" y="104" class="rosca-rotulo">no total</text>'
+      + '</svg>'
+      + '<div class="legenda">' + legenda + '</div></div>';
+  }
+
+  /** O caminho de uma fatia de rosca, em coordenadas de SVG. */
+  function arcoDaRosca(cx, cy, raio, buraco, de, ate) {
+    // Uma fatia que é o círculo inteiro não pode fechar em si mesma, ou o
+    // navegador não desenha nada. Tiramos um fio de grau dela.
+    if (ate - de >= Math.PI * 2) ate = de + Math.PI * 2 - 0.001;
+
+    var grande = (ate - de) > Math.PI ? 1 : 0;
+    var x1 = cx + raio * Math.cos(de), y1 = cy + raio * Math.sin(de);
+    var x2 = cx + raio * Math.cos(ate), y2 = cy + raio * Math.sin(ate);
+    var x3 = cx + buraco * Math.cos(ate), y3 = cy + buraco * Math.sin(ate);
+    var x4 = cx + buraco * Math.cos(de), y4 = cy + buraco * Math.sin(de);
+
+    return 'M ' + x1.toFixed(2) + ' ' + y1.toFixed(2)
+      + ' A ' + raio + ' ' + raio + ' 0 ' + grande + ' 1 '
+      + x2.toFixed(2) + ' ' + y2.toFixed(2)
+      + ' L ' + x3.toFixed(2) + ' ' + y3.toFixed(2)
+      + ' A ' + buraco + ' ' + buraco + ' 0 ' + grande + ' 0 '
+      + x4.toFixed(2) + ' ' + y4.toFixed(2) + ' Z';
+  }
+
+  /* -- barras em pé -------------------------------------------------------- */
+
+  function desenharBarras(componente) {
+    var maior = maiorValor(componente.pontos);
+    var largura = larguraDoDesenho(componente);
+    var altura = 240;
+    var pe = 46;          // espaço do rótulo embaixo
+    var topo = 22;        // espaço do número em cima
+    var faixa = largura / componente.pontos.length;
+    var grossura = Math.min(faixa - 10, 64);
+
+    var barras = componente.pontos.map(function (ponto, i) {
+      var alto = maior ? (ponto.valor / maior) * (altura - pe - topo) : 0;
+      var x = i * faixa + (faixa - grossura) / 2;
+      var y = altura - pe - alto;
+
+      return '<g class="barra ' + classeDoPonto(ponto) + '"'
+        + ' data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '">'
+        + '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '"'
+        + ' width="' + grossura.toFixed(1) + '" height="'
+        + Math.max(alto, 2).toFixed(1) + '" rx="4"></rect>'
+        + '<text x="' + (x + grossura / 2).toFixed(1) + '" y="'
+        + (y - 7).toFixed(1) + '" class="valor-da-barra">'
+        + escapar(numero(ponto.valor, componente.unidade)) + '</text>'
+        + '<text x="' + (x + grossura / 2).toFixed(1) + '" y="'
+        + (altura - pe + 18) + '" class="rotulo-da-barra">'
+        + escapar(encurtar(ponto.rotulo, 14)) + '</text>'
+        + '</g>';
+    }).join('');
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(componente.titulo) + '">'
+      + '<line x1="0" y1="' + (altura - pe) + '" x2="' + largura + '" y2="'
+      + (altura - pe) + '" class="regua"></line>'
+      + barras + '</svg></div>';
+  }
+
+  /* -- barras deitadas ----------------------------------------------------- */
+
+  /**
+   * Deitadas porque o rótulo é comprido. Em pé, "Aumento do prêmio na
+   * renovação" vira uma escadinha ilegível ou é cortado no meio.
+   */
+  function desenharBarrasDeitadas(componente) {
+    var maior = maiorValor(componente.pontos);
+    var largura = larguraDoDesenho(componente);
+    var alturaDaLinha = 34;
+    var altura = componente.pontos.length * alturaDaLinha + 8;
+    var areaDoRotulo = componente.largura === 2 ? 240 : 152;
+    var areaDoValor = 62;
+    var comprimentoMaximo = largura - areaDoRotulo - areaDoValor;
+
+    var barras = componente.pontos.map(function (ponto, i) {
+      var comprimento = maior ? (ponto.valor / maior) * comprimentoMaximo : 0;
+      var y = i * alturaDaLinha + 8;
+
+      return '<g class="barra deitada ' + classeDoPonto(ponto) + '"'
+        + ' data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '">'
+        + '<text x="' + (areaDoRotulo - 10) + '" y="' + (y + 14)
+        + '" class="rotulo-deitado">'
+        + escapar(encurtar(ponto.rotulo, componente.largura === 2 ? 38 : 22))
+        + '</text>'
+        + '<rect x="' + areaDoRotulo + '" y="' + y + '" width="'
+        + Math.max(comprimento, 2).toFixed(1) + '" height="18" rx="4"></rect>'
+        + '<text x="' + (areaDoRotulo + Math.max(comprimento, 2) + 8).toFixed(1)
+        + '" y="' + (y + 14) + '" class="valor-deitado">'
+        + escapar(numero(ponto.valor, componente.unidade)) + '</text>'
+        + '</g>';
+    }).join('');
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(componente.titulo) + '">'
+      + barras + '</svg></div>';
+  }
+
+  /* -- linha, e barras com linha ------------------------------------------- */
+
+  function desenharLinha(componente, comBarras) {
+    var pontos = componente.pontos;
+    var maior = maiorValor(pontos);
+    var largura = larguraDoDesenho(componente);
+    var altura = componente.largura === 2 ? 300 : 240;
+    var pe = 40;
+    var topo = 20;
+    var faixa = pontos.length > 1 ? largura / pontos.length : largura;
+
+    function xDe(i) { return i * faixa + faixa / 2; }
+    function yDe(valor) {
+      return altura - pe - (maior ? (valor / maior) * (altura - pe - topo) : 0);
+    }
+
+    var barras = '';
+    if (comBarras) {
+      var grossura = Math.min(faixa - 6, 34);
+      barras = pontos.map(function (ponto, i) {
+        var y = yDe(ponto.valor);
+        return '<rect class="barra-de-fundo" x="'
+          + (xDe(i) - grossura / 2).toFixed(1) + '" y="' + y.toFixed(1)
+          + '" width="' + grossura.toFixed(1) + '" height="'
+          + Math.max(altura - pe - y, 2).toFixed(1) + '" rx="4"></rect>';
+      }).join('');
+    }
+
+    var serie = comBarras ? componente.tendencia : pontos;
+    var caminho = serie.map(function (ponto, i) {
+      return (i ? 'L' : 'M') + xDe(i).toFixed(1) + ' ' + yDe(ponto.valor).toFixed(1);
+    }).join(' ');
+
+    // Só alguns rótulos no eixo: um por ponto vira uma parede de texto em 30
+    // dias, e nenhum deles é lido.
+    var deQuantosEm = Math.max(1, Math.ceil(pontos.length / 8));
+    var ultimo = pontos.length - 1;
+    // O último rótulo entra sempre — menos quando cairia em cima do vizinho
+    // que já foi desenhado. Duas datas sobrepostas não são duas datas: são
+    // um borrão que não se lê.
+    var cabeOUltimo = (ultimo % deQuantosEm) === 0
+      || (ultimo - (ultimo - (ultimo % deQuantosEm))) >= deQuantosEm / 2;
+    var rotulos = pontos.map(function (ponto, i) {
+      if (i % deQuantosEm !== 0 && !(i === ultimo && cabeOUltimo)) return '';
+      return '<text x="' + xDe(i).toFixed(1) + '" y="' + (altura - pe + 18)
+        + '" class="rotulo-da-barra">' + escapar(ponto.rotulo) + '</text>';
+    }).join('');
+
+    var marcas = pontos.map(function (ponto, i) {
+      return '<g class="ponto-da-linha" data-ponto="' + escapar(ponto.chave) + '"'
+        + ' data-dica="' + dica(componente, ponto) + '"'
+        + ' tabindex="0" role="button"'
+        + ' aria-label="' + dica(componente, ponto) + '">'
+        // Alvo invisível e largo: acertar um círculo de 5px com o mouse é
+        // uma tarefa, e ninguém deveria ter de mirar num gráfico.
+        + '<rect class="alvo" x="' + (xDe(i) - faixa / 2).toFixed(1) + '" y="0"'
+        + ' width="' + faixa.toFixed(1) + '" height="' + (altura - pe) + '"></rect>'
+        + '<circle cx="' + xDe(i).toFixed(1) + '" cy="'
+        + yDe(ponto.valor).toFixed(1) + '" r="5" class="marcador"></circle>'
+        + '</g>';
+    }).join('');
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(componente.titulo) + '">'
+      + '<line x1="0" y1="' + (altura - pe) + '" x2="' + largura + '" y2="'
+      + (altura - pe) + '" class="regua"></line>'
+      + barras
+      + '<path d="' + caminho + '" class="linha-do-grafico"></path>'
+      + marcas + rotulos + '</svg>'
+      + (comBarras
+        ? '<p class="grafico-legenda-linha">As barras são o dia; a linha é a '
+          + '<strong>média dos 7 dias anteriores</strong>, na mesma escala — '
+          + 'ela mostra a tendência por cima do sobe e desce do dia a dia.</p>'
+        : '')
+      + '</div>';
+  }
+
+  /**
+   * A largura do desenho, em unidades do viewBox.
+   *
+   * O cartão largo recebe um desenho largo, e não o mesmo desenho esticado:
+   * esticado, um gráfico de 480 por 240 num cartão de 1200px fica com 600px
+   * de altura e letras do tamanho de um título. A proporção tem de nascer
+   * certa, não ser corrigida depois.
+   */
+  function larguraDoDesenho(componente) {
+    return componente.largura === 2 ? 960 : 480;
+  }
+
+  function maiorValor(pontos) {
+    return pontos.reduce(function (maior, ponto) {
+      return Math.max(maior, ponto.valor);
+    }, 0);
+  }
+
+  function encurtar(texto, quantos) {
+    var limpo = String(texto || '');
+    return limpo.length > quantos ? limpo.substring(0, quantos - 1) + '…' : limpo;
+  }
+
+  /* --------------------------------------------------------- comportamento */
+
+  /* --------------------------------------------------------- a porta única */
+
+  /** O desenho de um componente, seja ele qual for. */
+  function desenhar(componente) {
+    if (componente.aviso) {
+      return '<p class="grafico-aviso">' + escapar(componente.aviso) + '</p>';
+    }
+    if (!componente.pontos || !componente.pontos.length) {
+      return '<p class="grafico-vazio">Nenhum caso no período para somar aqui.</p>';
+    }
+    if (componente.tipo === 'pizza') return desenharPizza(componente);
+    if (componente.tipo === 'barrasDeitadas') return desenharBarrasDeitadas(componente);
+    if (componente.tipo === 'linha') return desenharLinha(componente, false);
+    if (componente.tipo === 'barrasComLinha') return desenharLinha(componente, true);
+    return desenharBarras(componente);
+  }
+
+  /** A tabela de números — a leitura de reserva, sem cor nenhuma. */
+  function tabela(componente) {
+    return '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>' + escapar(componente.dimensao || 'Item') + '</th>'
+      + '<th class="direita">' + (componente.agregacao === 'contagem'
+        ? 'Casos' : escapar(componente.medida || 'Valor')) + '</th>'
+      + '<th class="direita">Casos</th></tr></thead><tbody>'
+      + componente.pontos.map(function (ponto) {
+        return '<tr><td>' + escapar(ponto.rotulo) + '</td>'
+          + '<td class="direita">' + escapar(numero(ponto.valor, componente.unidade))
+          + '</td><td class="direita">' + ponto.casos + '</td></tr>';
+      }).join('')
+      + '</tbody></table></div>';
+  }
+
+  /**
+   * A dica que segue o mouse. Uma só, reaproveitada por todos os gráficos da
+   * página — uma por marca seriam centenas de elementos à toa.
+   */
+  function ligarDica(raiz) {
+    var dicaNaTela = document.querySelector('.dica-do-grafico');
+    if (!dicaNaTela) {
+      dicaNaTela = document.createElement('div');
+      dicaNaTela.className = 'dica-do-grafico';
+      dicaNaTela.hidden = true;
+      document.body.appendChild(dicaNaTela);
+    }
+
+    var comDica = (raiz || document).querySelectorAll('[data-dica]');
+    for (var i = 0; i < comDica.length; i++) {
+      comDica[i].addEventListener('mouseenter', function (evento) {
+        dicaNaTela.innerHTML = this.getAttribute('data-dica');
+        dicaNaTela.hidden = false;
+        posicionarDica(dicaNaTela, evento);
+      });
+      comDica[i].addEventListener('mousemove', function (evento) {
+        posicionarDica(dicaNaTela, evento);
+      });
+      comDica[i].addEventListener('mouseleave', function () {
+        dicaNaTela.hidden = true;
+      });
+      // Pelo teclado também: a dica é informação, não enfeite de mouse.
+      comDica[i].addEventListener('focus', function () {
+        dicaNaTela.innerHTML = this.getAttribute('data-dica');
+        dicaNaTela.hidden = false;
+        var caixa = this.getBoundingClientRect();
+        dicaNaTela.style.left = (caixa.left + caixa.width / 2) + 'px';
+        dicaNaTela.style.top = (caixa.top - 10) + 'px';
+      });
+      comDica[i].addEventListener('blur', function () { dicaNaTela.hidden = true; });
+    }
+  }
+
+  function posicionarDica(dicaNaTela, evento) {
+    // Presa à janela, para nunca escapar pela borda numa tela estreita.
+    var largura = dicaNaTela.offsetWidth || 160;
+    var x = Math.min(Math.max(evento.clientX, largura / 2 + 8),
+      window.innerWidth - largura / 2 - 8);
+    dicaNaTela.style.left = x + 'px';
+    dicaNaTela.style.top = (evento.clientY - 14) + 'px';
+  }
+
+  function tirarDica() {
+    var dicaNaTela = document.querySelector('.dica-do-grafico');
+    if (dicaNaTela) dicaNaTela.parentNode.removeChild(dicaNaTela);
+  }
+
+  return {
+    desenhar: desenhar,
+    tabela: tabela,
+    numero: numero,
+    porcento: porcento,
+    classeDoPonto: classeDoPonto,
+    encurtar: encurtar,
+    ligarDica: ligarDica,
+    tirarDica: tirarDica
+  };
+})();
+</script>

@@ -19,8 +19,8 @@ ATENÇÃO AOS NOMES: no Apps Script o arquivo se chama "Index", e não
 
 O QUE TEM DENTRO
 ----------------
-Codigo.gs      18 arquivos: Acesso.gs, Analise.gs, Analitico.gs, Busca.gs, Campos.gs, Casos.gs, Config.gs, Corretoras.gs, Diagnostico.gs, Esquema.gs, Importacao.gs, Instalador.gs, Painel.gs, Performance.gs, Planilha.gs, Principal.gs, Sequencia.gs, Usuarios.gs
-Index.html     15 telas: Estilos, Moldura, SenhaDeAdministrador, SeletorDeMesa, Formulario, CasoEmModal, Dashboard, BuscarCaso, Graficos, MinhaPerformance, TabelaCorretoras, PainelAnalitico, CadastrarCaso, Configuracoes, Aplicacao
+Codigo.gs      7 arquivos: Base.gs, Cadastros.gs, Casos.gs, Config.gs, Entrada.gs, Indicadores.gs, Instalacao.gs
+Index.html     10 telas: Estilos, Comuns, Dashboard, CadastrarCaso, MinhaPerformance, BuscarCaso, TabelaCorretoras, PainelAnalitico, Configuracoes, Aplicacao
 SemAcesso.html a tela de acesso negado, servida sozinha pelo doGet
 
 NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode

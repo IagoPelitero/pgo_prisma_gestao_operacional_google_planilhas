@@ -1,5 +1,749 @@
 /**
  * ============================================================================
+ * PGO — Base.gs · como o sistema fala com a planilha
+ * ============================================================================
+ * A fundação. Nada aqui sabe o que é um caso, uma mesa ou um usuário:
+ * são as três peças que todo o resto usa para chegar à planilha.
+ *
+ * O QUE TEM AQUI DENTRO, nesta ordem:
+ *
+ *   1. O CONTRATO DAS ABAS   (era Esquema.gs)
+ *   2. O GERADOR DE Id   (era Sequencia.gs)
+ *   3. A PORTA ÚNICA PARA O GOOGLE PLANILHAS   (era Planilha.gs)
+ *
+ * Procure pelo banner com ##### para pular de uma seção à outra.
+ * ============================================================================
+ */
+
+/* ############################################################################
+   #
+   #  SEÇÃO 1 de 3 · O CONTRATO DAS ABAS
+   #
+   #  Era o arquivo Back-End/Esquema.gs antes de os arquivos serem
+   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
+   #  inteiro — nada foi reescrito, só mudou de endereço.
+   #
+   ############################################################################ */
+
+/**
+ * ============================================================================
+ * RECC — Esquema.gs · o contrato das abas
+ * ============================================================================
+ * Plataforma PGO (Pelitero Labs) · operação RECC (Porto Seguro)
+ *
+ * Este arquivo é só declaração: nomes de aba, cabeçalhos e tipos. Não chama
+ * nada e não depende de nenhum outro arquivo — pode ser lido primeiro sem
+ * risco.
+ *
+ * COMO LER
+ * --------
+ *   c = o Cabeçalho, exatamente como aparece na linha 1 da planilha
+ *   t = o Tipo do dado, que decide o formato da célula
+ *   p = Protegido: a interface não renomeia nem exclui (no máximo esconde)
+ *
+ * O cabeçalho é o contrato — não a posição da coluna. Reordenar colunas na
+ * planilha não quebra nada. Ver Base.gs.
+ * ============================================================================
+ */
+
+/**
+ * Os tipos de dado. Cada um decide, e isso é o ponto do arquivo inteiro,
+ * COMO a célula é formatada antes de receber o valor.
+ *
+ *   ID       0000000010 precisa continuar 0000000010, e não virar o número 10
+ *   DINHEIRO a célula guarda 1234.56 e MOSTRA R$ 1.234,56 — formato, não texto
+ *   DATA     data de verdade, para o Power BI filtrar sem conversão
+ */
+const RECC_TIPO_DE_DADO = {
+  IDENTIFICADOR: 'identificador',
+  TEXTO: 'texto',
+  TEXTO_LONGO: 'textoLongo',
+  DATA: 'data',
+  HORA: 'hora',
+  DATA_HORA: 'dataHora',
+  DINHEIRO: 'dinheiro',
+  NUMERO: 'numero',
+  SIM_OU_NAO: 'simOuNao'
+};
+
+/** O formato de célula de cada tipo. Aplicado na linha ANTES de gravar. */
+const RECC_FORMATO_DA_CELULA = {
+  identificador: '@',
+  texto: '@',
+  textoLongo: '@',
+  data: 'dd/MM/yyyy',
+  hora: 'HH:mm',
+  dataHora: 'dd/MM/yyyy HH:mm',
+  dinheiro: '"R$ "#,##0.00',
+  numero: '#,##0.##',
+  simOuNao: '@'
+};
+
+/** Fuso da operação. O Apps Script roda em UTC e viraria o dia às 21 h. */
+const RECC_FUSO_HORARIO = 'America/Sao_Paulo';
+
+/** Maior Id possível: 10 casas decimais. */
+const RECC_MAIOR_IDENTIFICADOR = 9999999999;
+
+/**
+ * Colunas de controle, acrescentadas ao FIM das abas de dado.
+ *
+ * O prefixo "_" marca coluna de sistema e sinaliza ao Power BI o que ignorar.
+ * `_Visivel` é editável na mão, direto na planilha: é assim que uma linha
+ * ocultada volta a aparecer.
+ */
+const RECC_COLUNAS_DE_CONTROLE = [
+  { cabecalho: '_Visivel', tipo: 'texto', protegido: true },
+  { cabecalho: '_ExcluidoEm', tipo: 'dataHora', protegido: true },
+  { cabecalho: '_ExcluidoPor', tipo: 'identificador', protegido: true },
+  { cabecalho: '_Origem', tipo: 'texto', protegido: true }
+];
+
+const RECC_VISIVEL_SIM = 'SIM';
+const RECC_VISIVEL_NAO = 'NAO';
+const RECC_ORIGEM_SISTEMA = 'SISTEMA';
+const RECC_ORIGEM_PLANILHA = 'PLANILHA';
+
+/**
+ * As 13 abas.
+ *
+ * `controle: true`  → recebe as colunas _Visivel / _ExcluidoEm / _ExcluidoPor /
+ *                     _Origem, e exclusão vira ocultação.
+ * `reserva`         → quantas linhas a aba nasce tendo. Célula vazia também
+ *                     consome o teto de 10 milhões da planilha, então o
+ *                     instalador corta o que sobra. Ver Instalacao.gs.
+ */
+const RECC_ESQUEMA = {
+
+  // ------------------------------------------------------------------ bases
+  BASE_RET: {
+    aba: 'BASE_RET',
+    titulo: 'Retenção Vida',
+    controle: true,
+    reserva: 2000,
+    colunas: [
+      { cabecalho: 'id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'data de recepção do protocolo', tipo: 'data', protegido: true },
+      { cabecalho: 'analista', tipo: 'texto', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'segmento', tipo: 'texto', protegido: true },
+      { cabecalho: 'Código origem da proposta', tipo: 'identificador', protegido: true },
+      { cabecalho: 'número da proposta', tipo: 'identificador', protegido: true },
+      { cabecalho: 'nome do cliente', tipo: 'texto', protegido: true },
+      { cabecalho: 'cod produto', tipo: 'identificador', protegido: true },
+      { cabecalho: 'produto', tipo: 'texto', protegido: true },
+      { cabecalho: 'grupo', tipo: 'texto', protegido: true },
+      { cabecalho: 'sistema', tipo: 'texto', protegido: true },
+      { cabecalho: 'valor do prêmio', tipo: 'dinheiro', protegido: true },
+      { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
+      { cabecalho: 'prêmio mensal retido', tipo: 'dinheiro', protegido: true },
+      { cabecalho: 'agente da central', tipo: 'texto', protegido: true },
+      { cabecalho: 'canal', tipo: 'texto', protegido: true },
+      { cabecalho: 'relacionamento', tipo: 'texto', protegido: true },
+      { cabecalho: 'contato', tipo: 'texto', protegido: true },
+      // Texto, e não identificador: o protocolo da operação é alfanumérico
+      // ("RET-2026-1024"), e como identificador ele perderia as letras — o
+      // tipo identificador guarda só dígitos, de propósito.
+      { cabecalho: 'protocolo', tipo: 'texto', protegido: true },
+      { cabecalho: 'cod_sucursal', tipo: 'identificador', protegido: true },
+      { cabecalho: 'cod_ramo', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Num_apolice', tipo: 'identificador', protegido: true },
+      { cabecalho: 'CPF', tipo: 'identificador', protegido: true },
+      { cabecalho: 'status', tipo: 'texto', protegido: true },
+      { cabecalho: 'Forma de pagamento', tipo: 'texto', protegido: true },
+      { cabecalho: 'dados do pagamento', tipo: 'texto', protegido: true },
+      { cabecalho: 'descrição', tipo: 'textoLongo', protegido: true },
+      { cabecalho: 'telefones de contato', tipo: 'identificador', protegido: true },
+      { cabecalho: 'e-mail', tipo: 'texto', protegido: true },
+      { cabecalho: 'Novo cod origem proposta', tipo: 'identificador', protegido: true },
+      { cabecalho: 'novo numero da proposta', tipo: 'identificador', protegido: true },
+      { cabecalho: 'motivo do cancelamento', tipo: 'texto', protegido: true },
+      { cabecalho: 'data da transmissão', tipo: 'data', protegido: true },
+      { cabecalho: 'tentativas de contato', tipo: 'numero', protegido: true }
+    ]
+  },
+
+  BASE_MESA: {
+    aba: 'BASE_MESA',
+    titulo: 'Mesa Diamante',
+    controle: true,
+    reserva: 2000,
+    colunas: [
+      { cabecalho: 'ID', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Analista', tipo: 'texto', protegido: true },
+      { cabecalho: 'Status', tipo: 'texto', protegido: true },
+      { cabecalho: 'Canal', tipo: 'texto', protegido: true },
+      { cabecalho: 'Data de entrada', tipo: 'data', protegido: true },
+      { cabecalho: 'Horário', tipo: 'hora', protegido: true },
+      { cabecalho: 'Tipo', tipo: 'texto', protegido: true },
+      { cabecalho: 'Abertura indevida', tipo: 'simOuNao', protegido: true },
+      { cabecalho: 'Título do e-mail', tipo: 'texto', protegido: true },
+      { cabecalho: 'Nome do segurado', tipo: 'texto', protegido: true },
+      { cabecalho: 'Documento (CPF)', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Corretora', tipo: 'texto', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Ramo', tipo: 'texto', protegido: true },
+      { cabecalho: 'Assunto', tipo: 'texto', protegido: true },
+      { cabecalho: 'Área responsável', tipo: 'texto', protegido: true },
+      { cabecalho: 'Data resposta', tipo: 'data', protegido: true },
+      { cabecalho: 'Hora resposta', tipo: 'hora', protegido: true },
+      { cabecalho: 'Data da finalização', tipo: 'data', protegido: true },
+      { cabecalho: 'horário da finalização', tipo: 'hora', protegido: true }
+    ]
+  },
+
+  // -------------------------------------------------------------- cadastros
+  USUARIOS: {
+    aba: 'USUARIOS',
+    titulo: 'Usuários',
+    controle: true,
+    reserva: 300,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Email', tipo: 'texto', protegido: true },
+      { cabecalho: 'Canal que atende', tipo: 'texto', protegido: false },
+      // A mesa em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
+      // administrador: quem administra não pertence a uma mesa, atende as
+      // duas e delega para quem for. Exigir mesa dele obrigaria a inventar
+      // uma resposta para uma pergunta que não se aplica.
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true },
+      { cabecalho: 'DataCadastro', tipo: 'dataHora', protegido: true },
+      { cabecalho: 'UltimoAcesso', tipo: 'dataHora', protegido: true }
+    ]
+  },
+
+  CANAIS: {
+    aba: 'CANAIS',
+    titulo: 'Canais, corretores e agentes',
+    controle: true,
+    reserva: 1000,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Canal', tipo: 'texto', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Corretora', tipo: 'texto', protegido: true },
+      { cabecalho: 'Segmento', tipo: 'texto', protegido: true }
+    ]
+  },
+
+  // Código e descrição NUNCA dividem a mesma célula. Vale aqui e vale para
+  // proposta, sucursal, ramo e apólice nas bases.
+  PRODUTOS: {
+    aba: 'PRODUTOS',
+    titulo: 'Produtos',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Produto', tipo: 'texto', protegido: true },
+      { cabecalho: 'CodigoProduto', tipo: 'identificador', protegido: true }
+    ]
+  },
+
+  SUSEP_BLOQUEADAS: {
+    aba: 'SUSEP_BLOQUEADAS',
+    titulo: 'SUSEPs bloqueadas',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'NomeCorretora', tipo: 'texto', protegido: true },
+      { cabecalho: 'CpfReincidente', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Motivo', tipo: 'texto', protegido: false },
+      { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false }
+    ]
+  },
+
+  // ---------------------------------------------------------------- sistema
+  MESAS: {
+    aba: 'MESAS',
+    titulo: 'Mesas de trabalho',
+    controle: false,
+    reserva: 50,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
+      { cabecalho: 'Aba', tipo: 'texto', protegido: true },
+      // Quais colunas da base guardam quando o caso entrou. É daqui que sai a
+      // "data do último registro" da barra superior. Ficam declaradas, e não
+      // adivinhadas, porque cada mesa nomeia essa coluna do seu jeito.
+      { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
+      // O painel precisa saber onde a mesa guarda cada coisa. Declarado, e
+      // não adivinhado pelo nome: cada mesa batiza a coluna do seu jeito, e
+      // adivinhar acerta hoje e erra na mesa que vier depois.
+      { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
+      // As colunas da fila. Aceita duas escritas:
+      //
+      //   plana      Data de entrada, Status, Nome do segurado
+      //   agrupada   Situação: Data, Status; Dados da proposta: Protocolo…
+      //
+      // A agrupada junta várias colunas debaixo de um título só — é o que
+      // deixa a fila legível quando o caso tem trinta e cinco campos e a
+      // pessoa precisa achar o dele de relance.
+      { cabecalho: 'ColunasDaFila', tipo: 'textoLongo', protegido: false },
+      // Em quais colunas a busca procura. É por elas, e só por elas, que o
+      // sistema lê a base inteira — ler as 35 colunas de 200 mil linhas são
+      // 7 milhões de células, e ler cinco são um milhão.
+      { cabecalho: 'ColunasDaBusca', tipo: 'texto', protegido: false },
+      // Quantos casos por mês se espera de uma pessoa nesta mesa. Zero
+      // desliga a meta: mesa sem meta declarada não inventa uma, e a tela
+      // simplesmente não mostra a barra de progresso.
+      { cabecalho: 'MetaMensalPorPessoa', tipo: 'numero', protegido: false },
+      { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
+      { cabecalho: 'Icone', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }
+    ]
+  },
+
+  CAMPOS: {
+    aba: 'CAMPOS',
+    titulo: 'Campos do formulário',
+    controle: false,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Aba', tipo: 'texto', protegido: true },
+      { cabecalho: 'ChaveTecnica', tipo: 'texto', protegido: true },
+      { cabecalho: 'Cabecalho', tipo: 'texto', protegido: true },
+      { cabecalho: 'Rotulo', tipo: 'texto', protegido: false },
+      { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
+      { cabecalho: 'TipoCampo', tipo: 'texto', protegido: true },
+      { cabecalho: 'Secao', tipo: 'texto', protegido: false },
+      { cabecalho: 'Mascara', tipo: 'texto', protegido: false },
+      { cabecalho: 'Obrigatorio', tipo: 'simOuNao', protegido: false },
+      { cabecalho: 'Protegido', tipo: 'simOuNao', protegido: true },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'VisivelPara', tipo: 'texto', protegido: false },
+      { cabecalho: 'ValorPadrao', tipo: 'texto', protegido: false },
+      { cabecalho: 'Configuracao', tipo: 'textoLongo', protegido: false }
+    ]
+  },
+
+  CATALOGO: {
+    aba: 'CATALOGO',
+    titulo: 'Catálogo',
+    controle: false,
+    reserva: 1000,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Tipo', tipo: 'texto', protegido: true },
+      { cabecalho: 'Codigo', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Rotulo', tipo: 'texto', protegido: false },
+      { cabecalho: 'PaiId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Cor', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
+      { cabecalho: 'Configuracao', tipo: 'textoLongo', protegido: false }
+    ]
+  },
+
+  PAINEIS: {
+    aba: 'PAINEIS',
+    titulo: 'Painéis',
+    controle: false,
+    reserva: 300,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Tela', tipo: 'texto', protegido: true },
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
+      // 'cartao' no Dashboard; pizza, linha e barras no Painel Analítico.
+      { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
+      // Para um cartão, é a regra de contagem: 'total', 'situacao' ou
+      // 'naCelula'. Para um gráfico, é o campo que vira eixo.
+      { cabecalho: 'CampoDimensao', tipo: 'texto', protegido: false },
+      { cabecalho: 'CampoMedida', tipo: 'texto', protegido: false },
+      { cabecalho: 'Agregacao', tipo: 'texto', protegido: false },
+      { cabecalho: 'Limite', tipo: 'numero', protegido: false },
+      { cabecalho: 'Filtro', tipo: 'textoLongo', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Largura', tipo: 'numero', protegido: false },
+      // O tom, por NOME — 'bom', 'ruim', 'atencao'… Guardar '#15794A' aqui
+      // deixaria o verde do tema claro aparecendo no tema escuro.
+      { cabecalho: 'Cor', tipo: 'texto', protegido: false },
+      { cabecalho: 'VisivelPara', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
+  /*
+    As análises que o administrador montou.
+    Uma ABA, e não um JSON dentro de CONFIG, pela mesma razão que os cartões do
+    Dashboard saíram de MESAS: é uma LISTA de coisas configuráveis, cada uma
+    com nome, mesa, colunas e filtro próprios. Guardada como texto numa célula,
+    dava para escolher "quais" e para mais nada.
+
+    ATENÇÃO: esta aba guarda a RECEITA. A aba gerada — ANALISE_<Nome> — é outra
+    coisa, não está no contrato e é recriada a cada geração.
+  */
+  ANALISES: {
+    aba: 'ANALISES',
+    titulo: 'Análises',
+    controle: true,
+    reserva: 100,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      // Vira o nome da aba: 'Diamante' gera ANALISE_Diamante. Só letras,
+      // números e _ — é o que o Google Planilhas aceita sem aspas em fórmula.
+      { cabecalho: 'Nome', tipo: 'texto', protegido: false },
+      { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
+      { cabecalho: 'MesaId', tipo: 'identificador', protegido: false },
+      // Cabeçalhos separados por vírgula. Vazio = todas as colunas da mesa.
+      { cabecalho: 'Colunas', tipo: 'textoLongo', protegido: false },
+      // 'Coluna=valor' separados por ponto e vírgula. Vazio = sem filtro.
+      { cabecalho: 'Filtros', tipo: 'textoLongo', protegido: false },
+      // Janela em dias, contada da coluna de data da mesa. 0 = tudo.
+      { cabecalho: 'Dias', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
+      // O retrato: quando foi gerado e quantas linhas saíram. É o que faz a
+      // tela dizer "gerada ontem, 1.204 linhas" em vez de só "existe".
+      { cabecalho: 'GeradaEm', tipo: 'dataHora', protegido: true },
+      { cabecalho: 'GeradaPor', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Linhas', tipo: 'numero', protegido: true }
+    ]
+  },
+
+  CONFIG: {
+    aba: 'CONFIG',
+    titulo: 'Configurações',
+    controle: false,
+    reserva: 200,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Chave', tipo: 'texto', protegido: true },
+      { cabecalho: 'Valor', tipo: 'textoLongo', protegido: false },
+      { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
+      { cabecalho: 'AtualizadoPor', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Data', tipo: 'dataHora', protegido: false }
+    ]
+  },
+
+  AUDITORIA: {
+    aba: 'AUDITORIA',
+    titulo: 'Auditoria',
+    controle: false,
+    reserva: 2000,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'DataHora', tipo: 'dataHora', protegido: true },
+      { cabecalho: 'UsuarioId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Acao', tipo: 'texto', protegido: true },
+      { cabecalho: 'Entidade', tipo: 'texto', protegido: false },
+      { cabecalho: 'RegistroId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Detalhe', tipo: 'textoLongo', protegido: false }
+    ]
+  }
+};
+
+/**
+ * A ponte entre o tipo de DADO da coluna e o tipo de CAMPO do formulário.
+ *
+ * Existem os dois porque respondem a perguntas diferentes: o tipo de dado
+ * decide o formato da célula; o tipo de campo decide o controle que aparece
+ * na tela. "moeda" e "dinheiro" são a mesma coisa vista de dois lados.
+ */
+const RECC_DO_DADO_PARA_O_CAMPO = {
+  identificador: 'identificador',
+  texto: 'texto',
+  textoLongo: 'textoLongo',
+  data: 'data',
+  hora: 'hora',
+  dataHora: 'dataHora',
+  dinheiro: 'moeda',
+  numero: 'numero',
+  simOuNao: 'simOuNao'
+};
+
+/** O caminho de volta, com os apelidos que a configuração aceita. */
+const RECC_DO_CAMPO_PARA_O_DADO = {
+  identificador: 'identificador',
+  documento: 'identificador',
+  telefone: 'identificador',
+  texto: 'texto',
+  textoLongo: 'textoLongo',
+  email: 'texto',
+  seletor: 'texto',
+  seletorMultiplo: 'texto',
+  data: 'data',
+  hora: 'hora',
+  dataHora: 'dataHora',
+  moeda: 'dinheiro',
+  numero: 'numero',
+  percentual: 'numero',
+  simOuNao: 'simOuNao'
+};
+
+/** Prefixo reservado das abas geradas pelo gerador de análise. */
+const RECC_PREFIXO_ANALISE = 'ANALISE_';
+
+/**
+ * A definição de uma aba, com as colunas de controle já anexadas.
+ * É esta lista, e não `RECC_ESQUEMA[x].colunas`, que representa a aba inteira.
+ */
+function esquemaDaAba_(nomeDaAba) {
+  var definicao = RECC_ESQUEMA[nomeDaAba];
+  if (!definicao) {
+    throw new Error('Aba "' + nomeDaAba + '" não faz parte do esquema do RECC.');
+  }
+  var colunas = definicao.colunas.slice();
+  if (definicao.controle) {
+    for (var i = 0; i < RECC_COLUNAS_DE_CONTROLE.length; i++) {
+      colunas.push(RECC_COLUNAS_DE_CONTROLE[i]);
+    }
+  }
+  return {
+    aba: definicao.aba,
+    titulo: definicao.titulo,
+    controle: definicao.controle,
+    reserva: definicao.reserva,
+    colunas: colunas
+  };
+}
+
+/** Os nomes das abas do contrato, na ordem em que o instalador as cria. */
+function nomesDasAbasDoContrato_() {
+  return Object.keys(RECC_ESQUEMA);
+}
+
+/* ############################################################################
+   #
+   #  SEÇÃO 2 de 3 · O GERADOR DE Id
+   #
+   #  Era o arquivo Back-End/Sequencia.gs antes de os arquivos serem
+   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
+   #  inteiro — nada foi reescrito, só mudou de endereço.
+   #
+   ############################################################################ */
+
+/**
+ * ============================================================================
+ * RECC — Sequencia.gs · o gerador de Id
+ * ============================================================================
+ * O Id do RECC é DECIMAL, PROGRESSIVO, de 10 CASAS, começando em 0000000000.
+ * Dez casas dão dez bilhões de combinações.
+ *
+ * Três regras, e cada uma existe por causa de um estrago real no sistema
+ * anterior:
+ *
+ *   1. A sequência mora em Script Properties, NUNCA na planilha.
+ *      A planilha é editável à mão; um contador dentro dela seria zerado sem
+ *      querer numa tarde qualquer.
+ *
+ *   2. A sequência NUNCA anda para trás.
+ *      Quando o Sheets deformava um Id, o gerador não o reconhecia, rebaixava
+ *      o piso da aba e voltava a emitir Id já em uso. Aqui o piso é sempre
+ *      max(último guardado, maior Id encontrado na aba).
+ *
+ *   3. Toda emissão acontece dentro de uma trava.
+ *      Sem isso, dois usuários salvando no mesmo segundo recebem o mesmo Id.
+ *      Quem chama (Base.gs) já segura a trava.
+ * ============================================================================
+ */
+
+const RECC_PREFIXO_DA_SEQUENCIA = 'RECC_SEQ_';
+
+/** 42 vira "0000000042". */
+function formatarIdentificador_(numero) {
+  var texto = String(Math.floor(numero));
+  while (texto.length < 10) texto = '0' + texto;
+  return texto;
+}
+
+/**
+ * O maior Id já presente na aba, como número. -1 quando a aba está vazia.
+ * Ids deformados (texto que não é dígito) são ignorados de propósito: eles
+ * não podem rebaixar nem levantar o piso.
+ */
+function maiorIdentificadorDaAba_(nomeDaAba) {
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var iId = posicaoDaColuna_(estrutura, 'Id');
+  if (iId < 0) return -1;
+
+  var totalDados = quantidadeDeRegistros_(estrutura);
+  if (totalDados <= 0) return -1;
+
+  var coluna = estrutura.aba.getRange(2, iId + 1, totalDados, 1).getValues();
+  var maior = -1;
+  for (var i = 0; i < coluna.length; i++) {
+    var digitos = converterParaIdentificador_(coluna[i][0]);
+    if (!digitos) continue;
+    var n = Number(digitos);
+    if (isFinite(n) && n > maior) maior = n;
+  }
+  return maior;
+}
+
+/**
+ * RESERVA UM BLOCO de Ids de uma vez, e devolve todos.
+ *
+ * DEVE ser chamada dentro de uma trava — inserirVariosRegistros_ já segura a
+ * dela.
+ *
+ * POR QUE EM BLOCO, E NÃO UM POR VEZ. Esta função é a única do sistema que
+ * fala com o PropertiesService durante uma gravação, e cada ida lá custa
+ * dezenas de milissegundos no Apps Script. Emitindo um Id por vez, gravar
+ * cinco mil casos eram DEZ MIL idas — dois minutos só de pedágio, dentro de
+ * uma execução que tem seis. Reservando o bloco inteiro são DUAS: uma leitura
+ * e uma gravação, para cinco mil linhas ou para uma.
+ *
+ * O bloco é reservado ANTES de qualquer linha ser escrita na planilha, e a
+ * sequência já sai gravada no fim dele. Se a gravação estourar no meio, os
+ * Ids reservados se perdem — e é o que tem de acontecer: a sequência nunca
+ * anda para trás, mesmo que isso deixe buracos. Buraco na numeração não
+ * quebra nada; Id reemitido quebra tudo, e foi o que aconteceu no PGO 5.x.
+ */
+function proximosIdentificadores_(nomeDaAba, quantos) {
+  if (quantos <= 0) return [];
+
+  var props = PropertiesService.getScriptProperties();
+  var chave = RECC_PREFIXO_DA_SEQUENCIA + nomeDaAba;
+  var guardado = props.getProperty(chave);
+
+  var ultimo;
+  if (guardado === null) {
+    // Primeira emissão desta aba nesta instalação: alinha com o que já existe
+    // na planilha, para nunca reemitir um Id que já está gravado.
+    ultimo = maiorIdentificadorDaAba_(nomeDaAba);
+  } else {
+    ultimo = Number(guardado);
+    if (!isFinite(ultimo)) ultimo = maiorIdentificadorDaAba_(nomeDaAba);
+  }
+
+  var ultimoDoBloco = ultimo + quantos;
+  if (ultimoDoBloco > RECC_MAIOR_IDENTIFICADOR) {
+    throw new Error('A sequência da aba "' + nomeDaAba + '" chegou ao teto de 10 ' +
+      'casas decimais (' + RECC_MAIOR_IDENTIFICADOR + ').');
+  }
+
+  props.setProperty(chave, String(ultimoDoBloco));
+
+  var bloco = [];
+  for (var i = 1; i <= quantos; i++) bloco.push(formatarIdentificador_(ultimo + i));
+  return bloco;
+}
+
+/** Um Id só. É o bloco de tamanho um — não existe segunda regra. */
+function proximoIdentificador_(nomeDaAba) {
+  return proximosIdentificadores_(nomeDaAba, 1)[0];
+}
+
+/**
+ * Realinha a sequência com a planilha, sem nunca baixá-la.
+ * Chamada depois de uma carga feita direto na planilha.
+ */
+function realinharSequencia_(nomeDaAba) {
+  var props = PropertiesService.getScriptProperties();
+  var chave = RECC_PREFIXO_DA_SEQUENCIA + nomeDaAba;
+  var guardado = Number(props.getProperty(chave));
+  if (!isFinite(guardado)) guardado = -1;
+
+  var naAba = maiorIdentificadorDaAba_(nomeDaAba);
+  var piso = Math.max(guardado, naAba);
+  props.setProperty(chave, String(piso));
+  return { aba: nomeDaAba, guardado: guardado, naAba: naAba, piso: piso };
+}
+
+/**
+ * NORMALIZAR BASE — carimba Id em linha que entrou direto na planilha.
+ *
+ * Quem digita uma linha à mão não gera Id. Sem Id não há relacionamento, e
+ * a atualização por Id não acha o registro. Esta rotina percorre a aba, dá
+ * Id a quem está sem, e realinha a sequência.
+ *
+ * Só lê e escreve a coluna de Id: não toca em mais nada da linha.
+ */
+function normalizarIdentificadoresDaAba_(nomeDaAba) {
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(30000)) {
+    throw new Error('A planilha está ocupada. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(nomeDaAba);
+    var estrutura = estruturaDaAba_(nomeDaAba, true);
+    var iId = posicaoDaColuna_(estrutura, 'Id');
+    if (iId < 0) {
+      throw new Error('A aba "' + nomeDaAba + '" não tem coluna Id.');
+    }
+
+    var totalDados = quantidadeDeRegistros_(estrutura);
+    if (totalDados <= 0) {
+      return { aba: nomeDaAba, carimbados: 0, repetidos: [], total: 0 };
+    }
+
+    realinharSequencia_(nomeDaAba);
+
+    // Lê a aba inteira, e não só a coluna de Id: uma linha sem Id só se
+    // distingue de uma linha em branco olhando as outras colunas.
+    var bloco = estrutura.aba
+      .getRange(2, 1, totalDados, estrutura.cabecalhos.length)
+      .getValues();
+
+    var faixa = estrutura.aba.getRange(2, iId + 1, totalDados, 1);
+    var coluna = faixa.getValues();
+    var vistos = {};
+    var repetidos = [];
+    var carimbados = 0;
+
+    for (var i = 0; i < coluna.length; i++) {
+      var atual = converterParaIdentificador_(coluna[i][0]);
+      if (!atual) {
+        if (linhaEstaVazia_(bloco[i])) continue;   // linha em branco não ganha Id
+        coluna[i][0] = proximoIdentificador_(nomeDaAba);
+        carimbados++;
+        continue;
+      }
+      var normalizado = formatarIdentificador_(Number(atual));
+      if (vistos[normalizado]) {
+        repetidos.push({ linha: i + 2, id: normalizado });
+      } else {
+        vistos[normalizado] = true;
+      }
+      coluna[i][0] = normalizado;
+    }
+
+    // Texto ANTES do valor: é o que impede 0000000010 de virar 10.
+    faixa.setNumberFormat('@');
+    faixa.setValues(coluna);
+
+    return {
+      aba: nomeDaAba,
+      total: totalDados,
+      carimbados: carimbados,
+      repetidos: repetidos
+    };
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+/* ############################################################################
+   #
+   #  SEÇÃO 3 de 3 · A PORTA ÚNICA PARA O GOOGLE PLANILHAS
+   #
+   #  Era o arquivo Back-End/Planilha.gs antes de os arquivos serem
+   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
+   #  inteiro — nada foi reescrito, só mudou de endereço.
+   #
+   ############################################################################ */
+
+/**
+ * ============================================================================
  * RECC — Planilha.gs · a porta única para o Google Planilhas
  * ============================================================================
  * NENHUM outro arquivo chama SpreadsheetApp. Toda leitura e toda gravação
@@ -15,7 +759,7 @@
  *      quando o Sheets converteu 0000000010 em 10, o zero já se foi.
  *
  * Nenhum código de topo depende de outro arquivo: as referências a
- * RECC_ESQUEMA e a Sequencia.gs acontecem dentro de função.
+ * RECC_ESQUEMA e a Base.gs acontecem dentro de função.
  * ============================================================================
  */
 

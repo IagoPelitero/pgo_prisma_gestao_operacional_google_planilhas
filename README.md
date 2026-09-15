@@ -89,8 +89,8 @@ Dentro de `Evolucao/`:
 
    | Cole este | Num arquivo chamado | Que é |
    |---|---|---|
-   | `Codigo.gs` | `Codigo` (arquivo **.gs**) | os 18 arquivos do servidor |
-   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto com as 15 telas dentro |
+   | `Codigo.gs` | `Codigo` (arquivo **.gs**) | os 7 arquivos do servidor |
+   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto com as 10 telas dentro |
    | `SemAcesso.html` | `SemAcesso` (arquivo **HTML**) | a tela de acesso negado |
 
    **Atenção ao nome:** no Apps Script o arquivo se chama `Index`, e não
@@ -98,7 +98,7 @@ Dentro de `Evolucao/`:
 
    > O pacote é **gerado**, não escrito à mão: `node
    > Evolucao/Testes/gerar-pacote.js`. O teste ponta a ponta roda contra ele e
-   > contra os 35 arquivos, e cobra que os dois se comportem igual — senão
+   > contra os 19 arquivos soltos, e cobra que os dois se comportem igual — senão
    > haveria duas verdades, e a que a operação usa seria a que ninguém testa.
 
    ### O caminho longo: arquivo por arquivo
@@ -108,18 +108,38 @@ Dentro de `Evolucao/`:
 
    | Aqui | No editor do Apps Script |
    |---|---|
-   | `Back-End/Acesso.gs` | `Acesso.gs` |
+   | `Back-End/Entrada.gs` | `Entrada.gs` |
    | `Front-End/Index.html` | `Index.html` |
    | `Evolucao/` | **não vai** |
 
-   São 35 arquivos, e basta **um** ficar para trás para uma tela congelar
-   numa mensagem de carregamento. A ordem não importa: o Apps Script avalia os
-   `.gs` em ordem alfabética, e nenhum tem código de topo que dependa de outro.
+   São **19 arquivos** — 7 do servidor e 12 de tela —, e basta **um** ficar
+   para trás para uma tela congelar numa mensagem de carregamento. A ordem não
+   importa: o Apps Script avalia os `.gs` em ordem alfabética, e nenhum tem
+   código de topo que dependa de outro.
+
+   | Servidor (7) | Responde |
+   |---|---|
+   | `Base.gs` | como o sistema fala com a planilha |
+   | `Cadastros.gs` | quem traz o caso para dentro |
+   | `Casos.gs` | o caso, do formulário à busca |
+   | `Config.gs` | o que se ajusta sem programador |
+   | `Entrada.gs` | quem entra e o que pode |
+   | `Indicadores.gs` | os números |
+   | `Instalacao.gs` | criar e conferir a instalação |
+
+   | Tela (12) | O que é |
+   |---|---|
+   | `Index.html` | o esqueleto, que manda incluir os outros |
+   | `Estilos.html` | toda a aparência e os quatro temas |
+   | `Comuns.html` | as peças que mais de uma tela usa |
+   | `Aplicacao.html` | a ponte com o servidor e o roteador |
+   | `Dashboard.html` … `Configuracoes.html` | uma por item do menu (7) |
+   | `SemAcesso.html` | a tela de quem não está cadastrado |
 
    ### O caminho de quem tem terminal: `clasp`
 
    O `clasp` é a ferramenta oficial do Google e evita a cópia manual por
-   completo — os 35 arquivos sobem de uma vez, e sobem de novo a cada mudança:
+   completo — os 19 arquivos sobem de uma vez, e sobem de novo a cada mudança:
 
    ```bash
    npm install -g @google/clasp
@@ -145,7 +165,7 @@ Dentro de `Evolucao/`:
    > Nenhum teste rodado fora do Apps Script pega isso: a suíte lê a pasta do
    > repositório, onde os arquivos estão. Quem pode não tê-los é o projeto.
    >
-   > No Apps Script o arquivo se chama `Formulario`, e não `Formulario.html`:
+   > No Apps Script o arquivo se chama `Formulario`, e não `Comuns.html`:
    > sem extensão no nome, sem acento, e com as maiúsculas iguais.
 
 6. Se alguma tela ficar **parada numa mensagem de carregamento** — "Lendo o

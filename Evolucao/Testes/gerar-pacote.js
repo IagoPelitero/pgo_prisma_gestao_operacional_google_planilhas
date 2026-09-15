@@ -1,16 +1,16 @@
 /**
  * ============================================================================
- * PGO — gerar-pacote.js · os 35 arquivos viram 3
+ * PGO — gerar-pacote.js · os arquivos do repositório viram 3
  * ============================================================================
  *   node Evolucao/Testes/gerar-pacote.js
  *
  * ---------------------------------------------------------------------------
  * O PROBLEMA QUE ELE RESOLVE
  * ---------------------------------------------------------------------------
- * O repositório tem 18 arquivos `.gs` e 17 `.html`, separados por assunto —
- * e é assim que tem de ser para alguém conseguir ler e consertar. Mas o Apps
+ * O repositório separa o código por assunto, um arquivo por assunto — e é
+ * assim que tem de ser para alguém conseguir ler e consertar. Mas o Apps
  * Script não tem "importar pasta": cada um vira um arquivo criado à mão, com
- * o nome digitado certo. Trinta e cinco vezes.
+ * o nome digitado certo, um de cada vez.
  *
  * E o custo disso não é o tempo: é que basta UM ficar para trás para a tela
  * congelar num "Lendo o cadastro…" que não explica nada. Já aconteceu duas
@@ -18,21 +18,23 @@
  *
  * Então este gerador junta tudo em TRÊS arquivos:
  *
- *     Codigo.gs      os 18 arquivos do servidor, na ordem alfabética
- *     Index.html     o esqueleto com as 15 telas já coladas dentro
+ *     Codigo.gs      todos os .gs do servidor, na ordem alfabética
+ *     Index.html     o esqueleto com todas as telas já coladas dentro
  *     SemAcesso.html a tela de acesso negado, que o doGet serve sozinha
  *
- * Três colagens em vez de trinta e cinco. O repositório continua separado por
- * assunto — o pacote é SAÍDA, como as abas ANALISE_*, e é refeito a cada
- * mudança.
+ * Três colagens, não importa quantos arquivos o repositório tenha. E ele
+ * CONTA os arquivos em vez de trazer o número escrito: número escrito à mão
+ * envelhece calado na primeira vez que alguém junta ou separa um arquivo.
+ * O repositório continua separado por assunto — o pacote é SAÍDA, como as
+ * abas ANALISE_*, e é refeito a cada mudança.
  *
  * ---------------------------------------------------------------------------
  * O QUE ELE NÃO FAZ
  * ---------------------------------------------------------------------------
  * Não muda uma linha de código. Concatena `.gs` na ordem em que o Apps Script
  * já os avaliaria, e substitui cada `incluir('X')` do Index pelo conteúdo de
- * `X.html`. Se o pacote se comportar diferente dos 35 arquivos, é bug daqui —
- * e há teste comparando os dois.
+ * `X.html`. Se o pacote se comportar diferente dos arquivos soltos, é bug
+ * daqui — e há teste comparando os dois.
  * ============================================================================
  */
 
@@ -158,12 +160,23 @@ function gerar(pastaDeSaida) {
     destino: destino,
     servidor: servidor.arquivos.length,
     telas: telas.coladas.length,
+    // Quantos arquivos alguém teria de criar à mão sem o pacote. Contado da
+    // pasta, e não somado das duas listas acima: ali faltariam justamente os
+    // que não são colados em lugar nenhum — o Index e o SemAcesso.
+    soltos: contarArquivosSoltos_(),
     bytes: {
       codigo: servidor.conteudo.length,
       index: telas.conteudo.length,
       semAcesso: semAcesso.length
     }
   };
+}
+
+/** Todo .gs e todo .html do repositório — o que se copia sem o pacote. */
+function contarArquivosSoltos_() {
+  const gs = fs.readdirSync(SERVIDOR).filter((n) => n.endsWith('.gs')).length;
+  const html = fs.readdirSync(TELAS).filter((n) => n.endsWith('.html')).length;
+  return gs + html;
 }
 
 module.exports = { gerar };
@@ -179,5 +192,5 @@ if (require.main === module) {
   console.log('  SemAcesso.html   ' + kb(feito.bytes.semAcesso).padStart(7)
     + '   (a tela de acesso negado)');
   console.log('  COMO-USAR.txt            o passo a passo\n');
-  console.log('  35 arquivos para copiar viraram 3.\n');
+  console.log('  ' + feito.soltos + ' arquivos para copiar viraram 3.\n');
 }

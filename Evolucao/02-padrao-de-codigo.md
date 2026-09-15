@@ -95,6 +95,41 @@ Evolucao/     tudo que NÃO vai para o Apps Script:
 > escolha de quem é dono do projeto vem antes da preferência de quem escreve o
 > código. Dentro delas, tudo volta a ser em português.
 
+### Um arquivo por PERGUNTA, não por função
+
+Dentro dessas pastas, o critério para um arquivo existir é responder a **uma
+pergunta** que alguém faria. Não é o tamanho, e não é "uma função, um arquivo".
+
+| Arquivo | A pergunta |
+|---|---|
+| `Base.gs` | como o sistema fala com a planilha? |
+| `Cadastros.gs` | quem traz o caso para dentro? |
+| `Casos.gs` | o que acontece com um caso, do formulário à busca? |
+| `Config.gs` | o que se ajusta sem programador? |
+| `Entrada.gs` | quem entra e o que pode? |
+| `Indicadores.gs` | quais são os números? |
+| `Instalacao.gs` | como criar e conferir a instalação? |
+
+O teste é este: **se você não sabe em qual arquivo está o que procura, o
+agrupamento está errado.** Não é falta de familiaridade de quem procura.
+
+Muitos arquivos pequenos parecem organizados e não são: espalham uma regra em
+três lugares, e mudar num e esquecer dos outros dois vira o defeito normal.
+Foi o que decidiu juntar Dashboard, Painel Analítico e Performance no
+`Indicadores.gs` — os três contam os mesmos casos.
+
+E o contrário também vale: `Base.gs` não levou o formulário junto, embora
+"criação de formulários e ajustes no Planilhas" caiba numa frase só. São
+níveis diferentes — um é infraestrutura, o outro é domínio —, e infraestrutura
+que sabe o que é um caso deixa de servir a todas as abas.
+
+### Dentro do arquivo: banner de seção
+
+Arquivo que junta assuntos abre com um índice do que tem dentro, e separa cada
+seção com um banner de `#####`. Serve para um `Ctrl+F` levar direto ao trecho —
+sem isso, juntar arquivos só troca "não sei em qual arquivo" por "não sei em
+que parte do arquivo".
+
 ## 7. Antes de commitar
 
 ```bash

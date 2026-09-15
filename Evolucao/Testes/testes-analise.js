@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca } =
   require('./ferramentas');
 
 function rodarTestesDeAnalise() {
@@ -348,7 +348,7 @@ function rodarTestesDeAnalise() {
     const tela = fs.readFileSync(path.join(pasta, 'Configuracoes.html'), 'utf8');
     contem(tela, 'carregarAnalises');
     contem(tela, 'gerarAnalise');
-    contem(fs.readFileSync(path.join(pasta, 'Moldura.html'), 'utf8'), 'analises:',
+    contem(lerPeca('Moldura'), 'analises:',
       'sem ícone, a linha do menu fica torta ao lado das outras oito');
   });
 }

@@ -40,19 +40,25 @@
     </div>
   </div>
 
-  <?!= incluir('Moldura') ?>
-  <?!= incluir('SenhaDeAdministrador') ?>
-  <?!= incluir('SeletorDeMesa') ?>
-  <?!= incluir('Formulario') ?>
-  <?!= incluir('CasoEmModal') ?>
+  <!--
+    A ordem importa pouco, porque cada tela e cada peça é um módulo fechado
+    (var Nome = (function () { … })()), e nenhum lê o outro na hora de nascer.
+    Duas exceções, e por isso esta ordem:
+
+      • Comuns vem primeiro. É a casca e as peças que as telas usam.
+      • Aplicacao vem por último. É ela que liga o sistema, e ligar antes de
+        todas as telas existirem seria pedir por uma que ainda não nasceu.
+  -->
+  <?!= incluir('Comuns') ?>
+
   <?!= incluir('Dashboard') ?>
-  <?!= incluir('BuscarCaso') ?>
-  <?!= incluir('Graficos') ?>
+  <?!= incluir('CadastrarCaso') ?>
   <?!= incluir('MinhaPerformance') ?>
+  <?!= incluir('BuscarCaso') ?>
   <?!= incluir('TabelaCorretoras') ?>
   <?!= incluir('PainelAnalitico') ?>
-  <?!= incluir('CadastrarCaso') ?>
   <?!= incluir('Configuracoes') ?>
+
   <?!= incluir('Aplicacao') ?>
 </body>
 </html>
