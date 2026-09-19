@@ -350,7 +350,21 @@ button { font: inherit; color: inherit; }
 }
 .lateral-item svg { flex: 0 0 21px; width: 21px; height: 21px; opacity: .95; }
 .lateral-item[aria-current="page"] svg { opacity: 1; }
-.lateral-item .rotulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/*
+  O nome da tela QUEBRA EM DUAS LINHAS em vez de virar reticências.
+  
+  Antes era `white-space: nowrap` com `text-overflow: ellipsis`, e o menu
+  mostrava "Produtividade RE…". O nome da tela é configurável — o administrador
+  escolhe —, então cortar em 248 pixels é cortar a escolha dele. E reticências
+  num MENU são o pior lugar para elas: é o texto que diz para onde o clique
+  leva, e ele precisa ser lido inteiro antes do clique, não depois.
+  
+  O `align-items` do item vira `flex-start` para o ícone acompanhar a primeira
+  linha em vez de flutuar no meio das duas.
+*/
+.lateral-item .rotulo { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.lateral-item:has(.rotulo) { align-items: flex-start; }
+.lateral-item svg { margin-top: 1px; }
 .aplicacao.encolhida .lateral-item .rotulo { display: none; }
 .aplicacao.encolhida .lateral-marca .escrito { display: none; }
 .aplicacao.encolhida .lateral-item { justify-content: center; }
@@ -572,6 +586,97 @@ button { font: inherit; color: inherit; }
 .filtros .contagem {
   margin-left: auto; font-size: 13px; color: var(--suave);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+  A equipe toda ou só os meus, na Produtividade RECC.
+
+  Dois botões grudados, e não duas caixas de seleção: são apenas duas opções,
+  as duas visíveis ao mesmo tempo, e a pessoa alterna entre elas o tempo todo.
+  Numa caixa fechada, ela teria de abrir para lembrar qual está valendo — e o
+  número na tela muda de significado conforme a resposta.
+*/
+.vista-do-painel { display: inline-flex; border-radius: var(--raio-pequeno); overflow: hidden; }
+.botao-vista {
+  padding: 9px 14px; font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; color: var(--suave); background: var(--superficie);
+  border: 1px solid var(--linha); border-right-width: 0;
+}
+.botao-vista:last-child { border-right-width: 1px; }
+.botao-vista:hover { color: var(--texto); background: var(--superficie-2); }
+.botao-vista.ligado {
+  color: var(--destaque-sobre); background: var(--destaque);
+  border-color: var(--destaque);
+}
+.botao-vista:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+/* O recado que acompanha a vista da equipe: sem ele, "137 casos" se lê como
+   "137 casos meus", e a pessoa se compara com um número que não é dela. */
+.aviso-da-vista {
+  font-size: 12.5px; color: var(--suave); font-weight: 600;
+  padding: 0 2px;
+}
+
+/*
+  O TOMBAMENTO, em passos.
+
+  Cada passo é um cartão, empilhado. Poderia ser tudo numa tela só, mas o passo
+  do meio — conferir — é a razão de a tela existir: separá-lo visualmente é o
+  que impede alguém de rolar direto até o botão de gravar.
+*/
+.tombamento-passo { margin-bottom: 16px; }
+.tombamento-passo .grade { margin-bottom: 12px; }
+.tombamento-passo .cartoes { margin-bottom: 14px; }
+.tombamento-titulo {
+  margin: 20px 0 8px; font-size: 14px; font-weight: 700;
+  color: var(--suave); letter-spacing: .01em;
+}
+.tombamento-titulo:first-child { margin-top: 0; }
+/* O de-para é de LER, não de comparar números: a coluna da esquerda fica
+   estreita e monoespaçada, para o nome vindo de fora se distinguir do nosso. */
+.tombamento-depara td:first-child { width: 42%; }
+.tombamento-depara code {
+  font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
+}
+.tombamento-depara select { max-width: 100%; }
+/* Quem não atende este canal continua na lista, só mais discreto: a escolha é
+   da coordenação, e o sistema apenas diz qual é a opção esperada. */
+.config-chave.de-outro-canal span { color: var(--suave); }
+.config-chave.de-outro-canal em {
+  font-style: normal; font-size: 11.5px; color: var(--tenue);
+}
+
+/*
+  A linha do tempo do caso, dentro do detalhe.
+
+  Cada etapa é um status que carimba data e hora. A etapa que ainda não
+  aconteceu aparece apagada, no LUGAR dela — e não escondida: um buraco no meio
+  da jornada é informação ("passou do 1º contato direto para Reteve"), e
+  esconder transformaria isso em nada.
+*/
+.linha-do-tempo { list-style: none; margin: 0; padding: 0; }
+.linha-do-tempo li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--linha);
+  font-size: 14px;
+}
+.linha-do-tempo li:last-child { border-bottom: 0; }
+.linha-do-tempo .marca {
+  width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%;
+  background: var(--linha); margin-top: 5px;
+}
+.linha-do-tempo li.cumprida .marca { background: currentColor; }
+.linha-do-tempo .etapa { font-weight: 600; }
+.linha-do-tempo li.pendente { color: var(--suave); }
+.linha-do-tempo li.pendente .etapa { font-weight: 500; }
+.linha-do-tempo .quando {
+  margin-left: auto; color: var(--suave); font-size: 13px;
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.linha-do-tempo li.agora .etapa::after {
+  content: 'está aqui'; margin-left: 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+  background: var(--destaque); color: var(--destaque-sobre);
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }

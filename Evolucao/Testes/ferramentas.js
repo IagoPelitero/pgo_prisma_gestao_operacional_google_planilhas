@@ -179,7 +179,36 @@ function resumo() {
   return { passaram, falhas };
 }
 
+/**
+ * As telas do sistema, lidas do CÓDIGO.
+ *
+ * As duas ferramentas de navegador — a de responsividade e a de clicar em tudo
+ * — precisam saber quais telas existem. Cada uma tinha a sua lista escrita à
+ * mão, e elas já divergiam entre si: uma com sete nomes, a outra com cinco, e
+ * as duas dizendo "todas as telas" no cabeçalho. No dia em que nasceu o
+ * Tombamento, as duas continuaram aprovando com a mesma confiança — caladas a
+ * respeito da tela nova, que era justamente a que precisava ser olhada.
+ *
+ * Ferramenta de conferência que não conhece o que existe hoje é pior que
+ * nenhuma: quem a rodou já parou de procurar. É o achado 33.
+ */
+function telasDoSistema() {
+  const fonte = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'Back-End', 'Entrada.gs'), 'utf8');
+  const bloco = fonte.match(/RECC_TELAS_DO_SISTEMA\s*=\s*\[([\s\S]*?)\];/);
+  if (!bloco) {
+    throw new Error('Não achei RECC_TELAS_DO_SISTEMA no Back-End/Entrada.gs. '
+      + 'Sem ela ninguém sabe quais telas existem, e uma varredura que adivinha '
+      + 'é pior que nenhuma.');
+  }
+  const nomes = (bloco[1].match(/tela:\s*'([A-Za-z0-9_]+)'/g) || [])
+    .map((achado) => achado.replace(/.*'([A-Za-z0-9_]+)'.*/, '$1'));
+  if (!nomes.length) throw new Error('A lista de telas veio vazia.');
+  return nomes;
+}
+
 module.exports = {
+  telasDoSistema,
   carregar, secao, teste, igual, verdadeiro, contem, lanca, ehData,
   celula, formatoDaCelula, comoUsuario, resumo, lerPeca, scriptDaPeca
 };

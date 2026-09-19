@@ -51,7 +51,7 @@ function rodarTestesDeBusca() {
     igual(opcoes.minimo, 3);
     igual(opcoes.legado.ligado, false, 'instalação nova não tem base legada');
 
-    const daRet = opcoes.canais.find((m) => m.nome === 'RET Vida');
+    const daRet = opcoes.canais.find((m) => m.nome === 'RET');
     verdadeiro(daRet.procuraEm.indexOf('protocolo') >= 0,
       'o canal diz em quais colunas procura — quem procura precisa saber');
   });
@@ -65,7 +65,7 @@ function rodarTestesDeBusca() {
   teste('acha pelo protocolo, no canal certa', () => {
     const achado = chamar('buscarCasos')('RET-2026-0042', [], false);
     igual(achado.total, 1);
-    const daRet = achado.origens.find((o) => o.nome === 'RET Vida');
+    const daRet = achado.origens.find((o) => o.nome === 'RET');
     igual(daRet.casos.length, 1);
     verdadeiro(JSON.stringify(daRet.casos[0].celulas).includes('Cliente Antigo'));
   });

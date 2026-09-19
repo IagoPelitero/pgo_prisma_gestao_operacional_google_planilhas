@@ -85,6 +85,7 @@ function resumoDasConfiguracoes() {
     podeMexerNaEstrutura: podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA),
     senhaDefinida: existeSenhaDeAdministrador_(),
     identidade: lerIdentidadeVisual_(),
+    titulosDasTelas: titulosDasTelas(),
     /*
       Os títulos são CURTOS de propósito: o menu tem uma coluna só, e um
       título que quebra em duas linhas desalinha a contagem do lado direito.
@@ -604,6 +605,7 @@ function opcoesDeNivelDeAcesso() {
     editar: 'Alterar casos já cadastrados',
     ocultar: 'Tirar um caso da tela (a linha permanece na planilha)',
     exportar: 'Baixar o que está vendo',
+    tombar: 'Trazer uma base inteira de outra planilha, de uma vez',
     configurar: 'Abrir Configurações e mexer em conteúdo e regra',
     estrutura: 'Criar coluna e canal — pede senha de administrador'
   };
@@ -819,6 +821,24 @@ function listarCardsDoPainel(tela, idDoCanal) {
     });
   }
 
+  // "Já passaram por" conta pelo CARIMBO, e não pelo status de hoje.
+  //
+  // É a diferença entre "quantos estão em 1º contato" e "quantos já foram
+  // contatados". O primeiro zera assim que o caso avança; o segundo não, e é
+  // esse que a operação usa para medir produtividade. Uma opção por status que
+  // declarou coluna de carimbo, e só se a coluna existe de verdade na base —
+  // oferecer uma que não existe seria oferecer um cartão que nunca aparece.
+  var estruturaDaBase = estruturaDaAba_(canal.aba);
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    if (!situacao.colunaDeCarimbo) return;
+    if (posicaoDaColuna_(estruturaDaBase, situacao.colunaDeCarimbo) < 0) return;
+    oQueContar.push({
+      chave: 'preenchido',
+      rotulo: 'Já passaram por: ' + situacao.nome,
+      filtro: situacao.colunaDeCarimbo
+    });
+  });
+
   var cartoes = lerRegistros_('PAINEIS')
     .filter(function (linha) {
       if (normalizarParaComparar_(linha.Tela) !== alvo) return false;
@@ -886,7 +906,13 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     cartao.dimensao = dimensaoDoCartao_(cartao.dimensao);
     if (!cartao.dimensao) {
       throw new Error('Não sei contar isso. As contagens são: total, ' +
-        'situacao e naCelula.');
+        'situacao, naCelula e preenchido.');
+    }
+    if (cartao.dimensao === 'preenchido') {
+      // A coluna tem de existir AGORA, e não na hora de desenhar. Guardar um
+      // cartão que aponta para coluna inexistente cria um cartão que some da
+      // tela sem explicação — e quem o criou vai jurar que salvou.
+      conferirQueAColunaExiste_(estruturaDaAba_(canal.aba), cartao.filtro, canal.aba);
     }
     if (cartao.dimensao === 'situacao') {
       var existe = situacoes.some(function (nome) {
@@ -918,7 +944,11 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
       CampoMedida: '',
       Agregacao: 'contagem',
       Limite: 0,
-      Filtro: cartao.dimensao === 'situacao' ? String(cartao.filtro || '') : '',
+      // O Filtro é o que o cartão aponta: o nome do status, ou — quando conta
+      // pelo carimbo — o nome da coluna. Nas outras contagens não há para onde
+      // apontar, e um valor sobrando ali só confundiria quem for ler a aba.
+      Filtro: (cartao.dimensao === 'situacao' || cartao.dimensao === 'preenchido')
+        ? String(cartao.filtro || '') : '',
       Ordem: posicao + 1,
       Largura: 1,
       Cor: tomValido_(cartao.cor),
@@ -982,8 +1012,53 @@ function salvarIdentidade(dados) {
     gravarConfiguracao_(chave, mudancas[chave]);
   });
 
+  // OS NOMES DAS TELAS NO MENU.
+  //
+  // Eles moravam em MENU.TITULOS desde o começo e nunca tiveram onde ser
+  // editados — configuração sem tela é configuração que ninguém usa. Foi o
+  // que apareceu quando a operação quis chamar o Dashboard de "Trabalho".
+  //
+  // O que identifica a tela é a CHAVE, nunca o texto: renomear aqui não mexe
+  // em rota, em nível de acesso nem em endereço guardado.
+  if (dados.titulosDasTelas && typeof dados.titulosDasTelas === 'object') {
+    var titulos = {};
+    RECC_TELAS_DO_SISTEMA.forEach(function (item) {
+      var escolhido = String(dados.titulosDasTelas[item.tela] || '').trim();
+      // Nome em branco volta ao de fábrica. Menu com item sem nome é um
+      // buraco na lateral, e ninguém descobre para onde ele leva.
+      titulos[item.tela] = escolhido || item.titulo;
+    });
+    gravarConfiguracao_('MENU.TITULOS', JSON.stringify(titulos));
+  }
+
   registrarAuditoria_('identidade.editar', 'CONFIG', '', mudancas['IDENTIDADE.NOME']);
   return lerIdentidadeVisual_();
+}
+
+/**
+ * Como cada tela se chama hoje, e como ela se chamaria de fábrica.
+ *
+ * A tela de Configurações precisa das duas coisas: o nome atual, para
+ * preencher o campo, e o de fábrica, para mostrar como dica — sem ele,
+ * ninguém sabe ao que volta se apagar o texto.
+ */
+function titulosDasTelas() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var guardados = {};
+  try {
+    guardados = JSON.parse(valorDaConfiguracao_('MENU.TITULOS', '{}'));
+  } catch (erro) {
+    guardados = {};
+  }
+
+  return RECC_TELAS_DO_SISTEMA.map(function (item) {
+    return {
+      tela: item.tela,
+      titulo: guardados[item.tela] || item.titulo,
+      deFabrica: item.titulo
+    };
+  });
 }
 
 /** Grava uma chave da aba CONFIG, criando a linha se ela não existir. */

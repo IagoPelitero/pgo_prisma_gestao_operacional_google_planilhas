@@ -29,20 +29,25 @@ function rodarTestesDaFundacao() {
 
   teste('cada aba é cortada ao tamanho do contrato', () => {
     const base = planilha.getSheetByName('BASE_RET');
-    igual(base.getMaxColumns(), 40, 'colunas de BASE_RET (36 + 4 de controle)');
+    igual(base.getMaxColumns(), 52, 'colunas de BASE_RET (48 + 4 de controle)');
     igual(base.getMaxRows(), 2001, 'linhas de BASE_RET (reserva 2000 + cabeçalho)');
     const canal = planilha.getSheetByName('BASE_MESA');
-    igual(canal.getMaxColumns(), 24, 'colunas de BASE_MESA (20 + 4 de controle)');
+    igual(canal.getMaxColumns(), 29, 'colunas de BASE_MESA (25 + 4 de controle)');
   });
 
   teste('os cabeçalhos saem na ordem e na grafia do contrato', () => {
     const canal = planilha.getSheetByName('BASE_MESA');
-    const cabecalhos = canal.getRange(1, 1, 1, 24).getValues()[0];
+    const cabecalhos = canal.getRange(1, 1, 1, 29).getValues()[0];
     igual(cabecalhos[0], 'ID');
     igual(cabecalhos[7], 'Abertura indevida');
     igual(cabecalhos[15], 'Área responsável');
     igual(cabecalhos[19], 'horário da finalização');
-    igual(cabecalhos[20], '_Visivel');
+    igual(cabecalhos[20], 'Data da última mudança de status');
+    igual(cabecalhos[21], 'Quem mudou o status');
+    igual(cabecalhos[22], 'Mudanças de status');
+    igual(cabecalhos[23], 'Origem do tombamento');
+    igual(cabecalhos[24], 'Data do tombamento');
+    igual(cabecalhos[25], '_Visivel');
   });
 
   teste('quem instalou vira o primeiro Administrador', () => {
@@ -55,7 +60,7 @@ function rodarTestesDaFundacao() {
 
   teste('o formulário nasce mapeado coluna a coluna', () => {
     const campos = chamar('lerRegistros_("CAMPOS")');
-    igual(campos.length, 56, 'campos semeados (36 de RET + 20 da Mesa Diamante)');
+    igual(campos.length, 73, 'campos semeados (48 de RET + 25 da Mesa Diamante)');
     const cpf = campos.find((c) => c.Cabecalho === 'Documento (CPF)');
     igual(cpf.Mascara, '000.000.000-00', 'máscara do CPF');
     igual(cpf.TipoCampo, 'documento', 'na tela é campo com máscara');
@@ -91,13 +96,26 @@ function rodarTestesDaFundacao() {
 
   teste('o simulador realmente corrompe quando o formato é Geral', () => {
     // Prova de que o teste acima tem valor: sem o formato '@' o Sheets converte.
+    //
+    // A coluna usada de cobaia é a ÚLTIMA, procurada pelo nome. Já foi o
+    // número 24 escrito à mão, e o dia em que a Mesa Diamante ganhou duas
+    // colunas novas esse 24 passou a apontar para _ExcluidoEm: o teste
+    // escrevia "_Origem" ali e deixava a aba com dois cabeçalhos iguais. O
+    // erro aparecia longe daqui, num teste de sequência, falando de cabeçalho
+    // repetido. É a regra da casa outra vez — coluna se acha pelo nome, nunca
+    // pela posição — e ela vale para o teste do mesmo jeito que vale para o
+    // sistema.
     const aba = planilha.getSheetByName('BASE_MESA');
-    aba.getRange(1, 24).setNumberFormat('');
-    aba.getRange(1, 24).setValue('000000E1');
-    igual(aba.getRange(1, 24).getValue(), 0,
+    const cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+    const cobaia = cabecalhos.indexOf('_Origem') + 1;
+    verdadeiro(cobaia > 0, 'a coluna _Origem deveria existir em BASE_MESA');
+
+    aba.getRange(1, cobaia).setNumberFormat('');
+    aba.getRange(1, cobaia).setValue('000000E1');
+    igual(aba.getRange(1, cobaia).getValue(), 0,
       'notação científica deveria virar 0 numa célula Geral');
-    aba.getRange(1, 24).setNumberFormat('@');
-    aba.getRange(1, 24).setValue('_Origem');
+    aba.getRange(1, cobaia).setNumberFormat('@');
+    aba.getRange(1, cobaia).setValue('_Origem');
   });
 
   teste('a sequência nunca anda para trás', () => {

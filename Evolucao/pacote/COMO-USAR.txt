@@ -1,7 +1,7 @@
 COMO USAR ESTE PACOTE
 =====================
 
-São três arquivos, em vez dos 19 do repositório. No editor do Apps Script:
+São três arquivos, em vez dos 20 do repositório. No editor do Apps Script:
 
   1. Apague os arquivos que já estiverem lá (menu de cada um > Excluir).
      Sobra o Codigo.gs que o Apps Script cria sozinho — use ele no passo 2.
@@ -42,7 +42,7 @@ criaria abas por cima do que já existe. Escolha um dos dois caminhos:
 O QUE TEM DENTRO
 ----------------
 Codigo.gs      7 arquivos: Base.gs, Cadastros.gs, Casos.gs, Config.gs, Entrada.gs, Indicadores.gs, Instalacao.gs
-Index.html     10 telas: Estilos, Comuns, Dashboard, CadastrarCaso, MinhaPerformance, BuscarCaso, TabelaCorretoras, PainelAnalitico, Configuracoes, Aplicacao
+Index.html     11 telas: Estilos, Comuns, Dashboard, CadastrarCaso, MinhaPerformance, BuscarCaso, TabelaCorretoras, Tombamento, PainelAnalitico, Configuracoes, Aplicacao
 SemAcesso.html a tela de acesso negado, servida sozinha pelo doGet
 
 NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode

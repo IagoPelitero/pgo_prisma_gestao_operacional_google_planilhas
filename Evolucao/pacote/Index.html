@@ -359,7 +359,21 @@ button { font: inherit; color: inherit; }
 }
 .lateral-item svg { flex: 0 0 21px; width: 21px; height: 21px; opacity: .95; }
 .lateral-item[aria-current="page"] svg { opacity: 1; }
-.lateral-item .rotulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/*
+  O nome da tela QUEBRA EM DUAS LINHAS em vez de virar reticências.
+  
+  Antes era `white-space: nowrap` com `text-overflow: ellipsis`, e o menu
+  mostrava "Produtividade RE…". O nome da tela é configurável — o administrador
+  escolhe —, então cortar em 248 pixels é cortar a escolha dele. E reticências
+  num MENU são o pior lugar para elas: é o texto que diz para onde o clique
+  leva, e ele precisa ser lido inteiro antes do clique, não depois.
+  
+  O `align-items` do item vira `flex-start` para o ícone acompanhar a primeira
+  linha em vez de flutuar no meio das duas.
+*/
+.lateral-item .rotulo { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.lateral-item:has(.rotulo) { align-items: flex-start; }
+.lateral-item svg { margin-top: 1px; }
 .aplicacao.encolhida .lateral-item .rotulo { display: none; }
 .aplicacao.encolhida .lateral-marca .escrito { display: none; }
 .aplicacao.encolhida .lateral-item { justify-content: center; }
@@ -581,6 +595,97 @@ button { font: inherit; color: inherit; }
 .filtros .contagem {
   margin-left: auto; font-size: 13px; color: var(--suave);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+  A equipe toda ou só os meus, na Produtividade RECC.
+
+  Dois botões grudados, e não duas caixas de seleção: são apenas duas opções,
+  as duas visíveis ao mesmo tempo, e a pessoa alterna entre elas o tempo todo.
+  Numa caixa fechada, ela teria de abrir para lembrar qual está valendo — e o
+  número na tela muda de significado conforme a resposta.
+*/
+.vista-do-painel { display: inline-flex; border-radius: var(--raio-pequeno); overflow: hidden; }
+.botao-vista {
+  padding: 9px 14px; font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; color: var(--suave); background: var(--superficie);
+  border: 1px solid var(--linha); border-right-width: 0;
+}
+.botao-vista:last-child { border-right-width: 1px; }
+.botao-vista:hover { color: var(--texto); background: var(--superficie-2); }
+.botao-vista.ligado {
+  color: var(--destaque-sobre); background: var(--destaque);
+  border-color: var(--destaque);
+}
+.botao-vista:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+/* O recado que acompanha a vista da equipe: sem ele, "137 casos" se lê como
+   "137 casos meus", e a pessoa se compara com um número que não é dela. */
+.aviso-da-vista {
+  font-size: 12.5px; color: var(--suave); font-weight: 600;
+  padding: 0 2px;
+}
+
+/*
+  O TOMBAMENTO, em passos.
+
+  Cada passo é um cartão, empilhado. Poderia ser tudo numa tela só, mas o passo
+  do meio — conferir — é a razão de a tela existir: separá-lo visualmente é o
+  que impede alguém de rolar direto até o botão de gravar.
+*/
+.tombamento-passo { margin-bottom: 16px; }
+.tombamento-passo .grade { margin-bottom: 12px; }
+.tombamento-passo .cartoes { margin-bottom: 14px; }
+.tombamento-titulo {
+  margin: 20px 0 8px; font-size: 14px; font-weight: 700;
+  color: var(--suave); letter-spacing: .01em;
+}
+.tombamento-titulo:first-child { margin-top: 0; }
+/* O de-para é de LER, não de comparar números: a coluna da esquerda fica
+   estreita e monoespaçada, para o nome vindo de fora se distinguir do nosso. */
+.tombamento-depara td:first-child { width: 42%; }
+.tombamento-depara code {
+  font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
+}
+.tombamento-depara select { max-width: 100%; }
+/* Quem não atende este canal continua na lista, só mais discreto: a escolha é
+   da coordenação, e o sistema apenas diz qual é a opção esperada. */
+.config-chave.de-outro-canal span { color: var(--suave); }
+.config-chave.de-outro-canal em {
+  font-style: normal; font-size: 11.5px; color: var(--tenue);
+}
+
+/*
+  A linha do tempo do caso, dentro do detalhe.
+
+  Cada etapa é um status que carimba data e hora. A etapa que ainda não
+  aconteceu aparece apagada, no LUGAR dela — e não escondida: um buraco no meio
+  da jornada é informação ("passou do 1º contato direto para Reteve"), e
+  esconder transformaria isso em nada.
+*/
+.linha-do-tempo { list-style: none; margin: 0; padding: 0; }
+.linha-do-tempo li {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--linha);
+  font-size: 14px;
+}
+.linha-do-tempo li:last-child { border-bottom: 0; }
+.linha-do-tempo .marca {
+  width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%;
+  background: var(--linha); margin-top: 5px;
+}
+.linha-do-tempo li.cumprida .marca { background: currentColor; }
+.linha-do-tempo .etapa { font-weight: 600; }
+.linha-do-tempo li.pendente { color: var(--suave); }
+.linha-do-tempo li.pendente .etapa { font-weight: 500; }
+.linha-do-tempo .quando {
+  margin-left: auto; color: var(--suave); font-size: 13px;
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.linha-do-tempo li.agora .etapa::after {
+  content: 'está aqui'; margin-left: 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+  background: var(--destaque); color: var(--destaque-sobre);
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }
@@ -2049,6 +2154,14 @@ var Moldura = (function () {
       + '<path d="M9.2 20.6v-4.2h1.6v4.2"></path>',
 
     // análise: as barras em pé, sobre a régua
+    // Tombamento: uma caixa despejando linhas para dentro de uma bandeja. A
+    // ideia é "uma base inteira entrando de uma vez", que é o que a tela faz —
+    // e não um "mais", que já é o Cadastrar Caso.
+    tombamento:
+      '<path d="M3.4 13.6h4.2l1.4 2.6h6l1.4-2.6h4.2"></path>'
+      + '<path d="M3.4 13.6 6 5.9a1.5 1.5 0 0 1 1.4-1h9.2a1.5 1.5 0 0 1 1.4 1l2.6 7.7'
+      + 'v4.4a1.5 1.5 0 0 1-1.5 1.5H4.9a1.5 1.5 0 0 1-1.5-1.5z"></path>'
+      + '<path d="M12 5.4v5.2M9.8 8.4 12 10.6l2.2-2.2"></path>',
     painelAnalitico:
       '<path d="M3.6 20.4h16.8"></path>'
       + '<path d="M7.4 20.4v-6.2M12 20.4V6.8M16.6 20.4v-9.6"></path>',
@@ -3116,6 +3229,7 @@ var CasoEmModal = (function () {
           + '</div>';
       }).join('')
       + '</div>'
+      + desenharLinhaDoTempo()
       + desenharHistorico();
 
     // As quatro ações do caso vivem aqui. Excluir também está na fila, desde
@@ -3157,6 +3271,35 @@ var CasoEmModal = (function () {
         .entao(function () { mudouAlgo = true; fechar(); })
         .senao(function (erro) { window.alert(erro.message || String(erro)); });
     });
+  }
+
+  /**
+   * Por onde o caso passou, e quando.
+   *
+   * Vem dos CARIMBOS — cada status grava a data e a hora em que o caso chegou
+   * nele —, e é a resposta para "a data e a hora de cada contato" sem abrir a
+   * planilha. Fica ACIMA do histórico de auditoria de propósito: a jornada é o
+   * que a operação lê todo dia; a auditoria é para quando algo não fecha.
+   *
+   * A etapa que não aconteceu aparece apagada, no lugar dela. Sumir com ela
+   * esconderia o buraco — e o buraco é informação: quem pulou o 2º contato e
+   * foi direto para "Não reteve" contou uma história.
+   */
+  function desenharLinhaDoTempo() {
+    if (!detalhe.linhaDoTempo || !detalhe.linhaDoTempo.length) return '';
+
+    return '<section class="historico">'
+      + '<h4>Por onde o caso passou</h4>'
+      + '<ul class="linha-do-tempo">' + detalhe.linhaDoTempo.map(function (etapa) {
+        return '<li class="tom-' + escapar(etapa.tom || 'neutro')
+          + (etapa.cumprida ? ' cumprida' : ' pendente')
+          + (etapa.ehOndeEstaAgora ? ' agora' : '') + '">'
+          + '<span class="marca" aria-hidden="true"></span>'
+          + '<span class="etapa">' + escapar(etapa.status) + '</span>'
+          + '<span class="quando">'
+          + escapar(etapa.cumprida ? etapa.quando : 'ainda não') + '</span>'
+          + '</li>';
+      }).join('') + '</ul></section>';
   }
 
   function desenharHistorico() {
@@ -3831,7 +3974,11 @@ var TelaDashboard = (function () {
     if (!resumo.filtrosDisponiveis.length) return '';
 
     var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
-      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      // A primeira opção é o nome do filtro puro — "Analista", "Status".
+      // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
+      // fechada mostrava a palavra que menos importa, e em tela estreita o
+      // nome do filtro era justamente o pedaço que ficava cortado.
+      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
       filtro.opcoes.forEach(function (opcao) {
         var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
           ? ' selected' : '';
@@ -4199,6 +4346,9 @@ var TelaMinhaPerformance = (function () {
   var canalEscolhida = '';
   var dias = 0;
   var dados = null;
+  // 'eu' ou 'equipe'. Quem soma é o servidor; aqui só se guarda a escolha,
+  // para ela sobreviver a uma troca de período.
+  var vista = 'eu';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -4218,7 +4368,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', canalEscolhida, dias)
+    Servidor.chamar('minhaPerformance', canalEscolhida, dias, vista)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -4262,10 +4412,40 @@ var TelaMinhaPerformance = (function () {
     return '<div class="filtros">'
       + '<select class="filtro" id="periodo-da-performance" aria-label="Período">'
       + periodos + '</select>'
+      + desenharVista()
       + '<span class="contagem">' + escapar(dados.pessoa.nome)
       + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
       + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : '')
       + '</span></div>';
+  }
+
+  /**
+   * Os meus números, ou os da minha equipe.
+   *
+   * Só aparece para quem TEM equipe: quem administra não pertence a canal
+   * nenhum, e o servidor devolve a lista de vistas vazia. Dois botões em que um
+   * deles não muda nada ensinam a desconfiar dos outros.
+   *
+   * Quando a vista é a da equipe, o número deixa de ser sobre uma pessoa — e a
+   * tela precisa dizer isso, senão alguém lê "137 casos" como seus.
+   */
+  function desenharVista() {
+    if (!dados.vistasDisponiveis || !dados.vistasDisponiveis.length) return '';
+
+    return '<div class="vista-do-painel" role="group"'
+      + ' aria-label="De quem são os números">'
+      + dados.vistasDisponiveis.map(function (uma) {
+        return '<button type="button" class="botao-vista'
+          + (dados.vista === uma.valor ? ' ligado' : '') + '"'
+          + ' data-vista="' + escapar(uma.valor) + '"'
+          + ' aria-pressed="' + (dados.vista === uma.valor ? 'true' : 'false') + '">'
+          + escapar(uma.rotulo) + '</button>';
+      }).join('')
+      + '</div>'
+      + (dados.vista === 'equipe'
+        ? '<span class="aviso-da-vista">Somando as ' + dados.pessoasNaVista
+          + ' pessoas da sua equipe</span>'
+        : '');
   }
 
   /* --------------------------------------------------------- indicadores */
@@ -4407,6 +4587,14 @@ var TelaMinhaPerformance = (function () {
     if (periodo) {
       periodo.addEventListener('change', function () {
         dias = Number(this.value);
+        carregar();
+      });
+    }
+
+    var trocarVista = document.querySelectorAll('#performance [data-vista]');
+    for (var v = 0; v < trocarVista.length; v++) {
+      trocarVista[v].addEventListener('click', function () {
+        vista = this.getAttribute('data-vista');
         carregar();
       });
     }
@@ -5523,6 +5711,521 @@ var TelaTabelaCorretoras = (function () {
 </script>
 
 
+<!-- ==== Tombamento.html ==== -->
+<script>
+/* ============================================================================
+   PGO — Tombamento.html · trazer uma base inteira de fora
+   ============================================================================
+   A tela existe para um gesto que a operação faz toda semana: pegar a base de
+   inadimplentes do Vida Individual, do Vida em Grupo, ou a lista de corretoras
+   que a Mesa vai tratar, e jogar cem ou trezentos casos dentro do PGO — já
+   divididos entre os analistas.
+
+   TRÊS PASSOS, E O DO MEIO É O QUE IMPORTA:
+
+     1. DE ONDE VEM. Colar o conteúdo, ou dar o link da outra planilha.
+     2. CONFERIR. O servidor devolve para onde cada coluna vai, quantas linhas
+        entram, quantas repetem, e as três primeiras JÁ TRADUZIDAS.
+     3. TOMBAR.
+
+   O passo 2 não é burocracia: mapeamento errado é invisível no cabeçalho e
+   óbvio no dado. Ver "11999998888" na coluna "CPF" na terceira linha da
+   amostra custa cinco segundos; descobrir isso depois custa achar e apagar
+   trezentas linhas na mão, numa base que já está sendo trabalhada.
+
+   POR QUE COLAR, E NÃO SÓ O LINK: colar funciona sempre. Abrir outra planilha
+   pelo link exige que a conta que roda o PGO tenha acesso a ela, e esse é
+   exatamente o tipo de permissão que falta na hora errada. O link fica como a
+   opção melhor para quem repete o tombamento toda semana; colar fica como a
+   que nunca depende de nada.
+   ============================================================================ */
+
+var TelaTombamento = (function () {
+
+  var canalEscolhida = '';
+  var pacoteDoSistema = null;
+  var opcoes = null;          // colunas, analistas, lotes já tombados
+  var laudo = null;           // o resultado do passo 2, enquanto não se grava
+  var resultado = null;       // o que entrou, depois de gravar
+
+  var fonte = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
+  var deParaEscolhido = null; // o que a pessoa ajustou na tela
+  var analistasMarcados = {};
+  var colunaQueIdentifica = '';
+  var nomeDoLote = '';
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    pacoteDoSistema = pacote;
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+      + '<div id="tombamento"><p class="carregando-campos">'
+      + 'Lendo as colunas do canal…</p></div>';
+  }
+
+  function carregar() {
+    var caixa = elemento('tombamento');
+    if (caixa) {
+      caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
+    }
+    Servidor.chamar('opcoesDoTombamento', canalEscolhida)
+      .entao(function (resposta) {
+        opcoes = resposta;
+        laudo = null;
+        resultado = null;
+        deParaEscolhido = null;
+        desenhar();
+      })
+      .senao(function (erro) {
+        elemento('tombamento').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  /* -------------------------------------------------------------- desenho */
+
+  function desenhar() {
+    elemento('tombamento').innerHTML = resultado
+      ? desenharResultado()
+      : (desenharFonte() + (laudo ? desenharLaudo() : ''));
+    ligar();
+  }
+
+  /** Passo 1: de onde vem o dado. */
+  function desenharFonte() {
+    var colado = fonte.tipo === 'colado';
+
+    return '<section class="cartao tombamento-passo">'
+      + '<header class="grafico-cabeca"><h3>1. De onde vêm os casos</h3></header>'
+      + '<div class="config-abas">'
+      + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
+      + ' data-fonte="colado">Colar da planilha</button>'
+      + '<button type="button" class="config-aba' + (colado ? '' : ' atual') + '"'
+      + ' data-fonte="planilha">Ler outra planilha pelo link</button>'
+      + '</div>'
+      + (colado ? desenharColar() : desenharLink())
+      + '<p class="config-dica">A primeira linha tem de ser a dos NOMES das '
+      + 'colunas. É por ela que o sistema descobre para onde cada coluna vai. '
+      + 'Até ' + opcoes.limite + ' linhas por vez.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="conferir-tombamento">'
+      + 'Conferir antes de tombar</button></div>'
+      + '</section>';
+  }
+
+  function desenharColar() {
+    return '<label class="campo largura-2"><span>Cole aqui, com o cabeçalho</span>'
+      + '<textarea id="texto-colado" rows="8" spellcheck="false"'
+      + ' placeholder="CPF&#9;Nome&#9;Produto&#10;12345678900&#9;Maria&#9;Vida Individual">'
+      + escapar(fonte.texto) + '</textarea></label>';
+  }
+
+  function desenharLink() {
+    return '<div class="grade">'
+      + '<label class="campo"><span>Id da planilha</span>'
+      + '<input type="text" id="planilha-id" value="' + escapar(fonte.planilhaId) + '"'
+      + ' placeholder="o pedaço do endereço entre /d/ e /edit"></label>'
+      + '<label class="campo"><span>Nome da aba</span>'
+      + '<input type="text" id="planilha-aba" value="' + escapar(fonte.aba) + '"'
+      + ' placeholder="em branco = a primeira aba"></label>'
+      + '</div>'
+      + '<p class="config-dica">A conta que abre o PGO precisa ter acesso a essa '
+      + 'planilha. Se não tiver, o sistema diz isso em vez de tombar pela metade.</p>';
+  }
+
+  /** Passo 2: o laudo, que é a razão de a tela existir. */
+  function desenharLaudo() {
+    return '<section class="cartao tombamento-passo">'
+      + '<header class="grafico-cabeca"><h3>2. Confira antes de gravar</h3></header>'
+      + desenharContagem()
+      + desenharDePara()
+      + desenharAmostra()
+      + desenharDestino()
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="tombar-agora"'
+      + (laudo.vaoEntrar ? '' : ' disabled') + '>'
+      + 'Tombar ' + laudo.vaoEntrar + ' caso(s)</button>'
+      + '<button type="button" class="botao vazado" id="recomecar-do-laudo">'
+      + 'Recomeçar</button></div>'
+      + '</section>';
+  }
+
+  function desenharContagem() {
+    var pulados = laudo.vaoSerPuladas
+      ? '<div class="indicador tom-atencao" title="'
+        + laudo.motivosParaPular.vazia + ' em branco, '
+        + laudo.motivosParaPular.repetida + ' já na base">'
+        + '<span class="rotulo">Vão ser puladas'
+        + '</span><strong class="numero">' + laudo.vaoSerPuladas + '</strong>'
+        + '</div>'
+      : '';
+
+    return '<div class="cartoes">'
+      + '<div class="indicador tom-neutro"><span class="rotulo">Linhas na origem'
+      + '</span><strong class="numero">' + laudo.linhasNaFonte + '</strong></div>'
+      + '<div class="indicador tom-bom"><span class="rotulo">Vão entrar</span>'
+      + '<strong class="numero">' + laudo.vaoEntrar + '</strong></div>'
+      + pulados
+      + '</div>'
+      + (laudo.passaDoLimite
+        ? '<p class="aviso-janela">São ' + laudo.linhasNaFonte + ' linhas, e o '
+          + 'limite é ' + laudo.limite + '. Divida em levas: se o mapeamento '
+          + 'estiver errado, o estrago é menor.</p>'
+        : '');
+  }
+
+  /**
+   * O de-para, uma linha por coluna da origem.
+   *
+   * Vem sugerido pelo servidor, casando nome com nome. A pessoa corrige o que
+   * não reconheceu e deixa em "— não trazer —" o que não interessa: uma base de
+   * inadimplentes tem colunas que o PGO não quer, e forçar um destino para
+   * todas encheria a base de colunas de outra operação.
+   */
+  function desenharDePara() {
+    var atual = deParaEscolhido || laudo.dePara;
+
+    return '<h4 class="tombamento-titulo">Para onde vai cada coluna</h4>'
+      + '<table class="fila tombamento-depara"><thead><tr>'
+      + '<th>Na planilha de origem</th><th>Vai para esta coluna do canal</th>'
+      + '</tr></thead><tbody>'
+      + atual.map(function (par, i) {
+        var opcoesDeColuna = ['<option value="">— não trazer —</option>']
+          .concat(opcoes.colunasDoCanal.map(function (coluna) {
+            return '<option value="' + escapar(coluna) + '"'
+              + (par.paraAColuna === coluna ? ' selected' : '') + '>'
+              + escapar(coluna) + '</option>';
+          }));
+        return '<tr><td><code>' + escapar(par.daFonte || '(sem nome)') + '</code></td>'
+          + '<td><select class="filtro" data-depara="' + i + '">'
+          + opcoesDeColuna.join('') + '</select></td></tr>';
+      }).join('')
+      + '</tbody></table>';
+  }
+
+  /**
+   * As primeiras linhas JÁ TRADUZIDAS.
+   *
+   * É o único lugar da tela em que um mapeamento trocado aparece. O cabeçalho
+   * "CPF" apontando para a coluna "telefones de contato" parece certo na tabela
+   * de cima e salta aos olhos aqui.
+   */
+  function desenharAmostra() {
+    if (!laudo.amostra.length) {
+      return '<p class="config-dica">Nenhuma linha entraria, então não há o que '
+        + 'mostrar. Confira o de-para acima.</p>';
+    }
+
+    var colunas = [];
+    laudo.amostra.forEach(function (caso) {
+      Object.keys(caso).forEach(function (coluna) {
+        if (colunas.indexOf(coluna) < 0) colunas.push(coluna);
+      });
+    });
+
+    return '<h4 class="tombamento-titulo">As primeiras linhas, como vão ficar</h4>'
+      + '<div class="rolagem-tabela"><table class="fila"><thead><tr>'
+      + colunas.map(function (c) { return '<th>' + escapar(c) + '</th>'; }).join('')
+      + '</tr></thead><tbody>'
+      + laudo.amostra.map(function (caso) {
+        return '<tr>' + colunas.map(function (coluna) {
+          return '<td>' + escapar(caso[coluna] === undefined ? '' : caso[coluna])
+            + '</td>';
+        }).join('') + '</tr>';
+      }).join('')
+      + '</tbody></table></div>';
+  }
+
+  /** Nome do lote, para quem vai, e o que não repetir. */
+  function desenharDestino() {
+    return '<h4 class="tombamento-titulo">De quem são, e como se chama o lote</h4>'
+      + '<div class="grade">'
+      + '<label class="campo largura-2"><span>Nome do lote</span>'
+      + '<input type="text" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
+      + ' placeholder="Base de inadimplentes Vida Presente"'
+      + (opcoes.lotes.length ? ' list="lotes-ja-usados"' : '') + '>'
+      + (opcoes.lotes.length
+        ? '<datalist id="lotes-ja-usados">' + opcoes.lotes.map(function (lote) {
+          return '<option value="' + escapar(lote.origem) + '"></option>';
+        }).join('') + '</datalist>'
+        : '')
+      + '</label>'
+      + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
+      + '<select class="filtro" id="coluna-que-identifica">'
+      + ['<option value="">— trazer tudo, mesmo repetido —</option>']
+        .concat(opcoes.colunasDoCanal.map(function (coluna) {
+          return '<option value="' + escapar(coluna) + '"'
+            + (colunaQueIdentifica === coluna ? ' selected' : '') + '>'
+            + escapar(coluna) + '</option>';
+        })).join('')
+      + '</select></label>'
+      + '</div>'
+      + '<p class="config-dica">A base é atualizada toda semana e boa parte dela '
+      + 'repete. Escolhendo uma coluna que identifica o caso — o CPF, o número da '
+      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.</p>'
+      + desenharAnalistas()
+      + (opcoes.statusPadrao
+        ? '<p class="config-dica">Os casos vão nascer com o status '
+          + '<strong>' + escapar(opcoes.statusPadrao) + '</strong>. O analista '
+          + 'ajusta depois, caso a caso — e cada mudança fica registrada.</p>'
+        : '');
+  }
+
+  /**
+   * Quem recebe os casos.
+   *
+   * Vários marcados = rodízio, em partes iguais. É o pedido da operação:
+   * "uma base com 100 casos ou 300 casos podemos incluir no individual para
+   * cada analista". Nenhum marcado deixa a coluna de responsável como a origem
+   * mandou — que é o certo quando a própria base já traz o analista.
+   */
+  function desenharAnalistas() {
+    if (!opcoes.analistas.length) {
+      return '<p class="config-dica">Ninguém cadastrado e ativo no PGO, então os '
+        + 'casos entram sem responsável. Cadastre em Configurações › Usuários e '
+        + 'tombe depois.</p>';
+    }
+
+    var quantos = Object.keys(analistasMarcados).filter(function (nome) {
+      return analistasMarcados[nome];
+    }).length;
+
+    // Quem atende este canal vem primeiro e marcado como tal. Quem não atende
+    // continua na lista: enquanto a operação está se formando, um analista da
+    // RET pode receber um lote da Mesa, e quem decide isso é a coordenação, não
+    // o sistema. Esconder o nome tiraria a decisão da mão dela.
+    return '<h4 class="tombamento-titulo">Dividir entre</h4>'
+      + '<div class="config-marcadores">'
+      + opcoes.analistas.map(function (pessoa) {
+        return '<label class="config-chave'
+          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal') + '">'
+          + '<input type="checkbox"'
+          + ' data-analista="' + escapar(pessoa.nome) + '"'
+          + (analistasMarcados[pessoa.nome] ? ' checked' : '') + '>'
+          + '<span>' + escapar(pessoa.nome)
+          + (pessoa.atendeEsteCanal ? '' : ' <em>de outro canal</em>')
+          + '</span></label>';
+      }).join('')
+      + '</div>'
+      + '<p class="config-dica">'
+      + (quantos
+        ? 'Os casos vão ser divididos em partes iguais entre os ' + quantos
+          + ' marcado(s), em rodízio.'
+        : 'Ninguém marcado: o responsável vai ser o que vier na planilha de '
+          + 'origem, se ela trouxer um.')
+      + '</p>';
+  }
+
+  /** Passo 3: o que entrou. */
+  function desenharResultado() {
+    return '<section class="cartao tombamento-passo">'
+      + '<header class="grafico-cabeca"><h3>Tombado</h3></header>'
+      + '<div class="cartoes">'
+      + '<div class="indicador tom-bom"><span class="rotulo">Casos que entraram'
+      + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
+      + (resultado.pulados.repetida
+        ? '<div class="indicador tom-atencao"><span class="rotulo">Já estavam na base'
+          + '</span><strong class="numero">' + resultado.pulados.repetida
+          + '</strong></div>'
+        : '')
+      + (resultado.pulados.vazia
+        ? '<div class="indicador tom-neutro"><span class="rotulo">Linhas em branco'
+          + '</span><strong class="numero">' + resultado.pulados.vazia
+          + '</strong></div>'
+        : '')
+      + '</div>'
+      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, no canal '
+      + escapar(resultado.canal) + '.'
+      + (resultado.primeiroId
+        ? ' Do caso ' + escapar(resultado.primeiroId) + ' ao '
+          + escapar(resultado.ultimoId) + '.'
+        : '')
+      + '</p>'
+      + (resultado.analistas.length
+        ? '<p class="config-dica">Divididos entre: '
+          + escapar(resultado.analistas.join(', ')) + '.</p>'
+        : '')
+      + '<p class="config-dica">A Produtividade RECC já mostra este lote no '
+      + 'gráfico de casos tombados por dia.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="tombar-outro-lote">'
+      + 'Tombar outro lote</button></div>'
+      + '</section>';
+  }
+
+  /* --------------------------------------------------------- comportamento */
+
+  function ligar() {
+    SeletorDeCanal.ligar(function (id) {
+      canalEscolhida = id;
+      fonte = { tipo: fonte.tipo, texto: '', planilhaId: '', aba: '' };
+      analistasMarcados = {};
+      colunaQueIdentifica = '';
+      nomeDoLote = '';
+      desenharSeletor();
+      carregar();
+    });
+
+    cliques('[data-fonte]', function (botao) {
+      fonte.tipo = botao.getAttribute('data-fonte');
+      laudo = null;
+      guardarOQueEstaNaTela();
+      desenhar();
+    });
+
+    cliques('#conferir-tombamento', conferir);
+    cliques('#tombar-agora', tombar);
+    // Dois ids, e não um: os dois botões dizem coisas diferentes ("Recomeçar"
+    // depois de conferir, "Tombar outro lote" depois de gravar) e nunca estão
+    // na tela juntos. Compartilhar id é o achado 21 esperando a terceira tela
+    // que os coloque lado a lado.
+    cliques('#recomecar-do-laudo, #tombar-outro-lote', function () {
+      laudo = null;
+      resultado = null;
+      deParaEscolhido = null;
+      desenhar();
+    });
+
+    mudancas('[data-depara]', function (caixa) {
+      if (!deParaEscolhido) {
+        deParaEscolhido = laudo.dePara.map(function (par) {
+          return { daFonte: par.daFonte, paraAColuna: par.paraAColuna };
+        });
+      }
+      deParaEscolhido[Number(caixa.getAttribute('data-depara'))].paraAColuna =
+        caixa.value;
+    });
+
+    mudancas('[data-analista]', function (caixa) {
+      analistasMarcados[caixa.getAttribute('data-analista')] = caixa.checked;
+      // Só o texto de baixo muda; redesenhar a tela inteira aqui apagaria o
+      // que a pessoa já escreveu no nome do lote e nas caixas do de-para.
+      guardarOQueEstaNaTela();
+    });
+
+    mudancas('#coluna-que-identifica', function (caixa) {
+      colunaQueIdentifica = caixa.value;
+    });
+  }
+
+  function desenharSeletor() {
+    var antigo = document.querySelector('.canais');
+    if (!antigo || !antigo.parentNode) return;
+    var novo = document.createElement('div');
+    novo.innerHTML = SeletorDeCanal.montar(pacoteDoSistema.canais, canalEscolhida);
+    antigo.parentNode.replaceChild(novo.firstChild, antigo);
+  }
+
+  function cliques(seletor, oQueFazer) {
+    var achados = document.querySelectorAll('#tombamento ' + seletor);
+    for (var i = 0; i < achados.length; i++) {
+      achados[i].addEventListener('click', function () { oQueFazer(this); });
+    }
+  }
+
+  function mudancas(seletor, oQueFazer) {
+    var achados = document.querySelectorAll('#tombamento ' + seletor);
+    for (var i = 0; i < achados.length; i++) {
+      achados[i].addEventListener('change', function () { oQueFazer(this); });
+    }
+  }
+
+  /**
+   * Recolhe o que está digitado antes de redesenhar.
+   *
+   * Sem isto, trocar de aba ou marcar um analista apagaria o texto colado e o
+   * nome do lote — e a pessoa colaria trezentas linhas duas vezes.
+   */
+  function guardarOQueEstaNaTela() {
+    var colado = elemento('texto-colado');
+    if (colado) fonte.texto = colado.value;
+
+    var id = elemento('planilha-id');
+    if (id) fonte.planilhaId = id.value.trim();
+
+    var aba = elemento('planilha-aba');
+    if (aba) fonte.aba = aba.value.trim();
+
+    var lote = elemento('nome-do-lote');
+    if (lote) nomeDoLote = lote.value;
+
+    var chave = elemento('coluna-que-identifica');
+    if (chave) colunaQueIdentifica = chave.value;
+  }
+
+  function conferir() {
+    guardarOQueEstaNaTela();
+
+    var botao = elemento('conferir-tombamento');
+    if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
+
+    Servidor.chamar('conferirTombamento', canalEscolhida, {
+      fonte: fonte,
+      dePara: deParaEscolhido,
+      colunaQueIdentifica: colunaQueIdentifica
+    })
+      .entao(function (resposta) {
+        laudo = resposta;
+        deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
+        desenhar();
+      })
+      .senao(function (erro) {
+        if (botao) {
+          botao.disabled = false;
+          botao.textContent = 'Conferir antes de tombar';
+        }
+        window.alert(erro.message || String(erro));
+      });
+  }
+
+  function tombar() {
+    guardarOQueEstaNaTela();
+
+    var escolhidos = Object.keys(analistasMarcados).filter(function (nome) {
+      return analistasMarcados[nome];
+    });
+
+    // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
+    // fácil: tombar errado se desfaz apagando linha por linha.
+    if (!window.confirm('Tombar ' + laudo.vaoEntrar + ' caso(s) no canal '
+      + laudo.canal.nome + '? Desfazer isso é apagar os casos um a um.')) return;
+
+    var botao = elemento('tombar-agora');
+    if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
+
+    Servidor.chamar('tombarCasos', canalEscolhida, {
+      fonte: fonte,
+      dePara: deParaEscolhido || laudo.dePara,
+      colunaQueIdentifica: colunaQueIdentifica,
+      analistas: escolhidos,
+      origem: nomeDoLote
+    })
+      .entao(function (resposta) {
+        resultado = resposta;
+        laudo = null;
+        desenhar();
+      })
+      .senao(function (erro) {
+        if (botao) {
+          botao.disabled = false;
+          botao.textContent = 'Tombar ' + laudo.vaoEntrar + ' caso(s)';
+        }
+        window.alert(erro.message || String(erro));
+      });
+  }
+
+  return {
+    montar: montar,
+    ligar: function () { carregar(); }
+  };
+})();
+</script>
+
+
 <!-- ==== PainelAnalitico.html ==== -->
 <script>
 /* ============================================================================
@@ -5554,6 +6257,11 @@ var TelaPainelAnalitico = (function () {
   var canalEscolhida = '';
   var filtros = {};
   var dias = 0;
+  // 'equipe' ou 'eu'. Quem decide o que cada uma mostra é o servidor; aqui
+  // só se guarda a escolha, para ela sobreviver a um filtro e a uma troca de
+  // período. Filtrar no navegador daria dois números diferentes para a mesma
+  // pergunta, e o da tela seria o errado.
+  var vista = 'equipe';
   var painel = null;
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
@@ -5574,7 +6282,7 @@ var TelaPainelAnalitico = (function () {
     var caixa = elemento('analitico');
     if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
 
-    Servidor.chamar('painelAnalitico', canalEscolhida, filtros, dias)
+    Servidor.chamar('painelAnalitico', canalEscolhida, filtros, dias, vista)
       .entao(function (resposta) {
         painel = resposta;
         desenhar();
@@ -5589,6 +6297,7 @@ var TelaPainelAnalitico = (function () {
     // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
     // número que a pessoa já leu como se fosse o total.
     elemento('analitico').innerHTML = desenharFiltros()
+      + desenharCartoes()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
@@ -5600,9 +6309,76 @@ var TelaPainelAnalitico = (function () {
     ligarPainel();
   }
 
+  /**
+   * A variação em relação ao período anterior — igual à do Trabalho.
+   *
+   * Sem base de comparação o espaço fica em branco, e não "+100%": subir de
+   * zero para um não é 100% de melhora, e um número que mente uma vez faz a
+   * pessoa desconfiar dos outros.
+   */
+  function variacao(cartao) {
+    if (cartao.variacao === null || cartao.variacao === undefined) {
+      return '<span class="variacao vazia" aria-hidden="true">—</span>';
+    }
+    var subiu = cartao.variacao >= 0;
+    return '<span class="variacao ' + (subiu ? 'subiu' : 'desceu') + '">'
+      + (subiu ? '▲' : '▼') + ' ' + Math.abs(cartao.variacao) + '%'
+      + '<em>vs. período anterior</em></span>';
+  }
+
+  /**
+   * Os números que a operação pediu, antes dos gráficos.
+   *
+   * Vêm primeiro de propósito: "quantos reteve" é a pergunta, e o gráfico é a
+   * explicação. Quem abre a tela quer o número; quem quer entender desce.
+   *
+   * Nada aqui está escrito em código — cada cartão é uma linha de PAINEIS, e
+   * se some em Configurações › Painéis.
+   */
+  function desenharCartoes() {
+    if (!painel.cartoes || !painel.cartoes.length) return '';
+
+    return '<div class="cartoes">'
+      + painel.cartoes.map(function (cartao) {
+        return '<div class="indicador tom-' + escapar(cartao.tom || 'neutro') + '"'
+          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"' : '')
+          + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
+          + '<strong class="numero">' + cartao.valor + '</strong>'
+          + variacao(cartao)
+          + '</div>';
+      }).join('')
+      + '</div>';
+  }
+
+  /**
+   * A equipe toda ou só os meus.
+   *
+   * Só aparece para quem tem as duas: o servidor devolve a lista vazia quando
+   * o nível de acesso da pessoa já a limita aos próprios casos. Um controle que
+   * não muda nada ensina a não confiar nos outros controles.
+   */
+  function desenharVista() {
+    if (!painel.vistasDisponiveis || !painel.vistasDisponiveis.length) return '';
+
+    return '<div class="vista-do-painel" role="group"'
+      + ' aria-label="De quem são os números">'
+      + painel.vistasDisponiveis.map(function (uma) {
+        return '<button type="button" class="botao-vista'
+          + (painel.vista === uma.valor ? ' ligado' : '') + '"'
+          + ' data-vista="' + escapar(uma.valor) + '"'
+          + ' aria-pressed="' + (painel.vista === uma.valor ? 'true' : 'false') + '">'
+          + escapar(uma.rotulo) + '</button>';
+      }).join('')
+      + '</div>';
+  }
+
   function desenharFiltros() {
     var caixas = painel.filtrosDisponiveis.map(function (filtro) {
-      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      // A primeira opção é o nome do filtro puro — "Analista", "Status".
+      // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
+      // fechada mostrava a palavra que menos importa, e em tela estreita o
+      // nome do filtro era justamente o pedaço que ficava cortado.
+      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
       filtro.opcoes.forEach(function (opcao) {
         opcoes.push('<option value="' + escapar(opcao.valor) + '"'
           + (filtros[filtro.chave] === opcao.valor ? ' selected' : '') + '>'
@@ -5623,6 +6399,7 @@ var TelaPainelAnalitico = (function () {
       + '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
       + periodos + '</select>'
       + caixas.join('')
+      + desenharVista()
       + '<span class="contagem">' + painel.total + ' casos · '
       + escapar(painel.periodo.rotulo) + '</span></div>';
   }
@@ -5670,6 +6447,11 @@ var TelaPainelAnalitico = (function () {
       });
     }
 
+    ligarCliques('[data-vista]', function (botao) {
+      vista = botao.getAttribute('data-vista');
+      carregar();
+    });
+
     ligarCliques('[data-tabela]', function (botao) {
       var id = botao.getAttribute('data-tabela');
       tabelasAbertas[id] = !tabelasAbertas[id];
@@ -5709,7 +6491,7 @@ var TelaPainelAnalitico = (function () {
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     Servidor.chamar('detalharComponente', canalEscolhida, idDoComponente,
-      chaveDoPonto, filtros, dias)
+      chaveDoPonto, filtros, dias, vista)
       .entao(function (resposta) { desenharDetalhe(resposta); })
       .senao(function (erro) {
         caixa.innerHTML = '<p class="carregando-campos erro-carga">'
@@ -5775,7 +6557,7 @@ var TelaPainelAnalitico = (function () {
    */
   function exportar(idDoComponente) {
     Servidor.chamar('exportarComponente', canalEscolhida, idDoComponente,
-      filtros, dias)
+      filtros, dias, vista)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
   }
@@ -6473,7 +7255,7 @@ var TelaConfiguracoes = (function () {
       + '<fieldset class="config-grupo"><legend>Até onde enxerga</legend>'
       + escopos + '</fieldset>'
       + '<fieldset class="config-grupo"><legend>Quais canais enxerga</legend>'
-      + '<p class="config-dica">RET Vida e Mesa Diamante são operações '
+      + '<p class="config-dica">RET e Mesa Diamante são operações '
       + 'distintas. Marque os canais deste nível — <strong>nenhum marcado '
       + 'quer dizer todos</strong>, que é o caso de quem administra.</p>'
       + canaisDoNivel + '</fieldset>'
@@ -6741,15 +7523,32 @@ var TelaConfiguracoes = (function () {
   /* -------------------------------------------------------------- painéis */
 
   var canalDosCards = '';
-  var telaDosPaineis = 'dashboard';   // 'dashboard' ou 'painelAnalitico'
+  /*
+   * Qual das TRÊS listas está sendo editada.
+   *
+   * São três e não duas porque a Produtividade RECC tem cartões próprios além
+   * dos gráficos: os cartões respondem "quantos reteve", os gráficos explicam.
+   *
+   * A aba não é a mesma coisa que a tela do servidor: duas abas daqui editam
+   * cartões da MESMA tela (`painelAnalitico`), mudando só o tipo. Guardar as
+   * duas coisas na mesma variável foi o que me fez confundir uma com a outra.
+   */
+  var abaDosPaineis = 'cardsDoTrabalho';
   var cardsEmEdicao = null;           // a lista sendo mexida, antes de salvar
+
+  /** A qual tela do servidor cada aba daqui corresponde. */
+  var TELA_DA_ABA = {
+    cardsDoTrabalho: 'dashboard',
+    cartoesDaProdutividade: 'painelAnalitico',
+    graficosDaProdutividade: 'painelAnalitico'
+  };
 
   function carregarPaineis() {
     if (!canalDosCards) canalDosCards = canalEscolhida;
-    if (telaDosPaineis === 'painelAnalitico') return carregarGraficos();
+    if (abaDosPaineis === 'graficosDaProdutividade') return carregarGraficos();
 
     aguarde('Lendo os cards…');
-    Servidor.chamar('listarCardsDoPainel', 'dashboard', canalDosCards)
+    Servidor.chamar('listarCardsDoPainel', TELA_DA_ABA[abaDosPaineis], canalDosCards)
       .entao(function (resposta) {
         dados.painel = resposta;
         cardsEmEdicao = resposta.cartoes.map(copiarCard);
@@ -6782,14 +7581,31 @@ var TelaConfiguracoes = (function () {
     };
   }
 
-  /** As duas telas que têm componentes configuráveis. */
+  /**
+   * O nome que a tela tem HOJE, do jeito que o administrador a batizou.
+   *
+   * Escrever "Dashboard" aqui deixaria as abas de Configurações falando de uma
+   * tela que o menu chama de "Trabalho" — e a pessoa procuraria, com razão,
+   * uma terceira tela que não existe. O nome mora num lugar só, e é este.
+   */
+  function nomeDaTela(chave, seNaoAchar) {
+    var achado = ((resumo && resumo.titulosDasTelas) || [])
+      .filter(function (uma) { return uma.tela === chave; })[0];
+    return achado && achado.titulo ? achado.titulo : seNaoAchar;
+  }
+
+  /** As três listas configuráveis: os cards de uma tela e os da outra, mais os gráficos. */
   function escolhaDeTela() {
+    var trabalho = nomeDaTela('dashboard', 'Trabalho');
+    var produtividade = nomeDaTela('painelAnalitico', 'Produtividade RECC');
+
     return '<div class="config-abas">'
-      + [['dashboard', 'Cards do Dashboard'],
-         ['painelAnalitico', 'Gráficos do Painel Analítico']]
+      + [['cardsDoTrabalho', 'Cards do ' + trabalho],
+         ['cartoesDaProdutividade', 'Cartões da ' + produtividade],
+         ['graficosDaProdutividade', 'Gráficos da ' + produtividade]]
         .map(function (par) {
           return '<button type="button" class="config-aba'
-            + (telaDosPaineis === par[0] ? ' atual' : '') + '"'
+            + (abaDosPaineis === par[0] ? ' atual' : '') + '"'
             + ' data-tela-do-painel="' + par[0] + '">'
             + escapar(par[1]) + '</button>';
         }).join('') + '</div>';
@@ -6948,7 +7764,7 @@ var TelaConfiguracoes = (function () {
 
   function ligarTrocaDeTelaEDeCanal() {
     ligarCliques('[data-tela-do-painel]', function (botao) {
-      telaDosPaineis = botao.getAttribute('data-tela-do-painel');
+      abaDosPaineis = botao.getAttribute('data-tela-do-painel');
       carregarPaineis();
     });
     ligarCliques('[data-canal-dos-cards]', function (botao) {
@@ -7096,7 +7912,7 @@ var TelaConfiguracoes = (function () {
     elemento('descartar-cards').addEventListener('click', carregarPaineis);
 
     elemento('salvar-cards').addEventListener('click', function () {
-      Servidor.chamar('salvarCardsDoPainel', 'dashboard', canalDosCards,
+      Servidor.chamar('salvarCardsDoPainel', TELA_DA_ABA[abaDosPaineis], canalDosCards,
         cardsEmEdicao)
         .entao(function () { avisarSalvo('Cards salvos.'); carregarPaineis(); })
         .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
@@ -7147,6 +7963,16 @@ var TelaConfiguracoes = (function () {
       + (identidade.logo
         ? '<img src="' + escapar(identidade.logo) + '" alt="Logo atual">' : '')
       + '</div></div>'
+      + '<fieldset class="config-grupo"><legend>Nome de cada tela no menu</legend>'
+      + '<p class="config-dica">Só o TEXTO do menu muda. O que identifica a '
+      + 'tela por dentro é outra coisa, então renomear aqui não mexe em '
+      + 'permissão, em rota, nem nos endereços que as pessoas guardaram. '
+      + 'Apagar o campo devolve o nome de fábrica.</p>'
+      + (resumo.titulosDasTelas || []).map(function (tela) {
+        return campoDeTexto('tela-' + tela.tela, tela.deFabrica, tela.titulo,
+          tela.titulo === tela.deFabrica ? '' : 'De fábrica: ' + tela.deFabrica);
+      }).join('')
+      + '</fieldset>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar identidade</button>'
       + '</div></form>';
@@ -7188,7 +8014,13 @@ var TelaConfiguracoes = (function () {
     elemento('form-identidade').addEventListener('submit', function (evento) {
       evento.preventDefault();
       var logo = valorDe('logo');
+      var titulos = {};
+      (resumo.titulosDasTelas || []).forEach(function (tela) {
+        titulos[tela.tela] = valorDe('tela-' + tela.tela);
+      });
+
       Servidor.chamar('salvarIdentidade', {
+        titulosDasTelas: titulos,
         nome: valorDe('nome'),
         nomeLongo: valorDe('nomeLongo'),
         operacao: valorDe('operacao'),
@@ -7200,7 +8032,8 @@ var TelaConfiguracoes = (function () {
         resumo.identidade = nova;
         Servidor.chamar('definirLogo', logo)
           .entao(function () {
-            avisarSalvo('Identidade salva. Recarregue para ver a barra nova.');
+            avisarSalvo('Identidade salva. Use o botão de atualizar, no '
+              + 'alto, para ver a barra e o menu com os nomes novos.');
           })
           .senao(mostrarErroNoPainel);
       }).senao(mostrarErroNoPainel);
@@ -8086,6 +8919,12 @@ var Rotas = (function () {
       ligar: function (pacote) { TelaTabelaCorretoras.ligar(pacote); },
       desligar: function () { TelaTabelaCorretoras.desligar(); }
     },
+    tombamento: {
+      titulo: 'Tombamento',
+      subtitulo: 'Traga uma base inteira de outra planilha e divida entre os analistas.',
+      montar: function (pacote) { return TelaTombamento.montar(pacote); },
+      ligar: function (pacote) { TelaTombamento.ligar(pacote); }
+    },
     painelAnalitico: {
       titulo: 'Painel Analítico',
       subtitulo: 'Explore dados e identifique oportunidades para a operação.',
@@ -8114,6 +8953,24 @@ var Aplicacao = (function () {
   var telaAtual = '';
 
   function elemento(id) { return document.getElementById(id); }
+
+  /**
+   * O nome que a tela tem HOJE, que é o mesmo que o menu mostra.
+   *
+   * O título do menu é configurável desde que o PO renomeou "Dashboard" para
+   * "Trabalho" — mas o cabeçalho da página vinha da tabela de rotas, escrito à
+   * mão. O resultado era um menu dizendo "Trabalho" e a página, logo ao lado,
+   * dizendo "Dashboard": duas respostas para a mesma pergunta, na mesma tela.
+   *
+   * O título da rota continua servindo de reserva, para o caso de uma tela que
+   * o servidor não listou (sem permissão de ver, por exemplo).
+   */
+  function tituloDaTela(tela, seNaoAchar) {
+    var achado = (pacote.menu || []).filter(function (item) {
+      return item.tela === tela;
+    })[0];
+    return achado && achado.titulo ? achado.titulo : seNaoAchar;
+  }
 
   /* -- tema -------------------------------------------------------------- */
   function aplicarTema(tema) {
@@ -8168,14 +9025,16 @@ var Aplicacao = (function () {
     telaAtual = tela;
 
     var definicao = Rotas.pegar(tela);
+    var comoSeChama = tituloDaTela(tela, definicao.titulo);
+
     elemento('superior').innerHTML = Moldura.montarSuperior(pacote);
     elemento('lateral').innerHTML = Moldura.montarLateral(pacote, tela);
     elemento('miolo').innerHTML = '<div class="cabecalho-da-tela">'
-      + '<h2>' + Moldura.escapar(definicao.titulo) + '</h2>'
+      + '<h2>' + Moldura.escapar(comoSeChama) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
       + '</div>'
       + definicao.montar(pacote);
-    document.title = pacote.identidade.nome + ' — ' + definicao.titulo;
+    document.title = pacote.identidade.nome + ' — ' + comoSeChama;
 
     ligarMoldura();
     if (definicao.ligar) definicao.ligar(pacote);

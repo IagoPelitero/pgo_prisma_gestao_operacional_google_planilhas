@@ -243,6 +243,130 @@ function rodarTestesDePerformance() {
     verdadeiro(equipe.lista.some((p) => p.souEu), 'e eu estou dentro dela');
   });
 
+  secao('Eu, ou a minha equipe');
+
+  /*
+   * O pedido: "em minha performance deve ter o resultado individual, ou seja do
+   * Analista logado e deve ter a opção de escolher ver como está a equipe que
+   * pertence".
+   *
+   * A EQUIPE é quem está cadastrado no mesmo canal que a pessoa atende — a
+   * mesma definição que o escopo "equipe" usa. Quem administra não pertence a
+   * canal nenhum, e por isso não tem "a minha equipe": para ele a tela não
+   * oferece a troca, em vez de oferecer um botão que não muda nada.
+   */
+
+  teste('quem administra não tem equipe, e por isso não recebe a troca', () => {
+    const performance = minha();
+    igual(performance.vista, 'eu');
+    igual(performance.vistasDisponiveis.length, 0,
+      'o administrador atende as duas canais, e não pertence a uma');
+  });
+
+  teste('o analista recebe as duas vistas, e abre na dele', () => {
+    const coordenacao = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Coordenação');
+    const permissoes = JSON.parse(coordenacao.Configuracao);
+    if (permissoes.telas.indexOf('minhaPerformance') < 0) {
+      permissoes.telas.push('minhaPerformance');
+      chamar('atualizarRegistro_')('CATALOGO', coordenacao.Id,
+        { Configuracao: JSON.stringify(permissoes) });
+    }
+
+    // Três pessoas no MESMO canal: é isso que faz delas uma equipe.
+    [['Ana Martins', 'ana.equipe@exemplo.com'],
+     ['Diego Castilho', 'diego.equipe@exemplo.com'],
+     ['Carla Souza', 'carla.equipe@exemplo.com']].forEach((par) => {
+      chamar('salvarUsuario')({
+        nome: par[0], email: par[1], canalQueAtende: ret.nome,
+        nivelAcessoId: coordenacao.Id, ativo: true
+      });
+    });
+
+    comoUsuario(ambiente, 'ana.equipe@exemplo.com', () => {
+      const performance = chamar('minhaPerformance')(ret.id, 30);
+      igual(performance.vista, 'eu', 'abre no individual, que é o pedido');
+      igual(performance.vistasDisponiveis.map((v) => v.valor).join(','), 'eu,equipe');
+    });
+  });
+
+  teste('a vista da equipe soma as três, e a individual só as minhas', () => {
+    comoUsuario(ambiente, 'ana.equipe@exemplo.com', () => {
+      const soMeus = chamar('minhaPerformance')(ret.id, 30, 'eu');
+      const daEquipe = chamar('minhaPerformance')(ret.id, 30, 'equipe');
+
+      const trabalhados = (p) =>
+        p.indicadores.find((um) => um.chave === 'trabalhados').valor;
+
+      igual(trabalhados(soMeus), 3, 'os três casos da Ana');
+      igual(trabalhados(daEquipe), 5,
+        'os três dela mais o do Diego e o da Carla');
+      igual(daEquipe.pessoasNaVista, 3,
+        'a tela precisa dizer de quantas pessoas é o número');
+      igual(soMeus.pessoasNaVista, 1);
+    });
+  });
+
+  teste('a equipe NÃO inclui quem atende outro canal', () => {
+    // O "Pessoa B", "Pessoa C"… criados acima não estão cadastrados em canal
+    // nenhum: aparecem na base como responsáveis, mas não são da equipe dela.
+    comoUsuario(ambiente, 'ana.equipe@exemplo.com', () => {
+      const daEquipe = chamar('minhaPerformance')(ret.id, 30, 'equipe');
+      igual(daEquipe.indicadores.find((um) => um.chave === 'trabalhados').valor, 5,
+        'só as três cadastradas no canal, e não todo mundo que aparece na base');
+    });
+  });
+
+  teste('a meta da equipe é a soma das metas, e não a de uma pessoa', () => {
+    // Comparar o resultado de três pessoas com a meta de uma faria toda equipe
+    // parecer 300% acima do alvo — e um número que mente para cima é tão ruim
+    // quanto um que mente para baixo.
+    const comoEstava = chamar('listarCanaisConfiguraveis()')
+      .find((m) => m.aba === 'BASE_RET');
+    chamar('salvarCanal')(Object.assign({}, comoEstava,
+      { metaMensalPorPessoa: 30 }));
+
+    comoUsuario(ambiente, 'ana.equipe@exemplo.com', () => {
+      const minhaMeta = chamar('minhaPerformance')(ret.id, 30, 'eu').meta;
+      const daEquipe = chamar('minhaPerformance')(ret.id, 30, 'equipe').meta;
+
+      igual(minhaMeta.alvo, 30, '30 por mês, numa janela de 30 dias');
+      igual(minhaMeta.pessoas, 1);
+      igual(daEquipe.alvo, 90, 'três pessoas, três metas');
+      igual(daEquipe.pessoas, 3);
+      contem(daEquipe.rotulo, 'para cada uma das 3 pessoas',
+        'e o texto explica de onde saiu o alvo');
+    });
+
+    chamar('salvarCanal')(comoEstava);
+  });
+
+  teste('o ranking compara DENTRO da equipe, e não com o canal inteiro', () => {
+    // Rankear contra o canal todo colocaria a analista ao lado de gente que nem
+    // atende a mesma coisa — e a posição diria menos do que parece dizer.
+    comoUsuario(ambiente, 'ana.equipe@exemplo.com', () => {
+      const equipe = chamar('minhaPerformance')(ret.id, 30).equipe;
+      igual(equipe.quantasPessoas, 3,
+        'as três da equipe, e não as dez que aparecem na base');
+      igual(equipe.minhaPosicao, 1, 'a Ana tem 3, os outros 1 cada');
+    });
+  });
+
+  teste('vista desconhecida cai no individual, e não em lista vazia', () => {
+    comoUsuario(ambiente, 'ana.equipe@exemplo.com', () => {
+      igual(chamar('minhaPerformance')(ret.id, 30, 'sei-la').vista, 'eu');
+      igual(chamar('minhaPerformance')(ret.id, 30, '').vista, 'eu');
+    });
+  });
+
+  teste('pedir a equipe sem ter equipe devolve o individual, sem estourar', () => {
+    // Endereço guardado, clique repetido, chamada direta: o pedido torto chega.
+    // Estourar deixaria a tela com um recado de erro em vez de números.
+    const performance = chamar('minhaPerformance')(ret.id, 30, 'equipe');
+    igual(performance.vista, 'eu');
+    igual(performance.pessoasNaVista, 1);
+  });
+
   secao('O que eu fiz');
 
   teste('a trilha mostra só as MINHAS ações', () => {

@@ -202,12 +202,45 @@ function rodarTestesDeCadastro() {
   secao('O servidor não acredita no navegador');
 
   teste('campo obrigatório vazio é recusado, dizendo qual', () => {
+    // O exemplo é o Nome, e não o Status, de propósito: o Status é obrigatório
+    // MAS tem valor padrão, e um obrigatório com padrão nunca chega vazio ao
+    // servidor — o próprio servidor preenche. Testar com ele provaria o
+    // contrário do que este teste quer provar.
     const erro = lanca(() => chamar('cadastrarCaso')(canalDiamante.id, {
-      nomedosegurado: 'Sem status'
-    }), 'Status');
+      status: 'Em andamento'
+    }), 'Nome');
     igual(erro.problemas.length, 1);
-    igual(erro.problemas[0].campo, 'status');
+    igual(erro.problemas[0].campo, 'nomedosegurado');
     igual(erro.problemas[0].erro, 'é obrigatório');
+  });
+
+  teste('obrigatório COM valor padrão é preenchido, não recusado', () => {
+    // É o que a RET pediu: o caso nasce em "Não trabalhado" e o analista
+    // ajusta depois. Recusar por falta de um valor que o sistema tem guardado
+    // barraria o tombamento, que não passa por tela nenhuma — e na tela o
+    // problema ficaria invisível, porque ela preenche o padrão sozinha.
+    const novo = chamar('cadastrarCaso')(canalDiamante.id, {
+      nomedosegurado: 'Caso sem status na mão'
+    });
+    const gravado = chamar('buscarRegistros_')('BASE_MESA', 'ID', novo.id, 1)[0];
+    igual(gravado.Status, 'Em andamento', 'o padrão do canal entrou sozinho');
+  });
+
+  teste('editar NÃO repõe o padrão: reclama em vez de adivinhar', () => {
+    // O padrão vale no NASCIMENTO. Numa edição, um obrigatório que chega vazio
+    // é recusado com o nome do campo — repor o padrão calado desfaria o gesto
+    // de quem acabou de limpar aquilo, e ela só descobriria depois, no
+    // relatório. Entre adivinhar e perguntar, o sistema pergunta.
+    const novo = chamar('cadastrarCaso')(canalDiamante.id, {
+      nomedosegurado: 'Caso que muda de status', status: 'Concluído'
+    });
+    const erro = lanca(() => chamar('editarCaso')(canalDiamante.id, novo.id, {
+      nomedosegurado: 'Caso que muda de status', status: ''
+    }), 'Status');
+    igual(erro.problemas[0].erro, 'é obrigatório');
+
+    const gravado = chamar('buscarRegistros_')('BASE_MESA', 'ID', novo.id, 1)[0];
+    igual(gravado.Status, 'Concluído', 'e nada foi gravado pela metade');
   });
 
   teste('todos os problemas vêm de uma vez, não um por vez', () => {
@@ -221,7 +254,7 @@ function rodarTestesDeCadastro() {
     erro.problemas.forEach((p) => { porCampo[p.campo] = p.erro; });
     contem(porCampo.documentocpf, 'precisa ter 11 dígitos');
     contem(porCampo.dataresposta, 'não pode ser no futuro');
-    igual(porCampo.status, 'é obrigatório');
+    igual(porCampo.nomedosegurado, 'é obrigatório');
   });
 
   teste('data no futuro é recusada; ontem passa', () => {
@@ -362,6 +395,62 @@ function rodarTestesDeCadastro() {
     });
     igual(chamar('buscarRegistros_')('BASE_MESA', 'Id', novo.id, 1).length, 0,
       'o caso de outra pessoa foi apagado pela Ana');
+  });
+
+  teste('excluir na RET também apaga a linha — os DOIS canais', () => {
+    // Os testes acima provam a Mesa Diamante. Este prova a RET, e existe porque
+    // o pedido foi explícito: "confirme se os casos que forem selecionados para
+    // serem excluídos estão pelos dois canais e somem da planilha".
+    //
+    // Não é a mesma pergunta duas vezes: as duas abas têm colunas diferentes,
+    // nomes de Id diferentes ("id" minúsculo na RET, "ID" na Mesa) e formulários
+    // diferentes. Já bastou menos que isso para uma valer e a outra não.
+    const canalRetAqui = canais.find((canal) => canal.aba === 'BASE_RET');
+    const novo = chamar('cadastrarCaso')(canalRetAqui.id, {
+      nomedocliente: 'Caso da RET que vai sair'
+    });
+
+    const antes = chamar('lerRegistros_("BASE_RET")').length;
+    verdadeiro(chamar('buscarRegistros_')('BASE_RET', 'id', novo.id, 1).length === 1,
+      'o caso existe antes de ser apagado');
+
+    chamar('excluirCaso')(canalRetAqui.id, novo.id);
+
+    igual(chamar('lerRegistros_("BASE_RET")').length, antes - 1,
+      'uma linha a menos na planilha, e não uma linha escondida');
+    igual(chamar('buscarRegistros_')('BASE_RET', 'id', novo.id, 1).length, 0);
+
+    // E some da fila do Trabalho, que é onde a pessoa vai conferir.
+    const fila = chamar('resumoDoCanal')(canalRetAqui.id, {}).fila;
+    verdadeiro(!fila.some((linha) => linha.id === novo.id),
+      'o caso apagado não pode continuar na fila');
+  });
+
+  teste('o apagado da RET também fica na auditoria, com o conteúdo', () => {
+    const trilha = chamar('lerRegistros_("AUDITORIA")')
+      .filter((linha) => String(linha.Acao) === 'caso.excluir');
+    const daRet = trilha.filter((linha) =>
+      String(linha.Detalhe).indexOf('Caso da RET que vai sair') >= 0);
+    verdadeiro(daRet.length === 1,
+      'sem desfazer, a auditoria é o único rastro de que o caso existiu');
+    contem(String(daRet[0].Detalhe), 'RET', 'e diz de qual canal era');
+  });
+
+  teste('a busca é oferecida a TODOS os níveis de fábrica', () => {
+    // Pedido do PO: "Buscar caso... todos precisam dessa visualização". Ela
+    // procura nas bases do PGO E na planilha antiga, quando ela está ligada —
+    // não é só do legado.
+    const niveis = chamar('lerRegistros_("CATALOGO")')
+      .filter((item) => item.Tipo === 'NIVEL_ACESSO');
+    verdadeiro(niveis.length >= 4, 'os quatro níveis de fábrica');
+
+    const semBusca = niveis.filter((nivel) => {
+      const permissoes = JSON.parse(nivel.Configuracao || '{}');
+      return (permissoes.telas || []).indexOf('buscarCaso') < 0;
+    }).map((nivel) => nivel.Nome);
+
+    igual(semBusca.join(', '), '',
+      'nenhum nível pode nascer sem a busca — estes ficaram de fora');
   });
 
   secao('O formulário que a operação pediu');

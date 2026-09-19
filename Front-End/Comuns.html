@@ -87,6 +87,14 @@ var Moldura = (function () {
       + '<path d="M9.2 20.6v-4.2h1.6v4.2"></path>',
 
     // análise: as barras em pé, sobre a régua
+    // Tombamento: uma caixa despejando linhas para dentro de uma bandeja. A
+    // ideia é "uma base inteira entrando de uma vez", que é o que a tela faz —
+    // e não um "mais", que já é o Cadastrar Caso.
+    tombamento:
+      '<path d="M3.4 13.6h4.2l1.4 2.6h6l1.4-2.6h4.2"></path>'
+      + '<path d="M3.4 13.6 6 5.9a1.5 1.5 0 0 1 1.4-1h9.2a1.5 1.5 0 0 1 1.4 1l2.6 7.7'
+      + 'v4.4a1.5 1.5 0 0 1-1.5 1.5H4.9a1.5 1.5 0 0 1-1.5-1.5z"></path>'
+      + '<path d="M12 5.4v5.2M9.8 8.4 12 10.6l2.2-2.2"></path>',
     painelAnalitico:
       '<path d="M3.6 20.4h16.8"></path>'
       + '<path d="M7.4 20.4v-6.2M12 20.4V6.8M16.6 20.4v-9.6"></path>',
@@ -1154,6 +1162,7 @@ var CasoEmModal = (function () {
           + '</div>';
       }).join('')
       + '</div>'
+      + desenharLinhaDoTempo()
       + desenharHistorico();
 
     // As quatro ações do caso vivem aqui. Excluir também está na fila, desde
@@ -1195,6 +1204,35 @@ var CasoEmModal = (function () {
         .entao(function () { mudouAlgo = true; fechar(); })
         .senao(function (erro) { window.alert(erro.message || String(erro)); });
     });
+  }
+
+  /**
+   * Por onde o caso passou, e quando.
+   *
+   * Vem dos CARIMBOS — cada status grava a data e a hora em que o caso chegou
+   * nele —, e é a resposta para "a data e a hora de cada contato" sem abrir a
+   * planilha. Fica ACIMA do histórico de auditoria de propósito: a jornada é o
+   * que a operação lê todo dia; a auditoria é para quando algo não fecha.
+   *
+   * A etapa que não aconteceu aparece apagada, no lugar dela. Sumir com ela
+   * esconderia o buraco — e o buraco é informação: quem pulou o 2º contato e
+   * foi direto para "Não reteve" contou uma história.
+   */
+  function desenharLinhaDoTempo() {
+    if (!detalhe.linhaDoTempo || !detalhe.linhaDoTempo.length) return '';
+
+    return '<section class="historico">'
+      + '<h4>Por onde o caso passou</h4>'
+      + '<ul class="linha-do-tempo">' + detalhe.linhaDoTempo.map(function (etapa) {
+        return '<li class="tom-' + escapar(etapa.tom || 'neutro')
+          + (etapa.cumprida ? ' cumprida' : ' pendente')
+          + (etapa.ehOndeEstaAgora ? ' agora' : '') + '">'
+          + '<span class="marca" aria-hidden="true"></span>'
+          + '<span class="etapa">' + escapar(etapa.status) + '</span>'
+          + '<span class="quando">'
+          + escapar(etapa.cumprida ? etapa.quando : 'ainda não') + '</span>'
+          + '</li>';
+      }).join('') + '</ul></section>';
   }
 
   function desenharHistorico() {

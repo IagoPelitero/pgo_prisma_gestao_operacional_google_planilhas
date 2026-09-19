@@ -454,6 +454,193 @@ function rodarTestesDoPainel() {
     igual(String(depois), String(primeiro), 'o primeiro carimbo tem de sobreviver');
   });
 
+  secao('O controle de produtividade da RET');
+
+  /*
+   * Os testes acima provam o MECANISMO do carimbo, numa coluna criada à mão no
+   * meio do teste. Os de baixo provam a INSTALAÇÃO de fábrica da RET: que os
+   * oito status que o instalador semeia apontam para colunas que existem de
+   * verdade na BASE_RET.
+   *
+   * São perguntas diferentes, e a segunda já falhou calada uma vez: um status
+   * pode apontar para "Data do 1o contato" enquanto a coluna se chama "Data do
+   * 1º contato", e aí carimbarOStatus_ ignora — de propósito, para não impedir
+   * o caso de ser salvo. O resultado é um sistema que grava o status e não
+   * grava a hora, sem reclamar de nada.
+   */
+
+  const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+
+  function casoNovoDaRet(nome) {
+    return chamar('cadastrarCaso')(ret.id, {
+      status: 'Não trabalhado', nomedocliente: nome
+    });
+  }
+
+  function linhaDaRet(id) {
+    return chamar('buscarRegistros_')('BASE_RET', 'id', id, 1)[0];
+  }
+
+  teste('todo status de fábrica da RET aponta para uma coluna que existe', () => {
+    const estrutura = chamar('estruturaDaAba_')('BASE_RET');
+    const statusDaRet = chamar('lerRegistros_("CATALOGO")').filter((item) =>
+      item.Tipo === 'STATUS' && String(item.CanalId) === String(ret.id));
+
+    igual(statusDaRet.length, 8, 'os oito status que a operação pediu');
+
+    const semCarimbo = statusDaRet.filter((item) =>
+      !String(item.ColunaDeCarimbo || '').trim()).map((item) => item.Nome);
+    igual(semCarimbo.join(', '), 'Não trabalhado',
+      'só o estado de nascimento não carimba — os outros sete carimbam');
+
+    statusDaRet.forEach((item) => {
+      const coluna = String(item.ColunaDeCarimbo || '').trim();
+      if (!coluna) return;
+      verdadeiro(chamar('posicaoDaColuna_')(estrutura, coluna) >= 0,
+        'o status "' + item.Nome + '" aponta para a coluna "' + coluna
+        + '", que não existe na BASE_RET');
+    });
+  });
+
+  teste('o caso da RET nasce em Não trabalhado, sem ninguém escolher', () => {
+    // É o pedido da operação: o analista cadastra e ajusta o status depois.
+    const todos = chamar('formularioDoCanal')(ret.id).secoes
+      .reduce((soma, s) => soma.concat(s.campos), []);
+    igual(todos.find((c) => c.chave === 'status').valorPadrao, 'Não trabalhado',
+      'o formulário já chega com o status preenchido');
+
+    const novo = chamar('cadastrarCaso')(ret.id, { nomedocliente: 'Caso sem status' });
+    igual(linhaDaRet(novo.id).status, 'Não trabalhado',
+      'e quem não mandar status nenhum também cai em Não trabalhado');
+  });
+
+  teste('a jornada da RET fica carimbada coluna a coluna', () => {
+    // O caminho que a operação percorre de verdade, do cadastro à retenção.
+    const novo = casoNovoDaRet('Caso da jornada');
+    const caminho = [
+      ['Aguardando transmissão', 'Data aguardando transmissão'],
+      ['Pendente', 'Data pendente'],
+      ['1º contato realizado', 'Data do 1º contato'],
+      ['2º contato realizado', 'Data do 2º contato'],
+      ['Reteve', 'Data reteve']
+    ];
+
+    caminho.forEach((passo) => {
+      chamar('alterarSituacaoDoCaso')(ret.id, novo.id, passo[0]);
+      const gravado = linhaDaRet(novo.id);
+      igual(gravado.status, passo[0], 'o status ficou gravado');
+      verdadeiro(ehData(gravado[passo[1]]),
+        'o status "' + passo[0] + '" devia ter carimbado "' + passo[1]
+        + '", e a célula veio com: ' + JSON.stringify(gravado[passo[1]]));
+    });
+
+    // E os carimbos anteriores continuam lá: é a linha do tempo do caso.
+    const fim = linhaDaRet(novo.id);
+    caminho.forEach((passo) => {
+      verdadeiro(ehData(fim[passo[1]]),
+        'o carimbo de "' + passo[0] + '" não podia ter sido apagado no caminho');
+    });
+    verdadeiro(!fim['Data não reteve'],
+      'um caso que reteve não pode ter data de não reteve');
+  });
+
+  teste('toda mudança de status deixa rastro, inclusive a repetida', () => {
+    // O carimbo grava a PRIMEIRA visita a cada status. Um caso que vai e volta
+    // entre dois status não mexe em carimbo nenhum, e pareceria parado. Estas
+    // três colunas são o que a operação pediu: toda mudança precisa registrar.
+    const novo = casoNovoDaRet('Caso do vai e volta');
+    igual(linhaDaRet(novo.id)['Mudanças de status'], '',
+      'quem acabou de nascer ainda não mudou de status nenhuma vez');
+
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
+    const primeira = linhaDaRet(novo.id);
+    igual(primeira['Mudanças de status'], 1, 'a primeira mudança');
+    igual(primeira['Quem mudou o status'], 'primeiro.adm@exemplo.com');
+    verdadeiro(ehData(primeira['Data da última mudança de status']),
+      'a data da última mudança é data de verdade');
+
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
+
+    const fim = linhaDaRet(novo.id);
+    igual(fim['Mudanças de status'], 4,
+      'as quatro mudanças, mesmo as que repetiram status');
+    igual(String(fim['Data do 1º contato']),
+      String(primeira['Data do 1º contato'] || fim['Data do 1º contato']),
+      'e o carimbo do 1º contato continua marcando a primeira vez');
+  });
+
+  teste('contador estragado na planilha não vira lixo — recomeça do zero', () => {
+    // A coluna é editável: alguém pode digitar "três" ali. Number('três') é
+    // NaN, e NaN + 1 continua NaN, que gravado na célula não significa nada.
+    const novo = casoNovoDaRet('Caso do contador torto');
+    chamar('atualizarRegistro_')('BASE_RET', novo.id, { 'Mudanças de status': 'três' });
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
+    igual(linhaDaRet(novo.id)['Mudanças de status'], 1,
+      'texto que não é número conta como zero, e a mudança vira a primeira');
+  });
+
+  teste('o detalhe do caso mostra por onde ele passou, com data e hora', () => {
+    // É o pedido literal da operação: "a data e a hora de cada contato". Sem
+    // isto, responder isso exigiria abrir a planilha e procurar a coluna certa
+    // numa base de cinquenta colunas.
+    const novo = casoNovoDaRet('Caso da linha do tempo');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
+
+    const etapas = chamar('detalhesDoCaso')(ret.id, novo.id).linhaDoTempo;
+    const porStatus = {};
+    etapas.forEach((etapa) => { porStatus[etapa.status] = etapa; });
+
+    igual(etapas.length, 7,
+      'os sete status da RET que carimbam — "Não trabalhado" não carimba');
+    verdadeiro(porStatus['Pendente'].cumprida, 'passou por Pendente');
+    verdadeiro(/\d{2}\/\d{2}\/\d{4}/.test(porStatus['Pendente'].quando),
+      'e a data vem formatada para ler, veio: ' + porStatus['Pendente'].quando);
+    verdadeiro(porStatus['1º contato realizado'].ehOndeEstaAgora,
+      'o status de hoje vem marcado, para a tela destacar');
+
+    // A etapa que não aconteceu vem no LUGAR dela, vazia. Sumir esconderia o
+    // buraco — e o buraco é informação.
+    verdadeiro(!porStatus['2º contato realizado'].cumprida);
+    igual(porStatus['2º contato realizado'].quando, '');
+    verdadeiro(porStatus['Reteve'] !== undefined,
+      'Reteve aparece mesmo sem ter acontecido');
+  });
+
+  teste('a ordem da linha do tempo é a do catálogo, não a das datas', () => {
+    // A ordem do catálogo é a jornada como a operação a desenhou. Ordenar por
+    // data deixaria a etapa sem data sem lugar nenhum — e ela é justamente a
+    // que se quer ver faltando.
+    const doCatalogo = chamar('lerRegistros_("CATALOGO")')
+      .filter((item) => item.Tipo === 'STATUS'
+        && String(item.CanalId) === String(ret.id)
+        && String(item.ColunaDeCarimbo || '').trim())
+      .sort((um, outro) => Number(um.Ordem) - Number(outro.Ordem))
+      .map((item) => item.Nome);
+
+    const novo = casoNovoDaRet('Caso da ordem');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Reteve');
+    const etapas = chamar('detalhesDoCaso')(ret.id, novo.id).linhaDoTempo;
+
+    igual(etapas.map((e) => e.status).join(' | '), doCatalogo.join(' | '));
+  });
+
+  teste('a troca de status da RET continua fora da auditoria', () => {
+    // Um caso passa por quatro ou cinco status antes de fechar. Numa base de
+    // 200 mil casos isso seria quase um milhão de linhas de auditoria. O que
+    // a operação precisa saber está carimbado na linha do caso.
+    const novo = casoNovoDaRet('Caso fora da auditoria');
+    const antes = chamar('lerRegistros_("AUDITORIA")').length;
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Reteve');
+    igual(chamar('lerRegistros_("AUDITORIA")').length, antes,
+      'duas trocas de status não podem ter escrito nada na auditoria');
+  });
+
+  secao('O carimbo da Mesa Diamante');
+
   teste('concluir preenche a finalização quando o canal tem essa coluna', () => {
     const novo = chamar('cadastrarCaso')(canal.id, {
       analista: 'Ana Martins', status: 'Em andamento',

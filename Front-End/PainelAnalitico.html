@@ -28,6 +28,11 @@ var TelaPainelAnalitico = (function () {
   var canalEscolhida = '';
   var filtros = {};
   var dias = 0;
+  // 'equipe' ou 'eu'. Quem decide o que cada uma mostra é o servidor; aqui
+  // só se guarda a escolha, para ela sobreviver a um filtro e a uma troca de
+  // período. Filtrar no navegador daria dois números diferentes para a mesma
+  // pergunta, e o da tela seria o errado.
+  var vista = 'equipe';
   var painel = null;
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
@@ -48,7 +53,7 @@ var TelaPainelAnalitico = (function () {
     var caixa = elemento('analitico');
     if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
 
-    Servidor.chamar('painelAnalitico', canalEscolhida, filtros, dias)
+    Servidor.chamar('painelAnalitico', canalEscolhida, filtros, dias, vista)
       .entao(function (resposta) {
         painel = resposta;
         desenhar();
@@ -63,6 +68,7 @@ var TelaPainelAnalitico = (function () {
     // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
     // número que a pessoa já leu como se fosse o total.
     elemento('analitico').innerHTML = desenharFiltros()
+      + desenharCartoes()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
@@ -74,9 +80,76 @@ var TelaPainelAnalitico = (function () {
     ligarPainel();
   }
 
+  /**
+   * A variação em relação ao período anterior — igual à do Trabalho.
+   *
+   * Sem base de comparação o espaço fica em branco, e não "+100%": subir de
+   * zero para um não é 100% de melhora, e um número que mente uma vez faz a
+   * pessoa desconfiar dos outros.
+   */
+  function variacao(cartao) {
+    if (cartao.variacao === null || cartao.variacao === undefined) {
+      return '<span class="variacao vazia" aria-hidden="true">—</span>';
+    }
+    var subiu = cartao.variacao >= 0;
+    return '<span class="variacao ' + (subiu ? 'subiu' : 'desceu') + '">'
+      + (subiu ? '▲' : '▼') + ' ' + Math.abs(cartao.variacao) + '%'
+      + '<em>vs. período anterior</em></span>';
+  }
+
+  /**
+   * Os números que a operação pediu, antes dos gráficos.
+   *
+   * Vêm primeiro de propósito: "quantos reteve" é a pergunta, e o gráfico é a
+   * explicação. Quem abre a tela quer o número; quem quer entender desce.
+   *
+   * Nada aqui está escrito em código — cada cartão é uma linha de PAINEIS, e
+   * se some em Configurações › Painéis.
+   */
+  function desenharCartoes() {
+    if (!painel.cartoes || !painel.cartoes.length) return '';
+
+    return '<div class="cartoes">'
+      + painel.cartoes.map(function (cartao) {
+        return '<div class="indicador tom-' + escapar(cartao.tom || 'neutro') + '"'
+          + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"' : '')
+          + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
+          + '<strong class="numero">' + cartao.valor + '</strong>'
+          + variacao(cartao)
+          + '</div>';
+      }).join('')
+      + '</div>';
+  }
+
+  /**
+   * A equipe toda ou só os meus.
+   *
+   * Só aparece para quem tem as duas: o servidor devolve a lista vazia quando
+   * o nível de acesso da pessoa já a limita aos próprios casos. Um controle que
+   * não muda nada ensina a não confiar nos outros controles.
+   */
+  function desenharVista() {
+    if (!painel.vistasDisponiveis || !painel.vistasDisponiveis.length) return '';
+
+    return '<div class="vista-do-painel" role="group"'
+      + ' aria-label="De quem são os números">'
+      + painel.vistasDisponiveis.map(function (uma) {
+        return '<button type="button" class="botao-vista'
+          + (painel.vista === uma.valor ? ' ligado' : '') + '"'
+          + ' data-vista="' + escapar(uma.valor) + '"'
+          + ' aria-pressed="' + (painel.vista === uma.valor ? 'true' : 'false') + '">'
+          + escapar(uma.rotulo) + '</button>';
+      }).join('')
+      + '</div>';
+  }
+
   function desenharFiltros() {
     var caixas = painel.filtrosDisponiveis.map(function (filtro) {
-      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      // A primeira opção é o nome do filtro puro — "Analista", "Status".
+      // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
+      // fechada mostrava a palavra que menos importa, e em tela estreita o
+      // nome do filtro era justamente o pedaço que ficava cortado.
+      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
       filtro.opcoes.forEach(function (opcao) {
         opcoes.push('<option value="' + escapar(opcao.valor) + '"'
           + (filtros[filtro.chave] === opcao.valor ? ' selected' : '') + '>'
@@ -97,6 +170,7 @@ var TelaPainelAnalitico = (function () {
       + '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
       + periodos + '</select>'
       + caixas.join('')
+      + desenharVista()
       + '<span class="contagem">' + painel.total + ' casos · '
       + escapar(painel.periodo.rotulo) + '</span></div>';
   }
@@ -144,6 +218,11 @@ var TelaPainelAnalitico = (function () {
       });
     }
 
+    ligarCliques('[data-vista]', function (botao) {
+      vista = botao.getAttribute('data-vista');
+      carregar();
+    });
+
     ligarCliques('[data-tabela]', function (botao) {
       var id = botao.getAttribute('data-tabela');
       tabelasAbertas[id] = !tabelasAbertas[id];
@@ -183,7 +262,7 @@ var TelaPainelAnalitico = (function () {
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     Servidor.chamar('detalharComponente', canalEscolhida, idDoComponente,
-      chaveDoPonto, filtros, dias)
+      chaveDoPonto, filtros, dias, vista)
       .entao(function (resposta) { desenharDetalhe(resposta); })
       .senao(function (erro) {
         caixa.innerHTML = '<p class="carregando-campos erro-carga">'
@@ -249,7 +328,7 @@ var TelaPainelAnalitico = (function () {
    */
   function exportar(idDoComponente) {
     Servidor.chamar('exportarComponente', canalEscolhida, idDoComponente,
-      filtros, dias)
+      filtros, dias, vista)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
   }

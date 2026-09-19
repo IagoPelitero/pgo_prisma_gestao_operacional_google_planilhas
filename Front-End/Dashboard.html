@@ -78,7 +78,11 @@ var TelaDashboard = (function () {
     if (!resumo.filtrosDisponiveis.length) return '';
 
     var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
-      var opcoes = ['<option value="">Todos — ' + escapar(filtro.rotulo) + '</option>'];
+      // A primeira opção é o nome do filtro puro — "Analista", "Status".
+      // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
+      // fechada mostrava a palavra que menos importa, e em tela estreita o
+      // nome do filtro era justamente o pedaço que ficava cortado.
+      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
       filtro.opcoes.forEach(function (opcao) {
         var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
           ? ' selected' : '';

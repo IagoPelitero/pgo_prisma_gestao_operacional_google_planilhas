@@ -220,6 +220,12 @@ var Rotas = (function () {
       ligar: function (pacote) { TelaTabelaCorretoras.ligar(pacote); },
       desligar: function () { TelaTabelaCorretoras.desligar(); }
     },
+    tombamento: {
+      titulo: 'Tombamento',
+      subtitulo: 'Traga uma base inteira de outra planilha e divida entre os analistas.',
+      montar: function (pacote) { return TelaTombamento.montar(pacote); },
+      ligar: function (pacote) { TelaTombamento.ligar(pacote); }
+    },
     painelAnalitico: {
       titulo: 'Painel Analítico',
       subtitulo: 'Explore dados e identifique oportunidades para a operação.',
@@ -248,6 +254,24 @@ var Aplicacao = (function () {
   var telaAtual = '';
 
   function elemento(id) { return document.getElementById(id); }
+
+  /**
+   * O nome que a tela tem HOJE, que é o mesmo que o menu mostra.
+   *
+   * O título do menu é configurável desde que o PO renomeou "Dashboard" para
+   * "Trabalho" — mas o cabeçalho da página vinha da tabela de rotas, escrito à
+   * mão. O resultado era um menu dizendo "Trabalho" e a página, logo ao lado,
+   * dizendo "Dashboard": duas respostas para a mesma pergunta, na mesma tela.
+   *
+   * O título da rota continua servindo de reserva, para o caso de uma tela que
+   * o servidor não listou (sem permissão de ver, por exemplo).
+   */
+  function tituloDaTela(tela, seNaoAchar) {
+    var achado = (pacote.menu || []).filter(function (item) {
+      return item.tela === tela;
+    })[0];
+    return achado && achado.titulo ? achado.titulo : seNaoAchar;
+  }
 
   /* -- tema -------------------------------------------------------------- */
   function aplicarTema(tema) {
@@ -302,14 +326,16 @@ var Aplicacao = (function () {
     telaAtual = tela;
 
     var definicao = Rotas.pegar(tela);
+    var comoSeChama = tituloDaTela(tela, definicao.titulo);
+
     elemento('superior').innerHTML = Moldura.montarSuperior(pacote);
     elemento('lateral').innerHTML = Moldura.montarLateral(pacote, tela);
     elemento('miolo').innerHTML = '<div class="cabecalho-da-tela">'
-      + '<h2>' + Moldura.escapar(definicao.titulo) + '</h2>'
+      + '<h2>' + Moldura.escapar(comoSeChama) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
       + '</div>'
       + definicao.montar(pacote);
-    document.title = pacote.identidade.nome + ' — ' + definicao.titulo;
+    document.title = pacote.identidade.nome + ' — ' + comoSeChama;
 
     ligarMoldura();
     if (definicao.ligar) definicao.ligar(pacote);

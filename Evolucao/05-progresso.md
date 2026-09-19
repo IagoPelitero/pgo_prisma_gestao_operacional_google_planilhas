@@ -560,7 +560,7 @@ quase preto. É por isso que o par certo é sempre `--destaque-escuro` com
 
 A operação perguntou se o Painel Analítico tinha os dois recortes. **Por área**
 sempre teve, e não como gráfico: é o seletor de canal. Um gráfico "casos por
-área" com duas barras compararia RET Vida com Mesa Diamante, que têm colunas,
+área" com duas barras compararia RET com Mesa Diamante, que têm colunas,
 situações e volumes incomparáveis — a Canal sempre pareceria pequena, e nunca
 foi para ser grande.
 
@@ -903,7 +903,7 @@ nem calculava — e é a tela sobre uma pessoa.
 | operação | idas | células | tempo est. |
 |---|---:|---:|---:|
 | Gravar 5.000 casos de uma vez | 5 | 195 mil | 275 ms |
-| Dashboard: abrir a RET Vida | 16 | 202 mil | 581 ms |
+| Dashboard: abrir a RET | 16 | 202 mil | 581 ms |
 | Buscar por protocolo | 21 | 1,0 mi | 1,4 s |
 | Buscar termo que casa com milhares | 20 | 1,0 mi | 1,4 s |
 | Painel Analítico: os 6 gráficos | 16 | 202 mil | 582 ms |
@@ -1260,7 +1260,7 @@ coluna da SUSEP e só a linha que casar: **24 mil**, dez vezes menos.
 
 ### 3. Mesas viraram canais
 
-RET Vida e Mesa Diamante são **canais**, não mesas. O vocabulário do código
+RET e Mesa Diamante são **canais**, não mesas. O vocabulário do código
 inteiro mudou junto — 1.351 linhas.
 
 A aba `CANAIS` existia e guardava **corretoras**. Virou `CORRETORAS`, que é o
@@ -1298,7 +1298,7 @@ ser de outra pessoa, e o nível alcançar só os próprios.
 A mensagem é que estava errada. "Fora do seu alcance" foi lido como "este
 canal não deixa excluir", porque na Mesa Diamante a pessoa conseguia e na RET
 não. Agora ela nomeia o responsável pelo caso e diz, em letras: *"isso vale
-para qualquer canal, e não é uma regra do RET Vida"*.
+para qualquer canal, e não é uma regra do RET"*.
 
 > De quebra, achei uma função `ocultar` no Dashboard escrita antes da decisão
 > de pôr excluir no caso aberto, e **nunca chamada**. Código morto num arquivo
@@ -1365,12 +1365,192 @@ tem o PGO rodando recola só o que mudou.
 
 ---
 
+## A rodada do RECC: mais dedicado à operação, e mais ajustável
+
+O pedido tinha uma tensão dentro dele, e é ela que orientou tudo: *"vou deixar o
+sistema mais adaptado e exclusivo para eles, ou seja, voltado para Retenção e
+para a Mesa Diamante. Como a operação está ainda se formando... o sistema não
+pode ser fechado, precisa ser mais ajustável."*
+
+Mais dedicado E mais ajustável ao mesmo tempo. A resposta, em todos os itens
+abaixo, foi a mesma: **o que a operação pediu virou o PADRÃO DE FÁBRICA, e não
+uma regra no código.** Os oito status da RET, os cartões da Produtividade, os
+gráficos do tombamento — tudo isso nasce pronto e tudo isso se muda em
+Configurações, sem programador.
+
+### 1. RET, Trabalho, Produtividade RECC
+
+"RET Vida" virou **RET**: o canal passou a atender Vida Individual e Vida em
+Grupo, e o nome não podia dizer só metade.
+
+O `Dashboard` virou **Trabalho** e o `Painel Analítico` virou **Produtividade
+RECC** — e a pergunta do PO foi *"consigo editar o nome depois?"*. Não conseguia:
+os títulos moravam em `MENU.TITULOS` desde sempre e nunca tiveram onde ser
+editados. Ganharam tela.
+
+O que identifica a tela é a **chave**, nunca o texto. `dashboard` continua sendo
+a chave da tela que hoje se chama "Trabalho" — trocar a chave junto com o nome
+quebraria rota, nível de acesso e endereço guardado.
+
+> **E o cabeçalho da página ficou para trás.** O menu obedecia ao nome novo; o
+> título da página, dois centímetros ao lado, continuava lendo a tabela de rotas
+> e dizendo "Dashboard". É o achado 37: quando uma informação vira
+> configurável, todo lugar que a exibia precisa ser revisitado.
+
+### 2. O caso da RET nasce em "Não trabalhado"
+
+O status padrão do formulário da RET passou a ser "Não trabalhado" — o analista
+ajusta depois de cadastrar.
+
+Isso expôs um defeito que estava escondido havia meses: o servidor conferia
+"é obrigatório" **antes** de aplicar o valor padrão. Na tela não aparecia,
+porque a tela preenche o padrão sozinha antes de a pessoa ver — dois lugares
+fazendo o mesmo trabalho, e só um deles certo.
+
+Quem ia pagar a conta era o tombamento: uma base de 300 inadimplentes não traz
+coluna de status, não passa por tela nenhuma, e as 300 linhas seriam recusadas
+uma a uma. É o achado 34.
+
+### 3. Toda mudança de status fica registrada
+
+O controle de produtividade da RET. São **duas coisas diferentes**, e o sistema
+guarda as duas:
+
+- **Os carimbos** — uma coluna por status, com a data e a hora em que o caso
+  chegou nele pela **primeira** vez. "Data do 1º contato", "Data reteve". É o
+  que responde *"a data e a hora de cada contato"* sem abrir a planilha.
+- **O rastro de toda mudança** — quando foi a última, quem fez, e quantas vezes
+  o caso já andou. Um caso que vai e volta entre dois status não mexe em carimbo
+  nenhum, e sem estas três colunas pareceria parado.
+
+Nada disso vai para a auditoria, e é decisão da operação: troca de status é o
+evento mais frequente do sistema, e numa base de 200 mil casos seriam quase um
+milhão de linhas numa aba da qual ninguém tira relatório.
+
+No detalhe do caso, os carimbos viram uma **linha do tempo**: por onde o caso
+passou, na ordem do catálogo — que é a jornada como a operação a desenhou. A
+etapa que não aconteceu aparece **no lugar dela**, apagada. Sumir esconderia o
+buraco, e o buraco é informação: quem pulou o 2º contato e foi direto para "Não
+reteve" contou uma história.
+
+### 4. A Produtividade RECC
+
+A tela abre pelos **cartões**, porque é o cartão que responde a pergunta. Para a
+RET: reteve, não reteve, já contatados, com 2º contato, cadastrados, pendentes e
+não trabalhados.
+
+"Já contatados" sai do **carimbo**, e não do status de hoje — a diferença que
+importa. Um caso que passou do "1º contato realizado" e hoje está em "Reteve"
+continua tendo sido contatado; contar pelo status diria zero.
+
+Dois botões trocam entre **a equipe toda** e **só os meus**. O nível define o
+teto; a vista escolhe quanto dele aparece. Quem já só enxerga os próprios casos
+não recebe os botões.
+
+E os filtros perderam o "Todos —": a caixa fechada mostrava a palavra que menos
+importa, e em tela estreita o nome do filtro era o pedaço que ficava cortado.
+
+> **Os cartões quase apagaram os gráficos.** As duas coisas passaram a morar na
+> mesma tela da aba `PAINEIS`, distinguidas só pelo `TipoWidget`. O
+> `salvarComponentesDoPainel` recolhia "tudo desta tela neste canal" e desligava
+> o que não estivesse na lista de gráficos — e os cartões não estavam. A
+> pergunta "esta linha é um gráfico?" virou uma função só, usada nos três
+> lugares que a faziam.
+
+### 5. O tombamento
+
+Trazer uma base inteira de fora, numa gravação só: os inadimplentes do Vida
+Individual, do Vida em Grupo, as corretoras que a Mesa vai tratar. Cem casos,
+trezentos casos, toda semana.
+
+Três passos, e **o do meio é a razão de a tela existir**: conferir. O servidor
+devolve para onde cada coluna vai, quantas linhas entram, quantas repetem e as
+**três primeiras já traduzidas**. Mapeamento errado é invisível olhando o
+cabeçalho e óbvio olhando o dado.
+
+O que o tombamento resolve, além de inserir:
+
+| Problema | Resposta |
+|---|---|
+| Os cabeçalhos são os da outra planilha | Casa nome com nome e **sugere**; a pessoa corrige |
+| A base chega sem responsável | **Rodízio** em partes iguais entre os analistas marcados |
+| A base repete toda semana | Coluna que identifica o caso → o que já está dentro é **pulado** |
+| O caso precisa nascer trabalhável | Entra com o **status padrão** do canal |
+| De onde veio cada caso | Grava o **lote** e a **data** — é o que faz o gráfico existir |
+
+Na Produtividade RECC, dois gráficos por canal: **casos tombados por dia** e **de
+qual base os casos vieram**. É o pedido literal: *"no dia 05 incluímos 100 casos
+da base de inadimplentes Vida Presente"*.
+
+`tombar` é uma ação separada de `criar`: quem cadastra um caso por vez erra um
+caso; quem tomba errado suja a base toda, e o desfazer é apagar trezentas linhas
+na mão. De fábrica, Administração e Coordenação tombam; a Operação não.
+
+> **A lista de analistas veio vazia numa operação cheia de analistas.** Eu
+> filtrava por "Canal que atende igual ao nome do canal", e esse campo é de
+> digitar livre: a operação escreve "Vida Individual", não "RET". Pior, os meus
+> testes cadastravam as pessoas com o nome do canal — o teste herdou a suposição
+> do código. Só apareceu abrindo a tela e lendo a frase. É o achado 40.
+
+### 6. Minha Performance: eu e a minha equipe
+
+O resultado individual do analista logado, com a opção de ver como vai o grupo a
+que ele pertence. A equipe é quem está cadastrado no **mesmo canal que ele
+atende** — a mesma definição que o alcance usa, para os dois números nunca
+divergirem.
+
+Na vista da equipe a **meta vira a soma das metas**: comparar o resultado de
+cinco pessoas com a meta de uma faria toda equipe parecer 400% acima do alvo. E
+o ranking passou a comparar **dentro da equipe**, e não com o canal inteiro —
+rankear contra o canal colocava o analista ao lado de gente que nem atende a
+mesma coisa.
+
+### 7. A busca e a exclusão, confirmadas
+
+Duas perguntas do PO, e as duas respondidas com teste em vez de com opinião:
+
+- **"Buscar caso é para localizarmos na antiga base, correto? Todos precisam
+  dessa visualização."** A busca procura nas bases do PGO **e** na planilha
+  antiga, quando ela está configurada — não é só do legado. E os quatro níveis
+  de fábrica já nascem com ela; um teste agora reprova qualquer nível que nasça
+  sem.
+- **"Confirme se os casos excluídos somem da planilha nos dois canais."** Somem.
+  Havia teste para a Mesa Diamante e não para a RET — as duas abas têm colunas,
+  nomes de Id e formulários diferentes, e já bastou menos que isso para uma
+  valer e a outra não. Agora há para as duas, e para a auditoria das duas.
+
+### O que as varreduras de navegador pegaram
+
+Três coisas que nenhum teste de servidor veria:
+
+1. **O menu cortava "Produtividade RE…".** O rótulo tinha `nowrap` com
+   reticências. O nome da tela é escolha do administrador, e cortá-lo em 248
+   pixels é cortar a escolha dele — num MENU, ainda por cima, que é o texto lido
+   *antes* do clique. Agora quebra em duas linhas.
+2. **O Tombamento nasceu com o ícone do Trabalho.** O desenho caía no padrão. O
+   teste que cobrava desenhos únicos comparava contra o número 7, escrito à mão,
+   enquanto o menu já tinha 8 — passou a comparar contra o tamanho do menu.
+3. **Gráfico com uma barra só, chamada "Sem informação".** É o estado normal de
+   um gráfico sobre o tombamento antes do primeiro tombamento. Não diz nada e
+   parece defeito. Agora vira o recado, que explica.
+
+E as duas varreduras de navegador **não conheciam a tela nova**: cada uma tinha
+a sua lista de telas escrita à mão — uma com sete nomes, a outra com cinco, e as
+duas dizendo "TODAS as telas" no cabeçalho. Continuaram aprovando com a mesma
+confiança, caladas sobre a oitava. A lista passou a sair do código, num lugar
+só. É o achado 33 outra vez.
+
+**490 testes**, cinco execuções seguidas sem falha, 136 cliques em 8 telas, 96
+combinações de tela × largura e 9 testes de ponta a ponta.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
 |---|---|
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
-| **Nome das telas, janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela |
+| **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
 | **Criar e apagar canal** | A tela ajusta os canais que existem. Criar um canal nova é estrutura (cria aba), e ainda não passa por Configurações |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

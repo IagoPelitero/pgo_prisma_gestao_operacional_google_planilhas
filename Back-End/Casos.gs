@@ -340,8 +340,14 @@ function canalQueEuPossoVer_(idDoCanal, quem) {
  *
  * Junta todos os problemas antes de reclamar. Devolver um erro por vez faria a
  * pessoa corrigir, salvar, descobrir o segundo, corrigir, salvar de novo.
+ *
+ * `ehCasoNovo` diz se o VALOR PADRÃO do campo entra quando nada veio da tela.
+ * Num caso novo entra: o status da RET nasce em "Não trabalhado" mesmo que o
+ * pedido chegue sem ele — é o que o tombamento precisa, porque uma base de 300
+ * casos não traz status nenhum. Numa EDIÇÃO não entra: repor o padrão num
+ * campo que a pessoa esvaziou seria desfazer o que ela acabou de fazer.
  */
-function validarValores_(idDoCanal, valoresDaTela, quem) {
+function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var problemas = [];
   var paraGravar = {};
@@ -357,6 +363,16 @@ function validarValores_(idDoCanal, valoresDaTela, quem) {
     var bruto = valoresDaTela[descricao.chave];
     if (bruto === undefined) bruto = valoresDaTela[descricao.cabecalho];
     if (bruto === undefined || bruto === null) bruto = '';
+
+    // O padrão vem ANTES de conferir se é obrigatório, e é isso que faz o
+    // "Não trabalhado" da RET valer de verdade. Conferir primeiro recusaria um
+    // caso por falta de um valor que o próprio sistema tem guardado — e a tela
+    // até esconderia o problema, porque ela preenche o padrão sozinha. Quem
+    // pagaria a conta é o tombamento, que não passa por tela nenhuma.
+    if (ehCasoNovo && String(bruto).trim() === '') {
+      bruto = descricao.valorPadrao === undefined || descricao.valorPadrao === null
+        ? '' : descricao.valorPadrao;
+    }
 
     var problema = conferirCampo_(descricao, bruto);
     if (problema) {
@@ -509,7 +525,7 @@ function cadastrarCaso(idDoCanal, valores) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var paraGravar = validarValores_(canal.id, valores || {}, quem);
+  var paraGravar = validarValores_(canal.id, valores || {}, quem, true);
   preencherEntradaAutomatica_(canal, paraGravar);
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
 
@@ -539,7 +555,7 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
   }
   exigirAlcanceSobre_(atual, canal, quem);
 
-  var paraGravar = validarValores_(canal.id, valores || {}, quem);
+  var paraGravar = validarValores_(canal.id, valores || {}, quem, false);
   atualizarRegistro_(canal.aba, alvo, paraGravar);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
@@ -597,6 +613,7 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
   }
 
   carimbarOStatus_(canal, achada, atual, alteracao);
+  registrarAMudancaDeStatus_(canal, atual, alteracao, quem);
 
   atualizarRegistro_(canal.aba, alvo, alteracao);
 
@@ -645,6 +662,51 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   if (jaTem) return;
 
   alteracao[coluna] = new Date();
+}
+
+/**
+ * As três colunas que TODA mudança de status atualiza, sempre.
+ *
+ * Diferente do carimbo, que grava só a primeira visita a cada status, estas
+ * respondem "quando foi a última vez que alguém mexeu neste caso, quem mexeu
+ * e quantas vezes o caso já andou". Um caso que vai e volta entre dois status
+ * não mexe em carimbo nenhum — e sem estas colunas ele pareceria parado.
+ *
+ * É o pedido da operação: toda mudança de status precisa ficar registrada,
+ * porque é disso que sai o controle de produtividade.
+ *
+ * Coluna que não existe na base é ignorada, sem estourar — igual ao carimbo.
+ * Quem já tem o PGO instalado e ainda não tem estas colunas continua
+ * trabalhando; o diagnóstico é que avisa o que falta.
+ */
+function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
+
+  function temAColuna(cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) >= 0;
+  }
+
+  if (temAColuna(RECC_COLUNA_QUANDO_MUDOU_O_STATUS)) {
+    alteracao[RECC_COLUNA_QUANDO_MUDOU_O_STATUS] = new Date();
+  }
+  if (temAColuna(RECC_COLUNA_QUEM_MUDOU_O_STATUS)) {
+    // `quem.email`, minúsculo: é assim que usuarioAtual_ devolve. `quem.usuario`
+    // é a LINHA da aba USUARIOS, e ali a coluna se chama `Email`, com maiúscula.
+    // São dois objetos diferentes no mesmo lugar, e trocar um pelo outro grava
+    // vazio sem reclamar de nada — um teste pegou isso aqui.
+    //
+    // Guarda o e-mail, e não o Id: esta coluna é lida na própria planilha e no
+    // Power BI, onde um Id de dez dígitos não diz quem trabalhou o caso.
+    alteracao[RECC_COLUNA_QUEM_MUDOU_O_STATUS] = quem.email || '';
+  }
+  if (temAColuna(RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS)) {
+    // O valor guardado pode chegar como número, como texto ou vazio — a
+    // coluna é editável na planilha. Number('') é 0, e Number('abc') é NaN:
+    // os dois viram 0 aqui, então o contador nunca grava lixo.
+    var quantas = Number(registroAtual[RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS]);
+    if (!quantas || quantas < 0) quantas = 0;
+    alteracao[RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS] = Math.floor(quantas) + 1;
+  }
 }
 
 /**
@@ -1312,4 +1374,640 @@ function salvarConfiguracaoDoLegado(dados) {
 
   registrarAuditoria_('legado.configurar', 'CONFIG', '', id ? 'ligada' : 'desligada');
   return configuracaoDoLegado();
+}
+
+/* ############################################################################
+   #
+   #  SEÇÃO 4 de 4 · O TOMBAMENTO — TRAZER UMA BASE INTEIRA DE FORA
+   #
+   ############################################################################ */
+
+/**
+ * ============================================================================
+ * O TOMBAMENTO
+ * ============================================================================
+ * Tombar é trazer casos de OUTRA planilha para dentro do PGO, de uma vez: a
+ * base de inadimplentes do Vida Individual, a do Vida em Grupo, a lista de
+ * corretoras que a Mesa vai tratar com ação diferenciada. Cem casos, trezentos
+ * casos, e geralmente toda semana.
+ *
+ * Por que não é "cadastrar caso num laço": porque as perguntas são outras.
+ *
+ *   ONDE ESTÁ O DADO. Numa planilha de fora, com os cabeçalhos DELA. Ninguém
+ *   vai renomear as colunas da base de inadimplentes para agradar o PGO, então
+ *   quem se adapta é o PGO: o tombamento casa cabeçalho com cabeçalho, sugere
+ *   o que reconhece e deixa a pessoa corrigir o resto.
+ *
+ *   DE QUEM É O CASO. Uma base de trezentos chega sem responsável. O pedido da
+ *   operação é dividir entre os analistas — então o tombamento distribui, em
+ *   rodízio, entre os nomes escolhidos.
+ *
+ *   E SE JÁ ENTROU ANTES. A base é atualizada toda semana, e boa parte dela
+ *   repete. Sem uma coluna que identifique o caso, o segundo tombamento
+ *   duplica tudo. Com ela, o que já está dentro é PULADO, e o laudo diz quantos.
+ *
+ * O TOMBAMENTO NUNCA GRAVA SEM MOSTRAR ANTES. `conferirTombamento` devolve o
+ * laudo — quantas linhas, para onde cada coluna vai, quantas serão puladas e
+ * as três primeiras já traduzidas. `tombarCasos` só então grava. Trezentas
+ * linhas erradas dentro da base se desfazem apagando trezentas linhas na mão.
+ * ============================================================================
+ */
+
+/**
+ * O teto de linhas por tombamento.
+ *
+ * Não é medo de volume: `inserirVariosRegistros_` grava tudo numa ida só, e
+ * duas mil linhas passam folgado dentro dos seis minutos. O teto existe porque
+ * acima disso quem errou o mapeamento erra em escala — e porque uma base de
+ * dez mil linhas colada numa caixa de texto quase nunca é o que a pessoa
+ * queria fazer.
+ */
+const RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO = 2000;
+
+/** Quantas linhas do laudo vêm já traduzidas, para a pessoa conferir. */
+const RECC_LINHAS_DE_AMOSTRA = 3;
+
+// ----------------------------------------------------------------------------
+// LER A FONTE
+// ----------------------------------------------------------------------------
+
+/**
+ * Transforma o texto colado numa grade de linhas e colunas.
+ *
+ * Aceita TABULAÇÃO e PONTO E VÍRGULA, e decide pela primeira linha: copiar de
+ * uma planilha e colar dá tabulação; salvar como CSV em português dá ponto e
+ * vírgula. Vírgula NÃO entra na disputa de propósito — "R$ 1.234,56" e
+ * "Silva, João" são dado comum aqui, e um separador que parte esses dois no
+ * meio erraria calado, deslocando todas as colunas da linha em diante.
+ */
+function separarTextoColado_(texto) {
+  var inteiro = String(texto || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var linhas = inteiro.split('\n').filter(function (uma) {
+    return String(uma).trim() !== '';
+  });
+  if (!linhas.length) return [];
+
+  var separador = linhas[0].indexOf('\t') >= 0 ? '\t' : ';';
+  return linhas.map(function (uma) {
+    return uma.split(separador).map(function (celula) {
+      // Planilha exporta texto com aspas em volta quando ele tem o separador
+      // dentro. Tirar as aspas das pontas é o mínimo para o valor chegar limpo.
+      var valor = String(celula).trim();
+      if (valor.length > 1 && valor.charAt(0) === '"'
+        && valor.charAt(valor.length - 1) === '"') {
+        valor = valor.substring(1, valor.length - 1).replace(/""/g, '"');
+      }
+      return valor;
+    });
+  });
+}
+
+/**
+ * A grade de uma aba de OUTRA planilha, pelo Id e pelo nome da aba.
+ *
+ * Lê tudo de uma vez — uma ida só ao serviço. Ler linha por linha numa base de
+ * trezentas seriam trezentas idas, e o pedágio de 25 ms cada come a execução.
+ */
+function gradeDeOutraPlanilha_(idDaPlanilha, nomeDaAba) {
+  var planilha = abrirPlanilhaDeFora_(idDaPlanilha);
+  var procurado = String(nomeDaAba || '').trim();
+
+  var aba = procurado ? planilha.getSheetByName(procurado) : planilha.getSheets()[0];
+  if (!aba) {
+    throw new Error('A planilha abriu, mas não tem uma aba chamada "' + procurado
+      + '". As abas dela são: ' + planilha.getSheets().map(function (uma) {
+        return uma.getName();
+      }).join(', ') + '.');
+  }
+
+  var ultima = aba.getLastRow();
+  var largura = aba.getLastColumn();
+  if (ultima < 1 || largura < 1) return [];
+
+  // getDisplayValues, e não getValues: o valor vem como a pessoa VÊ na tela da
+  // outra planilha. Um CPF formatado como texto ali chega inteiro; como número,
+  // chegaria sem o zero à esquerda. E a data chega no formato que ela mostra,
+  // que é o que converterParaData_ já sabe ler.
+  return aba.getRange(1, 1, ultima, largura).getDisplayValues();
+}
+
+/** A grade, venha ela do texto colado ou de outra planilha. */
+function gradeDaFonte_(fonte) {
+  var tipo = normalizarParaComparar_((fonte || {}).tipo);
+  if (tipo === 'planilha') {
+    return gradeDeOutraPlanilha_(fonte.planilhaId, fonte.aba);
+  }
+  return separarTextoColado_((fonte || {}).texto);
+}
+
+// ----------------------------------------------------------------------------
+// CASAR AS COLUNAS
+// ----------------------------------------------------------------------------
+
+/**
+ * Para cada cabeçalho da fonte, qual coluna do canal ele parece ser.
+ *
+ * O casamento é por nome normalizado — acento e caixa não contam, que é a
+ * mesma regra que o resto do sistema usa para achar coluna. Sugere apenas: a
+ * pessoa confirma ou troca cada um na tela, e o que ela mandar é o que vale.
+ *
+ * Coluna preenchida pelo sistema NÃO é sugerida. O carimbo do 1º contato, a
+ * origem do tombamento e a data dele são do sistema; deixar a fonte escrever
+ * ali apagaria o controle de produtividade com dado de outra planilha.
+ */
+function sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal) {
+  // A lista do que PODE ser destino é uma só, e é a mesma que a tela oferece.
+  // Já errei isto aqui: eu montava a lista pelo contrato, pulando as colunas do
+  // sistema, e depois acrescentava "tudo o que está na aba e ainda não entrou"
+  // para pegar as colunas criadas em Configurações. Só que as do sistema tinham
+  // acabado de ficar de fora — então a segunda volta as trazia de novo, e o
+  // carimbo do 1º contato voltava a ser sugerido como destino.
+  var porNome = {};
+  colunasQueOTombamentoPreenche_(canal).forEach(function (cabecalho) {
+    porNome[normalizarParaComparar_(cabecalho)] = cabecalho;
+  });
+
+  return cabecalhosDaFonte.map(function (cabecalho) {
+    return {
+      daFonte: String(cabecalho || ''),
+      paraAColuna: porNome[normalizarParaComparar_(cabecalho)] || ''
+    };
+  });
+}
+
+/** As colunas do canal que o tombamento pode preencher, para a tela oferecer. */
+function colunasQueOTombamentoPreenche_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var doSistema = {};
+  esquemaDaAba_(canal.aba).colunas.forEach(function (coluna) {
+    if (coluna.preenchidoPeloSistema === true) {
+      doSistema[normalizarParaComparar_(coluna.cabecalho)] = true;
+    }
+  });
+
+  return estrutura.cabecalhos.filter(function (cabecalho) {
+    if (!cabecalho || cabecalho.charAt(0) === '_') return false;
+    return !doSistema[normalizarParaComparar_(cabecalho)];
+  });
+}
+
+// ----------------------------------------------------------------------------
+// O LAUDO, ANTES DE GRAVAR
+// ----------------------------------------------------------------------------
+
+/**
+ * O que o tombamento vai fazer, sem fazer.
+ *
+ * Devolve o de-para sugerido, quantas linhas entram, quantas repetem e as
+ * primeiras já traduzidas. É esta tela que evita o desastre: mapeamento errado
+ * só aparece olhando o dado traduzido, e nunca olhando o cabeçalho.
+ */
+function conferirTombamento(idDoCanal, pedido) {
+  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
+  exigirTela_('tombamento');
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  pedido = pedido || {};
+
+  var grade = gradeDaFonte_(pedido.fonte);
+  if (grade.length < 2) {
+    throw new Error('Preciso de pelo menos duas linhas: a primeira com os '
+      + 'nomes das colunas e ao menos uma de dado. Recebi ' + grade.length + '.');
+  }
+
+  var cabecalhosDaFonte = grade[0];
+  var corpo = grade.slice(1);
+  var deParaEscolhido = Array.isArray(pedido.dePara) && pedido.dePara.length
+    ? pedido.dePara
+    : sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal);
+
+  var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
+  var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
+  var contagem = contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte,
+    deParaEscolhido, chaveParaNaoRepetir, jaEstaDentro);
+
+  return {
+    canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
+    cabecalhosDaFonte: cabecalhosDaFonte,
+    colunasDoCanal: colunasQueOTombamentoPreenche_(canal),
+    dePara: deParaEscolhido,
+    linhasNaFonte: corpo.length,
+    vaoEntrar: contagem.entram,
+    vaoSerPuladas: contagem.pulam,
+    motivosParaPular: contagem.motivos,
+    limite: RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO,
+    passaDoLimite: corpo.length > RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO,
+    amostra: contagem.amostra,
+    analistas: analistasParaDistribuir_(canal),
+    statusPadrao: statusPadraoDoCanal_(canal)
+  };
+}
+
+/**
+ * Os valores que já estão na base, na coluna que identifica o caso.
+ *
+ * Lê a COLUNA inteira, e não as linhas: é a regra de desempenho da casa — uma
+ * ida ao serviço para uma coluna, em vez de uma para cada linha. Sem a coluna
+ * declarada, devolve um conjunto vazio, e nada é pulado.
+ */
+function jaEstaNaBase_(canal, cabecalho) {
+  var dentro = {};
+  if (!cabecalho) return dentro;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var posicao = posicaoDaColuna_(estrutura, cabecalho);
+  if (posicao < 0) {
+    throw new Error('A coluna "' + cabecalho + '" não existe na aba '
+      + canal.aba + ', então não dá para saber o que já entrou. '
+      + 'Escolha uma das colunas do canal.');
+  }
+
+  lerColunaInteira_(canal.aba, cabecalho).forEach(function (valor) {
+    // As DUAS formas entram no conjunto: a normalizada e a só-dígitos. Não
+    // sabemos de que jeito a outra planilha escreve o CPF, e guardar as duas
+    // aqui é mais barato que adivinhar na hora de comparar.
+    var texto = normalizarParaComparar_(valor);
+    if (texto) dentro[texto] = true;
+    var soDigitos = apenasDigitos_(valor);
+    if (soDigitos) dentro[soDigitos] = true;
+  });
+  return dentro;
+}
+
+/**
+ * Percorre a fonte contando o que entra, o que pula e por quê.
+ *
+ * Conta e traduz no MESMO laço que a gravação usa (`linhaDaFonteParaOCaso_`),
+ * de propósito: se o laudo contasse por uma regra e a gravação gravasse por
+ * outra, o laudo prometeria um número e a base receberia outro — e ninguém
+ * descobre isso olhando a tela.
+ */
+function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara,
+  chaveParaNaoRepetir, jaEstaDentro) {
+  var motivos = { vazia: 0, repetida: 0 };
+  var amostra = [];
+  var entram = 0;
+  var vistosNestaLeva = {};
+
+  for (var i = 0; i < corpo.length; i++) {
+    var caso = linhaDaFonteParaOCaso_(corpo[i], cabecalhosDaFonte, dePara);
+
+    if (!temAlgumValor_(caso)) { motivos.vazia++; continue; }
+
+    if (chaveParaNaoRepetir) {
+      var chave = normalizarParaComparar_(caso[chaveParaNaoRepetir]);
+      var soDigitos = apenasDigitos_(caso[chaveParaNaoRepetir]);
+      // As duas formas são conferidas porque não sabemos aqui se a coluna é
+      // identificador: a base pode ter sido lida com um tipo e a fonte trazer
+      // o valor com máscara. Pular por qualquer das duas é o lado seguro.
+      if (jaEstaDentro[chave] || (soDigitos && jaEstaDentro[soDigitos])
+        || vistosNestaLeva[chave || soDigitos]) {
+        motivos.repetida++;
+        continue;
+      }
+      vistosNestaLeva[chave || soDigitos] = true;
+    }
+
+    entram++;
+    if (amostra.length < RECC_LINHAS_DE_AMOSTRA) amostra.push(caso);
+  }
+
+  return {
+    entram: entram,
+    pulam: motivos.vazia + motivos.repetida,
+    motivos: motivos,
+    amostra: amostra
+  };
+}
+
+/** Uma linha da fonte virada num caso, com as chaves iguais aos cabeçalhos. */
+function linhaDaFonteParaOCaso_(linha, cabecalhosDaFonte, dePara) {
+  var paraOnde = {};
+  dePara.forEach(function (par) {
+    if (!par || !par.paraAColuna) return;
+    paraOnde[normalizarParaComparar_(par.daFonte)] = par.paraAColuna;
+  });
+
+  var caso = {};
+  for (var i = 0; i < cabecalhosDaFonte.length; i++) {
+    var destino = paraOnde[normalizarParaComparar_(cabecalhosDaFonte[i])];
+    if (!destino) continue;
+    var valor = linha[i];
+    if (valor === undefined || valor === null) continue;
+    if (String(valor).trim() === '') continue;
+    caso[destino] = valor;
+  }
+  return caso;
+}
+
+function temAlgumValor_(caso) {
+  return Object.keys(caso).some(function (chave) {
+    return String(caso[chave]).trim() !== '';
+  });
+}
+
+/**
+ * Quem pode receber os casos: TODO MUNDO que está cadastrado e ativo.
+ *
+ * A primeira versão desta função só oferecia quem tivesse "Canal que atende"
+ * igual ao nome do canal. Parecia certo e não funcionava: o campo é de digitar
+ * livre, e a operação escreve nele o que faz sentido para ela — "Vida
+ * Individual", "Vida em Grupo" —, quase nunca o nome do canal do PGO. O
+ * resultado era a tela de Tombamento dizendo "nenhum analista cadastrado neste
+ * canal" numa operação cheia de analistas. Só apareceu abrindo no navegador.
+ *
+ * A regra que IMPORTA é outra, e é sobre não perder o caso: o nome tem de
+ * existir no cadastro e estar ativo, senão o caso fica no nome de ninguém e
+ * some da fila de todo mundo. A que canal a pessoa atende é SUGESTÃO — quem
+ * atende este canal aparece primeiro na lista —, e não trava: enquanto a
+ * operação está se formando, um analista da RET pode muito bem receber um lote
+ * da Mesa, e o sistema não é quem decide isso.
+ */
+function analistasParaDistribuir_(canal) {
+  var doCanal = normalizarParaComparar_(canal.nome);
+
+  return lerRegistros_('USUARIOS')
+    .filter(function (usuario) {
+      return normalizarParaComparar_(usuario.Ativo) === 'sim'
+        && String(usuario.Nome || '').trim();
+    })
+    .map(function (usuario) {
+      var dela = normalizarParaComparar_(usuario['Canal que atende']);
+      return {
+        nome: String(usuario.Nome),
+        // Vazio é o caso de quem administra: atende as duas, e fica no topo
+        // junto de quem é deste canal.
+        atendeEsteCanal: !dela || dela === doCanal
+      };
+    })
+    .sort(function (um, outro) {
+      if (um.atendeEsteCanal !== outro.atendeEsteCanal) {
+        return um.atendeEsteCanal ? -1 : 1;
+      }
+      return um.nome < outro.nome ? -1 : (um.nome > outro.nome ? 1 : 0);
+    });
+}
+
+/** Só os nomes, para quem precisa conferir se alguém está na lista. */
+function nomesQuePodemReceberCasos_(canal) {
+  return analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
+}
+
+/** O status com que o caso tombado nasce, tirado do formulário do canal. */
+function statusPadraoDoCanal_(canal) {
+  if (!canal.colunaDoStatus) return '';
+  var achado = '';
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Cabecalho)
+      === normalizarParaComparar_(canal.colunaDoStatus)) {
+      achado = String(campo.ValorPadrao || '');
+    }
+  });
+  return achado;
+}
+
+// ----------------------------------------------------------------------------
+// GRAVAR
+// ----------------------------------------------------------------------------
+
+/**
+ * Traz a base para dentro.
+ *
+ * Numa gravação só, por `inserirVariosRegistros_`: trezentas chamadas
+ * separadas seriam trezentas idas ao serviço e trezentos Ids pedidos um a um.
+ *
+ * O que o tombamento acrescenta a cada caso, além do que veio da fonte:
+ *
+ *   - o ANALISTA, em rodízio entre os escolhidos (ou um só, se for um só);
+ *   - o STATUS padrão do canal, quando a fonte não trouxe um — é o
+ *     "Não trabalhado" que a RET pediu;
+ *   - a ORIGEM DO TOMBAMENTO, que é o nome do lote, e a DATA — as duas colunas
+ *     que fazem o gráfico da Produtividade RECC existir;
+ *   - `_Origem` = PLANILHA, porque o dado veio de fora e não da tela.
+ *
+ * A auditoria recebe UMA linha por lote, não uma por caso. Trezentas linhas de
+ * auditoria dizendo a mesma coisa afogam as que importam.
+ */
+function tombarCasos(idDoCanal, pedido) {
+  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
+  exigirTela_('tombamento');
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  pedido = pedido || {};
+
+  var nomeDoLote = String(pedido.origem || '').trim();
+  if (!nomeDoLote) {
+    throw new Error('Dê um nome ao lote — "Base de inadimplentes Vida Presente", '
+      + 'por exemplo. É por ele que a Produtividade RECC vai mostrar quantos '
+      + 'casos entraram em cada dia, e sem ele o gráfico não tem o que dizer.');
+  }
+
+  var grade = gradeDaFonte_(pedido.fonte);
+  if (grade.length < 2) {
+    throw new Error('Preciso de pelo menos duas linhas: a primeira com os '
+      + 'nomes das colunas e ao menos uma de dado.');
+  }
+
+  var cabecalhosDaFonte = grade[0];
+  var corpo = grade.slice(1);
+  if (corpo.length > RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO) {
+    throw new Error('São no máximo ' + RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO
+      + ' linhas por tombamento, e vieram ' + corpo.length + '. Divida em '
+      + 'levas — assim, se o mapeamento estiver errado, o estrago é menor.');
+  }
+
+  var dePara = Array.isArray(pedido.dePara) && pedido.dePara.length
+    ? pedido.dePara
+    : sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal);
+  exigirQueODeParaLeveAAlgumLugar_(dePara, canal);
+
+  var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
+  var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
+
+  var analistas = analistasEscolhidos_(pedido.analistas, canal);
+  var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
+  var agora = new Date();
+  var statusPadrao = statusPadraoDoCanal_(canal);
+
+  var paraGravar = [];
+  var pulados = { vazia: 0, repetida: 0 };
+  var vistosNestaLeva = {};
+
+  for (var i = 0; i < corpo.length; i++) {
+    var caso = linhaDaFonteParaOCaso_(corpo[i], cabecalhosDaFonte, dePara);
+    if (!temAlgumValor_(caso)) { pulados.vazia++; continue; }
+
+    if (chaveParaNaoRepetir) {
+      var chave = normalizarParaComparar_(caso[chaveParaNaoRepetir]);
+      var soDigitos = apenasDigitos_(caso[chaveParaNaoRepetir]);
+      if (jaEstaDentro[chave] || (soDigitos && jaEstaDentro[soDigitos])
+        || vistosNestaLeva[chave || soDigitos]) {
+        pulados.repetida++;
+        continue;
+      }
+      vistosNestaLeva[chave || soDigitos] = true;
+    }
+
+    if (colunaDoAnalista && analistas.length && !caso[colunaDoAnalista]) {
+      // Rodízio pelo número de casos JÁ MONTADOS, e não pelo índice da linha
+      // da fonte: linha pulada não pode fazer a fila do rodízio andar, senão a
+      // divisão sai torta sempre que a base tem repetição no meio.
+      caso[colunaDoAnalista] = analistas[paraGravar.length % analistas.length];
+    }
+    if (canal.colunaDoStatus && !caso[canal.colunaDoStatus] && statusPadrao) {
+      caso[canal.colunaDoStatus] = statusPadrao;
+    }
+    caso[RECC_COLUNA_ORIGEM_DO_TOMBAMENTO] = nomeDoLote;
+    caso[RECC_COLUNA_DATA_DO_TOMBAMENTO] = agora;
+
+    paraGravar.push(caso);
+  }
+
+  if (!paraGravar.length) {
+    throw new Error('Nenhuma linha entraria: ' + pulados.vazia + ' em branco e '
+      + pulados.repetida + ' já estão na base. Nada foi gravado.');
+  }
+
+  // _Origem = PLANILHA porque o dado veio de FORA, e não da tela do PGO. É o
+  // que permite, meses depois, separar o que a operação digitou do que foi
+  // tombado — e conferir um contra o outro quando um número não fecha.
+  var gravados = inserirVariosRegistros_(canal.aba, paraGravar,
+    { origem: RECC_ORIGEM_PLANILHA });
+
+  registrarAuditoria_('caso.tombar', canal.aba, '',
+    canal.nome + ' · ' + nomeDoLote + ' · ' + gravados.length + ' casos'
+    + (pulados.repetida ? ' · ' + pulados.repetida + ' repetidos pulados' : ''));
+
+  return {
+    canal: canal.nome,
+    origem: nomeDoLote,
+    entraram: gravados.length,
+    pulados: pulados,
+    analistas: analistas,
+    primeiroId: gravados.length ? gravados[0].__id : '',
+    ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
+  };
+}
+
+/**
+ * Recusa um tombamento que não levaria dado a coluna nenhuma.
+ *
+ * Sem isto, um de-para todo vazio gravaria trezentas linhas contendo só o Id, o
+ * analista e a data — trezentas linhas em branco na base operacional, que
+ * alguém teria de achar e apagar uma a uma.
+ */
+function exigirQueODeParaLeveAAlgumLugar_(dePara, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var destinos = [];
+  var inexistentes = [];
+
+  dePara.forEach(function (par) {
+    var destino = String((par || {}).paraAColuna || '').trim();
+    if (!destino) return;
+    if (posicaoDaColuna_(estrutura, destino) < 0) {
+      inexistentes.push(destino);
+      return;
+    }
+    destinos.push(destino);
+  });
+
+  if (inexistentes.length) {
+    throw new Error('Estas colunas não existem na aba ' + canal.aba + ': '
+      + inexistentes.join(', ') + '. As colunas dela são: '
+      + colunasQueOTombamentoPreenche_(canal).join(' | ') + '.');
+  }
+  if (!destinos.length) {
+    throw new Error('Nenhuma coluna da planilha de origem está apontando para '
+      + 'uma coluna do canal ' + canal.nome + '. Do jeito que está, o '
+      + 'tombamento criaria linhas em branco.');
+  }
+}
+
+/**
+ * Os analistas que vão receber os casos, conferidos contra o cadastro.
+ *
+ * Nome que não está cadastrado e ativo é RECUSADO, e não aceito calado: um
+ * nome digitado errado vira trezentos casos no nome de ninguém, e eles somem
+ * da fila de todo mundo — o escopo "próprios" não acha um responsável que não
+ * existe. O caso estaria na planilha e invisível no sistema.
+ *
+ * O que NÃO é conferido é a que canal a pessoa atende: ver
+ * analistasParaDistribuir_, que explica por quê.
+ */
+function analistasEscolhidos_(escolhidos, canal) {
+  var lista = Array.isArray(escolhidos) ? escolhidos : [];
+  var limpos = [];
+  lista.forEach(function (nome) {
+    var texto = String(nome || '').trim();
+    if (texto && limpos.indexOf(texto) < 0) limpos.push(texto);
+  });
+  if (!limpos.length) return [];
+
+  var podem = nomesQuePodemReceberCasos_(canal);
+  var foraDoCadastro = limpos.filter(function (nome) {
+    return !podem.some(function (um) {
+      return normalizarParaComparar_(um) === normalizarParaComparar_(nome);
+    });
+  });
+  if (foraDoCadastro.length) {
+    throw new Error('Estes nomes não estão cadastrados e ativos no PGO: '
+      + foraDoCadastro.join(', ') + '. Caso no nome de quem não existe não '
+      + 'aparece na fila de ninguém — fica na planilha e invisível no sistema. '
+      + 'Cadastre em Configurações › Usuários e tombe depois.');
+  }
+
+  // Devolve com a grafia do CADASTRO, e não a que veio da tela: é o nome do
+  // cadastro que a coluna de responsável guarda, e é por ele que o escopo
+  // "próprios" compara.
+  return limpos.map(function (nome) {
+    var achado = nome;
+    podem.forEach(function (um) {
+      if (normalizarParaComparar_(um) === normalizarParaComparar_(nome)) achado = um;
+    });
+    return achado;
+  });
+}
+
+/**
+ * Os lotes já tombados neste canal, do mais recente para o mais antigo.
+ *
+ * Serve para a tela oferecer um nome que já existe — tombar a mesma base toda
+ * semana com o nome escrito de um jeito diferente a cada vez faria o gráfico
+ * da Produtividade RECC mostrar cinco lotes onde há um.
+ */
+function lotesJaTombados(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
+  exigirTela_('tombamento');
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+
+  // Coluna ausente devolve lista vazia, e não estoura: quem já tinha o PGO
+  // instalado antes do tombamento não tem esta coluna, e a tela precisa abrir
+  // do mesmo jeito para ele — é o diagnóstico que cobra o que falta.
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_ORIGEM_DO_TOMBAMENTO) < 0) return [];
+
+  var quantos = {};
+  lerColunaInteira_(canal.aba, RECC_COLUNA_ORIGEM_DO_TOMBAMENTO).forEach(function (valor) {
+    var nome = String(valor === null || valor === undefined ? '' : valor).trim();
+    if (!nome) return;
+    quantos[nome] = (quantos[nome] || 0) + 1;
+  });
+
+  return Object.keys(quantos).map(function (nome) {
+    return { origem: nome, casos: quantos[nome] };
+  }).sort(function (um, outro) { return outro.casos - um.casos; });
+}
+
+/** O que a tela de Tombamento precisa para abrir. */
+function opcoesDoTombamento(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
+  exigirTela_('tombamento');
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+
+  return {
+    canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
+    colunasDoCanal: colunasQueOTombamentoPreenche_(canal),
+    analistas: analistasParaDistribuir_(canal),
+    statusPadrao: statusPadraoDoCanal_(canal),
+    lotes: lotesJaTombados(canal.id),
+    limite: RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO
+  };
 }

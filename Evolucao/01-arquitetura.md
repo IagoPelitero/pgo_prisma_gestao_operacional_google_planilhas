@@ -35,7 +35,7 @@ sem tocar em código:
 
 | Canal | Base | O que é |
 |---|---|---|
-| **RET Vida** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
+| **RET** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
 | **Mesa Diamante** | `BASE_MESA` | Atendimento a casos prioritários |
 
 ### Telas (menu lateral, presente em todas as abas)
@@ -337,7 +337,7 @@ NAVEGADOR (uma página só, servida por HtmlService)
   Comuns.html ........ as peças que MAIS DE UMA tela usa:
                          Moldura ............. menu lateral e barra superior
                          SenhaDeAdministrador  o diálogo das ações sem desfazer
-                         SeletorDeCanal ....... RET Vida ou Mesa Diamante
+                         SeletorDeCanal ....... RET ou Mesa Diamante
                          Formulario .......... o formulário montado por CAMPOS
                          CasoEmModal ......... o caso aberto por cima da fila
                          Graficos ............ os desenhos em SVG

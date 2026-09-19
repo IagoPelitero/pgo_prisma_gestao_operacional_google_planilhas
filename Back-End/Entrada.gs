@@ -531,6 +531,11 @@ const RECC_ACOES = {
   EDITAR: 'editar',
   OCULTAR: 'ocultar',
   EXPORTAR: 'exportar',
+  // Tombar é trazer uma base inteira de outra planilha para dentro do PGO —
+  // cem, trezentos casos de uma vez. É separado de `criar` de propósito: quem
+  // cadastra um caso por vez erra um caso; quem tomba errado suja a base toda,
+  // e o desfazer é apagar trezentas linhas na mão.
+  TOMBAR: 'tombar',
   CONFIGURAR: 'configurar',
   ESTRUTURA: 'estrutura'
 };
@@ -557,12 +562,17 @@ const RECC_ESCOPOS = {
  * identifica a tela é a CHAVE, nunca o texto.
  */
 const RECC_TELAS_DO_SISTEMA = [
-  { tela: 'dashboard', titulo: 'Dashboard' },
+  // A CHAVE é o que identifica a tela para sempre; o título é só o que se lê.
+  // Por isso "dashboard" continua sendo a chave da tela que hoje se chama
+  // "Trabalho": trocar a chave junto com o nome quebraria as rotas gravadas,
+  // os níveis de acesso e os endereços que as pessoas guardaram.
+  { tela: 'dashboard', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
   { tela: 'minhaPerformance', titulo: 'Minha Performance' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
   { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
-  { tela: 'painelAnalitico', titulo: 'Painel Analítico' },
+  { tela: 'tombamento', titulo: 'Tombamento' },
+  { tela: 'painelAnalitico', titulo: 'Produtividade RECC' },
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
 
@@ -710,7 +720,7 @@ function lerPermissoesDoNivel_(nivel) {
 
   // QUAIS CANAIS ESTE NÍVEL ENXERGA.
   //
-  // RET Vida e Mesa Diamante são operações distintas: tratativas diferentes,
+  // RET e Mesa Diamante são operações distintas: tratativas diferentes,
   // colunas diferentes, gente diferente. Quem atende a RET não tem o que
   // fazer com a fila da Mesa, e o contrário também vale.
   //
@@ -835,18 +845,42 @@ function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
   }
 
   // EQUIPE
-  var meuCanal = normalizarParaComparar_(quem.usuario['Canal que atende']);
-  if (!meuCanal) return [];
+  var nomesDaEquipe = nomesDaMinhaEquipe_(quem);
+  if (nomesDaEquipe === null) return [];
 
-  var nomesDaEquipe = {};
-  lerRegistros_('USUARIOS').forEach(function (usuario) {
-    if (normalizarParaComparar_(usuario['Canal que atende']) === meuCanal) {
-      nomesDaEquipe[normalizarParaComparar_(usuario.Nome)] = true;
-    }
+  var indice = {};
+  nomesDaEquipe.forEach(function (nome) {
+    indice[normalizarParaComparar_(nome)] = true;
   });
   return registros.filter(function (registro) {
-    return nomesDaEquipe[normalizarParaComparar_(registro[coluna])] === true;
+    return indice[normalizarParaComparar_(registro[coluna])] === true;
   });
+}
+
+/**
+ * Quem é da MINHA equipe: as pessoas cadastradas no mesmo canal que eu atendo.
+ *
+ * Mora aqui, fora do `filtrarPeloAlcance_`, porque duas telas fazem a mesma
+ * pergunta por motivos diferentes — o alcance para RECORTAR o que eu vejo, e a
+ * Minha Performance para COMPARAR o meu resultado com o do meu grupo. Escrever
+ * a regra duas vezes faria as duas divergirem, e aí "a minha equipe" na
+ * performance não seria a mesma "minha equipe" que o alcance enxerga.
+ *
+ * Devolve null — e não lista vazia — para quem NÃO PERTENCE a canal nenhum, que
+ * é o caso de quem administra. As duas coisas são diferentes: "a minha equipe
+ * não tem ninguém" e "eu não tenho equipe" pedem respostas diferentes na tela.
+ */
+function nomesDaMinhaEquipe_(quem) {
+  var meuCanal = normalizarParaComparar_((quem.usuario || {})['Canal que atende']);
+  if (!meuCanal) return null;
+
+  var nomes = [];
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    if (normalizarParaComparar_(usuario.Ativo) !== 'sim') return;
+    if (normalizarParaComparar_(usuario['Canal que atende']) !== meuCanal) return;
+    nomes.push(String(usuario.Nome));
+  });
+  return nomes;
 }
 
 // ============================================================================

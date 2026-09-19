@@ -22,6 +22,7 @@ const { rodarTestesDoAnalitico } = require('./testes-analitico');
 const { rodarTestesDePerformance } = require('./testes-performance');
 const { rodarTestesDeCorretoras } = require('./testes-corretoras');
 const { rodarTestesDeAnalise } = require('./testes-analise');
+const { rodarTestesDeTombamento } = require('./testes-tombamento');
 const { rodarTestesDeDiagnostico } = require('./testes-diagnostico');
 
 rodarTestesDaFundacao();
@@ -35,6 +36,7 @@ rodarTestesDoAnalitico();
 rodarTestesDePerformance();
 rodarTestesDeCorretoras();
 rodarTestesDeAnalise();
+rodarTestesDeTombamento();
 rodarTestesDeDiagnostico();
 
 const { passaram, falhas } = resumo();

@@ -99,11 +99,16 @@ function rodarTestesDaCasca() {
     const listaDeItens = lateral.substring(
       lateral.indexOf('lateral-itens'), lateral.indexOf('</ul>'));
     const doMenu = listaDeItens.match(/<svg[\s\S]*?<\/svg>/g) || [];
-    igual(doMenu.length, 7, 'um desenho por item do menu');
+    igual(doMenu.length, 8, 'um desenho por item do menu');
 
+    // A conta é contra o TAMANHO DO MENU, e não contra um número escrito aqui:
+    // "8 itens, 8 desenhos" continua certo no dia em que nascer a nona tela, e
+    // um número fixo teria dito "7" enquanto o menu já tinha 8 — que foi
+    // exatamente o que aconteceu quando o Tombamento entrou repetindo o ícone
+    // do Trabalho.
     const unicos = {};
     doMenu.forEach((d) => { unicos[d] = true; });
-    igual(Object.keys(unicos).length, 7,
+    igual(Object.keys(unicos).length, doMenu.length,
       'dois itens com o mesmo desenho deixam o menu ilegível');
     doMenu.forEach((d) => {
       contem(d, 'viewBox="0 0 24 24"', 'todos na mesma grade');
@@ -287,11 +292,11 @@ function rodarTestesDaCasca() {
 
   secao('O menu e a guarda de rota');
 
-  teste('o menu do Administrador traz as sete telas', () => {
+  teste('o menu do Administrador traz as oito telas', () => {
     const pacote = chamar('pacoteDePartida()');
-    igual(pacote.menu.length, 7);
+    igual(pacote.menu.length, 8);
     igual(pacote.menu[0].tela, 'dashboard');
-    igual(pacote.menu[6].titulo, 'Configurações');
+    igual(pacote.menu[7].titulo, 'Configurações');
   });
 
   teste('a guarda de rota vive no roteador, não no menu', () => {
@@ -344,7 +349,42 @@ function rodarTestesDaCasca() {
   teste('o nome da tela vai para o topo do conteúdo', () => {
     const aplicacao = lerTela('Aplicacao.html');
     contem(aplicacao, 'class="cabecalho-da-tela"');
-    contem(aplicacao, 'Moldura.escapar(definicao.titulo)');
+    contem(aplicacao, 'Moldura.escapar(comoSeChama)');
+  });
+
+  teste('o cabeçalho da tela usa o nome de HOJE, o mesmo do menu', () => {
+    // O título das telas é configurável desde que o PO renomeou "Dashboard"
+    // para "Trabalho". O menu passou a obedecer; o cabeçalho da página, não —
+    // ele vinha da tabela de rotas, escrito à mão. A tela mostrava os dois
+    // nomes ao mesmo tempo, um do lado do outro.
+    const aplicacao = lerTela('Aplicacao.html');
+    contem(aplicacao, 'function tituloDaTela(',
+      'o nome tem de vir de um lugar só');
+    contem(aplicacao, 'pacote.menu', 'e esse lugar é o menu que o servidor montou');
+    verdadeiro(aplicacao.indexOf('escapar(definicao.titulo)') < 0,
+      'o cabeçalho não pode voltar a ler o título fixo da rota');
+
+    // E o servidor entrega no menu o nome que está gravado, não o de fábrica.
+    //
+    // A identidade inteira vai e volta: salvarIdentidade grava TODOS os campos
+    // dela de uma vez, então mandar só o nome apagaria o rodapé, a cor e a
+    // frase. O teste seguinte é que descobriria isso, falando de rodapé.
+    const identidade = chamar('resumoDasConfiguracoes()').identidade;
+    const comOsNomes = (titulos) => {
+      const copia = {};
+      Object.keys(identidade).forEach((chave) => { copia[chave] = identidade[chave]; });
+      copia.titulosDasTelas = titulos;
+      chamar('salvarIdentidade')(copia);
+    };
+
+    comOsNomes({ dashboard: 'Minha Fila' });
+    igual(chamar('pacoteDePartida()').menu
+      .find((item) => item.tela === 'dashboard').titulo, 'Minha Fila');
+
+    comOsNomes({ dashboard: '' });
+    igual(chamar('pacoteDePartida()').menu
+      .find((item) => item.tela === 'dashboard').titulo, 'Trabalho',
+      'apagar o nome volta ao de fábrica, e não a vazio');
   });
 
   teste('a pessoa aparece com nome e cargo, e o canal quando existe', () => {
@@ -431,7 +471,7 @@ function rodarTestesDaCasca() {
       'data de recepção do protocolo': '20/09/2026'
     });
     const informacao = chamar('dataDoUltimoRegistro_()');
-    igual(informacao.canal, 'RET Vida', 'a RET tem o registro mais novo');
+    igual(informacao.canal, 'RET', 'a RET tem o registro mais novo');
     igual(informacao.texto, '20/09/2026', 'sem hora, mostra só o dia');
   });
 
@@ -449,7 +489,7 @@ function rodarTestesDaCasca() {
       'a ponte substituta precisa entrar na página');
     contem(gerada.paginaDoSistema, '"disponivel": true',
       'o pacote embutido é o que o servidor devolveu');
-    igual(gerada.pacote.menu.length, 7, 'o menu da prévia é o menu de verdade');
+    igual(gerada.pacote.menu.length, 8, 'o menu da prévia é o menu de verdade');
     contem(gerada.telaSemAcesso, 'Seu usuário ainda');
 
     verdadeiro(fs.existsSync(path.join(pasta, 'sistema.html')));

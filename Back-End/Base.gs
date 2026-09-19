@@ -99,6 +99,42 @@ const RECC_COLUNAS_DE_CONTROLE = [
   { cabecalho: '_Origem', tipo: 'texto', protegido: true }
 ];
 
+/*
+ * `preenchidoPeloSistema: true` numa coluna quer dizer: a coluna é de DADO —
+ * o Power BI lê, a exclusão não a esconde, ela aparece na exportação — mas
+ * NINGUÉM a digita no formulário. Quem escreve nela é o sistema.
+ *
+ * É o caso das colunas de carimbo (o sistema grava a data quando o status
+ * muda) e das duas do tombamento (o sistema grava de qual lote o caso veio).
+ * Deixá-las como campo de tela seria pedir ao analista para digitar à mão
+ * exatamente o dado que existe para não depender dele.
+ *
+ * Não confundir com `protegido`, que é sobre PODER MUDAR depois, nem com o
+ * prefixo "_", que marca coluna de sistema e sai de todo relatório.
+ */
+
+/*
+ * As três colunas que toda mudança de status atualiza.
+ *
+ * O nome fica aqui, num lugar só, porque ele é escrito em dois momentos
+ * distantes: quando a aba nasce (o Esquema, logo abaixo) e quando o status
+ * muda (registrarAMudancaDeStatus_, no Casos.gs). Se o nome fosse digitado
+ * nos dois lugares, trocar um e esquecer o outro faria o sistema procurar uma
+ * coluna que não existe — e, como coluna ausente é ignorada de propósito, ele
+ * pararia de registrar em silêncio. Erro calado é o pior tipo.
+ */
+const RECC_COLUNA_QUANDO_MUDOU_O_STATUS = 'Data da última mudança de status';
+const RECC_COLUNA_QUEM_MUDOU_O_STATUS = 'Quem mudou o status';
+const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
+
+/*
+ * As duas colunas do tombamento, pelo mesmo motivo das de cima: o nome é
+ * escrito quando a aba nasce (o Esquema) e lido quando o lote entra (o
+ * tombamento, no Casos.gs) e quando a Produtividade RECC monta o gráfico.
+ */
+const RECC_COLUNA_ORIGEM_DO_TOMBAMENTO = 'Origem do tombamento';
+const RECC_COLUNA_DATA_DO_TOMBAMENTO = 'Data do tombamento';
+
 const RECC_VISIVEL_SIM = 'SIM';
 const RECC_VISIVEL_NAO = 'NAO';
 const RECC_ORIGEM_SISTEMA = 'SISTEMA';
@@ -162,7 +198,47 @@ const RECC_ESQUEMA = {
       { cabecalho: 'novo numero da proposta', tipo: 'identificador', protegido: true },
       { cabecalho: 'motivo do cancelamento', tipo: 'texto', protegido: true },
       { cabecalho: 'data da transmissão', tipo: 'data', protegido: true },
-      { cabecalho: 'tentativas de contato', tipo: 'numero', protegido: true }
+      { cabecalho: 'tentativas de contato', tipo: 'numero', protegido: true },
+
+      // ---- OS CARIMBOS DE STATUS ----------------------------------------
+      // Uma coluna por status da RET, com a data e a hora em que o caso
+      // chegou nele. É o controle de produtividade: sem isto, saber quando o
+      // 1º contato aconteceu exigiria cruzar a auditoria com a base — e
+      // ninguém monta relatório assim.
+      //
+      // Quem liga cada status à sua coluna é o catálogo, na coluna
+      // ColunaDeCarimbo. Essas aqui são só as colunas de fábrica; o
+      // administrador cria outras em Configurações e aponta status novos
+      // para elas, sem programador.
+      { cabecalho: 'Data aguardando transmissão', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: 'Data pendente', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: 'Data do 1º contato', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: 'Data do 2º contato', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: 'Data não reteve', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: 'Data reteve', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: 'Data concluído', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+
+      // ---- TODA MUDANÇA DE STATUS DEIXA RASTRO ---------------------------
+      // Os carimbos acima gravam a PRIMEIRA vez que o caso chegou em cada
+      // status. Estas três respondem a outra pergunta: quando foi a última
+      // vez que alguém mexeu neste caso, quem mexeu, e quantas vezes o caso
+      // já andou. Um caso que volta de "Pendente" para "1º contato" e depois
+      // volta de novo não mexe em nenhum carimbo — mas mexe nestas, e é por
+      // isso que elas existem.
+      //
+      // Por que não na auditoria: troca de status é o evento mais frequente
+      // do sistema. Numa base de 200 mil casos seriam quase um milhão de
+      // linhas, empurrando a planilha para o teto de células. Aqui a
+      // informação fica na própria linha do caso, que é onde ela é lida.
+      { cabecalho: RECC_COLUNA_QUANDO_MUDOU_O_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
+
+      // ---- O TOMBAMENTO --------------------------------------------------
+      // De qual lote o caso veio, quando ele entrou. Vazio quer dizer que o
+      // caso foi cadastrado um a um, na tela.
+      { cabecalho: RECC_COLUNA_ORIGEM_DO_TOMBAMENTO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DO_TOMBAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -191,7 +267,18 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Data resposta', tipo: 'data', protegido: true },
       { cabecalho: 'Hora resposta', tipo: 'hora', protegido: true },
       { cabecalho: 'Data da finalização', tipo: 'data', protegido: true },
-      { cabecalho: 'horário da finalização', tipo: 'hora', protegido: true }
+      { cabecalho: 'horário da finalização', tipo: 'hora', protegido: true },
+      // Toda mudança de status deixa rastro na própria linha, igual à RET:
+      // quando foi a última, quem fez, e quantas vezes o caso já andou. Ver o
+      // bloco equivalente em BASE_RET, que explica por que não é na auditoria.
+      { cabecalho: RECC_COLUNA_QUANDO_MUDOU_O_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
+
+      // De qual lote o caso veio. A Mesa tomba casos de corretoras para ações
+      // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
+      { cabecalho: RECC_COLUNA_ORIGEM_DO_TOMBAMENTO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DO_TOMBAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -1235,7 +1322,7 @@ function linhaEstaVazia_(valores) {
  * Além dos cabeçalhos, todo registro carrega `__id` e `__linha`.
  *
  * O `__id` existe porque a coluna de identificador NÃO tem o mesmo nome em
- * toda aba: é `ID` na Mesa Diamante, `id` na RET Vida e `Id` nas abas de
+ * toda aba: é `ID` na Mesa Diamante, `id` na RET e `Id` nas abas de
  * sistema. Quem consome o registro não deveria precisar saber a grafia de
  * cada aba para achar o identificador — e quando precisava, lia `undefined`
  * em silêncio e seguia adiante com ele.

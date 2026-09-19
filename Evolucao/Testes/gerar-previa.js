@@ -146,6 +146,16 @@ function pontePreparada(respostas) {
     + '      listarCardsDoPainel: function (tela, idDoCanal) {\n'
     + '        responder(respostas.configuracoes.cards[idDoCanal]);\n'
     + '      },\n'
+    + '      opcoesDoTombamento: function (idDoCanal) {\n'
+    + '        responder(respostas.tombamento[idDoCanal]);\n'
+    + '      },\n'
+    // Conferir e tombar dependem do que a pessoa COLA na hora, e a prévia não
+    // tem servidor para ler aquilo. Recusam com o motivo, em vez de devolver
+    // um laudo inventado: um laudo falso na prévia ensinaria a confiar nele.
+    + '      conferirTombamento: function () {\n'
+    + '        recusar("Na prévia não dá para conferir um tombamento: o laudo '
+    + 'sai de ler o que você colou, e aqui não há servidor para ler.");\n'
+    + '      },\n'
     + '      configuracaoDoLegado: function () {\n'
     + '        responder(respostas.busca.legado);\n'
     + '      },\n'
@@ -280,7 +290,7 @@ function pontePreparada(respostas) {
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
-      'salvarConfiguracaoDoLegado'])
+      'salvarConfiguracaoDoLegado', 'tombarCasos'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -368,7 +378,7 @@ function gerar(pastaDeSaida) {
   ]);
 
   // ------------------------------------------------------------------- RET
-  // A RET Vida trata RETENÇÃO: o cliente pediu para cancelar, e o analista
+  // A RET trata RETENÇÃO: o cliente pediu para cancelar, e o analista
   // tenta manter. A demanda é outra, e por isso as colunas são outras —
   // proposta, apólice, prêmio, motivo do cancelamento, tentativas de contato.
   chamar('inserirVariosRegistros_')('BASE_RET', [
@@ -630,10 +640,12 @@ function gerar(pastaDeSaida) {
   const cards = {};
   const opcoesDoGrafico = {};
   const componentes = {};
+  const tombamento = {};
   pacote.canais.forEach((canal) => {
     cards[canal.id] = chamar('listarCardsDoPainel')('dashboard', canal.id);
     opcoesDoGrafico[canal.id] = chamar('opcoesDoPainelAnalitico')(canal.id);
     componentes[canal.id] = chamar('listarComponentesDoPainel')(canal.id);
+    tombamento[canal.id] = chamar('opcoesDoTombamento')(canal.id);
   });
 
   const configuracoes = {
@@ -744,7 +756,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
-      busca, analitico, performance, corretoras
+      busca, analitico, performance, corretoras, tombamento
     })
       + '</head>');
 

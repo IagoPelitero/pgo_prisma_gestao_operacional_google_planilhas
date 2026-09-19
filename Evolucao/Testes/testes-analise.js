@@ -119,14 +119,14 @@ function rodarTestesDeAnalise() {
     verdadeiro(cabecalho.indexOf('_Visivel') < 0,
       'coluna de sistema numa tabela dinâmica só atrapalha');
     verdadeiro(cabecalho.indexOf('_Origem') < 0);
-    igual(cabecalho.length, 20, 'as 20 colunas da BASE_MESA, sem as 4 de controle');
+    igual(cabecalho.length, 25, 'as 25 colunas da BASE_MESA, sem as 4 de controle');
   });
 
   teste('a grade fica do tamanho do conteúdo, e não do tamanho de fábrica', () => {
     // Célula vazia também consome o teto de 10 milhões da planilha. Uma aba
     // deixada em 1000 x 26 gasta 26 mil células para mostrar três linhas.
     const aba = planilha.getSheetByName('ANALISE_Tudo');
-    igual(aba.getMaxColumns(), 20);
+    igual(aba.getMaxColumns(), 25);
     igual(aba.getMaxRows(), 4);
   });
 

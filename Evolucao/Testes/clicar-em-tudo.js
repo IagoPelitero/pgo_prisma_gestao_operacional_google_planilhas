@@ -4,7 +4,7 @@
  * ============================================================================
  *   node Evolucao/Testes/clicar-em-tudo.js
  *
- * Abre a prévia num navegador de verdade, percorre as sete telas e clica em
+ * Abre a prévia num navegador de verdade, percorre TODAS as telas e clica em
  * tudo que tem um atributo de ação, ouvindo `pageerror` e `console.error`.
  *
  * POR QUE ELA EXISTE. Os dois defeitos de "resposta atrasada" — o achado 27 —
@@ -27,8 +27,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const TELAS = ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-  'tabelaCorretoras', 'painelAnalitico', 'configuracoes'];
+// As telas saem do CÓDIGO, e não de uma lista aqui: ver telasDoSistema, no
+// ferramentas.js, que explica por quê e serve às duas varreduras.
+const { telasDoSistema } = require('./ferramentas');
+
+const TELAS = telasDoSistema();
 
 /**
  * Tudo que a operação aperta. São os atributos que as telas usam para marcar

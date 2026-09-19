@@ -26,8 +26,12 @@
 const fs = require('fs');
 const path = require('path');
 
-const TELAS = ['dashboard', 'cadastrarCaso', 'buscarCaso', 'painelAnalitico',
-  'configuracoes', 'minhaPerformance', 'tabelaCorretoras'];
+// TODAS as telas, e desta vez de verdade: a lista sai do código. Aqui já
+// esteve escrita à mão, com CINCO nomes, sob um cabeçalho que prometia
+// "TODAS". Ver telasDoSistema, no ferramentas.js.
+const { telasDoSistema } = require('./ferramentas');
+
+const TELAS = telasDoSistema();
 
 /** As larguras que importam: monitor, notebook, tablet, celular. */
 const LARGURAS = [1600, 1280, 1024, 900, 820, 768, 640, 540, 430, 390, 360, 320];

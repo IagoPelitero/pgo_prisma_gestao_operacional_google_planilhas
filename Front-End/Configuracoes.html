@@ -635,7 +635,7 @@ var TelaConfiguracoes = (function () {
       + '<fieldset class="config-grupo"><legend>Até onde enxerga</legend>'
       + escopos + '</fieldset>'
       + '<fieldset class="config-grupo"><legend>Quais canais enxerga</legend>'
-      + '<p class="config-dica">RET Vida e Mesa Diamante são operações '
+      + '<p class="config-dica">RET e Mesa Diamante são operações '
       + 'distintas. Marque os canais deste nível — <strong>nenhum marcado '
       + 'quer dizer todos</strong>, que é o caso de quem administra.</p>'
       + canaisDoNivel + '</fieldset>'
@@ -903,15 +903,32 @@ var TelaConfiguracoes = (function () {
   /* -------------------------------------------------------------- painéis */
 
   var canalDosCards = '';
-  var telaDosPaineis = 'dashboard';   // 'dashboard' ou 'painelAnalitico'
+  /*
+   * Qual das TRÊS listas está sendo editada.
+   *
+   * São três e não duas porque a Produtividade RECC tem cartões próprios além
+   * dos gráficos: os cartões respondem "quantos reteve", os gráficos explicam.
+   *
+   * A aba não é a mesma coisa que a tela do servidor: duas abas daqui editam
+   * cartões da MESMA tela (`painelAnalitico`), mudando só o tipo. Guardar as
+   * duas coisas na mesma variável foi o que me fez confundir uma com a outra.
+   */
+  var abaDosPaineis = 'cardsDoTrabalho';
   var cardsEmEdicao = null;           // a lista sendo mexida, antes de salvar
+
+  /** A qual tela do servidor cada aba daqui corresponde. */
+  var TELA_DA_ABA = {
+    cardsDoTrabalho: 'dashboard',
+    cartoesDaProdutividade: 'painelAnalitico',
+    graficosDaProdutividade: 'painelAnalitico'
+  };
 
   function carregarPaineis() {
     if (!canalDosCards) canalDosCards = canalEscolhida;
-    if (telaDosPaineis === 'painelAnalitico') return carregarGraficos();
+    if (abaDosPaineis === 'graficosDaProdutividade') return carregarGraficos();
 
     aguarde('Lendo os cards…');
-    Servidor.chamar('listarCardsDoPainel', 'dashboard', canalDosCards)
+    Servidor.chamar('listarCardsDoPainel', TELA_DA_ABA[abaDosPaineis], canalDosCards)
       .entao(function (resposta) {
         dados.painel = resposta;
         cardsEmEdicao = resposta.cartoes.map(copiarCard);
@@ -944,14 +961,31 @@ var TelaConfiguracoes = (function () {
     };
   }
 
-  /** As duas telas que têm componentes configuráveis. */
+  /**
+   * O nome que a tela tem HOJE, do jeito que o administrador a batizou.
+   *
+   * Escrever "Dashboard" aqui deixaria as abas de Configurações falando de uma
+   * tela que o menu chama de "Trabalho" — e a pessoa procuraria, com razão,
+   * uma terceira tela que não existe. O nome mora num lugar só, e é este.
+   */
+  function nomeDaTela(chave, seNaoAchar) {
+    var achado = ((resumo && resumo.titulosDasTelas) || [])
+      .filter(function (uma) { return uma.tela === chave; })[0];
+    return achado && achado.titulo ? achado.titulo : seNaoAchar;
+  }
+
+  /** As três listas configuráveis: os cards de uma tela e os da outra, mais os gráficos. */
   function escolhaDeTela() {
+    var trabalho = nomeDaTela('dashboard', 'Trabalho');
+    var produtividade = nomeDaTela('painelAnalitico', 'Produtividade RECC');
+
     return '<div class="config-abas">'
-      + [['dashboard', 'Cards do Dashboard'],
-         ['painelAnalitico', 'Gráficos do Painel Analítico']]
+      + [['cardsDoTrabalho', 'Cards do ' + trabalho],
+         ['cartoesDaProdutividade', 'Cartões da ' + produtividade],
+         ['graficosDaProdutividade', 'Gráficos da ' + produtividade]]
         .map(function (par) {
           return '<button type="button" class="config-aba'
-            + (telaDosPaineis === par[0] ? ' atual' : '') + '"'
+            + (abaDosPaineis === par[0] ? ' atual' : '') + '"'
             + ' data-tela-do-painel="' + par[0] + '">'
             + escapar(par[1]) + '</button>';
         }).join('') + '</div>';
@@ -1110,7 +1144,7 @@ var TelaConfiguracoes = (function () {
 
   function ligarTrocaDeTelaEDeCanal() {
     ligarCliques('[data-tela-do-painel]', function (botao) {
-      telaDosPaineis = botao.getAttribute('data-tela-do-painel');
+      abaDosPaineis = botao.getAttribute('data-tela-do-painel');
       carregarPaineis();
     });
     ligarCliques('[data-canal-dos-cards]', function (botao) {
@@ -1258,7 +1292,7 @@ var TelaConfiguracoes = (function () {
     elemento('descartar-cards').addEventListener('click', carregarPaineis);
 
     elemento('salvar-cards').addEventListener('click', function () {
-      Servidor.chamar('salvarCardsDoPainel', 'dashboard', canalDosCards,
+      Servidor.chamar('salvarCardsDoPainel', TELA_DA_ABA[abaDosPaineis], canalDosCards,
         cardsEmEdicao)
         .entao(function () { avisarSalvo('Cards salvos.'); carregarPaineis(); })
         .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
@@ -1309,6 +1343,16 @@ var TelaConfiguracoes = (function () {
       + (identidade.logo
         ? '<img src="' + escapar(identidade.logo) + '" alt="Logo atual">' : '')
       + '</div></div>'
+      + '<fieldset class="config-grupo"><legend>Nome de cada tela no menu</legend>'
+      + '<p class="config-dica">Só o TEXTO do menu muda. O que identifica a '
+      + 'tela por dentro é outra coisa, então renomear aqui não mexe em '
+      + 'permissão, em rota, nem nos endereços que as pessoas guardaram. '
+      + 'Apagar o campo devolve o nome de fábrica.</p>'
+      + (resumo.titulosDasTelas || []).map(function (tela) {
+        return campoDeTexto('tela-' + tela.tela, tela.deFabrica, tela.titulo,
+          tela.titulo === tela.deFabrica ? '' : 'De fábrica: ' + tela.deFabrica);
+      }).join('')
+      + '</fieldset>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar identidade</button>'
       + '</div></form>';
@@ -1350,7 +1394,13 @@ var TelaConfiguracoes = (function () {
     elemento('form-identidade').addEventListener('submit', function (evento) {
       evento.preventDefault();
       var logo = valorDe('logo');
+      var titulos = {};
+      (resumo.titulosDasTelas || []).forEach(function (tela) {
+        titulos[tela.tela] = valorDe('tela-' + tela.tela);
+      });
+
       Servidor.chamar('salvarIdentidade', {
+        titulosDasTelas: titulos,
         nome: valorDe('nome'),
         nomeLongo: valorDe('nomeLongo'),
         operacao: valorDe('operacao'),
@@ -1362,7 +1412,8 @@ var TelaConfiguracoes = (function () {
         resumo.identidade = nova;
         Servidor.chamar('definirLogo', logo)
           .entao(function () {
-            avisarSalvo('Identidade salva. Recarregue para ver a barra nova.');
+            avisarSalvo('Identidade salva. Use o botão de atualizar, no '
+              + 'alto, para ver a barra e o menu com os nomes novos.');
           })
           .senao(mostrarErroNoPainel);
       }).senao(mostrarErroNoPainel);

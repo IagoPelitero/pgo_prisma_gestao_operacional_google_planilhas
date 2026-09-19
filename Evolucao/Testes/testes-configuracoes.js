@@ -72,7 +72,7 @@ function rodarTestesDeConfiguracoes() {
 
   teste('a lista traz protegidos, desligados e o estado da coluna', () => {
     const campos = chamar('listarCamposDoCanal')(canal.id);
-    igual(campos.length, 20, 'os 20 cabeçalhos do canal, inclusive o Id');
+    igual(campos.length, 25, 'os 25 cabeçalhos do canal, inclusive o Id');
     verdadeiro(campos.every((c) => c.colunaExiste), 'todas as colunas existem');
     verdadeiro(campos.find((c) => c.chave === 'id').protegido);
     igual(campos.find((c) => c.chave === 'id').ativo, false);
@@ -260,7 +260,7 @@ function rodarTestesDeConfiguracoes() {
     });
     const pessoa = chamar('listarUsuarios()').find((u) => u.id === id);
     igual(pessoa.canalId, ret.id);
-    igual(pessoa.canal, 'RET Vida', 'o Id não diz nada a quem lê a tela');
+    igual(pessoa.canal, 'RET', 'o Id não diz nada a quem lê a tela');
     igual(pessoa.administrador, false);
 
     // E dá para voltar a não ter canal: a pessoa foi promovida, ou passou a
@@ -419,7 +419,7 @@ function rodarTestesDeConfiguracoes() {
 
     igual(opcoes.telas.map((t) => t.chave).join(','), doMenu.join(','),
       'duas listas de telas divergiriam, e a tela nova nasceria inacessível');
-    igual(opcoes.acoes.length, 6);
+    igual(opcoes.acoes.length, 7);
     igual(opcoes.escopos.length, 4);
     opcoes.acoes.forEach((acao) => {
       verdadeiro(acao.descricao.length > 10,
@@ -493,6 +493,57 @@ function rodarTestesDeConfiguracoes() {
     chamar('salvarCardsDoPainel')('dashboard', canal.id, painel.cartoes);
     igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length,
       painel.cartoes.length);
+  });
+
+  teste('os cartões da Produtividade RECC se editam pela mesma máquina', () => {
+    // A tela é outra, a lista é outra, o código é o mesmo. Duas máquinas para
+    // a mesma coisa seriam duas para consertar quando uma delas errasse.
+    const doTrabalho = chamar('listarCardsDoPainel')('dashboard', canal.id);
+    const daProdutividade = chamar('listarCardsDoPainel')('painelAnalitico', canal.id);
+
+    igual(daProdutividade.tela, 'painelanalitico');
+    verdadeiro(daProdutividade.cartoes.length > 0,
+      'a Produtividade RECC nasce com cartões próprios');
+    verdadeiro(doTrabalho.cartoes.map((c) => c.titulo).join() !==
+      daProdutividade.cartoes.map((c) => c.titulo).join(),
+      'as duas listas não podem ser a mesma');
+
+    // Mexer numa não mexe na outra. A conta é feita sobre o que a TELA desenha,
+    // e não sobre o que o editor lista: o editor mostra de propósito também os
+    // cartões desligados, para dar como religá-los, então a lista dele não
+    // encurta quando um cartão sai de cena.
+    const naTela = () => chamar('painelAnalitico')(canal.id, {}, 30).cartoes.length;
+    const noTrabalho = () => chamar('resumoDoCanal')(canal.id, {}).cartoes.length;
+    const cardsDoTrabalhoAntes = noTrabalho();
+
+    chamar('salvarCardsDoPainel')('painelAnalitico', canal.id, [
+      { titulo: 'Só isto', dimensao: 'total', filtro: '', cor: 'bom', mostrar: true }
+    ]);
+    igual(naTela(), 1, 'a Produtividade RECC ficou com um cartão');
+    igual(noTrabalho(), cardsDoTrabalhoAntes, 'os cards do Trabalho ficaram intactos');
+
+    chamar('salvarCardsDoPainel')('painelAnalitico', canal.id,
+      daProdutividade.cartoes);
+    igual(naTela(), daProdutividade.cartoes.length, 'e volta inteiro');
+  });
+
+  teste('"já passaram por" é oferecido por status que carimba', () => {
+    // A opção existe porque a coluna existe. Oferecer uma contagem sobre coluna
+    // que não está na base criaria um cartão que nunca aparece, e quem o
+    // criasse ia jurar que salvou.
+    const opcoes = chamar('listarCardsDoPainel')('painelAnalitico', canal.id).oQueContar;
+    const porCarimbo = opcoes.filter((o) => o.chave === 'preenchido');
+    verdadeiro(porCarimbo.length > 0, 'a Mesa Diamante carimba a finalização');
+    verdadeiro(porCarimbo.every((o) => o.rotulo.indexOf('Já passaram por: ') === 0),
+      'o rótulo diz que é jornada, e não estado de hoje');
+    verdadeiro(porCarimbo.every((o) => o.filtro), 'cada uma aponta para uma coluna');
+  });
+
+  teste('cartão por carimbo apontando para coluna inexistente é recusado', () => {
+    lanca(() => chamar('salvarCardsDoPainel')('painelAnalitico', canal.id, [
+      { titulo: 'Já contatados', dimensao: 'preenchido',
+        filtro: 'Coluna que nunca existiu', cor: 'bom', mostrar: true }
+    ]), 'não existe', 'recusar na hora de salvar, e não na hora de desenhar');
   });
 
   secao('A tela');

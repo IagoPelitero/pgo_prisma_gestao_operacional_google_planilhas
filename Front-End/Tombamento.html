@@ -1,0 +1,512 @@
+<script>
+/* ============================================================================
+   PGO — Tombamento.html · trazer uma base inteira de fora
+   ============================================================================
+   A tela existe para um gesto que a operação faz toda semana: pegar a base de
+   inadimplentes do Vida Individual, do Vida em Grupo, ou a lista de corretoras
+   que a Mesa vai tratar, e jogar cem ou trezentos casos dentro do PGO — já
+   divididos entre os analistas.
+
+   TRÊS PASSOS, E O DO MEIO É O QUE IMPORTA:
+
+     1. DE ONDE VEM. Colar o conteúdo, ou dar o link da outra planilha.
+     2. CONFERIR. O servidor devolve para onde cada coluna vai, quantas linhas
+        entram, quantas repetem, e as três primeiras JÁ TRADUZIDAS.
+     3. TOMBAR.
+
+   O passo 2 não é burocracia: mapeamento errado é invisível no cabeçalho e
+   óbvio no dado. Ver "11999998888" na coluna "CPF" na terceira linha da
+   amostra custa cinco segundos; descobrir isso depois custa achar e apagar
+   trezentas linhas na mão, numa base que já está sendo trabalhada.
+
+   POR QUE COLAR, E NÃO SÓ O LINK: colar funciona sempre. Abrir outra planilha
+   pelo link exige que a conta que roda o PGO tenha acesso a ela, e esse é
+   exatamente o tipo de permissão que falta na hora errada. O link fica como a
+   opção melhor para quem repete o tombamento toda semana; colar fica como a
+   que nunca depende de nada.
+   ============================================================================ */
+
+var TelaTombamento = (function () {
+
+  var canalEscolhida = '';
+  var pacoteDoSistema = null;
+  var opcoes = null;          // colunas, analistas, lotes já tombados
+  var laudo = null;           // o resultado do passo 2, enquanto não se grava
+  var resultado = null;       // o que entrou, depois de gravar
+
+  var fonte = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
+  var deParaEscolhido = null; // o que a pessoa ajustou na tela
+  var analistasMarcados = {};
+  var colunaQueIdentifica = '';
+  var nomeDoLote = '';
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  /* --------------------------------------------------------------- montar */
+
+  function montar(pacote) {
+    pacoteDoSistema = pacote;
+    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+      + '<div id="tombamento"><p class="carregando-campos">'
+      + 'Lendo as colunas do canal…</p></div>';
+  }
+
+  function carregar() {
+    var caixa = elemento('tombamento');
+    if (caixa) {
+      caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
+    }
+    Servidor.chamar('opcoesDoTombamento', canalEscolhida)
+      .entao(function (resposta) {
+        opcoes = resposta;
+        laudo = null;
+        resultado = null;
+        deParaEscolhido = null;
+        desenhar();
+      })
+      .senao(function (erro) {
+        elemento('tombamento').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
+  /* -------------------------------------------------------------- desenho */
+
+  function desenhar() {
+    elemento('tombamento').innerHTML = resultado
+      ? desenharResultado()
+      : (desenharFonte() + (laudo ? desenharLaudo() : ''));
+    ligar();
+  }
+
+  /** Passo 1: de onde vem o dado. */
+  function desenharFonte() {
+    var colado = fonte.tipo === 'colado';
+
+    return '<section class="cartao tombamento-passo">'
+      + '<header class="grafico-cabeca"><h3>1. De onde vêm os casos</h3></header>'
+      + '<div class="config-abas">'
+      + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
+      + ' data-fonte="colado">Colar da planilha</button>'
+      + '<button type="button" class="config-aba' + (colado ? '' : ' atual') + '"'
+      + ' data-fonte="planilha">Ler outra planilha pelo link</button>'
+      + '</div>'
+      + (colado ? desenharColar() : desenharLink())
+      + '<p class="config-dica">A primeira linha tem de ser a dos NOMES das '
+      + 'colunas. É por ela que o sistema descobre para onde cada coluna vai. '
+      + 'Até ' + opcoes.limite + ' linhas por vez.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="conferir-tombamento">'
+      + 'Conferir antes de tombar</button></div>'
+      + '</section>';
+  }
+
+  function desenharColar() {
+    return '<label class="campo largura-2"><span>Cole aqui, com o cabeçalho</span>'
+      + '<textarea id="texto-colado" rows="8" spellcheck="false"'
+      + ' placeholder="CPF&#9;Nome&#9;Produto&#10;12345678900&#9;Maria&#9;Vida Individual">'
+      + escapar(fonte.texto) + '</textarea></label>';
+  }
+
+  function desenharLink() {
+    return '<div class="grade">'
+      + '<label class="campo"><span>Id da planilha</span>'
+      + '<input type="text" id="planilha-id" value="' + escapar(fonte.planilhaId) + '"'
+      + ' placeholder="o pedaço do endereço entre /d/ e /edit"></label>'
+      + '<label class="campo"><span>Nome da aba</span>'
+      + '<input type="text" id="planilha-aba" value="' + escapar(fonte.aba) + '"'
+      + ' placeholder="em branco = a primeira aba"></label>'
+      + '</div>'
+      + '<p class="config-dica">A conta que abre o PGO precisa ter acesso a essa '
+      + 'planilha. Se não tiver, o sistema diz isso em vez de tombar pela metade.</p>';
+  }
+
+  /** Passo 2: o laudo, que é a razão de a tela existir. */
+  function desenharLaudo() {
+    return '<section class="cartao tombamento-passo">'
+      + '<header class="grafico-cabeca"><h3>2. Confira antes de gravar</h3></header>'
+      + desenharContagem()
+      + desenharDePara()
+      + desenharAmostra()
+      + desenharDestino()
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="tombar-agora"'
+      + (laudo.vaoEntrar ? '' : ' disabled') + '>'
+      + 'Tombar ' + laudo.vaoEntrar + ' caso(s)</button>'
+      + '<button type="button" class="botao vazado" id="recomecar-do-laudo">'
+      + 'Recomeçar</button></div>'
+      + '</section>';
+  }
+
+  function desenharContagem() {
+    var pulados = laudo.vaoSerPuladas
+      ? '<div class="indicador tom-atencao" title="'
+        + laudo.motivosParaPular.vazia + ' em branco, '
+        + laudo.motivosParaPular.repetida + ' já na base">'
+        + '<span class="rotulo">Vão ser puladas'
+        + '</span><strong class="numero">' + laudo.vaoSerPuladas + '</strong>'
+        + '</div>'
+      : '';
+
+    return '<div class="cartoes">'
+      + '<div class="indicador tom-neutro"><span class="rotulo">Linhas na origem'
+      + '</span><strong class="numero">' + laudo.linhasNaFonte + '</strong></div>'
+      + '<div class="indicador tom-bom"><span class="rotulo">Vão entrar</span>'
+      + '<strong class="numero">' + laudo.vaoEntrar + '</strong></div>'
+      + pulados
+      + '</div>'
+      + (laudo.passaDoLimite
+        ? '<p class="aviso-janela">São ' + laudo.linhasNaFonte + ' linhas, e o '
+          + 'limite é ' + laudo.limite + '. Divida em levas: se o mapeamento '
+          + 'estiver errado, o estrago é menor.</p>'
+        : '');
+  }
+
+  /**
+   * O de-para, uma linha por coluna da origem.
+   *
+   * Vem sugerido pelo servidor, casando nome com nome. A pessoa corrige o que
+   * não reconheceu e deixa em "— não trazer —" o que não interessa: uma base de
+   * inadimplentes tem colunas que o PGO não quer, e forçar um destino para
+   * todas encheria a base de colunas de outra operação.
+   */
+  function desenharDePara() {
+    var atual = deParaEscolhido || laudo.dePara;
+
+    return '<h4 class="tombamento-titulo">Para onde vai cada coluna</h4>'
+      + '<table class="fila tombamento-depara"><thead><tr>'
+      + '<th>Na planilha de origem</th><th>Vai para esta coluna do canal</th>'
+      + '</tr></thead><tbody>'
+      + atual.map(function (par, i) {
+        var opcoesDeColuna = ['<option value="">— não trazer —</option>']
+          .concat(opcoes.colunasDoCanal.map(function (coluna) {
+            return '<option value="' + escapar(coluna) + '"'
+              + (par.paraAColuna === coluna ? ' selected' : '') + '>'
+              + escapar(coluna) + '</option>';
+          }));
+        return '<tr><td><code>' + escapar(par.daFonte || '(sem nome)') + '</code></td>'
+          + '<td><select class="filtro" data-depara="' + i + '">'
+          + opcoesDeColuna.join('') + '</select></td></tr>';
+      }).join('')
+      + '</tbody></table>';
+  }
+
+  /**
+   * As primeiras linhas JÁ TRADUZIDAS.
+   *
+   * É o único lugar da tela em que um mapeamento trocado aparece. O cabeçalho
+   * "CPF" apontando para a coluna "telefones de contato" parece certo na tabela
+   * de cima e salta aos olhos aqui.
+   */
+  function desenharAmostra() {
+    if (!laudo.amostra.length) {
+      return '<p class="config-dica">Nenhuma linha entraria, então não há o que '
+        + 'mostrar. Confira o de-para acima.</p>';
+    }
+
+    var colunas = [];
+    laudo.amostra.forEach(function (caso) {
+      Object.keys(caso).forEach(function (coluna) {
+        if (colunas.indexOf(coluna) < 0) colunas.push(coluna);
+      });
+    });
+
+    return '<h4 class="tombamento-titulo">As primeiras linhas, como vão ficar</h4>'
+      + '<div class="rolagem-tabela"><table class="fila"><thead><tr>'
+      + colunas.map(function (c) { return '<th>' + escapar(c) + '</th>'; }).join('')
+      + '</tr></thead><tbody>'
+      + laudo.amostra.map(function (caso) {
+        return '<tr>' + colunas.map(function (coluna) {
+          return '<td>' + escapar(caso[coluna] === undefined ? '' : caso[coluna])
+            + '</td>';
+        }).join('') + '</tr>';
+      }).join('')
+      + '</tbody></table></div>';
+  }
+
+  /** Nome do lote, para quem vai, e o que não repetir. */
+  function desenharDestino() {
+    return '<h4 class="tombamento-titulo">De quem são, e como se chama o lote</h4>'
+      + '<div class="grade">'
+      + '<label class="campo largura-2"><span>Nome do lote</span>'
+      + '<input type="text" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
+      + ' placeholder="Base de inadimplentes Vida Presente"'
+      + (opcoes.lotes.length ? ' list="lotes-ja-usados"' : '') + '>'
+      + (opcoes.lotes.length
+        ? '<datalist id="lotes-ja-usados">' + opcoes.lotes.map(function (lote) {
+          return '<option value="' + escapar(lote.origem) + '"></option>';
+        }).join('') + '</datalist>'
+        : '')
+      + '</label>'
+      + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
+      + '<select class="filtro" id="coluna-que-identifica">'
+      + ['<option value="">— trazer tudo, mesmo repetido —</option>']
+        .concat(opcoes.colunasDoCanal.map(function (coluna) {
+          return '<option value="' + escapar(coluna) + '"'
+            + (colunaQueIdentifica === coluna ? ' selected' : '') + '>'
+            + escapar(coluna) + '</option>';
+        })).join('')
+      + '</select></label>'
+      + '</div>'
+      + '<p class="config-dica">A base é atualizada toda semana e boa parte dela '
+      + 'repete. Escolhendo uma coluna que identifica o caso — o CPF, o número da '
+      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.</p>'
+      + desenharAnalistas()
+      + (opcoes.statusPadrao
+        ? '<p class="config-dica">Os casos vão nascer com o status '
+          + '<strong>' + escapar(opcoes.statusPadrao) + '</strong>. O analista '
+          + 'ajusta depois, caso a caso — e cada mudança fica registrada.</p>'
+        : '');
+  }
+
+  /**
+   * Quem recebe os casos.
+   *
+   * Vários marcados = rodízio, em partes iguais. É o pedido da operação:
+   * "uma base com 100 casos ou 300 casos podemos incluir no individual para
+   * cada analista". Nenhum marcado deixa a coluna de responsável como a origem
+   * mandou — que é o certo quando a própria base já traz o analista.
+   */
+  function desenharAnalistas() {
+    if (!opcoes.analistas.length) {
+      return '<p class="config-dica">Ninguém cadastrado e ativo no PGO, então os '
+        + 'casos entram sem responsável. Cadastre em Configurações › Usuários e '
+        + 'tombe depois.</p>';
+    }
+
+    var quantos = Object.keys(analistasMarcados).filter(function (nome) {
+      return analistasMarcados[nome];
+    }).length;
+
+    // Quem atende este canal vem primeiro e marcado como tal. Quem não atende
+    // continua na lista: enquanto a operação está se formando, um analista da
+    // RET pode receber um lote da Mesa, e quem decide isso é a coordenação, não
+    // o sistema. Esconder o nome tiraria a decisão da mão dela.
+    return '<h4 class="tombamento-titulo">Dividir entre</h4>'
+      + '<div class="config-marcadores">'
+      + opcoes.analistas.map(function (pessoa) {
+        return '<label class="config-chave'
+          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal') + '">'
+          + '<input type="checkbox"'
+          + ' data-analista="' + escapar(pessoa.nome) + '"'
+          + (analistasMarcados[pessoa.nome] ? ' checked' : '') + '>'
+          + '<span>' + escapar(pessoa.nome)
+          + (pessoa.atendeEsteCanal ? '' : ' <em>de outro canal</em>')
+          + '</span></label>';
+      }).join('')
+      + '</div>'
+      + '<p class="config-dica">'
+      + (quantos
+        ? 'Os casos vão ser divididos em partes iguais entre os ' + quantos
+          + ' marcado(s), em rodízio.'
+        : 'Ninguém marcado: o responsável vai ser o que vier na planilha de '
+          + 'origem, se ela trouxer um.')
+      + '</p>';
+  }
+
+  /** Passo 3: o que entrou. */
+  function desenharResultado() {
+    return '<section class="cartao tombamento-passo">'
+      + '<header class="grafico-cabeca"><h3>Tombado</h3></header>'
+      + '<div class="cartoes">'
+      + '<div class="indicador tom-bom"><span class="rotulo">Casos que entraram'
+      + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
+      + (resultado.pulados.repetida
+        ? '<div class="indicador tom-atencao"><span class="rotulo">Já estavam na base'
+          + '</span><strong class="numero">' + resultado.pulados.repetida
+          + '</strong></div>'
+        : '')
+      + (resultado.pulados.vazia
+        ? '<div class="indicador tom-neutro"><span class="rotulo">Linhas em branco'
+          + '</span><strong class="numero">' + resultado.pulados.vazia
+          + '</strong></div>'
+        : '')
+      + '</div>'
+      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, no canal '
+      + escapar(resultado.canal) + '.'
+      + (resultado.primeiroId
+        ? ' Do caso ' + escapar(resultado.primeiroId) + ' ao '
+          + escapar(resultado.ultimoId) + '.'
+        : '')
+      + '</p>'
+      + (resultado.analistas.length
+        ? '<p class="config-dica">Divididos entre: '
+          + escapar(resultado.analistas.join(', ')) + '.</p>'
+        : '')
+      + '<p class="config-dica">A Produtividade RECC já mostra este lote no '
+      + 'gráfico de casos tombados por dia.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="tombar-outro-lote">'
+      + 'Tombar outro lote</button></div>'
+      + '</section>';
+  }
+
+  /* --------------------------------------------------------- comportamento */
+
+  function ligar() {
+    SeletorDeCanal.ligar(function (id) {
+      canalEscolhida = id;
+      fonte = { tipo: fonte.tipo, texto: '', planilhaId: '', aba: '' };
+      analistasMarcados = {};
+      colunaQueIdentifica = '';
+      nomeDoLote = '';
+      desenharSeletor();
+      carregar();
+    });
+
+    cliques('[data-fonte]', function (botao) {
+      fonte.tipo = botao.getAttribute('data-fonte');
+      laudo = null;
+      guardarOQueEstaNaTela();
+      desenhar();
+    });
+
+    cliques('#conferir-tombamento', conferir);
+    cliques('#tombar-agora', tombar);
+    // Dois ids, e não um: os dois botões dizem coisas diferentes ("Recomeçar"
+    // depois de conferir, "Tombar outro lote" depois de gravar) e nunca estão
+    // na tela juntos. Compartilhar id é o achado 21 esperando a terceira tela
+    // que os coloque lado a lado.
+    cliques('#recomecar-do-laudo, #tombar-outro-lote', function () {
+      laudo = null;
+      resultado = null;
+      deParaEscolhido = null;
+      desenhar();
+    });
+
+    mudancas('[data-depara]', function (caixa) {
+      if (!deParaEscolhido) {
+        deParaEscolhido = laudo.dePara.map(function (par) {
+          return { daFonte: par.daFonte, paraAColuna: par.paraAColuna };
+        });
+      }
+      deParaEscolhido[Number(caixa.getAttribute('data-depara'))].paraAColuna =
+        caixa.value;
+    });
+
+    mudancas('[data-analista]', function (caixa) {
+      analistasMarcados[caixa.getAttribute('data-analista')] = caixa.checked;
+      // Só o texto de baixo muda; redesenhar a tela inteira aqui apagaria o
+      // que a pessoa já escreveu no nome do lote e nas caixas do de-para.
+      guardarOQueEstaNaTela();
+    });
+
+    mudancas('#coluna-que-identifica', function (caixa) {
+      colunaQueIdentifica = caixa.value;
+    });
+  }
+
+  function desenharSeletor() {
+    var antigo = document.querySelector('.canais');
+    if (!antigo || !antigo.parentNode) return;
+    var novo = document.createElement('div');
+    novo.innerHTML = SeletorDeCanal.montar(pacoteDoSistema.canais, canalEscolhida);
+    antigo.parentNode.replaceChild(novo.firstChild, antigo);
+  }
+
+  function cliques(seletor, oQueFazer) {
+    var achados = document.querySelectorAll('#tombamento ' + seletor);
+    for (var i = 0; i < achados.length; i++) {
+      achados[i].addEventListener('click', function () { oQueFazer(this); });
+    }
+  }
+
+  function mudancas(seletor, oQueFazer) {
+    var achados = document.querySelectorAll('#tombamento ' + seletor);
+    for (var i = 0; i < achados.length; i++) {
+      achados[i].addEventListener('change', function () { oQueFazer(this); });
+    }
+  }
+
+  /**
+   * Recolhe o que está digitado antes de redesenhar.
+   *
+   * Sem isto, trocar de aba ou marcar um analista apagaria o texto colado e o
+   * nome do lote — e a pessoa colaria trezentas linhas duas vezes.
+   */
+  function guardarOQueEstaNaTela() {
+    var colado = elemento('texto-colado');
+    if (colado) fonte.texto = colado.value;
+
+    var id = elemento('planilha-id');
+    if (id) fonte.planilhaId = id.value.trim();
+
+    var aba = elemento('planilha-aba');
+    if (aba) fonte.aba = aba.value.trim();
+
+    var lote = elemento('nome-do-lote');
+    if (lote) nomeDoLote = lote.value;
+
+    var chave = elemento('coluna-que-identifica');
+    if (chave) colunaQueIdentifica = chave.value;
+  }
+
+  function conferir() {
+    guardarOQueEstaNaTela();
+
+    var botao = elemento('conferir-tombamento');
+    if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
+
+    Servidor.chamar('conferirTombamento', canalEscolhida, {
+      fonte: fonte,
+      dePara: deParaEscolhido,
+      colunaQueIdentifica: colunaQueIdentifica
+    })
+      .entao(function (resposta) {
+        laudo = resposta;
+        deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
+        desenhar();
+      })
+      .senao(function (erro) {
+        if (botao) {
+          botao.disabled = false;
+          botao.textContent = 'Conferir antes de tombar';
+        }
+        window.alert(erro.message || String(erro));
+      });
+  }
+
+  function tombar() {
+    guardarOQueEstaNaTela();
+
+    var escolhidos = Object.keys(analistasMarcados).filter(function (nome) {
+      return analistasMarcados[nome];
+    });
+
+    // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
+    // fácil: tombar errado se desfaz apagando linha por linha.
+    if (!window.confirm('Tombar ' + laudo.vaoEntrar + ' caso(s) no canal '
+      + laudo.canal.nome + '? Desfazer isso é apagar os casos um a um.')) return;
+
+    var botao = elemento('tombar-agora');
+    if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
+
+    Servidor.chamar('tombarCasos', canalEscolhida, {
+      fonte: fonte,
+      dePara: deParaEscolhido || laudo.dePara,
+      colunaQueIdentifica: colunaQueIdentifica,
+      analistas: escolhidos,
+      origem: nomeDoLote
+    })
+      .entao(function (resposta) {
+        resultado = resposta;
+        laudo = null;
+        desenhar();
+      })
+      .senao(function (erro) {
+        if (botao) {
+          botao.disabled = false;
+          botao.textContent = 'Tombar ' + laudo.vaoEntrar + ' caso(s)';
+        }
+        window.alert(erro.message || String(erro));
+      });
+  }
+
+  return {
+    montar: montar,
+    ligar: function () { carregar(); }
+  };
+})();
+</script>

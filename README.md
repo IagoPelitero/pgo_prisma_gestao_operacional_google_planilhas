@@ -26,15 +26,22 @@ código:
 
 | Canal | Base | O que é |
 |---|---|---|
-| **RET Vida** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
+| **RET** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
 | **Mesa Diamante** | `BASE_MESA` | Atendimento a casos prioritários |
 
 ### As telas
 
-`Dashboard` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
-`Tabela de Corretoras` · `Painel Analítico` · `Configurações`
+`Trabalho` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
+`Tabela de Corretoras` · `Tombamento` · `Produtividade RECC` · `Configurações`
 
 Cada uma aparece — ou não — conforme o **nível de acesso** de quem entrou.
+
+**Os nomes acima são só os de fábrica.** O administrador renomeia qualquer tela
+em Configurações › Identidade, e o menu, o cabeçalho da página e o título da
+janela passam a usar o nome novo. O que identifica a tela para o sistema é uma
+CHAVE interna que nunca muda — por isso renomear não quebra rota, nível de
+acesso nem endereço guardado. Foi assim que o `Dashboard` virou `Trabalho` e o
+`Painel Analítico` virou `Produtividade RECC`.
 
 ### Os quatro temas
 
@@ -67,9 +74,9 @@ Dentro de `Evolucao/`:
 | [`02-padrao-de-codigo.md`](Evolucao/02-padrao-de-codigo.md) | Como os nomes são escolhidos, e as exceções |
 | [`03-manutencao.md`](Evolucao/03-manutencao.md) | Como mexer sem quebrar — leia antes de tocar em código |
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
-| [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 12 etapas |
+| [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 13 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 269 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 490 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -162,7 +169,7 @@ Dentro de `Evolucao/`:
    | `Estilos.html` | toda a aparência e os quatro temas |
    | `Comuns.html` | as peças que mais de uma tela usa |
    | `Aplicacao.html` | a ponte com o servidor e o roteador |
-   | `Dashboard.html` … `Configuracoes.html` | uma por item do menu (7) |
+   | `Dashboard.html` … `Configuracoes.html` | uma por item do menu (8) |
    | `SemAcesso.html` | a tela de quem não está cadastrado |
 
    ### O caminho de quem tem terminal: `clasp`
@@ -251,13 +258,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-269 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+490 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 268 não valeriam nada.
+realmente corrompe — sem ele, os outros 489 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -330,9 +337,24 @@ edição do que não é caso do sistema.
 
 ---
 
-## O que está acontecendo na operação
+## O que a operação entregou — a Produtividade RECC
 
-![O Painel Analítico](Evolucao/imagens/tela-painel-analitico.png)
+![A Produtividade RECC](Evolucao/imagens/tela-painel-analitico.png)
+
+A tela abre pelos **cartões**, porque é o cartão que responde a pergunta: para a
+RET, quantos **reteve**, quantos **não reteve**, quantos **já foram contatados**,
+quantos estão **cadastrados** e quantos **pendentes**. O gráfico vem depois, e é
+a explicação.
+
+"Já contatados" sai do **carimbo**, e não do status de hoje. Um caso que passou
+do "1º contato realizado" e hoje está em "Reteve" continua tendo sido contatado
+— contar pelo status diria zero, e a operação concluiria que ninguém ligou para
+ninguém. A coluna de carimbo não esquece.
+
+Dois botões no alto trocam entre **a equipe toda** e **só os meus**. O nível de
+acesso define o teto do que a pessoa pode ver; a vista escolhe quanto desse teto
+aparece. Quem já só enxerga os próprios casos não recebe os botões — um controle
+que não muda nada ensina a desconfiar dos outros.
 
 Cada gráfico é uma linha da aba `PAINEIS` — nada aqui está escrito no código.
 Cinco formas: pizza, barras em pé, barras deitadas, linha e barras com linha.
@@ -374,6 +396,14 @@ aqui, atrapalha alguém.
 - **O que não dá para calcular some**, em vez de aparecer zerado
 - **A meta é declarada, nunca inventada.** Canal sem meta não ganha barra
 
+E **dois botões trocam entre "só os meus" e "a minha equipe"**, que é o pedido
+da operação: o resultado individual do analista logado, com a opção de ver como
+vai o grupo a que ele pertence. A equipe é quem está cadastrado no mesmo canal
+que ele atende — a mesma definição que o alcance usa, para os dois números nunca
+divergirem. Na vista da equipe a **meta vira a soma das metas**: comparar o
+resultado de cinco pessoas com a meta de uma faria toda equipe parecer 400%
+acima do alvo.
+
 ---
 
 ## Quem traz o caso para dentro
@@ -392,6 +422,45 @@ uma pessoa de cada vez, sem ninguém ligar à causa.
 **Bloquear não impede cadastrar**: o formulário mostra o selo vermelho com o
 motivo, e quem atende decide. Bloqueio que impedisse faria a pessoa registrar o
 caso num caderno, e o sistema perderia o caso de vista.
+
+---
+
+## Trazer uma base inteira de fora — o Tombamento
+
+Toda semana chega uma base para trabalhar: os inadimplentes do Vida Individual,
+os do Vida em Grupo, a lista de corretoras que a Mesa vai tratar com ação
+diferenciada. Cem casos, trezentos casos. O Tombamento traz essa base para
+dentro do PGO **numa gravação só**, já dividida entre os analistas.
+
+São três passos, e **o do meio é a razão de a tela existir**:
+
+1. **De onde vem.** Colar o conteúdo da outra planilha, ou dar o link dela.
+   Colar funciona sempre; o link é melhor para quem repete toda semana, e exige
+   que a conta que roda o PGO tenha acesso àquela planilha.
+2. **Conferir.** O servidor devolve para onde cada coluna vai, quantas linhas
+   entram, quantas repetem — e **as três primeiras já traduzidas**.
+3. **Tombar.**
+
+O passo 2 não é burocracia. Um mapeamento trocado é invisível olhando o
+cabeçalho e óbvio olhando o dado: ver `11999998888` na coluna "CPF" custa cinco
+segundos; descobrir isso depois custa achar e apagar trezentas linhas na mão,
+numa base que já está sendo trabalhada.
+
+| O que o tombamento resolve | Como |
+|---|---|
+| Os cabeçalhos são os da OUTRA planilha | Casa nome com nome e sugere; a pessoa corrige o que não reconheceu |
+| A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados |
+| A base repete toda semana | Escolhendo a coluna que identifica o caso — CPF, nº da proposta —, o que já está dentro é **pulado**, e o laudo diz quantos |
+| O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET |
+| De onde veio cada caso | Grava o **nome do lote** e a **data**, que é o que faz o gráfico existir |
+
+Na Produtividade RECC, dois gráficos respondem ao que a operação pediu — *"no
+dia 05 incluímos 100 casos da base de inadimplentes Vida Presente"*: **casos
+tombados por dia** e **de qual base os casos vieram**, em cada canal.
+
+O tombamento é a ação `tombar`, separada de `criar`: quem cadastra um caso por
+vez erra um caso; quem tomba errado suja a base toda. De fábrica, Administração
+e Coordenação tombam; a Operação não.
 
 ---
 
@@ -417,12 +486,18 @@ para ele), renomear um item de lista que já está gravado em casos, e tirar
 Configurações do último nível que ainda a tem — ninguém se tranca do lado de
 fora.
 
-Os **cards do Dashboard** são configuráveis um a um: nome, o que cada um
-conta, cor, ordem e mostrar ou ocultar. Até 12 por operação. Remover um card
-não toca em caso nenhum — o card é uma forma de contar, e apagar a conta não
-apaga o que foi contado.
+Os **cartões são configuráveis um a um** — nome, o que cada um conta, cor,
+ordem e mostrar ou ocultar —, e são **duas listas**: a do Trabalho, que mostra o
+que ainda dá trabalho, e a da Produtividade RECC, que mostra o que já foi
+entregue. Mesma máquina, duas perguntas. Até 12 por tela. Remover um cartão não
+toca em caso nenhum — o cartão é uma forma de contar, e apagar a conta não apaga
+o que foi contado.
 
-![Os cards do Dashboard](Evolucao/imagens/tela-configuracoes-paineis.png)
+Um cartão conta de quatro maneiras: o **total**, uma **situação**, os
+**finalizados na célula** (que é conta, não coluna) e **"já passaram por"** — que
+lê a coluna de carimbo, e por isso não zera quando o caso avança.
+
+![Os cartões e os gráficos](Evolucao/imagens/tela-configuracoes-paineis.png)
 
 **Configurações permite ajustar tudo?** Quase — e a lista completa, com o que
 ainda falta e por quê, está em
@@ -444,7 +519,8 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | **Máscara é aparência**: a planilha recebe só dígitos | Cruzamento com outros sistemas sem tratamento |
 | Um caso = **uma linha**, sempre | Campo novo vira coluna nova, não linha em tabela de valores |
 | Permissão vem do **nível de acesso**, nunca do cargo | O nome do cargo é livre e muda |
-| Excluir **some da tela, nunca da planilha** | Exclusão é lógica (`_Visivel`), e reversível na mão |
+| Excluir **some da tela, nunca da planilha** — menos o CASO | Exclusão é lógica (`_Visivel`) e reversível na mão. O caso é a exceção, a pedido da operação: ele sai da planilha de vez, nos dois canais, e o conteúdo fica na auditoria |
+| Toda **mudança de status carimba** data e hora na linha do caso | É o controle de produtividade. Na auditoria seriam quase um milhão de linhas numa base de 200 mil casos |
 | **Erro alto** em vez de padrão silencioso | Dado errado calado é pior que operação parada |
 | A estrutura da planilha **nunca muda sozinha** | Só o instalador cria estrutura, e só sobre planilha vazia |
 | Esconder botão **não é segurança** | Toda função sensível revalida no servidor |
@@ -453,13 +529,15 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**5 de 12 etapas construídas.** O detalhe de cada uma está em
+**13 de 13 etapas construídas.** O detalhe de cada uma está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
 
-| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Dashboard |
+| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Tombamento |
 |---|---|
-| 🔨 | Configurações |
-| ⏳ | Buscar Caso · Painel Analítico · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico |
+
+490 testes, cinco execuções seguidas sem falha, mais as três varreduras de
+navegador: responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo
+e os testes de ponta a ponta.
 
 ---
 

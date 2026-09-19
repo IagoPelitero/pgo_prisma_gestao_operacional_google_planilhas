@@ -160,7 +160,7 @@ function casoDaRet(i) {
 
 function rodar(alvo) {
   console.log('\n' + '='.repeat(94));
-  console.log('TESTE DE ESTRESSE — ' + comoNumero(alvo) + ' casos na RET Vida');
+  console.log('TESTE DE ESTRESSE — ' + comoNumero(alvo) + ' casos na RET');
   console.log('='.repeat(94));
   console.log('Régua: ' + ORCAMENTO.msPorIdaAoServico + ' ms por ida ao serviço, '
     + ORCAMENTO.msPorMilhaoDeCelulas + ' ms por milhão de células, '
@@ -203,7 +203,7 @@ function rodar(alvo) {
   console.log('\r  pronto em ' + comoTempo(Date.now() - carga) + '            ');
 
   /* -- as telas ---------------------------------------------------------- */
-  medir('Dashboard: abrir a RET Vida', 0.5,
+  medir('Dashboard: abrir a RET', 0.5,
     () => chamar('resumoDoCanal')(ret.id, {}));
 
   medir('Dashboard: filtrar por situação', 0.5,
@@ -243,11 +243,11 @@ function rodar(alvo) {
     () => chamar('diagnosticoRECC()'));
 
   const analise = chamar('lerRegistros_("ANALISES")')
-    .find((a) => String(a.Nome) === 'RetVida');
+    .find((a) => String(a.Nome) === 'RET');
   chamar('atualizarRegistro_')('ANALISES', analise.Id, { Dias: 0 });
   chamar('definirSenhaDeAdministrador')('segredo123', '');
   chamar('liberarComSenha')('segredo123');
-  medir('Gerar ANALISE_RetVida (tudo)', 1,
+  medir('Gerar ANALISE_RET (tudo)', 1,
     () => chamar('gerarAnalise')(analise.Id));
 
   /* -- a importação no teto ----------------------------------------------- */

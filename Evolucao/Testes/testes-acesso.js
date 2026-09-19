@@ -141,11 +141,14 @@ function rodarTestesDeAcesso() {
     ambiente.definirEmail('ana@exemplo.com');
     const daOperacao = chamar('pacoteDePartida()');
     igual(daOperacao.disponivel, true);
-    igual(daOperacao.menu.length, 5, 'a Operação não vê Painel Analítico nem Configurações');
-    igual(daOperacao.menu[0].titulo, 'Dashboard', 'o título vem de CONFIG');
+    igual(daOperacao.menu.length, 5,
+      'a Operação não vê Produtividade RECC nem Configurações');
+    igual(daOperacao.menu[0].titulo, 'Trabalho', 'o título vem de CONFIG');
+    igual(daOperacao.menu[0].tela, 'dashboard',
+      'e a CHAVE não muda com o nome — é ela que identifica a tela');
 
     ambiente.definirEmail('primeiro.adm@exemplo.com');
-    igual(chamar('pacoteDePartida()').menu.length, 7, 'o Administrador vê tudo');
+    igual(chamar('pacoteDePartida()').menu.length, 8, 'o Administrador vê tudo');
   });
 
   teste('a guarda do servidor barra a ação que o nível não tem', () => {
@@ -293,7 +296,7 @@ function rodarTestesDeAcesso() {
     nivelDaOperacaoVendo([ret.id]);
 
     ambiente.definirEmail('ana@exemplo.com');
-    lanca(() => chamar('resumoDoCanal')(diamante.id, {}), 'RET Vida',
+    lanca(() => chamar('resumoDoCanal')(diamante.id, {}), 'RET',
       'a mensagem nomeia o canal que ela enxerga');
     ambiente.definirEmail('primeiro.adm@exemplo.com');
   });
@@ -305,7 +308,7 @@ function rodarTestesDeAcesso() {
     ambiente.definirEmail('ana@exemplo.com');
     const opcoes = chamar('opcoesDaBusca()');
     igual(opcoes.canais.length, 1, 'a tela só oferece a RET');
-    igual(opcoes.canais[0].nome, 'RET Vida');
+    igual(opcoes.canais[0].nome, 'RET');
     ambiente.definirEmail('primeiro.adm@exemplo.com');
   });
 

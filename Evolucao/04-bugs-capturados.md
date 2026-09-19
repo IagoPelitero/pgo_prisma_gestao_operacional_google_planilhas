@@ -698,6 +698,203 @@ artefato que vai ser usado, não para um gêmeo recém-nascido dele.
 
 ---
 
+### 34 · O obrigatório que recusava o valor que o sistema tinha guardado
+
+**Sintoma.** Nenhum, na tela. E ia ficar assim até o tombamento existir.
+
+**Causa.** O campo Status da RET ganhou `valorPadrao: 'Não trabalhado'`, como a
+operação pediu. Mas o `validarValores_` conferia obrigatoriedade **antes** de
+aplicar o padrão:
+
+```js
+if (bruto === undefined || bruto === null) bruto = '';
+var problema = conferirCampo_(descricao, bruto);   // <- confere primeiro
+```
+
+Um cadastro que chegasse sem status era recusado — por falta de um valor que o
+próprio servidor tinha à mão. Na tela não aparecia: o `aplicarPadroes` do
+`Comuns.html` já preenche a caixa antes de a pessoa ver. O padrão parecia
+funcionar porque **dois lugares diferentes faziam o mesmo trabalho**, e só um
+deles estava certo.
+
+Quem ia pagar a conta é o tombamento: uma base de 300 inadimplentes não traz
+coluna de status, não passa por tela nenhuma, e as 300 linhas seriam recusadas
+uma a uma por um campo que tem padrão declarado.
+
+**Defesa.** O padrão passou a ser aplicado antes de conferir, e só na criação
+(`validarValores_(..., ehCasoNovo)`). Na edição continua recusando: repor o
+padrão num campo que a pessoa acabou de limpar seria desfazer o gesto dela em
+silêncio. Três testes seguram isso — o obrigatório sem padrão que é recusado, o
+obrigatório com padrão que é preenchido, e a edição que reclama em vez de
+adivinhar.
+
+**O que ele ensina.** **Regra escrita em dois lugares é uma regra e um enfeite,
+e de fora não se sabe qual é qual.** Enquanto o único caminho até o servidor
+passava pela tela, o enfeite bastava. O primeiro caminho novo revelaria a
+diferença — e revelaria em produção, numa carga de 300 casos.
+
+---
+
+### 35 · `quem.Email` num objeto cujo campo é `quem.email`
+
+**Sintoma.** A coluna "Quem mudou o status" gravava vazio. Sem erro, sem log.
+
+**Causa.** Duas formas do mesmo dado no mesmo escopo. `usuarioAtual_()` devolve
+`{ cadastrado, email, usuario, cargo, nivel, permissoes }` — `email` minúsculo
+— e dentro dele `usuario` é a LINHA da aba USUARIOS, onde a coluna se chama
+`Email`, com maiúscula. Escrevi `quem.Email`. Em JavaScript isso é `undefined`,
+o `|| ''` transformou em string vazia, e a célula recebeu vazio com toda a
+educação do mundo.
+
+**Defesa.** Um teste que confere o conteúdo da coluna, não a existência dela:
+`igual(primeira['Quem mudou o status'], 'primeiro.adm@exemplo.com')`. E um
+comentário no ponto exato dizendo que os dois objetos existem e por que o
+minúsculo é o certo ali.
+
+**O que ele ensina.** O `|| ''` é uma conveniência que **apaga a diferença
+entre "não tem" e "não existe esse campo"**. Um teste que só perguntasse "a
+coluna foi escrita?" passaria. O que pega é perguntar **o que** foi escrito.
+
+---
+
+### 36 · O teste que escrevia na coluna 24
+
+**Sintoma.** `A aba "BASE_MESA" tem cabeçalho repetido: _Origem` — num teste de
+sequência de Id, que não mexe em cabeçalho nenhum.
+
+**Causa.** O teste "o simulador realmente corrompe quando o formato é Geral"
+usava a última coluna da BASE_MESA como cobaia, e a chamava de `24`, escrito à
+mão. No dia em que a Mesa Diamante ganhou as colunas do tombamento, a última
+passou a ser a 26 — e a 24 virou `_ExcluidoEm`. O teste escrevia `_Origem` ali,
+deixava a aba com dois cabeçalhos iguais, e a falha estourava vários testes
+depois, falando de uma coisa que não tinha nada a ver com ele.
+
+**Defesa.** O teste procura a coluna pelo nome, como o sistema faz:
+
+```js
+const cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+const cobaia = cabecalhos.indexOf('_Origem') + 1;
+```
+
+**O que ele ensina.** **A regra da casa vale para o teste do mesmo jeito que
+vale para o sistema.** "Coluna se acha pelo nome, nunca pela posição" é o
+pedido central deste projeto, e estava escrito em quase todo lugar — menos num
+teste, onde custava uma linha a menos. O preço veio na forma de um erro que
+apontava para o arquivo errado.
+
+---
+
+### 37 · O cabeçalho da tela dizendo outro nome que o menu
+
+**Sintoma.** O menu na lateral dizia "Trabalho". O título da página, dois
+centímetros ao lado, dizia "Dashboard".
+
+**Causa.** Renomear tela virou configuração (`MENU.TITULOS`), e o menu passou a
+obedecer. O cabeçalho da página, não: ele lia o `titulo` da tabela de rotas do
+`Aplicacao.html`, escrito à mão em 2024 e nunca mais olhado.
+
+```js
++ '<h2>' + Moldura.escapar(definicao.titulo) + '</h2>'   // <- da rota
+```
+
+**Defesa.** Um `tituloDaTela(chave)` que lê o menu que o servidor montou, e um
+teste que cobra as duas pontas: que o cabeçalho não volte a ler o título da
+rota, e que o servidor entregue no menu o nome gravado — inclusive voltando ao
+de fábrica quando o nome é apagado.
+
+**O que ele ensina.** É o item 34 outra vez, num lugar diferente: **quando uma
+informação passa a ser configurável, todo lugar que a exibia precisa ser
+revisitado**, não só o que motivou a mudança. O pedido era "quero renomear o
+Dashboard", e o Dashboard renomeou — no menu.
+
+---
+
+### 38 · A lista que eu esvaziava e voltava a encher
+
+**Sintoma.** O tombamento sugeria gravar na coluna "Data do 1º contato" —
+justamente um carimbo que só o sistema escreve.
+
+**Causa.** Eu montava a lista de destinos possíveis em duas voltas:
+
+```js
+esquema.colunas.forEach(...)      // pula as preenchidas pelo sistema
+estrutura.cabecalhos.forEach(...) // acrescenta "tudo que ainda não entrou"
+```
+
+A primeira volta excluía o carimbo. A segunda existia para pegar as colunas que
+o administrador criou em Configurações, e o critério dela era "ainda não está na
+lista" — o que descrevia exatamente o carimbo que eu tinha acabado de excluir.
+A segunda volta desfazia a primeira.
+
+**Defesa.** Uma função só respondendo "quais colunas o tombamento pode
+preencher" (`colunasQueOTombamentoPreenche_`), usada tanto para sugerir quanto
+para oferecer na tela. Duas perguntas idênticas, uma resposta.
+
+**O que ele ensina.** **Uma exclusão feita num passo e desfeita no seguinte não
+parece um erro em nenhum dos dois** — cada volta, lida sozinha, está certa. Só o
+resultado está errado, e só um teste que olha o resultado pega isso.
+
+---
+
+### 39 · Duas chamadas com a assinatura trocada, na mesma tarde
+
+**Sintoma.** `A aba "[object Object]" não existe nesta planilha.`
+
+**Causa.** `lerColunaInteira_(nomeDaAba, cabecalho)` — nome da aba e cabeçalho.
+Escrevi `lerColunaInteira_(estrutura, posicao)` nos dois lugares em que a usei,
+porque era assim que a função ao lado, `posicaoDaColuna_(estrutura, cabecalho)`,
+recebia. Duas funções vizinhas, duas convenções.
+
+**Defesa.** A mensagem de erro já era boa: ela imprime o que recebeu, e
+`"[object Object]"` aponta direto para o tipo errado. Foi o que resolveu os dois
+casos em segundos. Nada mudou no código além das chamadas.
+
+**O que ele ensina.** Menos sobre o bug e mais sobre a mensagem: **um erro que
+imprime o valor recebido se explica sozinho.** Se ele dissesse apenas "aba não
+encontrada", os dois casos teriam custado uma investigação cada.
+
+---
+
+### 40 · A lista de analistas vazia numa operação cheia de analistas
+
+**Sintoma.** A tela de Tombamento, aberta no navegador: *"Nenhum analista
+cadastrado e ativo neste canal, então os casos entram sem responsável."* Com
+três analistas cadastrados e ativos.
+
+**Causa.** Eu filtrava assim:
+
+```js
+return !dela || dela === normalizarParaComparar_(canal.nome);
+```
+
+`Canal que atende` é um campo de DIGITAR LIVRE em Configurações › Usuários, e a
+operação escreve nele o que faz sentido para ela — "Vida Individual", "Vida em
+Grupo". O nome do canal no PGO é "RET". As duas coisas nunca iam bater, e a
+função que parecia certa lendo o código devolvia lista vazia lendo o cadastro
+de verdade.
+
+Nenhum teste pegou porque **os meus testes cadastravam as pessoas com
+`canalQueAtende: ret.nome`** — eu escrevi o teste com a mesma suposição errada
+que escrevi o código.
+
+**Defesa.** A regra que importa é outra, e é sobre não perder o caso: o nome tem
+de estar cadastrado e ATIVO, senão o caso fica no nome de ninguém e some da fila
+de todo mundo. A que canal a pessoa atende virou SUGESTÃO — quem atende este
+canal aparece primeiro e marcado, quem não atende continua na lista, discreto.
+Isso também é mais fiel ao pedido do PO: enquanto a operação se forma, um
+analista da RET pode receber um lote da Mesa, e quem decide isso é a coordenação.
+
+Os testes novos cadastram alguém com `canalQueAtende: 'Vida em Grupo'` — um
+texto que não é nome de canal nenhum — que é o caso real.
+
+**O que ele ensina.** Duas coisas. **Campo de digitar livre não serve de chave
+para nada**: quem escreve nele não sabe que alguém vai comparar aquilo com uma
+constante. E, mais desconfortável: **um teste escrito pela mesma cabeça que
+escreveu o código herda as suposições dele.** O que quebrou a suposição foi
+abrir a tela e ler a frase.
+
+---
+
 ## O que esta lista ensina
 
 **São trinta e três achados, e a maioria era silenciosa.** Não davam erro, não
@@ -761,3 +958,33 @@ Daí as duas práticas que o projeto não abre mão:
     é a armadilha do verificador que se aprova sozinho, da Etapa 12, aparecendo
     dentro da própria suíte. O teste tem de olhar para o artefato que vai ser
     usado — não para uma cópia que ele mesmo gerou na linha anterior.
+16. **A mesma regra escrita em dois lugares é uma regra e um enfeite.** No item
+    34 a tela e o servidor preenchiam o mesmo padrão, e só o da tela estava
+    funcionando. Enquanto todo caminho passava pela tela ninguém notou. Um
+    caminho novo — o tombamento, que não tem tela — encontraria a diferença em
+    produção, numa carga de 300 casos recusada linha por linha.
+17. **"Foi escrito?" e "o que foi escrito?" são perguntas diferentes.** O item
+    35 passaria num teste que só conferisse a existência da coluna. O `|| ''`
+    apaga a diferença entre não ter valor e não existir o campo, e o único jeito
+    de ver isso é olhar o conteúdo.
+18. **A regra da casa vale para o teste também.** O item 36 é o pedido central
+    do projeto — coluna se acha pelo nome, nunca pela posição — desobedecido
+    dentro da suíte que existe para cobrá-lo. E cobrou caro: o erro apontava um
+    arquivo que não tinha culpa nenhuma.
+19. **Configuração nova pede varredura, não remendo.** O item 37 é o 34 num
+    lugar diferente: no dia em que o nome da tela virou dado, os DOIS lugares
+    que o exibiam passaram a ter de ler do mesmo lugar. Só um foi alterado, e a
+    tela ficou dizendo os dois nomes ao mesmo tempo.
+20. **Passo que desfaz o anterior não erra em nenhum dos dois.** No item 38 a
+    primeira volta excluía e a segunda trazia de volta. Lidas separadamente, as
+    duas estão certas. Só o resultado está errado — e só quem testa o resultado
+    descobre.
+21. **Erro que imprime o valor recebido se explica sozinho.** O item 39 foi
+    resolvido pelo próprio texto da mensagem, em segundos, duas vezes. "Aba não
+    encontrada" teria custado duas investigações; `A aba "[object Object]"` não
+    custou nenhuma.
+22. **O teste herda a suposição de quem escreveu o código.** No item 40 eu
+    comparei um campo livre com uma constante, e depois escrevi o teste
+    preenchendo esse campo com a constante. Os dois passaram. O que quebrou a
+    suposição foi abrir a tela e ler a frase que ela mostrava — é o item 5
+    desta lista outra vez, e é por isso que ele continua valendo.

@@ -22,15 +22,20 @@ abaixo com o motivo.
 | **Usuários** | Cadastrar, editar, trocar cargo e nível, canal que atende, tirar o acesso | Usuários |
 | **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga | Níveis de acesso |
 | **Listas** | Situações, canais, motivos, ramos, áreas, cargos, formas de pagamento, origens: criar, renomear o rótulo, recolorir, reordenar, desligar | Listas |
+| **Em qual coluna cada status carimba** | Um status pode gravar data e hora numa coluna da base quando o caso chega nele. É o controle de produtividade — e o administrador aponta status novos para colunas novas, sem programador | Listas → Situações |
 | **Canais de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Canais de trabalho |
-| **Cards do Dashboard** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por operação | Painéis → Cards |
-| **Gráficos do Painel Analítico** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
+| **Cartões do Trabalho** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por tela | Painéis → Cards do Trabalho |
+| **Cartões da Produtividade RECC** | A mesma coisa, numa **lista separada**: o Trabalho mostra o que ainda dá trabalho, a Produtividade mostra o que já foi entregue | Painéis → Cartões da Produtividade |
+| **O que um cartão conta** | O total, uma situação, os finalizados na célula, ou **"já passaram por"** — que lê a coluna de carimbo e por isso não zera quando o caso avança | Painéis |
+| **Gráficos da Produtividade RECC** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
 | **Meta por pessoa** | Quantos casos por mês se espera de alguém no canal. Zero desliga a barra de progresso | Canais de trabalho |
 | **Corretoras e canais** | Cadastrar, editar o segmento, tirar do cadastro — e cadastrar direto as SUSEPs que os casos citam | Tabela de Corretoras |
 | **Produtos** | Nome e código, que é único | Tabela de Corretoras |
 | **SUSEPs bloqueadas** | Bloquear com motivo, liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
 | **Importar em lote** | Colar a planilha de corretoras (SUSEP, corretora, canal, segmento) ou a de SUSEPs bloqueadas, conferir o que vai acontecer linha a linha, e só então gravar | Tabela de Corretoras → Importar · **pede senha** |
+| **Tombar uma base de casos** | Trazer cem ou trezentos casos de outra planilha — colando ou pelo link —, escolher para onde cada coluna vai, dividir entre os analistas em rodízio, pular o que já entrou e dar um nome ao lote | Tombamento · **ação `tombar`** |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
+| **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Dashboard virou "Trabalho" | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
 | **Busca** | Em quais colunas cado canal procura | Canais de trabalho |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
@@ -47,8 +52,7 @@ Funciona, e é editável — mas exige abrir a aba e digitar na célula, o que n
 
 | Assunto | Onde mora | Por que ainda não tem tela |
 |---|---|---|
-| **Nome das telas no menu** | `CONFIG` → `MENU.TITULOS` | Um JSON numa célula. Merece uma tela, e é o próximo a ganhar uma |
-| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; entra junto com os títulos do menu |
+| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; é o próximo a ganhar campo |
 | **Tema padrão da operação** | `CONFIG` → `OPERACAO.TEMA_PADRAO` | Idem |
 | **Visibilidade de campo por nível** | `CATALOGO` → `Configuracao.campos` | O servidor já respeita (oculto, leitura, edição). Falta a tela — hoje é um JSON |
 
@@ -79,7 +83,7 @@ propósito, cada um com o motivo escrito.
 **"No Painel Analítico tem tanto por área quanto por analista?"** — tem os
 dois, e por caminhos diferentes, o que é de propósito:
 
-- **Por área** é o seletor de canal no alto da tela. Não é um gráfico: RET Vida
+- **Por área** é o seletor de canal no alto da tela. Não é um gráfico: RET
   e Mesa Diamante têm colunas diferentes, situações diferentes e volumes que
   não se comparam. Um gráfico "casos por área" com duas barras dessas ao lado
   responderia à pergunta errada — a Canal sempre pareceria pequena, e nunca foi

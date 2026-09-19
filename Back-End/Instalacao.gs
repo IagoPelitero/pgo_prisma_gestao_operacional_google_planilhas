@@ -201,13 +201,16 @@ function semearDadosIniciais_(emailDoInstalador) {
   // caso — o nome dizia uma coisa e a permissão fazia outra.
   var niveis = inserirVariosRegistros_('CATALOGO', [
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
-      ['criar', 'editar', 'ocultar', 'exportar', 'configurar', 'estrutura'],
+      ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
       ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'painelAnalitico', 'configuracoes']),
+       'tabelaCorretoras', 'tombamento', 'painelAnalitico', 'configuracoes']),
+    // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
+    // distribui. A Operação não — um analista não traz trezentos casos para
+    // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
-      ['criar', 'editar', 'ocultar', 'exportar'],
+      ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
       ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'painelAnalitico']),
+       'tabelaCorretoras', 'tombamento', 'painelAnalitico']),
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
       ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
@@ -233,7 +236,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   // --- canais ----------------------------------------------------------------
   var canais = inserirVariosRegistros_('CANAIS', [
     {
-      Nome: 'RET Vida',
+      Nome: 'RET',
       Descricao: 'Relacionamento estratégico de clientes',
       Aba: 'BASE_RET',
       ColunaDaData: 'data de recepção do protocolo',
@@ -286,10 +289,24 @@ function semearDadosIniciais_(emailDoInstalador) {
   // Cada situação com a sua cor. A cor não é enfeite: numa fila de trinta
   // linhas, ela é o que faz "não trabalhado" saltar aos olhos sem ninguém
   // precisar ler. As cores válidas estão em RECC_TONS.
-  [['Aguardando transmissão', 'destaque'], ['Pendente', 'atencao'],
-   ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
-   ['Não trabalhado', 'ruim'], ['Concluído', 'bom']].forEach(function (par, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idRet, par[0], i + 1, par[1]));
+  // OS STATUS DA RET, cada um com a coluna onde carimba data e hora.
+  //
+  // É daqui que sai o controle de produtividade da RET: toda vez que um caso
+  // muda de status, o momento fica gravado na PRÓPRIA LINHA do caso, na
+  // coluna que o status declarou. É isso que permite ao painel responder
+  // "quantos contatou, e quando foi cada contato" sem cruzar duas abas.
+  //
+  // "Não trabalhado" é o estado de nascimento e não carimba nada: carimbar a
+  // hora em que o caso entrou seria repetir a data de recepção.
+  [['Não trabalhado', 'ruim', ''],
+   ['Aguardando transmissão', 'destaque', 'Data aguardando transmissão'],
+   ['Pendente', 'atencao', 'Data pendente'],
+   ['1º contato realizado', 'violeta', 'Data do 1º contato'],
+   ['2º contato realizado', 'violeta', 'Data do 2º contato'],
+   ['Não reteve', 'ruim', 'Data não reteve'],
+   ['Reteve', 'bom', 'Data reteve'],
+   ['Concluído', 'bom', 'Data concluído']].forEach(function (trio, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idRet, trio[0], i + 1, trio[1], trio[2]));
   });
   // A Mesa Diamante tem três status, e só três. O formulário nasce com
   // "Em andamento" já escolhido — é o estado em que todo caso começa, e
@@ -297,9 +314,10 @@ function semearDadosIniciais_(emailDoInstalador) {
   //
   // "Concluído na célula" é diferente de "Concluído": a célula resolveu sem
   // devolver para a área. A operação mede os dois separados.
-  [['Em andamento', 'atencao'], ['Concluído', 'bom'],
-   ['Concluído na célula', 'destaque']].forEach(function (par, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idCanal, par[0], i + 1, par[1]));
+  [['Em andamento', 'atencao', ''],
+   ['Concluído', 'bom', 'Data da finalização'],
+   ['Concluído na célula', 'destaque', 'Data da finalização']].forEach(function (trio, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idCanal, trio[0], i + 1, trio[1], trio[2]));
   });
   ['Diamante', 'Demais corretoras', 'Não encontrado'].forEach(function (nome, i) {
     itens.push(novoItemDeCatalogo_('SEGMENTO', '', nome, i + 1));
@@ -332,6 +350,9 @@ function semearDadosIniciais_(emailDoInstalador) {
       'Contato efetivado', 'Sem contato'],
     // O produto vem no formato "código - nome", num seletor só. O sistema
     // separa os dois ao gravar, para o painel agrupar por código.
+    // A RET trata Vida Individual e, agora, Vida em Grupo. A lista é ponto de
+    // partida: a operação acrescenta produto em Configurações › Listas, sem
+    // programador — é o que mantém o sistema aberto enquanto ela se forma.
     PRODUTO: ['1101 - VIDA INDIVIDUAL', '1102 - VIDA EM GRUPO',
       '1103 - PRESTAMISTA', '1104 - ACIDENTES PESSOAIS'],
     ORIGEM: ['Base de inadimplência', 'Central: Pessoa', 'URA', 'Site', 'Chat',
@@ -358,7 +379,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   // montar as dela. Nascem LIGADAS mas NÃO GERADAS: criar aba na instalação
   // custaria o dobro do tempo, e ninguém pediu a aba ainda.
   contagem.analises = inserirVariosRegistros_('ANALISES', [
-    { Nome: 'RetVida', Descricao: 'Tudo da RET Vida dos últimos 90 dias',
+    { Nome: 'RET', Descricao: 'Tudo da RET dos últimos 90 dias',
       CanalId: idRet, Colunas: '', Filtros: '', Dias: 90, Ordem: 1, Ativo: true },
     { Nome: 'Diamante',
       Descricao: 'Casos da Mesa Diamante dos últimos 90 dias',
@@ -407,15 +428,16 @@ function semearDadosIniciais_(emailDoInstalador) {
       + 'telas avisam quando isso acontece.'),
     novaConfiguracao_('OPERACAO.TEMA_PADRAO', 'padrao',
       'padrao | rosa | dark | brasil'),
-    novaConfiguracao_('MENU.TITULOS', JSON.stringify({
-      dashboard: 'Dashboard',
-      cadastrarCaso: 'Cadastrar Caso',
-      minhaPerformance: 'Minha Performance',
-      buscarCaso: 'Buscar Caso',
-      tabelaCorretoras: 'Tabela de Corretoras',
-      painelAnalitico: 'Painel Analítico',
-      configuracoes: 'Configurações'
-    }), 'Nome de cada tela no menu lateral. Editável.')
+    // Semeado A PARTIR de RECC_TELAS_DO_SISTEMA, e não digitado de novo aqui.
+    // Escrever a lista duas vezes é ter dois mapas do mesmo mar: um dia eles
+    // divergem, e a tela nova nasce com o nome errado no menu — ou sem nome.
+    novaConfiguracao_('MENU.TITULOS', JSON.stringify(
+      RECC_TELAS_DO_SISTEMA.reduce(function (mapa, item) {
+        mapa[item.tela] = item.titulo;
+        return mapa;
+      }, {})
+    ), 'Nome de cada tela no menu lateral. Editável em '
+      + 'Configurações › Identidade.')
   ]);
   contagem.config = config.length;
 
@@ -459,7 +481,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
 /**
  * Os cartões que o Dashboard mostra quando o sistema nasce.
  *
- * A RET Vida mostra todas as situações; a Mesa Diamante mostra duas. Não é
+ * A RET mostra todas as situações; a Mesa Diamante mostra duas. Não é
  * capricho: a Canal tem muito menos volume, e sete cartões de números pequenos
  * viram uma parede que ninguém lê. Tudo isso é editável em Configurações —
  * este é o ponto de partida, não a regra.
@@ -467,9 +489,9 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
 function cartoesIniciaisDoPainel_(idRet, idCanal) {
   var cartoes = [];
 
-  function novoCartao(canalId, titulo, dimensao, filtro, cor, ordem) {
+  function novoCartao(canalId, titulo, dimensao, filtro, cor, ordem, tela) {
     return {
-      Tela: 'dashboard',
+      Tela: tela || 'dashboard',
       CanalId: canalId,
       Titulo: titulo,
       TipoWidget: 'cartao',
@@ -508,6 +530,41 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   // para quem atende marcar; o cartão, para a operação medir.
   cartoes.push(novoCartao(idCanal, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
 
+  // ---- os cartões da Produtividade RECC -----------------------------------
+  //
+  // São OUTRA pergunta, e por isso outros cartões. O Trabalho responde "o que
+  // eu tenho que fazer hoje" e por isso só mostra o que ainda dá trabalho. A
+  // Produtividade responde "o que a gente entregou", e aí o que interessa é
+  // justamente o que já fechou: quantos reteve, quantos não reteve, quantos
+  // foram contatados.
+  //
+  // Contatados sai do CARIMBO, e não do status. Um caso que já passou do "1º
+  // contato realizado" e hoje está em "Reteve" continua tendo sido contatado —
+  // mas não conta mais em status nenhum. A coluna de carimbo não esquece.
+
+  function cartaoDaProdutividade(canalId, titulo, dimensao, filtro, cor, ordem) {
+    return novoCartao(canalId, titulo, dimensao, filtro, cor, ordem,
+      'painelAnalitico');
+  }
+
+  cartoes.push(cartaoDaProdutividade(idRet, 'Casos cadastrados', 'total', '', 'destaque', 1));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Reteve', 'situacao', 'Reteve', 'bom', 2));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Não reteve', 'situacao', 'Não reteve', 'ruim', 3));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Já contatados', 'preenchido',
+    'Data do 1º contato', 'violeta', 4));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Com 2º contato', 'preenchido',
+    'Data do 2º contato', 'violeta', 5));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Pendentes', 'situacao', 'Pendente', 'atencao', 6));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Não trabalhados', 'situacao',
+    'Não trabalhado', 'ruim', 7));
+
+  cartoes.push(cartaoDaProdutividade(idCanal, 'Casos cadastrados', 'total', '', 'destaque', 1));
+  cartoes.push(cartaoDaProdutividade(idCanal, 'Concluídos', 'situacao', 'Concluído', 'bom', 2));
+  cartoes.push(cartaoDaProdutividade(idCanal, 'Concluídos na célula', 'situacao',
+    'Concluído na célula', 'bom', 3));
+  cartoes.push(cartaoDaProdutividade(idCanal, 'Em andamento', 'situacao',
+    'Em andamento', 'atencao', 4));
+
   // ---- os gráficos do Painel Analítico ------------------------------------
   // Cada um responde a UMA pergunta. Gráfico que não responde pergunta
   // nenhuma é enfeite, e enfeite numa tela de trabalho é ruído.
@@ -544,6 +601,16 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
+  // OS DOIS DO TOMBAMENTO, que a operação pediu: "no dia 05 incluímos 100
+  // casos da base de inadimplentes Vida Presente". São duas perguntas, e por
+  // isso dois gráficos — QUANDO entraram, e DE QUAL base.
+  //
+  // Largura 2 no de datas: uma barra por dia ao longo de um mês não cabe em
+  // meia tela sem as datas virarem uma escadinha ilegível.
+  cartoes.push(novoGrafico(idRet, 'Casos tombados por dia',
+    'barrasComLinha', 'Data do tombamento', 'contagem', '', 0, 2, 7));
+  cartoes.push(novoGrafico(idRet, 'De qual base os casos vieram',
+    'barrasDeitadas', 'Origem do tombamento', 'contagem', '', 6, 1, 8));
 
   cartoes.push(novoGrafico(idCanal, 'Entradas por dia, e a tendência',
     'barrasComLinha', 'Data de entrada', 'contagem', '', 0, 2, 1));
@@ -555,11 +622,17 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'Canal', 'contagem', '', 6, 1, 4));
   cartoes.push(novoGrafico(idCanal, 'Casos por analista',
     'barrasDeitadas', 'Analista', 'contagem', '', 6, 1, 5));
+  // A Mesa também tomba: casos planilhados de corretoras, para ação
+  // diferenciada. Mesmos dois gráficos, mesma pergunta.
+  cartoes.push(novoGrafico(idCanal, 'Casos tombados por dia',
+    'barrasComLinha', 'Data do tombamento', 'contagem', '', 0, 2, 6));
+  cartoes.push(novoGrafico(idCanal, 'De qual base os casos vieram',
+    'barrasDeitadas', 'Origem do tombamento', 'contagem', '', 6, 1, 7));
 
   return cartoes;
 }
 
-function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor) {
+function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor, colunaDeCarimbo) {
   return {
     CanalId: canalId,
     Tipo: tipo,
@@ -568,6 +641,9 @@ function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor) {
     Rotulo: nome,
     PaiId: '',
     Cor: cor || '',
+    // Em qual coluna da base gravar data e hora quando o caso CHEGAR a este
+    // status. Só status usa; o resto do catálogo ignora.
+    ColunaDeCarimbo: colunaDeCarimbo || '',
     Ordem: ordem,
     Ativo: true,
     Configuracao: ''
@@ -676,8 +752,11 @@ const RECC_PADRAO_DO_FORMULARIO = {
   // --- Situação
   motivodocancelamento: { secao: 'Situação', ordem: 50,
     rotulo: 'Motivo do cancelamento', tipoCampo: 'seletor', catalogo: 'MOTIVO' },
+  // Nasce NÃO TRABALHADO, por decisão da operação: quem cadastra registra o
+  // caso; quem trabalha ajusta o status depois. Deixar em branco obrigaria a
+  // escolher na hora do cadastro, que é justamente quando ainda não se sabe.
   status: { secao: 'Situação', ordem: 51, rotulo: 'Status', tipoCampo: 'seletor',
-    catalogo: 'STATUS', obrigatorio: true },
+    catalogo: 'STATUS', obrigatorio: true, valorPadrao: 'Não trabalhado' },
   tentativasdecontato: { secao: 'Situação', ordem: 52,
     rotulo: 'Tentativas de contato', tipoCampo: 'seletor', catalogo: 'TENTATIVA' },
   datadatransmissao: { secao: 'Situação', ordem: 53,
@@ -764,6 +843,13 @@ const RECC_PADRAO_POR_ABA = {
  * As colunas de controle (_Visivel e companhia) ficam de fora: elas são do
  * sistema, não do formulário. A coluna Id entra desativada — precisa estar no
  * mapa, mas ninguém digita um Id.
+ *
+ * Também entram desativadas as colunas marcadas `preenchidoPeloSistema` no
+ * Esquema: os carimbos de status e as duas do tombamento. Elas PRECISAM estar
+ * em CAMPOS — é lá que mora o tipo da coluna, e sem isso a data do carimbo
+ * voltaria a ser lida como texto — mas não são campo de tela. Quem quiser
+ * ligar uma delas no formulário liga em Configurações; ninguém precisa mexer
+ * em código para isso.
  */
 function camposDoFormularioDaBase_(nomeDaAba, canalId) {
   var esquema = esquemaDaAba_(nomeDaAba);
@@ -776,6 +862,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
 
     var chave = normalizarParaComparar_(coluna.cabecalho);
     var ehId = (chave === 'id');
+    var quemPreencheEhOSistema = (coluna.preenchidoPeloSistema === true);
 
     // O que vale para ESTA aba vence o que vale para todas: `status` e
     // `canal` existem nos dois canais, em seções diferentes.
@@ -800,11 +887,11 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
       Rotulo: padrao.rotulo || coluna.cabecalho,
       Descricao: '',
       TipoCampo: padrao.tipoCampo || RECC_DO_DADO_PARA_O_CAMPO[coluna.tipo] || 'texto',
-      Secao: padrao.secao || 'Outros',
+      Secao: padrao.secao || (quemPreencheEhOSistema ? 'Preenchido pelo sistema' : 'Outros'),
       Mascara: padrao.mascara || '',
       Obrigatorio: padrao.obrigatorio === true,
       Protegido: coluna.protegido === true,
-      Ativo: !ehId && padrao.ativo !== false,
+      Ativo: !ehId && !quemPreencheEhOSistema && padrao.ativo !== false,
       // A ordem vem da LISTA da operação, não da posição da coluna na
       // planilha. Coluna sem lugar declarado cai no fim, junto das outras.
       Ordem: padrao.ordem || (semLugarNaLista++),
