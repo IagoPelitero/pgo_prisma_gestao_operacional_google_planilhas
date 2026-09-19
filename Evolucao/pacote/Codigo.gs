@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-19 12:06
+   Gerado em 2026-09-19 23:53
    ========================================================================== */
 
 
@@ -358,6 +358,45 @@ const RECC_ESQUEMA = {
     ]
   },
 
+  /*
+   * AS DUAS LISTAS DE ANALISTA que a operação mantém fora do PGO.
+   *
+   * Não são usuários do sistema: são as pessoas da Central e da Cobrança Ativa
+   * que APARECEM nos casos — quem transferiu, quem já tinha falado com o
+   * cliente. Elas não entram no PGO, e por isso não estão em USUARIOS.
+   *
+   * Nascem aqui com o contrato mínimo para o PGO saber ler. Quando vierem da
+   * planilha de cadastros, é lá que elas são mantidas; enquanto não vierem,
+   * ficam nestas abas, vazias, sem atrapalhar ninguém.
+   */
+  ANALISTAS_CENTRAL: {
+    aba: 'ANALISTAS_CENTRAL',
+    titulo: 'Analistas da Central',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Equipe', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
+  ANALISTAS_COBRANCA: {
+    aba: 'ANALISTAS_COBRANCA',
+    titulo: 'Analistas da cobrança ativa',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Equipe', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
   SUSEP_BLOQUEADAS: {
     aba: 'SUSEP_BLOQUEADAS',
     titulo: 'SUSEPs bloqueadas',
@@ -486,7 +525,7 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Tela', tipo: 'texto', protegido: true },
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
-      // 'cartao' no Dashboard; pizza, linha e barras no Painel Analítico.
+      // 'cartao' no Trabalho; pizza, linha e barras na Produtividade RECC.
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
       // Para um cartão, é a regra de contagem: 'total', 'situacao' ou
       // 'naCelula'. Para um gráfico, é o campo que vira eixo.
@@ -508,7 +547,7 @@ const RECC_ESQUEMA = {
   /*
     As análises que o administrador montou.
     Uma ABA, e não um JSON dentro de CONFIG, pela mesma razão que os cartões do
-    Dashboard saíram de CANAIS: é uma LISTA de coisas configuráveis, cada uma
+    Trabalho saíram de CANAIS: é uma LISTA de coisas configuráveis, cada uma
     com nome, canal, colunas e filtro próprios. Guardada como texto numa célula,
     dava para escolher "quais" e para mais nada.
 
@@ -894,7 +933,7 @@ var estruturasJaLidas = {};
  * ----------------------------------------------------------------------------
  * O MEMO DAS ABAS DE SISTEMA
  * ----------------------------------------------------------------------------
- * Abrir o Dashboard custava 48 idas ao Planilhas, e a maioria era a MESMA aba
+ * Abrir o Trabalho custava 48 idas ao Planilhas, e a maioria era a MESMA aba
  * lida de novo: num pacoteDePartida só, CONFIG era lido 10 vezes; num
  * resumoDoCanal, CATALOGO era lido 7. Ninguém escreveu isso de propósito — são
  * funções pequenas e corretas, cada uma lendo o que precisa, e o custo só
@@ -960,6 +999,14 @@ function esquecerEstruturaLida_(nomeDaAba) {
     estruturasJaLidas = {};
     esquecerRegistrosLidos_();
     tiposDeclaradosJaLidos = null;
+    // A planilha de cadastros aberta também é esquecida. Ela guarda a planilha
+    // que o Id APONTAVA — e quem chama isto sem nome de aba está dizendo "o
+    // que eu sabia não vale mais", que é exatamente o caso de quem acabou de
+    // trocar esse Id. Sem esta linha, ligar a segunda base só passaria a valer
+    // na execução seguinte, e a tela mostraria o cadastro antigo depois de
+    // dizer "salvo".
+    planilhaDeCadastrosAberta = null;
+    jaTenteiAbrirOsCadastros = false;
   }
 }
 
@@ -1061,11 +1108,7 @@ function planilhaAtiva_() {
 function estruturaDaAba_(nomeDaAba, recarregar) {
   if (!recarregar && estruturasJaLidas[nomeDaAba]) return estruturasJaLidas[nomeDaAba];
 
-  var aba = planilhaAtiva_().getSheetByName(nomeDaAba);
-  if (!aba) {
-    throw new Error('A aba "' + nomeDaAba + '" não existe nesta planilha. ' +
-      'Rode instalarRECC() numa planilha vazia, ou confira o nome da aba.');
-  }
+  var aba = abaOndeQuerQueElaMore_(nomeDaAba);
 
   var largura = aba.getLastColumn();
   if (largura < 1) {
@@ -1281,6 +1324,146 @@ function formatosDaLinha_(estrutura) {
 // ============================================================================
 // LEITURA
 // ============================================================================
+
+// ============================================================================
+// AS DUAS BASES — a operacional e a de cadastros
+// ============================================================================
+
+/**
+ * As abas que PODEM morar em outra planilha.
+ *
+ * São os CADASTROS: listas grandes, que mudam pouco, e que a operação mantém
+ * fora do PGO porque outras áreas também as usam. As 7 mil SUSEPs e as 145
+ * corretoras sozinhas já ocupam um pedaço considerável do teto de 10 milhões
+ * de células — tirá-las daqui deixa a planilha operacional com espaço para o
+ * que ela existe para guardar, que é caso.
+ *
+ * O que NÃO entra nesta lista, e não deve entrar: as bases de caso, a
+ * auditoria, os usuários e a configuração. Essas são do PGO, e um sistema que
+ * depende de outra planilha para saber quem pode entrar é um sistema que para
+ * de funcionar quando alguém mexe num compartilhamento.
+ */
+const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
+  'CORRETORAS',
+  'SUSEP_BLOQUEADAS',
+  'PRODUTOS',
+  'ANALISTAS_CENTRAL',
+  'ANALISTAS_COBRANCA'
+];
+
+/** Onde a planilha de cadastros está configurada. */
+const RECC_CHAVE_DA_PLANILHA_DE_CADASTROS = 'CADASTROS.PLANILHA_ID';
+
+/*
+ * A planilha de cadastros aberta, guardada pela execução inteira.
+ *
+ * `SpreadsheetApp.openById` é uma IDA ao serviço, das caras. Sem isto, uma
+ * tela que lê corretoras, produtos e SUSEPs pagaria três aberturas da MESMA
+ * planilha na mesma execução. Como cada `google.script.run` é uma execução
+ * nova, a variável nasce vazia a cada chamada — não há risco de servir uma
+ * planilha velha.
+ */
+var planilhaDeCadastrosAberta = null;
+var jaTenteiAbrirOsCadastros = false;
+
+/** O Id configurado, ou vazio quando os cadastros moram aqui mesmo. */
+function idDaPlanilhaDeCadastros_() {
+  return String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '') || '').trim();
+}
+
+/** Esta aba vem de fora? */
+function abaVemDeOutraPlanilha_(nomeDaAba) {
+  if (RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nomeDaAba) < 0) return false;
+  return !!idDaPlanilhaDeCadastros_();
+}
+
+/**
+ * A aba, venha ela desta planilha ou da de cadastros.
+ *
+ * É o ponto ÚNICO em que o sistema decide de qual planilha ler. Todo o resto —
+ * `lerRegistros_`, a busca, o selo da SUSEP, as listas do formulário — passa
+ * por aqui sem saber que existem duas bases, e é por isso que ligar a segunda
+ * não exigiu mexer em trinta lugares.
+ */
+function abaOndeQuerQueElaMore_(nomeDaAba) {
+  if (abaVemDeOutraPlanilha_(nomeDaAba)) {
+    var deFora = planilhaDeCadastros_().getSheetByName(nomeDaAba);
+    if (!deFora) {
+      throw new Error('A planilha de cadastros abriu, mas não tem uma aba '
+        + 'chamada "' + nomeDaAba + '". Crie a aba lá, ou desligue a planilha '
+        + 'de cadastros em Configurações › Estrutura para o PGO voltar a usar '
+        + 'a aba daqui.');
+    }
+    return deFora;
+  }
+
+  var aqui = planilhaAtiva_().getSheetByName(nomeDaAba);
+  if (!aqui) {
+    throw new Error('A aba "' + nomeDaAba + '" não existe nesta planilha. ' +
+      'Rode instalarRECC() numa planilha vazia, ou confira o nome da aba.');
+  }
+  return aqui;
+}
+
+/**
+ * A planilha de cadastros, aberta uma vez por execução.
+ *
+ * Quando ela não abre, o erro DERRUBA com o motivo — e não devolve lista
+ * vazia. Lista vazia aqui seria "nenhuma SUSEP está bloqueada" e "nenhuma
+ * corretora existe": duas afirmações falsas que a operação acreditaria, e que
+ * fariam um caso bloqueado passar como liberado. Parar e explicar é pior para
+ * o dia e melhor para o dado.
+ */
+function planilhaDeCadastros_() {
+  if (planilhaDeCadastrosAberta) return planilhaDeCadastrosAberta;
+
+  var id = idDaPlanilhaDeCadastros_();
+  if (!id) throw new Error('Nenhuma planilha de cadastros está configurada.');
+
+  // Uma tentativa por execução. Sem isto, uma tela que lê três cadastros
+  // tentaria abrir três vezes a planilha que não abre, e o tempo de espera
+  // triplicaria antes de a pessoa ver o recado.
+  if (jaTenteiAbrirOsCadastros) {
+    throw new Error('A planilha de cadastros não abriu nesta execução.');
+  }
+  jaTenteiAbrirOsCadastros = true;
+
+  try {
+    planilhaDeCadastrosAberta = SpreadsheetApp.openById(id);
+  } catch (erro) {
+    throw new Error('Não consegui abrir a planilha de cadastros (' + id + '): '
+      + (erro.message || erro) + ' As corretoras, as SUSEPs bloqueadas e as '
+      + 'listas de analistas moram nela. Confira se o Id está certo e se a '
+      + 'conta que abre o PGO tem acesso a ela — é quase sempre isso. '
+      + 'Em Configurações › Estrutura dá para conferir a ligação ou desligá-la.');
+  }
+  return planilhaDeCadastrosAberta;
+}
+
+/**
+ * Recusa ESCRITA numa aba que vem de fora.
+ *
+ * A planilha de cadastros é a FONTE DE VERDADE: ela é mantida fora do PGO
+ * porque outras áreas também a usam. O PGO lê e não escreve — não por medo de
+ * dar erro, mas porque duas mãos escrevendo na mesma lista, uma delas sem
+ * saber da outra, é como um cadastro começa a divergir.
+ *
+ * Há um motivo técnico junto, e ele sozinho já bastaria: a sequência de Id
+ * mora no PropertiesService DESTE projeto, e as linhas morariam na outra
+ * planilha. Duas instalações apontando para o mesmo cadastro gerariam o mesmo
+ * Id para registros diferentes.
+ *
+ * O recado diz ONDE editar. Um "não permitido" seco mandaria a pessoa procurar
+ * uma permissão que não é o problema.
+ */
+function recusarEscritaEmAbaDeFora_(nomeDaAba) {
+  if (!abaVemDeOutraPlanilha_(nomeDaAba)) return;
+
+  throw new Error('A aba "' + nomeDaAba + '" vem da planilha de cadastros, e o '
+    + 'PGO só lê dela. Para mudar este cadastro, edite a planilha de cadastros '
+    + 'direto — a alteração aparece aqui na hora seguinte, sem sincronizar '
+    + 'nada. Quem aponta qual planilha é Configurações › Estrutura.');
+}
 
 /**
  * Abre uma planilha DE FORA, pelo Id.
@@ -1628,11 +1811,13 @@ function formatarEGravar_(estrutura, primeiraLinha, linhas) {
  * visível e registra que ela nasceu no sistema.
  */
 function inserirRegistro_(nomeDaAba, dados, contexto) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   return inserirVariosRegistros_(nomeDaAba, [dados], contexto)[0];
 }
 
 /** Insere vários registros numa gravação só. */
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
   contexto = contexto || {};
 
@@ -1707,6 +1892,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
  * assim uma coluna nunca fica com o formato de outro tipo.
  */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1733,6 +1919,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
  * Nenhuma linha de base operacional é apagada — nunca.
  */
 function ocultarRegistro_(nomeDaAba, id, usuarioId) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba), '_Visivel') < 0) {
     throw new Error('A aba "' + nomeDaAba + '" não tem exclusão lógica — ela ' +
       'não possui a coluna _Visivel. Em abas de catálogo, o que desliga um ' +
@@ -1767,6 +1954,7 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
  * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
  */
 function apagarRegistroDeVez_(nomeDaAba, id) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1821,6 +2009,7 @@ function garantirLinhasNaGrade_(aba, ateLinha) {
  * salvamento comum. Recusa cabeçalho que já exista, mesmo escrito diferente.
  */
 function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   var texto = String(cabecalho || '').trim();
   if (!texto) throw new Error('Cabeçalho vazio.');
   if (!RECC_FORMATO_DA_CELULA[tipo]) throw new Error('Tipo de coluna desconhecido: ' + tipo);
@@ -3164,8 +3353,50 @@ function opcoesDeUmCadastro_(qualCadastro) {
     });
   }
 
+  // As duas listas de analista que a operação mantém fora do PGO: quem
+  // transferiu o caso, quem já tinha falado com o cliente. Não são usuários do
+  // sistema — não entram no PGO —, e por isso vêm de cadastro próprio.
+  if (cadastro === 'analistascentral') {
+    return nomesAtivosDoCadastro_('ANALISTAS_CENTRAL');
+  }
+  if (cadastro === 'analistascobranca') {
+    return nomesAtivosDoCadastro_('ANALISTAS_COBRANCA');
+  }
+
   throw new Error('Cadastro desconhecido em listaDe: "' + qualCadastro + '". ' +
-    'Os cadastros são usuarios, produtos e canais.');
+    'Os cadastros são usuarios, produtos, canais, analistasCentral e ' +
+    'analistasCobranca.');
+}
+
+/**
+ * Os nomes ativos de um cadastro de pessoas, em ordem.
+ *
+ * Aba que ainda não existe devolve LISTA VAZIA em vez de estourar. Estas duas
+ * nasceram depois do resto, e uma instalação mais antiga não as tem: derrubar
+ * o formulário inteiro por causa de um seletor que ninguém configurou ainda
+ * seria trocar um campo vazio por uma tela que não abre.
+ */
+function nomesAtivosDoCadastro_(nomeDaAba) {
+  var registros;
+  try {
+    registros = lerRegistros_(nomeDaAba);
+  } catch (erro) {
+    return [];
+  }
+
+  return registros
+    .filter(function (linha) {
+      // Sem coluna Ativo preenchida, a pessoa CONTA. Um cadastro que a
+      // operação acabou de colar não tem essa coluna marcada, e esconder todo
+      // mundo faria a lista parecer quebrada.
+      var ativo = String(linha.Ativo === null || linha.Ativo === undefined
+        ? '' : linha.Ativo).trim();
+      return !ativo || normalizarParaComparar_(ativo) === 'sim';
+    })
+    .map(function (linha) { return String(linha.Nome || '').trim(); })
+    .filter(function (nome) { return nome !== ''; })
+    .sort()
+    .map(function (nome) { return { valor: nome, rotulo: nome }; });
 }
 
 function canalPeloId_(idDoCanal) {
@@ -3868,7 +4099,7 @@ function consultarSusep(susep) {
  * ============================================================================
  * PGO — Busca.gs · achar um caso que a fila não mostra mais
  * ============================================================================
- * O Dashboard mostra os últimos 30 dias. Isso é de propósito: ele responde
+ * O Trabalho mostra os últimos 30 dias. Isso é de propósito: ele responde
  * "o que eu tenho que trabalhar hoje". Quando o cliente liga citando um
  * protocolo de abril, é aqui que se procura.
  *
@@ -5003,7 +5234,7 @@ function resumoDasConfiguracoes() {
         descricao: 'Nome, logo, cor e a senha de administrador',
         quantidade: 0 },
       { chave: 'paineis', titulo: 'Painéis',
-        descricao: 'Os cards do Dashboard e dos painéis',
+        descricao: 'Os cards do Trabalho e dos painéis',
         quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
           return normalizarParaComparar_(linha.Ativo) === 'sim';
         }).length },
@@ -5628,7 +5859,7 @@ function salvarCanal(dados) {
     });
   });
 
-  // Desligar a último canal ativa deixaria o Dashboard sem nada para mostrar,
+  // Desligar a último canal ativa deixaria o Trabalho sem nada para mostrar,
   // e o cadastro sem formulário — o sistema inteiro pareceria quebrado.
   if (dados.ativo === false) {
     var outrasAtivas = lerRegistros_('CANAIS').filter(function (canal) {
@@ -5637,7 +5868,7 @@ function salvarCanal(dados) {
     });
     if (!outrasAtivas.length) {
       throw new Error('Esta é a último canal ativa. Desligá-la deixaria o ' +
-        'Dashboard e o cadastro sem nenhuma base para trabalhar.');
+        'Trabalho e o cadastro sem nenhuma base para trabalhar.');
     }
   }
 
@@ -5665,7 +5896,7 @@ function salvarCanal(dados) {
 /**
  * Recusa o nome de uma coluna que não existe na base do canal.
  *
- * Sem esta conferência o erro só apareceria no Dashboard, dias depois, como
+ * Sem esta conferência o erro só apareceria no Trabalho, dias depois, como
  * uma coluna em branco — e ninguém ligaria a coisa à letra trocada aqui.
  */
 function conferirQueAColunaExiste_(estrutura, nomeDaColuna, nomeDaAba) {
@@ -5695,7 +5926,7 @@ const RECC_MAXIMO_DE_CARTOES = 12;
 function listarCardsDoPainel(tela, idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
-  var alvo = normalizarParaComparar_(tela) || 'dashboard';
+  var alvo = normalizarParaComparar_(tela) || 'trabalho';
 
   var oQueContar = [
     { chave: 'total', rotulo: 'Total de casos', filtro: '' }
@@ -5776,7 +6007,7 @@ function listarCardsDoPainel(tela, idDoCanal) {
 function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
-  var alvo = normalizarParaComparar_(tela) || 'dashboard';
+  var alvo = normalizarParaComparar_(tela) || 'trabalho';
   var lista = Array.isArray(cartoes) ? cartoes : [];
 
   if (lista.length > RECC_MAXIMO_DE_CARTOES) {
@@ -5907,7 +6138,7 @@ function salvarIdentidade(dados) {
   //
   // Eles moravam em MENU.TITULOS desde o começo e nunca tiveram onde ser
   // editados — configuração sem tela é configuração que ninguém usa. Foi o
-  // que apareceu quando a operação quis chamar o Dashboard de "Trabalho".
+  // que apareceu quando a operação quis chamar o Trabalho de "Trabalho".
   //
   // O que identifica a tela é a CHAVE, nunca o texto: renomear aqui não mexe
   // em rota, em nível de acesso nem em endereço guardado.
@@ -6243,7 +6474,7 @@ function opcoesDeAnalise() {
 /**
  * Os campos do canal que dão para usar como filtro: os que já são lista.
  *
- * Não é `filtrosDoCanal_`, do Dashboard, por um motivo só: lá o teto é QUATRO,
+ * Não é `filtrosDoCanal_`, do Trabalho, por um motivo só: lá o teto é QUATRO,
  * porque cinco caixas de seleção em cima da fila viram uma parede. Aqui não há
  * parede — escolhe-se um filtro por vez, num formulário —, e cortar em quatro
  * deixaria de fora justamente o campo pelo qual alguém quer recortar.
@@ -6565,6 +6796,161 @@ function atualizarAnalisesAgendadas() {
     + (falharam.length ? ', ' + falharam.length + ' com erro' : ''));
 
   return { geradas: feitas, falharam: falharam };
+}
+
+// ============================================================================
+// A PLANILHA DE CADASTROS — a segunda base
+// ============================================================================
+
+/**
+ * Onde os cadastros moram hoje, e o que cabe neles.
+ *
+ * Duas bases: a OPERACIONAL, que guarda caso, e a de CADASTROS, que guarda
+ * corretora, SUSEP bloqueada, produto e as duas listas de analista. A segunda
+ * é opcional — sem ela configurada, tudo continua morando aqui, como sempre
+ * morou.
+ */
+function configuracaoDosCadastros() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '')).trim();
+
+  return {
+    planilhaId: id,
+    ligada: !!id,
+    abas: RECC_ABAS_QUE_PODEM_VIR_DE_FORA.map(function (nome) {
+      var esquema = RECC_ESQUEMA[nome];
+      return {
+        aba: nome,
+        titulo: esquema ? esquema.titulo : nome,
+        // As colunas que o PGO procura naquela aba. A planilha de cadastros
+        // pode ter outras no meio — elas são lidas e ignoradas —, mas estas
+        // precisam estar lá com estes nomes.
+        colunas: esquema
+          ? esquema.colunas.filter(function (coluna) {
+            return coluna.cabecalho.charAt(0) !== '_';
+          }).map(function (coluna) { return coluna.cabecalho; })
+          : []
+      };
+    })
+  };
+}
+
+/**
+ * Aponta a planilha de cadastros — ou desliga, com o Id em branco.
+ *
+ * CONFERE ANTES DE GRAVAR, e a falha DERRUBA. Guardar um Id que não abre
+ * deixaria a Tabela de Corretoras e o selo da SUSEP com recado de erro para
+ * sempre, e ninguém saberia se o Id estava errado, se a planilha sumiu ou se
+ * faltou compartilhar — que são três conversas diferentes.
+ *
+ * A conferência olha ABA POR ABA e cobra as colunas que o PGO procura. Um Id
+ * certo apontando para uma planilha sem as colunas certas abre sem reclamar e
+ * devolve lista vazia depois, que é o pior dos dois mundos.
+ */
+function salvarConfiguracaoDosCadastros(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  // Apontar a segunda base muda de onde o sistema INTEIRO lê os cadastros.
+  // É mudança de estrutura, e passa pela mesma porta que as outras.
+  exigirSenhaDeAdministrador_();
+
+  var id = String((dados || {}).planilhaId || '').trim();
+
+  if (id) {
+    var laudo = conferirPlanilhaDeCadastros(id);
+    if (!laudo.abre) throw new Error(laudo.recado);
+    if (laudo.faltando.length) {
+      throw new Error('A planilha abriu, mas não está pronta:\n\n'
+        + laudo.faltando.join('\n')
+        + '\n\nAcerte a planilha de cadastros e tente de novo. Enquanto isso, '
+        + 'os cadastros continuam onde estão.');
+    }
+  }
+
+  gravarConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, id);
+  registrarAuditoria_('cadastros.configurar', 'CONFIG', '',
+    id ? 'ligada em ' + id : 'desligada');
+
+  // A estrutura lida em memória aponta para a planilha antiga. Sem esquecer,
+  // a próxima leitura desta execução ainda viria do lugar errado.
+  esquecerEstruturaLida_();
+  return configuracaoDosCadastros();
+}
+
+/**
+ * Confere uma planilha de cadastros SEM ligar nada.
+ *
+ * É o botão "testar a ligação": responde se abre, quais abas tem e o que falta
+ * em cada uma — antes de a operação depender dela.
+ */
+function conferirPlanilhaDeCadastros(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var id = String(planilhaId || '').trim();
+  if (!id) {
+    return { abre: false, recado: 'Informe o Id da planilha de cadastros. '
+      + 'Ele é o pedaço do endereço entre /d/ e /edit.', abas: [], faltando: [] };
+  }
+
+  var planilha;
+  try {
+    planilha = SpreadsheetApp.openById(id);
+  } catch (erro) {
+    return {
+      abre: false,
+      recado: 'Não consegui abrir: ' + (erro.message || erro)
+        + ' Confira o Id e se esta conta tem acesso à planilha — é quase '
+        + 'sempre o acesso.',
+      abas: [],
+      faltando: []
+    };
+  }
+
+  var faltando = [];
+  var achadas = [];
+
+  RECC_ABAS_QUE_PODEM_VIR_DE_FORA.forEach(function (nome) {
+    var aba = planilha.getSheetByName(nome);
+    if (!aba) {
+      faltando.push('• Falta a aba "' + nome + '".');
+      return;
+    }
+
+    var largura = aba.getLastColumn();
+    var cabecalhos = largura
+      ? aba.getRange(1, 1, 1, largura).getValues()[0].map(function (v) {
+        return normalizarParaComparar_(v);
+      })
+      : [];
+
+    var esquema = RECC_ESQUEMA[nome];
+    var ausentes = (esquema ? esquema.colunas : [])
+      .filter(function (coluna) {
+        if (coluna.cabecalho.charAt(0) === '_') return false;
+        return cabecalhos.indexOf(normalizarParaComparar_(coluna.cabecalho)) < 0;
+      })
+      .map(function (coluna) { return coluna.cabecalho; });
+
+    if (ausentes.length) {
+      faltando.push('• A aba "' + nome + '" está sem: ' + ausentes.join(', ') + '.');
+    }
+    achadas.push({
+      aba: nome,
+      linhas: Math.max(aba.getLastRow() - 1, 0),
+      completa: ausentes.length === 0
+    });
+  });
+
+  return {
+    abre: true,
+    recado: faltando.length
+      ? 'A planilha abriu, mas ' + faltando.length + ' aba(s) precisam de ajuste.'
+      : 'Tudo certo: as ' + achadas.length + ' abas estão lá, com as colunas '
+        + 'que o PGO procura.',
+    nome: planilha.getName(),
+    abas: achadas,
+    faltando: faltando
+  };
 }
 
 
@@ -7135,16 +7521,23 @@ const RECC_ESCOPOS = {
  */
 const RECC_TELAS_DO_SISTEMA = [
   // A CHAVE é o que identifica a tela para sempre; o título é só o que se lê.
-  // Por isso "dashboard" continua sendo a chave da tela que hoje se chama
-  // "Trabalho": trocar a chave junto com o nome quebraria as rotas gravadas,
-  // os níveis de acesso e os endereços que as pessoas guardaram.
-  { tela: 'dashboard', titulo: 'Trabalho' },
+  // As duas começam iguais aqui, e é só aqui que elas se encontram: trocar o
+  // título em Configurações não mexe na chave, e é isso que deixa renomear uma
+  // tela sem quebrar rota gravada, nível de acesso nem endereço guardado.
+  //
+  // AS CHAVES SÓ SE TROCAM COM O SISTEMA FORA DO AR. Duas delas mudaram uma
+  // vez — "dashboard" virou "trabalho" e "painelAnalitico" virou
+  // "produtividade" —, e deu para fazer porque nada estava instalado ainda.
+  // Com o PGO rodando, trocar uma chave é apagar as rotas que as pessoas
+  // guardaram e as telas que os níveis de acesso liberam, de uma vez. Daqui em
+  // diante o nome se muda pelo TÍTULO, que existe exatamente para isso.
+  { tela: 'trabalho', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
   { tela: 'minhaPerformance', titulo: 'Minha Performance' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
   { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
   { tela: 'tombamento', titulo: 'Tombamento' },
-  { tela: 'painelAnalitico', titulo: 'Produtividade RECC' },
+  { tela: 'produtividade', titulo: 'Produtividade RECC' },
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
 
@@ -7342,7 +7735,7 @@ function exigirPermissao_(acao) {
 /**
  * A guarda de quem só quer VER uma tela.
  *
- * Abrir o Dashboard não é uma ação como criar ou editar — é uma tela. Exigir
+ * Abrir o Trabalho não é uma ação como criar ou editar — é uma tela. Exigir
  * "criar" para ver o painel tiraria o painel de quem só consulta, e exigir
  * nada deixaria qualquer nível abrir qualquer tela pelo endereço.
  */
@@ -7741,7 +8134,7 @@ function salvarUsuario(dados) {
 
   // O canal é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
   // preenchida, tem de existir: um canal que sumiu deixaria a pessoa apontando
-  // para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
+  // para o nada, e ninguém descobriria até alguém estranhar o Trabalho vazio.
   var canalEscolhida = converterParaIdentificador_(dados.canalId);
   if (canalEscolhida) {
     var existe = lerRegistros_('CANAIS').filter(function (canal) {
@@ -7889,7 +8282,7 @@ function registrarUltimoAcesso_(usuario) {
  * ============================================================================
  * PGO — Painel.gs · os números do dia e a fila de trabalho
  * ============================================================================
- * O Dashboard responde três perguntas, nesta ordem de importância:
+ * O Trabalho responde três perguntas, nesta ordem de importância:
  *
  *   quanto tem?        os cartões, contados por situação
  *   o que fazer agora? a fila, filtrável
@@ -7939,14 +8332,14 @@ function tomValido_(cor) {
 }
 
 /**
- * Tudo que o Dashboard precisa, numa chamada.
+ * Tudo que o Trabalho precisa, numa chamada.
  *
  * `filtros` é um objeto simples: { chaveDoCampo: valorEscolhido }. As chaves
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
 function resumoDoCanal(idDoCanal, filtros) {
-  var quem = exigirTela_('dashboard');
+  var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var dias = Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
 
@@ -8000,15 +8393,219 @@ function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
   var inicio = new Date();
   inicio.setDate(inicio.getDate() - recuo - dias);
 
+  return entreDuasDatas_(registros, canal, inicio, fim, !recuo);
+}
+
+/**
+ * Os registros cuja data está entre duas datas, inclusive as duas pontas.
+ *
+ * Compara em texto `yyyy-MM-dd`, e não em milissegundos: a hora não importa
+ * aqui, e comparar objetos Date faria "hoje às 14h" ficar de fora de um
+ * período que termina "hoje", porque hoje às 14h é depois de hoje às 00h.
+ *
+ * `guardarSemData` diz o que fazer com a linha que não tem data preenchida.
+ * No período atual ela FICA: sumir por omissão esconderia justamente as linhas
+ * mal preenchidas, que são as que precisam de atenção. Num período fechado —
+ * "setembro", "de 01 a 15" — ela sai, porque não dá para afirmar que ela é
+ * daquele mês.
+ */
+function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
   var de = Utilities.formatDate(inicio, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
   var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
 
   return registros.filter(function (registro) {
     var data = converterParaData_(registro[canal.colunaDaData]);
-    if (!data) return !recuo;
+    if (!data) return guardarSemData === true;
     var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
+}
+
+// ============================================================================
+// O PERÍODO — três maneiras de escolher, uma só de contar
+// ============================================================================
+
+/**
+ * As três maneiras de a operação dizer "deste tempo aqui".
+ *
+ *   ATALHO    — "últimos 30 dias". É o que se usa no dia a dia, e continua
+ *               sendo a abertura da tela.
+ *   INTERVALO — "de 01/09 a 15/09". É o que responde uma pergunta específica:
+ *               a semana da campanha, os dias da virada do sistema.
+ *   MÊS       — "setembro de 2026". É como a operação REPORTA, e é diferente
+ *               de "últimos 30 dias" — no dia 20 de outubro, os últimos 30
+ *               dias pegam metade de setembro e metade de outubro, e nenhum
+ *               fechamento mensal se faz assim.
+ *
+ * O servidor é quem resolve as três numa coisa só: duas datas. A tela escolhe;
+ * ela não calcula. Se ela calculasse, o dia que aparece no gráfico e o dia que
+ * o servidor contou seriam dois relógios diferentes — o do navegador de quem
+ * está olhando e o da planilha —, e num fechamento de mês essa diferença é um
+ * dia inteiro de casos.
+ */
+const RECC_TIPOS_DE_PERIODO = { dias: 'Atalho', intervalo: 'De / até', mes: 'Mês fechado' };
+
+/** Quantos meses fechados a tela oferece para trás. */
+const RECC_MESES_PARA_TRAS = 12;
+
+const RECC_NOMES_DOS_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio',
+  'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+/**
+ * Transforma o que a tela pediu em duas datas, um tamanho e um rótulo.
+ *
+ * Pedido torto NÃO estoura: cai no atalho padrão. Um endereço guardado, um
+ * clique repetido ou uma data digitada pela metade chegam aqui o tempo todo, e
+ * uma tela de número que mostra erro em vez de número é uma tela que ninguém
+ * abre de novo.
+ */
+function resolverPeriodo_(pedido, diasPadrao) {
+  var padrao = Number(diasPadrao)
+    || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  pedido = pedido || {};
+
+  // Compatibilidade: quem chamar só com um número continua funcionando. É o
+  // que a Minha Performance e o Trabalho fazem, e não há motivo para mexer
+  // neles — a pergunta deles é sempre "os últimos N dias".
+  if (typeof pedido === 'number' || typeof pedido === 'string') {
+    return periodoPorDias_(Number(pedido) || padrao);
+  }
+
+  var tipo = normalizarParaComparar_(pedido.tipo);
+
+  if (tipo === 'intervalo') {
+    var de = converterParaData_(pedido.de);
+    var ate = converterParaData_(pedido.ate);
+    if (de && ate) {
+      // Datas invertidas se endireitam em vez de devolver lista vazia. Quem
+      // digitou "de 30/09 a 01/09" quis setembro, e uma tela zerada faria a
+      // pessoa procurar defeito no dado.
+      if (de > ate) { var troca = de; de = ate; ate = troca; }
+      return {
+        tipo: 'intervalo',
+        de: de,
+        ate: ate,
+        dias: diasEntre_(de, ate),
+        rotulo: 'de ' + comoSeEscreve_(de) + ' a ' + comoSeEscreve_(ate)
+      };
+    }
+  }
+
+  if (tipo === 'mes') {
+    var escolhido = mesValido_(pedido.mes);
+    if (escolhido) return periodoDoMes_(escolhido);
+  }
+
+  return periodoPorDias_(Number(pedido.dias) || padrao);
+}
+
+function periodoPorDias_(dias) {
+  var ate = new Date();
+  var de = new Date();
+  de.setDate(de.getDate() - dias);
+  return {
+    tipo: 'dias',
+    de: de,
+    ate: ate,
+    dias: dias,
+    rotulo: 'últimos ' + dias + ' dias'
+  };
+}
+
+/** Do dia 1 ao último dia do mês. `mes` chega como "2026-09". */
+function periodoDoMes_(mes) {
+  var partes = mes.split('-');
+  var ano = Number(partes[0]);
+  var numero = Number(partes[1]);
+
+  var de = new Date(ano, numero - 1, 1);
+  // Dia ZERO do mês seguinte é o último dia deste. Evita a tabela de "30 ou
+  // 31", e acerta fevereiro bissexto sem ninguém precisar lembrar dele.
+  var ate = new Date(ano, numero, 0);
+
+  return {
+    tipo: 'mes',
+    mes: mes,
+    de: de,
+    ate: ate,
+    dias: diasEntre_(de, ate),
+    rotulo: RECC_NOMES_DOS_MESES[numero - 1] + ' de ' + ano
+  };
+}
+
+/**
+ * O período imediatamente anterior, para a comparação dos cartões.
+ *
+ * Num MÊS, o anterior é o mês anterior inteiro — e não "os 30 dias antes do
+ * dia 1". Comparar setembro com "os 30 dias antes de setembro" daria quase
+ * agosto, mas não agosto: fevereiro contra os 30 dias antes dele pegaria três
+ * dias de janeiro a mais, e a comparação que a operação reporta estaria errada
+ * por três dias todo ano.
+ *
+ * Nos outros dois, é uma janela do mesmo tamanho, encostada antes.
+ */
+function periodoAnterior_(periodo) {
+  if (periodo.tipo === 'mes') {
+    var partes = periodo.mes.split('-');
+    var ano = Number(partes[0]);
+    var numero = Number(partes[1]) - 1;
+    if (numero < 1) { numero = 12; ano = ano - 1; }
+    return periodoDoMes_(ano + '-' + (numero < 10 ? '0' : '') + numero);
+  }
+
+  // O tamanho é o VÃO REAL entre as duas datas, e não o `dias` que o pedido
+  // trouxe: "últimos 30 dias" pega 31 datas (de hoje-30 até hoje, com as duas
+  // pontas), e usar o 30 aqui deixaria a janela anterior um dia mais curta que
+  // a atual. Comparar duas janelas de tamanhos diferentes é o tipo de erro que
+  // some numa variação de 3% e ninguém confere.
+  var quantos = diasEntre_(periodo.de, periodo.ate);
+
+  var ate = new Date(periodo.de.getTime());
+  ate.setDate(ate.getDate() - 1);
+  var de = new Date(ate.getTime());
+  de.setDate(de.getDate() - (quantos - 1));
+
+  return { tipo: periodo.tipo, de: de, ate: ate, dias: periodo.dias, rotulo: '' };
+}
+
+/**
+ * Quantas DATAS o intervalo cobre, contando as duas pontas.
+ *
+ * De 10/09 a 19/09 são DEZ dias, e não nove. Contar a subtração crua daria
+ * nove, e a janela de comparação sairia um dia mais curta que a medida.
+ */
+function diasEntre_(de, ate) {
+  var umDia = 24 * 60 * 60 * 1000;
+  var cru = Math.round((ate.getTime() - de.getTime()) / umDia);
+  return Math.max(cru + 1, 1);
+}
+
+function comoSeEscreve_(data) {
+  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+}
+
+/** "2026-09" quando o texto é um mês de verdade; vazio quando não é. */
+function mesValido_(texto) {
+  var limpo = String(texto || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(limpo)) return '';
+  var numero = Number(limpo.split('-')[1]);
+  return (numero >= 1 && numero <= 12) ? limpo : '';
+}
+
+/** Os meses que a tela oferece: deste para trás, com o nome por extenso. */
+function mesesParaEscolher_() {
+  var lista = [];
+  var hoje = new Date();
+  for (var i = 0; i < RECC_MESES_PARA_TRAS; i++) {
+    var quando = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    var numero = quando.getMonth() + 1;
+    var chave = quando.getFullYear() + '-' + (numero < 10 ? '0' : '') + numero;
+    lista.push({
+      valor: chave,
+      rotulo: RECC_NOMES_DOS_MESES[numero - 1] + ' de ' + quando.getFullYear()
+    });
+  }
+  return lista;
 }
 
 /**
@@ -8164,7 +8761,7 @@ function contarComColunaPreenchida_(registros, canal, cabecalho) {
 }
 
 /**
- * Os cartões declarados para o Dashboard deste canal, na ordem escolhida.
+ * Os cartões declarados para o Trabalho deste canal, na ordem escolhida.
  *
  * Cada cartão é uma linha de `PAINEIS`, e não um pedaço de texto dentro de
  * `CANAIS`: assim ele tem nome, cor e ordem próprios, e o administrador
@@ -8180,7 +8777,7 @@ function contarComColunaPreenchida_(registros, canal, cabecalho) {
  */
 function cartoesDoCanal_(canal, tela) {
   var doCanal = converterParaIdentificador_(canal.id);
-  var qual = normalizarParaComparar_(tela || 'dashboard');
+  var qual = normalizarParaComparar_(tela || 'trabalho');
 
   return lerRegistros_('PAINEIS')
     .filter(function (linha) {
@@ -8304,7 +8901,7 @@ function contarFinalizadosNaCelula_(registros, canal) {
  * duas coisas.
  *
  * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
- * descuido: a fila é leitura, e derrubar o Dashboard inteiro porque alguém
+ * descuido: a fila é leitura, e derrubar o Trabalho inteiro porque alguém
  * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
  * na hora de salvar o canal.
  */
@@ -8430,7 +9027,7 @@ function paraTexto_(valor, tipo) {
  * Devolve só o que o nível pode ver — a mesma regra do formulário.
  */
 function detalhesDoCaso(idDoCanal, idDoCaso) {
-  var quem = exigirTela_('dashboard');
+  var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var registro = buscarRegistros_(canal.aba, 'Id', idDoCaso, 1)[0];
@@ -8579,7 +9176,7 @@ function quandoFoiMexido_(nomeDaAba, idDoCaso) {
  * ============================================================================
  * PGO — Analitico.gs · os números por trás da operação
  * ============================================================================
- * O Dashboard responde "o que eu tenho que trabalhar hoje". Esta tela responde
+ * O Trabalho responde "o que eu tenho que trabalhar hoje". Esta tela responde
  * outra pergunta: "o que está acontecendo na operação". São coisas diferentes,
  * e por isso são telas diferentes.
  *
@@ -8632,28 +9229,32 @@ const RECC_MAXIMO_DE_FATIAS = 6;
  * Vem numa chamada só porque a tela abre mostrando todos ao mesmo tempo —
  * seis idas ao servidor fariam a tela montar aos pedaços.
  */
-function painelAnalitico(idDoCanal, filtros, dias, vista) {
-  var quem = exigirTela_('painelAnalitico');
+function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
+  var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  var periodo = resolverPeriodo_(periodoPedido);
+  var antes = periodoAnterior_(periodo);
+
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  var escolhida = vistaValida_(vista);
+  // Linha sem data FICA no atalho e SAI dos períodos fechados. Num "últimos 30
+  // dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela
+  // é um caso sobre o qual não dá para afirmar que é de setembro.
+  var guardarSemData = (periodo.tipo === 'dias');
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, janela, 0);
-  var meus = filtrarSoOsMeus_(
-    filtrarPeloAlcance_(noPeriodo, canal.aba, quem), canal, quem, escolhida);
+  var noPeriodo = alcanceDaProdutividade_(
+    entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
+    canal, quem);
 
-  // O período ANTERIOR, do mesmo tamanho, para os cartões dizerem se subiu ou
-  // desceu. Um número sozinho não diz nada: 40 retenções é bom ou ruim?
-  var anterior = filtrarSoOsMeus_(
-    filtrarPeloAlcance_(filtrarPeloPeriodo_(recentes, canal, janela, janela),
-      canal.aba, quem), canal, quem, escolhida);
+  // O período ANTERIOR, para os cartões dizerem se subiu ou desceu. Um número
+  // sozinho não diz nada: 40 retenções é bom ou ruim?
+  var anterior = alcanceDaProdutividade_(
+    entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
-  var casos = aplicarFiltros_(meus, disponiveis, filtros || {});
+  var casos = aplicarFiltros_(noPeriodo, disponiveis, filtros || {});
   var casosDeAntes = aplicarFiltros_(anterior, disponiveis, filtros || {});
 
   var componentes = componentesDoCanal_(canal).map(function (componente) {
@@ -8662,72 +9263,77 @@ function painelAnalitico(idDoCanal, filtros, dias, vista) {
 
   return {
     canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
-    periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
+    periodo: {
+      tipo: periodo.tipo,
+      dias: periodo.dias,
+      mes: periodo.mes || '',
+      de: comoSeEscreve_(periodo.de),
+      ate: comoSeEscreve_(periodo.ate),
+      rotulo: periodo.rotulo
+    },
+    // Os meses que a tela oferece, para ela não precisar calcular nenhum.
+    mesesDisponiveis: mesesParaEscolher_(),
     total: casos.length,
     truncada: truncada,
     linhasLidas: recentes.length,
     filtrosDisponiveis: disponiveis,
-    cartoes: contarCartoes_(casos, casosDeAntes, canal, 'painelAnalitico'),
-    vista: escolhida,
-    vistasDisponiveis: vistasDisponiveis_(canal, quem),
+    cartoes: contarCartoes_(casos, casosDeAntes, canal, 'produtividade'),
     componentes: componentes,
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }
 
 // ----------------------------------------------------------------------------
-// A EQUIPE E O INDIVIDUAL
+// O ALCANCE DESTA TELA
 // ----------------------------------------------------------------------------
 
 /**
- * As duas maneiras de olhar a Produtividade RECC.
+ * A Produtividade RECC mostra SEMPRE a equipe. Não há vista individual aqui.
  *
- * `equipe` é tudo o que o nível de acesso da pessoa deixa ela ver; `eu` é só o
- * que está no nome dela. São coisas empilhadas, e não alternativas: o nível
- * define o TETO, e a vista escolhe quanto desse teto aparece. Um analista com
- * escopo "próprios" vê a mesma coisa nas duas — e é por isso que, para ele, o
- * seletor nem aparece.
- */
-const RECC_VISTAS_DO_PAINEL = { equipe: 'A equipe toda', eu: 'Só os meus' };
-
-function vistaValida_(valor) {
-  var procurado = normalizarParaComparar_(valor);
-  return procurado === 'eu' ? 'eu' : 'equipe';
-}
-
-/**
- * Corta para só os casos de quem está olhando, quando a vista pede isso.
+ * As duas telas de número responderam a mesma pergunta por um tempo, com um
+ * par de botões em cada uma para escolher "eu" ou "a equipe". A operação
+ * cortou isso, e a divisão ficou mais clara do que estava:
  *
- * Compara pelo NOME na coluna de responsável, que é o mesmo critério que o
- * escopo "próprios" usa. Usar outro critério aqui faria as duas vistas
- * divergirem para a mesma pessoa, e ninguém saberia qual acreditar.
+ *   MINHA PERFORMANCE é sobre MIM — as minhas inclusões, sempre.
+ *   PRODUTIVIDADE RECC é sobre A EQUIPE — sempre.
+ *
+ * Duas telas, duas perguntas, nenhum botão para errar. Quem quiser o número de
+ * uma pessoa dentro da equipe usa o filtro de Analista, que é outra coisa:
+ * recortar a equipe, e não trocar de assunto.
+ *
+ * O ALARGAMENTO, que é a parte que merece atenção. Um analista com escopo
+ * "próprios" enxerga só os casos dele no Trabalho e na Busca — e continua
+ * assim nessas telas. AQUI ele passa a ver a equipe, porque uma tela chamada
+ * "Produtividade RECC" que mostrasse uma pessoa só não seria a tela que a
+ * operação pediu. É uma decisão de produto, tomada pelo PO, e vale só nesta
+ * tela: as outras seguem obedecendo ao escopo do nível.
+ *
+ * A equipe é quem está cadastrado no mesmo canal que a pessoa atende — a mesma
+ * definição que o escopo "equipe" usa. Quem não pertence a canal nenhum (quem
+ * administra) já enxerga tudo pelo escopo dele, e não precisa de alargamento.
  */
-function filtrarSoOsMeus_(registros, canal, quem, vista) {
-  if (vista !== 'eu') return registros;
+function alcanceDaProdutividade_(registros, canal, quem) {
+  if (quem.permissoes.escopo !== RECC_ESCOPOS.PROPRIOS) {
+    return filtrarPeloAlcance_(registros, canal.aba, quem);
+  }
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
-  if (!coluna) return registros;
+  var minhaEquipe = nomesDaMinhaEquipe_(quem);
 
-  var meuNome = normalizarParaComparar_((quem.usuario || {}).Nome);
-  if (!meuNome) return [];
-  return registros.filter(function (registro) {
-    return normalizarParaComparar_(registro[coluna]) === meuNome;
+  // Sem coluna de responsável não há como recortar por pessoa, e sem equipe
+  // declarada não há equipe para alargar. Nos dois casos o alcance normal
+  // vale — mostrar a base inteira porque faltou um cadastro seria trocar uma
+  // regra de acesso por um descuido.
+  if (!coluna || !minhaEquipe || !minhaEquipe.length) {
+    return filtrarPeloAlcance_(registros, canal.aba, quem);
+  }
+
+  var indice = {};
+  minhaEquipe.forEach(function (nome) {
+    indice[normalizarParaComparar_(nome)] = true;
   });
-}
-
-/**
- * O seletor de vista só aparece para quem tem as duas.
- *
- * Quem só enxerga os próprios casos veria dois botões que fazem a mesma coisa
- * — e um controle que não muda nada é pior que controle nenhum, porque ensina
- * a não confiar nos outros.
- */
-function vistasDisponiveis_(canal, quem) {
-  if (quem.permissoes.escopo === RECC_ESCOPOS.PROPRIOS) return [];
-  if (!colunaDoResponsavel_(estruturaDaAba_(canal.aba))) return [];
-
-  return Object.keys(RECC_VISTAS_DO_PAINEL).map(function (chave) {
-    return { valor: chave, rotulo: RECC_VISTAS_DO_PAINEL[chave] };
+  return registros.filter(function (registro) {
+    return indice[normalizarParaComparar_(registro[coluna])] === true;
   });
 }
 
@@ -9057,8 +9663,9 @@ function mediaMovel_(pontos, janela) {
  * É o que transforma um número numa lista de protocolos para trabalhar — sem
  * isso, o painel só informa, e informar não resolve caso nenhum.
  */
-function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, dias, vista) {
-  var quem = exigirTela_('painelAnalitico');
+function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
+  periodoPedido) {
+  var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var componente = null;
@@ -9070,15 +9677,15 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, di
     throw new Error('Este gráfico não existe mais. Recarregue a tela.');
   }
 
-  var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  var periodo = resolverPeriodo_(periodoPedido);
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  // A MESMA vista do gráfico que foi clicado. Sem isto, clicar numa barra da
-  // vista "Só os meus" abriria a lista da equipe inteira: o número do gráfico
-  // e o tamanho da lista não bateriam, e a pessoa concluiria — com razão — que
-  // um dos dois está errado.
-  var meus = filtrarSoOsMeus_(filtrarPeloAlcance_(
-    filtrarPeloPeriodo_(recentes, canal, janela, 0), canal.aba, quem),
-    canal, quem, vistaValida_(vista));
+  // O MESMO período e o MESMO alcance do painel. Sem isto, clicar numa barra
+  // abriria uma lista de tamanho diferente do número que a barra mostrava — e
+  // a pessoa concluiria, com razão, que um dos dois está errado.
+  var meus = alcanceDaProdutividade_(
+    entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
+      periodo.tipo === 'dias'),
+    canal, quem);
   var casos = aplicarFiltros_(meus, filtrosDoCanal_(canal, quem), filtros || {});
 
   var estrutura = estruturaDaAba_(canal.aba);
@@ -9130,11 +9737,11 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, di
  * Ponto e vírgula, e não vírgula: o Excel em português abre assim sem pedir
  * nada. Vírgula abriria tudo numa coluna só, e a pessoa desistiria no meio.
  */
-function exportarComponente(idDoCanal, idDoComponente, filtros, dias, vista) {
+function exportarComponente(idDoCanal, idDoComponente, filtros, periodoPedido) {
   var quem = exigirPermissao_(RECC_ACOES.EXPORTAR);
-  exigirTela_('painelAnalitico');
+  exigirTela_('produtividade');
 
-  var painel = painelAnalitico(idDoCanal, filtros, dias, vista);
+  var painel = produtividadeDaEquipe(idDoCanal, filtros, periodoPedido);
   var componente = null;
   painel.componentes.forEach(function (um) {
     if (converterParaIdentificador_(um.id)
@@ -9173,7 +9780,7 @@ function nomeDeArquivo_(titulo) {
 // ============================================================================
 
 /** O que a tela de Configurações oferece ao montar um gráfico. */
-function opcoesDoPainelAnalitico(idDoCanal) {
+function opcoesDosGraficos(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
@@ -9216,7 +9823,7 @@ function opcoesDoPainelAnalitico(idDoCanal) {
  * desligava o que não estivesse na lista de gráficos. Os cartões não estavam.
  */
 function ehGraficoDoPainel_(linha, idDoCanal) {
-  if (normalizarParaComparar_(linha.Tela) !== 'painelanalitico') return false;
+  if (normalizarParaComparar_(linha.Tela) !== 'produtividade') return false;
   if (normalizarParaComparar_(linha.TipoWidget) === 'cartao') return false;
   return converterParaIdentificador_(linha.CanalId)
     === converterParaIdentificador_(idDoCanal);
@@ -9247,7 +9854,7 @@ function listarComponentesDoPainel(idDoCanal) {
     });
 }
 
-/** Grava a lista inteira de gráficos de um canal, como os cards do Dashboard. */
+/** Grava a lista inteira de gráficos de um canal, como os cards do Trabalho. */
 function salvarComponentesDoPainel(idDoCanal, componentes) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -9281,7 +9888,7 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
 
   lista.forEach(function (componente, posicao) {
     var campos = {
-      Tela: 'painelAnalitico',
+      Tela: 'produtividade',
       CanalId: canal.id,
       Titulo: String(componente.titulo).trim(),
       TipoWidget: tipoDeGraficoValido_(componente.tipo),
@@ -9333,7 +9940,7 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
  * PGO — Performance.gs · a tela em que o analista se vê
  * ============================================================================
  * As outras telas mostram a operação. Esta mostra UMA PESSOA — e por isso o
- * cuidado aqui é de outra natureza. Um número mal escolhido no Dashboard
+ * cuidado aqui é de outra natureza. Um número mal escolhido no Trabalho
  * atrapalha uma decisão; um número mal escolhido aqui atrapalha alguém.
  *
  * QUATRO DECISÕES, e cada uma tem motivo:
@@ -9363,7 +9970,7 @@ const RECC_VIZINHOS_NO_RANKING = 2;
 /**
  * Os números de quem está olhando, no canal e no período escolhidos.
  */
-function minhaPerformance(idDoCanal, dias, vista) {
+function minhaPerformance(idDoCanal, dias) {
   var quem = exigirTela_('minhaPerformance');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -9379,25 +9986,16 @@ function minhaPerformance(idDoCanal, dias, vista) {
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var meuNome = String(quem.usuario.Nome || '');
 
-  // A EQUIPE é quem está cadastrado no mesmo canal que eu — a mesma definição
-  // que o escopo "equipe" usa. Sem canal declarado (o caso de quem administra)
-  // não existe "a minha equipe", e a tela não oferece a vista.
+  // SEMPRE as minhas inclusões. Esta tela é sobre UMA PESSOA, e por decisão da
+  // operação ela não troca de assunto: quem quiser o número da equipe abre a
+  // Produtividade RECC, que é a tela da equipe. Duas telas, duas perguntas.
+  //
+  // O que a equipe ainda faz aqui é dar REFERÊNCIA: o bloco "Você e a equipe",
+  // mais abaixo, mostra a média e a posição de quem está olhando. Saber que se
+  // fez 8 não diz nada sem saber que a média é 6.
   var minhaEquipe = nomesDaMinhaEquipe_(quem);
-  var escolhida = (normalizarParaComparar_(vista) === 'equipe' && minhaEquipe)
-    ? 'equipe' : 'eu';
-
-  var olhados = escolhida === 'equipe'
-    ? casosDaEquipe_(noPeriodo, coluna, minhaEquipe)
-    : casosDaPessoa_(noPeriodo, coluna, meuNome);
-  var olhadosAntes = escolhida === 'equipe'
-    ? casosDaEquipe_(anterior, coluna, minhaEquipe)
-    : casosDaPessoa_(anterior, coluna, meuNome);
-
-  // A meta é POR PESSOA. Na vista da equipe ela vira a soma das metas de quem
-  // está nela — comparar o resultado de cinco pessoas com a meta de uma faria
-  // toda equipe parecer 400% acima do alvo.
-  var quantasPessoas = escolhida === 'equipe' && minhaEquipe
-    ? Math.max(minhaEquipe.length, 1) : 1;
+  var olhados = casosDaPessoa_(noPeriodo, coluna, meuNome);
+  var olhadosAntes = casosDaPessoa_(anterior, coluna, meuNome);
 
   return {
     canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
@@ -9413,53 +10011,17 @@ function minhaPerformance(idDoCanal, dias, vista) {
     // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez
     // de mostrar zero — zero pareceria que a pessoa não trabalhou.
     temResponsavel: !!coluna,
-    vista: escolhida,
-    vistasDisponiveis: vistasDaPerformance_(minhaEquipe, coluna),
-    // Quantas pessoas o número da vista está somando. A tela escreve isso ao
-    // lado do total: "137 casos, de 5 pessoas" e "137 casos" seus são leituras
-    // muito diferentes do mesmo número.
-    pessoasNaVista: quantasPessoas,
     indicadores: indicadoresDaPessoa_(olhados, olhadosAntes, canal),
-    meta: metaDaPessoa_(olhados, canal, janela, quantasPessoas),
+    meta: metaDaPessoa_(olhados, canal, janela, 1),
     porDia: serieDoPeriodo_(olhados, canal, janela),
     porSituacao: distribuicao_(olhados, canal, canal.colunaDoStatus, 'Situação'),
     porCanal: distribuicao_(olhados, canal, colunaDoCanal_(canal), 'Canal'),
-    // O ranking compara sempre DENTRO da equipe, nas duas vistas: é a pergunta
-    // "como eu vou em relação a quem faz o mesmo que eu". Rankear contra o
-    // canal inteiro colocaria o analista da RET ao lado de quem nem atende RET.
+    // O ranking compara DENTRO da equipe: é a pergunta "como eu vou em relação
+    // a quem faz o mesmo que eu". Rankear contra o canal inteiro colocaria o
+    // analista da RET ao lado de quem nem atende RET.
     equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe),
     recentes: oQueEuFiz_(quem, canal)
   };
-}
-
-/** Os casos de quem está na equipe — de todos eles, somados. */
-function casosDaEquipe_(registros, coluna, nomesDaEquipe) {
-  if (!coluna || !nomesDaEquipe || !nomesDaEquipe.length) return [];
-
-  var indice = {};
-  nomesDaEquipe.forEach(function (nome) {
-    indice[normalizarParaComparar_(nome)] = true;
-  });
-  return registros.filter(function (registro) {
-    return indice[normalizarParaComparar_(registro[coluna])] === true;
-  });
-}
-
-/**
- * As vistas que ESTA pessoa tem.
- *
- * Quem não pertence a canal nenhum — quem administra — não tem "a minha
- * equipe", e receber um botão que não muda nada é pior que não receber botão.
- * Sem coluna de responsável na base não há de quem falar, nem no singular.
- */
-function vistasDaPerformance_(minhaEquipe, colunaDoResponsavel) {
-  if (!colunaDoResponsavel) return [];
-  if (!minhaEquipe || !minhaEquipe.length) return [];
-
-  return [
-    { valor: 'eu', rotulo: 'Só os meus' },
-    { valor: 'equipe', rotulo: 'A minha equipe' }
-  ];
 }
 
 /** Os casos em que a pessoa é a responsável. */
@@ -9604,6 +10166,11 @@ function metaDaPessoa_(meus, canal, dias, quantasPessoas) {
   var mensal = Number(canal.metaMensalPorPessoa) || 0;
   if (!mensal) return null;
 
+  // `quantasPessoas` é sempre 1 hoje: a Minha Performance é de uma pessoa só.
+  // O parâmetro ficou porque a conta é a mesma para um grupo — meta por pessoa
+  // vezes o tamanho do grupo —, e o dia em que alguma tela somar gente ela não
+  // vai precisar reescrever isto. Comparar o resultado de cinco pessoas com a
+  // meta de uma faria toda equipe parecer 400% acima do alvo.
   var pessoas = Number(quantasPessoas) || 1;
   var alvo = Math.round((mensal / 30) * dias) * pessoas;
   var feito = contarConcluidos_(meus, canal);
@@ -10057,22 +10624,22 @@ function semearDadosIniciais_(emailDoInstalador) {
   var niveis = inserirVariosRegistros_('CATALOGO', [
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
-      ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'painelAnalitico', 'configuracoes']),
+      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes']),
     // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
     // distribui. A Operação não — um analista não traz trezentos casos para
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
-      ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'painelAnalitico']),
+      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+       'tabelaCorretoras', 'tombamento', 'produtividade']),
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
-      ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
        'tabelaCorretoras']),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
       ['exportar'],
-      ['dashboard', 'buscarCaso', 'painelAnalitico'])
+      ['trabalho', 'buscarCaso', 'produtividade'])
   ]);
   contagem.niveis = niveis.length;
   var idAdministrador = niveis[0]['Id'];
@@ -10221,7 +10788,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.catalogo = inserirVariosRegistros_('CATALOGO', itens).length +
     contagem.niveis + contagem.cargos;
 
-  // --- cartões do Dashboard -------------------------------------------------
+  // --- cartões do Trabalho -------------------------------------------------
   // Os cartões moram em PAINEIS, e não em CANAIS: são uma LISTA de coisas
   // configuráveis, cada uma com nome, cor e ordem próprios. Guardá-los como
   // um texto separado por vírgula dentro do canal dava conta de escolher
@@ -10334,7 +10901,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
 }
 
 /**
- * Os cartões que o Dashboard mostra quando o sistema nasce.
+ * Os cartões que o Trabalho mostra quando o sistema nasce.
  *
  * A RET mostra todas as situações; a Mesa Diamante mostra duas. Não é
  * capricho: a Canal tem muito menos volume, e sete cartões de números pequenos
@@ -10346,7 +10913,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
 
   function novoCartao(canalId, titulo, dimensao, filtro, cor, ordem, tela) {
     return {
-      Tela: tela || 'dashboard',
+      Tela: tela || 'trabalho',
       CanalId: canalId,
       Titulo: titulo,
       TipoWidget: 'cartao',
@@ -10364,7 +10931,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   }
 
   // A RET mostra o total e as cinco situações que ainda pedem trabalho.
-  // "Concluído" existe como situação, mas NÃO ganha cartão: o Dashboard
+  // "Concluído" existe como situação, mas NÃO ganha cartão: o Trabalho
   // responde "o que eu tenho que trabalhar hoje", e caso concluído não é
   // trabalho. Quem quiser o número acrescenta o cartão em Configurações.
   cartoes.push(novoCartao(idRet, 'Total de casos', 'total', '', 'destaque', 1));
@@ -10399,7 +10966,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
 
   function cartaoDaProdutividade(canalId, titulo, dimensao, filtro, cor, ordem) {
     return novoCartao(canalId, titulo, dimensao, filtro, cor, ordem,
-      'painelAnalitico');
+      'produtividade');
   }
 
   cartoes.push(cartaoDaProdutividade(idRet, 'Casos cadastrados', 'total', '', 'destaque', 1));
@@ -10420,13 +10987,13 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   cartoes.push(cartaoDaProdutividade(idCanal, 'Em andamento', 'situacao',
     'Em andamento', 'atencao', 4));
 
-  // ---- os gráficos do Painel Analítico ------------------------------------
+  // ---- os gráficos da Produtividade RECC ------------------------------------
   // Cada um responde a UMA pergunta. Gráfico que não responde pergunta
   // nenhuma é enfeite, e enfeite numa tela de trabalho é ruído.
   function novoGrafico(canalId, titulo, tipo, dimensao, agregacao, medida,
     limite, largura, ordem) {
     return {
-      Tela: 'painelAnalitico', CanalId: canalId, Titulo: titulo,
+      Tela: 'produtividade', CanalId: canalId, Titulo: titulo,
       TipoWidget: tipo, CampoDimensao: dimensao, CampoMedida: medida || '',
       Agregacao: agregacao, Limite: limite || 0, Filtro: '',
       Ordem: ordem, Largura: largura, Cor: '', VisivelPara: '', Ativo: true
@@ -10792,7 +11359,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
  * POR QUE ELA EXISTE. Numa rodada, "mesa" virou "canal" em todo o sistema, e
  * a aba CANAIS — que guardava CORRETORAS — cedeu o nome. Uma instalação feita
  * antes disso continua com as abas antigas, e o código novo procura as novas:
- * o sistema abre, mas sem canal nenhum, e o Dashboard nasce vazio.
+ * o sistema abre, mas sem canal nenhum, e o Trabalho nasce vazio.
  *
  * O `instalarRECC()` não serve aqui: ele recusa rodar sobre planilha com dado,
  * de propósito. Sem esta função, a única saída seria apagar tudo e recomeçar —
@@ -11417,7 +11984,7 @@ function blocoDasCanais_() {
   if (!canais.length) {
     return [item_(RECC_SITUACOES_DO_LAUDO.FALHA,
       'Não há nenhum canal cadastrada',
-      'Sem canal, o Dashboard, o cadastro e a busca não têm onde procurar.',
+      'Sem canal, o Trabalho, o cadastro e a busca não têm onde procurar.',
       'Rode instalarRECC() ou cadastre em Configurações › Canais.')];
   }
 
@@ -11481,7 +12048,7 @@ function blocoDasCanais_() {
       'Nenhum canal está ligado',
       'Existem ' + canais.length + ' canal(is) cadastrado(s), e todos desligados.',
       'Ligue pelo menos uma em Configurações › Canais. Sem canal ligada o '
-        + 'Dashboard abre vazio.'));
+        + 'Trabalho abre vazio.'));
   }
 
   return itens;
@@ -11580,7 +12147,7 @@ function blocoDosPaineis_() {
   if (!componentes.length) {
     return [item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
       'Não há nenhum card nem gráfico cadastrado',
-      'O Dashboard abre só com a fila, e o Painel Analítico abre vazio.',
+      'O Trabalho abre só com a fila, e a Produtividade RECC abre vazio.',
       'Monte em Configurações › Painéis.')];
   }
 
@@ -11600,7 +12167,7 @@ function blocoDosPaineis_() {
       return;
     }
 
-    // Cartão do Dashboard não cita coluna: a dimensão dele é uma regra de
+    // Cartão do Trabalho não cita coluna: a dimensão dele é uma regra de
     // contagem ('total', 'situacao', 'naCelula'), e não um cabeçalho.
     if (normalizarParaComparar_(componente.TipoWidget) === 'cartao') return;
 

@@ -314,7 +314,7 @@ function rodarTestesDeConfiguracoes() {
       .find((n) => n.nome === 'Administrador');
     lanca(() => chamar('salvarNivelDeAcesso')({
       id: administrador.id, nome: 'Administrador', escopo: 'TODOS',
-      telas: ['dashboard'], acoes: administrador.acoes
+      telas: ['trabalho'], acoes: administrador.acoes
     }), 'deixaria NINGUÉM com acesso a Configurações');
   });
 
@@ -332,11 +332,11 @@ function rodarTestesDeConfiguracoes() {
       .find((n) => n.nome === 'Operação');
     lanca(() => chamar('salvarNivelDeAcesso')({
       id: nivel.id, nome: 'Operação', escopo: 'GALAXIA',
-      telas: ['dashboard'], acoes: ['criar']
+      telas: ['trabalho'], acoes: ['criar']
     }), 'Escopo desconhecido');
     lanca(() => chamar('salvarNivelDeAcesso')({
       id: nivel.id, nome: 'Operação', escopo: 'PROPRIOS',
-      telas: ['dashboard'], acoes: ['voar']
+      telas: ['trabalho'], acoes: ['voar']
     }), 'Ação desconhecida');
   });
 
@@ -472,13 +472,13 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('mexer nos cartões muda o painel na hora seguinte', () => {
-    const painel = chamar('listarCardsDoPainel')('dashboard', canal.id);
+    const painel = chamar('listarCardsDoPainel')('trabalho', canal.id);
     // "O que contar" oferece o total, cada situação do canal e, quando ela
     // declara as colunas, os finalizados na célula.
     verdadeiro(painel.oQueContar.some((o) => o.chave === 'total'));
     verdadeiro(painel.oQueContar.some((o) => o.chave === 'naCelula'));
 
-    chamar('salvarCardsDoPainel')('dashboard', canal.id, [
+    chamar('salvarCardsDoPainel')('trabalho', canal.id, [
       { titulo: 'Só o que falta fazer', dimensao: 'situacao',
         filtro: 'Em andamento', cor: 'ruim', mostrar: true }
     ]);
@@ -490,7 +490,7 @@ function rodarTestesDeConfiguracoes() {
     igual(cartoes[0].tom, 'ruim');
 
     // E o que foi tirado da tela não sumiu da planilha: volta inteiro.
-    chamar('salvarCardsDoPainel')('dashboard', canal.id, painel.cartoes);
+    chamar('salvarCardsDoPainel')('trabalho', canal.id, painel.cartoes);
     igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length,
       painel.cartoes.length);
   });
@@ -498,10 +498,10 @@ function rodarTestesDeConfiguracoes() {
   teste('os cartões da Produtividade RECC se editam pela mesma máquina', () => {
     // A tela é outra, a lista é outra, o código é o mesmo. Duas máquinas para
     // a mesma coisa seriam duas para consertar quando uma delas errasse.
-    const doTrabalho = chamar('listarCardsDoPainel')('dashboard', canal.id);
-    const daProdutividade = chamar('listarCardsDoPainel')('painelAnalitico', canal.id);
+    const doTrabalho = chamar('listarCardsDoPainel')('trabalho', canal.id);
+    const daProdutividade = chamar('listarCardsDoPainel')('produtividade', canal.id);
 
-    igual(daProdutividade.tela, 'painelanalitico');
+    igual(daProdutividade.tela, 'produtividade');
     verdadeiro(daProdutividade.cartoes.length > 0,
       'a Produtividade RECC nasce com cartões próprios');
     verdadeiro(doTrabalho.cartoes.map((c) => c.titulo).join() !==
@@ -512,17 +512,17 @@ function rodarTestesDeConfiguracoes() {
     // e não sobre o que o editor lista: o editor mostra de propósito também os
     // cartões desligados, para dar como religá-los, então a lista dele não
     // encurta quando um cartão sai de cena.
-    const naTela = () => chamar('painelAnalitico')(canal.id, {}, 30).cartoes.length;
+    const naTela = () => chamar('produtividadeDaEquipe')(canal.id, {}, 30).cartoes.length;
     const noTrabalho = () => chamar('resumoDoCanal')(canal.id, {}).cartoes.length;
     const cardsDoTrabalhoAntes = noTrabalho();
 
-    chamar('salvarCardsDoPainel')('painelAnalitico', canal.id, [
+    chamar('salvarCardsDoPainel')('produtividade', canal.id, [
       { titulo: 'Só isto', dimensao: 'total', filtro: '', cor: 'bom', mostrar: true }
     ]);
     igual(naTela(), 1, 'a Produtividade RECC ficou com um cartão');
     igual(noTrabalho(), cardsDoTrabalhoAntes, 'os cards do Trabalho ficaram intactos');
 
-    chamar('salvarCardsDoPainel')('painelAnalitico', canal.id,
+    chamar('salvarCardsDoPainel')('produtividade', canal.id,
       daProdutividade.cartoes);
     igual(naTela(), daProdutividade.cartoes.length, 'e volta inteiro');
   });
@@ -531,7 +531,7 @@ function rodarTestesDeConfiguracoes() {
     // A opção existe porque a coluna existe. Oferecer uma contagem sobre coluna
     // que não está na base criaria um cartão que nunca aparece, e quem o
     // criasse ia jurar que salvou.
-    const opcoes = chamar('listarCardsDoPainel')('painelAnalitico', canal.id).oQueContar;
+    const opcoes = chamar('listarCardsDoPainel')('produtividade', canal.id).oQueContar;
     const porCarimbo = opcoes.filter((o) => o.chave === 'preenchido');
     verdadeiro(porCarimbo.length > 0, 'a Mesa Diamante carimba a finalização');
     verdadeiro(porCarimbo.every((o) => o.rotulo.indexOf('Já passaram por: ') === 0),
@@ -540,7 +540,7 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('cartão por carimbo apontando para coluna inexistente é recusado', () => {
-    lanca(() => chamar('salvarCardsDoPainel')('painelAnalitico', canal.id, [
+    lanca(() => chamar('salvarCardsDoPainel')('produtividade', canal.id, [
       { titulo: 'Já contatados', dimensao: 'preenchido',
         filtro: 'Coluna que nunca existiu', cor: 'bom', mostrar: true }
     ]), 'não existe', 'recusar na hora de salvar, e não na hora de desenhar');

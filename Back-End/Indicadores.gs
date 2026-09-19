@@ -31,7 +31,7 @@
  * ============================================================================
  * PGO — Painel.gs · os números do dia e a fila de trabalho
  * ============================================================================
- * O Dashboard responde três perguntas, nesta ordem de importância:
+ * O Trabalho responde três perguntas, nesta ordem de importância:
  *
  *   quanto tem?        os cartões, contados por situação
  *   o que fazer agora? a fila, filtrável
@@ -81,14 +81,14 @@ function tomValido_(cor) {
 }
 
 /**
- * Tudo que o Dashboard precisa, numa chamada.
+ * Tudo que o Trabalho precisa, numa chamada.
  *
  * `filtros` é um objeto simples: { chaveDoCampo: valorEscolhido }. As chaves
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
 function resumoDoCanal(idDoCanal, filtros) {
-  var quem = exigirTela_('dashboard');
+  var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var dias = Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
 
@@ -142,15 +142,219 @@ function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
   var inicio = new Date();
   inicio.setDate(inicio.getDate() - recuo - dias);
 
+  return entreDuasDatas_(registros, canal, inicio, fim, !recuo);
+}
+
+/**
+ * Os registros cuja data está entre duas datas, inclusive as duas pontas.
+ *
+ * Compara em texto `yyyy-MM-dd`, e não em milissegundos: a hora não importa
+ * aqui, e comparar objetos Date faria "hoje às 14h" ficar de fora de um
+ * período que termina "hoje", porque hoje às 14h é depois de hoje às 00h.
+ *
+ * `guardarSemData` diz o que fazer com a linha que não tem data preenchida.
+ * No período atual ela FICA: sumir por omissão esconderia justamente as linhas
+ * mal preenchidas, que são as que precisam de atenção. Num período fechado —
+ * "setembro", "de 01 a 15" — ela sai, porque não dá para afirmar que ela é
+ * daquele mês.
+ */
+function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
   var de = Utilities.formatDate(inicio, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
   var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
 
   return registros.filter(function (registro) {
     var data = converterParaData_(registro[canal.colunaDaData]);
-    if (!data) return !recuo;
+    if (!data) return guardarSemData === true;
     var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
+}
+
+// ============================================================================
+// O PERÍODO — três maneiras de escolher, uma só de contar
+// ============================================================================
+
+/**
+ * As três maneiras de a operação dizer "deste tempo aqui".
+ *
+ *   ATALHO    — "últimos 30 dias". É o que se usa no dia a dia, e continua
+ *               sendo a abertura da tela.
+ *   INTERVALO — "de 01/09 a 15/09". É o que responde uma pergunta específica:
+ *               a semana da campanha, os dias da virada do sistema.
+ *   MÊS       — "setembro de 2026". É como a operação REPORTA, e é diferente
+ *               de "últimos 30 dias" — no dia 20 de outubro, os últimos 30
+ *               dias pegam metade de setembro e metade de outubro, e nenhum
+ *               fechamento mensal se faz assim.
+ *
+ * O servidor é quem resolve as três numa coisa só: duas datas. A tela escolhe;
+ * ela não calcula. Se ela calculasse, o dia que aparece no gráfico e o dia que
+ * o servidor contou seriam dois relógios diferentes — o do navegador de quem
+ * está olhando e o da planilha —, e num fechamento de mês essa diferença é um
+ * dia inteiro de casos.
+ */
+const RECC_TIPOS_DE_PERIODO = { dias: 'Atalho', intervalo: 'De / até', mes: 'Mês fechado' };
+
+/** Quantos meses fechados a tela oferece para trás. */
+const RECC_MESES_PARA_TRAS = 12;
+
+const RECC_NOMES_DOS_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio',
+  'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+/**
+ * Transforma o que a tela pediu em duas datas, um tamanho e um rótulo.
+ *
+ * Pedido torto NÃO estoura: cai no atalho padrão. Um endereço guardado, um
+ * clique repetido ou uma data digitada pela metade chegam aqui o tempo todo, e
+ * uma tela de número que mostra erro em vez de número é uma tela que ninguém
+ * abre de novo.
+ */
+function resolverPeriodo_(pedido, diasPadrao) {
+  var padrao = Number(diasPadrao)
+    || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  pedido = pedido || {};
+
+  // Compatibilidade: quem chamar só com um número continua funcionando. É o
+  // que a Minha Performance e o Trabalho fazem, e não há motivo para mexer
+  // neles — a pergunta deles é sempre "os últimos N dias".
+  if (typeof pedido === 'number' || typeof pedido === 'string') {
+    return periodoPorDias_(Number(pedido) || padrao);
+  }
+
+  var tipo = normalizarParaComparar_(pedido.tipo);
+
+  if (tipo === 'intervalo') {
+    var de = converterParaData_(pedido.de);
+    var ate = converterParaData_(pedido.ate);
+    if (de && ate) {
+      // Datas invertidas se endireitam em vez de devolver lista vazia. Quem
+      // digitou "de 30/09 a 01/09" quis setembro, e uma tela zerada faria a
+      // pessoa procurar defeito no dado.
+      if (de > ate) { var troca = de; de = ate; ate = troca; }
+      return {
+        tipo: 'intervalo',
+        de: de,
+        ate: ate,
+        dias: diasEntre_(de, ate),
+        rotulo: 'de ' + comoSeEscreve_(de) + ' a ' + comoSeEscreve_(ate)
+      };
+    }
+  }
+
+  if (tipo === 'mes') {
+    var escolhido = mesValido_(pedido.mes);
+    if (escolhido) return periodoDoMes_(escolhido);
+  }
+
+  return periodoPorDias_(Number(pedido.dias) || padrao);
+}
+
+function periodoPorDias_(dias) {
+  var ate = new Date();
+  var de = new Date();
+  de.setDate(de.getDate() - dias);
+  return {
+    tipo: 'dias',
+    de: de,
+    ate: ate,
+    dias: dias,
+    rotulo: 'últimos ' + dias + ' dias'
+  };
+}
+
+/** Do dia 1 ao último dia do mês. `mes` chega como "2026-09". */
+function periodoDoMes_(mes) {
+  var partes = mes.split('-');
+  var ano = Number(partes[0]);
+  var numero = Number(partes[1]);
+
+  var de = new Date(ano, numero - 1, 1);
+  // Dia ZERO do mês seguinte é o último dia deste. Evita a tabela de "30 ou
+  // 31", e acerta fevereiro bissexto sem ninguém precisar lembrar dele.
+  var ate = new Date(ano, numero, 0);
+
+  return {
+    tipo: 'mes',
+    mes: mes,
+    de: de,
+    ate: ate,
+    dias: diasEntre_(de, ate),
+    rotulo: RECC_NOMES_DOS_MESES[numero - 1] + ' de ' + ano
+  };
+}
+
+/**
+ * O período imediatamente anterior, para a comparação dos cartões.
+ *
+ * Num MÊS, o anterior é o mês anterior inteiro — e não "os 30 dias antes do
+ * dia 1". Comparar setembro com "os 30 dias antes de setembro" daria quase
+ * agosto, mas não agosto: fevereiro contra os 30 dias antes dele pegaria três
+ * dias de janeiro a mais, e a comparação que a operação reporta estaria errada
+ * por três dias todo ano.
+ *
+ * Nos outros dois, é uma janela do mesmo tamanho, encostada antes.
+ */
+function periodoAnterior_(periodo) {
+  if (periodo.tipo === 'mes') {
+    var partes = periodo.mes.split('-');
+    var ano = Number(partes[0]);
+    var numero = Number(partes[1]) - 1;
+    if (numero < 1) { numero = 12; ano = ano - 1; }
+    return periodoDoMes_(ano + '-' + (numero < 10 ? '0' : '') + numero);
+  }
+
+  // O tamanho é o VÃO REAL entre as duas datas, e não o `dias` que o pedido
+  // trouxe: "últimos 30 dias" pega 31 datas (de hoje-30 até hoje, com as duas
+  // pontas), e usar o 30 aqui deixaria a janela anterior um dia mais curta que
+  // a atual. Comparar duas janelas de tamanhos diferentes é o tipo de erro que
+  // some numa variação de 3% e ninguém confere.
+  var quantos = diasEntre_(periodo.de, periodo.ate);
+
+  var ate = new Date(periodo.de.getTime());
+  ate.setDate(ate.getDate() - 1);
+  var de = new Date(ate.getTime());
+  de.setDate(de.getDate() - (quantos - 1));
+
+  return { tipo: periodo.tipo, de: de, ate: ate, dias: periodo.dias, rotulo: '' };
+}
+
+/**
+ * Quantas DATAS o intervalo cobre, contando as duas pontas.
+ *
+ * De 10/09 a 19/09 são DEZ dias, e não nove. Contar a subtração crua daria
+ * nove, e a janela de comparação sairia um dia mais curta que a medida.
+ */
+function diasEntre_(de, ate) {
+  var umDia = 24 * 60 * 60 * 1000;
+  var cru = Math.round((ate.getTime() - de.getTime()) / umDia);
+  return Math.max(cru + 1, 1);
+}
+
+function comoSeEscreve_(data) {
+  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+}
+
+/** "2026-09" quando o texto é um mês de verdade; vazio quando não é. */
+function mesValido_(texto) {
+  var limpo = String(texto || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(limpo)) return '';
+  var numero = Number(limpo.split('-')[1]);
+  return (numero >= 1 && numero <= 12) ? limpo : '';
+}
+
+/** Os meses que a tela oferece: deste para trás, com o nome por extenso. */
+function mesesParaEscolher_() {
+  var lista = [];
+  var hoje = new Date();
+  for (var i = 0; i < RECC_MESES_PARA_TRAS; i++) {
+    var quando = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    var numero = quando.getMonth() + 1;
+    var chave = quando.getFullYear() + '-' + (numero < 10 ? '0' : '') + numero;
+    lista.push({
+      valor: chave,
+      rotulo: RECC_NOMES_DOS_MESES[numero - 1] + ' de ' + quando.getFullYear()
+    });
+  }
+  return lista;
 }
 
 /**
@@ -306,7 +510,7 @@ function contarComColunaPreenchida_(registros, canal, cabecalho) {
 }
 
 /**
- * Os cartões declarados para o Dashboard deste canal, na ordem escolhida.
+ * Os cartões declarados para o Trabalho deste canal, na ordem escolhida.
  *
  * Cada cartão é uma linha de `PAINEIS`, e não um pedaço de texto dentro de
  * `CANAIS`: assim ele tem nome, cor e ordem próprios, e o administrador
@@ -322,7 +526,7 @@ function contarComColunaPreenchida_(registros, canal, cabecalho) {
  */
 function cartoesDoCanal_(canal, tela) {
   var doCanal = converterParaIdentificador_(canal.id);
-  var qual = normalizarParaComparar_(tela || 'dashboard');
+  var qual = normalizarParaComparar_(tela || 'trabalho');
 
   return lerRegistros_('PAINEIS')
     .filter(function (linha) {
@@ -446,7 +650,7 @@ function contarFinalizadosNaCelula_(registros, canal) {
  * duas coisas.
  *
  * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
- * descuido: a fila é leitura, e derrubar o Dashboard inteiro porque alguém
+ * descuido: a fila é leitura, e derrubar o Trabalho inteiro porque alguém
  * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
  * na hora de salvar o canal.
  */
@@ -572,7 +776,7 @@ function paraTexto_(valor, tipo) {
  * Devolve só o que o nível pode ver — a mesma regra do formulário.
  */
 function detalhesDoCaso(idDoCanal, idDoCaso) {
-  var quem = exigirTela_('dashboard');
+  var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var registro = buscarRegistros_(canal.aba, 'Id', idDoCaso, 1)[0];
@@ -721,7 +925,7 @@ function quandoFoiMexido_(nomeDaAba, idDoCaso) {
  * ============================================================================
  * PGO — Analitico.gs · os números por trás da operação
  * ============================================================================
- * O Dashboard responde "o que eu tenho que trabalhar hoje". Esta tela responde
+ * O Trabalho responde "o que eu tenho que trabalhar hoje". Esta tela responde
  * outra pergunta: "o que está acontecendo na operação". São coisas diferentes,
  * e por isso são telas diferentes.
  *
@@ -774,28 +978,32 @@ const RECC_MAXIMO_DE_FATIAS = 6;
  * Vem numa chamada só porque a tela abre mostrando todos ao mesmo tempo —
  * seis idas ao servidor fariam a tela montar aos pedaços.
  */
-function painelAnalitico(idDoCanal, filtros, dias, vista) {
-  var quem = exigirTela_('painelAnalitico');
+function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
+  var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  var periodo = resolverPeriodo_(periodoPedido);
+  var antes = periodoAnterior_(periodo);
+
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  var escolhida = vistaValida_(vista);
+  // Linha sem data FICA no atalho e SAI dos períodos fechados. Num "últimos 30
+  // dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela
+  // é um caso sobre o qual não dá para afirmar que é de setembro.
+  var guardarSemData = (periodo.tipo === 'dias');
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, janela, 0);
-  var meus = filtrarSoOsMeus_(
-    filtrarPeloAlcance_(noPeriodo, canal.aba, quem), canal, quem, escolhida);
+  var noPeriodo = alcanceDaProdutividade_(
+    entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
+    canal, quem);
 
-  // O período ANTERIOR, do mesmo tamanho, para os cartões dizerem se subiu ou
-  // desceu. Um número sozinho não diz nada: 40 retenções é bom ou ruim?
-  var anterior = filtrarSoOsMeus_(
-    filtrarPeloAlcance_(filtrarPeloPeriodo_(recentes, canal, janela, janela),
-      canal.aba, quem), canal, quem, escolhida);
+  // O período ANTERIOR, para os cartões dizerem se subiu ou desceu. Um número
+  // sozinho não diz nada: 40 retenções é bom ou ruim?
+  var anterior = alcanceDaProdutividade_(
+    entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
-  var casos = aplicarFiltros_(meus, disponiveis, filtros || {});
+  var casos = aplicarFiltros_(noPeriodo, disponiveis, filtros || {});
   var casosDeAntes = aplicarFiltros_(anterior, disponiveis, filtros || {});
 
   var componentes = componentesDoCanal_(canal).map(function (componente) {
@@ -804,72 +1012,77 @@ function painelAnalitico(idDoCanal, filtros, dias, vista) {
 
   return {
     canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
-    periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
+    periodo: {
+      tipo: periodo.tipo,
+      dias: periodo.dias,
+      mes: periodo.mes || '',
+      de: comoSeEscreve_(periodo.de),
+      ate: comoSeEscreve_(periodo.ate),
+      rotulo: periodo.rotulo
+    },
+    // Os meses que a tela oferece, para ela não precisar calcular nenhum.
+    mesesDisponiveis: mesesParaEscolher_(),
     total: casos.length,
     truncada: truncada,
     linhasLidas: recentes.length,
     filtrosDisponiveis: disponiveis,
-    cartoes: contarCartoes_(casos, casosDeAntes, canal, 'painelAnalitico'),
-    vista: escolhida,
-    vistasDisponiveis: vistasDisponiveis_(canal, quem),
+    cartoes: contarCartoes_(casos, casosDeAntes, canal, 'produtividade'),
     componentes: componentes,
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }
 
 // ----------------------------------------------------------------------------
-// A EQUIPE E O INDIVIDUAL
+// O ALCANCE DESTA TELA
 // ----------------------------------------------------------------------------
 
 /**
- * As duas maneiras de olhar a Produtividade RECC.
+ * A Produtividade RECC mostra SEMPRE a equipe. Não há vista individual aqui.
  *
- * `equipe` é tudo o que o nível de acesso da pessoa deixa ela ver; `eu` é só o
- * que está no nome dela. São coisas empilhadas, e não alternativas: o nível
- * define o TETO, e a vista escolhe quanto desse teto aparece. Um analista com
- * escopo "próprios" vê a mesma coisa nas duas — e é por isso que, para ele, o
- * seletor nem aparece.
- */
-const RECC_VISTAS_DO_PAINEL = { equipe: 'A equipe toda', eu: 'Só os meus' };
-
-function vistaValida_(valor) {
-  var procurado = normalizarParaComparar_(valor);
-  return procurado === 'eu' ? 'eu' : 'equipe';
-}
-
-/**
- * Corta para só os casos de quem está olhando, quando a vista pede isso.
+ * As duas telas de número responderam a mesma pergunta por um tempo, com um
+ * par de botões em cada uma para escolher "eu" ou "a equipe". A operação
+ * cortou isso, e a divisão ficou mais clara do que estava:
  *
- * Compara pelo NOME na coluna de responsável, que é o mesmo critério que o
- * escopo "próprios" usa. Usar outro critério aqui faria as duas vistas
- * divergirem para a mesma pessoa, e ninguém saberia qual acreditar.
+ *   MINHA PERFORMANCE é sobre MIM — as minhas inclusões, sempre.
+ *   PRODUTIVIDADE RECC é sobre A EQUIPE — sempre.
+ *
+ * Duas telas, duas perguntas, nenhum botão para errar. Quem quiser o número de
+ * uma pessoa dentro da equipe usa o filtro de Analista, que é outra coisa:
+ * recortar a equipe, e não trocar de assunto.
+ *
+ * O ALARGAMENTO, que é a parte que merece atenção. Um analista com escopo
+ * "próprios" enxerga só os casos dele no Trabalho e na Busca — e continua
+ * assim nessas telas. AQUI ele passa a ver a equipe, porque uma tela chamada
+ * "Produtividade RECC" que mostrasse uma pessoa só não seria a tela que a
+ * operação pediu. É uma decisão de produto, tomada pelo PO, e vale só nesta
+ * tela: as outras seguem obedecendo ao escopo do nível.
+ *
+ * A equipe é quem está cadastrado no mesmo canal que a pessoa atende — a mesma
+ * definição que o escopo "equipe" usa. Quem não pertence a canal nenhum (quem
+ * administra) já enxerga tudo pelo escopo dele, e não precisa de alargamento.
  */
-function filtrarSoOsMeus_(registros, canal, quem, vista) {
-  if (vista !== 'eu') return registros;
+function alcanceDaProdutividade_(registros, canal, quem) {
+  if (quem.permissoes.escopo !== RECC_ESCOPOS.PROPRIOS) {
+    return filtrarPeloAlcance_(registros, canal.aba, quem);
+  }
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
-  if (!coluna) return registros;
+  var minhaEquipe = nomesDaMinhaEquipe_(quem);
 
-  var meuNome = normalizarParaComparar_((quem.usuario || {}).Nome);
-  if (!meuNome) return [];
-  return registros.filter(function (registro) {
-    return normalizarParaComparar_(registro[coluna]) === meuNome;
+  // Sem coluna de responsável não há como recortar por pessoa, e sem equipe
+  // declarada não há equipe para alargar. Nos dois casos o alcance normal
+  // vale — mostrar a base inteira porque faltou um cadastro seria trocar uma
+  // regra de acesso por um descuido.
+  if (!coluna || !minhaEquipe || !minhaEquipe.length) {
+    return filtrarPeloAlcance_(registros, canal.aba, quem);
+  }
+
+  var indice = {};
+  minhaEquipe.forEach(function (nome) {
+    indice[normalizarParaComparar_(nome)] = true;
   });
-}
-
-/**
- * O seletor de vista só aparece para quem tem as duas.
- *
- * Quem só enxerga os próprios casos veria dois botões que fazem a mesma coisa
- * — e um controle que não muda nada é pior que controle nenhum, porque ensina
- * a não confiar nos outros.
- */
-function vistasDisponiveis_(canal, quem) {
-  if (quem.permissoes.escopo === RECC_ESCOPOS.PROPRIOS) return [];
-  if (!colunaDoResponsavel_(estruturaDaAba_(canal.aba))) return [];
-
-  return Object.keys(RECC_VISTAS_DO_PAINEL).map(function (chave) {
-    return { valor: chave, rotulo: RECC_VISTAS_DO_PAINEL[chave] };
+  return registros.filter(function (registro) {
+    return indice[normalizarParaComparar_(registro[coluna])] === true;
   });
 }
 
@@ -1199,8 +1412,9 @@ function mediaMovel_(pontos, janela) {
  * É o que transforma um número numa lista de protocolos para trabalhar — sem
  * isso, o painel só informa, e informar não resolve caso nenhum.
  */
-function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, dias, vista) {
-  var quem = exigirTela_('painelAnalitico');
+function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
+  periodoPedido) {
+  var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   var componente = null;
@@ -1212,15 +1426,15 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, di
     throw new Error('Este gráfico não existe mais. Recarregue a tela.');
   }
 
-  var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  var periodo = resolverPeriodo_(periodoPedido);
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  // A MESMA vista do gráfico que foi clicado. Sem isto, clicar numa barra da
-  // vista "Só os meus" abriria a lista da equipe inteira: o número do gráfico
-  // e o tamanho da lista não bateriam, e a pessoa concluiria — com razão — que
-  // um dos dois está errado.
-  var meus = filtrarSoOsMeus_(filtrarPeloAlcance_(
-    filtrarPeloPeriodo_(recentes, canal, janela, 0), canal.aba, quem),
-    canal, quem, vistaValida_(vista));
+  // O MESMO período e o MESMO alcance do painel. Sem isto, clicar numa barra
+  // abriria uma lista de tamanho diferente do número que a barra mostrava — e
+  // a pessoa concluiria, com razão, que um dos dois está errado.
+  var meus = alcanceDaProdutividade_(
+    entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
+      periodo.tipo === 'dias'),
+    canal, quem);
   var casos = aplicarFiltros_(meus, filtrosDoCanal_(canal, quem), filtros || {});
 
   var estrutura = estruturaDaAba_(canal.aba);
@@ -1272,11 +1486,11 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros, di
  * Ponto e vírgula, e não vírgula: o Excel em português abre assim sem pedir
  * nada. Vírgula abriria tudo numa coluna só, e a pessoa desistiria no meio.
  */
-function exportarComponente(idDoCanal, idDoComponente, filtros, dias, vista) {
+function exportarComponente(idDoCanal, idDoComponente, filtros, periodoPedido) {
   var quem = exigirPermissao_(RECC_ACOES.EXPORTAR);
-  exigirTela_('painelAnalitico');
+  exigirTela_('produtividade');
 
-  var painel = painelAnalitico(idDoCanal, filtros, dias, vista);
+  var painel = produtividadeDaEquipe(idDoCanal, filtros, periodoPedido);
   var componente = null;
   painel.componentes.forEach(function (um) {
     if (converterParaIdentificador_(um.id)
@@ -1315,7 +1529,7 @@ function nomeDeArquivo_(titulo) {
 // ============================================================================
 
 /** O que a tela de Configurações oferece ao montar um gráfico. */
-function opcoesDoPainelAnalitico(idDoCanal) {
+function opcoesDosGraficos(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
@@ -1358,7 +1572,7 @@ function opcoesDoPainelAnalitico(idDoCanal) {
  * desligava o que não estivesse na lista de gráficos. Os cartões não estavam.
  */
 function ehGraficoDoPainel_(linha, idDoCanal) {
-  if (normalizarParaComparar_(linha.Tela) !== 'painelanalitico') return false;
+  if (normalizarParaComparar_(linha.Tela) !== 'produtividade') return false;
   if (normalizarParaComparar_(linha.TipoWidget) === 'cartao') return false;
   return converterParaIdentificador_(linha.CanalId)
     === converterParaIdentificador_(idDoCanal);
@@ -1389,7 +1603,7 @@ function listarComponentesDoPainel(idDoCanal) {
     });
 }
 
-/** Grava a lista inteira de gráficos de um canal, como os cards do Dashboard. */
+/** Grava a lista inteira de gráficos de um canal, como os cards do Trabalho. */
 function salvarComponentesDoPainel(idDoCanal, componentes) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -1423,7 +1637,7 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
 
   lista.forEach(function (componente, posicao) {
     var campos = {
-      Tela: 'painelAnalitico',
+      Tela: 'produtividade',
       CanalId: canal.id,
       Titulo: String(componente.titulo).trim(),
       TipoWidget: tipoDeGraficoValido_(componente.tipo),
@@ -1475,7 +1689,7 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
  * PGO — Performance.gs · a tela em que o analista se vê
  * ============================================================================
  * As outras telas mostram a operação. Esta mostra UMA PESSOA — e por isso o
- * cuidado aqui é de outra natureza. Um número mal escolhido no Dashboard
+ * cuidado aqui é de outra natureza. Um número mal escolhido no Trabalho
  * atrapalha uma decisão; um número mal escolhido aqui atrapalha alguém.
  *
  * QUATRO DECISÕES, e cada uma tem motivo:
@@ -1505,7 +1719,7 @@ const RECC_VIZINHOS_NO_RANKING = 2;
 /**
  * Os números de quem está olhando, no canal e no período escolhidos.
  */
-function minhaPerformance(idDoCanal, dias, vista) {
+function minhaPerformance(idDoCanal, dias) {
   var quem = exigirTela_('minhaPerformance');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -1521,25 +1735,16 @@ function minhaPerformance(idDoCanal, dias, vista) {
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var meuNome = String(quem.usuario.Nome || '');
 
-  // A EQUIPE é quem está cadastrado no mesmo canal que eu — a mesma definição
-  // que o escopo "equipe" usa. Sem canal declarado (o caso de quem administra)
-  // não existe "a minha equipe", e a tela não oferece a vista.
+  // SEMPRE as minhas inclusões. Esta tela é sobre UMA PESSOA, e por decisão da
+  // operação ela não troca de assunto: quem quiser o número da equipe abre a
+  // Produtividade RECC, que é a tela da equipe. Duas telas, duas perguntas.
+  //
+  // O que a equipe ainda faz aqui é dar REFERÊNCIA: o bloco "Você e a equipe",
+  // mais abaixo, mostra a média e a posição de quem está olhando. Saber que se
+  // fez 8 não diz nada sem saber que a média é 6.
   var minhaEquipe = nomesDaMinhaEquipe_(quem);
-  var escolhida = (normalizarParaComparar_(vista) === 'equipe' && minhaEquipe)
-    ? 'equipe' : 'eu';
-
-  var olhados = escolhida === 'equipe'
-    ? casosDaEquipe_(noPeriodo, coluna, minhaEquipe)
-    : casosDaPessoa_(noPeriodo, coluna, meuNome);
-  var olhadosAntes = escolhida === 'equipe'
-    ? casosDaEquipe_(anterior, coluna, minhaEquipe)
-    : casosDaPessoa_(anterior, coluna, meuNome);
-
-  // A meta é POR PESSOA. Na vista da equipe ela vira a soma das metas de quem
-  // está nela — comparar o resultado de cinco pessoas com a meta de uma faria
-  // toda equipe parecer 400% acima do alvo.
-  var quantasPessoas = escolhida === 'equipe' && minhaEquipe
-    ? Math.max(minhaEquipe.length, 1) : 1;
+  var olhados = casosDaPessoa_(noPeriodo, coluna, meuNome);
+  var olhadosAntes = casosDaPessoa_(anterior, coluna, meuNome);
 
   return {
     canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
@@ -1555,53 +1760,17 @@ function minhaPerformance(idDoCanal, dias, vista) {
     // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez
     // de mostrar zero — zero pareceria que a pessoa não trabalhou.
     temResponsavel: !!coluna,
-    vista: escolhida,
-    vistasDisponiveis: vistasDaPerformance_(minhaEquipe, coluna),
-    // Quantas pessoas o número da vista está somando. A tela escreve isso ao
-    // lado do total: "137 casos, de 5 pessoas" e "137 casos" seus são leituras
-    // muito diferentes do mesmo número.
-    pessoasNaVista: quantasPessoas,
     indicadores: indicadoresDaPessoa_(olhados, olhadosAntes, canal),
-    meta: metaDaPessoa_(olhados, canal, janela, quantasPessoas),
+    meta: metaDaPessoa_(olhados, canal, janela, 1),
     porDia: serieDoPeriodo_(olhados, canal, janela),
     porSituacao: distribuicao_(olhados, canal, canal.colunaDoStatus, 'Situação'),
     porCanal: distribuicao_(olhados, canal, colunaDoCanal_(canal), 'Canal'),
-    // O ranking compara sempre DENTRO da equipe, nas duas vistas: é a pergunta
-    // "como eu vou em relação a quem faz o mesmo que eu". Rankear contra o
-    // canal inteiro colocaria o analista da RET ao lado de quem nem atende RET.
+    // O ranking compara DENTRO da equipe: é a pergunta "como eu vou em relação
+    // a quem faz o mesmo que eu". Rankear contra o canal inteiro colocaria o
+    // analista da RET ao lado de quem nem atende RET.
     equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe),
     recentes: oQueEuFiz_(quem, canal)
   };
-}
-
-/** Os casos de quem está na equipe — de todos eles, somados. */
-function casosDaEquipe_(registros, coluna, nomesDaEquipe) {
-  if (!coluna || !nomesDaEquipe || !nomesDaEquipe.length) return [];
-
-  var indice = {};
-  nomesDaEquipe.forEach(function (nome) {
-    indice[normalizarParaComparar_(nome)] = true;
-  });
-  return registros.filter(function (registro) {
-    return indice[normalizarParaComparar_(registro[coluna])] === true;
-  });
-}
-
-/**
- * As vistas que ESTA pessoa tem.
- *
- * Quem não pertence a canal nenhum — quem administra — não tem "a minha
- * equipe", e receber um botão que não muda nada é pior que não receber botão.
- * Sem coluna de responsável na base não há de quem falar, nem no singular.
- */
-function vistasDaPerformance_(minhaEquipe, colunaDoResponsavel) {
-  if (!colunaDoResponsavel) return [];
-  if (!minhaEquipe || !minhaEquipe.length) return [];
-
-  return [
-    { valor: 'eu', rotulo: 'Só os meus' },
-    { valor: 'equipe', rotulo: 'A minha equipe' }
-  ];
 }
 
 /** Os casos em que a pessoa é a responsável. */
@@ -1746,6 +1915,11 @@ function metaDaPessoa_(meus, canal, dias, quantasPessoas) {
   var mensal = Number(canal.metaMensalPorPessoa) || 0;
   if (!mensal) return null;
 
+  // `quantasPessoas` é sempre 1 hoje: a Minha Performance é de uma pessoa só.
+  // O parâmetro ficou porque a conta é a mesma para um grupo — meta por pessoa
+  // vezes o tamanho do grupo —, e o dia em que alguma tela somar gente ela não
+  // vai precisar reescrever isto. Comparar o resultado de cinco pessoas com a
+  // meta de uma faria toda equipe parecer 400% acima do alvo.
   var pessoas = Number(quantasPessoas) || 1;
   var alvo = Math.round((mensal / 30) * dias) * pessoas;
   var feito = contarConcluidos_(meus, canal);

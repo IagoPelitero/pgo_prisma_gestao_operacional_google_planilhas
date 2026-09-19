@@ -116,8 +116,48 @@ function rodarTestesDeCadastro() {
   });
 
   teste('cadastro desconhecido em listaDe é erro, e diz quais existem', () => {
-    lanca(() => chamar('opcoesDeUmCadastro_')('planetas'),
-      'Os cadastros são usuarios, produtos e canais');
+    const erro = lanca(() => chamar('opcoesDeUmCadastro_')('planetas'),
+      'Cadastro desconhecido');
+    // O recado LISTA os que existem. Sem a lista, quem errou o nome fica
+    // adivinhando qual era — e a lista cresce, então ela sai do código.
+    ['usuarios', 'produtos', 'canais', 'analistasCentral', 'analistasCobranca']
+      .forEach((qual) => contem(erro.message, qual));
+  });
+
+  teste('as duas listas de analista viram opções de seletor', () => {
+    // Não são usuários do PGO: são as pessoas da Central e da Cobrança Ativa
+    // que APARECEM nos casos. Por isso têm cadastro próprio.
+    chamar('inserirVariosRegistros_')('ANALISTAS_CENTRAL', [
+      { Nome: 'Rita da Central', Ativo: 'SIM' },
+      { Nome: 'Aline da Central', Ativo: 'SIM' },
+      { Nome: 'Saiu da Central', Ativo: 'NAO' }
+    ]);
+    chamar('inserirRegistro_')('ANALISTAS_COBRANCA', { Nome: 'Bruno da Cobrança' });
+
+    const daCentral = chamar('opcoesDeUmCadastro_')('analistasCentral');
+    igual(daCentral.map((o) => o.valor).join(', '),
+      'Aline da Central, Rita da Central', 'em ordem, e sem quem saiu');
+
+    const daCobranca = chamar('opcoesDeUmCadastro_')('analistasCobranca');
+    igual(daCobranca.length, 1);
+    igual(daCobranca[0].valor, 'Bruno da Cobrança',
+      'sem a coluna Ativo preenchida a pessoa CONTA — cadastro recém-colado '
+      + 'não vem com ela marcada, e esconder todo mundo pareceria defeito');
+  });
+
+  teste('lista de analista sem aba devolve vazio, e não derruba o formulário', () => {
+    // Instalação mais antiga não tem estas abas. Derrubar o formulário inteiro
+    // por causa de um seletor que ninguém configurou seria trocar um campo
+    // vazio por uma tela que não abre.
+    const aba = ambiente.planilha.getSheetByName('ANALISTAS_CENTRAL');
+    aba.setName('ANALISTAS_CENTRAL_SUMIU');
+    chamar('esquecerEstruturaLida_()');
+
+    igual(chamar('opcoesDeUmCadastro_')('analistasCentral').length, 0,
+      'sem a aba, a lista vem vazia — e a tela abre');
+
+    aba.setName('ANALISTAS_CENTRAL');
+    chamar('esquecerEstruturaLida_()');
   });
 
   teste('cado canal aparece com o seu desenho, vindo da aba CANAIS', () => {
@@ -138,7 +178,7 @@ function rodarTestesDeCadastro() {
     const cadastro = fs.readFileSync(
       path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
     const painel = fs.readFileSync(
-      path.join(__dirname, '..', '..', 'Front-End', 'Dashboard.html'), 'utf8');
+      path.join(__dirname, '..', '..', 'Front-End', 'Trabalho.html'), 'utf8');
     contem(cadastro, 'SeletorDeCanal.montar');
     contem(painel, 'SeletorDeCanal.montar');
     verdadeiro(cadastro.indexOf('DESENHOS_DAS_CANAIS') < 0,
@@ -626,6 +666,118 @@ function rodarTestesDeCadastro() {
       '123.456.789-01', 'digitar demais não estoura a máscara');
   });
 
+  teste('o campo de valor só aceita dígito, e cresce da direita', () => {
+    // Um "aprox. 1200" no campo de prêmio chega ao servidor, não vira número e
+    // a célula fica VAZIA — o caso é gravado com o valor faltando, sem ninguém
+    // notar, e o relatório soma menos do que deveria. Barrar a letra na tela é
+    // mais barato que achar isso três meses depois.
+    const fonte = scriptDaPeca('Formulario');
+    const contexto = vm.createContext({ document: { getElementById: () => null },
+      Moldura: { escapar: (t) => String(t) }, Servidor: {}, console });
+    vm.runInContext(fonte, contexto);
+    const form = contexto.Formulario;
+    const dinheiro = form.aplicarMascaraDeDinheiro;
+
+    // Cresce da direita, como numa maquininha de cartão.
+    igual(dinheiro('1'), 'R$ 0,01');
+    igual(dinheiro('12'), 'R$ 0,12');
+    igual(dinheiro('123'), 'R$ 1,23');
+    igual(dinheiro('123456'), 'R$ 1.234,56');
+
+    // O formato que a operação pediu: de apólice pequena a apólice grande.
+    igual(dinheiro('999999999999'), 'R$ 999.999.999,99',
+      'para de crescer em nove casas inteiras, e não estoura');
+    igual(dinheiro('1290'), 'R$ 12,90');
+
+    // Letra não entra de jeito nenhum.
+    igual(dinheiro('aprox. 1200'), 'R$ 12,00', 'as letras somem, os dígitos ficam');
+    igual(dinheiro('R$ abc'), '', 'sem dígito nenhum, o campo fica vazio');
+    igual(dinheiro(''), '');
+    igual(dinheiro('000'), '', 'zero à esquerda não vira R$ 0,00 na tela');
+  });
+
+  teste('o valor volta do servidor formatado, e não como 1234.56', () => {
+    // Abrir um caso para editar mostrava "1234.56" no campo. Salvar de novo
+    // mandaria isso de volta pela máscara, que conta em centavos, e gravaria
+    // R$ 123.456,00 — o valor multiplicado por cem, calado.
+    const fonte = scriptDaPeca('Formulario');
+    contem(fonte, 'function comoNumeroEmCentavos',
+      'a conversão de volta precisa existir');
+
+    const contexto = vm.createContext({ document: { getElementById: () => null },
+      Moldura: { escapar: (t) => String(t) }, Servidor: {}, console });
+    vm.runInContext(fonte, contexto);
+    const dinheiro = contexto.Formulario.aplicarMascaraDeDinheiro;
+
+    // Os três formatos que o servidor manda, e que davam três resultados
+    // diferentes quando iam direto para a máscara.
+    igual(dinheiro(String(Math.round(1234.56 * 100))), 'R$ 1.234,56');
+    igual(dinheiro(String(Math.round(1234.5 * 100))), 'R$ 1.234,50');
+    igual(dinheiro(String(Math.round(1234 * 100))), 'R$ 1.234,00');
+  });
+
+  teste('o campo de dinheiro é marcado no HTML, com teclado numérico', () => {
+    const fonte = scriptDaPeca('Formulario');
+    contem(fonte, 'data-dinheiro', 'a marca que liga o comportamento');
+    contem(fonte, 'inputmode="decimal"',
+      'no celular o teclado tem de abrir numérico — metade da operação é telefone');
+    contem(fonte, "evento.preventDefault()",
+      'a tecla que não é dígito é barrada antes de entrar');
+  });
+
+  teste('o servidor recusa valor que não é número, e não grava vazio', () => {
+    // A tela barra; o servidor confere de novo. Esconder o campo não é
+    // segurança, e impedir a digitação também não: a chamada existe.
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const erro = lanca(() => chamar('cadastrarCaso')(ret.id, {
+      nomedocliente: 'Cliente do valor torto',
+      valordopremio: 'uns mil e duzentos'
+    }), 'Confira');
+    contem(erro.problemas.find((p) => p.campo === 'valordopremio').erro,
+      'precisa ser um número');
+  });
+
+  teste('o valor em reais chega à célula como NÚMERO, com centavos', () => {
+    // Texto na célula não soma no Power BI, e é o erro que o PGO 5 cometia.
+    const ret = canais.find((canal) => canal.aba === 'BASE_RET');
+    const novo = chamar('cadastrarCaso')(ret.id, {
+      nomedocliente: 'Cliente do valor certo',
+      valordopremio: 'R$ 1.234,56'
+    });
+    const gravado = chamar('buscarRegistros_')('BASE_RET', 'id', novo.id, 1)[0];
+    igual(gravado['valor do prêmio'], 1234.56);
+    igual(typeof gravado['valor do prêmio'], 'number');
+  });
+
+  teste('todo campo de dinheiro da base é dinheiro de verdade, nos dois canais', () => {
+    // "Ou demais que encontrar", disse o PO. Este teste é o "encontrar": ele
+    // varre o Esquema procurando coluna cujo NOME fala de valor, prêmio ou
+    // preço, e cobra que ela seja do tipo dinheiro. Uma coluna dessas nascendo
+    // como texto guardaria "R$ 1.200,00" em texto, e ninguém somaria.
+    const esquema = chamar('RECC_ESQUEMA');
+    const falamDeDinheiro = /valor|pr[eê]mio|pre[çc]o|montante|sal[áa]rio/i;
+    const erradas = [];
+
+    ['BASE_RET', 'BASE_MESA'].forEach((aba) => {
+      esquema[aba].colunas.forEach((coluna) => {
+        if (!falamDeDinheiro.test(coluna.cabecalho)) return;
+        if (coluna.tipo !== 'dinheiro') {
+          erradas.push(aba + ' · ' + coluna.cabecalho + ' é ' + coluna.tipo);
+        }
+      });
+    });
+
+    igual(erradas.join(' | '), '',
+      'estas colunas falam de dinheiro e não são do tipo dinheiro');
+  });
+
+  teste('a célula de dinheiro guarda duas casas, e o R$ é formato', () => {
+    // O "R$" é FORMATO da célula, nunca conteúdo: com ele no conteúdo, a
+    // célula vira texto e o Power BI não soma.
+    igual(chamar('RECC_FORMATO_DA_CELULA')['dinheiro'], '"R$ "#,##0.00',
+      'duas casas depois da vírgula, como a operação pediu');
+  });
+
   teste('a tela pede ao servidor em vez de desenhar campo fixo', () => {
     const fonte = fs.readFileSync(
       path.join(__dirname, '..', '..', 'Front-End', 'CadastrarCaso.html'), 'utf8');
@@ -636,7 +788,7 @@ function rodarTestesDeCadastro() {
   });
 
   teste('o formulário é desenhado num lugar só, e as duas telas o usam', () => {
-    // Cadastrar Caso e o modal de edição do Dashboard montam o MESMO
+    // Cadastrar Caso e o modal de edição do Trabalho montam o MESMO
     // formulário. Duas cópias divergiriam no primeiro ajuste de máscara.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
     const cadastro = fs.readFileSync(path.join(pasta, 'CadastrarCaso.html'), 'utf8');

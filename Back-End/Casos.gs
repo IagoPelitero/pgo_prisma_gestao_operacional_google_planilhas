@@ -290,8 +290,50 @@ function opcoesDeUmCadastro_(qualCadastro) {
     });
   }
 
+  // As duas listas de analista que a operação mantém fora do PGO: quem
+  // transferiu o caso, quem já tinha falado com o cliente. Não são usuários do
+  // sistema — não entram no PGO —, e por isso vêm de cadastro próprio.
+  if (cadastro === 'analistascentral') {
+    return nomesAtivosDoCadastro_('ANALISTAS_CENTRAL');
+  }
+  if (cadastro === 'analistascobranca') {
+    return nomesAtivosDoCadastro_('ANALISTAS_COBRANCA');
+  }
+
   throw new Error('Cadastro desconhecido em listaDe: "' + qualCadastro + '". ' +
-    'Os cadastros são usuarios, produtos e canais.');
+    'Os cadastros são usuarios, produtos, canais, analistasCentral e ' +
+    'analistasCobranca.');
+}
+
+/**
+ * Os nomes ativos de um cadastro de pessoas, em ordem.
+ *
+ * Aba que ainda não existe devolve LISTA VAZIA em vez de estourar. Estas duas
+ * nasceram depois do resto, e uma instalação mais antiga não as tem: derrubar
+ * o formulário inteiro por causa de um seletor que ninguém configurou ainda
+ * seria trocar um campo vazio por uma tela que não abre.
+ */
+function nomesAtivosDoCadastro_(nomeDaAba) {
+  var registros;
+  try {
+    registros = lerRegistros_(nomeDaAba);
+  } catch (erro) {
+    return [];
+  }
+
+  return registros
+    .filter(function (linha) {
+      // Sem coluna Ativo preenchida, a pessoa CONTA. Um cadastro que a
+      // operação acabou de colar não tem essa coluna marcada, e esconder todo
+      // mundo faria a lista parecer quebrada.
+      var ativo = String(linha.Ativo === null || linha.Ativo === undefined
+        ? '' : linha.Ativo).trim();
+      return !ativo || normalizarParaComparar_(ativo) === 'sim';
+    })
+    .map(function (linha) { return String(linha.Nome || '').trim(); })
+    .filter(function (nome) { return nome !== ''; })
+    .sort()
+    .map(function (nome) { return { valor: nome, rotulo: nome }; });
 }
 
 function canalPeloId_(idDoCanal) {
@@ -994,7 +1036,7 @@ function consultarSusep(susep) {
  * ============================================================================
  * PGO — Busca.gs · achar um caso que a fila não mostra mais
  * ============================================================================
- * O Dashboard mostra os últimos 30 dias. Isso é de propósito: ele responde
+ * O Trabalho mostra os últimos 30 dias. Isso é de propósito: ele responde
  * "o que eu tenho que trabalhar hoje". Quando o cliente liga citando um
  * protocolo de abril, é aqui que se procura.
  *

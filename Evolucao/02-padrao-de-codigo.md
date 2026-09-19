@@ -115,7 +115,7 @@ agrupamento está errado.** Não é falta de familiaridade de quem procura.
 
 Muitos arquivos pequenos parecem organizados e não são: espalham uma regra em
 três lugares, e mudar num e esquecer dos outros dois vira o defeito normal.
-Foi o que decidiu juntar Dashboard, Painel Analítico e Performance no
+Foi o que decidiu juntar Trabalho, Produtividade RECC e Performance no
 `Indicadores.gs` — os três contam os mesmos casos.
 
 E o contrário também vale: `Base.gs` não levou o formulário junto, embora

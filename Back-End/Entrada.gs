@@ -563,16 +563,23 @@ const RECC_ESCOPOS = {
  */
 const RECC_TELAS_DO_SISTEMA = [
   // A CHAVE é o que identifica a tela para sempre; o título é só o que se lê.
-  // Por isso "dashboard" continua sendo a chave da tela que hoje se chama
-  // "Trabalho": trocar a chave junto com o nome quebraria as rotas gravadas,
-  // os níveis de acesso e os endereços que as pessoas guardaram.
-  { tela: 'dashboard', titulo: 'Trabalho' },
+  // As duas começam iguais aqui, e é só aqui que elas se encontram: trocar o
+  // título em Configurações não mexe na chave, e é isso que deixa renomear uma
+  // tela sem quebrar rota gravada, nível de acesso nem endereço guardado.
+  //
+  // AS CHAVES SÓ SE TROCAM COM O SISTEMA FORA DO AR. Duas delas mudaram uma
+  // vez — "dashboard" virou "trabalho" e "painelAnalitico" virou
+  // "produtividade" —, e deu para fazer porque nada estava instalado ainda.
+  // Com o PGO rodando, trocar uma chave é apagar as rotas que as pessoas
+  // guardaram e as telas que os níveis de acesso liberam, de uma vez. Daqui em
+  // diante o nome se muda pelo TÍTULO, que existe exatamente para isso.
+  { tela: 'trabalho', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
   { tela: 'minhaPerformance', titulo: 'Minha Performance' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
   { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
   { tela: 'tombamento', titulo: 'Tombamento' },
-  { tela: 'painelAnalitico', titulo: 'Produtividade RECC' },
+  { tela: 'produtividade', titulo: 'Produtividade RECC' },
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
 
@@ -770,7 +777,7 @@ function exigirPermissao_(acao) {
 /**
  * A guarda de quem só quer VER uma tela.
  *
- * Abrir o Dashboard não é uma ação como criar ou editar — é uma tela. Exigir
+ * Abrir o Trabalho não é uma ação como criar ou editar — é uma tela. Exigir
  * "criar" para ver o painel tiraria o painel de quem só consulta, e exigir
  * nada deixaria qualquer nível abrir qualquer tela pelo endereço.
  */
@@ -1169,7 +1176,7 @@ function salvarUsuario(dados) {
 
   // O canal é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
   // preenchida, tem de existir: um canal que sumiu deixaria a pessoa apontando
-  // para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
+  // para o nada, e ninguém descobriria até alguém estranhar o Trabalho vazio.
   var canalEscolhida = converterParaIdentificador_(dados.canalId);
   if (canalEscolhida) {
     var existe = lerRegistros_('CANAIS').filter(function (canal) {

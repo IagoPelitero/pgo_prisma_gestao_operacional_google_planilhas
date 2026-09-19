@@ -340,6 +340,45 @@ const RECC_ESQUEMA = {
     ]
   },
 
+  /*
+   * AS DUAS LISTAS DE ANALISTA que a operação mantém fora do PGO.
+   *
+   * Não são usuários do sistema: são as pessoas da Central e da Cobrança Ativa
+   * que APARECEM nos casos — quem transferiu, quem já tinha falado com o
+   * cliente. Elas não entram no PGO, e por isso não estão em USUARIOS.
+   *
+   * Nascem aqui com o contrato mínimo para o PGO saber ler. Quando vierem da
+   * planilha de cadastros, é lá que elas são mantidas; enquanto não vierem,
+   * ficam nestas abas, vazias, sem atrapalhar ninguém.
+   */
+  ANALISTAS_CENTRAL: {
+    aba: 'ANALISTAS_CENTRAL',
+    titulo: 'Analistas da Central',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Equipe', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
+  ANALISTAS_COBRANCA: {
+    aba: 'ANALISTAS_COBRANCA',
+    titulo: 'Analistas da cobrança ativa',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Equipe', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
   SUSEP_BLOQUEADAS: {
     aba: 'SUSEP_BLOQUEADAS',
     titulo: 'SUSEPs bloqueadas',
@@ -468,7 +507,7 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Tela', tipo: 'texto', protegido: true },
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
-      // 'cartao' no Dashboard; pizza, linha e barras no Painel Analítico.
+      // 'cartao' no Trabalho; pizza, linha e barras na Produtividade RECC.
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
       // Para um cartão, é a regra de contagem: 'total', 'situacao' ou
       // 'naCelula'. Para um gráfico, é o campo que vira eixo.
@@ -490,7 +529,7 @@ const RECC_ESQUEMA = {
   /*
     As análises que o administrador montou.
     Uma ABA, e não um JSON dentro de CONFIG, pela mesma razão que os cartões do
-    Dashboard saíram de CANAIS: é uma LISTA de coisas configuráveis, cada uma
+    Trabalho saíram de CANAIS: é uma LISTA de coisas configuráveis, cada uma
     com nome, canal, colunas e filtro próprios. Guardada como texto numa célula,
     dava para escolher "quais" e para mais nada.
 
@@ -876,7 +915,7 @@ var estruturasJaLidas = {};
  * ----------------------------------------------------------------------------
  * O MEMO DAS ABAS DE SISTEMA
  * ----------------------------------------------------------------------------
- * Abrir o Dashboard custava 48 idas ao Planilhas, e a maioria era a MESMA aba
+ * Abrir o Trabalho custava 48 idas ao Planilhas, e a maioria era a MESMA aba
  * lida de novo: num pacoteDePartida só, CONFIG era lido 10 vezes; num
  * resumoDoCanal, CATALOGO era lido 7. Ninguém escreveu isso de propósito — são
  * funções pequenas e corretas, cada uma lendo o que precisa, e o custo só
@@ -942,6 +981,14 @@ function esquecerEstruturaLida_(nomeDaAba) {
     estruturasJaLidas = {};
     esquecerRegistrosLidos_();
     tiposDeclaradosJaLidos = null;
+    // A planilha de cadastros aberta também é esquecida. Ela guarda a planilha
+    // que o Id APONTAVA — e quem chama isto sem nome de aba está dizendo "o
+    // que eu sabia não vale mais", que é exatamente o caso de quem acabou de
+    // trocar esse Id. Sem esta linha, ligar a segunda base só passaria a valer
+    // na execução seguinte, e a tela mostraria o cadastro antigo depois de
+    // dizer "salvo".
+    planilhaDeCadastrosAberta = null;
+    jaTenteiAbrirOsCadastros = false;
   }
 }
 
@@ -1043,11 +1090,7 @@ function planilhaAtiva_() {
 function estruturaDaAba_(nomeDaAba, recarregar) {
   if (!recarregar && estruturasJaLidas[nomeDaAba]) return estruturasJaLidas[nomeDaAba];
 
-  var aba = planilhaAtiva_().getSheetByName(nomeDaAba);
-  if (!aba) {
-    throw new Error('A aba "' + nomeDaAba + '" não existe nesta planilha. ' +
-      'Rode instalarRECC() numa planilha vazia, ou confira o nome da aba.');
-  }
+  var aba = abaOndeQuerQueElaMore_(nomeDaAba);
 
   var largura = aba.getLastColumn();
   if (largura < 1) {
@@ -1263,6 +1306,146 @@ function formatosDaLinha_(estrutura) {
 // ============================================================================
 // LEITURA
 // ============================================================================
+
+// ============================================================================
+// AS DUAS BASES — a operacional e a de cadastros
+// ============================================================================
+
+/**
+ * As abas que PODEM morar em outra planilha.
+ *
+ * São os CADASTROS: listas grandes, que mudam pouco, e que a operação mantém
+ * fora do PGO porque outras áreas também as usam. As 7 mil SUSEPs e as 145
+ * corretoras sozinhas já ocupam um pedaço considerável do teto de 10 milhões
+ * de células — tirá-las daqui deixa a planilha operacional com espaço para o
+ * que ela existe para guardar, que é caso.
+ *
+ * O que NÃO entra nesta lista, e não deve entrar: as bases de caso, a
+ * auditoria, os usuários e a configuração. Essas são do PGO, e um sistema que
+ * depende de outra planilha para saber quem pode entrar é um sistema que para
+ * de funcionar quando alguém mexe num compartilhamento.
+ */
+const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
+  'CORRETORAS',
+  'SUSEP_BLOQUEADAS',
+  'PRODUTOS',
+  'ANALISTAS_CENTRAL',
+  'ANALISTAS_COBRANCA'
+];
+
+/** Onde a planilha de cadastros está configurada. */
+const RECC_CHAVE_DA_PLANILHA_DE_CADASTROS = 'CADASTROS.PLANILHA_ID';
+
+/*
+ * A planilha de cadastros aberta, guardada pela execução inteira.
+ *
+ * `SpreadsheetApp.openById` é uma IDA ao serviço, das caras. Sem isto, uma
+ * tela que lê corretoras, produtos e SUSEPs pagaria três aberturas da MESMA
+ * planilha na mesma execução. Como cada `google.script.run` é uma execução
+ * nova, a variável nasce vazia a cada chamada — não há risco de servir uma
+ * planilha velha.
+ */
+var planilhaDeCadastrosAberta = null;
+var jaTenteiAbrirOsCadastros = false;
+
+/** O Id configurado, ou vazio quando os cadastros moram aqui mesmo. */
+function idDaPlanilhaDeCadastros_() {
+  return String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '') || '').trim();
+}
+
+/** Esta aba vem de fora? */
+function abaVemDeOutraPlanilha_(nomeDaAba) {
+  if (RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nomeDaAba) < 0) return false;
+  return !!idDaPlanilhaDeCadastros_();
+}
+
+/**
+ * A aba, venha ela desta planilha ou da de cadastros.
+ *
+ * É o ponto ÚNICO em que o sistema decide de qual planilha ler. Todo o resto —
+ * `lerRegistros_`, a busca, o selo da SUSEP, as listas do formulário — passa
+ * por aqui sem saber que existem duas bases, e é por isso que ligar a segunda
+ * não exigiu mexer em trinta lugares.
+ */
+function abaOndeQuerQueElaMore_(nomeDaAba) {
+  if (abaVemDeOutraPlanilha_(nomeDaAba)) {
+    var deFora = planilhaDeCadastros_().getSheetByName(nomeDaAba);
+    if (!deFora) {
+      throw new Error('A planilha de cadastros abriu, mas não tem uma aba '
+        + 'chamada "' + nomeDaAba + '". Crie a aba lá, ou desligue a planilha '
+        + 'de cadastros em Configurações › Estrutura para o PGO voltar a usar '
+        + 'a aba daqui.');
+    }
+    return deFora;
+  }
+
+  var aqui = planilhaAtiva_().getSheetByName(nomeDaAba);
+  if (!aqui) {
+    throw new Error('A aba "' + nomeDaAba + '" não existe nesta planilha. ' +
+      'Rode instalarRECC() numa planilha vazia, ou confira o nome da aba.');
+  }
+  return aqui;
+}
+
+/**
+ * A planilha de cadastros, aberta uma vez por execução.
+ *
+ * Quando ela não abre, o erro DERRUBA com o motivo — e não devolve lista
+ * vazia. Lista vazia aqui seria "nenhuma SUSEP está bloqueada" e "nenhuma
+ * corretora existe": duas afirmações falsas que a operação acreditaria, e que
+ * fariam um caso bloqueado passar como liberado. Parar e explicar é pior para
+ * o dia e melhor para o dado.
+ */
+function planilhaDeCadastros_() {
+  if (planilhaDeCadastrosAberta) return planilhaDeCadastrosAberta;
+
+  var id = idDaPlanilhaDeCadastros_();
+  if (!id) throw new Error('Nenhuma planilha de cadastros está configurada.');
+
+  // Uma tentativa por execução. Sem isto, uma tela que lê três cadastros
+  // tentaria abrir três vezes a planilha que não abre, e o tempo de espera
+  // triplicaria antes de a pessoa ver o recado.
+  if (jaTenteiAbrirOsCadastros) {
+    throw new Error('A planilha de cadastros não abriu nesta execução.');
+  }
+  jaTenteiAbrirOsCadastros = true;
+
+  try {
+    planilhaDeCadastrosAberta = SpreadsheetApp.openById(id);
+  } catch (erro) {
+    throw new Error('Não consegui abrir a planilha de cadastros (' + id + '): '
+      + (erro.message || erro) + ' As corretoras, as SUSEPs bloqueadas e as '
+      + 'listas de analistas moram nela. Confira se o Id está certo e se a '
+      + 'conta que abre o PGO tem acesso a ela — é quase sempre isso. '
+      + 'Em Configurações › Estrutura dá para conferir a ligação ou desligá-la.');
+  }
+  return planilhaDeCadastrosAberta;
+}
+
+/**
+ * Recusa ESCRITA numa aba que vem de fora.
+ *
+ * A planilha de cadastros é a FONTE DE VERDADE: ela é mantida fora do PGO
+ * porque outras áreas também a usam. O PGO lê e não escreve — não por medo de
+ * dar erro, mas porque duas mãos escrevendo na mesma lista, uma delas sem
+ * saber da outra, é como um cadastro começa a divergir.
+ *
+ * Há um motivo técnico junto, e ele sozinho já bastaria: a sequência de Id
+ * mora no PropertiesService DESTE projeto, e as linhas morariam na outra
+ * planilha. Duas instalações apontando para o mesmo cadastro gerariam o mesmo
+ * Id para registros diferentes.
+ *
+ * O recado diz ONDE editar. Um "não permitido" seco mandaria a pessoa procurar
+ * uma permissão que não é o problema.
+ */
+function recusarEscritaEmAbaDeFora_(nomeDaAba) {
+  if (!abaVemDeOutraPlanilha_(nomeDaAba)) return;
+
+  throw new Error('A aba "' + nomeDaAba + '" vem da planilha de cadastros, e o '
+    + 'PGO só lê dela. Para mudar este cadastro, edite a planilha de cadastros '
+    + 'direto — a alteração aparece aqui na hora seguinte, sem sincronizar '
+    + 'nada. Quem aponta qual planilha é Configurações › Estrutura.');
+}
 
 /**
  * Abre uma planilha DE FORA, pelo Id.
@@ -1610,11 +1793,13 @@ function formatarEGravar_(estrutura, primeiraLinha, linhas) {
  * visível e registra que ela nasceu no sistema.
  */
 function inserirRegistro_(nomeDaAba, dados, contexto) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   return inserirVariosRegistros_(nomeDaAba, [dados], contexto)[0];
 }
 
 /** Insere vários registros numa gravação só. */
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
   contexto = contexto || {};
 
@@ -1689,6 +1874,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
  * assim uma coluna nunca fica com o formato de outro tipo.
  */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1715,6 +1901,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
  * Nenhuma linha de base operacional é apagada — nunca.
  */
 function ocultarRegistro_(nomeDaAba, id, usuarioId) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba), '_Visivel') < 0) {
     throw new Error('A aba "' + nomeDaAba + '" não tem exclusão lógica — ela ' +
       'não possui a coluna _Visivel. Em abas de catálogo, o que desliga um ' +
@@ -1749,6 +1936,7 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
  * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
  */
 function apagarRegistroDeVez_(nomeDaAba, id) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1803,6 +1991,7 @@ function garantirLinhasNaGrade_(aba, ateLinha) {
  * salvamento comum. Recusa cabeçalho que já exista, mesmo escrito diferente.
  */
 function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
+  recusarEscritaEmAbaDeFora_(nomeDaAba);
   var texto = String(cabecalho || '').trim();
   if (!texto) throw new Error('Cabeçalho vazio.');
   if (!RECC_FORMATO_DA_CELULA[tipo]) throw new Error('Tipo de coluna desconhecido: ' + tipo);

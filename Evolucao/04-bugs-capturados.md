@@ -895,6 +895,80 @@ abrir a tela e ler a frase.
 
 ---
 
+### 41 · A varredura que olhava sempre a tela errada
+
+**Sintoma.** A Produtividade RECC abria com um recado vermelho — *"A função
+produtividadeDaEquipe não existe no servidor"* — e a varredura que clica em
+tudo dizia, na mesma rodada, **"136 cliques, nenhum erro"**.
+
+**Causa.** Duas, empilhadas, e a segunda é a grave.
+
+A primeira: renomeei a função do servidor e a ponte da prévia ficou com o nome
+antigo. Defeito da prévia, não do sistema — mas a prévia é o que a operação
+clica para acompanhar a obra.
+
+A segunda: o roteiro fazia isto, por tela:
+
+```js
+await pagina.click('[data-tela="' + tela + '"]');   // abre a tela
+for (const seletor of CLICAVEIS) { ... }            // clica em tudo
+const naTela = await pagina.evaluate(...)           // confere o texto
+```
+
+E o **primeiro** item de `CLICAVEIS` é `[data-tela]` — o próprio menu. O
+roteiro abria a Produtividade, saía clicando nos outros itens do menu, parava
+em outra tela qualquer, e só então lia o texto. **A conferência inteira olhava
+sempre a última tela clicada**, nunca a do laço. Oito telas visitadas, e o
+texto de uma só conferido, oito vezes.
+
+Quem pegou foi a **foto da tela para o README**.
+
+**Defesa.** Três mudanças. A conferência da tela recém-aberta passou para
+**antes** dos cliques. Ela procura a **classe** da caixa de erro
+(`.erro-carga`, `.config-alerta`) em vez de uma frase — frase depende de eu ter
+previsto o texto; classe não. E o recado da conferência do fim passou a dizer
+"depois dos cliques a partir de X", porque afirmar "na tela X" era mentir
+sobre onde o texto foi encontrado.
+
+Provei quebrando de propósito: com a ponte renomeada à mão, a varredura agora
+falha e imprime o recado inteiro.
+
+**O que ele ensina.** **Uma varredura que diz "nenhum erro" olhando o lugar
+errado é pior que varredura nenhuma** — ela dá a licença de parar de procurar.
+E o defeito não estava no que ela procurava, estava em ONDE: a lista de frases
+proibidas até continha a frase certa. É o achado 33 mais uma vez, agora do lado
+de fora da suíte.
+
+---
+
+### 42 · O teste da prévia que procurava a palavra no arquivo inteiro
+
+**Sintoma.** O mesmo do item 41, do outro lado: o teste
+`a prévia responde por TODA função que as telas chamam` passava verde enquanto
+a prévia não respondia por `produtividadeDaEquipe`.
+
+**Causa.**
+
+```js
+return previa.indexOf("'" + nome + "'") < 0
+  && previa.indexOf(nome + ': function') < 0;
+```
+
+Ele procurava o nome em **qualquer lugar** do `gerar-previa.js`. E o nome
+estava lá — numa linha que apenas COLETAVA o dado para a prévia
+(`chamar('produtividadeDaEquipe')`), trezentas linhas longe da ponte. O teste
+provou que alguém escreveu aquela palavra no arquivo, e não que a ponte
+responde.
+
+**Defesa.** A busca passou a ser feita **só dentro da ponte** — o trecho entre
+`function pontePreparada(` e `function gerar(`.
+
+**O que ele ensina.** **Procurar num arquivo inteiro é quase sempre procurar
+no lugar errado.** O teste tinha o nome certo, a intenção certa e o escopo
+errado — e escopo errado num teste não deixa sintoma nenhum.
+
+---
+
 ## O que esta lista ensina
 
 **São trinta e três achados, e a maioria era silenciosa.** Não davam erro, não
@@ -988,3 +1062,12 @@ Daí as duas práticas que o projeto não abre mão:
     preenchendo esse campo com a constante. Os dois passaram. O que quebrou a
     suposição foi abrir a tela e ler a frase que ela mostrava — é o item 5
     desta lista outra vez, e é por isso que ele continua valendo.
+23. **"Nenhum erro" tem de dizer onde olhou.** Os itens 41 e 42 são o mesmo
+    defeito em dois lugares: uma conferência olhando a tela errada e um teste
+    procurando no arquivo errado. Nos dois, o que estava sendo procurado era o
+    certo. **Escopo errado não deixa sintoma** — a verificação passa, e a
+    licença de parar de procurar é dada do mesmo jeito.
+24. **Gerar as imagens do README é conferência, não enfeite.** Foi a foto da
+    tela que pegou os dois. Ela é a única verificação que olha a tela inteira
+    sem saber o que procurar — e por isso ela agora sai de um gerador
+    (`gerar-imagens.js`), e não da mão de alguém.

@@ -340,7 +340,7 @@ button { font: inherit; color: inherit; }
 .lateral-itens li { margin-bottom: 2px; }
 
 .lateral-item {
-  display: flex; align-items: center; gap: 13px; width: 100%;
+  display: flex; gap: 13px; width: 100%;
   padding: 12px 13px; border: 0; border-radius: var(--raio-pequeno);
   background: transparent; color: var(--lateral-texto);
   cursor: pointer; text-align: left; font-size: 15px;
@@ -372,7 +372,17 @@ button { font: inherit; color: inherit; }
   linha em vez de flutuar no meio das duas.
 */
 .lateral-item .rotulo { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
-.lateral-item:has(.rotulo) { align-items: flex-start; }
+/*
+  `align-items: flex-start` no item, e não um `:has(.rotulo)`.
+  
+  O `:has()` só existe em navegador de 2022 para cá, e parte da operação abre o
+  sistema em máquina corporativa que demora a atualizar. Uma regra que o
+  navegador não entende ele ignora CALADO — o menu ficaria desalinhado em
+  algumas máquinas e certo nas outras, e o defeito só apareceria por relato.
+  Alinhar sempre pelo topo dá no mesmo com o menu encolhido, porque ali o
+  rótulo some e sobra só o ícone, que ocupa a linha inteira.
+*/
+.lateral-item { align-items: flex-start; }
 .lateral-item svg { margin-top: 1px; }
 .aplicacao.encolhida .lateral-item .rotulo { display: none; }
 .aplicacao.encolhida .lateral-marca .escrito { display: none; }
@@ -588,6 +598,12 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
   max-width: 230px;
 }
+/* O "até" entre as duas datas: é ligação, não rótulo — fica discreto. */
+.ate-do-periodo { font-size: 13.5px; color: var(--suave); }
+/* Campo de data não precisa dos 230px das caixas de filtro, e sobrando espaço
+   ele empurra os outros filtros para a linha de baixo sem necessidade. */
+.filtro[type="date"] { max-width: 165px; }
+
 .limpar-filtros {
   border: 0; background: transparent; color: var(--destaque);
   font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 4px;
@@ -595,34 +611,6 @@ button { font: inherit; color: inherit; }
 .filtros .contagem {
   margin-left: auto; font-size: 13px; color: var(--suave);
   font-variant-numeric: tabular-nums;
-}
-
-/*
-  A equipe toda ou só os meus, na Produtividade RECC.
-
-  Dois botões grudados, e não duas caixas de seleção: são apenas duas opções,
-  as duas visíveis ao mesmo tempo, e a pessoa alterna entre elas o tempo todo.
-  Numa caixa fechada, ela teria de abrir para lembrar qual está valendo — e o
-  número na tela muda de significado conforme a resposta.
-*/
-.vista-do-painel { display: inline-flex; border-radius: var(--raio-pequeno); overflow: hidden; }
-.botao-vista {
-  padding: 9px 14px; font: inherit; font-size: 13.5px; font-weight: 600;
-  cursor: pointer; color: var(--suave); background: var(--superficie);
-  border: 1px solid var(--linha); border-right-width: 0;
-}
-.botao-vista:last-child { border-right-width: 1px; }
-.botao-vista:hover { color: var(--texto); background: var(--superficie-2); }
-.botao-vista.ligado {
-  color: var(--destaque-sobre); background: var(--destaque);
-  border-color: var(--destaque);
-}
-.botao-vista:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
-/* O recado que acompanha a vista da equipe: sem ele, "137 casos" se lê como
-   "137 casos meus", e a pessoa se compara com um número que não é dela. */
-.aviso-da-vista {
-  font-size: 12.5px; color: var(--suave); font-weight: 600;
-  padding: 0 2px;
 }
 
 /*
@@ -1534,7 +1522,7 @@ table.fila tr.importar-igual { color: var(--tenue); }
   display: block; font-style: normal; font-size: 12px; opacity: .75;
 }
 
-/* As abas de dentro de uma seção: Dashboard e Painel Analítico têm cada um
+/* As abas de dentro de uma seção: Trabalho e Produtividade RECC têm cada um
    os seus componentes, e são a mesma pergunta — "o que esta tela mostra". */
 .config-abas {
   display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px;
@@ -1649,7 +1637,7 @@ table.fila.legado td { color: var(--suave); }
   .busca-linha .botao { width: 100%; justify-content: center; }
 }
 
-/* ==================================================== painel analítico === */
+/* ==================================================== Produtividade RECC === */
 /*
   A grade dos gráficos. `auto-fit` com um mínimo generoso: numa tela larga
   cabem dois lado a lado, e numa estreita eles empilham sozinhos, sem media
@@ -2118,7 +2106,7 @@ var Moldura = (function () {
    */
   var DESENHOS = {
     // painel: quatro áreas iguais, como os cartões da tela
-    dashboard:
+    trabalho:
       '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="13.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>'
@@ -2162,7 +2150,7 @@ var Moldura = (function () {
       + '<path d="M3.4 13.6 6 5.9a1.5 1.5 0 0 1 1.4-1h9.2a1.5 1.5 0 0 1 1.4 1l2.6 7.7'
       + 'v4.4a1.5 1.5 0 0 1-1.5 1.5H4.9a1.5 1.5 0 0 1-1.5-1.5z"></path>'
       + '<path d="M12 5.4v5.2M9.8 8.4 12 10.6l2.2-2.2"></path>',
-    painelAnalitico:
+    produtividade:
       '<path d="M3.6 20.4h16.8"></path>'
       + '<path d="M7.4 20.4v-6.2M12 20.4V6.8M16.6 20.4v-9.6"></path>',
 
@@ -2275,7 +2263,7 @@ var Moldura = (function () {
    * ao lado de outros com ícone, parece um botão quebrado.
    */
   function icone(tela) {
-    var desenho = DESENHOS[tela] || DESENHOS.dashboard;
+    var desenho = DESENHOS[tela] || DESENHOS.trabalho;
     // Traço fino: 1,7 deixava os desenhos pesados ao lado de texto normal.
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
@@ -2440,8 +2428,8 @@ var Moldura = (function () {
   /**
    * O aviso de que a tela leu só uma parte da base.
    *
-   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Dashboard,
-   * Painel Analítico e Minha Performance —, e três textos diferentes para o
+   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Trabalho,
+   * Produtividade RECC e Minha Performance —, e três textos diferentes para o
    * mesmo fato é como a operação aprende que um deles não é sério.
    *
    * A frase diz o que foi lido e o que fazer, nessa ordem. "Os números podem
@@ -2599,7 +2587,7 @@ var SenhaDeAdministrador = (function () {
 /* ============================================================================
    PGO — SeletorDeCanal.html · a escolha do canal de trabalho
    ============================================================================
-   Aparece no Dashboard e no Cadastrar Caso, e é a mesma peça nos dois. Duas
+   Aparece no Trabalho e no Cadastrar Caso, e é a mesma peça nos dois. Duas
    cópias divergiriam na primeira mudança — bastaria um canal nova ganhar
    ícone só num dos lugares.
 
@@ -2669,7 +2657,7 @@ var SeletorDeCanal = (function () {
    PGO — Formulario.html · o formulário, desenhado num lugar só
    ============================================================================
    Duas telas montam o mesmo formulário: Cadastrar Caso e a edição dentro do
-   modal do Dashboard. Elas não têm duas cópias disto.
+   modal do Trabalho. Elas não têm duas cópias disto.
 
    A razão é a mesma que já custou caro neste projeto: regra copiada em dois
    lugares é regra que um dia diverge. A máscara do CPF, o seletor vazio que
@@ -2720,6 +2708,54 @@ var Formulario = (function () {
     return !!campo.mascara
       && (campo.tipo === 'documento' || campo.tipo === 'identificador'
         || campo.tipo === 'telefone');
+  }
+
+  /* --------------------------------------------------------------- dinheiro */
+
+  /** Até onde o campo de valor vai: R$ 999.999.999,99. */
+  var DIGITOS_DO_DINHEIRO = 11;   // nove inteiros + dois centavos
+
+  /**
+   * O valor em dinheiro, formatado enquanto a pessoa digita.
+   *
+   * SÓ DÍGITO ENTRA. Não é preferência de estilo: um "aprox. 1200" ou um "1200
+   * reais" digitado no campo de prêmio chega ao servidor, não vira número, e a
+   * célula fica vazia — o caso é gravado com o valor faltando, sem ninguém
+   * notar, e o Power BI soma menos do que deveria. Impedir a letra de entrar é
+   * mais barato que descobrir isso num relatório três meses depois.
+   *
+   * O número CRESCE DA DIREITA, como numa maquininha de cartão: digitar 1, 2,
+   * 3 mostra R$ 0,01 → R$ 0,12 → R$ 1,23. É como se digita valor a vida
+   * inteira, e evita a dúvida de "preciso digitar a vírgula?".
+   *
+   * Nove casas inteiras contemplam de uma apólice de R$ 12,90 a uma de
+   * R$ 999.999.999,99 — que é o que a operação pediu.
+   */
+  function aplicarMascaraDeDinheiro(valor) {
+    var digitos = String(valor || '').replace(/\D/g, '');
+    // Zeros à esquerda saem, senão digitar e apagar deixa "R$ 000,05" na tela.
+    digitos = digitos.replace(/^0+/, '');
+    if (!digitos) return '';
+    if (digitos.length > DIGITOS_DO_DINHEIRO) {
+      digitos = digitos.substring(0, DIGITOS_DO_DINHEIRO);
+    }
+
+    while (digitos.length < 3) digitos = '0' + digitos;   // garante os centavos
+
+    var centavos = digitos.slice(-2);
+    var inteiros = digitos.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'R$ ' + inteiros + ',' + centavos;
+  }
+
+  /**
+   * Campo de dinheiro não usa a máscara comum, que é de posição fixa.
+   *
+   * A do CPF tem onze dígitos sempre, nas mesmas casas. A de dinheiro cresce
+   * da direita e muda de tamanho a cada tecla — são duas máquinas diferentes,
+   * e tentar fazer uma servir às duas foi o que me fez escrever esta.
+   */
+  function ehCampoDeDinheiro(campo) {
+    return campo.tipo === 'moeda';
   }
 
   /* -------------------------------------------------------------- desenhar */
@@ -2777,8 +2813,14 @@ var Formulario = (function () {
       else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
         || campo.tipo === 'percentual') htmlTipo = 'text';
 
+      var dinheiro = ehCampoDeDinheiro(campo);
+      // inputmode="decimal" faz o celular abrir o teclado NUMÉRICO. Sem isso a
+      // pessoa abre o alfabético, procura o número e digita errado com mais
+      // frequência — e metade da operação trabalha no telefone.
       controle = '<input type="' + htmlTipo + '" id="' + id + '"'
         + ' data-chave="' + escapar(campo.chave) + '"'
+        + (dinheiro ? ' data-dinheiro="sim" inputmode="decimal"' : '')
+        + (dinheiro ? ' placeholder="R$ 0,00"' : '')
         + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
         + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
         + ' autocomplete="off"' + exigido + travado + '>';
@@ -2914,6 +2956,30 @@ var Formulario = (function () {
    * cima da tela de cadastro, procurar na página inteira ligaria os dois.
    */
   function ligar(raiz, prefixo) {
+    /*
+     * O CAMPO DE DINHEIRO.
+     *
+     * `keypress` barra a tecla que não é dígito ANTES de ela entrar; `input`
+     * reformata o que sobrou. Os dois são necessários: o keypress não pega
+     * colar nem ditado, e o input sozinho deixaria a letra piscar na tela
+     * antes de sumir.
+     *
+     * O cursor vai sempre para o fim porque o número cresce da direita — se
+     * ele ficasse no meio, digitar o próximo dígito inseriria no lugar errado.
+     */
+    var deDinheiro = raiz.querySelectorAll('[data-dinheiro]');
+    for (var d = 0; d < deDinheiro.length; d++) {
+      deDinheiro[d].addEventListener('keypress', function (evento) {
+        if (evento.key && evento.key.length === 1 && !/\d/.test(evento.key)) {
+          evento.preventDefault();
+        }
+      });
+      deDinheiro[d].addEventListener('input', function () {
+        this.value = aplicarMascaraDeDinheiro(this.value);
+        this.selectionStart = this.selectionEnd = this.value.length;
+      });
+    }
+
     var comMascara = raiz.querySelectorAll('[data-mascara]');
     for (var i = 0; i < comMascara.length; i++) {
       comMascara[i].addEventListener('input', function () {
@@ -3011,6 +3077,13 @@ var Formulario = (function () {
       var valor = texto(valoresDoCaso[chave]);
 
       if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
+      // O dinheiro volta do servidor como NÚMERO — 1234.56 —, porque é assim
+      // que ele mora na célula. Na tela ele tem de aparecer como a pessoa
+      // digitou: R$ 1.234,56. Sem esta linha, abrir um caso para editar
+      // mostraria "1234.56" no campo, e salvar de novo gravaria 123456.
+      if (controles[i].getAttribute('data-dinheiro')) {
+        valor = aplicarMascaraDeDinheiro(comoNumeroEmCentavos(valor));
+      }
       controles[i].value = valor;
 
       // Valor que não está entre as opções: o seletor ficaria em branco e a
@@ -3023,6 +3096,25 @@ var Formulario = (function () {
         controles[i].value = valor;
       }
     }
+  }
+
+  /**
+   * "1234.56" (como o servidor manda) vira "123456" (o que a máscara espera).
+   *
+   * A máscara conta em CENTAVOS, da direita para a esquerda. Mandar "1234.56"
+   * direto para ela daria R$ 1.234,56 por sorte — os dígitos são os mesmos —,
+   * mas "1234.5" daria R$ 123,45 em vez de R$ 1.234,50, e "1234" daria
+   * R$ 12,34 em vez de R$ 1.234,00. Os três casos chegam do servidor.
+   */
+  function comoNumeroEmCentavos(valor) {
+    var limpo = String(valor === null || valor === undefined ? '' : valor).trim();
+    if (!limpo) return '';
+    var numero = Number(limpo.replace(/\./g, '').replace(',', '.'));
+    if (limpo.indexOf('.') >= 0 || limpo.indexOf(',') >= 0) {
+      numero = Number(limpo.replace(',', '.'));
+    }
+    if (!isFinite(numero)) return '';
+    return String(Math.round(numero * 100));
   }
 
   function paraCaixaDeData(valor) {
@@ -3065,6 +3157,8 @@ var Formulario = (function () {
 
   return {
     aplicarMascara: aplicarMascara,
+    aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
+    ehCampoDeDinheiro: ehCampoDeDinheiro,
     usaMascara: usaMascara,
     desenhar: desenhar,
     ligar: ligar,
@@ -3126,7 +3220,7 @@ var CasoEmModal = (function () {
 
   /**
    * Abre o caso. `quandoMudar` é chamado no fim, e só se algo mudou — assim o
-   * Dashboard recarrega quando precisa, e fica quieto quando a pessoa só
+   * Trabalho recarrega quando precisa, e fica quieto quando a pessoa só
    * olhou e fechou.
    */
   function abrir(idDoCanal, idDoCaso, quandoMudar, jaEditando) {
@@ -3473,7 +3567,7 @@ var CasoEmModal = (function () {
 /* ============================================================================
    PGO — Graficos.html · os desenhos, num lugar só
    ============================================================================
-   Duas telas desenham gráficos: o Painel Analítico e Minha Performance. Elas
+   Duas telas desenham gráficos: a Produtividade RECC e Minha Performance. Elas
    não têm duas cópias disto — pela mesma razão que já custou caro aqui:
    regra copiada em dois lugares é regra que um dia diverge, e num gráfico a
    divergência não dá erro. Vira uma barra um pouco mais alta do que devia, e
@@ -3893,10 +3987,10 @@ var Graficos = (function () {
 
 
 
-<!-- ==== Dashboard.html ==== -->
+<!-- ==== Trabalho.html ==== -->
 <script>
 /* ============================================================================
-   PGO — Dashboard.html · a visão do dia
+   PGO — Trabalho.html · a visão do dia
    ============================================================================
    Cartões em cima, fila embaixo. Os dois vêm da MESMA resposta do servidor,
    já filtrados pelo alcance do nível — e por isso o número do cartão sempre
@@ -3905,7 +3999,7 @@ var Graficos = (function () {
    certo.
    ============================================================================ */
 
-var TelaDashboard = (function () {
+var TelaTrabalho = (function () {
 
   var canalEscolhida = '';
   var filtrosEscolhidos = {};
@@ -4191,7 +4285,7 @@ var TelaDashboard = (function () {
    aparece aqui sozinho; campo escondido para o nível nem chega a ser enviado.
 
    Quem desenha, mascara e marca erro é o Formulario — o mesmo que o modal de
-   edição do Dashboard usa. Duas cópias do mesmo formulário divergiriam no
+   edição do Trabalho usa. Duas cópias do mesmo formulário divergiriam no
    primeiro ajuste.
    ============================================================================ */
 
@@ -4318,7 +4412,7 @@ var TelaCadastrarCaso = (function () {
    PGO — MinhaPerformance.html · a tela em que o analista se vê
    ============================================================================
    As outras telas mostram a operação. Esta mostra UMA PESSOA, e o cuidado
-   aqui é de outra natureza: um número mal escolhido no Dashboard atrapalha
+   aqui é de outra natureza: um número mal escolhido no Trabalho atrapalha
    uma decisão; um número mal escolhido aqui atrapalha alguém.
 
    O QUE ISSO MUDOU NO DESENHO:
@@ -4338,7 +4432,7 @@ var TelaCadastrarCaso = (function () {
      A média da equipe aparece sempre. "Abaixo da média" sem saber qual é a
      média não é informação, é só desconforto.
 
-   Quem desenha os gráficos é o Graficos — o mesmo do Painel Analítico.
+   Quem desenha os gráficos é o Graficos — o mesmo da Produtividade RECC.
    ============================================================================ */
 
 var TelaMinhaPerformance = (function () {
@@ -4346,9 +4440,6 @@ var TelaMinhaPerformance = (function () {
   var canalEscolhida = '';
   var dias = 0;
   var dados = null;
-  // 'eu' ou 'equipe'. Quem soma é o servidor; aqui só se guarda a escolha,
-  // para ela sobreviver a uma troca de período.
-  var vista = 'eu';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -4368,7 +4459,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', canalEscolhida, dias, vista)
+    Servidor.chamar('minhaPerformance', canalEscolhida, dias)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -4412,40 +4503,10 @@ var TelaMinhaPerformance = (function () {
     return '<div class="filtros">'
       + '<select class="filtro" id="periodo-da-performance" aria-label="Período">'
       + periodos + '</select>'
-      + desenharVista()
       + '<span class="contagem">' + escapar(dados.pessoa.nome)
       + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
       + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : '')
       + '</span></div>';
-  }
-
-  /**
-   * Os meus números, ou os da minha equipe.
-   *
-   * Só aparece para quem TEM equipe: quem administra não pertence a canal
-   * nenhum, e o servidor devolve a lista de vistas vazia. Dois botões em que um
-   * deles não muda nada ensinam a desconfiar dos outros.
-   *
-   * Quando a vista é a da equipe, o número deixa de ser sobre uma pessoa — e a
-   * tela precisa dizer isso, senão alguém lê "137 casos" como seus.
-   */
-  function desenharVista() {
-    if (!dados.vistasDisponiveis || !dados.vistasDisponiveis.length) return '';
-
-    return '<div class="vista-do-painel" role="group"'
-      + ' aria-label="De quem são os números">'
-      + dados.vistasDisponiveis.map(function (uma) {
-        return '<button type="button" class="botao-vista'
-          + (dados.vista === uma.valor ? ' ligado' : '') + '"'
-          + ' data-vista="' + escapar(uma.valor) + '"'
-          + ' aria-pressed="' + (dados.vista === uma.valor ? 'true' : 'false') + '">'
-          + escapar(uma.rotulo) + '</button>';
-      }).join('')
-      + '</div>'
-      + (dados.vista === 'equipe'
-        ? '<span class="aviso-da-vista">Somando as ' + dados.pessoasNaVista
-          + ' pessoas da sua equipe</span>'
-        : '');
   }
 
   /* --------------------------------------------------------- indicadores */
@@ -4591,14 +4652,6 @@ var TelaMinhaPerformance = (function () {
       });
     }
 
-    var trocarVista = document.querySelectorAll('#performance [data-vista]');
-    for (var v = 0; v < trocarVista.length; v++) {
-      trocarVista[v].addEventListener('click', function () {
-        vista = this.getAttribute('data-vista');
-        carregar();
-      });
-    }
-
     var abrir = document.querySelectorAll('[data-caso-recente]');
     for (var i = 0; i < abrir.length; i++) {
       abrir[i].addEventListener('click', function () {
@@ -4630,7 +4683,7 @@ var TelaMinhaPerformance = (function () {
 /* ============================================================================
    PGO — BuscarCaso.html · achar um caso que a fila não mostra mais
    ============================================================================
-   O Dashboard mostra os últimos 30 dias, de propósito. Quando o cliente liga
+   O Trabalho mostra os últimos 30 dias, de propósito. Quando o cliente liga
    citando um protocolo de abril, é aqui que se procura.
 
    A tela é uma caixa de busca e nada mais até alguém procurar algo. Não
@@ -4854,7 +4907,7 @@ var TelaBuscarCaso = (function () {
       botoes[i].addEventListener('click', function () {
         var canal = this.getAttribute('data-canal');
         var caso = this.getAttribute('data-achado');
-        // O mesmo modal do Dashboard: quem acha um caso aqui quer as mesmas
+        // O mesmo modal do Trabalho: quem acha um caso aqui quer as mesmas
         // ações que teria lá, e aprender duas telas para o mesmo caso é uma
         // a mais do que o necessário.
         CasoEmModal.abrir(canal, caso, function () {
@@ -6226,10 +6279,10 @@ var TelaTombamento = (function () {
 </script>
 
 
-<!-- ==== PainelAnalitico.html ==== -->
+<!-- ==== Produtividade.html ==== -->
 <script>
 /* ============================================================================
-   PGO — PainelAnalitico.html · o que está acontecendo na operação
+   PGO — Produtividade.html · o que está acontecendo na operação
    ============================================================================
    Os gráficos são SVG escrito à mão, sem biblioteca de fora — pelo mesmo
    motivo dos ícones: o Apps Script serve a página num quadro isolado, e cada
@@ -6252,16 +6305,19 @@ var TelaTombamento = (function () {
      cor, e nenhuma tela de trabalho pode depender disso.
    ============================================================================ */
 
-var TelaPainelAnalitico = (function () {
+var TelaProdutividade = (function () {
 
   var canalEscolhida = '';
   var filtros = {};
-  var dias = 0;
-  // 'equipe' ou 'eu'. Quem decide o que cada uma mostra é o servidor; aqui
-  // só se guarda a escolha, para ela sobreviver a um filtro e a uma troca de
-  // período. Filtrar no navegador daria dois números diferentes para a mesma
-  // pergunta, e o da tela seria o errado.
-  var vista = 'equipe';
+  /*
+   * COMO o período foi escolhido, e não o período em si.
+   *
+   * Quem calcula as datas é o SERVIDOR. Se a tela calculasse, o dia que
+   * aparece no gráfico sairia do relógio do navegador de quem está olhando, e
+   * o dia que o servidor contou sairia do relógio da planilha. Num fechamento
+   * de mês essa diferença é um dia inteiro de casos.
+   */
+  var periodo = { tipo: 'dias', dias: 0, de: '', ate: '', mes: '' };
   var painel = null;
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
@@ -6282,7 +6338,7 @@ var TelaPainelAnalitico = (function () {
     var caixa = elemento('analitico');
     if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
 
-    Servidor.chamar('painelAnalitico', canalEscolhida, filtros, dias, vista)
+    Servidor.chamar('produtividadeDaEquipe', canalEscolhida, filtros, periodo)
       .entao(function (resposta) {
         painel = resposta;
         desenhar();
@@ -6350,28 +6406,6 @@ var TelaPainelAnalitico = (function () {
       + '</div>';
   }
 
-  /**
-   * A equipe toda ou só os meus.
-   *
-   * Só aparece para quem tem as duas: o servidor devolve a lista vazia quando
-   * o nível de acesso da pessoa já a limita aos próprios casos. Um controle que
-   * não muda nada ensina a não confiar nos outros controles.
-   */
-  function desenharVista() {
-    if (!painel.vistasDisponiveis || !painel.vistasDisponiveis.length) return '';
-
-    return '<div class="vista-do-painel" role="group"'
-      + ' aria-label="De quem são os números">'
-      + painel.vistasDisponiveis.map(function (uma) {
-        return '<button type="button" class="botao-vista'
-          + (painel.vista === uma.valor ? ' ligado' : '') + '"'
-          + ' data-vista="' + escapar(uma.valor) + '"'
-          + ' aria-pressed="' + (painel.vista === uma.valor ? 'true' : 'false') + '">'
-          + escapar(uma.rotulo) + '</button>';
-      }).join('')
-      + '</div>';
-  }
-
   function desenharFiltros() {
     var caixas = painel.filtrosDisponiveis.map(function (filtro) {
       // A primeira opção é o nome do filtro puro — "Analista", "Status".
@@ -6389,19 +6423,85 @@ var TelaPainelAnalitico = (function () {
         + opcoes.join('') + '</select>';
     });
 
-    var periodos = [30, 60, 90, 180, 365].map(function (quantos) {
+    return '<div class="filtros">'
+      + desenharPeriodo()
+      + caixas.join('')
+      + '<span class="contagem">' + painel.total + ' casos · '
+      + escapar(painel.periodo.rotulo) + '</span></div>';
+  }
+
+  /**
+   * As três maneiras de escolher o período.
+   *
+   *   ATALHO    — "últimos 30 dias", que é o do dia a dia.
+   *   DE / ATÉ  — duas datas, para uma pergunta específica.
+   *   MÊS       — "setembro de 2026", que é como a operação REPORTA.
+   *
+   * Os três não aparecem ao mesmo tempo: a primeira caixa escolhe QUAL deles
+   * está valendo, e só os controles dele ficam na tela. Mostrar os três juntos
+   * deixaria três períodos preenchidos na tela e um só valendo — e ninguém
+   * consegue olhar isso e dizer qual é.
+   */
+  function desenharPeriodo() {
+    var tipo = painel.periodo.tipo;
+
+    // "Por dias", e não "Últimos dias": a caixa da direita já diz "Últimos 30
+    // dias", e as duas juntas liam "Últimos dias | Últimos 30 dias". A primeira
+    // caixa responde COMO se escolhe; a segunda, QUAL.
+    var comoEscolher = [['dias', 'Por dias'], ['intervalo', 'Por data'],
+      ['mes', 'Por mês']].map(function (par) {
+      return '<option value="' + par[0] + '"'
+        + (tipo === par[0] ? ' selected' : '') + '>' + par[1] + '</option>';
+    }).join('');
+
+    return '<select class="filtro" id="como-escolher-periodo"'
+      + ' aria-label="Como escolher o período">' + comoEscolher + '</select>'
+      + (tipo === 'intervalo' ? desenharDeAte()
+        : (tipo === 'mes' ? desenharMes() : desenharAtalhos()));
+  }
+
+  function desenharAtalhos() {
+    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
       return '<option value="' + quantos + '"'
         + (painel.periodo.dias === quantos ? ' selected' : '') + '>'
         + 'Últimos ' + quantos + ' dias</option>';
     }).join('');
 
-    return '<div class="filtros">'
-      + '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
-      + periodos + '</select>'
-      + caixas.join('')
-      + desenharVista()
-      + '<span class="contagem">' + painel.total + ' casos · '
-      + escapar(painel.periodo.rotulo) + '</span></div>';
+    return '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
+      + opcoes + '</select>';
+  }
+
+  /*
+   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
+   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
+   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que é o que o
+   * servidor lê sem ambiguidade — 03/04 é 3 de abril aqui e 4 de março em
+   * outros lugares, e essa confusão não pode entrar num fechamento.
+   */
+  function desenharDeAte() {
+    return '<input type="date" class="filtro" id="periodo-de"'
+      + ' aria-label="Data inicial" value="' + escapar(comoOCampoDeDataLe(painel.periodo.de)) + '">'
+      + '<span class="ate-do-periodo">até</span>'
+      + '<input type="date" class="filtro" id="periodo-ate"'
+      + ' aria-label="Data final" value="' + escapar(comoOCampoDeDataLe(painel.periodo.ate)) + '">';
+  }
+
+  function desenharMes() {
+    var opcoes = (painel.mesesDisponiveis || []).map(function (mes) {
+      return '<option value="' + escapar(mes.valor) + '"'
+        + (painel.periodo.mes === mes.valor ? ' selected' : '') + '>'
+        + escapar(mes.rotulo) + '</option>';
+    }).join('');
+
+    return '<select class="filtro" id="mes-do-painel" aria-label="Mês">'
+      + opcoes + '</select>';
+  }
+
+  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
+  function comoOCampoDeDataLe(texto) {
+    var partes = String(texto || '').split('/');
+    if (partes.length !== 3) return '';
+    return partes[2] + '-' + partes[1] + '-' + partes[0];
   }
 
   /* ------------------------------------------------------------- gráficos */
@@ -6441,16 +6541,11 @@ var TelaPainelAnalitico = (function () {
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
-        if (this.id === 'periodo-do-painel') dias = Number(this.value);
-        else filtros[this.getAttribute('data-filtro')] = this.value;
+        if (mexeuNoPeriodo(this)) return;
+        filtros[this.getAttribute('data-filtro')] = this.value;
         carregar();
       });
     }
-
-    ligarCliques('[data-vista]', function (botao) {
-      vista = botao.getAttribute('data-vista');
-      carregar();
-    });
 
     ligarCliques('[data-tabela]', function (botao) {
       var id = botao.getAttribute('data-tabela');
@@ -6472,6 +6567,66 @@ var TelaPainelAnalitico = (function () {
     Graficos.ligarDica(elemento('analitico'));
   }
 
+  /**
+   * Trata as caixas do período, e devolve true quando era uma delas.
+   *
+   * O DE/ATÉ só recarrega com as DUAS datas preenchidas. Recarregar na
+   * primeira mostraria o resultado de um intervalo pela metade, que a pessoa
+   * leria como se fosse a resposta — e ela vai preencher a segunda meio
+   * segundo depois de qualquer jeito.
+   */
+  function mexeuNoPeriodo(caixa) {
+    if (caixa.id === 'como-escolher-periodo') {
+      // Trocar de maneira zera as outras: guardar um mês escolhido enquanto se
+      // usa o de/até deixaria dois períodos vivos e um só valendo.
+      periodo = { tipo: caixa.value, dias: painel.periodo.dias, de: '', ate: '', mes: '' };
+      if (periodo.tipo === 'mes' && painel.mesesDisponiveis.length) {
+        periodo.mes = painel.mesesDisponiveis[0].valor;   // o mês corrente
+      }
+      if (periodo.tipo === 'intervalo') {
+        // Abre já preenchido com o período que estava valendo, para a pessoa
+        // ajustar uma ponta em vez de digitar as duas do zero.
+        periodo.de = painel.periodo.de;
+        periodo.ate = painel.periodo.ate;
+      }
+      carregar();
+      return true;
+    }
+
+    if (caixa.id === 'periodo-do-painel') {
+      periodo = { tipo: 'dias', dias: Number(caixa.value), de: '', ate: '', mes: '' };
+      carregar();
+      return true;
+    }
+
+    if (caixa.id === 'mes-do-painel') {
+      periodo = { tipo: 'mes', dias: 0, de: '', ate: '', mes: caixa.value };
+      carregar();
+      return true;
+    }
+
+    if (caixa.id === 'periodo-de' || caixa.id === 'periodo-ate') {
+      var de = elemento('periodo-de');
+      var ate = elemento('periodo-ate');
+      periodo = {
+        tipo: 'intervalo', dias: 0, mes: '',
+        de: comoOServidorLe(de ? de.value : ''),
+        ate: comoOServidorLe(ate ? ate.value : '')
+      };
+      if (periodo.de && periodo.ate) carregar();
+      return true;
+    }
+
+    return false;
+  }
+
+  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
+  function comoOServidorLe(texto) {
+    var partes = String(texto || '').split('-');
+    if (partes.length !== 3) return '';
+    return partes[2] + '/' + partes[1] + '/' + partes[0];
+  }
+
   function ligarCliques(seletor, oQueFazer) {
     var achados = document.querySelectorAll('#analitico ' + seletor);
     for (var i = 0; i < achados.length; i++) {
@@ -6491,7 +6646,7 @@ var TelaPainelAnalitico = (function () {
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     Servidor.chamar('detalharComponente', canalEscolhida, idDoComponente,
-      chaveDoPonto, filtros, dias, vista)
+      chaveDoPonto, filtros, periodo)
       .entao(function (resposta) { desenharDetalhe(resposta); })
       .senao(function (erro) {
         caixa.innerHTML = '<p class="carregando-campos erro-carga">'
@@ -6557,7 +6712,7 @@ var TelaPainelAnalitico = (function () {
    */
   function exportar(idDoComponente) {
     Servidor.chamar('exportarComponente', canalEscolhida, idDoComponente,
-      filtros, dias, vista)
+      filtros, periodo)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
   }
@@ -7530,7 +7685,7 @@ var TelaConfiguracoes = (function () {
    * dos gráficos: os cartões respondem "quantos reteve", os gráficos explicam.
    *
    * A aba não é a mesma coisa que a tela do servidor: duas abas daqui editam
-   * cartões da MESMA tela (`painelAnalitico`), mudando só o tipo. Guardar as
+   * cartões da MESMA tela (`produtividade`), mudando só o tipo. Guardar as
    * duas coisas na mesma variável foi o que me fez confundir uma com a outra.
    */
   var abaDosPaineis = 'cardsDoTrabalho';
@@ -7538,9 +7693,9 @@ var TelaConfiguracoes = (function () {
 
   /** A qual tela do servidor cada aba daqui corresponde. */
   var TELA_DA_ABA = {
-    cardsDoTrabalho: 'dashboard',
-    cartoesDaProdutividade: 'painelAnalitico',
-    graficosDaProdutividade: 'painelAnalitico'
+    cardsDoTrabalho: 'trabalho',
+    cartoesDaProdutividade: 'produtividade',
+    graficosDaProdutividade: 'produtividade'
   };
 
   function carregarPaineis() {
@@ -7559,7 +7714,7 @@ var TelaConfiguracoes = (function () {
 
   function carregarGraficos() {
     aguarde('Lendo os gráficos…');
-    Servidor.chamar('opcoesDoPainelAnalitico', canalDosCards)
+    Servidor.chamar('opcoesDosGraficos', canalDosCards)
       .entao(function (opcoes) {
         dados.opcoesDoGrafico = opcoes;
         Servidor.chamar('listarComponentesDoPainel', canalDosCards)
@@ -7584,7 +7739,7 @@ var TelaConfiguracoes = (function () {
   /**
    * O nome que a tela tem HOJE, do jeito que o administrador a batizou.
    *
-   * Escrever "Dashboard" aqui deixaria as abas de Configurações falando de uma
+   * Escrever "Trabalho" aqui deixaria as abas de Configurações falando de uma
    * tela que o menu chama de "Trabalho" — e a pessoa procuraria, com razão,
    * uma terceira tela que não existe. O nome mora num lugar só, e é este.
    */
@@ -7596,8 +7751,8 @@ var TelaConfiguracoes = (function () {
 
   /** As três listas configuráveis: os cards de uma tela e os da outra, mais os gráficos. */
   function escolhaDeTela() {
-    var trabalho = nomeDaTela('dashboard', 'Trabalho');
-    var produtividade = nomeDaTela('painelAnalitico', 'Produtividade RECC');
+    var trabalho = nomeDaTela('trabalho', 'Trabalho');
+    var produtividade = nomeDaTela('produtividade', 'Produtividade RECC');
 
     return '<div class="config-abas">'
       + [['cardsDoTrabalho', 'Cards do ' + trabalho],
@@ -7623,7 +7778,7 @@ var TelaConfiguracoes = (function () {
     var opcoes = dados.opcoesDoGrafico;
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">Gráficos do Painel Analítico</span></div>'
+      + '<span class="config-titulo">Gráficos da Produtividade RECC</span></div>'
       + escolhaDeTela()
       + '<p class="config-explica">Cada gráfico responde a <strong>uma</strong> '
       + 'pergunta. Gráfico que não responde pergunta nenhuma é enfeite, e '
@@ -7785,7 +7940,7 @@ var TelaConfiguracoes = (function () {
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Cards da operação</span></div>'
       + escolhaDeTela()
-      + '<p class="config-explica">Escolha os cards do Dashboard. '
+      + '<p class="config-explica">Escolha os cards do Trabalho. '
       + 'Até ' + dados.painel.maximo + ' cards por operação. Remover ou '
       + 'ocultar um card <strong>mantém os casos</strong> — o card é uma forma '
       + 'de contar, e apagar a conta não apaga o que foi contado. As contagens '
@@ -7821,7 +7976,7 @@ var TelaConfiguracoes = (function () {
 
   function desenharCards() {
     if (!cardsEmEdicao.length) {
-      return '<p class="config-vazio">Nenhum card nesta operação. O Dashboard '
+      return '<p class="config-vazio">Nenhum card nesta operação. O Trabalho '
         + 'mostra a fila, e nenhum número em cima dela.</p>';
     }
     return cardsEmEdicao.map(function (card, posicao) {
@@ -8337,10 +8492,15 @@ var TelaConfiguracoes = (function () {
         Servidor.chamar('configuracaoDoLegado')
           .entao(function (legado) {
             dados.legado = legado;
-            Servidor.chamar('listarAuditoria', 40)
-              .entao(function (trilha) {
-                dados.trilha = trilha;
-                desenharEstrutura();
+            Servidor.chamar('configuracaoDosCadastros')
+              .entao(function (cadastros) {
+                dados.cadastros = cadastros;
+                Servidor.chamar('listarAuditoria', 40)
+                  .entao(function (trilha) {
+                    dados.trilha = trilha;
+                    desenharEstrutura();
+                  })
+                  .senao(falhou);
               })
               .senao(falhou);
           })
@@ -8378,8 +8538,10 @@ var TelaConfiguracoes = (function () {
       + 'para a coluna errada.</p>'
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
-    elemento('config-lista').innerHTML += desenharDiagnostico() + desenharLegado();
+    elemento('config-lista').innerHTML += desenharDiagnostico()
+      + desenharCadastros() + desenharLegado();
     ligarDiagnostico();
+    ligarCadastros();
     ligarLegado();
 
     elemento('config-painel').innerHTML = '<div class="config-form">'
@@ -8494,6 +8656,111 @@ var TelaConfiguracoes = (function () {
    * guardar um Id que não abre deixaria a busca com um recado de erro para
    * sempre, sem ninguém saber se o Id estava errado ou se a planilha sumiu.
    */
+  /**
+   * A segunda base: onde os cadastros moram.
+   *
+   * Duas bases — a operacional, com os casos, e a de cadastros, com corretora,
+   * SUSEP, produto e as listas de analista. Tirar os cadastros daqui é o que
+   * deixa a planilha operacional leve: as 7 mil SUSEPs e as 145 corretoras
+   * sozinhas já ocupam um pedaço do teto de 10 milhões de células.
+   *
+   * O botão de CONFERIR vem antes do de salvar, e é de propósito: apontar uma
+   * planilha errada deixa a Tabela de Corretoras e o selo da SUSEP com recado
+   * de erro, e conferir antes custa cinco segundos.
+   */
+  function desenharCadastros() {
+    var cadastros = dados.cadastros || { planilhaId: '', ligada: false, abas: [] };
+
+    var quaisAbas = cadastros.abas.map(function (uma) {
+      return '<li><strong>' + escapar(uma.aba) + '</strong> — '
+        + escapar(uma.titulo) + '<br><small>colunas: '
+        + escapar(uma.colunas.join(', ')) + '</small></li>';
+    }).join('');
+
+    return '<div class="config-legado">'
+      + '<h4>Planilha de cadastros — a segunda base</h4>'
+      + '<p class="config-explica">Corretoras, SUSEPs bloqueadas, produtos e as '
+      + 'duas listas de analista podem morar em OUTRA planilha. O PGO lê dela '
+      + 'na hora, sem copiar nada: o que mudar lá vale aqui na leitura '
+      + 'seguinte. Isso deixa esta planilha mais leve e evita manter o mesmo '
+      + 'cadastro em dois lugares. <strong>O PGO só lê</strong> — para editar '
+      + 'um cadastro, edite a planilha de cadastros. Vazio traz tudo de volta '
+      + 'para cá.</p>'
+      + (cadastros.ligada
+        ? '<p class="config-alerta suave">Ligada. Se essa planilha sair do ar '
+          + 'ou perder o compartilhamento, a Tabela de Corretoras e o selo da '
+          + 'SUSEP param — com recado explicando o motivo, não em silêncio.</p>'
+        : '')
+      + '<form class="config-form" id="form-cadastros">'
+      + campoDeTexto('cadastrosId', 'Id da planilha de cadastros',
+        cadastros.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
+        + 'precisa ter acesso a ela.')
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="conferir-cadastros">'
+      + 'Conferir a ligação</button>'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + '</div></form>'
+      + '<div id="laudo-dos-cadastros"></div>'
+      + '<details class="config-explica"><summary>O que a planilha precisa ter'
+      + '</summary><ul class="config-itens">' + quaisAbas + '</ul>'
+      + '<p>Uma aba por lista, com esses nomes, e a primeira linha com esses '
+      + 'cabeçalhos. Coluna a mais é lida e ignorada; coluna a menos o botão '
+      + 'de conferir aponta.</p></details>'
+      + '</div>';
+  }
+
+  function ligarCadastros() {
+    elemento('conferir-cadastros').addEventListener('click', function () {
+      var caixa = elemento('laudo-dos-cadastros');
+      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
+
+      Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'))
+        .entao(function (laudo) {
+          caixa.innerHTML = '<p class="config-alerta'
+            + (laudo.abre && !laudo.faltando.length ? ' suave' : '') + '">'
+            + escapar(laudo.recado) + '</p>'
+            + (laudo.faltando.length
+              ? '<ul class="config-itens">' + laudo.faltando.map(function (linha) {
+                return '<li>' + escapar(linha) + '</li>';
+              }).join('') + '</ul>'
+              : '')
+            + (laudo.abas && laudo.abas.length
+              ? '<ul class="config-itens">' + laudo.abas.map(function (uma) {
+                return '<li>' + escapar(uma.aba) + ': ' + uma.linhas
+                  + ' linha(s)' + (uma.completa ? '' : ' — faltam colunas')
+                  + '</li>';
+              }).join('') + '</ul>'
+              : '');
+        })
+        .senao(function (erro) {
+          caixa.innerHTML = '<p class="config-alerta">'
+            + escapar(erro.message || String(erro)) + '</p>';
+        });
+    });
+
+    elemento('form-cadastros').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      // Apontar a segunda base muda de onde o sistema inteiro lê os cadastros.
+      // Vai pela porta da senha, como as outras mudanças de estrutura.
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarConfiguracaoDosCadastros',
+          { planilhaId: valorDe('cadastrosId') })
+          .entao(function (nova) {
+            dados.cadastros = nova;
+            avisarSalvo(nova.ligada
+              ? 'Planilha de cadastros ligada e conferida.'
+              : 'Planilha de cadastros desligada — os cadastros voltam a ser '
+                + 'lidos desta planilha.');
+            carregarEstrutura();
+          })
+          .senao(function (erro) {
+            avisar(erro.message || String(erro), 'ruim');
+          });
+      });
+    });
+  }
+
   function desenharLegado() {
     var legado = dados.legado;
     return '<div class="config-legado">'
@@ -8723,7 +8990,7 @@ var Servidor = (function () {
 
     O Apps Script responde quando responde, e ninguém espera parado: dá tempo
     de sobra para clicar em Configurações, achar que demorou, e ir para o
-    Dashboard antes de a resposta chegar. Quando ela chega, o código que ia
+    Trabalho antes de a resposta chegar. Quando ela chega, o código que ia
     desenhá-la procura um elemento que não existe mais e estoura com
     "Cannot set properties of null" — um erro que não diz nada sobre o que a
     pessoa fez, e que só aparece para quem está com o console aberto.
@@ -8886,11 +9153,11 @@ var Rotas = (function () {
   }
 
   var TELAS = {
-    dashboard: {
-      titulo: 'Dashboard',
+    trabalho: {
+      titulo: 'Trabalho',
       subtitulo: 'Visão do dia: indicadores e a fila de trabalho da sua equipe.',
-      montar: function (pacote) { return TelaDashboard.montar(pacote); },
-      ligar: function (pacote) { TelaDashboard.ligar(pacote); }
+      montar: function (pacote) { return TelaTrabalho.montar(pacote); },
+      ligar: function (pacote) { TelaTrabalho.ligar(pacote); }
     },
     cadastrarCaso: {
       titulo: 'Cadastrar Caso',
@@ -8925,12 +9192,12 @@ var Rotas = (function () {
       montar: function (pacote) { return TelaTombamento.montar(pacote); },
       ligar: function (pacote) { TelaTombamento.ligar(pacote); }
     },
-    painelAnalitico: {
-      titulo: 'Painel Analítico',
+    produtividade: {
+      titulo: 'Produtividade RECC',
       subtitulo: 'Explore dados e identifique oportunidades para a operação.',
-      montar: function (pacote) { return TelaPainelAnalitico.montar(pacote); },
-      ligar: function (pacote) { TelaPainelAnalitico.ligar(pacote); },
-      desligar: function () { TelaPainelAnalitico.desligar(); }
+      montar: function (pacote) { return TelaProdutividade.montar(pacote); },
+      ligar: function (pacote) { TelaProdutividade.ligar(pacote); },
+      desligar: function () { TelaProdutividade.desligar(); }
     },
     configuracoes: {
       titulo: 'Configurações',
@@ -8957,10 +9224,10 @@ var Aplicacao = (function () {
   /**
    * O nome que a tela tem HOJE, que é o mesmo que o menu mostra.
    *
-   * O título do menu é configurável desde que o PO renomeou "Dashboard" para
+   * O título do menu é configurável desde que o PO renomeou "Trabalho" para
    * "Trabalho" — mas o cabeçalho da página vinha da tabela de rotas, escrito à
    * mão. O resultado era um menu dizendo "Trabalho" e a página, logo ao lado,
-   * dizendo "Dashboard": duas respostas para a mesma pergunta, na mesma tela.
+   * dizendo "Trabalho": duas respostas para a mesma pergunta, na mesma tela.
    *
    * O título da rota continua servindo de reserva, para o caso de uma tela que
    * o servidor não listou (sem permissão de ver, por exemplo).
@@ -9012,12 +9279,12 @@ var Aplicacao = (function () {
     Servidor.trocouDeTela();
 
     if (!Rotas.existe(tela) || !podeVer(tela)) {
-      tela = pacote.menu.length ? pacote.menu[0].tela : 'dashboard';
+      tela = pacote.menu.length ? pacote.menu[0].tela : 'trabalho';
     }
 
     // A tela que sai precisa poder se despedir: quem registrou atalho de
     // teclado tem de removê-lo, senão o Ctrl+Enter do cadastro continuaria
-    // valendo dentro do Painel Analítico.
+    // valendo dentro da Produtividade RECC.
     if (telaAtual && Rotas.existe(telaAtual)) {
       var anterior = Rotas.pegar(telaAtual);
       if (anterior.desligar) anterior.desligar();
@@ -9192,7 +9459,7 @@ var Aplicacao = (function () {
     elemento('aplicacao').hidden = false;
     restaurarEncolhido();
     aplicarTema(pacote.tema || 'padrao');
-    irPara(telaDoEndereco() || 'dashboard', true);
+    irPara(telaDoEndereco() || 'trabalho', true);
     ligarTeclado();
   }
 

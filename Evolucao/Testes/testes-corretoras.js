@@ -362,7 +362,7 @@ function rodarTestesDeCorretoras() {
     chamar('salvarNivelDeAcesso')({
       id: consulta.Id, escopo: 'TODOS',
       acoes: ['exportar', 'configurar'],
-      telas: ['dashboard', 'buscarCaso', 'painelAnalitico', 'configuracoes',
+      telas: ['trabalho', 'buscarCaso', 'produtividade', 'configuracoes',
         'tabelaCorretoras']
     });
     chamar('salvarUsuario')({

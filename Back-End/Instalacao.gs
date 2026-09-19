@@ -202,22 +202,22 @@ function semearDadosIniciais_(emailDoInstalador) {
   var niveis = inserirVariosRegistros_('CATALOGO', [
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
-      ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'painelAnalitico', 'configuracoes']),
+      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes']),
     // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
     // distribui. A Operação não — um analista não traz trezentos casos para
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
-      ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'painelAnalitico']),
+      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+       'tabelaCorretoras', 'tombamento', 'produtividade']),
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
-      ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
        'tabelaCorretoras']),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
       ['exportar'],
-      ['dashboard', 'buscarCaso', 'painelAnalitico'])
+      ['trabalho', 'buscarCaso', 'produtividade'])
   ]);
   contagem.niveis = niveis.length;
   var idAdministrador = niveis[0]['Id'];
@@ -366,7 +366,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.catalogo = inserirVariosRegistros_('CATALOGO', itens).length +
     contagem.niveis + contagem.cargos;
 
-  // --- cartões do Dashboard -------------------------------------------------
+  // --- cartões do Trabalho -------------------------------------------------
   // Os cartões moram em PAINEIS, e não em CANAIS: são uma LISTA de coisas
   // configuráveis, cada uma com nome, cor e ordem próprios. Guardá-los como
   // um texto separado por vírgula dentro do canal dava conta de escolher
@@ -479,7 +479,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
 }
 
 /**
- * Os cartões que o Dashboard mostra quando o sistema nasce.
+ * Os cartões que o Trabalho mostra quando o sistema nasce.
  *
  * A RET mostra todas as situações; a Mesa Diamante mostra duas. Não é
  * capricho: a Canal tem muito menos volume, e sete cartões de números pequenos
@@ -491,7 +491,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
 
   function novoCartao(canalId, titulo, dimensao, filtro, cor, ordem, tela) {
     return {
-      Tela: tela || 'dashboard',
+      Tela: tela || 'trabalho',
       CanalId: canalId,
       Titulo: titulo,
       TipoWidget: 'cartao',
@@ -509,7 +509,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   }
 
   // A RET mostra o total e as cinco situações que ainda pedem trabalho.
-  // "Concluído" existe como situação, mas NÃO ganha cartão: o Dashboard
+  // "Concluído" existe como situação, mas NÃO ganha cartão: o Trabalho
   // responde "o que eu tenho que trabalhar hoje", e caso concluído não é
   // trabalho. Quem quiser o número acrescenta o cartão em Configurações.
   cartoes.push(novoCartao(idRet, 'Total de casos', 'total', '', 'destaque', 1));
@@ -544,7 +544,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
 
   function cartaoDaProdutividade(canalId, titulo, dimensao, filtro, cor, ordem) {
     return novoCartao(canalId, titulo, dimensao, filtro, cor, ordem,
-      'painelAnalitico');
+      'produtividade');
   }
 
   cartoes.push(cartaoDaProdutividade(idRet, 'Casos cadastrados', 'total', '', 'destaque', 1));
@@ -565,13 +565,13 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   cartoes.push(cartaoDaProdutividade(idCanal, 'Em andamento', 'situacao',
     'Em andamento', 'atencao', 4));
 
-  // ---- os gráficos do Painel Analítico ------------------------------------
+  // ---- os gráficos da Produtividade RECC ------------------------------------
   // Cada um responde a UMA pergunta. Gráfico que não responde pergunta
   // nenhuma é enfeite, e enfeite numa tela de trabalho é ruído.
   function novoGrafico(canalId, titulo, tipo, dimensao, agregacao, medida,
     limite, largura, ordem) {
     return {
-      Tela: 'painelAnalitico', CanalId: canalId, Titulo: titulo,
+      Tela: 'produtividade', CanalId: canalId, Titulo: titulo,
       TipoWidget: tipo, CampoDimensao: dimensao, CampoMedida: medida || '',
       Agregacao: agregacao, Limite: limite || 0, Filtro: '',
       Ordem: ordem, Largura: largura, Cor: '', VisivelPara: '', Ativo: true
@@ -937,7 +937,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
  * POR QUE ELA EXISTE. Numa rodada, "mesa" virou "canal" em todo o sistema, e
  * a aba CANAIS — que guardava CORRETORAS — cedeu o nome. Uma instalação feita
  * antes disso continua com as abas antigas, e o código novo procura as novas:
- * o sistema abre, mas sem canal nenhum, e o Dashboard nasce vazio.
+ * o sistema abre, mas sem canal nenhum, e o Trabalho nasce vazio.
  *
  * O `instalarRECC()` não serve aqui: ele recusa rodar sobre planilha com dado,
  * de propósito. Sem esta função, a única saída seria apagar tudo e recomeçar —
@@ -1562,7 +1562,7 @@ function blocoDasCanais_() {
   if (!canais.length) {
     return [item_(RECC_SITUACOES_DO_LAUDO.FALHA,
       'Não há nenhum canal cadastrada',
-      'Sem canal, o Dashboard, o cadastro e a busca não têm onde procurar.',
+      'Sem canal, o Trabalho, o cadastro e a busca não têm onde procurar.',
       'Rode instalarRECC() ou cadastre em Configurações › Canais.')];
   }
 
@@ -1626,7 +1626,7 @@ function blocoDasCanais_() {
       'Nenhum canal está ligado',
       'Existem ' + canais.length + ' canal(is) cadastrado(s), e todos desligados.',
       'Ligue pelo menos uma em Configurações › Canais. Sem canal ligada o '
-        + 'Dashboard abre vazio.'));
+        + 'Trabalho abre vazio.'));
   }
 
   return itens;
@@ -1725,7 +1725,7 @@ function blocoDosPaineis_() {
   if (!componentes.length) {
     return [item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
       'Não há nenhum card nem gráfico cadastrado',
-      'O Dashboard abre só com a fila, e o Painel Analítico abre vazio.',
+      'O Trabalho abre só com a fila, e a Produtividade RECC abre vazio.',
       'Monte em Configurações › Painéis.')];
   }
 
@@ -1745,7 +1745,7 @@ function blocoDosPaineis_() {
       return;
     }
 
-    // Cartão do Dashboard não cita coluna: a dimensão dele é uma regra de
+    // Cartão do Trabalho não cita coluna: a dimensão dele é uma regra de
     // contagem ('total', 'situacao', 'naCelula'), e não um cabeçalho.
     if (normalizarParaComparar_(componente.TipoWidget) === 'cartao') return;
 

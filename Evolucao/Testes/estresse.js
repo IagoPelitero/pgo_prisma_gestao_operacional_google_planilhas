@@ -203,10 +203,10 @@ function rodar(alvo) {
   console.log('\r  pronto em ' + comoTempo(Date.now() - carga) + '            ');
 
   /* -- as telas ---------------------------------------------------------- */
-  medir('Dashboard: abrir a RET', 0.5,
+  medir('Trabalho: abrir a RET', 0.5,
     () => chamar('resumoDoCanal')(ret.id, {}));
 
-  medir('Dashboard: filtrar por situação', 0.5,
+  medir('Trabalho: filtrar por situação', 0.5,
     () => chamar('resumoDoCanal')(ret.id, { status: 'Pendente' }));
 
   medir('Buscar: por protocolo (só dígitos)', 0.5,
@@ -223,8 +223,8 @@ function rodar(alvo) {
   medir('Buscar: termo que casa com milhares', 0.5,
     () => chamar('buscarCasos')('Cliente', [], false));
 
-  medir('Painel Analítico: os 6 gráficos', 0.5,
-    () => chamar('painelAnalitico')(ret.id, {}, 30));
+  medir('Produtividade RECC: os 6 gráficos', 0.5,
+    () => chamar('produtividadeDaEquipe')(ret.id, {}, 30));
 
   medir('Minha Performance: 30 dias', 0.5,
     () => chamar('minhaPerformance')(ret.id, 30));
@@ -286,7 +286,7 @@ function rodar(alvo) {
   aba.getRange(linhaSuja, 2, 1, 4).setValues([['não é data', 'Ana Martins',
     'SUSEP inválida', 'Diamante']]);
 
-  medir('Dashboard com linha suja na base', 0.5,
+  medir('Trabalho com linha suja na base', 0.5,
     () => chamar('resumoDoCanal')(ret.id, {}));
   medir('Buscar com linha suja na base', 0.5,
     () => chamar('buscarCasos')('Ana Martins', [], false));

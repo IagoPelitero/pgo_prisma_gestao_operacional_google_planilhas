@@ -21,8 +21,8 @@ const path = require('path');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca } =
   require('./ferramentas');
 
-function rodarTestesDoAnalitico() {
-  console.log('\nEtapa 8 — Painel Analítico');
+function rodarTestesDaProdutividade() {
+  console.log('\nEtapa 8 — Produtividade RECC');
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
@@ -53,7 +53,7 @@ function rodarTestesDoAnalitico() {
   ]);
 
   const painelDaRet = (filtros, dias) =>
-    chamar('painelAnalitico')(ret.id, filtros || {}, dias || 30);
+    chamar('produtividadeDaEquipe')(ret.id, filtros || {}, dias || 30);
   const acharGrafico = (titulo) =>
     painelDaRet().componentes.find((c) => c.titulo.indexOf(titulo) === 0);
 
@@ -287,9 +287,9 @@ function rodarTestesDoAnalitico() {
     // Mesma máquina, duas telas, duas perguntas. O Trabalho mostra o que ainda
     // dá trabalho; a Produtividade, o que já foi entregue. Se a lista fosse uma
     // só, uma das duas telas estaria respondendo a pergunta da outra.
-    const doTrabalho = chamar('cartoesDoCanal_')(ret, 'dashboard')
+    const doTrabalho = chamar('cartoesDoCanal_')(ret, 'trabalho')
       .map((c) => c.titulo).join(' | ');
-    const daProdutividade = chamar('cartoesDoCanal_')(ret, 'painelAnalitico')
+    const daProdutividade = chamar('cartoesDoCanal_')(ret, 'produtividade')
       .map((c) => c.titulo).join(' | ');
     verdadeiro(doTrabalho !== daProdutividade, 'as duas listas não podem ser iguais');
     verdadeiro(doTrabalho.indexOf('Reteve') < 0, 'o Trabalho não mostra Reteve');
@@ -320,7 +320,7 @@ function rodarTestesDoAnalitico() {
     // ninguém" — quando é problema de instalação. Sumir manda procurar no
     // lugar certo, que é o diagnóstico.
     const lista = chamar('lerRegistros_("PAINEIS")').find((linha) =>
-      linha.Tela === 'painelAnalitico' && linha.Titulo === 'Com 2º contato');
+      linha.Tela === 'produtividade' && linha.Titulo === 'Com 2º contato');
     chamar('atualizarRegistro_')('PAINEIS', lista.Id,
       { CampoDimensao: 'preenchido', Filtro: 'Coluna que não existe' });
 
@@ -346,47 +346,212 @@ function rodarTestesDoAnalitico() {
     igual(painelDaRet().cartoes.length, antes, 'os cartões continuam todos lá');
   });
 
-  secao('A equipe e o individual');
+  secao('O período: atalho, de/até e mês fechado');
 
-  teste('o painel abre na equipe, e o seletor oferece as duas', () => {
+  /*
+   * Quem resolve as três maneiras é o SERVIDOR. A tela escolhe; ela não
+   * calcula. Se calculasse, o dia do gráfico sairia do relógio do navegador e
+   * o dia da conta sairia do relógio da planilha — num fechamento de mês essa
+   * diferença é um dia inteiro de casos.
+   */
+
+  const mesDe = (recuo) => {
+    const quando = new Date(hoje.getFullYear(), hoje.getMonth() - recuo, 1);
+    return quando.getFullYear() + '-'
+      + String(quando.getMonth() + 1).padStart(2, '0');
+  };
+
+  teste('o atalho continua sendo a abertura, e em dias', () => {
     const painel = painelDaRet();
-    igual(painel.vista, 'equipe', 'a visão completa é a de abertura');
-    igual(painel.vistasDisponiveis.map((v) => v.valor).join(','), 'equipe,eu');
+    igual(painel.periodo.tipo, 'dias');
+    igual(painel.periodo.dias, 30);
+    contem(painel.periodo.rotulo, 'últimos 30 dias');
   });
 
-  teste('"só os meus" corta para os casos de quem está olhando', () => {
-    const daEquipe = painelDaRet().total;
-    const meus = chamar('painelAnalitico')(ret.id, {}, 30, 'eu').total;
-    verdadeiro(meus < daEquipe,
-      'o administrador não é o responsável por todos os casos de teste');
-
-    // E o cartão acompanha: número de cartão que não bate com a vista é o
-    // tipo de erro que faz a operação parar de confiar na tela inteira.
-    const cartaoDaEquipe = painelDaRet().cartoes.find((c) => c.rotulo === 'Casos cadastrados');
-    const cartaoMeu = chamar('painelAnalitico')(ret.id, {}, 30, 'eu').cartoes
-      .find((c) => c.rotulo === 'Casos cadastrados');
-    igual(cartaoDaEquipe.valor, daEquipe);
-    igual(cartaoMeu.valor, meus);
+  teste('mandar só um número continua funcionando', () => {
+    // O Trabalho e a Minha Performance chamam assim, e a pergunta deles é
+    // sempre "os últimos N dias". Não havia motivo para mexer neles.
+    const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 60);
+    igual(painel.periodo.tipo, 'dias');
+    igual(painel.periodo.dias, 60);
   });
 
-  teste('o detalhamento respeita a vista do gráfico que foi clicado', () => {
-    // Sem número fixo: os testes acima deste vão criando casos, e um número
-    // cravado aqui quebraria a cada caso novo sem que nada tivesse quebrado.
-    // O que este teste precisa provar é a RELAÇÃO entre as duas vistas.
-    const grafico = acharGrafico('Casos por analista');
-    const daEquipe = chamar('detalharComponente')(ret.id, grafico.id,
-      'Marcos Vieira', {}, 30, 'equipe').total;
-    const meu = chamar('detalharComponente')(ret.id, grafico.id,
-      'Marcos Vieira', {}, 30, 'eu').total;
-    verdadeiro(daEquipe > 0, 'a equipe tem casos do Marcos, veio ' + daEquipe);
-    igual(meu, 0, 'e nenhum deles é do administrador que está olhando');
+  teste('de/até recorta exatamente entre as duas datas, inclusive', () => {
+    const painel = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(1) });
+
+    igual(painel.periodo.tipo, 'intervalo');
+    igual(painel.periodo.de, diasAtras(2), 'as duas pontas entram');
+    igual(painel.periodo.ate, diasAtras(1));
+    contem(painel.periodo.rotulo, 'de ' + diasAtras(2));
+
+    // Sem número cravado: os testes acima vão criando casos, e um número fixo
+    // quebraria a cada caso novo sem que nada tivesse quebrado. O que importa
+    // é a RELAÇÃO — os dois dias somam o que cada dia tem sozinho.
+    const primeiro = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(2) }).total;
+    const segundo = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'intervalo', de: diasAtras(1), ate: diasAtras(1) }).total;
+
+    verdadeiro(primeiro > 0 && segundo > 0, 'os dois dias têm caso');
+    igual(painel.total, primeiro + segundo,
+      'o intervalo de dois dias é a soma dos dois, com as pontas dentro');
   });
 
-  teste('vista desconhecida cai na equipe, e não em lista vazia', () => {
-    // Pedido torto vindo de um endereço antigo, ou de um clique repetido, não
-    // pode devolver zero: zero se lê como "a operação não produziu nada".
-    igual(chamar('painelAnalitico')(ret.id, {}, 30, 'sei-la').vista, 'equipe');
-    igual(chamar('painelAnalitico')(ret.id, {}, 30, '').vista, 'equipe');
+  teste('datas invertidas se endireitam, em vez de devolver zero', () => {
+    // Quem digitou "de 30/09 a 01/09" quis setembro. Uma tela zerada faria a
+    // pessoa procurar defeito no dado, que é o lugar errado.
+    const certo = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(1) });
+    const trocado = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'intervalo', de: diasAtras(1), ate: diasAtras(2) });
+    igual(trocado.total, certo.total);
+    igual(trocado.periodo.de, certo.periodo.de);
+  });
+
+  teste('o mês fechado vai do dia 1 ao último dia', () => {
+    const painel = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'mes', mes: mesDe(0) });
+
+    igual(painel.periodo.tipo, 'mes');
+    igual(painel.periodo.mes, mesDe(0));
+    contem(painel.periodo.de, '01/', 'começa no dia 1');
+
+    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+    contem(painel.periodo.ate, String(ultimoDia.getDate()).padStart(2, '0') + '/',
+      'e termina no último dia do mês, sem tabela de 30 ou 31');
+  });
+
+  teste('fevereiro bissexto sai certo, sem ninguém lembrar dele', () => {
+    const bissexto = chamar('resolverPeriodo_')({ tipo: 'mes', mes: '2024-02' });
+    igual(chamar('comoSeEscreve_')(bissexto.ate), '29/02/2024');
+
+    const comum = chamar('resolverPeriodo_')({ tipo: 'mes', mes: '2023-02' });
+    igual(chamar('comoSeEscreve_')(comum.ate), '28/02/2023');
+  });
+
+  teste('o mês anterior de um mês é o MÊS anterior, não 30 dias antes', () => {
+    // Comparar setembro com "os 30 dias antes de setembro" daria quase agosto,
+    // mas não agosto. Em fevereiro o erro é de três dias, todo ano.
+    const marco = chamar('resolverPeriodo_')({ tipo: 'mes', mes: '2024-03' });
+    const antes = chamar('periodoAnterior_')(marco);
+
+    igual(antes.mes, '2024-02');
+    igual(chamar('comoSeEscreve_')(antes.de), '01/02/2024');
+    igual(chamar('comoSeEscreve_')(antes.ate), '29/02/2024');
+  });
+
+  teste('janeiro volta para dezembro do ano anterior', () => {
+    const antes = chamar('periodoAnterior_')(
+      chamar('resolverPeriodo_')({ tipo: 'mes', mes: '2025-01' }));
+    igual(antes.mes, '2024-12');
+  });
+
+  teste('o período anterior de um intervalo encosta antes dele', () => {
+    const periodo = chamar('resolverPeriodo_')(
+      { tipo: 'intervalo', de: '10/09/2026', ate: '19/09/2026' });
+    const antes = chamar('periodoAnterior_')(periodo);
+
+    igual(chamar('comoSeEscreve_')(antes.ate), '09/09/2026',
+      'termina no dia anterior ao começo, sem sobrepor um dia');
+    // De 10/09 a 19/09 são DEZ datas, com as duas pontas. A janela anterior
+    // precisa ter dez também: 31/08 a 09/09. Eu escrevi 30/08 na primeira
+    // versão deste teste, que seriam onze — e comparar uma janela de dez com
+    // uma de onze é um erro que some dentro de uma variação de 3%.
+    igual(chamar('comoSeEscreve_')(antes.de), '31/08/2026',
+      'e tem o mesmo tamanho: dez datas, como o período medido');
+    igual(chamar('diasEntre_')(antes.de, antes.ate),
+      chamar('diasEntre_')(periodo.de, periodo.ate),
+      'as duas janelas têm de cobrir o mesmo número de datas');
+  });
+
+  teste('pedido torto cai no atalho, e não em erro', () => {
+    // Endereço guardado, clique repetido, data digitada pela metade. Uma tela
+    // de número que mostra erro em vez de número é uma tela que ninguém abre
+    // de novo.
+    [{ tipo: 'intervalo', de: '', ate: '' },
+     { tipo: 'intervalo', de: 'qualquer coisa', ate: diasAtras(1) },
+     { tipo: 'mes', mes: '2026-13' },
+     { tipo: 'mes', mes: 'setembro' },
+     { tipo: 'sei-la' },
+     {}].forEach((pedido) => {
+      const painel = chamar('produtividadeDaEquipe')(ret.id, {}, pedido);
+      igual(painel.periodo.tipo, 'dias',
+        'caiu em ' + painel.periodo.tipo + ' com ' + JSON.stringify(pedido));
+      igual(painel.periodo.dias, 30);
+    });
+  });
+
+  teste('caso sem data fica no atalho e sai do período fechado', () => {
+    // No "últimos 30 dias" ele é um caso mal preenchido que precisa aparecer.
+    // Num "setembro" ele é um caso sobre o qual não dá para AFIRMAR que é de
+    // setembro — e afirmar isso num fechamento é o que não pode acontecer.
+    chamar('inserirRegistro_')('BASE_RET', {
+      analista: 'Marcos Vieira', status: 'Pendente',
+      'nome do cliente': 'Caso sem data nenhuma'
+    });
+
+    const noAtalho = painelDaRet().total;
+    const noMes = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'mes', mes: mesDe(0) }).total;
+    const noIntervalo = chamar('produtividadeDaEquipe')(ret.id, {},
+      { tipo: 'intervalo', de: diasAtras(60), ate: diasAtras(0) }).total;
+
+    verdadeiro(noAtalho > noMes,
+      'o atalho guarda o caso sem data: ' + noAtalho + ' contra ' + noMes);
+    verdadeiro(noAtalho > noIntervalo, 'e o intervalo também o deixa de fora');
+  });
+
+  teste('a tela recebe os meses prontos, e não os calcula', () => {
+    const meses = painelDaRet().mesesDisponiveis;
+    igual(meses.length, 12, 'um ano para trás');
+    igual(meses[0].valor, mesDe(0), 'o corrente vem primeiro');
+    igual(meses[11].valor, mesDe(11));
+    verdadeiro(/^[a-zçã]+ de \d{4}$/.test(meses[0].rotulo),
+      'com o nome por extenso, veio: ' + meses[0].rotulo);
+  });
+
+  teste('o detalhamento usa o MESMO período do gráfico', () => {
+    // Clicar numa barra de setembro não pode abrir a lista dos últimos 30 dias.
+    const doMes = { tipo: 'mes', mes: mesDe(0) };
+    const painel = chamar('produtividadeDaEquipe')(ret.id, {}, doMes);
+    const grafico = painel.componentes.find((c) => c.titulo.indexOf('Situação') === 0);
+
+    const somaDasListas = grafico.pontos.reduce((soma, ponto) => soma
+      + chamar('detalharComponente')(ret.id, grafico.id, ponto.chave, {}, doMes).total,
+      0);
+    igual(somaDasListas, grafico.pontos.reduce((s, p) => s + p.casos, 0));
+  });
+
+  secao('A Produtividade RECC é a tela DA EQUIPE');
+
+  /*
+   * Duas telas, duas perguntas, e nenhum botão para errar:
+   *
+   *   MINHA PERFORMANCE é sobre MIM — as minhas inclusões, sempre.
+   *   PRODUTIVIDADE RECC é sobre A EQUIPE — sempre.
+   *
+   * Quem quiser o número de uma pessoa dentro da equipe usa o filtro de
+   * Analista. Isso é recortar a equipe, e não trocar de assunto.
+   */
+
+  teste('não existe mais seletor de vista — a tela é da equipe e pronto', () => {
+    const painel = painelDaRet();
+    verdadeiro(painel.vista === undefined,
+      'a tela não escolhe mais de quem é o número');
+    verdadeiro(painel.vistasDisponiveis === undefined);
+
+    const tela = lerPeca('Produtividade');
+    verdadeiro(tela.indexOf('data-vista') < 0,
+      'e o botão não pode ter ficado para trás no HTML');
+  });
+
+  teste('mandar vista pela chamada direta não muda nada', () => {
+    // O parâmetro sumiu da assinatura. Um endereço guardado ou um clique de
+    // quem ficou com a tela antiga aberta não pode fazer o painel encolher.
+    const normal = painelDaRet().total;
+    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30, 'eu').total, normal);
+    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30, 'equipe').total, normal);
   });
 
   secao('Alcance, filtros e exportação');
@@ -397,7 +562,7 @@ function rodarTestesDoAnalitico() {
     // O nível de Operação não abre o Painel por padrão; damos a tela a ele
     // para poder conferir o alcance, que é o que este teste investiga.
     const permissoesDaOperacao = JSON.parse(operacao.Configuracao);
-    permissoesDaOperacao.telas.push('painelAnalitico');
+    permissoesDaOperacao.telas.push('produtividade');
     chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
       { Configuracao: JSON.stringify(permissoesDaOperacao) });
     chamar('salvarUsuario')({
@@ -405,16 +570,67 @@ function rodarTestesDoAnalitico() {
       nivelAcessoId: operacao.Id, ativo: true
     });
 
-    const total = painelDaRet().total;
-    comoUsuario(ambiente, 'patricia@exemplo.com', () => {
-      const dela = chamar('painelAnalitico')(ret.id, {}, 30);
-      verdadeiro(dela.total < total, 'ela vê menos que o administrador');
-      igual(dela.total, 1, 'só o caso em que ela é a responsável');
+    const total = painelDaRet().total;   // o que o administrador enxerga
 
-      // E ela NÃO ganha o seletor de vista: as duas vistas mostrariam a mesma
-      // coisa para quem já só enxerga os próprios casos, e um controle que não
-      // muda nada ensina a não confiar nos outros controles.
-      igual(dela.vistasDisponiveis.length, 0);
+    // AQUI a regra é outra, e de propósito. A Patrícia tem escopo "próprios":
+    // no Trabalho e na Busca ela enxerga só os casos dela, e continua assim. Na
+    // Produtividade RECC ela passa a ver A EQUIPE — uma tela com esse nome
+    // mostrando uma pessoa só não seria a tela que a operação pediu.
+    //
+    // O alargamento vale SÓ NESTA TELA, e só até a equipe dela: as pessoas
+    // cadastradas no mesmo canal que ela atende. Não é "ver tudo".
+    comoUsuario(ambiente, 'patricia@exemplo.com', () => {
+      const dela = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
+      igual(dela.total, chamar('resumoDoCanal')(ret.id, {}).total,
+        'sem canal declarado, ela não tem equipe, e o alcance normal vale');
+    });
+
+    // Com canal declarado, ela passa a enxergar quem atende o mesmo canal.
+    // A Patrícia já existe: mandar o Id EDITA, e mandar sem Id seria cadastrar
+    // de novo — o que o servidor recusa, porque o e-mail é único.
+    const jaCadastrada = chamar('listarUsuarios()')
+      .find((u) => u.email === 'patricia@exemplo.com');
+    chamar('salvarUsuario')({
+      id: jaCadastrada.id,
+      nome: 'Patrícia Nunes', email: 'patricia@exemplo.com',
+      canalQueAtende: 'Cobrança ativa',
+      nivelAcessoId: operacao.Id, ativo: true
+    });
+    chamar('salvarUsuario')({
+      nome: 'Marcos Vieira', email: 'marcos.eq@exemplo.com',
+      canalQueAtende: 'Cobrança ativa',
+      nivelAcessoId: operacao.Id, ativo: true
+    });
+
+    comoUsuario(ambiente, 'patricia@exemplo.com', () => {
+      const naProdutividade = chamar('produtividadeDaEquipe')(ret.id, {}, 30).total;
+      const noTrabalho = chamar('resumoDoCanal')(ret.id, {}).total;
+
+      verdadeiro(naProdutividade > noTrabalho,
+        'a Produtividade mostra a equipe; o Trabalho continua só o dela. '
+        + 'Vieram ' + naProdutividade + ' e ' + noTrabalho);
+      verdadeiro(naProdutividade < total,
+        'mas é a EQUIPE dela, e não a base inteira: ' + naProdutividade
+        + ' contra ' + total);
+    });
+  });
+
+  teste('o detalhamento usa o mesmo alcance do gráfico', () => {
+    // Clicar numa barra tem de abrir uma lista do tamanho que a barra mostrava.
+    // Dois alcances diferentes fariam a pessoa concluir, com razão, que um dos
+    // dois números está errado.
+    comoUsuario(ambiente, 'patricia@exemplo.com', () => {
+      const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
+      const grafico = painel.componentes.find((c) =>
+        c.titulo.indexOf('Casos por analista') === 0);
+
+      const somaDoGrafico = grafico.pontos.reduce((soma, p) => soma + p.casos, 0);
+      const somaDasListas = grafico.pontos.reduce((soma, ponto) => soma
+        + chamar('detalharComponente')(ret.id, grafico.id, ponto.chave, {}, 30).total,
+        0);
+
+      igual(somaDasListas, somaDoGrafico,
+        'a soma das listas tem de bater com a soma das barras');
     });
   });
 
@@ -446,7 +662,7 @@ function rodarTestesDoAnalitico() {
       .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
     const permissoes = JSON.parse(consulta.Configuracao);
     permissoes.acoes = [];
-    permissoes.telas = ['painelAnalitico'];
+    permissoes.telas = ['produtividade'];
     chamar('atualizarRegistro_')('CATALOGO', consulta.Id,
       { Configuracao: JSON.stringify(permissoes) });
     chamar('salvarUsuario')({
@@ -455,7 +671,7 @@ function rodarTestesDoAnalitico() {
     });
 
     comoUsuario(ambiente, 'olha@exemplo.com', () => {
-      verdadeiro(chamar('painelAnalitico')(ret.id, {}, 30).podeExportar === false,
+      verdadeiro(chamar('produtividadeDaEquipe')(ret.id, {}, 30).podeExportar === false,
         'a tela esconde o botão');
       lanca(() => chamar('exportarComponente')(ret.id, 'x', {}, 30),
         'não permite exportar');
@@ -496,9 +712,9 @@ function rodarTestesDoAnalitico() {
   teste('a página inclui a tela, e a rota chama ela', () => {
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
     contem(fs.readFileSync(path.join(pasta, 'Index.html'), 'utf8'),
-      "incluir('PainelAnalitico')");
+      "incluir('Produtividade')");
     contem(fs.readFileSync(path.join(pasta, 'Aplicacao.html'), 'utf8'),
-      'TelaPainelAnalitico.montar(pacote)');
+      'TelaProdutividade.montar(pacote)');
   });
 
   teste('os gráficos são SVG da casa, sem biblioteca de fora', () => {
@@ -507,7 +723,7 @@ function rodarTestesDoAnalitico() {
     // carrega é pior que gráfico nenhum — deixa um buraco na tela.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
     const desenho = lerPeca('Graficos');
-    const tela = fs.readFileSync(path.join(pasta, 'PainelAnalitico.html'), 'utf8');
+    const tela = fs.readFileSync(path.join(pasta, 'Produtividade.html'), 'utf8');
 
     [desenho, tela].forEach((fonte) => {
       verdadeiro(fonte.indexOf('<script src') < 0 && fonte.indexOf('cdn.') < 0,
@@ -522,7 +738,7 @@ function rodarTestesDoAnalitico() {
     // gráfico a divergência não dá erro: vira uma barra um pouco mais alta
     // do que devia, e alguém decide alguma coisa com base nela.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    ['PainelAnalitico.html', 'MinhaPerformance.html'].forEach((nome) => {
+    ['Produtividade.html', 'MinhaPerformance.html'].forEach((nome) => {
       const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
       contem(fonte, 'Graficos.desenhar(', nome + ' pede o desenho ao módulo');
       verdadeiro(fonte.indexOf('function desenharPizza') < 0
@@ -558,4 +774,4 @@ function rodarTestesDoAnalitico() {
   });
 }
 
-module.exports = { rodarTestesDoAnalitico };
+module.exports = { rodarTestesDaProdutividade };

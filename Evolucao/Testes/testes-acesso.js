@@ -125,7 +125,7 @@ function rodarTestesDeAcesso() {
     chamar('atualizarRegistro_')('CATALOGO', operacao.Id, {
       Configuracao: JSON.stringify({
         escopo: 'PROPRIOS',
-        telas: ['dashboard', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+        telas: ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
           'tabelaCorretoras'],
         acoes: ['criar', 'editar', 'exportar'],
         campos: {},
@@ -144,7 +144,7 @@ function rodarTestesDeAcesso() {
     igual(daOperacao.menu.length, 5,
       'a Operação não vê Produtividade RECC nem Configurações');
     igual(daOperacao.menu[0].titulo, 'Trabalho', 'o título vem de CONFIG');
-    igual(daOperacao.menu[0].tela, 'dashboard',
+    igual(daOperacao.menu[0].tela, 'trabalho',
       'e a CHAVE não muda com o nome — é ela que identifica a tela');
 
     ambiente.definirEmail('primeiro.adm@exemplo.com');
@@ -282,7 +282,7 @@ function rodarTestesDeAcesso() {
 
     ambiente.definirEmail('ana@exemplo.com');
     lanca(() => chamar('resumoDoCanal')(diamante.id, {}),
-      'não enxerga o canal', 'o Dashboard do canal alheio é recusado');
+      'não enxerga o canal', 'o Trabalho do canal alheio é recusado');
     lanca(() => chamar('formularioDoCanal')(diamante.id),
       'não enxerga o canal', 'e o formulário dele também');
     ambiente.definirEmail('primeiro.adm@exemplo.com');
@@ -355,7 +355,7 @@ function rodarTestesDeAcesso() {
       Ativo: true,
       Configuracao: JSON.stringify({
         escopo: 'TODOS',
-        telas: ['dashboard', 'configuracoes'],
+        telas: ['trabalho', 'configuracoes'],
         acoes: ['criar', 'editar', 'configurar'],
         campos: {},
         componentes: {}

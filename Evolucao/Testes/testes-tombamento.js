@@ -534,7 +534,7 @@ function rodarTestesDeTombamento() {
   teste('a Produtividade RECC mostra o tombamento por dia e por base', () => {
     // O pedido literal: "no dia 05 incluímos 100 casos da base de
     // inadimplentes Vida Presente". São duas perguntas, e dois gráficos.
-    const painel = chamar('painelAnalitico')(ret.id, {}, 30);
+    const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
     const titulos = painel.componentes.map((c) => c.titulo);
     verdadeiro(titulos.indexOf('Casos tombados por dia') >= 0, titulos.join(' | '));
     verdadeiro(titulos.indexOf('De qual base os casos vieram') >= 0);

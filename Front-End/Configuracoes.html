@@ -910,7 +910,7 @@ var TelaConfiguracoes = (function () {
    * dos gráficos: os cartões respondem "quantos reteve", os gráficos explicam.
    *
    * A aba não é a mesma coisa que a tela do servidor: duas abas daqui editam
-   * cartões da MESMA tela (`painelAnalitico`), mudando só o tipo. Guardar as
+   * cartões da MESMA tela (`produtividade`), mudando só o tipo. Guardar as
    * duas coisas na mesma variável foi o que me fez confundir uma com a outra.
    */
   var abaDosPaineis = 'cardsDoTrabalho';
@@ -918,9 +918,9 @@ var TelaConfiguracoes = (function () {
 
   /** A qual tela do servidor cada aba daqui corresponde. */
   var TELA_DA_ABA = {
-    cardsDoTrabalho: 'dashboard',
-    cartoesDaProdutividade: 'painelAnalitico',
-    graficosDaProdutividade: 'painelAnalitico'
+    cardsDoTrabalho: 'trabalho',
+    cartoesDaProdutividade: 'produtividade',
+    graficosDaProdutividade: 'produtividade'
   };
 
   function carregarPaineis() {
@@ -939,7 +939,7 @@ var TelaConfiguracoes = (function () {
 
   function carregarGraficos() {
     aguarde('Lendo os gráficos…');
-    Servidor.chamar('opcoesDoPainelAnalitico', canalDosCards)
+    Servidor.chamar('opcoesDosGraficos', canalDosCards)
       .entao(function (opcoes) {
         dados.opcoesDoGrafico = opcoes;
         Servidor.chamar('listarComponentesDoPainel', canalDosCards)
@@ -964,7 +964,7 @@ var TelaConfiguracoes = (function () {
   /**
    * O nome que a tela tem HOJE, do jeito que o administrador a batizou.
    *
-   * Escrever "Dashboard" aqui deixaria as abas de Configurações falando de uma
+   * Escrever "Trabalho" aqui deixaria as abas de Configurações falando de uma
    * tela que o menu chama de "Trabalho" — e a pessoa procuraria, com razão,
    * uma terceira tela que não existe. O nome mora num lugar só, e é este.
    */
@@ -976,8 +976,8 @@ var TelaConfiguracoes = (function () {
 
   /** As três listas configuráveis: os cards de uma tela e os da outra, mais os gráficos. */
   function escolhaDeTela() {
-    var trabalho = nomeDaTela('dashboard', 'Trabalho');
-    var produtividade = nomeDaTela('painelAnalitico', 'Produtividade RECC');
+    var trabalho = nomeDaTela('trabalho', 'Trabalho');
+    var produtividade = nomeDaTela('produtividade', 'Produtividade RECC');
 
     return '<div class="config-abas">'
       + [['cardsDoTrabalho', 'Cards do ' + trabalho],
@@ -1003,7 +1003,7 @@ var TelaConfiguracoes = (function () {
     var opcoes = dados.opcoesDoGrafico;
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">Gráficos do Painel Analítico</span></div>'
+      + '<span class="config-titulo">Gráficos da Produtividade RECC</span></div>'
       + escolhaDeTela()
       + '<p class="config-explica">Cada gráfico responde a <strong>uma</strong> '
       + 'pergunta. Gráfico que não responde pergunta nenhuma é enfeite, e '
@@ -1165,7 +1165,7 @@ var TelaConfiguracoes = (function () {
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Cards da operação</span></div>'
       + escolhaDeTela()
-      + '<p class="config-explica">Escolha os cards do Dashboard. '
+      + '<p class="config-explica">Escolha os cards do Trabalho. '
       + 'Até ' + dados.painel.maximo + ' cards por operação. Remover ou '
       + 'ocultar um card <strong>mantém os casos</strong> — o card é uma forma '
       + 'de contar, e apagar a conta não apaga o que foi contado. As contagens '
@@ -1201,7 +1201,7 @@ var TelaConfiguracoes = (function () {
 
   function desenharCards() {
     if (!cardsEmEdicao.length) {
-      return '<p class="config-vazio">Nenhum card nesta operação. O Dashboard '
+      return '<p class="config-vazio">Nenhum card nesta operação. O Trabalho '
         + 'mostra a fila, e nenhum número em cima dela.</p>';
     }
     return cardsEmEdicao.map(function (card, posicao) {
@@ -1717,10 +1717,15 @@ var TelaConfiguracoes = (function () {
         Servidor.chamar('configuracaoDoLegado')
           .entao(function (legado) {
             dados.legado = legado;
-            Servidor.chamar('listarAuditoria', 40)
-              .entao(function (trilha) {
-                dados.trilha = trilha;
-                desenharEstrutura();
+            Servidor.chamar('configuracaoDosCadastros')
+              .entao(function (cadastros) {
+                dados.cadastros = cadastros;
+                Servidor.chamar('listarAuditoria', 40)
+                  .entao(function (trilha) {
+                    dados.trilha = trilha;
+                    desenharEstrutura();
+                  })
+                  .senao(falhou);
               })
               .senao(falhou);
           })
@@ -1758,8 +1763,10 @@ var TelaConfiguracoes = (function () {
       + 'para a coluna errada.</p>'
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
-    elemento('config-lista').innerHTML += desenharDiagnostico() + desenharLegado();
+    elemento('config-lista').innerHTML += desenharDiagnostico()
+      + desenharCadastros() + desenharLegado();
     ligarDiagnostico();
+    ligarCadastros();
     ligarLegado();
 
     elemento('config-painel').innerHTML = '<div class="config-form">'
@@ -1874,6 +1881,111 @@ var TelaConfiguracoes = (function () {
    * guardar um Id que não abre deixaria a busca com um recado de erro para
    * sempre, sem ninguém saber se o Id estava errado ou se a planilha sumiu.
    */
+  /**
+   * A segunda base: onde os cadastros moram.
+   *
+   * Duas bases — a operacional, com os casos, e a de cadastros, com corretora,
+   * SUSEP, produto e as listas de analista. Tirar os cadastros daqui é o que
+   * deixa a planilha operacional leve: as 7 mil SUSEPs e as 145 corretoras
+   * sozinhas já ocupam um pedaço do teto de 10 milhões de células.
+   *
+   * O botão de CONFERIR vem antes do de salvar, e é de propósito: apontar uma
+   * planilha errada deixa a Tabela de Corretoras e o selo da SUSEP com recado
+   * de erro, e conferir antes custa cinco segundos.
+   */
+  function desenharCadastros() {
+    var cadastros = dados.cadastros || { planilhaId: '', ligada: false, abas: [] };
+
+    var quaisAbas = cadastros.abas.map(function (uma) {
+      return '<li><strong>' + escapar(uma.aba) + '</strong> — '
+        + escapar(uma.titulo) + '<br><small>colunas: '
+        + escapar(uma.colunas.join(', ')) + '</small></li>';
+    }).join('');
+
+    return '<div class="config-legado">'
+      + '<h4>Planilha de cadastros — a segunda base</h4>'
+      + '<p class="config-explica">Corretoras, SUSEPs bloqueadas, produtos e as '
+      + 'duas listas de analista podem morar em OUTRA planilha. O PGO lê dela '
+      + 'na hora, sem copiar nada: o que mudar lá vale aqui na leitura '
+      + 'seguinte. Isso deixa esta planilha mais leve e evita manter o mesmo '
+      + 'cadastro em dois lugares. <strong>O PGO só lê</strong> — para editar '
+      + 'um cadastro, edite a planilha de cadastros. Vazio traz tudo de volta '
+      + 'para cá.</p>'
+      + (cadastros.ligada
+        ? '<p class="config-alerta suave">Ligada. Se essa planilha sair do ar '
+          + 'ou perder o compartilhamento, a Tabela de Corretoras e o selo da '
+          + 'SUSEP param — com recado explicando o motivo, não em silêncio.</p>'
+        : '')
+      + '<form class="config-form" id="form-cadastros">'
+      + campoDeTexto('cadastrosId', 'Id da planilha de cadastros',
+        cadastros.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
+        + 'precisa ter acesso a ela.')
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="conferir-cadastros">'
+      + 'Conferir a ligação</button>'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + '</div></form>'
+      + '<div id="laudo-dos-cadastros"></div>'
+      + '<details class="config-explica"><summary>O que a planilha precisa ter'
+      + '</summary><ul class="config-itens">' + quaisAbas + '</ul>'
+      + '<p>Uma aba por lista, com esses nomes, e a primeira linha com esses '
+      + 'cabeçalhos. Coluna a mais é lida e ignorada; coluna a menos o botão '
+      + 'de conferir aponta.</p></details>'
+      + '</div>';
+  }
+
+  function ligarCadastros() {
+    elemento('conferir-cadastros').addEventListener('click', function () {
+      var caixa = elemento('laudo-dos-cadastros');
+      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
+
+      Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'))
+        .entao(function (laudo) {
+          caixa.innerHTML = '<p class="config-alerta'
+            + (laudo.abre && !laudo.faltando.length ? ' suave' : '') + '">'
+            + escapar(laudo.recado) + '</p>'
+            + (laudo.faltando.length
+              ? '<ul class="config-itens">' + laudo.faltando.map(function (linha) {
+                return '<li>' + escapar(linha) + '</li>';
+              }).join('') + '</ul>'
+              : '')
+            + (laudo.abas && laudo.abas.length
+              ? '<ul class="config-itens">' + laudo.abas.map(function (uma) {
+                return '<li>' + escapar(uma.aba) + ': ' + uma.linhas
+                  + ' linha(s)' + (uma.completa ? '' : ' — faltam colunas')
+                  + '</li>';
+              }).join('') + '</ul>'
+              : '');
+        })
+        .senao(function (erro) {
+          caixa.innerHTML = '<p class="config-alerta">'
+            + escapar(erro.message || String(erro)) + '</p>';
+        });
+    });
+
+    elemento('form-cadastros').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      // Apontar a segunda base muda de onde o sistema inteiro lê os cadastros.
+      // Vai pela porta da senha, como as outras mudanças de estrutura.
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarConfiguracaoDosCadastros',
+          { planilhaId: valorDe('cadastrosId') })
+          .entao(function (nova) {
+            dados.cadastros = nova;
+            avisarSalvo(nova.ligada
+              ? 'Planilha de cadastros ligada e conferida.'
+              : 'Planilha de cadastros desligada — os cadastros voltam a ser '
+                + 'lidos desta planilha.');
+            carregarEstrutura();
+          })
+          .senao(function (erro) {
+            avisar(erro.message || String(erro), 'ruim');
+          });
+      });
+    });
+  }
+
   function desenharLegado() {
     var legado = dados.legado;
     return '<div class="config-legado">'

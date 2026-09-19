@@ -112,7 +112,7 @@ function resumoDasConfiguracoes() {
         descricao: 'Nome, logo, cor e a senha de administrador',
         quantidade: 0 },
       { chave: 'paineis', titulo: 'Painéis',
-        descricao: 'Os cards do Dashboard e dos painéis',
+        descricao: 'Os cards do Trabalho e dos painéis',
         quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
           return normalizarParaComparar_(linha.Ativo) === 'sim';
         }).length },
@@ -737,7 +737,7 @@ function salvarCanal(dados) {
     });
   });
 
-  // Desligar a último canal ativa deixaria o Dashboard sem nada para mostrar,
+  // Desligar a último canal ativa deixaria o Trabalho sem nada para mostrar,
   // e o cadastro sem formulário — o sistema inteiro pareceria quebrado.
   if (dados.ativo === false) {
     var outrasAtivas = lerRegistros_('CANAIS').filter(function (canal) {
@@ -746,7 +746,7 @@ function salvarCanal(dados) {
     });
     if (!outrasAtivas.length) {
       throw new Error('Esta é a último canal ativa. Desligá-la deixaria o ' +
-        'Dashboard e o cadastro sem nenhuma base para trabalhar.');
+        'Trabalho e o cadastro sem nenhuma base para trabalhar.');
     }
   }
 
@@ -774,7 +774,7 @@ function salvarCanal(dados) {
 /**
  * Recusa o nome de uma coluna que não existe na base do canal.
  *
- * Sem esta conferência o erro só apareceria no Dashboard, dias depois, como
+ * Sem esta conferência o erro só apareceria no Trabalho, dias depois, como
  * uma coluna em branco — e ninguém ligaria a coisa à letra trocada aqui.
  */
 function conferirQueAColunaExiste_(estrutura, nomeDaColuna, nomeDaAba) {
@@ -804,7 +804,7 @@ const RECC_MAXIMO_DE_CARTOES = 12;
 function listarCardsDoPainel(tela, idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
-  var alvo = normalizarParaComparar_(tela) || 'dashboard';
+  var alvo = normalizarParaComparar_(tela) || 'trabalho';
 
   var oQueContar = [
     { chave: 'total', rotulo: 'Total de casos', filtro: '' }
@@ -885,7 +885,7 @@ function listarCardsDoPainel(tela, idDoCanal) {
 function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
-  var alvo = normalizarParaComparar_(tela) || 'dashboard';
+  var alvo = normalizarParaComparar_(tela) || 'trabalho';
   var lista = Array.isArray(cartoes) ? cartoes : [];
 
   if (lista.length > RECC_MAXIMO_DE_CARTOES) {
@@ -1016,7 +1016,7 @@ function salvarIdentidade(dados) {
   //
   // Eles moravam em MENU.TITULOS desde o começo e nunca tiveram onde ser
   // editados — configuração sem tela é configuração que ninguém usa. Foi o
-  // que apareceu quando a operação quis chamar o Dashboard de "Trabalho".
+  // que apareceu quando a operação quis chamar o Trabalho de "Trabalho".
   //
   // O que identifica a tela é a CHAVE, nunca o texto: renomear aqui não mexe
   // em rota, em nível de acesso nem em endereço guardado.
@@ -1352,7 +1352,7 @@ function opcoesDeAnalise() {
 /**
  * Os campos do canal que dão para usar como filtro: os que já são lista.
  *
- * Não é `filtrosDoCanal_`, do Dashboard, por um motivo só: lá o teto é QUATRO,
+ * Não é `filtrosDoCanal_`, do Trabalho, por um motivo só: lá o teto é QUATRO,
  * porque cinco caixas de seleção em cima da fila viram uma parede. Aqui não há
  * parede — escolhe-se um filtro por vez, num formulário —, e cortar em quatro
  * deixaria de fora justamente o campo pelo qual alguém quer recortar.
@@ -1674,4 +1674,159 @@ function atualizarAnalisesAgendadas() {
     + (falharam.length ? ', ' + falharam.length + ' com erro' : ''));
 
   return { geradas: feitas, falharam: falharam };
+}
+
+// ============================================================================
+// A PLANILHA DE CADASTROS — a segunda base
+// ============================================================================
+
+/**
+ * Onde os cadastros moram hoje, e o que cabe neles.
+ *
+ * Duas bases: a OPERACIONAL, que guarda caso, e a de CADASTROS, que guarda
+ * corretora, SUSEP bloqueada, produto e as duas listas de analista. A segunda
+ * é opcional — sem ela configurada, tudo continua morando aqui, como sempre
+ * morou.
+ */
+function configuracaoDosCadastros() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '')).trim();
+
+  return {
+    planilhaId: id,
+    ligada: !!id,
+    abas: RECC_ABAS_QUE_PODEM_VIR_DE_FORA.map(function (nome) {
+      var esquema = RECC_ESQUEMA[nome];
+      return {
+        aba: nome,
+        titulo: esquema ? esquema.titulo : nome,
+        // As colunas que o PGO procura naquela aba. A planilha de cadastros
+        // pode ter outras no meio — elas são lidas e ignoradas —, mas estas
+        // precisam estar lá com estes nomes.
+        colunas: esquema
+          ? esquema.colunas.filter(function (coluna) {
+            return coluna.cabecalho.charAt(0) !== '_';
+          }).map(function (coluna) { return coluna.cabecalho; })
+          : []
+      };
+    })
+  };
+}
+
+/**
+ * Aponta a planilha de cadastros — ou desliga, com o Id em branco.
+ *
+ * CONFERE ANTES DE GRAVAR, e a falha DERRUBA. Guardar um Id que não abre
+ * deixaria a Tabela de Corretoras e o selo da SUSEP com recado de erro para
+ * sempre, e ninguém saberia se o Id estava errado, se a planilha sumiu ou se
+ * faltou compartilhar — que são três conversas diferentes.
+ *
+ * A conferência olha ABA POR ABA e cobra as colunas que o PGO procura. Um Id
+ * certo apontando para uma planilha sem as colunas certas abre sem reclamar e
+ * devolve lista vazia depois, que é o pior dos dois mundos.
+ */
+function salvarConfiguracaoDosCadastros(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  // Apontar a segunda base muda de onde o sistema INTEIRO lê os cadastros.
+  // É mudança de estrutura, e passa pela mesma porta que as outras.
+  exigirSenhaDeAdministrador_();
+
+  var id = String((dados || {}).planilhaId || '').trim();
+
+  if (id) {
+    var laudo = conferirPlanilhaDeCadastros(id);
+    if (!laudo.abre) throw new Error(laudo.recado);
+    if (laudo.faltando.length) {
+      throw new Error('A planilha abriu, mas não está pronta:\n\n'
+        + laudo.faltando.join('\n')
+        + '\n\nAcerte a planilha de cadastros e tente de novo. Enquanto isso, '
+        + 'os cadastros continuam onde estão.');
+    }
+  }
+
+  gravarConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, id);
+  registrarAuditoria_('cadastros.configurar', 'CONFIG', '',
+    id ? 'ligada em ' + id : 'desligada');
+
+  // A estrutura lida em memória aponta para a planilha antiga. Sem esquecer,
+  // a próxima leitura desta execução ainda viria do lugar errado.
+  esquecerEstruturaLida_();
+  return configuracaoDosCadastros();
+}
+
+/**
+ * Confere uma planilha de cadastros SEM ligar nada.
+ *
+ * É o botão "testar a ligação": responde se abre, quais abas tem e o que falta
+ * em cada uma — antes de a operação depender dela.
+ */
+function conferirPlanilhaDeCadastros(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var id = String(planilhaId || '').trim();
+  if (!id) {
+    return { abre: false, recado: 'Informe o Id da planilha de cadastros. '
+      + 'Ele é o pedaço do endereço entre /d/ e /edit.', abas: [], faltando: [] };
+  }
+
+  var planilha;
+  try {
+    planilha = SpreadsheetApp.openById(id);
+  } catch (erro) {
+    return {
+      abre: false,
+      recado: 'Não consegui abrir: ' + (erro.message || erro)
+        + ' Confira o Id e se esta conta tem acesso à planilha — é quase '
+        + 'sempre o acesso.',
+      abas: [],
+      faltando: []
+    };
+  }
+
+  var faltando = [];
+  var achadas = [];
+
+  RECC_ABAS_QUE_PODEM_VIR_DE_FORA.forEach(function (nome) {
+    var aba = planilha.getSheetByName(nome);
+    if (!aba) {
+      faltando.push('• Falta a aba "' + nome + '".');
+      return;
+    }
+
+    var largura = aba.getLastColumn();
+    var cabecalhos = largura
+      ? aba.getRange(1, 1, 1, largura).getValues()[0].map(function (v) {
+        return normalizarParaComparar_(v);
+      })
+      : [];
+
+    var esquema = RECC_ESQUEMA[nome];
+    var ausentes = (esquema ? esquema.colunas : [])
+      .filter(function (coluna) {
+        if (coluna.cabecalho.charAt(0) === '_') return false;
+        return cabecalhos.indexOf(normalizarParaComparar_(coluna.cabecalho)) < 0;
+      })
+      .map(function (coluna) { return coluna.cabecalho; });
+
+    if (ausentes.length) {
+      faltando.push('• A aba "' + nome + '" está sem: ' + ausentes.join(', ') + '.');
+    }
+    achadas.push({
+      aba: nome,
+      linhas: Math.max(aba.getLastRow() - 1, 0),
+      completa: ausentes.length === 0
+    });
+  });
+
+  return {
+    abre: true,
+    recado: faltando.length
+      ? 'A planilha abriu, mas ' + faltando.length + ' aba(s) precisam de ajuste.'
+      : 'Tudo certo: as ' + achadas.length + ' abas estão lá, com as colunas '
+        + 'que o PGO procura.',
+    nome: planilha.getName(),
+    abas: achadas,
+    faltando: faltando
+  };
 }

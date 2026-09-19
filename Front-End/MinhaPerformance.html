@@ -3,7 +3,7 @@
    PGO — MinhaPerformance.html · a tela em que o analista se vê
    ============================================================================
    As outras telas mostram a operação. Esta mostra UMA PESSOA, e o cuidado
-   aqui é de outra natureza: um número mal escolhido no Dashboard atrapalha
+   aqui é de outra natureza: um número mal escolhido no Trabalho atrapalha
    uma decisão; um número mal escolhido aqui atrapalha alguém.
 
    O QUE ISSO MUDOU NO DESENHO:
@@ -23,7 +23,7 @@
      A média da equipe aparece sempre. "Abaixo da média" sem saber qual é a
      média não é informação, é só desconforto.
 
-   Quem desenha os gráficos é o Graficos — o mesmo do Painel Analítico.
+   Quem desenha os gráficos é o Graficos — o mesmo da Produtividade RECC.
    ============================================================================ */
 
 var TelaMinhaPerformance = (function () {
@@ -31,9 +31,6 @@ var TelaMinhaPerformance = (function () {
   var canalEscolhida = '';
   var dias = 0;
   var dados = null;
-  // 'eu' ou 'equipe'. Quem soma é o servidor; aqui só se guarda a escolha,
-  // para ela sobreviver a uma troca de período.
-  var vista = 'eu';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -53,7 +50,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', canalEscolhida, dias, vista)
+    Servidor.chamar('minhaPerformance', canalEscolhida, dias)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -97,40 +94,10 @@ var TelaMinhaPerformance = (function () {
     return '<div class="filtros">'
       + '<select class="filtro" id="periodo-da-performance" aria-label="Período">'
       + periodos + '</select>'
-      + desenharVista()
       + '<span class="contagem">' + escapar(dados.pessoa.nome)
       + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
       + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : '')
       + '</span></div>';
-  }
-
-  /**
-   * Os meus números, ou os da minha equipe.
-   *
-   * Só aparece para quem TEM equipe: quem administra não pertence a canal
-   * nenhum, e o servidor devolve a lista de vistas vazia. Dois botões em que um
-   * deles não muda nada ensinam a desconfiar dos outros.
-   *
-   * Quando a vista é a da equipe, o número deixa de ser sobre uma pessoa — e a
-   * tela precisa dizer isso, senão alguém lê "137 casos" como seus.
-   */
-  function desenharVista() {
-    if (!dados.vistasDisponiveis || !dados.vistasDisponiveis.length) return '';
-
-    return '<div class="vista-do-painel" role="group"'
-      + ' aria-label="De quem são os números">'
-      + dados.vistasDisponiveis.map(function (uma) {
-        return '<button type="button" class="botao-vista'
-          + (dados.vista === uma.valor ? ' ligado' : '') + '"'
-          + ' data-vista="' + escapar(uma.valor) + '"'
-          + ' aria-pressed="' + (dados.vista === uma.valor ? 'true' : 'false') + '">'
-          + escapar(uma.rotulo) + '</button>';
-      }).join('')
-      + '</div>'
-      + (dados.vista === 'equipe'
-        ? '<span class="aviso-da-vista">Somando as ' + dados.pessoasNaVista
-          + ' pessoas da sua equipe</span>'
-        : '');
   }
 
   /* --------------------------------------------------------- indicadores */
@@ -272,14 +239,6 @@ var TelaMinhaPerformance = (function () {
     if (periodo) {
       periodo.addEventListener('change', function () {
         dias = Number(this.value);
-        carregar();
-      });
-    }
-
-    var trocarVista = document.querySelectorAll('#performance [data-vista]');
-    for (var v = 0; v < trocarVista.length; v++) {
-      trocarVista[v].addEventListener('click', function () {
-        vista = this.getAttribute('data-vista');
         carregar();
       });
     }

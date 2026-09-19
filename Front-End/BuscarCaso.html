@@ -2,7 +2,7 @@
 /* ============================================================================
    PGO — BuscarCaso.html · achar um caso que a fila não mostra mais
    ============================================================================
-   O Dashboard mostra os últimos 30 dias, de propósito. Quando o cliente liga
+   O Trabalho mostra os últimos 30 dias, de propósito. Quando o cliente liga
    citando um protocolo de abril, é aqui que se procura.
 
    A tela é uma caixa de busca e nada mais até alguém procurar algo. Não
@@ -226,7 +226,7 @@ var TelaBuscarCaso = (function () {
       botoes[i].addEventListener('click', function () {
         var canal = this.getAttribute('data-canal');
         var caso = this.getAttribute('data-achado');
-        // O mesmo modal do Dashboard: quem acha um caso aqui quer as mesmas
+        // O mesmo modal do Trabalho: quem acha um caso aqui quer as mesmas
         // ações que teria lá, e aprender duas telas para o mesmo caso é uma
         // a mais do que o necessário.
         CasoEmModal.abrir(canal, caso, function () {

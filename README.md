@@ -40,8 +40,8 @@ Cada uma aparece — ou não — conforme o **nível de acesso** de quem entrou.
 em Configurações › Identidade, e o menu, o cabeçalho da página e o título da
 janela passam a usar o nome novo. O que identifica a tela para o sistema é uma
 CHAVE interna que nunca muda — por isso renomear não quebra rota, nível de
-acesso nem endereço guardado. Foi assim que o `Dashboard` virou `Trabalho` e o
-`Painel Analítico` virou `Produtividade RECC`.
+acesso nem endereço guardado. Foi assim que o `Trabalho` virou `Trabalho` e o
+`Produtividade RECC` virou `Produtividade RECC`.
 
 ### Os quatro temas
 
@@ -74,9 +74,9 @@ Dentro de `Evolucao/`:
 | [`02-padrao-de-codigo.md`](Evolucao/02-padrao-de-codigo.md) | Como os nomes são escolhidos, e as exceções |
 | [`03-manutencao.md`](Evolucao/03-manutencao.md) | Como mexer sem quebrar — leia antes de tocar em código |
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
-| [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 13 etapas |
+| [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 490 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 531 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -94,7 +94,7 @@ Dentro de `Evolucao/`:
    Numa rodada, "mesa" virou **canal** em todo o sistema, e a aba `CANAIS` —
    que guardava corretoras — cedeu o nome. Uma planilha instalada antes disso
    continua com as abas antigas: o sistema abre, mas **sem canal nenhum**, e o
-   Dashboard nasce vazio.
+   Trabalho nasce vazio.
 
    Depois de copiar os arquivos novos, rode **uma vez** no editor do Apps
    Script:
@@ -169,7 +169,7 @@ Dentro de `Evolucao/`:
    | `Estilos.html` | toda a aparência e os quatro temas |
    | `Comuns.html` | as peças que mais de uma tela usa |
    | `Aplicacao.html` | a ponte com o servidor e o roteador |
-   | `Dashboard.html` … `Configuracoes.html` | uma por item do menu (8) |
+   | `Trabalho.html` … `Configuracoes.html` | uma por item do menu (8) |
    | `SemAcesso.html` | a tela de quem não está cadastrado |
 
    ### O caminho de quem tem terminal: `clasp`
@@ -258,13 +258,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-490 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+531 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 489 não valeriam nada.
+realmente corrompe — sem ele, os outros 530 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -285,7 +285,7 @@ Cartões e fila saem da **mesma lista**, já filtrada pelo alcance do nível —
 isso o número do cartão sempre bate com o que a fila mostra. Os filtros são os
 campos que já são lista: nada escrito em código.
 
-![O Dashboard](Evolucao/imagens/tela-dashboard.png)
+![O Trabalho](Evolucao/imagens/tela-trabalho.png)
 
 A fila vem em **grupos**: várias colunas debaixo de um título só, com a
 primeira em destaque. Um caso da RET tem trinta e cinco colunas — seis lado a
@@ -319,7 +319,7 @@ erro, é uma corretora que o cadastro ainda não conhece.
 
 ## Achar um caso que a fila não mostra mais
 
-O Dashboard mostra os últimos 30 dias, de propósito. Quando o cliente liga
+O Trabalho mostra os últimos 30 dias, de propósito. Quando o cliente liga
 citando um protocolo de abril, é aqui que se procura.
 
 ![A busca](Evolucao/imagens/tela-buscar-caso.png)
@@ -339,7 +339,7 @@ edição do que não é caso do sistema.
 
 ## O que a operação entregou — a Produtividade RECC
 
-![A Produtividade RECC](Evolucao/imagens/tela-painel-analitico.png)
+![A Produtividade RECC](Evolucao/imagens/tela-produtividade.png)
 
 A tela abre pelos **cartões**, porque é o cartão que responde a pergunta: para a
 RET, quantos **reteve**, quantos **não reteve**, quantos **já foram contatados**,
@@ -351,10 +351,32 @@ do "1º contato realizado" e hoje está em "Reteve" continua tendo sido contatad
 — contar pelo status diria zero, e a operação concluiria que ninguém ligou para
 ninguém. A coluna de carimbo não esquece.
 
-Dois botões no alto trocam entre **a equipe toda** e **só os meus**. O nível de
-acesso define o teto do que a pessoa pode ver; a vista escolhe quanto desse teto
-aparece. Quem já só enxerga os próprios casos não recebe os botões — um controle
-que não muda nada ensina a desconfiar dos outros.
+**Esta tela é da EQUIPE, sempre.** Não há botão para trocar: Minha Performance
+é sobre uma pessoa, a Produtividade RECC é sobre o grupo, e cada pergunta tem a
+sua tela. Quem quiser o número de uma pessoa dentro da equipe usa o filtro de
+Analista — isso é recortar a equipe, e não trocar de assunto.
+
+Um analista com escopo "próprios" enxerga só os casos dele no Trabalho e na
+Busca, e **aqui passa a ver a equipe**: uma tela com esse nome mostrando uma
+pessoa só não seria a tela que a operação pediu. O alargamento vale nesta tela e
+em nenhuma outra, e vai só até a equipe dele — as pessoas cadastradas no mesmo
+canal que ele atende.
+
+### O período, de três maneiras
+
+| Maneira | Para quê |
+|---|---|
+| **Por dias** | "Últimos 30 dias". É o do dia a dia, e continua sendo a abertura |
+| **Por data** | Duas datas, de/até. Responde uma pergunta específica: a semana da campanha, os dias da virada |
+| **Por mês** | "Setembro de 2026". É como a operação REPORTA — e é diferente de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias pegam metade de setembro e metade de outubro, e nenhum fechamento se faz assim |
+
+Quem resolve as três é o **servidor**. Se a tela calculasse as datas, o dia do
+gráfico sairia do relógio de quem está olhando e o dia da conta sairia do
+relógio da planilha — num fechamento de mês, essa diferença é um dia inteiro de
+casos.
+
+No mês, o período anterior é **o mês anterior inteiro**, e não "os 30 dias antes
+do dia 1". Em fevereiro, a segunda conta erraria por três dias todo ano.
 
 Cada gráfico é uma linha da aba `PAINEIS` — nada aqui está escrito no código.
 Cinco formas: pizza, barras em pé, barras deitadas, linha e barras com linha.
@@ -383,7 +405,7 @@ clique e a dica no passar do mouse — cor é a segunda leitura, nunca a única.
 ![Minha Performance](Evolucao/imagens/tela-minha-performance.png)
 
 As outras telas mostram a operação; esta mostra **uma pessoa**, e o cuidado é
-de outra natureza. Um número mal escolhido no Dashboard atrapalha uma decisão;
+de outra natureza. Um número mal escolhido no Trabalho atrapalha uma decisão;
 aqui, atrapalha alguém.
 
 - **O ranking segue o alcance do nível.** Quem só enxerga os próprios casos não
@@ -396,13 +418,10 @@ aqui, atrapalha alguém.
 - **O que não dá para calcular some**, em vez de aparecer zerado
 - **A meta é declarada, nunca inventada.** Canal sem meta não ganha barra
 
-E **dois botões trocam entre "só os meus" e "a minha equipe"**, que é o pedido
-da operação: o resultado individual do analista logado, com a opção de ver como
-vai o grupo a que ele pertence. A equipe é quem está cadastrado no mesmo canal
-que ele atende — a mesma definição que o alcance usa, para os dois números nunca
-divergirem. Na vista da equipe a **meta vira a soma das metas**: comparar o
-resultado de cinco pessoas com a meta de uma faria toda equipe parecer 400%
-acima do alvo.
+**Esta tela é sobre MIM, sempre** — as minhas inclusões. A equipe continua
+aparecendo, mas como REFERÊNCIA: a média e a minha posição, no bloco de baixo.
+Saber que se fez 8 não diz nada sem saber que a média é 6. O que ela não faz é
+virar o assunto da tela — para isso existe a Produtividade RECC.
 
 ---
 
@@ -464,6 +483,40 @@ e Coordenação tombam; a Operação não.
 
 ---
 
+## Duas bases: a operacional e a de cadastros
+
+Corretoras, SUSEPs bloqueadas, produtos e as duas listas de analista — Central e
+Cobrança Ativa — podem morar em **outra planilha**. O PGO lê dela na hora, sem
+copiar nada: o que mudar lá vale aqui na leitura seguinte.
+
+Duas razões, e as duas importam:
+
+- **Tamanho.** As 7 mil SUSEPs e as 145 corretoras ocupam um pedaço
+  considerável do teto de 10 milhões de células. Tirá-las daqui deixa espaço
+  para o que a planilha existe para guardar, que é caso.
+- **Dono.** Esses cadastros são mantidos por outras áreas. Manter a mesma lista
+  em dois lugares é garantir que um dia elas divirjam.
+
+**O PGO lê e não escreve.** A planilha de cadastros é a fonte de verdade; para
+mudar um cadastro, edita-se lá. As portas de escrita recusam com uma frase que
+diz onde editar — duas mãos escrevendo na mesma lista, uma sem saber da outra, é
+como um cadastro começa a divergir.
+
+O que **não** sai desta planilha, e não deve sair: as bases de caso, a
+auditoria, os usuários e a configuração. Um sistema que depende de outra
+planilha para saber quem pode entrar para de funcionar quando alguém mexe num
+compartilhamento.
+
+Aponta-se em Configurações › Estrutura, e há um botão de **conferir antes de
+ligar**: ele abre a planilha, olha aba por aba e diz o que falta. Um Id certo
+apontando para uma planilha sem as colunas certas abre sem reclamar e devolve
+lista vazia depois — o pior dos dois mundos. E quando a planilha não abre, o
+sistema **para com o motivo** em vez de devolver lista vazia: "nenhuma SUSEP
+está bloqueada" é uma afirmação falsa que deixaria passar um caso que devia ser
+barrado.
+
+---
+
 ## Configurações, a tela que muda todas as outras
 
 Três colunas: os **assuntos** à esquerda, os **itens** no meio, as
@@ -516,6 +569,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | A coluna é encontrada pelo **nome do cabeçalho**, nunca pela posição | Reordenar coluna na planilha não pode quebrar o sistema |
 | **Identificador é texto**, formatado na linha antes da gravação | O Planilhas converte `00000010` em `10` e `000000E1` em `0` |
 | **Dinheiro é número** com formato de moeda | O `R$` é formato da célula, não conteúdo. O Power BI soma direto |
+| Campo de valor **só aceita dígito**, e cresce da direita | `R$ 000.000.000,00`, com duas casas na célula. Um "aprox. 1200" digitado chega ao servidor, não vira número, e a célula fica vazia — o caso é gravado com o valor faltando, sem ninguém notar |
 | **Máscara é aparência**: a planilha recebe só dígitos | Cruzamento com outros sistemas sem tratamento |
 | Um caso = **uma linha**, sempre | Campo novo vira coluna nova, não linha em tabela de valores |
 | Permissão vem do **nível de acesso**, nunca do cargo | O nome do cargo é livre e muda |
@@ -529,15 +583,20 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**13 de 13 etapas construídas.** O detalhe de cada uma está em
+**14 de 14 etapas construídas.** O detalhe de cada uma está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
 
-| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Tombamento |
+| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Tombamento · A segunda base |
 |---|---|
 
-490 testes, cinco execuções seguidas sem falha, mais as três varreduras de
-navegador: responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo
-e os testes de ponta a ponta.
+531 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
+de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
+mostram a tela de hoje.
+
+> **Nada foi implantado ainda.** Enquanto for assim, renomear arquivo e chave de
+> tela é barato e se faz. Com o sistema no ar, a chave de uma tela deixa de se
+> trocar: o título é configurável exatamente para isso.
 
 ---
 

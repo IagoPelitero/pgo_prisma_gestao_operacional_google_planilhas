@@ -339,7 +339,7 @@ function rodarTestesDeDiagnostico() {
       .forEach((nivel) => {
         chamar('atualizarRegistro_')('CATALOGO', nivel.Id,
           { Configuracao: JSON.stringify({
-            escopo: 'PROPRIOS', telas: ['dashboard'], acoes: [],
+            escopo: 'PROPRIOS', telas: ['trabalho'], acoes: [],
             campos: {}, widgets: {} }) });
       });
 
@@ -410,7 +410,7 @@ function rodarTestesDeDiagnostico() {
 
   teste('as três telas dizem que leram só uma parte, e não deixam calado', () => {
     // Achado do teste de estresse. Com muito volume, os painéis leem só as
-    // últimas N linhas — e o Painel Analítico calculava esse "truncada" e
+    // últimas N linhas — e a Produtividade RECC calculava esse "truncada" e
     // NUNCA mostrava, enquanto Minha Performance nem calculava. Numa base de
     // 200 mil casos, o gráfico mostrava um pedaço e parecia o total.
     const { chamar } = instalacaoNova();
@@ -434,14 +434,14 @@ function rodarTestesDeDiagnostico() {
     }
     chamar('inserirVariosRegistros_')('BASE_RET', casos);
 
-    igual(chamar('resumoDoCanal')(ret.id, {}).truncada, true, 'Dashboard');
-    igual(chamar('painelAnalitico')(ret.id, {}, 30).truncada, true,
-      'Painel Analítico');
+    igual(chamar('resumoDoCanal')(ret.id, {}).truncada, true, 'Trabalho');
+    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).truncada, true,
+      'Produtividade RECC');
     igual(chamar('minhaPerformance')(ret.id, 30).truncada, true,
       'Minha Performance');
 
     // E cada uma diz QUANTAS leu, para o aviso ser concreto em vez de vago.
-    igual(chamar('painelAnalitico')(ret.id, {}, 30).linhasLidas, 3);
+    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).linhasLidas, 3);
     igual(chamar('minhaPerformance')(ret.id, 30).linhasLidas, 3);
   });
 
@@ -450,7 +450,7 @@ function rodarTestesDeDiagnostico() {
     const { chamar } = instalacaoNova();
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
     igual(chamar('resumoDoCanal')(ret.id, {}).truncada, false);
-    igual(chamar('painelAnalitico')(ret.id, {}, 30).truncada, false);
+    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).truncada, false);
     igual(chamar('minhaPerformance')(ret.id, 30).truncada, false);
   });
 
@@ -458,7 +458,7 @@ function rodarTestesDeDiagnostico() {
     // Três frases diferentes para o mesmo fato é como a operação aprende que
     // uma delas não é séria.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    ['Dashboard.html', 'PainelAnalitico.html', 'MinhaPerformance.html']
+    ['Trabalho.html', 'Produtividade.html', 'MinhaPerformance.html']
       .forEach((arquivo) => {
         const tela = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
         verdadeiro(tela.indexOf('Moldura.avisoDeJanela(') >= 0,
@@ -480,6 +480,165 @@ function rodarTestesDeDiagnostico() {
   });
 
   secao('O projeto do Apps Script');
+
+  /*
+   * OS DOIS MUNDOS.
+   *
+   * O `.gs` roda no servidor do Google; o `.html` roda no navegador de quem
+   * usa. Eles não compartilham NADA além do que passa pela ponte
+   * `google.script.run`, e cada um enxerga um conjunto próprio de objetos.
+   *
+   * Trocar um pelo outro dá um erro que só aparece em produção, porque a suíte
+   * roda em Node — onde nem `document` nem `SpreadsheetApp` existem de
+   * verdade, e o simulador fornece o que precisa. Os testes abaixo leem o
+   * TEXTO dos arquivos, que é o único jeito de pegar isso antes de colar.
+   */
+
+  /*
+   * Os nomes são procurados como PALAVRA INTEIRA, e não como pedaço de texto.
+   *
+   * A primeira versão procurava a substring "document" e reprovou três
+   * arquivos por causa da palavra portuguesa "documento" — que é um TIPO DE
+   * CAMPO do sistema, escrito em português, exatamente como o padrão da casa
+   * manda. Uma guarda que reprova o código certo é pior que guarda nenhuma:
+   * ensina a ignorar o vermelho.
+   */
+  const SO_NO_NAVEGADOR = [
+    /\bdocument\b/, /\bwindow\b/, /\blocalStorage\b/, /\bsessionStorage\b/,
+    /\balert\s*\(/, /\bnavigator\b/, /\bfetch\s*\(/, /\bXMLHttpRequest\b/,
+    /google\.script\.run/
+  ];
+
+  const SO_NO_SERVIDOR = [
+    /\bSpreadsheetApp\b/, /\bPropertiesService\b/, /\bLockService\b/,
+    /\bSession\s*\./, /\bDriveApp\b/, /\bHtmlService\b/, /\bScriptApp\b/,
+    /\bMailApp\b/, /\bUrlFetchApp\b/
+  ];
+
+  const SO_NO_NODE = [
+    /\brequire\s*\(/, /\bmodule\.exports\b/, /\bprocess\.env\b/,
+    /\b__dirname\b/, /^\s*import\s+/m, /^\s*export\s+/m
+  ];
+
+  /** O código de um arquivo, sem comentário nenhum — texto em comentário não roda. */
+  function semComentarios(fonte) {
+    return String(fonte)
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .split('\n')
+      .map((linha) => linha.replace(/(^|[^:])\/\/.*$/, '$1'))
+      .join('\n');
+  }
+
+  function arquivosDe(pasta, extensao) {
+    const cheio = path.join(__dirname, '..', '..', pasta);
+    return fs.readdirSync(cheio)
+      .filter((nome) => nome.endsWith(extensao))
+      .map((nome) => ({
+        nome: nome,
+        fonte: semComentarios(fs.readFileSync(path.join(cheio, nome), 'utf8'))
+      }));
+  }
+
+  teste('nenhum .gs usa coisa que só existe no navegador', () => {
+    // `document.getElementById` num .gs é ReferenceError na primeira execução,
+    // e o recado que chega à tela é "erro no servidor" — sem dizer qual.
+    const achados = [];
+    arquivosDe('Back-End', '.gs').forEach((arquivo) => {
+      SO_NO_NAVEGADOR.forEach((proibido) => {
+        if (proibido.test(arquivo.fonte)) {
+          achados.push(arquivo.nome + ' usa ' + proibido.source);
+        }
+      });
+    });
+    igual(achados.join(' | '), '', 'isto roda no Google, não no navegador');
+  });
+
+  teste('nenhuma tela chama serviço do Google direto', () => {
+    // `SpreadsheetApp` no .html é undefined: a tela trava sem log, porque o
+    // erro acontece antes de qualquer tratamento. É o achado 27 de novo.
+    const achados = [];
+    arquivosDe('Front-End', '.html').forEach((arquivo) => {
+      SO_NO_SERVIDOR.forEach((proibido) => {
+        if (proibido.test(arquivo.fonte)) {
+          achados.push(arquivo.nome + ' usa ' + proibido.source);
+        }
+      });
+    });
+    igual(achados.join(' | '), '',
+      'a tela fala com o servidor pela ponte, e só por ela');
+  });
+
+  teste('nem .gs nem .html usam coisa do Node', () => {
+    // A suíte roda em Node e o sistema não. Um `require` que passe despercebido
+    // funciona aqui e estoura lá — o pior tipo de teste verde.
+    const achados = [];
+    arquivosDe('Back-End', '.gs').concat(arquivosDe('Front-End', '.html'))
+      .forEach((arquivo) => {
+        SO_NO_NODE.forEach((proibido) => {
+          if (proibido.test(arquivo.fonte)) {
+            achados.push(arquivo.nome + ' usa ' + proibido.source);
+          }
+        });
+      });
+    igual(achados.join(' | '), '', 'isto é do Node, e o Apps Script não é Node');
+  });
+
+  teste('a guarda dos dois mundos pega de verdade, e não só passa', () => {
+    // Uma lista de proibidos que nunca dispara é uma lista que pode estar
+    // vazia, escrita errada ou testando nada — e ela passaria verde do mesmo
+    // jeito. Este teste é o que separa "não achei nada" de "não procurei".
+    const fingido = 'function x() { var a = document.getElementById("z"); '
+      + 'window.alert("oi"); SpreadsheetApp.getActive(); require("fs"); }';
+
+    verdadeiro(SO_NO_NAVEGADOR.some((r) => r.test(fingido)),
+      'a lista do navegador tem de pegar document e window');
+    verdadeiro(SO_NO_SERVIDOR.some((r) => r.test(fingido)),
+      'a lista do servidor tem de pegar SpreadsheetApp');
+    verdadeiro(SO_NO_NODE.some((r) => r.test(fingido)),
+      'a lista do Node tem de pegar require');
+
+    // E o contrário: o código escrito em português não pode disparar nenhuma.
+    // Foi "documento" — o tipo de campo do CPF — que reprovou três arquivos na
+    // primeira versão desta guarda.
+    const emPortugues = 'var tipo = "documento"; var janela = 30; '
+      + 'exportarComponente(); var importado = tombarCasos();';
+    const disparou = []
+      .concat(SO_NO_NAVEGADOR, SO_NO_SERVIDOR, SO_NO_NODE)
+      .filter((r) => r.test(emPortugues))
+      .map((r) => r.source);
+    igual(disparou.join(' | '), '',
+      'nenhuma pode confundir palavra portuguesa com objeto do navegador');
+  });
+
+  teste('toda tela abre e fecha o <script>, e o Index fecha o HTML', () => {
+    // Colagem cortada no meio é o defeito mais comum de todos, e o sintoma é
+    // uma tela em branco sem erro nenhum.
+    const desbalanceados = [];
+    arquivosDe('Front-End', '.html').forEach((arquivo) => {
+      const cheio = fs.readFileSync(path.join(__dirname, '..', '..',
+        'Front-End', arquivo.nome), 'utf8');
+      const abre = (cheio.match(/<script(\s|>)/g) || []).length;
+      const fecha = (cheio.match(/<\/script>/g) || []).length;
+      if (abre !== fecha) {
+        desbalanceados.push(arquivo.nome + ': ' + abre + ' <script> e '
+          + fecha + ' </script>');
+      }
+    });
+    igual(desbalanceados.join(' | '), '');
+  });
+
+  teste('todo arquivo .gs é avaliável do começo ao fim', () => {
+    // O simulador já avalia todos para rodar a suíte, então um erro de sintaxe
+    // derrubaria tudo antes daqui. O que este teste acrescenta é a CONTAGEM:
+    // um arquivo que sumir da pasta, ou que não for copiado, aparece aqui em
+    // vez de virar "função não existe" no meio de uma tela.
+    const servidor = arquivosDe('Back-End', '.gs');
+    igual(servidor.length, 7, 'os sete arquivos do servidor: '
+      + servidor.map((a) => a.nome).join(', '));
+
+    const telas = arquivosDe('Front-End', '.html');
+    igual(telas.length, 13, 'as treze telas: ' + telas.map((a) => a.nome).join(', '));
+  });
 
   teste('nenhum .gs tem o mesmo nome de um .html', () => {
     // No Apps Script os arquivos moram todos num projeto só, sem pasta, e o
@@ -569,12 +728,28 @@ function rodarTestesDeDiagnostico() {
       });
     });
 
-    // A prévia responde de dois jeitos: gravando a resposta (o nome aparece
-    // como chave) ou recusando com uma frase (o nome entra na lista de
-    // gravações recusadas). Os dois valem.
+    /*
+     * A conta é feita SÓ DENTRO DA PONTE, e não no arquivo inteiro.
+     *
+     * A primeira versão procurava o nome em qualquer lugar do gerador, e por
+     * isso aprovou uma função que a ponte não respondia: o nome aparecia numa
+     * linha que apenas COLETAVA o dado para a prévia (`chamar('nome')`), longe
+     * da ponte. A tela abria com um recado vermelho dizendo que a função não
+     * existia no servidor, e o teste continuava verde.
+     *
+     * Quem pegou foi a foto da tela para o README. Um teste que procura o
+     * nome em qualquer lugar não prova que a ponte responde — prova que
+     * alguém escreveu aquela palavra no arquivo.
+     */
+    const dentroDaPonte = previa.slice(
+      previa.indexOf('function pontePreparada('),
+      previa.indexOf('function gerar('));
+
     const semResposta = chamadas.filter(function (nome) {
-      return previa.indexOf("'" + nome + "'") < 0
-        && previa.indexOf(nome + ': function') < 0;
+      // Ou a ponte declara a função, ou ela está na lista das que recusam
+      // gravação com uma frase. Os dois valem; nada mais vale.
+      return dentroDaPonte.indexOf(nome + ': function') < 0
+        && dentroDaPonte.indexOf("'" + nome + "'") < 0;
     });
     igual(semResposta.join(', '), '', 'funções que a prévia não sabe responder');
   });
@@ -998,12 +1173,12 @@ function rodarTestesDeDiagnostico() {
     // quem não tinha o arquivo era o PROJETO.
     const { ambiente, chamar } = instalacaoNova();
     ambiente.esconderTela('Comuns');
-    ambiente.esconderTela('Dashboard');
+    ambiente.esconderTela('Trabalho');
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
     contem(falhasEmTexto(laudo), '2 arquivo(s) de tela incluídos e ausentes');
-    contem(falhasEmTexto(laudo), 'Comuns, Dashboard',
+    contem(falhasEmTexto(laudo), 'Comuns, Trabalho',
       'a lista inteira, e não só o primeiro');
     contem(falhasEmTexto(laudo), 'sem acento',
       'e a regra de nomenclatura, que é metade dos casos');
@@ -1014,7 +1189,7 @@ function rodarTestesDeDiagnostico() {
     // quinze vezes.
     const { ambiente, chamar } = instalacaoNova();
     ambiente.esconderTela('Comuns');
-    ambiente.esconderTela('Dashboard');
+    ambiente.esconderTela('Trabalho');
     ambiente.esconderTela('Configuracoes');
 
     const recado = chamar('recadoDoArquivoQueFalta_')('Comuns');
@@ -1022,7 +1197,7 @@ function rodarTestesDeDiagnostico() {
     contem(recado, 'Front-End/Comuns.html');
     contem(recado, 'sem acento');
     contem(recado, 'No total faltam 3 arquivos');
-    contem(recado, 'Dashboard');
+    contem(recado, 'Trabalho');
     contem(recado, 'Configuracoes');
   });
 
@@ -1105,7 +1280,7 @@ function rodarTestesDeDiagnostico() {
   }
 
   teste('sem migrar, o sistema abre sem canal nenhum', () => {
-    // O sintoma que a operação veria: o Dashboard vazio, sem erro nenhum.
+    // O sintoma que a operação veria: o Trabalho vazio, sem erro nenhum.
     // Este teste existe para provar que a migração é NECESSÁRIA — sem ele,
     // ninguém saberia dizer se ela resolve algo.
     const { chamar } = comoEraAntesDosCanais();

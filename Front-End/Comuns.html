@@ -51,7 +51,7 @@ var Moldura = (function () {
    */
   var DESENHOS = {
     // painel: quatro áreas iguais, como os cartões da tela
-    dashboard:
+    trabalho:
       '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="13.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="3.5" y="13.5" width="7" height="7" rx="1.6"></rect>'
@@ -95,7 +95,7 @@ var Moldura = (function () {
       + '<path d="M3.4 13.6 6 5.9a1.5 1.5 0 0 1 1.4-1h9.2a1.5 1.5 0 0 1 1.4 1l2.6 7.7'
       + 'v4.4a1.5 1.5 0 0 1-1.5 1.5H4.9a1.5 1.5 0 0 1-1.5-1.5z"></path>'
       + '<path d="M12 5.4v5.2M9.8 8.4 12 10.6l2.2-2.2"></path>',
-    painelAnalitico:
+    produtividade:
       '<path d="M3.6 20.4h16.8"></path>'
       + '<path d="M7.4 20.4v-6.2M12 20.4V6.8M16.6 20.4v-9.6"></path>',
 
@@ -208,7 +208,7 @@ var Moldura = (function () {
    * ao lado de outros com ícone, parece um botão quebrado.
    */
   function icone(tela) {
-    var desenho = DESENHOS[tela] || DESENHOS.dashboard;
+    var desenho = DESENHOS[tela] || DESENHOS.trabalho;
     // Traço fino: 1,7 deixava os desenhos pesados ao lado de texto normal.
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
       + ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"'
@@ -373,8 +373,8 @@ var Moldura = (function () {
   /**
    * O aviso de que a tela leu só uma parte da base.
    *
-   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Dashboard,
-   * Painel Analítico e Minha Performance —, e três textos diferentes para o
+   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Trabalho,
+   * Produtividade RECC e Minha Performance —, e três textos diferentes para o
    * mesmo fato é como a operação aprende que um deles não é sério.
    *
    * A frase diz o que foi lido e o que fazer, nessa ordem. "Os números podem
@@ -532,7 +532,7 @@ var SenhaDeAdministrador = (function () {
 /* ============================================================================
    PGO — SeletorDeCanal.html · a escolha do canal de trabalho
    ============================================================================
-   Aparece no Dashboard e no Cadastrar Caso, e é a mesma peça nos dois. Duas
+   Aparece no Trabalho e no Cadastrar Caso, e é a mesma peça nos dois. Duas
    cópias divergiriam na primeira mudança — bastaria um canal nova ganhar
    ícone só num dos lugares.
 
@@ -602,7 +602,7 @@ var SeletorDeCanal = (function () {
    PGO — Formulario.html · o formulário, desenhado num lugar só
    ============================================================================
    Duas telas montam o mesmo formulário: Cadastrar Caso e a edição dentro do
-   modal do Dashboard. Elas não têm duas cópias disto.
+   modal do Trabalho. Elas não têm duas cópias disto.
 
    A razão é a mesma que já custou caro neste projeto: regra copiada em dois
    lugares é regra que um dia diverge. A máscara do CPF, o seletor vazio que
@@ -653,6 +653,54 @@ var Formulario = (function () {
     return !!campo.mascara
       && (campo.tipo === 'documento' || campo.tipo === 'identificador'
         || campo.tipo === 'telefone');
+  }
+
+  /* --------------------------------------------------------------- dinheiro */
+
+  /** Até onde o campo de valor vai: R$ 999.999.999,99. */
+  var DIGITOS_DO_DINHEIRO = 11;   // nove inteiros + dois centavos
+
+  /**
+   * O valor em dinheiro, formatado enquanto a pessoa digita.
+   *
+   * SÓ DÍGITO ENTRA. Não é preferência de estilo: um "aprox. 1200" ou um "1200
+   * reais" digitado no campo de prêmio chega ao servidor, não vira número, e a
+   * célula fica vazia — o caso é gravado com o valor faltando, sem ninguém
+   * notar, e o Power BI soma menos do que deveria. Impedir a letra de entrar é
+   * mais barato que descobrir isso num relatório três meses depois.
+   *
+   * O número CRESCE DA DIREITA, como numa maquininha de cartão: digitar 1, 2,
+   * 3 mostra R$ 0,01 → R$ 0,12 → R$ 1,23. É como se digita valor a vida
+   * inteira, e evita a dúvida de "preciso digitar a vírgula?".
+   *
+   * Nove casas inteiras contemplam de uma apólice de R$ 12,90 a uma de
+   * R$ 999.999.999,99 — que é o que a operação pediu.
+   */
+  function aplicarMascaraDeDinheiro(valor) {
+    var digitos = String(valor || '').replace(/\D/g, '');
+    // Zeros à esquerda saem, senão digitar e apagar deixa "R$ 000,05" na tela.
+    digitos = digitos.replace(/^0+/, '');
+    if (!digitos) return '';
+    if (digitos.length > DIGITOS_DO_DINHEIRO) {
+      digitos = digitos.substring(0, DIGITOS_DO_DINHEIRO);
+    }
+
+    while (digitos.length < 3) digitos = '0' + digitos;   // garante os centavos
+
+    var centavos = digitos.slice(-2);
+    var inteiros = digitos.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'R$ ' + inteiros + ',' + centavos;
+  }
+
+  /**
+   * Campo de dinheiro não usa a máscara comum, que é de posição fixa.
+   *
+   * A do CPF tem onze dígitos sempre, nas mesmas casas. A de dinheiro cresce
+   * da direita e muda de tamanho a cada tecla — são duas máquinas diferentes,
+   * e tentar fazer uma servir às duas foi o que me fez escrever esta.
+   */
+  function ehCampoDeDinheiro(campo) {
+    return campo.tipo === 'moeda';
   }
 
   /* -------------------------------------------------------------- desenhar */
@@ -710,8 +758,14 @@ var Formulario = (function () {
       else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
         || campo.tipo === 'percentual') htmlTipo = 'text';
 
+      var dinheiro = ehCampoDeDinheiro(campo);
+      // inputmode="decimal" faz o celular abrir o teclado NUMÉRICO. Sem isso a
+      // pessoa abre o alfabético, procura o número e digita errado com mais
+      // frequência — e metade da operação trabalha no telefone.
       controle = '<input type="' + htmlTipo + '" id="' + id + '"'
         + ' data-chave="' + escapar(campo.chave) + '"'
+        + (dinheiro ? ' data-dinheiro="sim" inputmode="decimal"' : '')
+        + (dinheiro ? ' placeholder="R$ 0,00"' : '')
         + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
         + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
         + ' autocomplete="off"' + exigido + travado + '>';
@@ -847,6 +901,30 @@ var Formulario = (function () {
    * cima da tela de cadastro, procurar na página inteira ligaria os dois.
    */
   function ligar(raiz, prefixo) {
+    /*
+     * O CAMPO DE DINHEIRO.
+     *
+     * `keypress` barra a tecla que não é dígito ANTES de ela entrar; `input`
+     * reformata o que sobrou. Os dois são necessários: o keypress não pega
+     * colar nem ditado, e o input sozinho deixaria a letra piscar na tela
+     * antes de sumir.
+     *
+     * O cursor vai sempre para o fim porque o número cresce da direita — se
+     * ele ficasse no meio, digitar o próximo dígito inseriria no lugar errado.
+     */
+    var deDinheiro = raiz.querySelectorAll('[data-dinheiro]');
+    for (var d = 0; d < deDinheiro.length; d++) {
+      deDinheiro[d].addEventListener('keypress', function (evento) {
+        if (evento.key && evento.key.length === 1 && !/\d/.test(evento.key)) {
+          evento.preventDefault();
+        }
+      });
+      deDinheiro[d].addEventListener('input', function () {
+        this.value = aplicarMascaraDeDinheiro(this.value);
+        this.selectionStart = this.selectionEnd = this.value.length;
+      });
+    }
+
     var comMascara = raiz.querySelectorAll('[data-mascara]');
     for (var i = 0; i < comMascara.length; i++) {
       comMascara[i].addEventListener('input', function () {
@@ -944,6 +1022,13 @@ var Formulario = (function () {
       var valor = texto(valoresDoCaso[chave]);
 
       if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
+      // O dinheiro volta do servidor como NÚMERO — 1234.56 —, porque é assim
+      // que ele mora na célula. Na tela ele tem de aparecer como a pessoa
+      // digitou: R$ 1.234,56. Sem esta linha, abrir um caso para editar
+      // mostraria "1234.56" no campo, e salvar de novo gravaria 123456.
+      if (controles[i].getAttribute('data-dinheiro')) {
+        valor = aplicarMascaraDeDinheiro(comoNumeroEmCentavos(valor));
+      }
       controles[i].value = valor;
 
       // Valor que não está entre as opções: o seletor ficaria em branco e a
@@ -956,6 +1041,25 @@ var Formulario = (function () {
         controles[i].value = valor;
       }
     }
+  }
+
+  /**
+   * "1234.56" (como o servidor manda) vira "123456" (o que a máscara espera).
+   *
+   * A máscara conta em CENTAVOS, da direita para a esquerda. Mandar "1234.56"
+   * direto para ela daria R$ 1.234,56 por sorte — os dígitos são os mesmos —,
+   * mas "1234.5" daria R$ 123,45 em vez de R$ 1.234,50, e "1234" daria
+   * R$ 12,34 em vez de R$ 1.234,00. Os três casos chegam do servidor.
+   */
+  function comoNumeroEmCentavos(valor) {
+    var limpo = String(valor === null || valor === undefined ? '' : valor).trim();
+    if (!limpo) return '';
+    var numero = Number(limpo.replace(/\./g, '').replace(',', '.'));
+    if (limpo.indexOf('.') >= 0 || limpo.indexOf(',') >= 0) {
+      numero = Number(limpo.replace(',', '.'));
+    }
+    if (!isFinite(numero)) return '';
+    return String(Math.round(numero * 100));
   }
 
   function paraCaixaDeData(valor) {
@@ -998,6 +1102,8 @@ var Formulario = (function () {
 
   return {
     aplicarMascara: aplicarMascara,
+    aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
+    ehCampoDeDinheiro: ehCampoDeDinheiro,
     usaMascara: usaMascara,
     desenhar: desenhar,
     ligar: ligar,
@@ -1059,7 +1165,7 @@ var CasoEmModal = (function () {
 
   /**
    * Abre o caso. `quandoMudar` é chamado no fim, e só se algo mudou — assim o
-   * Dashboard recarrega quando precisa, e fica quieto quando a pessoa só
+   * Trabalho recarrega quando precisa, e fica quieto quando a pessoa só
    * olhou e fechou.
    */
   function abrir(idDoCanal, idDoCaso, quandoMudar, jaEditando) {
@@ -1406,7 +1512,7 @@ var CasoEmModal = (function () {
 /* ============================================================================
    PGO — Graficos.html · os desenhos, num lugar só
    ============================================================================
-   Duas telas desenham gráficos: o Painel Analítico e Minha Performance. Elas
+   Duas telas desenham gráficos: a Produtividade RECC e Minha Performance. Elas
    não têm duas cópias disto — pela mesma razão que já custou caro aqui:
    regra copiada em dois lugares é regra que um dia diverge, e num gráfico a
    divergência não dá erro. Vira uma barra um pouco mais alta do que devia, e

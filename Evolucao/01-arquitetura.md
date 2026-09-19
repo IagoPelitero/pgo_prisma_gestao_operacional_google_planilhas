@@ -40,8 +40,8 @@ sem tocar em código:
 
 ### Telas (menu lateral, presente em todas as abas)
 
-`Dashboard` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
-`Tabela de Corretoras` · `Painel Analítico` · `Configurações`
+`Trabalho` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
+`Tabela de Corretoras` · `Produtividade RECC` · `Configurações`
 
 ### Barra superior (presente em todas as abas)
 
@@ -232,7 +232,7 @@ Hora resposta | Data da finalização | horário da finalização
 
 **Indicador "finalizado na célula"** (pedido explícito): não é coluna gravada, é
 métrica calculada — `Data da finalização` preenchida **E** `Área responsável`
-vazia. Vira card no Dashboard da Mesa Diamante. Calcular em vez de gravar evita o campo
+vazia. Vira card no Trabalho da Mesa Diamante. Calcular em vez de gravar evita o campo
 mentir quando alguém edita a área responsável direto na planilha.
 
 **`Abertura indevida`**: `SIM` / `NAO`, também vira indicador.
@@ -257,7 +257,7 @@ código sem depender do texto, que muda.
 acesso decide o que a pessoa pode fazer. Sem `Email`, `NivelAcessoId` e `Ativo`
 não existe login nem permissão. As três colunas são obrigatórias.
 
-**`CORRETORAS`** responde a pergunta do segmento no formulário e no dashboard:
+**`CORRETORAS`** responde a pergunta do segmento no formulário e no trabalho:
 `Diamante` · `Demais corretoras` · `Não encontrado` (quando a SUSEP não está na
 aba). "Não encontrado" é resposta legítima, diferente de vazio.
 
@@ -344,7 +344,7 @@ NAVEGADOR (uma página só, servida por HtmlService)
   Aplicacao.html ..... a ponte com o servidor e o roteador entre telas
 
   Uma por item do menu (7):
-    Dashboard · CadastrarCaso · MinhaPerformance · BuscarCaso
+    Trabalho · CadastrarCaso · MinhaPerformance · BuscarCaso
     TabelaCorretoras · PainelAnalitico · Configuracoes
 
   SemAcesso.html ..... servida sozinha, a quem não está cadastrado
@@ -370,8 +370,8 @@ APPS SCRIPT
                        busca na base própria e em planilha legada
 
   Indicadores.gs .. OS NÚMEROS
-                       os cartões do dia e a fila (Dashboard)
-                       os gráficos da operação (Painel Analítico)
+                       os cartões do dia e a fila (Trabalho)
+                       os gráficos da operação (Produtividade RECC)
                        a tela em que o analista se vê (Performance)
 
   Cadastros.gs .... QUEM TRAZ O CASO PARA DENTRO
@@ -399,7 +399,7 @@ GOOGLE PLANILHAS  (13 abas + ANALISE_*)
 diretamente. Toda leitura e gravação passa por ele — é o que garante, num lugar
 só, o vínculo por cabeçalho e o formato texto antes da gravação.
 
-**Por que `Indicadores.gs` junta três telas.** Dashboard, Painel Analítico e
+**Por que `Indicadores.gs` junta três telas.** Trabalho, Produtividade RECC e
 Minha Performance contam os MESMOS casos e respondem perguntas diferentes.
 Separá-los convida ao erro de mudar a regra de contagem num e esquecer dos
 outros dois — e aí o cartão diz 12, o gráfico diz 9, e ninguém sabe qual está
@@ -544,10 +544,10 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 | 2 | Acesso | Login pelo e-mail, `USUARIOS`, cargos, níveis, tela de não cadastrado | **pronta** |
 | 3 | Casca | Menu lateral, barra superior, 4 temas, roteador | **pronta** |
 | 4 | Cadastrar Caso | Formulário dirigido por `CAMPOS`, máscaras, validação, selo de SUSEP | **pronta** |
-| 5 | Dashboard | Seletor de canal, cards, fila de trabalho com filtros | **pronta** |
+| 5 | Trabalho | Seletor de canal, cards, fila de trabalho com filtros | **pronta** |
 | 6 | Configurações | Campos, catálogo, usuários, níveis, senha de ADM, reconciliação de colunas | **pronta** |
 | 7 | Buscar Caso | Base própria + planilha legada | **pronta** |
-| 8 | Painel Analítico | Componentes configuráveis, exportação | **pronta** |
+| 8 | Produtividade RECC | Componentes configuráveis, exportação | **pronta** |
 | 9 | Minha Performance | Indicadores individuais, meta, ranking | **pronta** |
 | 10 | Tabela de Corretoras | `CORRETORAS` + segmento + SUSEP bloqueada | **pronta** |
 | 11 | Abas de análise | Gerador `ANALISE_*` | **pronta** |

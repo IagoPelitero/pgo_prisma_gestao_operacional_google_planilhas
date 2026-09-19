@@ -306,6 +306,9 @@ const medidor = {
 };
 
 class Planilha {
+  /** O nome da planilha. O laudo dos cadastros mostra qual foi aberta. */
+  getName() { return this.nome || 'Planilha de teste'; }
+
   constructor() { this.abas = []; this.fuso = 'Etc/GMT'; }
   insertSheet(nome) { const a = new Aba(nome); this.abas.push(a); return a; }
   getSheetByName(nome) { return this.abas.find((a) => a.nome === nome) || null; }
@@ -360,15 +363,34 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     trocarTelaPor(nome, conteudo) { telasTrocadas.set(nome, conteudo); },
     emailAtual() { return emailAtual; },
     /**
-     * Cria uma planilha "de fora", com uma aba já preenchida, e devolve o Id.
-     * Serve para testar a leitura da base legada sem contrato nenhum.
+     * Cria uma planilha "de fora" e devolve o Id.
+     *
+     * Duas formas de chamar, porque há duas coisas de fora a testar:
+     *
+     *   criarPlanilhaExterna('Legado 4.x', [[...]])  — UMA aba, para a base
+     *     legada, que não tem contrato nenhum;
+     *   criarPlanilhaExterna({ CORRETORAS: [[...]], PRODUTOS: [[...]] })  —
+     *     VÁRIAS abas, para a planilha de cadastros, que tem uma por lista.
      */
     criarPlanilhaExterna(nomeDaAba, linhas) {
       const outra = new Planilha();
-      const aba = outra.insertSheet(nomeDaAba || 'Página1');
-      if (linhas && linhas.length) {
-        aba.getRange(1, 1, linhas.length, linhas[0].length).setValues(linhas);
+
+      if (nomeDaAba && typeof nomeDaAba === 'object') {
+        Object.keys(nomeDaAba).forEach((nome) => {
+          const aba = outra.insertSheet(nome);
+          const conteudo = nomeDaAba[nome];
+          if (conteudo && conteudo.length) {
+            aba.getRange(1, 1, conteudo.length, conteudo[0].length)
+              .setValues(conteudo);
+          }
+        });
+      } else {
+        const aba = outra.insertSheet(nomeDaAba || 'Página1');
+        if (linhas && linhas.length) {
+          aba.getRange(1, 1, linhas.length, linhas[0].length).setValues(linhas);
+        }
       }
+
       const id = 'planilha-externa-' + (planilhasExternas.size + 1);
       planilhasExternas.set(id, outra);
       return id;

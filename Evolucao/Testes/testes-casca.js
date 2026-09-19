@@ -92,7 +92,7 @@ function rodarTestesDaCasca() {
 
   teste('cada item do menu tem o seu próprio desenho', () => {
     const { Moldura } = carregarScriptDaTela('Moldura');
-    const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'dashboard');
+    const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'trabalho');
 
     // Só os desenhos dos ITENS: o botão de encolher também tem um svg, e ele
     // não faz parte do conjunto.
@@ -150,7 +150,7 @@ function rodarTestesDaCasca() {
     // é ela rolar sozinha, dentro da caixa — e nunca a PÁGINA rolar, que
     // arrasta o menu e o cabeçalho junto.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    ['Dashboard.html', 'BuscarCaso.html', 'PainelAnalitico.html',
+    ['Trabalho.html', 'BuscarCaso.html', 'Produtividade.html',
       'Configuracoes.html'].forEach((nome) => {
       const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
       const tabelas = (fonte.match(/<table/g) || []).length;
@@ -295,7 +295,7 @@ function rodarTestesDaCasca() {
   teste('o menu do Administrador traz as oito telas', () => {
     const pacote = chamar('pacoteDePartida()');
     igual(pacote.menu.length, 8);
-    igual(pacote.menu[0].tela, 'dashboard');
+    igual(pacote.menu[0].tela, 'trabalho');
     igual(pacote.menu[7].titulo, 'Configurações');
   });
 
@@ -342,7 +342,7 @@ function rodarTestesDaCasca() {
     const barra = Moldura.montarSuperior(chamar('pacoteDePartida()'));
     contem(barra, 'RECC — Relacionamento Estratégico de Clientes e Corretores');
     contem(barra, 'Porto Seguro', 'a operação vem embaixo');
-    verdadeiro(barra.indexOf('Dashboard') < 0,
+    verdadeiro(barra.indexOf('Trabalho') < 0,
       'o nome da tela pertence ao conteúdo, não à barra');
   });
 
@@ -353,7 +353,7 @@ function rodarTestesDaCasca() {
   });
 
   teste('o cabeçalho da tela usa o nome de HOJE, o mesmo do menu', () => {
-    // O título das telas é configurável desde que o PO renomeou "Dashboard"
+    // O título das telas é configurável desde que o PO renomeou "Trabalho"
     // para "Trabalho". O menu passou a obedecer; o cabeçalho da página, não —
     // ele vinha da tabela de rotas, escrito à mão. A tela mostrava os dois
     // nomes ao mesmo tempo, um do lado do outro.
@@ -377,13 +377,13 @@ function rodarTestesDaCasca() {
       chamar('salvarIdentidade')(copia);
     };
 
-    comOsNomes({ dashboard: 'Minha Fila' });
+    comOsNomes({ trabalho: 'Minha Fila' });
     igual(chamar('pacoteDePartida()').menu
-      .find((item) => item.tela === 'dashboard').titulo, 'Minha Fila');
+      .find((item) => item.tela === 'trabalho').titulo, 'Minha Fila');
 
-    comOsNomes({ dashboard: '' });
+    comOsNomes({ trabalho: '' });
     igual(chamar('pacoteDePartida()').menu
-      .find((item) => item.tela === 'dashboard').titulo, 'Trabalho',
+      .find((item) => item.tela === 'trabalho').titulo, 'Trabalho',
       'apagar o nome volta ao de fábrica, e não a vazio');
   });
 
@@ -402,7 +402,7 @@ function rodarTestesDaCasca() {
 
   teste('o menu traz o rodapé da plataforma, que vem de CONFIG', () => {
     const { Moldura } = carregarScriptDaTela('Moldura');
-    const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'dashboard');
+    const lateral = Moldura.montarLateral(chamar('pacoteDePartida()'), 'trabalho');
     contem(lateral, 'PGO — Prisma Gestão Operacional');
     contem(lateral, 'by Pelitero labs');
     contem(lateral, 'id="encolher"', 'o botão de encolher fica junto da marca');

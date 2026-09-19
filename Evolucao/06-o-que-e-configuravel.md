@@ -35,7 +35,7 @@ abaixo com o motivo.
 | **Importar em lote** | Colar a planilha de corretoras (SUSEP, corretora, canal, segmento) ou a de SUSEPs bloqueadas, conferir o que vai acontecer linha a linha, e só então gravar | Tabela de Corretoras → Importar · **pede senha** |
 | **Tombar uma base de casos** | Trazer cem ou trezentos casos de outra planilha — colando ou pelo link —, escolher para onde cada coluna vai, dividir entre os analistas em rodízio, pular o que já entrou e dar um nome ao lote | Tombamento · **ação `tombar`** |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
-| **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Dashboard virou "Trabalho" | Identidade e segurança |
+| **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
 | **Busca** | Em quais colunas cado canal procura | Canais de trabalho |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
@@ -80,7 +80,7 @@ dia está na primeira. O que sobrou na segunda são quatro ajustes que se fazem
 uma vez e quase nunca se repetem. O que está na terceira está fora de
 propósito, cada um com o motivo escrito.
 
-**"No Painel Analítico tem tanto por área quanto por analista?"** — tem os
+**"Na Produtividade RECC tem tanto por área quanto por analista?"** — tem os
 dois, e por caminhos diferentes, o que é de propósito:
 
 - **Por área** é o seletor de canal no alto da tela. Não é um gráfico: RET

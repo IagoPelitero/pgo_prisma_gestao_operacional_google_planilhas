@@ -24,7 +24,7 @@ var Servidor = (function () {
 
     O Apps Script responde quando responde, e ninguém espera parado: dá tempo
     de sobra para clicar em Configurações, achar que demorou, e ir para o
-    Dashboard antes de a resposta chegar. Quando ela chega, o código que ia
+    Trabalho antes de a resposta chegar. Quando ela chega, o código que ia
     desenhá-la procura um elemento que não existe mais e estoura com
     "Cannot set properties of null" — um erro que não diz nada sobre o que a
     pessoa fez, e que só aparece para quem está com o console aberto.
@@ -187,11 +187,11 @@ var Rotas = (function () {
   }
 
   var TELAS = {
-    dashboard: {
-      titulo: 'Dashboard',
+    trabalho: {
+      titulo: 'Trabalho',
       subtitulo: 'Visão do dia: indicadores e a fila de trabalho da sua equipe.',
-      montar: function (pacote) { return TelaDashboard.montar(pacote); },
-      ligar: function (pacote) { TelaDashboard.ligar(pacote); }
+      montar: function (pacote) { return TelaTrabalho.montar(pacote); },
+      ligar: function (pacote) { TelaTrabalho.ligar(pacote); }
     },
     cadastrarCaso: {
       titulo: 'Cadastrar Caso',
@@ -226,12 +226,12 @@ var Rotas = (function () {
       montar: function (pacote) { return TelaTombamento.montar(pacote); },
       ligar: function (pacote) { TelaTombamento.ligar(pacote); }
     },
-    painelAnalitico: {
-      titulo: 'Painel Analítico',
+    produtividade: {
+      titulo: 'Produtividade RECC',
       subtitulo: 'Explore dados e identifique oportunidades para a operação.',
-      montar: function (pacote) { return TelaPainelAnalitico.montar(pacote); },
-      ligar: function (pacote) { TelaPainelAnalitico.ligar(pacote); },
-      desligar: function () { TelaPainelAnalitico.desligar(); }
+      montar: function (pacote) { return TelaProdutividade.montar(pacote); },
+      ligar: function (pacote) { TelaProdutividade.ligar(pacote); },
+      desligar: function () { TelaProdutividade.desligar(); }
     },
     configuracoes: {
       titulo: 'Configurações',
@@ -258,10 +258,10 @@ var Aplicacao = (function () {
   /**
    * O nome que a tela tem HOJE, que é o mesmo que o menu mostra.
    *
-   * O título do menu é configurável desde que o PO renomeou "Dashboard" para
+   * O título do menu é configurável desde que o PO renomeou "Trabalho" para
    * "Trabalho" — mas o cabeçalho da página vinha da tabela de rotas, escrito à
    * mão. O resultado era um menu dizendo "Trabalho" e a página, logo ao lado,
-   * dizendo "Dashboard": duas respostas para a mesma pergunta, na mesma tela.
+   * dizendo "Trabalho": duas respostas para a mesma pergunta, na mesma tela.
    *
    * O título da rota continua servindo de reserva, para o caso de uma tela que
    * o servidor não listou (sem permissão de ver, por exemplo).
@@ -313,12 +313,12 @@ var Aplicacao = (function () {
     Servidor.trocouDeTela();
 
     if (!Rotas.existe(tela) || !podeVer(tela)) {
-      tela = pacote.menu.length ? pacote.menu[0].tela : 'dashboard';
+      tela = pacote.menu.length ? pacote.menu[0].tela : 'trabalho';
     }
 
     // A tela que sai precisa poder se despedir: quem registrou atalho de
     // teclado tem de removê-lo, senão o Ctrl+Enter do cadastro continuaria
-    // valendo dentro do Painel Analítico.
+    // valendo dentro da Produtividade RECC.
     if (telaAtual && Rotas.existe(telaAtual)) {
       var anterior = Rotas.pegar(telaAtual);
       if (anterior.desligar) anterior.desligar();
@@ -493,7 +493,7 @@ var Aplicacao = (function () {
     elemento('aplicacao').hidden = false;
     restaurarEncolhido();
     aplicarTema(pacote.tema || 'padrao');
-    irPara(telaDoEndereco() || 'dashboard', true);
+    irPara(telaDoEndereco() || 'trabalho', true);
     ligarTeclado();
   }
 

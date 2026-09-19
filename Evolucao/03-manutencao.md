@@ -119,7 +119,7 @@ você. Abra uma questão.
 | As perguntas do formulário, a validação | `Back-End/Casos.gs` |
 | Gravar, editar ou ocultar um caso | `Back-End/Casos.gs` |
 | Como a busca procura | `Back-End/Casos.gs` |
-| Os cartões do Dashboard e a fila | `Back-End/Indicadores.gs` |
+| Os cartões do Trabalho e a fila | `Back-End/Indicadores.gs` |
 | As contas dos gráficos | `Back-End/Indicadores.gs` |
 | Os números de uma pessoa, a meta, o ranking | `Back-End/Indicadores.gs` |
 | Corretoras, produtos, SUSEPs bloqueadas | `Back-End/Cadastros.gs` |
@@ -160,6 +160,68 @@ causa.
 Depois de publicar, rode `verificarEstruturaRECC()` no editor. Nenhum teste
 rodado fora do Apps Script pega um arquivo que ficou para trás na cópia.
 
+### Vai rodar no Apps Script? A conferência em quatro camadas
+
+A suíte roda em **Node**, e o sistema roda no **Google**. São dois ambientes
+diferentes, e um teste verde aqui não é, sozinho, promessa de que roda lá. As
+quatro camadas abaixo existem para fechar essa distância, cada uma pegando o
+que a anterior não pega.
+
+| Camada | Comando | O que só ela pega |
+|---|---|---|
+| **1. A suíte** | `node Evolucao/Testes/rodar.js` | Regra de negócio, conversão de tipo, permissão. E erro de sintaxe em qualquer `.gs`: o simulador avalia os sete para poder rodar, então um arquivo quebrado derruba tudo na primeira linha |
+| **2. Os dois mundos** | (dentro da suíte, bloco *O projeto do Apps Script*) | `.gs` usando `document`; `.html` chamando `SpreadsheetApp`; `require` em qualquer um dos dois; `<script>` sem fechar; nome de arquivo que colide ignorando a extensão |
+| **3. O navegador** | `conferir-responsividade.js`, `clicar-em-tudo.js`, `ponta-a-ponta.js` | O que só aparece com a tela montada: botão cortado, classe de CSS que não existe, clique que estoura, `undefined` escrito na tela |
+| **4. Lá dentro** | `diagnosticoRECC()` no editor | O que depende da INSTALAÇÃO: arquivo que ficou para trás na cópia, aba apagada, coluna fora do contrato, fuso horário do projeto, sequência de Id corrompida |
+
+**As três primeiras rodam aqui e não provam a quarta.** É por isso que a
+quarta existe, e é por isso que ela mora dentro do sistema em vez de na suíte
+— ver o achado 25.
+
+#### O que é proibido em cada lado, e por quê
+
+O `.gs` roda no servidor do Google; o `.html` roda no navegador de quem usa.
+Eles não compartilham nada além do que passa pela ponte `google.script.run`.
+
+| Não pode aparecer em `.gs` | Não pode aparecer em `.html` | Não pode em nenhum dos dois |
+|---|---|---|
+| `document`, `window`, `navigator` | `SpreadsheetApp`, `DriveApp` | `require(`, `module.exports` |
+| `localStorage`, `sessionStorage` | `PropertiesService`, `LockService` | `process.env`, `__dirname` |
+| `alert(`, `fetch(`, `XMLHttpRequest` | `Session.`, `HtmlService`, `ScriptApp` | `import`, `export` |
+| `google.script.run` | `MailApp`, `UrlFetchApp` | |
+
+Um `document` num `.gs` é `ReferenceError` na primeira execução, e o recado que
+chega à tela é "erro no servidor", sem dizer qual. Um `SpreadsheetApp` num
+`.html` é `undefined`: a tela trava sem log nenhum, porque o erro acontece
+antes de qualquer tratamento — é o achado 27.
+
+A guarda procura **palavra inteira**, e não pedaço de texto. A primeira versão
+procurava a substring `document` e reprovou três arquivos por causa da palavra
+portuguesa **"documento"**, que é um tipo de campo do sistema. Guarda que
+reprova o código certo ensina a ignorar o vermelho, e aí ela não serve mais
+para nada. Há um teste que confere as duas pontas: que a lista dispara num
+trecho fabricado com `document` e `SpreadsheetApp` dentro, e que ela NÃO
+dispara num trecho escrito em português.
+
+#### Coisas do Apps Script que a suíte não vê, e que valem lembrar
+
+- **Sem pastas, e nome único ignorando a extensão.** `Configuracoes.html` e
+  `Configuracoes.gs` não convivem — foi o achado 26, e por isso o arquivo do
+  servidor se chama `Config.gs`.
+- **Os `.gs` compartilham UM escopo global.** Duas funções com o mesmo nome em
+  arquivos diferentes: vence a do arquivo avaliado por último, em ordem
+  alfabética, e sem aviso.
+- **Cada `google.script.run` é uma EXECUÇÃO NOVA.** Nada sobrevive entre uma
+  chamada e outra além do que está na planilha ou no PropertiesService. É isso
+  que torna seguro o memo por execução do `Base.gs`.
+- **Seis minutos por execução.** O custo é a IDA ao serviço (~25 ms cada), e
+  não a conta em JavaScript — o relógio do Node não paga esse pedágio e por
+  isso não enxerga o problema. Ver os achados 28 e 29.
+- **Scriptlet roda até dentro de comentário de HTML.**
+- **A chave de uma tela só se troca com o sistema fora do ar.** O título é
+  configurável justamente para não precisar mexer na chave; trocar a chave
+  apaga rota guardada e nível de acesso de uma vez.
+
 ---
 
 ## 6. As armadilhas que já custaram caro
@@ -177,6 +239,11 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
 6. **Escrever a sintaxe de scriptlet dentro de comentário de HTML.** O Apps
    Script executa scriptlet até em comentário.
 7. **Código de topo num `.gs` que dependa de outro arquivo.**
+8. **Usar `document` num `.gs`, ou `SpreadsheetApp` num `.html`.** São dois
+   ambientes, e o erro só aparece em produção. A guarda da camada 2 pega.
+9. **Usar CSS que só existe em navegador recente** — `:has()`, por exemplo.
+   Regra que o navegador não entende ele ignora CALADO: fica desalinhado em
+   algumas máquinas e certo nas outras, e o defeito só chega por relato.
 
 ---
 

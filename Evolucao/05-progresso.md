@@ -19,10 +19,10 @@ entrega algo que funciona sozinho e pode ser conferido na planilha. Nada de
 | 2 | Acesso | ✅ pronta | 32 |
 | 3 | Casca | ✅ pronta | 28 |
 | 4 | Cadastrar Caso | ✅ pronta | 28 |
-| 5 | Dashboard | ✅ pronta · reformado | 28 |
+| 5 | Trabalho | ✅ pronta · reformado | 28 |
 | 6 | Configurações | ✅ pronta | 35 |
 | 7 | Buscar Caso | ✅ pronta | 17 |
-| 8 | Painel Analítico | ✅ pronta | 24 |
+| 8 | Produtividade RECC | ✅ pronta | 24 |
 | 9 | Minha Performance | ✅ pronta | 19 |
 | 10 | Tabela de Corretoras | ✅ pronta | 22 |
 | 11 | Abas de análise | ⏳ | — |
@@ -125,14 +125,14 @@ inteira e um que era defeito da própria ferramenta de prévia.
 
 ---
 
-## Etapa 5 — Dashboard ✅
+## Etapa 5 — Trabalho ✅
 
 **A visão do dia: quanto tem, e o que fazer agora.**
 
 | Arquivo | Entrega |
 |---|---|
 | `Back-End/Indicadores.gs` | Cartões, fila, filtros e o detalhe de um caso |
-| `Front-End/Dashboard.html` | A tela |
+| `Front-End/Trabalho.html` | A tela |
 | `Front-End/Comuns.html` | A escolha do canal, usada aqui e no cadastro |
 
 **Cartão e fila saem da mesma lista.** Contar de um lado e listar de outro
@@ -156,7 +156,7 @@ O canal passou a declarar, na aba `CANAIS`, onde guarda cada coisa:
 `ColunaDaAreaResponsavel`. Declarado, e não adivinhado pelo nome — adivinhar
 acerta hoje e erra no canal que vier depois.
 
-![O Dashboard](imagens/tela-dashboard.png)
+![O Trabalho](imagens/tela-dashboard.png)
 
 ---
 
@@ -215,7 +215,7 @@ não existe desfazer.
 - **Nome de coluna é escolhido numa lista**, nunca digitado: o nome que não
   existe é recusado dizendo quais existem, em vez de deixar o painel em branco
   dias depois
-- **Desligar a último canal ativa é recusado** — o Dashboard e o cadastro
+- **Desligar a último canal ativa é recusado** — o Trabalho e o cadastro
   ficariam sem base nenhuma
 - **A lista de telas é uma só.** `RECC_TELAS_DO_SISTEMA` alimenta o menu e a
   tela de níveis ao mesmo tempo; duas listas divergiriam, e a tela nova
@@ -229,7 +229,7 @@ senha é o tipo de detalhe que faz alguém desistir no meio.
 
 ### A seção Painéis
 
-Os cards do Dashboard deixaram de ser um texto separado por vírgula dentro da
+Os cards do Trabalho deixaram de ser um texto separado por vírgula dentro da
 canal e viraram **linhas da aba `PAINEIS`**: cada um com nome, o que conta,
 cor, ordem e o interruptor de mostrar. Até 12 por operação. Remover um card
 não toca em caso nenhum — o card é uma forma de contar, e apagar a conta não
@@ -244,7 +244,7 @@ nenhum — com o motivo de cada um.
 
 ---
 
-## Dashboard, segunda passada 🔧
+## Trabalho, segunda passada 🔧
 
 **A fila deixou de ser uma tabela e virou uma tela de trabalho.**
 
@@ -296,7 +296,7 @@ essa coluna e ela está vazia — é o que a operação faria à mão em seguida
 
 ## Etapa 7 — Buscar Caso ✅
 
-**O Dashboard mostra 30 dias. Aqui se acha o resto.**
+**O Trabalho mostra 30 dias. Aqui se acha o resto.**
 
 `Back-End/Casos.gs` e `Front-End/BuscarCaso.html`, 17 testes.
 
@@ -346,12 +346,12 @@ fundos. Caso ocultado também não volta.
 
 ---
 
-## Etapa 8 — Painel Analítico ✅
+## Etapa 8 — Produtividade RECC ✅
 
-**O Dashboard responde "o que eu tenho que trabalhar hoje". Aqui a pergunta é
+**O Trabalho responde "o que eu tenho que trabalhar hoje". Aqui a pergunta é
 outra: "o que está acontecendo na operação".**
 
-`Back-End/Indicadores.gs` e `Front-End/PainelAnalitico.html`, 24 testes.
+`Back-End/Indicadores.gs` e `Front-End/Produtividade.html`, 24 testes.
 
 Cada gráfico é uma linha da aba `PAINEIS` — tipo, campo que vira eixo, o que
 se mede, o TOP N e a ordem. Acrescentar um gráfico é acrescentar uma linha,
@@ -402,7 +402,7 @@ não é a paleta clara reaproveitada.
 ### Clicar leva ao caso
 
 Clicar numa fatia ou numa barra abre a lista dos casos que a formam, e dali o
-mesmo modal do Dashboard. Sem isso o painel só informa, e informar não resolve
+mesmo modal do Trabalho. Sem isso o painel só informa, e informar não resolve
 caso nenhum.
 
 ### Exportar
@@ -419,7 +419,7 @@ aqui é de outra natureza.**
 
 `Back-End/Indicadores.gs` e `Front-End/MinhaPerformance.html`, 19 testes.
 
-Um número mal escolhido no Dashboard atrapalha uma decisão. Um número mal
+Um número mal escolhido no Trabalho atrapalha uma decisão. Um número mal
 escolhido aqui atrapalha alguém. Quatro decisões saíram disso:
 
 ### 1. O ranking segue o alcance do nível
@@ -558,7 +558,7 @@ quase preto. É por isso que o par certo é sempre `--destaque-escuro` com
 
 ### Por analista virou gráfico
 
-A operação perguntou se o Painel Analítico tinha os dois recortes. **Por área**
+A operação perguntou se a Produtividade RECC tinha os dois recortes. **Por área**
 sempre teve, e não como gráfico: é o seletor de canal. Um gráfico "casos por
 área" com duas barras compararia RET com Mesa Diamante, que têm colunas,
 situações e volumes incomparáveis — a Canal sempre pareceria pequena, e nunca
@@ -677,7 +677,7 @@ tem teste para isso.
 
 O que está no contrato é a **receita**, na aba `ANALISES` — a décima terceira.
 Uma aba, e não um JSON dentro de `CONFIG`, pela mesma razão que os cartões do
-Dashboard saíram de `CANAIS`: é uma lista de coisas configuráveis, cada uma com
+Trabalho saíram de `CANAIS`: é uma lista de coisas configuráveis, cada uma com
 nome, canal, colunas e filtro próprios.
 
 **313 testes**, e o [bug 24](04-bugs-capturados.md) pelo caminho: a regra de
@@ -891,9 +891,9 @@ Três defeitos, e o terceiro não é lentidão.
 
 O 30 é o grave. Os painéis leem só as últimas 5.000 linhas — de propósito, e
 documentado. Com 200 mil casos em um ano, uma janela de 30 dias tem umas 15
-mil: **o painel mostrava um terço do período**. O Dashboard avisava, mas o
+mil: **o painel mostrava um terço do período**. O Trabalho avisava, mas o
 aviso estava colado na fila e dava a entender que os cartões estavam completos;
-o Painel Analítico calculava `truncada` e nunca mostrava; a Minha Performance
+a Produtividade RECC calculava `truncada` e nunca mostrava; a Minha Performance
 nem calculava — e é a tela sobre uma pessoa.
 
 > Um sistema que fica lento avisa sozinho. Um que fica errado, não.
@@ -903,10 +903,10 @@ nem calculava — e é a tela sobre uma pessoa.
 | operação | idas | células | tempo est. |
 |---|---:|---:|---:|
 | Gravar 5.000 casos de uma vez | 5 | 195 mil | 275 ms |
-| Dashboard: abrir a RET | 16 | 202 mil | 581 ms |
+| Trabalho: abrir a RET | 16 | 202 mil | 581 ms |
 | Buscar por protocolo | 21 | 1,0 mi | 1,4 s |
 | Buscar termo que casa com milhares | 20 | 1,0 mi | 1,4 s |
-| Painel Analítico: os 6 gráficos | 16 | 202 mil | 582 ms |
+| Produtividade RECC: os 6 gráficos | 16 | 202 mil | 582 ms |
 | Minha Performance | 14 | 201 mil | 531 ms |
 | Cadastrar um caso | 25 | 7,6 mil | 580 ms |
 | Diagnóstico completo | 59 | 403 mil | 1,7 s |
@@ -938,7 +938,7 @@ legada, que a busca já lê.
 - **Dez cadastros em sequência imediata** — nenhum Id repetido. É a trava que
   o PGO 5.x não tinha, e que lá custou 4.328 colisões.
 - **Linha suja digitada direto na planilha** — data que não é data, SUSEP
-  inválida, linha sem Id. Dashboard, busca e diagnóstico seguem funcionando, e
+  inválida, linha sem Id. Trabalho, busca e diagnóstico seguem funcionando, e
   o diagnóstico aponta a linha.
 - **Importação no teto** de 2.000 linhas.
 - **Análise sobre a base inteira**, que bate no corte de 50 mil e o informa.
@@ -1055,7 +1055,7 @@ lista isso aparece como *"todas os canais"*, e não em branco — em branco pare
 cadastro pela metade.
 
 Canal preenchida tem de existir. Um canal que sumiu deixaria a pessoa apontando
-para o nada, e ninguém descobriria até alguém estranhar o Dashboard vazio.
+para o nada, e ninguém descobriria até alguém estranhar o Trabalho vazio.
 
 A lista passou a mostrar **e-mail · nível · cargo · canal**, em vez de só
 e-mail e nível.
@@ -1145,7 +1145,7 @@ arquivo existe para que alguém que não conhece o sistema saiba onde procurar.
 | `Indicadores.gs` | os números | Painel, Analitico, Performance |
 | `Instalacao.gs` | criar e conferir a instalação | Instalador, Diagnostico |
 
-> **Por que `Indicadores.gs` junta três telas.** Dashboard, Painel Analítico e
+> **Por que `Indicadores.gs` junta três telas.** Trabalho, Produtividade RECC e
 > Minha Performance contam os MESMOS casos. Separados, convidam ao erro de
 > mudar a regra de contagem num e esquecer dos outros dois — e aí o cartão diz
 > 12, o gráfico diz 9, e ninguém sabe qual está certo. Juntos, a regra é uma
@@ -1217,7 +1217,7 @@ Apps Script:
 
 | | antes | depois |
 |---|---|---|
-| Abrir o Dashboard | 48 idas, **3 chamadas** | 32 idas, **2 chamadas** |
+| Abrir o Trabalho | 48 idas, **3 chamadas** | 32 idas, **2 chamadas** |
 | Abrir Cadastrar Caso | 44 idas, **3 chamadas** | 27 idas, **2 chamadas** |
 
 Duas causas, e a segunda vale mais que a primeira.
@@ -1280,7 +1280,7 @@ caso de quem administra, e é o que mantém de pé todo nível criado antes dest
 regra: nível antigo continua enxergando o que enxergava, em vez de amanhecer
 sem canal nenhum.
 
-Vale no menu, no Dashboard, no cadastro, na busca, no painel e na performance.
+Vale no menu, no Trabalho, no cadastro, na busca, no painel e na performance.
 E vale **no servidor**: as 24 portas que recebem um canal passaram a conferir.
 A tela não oferecer o canal na lista não protege nada — a chamada existe, e
 basta mandar outro Id.
@@ -1300,7 +1300,7 @@ canal não deixa excluir", porque na Mesa Diamante a pessoa conseguia e na RET
 não. Agora ela nomeia o responsável pelo caso e diz, em letras: *"isso vale
 para qualquer canal, e não é uma regra do RET"*.
 
-> De quebra, achei uma função `ocultar` no Dashboard escrita antes da decisão
+> De quebra, achei uma função `ocultar` no Trabalho escrita antes da decisão
 > de pôr excluir no caso aberto, e **nunca chamada**. Código morto num arquivo
 > de tela é pior que em outros lugares: quem vem depois lê o nome, conclui que
 > a fila já sabe excluir, e procura o defeito no lugar errado.
@@ -1383,7 +1383,7 @@ Configurações, sem programador.
 "RET Vida" virou **RET**: o canal passou a atender Vida Individual e Vida em
 Grupo, e o nome não podia dizer só metade.
 
-O `Dashboard` virou **Trabalho** e o `Painel Analítico` virou **Produtividade
+O `Trabalho` virou **Trabalho** e o `Produtividade RECC` virou **Produtividade
 RECC** — e a pergunta do PO foi *"consigo editar o nome depois?"*. Não conseguia:
 os títulos moravam em `MENU.TITULOS` desde sempre e nunca tiveram onde ser
 editados. Ganharam tela.
@@ -1394,7 +1394,7 @@ quebraria rota, nível de acesso e endereço guardado.
 
 > **E o cabeçalho da página ficou para trás.** O menu obedecia ao nome novo; o
 > título da página, dois centímetros ao lado, continuava lendo a tabela de rotas
-> e dizendo "Dashboard". É o achado 37: quando uma informação vira
+> e dizendo "Trabalho". É o achado 37: quando uma informação vira
 > configurável, todo lugar que a exibia precisa ser revisitado.
 
 ### 2. O caso da RET nasce em "Não trabalhado"
@@ -1542,6 +1542,162 @@ só. É o achado 33 outra vez.
 
 **490 testes**, cinco execuções seguidas sem falha, 136 cliques em 8 telas, 96
 combinações de tela × largura e 9 testes de ponta a ponta.
+
+---
+
+## A rodada do ajuste fino: duas telas, dois filtros, dois bases
+
+Cinco pedidos curtos que mexeram em lugares fundos.
+
+### 1. Cada tela com uma pergunta só
+
+*"Produtividade RECC a visualização é sempre da equipe. Minha Performance será
+sempre sobre minhas inclusões."*
+
+Os dois pares de botões saíram. A divisão ficou mais clara do que estava:
+
+| Tela | Pergunta | Sempre |
+|---|---|---|
+| **Minha Performance** | como EU vou | as minhas inclusões |
+| **Produtividade RECC** | como A EQUIPE vai | a equipe |
+
+E um **alargamento deliberado**: um analista com escopo "próprios" enxerga só os
+casos dele no Trabalho e na Busca, e na Produtividade RECC passa a ver a equipe.
+Uma tela com esse nome mostrando uma pessoa só não seria a tela que a operação
+pediu. Vale nesta tela e em nenhuma outra, e vai só até a equipe dele.
+
+A equipe continua na Minha Performance como REFERÊNCIA — a média e a posição.
+Saber que se fez 8 não diz nada sem saber que a média é 6.
+
+### 2. O período, de três maneiras
+
+*"Troque para que fique por período e seja possível selecionar."* Perguntei o
+que faltava, e a resposta foi: **de/até E por mês**.
+
+São três, e a primeira caixa escolhe qual está valendo — mostrar as três
+preenchidas ao mesmo tempo deixaria três períodos na tela e um só valendo.
+
+Quem resolve as três numa coisa só — duas datas — é o **servidor**. Se a tela
+calculasse, o dia do gráfico sairia do relógio do navegador de quem está
+olhando e o dia da conta sairia do relógio da planilha. Num fechamento de mês
+essa diferença é um dia inteiro de casos.
+
+Dois detalhes que só aparecem fazendo:
+
+- **O mês anterior de um mês é o MÊS anterior.** Comparar setembro com "os 30
+  dias antes de setembro" daria quase agosto, mas não agosto. Em fevereiro o
+  erro seria de três dias, todo ano.
+- **De 10/09 a 19/09 são DEZ datas, não nove.** A subtração crua dá nove, e a
+  janela de comparação sairia um dia mais curta que a medida — um erro que some
+  dentro de uma variação de 3% e ninguém confere. Escrevi o teste com a conta
+  errada primeiro; o código estava certo.
+
+E a linha sem data: FICA no atalho, SAI do período fechado. Num "últimos 30
+dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela é um
+caso sobre o qual não dá para afirmar que é de setembro.
+
+### 3. Campo de valor só aceita número
+
+*"Inputs de valor em R$ devem obrigatoriamente aceitar apenas número para não
+atrapalhar o resultado."*
+
+O número cresce da direita, como numa maquininha de cartão: 1, 2, 3 vira
+R$ 0,01 → R$ 0,12 → R$ 1,23. Nove casas inteiras, duas de centavo —
+`R$ 999.999.999,99`, que contempla a apólice de doze reais e a de um milhão.
+A tecla que não é dígito é barrada ANTES de entrar, e no celular o teclado abre
+numérico.
+
+Por que não bastava validar no servidor: um "aprox. 1200" chega lá, não vira
+número, e a célula fica **vazia**. O caso é gravado com o valor faltando, sem
+ninguém notar, e o relatório soma menos do que deveria.
+
+Um teste varre o Esquema procurando coluna cujo NOME fala de valor, prêmio ou
+preço e cobra que ela seja do tipo dinheiro. É o *"ou demais que encontrar"* do
+pedido, virado guarda.
+
+### 4. A segunda base
+
+*"A tabela de corretoras, SUSEP's, Analistas da Central e Analistas da cobrança
+ativa virá de outra planilha. Assim fica menos pesado e teremos 2 bases certo?"*
+
+Certo. Duas bases: a **operacional**, com os casos, e a de **cadastros**.
+Perguntei se devia ler direto ou copiar, e a escolha foi ler direto — é o que
+realmente tira as 7 mil SUSEPs desta planilha.
+
+A implementação inteira cabe num lugar só, e esse é o ponto: todas as leituras
+já passavam por `lerRegistros_`, que passa por `estruturaDaAba_`, que abria a
+aba numa linha. Essa linha virou `abaOndeQuerQueElaMore_`, e o resto do sistema
+— a busca, o selo da SUSEP, as listas do formulário, a Tabela de Corretoras —
+nem soube que existem duas planilhas.
+
+> **O PGO lê e não escreve.** A planilha de cadastros é a fonte de verdade.
+> As portas de escrita recusam com uma frase que diz ONDE editar — um "não
+> permitido" seco mandaria a pessoa procurar uma permissão que não é o problema.
+
+E quando a outra planilha não abre, o sistema **para com o motivo**. Lista vazia
+aqui seria "nenhuma SUSEP está bloqueada": uma afirmação falsa que a operação
+acreditaria, e que deixaria passar um caso que devia ser barrado.
+
+### 5. Nomes alinhados, enquanto dá
+
+*"Pode alterar os nomes dos arquivos pois não implantei nada oficialmente."*
+
+Duas chaves de tela ainda estavam em inglês, presas ao nome antigo porque
+trocá-las quebraria rota gravada. Sem nada instalado, não há rota gravada:
+
+| Antes | Agora |
+|---|---|
+| `Dashboard.html`, chave `dashboard` | `Trabalho.html`, chave `trabalho` |
+| `PainelAnalitico.html`, chave `painelAnalitico` | `Produtividade.html`, chave `produtividade` |
+| `testes-painel.js`, `testes-analitico.js` | `testes-trabalho.js`, `testes-produtividade.js` |
+
+251 linhas em 37 arquivos. A troca de "o Painel" (masculino) por "a
+Produtividade" (feminino) deixou uma dúzia de concordâncias tortas — "o
+Produtividade RECC" —, varridas em seguida.
+
+**Daqui em diante a chave não se troca mais com o sistema no ar.** Está escrito
+onde ela é declarada.
+
+### A conferência de Apps Script, em quatro camadas
+
+*"Preciso que tudo funcione em apps script. Registre para que se precisar
+consultar você consiga se guiar."*
+
+A suíte roda em Node e o sistema roda no Google. Faltava uma camada entre as
+duas, e ela virou um bloco de testes permanente: `.gs` usando `document`,
+`.html` chamando `SpreadsheetApp`, `require` em qualquer um dos dois,
+`<script>` sem fechar. As quatro camadas estão na seção 5 do
+[`03-manutencao.md`](03-manutencao.md), com a tabela do que é proibido de cada
+lado.
+
+A primeira versão dessa guarda **reprovou três arquivos por causa da palavra
+portuguesa "documento"** — que é um tipo de campo do sistema. Guarda que reprova
+o código certo ensina a ignorar o vermelho. Passou a procurar palavra inteira, e
+há um teste que confere as duas pontas: que ela dispara num trecho com
+`document` dentro, e que NÃO dispara num trecho em português.
+
+### O que as imagens do README pegaram
+
+As fotos do README eram tiradas à mão. Viraram um gerador — `gerar-imagens.js` —
+e na primeira rodada ele fotografou a **Produtividade RECC abrindo com um recado
+vermelho**: a ponte da prévia tinha ficado com o nome antigo da função.
+
+O incômodo é que **duas verificações estavam olhando para isso e disseram que
+estava tudo bem**:
+
+- O `clicar-em-tudo.js` conferia o texto no FIM do laço — depois de clicar em
+  tudo, inclusive nos itens do menu. Ele terminava numa tela diferente da que
+  estava visitando, e a conferência inteira olhava sempre a última tela clicada.
+- O teste `a prévia responde por TODA função` procurava o nome em **qualquer
+  lugar** do gerador. O nome estava lá, trezentas linhas longe da ponte, numa
+  linha que só coletava dado.
+
+Os dois tinham o alvo certo e o escopo errado. **Escopo errado numa verificação
+não deixa sintoma nenhum** — ela passa, e a licença de parar de procurar é dada
+do mesmo jeito. São os achados 41 e 42.
+
+**531 testes**, cinco execuções seguidas sem falha, 136 cliques em 8 telas, 96
+combinações de tela × largura, 9 testes de ponta a ponta e 14 imagens geradas.
 
 ---
 

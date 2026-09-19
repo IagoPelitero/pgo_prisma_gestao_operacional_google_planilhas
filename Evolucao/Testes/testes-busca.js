@@ -219,7 +219,7 @@ function rodarTestesDeBusca() {
     const tela = fs.readFileSync(path.join(pasta, 'BuscarCaso.html'), 'utf8');
     contem(tela, "Servidor.chamar('buscarCasos'");
     contem(tela, "Servidor.chamar('opcoesDaBusca'");
-    // O mesmo modal do Dashboard: aprender duas telas para o mesmo caso é
+    // O mesmo modal do Trabalho: aprender duas telas para o mesmo caso é
     // uma a mais do que o necessário.
     contem(tela, 'CasoEmModal.abrir(');
   });

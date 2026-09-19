@@ -156,6 +156,17 @@ function pontePreparada(respostas) {
     + '        recusar("Na prévia não dá para conferir um tombamento: o laudo '
     + 'sai de ler o que você colou, e aqui não há servidor para ler.");\n'
     + '      },\n'
+    + '      configuracaoDosCadastros: function () {\n'
+    + '        responder(respostas.configuracoes.cadastros);\n'
+    + '      },\n'
+    // Conferir abre uma planilha DE VERDADE, e a prévia não tem servidor para
+    // isso. Recusa com o motivo, em vez de inventar um laudo — laudo falso
+    // numa prévia ensinaria a confiar nele.
+    + '      conferirPlanilhaDeCadastros: function () {\n'
+    + '        recusar("Na prévia não dá para conferir a planilha de '
+    + 'cadastros: isso abre outra planilha de verdade, e aqui não há '
+    + 'servidor para abrir.");\n'
+    + '      },\n'
     + '      configuracaoDoLegado: function () {\n'
     + '        responder(respostas.busca.legado);\n'
     + '      },\n'
@@ -198,7 +209,7 @@ function pontePreparada(respostas) {
     + '      minhaPerformance: function (idDoCanal) {\n'
     + '        responder(respostas.performance[idDoCanal]);\n'
     + '      },\n'
-    + '      painelAnalitico: function (idDoCanal) {\n'
+    + '      produtividadeDaEquipe: function (idDoCanal) {\n'
     + '        responder(respostas.analitico.paineis[idDoCanal]);\n'
     + '      },\n'
     + '      detalharComponente: function (idDoCanal, idDoComponente, ponto) {\n'
@@ -261,7 +272,7 @@ function pontePreparada(respostas) {
     + '      listarCanaisConfiguraveis: function () {\n'
     + '        responder(respostas.configuracoes.canais);\n'
     + '      },\n'
-    + '      opcoesDoPainelAnalitico: function (idDoCanal) {\n'
+    + '      opcoesDosGraficos: function (idDoCanal) {\n'
     + '        responder(respostas.configuracoes.opcoesDoGrafico[idDoCanal]);\n'
     + '      },\n'
     + '      listarComponentesDoPainel: function (idDoCanal) {\n'
@@ -290,7 +301,8 @@ function pontePreparada(respostas) {
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
-      'salvarConfiguracaoDoLegado', 'tombarCasos'])
+      'salvarConfiguracaoDoLegado', 'tombarCasos',
+      'salvarConfiguracaoDosCadastros'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -642,14 +654,15 @@ function gerar(pastaDeSaida) {
   const componentes = {};
   const tombamento = {};
   pacote.canais.forEach((canal) => {
-    cards[canal.id] = chamar('listarCardsDoPainel')('dashboard', canal.id);
-    opcoesDoGrafico[canal.id] = chamar('opcoesDoPainelAnalitico')(canal.id);
+    cards[canal.id] = chamar('listarCardsDoPainel')('trabalho', canal.id);
+    opcoesDoGrafico[canal.id] = chamar('opcoesDosGraficos')(canal.id);
     componentes[canal.id] = chamar('listarComponentesDoPainel')(canal.id);
     tombamento[canal.id] = chamar('opcoesDoTombamento')(canal.id);
   });
 
   const configuracoes = {
     cards: cards,
+    cadastros: chamar('configuracaoDosCadastros()'),
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,
     opcoesDeNivel: chamar('opcoesDeNivelDeAcesso()'),
@@ -687,13 +700,13 @@ function gerar(pastaDeSaida) {
     }))
   };
 
-  // O Painel Analítico, calculado de verdade para cado canal — e o
+  // A Produtividade RECC, calculado de verdade para cado canal — e o
   // detalhamento de cada ponto de cada gráfico, para os cliques funcionarem.
   const paineisAnaliticos = {};
   const detalhesDoPainel = {};
   const exportados = {};
   pacote.canais.forEach((canal) => {
-    const analitico = chamar('painelAnalitico')(canal.id, {}, 30);
+    const analitico = chamar('produtividadeDaEquipe')(canal.id, {}, 30);
     paineisAnaliticos[canal.id] = analitico;
     analitico.componentes.forEach((componente) => {
       exportados[componente.id] =

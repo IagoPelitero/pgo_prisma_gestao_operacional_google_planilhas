@@ -11,8 +11,8 @@
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, ehData, lerPeca } =
   require('./ferramentas');
 
-function rodarTestesDoPainel() {
-  console.log('\nEtapa 5 — Dashboard');
+function rodarTestesDoTrabalho() {
+  console.log('\nEtapa 5 — Trabalho');
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
@@ -71,35 +71,35 @@ function rodarTestesDoPainel() {
   });
 
   teste('desligar um cartão tira ele da tela e não toca em caso nenhum', () => {
-    const painel = chamar('listarCardsDoPainel')('dashboard', canal.id);
+    const painel = chamar('listarCardsDoPainel')('trabalho', canal.id);
     igual(painel.cartoes.length, 4);
 
     const antes = chamar('resumoDoCanal')(canal.id, {}).total;
     const sobrando = painel.cartoes.filter((c) => c.dimensao !== 'naCelula');
-    chamar('salvarCardsDoPainel')('dashboard', canal.id, sobrando);
+    chamar('salvarCardsDoPainel')('trabalho', canal.id, sobrando);
 
     const depois = chamar('resumoDoCanal')(canal.id, {});
     igual(depois.cartoes.length, 3, 'o cartão sumiu da tela');
     igual(depois.total, antes, 'e os casos continuam todos lá');
 
     // E volta, porque a linha não foi apagada — foi desligada.
-    chamar('salvarCardsDoPainel')('dashboard', canal.id, painel.cartoes);
+    chamar('salvarCardsDoPainel')('trabalho', canal.id, painel.cartoes);
     igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length, 4);
   });
 
   teste('cartão além do teto, sem nome ou de situação inventada é recusado', () => {
-    const painel = chamar('listarCardsDoPainel')('dashboard', canal.id);
+    const painel = chamar('listarCardsDoPainel')('trabalho', canal.id);
     igual(painel.maximo, 12);
 
     const demais = [];
     for (let i = 0; i < 13; i++) {
       demais.push({ titulo: 'Card ' + i, dimensao: 'total', cor: 'neutro' });
     }
-    lanca(() => chamar('salvarCardsDoPainel')('dashboard', canal.id, demais),
+    lanca(() => chamar('salvarCardsDoPainel')('trabalho', canal.id, demais),
       'no máximo 12');
-    lanca(() => chamar('salvarCardsDoPainel')('dashboard', canal.id,
+    lanca(() => chamar('salvarCardsDoPainel')('trabalho', canal.id,
       [{ titulo: '', dimensao: 'total' }]), 'precisa de um nome');
-    lanca(() => chamar('salvarCardsDoPainel')('dashboard', canal.id,
+    lanca(() => chamar('salvarCardsDoPainel')('trabalho', canal.id,
       [{ titulo: 'X', dimensao: 'situacao', filtro: 'Inventada' }]),
       'não existe no canal');
   });
@@ -228,7 +228,7 @@ function rodarTestesDoPainel() {
   teste('coluna que não existe some da fila em vez de derrubar a tela', () => {
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
     // Direto na planilha, como alguém faria à mão — sem passar por salvarCanal,
-    // que recusaria. A fila é leitura: derrubar o Dashboard inteiro porque
+    // que recusaria. A fila é leitura: derrubar o Trabalho inteiro porque
     // uma coluna foi renomeada seria pior do que mostrar o resto.
     chamar('atualizarRegistro_')('CANAIS', ret.id,
       { ColunasDaFila: 'Cliente: nome do cliente, coluna que nao existe' });
@@ -269,7 +269,7 @@ function rodarTestesDoPainel() {
     const fs = require('fs');
     const path = require('path');
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    const dashboard = fs.readFileSync(path.join(pasta, 'Dashboard.html'), 'utf8');
+    const dashboard = fs.readFileSync(path.join(pasta, 'Trabalho.html'), 'utf8');
     const modal = lerPeca('CasoEmModal');
 
     contem(dashboard, 'CasoEmModal.abrir(', 'ver detalhes abre o modal');
@@ -350,7 +350,7 @@ function rodarTestesDoPainel() {
     });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('resumoDoCanal')(canal.id, {}), 'não abre a tela dashboard');
+      lanca(() => chamar('resumoDoCanal')(canal.id, {}), 'não abre a tela trabalho');
     });
 
     configuracao.telas = guardadas;
@@ -678,7 +678,7 @@ function rodarTestesDoPainel() {
     // Pedido do PO: excluir na própria fila, como no PGO 5. A decisão
     // anterior era outra — excluir vivia só no caso aberto —, e cabe agora
     // porque é um ícone, não um botão com texto.
-    const fila = lerPeca('Dashboard');
+    const fila = lerPeca('Trabalho');
     contem(fila, "data-excluir=", 'o botão tem de existir na linha');
     contem(fila, "Servidor.chamar('excluirCaso'", 'e chamar a exclusão');
     contem(fila, 'Formulario.confirmarExclusao', 'perguntando antes');
@@ -706,4 +706,4 @@ function rodarTestesDoPainel() {
   });
 }
 
-module.exports = { rodarTestesDoPainel };
+module.exports = { rodarTestesDoTrabalho };

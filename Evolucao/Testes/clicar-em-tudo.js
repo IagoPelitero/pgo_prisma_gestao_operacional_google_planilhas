@@ -110,10 +110,42 @@ async function varrer() {
   console.log('\nClicando em tudo — ' + TELAS.length + ' telas');
   console.log('-'.repeat(60));
 
+  /** As caixas de erro que a tela montou, pela CLASSE e não pela frase. */
+  async function caixasDeErro() {
+    return pagina.evaluate(() => {
+      const achadas = [];
+      document.querySelectorAll('.erro-carga, .config-alerta:not(.suave)')
+        .forEach((caixa) => {
+          const texto = (caixa.textContent || '').trim();
+          if (texto) achadas.push(texto.slice(0, 160));
+        });
+      return achadas;
+    });
+  }
+
   let cliques = 0;
   for (const tela of TELAS) {
     await pagina.click('[data-tela="' + tela + '"]');
-    await pagina.waitForTimeout(700);
+    await pagina.waitForTimeout(1400);
+
+    /*
+     * A TELA RECÉM-ABERTA é conferida AQUI, antes de clicar em nada.
+     *
+     * Antes, a conferência ficava no fim do laço — depois dos cliques. Só que
+     * a lista de clicáveis começa por `[data-tela]`, que é o próprio menu:
+     * o roteiro saía clicando nos outros itens e terminava numa tela
+     * diferente da que o laço dizia estar visitando. A conferência inteira
+     * olhava sempre a última tela clicada, e por isso a Produtividade RECC
+     * abriu com um recado vermelho por uma rodada inteira sem ninguém notar.
+     *
+     * Quem pegou foi a foto da tela para o README. Uma varredura que diz
+     * "nenhum erro" olhando o lugar errado é pior que varredura nenhuma.
+     */
+    const aoAbrir = await caixasDeErro();
+    aoAbrir.forEach((recado) => {
+      erros.push('a tela ' + tela + ' ABRIU com recado de erro: ' + recado);
+    });
+
     const antes = cliques;
 
     for (const seletor of CLICAVEIS) {
@@ -145,9 +177,13 @@ async function varrer() {
       }
       return junto;
     });
+    // Os cliques podem ter levado para outra tela — a lista de clicáveis
+    // começa pelo próprio menu. Por isso o recado abaixo diz "depois dos
+    // cliques a partir de X", e não "na tela X": afirmar a segunda coisa
+    // seria mentir sobre onde o texto foi encontrado.
     NUNCA_NA_TELA.forEach((texto) => {
       if (naTela.indexOf(texto) >= 0) {
-        erros.push('"' + texto + '" apareceu na tela ' + tela);
+        erros.push('"' + texto + '" apareceu depois dos cliques a partir de ' + tela);
       }
     });
 
