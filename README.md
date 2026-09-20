@@ -351,16 +351,28 @@ do "1º contato realizado" e hoje está em "Reteve" continua tendo sido contatad
 — contar pelo status diria zero, e a operação concluiria que ninguém ligou para
 ninguém. A coluna de carimbo não esquece.
 
-**Esta tela é da EQUIPE, sempre.** Não há botão para trocar: Minha Performance
-é sobre uma pessoa, a Produtividade RECC é sobre o grupo, e cada pergunta tem a
+**Esta tela é da EQUIPE, e não tem botão para trocar:** Minha Performance é
+sobre uma pessoa, a Produtividade RECC é sobre o grupo, e cada pergunta tem a
 sua tela. Quem quiser o número de uma pessoa dentro da equipe usa o filtro de
 Analista — isso é recortar a equipe, e não trocar de assunto.
 
-Um analista com escopo "próprios" enxerga só os casos dele no Trabalho e na
-Busca, e **aqui passa a ver a equipe**: uma tela com esse nome mostrando uma
-pessoa só não seria a tela que a operação pediu. O alargamento vale nesta tela e
-em nenhuma outra, e vai só até a equipe dele — as pessoas cadastradas no mesmo
-canal que ele atende.
+**Quem vê a produtividade de quem é NÍVEL DE ACESSO**, com quatro respostas:
+
+| Alcance | O que o nível vê aqui |
+|---|---|
+| **Bloqueado** | a tela não abre — some do menu |
+| **Próprios** | só os casos da própria pessoa |
+| **Equipe** | quem atende o mesmo canal que ela *(o padrão)* |
+| **Canal** | o canal inteiro, de todos os analistas |
+
+Isso é **independente do "até onde enxerga"** do nível. Um analista com escopo
+"próprios" e Produtividade em "equipe" vê a equipe **aqui** e continua vendo só
+os casos dele na fila de trabalho: são duas perguntas diferentes — "o que eu
+tenho para fazer" e "como a equipe está indo" —, e elas não precisam ter a mesma
+resposta.
+
+E **quais** canais aparecem continua sendo a lista de canais do nível: quem abre
+só a RET e tem "o canal inteiro" vê a RET inteira, não a Mesa Diamante.
 
 ### O período, de três maneiras
 

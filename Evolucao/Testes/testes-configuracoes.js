@@ -417,8 +417,22 @@ function rodarTestesDeConfiguracoes() {
     const opcoes = chamar('opcoesDeNivelDeAcesso()');
     const doMenu = chamar('RECC_TELAS_DO_SISTEMA').map((t) => t.tela);
 
-    igual(opcoes.telas.map((t) => t.chave).join(','), doMenu.join(','),
+    // A Produtividade RECC sai desta lista porque tem seletor PRÓPRIO — ela
+    // liga, desliga e escolhe o alcance num lugar só. Duas caixas para a mesma
+    // tela é como alguém desliga a metade e jura que desligou.
+    //
+    // O que o teste continua cobrando é que NENHUMA OUTRA falte: duas listas
+    // divergindo é como uma tela nova nasce inacessível.
+    const esperadas = doMenu.filter((tela) => tela !== 'produtividade');
+    igual(opcoes.telas.map((t) => t.chave).join(','), esperadas.join(','),
       'duas listas de telas divergiriam, e a tela nova nasceria inacessível');
+
+    verdadeiro(opcoes.produtividade !== undefined,
+      'e a Produtividade tem o seletor dela, com os alcances');
+    igual(opcoes.produtividade.opcoes.map((o) => o.chave).join(','),
+      'BLOQUEADO,PROPRIOS,EQUIPE,CANAL');
+    verdadeiro(opcoes.produtividade.opcoes.every((o) => o.descricao.length > 10),
+      'cada alcance explica o que faz');
     igual(opcoes.acoes.length, 7);
     igual(opcoes.escopos.length, 4);
     opcoes.acoes.forEach((acao) => {

@@ -1037,43 +1037,62 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
 // ----------------------------------------------------------------------------
 
 /**
- * A Produtividade RECC mostra SEMPRE a equipe. Não há vista individual aqui.
+ * De quem são os números desta tela. Quem responde é o NÍVEL DE ACESSO.
  *
- * As duas telas de número responderam a mesma pergunta por um tempo, com um
- * par de botões em cada uma para escolher "eu" ou "a equipe". A operação
- * cortou isso, e a divisão ficou mais clara do que estava:
+ * A Produtividade RECC é a tela da equipe — é para isso que ela existe, e por
+ * isso ela não tem botão de "só os meus": Minha Performance é a tela de uma
+ * pessoa, esta é a do grupo, e cada pergunta tem a sua tela.
  *
- *   MINHA PERFORMANCE é sobre MIM — as minhas inclusões, sempre.
- *   PRODUTIVIDADE RECC é sobre A EQUIPE — sempre.
+ * Mas QUEM vê a produtividade de quem não é decisão do código. Em algumas
+ * equipes o analista acompanhar o grupo puxa todo mundo para cima; em outras,
+ * o mesmo número vira constrangimento. Quem sabe qual é o caso é quem conduz a
+ * equipe — então isto mora em Configurações › Níveis de acesso, com quatro
+ * respostas possíveis:
  *
- * Duas telas, duas perguntas, nenhum botão para errar. Quem quiser o número de
- * uma pessoa dentro da equipe usa o filtro de Analista, que é outra coisa:
- * recortar a equipe, e não trocar de assunto.
+ *   BLOQUEADO  a tela não abre para este nível
+ *   PROPRIOS   só os casos da própria pessoa
+ *   EQUIPE     quem atende o mesmo canal que ela          (o padrão)
+ *   CANAL      o canal inteiro, de todos os analistas
  *
- * O ALARGAMENTO, que é a parte que merece atenção. Um analista com escopo
- * "próprios" enxerga só os casos dele no Trabalho e na Busca — e continua
- * assim nessas telas. AQUI ele passa a ver a equipe, porque uma tela chamada
- * "Produtividade RECC" que mostrasse uma pessoa só não seria a tela que a
- * operação pediu. É uma decisão de produto, tomada pelo PO, e vale só nesta
- * tela: as outras seguem obedecendo ao escopo do nível.
+ * ISTO NÃO ALARGA O RESTO. O escopo geral do nível continua mandando no
+ * Trabalho, na Busca e em tudo mais: um analista com escopo "próprios" e
+ * Produtividade em "equipe" vê a equipe AQUI e continua vendo só os casos dele
+ * na fila de trabalho. São duas perguntas diferentes — "o que eu tenho para
+ * fazer" e "como a equipe está indo" —, e elas não precisam ter a mesma
+ * resposta.
  *
- * A equipe é quem está cadastrado no mesmo canal que a pessoa atende — a mesma
- * definição que o escopo "equipe" usa. Quem não pertence a canal nenhum (quem
- * administra) já enxerga tudo pelo escopo dele, e não precisa de alargamento.
+ * QUAIS canais o nível abre continua sendo a lista de canais dele. Um nível
+ * que abre só a RET e tem "o canal inteiro" vê a RET inteira, e não a Mesa.
  */
 function alcanceDaProdutividade_(registros, canal, quem) {
-  if (quem.permissoes.escopo !== RECC_ESCOPOS.PROPRIOS) {
-    return filtrarPeloAlcance_(registros, canal.aba, quem);
-  }
+  var alcance = quem.permissoes.escopoNaProdutividade || 'EQUIPE';
+
+  // O canal inteiro é o que a tela já mostraria sem recorte por pessoa. Não é
+  // "ver tudo": a lista de canais do nível é quem diz quais canais existem
+  // para ele, e essa conferência já aconteceu em canalQueEuPossoVer_.
+  if (alcance === 'CANAL') return registros;
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
+
+  // Sem coluna de responsável não há como recortar por pessoa. Mostrar a base
+  // inteira porque faltou uma coluna seria trocar uma regra de acesso por um
+  // descuido de configuração — então vale o alcance normal do nível.
+  if (!coluna) return filtrarPeloAlcance_(registros, canal.aba, quem);
+
+  if (alcance === 'PROPRIOS') {
+    var meuNome = normalizarParaComparar_((quem.usuario || {}).Nome);
+    if (!meuNome) return [];
+    return registros.filter(function (registro) {
+      return normalizarParaComparar_(registro[coluna]) === meuNome;
+    });
+  }
+
+  // EQUIPE, que é o padrão.
   var minhaEquipe = nomesDaMinhaEquipe_(quem);
 
-  // Sem coluna de responsável não há como recortar por pessoa, e sem equipe
-  // declarada não há equipe para alargar. Nos dois casos o alcance normal
-  // vale — mostrar a base inteira porque faltou um cadastro seria trocar uma
-  // regra de acesso por um descuido.
-  if (!coluna || !minhaEquipe || !minhaEquipe.length) {
+  // Quem não pertence a canal nenhum — quem administra — não tem "a minha
+  // equipe". Para ele o alcance normal do nível vale, e ele já é amplo.
+  if (!minhaEquipe || !minhaEquipe.length) {
     return filtrarPeloAlcance_(registros, canal.aba, quem);
   }
 

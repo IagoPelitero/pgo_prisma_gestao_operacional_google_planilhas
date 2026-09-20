@@ -480,6 +480,7 @@ function listarNiveisDeAcesso() {
         canais: permissoes.canais,
         telas: permissoes.telas,
         acoes: permissoes.acoes,
+        escopoNaProdutividade: permissoes.escopoNaProdutividade,
         campos: permissoes.campos,
         defeito: permissoes.defeito,
         pessoas: quantosUsam[item.__id] || 0
@@ -510,6 +511,25 @@ function salvarNivelDeAcesso(dados) {
     });
     if (!conhecida) throw new Error('Ação desconhecida: "' + acao + '".');
   });
+
+  /*
+   * O ALCANCE NA PRODUTIVIDADE RECC decide, sozinho, se a tela abre.
+   *
+   * A lista de telas é a fonte de verdade — é ela que `podeVerTela_` consulta
+   * em todo lugar —, então o seletor ESCREVE nela em vez de virar um segundo
+   * lugar para conferir. Escolher "Bloqueado" tira a tela; escolher qualquer
+   * outra coisa põe. Assim não existe o estado em que o seletor diz uma coisa
+   * e o menu faz outra.
+   */
+  var naProdutividade = String(dados.escopoNaProdutividade || 'EQUIPE').toUpperCase();
+  if (!RECC_ESCOPOS_DA_PRODUTIVIDADE[naProdutividade]) {
+    throw new Error('Alcance desconhecido na Produtividade RECC: "' +
+      naProdutividade + '". Os alcances são ' +
+      Object.keys(RECC_ESCOPOS_DA_PRODUTIVIDADE).join(', ') + '.');
+  }
+
+  telas = telas.filter(function (tela) { return tela !== 'produtividade'; });
+  if (naProdutividade !== 'BLOQUEADO') telas.push('produtividade');
   if (!RECC_ESCOPOS[dados.escopo]) {
     throw new Error('Escopo desconhecido: "' + dados.escopo + '". Os escopos ' +
       'são ' + Object.keys(RECC_ESCOPOS).join(', ') + '.');
@@ -543,6 +563,7 @@ function salvarNivelDeAcesso(dados) {
       canais: canais,
       telas: telas,
       acoes: acoes,
+      escopoNaProdutividade: naProdutividade,
       campos: dados.campos && typeof dados.campos === 'object' ? dados.campos : {},
       componentes: {}
     })
@@ -618,9 +639,25 @@ function opcoesDeNivelDeAcesso() {
   };
 
   return {
-    telas: RECC_TELAS_DO_SISTEMA.map(function (item) {
-      return { chave: item.tela, titulo: item.titulo };
-    }),
+    // A Produtividade RECC sai da lista de telas: ela tem um seletor próprio,
+    // logo abaixo, que já liga e desliga. Duas caixas para a mesma tela é como
+    // alguém desliga a metade e jura que desligou.
+    telas: RECC_TELAS_DO_SISTEMA
+      .filter(function (item) { return item.tela !== 'produtividade'; })
+      .map(function (item) {
+        return { chave: item.tela, titulo: item.titulo };
+      }),
+    produtividade: {
+      // O nome de HOJE, que o administrador pode ter trocado. Escrever
+      // "Produtividade RECC" fixo aqui faria a tela de níveis falar de uma
+      // tela que o menu chama de outra coisa — é o achado 37.
+      titulo: (titulosDasTelas().filter(function (uma) {
+        return uma.tela === 'produtividade';
+      })[0] || {}).titulo || 'Produtividade RECC',
+      opcoes: Object.keys(RECC_ESCOPOS_DA_PRODUTIVIDADE).map(function (chave) {
+        return { chave: chave, descricao: RECC_ESCOPOS_DA_PRODUTIVIDADE[chave] };
+      })
+    },
     acoes: Object.keys(RECC_ACOES).map(function (chave) {
       var acao = RECC_ACOES[chave];
       return { chave: acao, descricao: oQueCadaAcaoFaz[acao] || '' };

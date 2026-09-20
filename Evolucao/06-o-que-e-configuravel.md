@@ -20,7 +20,8 @@ abaixo com o motivo.
 | **Campos do formulário** | Rótulo, dica, seção, tipo, máscara, obrigatoriedade, ordem, lista de origem, ligar e desligar | Campos do formulário |
 | **Coluna nova na base** | Criar campo, que cria a coluna na planilha | Campos do formulário · **pede senha** |
 | **Usuários** | Cadastrar, editar, trocar cargo e nível, canal que atende, tirar o acesso | Usuários |
-| **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga | Níveis de acesso |
+| **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga, quais canais | Níveis de acesso |
+| **Quem vê a produtividade de quem** | Por nível: bloqueado, só os próprios, a equipe dele, ou o canal inteiro. É INDEPENDENTE do "até onde enxerga" — um analista pode ver só os casos dele na fila e a equipe inteira na Produtividade. E "bloqueado" tira a tela do menu | Níveis de acesso |
 | **Listas** | Situações, canais, motivos, ramos, áreas, cargos, formas de pagamento, origens: criar, renomear o rótulo, recolorir, reordenar, desligar | Listas |
 | **Em qual coluna cada status carimba** | Um status pode gravar data e hora numa coluna da base quando o caso chega nele. É o controle de produtividade — e o administrador aponta status novos para colunas novas, sem programador | Listas → Situações |
 | **Canais de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Canais de trabalho |

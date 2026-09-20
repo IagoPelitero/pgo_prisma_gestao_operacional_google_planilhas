@@ -583,6 +583,31 @@ const RECC_TELAS_DO_SISTEMA = [
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
 
+/**
+ * De quem são os números que a Produtividade RECC mostra, por nível de acesso.
+ *
+ * A tela é DA EQUIPE por natureza — é para isso que ela existe. Mas quem vê a
+ * produtividade de quem é decisão da operação, não do código: em algumas
+ * equipes o analista acompanha o grupo dele e isso puxa todo mundo para cima;
+ * em outras, o mesmo número vira constrangimento. Quem sabe qual é o caso é
+ * quem conduz a equipe, e por isso isto é NÍVEL DE ACESSO.
+ *
+ * BLOQUEADO não é um escopo, é a ausência da tela: escolher isto tira a
+ * Produtividade RECC do menu daquele nível. Fica na mesma lista porque é ali
+ * que a pessoa está decidindo sobre esta tela, e obrigá-la a lembrar de uma
+ * segunda caixa noutro canto é como se esquece de desligar a metade.
+ *
+ * "O canal inteiro" já é o teto: QUAIS canais o nível abre continua sendo a
+ * lista de canais dele. Um nível que abre só a RET e vê "o canal inteiro" vê a
+ * RET inteira, e não a Mesa Diamante.
+ */
+const RECC_ESCOPOS_DA_PRODUTIVIDADE = {
+  BLOQUEADO: 'Não abre a Produtividade RECC',
+  PROPRIOS: 'Só os casos da própria pessoa',
+  EQUIPE: 'A equipe dela — quem atende o mesmo canal',
+  CANAL: 'O canal inteiro, de todos os analistas'
+};
+
 /** Como um campo pode aparecer para um nível de acesso. */
 const RECC_VISIBILIDADE = {
   OCULTO: 'oculto',
@@ -700,6 +725,7 @@ function itemDoCatalogo_(idDoItem) {
 function lerPermissoesDoNivel_(nivel) {
   var permissoes = {
     escopo: RECC_ESCOPOS.PROPRIOS,
+    escopoNaProdutividade: 'BLOQUEADO',
     canais: [],
     telas: [],
     acoes: [],
@@ -740,6 +766,28 @@ function lerPermissoesDoNivel_(nivel) {
       .filter(function (id) { return id !== ''; })
     : [];
   permissoes.telas = Array.isArray(lido.telas) ? lido.telas : [];
+
+  /*
+   * O ALCANCE NA PRODUTIVIDADE RECC.
+   *
+   * Nível sem isto declarado cai em EQUIPE, e é decisão: a tela foi pedida
+   * para mostrar a equipe, e um nível antigo que amanhecesse mostrando só os
+   * próprios números estaria mostrando outra coisa sem ninguém ter escolhido.
+   *
+   * Se a tela não está na lista de telas, o alcance é BLOQUEADO — os dois não
+   * podem divergir, e quem manda é a lista de telas, que é o que `podeVerTela_`
+   * já consulta em todo lugar. Uma segunda fonte de verdade aqui seria o
+   * achado 34 outra vez.
+   */
+  if (permissoes.telas.indexOf('produtividade') < 0) {
+    permissoes.escopoNaProdutividade = 'BLOQUEADO';
+  } else {
+    var pedido = String(lido.escopoNaProdutividade || '').toUpperCase();
+    permissoes.escopoNaProdutividade =
+      (pedido && pedido !== 'BLOQUEADO' && RECC_ESCOPOS_DA_PRODUTIVIDADE[pedido])
+        ? pedido : 'EQUIPE';
+  }
+
   permissoes.acoes = Array.isArray(lido.acoes) ? lido.acoes : [];
   permissoes.campos = lido.campos && typeof lido.campos === 'object' ? lido.campos : {};
   permissoes.componentes =

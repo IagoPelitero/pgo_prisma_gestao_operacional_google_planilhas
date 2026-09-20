@@ -7346,6 +7346,7 @@ var TelaConfiguracoes = (function () {
         + '<span class="nome">' + escapar(nivel.nome) + '</span>'
         + '<span class="detalhe">' + nivel.telas.length + ' telas · '
         + nivel.acoes.length + ' ações · alcance ' + escapar(nivel.escopo)
+        + ' · produtividade ' + escapar(nivel.escopoNaProdutividade || 'EQUIPE')
         + ' · ' + nivel.pessoas + ' pessoa(s)'
         + (nivel.defeito
           ? ' · <strong class="alerta">' + escapar(nivel.defeito) + '</strong>' : '')
@@ -7391,6 +7392,43 @@ var TelaConfiguracoes = (function () {
         escolhidos.indexOf(canal.id) >= 0, canal.descricao);
     }).join('');
 
+    /**
+     * De quem são os números da Produtividade RECC, para ESTE nível.
+     *
+     * Ela não está na lista de "Telas que abrem" logo acima, e é de propósito:
+     * este seletor já liga e desliga. Duas caixas para a mesma tela é como
+     * alguém desliga a metade e jura que desligou — e depois passa a tarde
+     * procurando por que o menu ainda mostra.
+     *
+     * O alcance é INDEPENDENTE do "Até onde enxerga". São duas perguntas: "o
+     * que eu tenho para fazer" e "como a equipe está indo". Um analista pode
+     * ver só os casos dele na fila e a equipe inteira aqui.
+     */
+    function desenharAlcanceNaProdutividade(nivel, opcoes) {
+      var config = opcoes.produtividade;
+      if (!config) return '';
+
+      var atual = nivel.escopoNaProdutividade || 'EQUIPE';
+      var escolhas = config.opcoes.map(function (uma) {
+        return '<label class="config-radio">'
+          + '<input type="radio" name="escopoProdutividade"'
+          + ' value="' + escapar(uma.chave) + '"'
+          + (atual === uma.chave ? ' checked' : '') + '>'
+          + '<span><strong>' + escapar(uma.chave) + '</strong>'
+          + '<em>' + escapar(uma.descricao) + '</em></span></label>';
+      }).join('');
+
+      return '<fieldset class="config-grupo"><legend>'
+        + escapar(config.titulo) + '</legend>'
+        + '<p class="config-dica">Esta tela é a da EQUIPE, e quem vê a '
+        + 'produtividade de quem é decisão sua. <strong>Bloqueado tira a tela '
+        + 'do menu</strong> deste nível — por isso ela não aparece em "Telas '
+        + 'que abrem".<br>Vale só aqui: o alcance acima continua mandando no '
+        + 'Trabalho e na Busca. E <strong>quais</strong> canais aparecem '
+        + 'continua sendo a lista de canais, logo abaixo.</p>'
+        + escolhas + '</fieldset>';
+    }
+
     var escopos = opcoes.escopos.map(function (escopo) {
       return '<label class="config-radio">'
         + '<input type="radio" name="escopo" value="' + escapar(escopo.chave) + '"'
@@ -7409,6 +7447,7 @@ var TelaConfiguracoes = (function () {
       + acoes + '</fieldset>'
       + '<fieldset class="config-grupo"><legend>Até onde enxerga</legend>'
       + escopos + '</fieldset>'
+      + desenharAlcanceNaProdutividade(nivel, opcoes)
       + '<fieldset class="config-grupo"><legend>Quais canais enxerga</legend>'
       + '<p class="config-dica">RET e Mesa Diamante são operações '
       + 'distintas. Marque os canais deste nível — <strong>nenhum marcado '
@@ -7435,6 +7474,8 @@ var TelaConfiguracoes = (function () {
       });
 
       var escolhidoEscopo = document.querySelector('input[name="escopo"]:checked');
+      var naProdutividade = document.querySelector(
+        'input[name="escopoProdutividade"]:checked');
 
       Servidor.chamar('salvarNivelDeAcesso', {
         id: nivel.id,
@@ -7444,6 +7485,8 @@ var TelaConfiguracoes = (function () {
         telas: telasMarcadas,
         acoes: acoesMarcadas,
         escopo: escolhidoEscopo ? escolhidoEscopo.value : nivel.escopo,
+        escopoNaProdutividade: naProdutividade
+          ? naProdutividade.value : (nivel.escopoNaProdutividade || 'EQUIPE'),
         campos: nivel.campos
       }).entao(function () { avisarSalvo(); carregarNiveis(); })
         .senao(mostrarErroNoPainel);

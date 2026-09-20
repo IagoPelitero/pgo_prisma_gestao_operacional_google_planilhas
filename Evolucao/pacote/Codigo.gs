@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-19 23:53
+   Gerado em 2026-09-20 00:12
    ========================================================================== */
 
 
@@ -5602,6 +5602,7 @@ function listarNiveisDeAcesso() {
         canais: permissoes.canais,
         telas: permissoes.telas,
         acoes: permissoes.acoes,
+        escopoNaProdutividade: permissoes.escopoNaProdutividade,
         campos: permissoes.campos,
         defeito: permissoes.defeito,
         pessoas: quantosUsam[item.__id] || 0
@@ -5632,6 +5633,25 @@ function salvarNivelDeAcesso(dados) {
     });
     if (!conhecida) throw new Error('Ação desconhecida: "' + acao + '".');
   });
+
+  /*
+   * O ALCANCE NA PRODUTIVIDADE RECC decide, sozinho, se a tela abre.
+   *
+   * A lista de telas é a fonte de verdade — é ela que `podeVerTela_` consulta
+   * em todo lugar —, então o seletor ESCREVE nela em vez de virar um segundo
+   * lugar para conferir. Escolher "Bloqueado" tira a tela; escolher qualquer
+   * outra coisa põe. Assim não existe o estado em que o seletor diz uma coisa
+   * e o menu faz outra.
+   */
+  var naProdutividade = String(dados.escopoNaProdutividade || 'EQUIPE').toUpperCase();
+  if (!RECC_ESCOPOS_DA_PRODUTIVIDADE[naProdutividade]) {
+    throw new Error('Alcance desconhecido na Produtividade RECC: "' +
+      naProdutividade + '". Os alcances são ' +
+      Object.keys(RECC_ESCOPOS_DA_PRODUTIVIDADE).join(', ') + '.');
+  }
+
+  telas = telas.filter(function (tela) { return tela !== 'produtividade'; });
+  if (naProdutividade !== 'BLOQUEADO') telas.push('produtividade');
   if (!RECC_ESCOPOS[dados.escopo]) {
     throw new Error('Escopo desconhecido: "' + dados.escopo + '". Os escopos ' +
       'são ' + Object.keys(RECC_ESCOPOS).join(', ') + '.');
@@ -5665,6 +5685,7 @@ function salvarNivelDeAcesso(dados) {
       canais: canais,
       telas: telas,
       acoes: acoes,
+      escopoNaProdutividade: naProdutividade,
       campos: dados.campos && typeof dados.campos === 'object' ? dados.campos : {},
       componentes: {}
     })
@@ -5740,9 +5761,25 @@ function opcoesDeNivelDeAcesso() {
   };
 
   return {
-    telas: RECC_TELAS_DO_SISTEMA.map(function (item) {
-      return { chave: item.tela, titulo: item.titulo };
-    }),
+    // A Produtividade RECC sai da lista de telas: ela tem um seletor próprio,
+    // logo abaixo, que já liga e desliga. Duas caixas para a mesma tela é como
+    // alguém desliga a metade e jura que desligou.
+    telas: RECC_TELAS_DO_SISTEMA
+      .filter(function (item) { return item.tela !== 'produtividade'; })
+      .map(function (item) {
+        return { chave: item.tela, titulo: item.titulo };
+      }),
+    produtividade: {
+      // O nome de HOJE, que o administrador pode ter trocado. Escrever
+      // "Produtividade RECC" fixo aqui faria a tela de níveis falar de uma
+      // tela que o menu chama de outra coisa — é o achado 37.
+      titulo: (titulosDasTelas().filter(function (uma) {
+        return uma.tela === 'produtividade';
+      })[0] || {}).titulo || 'Produtividade RECC',
+      opcoes: Object.keys(RECC_ESCOPOS_DA_PRODUTIVIDADE).map(function (chave) {
+        return { chave: chave, descricao: RECC_ESCOPOS_DA_PRODUTIVIDADE[chave] };
+      })
+    },
     acoes: Object.keys(RECC_ACOES).map(function (chave) {
       var acao = RECC_ACOES[chave];
       return { chave: acao, descricao: oQueCadaAcaoFaz[acao] || '' };
@@ -7541,6 +7578,31 @@ const RECC_TELAS_DO_SISTEMA = [
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
 
+/**
+ * De quem são os números que a Produtividade RECC mostra, por nível de acesso.
+ *
+ * A tela é DA EQUIPE por natureza — é para isso que ela existe. Mas quem vê a
+ * produtividade de quem é decisão da operação, não do código: em algumas
+ * equipes o analista acompanha o grupo dele e isso puxa todo mundo para cima;
+ * em outras, o mesmo número vira constrangimento. Quem sabe qual é o caso é
+ * quem conduz a equipe, e por isso isto é NÍVEL DE ACESSO.
+ *
+ * BLOQUEADO não é um escopo, é a ausência da tela: escolher isto tira a
+ * Produtividade RECC do menu daquele nível. Fica na mesma lista porque é ali
+ * que a pessoa está decidindo sobre esta tela, e obrigá-la a lembrar de uma
+ * segunda caixa noutro canto é como se esquece de desligar a metade.
+ *
+ * "O canal inteiro" já é o teto: QUAIS canais o nível abre continua sendo a
+ * lista de canais dele. Um nível que abre só a RET e vê "o canal inteiro" vê a
+ * RET inteira, e não a Mesa Diamante.
+ */
+const RECC_ESCOPOS_DA_PRODUTIVIDADE = {
+  BLOQUEADO: 'Não abre a Produtividade RECC',
+  PROPRIOS: 'Só os casos da própria pessoa',
+  EQUIPE: 'A equipe dela — quem atende o mesmo canal',
+  CANAL: 'O canal inteiro, de todos os analistas'
+};
+
 /** Como um campo pode aparecer para um nível de acesso. */
 const RECC_VISIBILIDADE = {
   OCULTO: 'oculto',
@@ -7658,6 +7720,7 @@ function itemDoCatalogo_(idDoItem) {
 function lerPermissoesDoNivel_(nivel) {
   var permissoes = {
     escopo: RECC_ESCOPOS.PROPRIOS,
+    escopoNaProdutividade: 'BLOQUEADO',
     canais: [],
     telas: [],
     acoes: [],
@@ -7698,6 +7761,28 @@ function lerPermissoesDoNivel_(nivel) {
       .filter(function (id) { return id !== ''; })
     : [];
   permissoes.telas = Array.isArray(lido.telas) ? lido.telas : [];
+
+  /*
+   * O ALCANCE NA PRODUTIVIDADE RECC.
+   *
+   * Nível sem isto declarado cai em EQUIPE, e é decisão: a tela foi pedida
+   * para mostrar a equipe, e um nível antigo que amanhecesse mostrando só os
+   * próprios números estaria mostrando outra coisa sem ninguém ter escolhido.
+   *
+   * Se a tela não está na lista de telas, o alcance é BLOQUEADO — os dois não
+   * podem divergir, e quem manda é a lista de telas, que é o que `podeVerTela_`
+   * já consulta em todo lugar. Uma segunda fonte de verdade aqui seria o
+   * achado 34 outra vez.
+   */
+  if (permissoes.telas.indexOf('produtividade') < 0) {
+    permissoes.escopoNaProdutividade = 'BLOQUEADO';
+  } else {
+    var pedido = String(lido.escopoNaProdutividade || '').toUpperCase();
+    permissoes.escopoNaProdutividade =
+      (pedido && pedido !== 'BLOQUEADO' && RECC_ESCOPOS_DA_PRODUTIVIDADE[pedido])
+        ? pedido : 'EQUIPE';
+  }
+
   permissoes.acoes = Array.isArray(lido.acoes) ? lido.acoes : [];
   permissoes.campos = lido.campos && typeof lido.campos === 'object' ? lido.campos : {};
   permissoes.componentes =
@@ -9288,43 +9373,62 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
 // ----------------------------------------------------------------------------
 
 /**
- * A Produtividade RECC mostra SEMPRE a equipe. Não há vista individual aqui.
+ * De quem são os números desta tela. Quem responde é o NÍVEL DE ACESSO.
  *
- * As duas telas de número responderam a mesma pergunta por um tempo, com um
- * par de botões em cada uma para escolher "eu" ou "a equipe". A operação
- * cortou isso, e a divisão ficou mais clara do que estava:
+ * A Produtividade RECC é a tela da equipe — é para isso que ela existe, e por
+ * isso ela não tem botão de "só os meus": Minha Performance é a tela de uma
+ * pessoa, esta é a do grupo, e cada pergunta tem a sua tela.
  *
- *   MINHA PERFORMANCE é sobre MIM — as minhas inclusões, sempre.
- *   PRODUTIVIDADE RECC é sobre A EQUIPE — sempre.
+ * Mas QUEM vê a produtividade de quem não é decisão do código. Em algumas
+ * equipes o analista acompanhar o grupo puxa todo mundo para cima; em outras,
+ * o mesmo número vira constrangimento. Quem sabe qual é o caso é quem conduz a
+ * equipe — então isto mora em Configurações › Níveis de acesso, com quatro
+ * respostas possíveis:
  *
- * Duas telas, duas perguntas, nenhum botão para errar. Quem quiser o número de
- * uma pessoa dentro da equipe usa o filtro de Analista, que é outra coisa:
- * recortar a equipe, e não trocar de assunto.
+ *   BLOQUEADO  a tela não abre para este nível
+ *   PROPRIOS   só os casos da própria pessoa
+ *   EQUIPE     quem atende o mesmo canal que ela          (o padrão)
+ *   CANAL      o canal inteiro, de todos os analistas
  *
- * O ALARGAMENTO, que é a parte que merece atenção. Um analista com escopo
- * "próprios" enxerga só os casos dele no Trabalho e na Busca — e continua
- * assim nessas telas. AQUI ele passa a ver a equipe, porque uma tela chamada
- * "Produtividade RECC" que mostrasse uma pessoa só não seria a tela que a
- * operação pediu. É uma decisão de produto, tomada pelo PO, e vale só nesta
- * tela: as outras seguem obedecendo ao escopo do nível.
+ * ISTO NÃO ALARGA O RESTO. O escopo geral do nível continua mandando no
+ * Trabalho, na Busca e em tudo mais: um analista com escopo "próprios" e
+ * Produtividade em "equipe" vê a equipe AQUI e continua vendo só os casos dele
+ * na fila de trabalho. São duas perguntas diferentes — "o que eu tenho para
+ * fazer" e "como a equipe está indo" —, e elas não precisam ter a mesma
+ * resposta.
  *
- * A equipe é quem está cadastrado no mesmo canal que a pessoa atende — a mesma
- * definição que o escopo "equipe" usa. Quem não pertence a canal nenhum (quem
- * administra) já enxerga tudo pelo escopo dele, e não precisa de alargamento.
+ * QUAIS canais o nível abre continua sendo a lista de canais dele. Um nível
+ * que abre só a RET e tem "o canal inteiro" vê a RET inteira, e não a Mesa.
  */
 function alcanceDaProdutividade_(registros, canal, quem) {
-  if (quem.permissoes.escopo !== RECC_ESCOPOS.PROPRIOS) {
-    return filtrarPeloAlcance_(registros, canal.aba, quem);
-  }
+  var alcance = quem.permissoes.escopoNaProdutividade || 'EQUIPE';
+
+  // O canal inteiro é o que a tela já mostraria sem recorte por pessoa. Não é
+  // "ver tudo": a lista de canais do nível é quem diz quais canais existem
+  // para ele, e essa conferência já aconteceu em canalQueEuPossoVer_.
+  if (alcance === 'CANAL') return registros;
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
+
+  // Sem coluna de responsável não há como recortar por pessoa. Mostrar a base
+  // inteira porque faltou uma coluna seria trocar uma regra de acesso por um
+  // descuido de configuração — então vale o alcance normal do nível.
+  if (!coluna) return filtrarPeloAlcance_(registros, canal.aba, quem);
+
+  if (alcance === 'PROPRIOS') {
+    var meuNome = normalizarParaComparar_((quem.usuario || {}).Nome);
+    if (!meuNome) return [];
+    return registros.filter(function (registro) {
+      return normalizarParaComparar_(registro[coluna]) === meuNome;
+    });
+  }
+
+  // EQUIPE, que é o padrão.
   var minhaEquipe = nomesDaMinhaEquipe_(quem);
 
-  // Sem coluna de responsável não há como recortar por pessoa, e sem equipe
-  // declarada não há equipe para alargar. Nos dois casos o alcance normal
-  // vale — mostrar a base inteira porque faltou um cadastro seria trocar uma
-  // regra de acesso por um descuido.
-  if (!coluna || !minhaEquipe || !minhaEquipe.length) {
+  // Quem não pertence a canal nenhum — quem administra — não tem "a minha
+  // equipe". Para ele o alcance normal do nível vale, e ele já é amplo.
+  if (!minhaEquipe || !minhaEquipe.length) {
     return filtrarPeloAlcance_(registros, canal.aba, quem);
   }
 
@@ -10622,24 +10726,39 @@ function semearDadosIniciais_(emailDoInstalador) {
   // não é administrador já deixou um nível chamado "Consulta" podendo criar
   // caso — o nome dizia uma coisa e a permissão fazia outra.
   var niveis = inserirVariosRegistros_('CATALOGO', [
+    /*
+     * O ALCANCE NA PRODUTIVIDADE RECC é o sexto parâmetro, e cada nível tem o
+     * seu — é o que a operação pediu: poder liberar e poder bloquear.
+     *
+     * Ele é INDEPENDENTE do escopo geral. A Operação enxerga só os casos dela
+     * no Trabalho e na Busca (escopo PROPRIOS) e vê A EQUIPE na Produtividade:
+     * são duas perguntas diferentes — "o que eu tenho para fazer" e "como a
+     * equipe está indo" —, e elas não precisam ter a mesma resposta.
+     */
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes']),
+       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes'],
+      'CANAL'),
     // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
     // distribui. A Operação não — um analista não traz trezentos casos para
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade']),
+       'tabelaCorretoras', 'tombamento', 'produtividade'],
+      'CANAL'),
+    // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
+    // "próprios" no resto do sistema.
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras']),
+       'tabelaCorretoras', 'produtividade'],
+      'EQUIPE'),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
       ['exportar'],
-      ['trabalho', 'buscarCaso', 'produtividade'])
+      ['trabalho', 'buscarCaso', 'produtividade'],
+      'CANAL')
   ]);
   contagem.niveis = niveis.length;
   var idAdministrador = niveis[0]['Id'];
@@ -10879,7 +10998,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   return contagem;
 }
 
-function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
+function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas, naProdutividade) {
   return {
     CanalId: '',
     Tipo: 'NIVEL_ACESSO',
@@ -10894,6 +11013,9 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
       escopo: escopo,
       telas: telas,
       acoes: acoes,
+      // De quem são os números da Produtividade RECC para este nível. Sem
+      // declarar, EQUIPE — a tela foi pedida para mostrar a equipe.
+      escopoNaProdutividade: naProdutividade || 'EQUIPE',
       campos: {},
       widgets: {}
     })

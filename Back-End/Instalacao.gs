@@ -200,24 +200,39 @@ function semearDadosIniciais_(emailDoInstalador) {
   // não é administrador já deixou um nível chamado "Consulta" podendo criar
   // caso — o nome dizia uma coisa e a permissão fazia outra.
   var niveis = inserirVariosRegistros_('CATALOGO', [
+    /*
+     * O ALCANCE NA PRODUTIVIDADE RECC é o sexto parâmetro, e cada nível tem o
+     * seu — é o que a operação pediu: poder liberar e poder bloquear.
+     *
+     * Ele é INDEPENDENTE do escopo geral. A Operação enxerga só os casos dela
+     * no Trabalho e na Busca (escopo PROPRIOS) e vê A EQUIPE na Produtividade:
+     * são duas perguntas diferentes — "o que eu tenho para fazer" e "como a
+     * equipe está indo" —, e elas não precisam ter a mesma resposta.
+     */
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes']),
+       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes'],
+      'CANAL'),
     // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
     // distribui. A Operação não — um analista não traz trezentos casos para
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade']),
+       'tabelaCorretoras', 'tombamento', 'produtividade'],
+      'CANAL'),
+    // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
+    // "próprios" no resto do sistema.
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras']),
+       'tabelaCorretoras', 'produtividade'],
+      'EQUIPE'),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
       ['exportar'],
-      ['trabalho', 'buscarCaso', 'produtividade'])
+      ['trabalho', 'buscarCaso', 'produtividade'],
+      'CANAL')
   ]);
   contagem.niveis = niveis.length;
   var idAdministrador = niveis[0]['Id'];
@@ -457,7 +472,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   return contagem;
 }
 
-function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
+function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas, naProdutividade) {
   return {
     CanalId: '',
     Tipo: 'NIVEL_ACESSO',
@@ -472,6 +487,9 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas) {
       escopo: escopo,
       telas: telas,
       acoes: acoes,
+      // De quem são os números da Produtividade RECC para este nível. Sem
+      // declarar, EQUIPE — a tela foi pedida para mostrar a equipe.
+      escopoNaProdutividade: naProdutividade || 'EQUIPE',
       campos: {},
       widgets: {}
     })

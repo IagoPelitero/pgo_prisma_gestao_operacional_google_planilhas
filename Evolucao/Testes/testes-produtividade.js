@@ -523,38 +523,217 @@ function rodarTestesDaProdutividade() {
     igual(somaDasListas, grafico.pontos.reduce((s, p) => s + p.casos, 0));
   });
 
-  secao('A Produtividade RECC é a tela DA EQUIPE');
+  secao('De quem são os números: o nível de acesso decide');
 
   /*
-   * Duas telas, duas perguntas, e nenhum botão para errar:
+   * A tela é DA EQUIPE por natureza — não há botão de "só os meus", porque
+   * Minha Performance é a tela de uma pessoa e esta é a do grupo.
    *
-   *   MINHA PERFORMANCE é sobre MIM — as minhas inclusões, sempre.
-   *   PRODUTIVIDADE RECC é sobre A EQUIPE — sempre.
-   *
-   * Quem quiser o número de uma pessoa dentro da equipe usa o filtro de
-   * Analista. Isso é recortar a equipe, e não trocar de assunto.
+   * Mas QUEM vê a produtividade de quem é decisão da operação, e por isso é
+   * nível de acesso. Quatro respostas: bloqueado, próprios, equipe, canal.
    */
 
-  teste('não existe mais seletor de vista — a tela é da equipe e pronto', () => {
+  /** Troca o alcance de um nível e devolve o Id dele. */
+  function comAlcance(nomeDoNivel, alcance) {
+    const nivel = chamar('listarNiveisDeAcesso()')
+      .find((um) => um.nome === nomeDoNivel);
+    chamar('salvarNivelDeAcesso')(Object.assign({}, nivel, {
+      escopoNaProdutividade: alcance
+    }));
+    return nivel.id;
+  }
+
+  teste('não existe mais seletor de vista na tela — quem decide é o nível', () => {
     const painel = painelDaRet();
-    verdadeiro(painel.vista === undefined,
-      'a tela não escolhe mais de quem é o número');
+    verdadeiro(painel.vista === undefined);
     verdadeiro(painel.vistasDisponiveis === undefined);
 
     const tela = lerPeca('Produtividade');
     verdadeiro(tela.indexOf('data-vista') < 0,
-      'e o botão não pode ter ficado para trás no HTML');
+      'o botão não pode ter ficado para trás no HTML');
   });
 
-  teste('mandar vista pela chamada direta não muda nada', () => {
-    // O parâmetro sumiu da assinatura. Um endereço guardado ou um clique de
-    // quem ficou com a tela antiga aberta não pode fazer o painel encolher.
-    const normal = painelDaRet().total;
-    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30, 'eu').total, normal);
-    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30, 'equipe').total, normal);
+  teste('os quatro alcances existem, e cada um explica o que faz', () => {
+    const opcoes = chamar('opcoesDeNivelDeAcesso()').produtividade;
+    igual(opcoes.opcoes.map((o) => o.chave).join(','),
+      'BLOQUEADO,PROPRIOS,EQUIPE,CANAL');
+    contem(opcoes.titulo, 'Produtividade',
+      'o seletor usa o nome de HOJE da tela, e não um texto fixo');
   });
 
-  secao('Alcance, filtros e exportação');
+  teste('a Produtividade sai da lista de "telas que abrem"', () => {
+    // Ela tem seletor próprio, que já liga e desliga. Duas caixas para a mesma
+    // tela é como alguém desliga a metade e jura que desligou.
+    const telas = chamar('opcoesDeNivelDeAcesso()').telas.map((uma) => uma.chave);
+    verdadeiro(telas.indexOf('produtividade') < 0);
+    verdadeiro(telas.indexOf('trabalho') >= 0, 'as outras continuam lá');
+  });
+
+  teste('os níveis de fábrica nascem com o alcance declarado', () => {
+    const porNome = {};
+    chamar('listarNiveisDeAcesso()').forEach((nivel) => {
+      porNome[nivel.nome] = nivel.escopoNaProdutividade;
+    });
+
+    igual(porNome['Administrador'], 'CANAL');
+    igual(porNome['Coordenação'], 'CANAL');
+    igual(porNome['Operação'], 'EQUIPE',
+      'a Operação tem escopo PRÓPRIOS no resto e vê a EQUIPE aqui — são duas '
+      + 'perguntas diferentes, e não precisam ter a mesma resposta');
+  });
+
+  secao('Liberar e bloquear, por nível');
+
+  teste('BLOQUEADO tira a tela do menu, e a chamada direta é recusada', () => {
+    // Esconder o item não basta: a função existe e nada impede chamá-la.
+    const consulta = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
+    const permissoes = JSON.parse(consulta.Configuracao);
+    permissoes.escopo = 'TODOS';
+    chamar('atualizarRegistro_')('CATALOGO', consulta.Id,
+      { Configuracao: JSON.stringify(permissoes) });
+    chamar('salvarUsuario')({
+      nome: 'Só Consulta', email: 'soconsulta@exemplo.com',
+      nivelAcessoId: consulta.Id, ativo: true
+    });
+
+    comAlcance('Consulta', 'BLOQUEADO');
+
+    comoUsuario(ambiente, 'soconsulta@exemplo.com', () => {
+      const menu = chamar('pacoteDePartida()').menu.map((item) => item.tela);
+      verdadeiro(menu.indexOf('produtividade') < 0, 'sumiu do menu');
+      lanca(() => chamar('produtividadeDaEquipe')(ret.id, {}, 30), 'não abre a tela');
+    });
+  });
+
+  teste('liberar de volta devolve a tela ao menu', () => {
+    comAlcance('Consulta', 'CANAL');
+    comoUsuario(ambiente, 'soconsulta@exemplo.com', () => {
+      verdadeiro(chamar('pacoteDePartida()').menu
+        .some((item) => item.tela === 'produtividade'), 'voltou ao menu');
+      verdadeiro(chamar('produtividadeDaEquipe')(ret.id, {}, 30).total > 0);
+    });
+  });
+
+  teste('o seletor e o menu nunca divergem — a lista de telas manda', () => {
+    // Se alguém mexer na lista de telas por fora, o alcance acompanha. Duas
+    // fontes de verdade para a mesma coisa é o achado 34.
+    const consulta = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
+    const permissoes = JSON.parse(consulta.Configuracao);
+    permissoes.telas = permissoes.telas.filter((t) => t !== 'produtividade');
+    chamar('atualizarRegistro_')('CATALOGO', consulta.Id,
+      { Configuracao: JSON.stringify(permissoes) });
+
+    igual(chamar('listarNiveisDeAcesso()')
+      .find((n) => n.nome === 'Consulta').escopoNaProdutividade, 'BLOQUEADO',
+      'tela fora da lista quer dizer alcance bloqueado, sem exceção');
+
+    comAlcance('Consulta', 'CANAL');
+  });
+
+  secao('Os três alcances que mostram número');
+
+  teste('cada alcance mostra uma quantidade diferente, e crescente', () => {
+    // A prova de que o seletor faz alguma coisa: os três números têm de ser
+    // diferentes entre si, e na ordem. Um seletor que não muda o número seria
+    // indistinguível de um que não está ligado em nada.
+    const operacao = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+    const permissoes = JSON.parse(operacao.Configuracao);
+    permissoes.telas.push('produtividade');
+    chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
+      { Configuracao: JSON.stringify(permissoes) });
+
+    // Três pessoas no mesmo canal, e mais gente na base fora dele.
+    [['Ana da Equipe', 'ana.eq@exemplo.com'],
+     ['Bruno da Equipe', 'bruno.eq@exemplo.com']].forEach((par) => {
+      chamar('salvarUsuario')({
+        nome: par[0], email: par[1], canalQueAtende: 'Cobrança ativa',
+        nivelAcessoId: operacao.Id, ativo: true
+      });
+    });
+    chamar('inserirVariosRegistros_')('BASE_RET', [
+      { analista: 'Ana da Equipe', status: 'Pendente',
+        'data de recepção do protocolo': diasAtras(1), 'nome do cliente': 'E1' },
+      { analista: 'Ana da Equipe', status: 'Pendente',
+        'data de recepção do protocolo': diasAtras(1), 'nome do cliente': 'E2' },
+      { analista: 'Bruno da Equipe', status: 'Pendente',
+        'data de recepção do protocolo': diasAtras(1), 'nome do cliente': 'E3' }
+    ]);
+
+    const quantos = {};
+    ['PROPRIOS', 'EQUIPE', 'CANAL'].forEach((alcance) => {
+      comAlcance('Operação', alcance);
+      comoUsuario(ambiente, 'ana.eq@exemplo.com', () => {
+        quantos[alcance] = chamar('produtividadeDaEquipe')(ret.id, {}, 30).total;
+      });
+    });
+
+    igual(quantos.PROPRIOS, 2, 'os dois casos da Ana');
+    igual(quantos.EQUIPE, 3, 'os dela mais o do Bruno, que atende o mesmo canal');
+    verdadeiro(quantos.CANAL > quantos.EQUIPE,
+      'e o canal inteiro traz também quem não é da equipe dela: '
+      + quantos.CANAL + ' contra ' + quantos.EQUIPE);
+  });
+
+  teste('o alcance daqui NÃO alarga o resto do sistema', () => {
+    // É a parte que mais importa. Um analista com escopo "próprios" e
+    // Produtividade em "canal" vê o canal AQUI e continua vendo só os casos
+    // dele na fila de trabalho. Se isto vazasse, o seletor teria virado uma
+    // porta dos fundos para o sistema inteiro.
+    comAlcance('Operação', 'CANAL');
+
+    comoUsuario(ambiente, 'ana.eq@exemplo.com', () => {
+      const naProdutividade = chamar('produtividadeDaEquipe')(ret.id, {}, 30).total;
+      const noTrabalho = chamar('resumoDoCanal')(ret.id, {}).total;
+
+      verdadeiro(naProdutividade > noTrabalho,
+        'a Produtividade mostra o canal; o Trabalho, só os dela');
+      igual(noTrabalho, 2, 'na fila de trabalho ela continua vendo os dois dela');
+    });
+  });
+
+  teste('o detalhamento usa o mesmo alcance do gráfico', () => {
+    // Clicar numa barra tem de abrir uma lista do tamanho que a barra mostrava.
+    comAlcance('Operação', 'EQUIPE');
+
+    comoUsuario(ambiente, 'ana.eq@exemplo.com', () => {
+      const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
+      const grafico = painel.componentes.find((c) =>
+        c.titulo.indexOf('Casos por analista') === 0);
+
+      const somaDasListas = grafico.pontos.reduce((soma, ponto) => soma
+        + chamar('detalharComponente')(ret.id, grafico.id, ponto.chave, {}, 30).total,
+        0);
+      igual(somaDasListas, grafico.pontos.reduce((s, p) => s + p.casos, 0));
+    });
+  });
+
+  teste('alcance desconhecido é recusado ao salvar, dizendo quais existem', () => {
+    const nivel = chamar('listarNiveisDeAcesso()').find((n) => n.nome === 'Operação');
+    const erro = lanca(() => chamar('salvarNivelDeAcesso')(
+      Object.assign({}, nivel, { escopoNaProdutividade: 'SEI_LA' })),
+      'Alcance desconhecido');
+    contem(erro.message, 'EQUIPE', 'e o recado lista os que existem');
+  });
+
+  teste('nível sem o alcance declarado cai em EQUIPE, e não em bloqueado', () => {
+    // Nível antigo, de antes desta regra. Amanhecer sem a tela seria tirar
+    // acesso de quem tinha; amanhecer mostrando só os próprios números seria
+    // mostrar outra coisa sem ninguém ter escolhido.
+    const operacao = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+    const permissoes = JSON.parse(operacao.Configuracao);
+    delete permissoes.escopoNaProdutividade;
+    chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
+      { Configuracao: JSON.stringify(permissoes) });
+
+    igual(chamar('listarNiveisDeAcesso()')
+      .find((n) => n.nome === 'Operação').escopoNaProdutividade, 'EQUIPE');
+  });
+
+  secao('Alcance, filtros e exportação');  secao('Alcance, filtros e exportação');
 
   teste('o painel só soma o que a pessoa pode ver', () => {
     const operacao = chamar('lerRegistros_("CATALOGO")')
@@ -570,67 +749,13 @@ function rodarTestesDaProdutividade() {
       nivelAcessoId: operacao.Id, ativo: true
     });
 
-    const total = painelDaRet().total;   // o que o administrador enxerga
-
-    // AQUI a regra é outra, e de propósito. A Patrícia tem escopo "próprios":
-    // no Trabalho e na Busca ela enxerga só os casos dela, e continua assim. Na
-    // Produtividade RECC ela passa a ver A EQUIPE — uma tela com esse nome
-    // mostrando uma pessoa só não seria a tela que a operação pediu.
-    //
-    // O alargamento vale SÓ NESTA TELA, e só até a equipe dela: as pessoas
-    // cadastradas no mesmo canal que ela atende. Não é "ver tudo".
+    // A Patrícia tem escopo "próprios" e alcance EQUIPE na Produtividade —
+    // e sem canal declarado ela não tem equipe, então o alcance normal vale.
     comoUsuario(ambiente, 'patricia@exemplo.com', () => {
       const dela = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
       igual(dela.total, chamar('resumoDoCanal')(ret.id, {}).total,
-        'sem canal declarado, ela não tem equipe, e o alcance normal vale');
-    });
-
-    // Com canal declarado, ela passa a enxergar quem atende o mesmo canal.
-    // A Patrícia já existe: mandar o Id EDITA, e mandar sem Id seria cadastrar
-    // de novo — o que o servidor recusa, porque o e-mail é único.
-    const jaCadastrada = chamar('listarUsuarios()')
-      .find((u) => u.email === 'patricia@exemplo.com');
-    chamar('salvarUsuario')({
-      id: jaCadastrada.id,
-      nome: 'Patrícia Nunes', email: 'patricia@exemplo.com',
-      canalQueAtende: 'Cobrança ativa',
-      nivelAcessoId: operacao.Id, ativo: true
-    });
-    chamar('salvarUsuario')({
-      nome: 'Marcos Vieira', email: 'marcos.eq@exemplo.com',
-      canalQueAtende: 'Cobrança ativa',
-      nivelAcessoId: operacao.Id, ativo: true
-    });
-
-    comoUsuario(ambiente, 'patricia@exemplo.com', () => {
-      const naProdutividade = chamar('produtividadeDaEquipe')(ret.id, {}, 30).total;
-      const noTrabalho = chamar('resumoDoCanal')(ret.id, {}).total;
-
-      verdadeiro(naProdutividade > noTrabalho,
-        'a Produtividade mostra a equipe; o Trabalho continua só o dela. '
-        + 'Vieram ' + naProdutividade + ' e ' + noTrabalho);
-      verdadeiro(naProdutividade < total,
-        'mas é a EQUIPE dela, e não a base inteira: ' + naProdutividade
-        + ' contra ' + total);
-    });
-  });
-
-  teste('o detalhamento usa o mesmo alcance do gráfico', () => {
-    // Clicar numa barra tem de abrir uma lista do tamanho que a barra mostrava.
-    // Dois alcances diferentes fariam a pessoa concluir, com razão, que um dos
-    // dois números está errado.
-    comoUsuario(ambiente, 'patricia@exemplo.com', () => {
-      const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
-      const grafico = painel.componentes.find((c) =>
-        c.titulo.indexOf('Casos por analista') === 0);
-
-      const somaDoGrafico = grafico.pontos.reduce((soma, p) => soma + p.casos, 0);
-      const somaDasListas = grafico.pontos.reduce((soma, ponto) => soma
-        + chamar('detalharComponente')(ret.id, grafico.id, ponto.chave, {}, 30).total,
-        0);
-
-      igual(somaDasListas, somaDoGrafico,
-        'a soma das listas tem de bater com a soma das barras');
+        'sem equipe, o alcance normal do nível vale — mostrar a base inteira '
+        + 'porque faltou um cadastro seria trocar acesso por descuido');
     });
   });
 
