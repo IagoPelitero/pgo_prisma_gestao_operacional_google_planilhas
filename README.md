@@ -505,7 +505,10 @@ no Corpus Christi.
 
 **Férias não bloqueiam o acesso.** A pessoa continua entrando no sistema — quem
 volta às vezes precisa consultar um caso antes de reassumir. O que muda é a
-conta.
+conta, e a **divisão de um lote na Importação**: quem está fora hoje vai para o
+fim da lista, com a data da volta ao lado do nome. Não some — o lote pode ser
+justamente para quando ela voltar —, e se for marcada mesmo assim o laudo diz,
+antes de gravar, quantos casos vão ficar parados e até quando.
 
 ---
 
@@ -566,6 +569,32 @@ importados por dia** e **de qual base os casos vieram**, em cada canal.
 A importação é a ação `importar`, separada de `criar`: quem cadastra um caso por
 vez erra um caso; quem importa errado suja a base toda. De fábrica, Administração
 e Coordenação importam; a Operação não.
+
+---
+
+### Trazer as datas de contato da base antiga
+
+Há uma distinção que a tela faz e que vale entender, porque ela decide um número
+importante.
+
+O PGO **nunca sugere sozinho** que uma coluna da origem escreva num **carimbo de
+status** — "Data do 1º contato", "Data reteve". Uma coluna da planilha antiga
+com esse nome casando automaticamente escreveria no controle de produtividade
+sem ninguém decidir isso.
+
+Mas **escolher, pode** — e é o certo quando a base antiga guarda a data de
+verdade. Sem isso, 300 casos importados entravam sem data de contato e a
+Produtividade RECC dizia **"Já contatados: 0"** para uma leva inteira que tinha
+sido contatada, com a data ali na planilha de origem e sem forma de entrar.
+
+Na lista do de-para essas colunas vêm marcadas com *(controle de
+produtividade)*, e escolher uma mostra um aviso — para a pessoa conferir, nas
+três linhas já traduzidas, se a data chegou certa.
+
+O que **nunca** entra, nem sugerido nem escolhido, é a **origem e a data da
+importação**: elas são o rastro do próprio lote, a única resposta para "de que
+leva veio este caso?". A recusa é do **servidor**, e não da tela — antes era só
+a tela que não oferecia, e um de-para montado por fora passava.
 
 ---
 

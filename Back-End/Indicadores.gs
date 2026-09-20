@@ -594,6 +594,51 @@ function diasUteisTrabalhaveis_(usuarioId, de, ate) {
 }
 
 /**
+ * Quem está ausente HOJE, por nome.
+ *
+ * Devolve { nome: { ate, motivo } } — vazio quando não há ninguém fora. É o que
+ * a Importação pergunta antes de dividir um lote: distribuir 300 casos entre
+ * oito analistas quando dois estão de férias deixa 75 casos parados três
+ * semanas, e nada no sistema avisa — os casos estão lá, no nome de alguém,
+ * dentro do prazo, e ninguém os está trabalhando.
+ *
+ * Por NOME, e não por Id, porque é o nome que a coluna de responsável guarda —
+ * a mesma ponte do `ausenciasPorNome_`, pelo mesmo motivo.
+ */
+function quemEstaAusenteHoje_() {
+  var hoje = new Date();
+  hoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  var nomePorId = {};
+  lerRegistros_('USUARIOS').forEach(function (pessoa) {
+    nomePorId[String(pessoa.Id)] = String(pessoa.Nome || '');
+  });
+
+  var fora = {};
+  lerRegistros_('AUSENCIAS').forEach(function (linha) {
+    var de = converterParaData_(linha.De);
+    var ate = converterParaData_(linha.Ate);
+    if (!de || !ate || de > hoje || ate < hoje) return;
+
+    var nome = nomePorId[String(linha.UsuarioId || '')];
+    if (!nome) return;
+
+    // Quem tem duas ausências emendadas volta na MAIS LONGE das duas. Guardar
+    // a primeira diria que a pessoa volta semana que vem quando ela volta só
+    // no mês seguinte.
+    if (!fora[nome] || ate > fora[nome].quando) {
+      fora[nome] = {
+        quando: ate,
+        ate: comoSeEscreve_(ate),
+        motivo: String(linha.Motivo || 'ausente')
+      };
+    }
+  });
+
+  return fora;
+}
+
+/**
  * Quantos dias úteis cada NOME esteve ausente no período.
  *
  * A ponte que falta: o caso guarda o NOME de quem é responsável — porque é o

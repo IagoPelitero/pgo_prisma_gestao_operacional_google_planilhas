@@ -666,6 +666,32 @@ button { font: inherit; color: inherit; }
 }
 
 /*
+  Quem está de férias na lista da Importação.
+
+  A marca é em tom de ATENÇÃO, e não de erro: a pessoa pode ser marcada de
+  propósito, para um lote que só vai ser trabalhado quando ela voltar. Vermelho
+  diria "não faça isso", e não é isso que o sistema sabe.
+*/
+.config-chave.esta-fora span { color: var(--suave); }
+.config-chave.esta-fora em.fora {
+  font-style: normal; font-size: 11.5px; font-weight: 600;
+  color: var(--atencao);
+}
+.aviso-de-ausencia { color: var(--atencao); }
+
+/*
+  O recado de que a origem vai escrever numa coluna de produtividade.
+
+  Fundo, e não só cor de texto: este é o único aviso da tela que fala de uma
+  escolha CERTA com consequência grande. Uma linha de texto colorido no meio de
+  uma tabela de trinta linhas passa batida.
+*/
+.aviso-de-carimbo {
+  background: var(--atencao-tenue); color: var(--atencao);
+  border-radius: var(--raio-pequeno); padding: 10px 12px; margin-top: 10px;
+}
+
+/*
   A linha do tempo do caso, dentro do detalhe.
 
   Cada etapa é um status que carimba data e hora. A etapa que ainda não

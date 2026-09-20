@@ -1831,13 +1831,65 @@ nova usava e o `Estilos.html` não definia.
 combinações de tela × largura, 9 testes ponta a ponta, o estresse APROVADO em
 50 mil casos e 14 imagens geradas.
 
+## Etapa 18 — os dois pontos que ficaram em aberto
+
+O PO respondeu os dois de uma vez: *"faça os dois pontos"*.
+
+### Férias entram na divisão da Importação
+
+O problema era concreto: importar 300 casos numa segunda com dois analistas
+fora deixa 75 casos parados três semanas — e **nada no sistema avisa**. Os
+casos estão lá, no nome de alguém, dentro do prazo, e ninguém os trabalha. Quem
+descobre é o cliente, ligando.
+
+Quem está fora hoje vai para o **fim da lista**, com o motivo e a data da volta
+ao lado do nome. Não some: o lote pode ser justamente para quando ela voltar, e
+quem decide isso é a coordenação. E se for marcada mesmo assim, o **laudo diz**
+— quantos casos, até quando — antes de gravar. Recusar seria tirar a decisão da
+mão de quem a tem; calar seria o defeito de novo.
+
+### O carimbo virou destino escolhível
+
+Era uma regra só — "coluna preenchida pelo sistema não é sugerida nem
+oferecida" — e virou duas:
+
+| | |
+|---|---|
+| **Sugerir** | Continua proibido. Uma coluna da fonte chamada "Data do 1º contato" casando sozinha escreveria no controle de produtividade sem ninguém decidir |
+| **Escolher** | Passou a poder. É o certo quando a base antiga guarda a data de verdade — e é a única forma de esses casos contarem em "Já contatados" |
+
+A lista de carimbos sai do **catálogo**, e não de uma lista no código: o
+administrador cria status novos e aponta cada um para a sua coluna, e a
+importação acompanha sem ninguém mexer aqui.
+
+**E uma trava que não existia.** `exigirQueODeParaLeveAAlgumLugar_` só
+perguntava se a coluna EXISTE na aba. A origem e a data da importação, que a
+tela nunca ofereceu, podiam ser escritas por quem montasse o de-para por fora —
+a proteção do rastro do lote era um **combinado visual**, e combinado visual
+não é trava. Agora a lista do que se aceita é conferida no servidor, que é onde
+a linha entre "pode escolher" e "nunca" precisa estar.
+
+### De passagem
+
+O recado *"o importação criaria linhas em branco"* — erro de gênero que o
+renomeio da etapa 17 não pegou, porque "o" e "importação" estavam em literais
+de texto **separados**, unidos por concatenação. Busca de texto não vê palavra
+que o código junta em tempo de execução.
+
+E três testes alheios quebraram porque eu pus os meus, que **gravam**, no meio
+do arquivo: vários ali conferem total, e escrever no meio muda a contagem de
+quem vem depois. Consertei movendo os meus para o fim, e não reescrevendo os
+outros — não havia nada errado com eles.
+
+**589 testes**, cinco execuções seguidas sem falha, 144 cliques em 8 telas, 96
+combinações de tela × largura, 9 testes ponta a ponta e 14 imagens geradas.
+
 ---
 
 ## O que ainda está em aberto
 
 | Assunto | Situação |
 |---|---|
-| **Caso importado não conta em "Já contatados"** | Decisão do PO. Hoje a importação **não** escreve nas colunas de carimbo, de propósito: deixar a planilha de origem escrever ali apagaria o controle de produtividade com dado de fora. O efeito é que 300 casos trazidos da base antiga entram sem data de contato, e a Produtividade RECC não os conta como contatados — mesmo que a base antiga tenha essas datas. Abrir o carimbo como destino ESCOLHÍVEL no de-para (nunca sugerido) resolveria, e é mudança pequena. Fica aguardando a decisão |
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |

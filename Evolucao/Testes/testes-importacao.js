@@ -18,8 +18,8 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro, lanca, comoUsuario, ehData } =
-  require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, lanca, comoUsuario, ehData,
+  lerPeca } = require('./ferramentas');
 
 function rodarTestesDeImportacao() {
   console.log('\nEtapa 13 — Importação');
@@ -102,9 +102,19 @@ function rodarTestesDeImportacao() {
       'o que não casa fica em branco, e a pessoa decide');
   });
 
-  teste('coluna preenchida pelo sistema NÃO é sugerida nem oferecida', () => {
-    // Deixar a fonte escrever no carimbo do 1º contato apagaria o controle de
-    // produtividade com dado de outra planilha — e apagaria calado.
+  teste('o carimbo NÃO é sugerido sozinho, mas PODE ser escolhido', () => {
+    /*
+     * Esta era uma regra só, e o PO pediu para separá-la em duas.
+     *
+     * SUGERIR continua proibido: uma coluna da fonte chamada "Data do 1º
+     * contato" casando sozinha escreveria no controle de produtividade sem
+     * ninguém decidir isso.
+     *
+     * ESCOLHER passou a poder. Sem isso, 300 casos trazidos da base antiga
+     * entravam sem data de contato, e a Produtividade RECC dizia "Já
+     * contatados: 0" para uma leva inteira que TINHA sido contatada — com a
+     * data guardada na planilha de origem, sem forma de entrar.
+     */
     const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['Data do 1º contato', 'CPF'], ['01/01/2025', '12345678900']])
     });
@@ -112,13 +122,35 @@ function rodarTestesDeImportacao() {
     const porFonte = {};
     laudo.dePara.forEach((par) => { porFonte[par.daFonte] = par.paraAColuna; });
     igual(porFonte['Data do 1º contato'], '',
-      'o carimbo não pode ser sugerido como destino');
-    verdadeiro(laudo.colunasDoCanal.indexOf('Data do 1º contato') < 0,
-      'nem aparecer na lista que a tela oferece');
-    verdadeiro(laudo.colunasDoCanal.indexOf('Origem da importação') < 0);
+      'o carimbo não pode ser SUGERIDO como destino');
+    verdadeiro(laudo.colunasDoCanal.indexOf('Data do 1º contato') >= 0,
+      'mas tem de estar na lista que a tela OFERECE');
     verdadeiro(laudo.colunasDoCanal.indexOf('CPF') >= 0,
       'as colunas normais continuam lá');
   });
+
+  teste('o rastro do próprio lote continua fora das DUAS listas', () => {
+    // Origem e Data da importação são como o sistema sabe de onde cada caso
+    // veio. Deixar a fonte escrevê-las apagaria a única resposta que existe
+    // para "de que lote é este caso?".
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([
+        ['Origem da importação', 'Data da importação', 'CPF'],
+        ['Lote falso', '01/01/2025', '12345678900']
+      ])
+    });
+
+    const porFonte = {};
+    laudo.dePara.forEach((par) => { porFonte[par.daFonte] = par.paraAColuna; });
+    igual(porFonte['Origem da importação'], '', 'não sugerida');
+    igual(porFonte['Data da importação'], '', 'não sugerida');
+    verdadeiro(laudo.colunasDoCanal.indexOf('Origem da importação') < 0,
+      'nem oferecida');
+    verdadeiro(laudo.colunasDoCanal.indexOf('Data da importação') < 0,
+      'nem oferecida');
+  });
+
+
 
   secao('O laudo antes de gravar');
 
@@ -547,6 +579,241 @@ function rodarTestesDeImportacao() {
       'o lote precisa aparecer no gráfico: ' + porBase.pontos.map((p) => p.rotulo));
     igual(doLote.valor, 4);
   });
+
+  secao('Quem está de férias não entra no rodízio');
+
+  /*
+   * Pedido do PO, depois que o calendário nasceu. O problema é concreto:
+   * importar 300 casos numa segunda com dois analistas fora deixa 75 casos
+   * parados três semanas — e NADA no sistema avisa. Os casos estão lá, no nome
+   * de alguém, dentro do prazo, e ninguém os trabalha. Quem descobre é o
+   * cliente, ligando.
+   */
+
+  const hoje = new Date();
+  const escreverData = (d) => String(d.getDate()).padStart(2, '0') + '/'
+    + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  const daquiADias = (dias) => {
+    const quando = new Date(hoje);
+    quando.setDate(quando.getDate() + dias);
+    return escreverData(quando);
+  };
+
+  /** Põe alguém de férias a partir de hoje, e devolve como desfazer. */
+  function ferias(nome, dias) {
+    const pessoa = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === nome);
+    const criada = chamar('salvarAusencia')({
+      usuarioId: pessoa.Id, motivo: 'Férias',
+      de: escreverData(hoje), ate: daquiADias(dias)
+    });
+    return () => chamar('excluirAusencia')(criada.id);
+  }
+
+  teste('quem está fora hoje vai para o FIM da lista, marcado', () => {
+    const desfazer = ferias('Marcos Vieira', 12);
+
+    const lista = chamar('analistasParaDistribuir_')(ret);
+    const marcos = lista.find((um) => um.nome === 'Marcos Vieira');
+
+    igual(marcos.ausente, true);
+    igual(marcos.ausenteAte, daquiADias(12));
+    igual(marcos.motivoDaAusencia, 'Férias');
+    igual(lista[lista.length - 1].nome, 'Marcos Vieira',
+      'a ordem é o primeiro aviso, antes de alguém ler a marca');
+
+    desfazer();
+  });
+
+  teste('quem NÃO está fora continua limpo, sem marca nenhuma', () => {
+    // O contrário também precisa ser verdade: uma marca que aparece em todo
+    // mundo não marca ninguém.
+    const desfazer = ferias('Marcos Vieira', 12);
+
+    const patricia = chamar('analistasParaDistribuir_')(ret)
+      .find((um) => um.nome === 'Patrícia Nunes');
+    igual(patricia.ausente, false);
+    igual(patricia.ausenteAte, '');
+
+    desfazer();
+  });
+
+  teste('a ausência que JÁ PASSOU não marca ninguém', () => {
+    // Férias do mês passado não impedem ninguém de receber caso hoje.
+    const pessoa = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Marcos Vieira');
+    const passada = chamar('salvarAusencia')({
+      usuarioId: pessoa.Id, motivo: 'Férias',
+      de: daquiADias(-40), ate: daquiADias(-20)
+    });
+
+    const marcos = chamar('analistasParaDistribuir_')(ret)
+      .find((um) => um.nome === 'Marcos Vieira');
+    igual(marcos.ausente, false, 'férias que acabou não tira ninguém do rodízio');
+
+    chamar('excluirAusencia')(passada.id);
+  });
+
+  teste('marcar quem está fora NÃO é recusado — mas o laudo diz', () => {
+    /*
+     * Recusar seria errado: o lote pode ser justamente para quando a pessoa
+     * voltar, e quem decide isso é a coordenação. O que o sistema faz é o que
+     * esta tela inteira existe para fazer — mostrar antes de gravar.
+     */
+    const desfazer = ferias('Marcos Vieira', 12);
+
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([
+        ['CPF', 'nome do cliente'],
+        ['11122233301', 'Cliente de férias 1'],
+        ['11122233302', 'Cliente de férias 2'],
+        ['11122233303', 'Cliente de férias 3'],
+        ['11122233304', 'Cliente de férias 4']
+      ]),
+      analistas: ['Marcos Vieira', 'Patrícia Nunes']
+    });
+
+    igual(laudo.avisos.length, 1, 'um aviso, para a pessoa que está fora');
+    verdadeiro(laudo.avisos[0].indexOf('Marcos Vieira') === 0,
+      'o aviso começa pelo nome: ' + laudo.avisos[0]);
+    verdadeiro(laudo.avisos[0].indexOf(daquiADias(12)) > 0,
+      'e diz até quando');
+    verdadeiro(laudo.avisos[0].indexOf('2 caso(s)') > 0,
+      'e quantos casos ficam parados: ' + laudo.avisos[0]);
+    verdadeiro(laudo.vaoEntrar > 0, 'e a importação segue possível');
+
+    desfazer();
+  });
+
+  teste('sem ninguém de férias, o laudo não inventa aviso', () => {
+    // Aviso que aparece sempre deixa de ser lido — e aí o dia em que ele
+    // importa passa batido.
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([['CPF', 'nome do cliente'], ['11122233305', 'Sem aviso']]),
+      analistas: ['Marcos Vieira', 'Patrícia Nunes']
+    });
+    igual(laudo.avisos.length, 0);
+  });
+
+  teste('a tela mostra a marca, e avisa quantos estão fora', () => {
+    const tela = lerPeca('Importacao');
+    verdadeiro(tela.indexOf('pessoa.ausente') > 0, 'a tela olha a marca');
+    verdadeiro(tela.indexOf('pessoa.ausenteAte') > 0, 'e mostra até quando');
+    verdadeiro(tela.indexOf('aviso-de-ausencia') > 0, 'com o recado de quantos');
+    verdadeiro(lerPeca('Estilos').indexOf('.config-chave.esta-fora') > 0,
+      'e a marca tem estilo declarado');
+  });
+
+  secao('O carimbo trazido da base antiga');
+
+  // Estes dois GRAVAM, e por isso estão no fim do arquivo: teste que escreve
+  // muda a contagem de quem vem depois, e vários aqui conferem total. Pôr no
+  // meio quebrou três testes alheios que não tinham nada de errado.
+
+  teste('o servidor diz QUAIS colunas são carimbo, e a tela marca cada uma', () => {
+    /*
+     * As duas pontas, porque só uma não serve de nada: se o servidor mandasse
+     * a lista e a tela não a lesse, a pessoa escolheria "Data do 1º contato"
+     * achando que é uma coluna qualquer — e escreveria no controle de
+     * produtividade sem saber.
+     *
+     * Este passo da tela NÃO aparece na prévia: o de-para só existe depois de
+     * conferir, e a prévia recusa conferir de propósito (não há servidor para
+     * ler o que foi colado, e um laudo inventado ensinaria a confiar nele).
+     * Então aqui é o único lugar que olha para isso.
+     */
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([['CPF', 'nome do cliente'], ['44455566677', 'Alguém']])
+    });
+
+    verdadeiro(laudo.colunasDeCarimbo.indexOf('Data do 1º contato') >= 0,
+      'o carimbo tem de vir marcado: ' + laudo.colunasDeCarimbo.join(', '));
+    verdadeiro(laudo.colunasDeCarimbo.indexOf('CPF') < 0,
+      'e uma coluna comum não pode entrar na lista');
+    laudo.colunasDeCarimbo.forEach((coluna) => {
+      verdadeiro(laudo.colunasDoCanal.indexOf(coluna) >= 0,
+        coluna + ' está marcada como carimbo mas nem é oferecida');
+    });
+
+    const tela = lerPeca('Importacao');
+    verdadeiro(tela.indexOf('opcoes.colunasDeCarimbo') > 0,
+      'a tela tem de ler a lista que o servidor manda');
+    verdadeiro(tela.indexOf('controle de produtividade') > 0,
+      'e dizer isso na própria opção');
+    verdadeiro(tela.indexOf('aviso-de-carimbo') > 0,
+      'com o recado quando alguém escolhe uma');
+  });
+
+  teste('e o SERVIDOR recusa, mesmo com o de-para montado na mão', () => {
+    /*
+     * A trava só perguntava se a coluna EXISTE na aba. A origem e a data da
+     * importação, que a tela nunca ofereceu, podiam ser escritas por quem
+     * montasse o de-para por fora — a proteção do rastro do lote era um
+     * combinado visual, e combinado visual não é trava.
+     *
+     * Passou a importar de verdade agora que o carimbo virou destino
+     * escolhível: a linha entre "pode escolher" e "nunca" tem de ser a mesma
+     * na tela e no servidor.
+     */
+    lanca(() => chamar('importarCasos')(ret.id, {
+      fonte: colado([['de onde veio', 'CPF'], ['Lote inventado', '77788899900']]),
+      dePara: [
+        { daFonte: 'de onde veio', paraAColuna: 'Origem da importação' },
+        { daFonte: 'CPF', paraAColuna: 'CPF' }
+      ],
+      origem: 'Lote de verdade'
+    }), 'rastro do lote', 'a origem da importação não pode vir da fonte');
+
+    // E o carimbo, que É permitido, continua passando pela mesma trava.
+    chamar('importarCasos')(ret.id, {
+      fonte: colado([['quando falamos', 'CPF'], ['11/07/2026', '77788899901']]),
+      dePara: [
+        { daFonte: 'quando falamos', paraAColuna: 'Data do 1º contato' },
+        { daFonte: 'CPF', paraAColuna: 'CPF' }
+      ],
+      origem: 'Lote com carimbo'
+    });
+
+    const gravado = chamar('lerRegistros_("BASE_RET")')
+      .find((linha) => String(linha.CPF) === '77788899901');
+    igual(String(gravado[chamar('RECC_COLUNA_ORIGEM_DA_IMPORTACAO')]),
+      'Lote com carimbo',
+      'o rastro continua sendo o que o SISTEMA escreveu');
+  });
+
+  teste('escolhido o carimbo, o caso importado JÁ CONTA como contatado', () => {
+    /*
+     * É o pedido inteiro, de ponta a ponta: o número que estava errado tem de
+     * ficar certo. Não basta a coluna ser escolhível — o dado tem de chegar na
+     * base e a Produtividade RECC tem de contá-lo.
+     */
+    const antes = chamar('produtividadeDaEquipe')(ret.id, {}, 3650)
+      .cartoes.find((c) => c.chave === 'datado1contato');
+
+    chamar('importarCasos')(ret.id, {
+      fonte: colado([
+        ['quando falamos', 'CPF', 'nome do cliente'],
+        ['10/07/2026', '99911122233', 'Contatado na base antiga']
+      ]),
+      dePara: [
+        { daFonte: 'quando falamos', paraAColuna: 'Data do 1º contato' },
+        { daFonte: 'CPF', paraAColuna: 'CPF' },
+        { daFonte: 'nome do cliente', paraAColuna: 'nome do cliente' }
+      ],
+      origem: 'Base antiga com contatos'
+    });
+
+    const gravado = chamar('lerRegistros_("BASE_RET")')
+      .find((linha) => String(linha['nome do cliente']) === 'Contatado na base antiga');
+    verdadeiro(ehData(gravado['Data do 1º contato']),
+      'a data da base antiga tem de chegar como DATA, não como texto');
+
+    const depois = chamar('produtividadeDaEquipe')(ret.id, {}, 3650)
+      .cartoes.find((c) => c.chave === 'datado1contato');
+    igual(depois.valor, antes.valor + 1,
+      'e o cartão "Já contatados" tem de subir — era isso que estava errado');
+  });
+
 }
 
 module.exports = { rodarTestesDeImportacao };

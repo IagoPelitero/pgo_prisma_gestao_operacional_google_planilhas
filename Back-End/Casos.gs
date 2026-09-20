@@ -1640,7 +1640,7 @@ function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
   // acabado de ficar de fora — então a segunda volta as trazia de novo, e o
   // carimbo do 1º contato voltava a ser sugerido como destino.
   var porNome = {};
-  colunasQueAImportacaoPreenche_(canal).forEach(function (cabecalho) {
+  colunasQueAImportacaoSugere_(canal).forEach(function (cabecalho) {
     porNome[normalizarParaComparar_(cabecalho)] = cabecalho;
   });
 
@@ -1652,20 +1652,92 @@ function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
   });
 }
 
-/** As colunas do canal que a importação pode preencher, para a tela oferecer. */
-function colunasQueAImportacaoPreenche_(canal) {
-  var estrutura = estruturaDaAba_(canal.aba);
+/*
+ * DUAS LISTAS, E A DIFERENÇA ENTRE ELAS É O PEDIDO DO PO.
+ *
+ * `Sugere` é o que a importação casa SOZINHA, olhando o nome da coluna.
+ * `Aceita` é o que ela deixa a pessoa escolher no de-para.
+ *
+ * Elas eram uma só, e isso custava caro: o carimbo do 1º contato ficava fora
+ * das duas, então 300 casos trazidos da base antiga entravam SEM data de
+ * contato — e a Produtividade RECC dizia "Já contatados: 0" para uma leva
+ * inteira de casos que tinham sido contatados, com a data guardada na planilha
+ * de origem. O número estava errado e parecia certo.
+ *
+ * Sugerir continua proibido, e por um motivo que não mudou: uma coluna da
+ * fonte chamada "Data do 1º contato" casando sozinha escreveria no controle de
+ * produtividade sem ninguém decidir isso. Escolher, agora, pode — é uma
+ * decisão consciente, tomada na tela de conferência, olhando as três primeiras
+ * linhas já traduzidas.
+ */
+
+/** O que a importação casa sozinha: nada que o sistema preencha. */
+function colunasQueAImportacaoSugere_(canal) {
+  var doSistema = colunasPreenchidasPeloSistema_(canal);
+
+  return estruturaDaAba_(canal.aba).cabecalhos.filter(function (cabecalho) {
+    if (!cabecalho || cabecalho.charAt(0) === '_') return false;
+    return !doSistema[normalizarParaComparar_(cabecalho)];
+  });
+}
+
+/**
+ * O que a importação aceita como destino, se a pessoa escolher.
+ *
+ * É a lista do `Sugere` MAIS as colunas de carimbo. Elas voltam porque a base
+ * antiga sabe quando cada contato aconteceu, e essa é a única forma de esse
+ * dado entrar — o sistema não tem como inventá-lo, e carimbar "agora" diria
+ * que um contato de julho aconteceu hoje.
+ *
+ * O que NÃO volta, em hipótese nenhuma, é a origem e a data da importação:
+ * essas duas são o rastro do próprio lote, e deixar a fonte escrevê-las
+ * apagaria a única forma de saber de onde cada caso veio.
+ */
+function colunasQueAImportacaoAceita_(canal) {
+  var carimbos = colunasDeCarimboDoCanal_(canal);
+  var doSistema = colunasPreenchidasPeloSistema_(canal);
+
+  return estruturaDaAba_(canal.aba).cabecalhos.filter(function (cabecalho) {
+    if (!cabecalho || cabecalho.charAt(0) === '_') return false;
+    var chave = normalizarParaComparar_(cabecalho);
+    if (carimbos[chave]) return true;
+    return !doSistema[chave];
+  });
+}
+
+/** As colunas que o esquema marcou como preenchidas pelo sistema. */
+function colunasPreenchidasPeloSistema_(canal) {
   var doSistema = {};
   esquemaDaAba_(canal.aba).colunas.forEach(function (coluna) {
     if (coluna.preenchidoPeloSistema === true) {
       doSistema[normalizarParaComparar_(coluna.cabecalho)] = true;
     }
   });
+  return doSistema;
+}
 
-  return estrutura.cabecalhos.filter(function (cabecalho) {
-    if (!cabecalho || cabecalho.charAt(0) === '_') return false;
-    return !doSistema[normalizarParaComparar_(cabecalho)];
+/**
+ * As colunas em que os status deste canal carimbam.
+ *
+ * Sai do CATÁLOGO, e não de uma lista escrita aqui: o administrador cria
+ * status novos em Configurações e aponta cada um para a sua coluna. Uma lista
+ * fixa no código cobriria os sete de fábrica e deixaria de fora justamente os
+ * que a operação criou depois — que são os que ela mais quer trazer.
+ *
+ * A origem e a data da importação NUNCA entram, mesmo que alguém aponte um
+ * status para elas por engano: elas são o rastro do lote.
+ */
+function colunasDeCarimboDoCanal_(canal) {
+  var nunca = {};
+  nunca[normalizarParaComparar_(RECC_COLUNA_ORIGEM_DA_IMPORTACAO)] = true;
+  nunca[normalizarParaComparar_(RECC_COLUNA_DATA_DA_IMPORTACAO)] = true;
+
+  var carimbos = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    var coluna = normalizarParaComparar_(situacao.colunaDeCarimbo);
+    if (coluna && !nunca[coluna]) carimbos[coluna] = true;
   });
+  return carimbos;
 }
 
 // ----------------------------------------------------------------------------
@@ -1705,7 +1777,15 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
     cabecalhosDaFonte: cabecalhosDaFonte,
-    colunasDoCanal: colunasQueAImportacaoPreenche_(canal),
+    colunasDoCanal: colunasQueAImportacaoAceita_(canal),
+    // Quais das oferecidas são CARIMBO. A tela marca essas na lista: escolher
+    // uma delas escreve no controle de produtividade, e quem está mapeando
+    // precisa saber disso antes, não depois.
+    colunasDeCarimbo: Object.keys(colunasDeCarimboDoCanal_(canal)).length
+      ? colunasQueAImportacaoAceita_(canal).filter(function (cabecalho) {
+        return colunasDeCarimboDoCanal_(canal)[normalizarParaComparar_(cabecalho)];
+      })
+      : [],
     dePara: deParaEscolhido,
     linhasNaFonte: corpo.length,
     vaoEntrar: contagem.entram,
@@ -1715,8 +1795,41 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     passaDoLimite: corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
+    // Se alguém marcou um analista que está fora, o laudo DIZ, com quantos
+    // casos e até quando. Não recusa: o lote pode ser para a volta dela, e o
+    // laudo existe justamente para a pessoa ver antes de gravar.
+    avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
     statusPadrao: statusPadraoDoCanal_(canal)
   };
+}
+
+/**
+ * O que o laudo precisa dizer em voz alta antes de alguém apertar "importar".
+ *
+ * Hoje é um aviso só — analista de férias recebendo lote —, e a lista existe
+ * para o próximo caber sem mexer no formato da resposta.
+ */
+function avisosDaImportacao_(escolhidos, canal, quantosEntram) {
+  var lista = Array.isArray(escolhidos) ? escolhidos : [];
+  if (!lista.length || !quantosEntram) return [];
+
+  var ausentes = quemEstaAusenteHoje_();
+  var avisos = [];
+
+  // Divisão em rodízio: cada um recebe a parte dele, arredondada para cima na
+  // primeira sobra. O número não precisa ser exato para o recado servir — ele
+  // precisa dar a ORDEM DE GRANDEZA de quantos casos ficam parados.
+  var porPessoa = Math.ceil(quantosEntram / lista.length);
+
+  lista.forEach(function (nome) {
+    var fora = ausentes[String(nome || '').trim()];
+    if (!fora) return;
+    avisos.push(nome + ' está de ' + fora.motivo.toLowerCase() + ' até '
+      + fora.ate + ' e vai receber cerca de ' + porPessoa + ' caso(s). '
+      + 'Eles ficam parados até a volta.');
+  });
+
+  return avisos;
 }
 
 /**
@@ -1842,6 +1955,20 @@ function temAlgumValor_(caso) {
 function analistasParaDistribuir_(canal) {
   var doCanal = normalizarParaComparar_(canal.nome);
 
+  /*
+   * QUEM ESTÁ DE FÉRIAS HOJE NÃO ENTRA NA DIVISÃO.
+   *
+   * Sem isto, importar 300 casos numa segunda-feira com dois analistas fora
+   * deixa 75 casos parados três semanas — e nada no sistema avisa. Os casos
+   * estão lá, no nome de alguém, dentro do prazo, e ninguém os trabalha. É o
+   * tipo de problema que só aparece quando o cliente liga.
+   *
+   * A pessoa continua APARECENDO na lista, marcada e desmarcada: o lote pode
+   * ser justamente para quando ela voltar, e o sistema não é quem decide isso.
+   * O que ele faz é não escolher por ela, e dizer o porquê.
+   */
+  var ausentes = quemEstaAusenteHoje_();
+
   return lerRegistros_('USUARIOS')
     .filter(function (usuario) {
       return normalizarParaComparar_(usuario.Ativo) === 'sim'
@@ -1849,14 +1976,23 @@ function analistasParaDistribuir_(canal) {
     })
     .map(function (usuario) {
       var dela = normalizarParaComparar_(usuario['Canal que atende']);
+      var nome = String(usuario.Nome);
+      var fora = ausentes[nome];
+
       return {
-        nome: String(usuario.Nome),
+        nome: nome,
         // Vazio é o caso de quem administra: atende as duas, e fica no topo
         // junto de quem é deste canal.
-        atendeEsteCanal: !dela || dela === doCanal
+        atendeEsteCanal: !dela || dela === doCanal,
+        ausente: !!fora,
+        ausenteAte: fora ? fora.ate : '',
+        motivoDaAusencia: fora ? fora.motivo : ''
       };
     })
     .sort(function (um, outro) {
+      // Quem está fora vai para o fim da lista, de qualquer canal: a ordem é o
+      // primeiro aviso, antes mesmo de alguém ler a marca.
+      if (um.ausente !== outro.ausente) return um.ausente ? 1 : -1;
       if (um.atendeEsteCanal !== outro.atendeEsteCanal) {
         return um.atendeEsteCanal ? -1 : 1;
       }
@@ -2016,11 +2152,32 @@ function exigirQueODeParaLeveAAlgumLugar_(dePara, canal) {
   var destinos = [];
   var inexistentes = [];
 
+  /*
+   * A lista do que se ACEITA é conferida AQUI, no servidor, e não só na tela.
+   *
+   * Antes esta trava só perguntava se a coluna EXISTE na aba — então a origem
+   * e a data da importação, que a tela nunca ofereceu, podiam ser escritas por
+   * quem montasse o de-para na mão. A proteção do rastro do lote era só um
+   * combinado visual, e combinado visual não é trava.
+   *
+   * Passou a importar agora que o carimbo virou destino escolhível: a linha
+   * entre "pode escolher" e "nunca" tem de ser a mesma nos dois lados.
+   */
+  var aceitas = {};
+  colunasQueAImportacaoAceita_(canal).forEach(function (cabecalho) {
+    aceitas[normalizarParaComparar_(cabecalho)] = true;
+  });
+  var proibidas = [];
+
   dePara.forEach(function (par) {
     var destino = String((par || {}).paraAColuna || '').trim();
     if (!destino) return;
     if (posicaoDaColuna_(estrutura, destino) < 0) {
       inexistentes.push(destino);
+      return;
+    }
+    if (!aceitas[normalizarParaComparar_(destino)]) {
+      proibidas.push(destino);
       return;
     }
     destinos.push(destino);
@@ -2029,11 +2186,17 @@ function exigirQueODeParaLeveAAlgumLugar_(dePara, canal) {
   if (inexistentes.length) {
     throw new Error('Estas colunas não existem na aba ' + canal.aba + ': '
       + inexistentes.join(', ') + '. As colunas dela são: '
-      + colunasQueAImportacaoPreenche_(canal).join(' | ') + '.');
+      + colunasQueAImportacaoAceita_(canal).join(' | ') + '.');
+  }
+  if (proibidas.length) {
+    throw new Error('Estas colunas são preenchidas pelo sistema e não podem '
+      + 'receber dado da origem: ' + proibidas.join(', ') + '. A origem e a '
+      + 'data da importação são o rastro do lote — é por elas que se sabe de '
+      + 'onde cada caso veio, e a planilha de origem não pode escrevê-las.');
   }
   if (!destinos.length) {
     throw new Error('Nenhuma coluna da planilha de origem está apontando para '
-      + 'uma coluna do canal ' + canal.nome + '. Do jeito que está, o '
+      + 'uma coluna do canal ' + canal.nome + '. Do jeito que está, a '
       + 'importação criaria linhas em branco.');
   }
 }
@@ -2121,7 +2284,7 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
-    colunasDoCanal: colunasQueAImportacaoPreenche_(canal),
+    colunasDoCanal: colunasQueAImportacaoAceita_(canal),
     analistas: analistasParaDistribuir_(canal),
     statusPadrao: statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
