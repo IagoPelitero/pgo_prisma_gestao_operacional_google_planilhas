@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-20 01:04
+   Gerado em 2026-09-20 21:44
    ========================================================================== */
 
 
@@ -123,7 +123,7 @@ const RECC_COLUNAS_DE_CONTROLE = [
  * NINGUÉM a digita no formulário. Quem escreve nela é o sistema.
  *
  * É o caso das colunas de carimbo (o sistema grava a data quando o status
- * muda) e das duas do tombamento (o sistema grava de qual lote o caso veio).
+ * muda) e das duas da importação (o sistema grava de qual lote o caso veio).
  * Deixá-las como campo de tela seria pedir ao analista para digitar à mão
  * exatamente o dado que existe para não depender dele.
  *
@@ -146,12 +146,12 @@ const RECC_COLUNA_QUEM_MUDOU_O_STATUS = 'Quem mudou o status';
 const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 
 /*
- * As duas colunas do tombamento, pelo mesmo motivo das de cima: o nome é
+ * As duas colunas da importação, pelo mesmo motivo das de cima: o nome é
  * escrito quando a aba nasce (o Esquema) e lido quando o lote entra (o
- * tombamento, no Casos.gs) e quando a Produtividade RECC monta o gráfico.
+ * importação, no Casos.gs) e quando a Produtividade RECC monta o gráfico.
  */
-const RECC_COLUNA_ORIGEM_DO_TOMBAMENTO = 'Origem do tombamento';
-const RECC_COLUNA_DATA_DO_TOMBAMENTO = 'Data do tombamento';
+const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
+const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
 const RECC_VISIVEL_SIM = 'SIM';
 const RECC_VISIVEL_NAO = 'NAO';
@@ -252,11 +252,11 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
-      // ---- O TOMBAMENTO --------------------------------------------------
+      // ---- A IMPORTAÇÃO --------------------------------------------------
       // De qual lote o caso veio, quando ele entrou. Vazio quer dizer que o
       // caso foi cadastrado um a um, na tela.
-      { cabecalho: RECC_COLUNA_ORIGEM_DO_TOMBAMENTO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DO_TOMBAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -293,10 +293,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
-      // De qual lote o caso veio. A Mesa tomba casos de corretoras para ações
+      // De qual lote o caso veio. A Mesa importa casos de corretoras para ações
       // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
-      { cabecalho: RECC_COLUNA_ORIGEM_DO_TOMBAMENTO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DO_TOMBAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -3554,7 +3554,7 @@ function canalQueEuPossoVer_(idDoCanal, quem) {
  *
  * `ehCasoNovo` diz se o VALOR PADRÃO do campo entra quando nada veio da tela.
  * Num caso novo entra: o status da RET nasce em "Não trabalhado" mesmo que o
- * pedido chegue sem ele — é o que o tombamento precisa, porque uma base de 300
+ * pedido chegue sem ele — é o que a importação precisa, porque uma base de 300
  * casos não traz status nenhum. Numa EDIÇÃO não entra: repor o padrão num
  * campo que a pessoa esvaziou seria desfazer o que ela acabou de fazer.
  */
@@ -3579,7 +3579,7 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
     // "Não trabalhado" da RET valer de verdade. Conferir primeiro recusaria um
     // caso por falta de um valor que o próprio sistema tem guardado — e a tela
     // até esconderia o problema, porque ela preenche o padrão sozinha. Quem
-    // pagaria a conta é o tombamento, que não passa por tela nenhuma.
+    // pagaria a conta é a importação, que não passa por tela nenhuma.
     if (ehCasoNovo && String(bruto).trim() === '') {
       bruto = descricao.valorPadrao === undefined || descricao.valorPadrao === null
         ? '' : descricao.valorPadrao;
@@ -3935,8 +3935,8 @@ function carimbarSeOStatusMudou_(canal, registroAtual, alteracao, quem) {
  * nascido pelo formulário entrava sem data nenhuma, e só passava a ter data
  * quando alguém trocasse a situação pela primeira vez.
  *
- * NÃO vale para tombamento: lá o caso é antigo, e carimbar "agora" diria que
- * um contato de julho aconteceu hoje. O tombamento traz as datas da base
+ * NÃO vale para importação: lá o caso é antigo, e carimbar "agora" diria que
+ * um contato de julho aconteceu hoje. A importação traz as datas da base
  * antiga, pelo de-para.
  */
 function carimbarOStatusDeNascimento_(canal, paraGravar) {
@@ -4664,15 +4664,15 @@ function salvarConfiguracaoDoLegado(dados) {
 
 /* ############################################################################
    #
-   #  SEÇÃO 4 de 4 · O TOMBAMENTO — TRAZER UMA BASE INTEIRA DE FORA
+   #  SEÇÃO 4 de 4 · A IMPORTAÇÃO — TRAZER UMA BASE INTEIRA DE FORA
    #
    ############################################################################ */
 
 /**
  * ============================================================================
- * O TOMBAMENTO
+ * A IMPORTAÇÃO
  * ============================================================================
- * Tombar é trazer casos de OUTRA planilha para dentro do PGO, de uma vez: a
+ * Importar é trazer casos de OUTRA planilha para dentro do PGO, de uma vez: a
  * base de inadimplentes do Vida Individual, a do Vida em Grupo, a lista de
  * corretoras que a Mesa vai tratar com ação diferenciada. Cem casos, trezentos
  * casos, e geralmente toda semana.
@@ -4681,26 +4681,26 @@ function salvarConfiguracaoDoLegado(dados) {
  *
  *   ONDE ESTÁ O DADO. Numa planilha de fora, com os cabeçalhos DELA. Ninguém
  *   vai renomear as colunas da base de inadimplentes para agradar o PGO, então
- *   quem se adapta é o PGO: o tombamento casa cabeçalho com cabeçalho, sugere
+ *   quem se adapta é o PGO: a importação casa cabeçalho com cabeçalho, sugere
  *   o que reconhece e deixa a pessoa corrigir o resto.
  *
  *   DE QUEM É O CASO. Uma base de trezentos chega sem responsável. O pedido da
- *   operação é dividir entre os analistas — então o tombamento distribui, em
+ *   operação é dividir entre os analistas — então a importação distribui, em
  *   rodízio, entre os nomes escolhidos.
  *
  *   E SE JÁ ENTROU ANTES. A base é atualizada toda semana, e boa parte dela
- *   repete. Sem uma coluna que identifique o caso, o segundo tombamento
+ *   repete. Sem uma coluna que identifique o caso, o segunda importação
  *   duplica tudo. Com ela, o que já está dentro é PULADO, e o laudo diz quantos.
  *
- * O TOMBAMENTO NUNCA GRAVA SEM MOSTRAR ANTES. `conferirTombamento` devolve o
+ * A IMPORTAÇÃO NUNCA GRAVA SEM MOSTRAR ANTES. `conferirImportacaoDeCasos` devolve o
  * laudo — quantas linhas, para onde cada coluna vai, quantas serão puladas e
- * as três primeiras já traduzidas. `tombarCasos` só então grava. Trezentas
+ * as três primeiras já traduzidas. `importarCasos` só então grava. Trezentas
  * linhas erradas dentro da base se desfazem apagando trezentas linhas na mão.
  * ============================================================================
  */
 
 /**
- * O teto de linhas por tombamento.
+ * O teto de linhas por importação.
  *
  * Não é medo de volume: `inserirVariosRegistros_` grava tudo numa ida só, e
  * duas mil linhas passam folgado dentro dos seis minutos. O teto existe porque
@@ -4708,7 +4708,7 @@ function salvarConfiguracaoDoLegado(dados) {
  * dez mil linhas colada numa caixa de texto quase nunca é o que a pessoa
  * queria fazer.
  */
-const RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO = 2000;
+const RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO = 2000;
 
 /** Quantas linhas do laudo vêm já traduzidas, para a pessoa conferir. */
 const RECC_LINHAS_DE_AMOSTRA = 3;
@@ -4798,10 +4798,10 @@ function gradeDaFonte_(fonte) {
  * pessoa confirma ou troca cada um na tela, e o que ela mandar é o que vale.
  *
  * Coluna preenchida pelo sistema NÃO é sugerida. O carimbo do 1º contato, a
- * origem do tombamento e a data dele são do sistema; deixar a fonte escrever
+ * origem da importação e a data dele são do sistema; deixar a fonte escrever
  * ali apagaria o controle de produtividade com dado de outra planilha.
  */
-function sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal) {
+function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
   // A lista do que PODE ser destino é uma só, e é a mesma que a tela oferece.
   // Já errei isto aqui: eu montava a lista pelo contrato, pulando as colunas do
   // sistema, e depois acrescentava "tudo o que está na aba e ainda não entrou"
@@ -4809,7 +4809,7 @@ function sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal) {
   // acabado de ficar de fora — então a segunda volta as trazia de novo, e o
   // carimbo do 1º contato voltava a ser sugerido como destino.
   var porNome = {};
-  colunasQueOTombamentoPreenche_(canal).forEach(function (cabecalho) {
+  colunasQueAImportacaoPreenche_(canal).forEach(function (cabecalho) {
     porNome[normalizarParaComparar_(cabecalho)] = cabecalho;
   });
 
@@ -4821,8 +4821,8 @@ function sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal) {
   });
 }
 
-/** As colunas do canal que o tombamento pode preencher, para a tela oferecer. */
-function colunasQueOTombamentoPreenche_(canal) {
+/** As colunas do canal que a importação pode preencher, para a tela oferecer. */
+function colunasQueAImportacaoPreenche_(canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var doSistema = {};
   esquemaDaAba_(canal.aba).colunas.forEach(function (coluna) {
@@ -4842,15 +4842,15 @@ function colunasQueOTombamentoPreenche_(canal) {
 // ----------------------------------------------------------------------------
 
 /**
- * O que o tombamento vai fazer, sem fazer.
+ * O que a importação vai fazer, sem fazer.
  *
  * Devolve o de-para sugerido, quantas linhas entram, quantas repetem e as
  * primeiras já traduzidas. É esta tela que evita o desastre: mapeamento errado
  * só aparece olhando o dado traduzido, e nunca olhando o cabeçalho.
  */
-function conferirTombamento(idDoCanal, pedido) {
-  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
-  exigirTela_('tombamento');
+function conferirImportacaoDeCasos(idDoCanal, pedido) {
+  var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   pedido = pedido || {};
 
@@ -4864,7 +4864,7 @@ function conferirTombamento(idDoCanal, pedido) {
   var corpo = grade.slice(1);
   var deParaEscolhido = Array.isArray(pedido.dePara) && pedido.dePara.length
     ? pedido.dePara
-    : sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal);
+    : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
 
   var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
   var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
@@ -4874,14 +4874,14 @@ function conferirTombamento(idDoCanal, pedido) {
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
     cabecalhosDaFonte: cabecalhosDaFonte,
-    colunasDoCanal: colunasQueOTombamentoPreenche_(canal),
+    colunasDoCanal: colunasQueAImportacaoPreenche_(canal),
     dePara: deParaEscolhido,
     linhasNaFonte: corpo.length,
     vaoEntrar: contagem.entram,
     vaoSerPuladas: contagem.pulam,
     motivosParaPular: contagem.motivos,
-    limite: RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO,
-    passaDoLimite: corpo.length > RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO,
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    passaDoLimite: corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
     statusPadrao: statusPadraoDoCanal_(canal)
@@ -4998,7 +4998,7 @@ function temAlgumValor_(caso) {
  * igual ao nome do canal. Parecia certo e não funcionava: o campo é de digitar
  * livre, e a operação escreve nele o que faz sentido para ela — "Vida
  * Individual", "Vida em Grupo" —, quase nunca o nome do canal do PGO. O
- * resultado era a tela de Tombamento dizendo "nenhum analista cadastrado neste
+ * resultado era a tela de Importação dizendo "nenhum analista cadastrado neste
  * canal" numa operação cheia de analistas. Só apareceu abrindo no navegador.
  *
  * A regra que IMPORTA é outra, e é sobre não perder o caso: o nome tem de
@@ -5038,7 +5038,7 @@ function nomesQuePodemReceberCasos_(canal) {
   return analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
 }
 
-/** O status com que o caso tombado nasce, tirado do formulário do canal. */
+/** O status com que o caso importado nasce, tirado do formulário do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
   var achado = '';
@@ -5061,21 +5061,21 @@ function statusPadraoDoCanal_(canal) {
  * Numa gravação só, por `inserirVariosRegistros_`: trezentas chamadas
  * separadas seriam trezentas idas ao serviço e trezentos Ids pedidos um a um.
  *
- * O que o tombamento acrescenta a cada caso, além do que veio da fonte:
+ * O que a importação acrescenta a cada caso, além do que veio da fonte:
  *
  *   - o ANALISTA, em rodízio entre os escolhidos (ou um só, se for um só);
  *   - o STATUS padrão do canal, quando a fonte não trouxe um — é o
  *     "Não trabalhado" que a RET pediu;
- *   - a ORIGEM DO TOMBAMENTO, que é o nome do lote, e a DATA — as duas colunas
+ *   - a ORIGEM DA IMPORTAÇÃO, que é o nome do lote, e a DATA — as duas colunas
  *     que fazem o gráfico da Produtividade RECC existir;
  *   - `_Origem` = PLANILHA, porque o dado veio de fora e não da tela.
  *
  * A auditoria recebe UMA linha por lote, não uma por caso. Trezentas linhas de
  * auditoria dizendo a mesma coisa afogam as que importam.
  */
-function tombarCasos(idDoCanal, pedido) {
-  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
-  exigirTela_('tombamento');
+function importarCasos(idDoCanal, pedido) {
+  var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   pedido = pedido || {};
 
@@ -5094,15 +5094,15 @@ function tombarCasos(idDoCanal, pedido) {
 
   var cabecalhosDaFonte = grade[0];
   var corpo = grade.slice(1);
-  if (corpo.length > RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO) {
-    throw new Error('São no máximo ' + RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO
-      + ' linhas por tombamento, e vieram ' + corpo.length + '. Divida em '
+  if (corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO) {
+    throw new Error('São no máximo ' + RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO
+      + ' linhas por importação, e vieram ' + corpo.length + '. Divida em '
       + 'levas — assim, se o mapeamento estiver errado, o estrago é menor.');
   }
 
   var dePara = Array.isArray(pedido.dePara) && pedido.dePara.length
     ? pedido.dePara
-    : sugerirDeParaDoTombamento_(cabecalhosDaFonte, canal);
+    : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
   exigirQueODeParaLeveAAlgumLugar_(dePara, canal);
 
   var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
@@ -5141,8 +5141,8 @@ function tombarCasos(idDoCanal, pedido) {
     if (canal.colunaDoStatus && !caso[canal.colunaDoStatus] && statusPadrao) {
       caso[canal.colunaDoStatus] = statusPadrao;
     }
-    caso[RECC_COLUNA_ORIGEM_DO_TOMBAMENTO] = nomeDoLote;
-    caso[RECC_COLUNA_DATA_DO_TOMBAMENTO] = agora;
+    caso[RECC_COLUNA_ORIGEM_DA_IMPORTACAO] = nomeDoLote;
+    caso[RECC_COLUNA_DATA_DA_IMPORTACAO] = agora;
 
     paraGravar.push(caso);
   }
@@ -5154,11 +5154,11 @@ function tombarCasos(idDoCanal, pedido) {
 
   // _Origem = PLANILHA porque o dado veio de FORA, e não da tela do PGO. É o
   // que permite, meses depois, separar o que a operação digitou do que foi
-  // tombado — e conferir um contra o outro quando um número não fecha.
+  // importado — e conferir um contra o outro quando um número não fecha.
   var gravados = inserirVariosRegistros_(canal.aba, paraGravar,
     { origem: RECC_ORIGEM_PLANILHA });
 
-  registrarAuditoria_('caso.tombar', canal.aba, '',
+  registrarAuditoria_('caso.importar', canal.aba, '',
     canal.nome + ' · ' + nomeDoLote + ' · ' + gravados.length + ' casos'
     + (pulados.repetida ? ' · ' + pulados.repetida + ' repetidos pulados' : ''));
 
@@ -5174,7 +5174,7 @@ function tombarCasos(idDoCanal, pedido) {
 }
 
 /**
- * Recusa um tombamento que não levaria dado a coluna nenhuma.
+ * Recusa uma importação que não levaria dado a coluna nenhuma.
  *
  * Sem isto, um de-para todo vazio gravaria trezentas linhas contendo só o Id, o
  * analista e a data — trezentas linhas em branco na base operacional, que
@@ -5198,12 +5198,12 @@ function exigirQueODeParaLeveAAlgumLugar_(dePara, canal) {
   if (inexistentes.length) {
     throw new Error('Estas colunas não existem na aba ' + canal.aba + ': '
       + inexistentes.join(', ') + '. As colunas dela são: '
-      + colunasQueOTombamentoPreenche_(canal).join(' | ') + '.');
+      + colunasQueAImportacaoPreenche_(canal).join(' | ') + '.');
   }
   if (!destinos.length) {
     throw new Error('Nenhuma coluna da planilha de origem está apontando para '
       + 'uma coluna do canal ' + canal.nome + '. Do jeito que está, o '
-      + 'tombamento criaria linhas em branco.');
+      + 'importação criaria linhas em branco.');
   }
 }
 
@@ -5237,7 +5237,7 @@ function analistasEscolhidos_(escolhidos, canal) {
     throw new Error('Estes nomes não estão cadastrados e ativos no PGO: '
       + foraDoCadastro.join(', ') + '. Caso no nome de quem não existe não '
       + 'aparece na fila de ninguém — fica na planilha e invisível no sistema. '
-      + 'Cadastre em Configurações › Usuários e tombe depois.');
+      + 'Cadastre em Configurações › Usuários e importe depois.');
   }
 
   // Devolve com a grafia do CADASTRO, e não a que veio da tela: é o nome do
@@ -5253,25 +5253,25 @@ function analistasEscolhidos_(escolhidos, canal) {
 }
 
 /**
- * Os lotes já tombados neste canal, do mais recente para o mais antigo.
+ * Os lotes já importados neste canal, do mais recente para o mais antigo.
  *
- * Serve para a tela oferecer um nome que já existe — tombar a mesma base toda
+ * Serve para a tela oferecer um nome que já existe — importar a mesma base toda
  * semana com o nome escrito de um jeito diferente a cada vez faria o gráfico
  * da Produtividade RECC mostrar cinco lotes onde há um.
  */
-function lotesJaTombados(idDoCanal) {
-  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
-  exigirTela_('tombamento');
+function lotesJaImportados(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   // Coluna ausente devolve lista vazia, e não estoura: quem já tinha o PGO
-  // instalado antes do tombamento não tem esta coluna, e a tela precisa abrir
+  // instalado antes da importação não tem esta coluna, e a tela precisa abrir
   // do mesmo jeito para ele — é o diagnóstico que cobra o que falta.
   var estrutura = estruturaDaAba_(canal.aba);
-  if (posicaoDaColuna_(estrutura, RECC_COLUNA_ORIGEM_DO_TOMBAMENTO) < 0) return [];
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_ORIGEM_DA_IMPORTACAO) < 0) return [];
 
   var quantos = {};
-  lerColunaInteira_(canal.aba, RECC_COLUNA_ORIGEM_DO_TOMBAMENTO).forEach(function (valor) {
+  lerColunaInteira_(canal.aba, RECC_COLUNA_ORIGEM_DA_IMPORTACAO).forEach(function (valor) {
     var nome = String(valor === null || valor === undefined ? '' : valor).trim();
     if (!nome) return;
     quantos[nome] = (quantos[nome] || 0) + 1;
@@ -5282,19 +5282,19 @@ function lotesJaTombados(idDoCanal) {
   }).sort(function (um, outro) { return outro.casos - um.casos; });
 }
 
-/** O que a tela de Tombamento precisa para abrir. */
-function opcoesDoTombamento(idDoCanal) {
-  var quem = exigirPermissao_(RECC_ACOES.TOMBAR);
-  exigirTela_('tombamento');
+/** O que a tela de Importação precisa para abrir. */
+function opcoesDaImportacaoDeCasos(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
-    colunasDoCanal: colunasQueOTombamentoPreenche_(canal),
+    colunasDoCanal: colunasQueAImportacaoPreenche_(canal),
     analistas: analistasParaDistribuir_(canal),
     statusPadrao: statusPadraoDoCanal_(canal),
-    lotes: lotesJaTombados(canal.id),
-    limite: RECC_MAXIMO_DE_LINHAS_POR_TOMBAMENTO
+    lotes: lotesJaImportados(canal.id),
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO
   };
 }
 
@@ -5929,7 +5929,7 @@ function opcoesDeNivelDeAcesso() {
     editar: 'Alterar casos já cadastrados',
     ocultar: 'Tirar um caso da tela (a linha permanece na planilha)',
     exportar: 'Baixar o que está vendo',
-    tombar: 'Trazer uma base inteira de outra planilha, de uma vez',
+    importar: 'Trazer uma base inteira de outra planilha, de uma vez',
     configurar: 'Abrir Configurações e mexer em conteúdo e regra',
     estrutura: 'Criar coluna e canal — pede senha de administrador'
   };
@@ -7738,11 +7738,11 @@ const RECC_ACOES = {
   EDITAR: 'editar',
   OCULTAR: 'ocultar',
   EXPORTAR: 'exportar',
-  // Tombar é trazer uma base inteira de outra planilha para dentro do PGO —
+  // Importar é trazer uma base inteira de outra planilha para dentro do PGO —
   // cem, trezentos casos de uma vez. É separado de `criar` de propósito: quem
-  // cadastra um caso por vez erra um caso; quem tomba errado suja a base toda,
+  // cadastra um caso por vez erra um caso; quem importa errado suja a base toda,
   // e o desfazer é apagar trezentas linhas na mão.
-  TOMBAR: 'tombar',
+  IMPORTAR: 'importar',
   CONFIGURAR: 'configurar',
   ESTRUTURA: 'estrutura'
 };
@@ -7785,7 +7785,7 @@ const RECC_TELAS_DO_SISTEMA = [
   { tela: 'minhaPerformance', titulo: 'Minha Performance' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
   { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
-  { tela: 'tombamento', titulo: 'Tombamento' },
+  { tela: 'importacao', titulo: 'Importação' },
   { tela: 'produtividade', titulo: 'Produtividade RECC' },
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
@@ -9773,8 +9773,8 @@ function calcularComponente_(componente, casos, canal) {
 
   // Coluna VAZIA em todos os casos não vira um gráfico com uma barra só
   // chamada "Sem informação". Esse gráfico não diz nada e parece defeito — e é
-  // o estado normal de um gráfico sobre o tombamento antes do primeiro
-  // tombamento. A tela mostra o recado, que explica, no lugar do desenho, que
+  // o estado normal de um gráfico sobre a importação antes do primeiro
+  // importação. A tela mostra o recado, que explica, no lugar do desenho, que
   // não explica.
   if (ordemDasChaves.length === 1 && ordemDasChaves[0] === 'Sem informação') {
     return semDados_(componente, 'Nenhum caso do período tem "'
@@ -10983,17 +10983,17 @@ function semearDadosIniciais_(emailDoInstalador) {
      * equipe está indo" —, e elas não precisam ter a mesma resposta.
      */
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
-      ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
+      ['criar', 'editar', 'ocultar', 'exportar', 'importar', 'configurar', 'estrutura'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes'],
+       'tabelaCorretoras', 'importacao', 'produtividade', 'configuracoes'],
       'CANAL'),
-    // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
+    // A Coordenação importa: é ela quem recebe a base de inadimplentes e
     // distribui. A Operação não — um analista não traz trezentos casos para
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
-      ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
+      ['criar', 'editar', 'ocultar', 'exportar', 'importar'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade'],
+       'tabelaCorretoras', 'importacao', 'produtividade'],
       'CANAL'),
     // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
     // "próprios" no resto do sistema.
@@ -11392,16 +11392,16 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
-  // OS DOIS DO TOMBAMENTO, que a operação pediu: "no dia 05 incluímos 100
+  // OS DOIS DA IMPORTAÇÃO, que a operação pediu: "no dia 05 incluímos 100
   // casos da base de inadimplentes Vida Presente". São duas perguntas, e por
   // isso dois gráficos — QUANDO entraram, e DE QUAL base.
   //
   // Largura 2 no de datas: uma barra por dia ao longo de um mês não cabe em
   // meia tela sem as datas virarem uma escadinha ilegível.
-  cartoes.push(novoGrafico(idRet, 'Casos tombados por dia',
-    'barrasComLinha', 'Data do tombamento', 'contagem', '', 0, 2, 7));
+  cartoes.push(novoGrafico(idRet, 'Casos importados por dia',
+    'barrasComLinha', 'Data da importação', 'contagem', '', 0, 2, 7));
   cartoes.push(novoGrafico(idRet, 'De qual base os casos vieram',
-    'barrasDeitadas', 'Origem do tombamento', 'contagem', '', 6, 1, 8));
+    'barrasDeitadas', 'Origem da importação', 'contagem', '', 6, 1, 8));
 
   cartoes.push(novoGrafico(idCanal, 'Entradas por dia, e a tendência',
     'barrasComLinha', 'Data de entrada', 'contagem', '', 0, 2, 1));
@@ -11413,12 +11413,12 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'Canal', 'contagem', '', 6, 1, 4));
   cartoes.push(novoGrafico(idCanal, 'Casos por analista',
     'barrasDeitadas', 'Analista', 'contagem', '', 6, 1, 5));
-  // A Mesa também tomba: casos planilhados de corretoras, para ação
+  // A Mesa também importa: casos planilhados de corretoras, para ação
   // diferenciada. Mesmos dois gráficos, mesma pergunta.
-  cartoes.push(novoGrafico(idCanal, 'Casos tombados por dia',
-    'barrasComLinha', 'Data do tombamento', 'contagem', '', 0, 2, 6));
+  cartoes.push(novoGrafico(idCanal, 'Casos importados por dia',
+    'barrasComLinha', 'Data da importação', 'contagem', '', 0, 2, 6));
   cartoes.push(novoGrafico(idCanal, 'De qual base os casos vieram',
-    'barrasDeitadas', 'Origem do tombamento', 'contagem', '', 6, 1, 7));
+    'barrasDeitadas', 'Origem da importação', 'contagem', '', 6, 1, 7));
 
   return cartoes;
 }
@@ -11636,7 +11636,7 @@ const RECC_PADRAO_POR_ABA = {
  * mapa, mas ninguém digita um Id.
  *
  * Também entram desativadas as colunas marcadas `preenchidoPeloSistema` no
- * Esquema: os carimbos de status e as duas do tombamento. Elas PRECISAM estar
+ * Esquema: os carimbos de status e as duas da importação. Elas PRECISAM estar
  * em CAMPOS — é lá que mora o tipo da coluna, e sem isso a data do carimbo
  * voltaria a ser lida como texto — mas não são campo de tela. Quem quiser
  * ligar uma delas no formulário liga em Configurações; ninguém precisa mexer

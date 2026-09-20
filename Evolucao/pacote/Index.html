@@ -646,27 +646,27 @@ button { font: inherit; color: inherit; }
 }
 
 /*
-  O TOMBAMENTO, em passos.
+  A IMPORTAÇÃO, em passos.
 
   Cada passo é um cartão, empilhado. Poderia ser tudo numa tela só, mas o passo
   do meio — conferir — é a razão de a tela existir: separá-lo visualmente é o
   que impede alguém de rolar direto até o botão de gravar.
 */
-.tombamento-passo { margin-bottom: 16px; }
-.tombamento-passo .grade { margin-bottom: 12px; }
-.tombamento-passo .cartoes { margin-bottom: 14px; }
-.tombamento-titulo {
+.importacao-passo { margin-bottom: 16px; }
+.importacao-passo .grade { margin-bottom: 12px; }
+.importacao-passo .cartoes { margin-bottom: 14px; }
+.importacao-titulo {
   margin: 20px 0 8px; font-size: 14px; font-weight: 700;
   color: var(--suave); letter-spacing: .01em;
 }
-.tombamento-titulo:first-child { margin-top: 0; }
+.importacao-titulo:first-child { margin-top: 0; }
 /* O de-para é de LER, não de comparar números: a coluna da esquerda fica
    estreita e monoespaçada, para o nome vindo de fora se distinguir do nosso. */
-.tombamento-depara td:first-child { width: 42%; }
-.tombamento-depara code {
+.importacao-depara td:first-child { width: 42%; }
+.importacao-depara code {
   font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
 }
-.tombamento-depara select { max-width: 100%; }
+.importacao-depara select { max-width: 100%; }
 /* Quem não atende este canal continua na lista, só mais discreto: a escolha é
    da coordenação, e o sistema apenas diz qual é a opção esperada. */
 .config-chave.de-outro-canal span { color: var(--suave); }
@@ -2175,10 +2175,10 @@ var Moldura = (function () {
       + '<path d="M9.2 20.6v-4.2h1.6v4.2"></path>',
 
     // análise: as barras em pé, sobre a régua
-    // Tombamento: uma caixa despejando linhas para dentro de uma bandeja. A
+    // Importação: uma caixa despejando linhas para dentro de uma bandeja. A
     // ideia é "uma base inteira entrando de uma vez", que é o que a tela faz —
     // e não um "mais", que já é o Cadastrar Caso.
-    tombamento:
+    importacao:
       '<path d="M3.4 13.6h4.2l1.4 2.6h6l1.4-2.6h4.2"></path>'
       + '<path d="M3.4 13.6 6 5.9a1.5 1.5 0 0 1 1.4-1h9.2a1.5 1.5 0 0 1 1.4 1l2.6 7.7'
       + 'v4.4a1.5 1.5 0 0 1-1.5 1.5H4.9a1.5 1.5 0 0 1-1.5-1.5z"></path>'
@@ -6067,10 +6067,10 @@ var TelaTabelaCorretoras = (function () {
 </script>
 
 
-<!-- ==== Tombamento.html ==== -->
+<!-- ==== Importacao.html ==== -->
 <script>
 /* ============================================================================
-   PGO — Tombamento.html · trazer uma base inteira de fora
+   PGO — Importacao.html · trazer uma base inteira de fora
    ============================================================================
    A tela existe para um gesto que a operação faz toda semana: pegar a base de
    inadimplentes do Vida Individual, do Vida em Grupo, ou a lista de corretoras
@@ -6082,7 +6082,7 @@ var TelaTabelaCorretoras = (function () {
      1. DE ONDE VEM. Colar o conteúdo, ou dar o link da outra planilha.
      2. CONFERIR. O servidor devolve para onde cada coluna vai, quantas linhas
         entram, quantas repetem, e as três primeiras JÁ TRADUZIDAS.
-     3. TOMBAR.
+     3. IMPORTAR.
 
    O passo 2 não é burocracia: mapeamento errado é invisível no cabeçalho e
    óbvio no dado. Ver "11999998888" na coluna "CPF" na terceira linha da
@@ -6092,15 +6092,15 @@ var TelaTabelaCorretoras = (function () {
    POR QUE COLAR, E NÃO SÓ O LINK: colar funciona sempre. Abrir outra planilha
    pelo link exige que a conta que roda o PGO tenha acesso a ela, e esse é
    exatamente o tipo de permissão que falta na hora errada. O link fica como a
-   opção melhor para quem repete o tombamento toda semana; colar fica como a
+   opção melhor para quem repete a importação toda semana; colar fica como a
    que nunca depende de nada.
    ============================================================================ */
 
-var TelaTombamento = (function () {
+var TelaImportacao = (function () {
 
   var canalEscolhida = '';
   var pacoteDoSistema = null;
-  var opcoes = null;          // colunas, analistas, lotes já tombados
+  var opcoes = null;          // colunas, analistas, lotes já importados
   var laudo = null;           // o resultado do passo 2, enquanto não se grava
   var resultado = null;       // o que entrou, depois de gravar
 
@@ -6119,16 +6119,16 @@ var TelaTombamento = (function () {
     pacoteDoSistema = pacote;
     if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
-      + '<div id="tombamento"><p class="carregando-campos">'
+      + '<div id="importacao"><p class="carregando-campos">'
       + 'Lendo as colunas do canal…</p></div>';
   }
 
   function carregar() {
-    var caixa = elemento('tombamento');
+    var caixa = elemento('importacao');
     if (caixa) {
       caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
     }
-    Servidor.chamar('opcoesDoTombamento', canalEscolhida)
+    Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhida)
       .entao(function (resposta) {
         opcoes = resposta;
         laudo = null;
@@ -6137,7 +6137,7 @@ var TelaTombamento = (function () {
         desenhar();
       })
       .senao(function (erro) {
-        elemento('tombamento').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -6145,7 +6145,7 @@ var TelaTombamento = (function () {
   /* -------------------------------------------------------------- desenho */
 
   function desenhar() {
-    elemento('tombamento').innerHTML = resultado
+    elemento('importacao').innerHTML = resultado
       ? desenharResultado()
       : (desenharFonte() + (laudo ? desenharLaudo() : ''));
     ligar();
@@ -6155,7 +6155,7 @@ var TelaTombamento = (function () {
   function desenharFonte() {
     var colado = fonte.tipo === 'colado';
 
-    return '<section class="cartao tombamento-passo">'
+    return '<section class="cartaa importação-passo">'
       + '<header class="grafico-cabeca"><h3>1. De onde vêm os casos</h3></header>'
       + '<div class="config-abas">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
@@ -6168,8 +6168,8 @@ var TelaTombamento = (function () {
       + 'colunas. É por ela que o sistema descobre para onde cada coluna vai. '
       + 'Até ' + opcoes.limite + ' linhas por vez.</p>'
       + '<div class="config-acoes">'
-      + '<button type="button" class="botao" id="conferir-tombamento">'
-      + 'Conferir antes de tombar</button></div>'
+      + '<button type="button" class="botao" id="conferir-importacao">'
+      + 'Conferir antes de importar</button></div>'
       + '</section>';
   }
 
@@ -6190,21 +6190,21 @@ var TelaTombamento = (function () {
       + ' placeholder="em branco = a primeira aba"></label>'
       + '</div>'
       + '<p class="config-dica">A conta que abre o PGO precisa ter acesso a essa '
-      + 'planilha. Se não tiver, o sistema diz isso em vez de tombar pela metade.</p>';
+      + 'planilha. Se não tiver, o sistema diz isso em vez de importar pela metade.</p>';
   }
 
   /** Passo 2: o laudo, que é a razão de a tela existir. */
   function desenharLaudo() {
-    return '<section class="cartao tombamento-passo">'
+    return '<section class="cartaa importação-passo">'
       + '<header class="grafico-cabeca"><h3>2. Confira antes de gravar</h3></header>'
       + desenharContagem()
       + desenharDePara()
       + desenharAmostra()
       + desenharDestino()
       + '<div class="config-acoes">'
-      + '<button type="button" class="botao" id="tombar-agora"'
+      + '<button type="button" class="botao" id="importar-agora"'
       + (laudo.vaoEntrar ? '' : ' disabled') + '>'
-      + 'Tombar ' + laudo.vaoEntrar + ' caso(s)</button>'
+      + 'Importar ' + laudo.vaoEntrar + ' caso(s)</button>'
       + '<button type="button" class="botao vazado" id="recomecar-do-laudo">'
       + 'Recomeçar</button></div>'
       + '</section>';
@@ -6245,8 +6245,8 @@ var TelaTombamento = (function () {
   function desenharDePara() {
     var atual = deParaEscolhido || laudo.dePara;
 
-    return '<h4 class="tombamento-titulo">Para onde vai cada coluna</h4>'
-      + '<table class="fila tombamento-depara"><thead><tr>'
+    return '<h4 class="importacao-titulo">Para onde vai cada coluna</h4>'
+      + '<table class="fila importacao-depara"><thead><tr>'
       + '<th>Na planilha de origem</th><th>Vai para esta coluna do canal</th>'
       + '</tr></thead><tbody>'
       + atual.map(function (par, i) {
@@ -6283,7 +6283,7 @@ var TelaTombamento = (function () {
       });
     });
 
-    return '<h4 class="tombamento-titulo">As primeiras linhas, como vão ficar</h4>'
+    return '<h4 class="importacao-titulo">As primeiras linhas, como vão ficar</h4>'
       + '<div class="rolagem-tabela"><table class="fila"><thead><tr>'
       + colunas.map(function (c) { return '<th>' + escapar(c) + '</th>'; }).join('')
       + '</tr></thead><tbody>'
@@ -6298,7 +6298,7 @@ var TelaTombamento = (function () {
 
   /** Nome do lote, para quem vai, e o que não repetir. */
   function desenharDestino() {
-    return '<h4 class="tombamento-titulo">De quem são, e como se chama o lote</h4>'
+    return '<h4 class="importacao-titulo">De quem são, e como se chama o lote</h4>'
       + '<div class="grade">'
       + '<label class="campo largura-2"><span>Nome do lote</span>'
       + '<input type="text" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
@@ -6343,7 +6343,7 @@ var TelaTombamento = (function () {
     if (!opcoes.analistas.length) {
       return '<p class="config-dica">Ninguém cadastrado e ativo no PGO, então os '
         + 'casos entram sem responsável. Cadastre em Configurações › Usuários e '
-        + 'tombe depois.</p>';
+        + 'importe depois.</p>';
     }
 
     var quantos = Object.keys(analistasMarcados).filter(function (nome) {
@@ -6354,7 +6354,7 @@ var TelaTombamento = (function () {
     // continua na lista: enquanto a operação está se formando, um analista da
     // RET pode receber um lote da Mesa, e quem decide isso é a coordenação, não
     // o sistema. Esconder o nome tiraria a decisão da mão dela.
-    return '<h4 class="tombamento-titulo">Dividir entre</h4>'
+    return '<h4 class="importacao-titulo">Dividir entre</h4>'
       + '<div class="config-marcadores">'
       + opcoes.analistas.map(function (pessoa) {
         return '<label class="config-chave'
@@ -6378,8 +6378,8 @@ var TelaTombamento = (function () {
 
   /** Passo 3: o que entrou. */
   function desenharResultado() {
-    return '<section class="cartao tombamento-passo">'
-      + '<header class="grafico-cabeca"><h3>Tombado</h3></header>'
+    return '<section class="cartaa importação-passo">'
+      + '<header class="grafico-cabeca"><h3>Importado</h3></header>'
       + '<div class="cartoes">'
       + '<div class="indicador tom-bom"><span class="rotulo">Casos que entraram'
       + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
@@ -6406,10 +6406,10 @@ var TelaTombamento = (function () {
           + escapar(resultado.analistas.join(', ')) + '.</p>'
         : '')
       + '<p class="config-dica">A Produtividade RECC já mostra este lote no '
-      + 'gráfico de casos tombados por dia.</p>'
+      + 'gráfico de casos importados por dia.</p>'
       + '<div class="config-acoes">'
-      + '<button type="button" class="botao" id="tombar-outro-lote">'
-      + 'Tombar outro lote</button></div>'
+      + '<button type="button" class="botao" id="importar-outro-lote">'
+      + 'Importar outro lote</button></div>'
       + '</section>';
   }
 
@@ -6433,13 +6433,13 @@ var TelaTombamento = (function () {
       desenhar();
     });
 
-    cliques('#conferir-tombamento', conferir);
-    cliques('#tombar-agora', tombar);
+    cliques('#conferir-importacao', conferir);
+    cliques('#importar-agora', importar);
     // Dois ids, e não um: os dois botões dizem coisas diferentes ("Recomeçar"
-    // depois de conferir, "Tombar outro lote" depois de gravar) e nunca estão
+    // depois de conferir, "Importar outro lote" depois de gravar) e nunca estão
     // na tela juntos. Compartilhar id é o achado 21 esperando a terceira tela
     // que os coloque lado a lado.
-    cliques('#recomecar-do-laudo, #tombar-outro-lote', function () {
+    cliques('#recomecar-do-laudo, #importar-outro-lote', function () {
       laudo = null;
       resultado = null;
       deParaEscolhido = null;
@@ -6477,14 +6477,14 @@ var TelaTombamento = (function () {
   }
 
   function cliques(seletor, oQueFazer) {
-    var achados = document.querySelectorAll('#tombamento ' + seletor);
+    var achados = document.querySelectorAll('#importacao ' + seletor);
     for (var i = 0; i < achados.length; i++) {
       achados[i].addEventListener('click', function () { oQueFazer(this); });
     }
   }
 
   function mudancas(seletor, oQueFazer) {
-    var achados = document.querySelectorAll('#tombamento ' + seletor);
+    var achados = document.querySelectorAll('#importacao ' + seletor);
     for (var i = 0; i < achados.length; i++) {
       achados[i].addEventListener('change', function () { oQueFazer(this); });
     }
@@ -6516,10 +6516,10 @@ var TelaTombamento = (function () {
   function conferir() {
     guardarOQueEstaNaTela();
 
-    var botao = elemento('conferir-tombamento');
+    var botao = elemento('conferir-importacao');
     if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
 
-    Servidor.chamar('conferirTombamento', canalEscolhida, {
+    Servidor.chamar('conferirImportacaoDeCasos', canalEscolhida, {
       fonte: fonte,
       dePara: deParaEscolhido,
       colunaQueIdentifica: colunaQueIdentifica
@@ -6532,13 +6532,13 @@ var TelaTombamento = (function () {
       .senao(function (erro) {
         if (botao) {
           botao.disabled = false;
-          botao.textContent = 'Conferir antes de tombar';
+          botao.textContent = 'Conferir antes de importar';
         }
         window.alert(erro.message || String(erro));
       });
   }
 
-  function tombar() {
+  function importar() {
     guardarOQueEstaNaTela();
 
     var escolhidos = Object.keys(analistasMarcados).filter(function (nome) {
@@ -6546,14 +6546,14 @@ var TelaTombamento = (function () {
     });
 
     // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
-    // fácil: tombar errado se desfaz apagando linha por linha.
-    if (!window.confirm('Tombar ' + laudo.vaoEntrar + ' caso(s) no canal '
+    // fácil: importar errado se desfaz apagando linha por linha.
+    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' caso(s) no canal '
       + laudo.canal.nome + '? Desfazer isso é apagar os casos um a um.')) return;
 
-    var botao = elemento('tombar-agora');
+    var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
-    Servidor.chamar('tombarCasos', canalEscolhida, {
+    Servidor.chamar('importarCasos', canalEscolhida, {
       fonte: fonte,
       dePara: deParaEscolhido || laudo.dePara,
       colunaQueIdentifica: colunaQueIdentifica,
@@ -6568,7 +6568,7 @@ var TelaTombamento = (function () {
       .senao(function (erro) {
         if (botao) {
           botao.disabled = false;
-          botao.textContent = 'Tombar ' + laudo.vaoEntrar + ' caso(s)';
+          botao.textContent = 'Importar ' + laudo.vaoEntrar + ' caso(s)';
         }
         window.alert(erro.message || String(erro));
       });
@@ -9406,11 +9406,11 @@ var Rotas = (function () {
       ligar: function (pacote) { TelaTabelaCorretoras.ligar(pacote); },
       desligar: function () { TelaTabelaCorretoras.desligar(); }
     },
-    tombamento: {
-      titulo: 'Tombamento',
+    importacao: {
+      titulo: 'Importação',
       subtitulo: 'Traga uma base inteira de outra planilha e divida entre os analistas.',
-      montar: function (pacote) { return TelaTombamento.montar(pacote); },
-      ligar: function (pacote) { TelaTombamento.ligar(pacote); }
+      montar: function (pacote) { return TelaImportacao.montar(pacote); },
+      ligar: function (pacote) { TelaImportacao.ligar(pacote); }
     },
     produtividade: {
       titulo: 'Produtividade RECC',

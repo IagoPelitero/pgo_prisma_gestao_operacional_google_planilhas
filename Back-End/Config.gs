@@ -626,7 +626,7 @@ function opcoesDeNivelDeAcesso() {
     editar: 'Alterar casos já cadastrados',
     ocultar: 'Tirar um caso da tela (a linha permanece na planilha)',
     exportar: 'Baixar o que está vendo',
-    tombar: 'Trazer uma base inteira de outra planilha, de uma vez',
+    importar: 'Trazer uma base inteira de outra planilha, de uma vez',
     configurar: 'Abrir Configurações e mexer em conteúdo e regra',
     estrutura: 'Criar coluna e canal — pede senha de administrador'
   };

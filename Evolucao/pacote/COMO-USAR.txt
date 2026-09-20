@@ -42,7 +42,7 @@ criaria abas por cima do que já existe. Escolha um dos dois caminhos:
 O QUE TEM DENTRO
 ----------------
 Codigo.gs      7 arquivos: Base.gs, Cadastros.gs, Casos.gs, Config.gs, Entrada.gs, Indicadores.gs, Instalacao.gs
-Index.html     11 telas: Estilos, Comuns, Trabalho, CadastrarCaso, MinhaPerformance, BuscarCaso, TabelaCorretoras, Tombamento, Produtividade, Configuracoes, Aplicacao
+Index.html     11 telas: Estilos, Comuns, Trabalho, CadastrarCaso, MinhaPerformance, BuscarCaso, TabelaCorretoras, Importacao, Produtividade, Configuracoes, Aplicacao
 SemAcesso.html a tela de acesso negado, servida sozinha pelo doGet
 
 NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode

@@ -210,17 +210,17 @@ function semearDadosIniciais_(emailDoInstalador) {
      * equipe está indo" —, e elas não precisam ter a mesma resposta.
      */
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
-      ['criar', 'editar', 'ocultar', 'exportar', 'tombar', 'configurar', 'estrutura'],
+      ['criar', 'editar', 'ocultar', 'exportar', 'importar', 'configurar', 'estrutura'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade', 'configuracoes'],
+       'tabelaCorretoras', 'importacao', 'produtividade', 'configuracoes'],
       'CANAL'),
-    // A Coordenação tomba: é ela quem recebe a base de inadimplentes e
+    // A Coordenação importa: é ela quem recebe a base de inadimplentes e
     // distribui. A Operação não — um analista não traz trezentos casos para
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
-      ['criar', 'editar', 'ocultar', 'exportar', 'tombar'],
+      ['criar', 'editar', 'ocultar', 'exportar', 'importar'],
       ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
-       'tabelaCorretoras', 'tombamento', 'produtividade'],
+       'tabelaCorretoras', 'importacao', 'produtividade'],
       'CANAL'),
     // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
     // "próprios" no resto do sistema.
@@ -619,16 +619,16 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
-  // OS DOIS DO TOMBAMENTO, que a operação pediu: "no dia 05 incluímos 100
+  // OS DOIS DA IMPORTAÇÃO, que a operação pediu: "no dia 05 incluímos 100
   // casos da base de inadimplentes Vida Presente". São duas perguntas, e por
   // isso dois gráficos — QUANDO entraram, e DE QUAL base.
   //
   // Largura 2 no de datas: uma barra por dia ao longo de um mês não cabe em
   // meia tela sem as datas virarem uma escadinha ilegível.
-  cartoes.push(novoGrafico(idRet, 'Casos tombados por dia',
-    'barrasComLinha', 'Data do tombamento', 'contagem', '', 0, 2, 7));
+  cartoes.push(novoGrafico(idRet, 'Casos importados por dia',
+    'barrasComLinha', 'Data da importação', 'contagem', '', 0, 2, 7));
   cartoes.push(novoGrafico(idRet, 'De qual base os casos vieram',
-    'barrasDeitadas', 'Origem do tombamento', 'contagem', '', 6, 1, 8));
+    'barrasDeitadas', 'Origem da importação', 'contagem', '', 6, 1, 8));
 
   cartoes.push(novoGrafico(idCanal, 'Entradas por dia, e a tendência',
     'barrasComLinha', 'Data de entrada', 'contagem', '', 0, 2, 1));
@@ -640,12 +640,12 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'Canal', 'contagem', '', 6, 1, 4));
   cartoes.push(novoGrafico(idCanal, 'Casos por analista',
     'barrasDeitadas', 'Analista', 'contagem', '', 6, 1, 5));
-  // A Mesa também tomba: casos planilhados de corretoras, para ação
+  // A Mesa também importa: casos planilhados de corretoras, para ação
   // diferenciada. Mesmos dois gráficos, mesma pergunta.
-  cartoes.push(novoGrafico(idCanal, 'Casos tombados por dia',
-    'barrasComLinha', 'Data do tombamento', 'contagem', '', 0, 2, 6));
+  cartoes.push(novoGrafico(idCanal, 'Casos importados por dia',
+    'barrasComLinha', 'Data da importação', 'contagem', '', 0, 2, 6));
   cartoes.push(novoGrafico(idCanal, 'De qual base os casos vieram',
-    'barrasDeitadas', 'Origem do tombamento', 'contagem', '', 6, 1, 7));
+    'barrasDeitadas', 'Origem da importação', 'contagem', '', 6, 1, 7));
 
   return cartoes;
 }
@@ -863,7 +863,7 @@ const RECC_PADRAO_POR_ABA = {
  * mapa, mas ninguém digita um Id.
  *
  * Também entram desativadas as colunas marcadas `preenchidoPeloSistema` no
- * Esquema: os carimbos de status e as duas do tombamento. Elas PRECISAM estar
+ * Esquema: os carimbos de status e as duas da importação. Elas PRECISAM estar
  * em CAMPOS — é lá que mora o tipo da coluna, e sem isso a data do carimbo
  * voltaria a ser lida como texto — mas não são campo de tela. Quem quiser
  * ligar uma delas no formulário liga em Configurações; ninguém precisa mexer

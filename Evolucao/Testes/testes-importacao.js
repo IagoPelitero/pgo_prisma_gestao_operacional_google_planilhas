@@ -1,18 +1,18 @@
 /**
  * ============================================================================
- * PGO — testes-tombamento.js · a Etapa 13
+ * PGO — testes-importacao.js · a Etapa 13
  * ============================================================================
- * Tombar é o gesto mais caro de errar do sistema. Cadastrar um caso errado se
- * conserta abrindo o caso; tombar trezentos errados se conserta apagando
+ * Importar é o gesto mais caro de errar do sistema. Cadastrar um caso errado se
+ * conserta abrindo o caso; importar trezentos errados se conserta apagando
  * trezentas linhas na mão, numa base que já está sendo trabalhada.
  *
  * Por isso os testes aqui cobram, acima de tudo, as RECUSAS: o de-para que não
  * leva a lugar nenhum, o analista que não existe, o lote sem nome, o limite de
- * linhas. Um tombamento que recusa cedo custa um minuto; um que aceita e grava
+ * linhas. Uma importação que recusa cedo custa um minuto; um que aceita e grava
  * errado custa uma tarde.
  *
- * E cobram a promessa central do laudo: o número que `conferirTombamento`
- * promete é o número que `tombarCasos` grava. Se os dois contassem por regras
+ * E cobram a promessa central do laudo: o número que `conferirImportacaoDeCasos`
+ * promete é o número que `importarCasos` grava. Se os dois contassem por regras
  * diferentes, a tela prometeria 98 e a base receberia 112 — e ninguém
  * descobriria isso olhando.
  * ============================================================================
@@ -21,8 +21,8 @@
 const { carregar, secao, teste, igual, verdadeiro, lanca, comoUsuario, ehData } =
   require('./ferramentas');
 
-function rodarTestesDeTombamento() {
-  console.log('\nEtapa 13 — Tombamento');
+function rodarTestesDeImportacao() {
+  console.log('\nEtapa 13 — Importação');
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
@@ -87,7 +87,7 @@ function rodarTestesDeTombamento() {
   secao('Casar as colunas');
 
   teste('o de-para se sugere sozinho, casando nome com nome', () => {
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'nome do cliente', 'Coluna que o PGO não tem'],
         ['12345678900', 'Maria Silva', 'qualquer coisa']
@@ -105,7 +105,7 @@ function rodarTestesDeTombamento() {
   teste('coluna preenchida pelo sistema NÃO é sugerida nem oferecida', () => {
     // Deixar a fonte escrever no carimbo do 1º contato apagaria o controle de
     // produtividade com dado de outra planilha — e apagaria calado.
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['Data do 1º contato', 'CPF'], ['01/01/2025', '12345678900']])
     });
 
@@ -115,7 +115,7 @@ function rodarTestesDeTombamento() {
       'o carimbo não pode ser sugerido como destino');
     verdadeiro(laudo.colunasDoCanal.indexOf('Data do 1º contato') < 0,
       'nem aparecer na lista que a tela oferece');
-    verdadeiro(laudo.colunasDoCanal.indexOf('Origem do tombamento') < 0);
+    verdadeiro(laudo.colunasDoCanal.indexOf('Origem da importação') < 0);
     verdadeiro(laudo.colunasDoCanal.indexOf('CPF') >= 0,
       'as colunas normais continuam lá');
   });
@@ -123,7 +123,7 @@ function rodarTestesDeTombamento() {
   secao('O laudo antes de gravar');
 
   teste('o laudo conta o que entra e mostra as primeiras já traduzidas', () => {
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'nome do cliente'],
         ['11111111111', 'Um'],
@@ -147,7 +147,7 @@ function rodarTestesDeTombamento() {
     // Ela cai já na separação do texto, e por isso não aparece como "pulada":
     // o laudo diz "2 linhas, 2 entram", que é a verdade. Contá-la como pulada
     // faria a pessoa procurar um problema que não existe.
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'nome do cliente'],
         ['11111111111', 'Um'],
@@ -164,7 +164,7 @@ function rodarTestesDeTombamento() {
     // Esta é a que importa: a linha existe, tem texto, mas nada dela vai para
     // coluna nenhuma do canal. Gravar isso criaria um caso em branco com Id e
     // data — uma linha que alguém teria de achar e apagar depois.
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'Observação que o PGO não guarda'],
         ['11111111112', 'tem dado aqui'],
@@ -179,17 +179,17 @@ function rodarTestesDeTombamento() {
 
   teste('conferir NÃO grava nada', () => {
     const antes = casosDaRet().length;
-    chamar('conferirTombamento')(ret.id, {
+    chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['55555555555', 'Cinco']])
     });
     igual(casosDaRet().length, antes, 'o laudo é só um laudo');
   });
 
-  secao('Tombar');
+  secao('Importar');
 
   teste('a base entra, dividida entre os analistas em rodízio', () => {
     const antes = casosDaRet().length;
-    const resultado = chamar('tombarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'nome do cliente'],
         ['10000000001', 'Cliente Um'],
@@ -204,47 +204,47 @@ function rodarTestesDeTombamento() {
     igual(resultado.entraram, 4);
     igual(casosDaRet().length, antes + 4);
 
-    const tombados = casosDaRet().filter((linha) =>
-      linha['Origem do tombamento'] === 'Base de inadimplentes Vida Presente');
-    igual(tombados.length, 4);
+    const importados = casosDaRet().filter((linha) =>
+      linha['Origem da importação'] === 'Base de inadimplentes Vida Presente');
+    igual(importados.length, 4);
 
     const porAnalista = {};
-    tombados.forEach((caso) => {
+    importados.forEach((caso) => {
       porAnalista[caso.analista] = (porAnalista[caso.analista] || 0) + 1;
     });
     igual(porAnalista['Marcos Vieira'], 2, 'divisão em partes iguais');
     igual(porAnalista['Patrícia Nunes'], 2);
   });
 
-  teste('o caso tombado nasce com o status padrão do canal', () => {
-    // É por isso que o valor padrão tem de valer no SERVIDOR: o tombamento não
+  teste('o caso importado nasce com o status padrão do canal', () => {
+    // É por isso que o valor padrão tem de valer no SERVIDOR: a importação não
     // passa por tela nenhuma, e a tela é quem preenchia o padrão antes.
-    const tombados = casosDaRet().filter((linha) =>
-      linha['Origem do tombamento'] === 'Base de inadimplentes Vida Presente');
-    verdadeiro(tombados.every((caso) => caso.status === 'Não trabalhado'),
+    const importados = casosDaRet().filter((linha) =>
+      linha['Origem da importação'] === 'Base de inadimplentes Vida Presente');
+    verdadeiro(importados.every((caso) => caso.status === 'Não trabalhado'),
       'todos nascem em Não trabalhado, como a RET pediu');
   });
 
   teste('o lote e a data ficam gravados — é o que faz o gráfico existir', () => {
     const caso = casosDaRet().find((linha) =>
       linha['nome do cliente'] === 'Cliente Um');
-    igual(caso['Origem do tombamento'], 'Base de inadimplentes Vida Presente');
-    verdadeiro(ehData(caso['Data do tombamento']),
+    igual(caso['Origem da importação'], 'Base de inadimplentes Vida Presente');
+    verdadeiro(ehData(caso['Data da importação']),
       'data de verdade, e não texto: o gráfico agrupa por dia');
   });
 
-  teste('o caso tombado é marcado como vindo de FORA, e não da tela', () => {
+  teste('o caso importado é marcado como vindo de FORA, e não da tela', () => {
     const caso = casosDaRet().find((linha) =>
       linha['nome do cliente'] === 'Cliente Um');
     igual(caso._Origem, 'PLANILHA',
-      'meses depois, é isto que separa o que foi digitado do que foi tombado');
+      'meses depois, é isto que separa o que foi digitado do que foi importado');
   });
 
   teste('a auditoria leva UMA linha por lote, não uma por caso', () => {
     // Trezentas linhas de auditoria dizendo a mesma coisa afogam as que
     // importam — e a aba de auditoria é a que mais cresce no sistema.
     const doLote = chamar('lerRegistros_("AUDITORIA")').filter((linha) =>
-      String(linha.Acao) === 'caso.tombar');
+      String(linha.Acao) === 'caso.importar');
     igual(doLote.length, 1);
     verdadeiro(String(doLote[0].Detalhe).indexOf('4 casos') >= 0,
       'e a linha diz quantos entraram: ' + doLote[0].Detalhe);
@@ -254,8 +254,8 @@ function rodarTestesDeTombamento() {
 
   teste('o que já está na base é pulado quando há coluna que identifica', () => {
     // A base é atualizada toda semana e boa parte dela repete. Sem isto, o
-    // segundo tombamento duplica tudo.
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    // segunda importação duplica tudo.
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'nome do cliente'],
         ['10000000001', 'Cliente Um'],          // já entrou
@@ -270,7 +270,7 @@ function rodarTestesDeTombamento() {
   teste('CPF com máscara e sem máscara são o MESMO caso', () => {
     // A outra planilha formata do jeito dela. Tratar "100.000.000-01" como
     // diferente de "10000000001" duplicaria o caso justamente aí.
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['100.000.000-01', 'Cliente Um']]),
       colunaQueIdentifica: 'CPF'
     });
@@ -281,7 +281,7 @@ function rodarTestesDeTombamento() {
   teste('repetido DENTRO da própria leva também é pulado', () => {
     // A base de origem tem duplicata dela mesma com frequência. Conferir só
     // contra a base deixaria entrar duas cópias na mesma leva.
-    const laudo = chamar('conferirTombamento')(ret.id, {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([
         ['CPF', 'nome do cliente'],
         ['20000000001', 'Novo'],
@@ -304,11 +304,11 @@ function rodarTestesDeTombamento() {
       ['30000000002', 'Novo B'],
       ['30000000001', 'Novo A de novo']  // repetido na própria leva
     ]);
-    const laudo = chamar('conferirTombamento')(ret.id,
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id,
       { fonte: fonte, colunaQueIdentifica: 'CPF' });
 
     const antes = casosDaRet().length;
-    const resultado = chamar('tombarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, {
       fonte: fonte, colunaQueIdentifica: 'CPF', origem: 'Leva conferida'
     });
 
@@ -320,7 +320,7 @@ function rodarTestesDeTombamento() {
   teste('sem coluna que identifica, tudo entra — inclusive o repetido', () => {
     // É uma escolha, e às vezes a certa: a mesma pessoa pode ter dois casos.
     const antes = casosDaRet().length;
-    chamar('tombarCasos')(ret.id, {
+    chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['10000000001', 'Cliente Um']]),
       origem: 'Leva sem conferir repetido'
     });
@@ -330,7 +330,7 @@ function rodarTestesDeTombamento() {
   secao('As recusas');
 
   teste('lote sem nome é recusado — o gráfico não teria o que dizer', () => {
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF'], ['40000000001']])
     }), 'Dê um nome ao lote');
   });
@@ -338,14 +338,14 @@ function rodarTestesDeTombamento() {
   teste('de-para que não leva a coluna nenhuma é recusado', () => {
     // Sem isto, seriam trezentas linhas em branco na base operacional, que
     // alguém teria de achar e apagar uma a uma.
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['Coluna A', 'Coluna B'], ['x', 'y']]),
       origem: 'Lote perdido'
     }), 'criaria linhas em branco');
   });
 
   teste('de-para apontando para coluna inexistente é recusado, dizendo quais', () => {
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['Coluna A'], ['x']]),
       dePara: [{ daFonte: 'Coluna A', paraAColuna: 'Coluna que nunca existiu' }],
       origem: 'Lote torto'
@@ -356,7 +356,7 @@ function rodarTestesDeTombamento() {
     // Caso no nome de quem não existe some da fila de todo mundo: o escopo
     // "próprios" não acha um responsável que não está no cadastro. O caso
     // estaria na planilha e invisível no sistema.
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF'], ['50000000001']]),
       analistas: ['Fulano Que Não Existe'],
       origem: 'Lote sem dono'
@@ -364,7 +364,7 @@ function rodarTestesDeTombamento() {
   });
 
   teste('base em que nada entraria recusa em vez de gravar zero', () => {
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['10000000001', 'Cliente Um']]),
       colunaQueIdentifica: 'CPF',
       origem: 'Leva toda repetida'
@@ -376,38 +376,38 @@ function rodarTestesDeTombamento() {
     for (let i = 0; i < 2001; i++) {
       muitas.push(['9' + String(i).padStart(9, '0'), 'Cliente ' + i]);
     }
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado(muitas), origem: 'Leva gigante'
     }), 'no máximo 2000 linhas');
   });
 
   teste('fonte com só o cabeçalho é recusada', () => {
-    lanca(() => chamar('conferirTombamento')(ret.id, {
+    lanca(() => chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente']])
     }), 'pelo menos duas linhas');
   });
 
   teste('coluna que identifica inexistente é recusada, e não ignorada', () => {
-    // Ignorar deixaria o tombamento duplicar tudo em silêncio, que é
+    // Ignorar deixaria a importação duplicar tudo em silêncio, que é
     // exatamente o que a pessoa pediu para não acontecer.
-    lanca(() => chamar('conferirTombamento')(ret.id, {
+    lanca(() => chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['CPF'], ['60000000001']]),
       colunaQueIdentifica: 'Coluna inventada'
     }), 'não existe na aba');
   });
 
-  secao('Quem pode tombar');
+  secao('Quem pode importar');
 
-  teste('quem não tem a ação "tombar" é recusado, mesmo chamando direto', () => {
+  teste('quem não tem a ação "importar" é recusado, mesmo chamando direto', () => {
     const operacao = chamar('lerRegistros_("CATALOGO")')
       .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
     const permissoes = JSON.parse(operacao.Configuracao);
-    verdadeiro(permissoes.acoes.indexOf('tombar') < 0,
-      'a Operação não tomba: um analista não traz 300 casos para dentro');
+    verdadeiro(permissoes.acoes.indexOf('importar') < 0,
+      'a Operação não importa: um analista não traz 300 casos para dentro');
 
     // E mesmo com a TELA liberada, sem a AÇÃO não passa: esconder o menu não
     // impede ninguém de chamar a função.
-    permissoes.telas.push('tombamento');
+    permissoes.telas.push('importacao');
     chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
       { Configuracao: JSON.stringify(permissoes) });
     chamar('salvarUsuario')({
@@ -416,18 +416,18 @@ function rodarTestesDeTombamento() {
     });
 
     comoUsuario(ambiente, 'comum@exemplo.com', () => {
-      lanca(() => chamar('tombarCasos')(ret.id, {
+      lanca(() => chamar('importarCasos')(ret.id, {
         fonte: colado([['CPF'], ['70000000001']]), origem: 'Lote proibido'
       }), 'não permite');
     });
   });
 
-  teste('a Coordenação tomba — é ela quem recebe a base e distribui', () => {
+  teste('a Coordenação importa — é ela quem recebe a base e distribui', () => {
     const coordenacao = chamar('lerRegistros_("CATALOGO")')
       .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Coordenação');
     const permissoes = JSON.parse(coordenacao.Configuracao);
-    verdadeiro(permissoes.acoes.indexOf('tombar') >= 0);
-    verdadeiro(permissoes.telas.indexOf('tombamento') >= 0);
+    verdadeiro(permissoes.acoes.indexOf('importar') >= 0);
+    verdadeiro(permissoes.telas.indexOf('importacao') >= 0);
   });
 
   secao('Quem aparece na lista de analistas');
@@ -444,7 +444,7 @@ function rodarTestesDeTombamento() {
       nivelAcessoId: nivelDaOperacao, ativo: true
     });
 
-    const lista = chamar('opcoesDoTombamento')(ret.id).analistas;
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
     const sandra = lista.find((p) => p.nome === 'Sandra do Vida em Grupo');
     verdadeiro(sandra !== undefined,
       'ela precisa aparecer: ' + lista.map((p) => p.nome).join(', '));
@@ -457,17 +457,17 @@ function rodarTestesDeTombamento() {
   teste('quem é do canal vem primeiro na lista', () => {
     // A ordem é a sugestão. Quem atende este canal é a escolha esperada; os
     // outros continuam disponíveis, mais abaixo.
-    const lista = chamar('opcoesDoTombamento')(ret.id).analistas;
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
     const primeiroDeFora = lista.findIndex((p) => !p.atendeEsteCanal);
     const ultimoDeDentro = lista.map((p) => p.atendeEsteCanal).lastIndexOf(true);
     verdadeiro(primeiroDeFora < 0 || ultimoDeDentro < primeiroDeFora,
       'ninguém de fora pode aparecer antes de alguém de dentro');
   });
 
-  teste('tombar no nome de quem é de outro canal é PERMITIDO', () => {
+  teste('importar no nome de quem é de outro canal é PERMITIDO', () => {
     // Enquanto a operação está se formando, um analista da RET pode receber um
     // lote da Mesa. Quem decide isso é a coordenação, não o sistema.
-    const resultado = chamar('tombarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['80000000001', 'De outro canal']]),
       analistas: ['Sandra do Vida em Grupo'],
       origem: 'Lote cruzado'
@@ -485,21 +485,21 @@ function rodarTestesDeTombamento() {
       .find((u) => u.nome === 'Sandra do Vida em Grupo');
     chamar('desativarUsuario')(sandra.id);
 
-    const lista = chamar('opcoesDoTombamento')(ret.id).analistas;
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
     verdadeiro(!lista.some((p) => p.nome === 'Sandra do Vida em Grupo'),
       'saiu da lista');
 
-    lanca(() => chamar('tombarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF'], ['80000000002']]),
       analistas: ['Sandra do Vida em Grupo'],
       origem: 'Lote para quem saiu'
     }), 'não estão cadastrados e ativos');
   });
 
-  secao('A Mesa Diamante também tomba');
+  secao('A Mesa Diamante também importa');
 
-  teste('a Mesa tomba casos de corretoras, com as colunas dela', () => {
-    const resultado = chamar('tombarCasos')(mesa.id, {
+  teste('a Mesa importa casos de corretoras, com as colunas dela', () => {
+    const resultado = chamar('importarCasos')(mesa.id, {
       fonte: colado([
         ['Corretora', 'Nome do segurado', 'SUSEP'],
         ['Corretora Alfa', 'Segurado Um', '12345678901'],
@@ -509,19 +509,19 @@ function rodarTestesDeTombamento() {
     });
 
     igual(resultado.entraram, 2);
-    const tombados = chamar('lerRegistros_("BASE_MESA")').filter((linha) =>
-      linha['Origem do tombamento'] === 'Corretoras para ação diferenciada');
-    igual(tombados.length, 2);
-    igual(tombados[0].Corretora, 'Corretora Alfa');
-    igual(tombados[0].Status, 'Em andamento', 'o padrão da Mesa, não o da RET');
+    const importados = chamar('lerRegistros_("BASE_MESA")').filter((linha) =>
+      linha['Origem da importação'] === 'Corretoras para ação diferenciada');
+    igual(importados.length, 2);
+    igual(importados[0].Corretora, 'Corretora Alfa');
+    igual(importados[0].Status, 'Em andamento', 'o padrão da Mesa, não o da RET');
   });
 
-  secao('Os lotes já tombados');
+  secao('Os lotes já importados');
 
   teste('a tela sabe quais lotes já entraram, e quantos casos cada um', () => {
-    // Serve para oferecer o nome que já existe: tombar a mesma base toda
+    // Serve para oferecer o nome que já existe: importar a mesma base toda
     // semana com o nome escrito diferente mostraria cinco lotes onde há um.
-    const lotes = chamar('lotesJaTombados')(ret.id);
+    const lotes = chamar('lotesJaImportados')(ret.id);
     const porNome = {};
     lotes.forEach((lote) => { porNome[lote.origem] = lote.casos; });
 
@@ -531,12 +531,12 @@ function rodarTestesDeTombamento() {
       'o maior lote vem primeiro');
   });
 
-  teste('a Produtividade RECC mostra o tombamento por dia e por base', () => {
+  teste('a Produtividade RECC mostra a importação por dia e por base', () => {
     // O pedido literal: "no dia 05 incluímos 100 casos da base de
     // inadimplentes Vida Presente". São duas perguntas, e dois gráficos.
     const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
     const titulos = painel.componentes.map((c) => c.titulo);
-    verdadeiro(titulos.indexOf('Casos tombados por dia') >= 0, titulos.join(' | '));
+    verdadeiro(titulos.indexOf('Casos importados por dia') >= 0, titulos.join(' | '));
     verdadeiro(titulos.indexOf('De qual base os casos vieram') >= 0);
 
     const porBase = painel.componentes.find((c) =>
@@ -549,4 +549,4 @@ function rodarTestesDeTombamento() {
   });
 }
 
-module.exports = { rodarTestesDeTombamento };
+module.exports = { rodarTestesDeImportacao };

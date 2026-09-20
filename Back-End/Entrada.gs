@@ -531,11 +531,11 @@ const RECC_ACOES = {
   EDITAR: 'editar',
   OCULTAR: 'ocultar',
   EXPORTAR: 'exportar',
-  // Tombar é trazer uma base inteira de outra planilha para dentro do PGO —
+  // Importar é trazer uma base inteira de outra planilha para dentro do PGO —
   // cem, trezentos casos de uma vez. É separado de `criar` de propósito: quem
-  // cadastra um caso por vez erra um caso; quem tomba errado suja a base toda,
+  // cadastra um caso por vez erra um caso; quem importa errado suja a base toda,
   // e o desfazer é apagar trezentas linhas na mão.
-  TOMBAR: 'tombar',
+  IMPORTAR: 'importar',
   CONFIGURAR: 'configurar',
   ESTRUTURA: 'estrutura'
 };
@@ -578,7 +578,7 @@ const RECC_TELAS_DO_SISTEMA = [
   { tela: 'minhaPerformance', titulo: 'Minha Performance' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
   { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
-  { tela: 'tombamento', titulo: 'Tombamento' },
+  { tela: 'importacao', titulo: 'Importação' },
   { tela: 'produtividade', titulo: 'Produtividade RECC' },
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];

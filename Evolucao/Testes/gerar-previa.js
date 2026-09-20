@@ -146,14 +146,14 @@ function pontePreparada(respostas) {
     + '      listarCardsDoPainel: function (tela, idDoCanal) {\n'
     + '        responder(respostas.configuracoes.cards[idDoCanal]);\n'
     + '      },\n'
-    + '      opcoesDoTombamento: function (idDoCanal) {\n'
-    + '        responder(respostas.tombamento[idDoCanal]);\n'
+    + '      opcoesDaImportacaoDeCasos: function (idDoCanal) {\n'
+    + '        responder(respostas.importacao[idDoCanal]);\n'
     + '      },\n'
-    // Conferir e tombar dependem do que a pessoa COLA na hora, e a prévia não
+    // Conferir e importar dependem do que a pessoa COLA na hora, e a prévia não
     // tem servidor para ler aquilo. Recusam com o motivo, em vez de devolver
     // um laudo inventado: um laudo falso na prévia ensinaria a confiar nele.
-    + '      conferirTombamento: function () {\n'
-    + '        recusar("Na prévia não dá para conferir um tombamento: o laudo '
+    + '      conferirImportacaoDeCasos: function () {\n'
+    + '        recusar("Na prévia não dá para conferir uma importação: o laudo '
     + 'sai de ler o que você colou, e aqui não há servidor para ler.");\n'
     + '      },\n'
     + '      configuracaoDosCadastros: function () {\n'
@@ -304,7 +304,7 @@ function pontePreparada(respostas) {
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
-      'salvarConfiguracaoDoLegado', 'tombarCasos',
+      'salvarConfiguracaoDoLegado', 'importarCasos',
       'salvarConfiguracaoDosCadastros'])
     + '    };\n'
     + '  }\n'
@@ -655,12 +655,12 @@ function gerar(pastaDeSaida) {
   const cards = {};
   const opcoesDoGrafico = {};
   const componentes = {};
-  const tombamento = {};
+  const importacao = {};
   pacote.canais.forEach((canal) => {
     cards[canal.id] = chamar('listarCardsDoPainel')('trabalho', canal.id);
     opcoesDoGrafico[canal.id] = chamar('opcoesDosGraficos')(canal.id);
     componentes[canal.id] = chamar('listarComponentesDoPainel')(canal.id);
-    tombamento[canal.id] = chamar('opcoesDoTombamento')(canal.id);
+    importacao[canal.id] = chamar('opcoesDaImportacaoDeCasos')(canal.id);
   });
 
   const configuracoes = {
@@ -773,7 +773,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
-      busca, analitico, performance, corretoras, tombamento
+      busca, analitico, performance, corretoras, importacao
     })
       + '</head>');
 

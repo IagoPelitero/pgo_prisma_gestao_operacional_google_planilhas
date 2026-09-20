@@ -104,7 +104,7 @@ function rodarTestesDaCasca() {
     // A conta é contra o TAMANHO DO MENU, e não contra um número escrito aqui:
     // "8 itens, 8 desenhos" continua certo no dia em que nascer a nona tela, e
     // um número fixo teria dito "7" enquanto o menu já tinha 8 — que foi
-    // exatamente o que aconteceu quando o Tombamento entrou repetindo o ícone
+    // exatamente o que aconteceu quando a Importação entrou repetindo o ícone
     // do Trabalho.
     const unicos = {};
     doMenu.forEach((d) => { unicos[d] = true; });

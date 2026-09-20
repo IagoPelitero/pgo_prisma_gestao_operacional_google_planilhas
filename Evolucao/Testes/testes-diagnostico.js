@@ -481,6 +481,72 @@ function rodarTestesDeDiagnostico() {
 
   secao('O projeto do Apps Script');
 
+  teste('nenhuma função do servidor tem o nome de outra', () => {
+    /*
+     * NO APPS SCRIPT TODO .gs DIVIDE UM ESCOPO GLOBAL SÓ.
+     *
+     * Não há módulo, não há import: os arquivos são avaliados em ordem
+     * alfabética, um atrás do outro, na mesma gaveta. Duas funções com o mesmo
+     * nome não dão erro nenhum — a última avaliada simplesmente APAGA a
+     * primeira, e quem chamava a primeira passa a receber a segunda.
+     *
+     * Foi o que aconteceu ao renomear Tombamento para Importação: já existia
+     * um `conferirImportacao` no Cadastros.gs (a importação de corretoras e
+     * SUSEPs), e o `conferirTombamento` do Casos.gs virou o mesmo nome. Como
+     * Casos.gs vem depois de Cadastros.gs no alfabeto, a importação de
+     * corretoras deixou de existir — sem uma linha de erro. Os testes dela
+     * quebraram com "Canal 'corretoras' não existe", uma mensagem que aponta
+     * para o lugar errado.
+     *
+     * Esta guarda é barata e pega a classe inteira: qualquer nome repetido
+     * entre os .gs, venha de renomeio, de cópia ou de duas pessoas escrevendo
+     * a mesma função sem saber.
+     */
+    const pasta = path.join(__dirname, '..', '..', 'Back-End');
+    const ondeMora = {};
+
+    fs.readdirSync(pasta).filter((nome) => nome.endsWith('.gs')).forEach((nome) => {
+      const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
+      const achados = fonte.match(/^function\s+([A-Za-z0-9_]+)/gm) || [];
+      achados.forEach((linha) => {
+        const funcao = linha.replace(/^function\s+/, '');
+        if (!ondeMora[funcao]) ondeMora[funcao] = [];
+        ondeMora[funcao].push(nome);
+      });
+    });
+
+    const repetidas = Object.keys(ondeMora)
+      .filter((funcao) => ondeMora[funcao].length > 1)
+      .map((funcao) => funcao + ' (' + ondeMora[funcao].join(' e ') + ')');
+
+    igual(repetidas.join(' | '), '',
+      'no Apps Script a segunda definição apaga a primeira, sem avisar');
+  });
+
+  teste('nenhuma constante do servidor tem o nome de outra', () => {
+    // Mesmo motivo, e pior: `const` repetido no mesmo escopo é SyntaxError no
+    // V8, e o projeto inteiro para de carregar — a tela abre em branco.
+    const pasta = path.join(__dirname, '..', '..', 'Back-End');
+    const ondeMora = {};
+
+    fs.readdirSync(pasta).filter((nome) => nome.endsWith('.gs')).forEach((nome) => {
+      const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
+      const achados = fonte.match(/^(?:const|var|let)\s+([A-Za-z0-9_]+)/gm) || [];
+      achados.forEach((linha) => {
+        const nomeDela = linha.replace(/^(?:const|var|let)\s+/, '');
+        if (!ondeMora[nomeDela]) ondeMora[nomeDela] = [];
+        ondeMora[nomeDela].push(nome);
+      });
+    });
+
+    const repetidas = Object.keys(ondeMora)
+      .filter((umNome) => ondeMora[umNome].length > 1)
+      .map((umNome) => umNome + ' (' + ondeMora[umNome].join(' e ') + ')');
+
+    igual(repetidas.join(' | '), '',
+      'const repetido entre .gs derruba o projeto inteiro no carregamento');
+  });
+
   /*
    * OS DOIS MUNDOS.
    *
@@ -601,7 +667,7 @@ function rodarTestesDeDiagnostico() {
     // Foi "documento" — o tipo de campo do CPF — que reprovou três arquivos na
     // primeira versão desta guarda.
     const emPortugues = 'var tipo = "documento"; var janela = 30; '
-      + 'exportarComponente(); var importado = tombarCasos();';
+      + 'exportarComponente(); var importado = importarCasos();';
     const disparou = []
       .concat(SO_NO_NAVEGADOR, SO_NO_SERVIDOR, SO_NO_NODE)
       .filter((r) => r.test(emPortugues))

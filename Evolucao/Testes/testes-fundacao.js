@@ -45,8 +45,8 @@ function rodarTestesDaFundacao() {
     igual(cabecalhos[20], 'Data da última mudança de status');
     igual(cabecalhos[21], 'Quem mudou o status');
     igual(cabecalhos[22], 'Mudanças de status');
-    igual(cabecalhos[23], 'Origem do tombamento');
-    igual(cabecalhos[24], 'Data do tombamento');
+    igual(cabecalhos[23], 'Origem da importação');
+    igual(cabecalhos[24], 'Data da importação');
     igual(cabecalhos[25], '_Visivel');
   });
 

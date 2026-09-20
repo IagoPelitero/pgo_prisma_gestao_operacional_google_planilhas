@@ -34,7 +34,7 @@ abaixo com o motivo.
 | **Produtos** | Nome e código, que é único | Tabela de Corretoras |
 | **SUSEPs bloqueadas** | Bloquear com motivo, liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
 | **Importar em lote** | Colar a planilha de corretoras (SUSEP, corretora, canal, segmento) ou a de SUSEPs bloqueadas, conferir o que vai acontecer linha a linha, e só então gravar | Tabela de Corretoras → Importar · **pede senha** |
-| **Tombar uma base de casos** | Trazer cem ou trezentos casos de outra planilha — colando ou pelo link —, escolher para onde cada coluna vai, dividir entre os analistas em rodízio, pular o que já entrou e dar um nome ao lote | Tombamento · **ação `tombar`** |
+| **Importar uma base de casos** | Trazer cem ou trezentos casos de outra planilha — colando ou pelo link —, escolher para onde cada coluna vai, dividir entre os analistas em rodízio, pular o que já entrou e dar um nome ao lote | Importação · **ação `importar`** |
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |

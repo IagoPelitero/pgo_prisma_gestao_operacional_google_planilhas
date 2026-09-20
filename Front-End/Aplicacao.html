@@ -220,11 +220,11 @@ var Rotas = (function () {
       ligar: function (pacote) { TelaTabelaCorretoras.ligar(pacote); },
       desligar: function () { TelaTabelaCorretoras.desligar(); }
     },
-    tombamento: {
-      titulo: 'Tombamento',
+    importacao: {
+      titulo: 'Importação',
       subtitulo: 'Traga uma base inteira de outra planilha e divida entre os analistas.',
-      montar: function (pacote) { return TelaTombamento.montar(pacote); },
-      ligar: function (pacote) { TelaTombamento.ligar(pacote); }
+      montar: function (pacote) { return TelaImportacao.montar(pacote); },
+      ligar: function (pacote) { TelaImportacao.ligar(pacote); }
     },
     produtividade: {
       titulo: 'Produtividade RECC',

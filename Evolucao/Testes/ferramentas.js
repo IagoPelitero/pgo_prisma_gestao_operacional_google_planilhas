@@ -186,7 +186,7 @@ function resumo() {
  * — precisam saber quais telas existem. Cada uma tinha a sua lista escrita à
  * mão, e elas já divergiam entre si: uma com sete nomes, a outra com cinco, e
  * as duas dizendo "todas as telas" no cabeçalho. No dia em que nasceu o
- * Tombamento, as duas continuaram aprovando com a mesma confiança — caladas a
+ * Importação, as duas continuaram aprovando com a mesma confiança — caladas a
  * respeito da tela nova, que era justamente a que precisava ser olhada.
  *
  * Ferramenta de conferência que não conhece o que existe hoje é pior que

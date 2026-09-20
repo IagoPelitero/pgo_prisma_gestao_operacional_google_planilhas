@@ -55,7 +55,7 @@ const FOTOS = [
   { arquivo: 'tela-minha-performance', tela: 'minhaPerformance', inteira: true },
   { arquivo: 'tela-buscar-caso', tela: 'buscarCaso' },
   { arquivo: 'tela-tabela-corretoras', tela: 'tabelaCorretoras', inteira: true },
-  { arquivo: 'tela-tombamento', tela: 'tombamento', inteira: true },
+  { arquivo: 'tela-importacao', tela: 'importacao', inteira: true },
   { arquivo: 'tela-produtividade', tela: 'produtividade', inteira: true },
   { arquivo: 'tela-configuracoes', tela: 'configuracoes', inteira: true },
 

@@ -1375,7 +1375,7 @@ pode ser fechado, precisa ser mais ajustável."*
 Mais dedicado E mais ajustável ao mesmo tempo. A resposta, em todos os itens
 abaixo, foi a mesma: **o que a operação pediu virou o PADRÃO DE FÁBRICA, e não
 uma regra no código.** Os oito status da RET, os cartões da Produtividade, os
-gráficos do tombamento — tudo isso nasce pronto e tudo isso se muda em
+gráficos da importação — tudo isso nasce pronto e tudo isso se muda em
 Configurações, sem programador.
 
 ### 1. RET, Trabalho, Produtividade RECC
@@ -1407,7 +1407,7 @@ Isso expôs um defeito que estava escondido havia meses: o servidor conferia
 porque a tela preenche o padrão sozinha antes de a pessoa ver — dois lugares
 fazendo o mesmo trabalho, e só um deles certo.
 
-Quem ia pagar a conta era o tombamento: uma base de 300 inadimplentes não traz
+Quem ia pagar a conta era a importação: uma base de 300 inadimplentes não traz
 coluna de status, não passa por tela nenhuma, e as 300 linhas seriam recusadas
 uma a uma. É o achado 34.
 
@@ -1457,7 +1457,7 @@ importa, e em tela estreita o nome do filtro era o pedaço que ficava cortado.
 > pergunta "esta linha é um gráfico?" virou uma função só, usada nos três
 > lugares que a faziam.
 
-### 5. O tombamento
+### 5. A importação
 
 Trazer uma base inteira de fora, numa gravação só: os inadimplentes do Vida
 Individual, do Vida em Grupo, as corretoras que a Mesa vai tratar. Cem casos,
@@ -1468,7 +1468,7 @@ devolve para onde cada coluna vai, quantas linhas entram, quantas repetem e as
 **três primeiras já traduzidas**. Mapeamento errado é invisível olhando o
 cabeçalho e óbvio olhando o dado.
 
-O que o tombamento resolve, além de inserir:
+O que a importação resolve, além de inserir:
 
 | Problema | Resposta |
 |---|---|
@@ -1478,13 +1478,13 @@ O que o tombamento resolve, além de inserir:
 | O caso precisa nascer trabalhável | Entra com o **status padrão** do canal |
 | De onde veio cada caso | Grava o **lote** e a **data** — é o que faz o gráfico existir |
 
-Na Produtividade RECC, dois gráficos por canal: **casos tombados por dia** e **de
+Na Produtividade RECC, dois gráficos por canal: **casos importados por dia** e **de
 qual base os casos vieram**. É o pedido literal: *"no dia 05 incluímos 100 casos
 da base de inadimplentes Vida Presente"*.
 
-`tombar` é uma ação separada de `criar`: quem cadastra um caso por vez erra um
-caso; quem tomba errado suja a base toda, e o desfazer é apagar trezentas linhas
-na mão. De fábrica, Administração e Coordenação tombam; a Operação não.
+`importar` é uma ação separada de `criar`: quem cadastra um caso por vez erra um
+caso; quem importa errado suja a base toda, e o desfazer é apagar trezentas linhas
+na mão. De fábrica, Administração e Coordenação importam; a Operação não.
 
 > **A lista de analistas veio vazia numa operação cheia de analistas.** Eu
 > filtrava por "Canal que atende igual ao nome do canal", e esse campo é de
@@ -1527,11 +1527,11 @@ Três coisas que nenhum teste de servidor veria:
    reticências. O nome da tela é escolha do administrador, e cortá-lo em 248
    pixels é cortar a escolha dele — num MENU, ainda por cima, que é o texto lido
    *antes* do clique. Agora quebra em duas linhas.
-2. **O Tombamento nasceu com o ícone do Trabalho.** O desenho caía no padrão. O
+2. **A Importação nasceu com o ícone do Trabalho.** O desenho caía no padrão. O
    teste que cobrava desenhos únicos comparava contra o número 7, escrito à mão,
    enquanto o menu já tinha 8 — passou a comparar contra o tamanho do menu.
 3. **Gráfico com uma barra só, chamada "Sem informação".** É o estado normal de
-   um gráfico sobre o tombamento antes do primeiro tombamento. Não diz nada e
+   um gráfico sobre a importação antes do primeira importação. Não diz nada e
    parece defeito. Agora vira o recado, que explica.
 
 E as duas varreduras de navegador **não conheciam a tela nova**: cada uma tinha
@@ -1774,7 +1774,7 @@ em 50 mil casos e 14 imagens geradas.
 
 | Assunto | Situação |
 |---|---|
-| **Caso tombado não conta em "Já contatados"** | Decisão do PO. Hoje o tombamento **não** escreve nas colunas de carimbo, de propósito: deixar a planilha de origem escrever ali apagaria o controle de produtividade com dado de fora. O efeito é que 300 casos trazidos da base antiga entram sem data de contato, e a Produtividade RECC não os conta como contatados — mesmo que a base antiga tenha essas datas. Abrir o carimbo como destino ESCOLHÍVEL no de-para (nunca sugerido) resolveria, e é mudança pequena. Fica aguardando a decisão |
+| **Caso importado não conta em "Já contatados"** | Decisão do PO. Hoje a importação **não** escreve nas colunas de carimbo, de propósito: deixar a planilha de origem escrever ali apagaria o controle de produtividade com dado de fora. O efeito é que 300 casos trazidos da base antiga entram sem data de contato, e a Produtividade RECC não os conta como contatados — mesmo que a base antiga tenha essas datas. Abrir o carimbo como destino ESCOLHÍVEL no de-para (nunca sugerido) resolveria, e é mudança pequena. Fica aguardando a decisão |
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |

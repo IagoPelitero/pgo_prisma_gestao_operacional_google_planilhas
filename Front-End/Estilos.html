@@ -637,27 +637,27 @@ button { font: inherit; color: inherit; }
 }
 
 /*
-  O TOMBAMENTO, em passos.
+  A IMPORTAÇÃO, em passos.
 
   Cada passo é um cartão, empilhado. Poderia ser tudo numa tela só, mas o passo
   do meio — conferir — é a razão de a tela existir: separá-lo visualmente é o
   que impede alguém de rolar direto até o botão de gravar.
 */
-.tombamento-passo { margin-bottom: 16px; }
-.tombamento-passo .grade { margin-bottom: 12px; }
-.tombamento-passo .cartoes { margin-bottom: 14px; }
-.tombamento-titulo {
+.importacao-passo { margin-bottom: 16px; }
+.importacao-passo .grade { margin-bottom: 12px; }
+.importacao-passo .cartoes { margin-bottom: 14px; }
+.importacao-titulo {
   margin: 20px 0 8px; font-size: 14px; font-weight: 700;
   color: var(--suave); letter-spacing: .01em;
 }
-.tombamento-titulo:first-child { margin-top: 0; }
+.importacao-titulo:first-child { margin-top: 0; }
 /* O de-para é de LER, não de comparar números: a coluna da esquerda fica
    estreita e monoespaçada, para o nome vindo de fora se distinguir do nosso. */
-.tombamento-depara td:first-child { width: 42%; }
-.tombamento-depara code {
+.importacao-depara td:first-child { width: 42%; }
+.importacao-depara code {
   font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
 }
-.tombamento-depara select { max-width: 100%; }
+.importacao-depara select { max-width: 100%; }
 /* Quem não atende este canal continua na lista, só mais discreto: a escolha é
    da coordenação, e o sistema apenas diz qual é a opção esperada. */
 .config-chave.de-outro-canal span { color: var(--suave); }

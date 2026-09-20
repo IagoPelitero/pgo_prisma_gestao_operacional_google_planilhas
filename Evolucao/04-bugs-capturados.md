@@ -700,7 +700,7 @@ artefato que vai ser usado, não para um gêmeo recém-nascido dele.
 
 ### 34 · O obrigatório que recusava o valor que o sistema tinha guardado
 
-**Sintoma.** Nenhum, na tela. E ia ficar assim até o tombamento existir.
+**Sintoma.** Nenhum, na tela. E ia ficar assim até a importação existir.
 
 **Causa.** O campo Status da RET ganhou `valorPadrao: 'Não trabalhado'`, como a
 operação pediu. Mas o `validarValores_` conferia obrigatoriedade **antes** de
@@ -717,7 +717,7 @@ próprio servidor tinha à mão. Na tela não aparecia: o `aplicarPadroes` do
 funcionar porque **dois lugares diferentes faziam o mesmo trabalho**, e só um
 deles estava certo.
 
-Quem ia pagar a conta é o tombamento: uma base de 300 inadimplentes não traz
+Quem ia pagar a conta é a importação: uma base de 300 inadimplentes não traz
 coluna de status, não passa por tela nenhuma, e as 300 linhas seriam recusadas
 uma a uma por um campo que tem padrão declarado.
 
@@ -764,7 +764,7 @@ sequência de Id, que não mexe em cabeçalho nenhum.
 
 **Causa.** O teste "o simulador realmente corrompe quando o formato é Geral"
 usava a última coluna da BASE_MESA como cobaia, e a chamava de `24`, escrito à
-mão. No dia em que a Mesa Diamante ganhou as colunas do tombamento, a última
+mão. No dia em que a Mesa Diamante ganhou as colunas da importação, a última
 passou a ser a 26 — e a 24 virou `_ExcluidoEm`. O teste escrevia `_Origem` ali,
 deixava a aba com dois cabeçalhos iguais, e a falha estourava vários testes
 depois, falando de uma coisa que não tinha nada a ver com ele.
@@ -811,7 +811,7 @@ Dashboard", e o Dashboard renomeou — no menu.
 
 ### 38 · A lista que eu esvaziava e voltava a encher
 
-**Sintoma.** O tombamento sugeria gravar na coluna "Data do 1º contato" —
+**Sintoma.** A importação sugeria gravar na coluna "Data do 1º contato" —
 justamente um carimbo que só o sistema escreve.
 
 **Causa.** Eu montava a lista de destinos possíveis em duas voltas:
@@ -826,8 +826,8 @@ o administrador criou em Configurações, e o critério dela era "ainda não est
 lista" — o que descrevia exatamente o carimbo que eu tinha acabado de excluir.
 A segunda volta desfazia a primeira.
 
-**Defesa.** Uma função só respondendo "quais colunas o tombamento pode
-preencher" (`colunasQueOTombamentoPreenche_`), usada tanto para sugerir quanto
+**Defesa.** Uma função só respondendo "quais colunas a importação pode
+preencher" (`colunasQueAImportacaoPreenche_`), usada tanto para sugerir quanto
 para oferecer na tela. Duas perguntas idênticas, uma resposta.
 
 **O que ele ensina.** **Uma exclusão feita num passo e desfeita no seguinte não
@@ -857,7 +857,7 @@ encontrada", os dois casos teriam custado uma investigação cada.
 
 ### 40 · A lista de analistas vazia numa operação cheia de analistas
 
-**Sintoma.** A tela de Tombamento, aberta no navegador: *"Nenhum analista
+**Sintoma.** A tela de Importação, aberta no navegador: *"Nenhum analista
 cadastrado e ativo neste canal, então os casos entram sem responsável."* Com
 três analistas cadastrados e ativos.
 
@@ -1047,11 +1047,54 @@ dado.** "Veio de `formularioDoCanal`" descreve um acontecimento passado, e
 lê-se como se fosse uma garantia atual. A única forma de a frase continuar
 verdadeira é o código ir buscar de verdade, toda vez.
 
+### 45 · O renomeio que apagou uma função sem dizer nada
+
+**Sintoma.** Ao trocar "Tombamento" por "Importação", quinze testes ficaram
+vermelhos — e a mensagem mandava para o lugar errado:
+
+```
+FALHA cola do Excel: separado por TAB, com o cabeçalho junto
+      Canal "corretoras" não existe ou está desativado.
+```
+
+"corretoras" não é canal nenhum. É o TIPO de uma importação de cadastro.
+
+**Causa.** Já existia um `conferirImportacao` no `Cadastros.gs` — a importação
+de corretoras e SUSEPs, que nasceu muito antes. O renomeio transformou o
+`conferirTombamento` do `Casos.gs` no mesmo nome.
+
+**No Apps Script todo `.gs` divide um escopo global só.** Não há módulo, não há
+import: os arquivos são avaliados em ordem alfabética, um atrás do outro, na
+mesma gaveta. `Cadastros.gs` vem antes de `Casos.gs`, então a segunda definição
+**apagou a primeira** — sem erro, sem aviso, sem log. A tela de Corretoras
+passou a chamar, sem saber, a importação de casos; e esta foi procurar um canal
+chamado "corretoras".
+
+Havia uma segunda colisão idêntica: `opcoesDaImportacao`.
+
+**Defesa.** As funções de importar CASO ganharam nome próprio
+(`conferirImportacaoDeCasos`, `opcoesDaImportacaoDeCasos`) — a de cadastro é
+mais antiga e manteve o nome. E, mais importante, duas guardas novas varrem
+todos os `.gs` procurando **nome repetido**: uma para `function`, outra para
+`const`/`var`/`let`. A segunda é ainda mais urgente que a primeira: `const`
+repetido no mesmo escopo é `SyntaxError` no V8, e o projeto inteiro para de
+carregar — a tela abre em branco.
+
+**O que ele ensina.** **Renomear é criar um nome, e nome novo pode já existir.**
+Um renomeio parece uma operação de texto e é, na verdade, uma declaração: em
+escopo global único, declarar de novo é apagar. A busca que faltou não era
+"onde está o nome antigo" — essa eu fiz e fiz bem —, era **"o nome novo já está
+ocupado?"**, que ninguém pensa em fazer.
+
+É o achado 26 outra vez (lá eram nomes de ARQUIVO únicos independentemente da
+extensão), agora um nível abaixo: os nomes de FUNÇÃO também são únicos no
+projeto inteiro, e nada no Apps Script avisa quando deixam de ser.
+
 ---
 
 ## O que esta lista ensina
 
-**São quarenta e quatro achados, e a maioria era silenciosa.** Não davam erro, não
+**São quarenta e cinco achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1115,7 +1158,7 @@ Daí as duas práticas que o projeto não abre mão:
 16. **A mesma regra escrita em dois lugares é uma regra e um enfeite.** No item
     34 a tela e o servidor preenchiam o mesmo padrão, e só o da tela estava
     funcionando. Enquanto todo caminho passava pela tela ninguém notou. Um
-    caminho novo — o tombamento, que não tem tela — encontraria a diferença em
+    caminho novo — a importação, que não tem tela — encontraria a diferença em
     produção, numa carga de 300 casos recusada linha por linha.
 17. **"Foi escrito?" e "o que foi escrito?" são perguntas diferentes.** O item
     35 passaria num teste que só conferisse a existência da coluna. O `|| ''`
@@ -1165,3 +1208,7 @@ Daí as duas práticas que o projeto não abre mão:
     e está certa em não reclamar, porque importação é assim. O preço é que o
     dado errado fica invisível até passar por uma porta que confere, e aí o
     erro aparece muito longe de onde nasceu.
+28. **Ao renomear, procure também pelo nome NOVO.** O item 45 passou pela busca
+    completa do nome antigo e mesmo assim quebrou, porque o nome de chegada já
+    pertencia a outra função. Meia busca parece busca inteira: some o que se
+    procurava, e o estrago está no que não se procurou.

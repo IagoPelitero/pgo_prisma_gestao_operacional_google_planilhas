@@ -22,7 +22,7 @@ const { rodarTestesDaProdutividade } = require('./testes-produtividade');
 const { rodarTestesDePerformance } = require('./testes-performance');
 const { rodarTestesDeCorretoras } = require('./testes-corretoras');
 const { rodarTestesDeAnalise } = require('./testes-analise');
-const { rodarTestesDeTombamento } = require('./testes-tombamento');
+const { rodarTestesDeImportacao } = require('./testes-importacao');
 const { rodarTestesDeCadastrosDeFora } = require('./testes-cadastros-de-fora');
 const { rodarTestesDeDiagnostico } = require('./testes-diagnostico');
 
@@ -37,7 +37,7 @@ rodarTestesDaProdutividade();
 rodarTestesDePerformance();
 rodarTestesDeCorretoras();
 rodarTestesDeAnalise();
-rodarTestesDeTombamento();
+rodarTestesDeImportacao();
 rodarTestesDeCadastrosDeFora();
 rodarTestesDeDiagnostico();
 

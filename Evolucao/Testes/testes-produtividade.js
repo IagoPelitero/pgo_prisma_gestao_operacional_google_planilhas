@@ -64,7 +64,7 @@ function rodarTestesDaProdutividade() {
     igual(painel.componentes.map((c) => c.tipo).join(' | '),
       'barrasComLinha | pizza | barrasDeitadas | barras | barras | barrasDeitadas'
       + ' | barrasComLinha | barrasDeitadas',
-      'os seis de sempre, mais os dois do tombamento');
+      'os seis de sempre, mais os dois da importação');
     igual(painel.total, 3);
     igual(painel.periodo.dias, 30);
   });
@@ -240,14 +240,14 @@ function rodarTestesDaProdutividade() {
   });
 
   teste('coluna vazia em todos os casos vira recado, e não uma barra só', () => {
-    // O estado normal de um gráfico sobre o tombamento ANTES do primeiro
-    // tombamento: uma barra única chamada "Sem informação", que não diz nada e
+    // O estado normal de um gráfico sobre a importação ANTES do primeiro
+    // importação: uma barra única chamada "Sem informação", que não diz nada e
     // parece defeito. O recado explica; o desenho, não.
     const porBase = painelDaRet().componentes.find((c) =>
       c.titulo === 'De qual base os casos vieram');
     igual(porBase.pontos.length, 0, 'nenhum ponto para desenhar');
     contem(porBase.aviso, 'não há o que agrupar');
-    contem(porBase.aviso, 'Origem do tombamento', 'e diz qual coluna está vazia');
+    contem(porBase.aviso, 'Origem da importação', 'e diz qual coluna está vazia');
   });
 
   teste('basta UM caso com a coluna preenchida para o gráfico voltar', () => {
@@ -258,7 +258,7 @@ function rodarTestesDaProdutividade() {
       analista: 'Marcos Vieira', status: 'Pendente',
       'data de recepção do protocolo': diasAtras(1),
       'nome do cliente': 'Veio de um lote',
-      'Origem do tombamento': 'Base de teste'
+      'Origem da importação': 'Base de teste'
     });
 
     const porBase = painelDaRet().componentes.find((c) =>

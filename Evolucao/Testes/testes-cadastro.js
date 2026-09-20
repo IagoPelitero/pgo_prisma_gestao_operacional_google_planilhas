@@ -257,7 +257,7 @@ function rodarTestesDeCadastro() {
   teste('obrigatório COM valor padrão é preenchido, não recusado', () => {
     // É o que a RET pediu: o caso nasce em "Não trabalhado" e o analista
     // ajusta depois. Recusar por falta de um valor que o sistema tem guardado
-    // barraria o tombamento, que não passa por tela nenhuma — e na tela o
+    // barraria a importação, que não passa por tela nenhuma — e na tela o
     // problema ficaria invisível, porque ela preenche o padrão sozinha.
     const novo = chamar('cadastrarCaso')(canalDiamante.id, {
       nomedosegurado: 'Caso sem status na mão'

@@ -1225,8 +1225,8 @@ function calcularComponente_(componente, casos, canal) {
 
   // Coluna VAZIA em todos os casos não vira um gráfico com uma barra só
   // chamada "Sem informação". Esse gráfico não diz nada e parece defeito — e é
-  // o estado normal de um gráfico sobre o tombamento antes do primeiro
-  // tombamento. A tela mostra o recado, que explica, no lugar do desenho, que
+  // o estado normal de um gráfico sobre a importação antes do primeiro
+  // importação. A tela mostra o recado, que explica, no lugar do desenho, que
   // não explica.
   if (ordemDasChaves.length === 1 && ordemDasChaves[0] === 'Sem informação') {
     return semDados_(componente, 'Nenhum caso do período tem "'

@@ -32,7 +32,7 @@ código:
 ### As telas
 
 `Trabalho` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
-`Tabela de Corretoras` · `Tombamento` · `Produtividade RECC` · `Configurações`
+`Tabela de Corretoras` · `Importação` · `Produtividade RECC` · `Configurações`
 
 Cada uma aparece — ou não — conforme o **nível de acesso** de quem entrou.
 
@@ -40,8 +40,11 @@ Cada uma aparece — ou não — conforme o **nível de acesso** de quem entrou.
 em Configurações › Identidade, e o menu, o cabeçalho da página e o título da
 janela passam a usar o nome novo. O que identifica a tela para o sistema é uma
 CHAVE interna que nunca muda — por isso renomear não quebra rota, nível de
-acesso nem endereço guardado. Foi assim que o `Trabalho` virou `Trabalho` e o
-`Produtividade RECC` virou `Produtividade RECC`.
+acesso nem endereço guardado. Três telas já trocaram de nome assim, sem que
+nada quebrasse: `Dashboard` virou `Trabalho`, `Painel Analítico` virou
+`Produtividade RECC` e `Tombamento` virou `Importação` — este último porque os
+casos que entram por ali **são incorporados para serem tratados**, e "tombar"
+dizia só que eles tinham mudado de lugar.
 
 ### Os quatro temas
 
@@ -484,12 +487,14 @@ caso num caderno, e o sistema perderia o caso de vista.
 
 ---
 
-## Trazer uma base inteira de fora — o Tombamento
+## Trazer uma base inteira de fora — a Importação
 
 Toda semana chega uma base para trabalhar: os inadimplentes do Vida Individual,
 os do Vida em Grupo, a lista de corretoras que a Mesa vai tratar com ação
-diferenciada. Cem casos, trezentos casos. O Tombamento traz essa base para
+diferenciada. Cem casos, trezentos casos. A Importação traz essa base para
 dentro do PGO **numa gravação só**, já dividida entre os analistas.
+
+![A Importação](Evolucao/imagens/tela-importacao.png)
 
 São três passos, e **o do meio é a razão de a tela existir**:
 
@@ -498,14 +503,14 @@ São três passos, e **o do meio é a razão de a tela existir**:
    que a conta que roda o PGO tenha acesso àquela planilha.
 2. **Conferir.** O servidor devolve para onde cada coluna vai, quantas linhas
    entram, quantas repetem — e **as três primeiras já traduzidas**.
-3. **Tombar.**
+3. **Importar.**
 
 O passo 2 não é burocracia. Um mapeamento trocado é invisível olhando o
 cabeçalho e óbvio olhando o dado: ver `11999998888` na coluna "CPF" custa cinco
 segundos; descobrir isso depois custa achar e apagar trezentas linhas na mão,
 numa base que já está sendo trabalhada.
 
-| O que o tombamento resolve | Como |
+| O que a importação resolve | Como |
 |---|---|
 | Os cabeçalhos são os da OUTRA planilha | Casa nome com nome e sugere; a pessoa corrige o que não reconheceu |
 | A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados |
@@ -515,11 +520,11 @@ numa base que já está sendo trabalhada.
 
 Na Produtividade RECC, dois gráficos respondem ao que a operação pediu — *"no
 dia 05 incluímos 100 casos da base de inadimplentes Vida Presente"*: **casos
-tombados por dia** e **de qual base os casos vieram**, em cada canal.
+importados por dia** e **de qual base os casos vieram**, em cada canal.
 
-O tombamento é a ação `tombar`, separada de `criar`: quem cadastra um caso por
-vez erra um caso; quem tomba errado suja a base toda. De fábrica, Administração
-e Coordenação tombam; a Operação não.
+A importação é a ação `importar`, separada de `criar`: quem cadastra um caso por
+vez erra um caso; quem importa errado suja a base toda. De fábrica, Administração
+e Coordenação importam; a Operação não.
 
 ---
 
@@ -626,7 +631,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 **14 de 14 etapas construídas.** O detalhe de cada uma está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
 
-| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Tombamento · A segunda base |
+| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
 531 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:

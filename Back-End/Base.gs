@@ -105,7 +105,7 @@ const RECC_COLUNAS_DE_CONTROLE = [
  * NINGUÉM a digita no formulário. Quem escreve nela é o sistema.
  *
  * É o caso das colunas de carimbo (o sistema grava a data quando o status
- * muda) e das duas do tombamento (o sistema grava de qual lote o caso veio).
+ * muda) e das duas da importação (o sistema grava de qual lote o caso veio).
  * Deixá-las como campo de tela seria pedir ao analista para digitar à mão
  * exatamente o dado que existe para não depender dele.
  *
@@ -128,12 +128,12 @@ const RECC_COLUNA_QUEM_MUDOU_O_STATUS = 'Quem mudou o status';
 const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 
 /*
- * As duas colunas do tombamento, pelo mesmo motivo das de cima: o nome é
+ * As duas colunas da importação, pelo mesmo motivo das de cima: o nome é
  * escrito quando a aba nasce (o Esquema) e lido quando o lote entra (o
- * tombamento, no Casos.gs) e quando a Produtividade RECC monta o gráfico.
+ * importação, no Casos.gs) e quando a Produtividade RECC monta o gráfico.
  */
-const RECC_COLUNA_ORIGEM_DO_TOMBAMENTO = 'Origem do tombamento';
-const RECC_COLUNA_DATA_DO_TOMBAMENTO = 'Data do tombamento';
+const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
+const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
 const RECC_VISIVEL_SIM = 'SIM';
 const RECC_VISIVEL_NAO = 'NAO';
@@ -234,11 +234,11 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
-      // ---- O TOMBAMENTO --------------------------------------------------
+      // ---- A IMPORTAÇÃO --------------------------------------------------
       // De qual lote o caso veio, quando ele entrou. Vazio quer dizer que o
       // caso foi cadastrado um a um, na tela.
-      { cabecalho: RECC_COLUNA_ORIGEM_DO_TOMBAMENTO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DO_TOMBAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -275,10 +275,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
-      // De qual lote o caso veio. A Mesa tomba casos de corretoras para ações
+      // De qual lote o caso veio. A Mesa importa casos de corretoras para ações
       // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
-      { cabecalho: RECC_COLUNA_ORIGEM_DO_TOMBAMENTO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DO_TOMBAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
