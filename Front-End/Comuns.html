@@ -17,12 +17,13 @@
       4. Formulario
       5. CasoEmModal
       6. Graficos
+      7. SeletorDePeriodo
 
     Procure pelo banner "PEÇA n de m" para pular de uma à outra.
      ======================================================================== -->
 
 <!-- ========================================================================
-     PEÇA 1 de 6 · Moldura
+     PEÇA 1 de 7 · Moldura
      Era o arquivo Front-End/Moldura.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -168,6 +169,10 @@ var Moldura = (function () {
       + '<path d="m9.2 13.2 2 2 3.8-3.8"></path>',
 
     // --- os desenhos das AÇÕES, na mesma grade e na mesma espessura -------
+
+    // filtrar: o funil, que é o desenho que todo mundo já lê como filtro
+    filtro:
+      '<path d="M3.6 5.1h16.8l-6.5 7.7v5.6l-3.8 2.1v-7.7z"></path>',
 
     // ver: o olho
     olho:
@@ -394,8 +399,34 @@ var Moldura = (function () {
       + '</p>';
   }
 
+  /**
+   * A caixa que envolve os filtros de uma tela.
+   *
+   * Três telas filtram — Trabalho, Minha Performance e Produtividade RECC — e
+   * até aqui os controles ficavam soltos sobre o fundo da página, encostados
+   * no conteúdo. Numa tela com cartão, gráfico e tabela, a pessoa não sabia
+   * onde o recorte acabava e o resultado começava.
+   *
+   * A caixa resolve isso com fundo próprio e um título: o que está DENTRO
+   * muda o que está FORA. É uma peça só, usada pelas três, para elas não
+   * divergirem no primeiro ajuste — foi assim com o formulário.
+   *
+   * `contagem` é o texto do canto direito ("7 casos · últimos 30 dias"): ele é
+   * o resultado do recorte, e por isso mora na mesma caixa que o recorte.
+   */
+  function caixaDeFiltros(conteudo, contagem) {
+    return '<section class="caixa-de-filtros">'
+      + '<header class="caixa-de-filtros-cabeca">'
+      + '<h3>' + icone('filtro') + 'Filtros</h3>'
+      + (contagem ? '<span class="contagem">' + contagem + '</span>' : '')
+      + '</header>'
+      + '<div class="filtros">' + conteudo + '</div>'
+      + '</section>';
+  }
+
   return {
     avisoDeJanela: avisoDeJanela,
+    caixaDeFiltros: caixaDeFiltros,
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
     // Os desenhos são de todas as telas, e não só do menu: a fila usa o olho,
@@ -409,7 +440,7 @@ var Moldura = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 2 de 6 · SenhaDeAdministrador
+     PEÇA 2 de 7 · SenhaDeAdministrador
      Era o arquivo Front-End/SenhaDeAdministrador.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -523,7 +554,7 @@ var SenhaDeAdministrador = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 3 de 6 · SeletorDeCanal
+     PEÇA 3 de 7 · SeletorDeCanal
      Era o arquivo Front-End/SeletorDeCanal.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -592,7 +623,7 @@ var SeletorDeCanal = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 4 de 6 · Formulario
+     PEÇA 4 de 7 · Formulario
      Era o arquivo Front-End/Formulario.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -1118,7 +1149,7 @@ var Formulario = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 5 de 6 · CasoEmModal
+     PEÇA 5 de 7 · CasoEmModal
      Era o arquivo Front-End/CasoEmModal.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -1503,7 +1534,7 @@ var CasoEmModal = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 6 de 6 · Graficos
+     PEÇA 6 de 7 · Graficos
      Era o arquivo Front-End/Graficos.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -1927,5 +1958,173 @@ var Graficos = (function () {
     ligarDica: ligarDica,
     tirarDica: tirarDica
   };
+})();
+</script>
+
+<!-- ========================================================================
+     PEÇA 7 de 7 · SeletorDePeriodo
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — SeletorDePeriodo · as três maneiras de escolher o tempo
+   ============================================================================
+   TRÊS TELAS filtram por período — Trabalho, Minha Performance e Produtividade
+   RECC — e as três oferecem as mesmas três maneiras:
+
+     POR DIAS   "últimos 30 dias". É o do dia a dia, e é a abertura.
+     POR DATA   duas datas, de/até. Responde uma pergunta específica.
+     POR MÊS    "setembro de 2026". É como a operação REPORTA — e é diferente
+                de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias
+                pegam metade de setembro e metade de outubro.
+
+   ESTÁ AQUI, E NÃO EM CADA TELA, pelo mesmo motivo do formulário: três cópias
+   divergem no primeiro ajuste, e aí o mesmo "setembro" significa uma coisa
+   numa tela e outra na vizinha — que é o jeito mais rápido de a operação parar
+   de confiar nos dois números.
+
+   QUEM CALCULA AS DATAS É O SERVIDOR. Esta peça só diz COMO a pessoa escolheu.
+   Se ela calculasse, o dia que aparece na tela sairia do relógio do navegador
+   de quem está olhando e o dia da conta sairia do relógio da planilha — e num
+   fechamento de mês essa diferença é um dia inteiro de casos.
+   ============================================================================ */
+
+var SeletorDePeriodo = (function () {
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  /** O período de abertura: o atalho, com a janela que o servidor mandar. */
+  function padrao() {
+    return { tipo: 'dias', dias: 0, de: '', ate: '', mes: '' };
+  }
+
+  /**
+   * Os controles, prontos para entrar na caixa de filtros.
+   *
+   * `resposta` é o que o servidor devolveu — ele traz o período resolvido e a
+   * lista de meses. A primeira caixa escolhe QUAL maneira está valendo, e só
+   * os controles dela ficam na tela: mostrar as três juntas deixaria três
+   * períodos preenchidos e um só valendo, e ninguém olha isso e sabe qual é.
+   */
+  function desenhar(resposta) {
+    var periodo = resposta.periodo || {};
+    var tipo = periodo.tipo || 'dias';
+
+    var comoEscolher = [['dias', 'Por dias'], ['intervalo', 'Por data'],
+      ['mes', 'Por mês']].map(function (par) {
+      return '<option value="' + par[0] + '"'
+        + (tipo === par[0] ? ' selected' : '') + '>' + par[1] + '</option>';
+    }).join('');
+
+    return '<select class="filtro" data-periodo="como"'
+      + ' aria-label="Como escolher o período">' + comoEscolher + '</select>'
+      + (tipo === 'intervalo' ? deAte(periodo)
+        : (tipo === 'mes' ? porMes(resposta) : porDias(periodo)));
+  }
+
+  function porDias(periodo) {
+    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
+      return '<option value="' + quantos + '"'
+        + (periodo.dias === quantos ? ' selected' : '') + '>'
+        + 'Últimos ' + quantos + ' dias</option>';
+    }).join('');
+
+    return '<select class="filtro" data-periodo="dias" aria-label="Período">'
+      + opcoes + '</select>';
+  }
+
+  /*
+   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
+   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
+   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que o servidor lê sem
+   * ambiguidade — 03/04 é 3 de abril aqui e 4 de março em outros lugares, e
+   * essa confusão não pode entrar num fechamento.
+   */
+  function deAte(periodo) {
+    return '<input type="date" class="filtro" data-periodo="de"'
+      + ' aria-label="Data inicial" value="' + escapar(paraOCampo(periodo.de)) + '">'
+      + '<span class="ate-do-periodo">até</span>'
+      + '<input type="date" class="filtro" data-periodo="ate"'
+      + ' aria-label="Data final" value="' + escapar(paraOCampo(periodo.ate)) + '">';
+  }
+
+  function porMes(resposta) {
+    var escolhido = (resposta.periodo || {}).mes;
+    var opcoes = (resposta.mesesDisponiveis || []).map(function (mes) {
+      return '<option value="' + escapar(mes.valor) + '"'
+        + (escolhido === mes.valor ? ' selected' : '') + '>'
+        + escapar(mes.rotulo) + '</option>';
+    }).join('');
+
+    return '<select class="filtro" data-periodo="mes" aria-label="Mês">'
+      + opcoes + '</select>';
+  }
+
+  /**
+   * Trata a mudança numa das caixas do período.
+   *
+   * Devolve o período NOVO quando a tela deve recarregar, `null` quando a
+   * caixa não é do período, e `false` quando é do período mas ainda não está
+   * pronta — o de/até com uma data só, que é o caso comum de quem acabou de
+   * preencher a primeira.
+   */
+  function mudou(caixa, resposta, ondeProcurar) {
+    var qual = caixa.getAttribute('data-periodo');
+    if (!qual) return null;
+
+    var periodo = resposta.periodo || {};
+
+    if (qual === 'como') {
+      var novo = { tipo: caixa.value, dias: periodo.dias, de: '', ate: '', mes: '' };
+      if (novo.tipo === 'mes') {
+        var meses = resposta.mesesDisponiveis || [];
+        if (meses.length) novo.mes = meses[0].valor;   // o mês corrente
+      }
+      if (novo.tipo === 'intervalo') {
+        // Abre já preenchido com o período que estava valendo, para a pessoa
+        // ajustar uma ponta em vez de digitar as duas do zero.
+        novo.de = periodo.de;
+        novo.ate = periodo.ate;
+      }
+      return novo;
+    }
+
+    if (qual === 'dias') {
+      return { tipo: 'dias', dias: Number(caixa.value), de: '', ate: '', mes: '' };
+    }
+
+    if (qual === 'mes') {
+      return { tipo: 'mes', dias: 0, de: '', ate: '', mes: caixa.value };
+    }
+
+    // de/ATÉ: só recarrega com as DUAS datas. Recarregar na primeira mostraria
+    // o resultado de um intervalo pela metade, que a pessoa leria como se
+    // fosse a resposta — e ela vai preencher a segunda meio segundo depois.
+    var raiz = document.getElementById(ondeProcurar) || document;
+    var de = raiz.querySelector('[data-periodo="de"]');
+    var ate = raiz.querySelector('[data-periodo="ate"]');
+    var intervalo = {
+      tipo: 'intervalo', dias: 0, mes: '',
+      de: paraOServidor(de ? de.value : ''),
+      ate: paraOServidor(ate ? ate.value : '')
+    };
+    return (intervalo.de && intervalo.ate) ? intervalo : false;
+  }
+
+  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
+  function paraOCampo(texto) {
+    var partes = String(texto || '').split('/');
+    if (partes.length !== 3) return '';
+    return partes[2] + '-' + partes[1] + '-' + partes[0];
+  }
+
+  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
+  function paraOServidor(texto) {
+    var partes = String(texto || '').split('-');
+    if (partes.length !== 3) return '';
+    return partes[2] + '/' + partes[1] + '/' + partes[0];
+  }
+
+  return { padrao: padrao, desenhar: desenhar, mudou: mudou };
 })();
 </script>

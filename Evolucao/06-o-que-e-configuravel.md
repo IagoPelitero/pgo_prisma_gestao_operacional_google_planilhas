@@ -53,7 +53,7 @@ Funciona, e é editável — mas exige abrir a aba e digitar na célula, o que n
 
 | Assunto | Onde mora | Por que ainda não tem tela |
 |---|---|---|
-| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; é o próximo a ganhar campo |
+| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; é o próximo a ganhar campo. Agora é só a **abertura** das telas: quem está olhando troca o período na própria tela, por dias, por data ou por mês |
 | **Tema padrão da operação** | `CONFIG` → `OPERACAO.TEMA_PADRAO` | Idem |
 | **Visibilidade de campo por nível** | `CATALOGO` → `Configuracao.campos` | O servidor já respeita (oculto, leitura, edição). Falta a tela — hoje é um JSON |
 

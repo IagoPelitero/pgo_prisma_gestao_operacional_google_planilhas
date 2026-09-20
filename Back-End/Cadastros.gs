@@ -109,7 +109,14 @@ function tabelaDeCorretoras(procurar, segmento) {
     // encontrada" toda vez, e ninguém liga uma coisa à outra.
     foraDoCadastro: susepsForaDoCadastro_(volumes, todas, bloqueadas),
     podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR),
-    podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
+    podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR),
+    // De onde vieram estes cadastros. A tela precisa dizer: editar achando que
+    // mexeu numa planilha e ter mexido em outra é o tipo de confusão que só
+    // aparece quando já tem gente trabalhando em cima do dado errado.
+    origem: {
+      corretoras: deOndeVemAAba_('CORRETORAS'),
+      suseps: deOndeVemAAba_('SUSEP_BLOQUEADAS')
+    }
   };
 }
 
@@ -362,6 +369,23 @@ function desbloquearSusep(idDoBloqueio) {
 // ============================================================================
 // OS PRODUTOS
 // ============================================================================
+
+/**
+ * De onde vem cada cadastro desta tela, numa chamada só.
+ *
+ * A tela tem três abas — corretoras, produtos, SUSEPs bloqueadas — e cada uma
+ * carrega por conta própria. Perguntar a origem em cada carga seriam três idas
+ * ao servidor para uma resposta que não muda enquanto a tela está aberta.
+ */
+function origemDosCadastros() {
+  exigirTela_('tabelaCorretoras');
+
+  var resposta = {};
+  ['CORRETORAS', 'PRODUTOS', 'SUSEP_BLOQUEADAS'].forEach(function (aba) {
+    resposta[aba] = deOndeVemAAba_(aba);
+  });
+  return resposta;
+}
 
 function listarProdutos() {
   exigirTela_('tabelaCorretoras');

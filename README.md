@@ -287,6 +287,23 @@ campos que já são lista: nada escrito em código.
 
 ![O Trabalho](Evolucao/imagens/tela-trabalho.png)
 
+Tudo o que filtra mora numa **caixa branca, com o título "Filtros"** e, do lado
+direito, **quantos casos estão sendo mostrados e de qual período**. É a mesma
+caixa nas três telas que filtram — Trabalho, Minha Performance e Produtividade
+RECC —, desenhada por uma peça só (`Moldura.caixaDeFiltros`). A contagem ao
+lado do título é o que evita a leitura errada mais comum: um filtro esquecido
+ligado, a tela com três casos, e ninguém entendendo por quê.
+
+O primeiro filtro é o **período**, nas mesmas três maneiras da Produtividade
+RECC (ver adiante): por dias, por data e por mês. Antes o Trabalho olhava só a
+janela fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem
+precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
+
+Quando a fila sai vazia, o recado diz **o período que ela olhou**, com as
+palavras do próprio filtro: "nada foi registrado no período escolhido —
+setembro de 2026". Dizer "nos 30 dias mais recentes" com setembro escolhido
+mandaria a pessoa procurar defeito onde não há.
+
 A fila vem em **grupos**: várias colunas debaixo de um título só, com a
 primeira em destaque. Um caso da RET tem trinta e cinco colunas — seis lado a
 lado perdem o resto, e trinta e cinco não cabem.
@@ -351,6 +368,12 @@ do "1º contato realizado" e hoje está em "Reteve" continua tendo sido contatad
 — contar pelo status diria zero, e a operação concluiria que ninguém ligou para
 ninguém. A coluna de carimbo não esquece.
 
+E o carimbo vale para **toda** porta: o diálogo de situação, o formulário
+inteiro aberto pelo lápis e o cadastro de um caso novo. Por um tempo só o
+diálogo carimbava, e o mesmo caso na mesma situação ficava com data ou sem data
+conforme onde a pessoa tivesse clicado — a conta ficava pela metade sem errar
+em nada visível. É o achado 43.
+
 **Esta tela é da EQUIPE, e não tem botão para trocar:** Minha Performance é
 sobre uma pessoa, a Produtividade RECC é sobre o grupo, e cada pergunta tem a
 sua tela. Quem quiser o número de uma pessoa dentro da equipe usa o filtro de
@@ -375,6 +398,11 @@ E **quais** canais aparecem continua sendo a lista de canais do nível: quem abr
 só a RET e tem "o canal inteiro" vê a RET inteira, não a Mesa Diamante.
 
 ### O período, de três maneiras
+
+Vale para as **três telas que filtram** — Trabalho, Minha Performance e
+Produtividade RECC. É a mesma peça (`SeletorDePeriodo`) nas três: duas cópias
+divergiriam no primeiro ajuste, e a operação veria três telas diferentes
+fazendo a mesma pergunta.
 
 | Maneira | Para quê |
 |---|---|
@@ -586,7 +614,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | Um caso = **uma linha**, sempre | Campo novo vira coluna nova, não linha em tabela de valores |
 | Permissão vem do **nível de acesso**, nunca do cargo | O nome do cargo é livre e muda |
 | Excluir **some da tela, nunca da planilha** — menos o CASO | Exclusão é lógica (`_Visivel`) e reversível na mão. O caso é a exceção, a pedido da operação: ele sai da planilha de vez, nos dois canais, e o conteúdo fica na auditoria |
-| Toda **mudança de status carimba** data e hora na linha do caso | É o controle de produtividade. Na auditoria seriam quase um milhão de linhas numa base de 200 mil casos |
+| Toda **mudança de status carimba** data e hora na linha do caso — por qualquer porta: diálogo, formulário ou cadastro | É o controle de produtividade. Na auditoria seriam quase um milhão de linhas numa base de 200 mil casos |
 | **Erro alto** em vez de padrão silencioso | Dado errado calado é pior que operação parada |
 | A estrutura da planilha **nunca muda sozinha** | Só o instalador cria estrutura, e só sobre planilha vazia |
 | Esconder botão **não é segurança** | Toda função sensível revalida no servidor |

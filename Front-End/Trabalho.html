@@ -13,6 +13,10 @@ var TelaTrabalho = (function () {
 
   var canalEscolhida = '';
   var filtrosEscolhidos = {};
+  // COMO o período foi escolhido. Quem calcula as datas é o servidor — se a
+  // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
+  // conta sairia do relógio da planilha.
+  var periodo = SeletorDePeriodo.padrao();
   var resumo = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -75,8 +79,6 @@ var TelaTrabalho = (function () {
   }
 
   function desenharFiltros() {
-    if (!resumo.filtrosDisponiveis.length) return '';
-
     var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
       // A primeira opção é o nome do filtro puro — "Analista", "Status".
       // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
@@ -98,14 +100,22 @@ var TelaTrabalho = (function () {
       return filtrosEscolhidos[chave];
     });
 
-    return '<div class="filtros">' + caixas.join('')
-      + (algumAtivo
-        ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
-          + 'Limpar filtros</button>'
-        : '')
-      + '<span class="contagem">' + resumo.total + ' de ' + resumo.totalNoPeriodo
-      + ' casos · ' + escapar(resumo.periodo.rotulo) + '</span>'
-      + '</div>';
+    // O PERÍODO vem primeiro, e é o mesmo seletor das outras duas telas — a
+    // peça é compartilhada de propósito: três cópias divergiriam no primeiro
+    // ajuste, e aí "setembro" significaria uma coisa aqui e outra na
+    // Produtividade.
+    //
+    // A caixa existe mesmo sem filtro de lista nenhum: o período sozinho já é
+    // um recorte, e ele precisa estar em algum lugar.
+    return Moldura.caixaDeFiltros(
+      SeletorDePeriodo.desenhar(resumo)
+        + caixas.join('')
+        + (algumAtivo
+          ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
+            + 'Limpar filtros</button>'
+          : ''),
+      resumo.total + ' de ' + resumo.totalNoPeriodo
+        + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
 
   function desenharFila() {
@@ -115,7 +125,11 @@ var TelaTrabalho = (function () {
         + '<p>' + (resumo.totalNoPeriodo
           ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
             + 'pelos filtros escolhidos.'
-          : 'Nada foi registrado nos ' + resumo.periodo.dias + ' dias mais recentes. '
+          // O recado diz o período que a tela OLHOU, com as palavras do
+          // próprio filtro. Antes falava sempre "nos N dias mais recentes":
+          // com "setembro de 2026" escolhido, era mentira.
+          : 'Nada foi registrado no período escolhido — '
+            + escapar(resumo.periodo.rotulo) + '. '
             + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
     }
 
@@ -207,7 +221,7 @@ var TelaTrabalho = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos)
+    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -222,6 +236,13 @@ var TelaTrabalho = (function () {
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
+        var novoPeriodo = SeletorDePeriodo.mudou(this, resumo, 'painel');
+        if (novoPeriodo !== null) {
+          // `false` quer dizer "é do período, mas ainda incompleto" — o de/até
+          // com uma data só. Não recarrega, e também não vira filtro comum.
+          if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
+          return;
+        }
         filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
         carregar();
       });

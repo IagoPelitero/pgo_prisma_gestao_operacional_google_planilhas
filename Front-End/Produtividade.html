@@ -35,7 +35,7 @@ var TelaProdutividade = (function () {
    * o dia que o servidor contou sairia do relógio da planilha. Num fechamento
    * de mês essa diferença é um dia inteiro de casos.
    */
-  var periodo = { tipo: 'dias', dias: 0, de: '', ate: '', mes: '' };
+  var periodo = SeletorDePeriodo.padrao();
   var painel = null;
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
@@ -141,85 +141,13 @@ var TelaProdutividade = (function () {
         + opcoes.join('') + '</select>';
     });
 
-    return '<div class="filtros">'
-      + desenharPeriodo()
-      + caixas.join('')
-      + '<span class="contagem">' + painel.total + ' casos · '
-      + escapar(painel.periodo.rotulo) + '</span></div>';
-  }
-
-  /**
-   * As três maneiras de escolher o período.
-   *
-   *   ATALHO    — "últimos 30 dias", que é o do dia a dia.
-   *   DE / ATÉ  — duas datas, para uma pergunta específica.
-   *   MÊS       — "setembro de 2026", que é como a operação REPORTA.
-   *
-   * Os três não aparecem ao mesmo tempo: a primeira caixa escolhe QUAL deles
-   * está valendo, e só os controles dele ficam na tela. Mostrar os três juntos
-   * deixaria três períodos preenchidos na tela e um só valendo — e ninguém
-   * consegue olhar isso e dizer qual é.
-   */
-  function desenharPeriodo() {
-    var tipo = painel.periodo.tipo;
-
-    // "Por dias", e não "Últimos dias": a caixa da direita já diz "Últimos 30
-    // dias", e as duas juntas liam "Últimos dias | Últimos 30 dias". A primeira
-    // caixa responde COMO se escolhe; a segunda, QUAL.
-    var comoEscolher = [['dias', 'Por dias'], ['intervalo', 'Por data'],
-      ['mes', 'Por mês']].map(function (par) {
-      return '<option value="' + par[0] + '"'
-        + (tipo === par[0] ? ' selected' : '') + '>' + par[1] + '</option>';
-    }).join('');
-
-    return '<select class="filtro" id="como-escolher-periodo"'
-      + ' aria-label="Como escolher o período">' + comoEscolher + '</select>'
-      + (tipo === 'intervalo' ? desenharDeAte()
-        : (tipo === 'mes' ? desenharMes() : desenharAtalhos()));
-  }
-
-  function desenharAtalhos() {
-    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
-      return '<option value="' + quantos + '"'
-        + (painel.periodo.dias === quantos ? ' selected' : '') + '>'
-        + 'Últimos ' + quantos + ' dias</option>';
-    }).join('');
-
-    return '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
-      + opcoes + '</select>';
-  }
-
-  /*
-   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
-   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
-   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que é o que o
-   * servidor lê sem ambiguidade — 03/04 é 3 de abril aqui e 4 de março em
-   * outros lugares, e essa confusão não pode entrar num fechamento.
-   */
-  function desenharDeAte() {
-    return '<input type="date" class="filtro" id="periodo-de"'
-      + ' aria-label="Data inicial" value="' + escapar(comoOCampoDeDataLe(painel.periodo.de)) + '">'
-      + '<span class="ate-do-periodo">até</span>'
-      + '<input type="date" class="filtro" id="periodo-ate"'
-      + ' aria-label="Data final" value="' + escapar(comoOCampoDeDataLe(painel.periodo.ate)) + '">';
-  }
-
-  function desenharMes() {
-    var opcoes = (painel.mesesDisponiveis || []).map(function (mes) {
-      return '<option value="' + escapar(mes.valor) + '"'
-        + (painel.periodo.mes === mes.valor ? ' selected' : '') + '>'
-        + escapar(mes.rotulo) + '</option>';
-    }).join('');
-
-    return '<select class="filtro" id="mes-do-painel" aria-label="Mês">'
-      + opcoes + '</select>';
-  }
-
-  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
-  function comoOCampoDeDataLe(texto) {
-    var partes = String(texto || '').split('/');
-    if (partes.length !== 3) return '';
-    return partes[2] + '-' + partes[1] + '-' + partes[0];
+    // A caixa de filtros e o seletor de período são PEÇAS COMPARTILHADAS: o
+    // Trabalho e a Minha Performance usam as mesmas. Três cópias divergiriam
+    // no primeiro ajuste, e aí "setembro" significaria uma coisa numa tela e
+    // outra na vizinha.
+    return Moldura.caixaDeFiltros(
+      SeletorDePeriodo.desenhar(painel) + caixas.join(''),
+      painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
   }
 
   /* ------------------------------------------------------------- gráficos */
@@ -259,7 +187,13 @@ var TelaProdutividade = (function () {
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
-        if (mexeuNoPeriodo(this)) return;
+        var novoPeriodo = SeletorDePeriodo.mudou(this, painel, 'analitico');
+        if (novoPeriodo !== null) {
+          // `false` quer dizer "é do período, mas ainda incompleto" — o de/até
+          // com uma data só. Não recarrega, e também não cai no filtro comum.
+          if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
+          return;
+        }
         filtros[this.getAttribute('data-filtro')] = this.value;
         carregar();
       });
@@ -283,66 +217,6 @@ var TelaProdutividade = (function () {
     });
 
     Graficos.ligarDica(elemento('analitico'));
-  }
-
-  /**
-   * Trata as caixas do período, e devolve true quando era uma delas.
-   *
-   * O DE/ATÉ só recarrega com as DUAS datas preenchidas. Recarregar na
-   * primeira mostraria o resultado de um intervalo pela metade, que a pessoa
-   * leria como se fosse a resposta — e ela vai preencher a segunda meio
-   * segundo depois de qualquer jeito.
-   */
-  function mexeuNoPeriodo(caixa) {
-    if (caixa.id === 'como-escolher-periodo') {
-      // Trocar de maneira zera as outras: guardar um mês escolhido enquanto se
-      // usa o de/até deixaria dois períodos vivos e um só valendo.
-      periodo = { tipo: caixa.value, dias: painel.periodo.dias, de: '', ate: '', mes: '' };
-      if (periodo.tipo === 'mes' && painel.mesesDisponiveis.length) {
-        periodo.mes = painel.mesesDisponiveis[0].valor;   // o mês corrente
-      }
-      if (periodo.tipo === 'intervalo') {
-        // Abre já preenchido com o período que estava valendo, para a pessoa
-        // ajustar uma ponta em vez de digitar as duas do zero.
-        periodo.de = painel.periodo.de;
-        periodo.ate = painel.periodo.ate;
-      }
-      carregar();
-      return true;
-    }
-
-    if (caixa.id === 'periodo-do-painel') {
-      periodo = { tipo: 'dias', dias: Number(caixa.value), de: '', ate: '', mes: '' };
-      carregar();
-      return true;
-    }
-
-    if (caixa.id === 'mes-do-painel') {
-      periodo = { tipo: 'mes', dias: 0, de: '', ate: '', mes: caixa.value };
-      carregar();
-      return true;
-    }
-
-    if (caixa.id === 'periodo-de' || caixa.id === 'periodo-ate') {
-      var de = elemento('periodo-de');
-      var ate = elemento('periodo-ate');
-      periodo = {
-        tipo: 'intervalo', dias: 0, mes: '',
-        de: comoOServidorLe(de ? de.value : ''),
-        ate: comoOServidorLe(ate ? ate.value : '')
-      };
-      if (periodo.de && periodo.ate) carregar();
-      return true;
-    }
-
-    return false;
-  }
-
-  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
-  function comoOServidorLe(texto) {
-    var partes = String(texto || '').split('-');
-    if (partes.length !== 3) return '';
-    return partes[2] + '/' + partes[1] + '/' + partes[0];
   }
 
   function ligarCliques(seletor, oQueFazer) {

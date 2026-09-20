@@ -588,6 +588,38 @@ button { font: inherit; color: inherit; }
   box-shadow: inset 0 0 0 1px var(--tom);
 }
 
+/*
+  A CAIXA DE FILTROS.
+
+  Os controles ficavam soltos sobre o fundo da página, encostados no conteúdo.
+  Numa tela com cartão, gráfico e tabela, não dava para saber onde o recorte
+  acabava e o resultado começava. A caixa separa as duas coisas: o que está
+  dentro muda o que está fora.
+
+  A contagem mora no cabeçalho da caixa, e não perdida no meio dos controles:
+  ela é o RESULTADO do recorte, e o lugar dela é ao lado do título.
+*/
+.caixa-de-filtros {
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: var(--raio); padding: 14px 16px 4px;
+  margin-bottom: 16px; box-shadow: var(--sombra);
+}
+.caixa-de-filtros-cabeca {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.caixa-de-filtros-cabeca h3 {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0; font-size: 13px; font-weight: 700; color: var(--suave);
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.caixa-de-filtros-cabeca h3 svg { width: 15px; height: 15px; }
+.caixa-de-filtros-cabeca .contagem {
+  margin-left: auto; font-size: 13px; color: var(--suave);
+  font-variant-numeric: tabular-nums;
+}
+/* Dentro da caixa a margem de baixo vira o respiro do próprio forro. */
+.caixa-de-filtros .filtros { margin-bottom: 10px; }
+
 .filtros {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   margin-bottom: 14px;
@@ -2072,12 +2104,13 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
       4. Formulario
       5. CasoEmModal
       6. Graficos
+      7. SeletorDePeriodo
 
     Procure pelo banner "PEÇA n de m" para pular de uma à outra.
      ======================================================================== -->
 
 <!-- ========================================================================
-     PEÇA 1 de 6 · Moldura
+     PEÇA 1 de 7 · Moldura
      Era o arquivo Front-End/Moldura.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -2223,6 +2256,10 @@ var Moldura = (function () {
       + '<path d="m9.2 13.2 2 2 3.8-3.8"></path>',
 
     // --- os desenhos das AÇÕES, na mesma grade e na mesma espessura -------
+
+    // filtrar: o funil, que é o desenho que todo mundo já lê como filtro
+    filtro:
+      '<path d="M3.6 5.1h16.8l-6.5 7.7v5.6l-3.8 2.1v-7.7z"></path>',
 
     // ver: o olho
     olho:
@@ -2449,8 +2486,34 @@ var Moldura = (function () {
       + '</p>';
   }
 
+  /**
+   * A caixa que envolve os filtros de uma tela.
+   *
+   * Três telas filtram — Trabalho, Minha Performance e Produtividade RECC — e
+   * até aqui os controles ficavam soltos sobre o fundo da página, encostados
+   * no conteúdo. Numa tela com cartão, gráfico e tabela, a pessoa não sabia
+   * onde o recorte acabava e o resultado começava.
+   *
+   * A caixa resolve isso com fundo próprio e um título: o que está DENTRO
+   * muda o que está FORA. É uma peça só, usada pelas três, para elas não
+   * divergirem no primeiro ajuste — foi assim com o formulário.
+   *
+   * `contagem` é o texto do canto direito ("7 casos · últimos 30 dias"): ele é
+   * o resultado do recorte, e por isso mora na mesma caixa que o recorte.
+   */
+  function caixaDeFiltros(conteudo, contagem) {
+    return '<section class="caixa-de-filtros">'
+      + '<header class="caixa-de-filtros-cabeca">'
+      + '<h3>' + icone('filtro') + 'Filtros</h3>'
+      + (contagem ? '<span class="contagem">' + contagem + '</span>' : '')
+      + '</header>'
+      + '<div class="filtros">' + conteudo + '</div>'
+      + '</section>';
+  }
+
   return {
     avisoDeJanela: avisoDeJanela,
+    caixaDeFiltros: caixaDeFiltros,
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
     // Os desenhos são de todas as telas, e não só do menu: a fila usa o olho,
@@ -2464,7 +2527,7 @@ var Moldura = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 2 de 6 · SenhaDeAdministrador
+     PEÇA 2 de 7 · SenhaDeAdministrador
      Era o arquivo Front-End/SenhaDeAdministrador.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -2578,7 +2641,7 @@ var SenhaDeAdministrador = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 3 de 6 · SeletorDeCanal
+     PEÇA 3 de 7 · SeletorDeCanal
      Era o arquivo Front-End/SeletorDeCanal.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -2647,7 +2710,7 @@ var SeletorDeCanal = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 4 de 6 · Formulario
+     PEÇA 4 de 7 · Formulario
      Era o arquivo Front-End/Formulario.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -3173,7 +3236,7 @@ var Formulario = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 5 de 6 · CasoEmModal
+     PEÇA 5 de 7 · CasoEmModal
      Era o arquivo Front-End/CasoEmModal.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -3558,7 +3621,7 @@ var CasoEmModal = (function () {
 </script>
 
 <!-- ========================================================================
-     PEÇA 6 de 6 · Graficos
+     PEÇA 6 de 7 · Graficos
      Era o arquivo Front-End/Graficos.html antes de as peças
      compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
@@ -3985,6 +4048,174 @@ var Graficos = (function () {
 })();
 </script>
 
+<!-- ========================================================================
+     PEÇA 7 de 7 · SeletorDePeriodo
+     ======================================================================== -->
+
+<script>
+/* ============================================================================
+   PGO — SeletorDePeriodo · as três maneiras de escolher o tempo
+   ============================================================================
+   TRÊS TELAS filtram por período — Trabalho, Minha Performance e Produtividade
+   RECC — e as três oferecem as mesmas três maneiras:
+
+     POR DIAS   "últimos 30 dias". É o do dia a dia, e é a abertura.
+     POR DATA   duas datas, de/até. Responde uma pergunta específica.
+     POR MÊS    "setembro de 2026". É como a operação REPORTA — e é diferente
+                de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias
+                pegam metade de setembro e metade de outubro.
+
+   ESTÁ AQUI, E NÃO EM CADA TELA, pelo mesmo motivo do formulário: três cópias
+   divergem no primeiro ajuste, e aí o mesmo "setembro" significa uma coisa
+   numa tela e outra na vizinha — que é o jeito mais rápido de a operação parar
+   de confiar nos dois números.
+
+   QUEM CALCULA AS DATAS É O SERVIDOR. Esta peça só diz COMO a pessoa escolheu.
+   Se ela calculasse, o dia que aparece na tela sairia do relógio do navegador
+   de quem está olhando e o dia da conta sairia do relógio da planilha — e num
+   fechamento de mês essa diferença é um dia inteiro de casos.
+   ============================================================================ */
+
+var SeletorDePeriodo = (function () {
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  /** O período de abertura: o atalho, com a janela que o servidor mandar. */
+  function padrao() {
+    return { tipo: 'dias', dias: 0, de: '', ate: '', mes: '' };
+  }
+
+  /**
+   * Os controles, prontos para entrar na caixa de filtros.
+   *
+   * `resposta` é o que o servidor devolveu — ele traz o período resolvido e a
+   * lista de meses. A primeira caixa escolhe QUAL maneira está valendo, e só
+   * os controles dela ficam na tela: mostrar as três juntas deixaria três
+   * períodos preenchidos e um só valendo, e ninguém olha isso e sabe qual é.
+   */
+  function desenhar(resposta) {
+    var periodo = resposta.periodo || {};
+    var tipo = periodo.tipo || 'dias';
+
+    var comoEscolher = [['dias', 'Por dias'], ['intervalo', 'Por data'],
+      ['mes', 'Por mês']].map(function (par) {
+      return '<option value="' + par[0] + '"'
+        + (tipo === par[0] ? ' selected' : '') + '>' + par[1] + '</option>';
+    }).join('');
+
+    return '<select class="filtro" data-periodo="como"'
+      + ' aria-label="Como escolher o período">' + comoEscolher + '</select>'
+      + (tipo === 'intervalo' ? deAte(periodo)
+        : (tipo === 'mes' ? porMes(resposta) : porDias(periodo)));
+  }
+
+  function porDias(periodo) {
+    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
+      return '<option value="' + quantos + '"'
+        + (periodo.dias === quantos ? ' selected' : '') + '>'
+        + 'Últimos ' + quantos + ' dias</option>';
+    }).join('');
+
+    return '<select class="filtro" data-periodo="dias" aria-label="Período">'
+      + opcoes + '</select>';
+  }
+
+  /*
+   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
+   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
+   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que o servidor lê sem
+   * ambiguidade — 03/04 é 3 de abril aqui e 4 de março em outros lugares, e
+   * essa confusão não pode entrar num fechamento.
+   */
+  function deAte(periodo) {
+    return '<input type="date" class="filtro" data-periodo="de"'
+      + ' aria-label="Data inicial" value="' + escapar(paraOCampo(periodo.de)) + '">'
+      + '<span class="ate-do-periodo">até</span>'
+      + '<input type="date" class="filtro" data-periodo="ate"'
+      + ' aria-label="Data final" value="' + escapar(paraOCampo(periodo.ate)) + '">';
+  }
+
+  function porMes(resposta) {
+    var escolhido = (resposta.periodo || {}).mes;
+    var opcoes = (resposta.mesesDisponiveis || []).map(function (mes) {
+      return '<option value="' + escapar(mes.valor) + '"'
+        + (escolhido === mes.valor ? ' selected' : '') + '>'
+        + escapar(mes.rotulo) + '</option>';
+    }).join('');
+
+    return '<select class="filtro" data-periodo="mes" aria-label="Mês">'
+      + opcoes + '</select>';
+  }
+
+  /**
+   * Trata a mudança numa das caixas do período.
+   *
+   * Devolve o período NOVO quando a tela deve recarregar, `null` quando a
+   * caixa não é do período, e `false` quando é do período mas ainda não está
+   * pronta — o de/até com uma data só, que é o caso comum de quem acabou de
+   * preencher a primeira.
+   */
+  function mudou(caixa, resposta, ondeProcurar) {
+    var qual = caixa.getAttribute('data-periodo');
+    if (!qual) return null;
+
+    var periodo = resposta.periodo || {};
+
+    if (qual === 'como') {
+      var novo = { tipo: caixa.value, dias: periodo.dias, de: '', ate: '', mes: '' };
+      if (novo.tipo === 'mes') {
+        var meses = resposta.mesesDisponiveis || [];
+        if (meses.length) novo.mes = meses[0].valor;   // o mês corrente
+      }
+      if (novo.tipo === 'intervalo') {
+        // Abre já preenchido com o período que estava valendo, para a pessoa
+        // ajustar uma ponta em vez de digitar as duas do zero.
+        novo.de = periodo.de;
+        novo.ate = periodo.ate;
+      }
+      return novo;
+    }
+
+    if (qual === 'dias') {
+      return { tipo: 'dias', dias: Number(caixa.value), de: '', ate: '', mes: '' };
+    }
+
+    if (qual === 'mes') {
+      return { tipo: 'mes', dias: 0, de: '', ate: '', mes: caixa.value };
+    }
+
+    // de/ATÉ: só recarrega com as DUAS datas. Recarregar na primeira mostraria
+    // o resultado de um intervalo pela metade, que a pessoa leria como se
+    // fosse a resposta — e ela vai preencher a segunda meio segundo depois.
+    var raiz = document.getElementById(ondeProcurar) || document;
+    var de = raiz.querySelector('[data-periodo="de"]');
+    var ate = raiz.querySelector('[data-periodo="ate"]');
+    var intervalo = {
+      tipo: 'intervalo', dias: 0, mes: '',
+      de: paraOServidor(de ? de.value : ''),
+      ate: paraOServidor(ate ? ate.value : '')
+    };
+    return (intervalo.de && intervalo.ate) ? intervalo : false;
+  }
+
+  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
+  function paraOCampo(texto) {
+    var partes = String(texto || '').split('/');
+    if (partes.length !== 3) return '';
+    return partes[2] + '-' + partes[1] + '-' + partes[0];
+  }
+
+  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
+  function paraOServidor(texto) {
+    var partes = String(texto || '').split('-');
+    if (partes.length !== 3) return '';
+    return partes[2] + '/' + partes[1] + '/' + partes[0];
+  }
+
+  return { padrao: padrao, desenhar: desenhar, mudou: mudou };
+})();
+</script>
+
 
 
 <!-- ==== Trabalho.html ==== -->
@@ -4003,6 +4234,10 @@ var TelaTrabalho = (function () {
 
   var canalEscolhida = '';
   var filtrosEscolhidos = {};
+  // COMO o período foi escolhido. Quem calcula as datas é o servidor — se a
+  // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
+  // conta sairia do relógio da planilha.
+  var periodo = SeletorDePeriodo.padrao();
   var resumo = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -4065,8 +4300,6 @@ var TelaTrabalho = (function () {
   }
 
   function desenharFiltros() {
-    if (!resumo.filtrosDisponiveis.length) return '';
-
     var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
       // A primeira opção é o nome do filtro puro — "Analista", "Status".
       // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
@@ -4088,14 +4321,22 @@ var TelaTrabalho = (function () {
       return filtrosEscolhidos[chave];
     });
 
-    return '<div class="filtros">' + caixas.join('')
-      + (algumAtivo
-        ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
-          + 'Limpar filtros</button>'
-        : '')
-      + '<span class="contagem">' + resumo.total + ' de ' + resumo.totalNoPeriodo
-      + ' casos · ' + escapar(resumo.periodo.rotulo) + '</span>'
-      + '</div>';
+    // O PERÍODO vem primeiro, e é o mesmo seletor das outras duas telas — a
+    // peça é compartilhada de propósito: três cópias divergiriam no primeiro
+    // ajuste, e aí "setembro" significaria uma coisa aqui e outra na
+    // Produtividade.
+    //
+    // A caixa existe mesmo sem filtro de lista nenhum: o período sozinho já é
+    // um recorte, e ele precisa estar em algum lugar.
+    return Moldura.caixaDeFiltros(
+      SeletorDePeriodo.desenhar(resumo)
+        + caixas.join('')
+        + (algumAtivo
+          ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
+            + 'Limpar filtros</button>'
+          : ''),
+      resumo.total + ' de ' + resumo.totalNoPeriodo
+        + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
 
   function desenharFila() {
@@ -4105,7 +4346,11 @@ var TelaTrabalho = (function () {
         + '<p>' + (resumo.totalNoPeriodo
           ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
             + 'pelos filtros escolhidos.'
-          : 'Nada foi registrado nos ' + resumo.periodo.dias + ' dias mais recentes. '
+          // O recado diz o período que a tela OLHOU, com as palavras do
+          // próprio filtro. Antes falava sempre "nos N dias mais recentes":
+          // com "setembro de 2026" escolhido, era mentira.
+          : 'Nada foi registrado no período escolhido — '
+            + escapar(resumo.periodo.rotulo) + '. '
             + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
     }
 
@@ -4197,7 +4442,7 @@ var TelaTrabalho = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos)
+    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -4212,6 +4457,13 @@ var TelaTrabalho = (function () {
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
+        var novoPeriodo = SeletorDePeriodo.mudou(this, resumo, 'painel');
+        if (novoPeriodo !== null) {
+          // `false` quer dizer "é do período, mas ainda incompleto" — o de/até
+          // com uma data só. Não recarrega, e também não vira filtro comum.
+          if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
+          return;
+        }
         filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
         carregar();
       });
@@ -4438,8 +4690,9 @@ var TelaCadastrarCaso = (function () {
 var TelaMinhaPerformance = (function () {
 
   var canalEscolhida = '';
-  var dias = 0;
   var dados = null;
+  // COMO o período foi escolhido. O mesmo seletor das outras duas telas.
+  var periodo = SeletorDePeriodo.padrao();
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -4459,7 +4712,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', canalEscolhida, dias)
+    Servidor.chamar('minhaPerformance', canalEscolhida, periodo)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -4494,19 +4747,14 @@ var TelaMinhaPerformance = (function () {
   }
 
   function desenharCabeca() {
-    var periodos = [7, 15, 30, 60, 90].map(function (quantos) {
-      return '<option value="' + quantos + '"'
-        + (dados.periodo.dias === quantos ? ' selected' : '') + '>'
-        + 'Últimos ' + quantos + ' dias</option>';
-    }).join('');
-
-    return '<div class="filtros">'
-      + '<select class="filtro" id="periodo-da-performance" aria-label="Período">'
-      + periodos + '</select>'
-      + '<span class="contagem">' + escapar(dados.pessoa.nome)
-      + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
-      + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : '')
-      + '</span></div>';
+    // A caixa e o seletor são as PEÇAS COMPARTILHADAS, as mesmas do Trabalho e
+    // da Produtividade. A contagem aqui é quem está sendo medido — numa tela
+    // sobre uma pessoa, é o dado mais importante do recorte.
+    return Moldura.caixaDeFiltros(
+      SeletorDePeriodo.desenhar(dados),
+      escapar(dados.pessoa.nome)
+        + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
+        + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : ''));
   }
 
   /* --------------------------------------------------------- indicadores */
@@ -4644,11 +4892,12 @@ var TelaMinhaPerformance = (function () {
   /* ---------------------------------------------------------------- ligar */
 
   function ligar() {
-    var periodo = elemento('periodo-da-performance');
-    if (periodo) {
-      periodo.addEventListener('change', function () {
-        dias = Number(this.value);
-        carregar();
+    var caixas = document.querySelectorAll('#performance .filtro');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        var novo = SeletorDePeriodo.mudou(this, dados, 'performance');
+        // `false` é o de/até com uma data só: ainda não recarrega.
+        if (novo) { periodo = novo; carregar(); }
       });
     }
 
@@ -4970,6 +5219,14 @@ var TelaTabelaCorretoras = (function () {
   var dados = null;
   var editando = null;      // o item aberto no formulário lateral
   var tipoDaImportacao = '';  // qual lista está sendo importada
+  /*
+   * De onde vem cada cadastro: desta planilha ou da de cadastros.
+   *
+   * Lido UMA VEZ, quando a tela abre — a resposta não muda enquanto ela está
+   * aberta, e perguntar em cada aba seriam três idas ao servidor para a mesma
+   * coisa.
+   */
+  var origem = null;
   var conferido = null;       // o resultado do passo 2, enquanto não se aplica
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -5051,13 +5308,14 @@ var TelaTabelaCorretoras = (function () {
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
       + ' placeholder="Corretora, canal ou SUSEP" aria-label="Procurar corretora">'
       + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
-      + (dados.podeMexer
+      + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
           + 'Cadastrar corretora</button>' : '')
       + (dados.podeExportar
         ? '<button type="button" class="botao-texto" id="exportar-corretoras">'
           + 'Exportar</button>' : '')
       + '</div>'
+      + avisoDeOrigem('CORRETORAS')
       + avisoDasNaoCadastradas()
       + '<p class="config-explica">' + dados.quantasFiltradas + ' de '
       + dados.quantasNoTotal + ' corretoras · a lista vem de quem mais traz '
@@ -5129,7 +5387,7 @@ var TelaTabelaCorretoras = (function () {
         + (uma.bloqueada ? 'Bloqueada' : 'Liberada') + '</span></td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
-        + (dados.podeMexer
+        + (dados.podeMexer && podeMexerNesta('CORRETORAS')
           ? '<button type="button" class="acao-icone" data-corretora="'
             + escapar(uma.id) + '" title="Editar" aria-label="Editar corretora">'
             + Moldura.icone('editar') + '</button>' : '')
@@ -5306,8 +5564,11 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">' + dados.produtos.length + ' produtos</span>'
-      + '<button type="button" class="botao pequeno" id="novo-produto">'
-      + 'Cadastrar produto</button></div>'
+      + (podeMexerNesta('PRODUTOS')
+        ? '<button type="button" class="botao pequeno" id="novo-produto">'
+          + 'Cadastrar produto</button>' : '')
+      + '</div>'
+      + avisoDeOrigem('PRODUTOS')
       + '<p class="config-explica">O <strong>código</strong> é o que liga o '
       + 'produto ao caso — por isso ele é único, e o sistema recusa repetir.</p>'
       + (dados.produtos.length
@@ -5315,7 +5576,11 @@ var TelaTabelaCorretoras = (function () {
         : '<p class="config-vazio">Nenhum produto cadastrado. Sem eles, o '
           + 'campo de produto do formulário fica como caixa de texto livre.</p>');
 
-    elemento('novo-produto').addEventListener('click', function () {
+    // O botão só existe quando a aba aceita escrita. Ligar um ouvinte num
+    // elemento que não está na tela estoura, e o estouro acontece ANTES de
+    // qualquer tratamento — a tela fica em branco sem log. É o achado 27.
+    var novoProduto = elemento('novo-produto');
+    if (novoProduto) novoProduto.addEventListener('click', function () {
       editando = { id: '' };
       desenharFormularioDoProduto(null);
     });
@@ -5383,7 +5648,7 @@ var TelaTabelaCorretoras = (function () {
         + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
-        + (dados.podeMexer
+        + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
           ? '<button type="button" class="botao-texto" data-liberar="'
             + escapar(uma.id) + '">Liberar</button>' : '')
         + '</td></tr>';
@@ -5392,10 +5657,11 @@ var TelaTabelaCorretoras = (function () {
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">' + dados.bloqueadas.length
       + ' SUSEP(s) bloqueada(s)</span>'
-      + (dados.podeMexer
+      + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
         ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
           + 'Bloquear SUSEP</button>' : '')
       + '</div>'
+      + avisoDeOrigem('SUSEP_BLOQUEADAS')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
       + 'o formulário passa a mostrar o selo vermelho com o motivo, e quem está '
       + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa '
@@ -5753,7 +6019,44 @@ var TelaTabelaCorretoras = (function () {
         Aplicacao.remontar();
       });
     }
-    carregar();
+    // A origem vem ANTES da lista: o aviso precisa estar na tela junto com os
+    // dados, e não aparecendo meio segundo depois deles.
+    Servidor.chamar('origemDosCadastros')
+      .entao(function (resposta) { origem = resposta; carregar(); })
+      // Se nem a origem responde, a lista vai falhar do mesmo jeito e com um
+      // recado melhor. Não vale travar a tela aqui.
+      .senao(function () { carregar(); });
+  }
+
+  /**
+   * O aviso de que este cadastro mora em outra planilha.
+   *
+   * Sem ele, alguém edita achando que mexeu nesta planilha e mexeu na outra —
+   * ou pior, procura o botão de editar e não acha, sem saber por quê.
+   */
+  function avisoDeOrigem(aba) {
+    if (!origem || !origem[aba] || !origem[aba].deFora) return '';
+    var dela = origem[aba];
+
+    var onde = dela.planilha
+      ? 'a planilha de cadastros <strong>' + escapar(dela.planilha) + '</strong>'
+      : 'a planilha de cadastros';
+
+    if (dela.podeEditar) {
+      return '<p class="config-alerta suave">Este cadastro mora em ' + onde
+        + '. O que você cadastrar ou editar aqui é gravado <strong>lá</strong>.</p>';
+    }
+
+    return '<p class="config-alerta">Este cadastro mora em ' + onde
+      + ', e está <strong>só para leitura</strong>: faltam as colunas '
+      + escapar(dela.faltaParaEditar.join(', ')) + ' na primeira linha daquela '
+      + 'aba. Acrescente-as lá e o cadastro passa a ser editável por aqui.</p>';
+  }
+
+  /** Dá para cadastrar e editar nesta aba? */
+  function podeMexerNesta(aba) {
+    if (!origem || !origem[aba]) return true;
+    return origem[aba].podeEditar !== false;
   }
 
   /* Sair da tela fecha o diálogo de senha, se ele tiver ficado aberto. */
@@ -6317,7 +6620,7 @@ var TelaProdutividade = (function () {
    * o dia que o servidor contou sairia do relógio da planilha. Num fechamento
    * de mês essa diferença é um dia inteiro de casos.
    */
-  var periodo = { tipo: 'dias', dias: 0, de: '', ate: '', mes: '' };
+  var periodo = SeletorDePeriodo.padrao();
   var painel = null;
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
@@ -6423,85 +6726,13 @@ var TelaProdutividade = (function () {
         + opcoes.join('') + '</select>';
     });
 
-    return '<div class="filtros">'
-      + desenharPeriodo()
-      + caixas.join('')
-      + '<span class="contagem">' + painel.total + ' casos · '
-      + escapar(painel.periodo.rotulo) + '</span></div>';
-  }
-
-  /**
-   * As três maneiras de escolher o período.
-   *
-   *   ATALHO    — "últimos 30 dias", que é o do dia a dia.
-   *   DE / ATÉ  — duas datas, para uma pergunta específica.
-   *   MÊS       — "setembro de 2026", que é como a operação REPORTA.
-   *
-   * Os três não aparecem ao mesmo tempo: a primeira caixa escolhe QUAL deles
-   * está valendo, e só os controles dele ficam na tela. Mostrar os três juntos
-   * deixaria três períodos preenchidos na tela e um só valendo — e ninguém
-   * consegue olhar isso e dizer qual é.
-   */
-  function desenharPeriodo() {
-    var tipo = painel.periodo.tipo;
-
-    // "Por dias", e não "Últimos dias": a caixa da direita já diz "Últimos 30
-    // dias", e as duas juntas liam "Últimos dias | Últimos 30 dias". A primeira
-    // caixa responde COMO se escolhe; a segunda, QUAL.
-    var comoEscolher = [['dias', 'Por dias'], ['intervalo', 'Por data'],
-      ['mes', 'Por mês']].map(function (par) {
-      return '<option value="' + par[0] + '"'
-        + (tipo === par[0] ? ' selected' : '') + '>' + par[1] + '</option>';
-    }).join('');
-
-    return '<select class="filtro" id="como-escolher-periodo"'
-      + ' aria-label="Como escolher o período">' + comoEscolher + '</select>'
-      + (tipo === 'intervalo' ? desenharDeAte()
-        : (tipo === 'mes' ? desenharMes() : desenharAtalhos()));
-  }
-
-  function desenharAtalhos() {
-    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
-      return '<option value="' + quantos + '"'
-        + (painel.periodo.dias === quantos ? ' selected' : '') + '>'
-        + 'Últimos ' + quantos + ' dias</option>';
-    }).join('');
-
-    return '<select class="filtro" id="periodo-do-painel" aria-label="Período">'
-      + opcoes + '</select>';
-  }
-
-  /*
-   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
-   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
-   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que é o que o
-   * servidor lê sem ambiguidade — 03/04 é 3 de abril aqui e 4 de março em
-   * outros lugares, e essa confusão não pode entrar num fechamento.
-   */
-  function desenharDeAte() {
-    return '<input type="date" class="filtro" id="periodo-de"'
-      + ' aria-label="Data inicial" value="' + escapar(comoOCampoDeDataLe(painel.periodo.de)) + '">'
-      + '<span class="ate-do-periodo">até</span>'
-      + '<input type="date" class="filtro" id="periodo-ate"'
-      + ' aria-label="Data final" value="' + escapar(comoOCampoDeDataLe(painel.periodo.ate)) + '">';
-  }
-
-  function desenharMes() {
-    var opcoes = (painel.mesesDisponiveis || []).map(function (mes) {
-      return '<option value="' + escapar(mes.valor) + '"'
-        + (painel.periodo.mes === mes.valor ? ' selected' : '') + '>'
-        + escapar(mes.rotulo) + '</option>';
-    }).join('');
-
-    return '<select class="filtro" id="mes-do-painel" aria-label="Mês">'
-      + opcoes + '</select>';
-  }
-
-  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
-  function comoOCampoDeDataLe(texto) {
-    var partes = String(texto || '').split('/');
-    if (partes.length !== 3) return '';
-    return partes[2] + '-' + partes[1] + '-' + partes[0];
+    // A caixa de filtros e o seletor de período são PEÇAS COMPARTILHADAS: o
+    // Trabalho e a Minha Performance usam as mesmas. Três cópias divergiriam
+    // no primeiro ajuste, e aí "setembro" significaria uma coisa numa tela e
+    // outra na vizinha.
+    return Moldura.caixaDeFiltros(
+      SeletorDePeriodo.desenhar(painel) + caixas.join(''),
+      painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
   }
 
   /* ------------------------------------------------------------- gráficos */
@@ -6541,7 +6772,13 @@ var TelaProdutividade = (function () {
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
-        if (mexeuNoPeriodo(this)) return;
+        var novoPeriodo = SeletorDePeriodo.mudou(this, painel, 'analitico');
+        if (novoPeriodo !== null) {
+          // `false` quer dizer "é do período, mas ainda incompleto" — o de/até
+          // com uma data só. Não recarrega, e também não cai no filtro comum.
+          if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
+          return;
+        }
         filtros[this.getAttribute('data-filtro')] = this.value;
         carregar();
       });
@@ -6565,66 +6802,6 @@ var TelaProdutividade = (function () {
     });
 
     Graficos.ligarDica(elemento('analitico'));
-  }
-
-  /**
-   * Trata as caixas do período, e devolve true quando era uma delas.
-   *
-   * O DE/ATÉ só recarrega com as DUAS datas preenchidas. Recarregar na
-   * primeira mostraria o resultado de um intervalo pela metade, que a pessoa
-   * leria como se fosse a resposta — e ela vai preencher a segunda meio
-   * segundo depois de qualquer jeito.
-   */
-  function mexeuNoPeriodo(caixa) {
-    if (caixa.id === 'como-escolher-periodo') {
-      // Trocar de maneira zera as outras: guardar um mês escolhido enquanto se
-      // usa o de/até deixaria dois períodos vivos e um só valendo.
-      periodo = { tipo: caixa.value, dias: painel.periodo.dias, de: '', ate: '', mes: '' };
-      if (periodo.tipo === 'mes' && painel.mesesDisponiveis.length) {
-        periodo.mes = painel.mesesDisponiveis[0].valor;   // o mês corrente
-      }
-      if (periodo.tipo === 'intervalo') {
-        // Abre já preenchido com o período que estava valendo, para a pessoa
-        // ajustar uma ponta em vez de digitar as duas do zero.
-        periodo.de = painel.periodo.de;
-        periodo.ate = painel.periodo.ate;
-      }
-      carregar();
-      return true;
-    }
-
-    if (caixa.id === 'periodo-do-painel') {
-      periodo = { tipo: 'dias', dias: Number(caixa.value), de: '', ate: '', mes: '' };
-      carregar();
-      return true;
-    }
-
-    if (caixa.id === 'mes-do-painel') {
-      periodo = { tipo: 'mes', dias: 0, de: '', ate: '', mes: caixa.value };
-      carregar();
-      return true;
-    }
-
-    if (caixa.id === 'periodo-de' || caixa.id === 'periodo-ate') {
-      var de = elemento('periodo-de');
-      var ate = elemento('periodo-ate');
-      periodo = {
-        tipo: 'intervalo', dias: 0, mes: '',
-        de: comoOServidorLe(de ? de.value : ''),
-        ate: comoOServidorLe(ate ? ate.value : '')
-      };
-      if (periodo.de && periodo.ate) carregar();
-      return true;
-    }
-
-    return false;
-  }
-
-  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
-  function comoOServidorLe(texto) {
-    var partes = String(texto || '').split('-');
-    if (partes.length !== 3) return '';
-    return partes[2] + '/' + partes[1] + '/' + partes[0];
   }
 
   function ligarCliques(seletor, oQueFazer) {

@@ -33,27 +33,38 @@ function rodarTestesDeCadastrosDeFora() {
   /** Uma planilha de cadastros completa, como a operação vai montar. */
   function planilhaDeCadastros(ajustes) {
     const abas = {
+      // As colunas de CONTROLE entram: é o que permite ao PGO gravar nelas.
+      // Sem elas a aba abre só para leitura, e há testes para esse caso.
       CORRETORAS: [
-        ['Id', 'Nome', 'Canal', 'SUSEP', 'Corretora', 'Segmento', 'Consultor'],
+        ['Id', 'Nome', 'Canal', 'SUSEP', 'Corretora', 'Segmento', 'Consultor',
+          '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
         ['0000000001', 'Corretora de Fora', 'Corretor', '11122233344',
-          'Corretora de Fora', 'Diamante', 'Consultor Um']
+          'Corretora de Fora', 'Diamante', 'Consultor Um', 'SIM', '', '', 'PLANILHA']
       ],
       SUSEP_BLOQUEADAS: [
-        ['Id', 'SUSEP', 'NomeCorretora', 'CpfReincidente', 'Motivo', 'BloqueadaEm'],
-        ['0000000001', '99988877766', 'Bloqueada de Fora', '', 'Fraude', '01/01/2026']
+        ['Id', 'SUSEP', 'NomeCorretora', 'CpfReincidente', 'Motivo', 'BloqueadaEm',
+          '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
+        ['0000000001', '99988877766', 'Bloqueada de Fora', '', 'Fraude',
+          '01/01/2026', 'SIM', '', '', 'PLANILHA']
       ],
       PRODUTOS: [
-        ['Id', 'Produto', 'CodigoProduto'],
-        ['0000000001', 'Vida de Fora', '9901']
+        ['Id', 'Produto', 'CodigoProduto',
+          '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
+        ['0000000001', 'Vida de Fora', '9901', 'SIM', '', '', 'PLANILHA']
       ],
       ANALISTAS_CENTRAL: [
-        ['Id', 'Nome', 'Matricula', 'Equipe', 'Ativo'],
-        ['0000000001', 'Rita da Central', '12345', 'Central A', 'SIM'],
-        ['0000000002', 'Quem Saiu', '54321', 'Central A', 'NAO']
+        ['Id', 'Nome', 'Matricula', 'Equipe', 'Ativo',
+          '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
+        ['0000000001', 'Rita da Central', '12345', 'Central A', 'SIM',
+          'SIM', '', '', 'PLANILHA'],
+        ['0000000002', 'Quem Saiu', '54321', 'Central A', 'NAO',
+          'SIM', '', '', 'PLANILHA']
       ],
       ANALISTAS_COBRANCA: [
-        ['Id', 'Nome', 'Matricula', 'Equipe', 'Ativo'],
-        ['0000000001', 'Bruno da Cobrança', '67890', 'Cobrança', 'SIM']
+        ['Id', 'Nome', 'Matricula', 'Equipe', 'Ativo',
+          '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
+        ['0000000001', 'Bruno da Cobrança', '67890', 'Cobrança', 'SIM',
+          'SIM', '', '', 'PLANILHA']
       ]
     };
     Object.keys(ajustes || {}).forEach((aba) => {
@@ -194,36 +205,150 @@ function rodarTestesDeCadastrosDeFora() {
       });
   });
 
-  secao('O PGO lê, e não escreve');
+  secao('O PGO lê E escreve na segunda base');
 
-  teste('gravar numa aba de fora é recusado, dizendo onde editar', () => {
-    // A planilha de cadastros é a FONTE DE VERDADE. Duas mãos escrevendo na
-    // mesma lista, uma sem saber da outra, é como um cadastro diverge.
-    const erro = lanca(() => chamar('inserirRegistro_')('PRODUTOS',
-      { Produto: 'Tentativa', CodigoProduto: '1' }), 'vem da planilha de cadastros');
-    contem(erro.message, 'edite a planilha de cadastros',
-      'o recado tem de dizer ONDE editar — "não permitido" manda procurar '
-      + 'uma permissão que não é o problema');
+  /*
+   * A operação pediu para manusear tudo por aqui, em vez de abrir duas
+   * planilhas. Então o PGO grava na planilha de cadastros.
+   *
+   * O que ele precisa que a aba tenha: `Id`, para achar a linha, e as colunas
+   * de controle, onde mora a exclusão lógica. Aba que não as tem continua
+   * servindo para LER — exigi-las para poder ligar transformaria um cadastro
+   * útil em nenhum.
+   */
+
+  teste('cadastrar um produto grava na planilha de cadastros', () => {
+    const novo = chamar('salvarProduto')({
+      produto: 'Vida Nova de Fora', codigo: '9902'
+    });
+    verdadeiro(novo, 'o servidor aceitou');
+
+    // Foi gravado LÁ, e não aqui: a aba local continua como estava.
+    const deFora = chamar('lerRegistros_("PRODUTOS")');
+    verdadeiro(deFora.some((linha) => linha.Produto === 'Vida Nova de Fora'),
+      'aparece na leitura, que vem da planilha de cadastros');
   });
 
-  teste('as quatro portas de escrita recusam, e não só uma', () => {
-    // Inserir, atualizar, ocultar e apagar. Fechar uma porta e esquecer as
-    // outras é pior que não fechar nenhuma: dá a sensação de estar protegido.
-    lanca(() => chamar('atualizarRegistro_')('CORRETORAS', '0000000001',
-      { Nome: 'X' }), 'vem da planilha de cadastros');
-    lanca(() => chamar('ocultarRegistro_')('CORRETORAS', '0000000001', ''),
-      'vem da planilha de cadastros');
-    lanca(() => chamar('apagarRegistroDeVez_')('CORRETORAS', '0000000001'),
-      'vem da planilha de cadastros');
-    lanca(() => chamar('adicionarColuna_')('CORRETORAS', 'Nova', 'texto'),
-      'vem da planilha de cadastros');
+  teste('editar uma corretora muda a linha de lá', () => {
+    const corretora = chamar('tabelaDeCorretoras')('', '').corretoras
+      .find((c) => c.nome === 'Corretora de Fora');
+    chamar('salvarCorretora')(Object.assign({}, corretora,
+      { segmento: 'Ouro' }));
+
+    const depois = chamar('lerRegistros_("CORRETORAS")')
+      .find((linha) => linha.Nome === 'Corretora de Fora');
+    igual(depois.Segmento, 'Ouro');
   });
 
-  teste('bloquear SUSEP pela tela é recusado com o mesmo recado', () => {
-    // O botão existe na Tabela de Corretoras. Ele tem de recusar com uma
-    // frase que explique, e não com um erro técnico.
-    lanca(() => chamar('bloquearSusep')({ susep: '12345678901', motivo: 'Teste' }),
-      'planilha de cadastros');
+  teste('bloquear e liberar SUSEP funciona na base de fora', () => {
+    chamar('bloquearSusep')({ susep: '12345678901', motivo: 'Teste de escrita' });
+    igual(chamar('consultarSusep')('12345678901').situacao, 'BLOQUEADA',
+      'o selo já enxerga o bloqueio gravado lá');
+
+    const bloqueada = chamar('listarSusepsBloqueadas()')
+      .find((uma) => uma.susep === '12345678901');
+    chamar('desbloquearSusep')(bloqueada.id);
+    verdadeiro(chamar('consultarSusep')('12345678901').situacao !== 'BLOQUEADA',
+      'e liberar também');
+  });
+
+  teste('a exclusão continua lógica: a linha fica, some da tela', () => {
+    // Apagar linha de uma planilha que é de outra área não é decisão do PGO.
+    const antes = chamar('lerRegistros_("PRODUTOS", { incluirOcultos: true })').length;
+    const produto = chamar('listarProdutos()')
+      .find((um) => um.produto === 'Vida Nova de Fora');
+
+    chamar('ocultarProduto')(produto.id);
+
+    verdadeiro(!chamar('listarProdutos()').some((um) => um.id === produto.id),
+      'sumiu da tela');
+    igual(chamar('lerRegistros_("PRODUTOS", { incluirOcultos: true })').length, antes,
+      'e a linha continua lá, com _Visivel = NAO');
+  });
+
+  secao('O Id, que é onde isto podia corromper em silêncio');
+
+  teste('o Id de aba de fora tem o piso tirado da PRÓPRIA planilha', () => {
+    // O contador mora no PropertiesService DESTE projeto; as linhas moram lá.
+    // Uma segunda instalação, ou alguém acrescentando linha à mão, separa os
+    // dois — e o Id repetido não daria erro na hora, daria uma linha gravada
+    // por cima de outra semanas depois.
+    //
+    // Aqui simulo o caso mais comum: alguém acrescenta uma linha direto na
+    // planilha de cadastros, com um Id bem acima do que o contador conhece.
+    const daPlanilha = ambiente.planilhaExternaPeloId(
+      chamar('configuracaoDosCadastros()').planilhaId);
+    const aba = daPlanilha.getSheetByName('PRODUTOS');
+    const linha = aba.getLastRow() + 1;
+    aba.getRange(linha, 1).setValue('0000005000');
+    aba.getRange(linha, 2).setValue('Produto posto à mão');
+    aba.getRange(linha, 3).setValue('5000');
+    chamar('esquecerEstruturaLida_()');
+
+    const novo = chamar('salvarProduto')({ produto: 'Depois do posto', codigo: '5001' });
+    const gravado = chamar('lerRegistros_("PRODUTOS")')
+      .find((um) => um.Produto === 'Depois do posto');
+
+    verdadeiro(Number(gravado.Id) > 5000,
+      'o Id novo tem de passar do maior que já existe lá, e veio ' + gravado.Id);
+  });
+
+  teste('o contador local desatualizado não reemite Id', () => {
+    // O caso da segunda instalação: contador daqui baixo, planilha de lá alta.
+    ambiente.propriedades.set('RECC_SEQ_PRODUTOS', '3');
+
+    const novo = chamar('salvarProduto')({ produto: 'Com contador atrasado', codigo: '7' });
+    const gravado = chamar('lerRegistros_("PRODUTOS")')
+      .find((um) => um.Produto === 'Com contador atrasado');
+
+    verdadeiro(Number(gravado.Id) > 5000,
+      'mesmo com o contador em 3, o Id sai acima do que a planilha já tem: '
+      + gravado.Id);
+  });
+
+  secao('Aba de fora sem as colunas de controle: lê, mas não escreve');
+
+  teste('a aba incompleta continua sendo LIDA normalmente', () => {
+    // Uma lista montada por outra área provavelmente não tem _Visivel. Ela
+    // continua servindo para ler, que é metade do que se quer dela.
+    const semControle = planilhaDeCadastros({
+      PRODUTOS: [
+        ['Id', 'Produto', 'CodigoProduto'],
+        ['0000000001', 'Produto sem controle', '1']
+      ]
+    });
+    ligar(semControle);
+
+    igual(chamar('lerRegistros_("PRODUTOS")').length, 1);
+    igual(chamar('listarProdutos()')[0].produto, 'Produto sem controle');
+  });
+
+  teste('mas escrever nela é recusado, dizendo QUAIS colunas faltam', () => {
+    const erro = lanca(() => chamar('salvarProduto')(
+      { produto: 'Tentativa', codigo: '2' }), 'ainda não pode ser editada');
+    contem(erro.message, '_Visivel', 'o recado nomeia a coluna que falta');
+    contem(erro.message, 'continua LENDO',
+      'e deixa claro que a leitura segue funcionando');
+  });
+
+  teste('o conferidor avisa ANTES de ligar quais abas ficam só de leitura', () => {
+    const laudo = chamar('conferirPlanilhaDeCadastros')(
+      planilhaDeCadastros({
+        PRODUTOS: [['Id', 'Produto', 'CodigoProduto'], ['0000000001', 'X', '1']]
+      }));
+
+    igual(laudo.abre, true);
+    igual(laudo.faltando.length, 0, 'não é falta: as colunas de dado estão lá');
+    verdadeiro(laudo.avisos.length > 0, 'é aviso');
+    contem(laudo.avisos.join(' '), 'só para LEITURA');
+    contem(laudo.recado, 'leitura');
+
+    const produtos = laudo.abas.find((uma) => uma.aba === 'PRODUTOS');
+    igual(produtos.podeEditar, false);
+    contem(produtos.faltaParaEditar.join(','), '_Visivel');
+
+    const corretoras = laudo.abas.find((uma) => uma.aba === 'CORRETORAS');
+    igual(corretoras.podeEditar, true, 'as completas aceitam edição');
   });
 
   secao('Quando a outra planilha não abre');
@@ -260,6 +385,131 @@ function rodarTestesDeCadastrosDeFora() {
     const novo = chamar('inserirRegistro_')('PRODUTOS',
       { Produto: 'De volta em casa', CodigoProduto: '7777' });
     verdadeiro(novo.__id, 'gravou aqui');
+  });
+
+  secao('O encaixe das duas: ligada usa a de fora, desligada usa as daqui');
+
+  // Esta seção responde à pergunta que o PO fez com estas palavras: "caso a
+  // segunda base esteja inclusa no PGO, ele passa a utilizá-la e caso não seja
+  // cadastrada a segunda base segue mantendo nas abas que criou, combinado?".
+  //
+  // A resposta é sim, e o que precisa ser provado não é a troca — é que
+  // NENHUM DOS DOIS LADOS PERDE NADA ao trocar. O PGO não copia, não move e
+  // não apaga: ele só muda de onde lê. Uma cópia escondida em qualquer um dos
+  // sentidos é o defeito que apareceria meses depois, como duas listas
+  // divergentes, e ninguém saberia qual está certa.
+
+  teste('ligada e desligada, cada lado guarda as SUAS linhas', () => {
+    // Uma linha que só existe AQUI, gravada com a segunda base desligada.
+    chamar('gravarConfiguracao_')('CADASTROS.PLANILHA_ID', '');
+    chamar('esquecerEstruturaLida_()');
+    chamar('inserirRegistro_')('PRODUTOS',
+      { Produto: 'Produto só daqui', CodigoProduto: '1001' });
+
+    const daqui = () => chamar('lerRegistros_("PRODUTOS")')
+      .map((linha) => linha.Produto);
+
+    verdadeiro(daqui().indexOf('Produto só daqui') >= 0, 'desligada, lê a daqui');
+
+    // Liga: a lista passa a ser a de LÁ, inteira e só ela.
+    const idDeFora = planilhaDeCadastros();
+    ligar(idDeFora);
+    chamar('esquecerEstruturaLida_()');
+
+    verdadeiro(daqui().indexOf('Vida de Fora') >= 0, 'ligada, lê a de fora');
+    verdadeiro(daqui().indexOf('Produto só daqui') < 0,
+      'a linha daqui NÃO aparece misturada com as de fora');
+
+    // Desliga: a linha daqui volta exatamente como estava, e a de fora sai.
+    desligar();
+    chamar('esquecerEstruturaLida_()');
+
+    verdadeiro(daqui().indexOf('Produto só daqui') >= 0,
+      'desligada de novo, a linha daqui está inteira — nada foi perdido');
+    verdadeiro(daqui().indexOf('Vida de Fora') < 0,
+      'e a de fora não ficou copiada aqui');
+  });
+
+  teste('gravar com a segunda base desligada não toca na planilha de fora', () => {
+    // O contrário do teste acima: com ela desligada, a planilha de cadastros
+    // é um arquivo qualquer no Drive. O PGO não pode escrever nela por engano.
+    const idDeFora = planilhaDeCadastros();
+    const quantasLa = () => ambiente.planilhaExternaPeloId(idDeFora)
+      .getSheetByName('PRODUTOS').getLastRow();
+
+    const antes = quantasLa();
+
+    chamar('gravarConfiguracao_')('CADASTROS.PLANILHA_ID', '');
+    chamar('esquecerEstruturaLida_()');
+    chamar('inserirRegistro_')('PRODUTOS',
+      { Produto: 'Gravado com ela desligada', CodigoProduto: '1002' });
+
+    igual(quantasLa(), antes, 'a planilha de fora ficou intacta');
+  });
+
+  teste('ligar e desligar três vezes não duplica nem some com nada', () => {
+    // A troca é uma CHAVE, não uma migração: repetir tem de dar no mesmo. Se
+    // ligar copiasse, cada volta somaria uma cópia — e é exatamente assim que
+    // uma lista de corretora viraria 145, 290 e 435 linhas sem ninguém notar.
+    const idDeFora = planilhaDeCadastros();
+
+    // TODAS as abas que podem sair, não só uma: uma cópia acontece numa aba de
+    // cada vez, e conferir só CORRETORAS deixaria passar a mesma falha em
+    // PRODUTOS. Foi assim que este teste quase não serviu para nada.
+    const tamanhos = () => chamar('RECC_ABAS_QUE_PODEM_VIR_DE_FORA')
+      .map((aba) => aba + '=' + chamar('lerRegistros_')(aba).length).join(', ');
+
+    chamar('gravarConfiguracao_')('CADASTROS.PLANILHA_ID', '');
+    chamar('esquecerEstruturaLida_()');
+    const aquiNoComeco = tamanhos();
+
+    let laSempre = null;
+    for (let volta = 0; volta < 3; volta++) {
+      ligar(idDeFora);
+      chamar('esquecerEstruturaLida_()');
+      if (laSempre === null) laSempre = tamanhos();
+      igual(tamanhos(), laSempre, 'a de fora, na volta ' + (volta + 1));
+
+      desligar();
+      chamar('esquecerEstruturaLida_()');
+      igual(tamanhos(), aquiNoComeco, 'a daqui, na volta ' + (volta + 1));
+    }
+  });
+
+  teste('quem decide é uma chave só, e a tela mostra qual está valendo', () => {
+    // Uma chave só é o que torna a volta possível sem migração. Se a decisão
+    // estivesse espalhada — uma marca por aba, um campo por tela — desligar
+    // exigiria desfazer tudo em ordem, e meio desfeito é o pior estado.
+    const idDeFora = planilhaDeCadastros();
+    ligar(idDeFora);
+    chamar('esquecerEstruturaLida_()');
+    igual(chamar('configuracaoDosCadastros()').planilhaId, idDeFora,
+      'a tela mostra o Id que está valendo');
+
+    chamar('gravarConfiguracao_')('CADASTROS.PLANILHA_ID', '');
+    chamar('esquecerEstruturaLida_()');
+    igual(chamar('abaVemDeOutraPlanilha_')('CORRETORAS'), false,
+      'apagada a chave, tudo volta para casa — sem mais nenhum passo');
+
+    // E as abas de CASO nunca entram nessa conversa, ligada ou desligada.
+    ['BASE_RET', 'BASE_MESA', 'USUARIOS', 'AUDITORIA'].forEach((aba) => {
+      igual(chamar('abaVemDeOutraPlanilha_')(aba), false,
+        aba + ' é da base operacional e nunca sai daqui');
+    });
+  });
+
+  teste('a terceira base, se um dia vier, entra na lista e em nada mais', () => {
+    // O PO disse: "pode ser que no futuro, se houver necessidade, teremos uma
+    // 3ª base". Este teste guarda o caminho para isso: quem for fazer precisa
+    // mexer numa lista, não em trinta chamadas. Se um dia alguém espalhar a
+    // decisão por aí, é aqui que vai aparecer.
+    const podemSair = chamar('RECC_ABAS_QUE_PODEM_VIR_DE_FORA');
+    verdadeiro(podemSair.indexOf('CORRETORAS') >= 0);
+    verdadeiro(podemSair.indexOf('ANALISTAS_CENTRAL') >= 0);
+
+    const config = chamar('configuracaoDosCadastros()');
+    igual(config.abas.length, podemSair.length,
+      'a tela sai da MESMA lista — não de uma cópia dela');
   });
 }
 

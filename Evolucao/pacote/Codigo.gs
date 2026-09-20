@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-09-20 00:12
+   Gerado em 2026-09-20 01:04
    ========================================================================== */
 
 
@@ -788,6 +788,29 @@ function proximosIdentificadores_(nomeDaAba, quantos) {
     if (!isFinite(ultimo)) ultimo = maiorIdentificadorDaAba_(nomeDaAba);
   }
 
+  /*
+   * ABA DE FORA: o piso vem SEMPRE da planilha, e não só na primeira vez.
+   *
+   * O contador mora no PropertiesService DESTE projeto; as linhas de uma aba
+   * de fora moram na planilha de cadastros. Nada garante que os dois estejam
+   * de acordo — e três coisas comuns os separam:
+   *
+   *   1. Uma segunda instalação do PGO apontando para o mesmo cadastro. Cada
+   *      uma tem o seu contador, e as duas emitiriam o mesmo Id.
+   *   2. Alguém acrescentando uma linha na planilha de cadastros à mão, que é
+   *      justamente o que se espera de uma base mantida por outra área.
+   *   3. Esta instalação sendo refeita: contador zerado, planilha cheia.
+   *
+   * Nos três, o Id repetido não daria erro na hora — daria uma linha gravada
+   * por cima de outra semanas depois. Uma leitura de coluna por inserção é
+   * barata num cadastro, que tem centenas de linhas e recebe uma de cada vez;
+   * e é o preço de o contador nunca mentir sobre uma planilha que não é nossa.
+   */
+  if (abaVemDeOutraPlanilha_(nomeDaAba)) {
+    var naPlanilhaDeFora = maiorIdentificadorDaAba_(nomeDaAba);
+    if (naPlanilhaDeFora > ultimo) ultimo = naPlanilhaDeFora;
+  }
+
   var ultimoDoBloco = ultimo + quantos;
   if (ultimoDoBloco > RECC_MAIOR_IDENTIFICADOR) {
     throw new Error('A sequência da aba "' + nomeDaAba + '" chegou ao teto de 10 ' +
@@ -1441,28 +1464,87 @@ function planilhaDeCadastros_() {
 }
 
 /**
- * Recusa ESCRITA numa aba que vem de fora.
+ * O que uma aba de fora precisa ter para o PGO poder ESCREVER nela.
  *
- * A planilha de cadastros é a FONTE DE VERDADE: ela é mantida fora do PGO
- * porque outras áreas também a usam. O PGO lê e não escreve — não por medo de
- * dar erro, mas porque duas mãos escrevendo na mesma lista, uma delas sem
- * saber da outra, é como um cadastro começa a divergir.
- *
- * Há um motivo técnico junto, e ele sozinho já bastaria: a sequência de Id
- * mora no PropertiesService DESTE projeto, e as linhas morariam na outra
- * planilha. Duas instalações apontando para o mesmo cadastro gerariam o mesmo
- * Id para registros diferentes.
- *
- * O recado diz ONDE editar. Um "não permitido" seco mandaria a pessoa procurar
- * uma permissão que não é o problema.
+ * `Id` porque é por ele que o sistema acha a linha para alterar. As colunas de
+ * controle porque é nelas que mora a exclusão lógica — sem `_Visivel`, tirar um
+ * cadastro da tela só seria possível apagando a linha, e apagar linha de uma
+ * planilha que é de outra área não é decisão do PGO.
  */
-function recusarEscritaEmAbaDeFora_(nomeDaAba) {
+const RECC_COLUNAS_PARA_ESCREVER_DE_FORA = ['Id', '_Visivel'];
+
+/**
+ * Esta aba de fora aceita escrita?
+ *
+ * A resposta vem do que a planilha TEM, e não de uma configuração. Uma lista de
+ * corretoras montada à mão por outra área provavelmente não tem `_Visivel` — e
+ * ela continua servindo para LER, que é metade do que se quer dela. Exigir as
+ * colunas para poder ler seria transformar um cadastro útil em nenhum.
+ *
+ * Devolve o motivo quando não aceita, para a tela poder explicar em vez de
+ * apenas desabilitar um botão.
+ */
+function abaDeForaAceitaEscrita_(nomeDaAba) {
+  if (!abaVemDeOutraPlanilha_(nomeDaAba)) return { aceita: true, faltando: [] };
+
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var faltando = RECC_COLUNAS_PARA_ESCREVER_DE_FORA.filter(function (cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) < 0;
+  });
+  return { aceita: faltando.length === 0, faltando: faltando };
+}
+
+/**
+ * De onde esta aba vem, e se dá para editar por aqui — pronto para a tela.
+ *
+ * Toda tela de cadastro devolve isto junto com os dados. Uma tela que mostra
+ * corretoras sem dizer de qual planilha elas vieram é uma tela em que alguém
+ * vai editar achando que mexeu numa coisa e ter mexido em outra.
+ */
+function deOndeVemAAba_(nomeDaAba) {
+  if (!abaVemDeOutraPlanilha_(nomeDaAba)) {
+    return { deFora: false, podeEditar: true, faltaParaEditar: [], planilha: '' };
+  }
+
+  var pode = abaDeForaAceitaEscrita_(nomeDaAba);
+  var nome = '';
+  try {
+    nome = planilhaDeCadastros_().getName();
+  } catch (erro) {
+    // A tela não cai por causa do NOME da planilha. Se ela não abre, quem vai
+    // dizer isso é a leitura dos dados, com o recado inteiro.
+    nome = '';
+  }
+
+  return {
+    deFora: true,
+    podeEditar: pode.aceita,
+    faltaParaEditar: pode.faltando,
+    planilha: nome
+  };
+}
+
+/**
+ * Deixa escrever numa aba de fora — ou explica o que falta para isso.
+ *
+ * O PGO ESCREVE na planilha de cadastros, e isso é decisão da operação: é ela
+ * que pediu para manusear tudo por aqui em vez de abrir duas planilhas. Quando
+ * a aba de lá não tem o mínimo para ser escrita, o recado diz QUAIS COLUNAS
+ * acrescentar — um "não permitido" seco mandaria a pessoa procurar uma
+ * permissão que não é o problema.
+ */
+function exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba) {
   if (!abaVemDeOutraPlanilha_(nomeDaAba)) return;
 
-  throw new Error('A aba "' + nomeDaAba + '" vem da planilha de cadastros, e o '
-    + 'PGO só lê dela. Para mudar este cadastro, edite a planilha de cadastros '
-    + 'direto — a alteração aparece aqui na hora seguinte, sem sincronizar '
-    + 'nada. Quem aponta qual planilha é Configurações › Estrutura.');
+  var pode = abaDeForaAceitaEscrita_(nomeDaAba);
+  if (pode.aceita) return;
+
+  throw new Error('A aba "' + nomeDaAba + '" vem da planilha de cadastros e '
+    + 'ainda não pode ser editada daqui: faltam as colunas '
+    + pode.faltando.join(', ') + '. Acrescente-as na primeira linha da aba, lá '
+    + 'na planilha de cadastros, e o PGO passa a gravar nela. Enquanto isso, '
+    + 'ele continua LENDO a aba normalmente — e para mudar um cadastro, edite '
+    + 'a planilha de cadastros direto.');
 }
 
 /**
@@ -1811,13 +1893,13 @@ function formatarEGravar_(estrutura, primeiraLinha, linhas) {
  * visível e registra que ela nasceu no sistema.
  */
 function inserirRegistro_(nomeDaAba, dados, contexto) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   return inserirVariosRegistros_(nomeDaAba, [dados], contexto)[0];
 }
 
 /** Insere vários registros numa gravação só. */
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
   contexto = contexto || {};
 
@@ -1892,7 +1974,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
  * assim uma coluna nunca fica com o formato de outro tipo.
  */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1919,7 +2001,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
  * Nenhuma linha de base operacional é apagada — nunca.
  */
 function ocultarRegistro_(nomeDaAba, id, usuarioId) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba), '_Visivel') < 0) {
     throw new Error('A aba "' + nomeDaAba + '" não tem exclusão lógica — ela ' +
       'não possui a coluna _Visivel. Em abas de catálogo, o que desliga um ' +
@@ -1954,7 +2036,7 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
  * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
  */
 function apagarRegistroDeVez_(nomeDaAba, id) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -2009,7 +2091,7 @@ function garantirLinhasNaGrade_(aba, ateLinha) {
  * salvamento comum. Recusa cabeçalho que já exista, mesmo escrito diferente.
  */
 function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var texto = String(cabecalho || '').trim();
   if (!texto) throw new Error('Cabeçalho vazio.');
   if (!RECC_FORMATO_DA_CELULA[tipo]) throw new Error('Tipo de coluna desconhecido: ' + tipo);
@@ -2255,7 +2337,14 @@ function tabelaDeCorretoras(procurar, segmento) {
     // encontrada" toda vez, e ninguém liga uma coisa à outra.
     foraDoCadastro: susepsForaDoCadastro_(volumes, todas, bloqueadas),
     podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR),
-    podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
+    podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR),
+    // De onde vieram estes cadastros. A tela precisa dizer: editar achando que
+    // mexeu numa planilha e ter mexido em outra é o tipo de confusão que só
+    // aparece quando já tem gente trabalhando em cima do dado errado.
+    origem: {
+      corretoras: deOndeVemAAba_('CORRETORAS'),
+      suseps: deOndeVemAAba_('SUSEP_BLOQUEADAS')
+    }
   };
 }
 
@@ -2508,6 +2597,23 @@ function desbloquearSusep(idDoBloqueio) {
 // ============================================================================
 // OS PRODUTOS
 // ============================================================================
+
+/**
+ * De onde vem cada cadastro desta tela, numa chamada só.
+ *
+ * A tela tem três abas — corretoras, produtos, SUSEPs bloqueadas — e cada uma
+ * carrega por conta própria. Perguntar a origem em cada carga seriam três idas
+ * ao servidor para uma resposta que não muda enquanto a tela está aberta.
+ */
+function origemDosCadastros() {
+  exigirTela_('tabelaCorretoras');
+
+  var resposta = {};
+  ['CORRETORAS', 'PRODUTOS', 'SUSEP_BLOQUEADAS'].forEach(function (aba) {
+    resposta[aba] = deOndeVemAAba_(aba);
+  });
+  return resposta;
+}
 
 function listarProdutos() {
   exigirTela_('tabelaCorretoras');
@@ -3633,6 +3739,7 @@ function cadastrarCaso(idDoCanal, valores) {
   var paraGravar = validarValores_(canal.id, valores || {}, quem, true);
   preencherEntradaAutomatica_(canal, paraGravar);
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
+  carimbarOStatusDeNascimento_(canal, paraGravar);
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
   registrarAuditoria_('caso.criar', canal.aba, gravado.__id, canal.nome);
@@ -3661,6 +3768,11 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
   exigirAlcanceSobre_(atual, canal, quem);
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false);
+
+  // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
+  // diálogo, e tem de deixar o mesmo rastro.
+  carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
+
   atualizarRegistro_(canal.aba, alvo, paraGravar);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
@@ -3695,11 +3807,7 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
 
   var escolhida = String(situacaoNova || '').trim();
   var conhecidas = situacoesDoCanal_(canal);
-  var achada = null;
-  conhecidas.forEach(function (uma) {
-    if (normalizarParaComparar_(uma.gravadoComo)
-      === normalizarParaComparar_(escolhida)) achada = uma;
-  });
+  var achada = situacaoDoCanalPeloValor_(canal, escolhida);
   if (!achada) {
     throw new Error('A situação "' + escolhida + '" não existe no canal ' +
       canal.nome + '. As situações dela são: ' + conhecidas.map(function (uma) {
@@ -3767,6 +3875,79 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   if (jaTem) return;
 
   alteracao[coluna] = new Date();
+}
+
+/**
+ * A situação do canal que corresponde a este valor gravado.
+ *
+ * Compara sem acento e sem maiúscula, porque o valor pode ter sido digitado na
+ * planilha à mão. Devolve null quando não é situação conhecida — e aí quem
+ * chamou decide se isso é erro (o diálogo) ou se é só não carimbar (a edição).
+ */
+function situacaoDoCanalPeloValor_(canal, valor) {
+  var procurado = normalizarParaComparar_(String(valor || '').trim());
+  if (!procurado) return null;
+
+  var achada = null;
+  situacoesDoCanal_(canal).forEach(function (uma) {
+    if (normalizarParaComparar_(uma.gravadoComo) === procurado) achada = uma;
+  });
+  return achada;
+}
+
+/**
+ * Carimba a mudança de status vinda de QUALQUER porta.
+ *
+ * O PO pediu assim: "toda vez que mudar o status dos casos da RET ele deve
+ * registrar". Toda vez — e não "toda vez que a pessoa usar o diálogo".
+ *
+ * O sistema tem duas portas para trocar a situação: o diálogo de situação, que
+ * é o gesto de todo dia, e o formulário inteiro, aberto pelo lápis. Antes só o
+ * diálogo carimbava. O mesmo caso, na mesma situação, ficava com data ou sem
+ * data dependendo de onde a pessoa clicou — e a Produtividade RECC contava só
+ * metade, sem errar em nada visível. Número que erra sozinho é o pior tipo.
+ *
+ * Só age quando a situação MUDOU de verdade: salvar o formulário sem mexer na
+ * situação não é mudança, e contaria uma andada que não houve.
+ */
+function carimbarSeOStatusMudou_(canal, registroAtual, alteracao, quem) {
+  if (!canal.colunaDoStatus) return;
+  if (!alteracao.hasOwnProperty(canal.colunaDoStatus)) return;
+
+  var agora = String(alteracao[canal.colunaDoStatus] || '').trim();
+  var antes = String(registroAtual[canal.colunaDoStatus] || '').trim();
+  if (!agora) return;
+  if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+  // Situação que o catálogo não conhece ainda assim é mudança: as três colunas
+  // de rastro registram. O que não dá é carimbar, porque não há coluna
+  // declarada para ela — e inventar uma seria pior do que não ter.
+  var achada = situacaoDoCanalPeloValor_(canal, agora);
+  if (achada) carimbarOStatus_(canal, achada, registroAtual, alteracao);
+  registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem);
+}
+
+/**
+ * Carimba a situação em que o caso NASCE.
+ *
+ * Um caso cadastrado agora, em "Não trabalhado", chegou nessa situação agora —
+ * e a Produtividade RECC precisa saber disso. Sem este carimbo, todo caso
+ * nascido pelo formulário entrava sem data nenhuma, e só passava a ter data
+ * quando alguém trocasse a situação pela primeira vez.
+ *
+ * NÃO vale para tombamento: lá o caso é antigo, e carimbar "agora" diria que
+ * um contato de julho aconteceu hoje. O tombamento traz as datas da base
+ * antiga, pelo de-para.
+ */
+function carimbarOStatusDeNascimento_(canal, paraGravar) {
+  if (!canal.colunaDoStatus) return;
+
+  var achada = situacaoDoCanalPeloValor_(canal, paraGravar[canal.colunaDoStatus]);
+  if (!achada) return;
+
+  // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
+  // o que veio manda. O carimbo nunca reescreve o que alguém informou.
+  carimbarOStatus_(canal, achada, paraGravar, paraGravar);
 }
 
 /**
@@ -6944,6 +7125,7 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   }
 
   var faltando = [];
+  var avisos = [];
   var achadas = [];
 
   RECC_ABAS_QUE_PODEM_VIR_DE_FORA.forEach(function (nome) {
@@ -6971,22 +7153,52 @@ function conferirPlanilhaDeCadastros(planilhaId) {
     if (ausentes.length) {
       faltando.push('• A aba "' + nome + '" está sem: ' + ausentes.join(', ') + '.');
     }
+
+    /*
+     * EDITAR DAQUI é outra pergunta, e por isso é um aviso e não uma falta.
+     *
+     * Para o PGO gravar na aba ela precisa de Id e das colunas de controle —
+     * é nelas que mora a exclusão lógica. Uma lista montada por outra área
+     * provavelmente não as tem, e ela continua servindo para LER, que é metade
+     * do que se quer dela. Exigi-las para poder ligar transformaria um cadastro
+     * útil em nenhum.
+     */
+    var semEscrita = RECC_COLUNAS_PARA_ESCREVER_DE_FORA.filter(function (coluna) {
+      return cabecalhos.indexOf(normalizarParaComparar_(coluna)) < 0;
+    });
+    if (semEscrita.length) {
+      avisos.push('• A aba "' + nome + '" vai abrir só para LEITURA: faltam '
+        + semEscrita.join(', ') + '. Acrescente essas colunas se quiser '
+        + 'cadastrar e editar por aqui.');
+    }
+
     achadas.push({
       aba: nome,
       linhas: Math.max(aba.getLastRow() - 1, 0),
-      completa: ausentes.length === 0
+      completa: ausentes.length === 0,
+      podeEditar: semEscrita.length === 0,
+      faltaParaEditar: semEscrita
     });
   });
+
+  var soLeitura = achadas.filter(function (uma) { return !uma.podeEditar; }).length;
 
   return {
     abre: true,
     recado: faltando.length
       ? 'A planilha abriu, mas ' + faltando.length + ' aba(s) precisam de ajuste.'
       : 'Tudo certo: as ' + achadas.length + ' abas estão lá, com as colunas '
-        + 'que o PGO procura.',
+        + 'que o PGO procura.'
+        + (soLeitura
+          ? ' ' + soLeitura + ' delas vão abrir só para leitura — veja abaixo.'
+          : ' E todas aceitam cadastrar e editar por aqui.'),
     nome: planilha.getName(),
     abas: achadas,
-    faltando: faltando
+    faltando: faltando,
+    avisos: avisos,
+    // O que acrescentar numa aba para ela virar editável pelo PGO. A tela
+    // mostra isto junto do aviso, para ninguém precisar adivinhar.
+    colunasParaEditar: RECC_COLUNAS_PARA_ESCREVER_DE_FORA
   };
 }
 
@@ -8423,10 +8635,15 @@ function tomValido_(cor) {
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDoCanal(idDoCanal, filtros) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
-  var dias = Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+
+  // O PERÍODO é escolhido na tela, das três maneiras — por dias, por data e
+  // por mês. Antes era a janela fixa da CONFIG, igual para todo mundo: quem
+  // precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
+  var periodo = resolverPeriodo_(periodoPedido);
+  var antes = periodoAnterior_(periodo);
 
   // A base só acrescenta no fim, então o recente está nas últimas linhas.
   // Ler por data exigiria percorrer tudo; ler o fim e depois filtrar por data
@@ -8434,12 +8651,19 @@ function resumoDoCanal(idDoCanal, filtros) {
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, dias, 0);
+  // Linha sem data FICA no atalho e SAI dos períodos fechados — a mesma regra
+  // da Produtividade RECC, pelo mesmo motivo: num "últimos 30 dias" ela é um
+  // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
+  // o qual não dá para afirmar que é de setembro.
+  var guardarSemData = (periodo.tipo === 'dias');
+
+  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
+    guardarSemData);
   var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
 
   // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
   var anterior = filtrarPeloAlcance_(
-    filtrarPeloPeriodo_(recentes, canal, dias, dias), canal.aba, quem);
+    entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
   var filtrados = aplicarFiltros_(meus, disponiveis, filtros || {});
@@ -8447,7 +8671,15 @@ function resumoDoCanal(idDoCanal, filtros) {
 
   return {
     canal: canal,
-    periodo: { dias: dias, rotulo: 'últimos ' + dias + ' dias' },
+    periodo: {
+      tipo: periodo.tipo,
+      dias: periodo.dias,
+      mes: periodo.mes || '',
+      de: comoSeEscreve_(periodo.de),
+      ate: comoSeEscreve_(periodo.ate),
+      rotulo: periodo.rotulo
+    },
+    mesesDisponiveis: mesesParaEscolher_(),
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
@@ -10074,18 +10306,25 @@ const RECC_VIZINHOS_NO_RANKING = 2;
 /**
  * Os números de quem está olhando, no canal e no período escolhidos.
  */
-function minhaPerformance(idDoCanal, dias) {
+function minhaPerformance(idDoCanal, periodoPedido) {
   var quem = exigirTela_('minhaPerformance');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  // As mesmas três maneiras das outras duas telas — por dias, por data e por
+  // mês. `resolverPeriodo_` aceita só um número também, que é como esta tela
+  // era chamada antes; nada quebra por isso.
+  var periodo = resolverPeriodo_(periodoPedido);
+  var antesDele = periodoAnterior_(periodo);
+  var janela = periodo.dias;
+
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   // Bateu no teto de leitura: pode haver caso do período que ficou de fora.
   // Aqui isto pesa mais que nas outras telas — esta é a tela sobre UMA PESSOA,
   // e número incompleto vira julgamento errado sobre alguém.
   var truncada = recentes.length >= linhasQueOPainelOlha_();
-  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, janela, 0);
-  var anterior = filtrarPeloPeriodo_(recentes, canal, janela, janela);
+  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
+    periodo.tipo === 'dias');
+  var anterior = entreDuasDatas_(recentes, canal, antesDele.de, antesDele.ate, false);
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var meuNome = String(quem.usuario.Nome || '');
@@ -10109,7 +10348,15 @@ function minhaPerformance(idDoCanal, dias) {
       nivel: quem.nivel,
       canal: String(quem.usuario['Canal que atende'] || '')
     },
-    periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
+    periodo: {
+      tipo: periodo.tipo,
+      dias: periodo.dias,
+      mes: periodo.mes || '',
+      de: comoSeEscreve_(periodo.de),
+      ate: comoSeEscreve_(periodo.ate),
+      rotulo: periodo.rotulo
+    },
+    mesesDisponiveis: mesesParaEscolher_(),
     truncada: truncada,
     linhasLidas: recentes.length,
     // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez

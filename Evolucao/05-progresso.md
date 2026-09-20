@@ -1699,12 +1699,82 @@ do mesmo jeito. São os achados 41 e 42.
 **531 testes**, cinco execuções seguidas sem falha, 136 cliques em 8 telas, 96
 combinações de tela × largura, 9 testes de ponta a ponta e 14 imagens geradas.
 
+## Etapa 16 — a caixa de filtros, o período no Trabalho, e dois achados que só a foto pegou
+
+**O pedido do PO**, em duas frases: *"na aba trabalho precisa do filtro por
+data. Deixe por padrão e envolva tudo que for filtro por uma parte de fundo
+branca com título de filtro, o mesmo para minha performance e o mesmo para
+Produtividade"*.
+
+**A caixa e o seletor são peças únicas.** `Moldura.caixaDeFiltros` desenha a
+caixa branca com o título "Filtros" e a contagem à direita;
+`SeletorDePeriodo` (PEÇA 7 de 7 do `Comuns.html`) desenha e interpreta o
+período nas três formas. As três telas chamam as mesmas duas peças — e há um
+teste cobrando exatamente isso, nos moldes do que já valia para a máscara do
+formulário: *nenhuma tela pode ter a sua própria cópia*.
+
+O seletor devolve **três respostas**, e a do meio é a que evita a tela torta:
+
+| resposta | quer dizer |
+|---|---|
+| um objeto | período novo, pode recarregar |
+| `null` | não é do período — é um filtro comum |
+| `false` | é do período, mas ainda incompleto (de/até com uma data só) |
+
+Sem o `false`, mexer na primeira data recarregaria a tela com meio intervalo, e
+a pessoa leria aquele resultado como se fosse a resposta — meio segundo antes
+de preencher a segunda data.
+
+**O período no Trabalho** chegou até a fila: os mesmos `resolverPeriodo_`,
+`periodoAnterior_` e `entreDuasDatas_` que a Produtividade RECC já usava. Linha
+sem data continua **entrando** no atalho de dias e **saindo** dos períodos
+fechados, pelo motivo de sempre: num "últimos 30 dias" ela é um caso mal
+preenchido que precisa aparecer; num "setembro", é um caso sobre o qual não dá
+para afirmar que é de setembro.
+
+### Os dois achados desta etapa
+
+Nenhum dos dois veio de teste. Vieram de **olhar**.
+
+**O achado 43 apareceu na foto da Produtividade RECC**: o cartão "Já
+contatados" dizia `0` enquanto a rosca logo abaixo, na mesma tela, mostrava um
+caso em "1º contato realizado" e outro em "2º contato". Dois números da mesma
+tela discordando. A causa: `carimbarOStatus_` tinha **um único ponto de
+chamada**, dentro do diálogo de situação. Quem trocasse a situação pelo
+formulário — o mesmo gesto, na mesma tela, a um clique de distância — não
+deixava carimbo. E os dois testes que existiam do carimbo eram bons, e usavam
+justamente a porta que funcionava.
+
+**O achado 44 apareceu no estresse**, que terminou REPROVADO: a massa de teste
+trazia a lista de canais escrita à mão, com um comentário jurando que ela vinha
+de `formularioDoCanal`. Vinha — no dia em que foi escrita. Depois o catálogo
+virou o da RECC e a lista ficou para trás. Pior: a carga usa
+`inserirVariosRegistros_`, que grava sem validar, então **50 mil casos entraram
+com um valor que o sistema recusa, sem uma reclamação sequer**. Durante um bom
+tempo o estresse mediu desempenho sobre uma massa impossível.
+
+### O encaixe das duas bases, provado
+
+O PO perguntou com estas palavras: *"caso a segunda base esteja inclusa no PGO,
+ele passa a utilizá-la e caso não seja cadastrada a segunda base segue mantendo
+nas abas que criou, combinado?"*. A resposta é sim, e o que os testes novos
+cobram não é a troca — é que **nenhum dos dois lados perca nada** ao trocar:
+ligar e desligar três vezes seguidas deixa cada aba do mesmo tamanho, gravar
+com ela desligada não toca na planilha de fora, e quem decide é **uma chave
+só**. Os testes foram conferidos contra uma cópia-na-ligação injetada de
+propósito, e os dois que deviam ficar vermelhos ficaram.
+
+**565 testes**, cinco execuções seguidas sem falha, 136 cliques em 8 telas, 96
+combinações de tela × largura, 9 testes de ponta a ponta, o estresse APROVADO
+em 50 mil casos e 14 imagens geradas.
+
 ---
 
 ## O que ainda está em aberto
 
 | Assunto | Situação |
 |---|---|
+| **Caso tombado não conta em "Já contatados"** | Decisão do PO. Hoje o tombamento **não** escreve nas colunas de carimbo, de propósito: deixar a planilha de origem escrever ali apagaria o controle de produtividade com dado de fora. O efeito é que 300 casos trazidos da base antiga entram sem data de contato, e a Produtividade RECC não os conta como contatados — mesmo que a base antiga tenha essas datas. Abrir o carimbo como destino ESCOLHÍVEL no de-para (nunca sugerido) resolveria, e é mudança pequena. Fica aguardando a decisão |
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |

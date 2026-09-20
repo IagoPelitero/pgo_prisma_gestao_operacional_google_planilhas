@@ -178,6 +178,9 @@ function pontePreparada(respostas) {
     + '        responder(respostas.corretoras.tabelas[chave]\n'
     + '          || respostas.corretoras.tabelas["|"]);\n'
     + '      },\n'
+    + '      origemDosCadastros: function () {\n'
+    + '        responder(respostas.corretoras.origem);\n'
+    + '      },\n'
     + '      listarProdutos: function () {\n'
     + '        responder(respostas.corretoras.produtos);\n'
     + '      },\n'
@@ -753,6 +756,7 @@ function gerar(pastaDeSaida) {
   });
   const corretoras = {
     tabelas: tabelasDeCorretoras,
+    origem: chamar('origemDosCadastros()'),
     produtos: chamar('listarProdutos()'),
     bloqueadas: chamar('listarSusepsBloqueadas()'),
     exportado: chamar('exportarCorretoras')('', ''),

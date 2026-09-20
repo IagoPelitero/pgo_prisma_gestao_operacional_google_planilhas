@@ -121,15 +121,40 @@ function imprimirPlacar() {
 
 /* ------------------------------------------------------------ a massa ----- */
 
-const SITUACOES = ['Aguardando transmissão', 'Pendente', '1º contato realizado',
-  '2º contato realizado', 'Não trabalhado', 'Concluído'];
-// Os valores TÊM de ser os do catálogo: o cadastro recusa o que não está na
-// lista, e um teste de estresse com dado que o sistema recusaria não mede
-// nada. Vieram de chamar('formularioDoCanal'), não de memória.
-const CORRETORAS = ['E-mail', 'Chat', 'Telefone', 'Site', 'Corretora', 'Ouvidoria', 'URA'];
-const PRODUTOS = ['Vida Individual', 'Vida em Grupo', 'Prestamista', 'Acidentes'];
 const ANALISTAS = ['Ana Martins', 'Bruno Dias', 'Carla Souza', 'Diego Castilho',
   'Elisa Prado', 'Fábio Nunes', 'Gisele Antunes', 'Hugo Barros'];
+
+/**
+ * As opções de cada seletor, LIDAS DO SISTEMA na hora de rodar.
+ *
+ * Aqui já houve uma lista escrita à mão, com um comentário jurando que ela
+ * viera de `formularioDoCanal`. Vinha — no dia em que foi escrita. Depois o
+ * catálogo virou o da RECC (URA, Central, Base de Inadimplentes…) e a lista
+ * daqui continuou com a genérica antiga. O estresse então carregava 100 mil
+ * casos com "Canal de origem: E-mail", um valor que o sistema recusa.
+ *
+ * E não reclamava, porque a carga usa `inserirVariosRegistros_`, que grava sem
+ * validar — é o caminho da importação. Só o `cadastrarCaso` de uma linha só, lá
+ * no fim, passava pela validação e batia de frente. Medir desempenho com massa
+ * que o sistema recusaria não mede coisa nenhuma.
+ *
+ * Ler do formulário resolve de vez: mude o catálogo em Configurações e a massa
+ * muda junto, sem ninguém lembrar de vir aqui.
+ */
+function opcoesDosSeletores(chamar, canal) {
+  const formulario = chamar('formularioDoCanal')(canal.id);
+  const opcoes = {};
+
+  (formulario.secoes || []).forEach((secao) => {
+    (secao.campos || []).forEach((campo) => {
+      if (!campo.opcoes || !campo.opcoes.length) return;
+      opcoes[campo.chave] = campo.opcoes.map((uma) =>
+        (uma && uma.valor !== undefined) ? uma.valor : uma);
+    });
+  });
+
+  return opcoes;
+}
 
 /** Datas espalhadas nos últimos N dias, para a janela da fila ter o que cortar. */
 function dataDeDiasAtras(dias) {
@@ -139,17 +164,25 @@ function dataDeDiasAtras(dias) {
     + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
 }
 
-function casoDaRet(i) {
+function casoDaRet(i, opcoes) {
+  opcoes = opcoes || {};
+
+  /** O i-ésimo valor da lista do seletor, ou vazio se o campo não existir. */
+  const daLista = (chave) => {
+    const lista = opcoes[chave];
+    return (lista && lista.length) ? lista[i % lista.length] : '';
+  };
+
   return {
     'data de recepção do protocolo': dataDeDiasAtras(i % 400),
     'analista': ANALISTAS[i % ANALISTAS.length],
     'SUSEP': String(1000000 + (i % 900)),
-    'segmento': i % 7 === 0 ? 'Diamante' : 'Demais corretoras',
+    'segmento': daLista('segmento'),
     'número da proposta': String(70000000 + i),
     'nome do cliente': 'Cliente ' + i,
-    'produto': PRODUTOS[i % PRODUTOS.length],
-    'canal': CORRETORAS[i % CORRETORAS.length],
-    'status': SITUACOES[i % SITUACOES.length],
+    'codproduto': daLista('codproduto'),
+    'canal': daLista('canal'),
+    'status': daLista('status'),
     'protocolo': 'RET-2026-' + (100000 + i),
     'valor do prêmio retido': (i % 900) * 13.7,
     'CPF': String(10000000000 + i)
@@ -171,6 +204,10 @@ function rodar(alvo) {
   chamar('instalarRECC()');
   const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
 
+  // Lido AGORA, do sistema recém-instalado: a massa nasce com os valores que
+  // o cadastro aceita hoje, e não com os que alguém anotou um dia.
+  const opcoes = opcoesDosSeletores(chamar, ret);
+
   // Os analistas precisam existir: o campo "analista" é um seletor cujas
   // opções são as pessoas cadastradas, e cadastrar um caso com um nome que
   // não está na lista é recusado — como tem de ser.
@@ -180,7 +217,7 @@ function rodar(alvo) {
     Nome: nome,
     Email: nome.toLowerCase().replace(/[^a-z]/g, '.') + '@exemplo.com',
     NivelAcessoId: nivelOperacao.Id,
-    'Canal que atende': CORRETORAS[i % CORRETORAS.length],
+    'Canal que atende': ret.nome,
     Ativo: true
   })));
 
@@ -190,7 +227,9 @@ function rodar(alvo) {
   const LOTE = 5000;
   for (let feito = 0; feito < alvo; feito += LOTE) {
     const lote = [];
-    for (let i = feito; i < Math.min(feito + LOTE, alvo); i++) lote.push(casoDaRet(i));
+    for (let i = feito; i < Math.min(feito + LOTE, alvo); i++) {
+      lote.push(casoDaRet(i, opcoes));
+    }
     if (feito === 0) {
       // O primeiro lote é medido: é o custo de uma importação de verdade.
       medir('Gravar ' + comoNumero(lote.length) + ' casos de uma vez', 1,
@@ -233,7 +272,7 @@ function rodar(alvo) {
     () => chamar('tabelaDeCorretoras')('', ''));
 
   medir('Cadastrar UM caso', 0.25,
-    () => chamar('cadastrarCaso')(ret.id, casoDaRet(0)));
+    () => chamar('cadastrarCaso')(ret.id, casoDaRet(0, opcoes)));
 
   medir('Barra superior: data do último registro', 0.1,
     () => chamar('dataDoUltimoRegistro_()'));
@@ -268,7 +307,7 @@ function rodar(alvo) {
   medir('Dez cadastros em sequência imediata', 0.5, function () {
     var ids = [];
     for (var i = 0; i < 10; i++) {
-      ids.push(chamar('cadastrarCaso')(ret.id, casoDaRet(i)).id);
+      ids.push(chamar('cadastrarCaso')(ret.id, casoDaRet(i, opcoes)).id);
     }
     var unicos = {};
     ids.forEach(function (id) { unicos[id] = true; });

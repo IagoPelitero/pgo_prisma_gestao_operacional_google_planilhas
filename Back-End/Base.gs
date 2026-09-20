@@ -770,6 +770,29 @@ function proximosIdentificadores_(nomeDaAba, quantos) {
     if (!isFinite(ultimo)) ultimo = maiorIdentificadorDaAba_(nomeDaAba);
   }
 
+  /*
+   * ABA DE FORA: o piso vem SEMPRE da planilha, e não só na primeira vez.
+   *
+   * O contador mora no PropertiesService DESTE projeto; as linhas de uma aba
+   * de fora moram na planilha de cadastros. Nada garante que os dois estejam
+   * de acordo — e três coisas comuns os separam:
+   *
+   *   1. Uma segunda instalação do PGO apontando para o mesmo cadastro. Cada
+   *      uma tem o seu contador, e as duas emitiriam o mesmo Id.
+   *   2. Alguém acrescentando uma linha na planilha de cadastros à mão, que é
+   *      justamente o que se espera de uma base mantida por outra área.
+   *   3. Esta instalação sendo refeita: contador zerado, planilha cheia.
+   *
+   * Nos três, o Id repetido não daria erro na hora — daria uma linha gravada
+   * por cima de outra semanas depois. Uma leitura de coluna por inserção é
+   * barata num cadastro, que tem centenas de linhas e recebe uma de cada vez;
+   * e é o preço de o contador nunca mentir sobre uma planilha que não é nossa.
+   */
+  if (abaVemDeOutraPlanilha_(nomeDaAba)) {
+    var naPlanilhaDeFora = maiorIdentificadorDaAba_(nomeDaAba);
+    if (naPlanilhaDeFora > ultimo) ultimo = naPlanilhaDeFora;
+  }
+
   var ultimoDoBloco = ultimo + quantos;
   if (ultimoDoBloco > RECC_MAIOR_IDENTIFICADOR) {
     throw new Error('A sequência da aba "' + nomeDaAba + '" chegou ao teto de 10 ' +
@@ -1423,28 +1446,87 @@ function planilhaDeCadastros_() {
 }
 
 /**
- * Recusa ESCRITA numa aba que vem de fora.
+ * O que uma aba de fora precisa ter para o PGO poder ESCREVER nela.
  *
- * A planilha de cadastros é a FONTE DE VERDADE: ela é mantida fora do PGO
- * porque outras áreas também a usam. O PGO lê e não escreve — não por medo de
- * dar erro, mas porque duas mãos escrevendo na mesma lista, uma delas sem
- * saber da outra, é como um cadastro começa a divergir.
- *
- * Há um motivo técnico junto, e ele sozinho já bastaria: a sequência de Id
- * mora no PropertiesService DESTE projeto, e as linhas morariam na outra
- * planilha. Duas instalações apontando para o mesmo cadastro gerariam o mesmo
- * Id para registros diferentes.
- *
- * O recado diz ONDE editar. Um "não permitido" seco mandaria a pessoa procurar
- * uma permissão que não é o problema.
+ * `Id` porque é por ele que o sistema acha a linha para alterar. As colunas de
+ * controle porque é nelas que mora a exclusão lógica — sem `_Visivel`, tirar um
+ * cadastro da tela só seria possível apagando a linha, e apagar linha de uma
+ * planilha que é de outra área não é decisão do PGO.
  */
-function recusarEscritaEmAbaDeFora_(nomeDaAba) {
+const RECC_COLUNAS_PARA_ESCREVER_DE_FORA = ['Id', '_Visivel'];
+
+/**
+ * Esta aba de fora aceita escrita?
+ *
+ * A resposta vem do que a planilha TEM, e não de uma configuração. Uma lista de
+ * corretoras montada à mão por outra área provavelmente não tem `_Visivel` — e
+ * ela continua servindo para LER, que é metade do que se quer dela. Exigir as
+ * colunas para poder ler seria transformar um cadastro útil em nenhum.
+ *
+ * Devolve o motivo quando não aceita, para a tela poder explicar em vez de
+ * apenas desabilitar um botão.
+ */
+function abaDeForaAceitaEscrita_(nomeDaAba) {
+  if (!abaVemDeOutraPlanilha_(nomeDaAba)) return { aceita: true, faltando: [] };
+
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var faltando = RECC_COLUNAS_PARA_ESCREVER_DE_FORA.filter(function (cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) < 0;
+  });
+  return { aceita: faltando.length === 0, faltando: faltando };
+}
+
+/**
+ * De onde esta aba vem, e se dá para editar por aqui — pronto para a tela.
+ *
+ * Toda tela de cadastro devolve isto junto com os dados. Uma tela que mostra
+ * corretoras sem dizer de qual planilha elas vieram é uma tela em que alguém
+ * vai editar achando que mexeu numa coisa e ter mexido em outra.
+ */
+function deOndeVemAAba_(nomeDaAba) {
+  if (!abaVemDeOutraPlanilha_(nomeDaAba)) {
+    return { deFora: false, podeEditar: true, faltaParaEditar: [], planilha: '' };
+  }
+
+  var pode = abaDeForaAceitaEscrita_(nomeDaAba);
+  var nome = '';
+  try {
+    nome = planilhaDeCadastros_().getName();
+  } catch (erro) {
+    // A tela não cai por causa do NOME da planilha. Se ela não abre, quem vai
+    // dizer isso é a leitura dos dados, com o recado inteiro.
+    nome = '';
+  }
+
+  return {
+    deFora: true,
+    podeEditar: pode.aceita,
+    faltaParaEditar: pode.faltando,
+    planilha: nome
+  };
+}
+
+/**
+ * Deixa escrever numa aba de fora — ou explica o que falta para isso.
+ *
+ * O PGO ESCREVE na planilha de cadastros, e isso é decisão da operação: é ela
+ * que pediu para manusear tudo por aqui em vez de abrir duas planilhas. Quando
+ * a aba de lá não tem o mínimo para ser escrita, o recado diz QUAIS COLUNAS
+ * acrescentar — um "não permitido" seco mandaria a pessoa procurar uma
+ * permissão que não é o problema.
+ */
+function exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba) {
   if (!abaVemDeOutraPlanilha_(nomeDaAba)) return;
 
-  throw new Error('A aba "' + nomeDaAba + '" vem da planilha de cadastros, e o '
-    + 'PGO só lê dela. Para mudar este cadastro, edite a planilha de cadastros '
-    + 'direto — a alteração aparece aqui na hora seguinte, sem sincronizar '
-    + 'nada. Quem aponta qual planilha é Configurações › Estrutura.');
+  var pode = abaDeForaAceitaEscrita_(nomeDaAba);
+  if (pode.aceita) return;
+
+  throw new Error('A aba "' + nomeDaAba + '" vem da planilha de cadastros e '
+    + 'ainda não pode ser editada daqui: faltam as colunas '
+    + pode.faltando.join(', ') + '. Acrescente-as na primeira linha da aba, lá '
+    + 'na planilha de cadastros, e o PGO passa a gravar nela. Enquanto isso, '
+    + 'ele continua LENDO a aba normalmente — e para mudar um cadastro, edite '
+    + 'a planilha de cadastros direto.');
 }
 
 /**
@@ -1793,13 +1875,13 @@ function formatarEGravar_(estrutura, primeiraLinha, linhas) {
  * visível e registra que ela nasceu no sistema.
  */
 function inserirRegistro_(nomeDaAba, dados, contexto) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   return inserirVariosRegistros_(nomeDaAba, [dados], contexto)[0];
 }
 
 /** Insere vários registros numa gravação só. */
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
   contexto = contexto || {};
 
@@ -1874,7 +1956,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
  * assim uma coluna nunca fica com o formato de outro tipo.
  */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1901,7 +1983,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
  * Nenhuma linha de base operacional é apagada — nunca.
  */
 function ocultarRegistro_(nomeDaAba, id, usuarioId) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba), '_Visivel') < 0) {
     throw new Error('A aba "' + nomeDaAba + '" não tem exclusão lógica — ela ' +
       'não possui a coluna _Visivel. Em abas de catálogo, o que desliga um ' +
@@ -1936,7 +2018,7 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
  * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
  */
 function apagarRegistroDeVez_(nomeDaAba, id) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -1991,7 +2073,7 @@ function garantirLinhasNaGrade_(aba, ateLinha) {
  * salvamento comum. Recusa cabeçalho que já exista, mesmo escrito diferente.
  */
 function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
-  recusarEscritaEmAbaDeFora_(nomeDaAba);
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var texto = String(cabecalho || '').trim();
   if (!texto) throw new Error('Cabeçalho vazio.');
   if (!RECC_FORMATO_DA_CELULA[tipo]) throw new Error('Tipo de coluna desconhecido: ' + tipo);

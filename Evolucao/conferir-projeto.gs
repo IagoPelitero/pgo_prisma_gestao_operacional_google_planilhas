@@ -26,7 +26,7 @@
  */
 function oQueFaltaNoProjeto() {
   var esperado = {
-    'Cadastros.gs': ['aplicarImportacao', 'bloquearSusep', 'conferirImportacao', 'desbloquearSusep', 'exportarCorretoras', 'listarProdutos', 'listarSusepsBloqueadas', 'ocultarCorretora', 'ocultarProduto', 'opcoesDaImportacao', 'salvarCorretora', 'salvarProduto', 'tabelaDeCorretoras'],
+    'Cadastros.gs': ['aplicarImportacao', 'bloquearSusep', 'conferirImportacao', 'desbloquearSusep', 'exportarCorretoras', 'listarProdutos', 'listarSusepsBloqueadas', 'ocultarCorretora', 'ocultarProduto', 'opcoesDaImportacao', 'origemDosCadastros', 'salvarCorretora', 'salvarProduto', 'tabelaDeCorretoras'],
     'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'conferirTombamento', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'opcoesDaBusca', 'opcoesDoTombamento', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar', 'tombarCasos'],
     'Config.gs': ['conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDosCadastros', 'criarCampo', 'definirSenhaDeAdministrador', 'gerarAnalise', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'ocultarAnalise', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
@@ -48,7 +48,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 72 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 73 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

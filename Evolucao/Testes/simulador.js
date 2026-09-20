@@ -395,6 +395,18 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       planilhasExternas.set(id, outra);
       return id;
     },
+    /**
+     * A planilha externa, para o teste mexer nela POR FORA do PGO.
+     *
+     * É o que permite simular o caso real que mais preocupa numa base
+     * compartilhada: alguém acrescentando uma linha direto lá, sem o PGO saber.
+     */
+    planilhaExternaPeloId(id) {
+      if (!planilhasExternas.has(id)) {
+        throw new Error('Não existe planilha externa com o Id "' + id + '".');
+      }
+      return planilhasExternas.get(id);
+    },
     globais: {
       SpreadsheetApp: {
         getActive: () => planilha,

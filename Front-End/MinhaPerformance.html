@@ -29,8 +29,9 @@
 var TelaMinhaPerformance = (function () {
 
   var canalEscolhida = '';
-  var dias = 0;
   var dados = null;
+  // COMO o período foi escolhido. O mesmo seletor das outras duas telas.
+  var periodo = SeletorDePeriodo.padrao();
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -50,7 +51,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', canalEscolhida, dias)
+    Servidor.chamar('minhaPerformance', canalEscolhida, periodo)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -85,19 +86,14 @@ var TelaMinhaPerformance = (function () {
   }
 
   function desenharCabeca() {
-    var periodos = [7, 15, 30, 60, 90].map(function (quantos) {
-      return '<option value="' + quantos + '"'
-        + (dados.periodo.dias === quantos ? ' selected' : '') + '>'
-        + 'Últimos ' + quantos + ' dias</option>';
-    }).join('');
-
-    return '<div class="filtros">'
-      + '<select class="filtro" id="periodo-da-performance" aria-label="Período">'
-      + periodos + '</select>'
-      + '<span class="contagem">' + escapar(dados.pessoa.nome)
-      + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
-      + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : '')
-      + '</span></div>';
+    // A caixa e o seletor são as PEÇAS COMPARTILHADAS, as mesmas do Trabalho e
+    // da Produtividade. A contagem aqui é quem está sendo medido — numa tela
+    // sobre uma pessoa, é o dado mais importante do recorte.
+    return Moldura.caixaDeFiltros(
+      SeletorDePeriodo.desenhar(dados),
+      escapar(dados.pessoa.nome)
+        + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
+        + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : ''));
   }
 
   /* --------------------------------------------------------- indicadores */
@@ -235,11 +231,12 @@ var TelaMinhaPerformance = (function () {
   /* ---------------------------------------------------------------- ligar */
 
   function ligar() {
-    var periodo = elemento('periodo-da-performance');
-    if (periodo) {
-      periodo.addEventListener('change', function () {
-        dias = Number(this.value);
-        carregar();
+    var caixas = document.querySelectorAll('#performance .filtro');
+    for (var i = 0; i < caixas.length; i++) {
+      caixas[i].addEventListener('change', function () {
+        var novo = SeletorDePeriodo.mudou(this, dados, 'performance');
+        // `false` é o de/até com uma data só: ainda não recarrega.
+        if (novo) { periodo = novo; carregar(); }
       });
     }
 

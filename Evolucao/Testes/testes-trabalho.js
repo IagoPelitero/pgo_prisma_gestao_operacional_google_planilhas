@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * PGO — testes-painel.js · a Etapa 5
+ * PGO — testes-trabalho.js · a Etapa 5
  * ============================================================================
  * O painel só é útil se o número do cartão bater com o que a fila mostra.
  * Boa parte destes testes existe para provar que cartão e fila saem da MESMA
@@ -454,6 +454,87 @@ function rodarTestesDoTrabalho() {
     igual(String(depois), String(primeiro), 'o primeiro carimbo tem de sobreviver');
   });
 
+  teste('trocar o status pelo FORMULÁRIO carimba igual ao diálogo', () => {
+    // Os dois testes acima usam só o diálogo — e foi por isso que o defeito
+    // passou: o carimbo existia, o teste provava que existia, e quem editasse
+    // pelo lápis não carimbava nada. Mesmo caso, mesma situação, registro
+    // diferente conforme onde a pessoa clicou.
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'primeiro.adm', status: 'Em andamento',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso editado pelo lápis'
+    });
+
+    chamar('editarCaso')(canal.id, novo.id, {
+      analista: 'primeiro.adm', status: 'Concluído',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso editado pelo lápis'
+    });
+
+    const gravado = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0];
+    verdadeiro(ehData(gravado['Data do 1o contato']),
+      'a edição pelo formulário tem de carimbar também');
+  });
+
+  teste('as duas portas deixam o MESMO registro', () => {
+    // O que se cobra aqui não é cada coluna: é que a escolha da porta não
+    // apareça no dado. Se um dia aparecer, esta comparação diz em qual coluna.
+    const molde = (nome) => ({
+      analista: 'primeiro.adm', status: 'Em andamento',
+      datadeentrada: escrever(hoje), nomedosegurado: nome
+    });
+
+    const peloDialogo = chamar('cadastrarCaso')(canal.id, molde('Pelo diálogo'));
+    chamar('alterarSituacaoDoCaso')(canal.id, peloDialogo.id, 'Concluído');
+
+    const peloFormulario = chamar('cadastrarCaso')(canal.id, molde('Pelo formulário'));
+    const comStatusNovo = molde('Pelo formulário');
+    comStatusNovo.status = 'Concluído';
+    chamar('editarCaso')(canal.id, peloFormulario.id, comStatusNovo);
+
+    const um = chamar('buscarRegistros_')(canal.aba, 'Id', peloDialogo.id, 1)[0];
+    const outro = chamar('buscarRegistros_')(canal.aba, 'Id', peloFormulario.id, 1)[0];
+
+    ['Data do 1o contato', 'Quem mudou o status', 'Mudanças de status']
+      .forEach((coluna) => {
+        if (um[coluna] === undefined) return;   // coluna que este canal não tem
+        const temUm = String(um[coluna] || '') !== '';
+        const temOutro = String(outro[coluna] || '') !== '';
+        igual(temOutro, temUm, coluna + ' tem de ficar igual pelas duas portas');
+      });
+  });
+
+  teste('salvar sem mexer na situação NÃO conta uma andada', () => {
+    // O contador responde "quantas vezes este caso andou". Salvar o formulário
+    // para corrigir um telefone não é uma andada, e contar faria o caso
+    // parecer muito mais trabalhado do que foi.
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'primeiro.adm', status: 'Em andamento',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso só corrigido'
+    });
+    const antes = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0]['Mudanças de status'];
+
+    chamar('editarCaso')(canal.id, novo.id, {
+      analista: 'primeiro.adm', status: 'Em andamento',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso só corrigido, com o nome certo'
+    });
+    const depois = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0]['Mudanças de status'];
+
+    igual(String(depois || ''), String(antes || ''), 'mesma situação, mesmo contador');
+  });
+
+  teste('o caso já NASCE com a situação carimbada', () => {
+    // Sem isto, um caso cadastrado hoje em "Não trabalhado" só ganhava data
+    // quando alguém trocasse a situação pela primeira vez — e até lá a
+    // Produtividade RECC não sabia que ele existia naquela situação.
+    const novo = chamar('cadastrarCaso')(canal.id, {
+      analista: 'primeiro.adm', status: 'Concluído',
+      datadeentrada: escrever(hoje), nomedosegurado: 'Caso nascido concluído'
+    });
+
+    const gravado = chamar('buscarRegistros_')(canal.aba, 'Id', novo.id, 1)[0];
+    verdadeiro(ehData(gravado['Data do 1o contato']),
+      'a situação de nascimento também é uma chegada, e tem hora');
+  });
+
   secao('O controle de produtividade da RET');
 
   /*
@@ -703,6 +784,158 @@ function rodarTestesDoTrabalho() {
     igual(depois.total, antes.total - 1);
     igual(depois.fila.length, antes.fila.length - 1);
     igual(depois.cartoes[0].valor, antes.cartoes[0].valor - 1);
+  });
+
+  secao('O filtro por data no Trabalho');
+
+  // O PO pediu: "na aba trabalho precisa do filtro por data". Antes o Trabalho
+  // só olhava a janela fixa da CONFIG — os mesmos 30 dias para todo mundo.
+  // Estes testes provam que as TRÊS formas do período chegam até a fila.
+
+  const mesDe = (recuo) => {
+    const quando = new Date(hoje.getFullYear(), hoje.getMonth() - recuo, 1);
+    return quando.getFullYear() + '-'
+      + String(quando.getMonth() + 1).padStart(2, '0');
+  };
+
+  /** Uma data qualquer dentro do mês, longe das duas pontas. */
+  const diaNoMes = (recuo) => {
+    const quando = new Date(hoje.getFullYear(), hoje.getMonth() - recuo, 10);
+    return escrever(quando);
+  };
+
+  teste('sem pedido nenhum, o Trabalho abre no atalho da CONFIG', () => {
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    igual(resumo.periodo.tipo, 'dias');
+    igual(resumo.periodo.dias, 30);
+    contem(resumo.periodo.rotulo, 'últimos 30 dias');
+  });
+
+  teste('o Trabalho aceita um mês fechado, e a fila muda com ele', () => {
+    // O caso nasce em DOIS meses atrás: fora do atalho de 30 dias, dentro do
+    // seu próprio mês. Se o período não chegasse ao filtro, ele nunca
+    // apareceria — e é justamente o caso que o filtro por data existe para achar.
+    chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Ana Martins', Status: 'Em andamento',
+      'Data de entrada': diaNoMes(2), 'Nome do segurado': 'Caso de dois meses atras'
+    });
+
+    const noMesDele = chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(2) });
+    igual(noMesDele.periodo.tipo, 'mes');
+    igual(noMesDele.periodo.mes, mesDe(2));
+    verdadeiro(JSON.stringify(noMesDele.fila).includes('Caso de dois meses atras'),
+      'escolhido o mês dele, o caso aparece');
+
+    const noMesPassado = chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(1) });
+    verdadeiro(!JSON.stringify(noMesPassado.fila).includes('Caso de dois meses atras'),
+      'escolhido outro mês, ele sai');
+  });
+
+  teste('o Trabalho aceita de/até, com as duas pontas dentro', () => {
+    const resumo = chamar('resumoDoCanal')(canal.id, {},
+      { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(1) });
+    igual(resumo.periodo.tipo, 'intervalo');
+    igual(resumo.periodo.de, diasAtras(2));
+    igual(resumo.periodo.ate, diasAtras(1));
+    contem(resumo.periodo.rotulo, 'de ' + diasAtras(2));
+  });
+
+  teste('o mês fechado NÃO guarda o caso sem data; o atalho guarda', () => {
+    // Num "últimos 30 dias", a linha sem data é um caso mal preenchido que
+    // precisa aparecer para alguém arrumar. Num "setembro", ela é um caso
+    // sobre o qual não se pode afirmar que é de setembro.
+    chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Ana Martins', Status: 'Em andamento',
+      'Nome do segurado': 'Caso sem data nenhuma'
+    });
+
+    const atalho = chamar('resumoDoCanal')(canal.id, {});
+    verdadeiro(JSON.stringify(atalho.fila).includes('Caso sem data nenhuma'),
+      'no atalho ele aparece, para ser arrumado');
+
+    const mes = chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(0) });
+    verdadeiro(!JSON.stringify(mes.fila).includes('Caso sem data nenhuma'),
+      'num mês fechado ele sai');
+  });
+
+  teste('o Trabalho entrega os meses para a tela montar a lista', () => {
+    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    verdadeiro(resumo.mesesDisponiveis.length > 0, 'sem lista, não há o que escolher');
+    igual(resumo.mesesDisponiveis[0].valor, mesDe(0), 'o corrente vem primeiro');
+  });
+
+  teste('a fila vazia diz o período que olhou, não "os N dias"', () => {
+    // Com "setembro de 2026" escolhido, "nada nos 30 dias mais recentes" era
+    // mentira — e mandava a pessoa procurar defeito onde não havia.
+    const tela = lerPeca('Trabalho');
+    contem(tela, 'Nada foi registrado no período escolhido');
+    contem(tela, 'escapar(resumo.periodo.rotulo)');
+    verdadeiro(tela.indexOf("resumo.periodo.dias + ' dias mais recentes") < 0,
+      'o recado antigo não pode ter sobrado');
+  });
+
+  secao('A caixa de filtros, nas três telas');
+
+  // Pedido do PO: "envolva tudo que for filtro por uma parte de fundo branca
+  // com título de filtro, o mesmo para minha performance e o mesmo para
+  // Produtividade". Caixa e seletor moram numa peça só: três cópias
+  // divergiriam no primeiro ajuste, e o PO veria três telas diferentes.
+
+  const asTresTelas = ['Trabalho', 'Produtividade', 'MinhaPerformance'];
+
+  teste('as três telas põem os filtros na mesma caixa branca', () => {
+    asTresTelas.forEach((nome) => {
+      contem(lerPeca(nome), 'Moldura.caixaDeFiltros(',
+        nome + ' tem de usar a caixa compartilhada');
+    });
+    contem(lerPeca('Comuns'), 'Filtros</h3>', 'e a caixa tem o título pedido');
+    contem(lerPeca('Estilos'), '.caixa-de-filtros', 'com o fundo branco declarado');
+  });
+
+  teste('as três telas usam o MESMO seletor de período', () => {
+    asTresTelas.forEach((nome) => {
+      const tela = lerPeca(nome);
+      contem(tela, 'SeletorDePeriodo.desenhar(', nome + ' desenha pelo seletor');
+      contem(tela, 'SeletorDePeriodo.mudou(', nome + ' reage pelo seletor');
+      contem(tela, 'SeletorDePeriodo.padrao()', nome + ' abre pelo padrão do seletor');
+
+      // A peça é uma só: nenhuma tela pode ter a sua própria cópia.
+      verdadeiro(tela.indexOf('function desenharPeriodo') < 0,
+        nome + ' não pode ter o seu próprio seletor');
+      verdadeiro(tela.indexOf('RECC_NOMES_DOS_MESES') < 0,
+        nome + ' não pode ter a sua própria lista de meses');
+    });
+  });
+
+  teste('o seletor devolve três respostas, e a do meio evita a busca torta', () => {
+    // De/até com UMA data só não é um período: recarregar ali traria a tela
+    // zerada e a pessoa acharia que não há caso. Por isso `false` — "é do
+    // período, mas ainda não está pronto" — separado de `null`, "não é meu".
+    const peca = lerPeca('Comuns');
+    contem(peca, 'PEÇA 7 de 7', 'a peça é anunciada como as outras');
+    contem(peca, 'var SeletorDePeriodo = (function ()');
+    contem(peca, '(intervalo.de && intervalo.ate) ? intervalo : false',
+      'só com as DUAS datas o intervalo vale');
+    contem(peca, "data-periodo=", 'os campos se identificam para o seletor');
+
+    // E as telas que têm filtro comum PRECISAM separar `false` de `null`: sem
+    // isso, mexer no período cairia no `filtrosEscolhidos` e a tela procuraria
+    // um filtro chamado "de" — que não existe, e zeraria a fila.
+    ['Trabalho', 'Produtividade'].forEach((nome) => {
+      contem(lerPeca(nome), 'novoPeriodo !== null',
+        nome + ' tem de separar "não é meu" de "ainda incompleto"');
+    });
+  });
+
+  teste('a caixa de filtros conta o que está sendo mostrado', () => {
+    // O número ao lado de "Filtros" é o que impede a leitura errada: filtro
+    // esquecido ligado, tela com três casos e ninguém entende o porquê.
+    contem(lerPeca('Comuns'), 'caixa-de-filtros-cabeca');
+    asTresTelas.forEach((nome) => {
+      const chamada = lerPeca(nome).split('Moldura.caixaDeFiltros(')[1];
+      verdadeiro(chamada.indexOf(',') > 0,
+        nome + ' tem de passar a contagem, não só o conteúdo');
+    });
   });
 }
 

@@ -87,10 +87,15 @@ function tomValido_(cor) {
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDoCanal(idDoCanal, filtros) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
-  var dias = Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+
+  // O PERÍODO é escolhido na tela, das três maneiras — por dias, por data e
+  // por mês. Antes era a janela fixa da CONFIG, igual para todo mundo: quem
+  // precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
+  var periodo = resolverPeriodo_(periodoPedido);
+  var antes = periodoAnterior_(periodo);
 
   // A base só acrescenta no fim, então o recente está nas últimas linhas.
   // Ler por data exigiria percorrer tudo; ler o fim e depois filtrar por data
@@ -98,12 +103,19 @@ function resumoDoCanal(idDoCanal, filtros) {
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, dias, 0);
+  // Linha sem data FICA no atalho e SAI dos períodos fechados — a mesma regra
+  // da Produtividade RECC, pelo mesmo motivo: num "últimos 30 dias" ela é um
+  // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
+  // o qual não dá para afirmar que é de setembro.
+  var guardarSemData = (periodo.tipo === 'dias');
+
+  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
+    guardarSemData);
   var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
 
   // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
   var anterior = filtrarPeloAlcance_(
-    filtrarPeloPeriodo_(recentes, canal, dias, dias), canal.aba, quem);
+    entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
   var filtrados = aplicarFiltros_(meus, disponiveis, filtros || {});
@@ -111,7 +123,15 @@ function resumoDoCanal(idDoCanal, filtros) {
 
   return {
     canal: canal,
-    periodo: { dias: dias, rotulo: 'últimos ' + dias + ' dias' },
+    periodo: {
+      tipo: periodo.tipo,
+      dias: periodo.dias,
+      mes: periodo.mes || '',
+      de: comoSeEscreve_(periodo.de),
+      ate: comoSeEscreve_(periodo.ate),
+      rotulo: periodo.rotulo
+    },
+    mesesDisponiveis: mesesParaEscolher_(),
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
@@ -1738,18 +1758,25 @@ const RECC_VIZINHOS_NO_RANKING = 2;
 /**
  * Os números de quem está olhando, no canal e no período escolhidos.
  */
-function minhaPerformance(idDoCanal, dias) {
+function minhaPerformance(idDoCanal, periodoPedido) {
   var quem = exigirTela_('minhaPerformance');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var janela = Number(dias) || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
+  // As mesmas três maneiras das outras duas telas — por dias, por data e por
+  // mês. `resolverPeriodo_` aceita só um número também, que é como esta tela
+  // era chamada antes; nada quebra por isso.
+  var periodo = resolverPeriodo_(periodoPedido);
+  var antesDele = periodoAnterior_(periodo);
+  var janela = periodo.dias;
+
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   // Bateu no teto de leitura: pode haver caso do período que ficou de fora.
   // Aqui isto pesa mais que nas outras telas — esta é a tela sobre UMA PESSOA,
   // e número incompleto vira julgamento errado sobre alguém.
   var truncada = recentes.length >= linhasQueOPainelOlha_();
-  var noPeriodo = filtrarPeloPeriodo_(recentes, canal, janela, 0);
-  var anterior = filtrarPeloPeriodo_(recentes, canal, janela, janela);
+  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
+    periodo.tipo === 'dias');
+  var anterior = entreDuasDatas_(recentes, canal, antesDele.de, antesDele.ate, false);
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var meuNome = String(quem.usuario.Nome || '');
@@ -1773,7 +1800,15 @@ function minhaPerformance(idDoCanal, dias) {
       nivel: quem.nivel,
       canal: String(quem.usuario['Canal que atende'] || '')
     },
-    periodo: { dias: janela, rotulo: 'últimos ' + janela + ' dias' },
+    periodo: {
+      tipo: periodo.tipo,
+      dias: periodo.dias,
+      mes: periodo.mes || '',
+      de: comoSeEscreve_(periodo.de),
+      ate: comoSeEscreve_(periodo.ate),
+      rotulo: periodo.rotulo
+    },
+    mesesDisponiveis: mesesParaEscolher_(),
     truncada: truncada,
     linhasLidas: recentes.length,
     // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez

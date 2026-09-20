@@ -579,6 +579,38 @@ button { font: inherit; color: inherit; }
   box-shadow: inset 0 0 0 1px var(--tom);
 }
 
+/*
+  A CAIXA DE FILTROS.
+
+  Os controles ficavam soltos sobre o fundo da página, encostados no conteúdo.
+  Numa tela com cartão, gráfico e tabela, não dava para saber onde o recorte
+  acabava e o resultado começava. A caixa separa as duas coisas: o que está
+  dentro muda o que está fora.
+
+  A contagem mora no cabeçalho da caixa, e não perdida no meio dos controles:
+  ela é o RESULTADO do recorte, e o lugar dela é ao lado do título.
+*/
+.caixa-de-filtros {
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: var(--raio); padding: 14px 16px 4px;
+  margin-bottom: 16px; box-shadow: var(--sombra);
+}
+.caixa-de-filtros-cabeca {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.caixa-de-filtros-cabeca h3 {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0; font-size: 13px; font-weight: 700; color: var(--suave);
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.caixa-de-filtros-cabeca h3 svg { width: 15px; height: 15px; }
+.caixa-de-filtros-cabeca .contagem {
+  margin-left: auto; font-size: 13px; color: var(--suave);
+  font-variant-numeric: tabular-nums;
+}
+/* Dentro da caixa a margem de baixo vira o respiro do próprio forro. */
+.caixa-de-filtros .filtros { margin-bottom: 10px; }
+
 .filtros {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   margin-bottom: 14px;

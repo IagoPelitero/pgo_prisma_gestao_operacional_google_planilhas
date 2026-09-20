@@ -1822,6 +1822,7 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   }
 
   var faltando = [];
+  var avisos = [];
   var achadas = [];
 
   RECC_ABAS_QUE_PODEM_VIR_DE_FORA.forEach(function (nome) {
@@ -1849,21 +1850,51 @@ function conferirPlanilhaDeCadastros(planilhaId) {
     if (ausentes.length) {
       faltando.push('• A aba "' + nome + '" está sem: ' + ausentes.join(', ') + '.');
     }
+
+    /*
+     * EDITAR DAQUI é outra pergunta, e por isso é um aviso e não uma falta.
+     *
+     * Para o PGO gravar na aba ela precisa de Id e das colunas de controle —
+     * é nelas que mora a exclusão lógica. Uma lista montada por outra área
+     * provavelmente não as tem, e ela continua servindo para LER, que é metade
+     * do que se quer dela. Exigi-las para poder ligar transformaria um cadastro
+     * útil em nenhum.
+     */
+    var semEscrita = RECC_COLUNAS_PARA_ESCREVER_DE_FORA.filter(function (coluna) {
+      return cabecalhos.indexOf(normalizarParaComparar_(coluna)) < 0;
+    });
+    if (semEscrita.length) {
+      avisos.push('• A aba "' + nome + '" vai abrir só para LEITURA: faltam '
+        + semEscrita.join(', ') + '. Acrescente essas colunas se quiser '
+        + 'cadastrar e editar por aqui.');
+    }
+
     achadas.push({
       aba: nome,
       linhas: Math.max(aba.getLastRow() - 1, 0),
-      completa: ausentes.length === 0
+      completa: ausentes.length === 0,
+      podeEditar: semEscrita.length === 0,
+      faltaParaEditar: semEscrita
     });
   });
+
+  var soLeitura = achadas.filter(function (uma) { return !uma.podeEditar; }).length;
 
   return {
     abre: true,
     recado: faltando.length
       ? 'A planilha abriu, mas ' + faltando.length + ' aba(s) precisam de ajuste.'
       : 'Tudo certo: as ' + achadas.length + ' abas estão lá, com as colunas '
-        + 'que o PGO procura.',
+        + 'que o PGO procura.'
+        + (soLeitura
+          ? ' ' + soLeitura + ' delas vão abrir só para leitura — veja abaixo.'
+          : ' E todas aceitam cadastrar e editar por aqui.'),
     nome: planilha.getName(),
     abas: achadas,
-    faltando: faltando
+    faltando: faltando,
+    avisos: avisos,
+    // O que acrescentar numa aba para ela virar editável pelo PGO. A tela
+    // mostra isto junto do aviso, para ninguém precisar adivinhar.
+    colunasParaEditar: RECC_COLUNAS_PARA_ESCREVER_DE_FORA
   };
 }

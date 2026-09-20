@@ -570,6 +570,7 @@ function cadastrarCaso(idDoCanal, valores) {
   var paraGravar = validarValores_(canal.id, valores || {}, quem, true);
   preencherEntradaAutomatica_(canal, paraGravar);
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
+  carimbarOStatusDeNascimento_(canal, paraGravar);
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
   registrarAuditoria_('caso.criar', canal.aba, gravado.__id, canal.nome);
@@ -598,6 +599,11 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
   exigirAlcanceSobre_(atual, canal, quem);
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false);
+
+  // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
+  // diálogo, e tem de deixar o mesmo rastro.
+  carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
+
   atualizarRegistro_(canal.aba, alvo, paraGravar);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
@@ -632,11 +638,7 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
 
   var escolhida = String(situacaoNova || '').trim();
   var conhecidas = situacoesDoCanal_(canal);
-  var achada = null;
-  conhecidas.forEach(function (uma) {
-    if (normalizarParaComparar_(uma.gravadoComo)
-      === normalizarParaComparar_(escolhida)) achada = uma;
-  });
+  var achada = situacaoDoCanalPeloValor_(canal, escolhida);
   if (!achada) {
     throw new Error('A situação "' + escolhida + '" não existe no canal ' +
       canal.nome + '. As situações dela são: ' + conhecidas.map(function (uma) {
@@ -704,6 +706,79 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   if (jaTem) return;
 
   alteracao[coluna] = new Date();
+}
+
+/**
+ * A situação do canal que corresponde a este valor gravado.
+ *
+ * Compara sem acento e sem maiúscula, porque o valor pode ter sido digitado na
+ * planilha à mão. Devolve null quando não é situação conhecida — e aí quem
+ * chamou decide se isso é erro (o diálogo) ou se é só não carimbar (a edição).
+ */
+function situacaoDoCanalPeloValor_(canal, valor) {
+  var procurado = normalizarParaComparar_(String(valor || '').trim());
+  if (!procurado) return null;
+
+  var achada = null;
+  situacoesDoCanal_(canal).forEach(function (uma) {
+    if (normalizarParaComparar_(uma.gravadoComo) === procurado) achada = uma;
+  });
+  return achada;
+}
+
+/**
+ * Carimba a mudança de status vinda de QUALQUER porta.
+ *
+ * O PO pediu assim: "toda vez que mudar o status dos casos da RET ele deve
+ * registrar". Toda vez — e não "toda vez que a pessoa usar o diálogo".
+ *
+ * O sistema tem duas portas para trocar a situação: o diálogo de situação, que
+ * é o gesto de todo dia, e o formulário inteiro, aberto pelo lápis. Antes só o
+ * diálogo carimbava. O mesmo caso, na mesma situação, ficava com data ou sem
+ * data dependendo de onde a pessoa clicou — e a Produtividade RECC contava só
+ * metade, sem errar em nada visível. Número que erra sozinho é o pior tipo.
+ *
+ * Só age quando a situação MUDOU de verdade: salvar o formulário sem mexer na
+ * situação não é mudança, e contaria uma andada que não houve.
+ */
+function carimbarSeOStatusMudou_(canal, registroAtual, alteracao, quem) {
+  if (!canal.colunaDoStatus) return;
+  if (!alteracao.hasOwnProperty(canal.colunaDoStatus)) return;
+
+  var agora = String(alteracao[canal.colunaDoStatus] || '').trim();
+  var antes = String(registroAtual[canal.colunaDoStatus] || '').trim();
+  if (!agora) return;
+  if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+  // Situação que o catálogo não conhece ainda assim é mudança: as três colunas
+  // de rastro registram. O que não dá é carimbar, porque não há coluna
+  // declarada para ela — e inventar uma seria pior do que não ter.
+  var achada = situacaoDoCanalPeloValor_(canal, agora);
+  if (achada) carimbarOStatus_(canal, achada, registroAtual, alteracao);
+  registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem);
+}
+
+/**
+ * Carimba a situação em que o caso NASCE.
+ *
+ * Um caso cadastrado agora, em "Não trabalhado", chegou nessa situação agora —
+ * e a Produtividade RECC precisa saber disso. Sem este carimbo, todo caso
+ * nascido pelo formulário entrava sem data nenhuma, e só passava a ter data
+ * quando alguém trocasse a situação pela primeira vez.
+ *
+ * NÃO vale para tombamento: lá o caso é antigo, e carimbar "agora" diria que
+ * um contato de julho aconteceu hoje. O tombamento traz as datas da base
+ * antiga, pelo de-para.
+ */
+function carimbarOStatusDeNascimento_(canal, paraGravar) {
+  if (!canal.colunaDoStatus) return;
+
+  var achada = situacaoDoCanalPeloValor_(canal, paraGravar[canal.colunaDoStatus]);
+  if (!achada) return;
+
+  // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
+  // o que veio manda. O carimbo nunca reescreve o que alguém informou.
+  carimbarOStatus_(canal, achada, paraGravar, paraGravar);
 }
 
 /**

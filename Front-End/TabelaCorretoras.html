@@ -21,6 +21,14 @@ var TelaTabelaCorretoras = (function () {
   var dados = null;
   var editando = null;      // o item aberto no formulário lateral
   var tipoDaImportacao = '';  // qual lista está sendo importada
+  /*
+   * De onde vem cada cadastro: desta planilha ou da de cadastros.
+   *
+   * Lido UMA VEZ, quando a tela abre — a resposta não muda enquanto ela está
+   * aberta, e perguntar em cada aba seriam três idas ao servidor para a mesma
+   * coisa.
+   */
+  var origem = null;
   var conferido = null;       // o resultado do passo 2, enquanto não se aplica
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -102,13 +110,14 @@ var TelaTabelaCorretoras = (function () {
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
       + ' placeholder="Corretora, canal ou SUSEP" aria-label="Procurar corretora">'
       + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
-      + (dados.podeMexer
+      + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
           + 'Cadastrar corretora</button>' : '')
       + (dados.podeExportar
         ? '<button type="button" class="botao-texto" id="exportar-corretoras">'
           + 'Exportar</button>' : '')
       + '</div>'
+      + avisoDeOrigem('CORRETORAS')
       + avisoDasNaoCadastradas()
       + '<p class="config-explica">' + dados.quantasFiltradas + ' de '
       + dados.quantasNoTotal + ' corretoras · a lista vem de quem mais traz '
@@ -180,7 +189,7 @@ var TelaTabelaCorretoras = (function () {
         + (uma.bloqueada ? 'Bloqueada' : 'Liberada') + '</span></td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
-        + (dados.podeMexer
+        + (dados.podeMexer && podeMexerNesta('CORRETORAS')
           ? '<button type="button" class="acao-icone" data-corretora="'
             + escapar(uma.id) + '" title="Editar" aria-label="Editar corretora">'
             + Moldura.icone('editar') + '</button>' : '')
@@ -357,8 +366,11 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">' + dados.produtos.length + ' produtos</span>'
-      + '<button type="button" class="botao pequeno" id="novo-produto">'
-      + 'Cadastrar produto</button></div>'
+      + (podeMexerNesta('PRODUTOS')
+        ? '<button type="button" class="botao pequeno" id="novo-produto">'
+          + 'Cadastrar produto</button>' : '')
+      + '</div>'
+      + avisoDeOrigem('PRODUTOS')
       + '<p class="config-explica">O <strong>código</strong> é o que liga o '
       + 'produto ao caso — por isso ele é único, e o sistema recusa repetir.</p>'
       + (dados.produtos.length
@@ -366,7 +378,11 @@ var TelaTabelaCorretoras = (function () {
         : '<p class="config-vazio">Nenhum produto cadastrado. Sem eles, o '
           + 'campo de produto do formulário fica como caixa de texto livre.</p>');
 
-    elemento('novo-produto').addEventListener('click', function () {
+    // O botão só existe quando a aba aceita escrita. Ligar um ouvinte num
+    // elemento que não está na tela estoura, e o estouro acontece ANTES de
+    // qualquer tratamento — a tela fica em branco sem log. É o achado 27.
+    var novoProduto = elemento('novo-produto');
+    if (novoProduto) novoProduto.addEventListener('click', function () {
       editando = { id: '' };
       desenharFormularioDoProduto(null);
     });
@@ -434,7 +450,7 @@ var TelaTabelaCorretoras = (function () {
         + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
-        + (dados.podeMexer
+        + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
           ? '<button type="button" class="botao-texto" data-liberar="'
             + escapar(uma.id) + '">Liberar</button>' : '')
         + '</td></tr>';
@@ -443,10 +459,11 @@ var TelaTabelaCorretoras = (function () {
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">' + dados.bloqueadas.length
       + ' SUSEP(s) bloqueada(s)</span>'
-      + (dados.podeMexer
+      + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
         ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
           + 'Bloquear SUSEP</button>' : '')
       + '</div>'
+      + avisoDeOrigem('SUSEP_BLOQUEADAS')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
       + 'o formulário passa a mostrar o selo vermelho com o motivo, e quem está '
       + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa '
@@ -804,7 +821,44 @@ var TelaTabelaCorretoras = (function () {
         Aplicacao.remontar();
       });
     }
-    carregar();
+    // A origem vem ANTES da lista: o aviso precisa estar na tela junto com os
+    // dados, e não aparecendo meio segundo depois deles.
+    Servidor.chamar('origemDosCadastros')
+      .entao(function (resposta) { origem = resposta; carregar(); })
+      // Se nem a origem responde, a lista vai falhar do mesmo jeito e com um
+      // recado melhor. Não vale travar a tela aqui.
+      .senao(function () { carregar(); });
+  }
+
+  /**
+   * O aviso de que este cadastro mora em outra planilha.
+   *
+   * Sem ele, alguém edita achando que mexeu nesta planilha e mexeu na outra —
+   * ou pior, procura o botão de editar e não acha, sem saber por quê.
+   */
+  function avisoDeOrigem(aba) {
+    if (!origem || !origem[aba] || !origem[aba].deFora) return '';
+    var dela = origem[aba];
+
+    var onde = dela.planilha
+      ? 'a planilha de cadastros <strong>' + escapar(dela.planilha) + '</strong>'
+      : 'a planilha de cadastros';
+
+    if (dela.podeEditar) {
+      return '<p class="config-alerta suave">Este cadastro mora em ' + onde
+        + '. O que você cadastrar ou editar aqui é gravado <strong>lá</strong>.</p>';
+    }
+
+    return '<p class="config-alerta">Este cadastro mora em ' + onde
+      + ', e está <strong>só para leitura</strong>: faltam as colunas '
+      + escapar(dela.faltaParaEditar.join(', ')) + ' na primeira linha daquela '
+      + 'aba. Acrescente-as lá e o cadastro passa a ser editável por aqui.</p>';
+  }
+
+  /** Dá para cadastrar e editar nesta aba? */
+  function podeMexerNesta(aba) {
+    if (!origem || !origem[aba]) return true;
+    return origem[aba].podeEditar !== false;
   }
 
   /* Sair da tela fecha o diálogo de senha, se ele tiver ficado aberto. */

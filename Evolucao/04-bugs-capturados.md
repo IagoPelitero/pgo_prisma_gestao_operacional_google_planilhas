@@ -967,11 +967,91 @@ responde.
 no lugar errado.** O teste tinha o nome certo, a intenção certa e o escopo
 errado — e escopo errado num teste não deixa sintoma nenhum.
 
+### 43 · O carimbo que dependia de qual porta a pessoa usou
+
+**Sintoma.** Na foto da Produtividade RECC, o cartão **"Já contatados" dizia
+0** enquanto a rosca "Situação dos casos", logo abaixo na mesma tela, mostrava
+um caso em "1º contato realizado" e outro em "2º contato realizado". Dois
+números da mesma tela, discordando.
+
+**Causa.** O sistema tem **três portas** para um caso chegar a uma situação, e
+só uma delas carimbava:
+
+| porta | carimbava? |
+|---|---|
+| diálogo de situação (`alterarSituacaoDoCaso`) | sim |
+| formulário inteiro, pelo lápis (`editarCaso`) | **não** |
+| cadastro de um caso novo (`cadastrarCaso`) | **não** |
+
+`carimbarOStatus_` tinha **um único ponto de chamada**, dentro do diálogo. O
+analista que trocasse a situação pelo formulário — que é o mesmo gesto, na
+mesma tela, a um clique de distância — não deixava carimbo nenhum. E como
+"Já contatados" sai do carimbo, e não do status (decisão certa, item 11 do
+progresso), a conta ficava pela metade.
+
+**Por que os testes não pegaram.** Havia dois testes do carimbo, e os dois
+bons: um provava que o carimbo é data de verdade, outro que voltar ao mesmo
+status não reescreve. **Os dois usavam o diálogo** — justamente a porta que
+funcionava. O mecanismo estava provado; a cobertura das portas, não.
+
+**Defesa.** O carimbo virou uma função por onde **toda** porta passa:
+`carimbarSeOStatusMudou_` na edição e `carimbarOStatusDeNascimento_` no
+cadastro. E quatro testes novos, sendo um deles a pergunta direta — *as duas
+portas deixam o MESMO registro?* — que compara caso a caso em vez de conferir
+coluna por coluna.
+
+**O que ele ensina.** **Um ponto de chamada só não é um ponto único: é um
+caminho coberto e os outros não.** O motor certo, chamado de um lugar só, dá
+exatamente o mesmo resultado que motor nenhum para quem entra por outra porta.
+E o que denunciou foi, de novo, a foto da tela: dois números discordando lado a
+lado, que nenhum teste comparava porque nenhum teste sabia que eles deviam
+bater.
+
+### 44 · O teste de estresse que media com dado que o sistema recusa
+
+**Sintoma.** O estresse terminava **REPROVADO** em duas operações:
+
+```
+Cadastrar UM caso — ESTOUROU: Confira 1 campo(s):
+  Canal de origem — não é uma das opções da lista
+```
+
+**Causa.** A massa de teste trazia a lista de canais escrita à mão:
+
+```js
+// Os valores TÊM de ser os do catálogo (…).
+// Vieram de chamar('formularioDoCanal'), não de memória.
+const CORRETORAS = ['E-mail', 'Chat', 'Telefone', 'Site', 'Corretora', 'Ouvidoria', 'URA'];
+```
+
+O comentário era **verdadeiro no dia em que foi escrito**. Depois o catálogo
+virou o da RECC — `URA | Central | Base de Inadimplentes | Piloto Formulário -
+Cancelamento` — e a lista daqui ficou com a genérica antiga.
+
+**Por que demorou a aparecer.** A carga dos 50 mil casos usa
+`inserirVariosRegistros_`, que **grava sem validar** — é o caminho da
+importação, e é assim de propósito. Então 50 mil casos entraram com
+`Canal de origem: E-mail`, um valor que o sistema recusa, **sem uma reclamação
+sequer**. Só o `cadastrarCaso` de uma linha só, lá no fim da corrida, passa
+pela validação — e foi ele quem bateu de frente.
+
+Ou seja: durante um bom tempo o estresse mediu desempenho sobre uma massa que
+o sistema jamais teria aceitado.
+
+**Defesa.** As listas passaram a ser lidas do próprio formulário, na hora de
+rodar (`opcoesDosSeletores`), campo de seletor por campo de seletor. Mude o
+catálogo em Configurações e a massa muda junto.
+
+**O que ele ensina.** **Comentário que jura a origem do dado envelhece igual ao
+dado.** "Veio de `formularioDoCanal`" descreve um acontecimento passado, e
+lê-se como se fosse uma garantia atual. A única forma de a frase continuar
+verdadeira é o código ir buscar de verdade, toda vez.
+
 ---
 
 ## O que esta lista ensina
 
-**São trinta e três achados, e a maioria era silenciosa.** Não davam erro, não
+**São quarenta e quatro achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1071,3 +1151,17 @@ Daí as duas práticas que o projeto não abre mão:
     tela que pegou os dois. Ela é a única verificação que olha a tela inteira
     sem saber o que procurar — e por isso ela agora sai de um gerador
     (`gerar-imagens.js`), e não da mão de alguém.
+25. **Dois números da mesma tela que deviam bater são um teste que ninguém
+    escreveu.** O item 43 ficou visível porque o cartão e a rosca discordavam
+    lado a lado. Nenhum teste comparava os dois, porque cada um estava certo
+    sozinho — e é sempre assim: o defeito mora no encontro, e o encontro é
+    exatamente o que ninguém testa.
+26. **Motor único chamado de um lugar só não é motor único.** No item 43 a
+    função do carimbo estava certa, bem escrita e bem comentada. Ela só era
+    chamada de uma das três portas — e para quem entrava pelas outras duas, o
+    efeito foi o mesmo que ela não existir.
+27. **Caminho que não valida esconde dado inválido até alguém validar.** No
+    item 44 a importação gravou 50 mil linhas recusáveis sem uma reclamação —
+    e está certa em não reclamar, porque importação é assim. O preço é que o
+    dado errado fica invisível até passar por uma porta que confere, e aí o
+    erro aparece muito longe de onde nasceu.
