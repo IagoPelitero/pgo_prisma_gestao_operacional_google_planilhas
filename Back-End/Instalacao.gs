@@ -248,6 +248,18 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.cargos = cargos.length;
   var idCargoAdm = cargos[2]['Id'];
 
+  // --- motivos de ausência ---------------------------------------------------
+  // Estes quatro cobrem o que a operação registra hoje. São CATÁLOGO, e não
+  // lista fixa no código, porque "afastamento INSS" e "licença paternidade"
+  // aparecem sem aviso — e quem precisa acrescentar é quem monta a escala.
+  var motivosDeAusencia = inserirVariosRegistros_('CATALOGO', [
+    novoItemDeCatalogo_('AUSENCIA_MOTIVO', '', 'Férias', 1),
+    novoItemDeCatalogo_('AUSENCIA_MOTIVO', '', 'Licença', 2),
+    novoItemDeCatalogo_('AUSENCIA_MOTIVO', '', 'Afastamento', 3),
+    novoItemDeCatalogo_('AUSENCIA_MOTIVO', '', 'Treinamento', 4)
+  ]);
+  contagem.motivosDeAusencia = motivosDeAusencia.length;
+
   // --- canais ----------------------------------------------------------------
   var canais = inserirVariosRegistros_('CANAIS', [
     {

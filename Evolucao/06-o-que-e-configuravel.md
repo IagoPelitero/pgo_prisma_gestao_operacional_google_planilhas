@@ -41,6 +41,9 @@ abaixo com o motivo.
 | **Busca** | Em quais colunas cado canal procura | Canais de trabalho |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
+| **Ausências** (férias, licença, afastamento) | Configurações › Calendário | Quem, motivo e o período. Sai da meta da pessoa e da média da equipe — não bloqueia o acesso |
+| **Feriados da operação** (municipal, facultativo, emenda) | Configurações › Calendário | Os nacionais o sistema calcula sozinho, móveis inclusive. `Trabalha = SIM` cancela um nacional |
+| **Motivos de ausência** | Configurações › Listas (`AUSENCIA_MOTIVO`) | Nascem quatro; "licença paternidade" e "afastamento INSS" se acrescentam sem programador |
 | **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: canal, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
 | **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, canais, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
 

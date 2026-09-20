@@ -460,11 +460,52 @@ aqui, atrapalha alguém.
   "concluídos" é o contrário
 - **O que não dá para calcular some**, em vez de aparecer zerado
 - **A meta é declarada, nunca inventada.** Canal sem meta não ganha barra
+- **A meta conta DIA ÚTIL, e desconta férias** — ver a seção seguinte
 
 **Esta tela é sobre MIM, sempre** — as minhas inclusões. A equipe continua
 aparecendo, mas como REFERÊNCIA: a média e a minha posição, no bloco de baixo.
 Saber que se fez 8 não diz nada sem saber que a média é 6. O que ela não faz é
 virar o assunto da tela — para isso existe a Produtividade RECC.
+
+### O calendário: dias úteis, feriados e férias
+
+A operação **só trabalha em dias úteis**, e todo mês alguém entra de férias. As
+duas coisas mexem na mesma conta — quantos dias a pessoa realmente tinha para
+trabalhar — e é essa conta que a meta usa.
+
+Antes a meta se repartia por **30 dias corridos**. Num mês de 21 dias úteis
+isso cobrava trabalho de nove dias que não existem, e a barra acusava um atraso
+que era só do calendário. Quem tirava férias piorava: aparecia devendo os dias
+em que estava fora.
+
+Agora:
+
+| conta | como é hoje |
+|---|---|
+| **Denominador da meta** | Os dias úteis **daquele mês** — que variam de 19 a 23. Num mês fechado o alvo bate exatamente com a meta mensal |
+| **Ausência** | Desconta os dias úteis em que a pessoa esteve fora. Uma semana de férias que pega um fim de semana são 5 dias, não 7 |
+| **Média da equipe** | Quem esteve ausente sai da média e da posição, e continua na lista com a marca de quantos dias ficou fora |
+
+**Os feriados nacionais o sistema calcula sozinho** — inclusive Carnaval,
+Sexta-feira Santa e Corpus Christi, que mudam de data todo ano. Eles saem do
+**Domingo de Páscoa**, pelo algoritmo gregoriano, conferido contra quinze anos
+de datas conhecidas. A alternativa seria uma tabela que alguém teria de
+preencher todo dezembro — e esquecer uma vez faz a meta de fevereiro sair
+errada sem ninguém entender por quê.
+
+A Consciência Negra só conta **de 2024 em diante**, que é quando virou nacional
+(Lei 14.759/2023). Contar antes tiraria um dia útil de um ano em que a operação
+trabalhou.
+
+O que o sistema **não** adivinha — o feriado municipal, o ponto facultativo que
+a área de fato não trabalha, a emenda — fica em **Configurações › Calendário**,
+junto das ausências. E lá também se faz o contrário: marcar *"neste dia a
+operação TRABALHA"* cancela um feriado nacional, para o ano em que se trabalhou
+no Corpus Christi.
+
+**Férias não bloqueiam o acesso.** A pessoa continua entrando no sistema — quem
+volta às vezes precisa consultar um caso antes de reassumir. O que muda é a
+conta.
 
 ---
 

@@ -1401,6 +1401,34 @@ table.fila tr.importar-igual { color: var(--tenue); }
   grid-column: 1 / -1;
 }
 
+/* --- o calendário: ausências e feriados ---------------------------------- */
+/*
+   A lista de feriados tem DOIS blocos com peso diferente: os nacionais, que o
+   sistema calcula e ninguém edita, e os da operação, que se clicam. Os
+   primeiros vêm em tom mais baixo e sem borda de item — parecer clicável o que
+   não é clica é o tipo de frustração que faz a pessoa achar que a tela travou.
+*/
+.config-lista-cabeca {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.config-lista-cabeca .config-titulo { margin-right: auto; }
+.calendario-cabeca { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--linha); }
+
+.feriados-do-sistema { list-style: none; margin: 10px 0 14px; padding: 0; }
+.feriado-do-sistema {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 0; font-size: 13px; color: var(--texto-suave);
+  border-bottom: 1px dashed var(--linha);
+}
+.feriado-do-sistema .quando {
+  font-variant-numeric: tabular-nums; color: var(--tenue); min-width: 84px;
+}
+.feriado-do-sistema .qual { overflow-wrap: anywhere; }
+/* Cancelado por "a operação trabalha neste dia": continua na lista, riscado,
+   porque some-lo faria parecer que o sistema esqueceu o feriado. */
+.feriado-do-sistema.cancelado .qual { text-decoration: line-through; opacity: .65; }
+
 .config-vazio { color: var(--tenue); font-size: 13.5px; margin: 0; }
 .config-erro {
   margin: 0 0 12px; font-size: 13px; font-weight: 600; line-height: 1.45;
@@ -2248,6 +2276,15 @@ var Moldura = (function () {
       + '<path d="M3.4 9.2h17.2"></path>'
       + '<path d="M3.4 14.4h17.2"></path>'
       + '<path d="M9.4 9.2v10.4M15 9.2v10.4"></path>',
+
+    // calendário: a folhinha de parede, com os dois furos de cima e um dia
+    // marcado. É o desenho que já significa "data" para qualquer pessoa — e
+    // esta seção fala de dias: férias, feriados, dias úteis.
+    calendario:
+      '<rect x="3.6" y="5.2" width="16.8" height="15.2" rx="1.8"></rect>'
+      + '<path d="M3.6 10h16.8"></path>'
+      + '<path d="M8.2 3.6v3.2M15.8 3.6v3.2"></path>'
+      + '<rect x="10.6" y="13" width="3.4" height="3.2" rx=".6"></rect>',
 
     // estrutura e auditoria: a prancheta do laudo, com o visto
     estrutura:
@@ -4212,7 +4249,14 @@ var SeletorDePeriodo = (function () {
     return partes[2] + '/' + partes[1] + '/' + partes[0];
   }
 
-  return { padrao: padrao, desenhar: desenhar, mudou: mudou };
+  // `paraOCampo` e `paraOServidor` saem daqui porque QUALQUER tela com campo
+  // de data precisa das duas: o servidor fala dd/mm/aaaa (que é como a
+  // planilha guarda e como a operação lê) e o <input type="date"> só
+  // entende aaaa-mm-dd. Uma segunda cópia divergiria na primeira correção.
+  return {
+    padrao: padrao, desenhar: desenhar, mudou: mudou,
+    paraOCampo: paraOCampo, paraOServidor: paraOServidor
+  };
 })();
 </script>
 
@@ -6983,6 +7027,11 @@ var TelaConfiguracoes = (function () {
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
+  // O ano que a lista de feriados mostra. Fora de `dados` de propósito: `dados`
+  // é esvaziado a cada troca de seção, e o ano escolhido tem de sobreviver a
+  // salvar um feriado — senão a tela pularia de volta para o ano corrente a
+  // cada gravação, no meio de quem está cadastrando o ano que vem.
+  var anoDoCalendario = (new Date()).getFullYear();
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -7112,6 +7161,7 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'catalogo') return carregarListas();
     if (secaoAtual === 'canais') return carregarCanais();
     if (secaoAtual === 'paineis') return carregarPaineis();
+    if (secaoAtual === 'calendario') return carregarCalendario();
     if (secaoAtual === 'analises') return carregarAnalises();
     if (secaoAtual === 'identidade') return desenharIdentidade();
     if (secaoAtual === 'estrutura') return carregarEstrutura();
@@ -9089,6 +9139,26 @@ var TelaConfiguracoes = (function () {
       + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
   }
 
+  /**
+   * Um campo de data.
+   *
+   * Recebe e devolve dd/mm/aaaa, que é como o servidor fala; a conversão para
+   * o formato do <input type="date"> é do SeletorDePeriodo, que já a fazia
+   * para o filtro de período. Uma segunda cópia da conversão é uma segunda
+   * chance de errar o fuso na virada do dia.
+   */
+  function campoDeData(nome, rotulo, valor, dica) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<input type="date" id="cfg-' + nome + '" value="'
+      + escapar(SeletorDePeriodo.paraOCampo(valor)) + '">'
+      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
+  }
+
+  /** O valor de um campo de data, já em dd/mm/aaaa para o servidor. */
+  function dataDe(nome) {
+    return SeletorDePeriodo.paraOServidor(valorDe(nome));
+  }
+
   function caixaDeSimNao(nome, rotulo, ligado) {
     return '<label class="config-chave">'
       + '<input type="checkbox" id="cfg-' + nome + '"'
@@ -9102,6 +9172,281 @@ var TelaConfiguracoes = (function () {
       + (ligado ? ' checked' : '') + '>'
       + '<span>' + escapar(rotulo)
       + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</span></label>';
+  }
+
+  /* --------------------------------------------------------- o calendário */
+
+  /*
+    DUAS LISTAS PEQUENAS QUE MEXEM NUMA CONTA GRANDE.
+
+    A meta de cada pessoa se reparte pelos DIAS ÚTEIS do mês, e desconta os
+    dias em que ela esteve fora. Quem cadastra isto é quem monta a escala — não
+    quem mexe em planilha —, e por isso as duas moram aqui.
+
+    Os feriados NACIONAIS aparecem na tela mas não se cadastram: o sistema os
+    calcula, inclusive Carnaval e Corpus Christi, que mudam de data todo ano.
+    Mostrá-los é o que evita a operação cadastrar o Natal por via das dúvidas.
+  */
+
+  function carregarCalendario() {
+    aguarde('Lendo o calendário…');
+    // Três idas ao servidor, encadeadas: quem pode ficar ausente (os usuários),
+    // os motivos que a operação cadastrou, e o calendário em si.
+    Servidor.chamar('listarUsuarios')
+      .entao(function (usuarios) {
+        dados.usuarios = usuarios;
+        Servidor.chamar('listarCatalogo', 'AUSENCIA_MOTIVO', '')
+          .entao(function (motivos) {
+            dados.motivosDeAusencia = motivos.filter(function (um) {
+              return um.ativo;
+            });
+            Servidor.chamar('listarAusencias')
+              .entao(function (ausencias) {
+                dados.ausencias = ausencias;
+                Servidor.chamar('listarFeriados', anoDoCalendario)
+                  .entao(function (feriados) {
+                    dados.feriados = feriados;
+                    desenharCalendario();
+                  })
+                  .senao(falhou);
+              })
+              .senao(falhou);
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharCalendario() {
+    if (respostaAtrasada('calendario')) return;
+
+    var linhas = dados.ausencias.map(function (uma) {
+      return '<li class="config-item'
+        + (escolhido && escolhido.id === uma.id ? ' atual' : '')
+        + (uma.jaPassou ? ' desligado' : '') + '">'
+        + '<button type="button" class="abrir" data-ausencia="'
+        + escapar(uma.id) + '">'
+        + '<span class="nome">' + escapar(uma.nome) + '</span>'
+        + '<span class="detalhe">' + escapar(uma.motivo) + ' · '
+        + escapar(uma.de) + ' a ' + escapar(uma.ate)
+        + ' · ' + uma.diasUteis + ' dia(s) útil(eis)'
+        + (uma.acontecendoAgora ? ' · fora agora' : '')
+        + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML =
+      '<div class="config-lista-cabeca">'
+      + '<span class="config-titulo">' + dados.ausencias.length + ' ausência(s)</span>'
+      + '<button type="button" class="botao pequeno" id="nova-ausencia">'
+      + 'Nova ausência</button></div>'
+      + (linhas
+        ? '<ul class="config-itens">' + linhas + '</ul>'
+        : '<p class="config-vazio">Ninguém com ausência cadastrada.</p>')
+      + desenharOsFeriados();
+
+    elemento('nova-ausencia').addEventListener('click', function () {
+      escolhido = null;
+      desenharPainelDaAusencia(null);
+    });
+    ligarCliques('[data-ausencia]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-ausencia') };
+      desenharCalendario();
+    });
+    ligarOsFeriados();
+
+    if (escolhido) {
+      desenharPainelDaAusencia(acharNaLista(dados.ausencias, escolhido.id));
+    } else {
+      painelVazio('Escolha uma ausência, ou cadastre uma nova.');
+    }
+  }
+
+  function desenharOsFeriados() {
+    var calendario = dados.feriados;
+
+    var doSistema = calendario.doSistema.map(function (um) {
+      return '<li class="feriado-do-sistema' + (um.cancelado ? ' cancelado' : '') + '">'
+        + '<span class="quando">' + escapar(um.data) + '</span>'
+        + '<span class="qual">' + escapar(um.nome)
+        + (um.cancelado ? ' — a operação trabalha neste dia' : '') + '</span></li>';
+    }).join('');
+
+    var daOperacao = calendario.cadastrados.map(function (um) {
+      return '<li class="config-item">'
+        + '<button type="button" class="abrir" data-feriado="'
+        + escapar(um.id) + '">'
+        + '<span class="nome">' + escapar(um.data) + ' · ' + escapar(um.nome) + '</span>'
+        + '<span class="detalhe">' + escapar(um.tipo)
+        + (um.trabalha ? ' · a operação TRABALHA neste dia' : ' · não se trabalha')
+        + '</span></button></li>';
+    }).join('');
+
+    return '<div class="config-lista-cabeca calendario-cabeca">'
+      + '<span class="config-titulo">Feriados de ' + calendario.ano
+      + ' · ' + calendario.diasUteisNoAno + ' dias úteis no ano</span>'
+      + '<select id="ano-do-calendario" class="filtro">'
+      + calendario.anos.map(function (ano) {
+        return '<option value="' + ano + '"'
+          + (ano === calendario.ano ? ' selected' : '') + '>' + ano + '</option>';
+      }).join('') + '</select>'
+      + '<button type="button" class="botao pequeno" id="novo-feriado">'
+      + 'Novo feriado</button></div>'
+      + '<p class="config-dica">Os nacionais o sistema calcula sozinho, '
+      + 'inclusive os que mudam de data todo ano. Cadastre só o que é seu: '
+      + 'municipal, facultativo, emenda.</p>'
+      + '<ul class="feriados-do-sistema">' + doSistema + '</ul>'
+      + (daOperacao
+        ? '<ul class="config-itens">' + daOperacao + '</ul>'
+        : '<p class="config-vazio">Nenhum feriado próprio cadastrado.</p>');
+  }
+
+  function ligarOsFeriados() {
+    elemento('ano-do-calendario').addEventListener('change', function () {
+      anoDoCalendario = Number(this.value);
+      escolhido = null;
+      carregarCalendario();
+    });
+    elemento('novo-feriado').addEventListener('click', function () {
+      escolhido = null;
+      desenharPainelDoFeriado(null);
+    });
+    ligarCliques('[data-feriado]', function (botao) {
+      var id = botao.getAttribute('data-feriado');
+      desenharPainelDoFeriado(acharNaLista(dados.feriados.cadastrados, id));
+    });
+  }
+
+  function desenharPainelDaAusencia(ausencia) {
+    var atual = ausencia
+      || { id: '', usuarioId: '', motivo: '', de: '', ate: '', observacao: '' };
+
+    elemento('config-painel').innerHTML =
+      '<form class="config-form" id="form-ausencia">'
+      + tituloDoPainel(atual.id ? atual.nome : 'Nova ausência',
+        'A pessoa continua entrando no sistema. O que muda é a CONTA: '
+        + 'estes dias saem da meta dela e da média da equipe.')
+      + caixaDeItens('au-pessoa', 'Quem', pessoasParaAusencia(), atual.usuarioId, '')
+      + caixaDeOpcoes('au-motivo', 'Motivo', motivosDeAusencia(), atual.motivo, '')
+      + campoDeData('au-de', 'Primeiro dia', atual.de, '')
+      + campoDeData('au-ate', 'Último dia', atual.ate,
+        'As duas pontas entram na conta.')
+      + campoDeTexto('au-obs', 'Observação', atual.observacao, 'Opcional.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (atual.id
+        ? '<button type="button" class="botao suave" id="excluir-ausencia">'
+          + 'Excluir</button>'
+        : '')
+      + '</div></form>';
+
+    elemento('form-ausencia').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      salvarAAusencia(atual.id);
+    });
+    if (atual.id) {
+      elemento('excluir-ausencia').addEventListener('click', function () {
+        Formulario.confirmarExclusao(
+          'Tirar a ausência de ' + atual.nome + '?',
+          'Os dias voltam a contar na meta dela.',
+          function () {
+            Servidor.chamar('excluirAusencia', atual.id)
+              .entao(function () { escolhido = null; carregarCalendario(); })
+              .senao(falhou);
+          });
+      });
+    }
+  }
+
+  function salvarAAusencia(id) {
+    Servidor.chamar('salvarAusencia', {
+      id: id,
+      usuarioId: valorDe('au-pessoa'),
+      motivo: valorDe('au-motivo'),
+      de: dataDe('au-de'),
+      ate: dataDe('au-ate'),
+      observacao: valorDe('au-obs')
+    })
+      .entao(function (resposta) {
+        escolhido = { id: resposta.id };
+        carregarCalendario();
+      })
+      .senao(falhou);
+  }
+
+  function desenharPainelDoFeriado(feriado) {
+    var atual = feriado
+      || { id: '', data: '', nome: '', tipo: 'Municipal', trabalha: false };
+
+    elemento('config-painel').innerHTML =
+      '<form class="config-form" id="form-feriado">'
+      + tituloDoPainel(atual.id ? atual.nome : 'Novo feriado',
+        'Um dia que sai da conta de dias úteis.')
+      + campoDeData('fe-data', 'Data', atual.data, '')
+      + campoDeTexto('fe-nome', 'Nome', atual.nome,
+        'É o que a lista mostra. "Aniversário da cidade", "Emenda de Corpus Christi".')
+      + caixaDeOpcoes('fe-tipo', 'Tipo',
+        ['Municipal', 'Estadual', 'Facultativo', 'Emenda'], atual.tipo,
+        'Só rótulo, para quem lê a lista. A conta não olha para ele.')
+      + caixaDeMarcar('fe-trabalha', 'Neste dia a operação TRABALHA',
+        atual.trabalha,
+        'Marque para CANCELAR um feriado nacional que o sistema calculou — '
+        + 'o ano em que se trabalhou no Corpus Christi, por exemplo.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (atual.id
+        ? '<button type="button" class="botao suave" id="excluir-feriado">'
+          + 'Excluir</button>'
+        : '')
+      + '</div></form>';
+
+    elemento('form-feriado').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarFeriado', {
+        id: atual.id,
+        data: dataDe('fe-data'),
+        nome: valorDe('fe-nome'),
+        tipo: valorDe('fe-tipo'),
+        trabalha: marcado('fe-trabalha')
+      })
+        .entao(function () { escolhido = null; carregarCalendario(); })
+        .senao(falhou);
+    });
+    if (atual.id) {
+      elemento('excluir-feriado').addEventListener('click', function () {
+        Formulario.confirmarExclusao(
+          'Tirar o feriado "' + atual.nome + '"?',
+          'O dia volta a contar como dia útil.',
+          function () {
+            Servidor.chamar('excluirFeriado', atual.id)
+              .entao(function () { escolhido = null; carregarCalendario(); })
+              .senao(falhou);
+          });
+      });
+    }
+  }
+
+  /** Quem pode receber uma ausência: todo mundo que está cadastrado e ativo. */
+  function pessoasParaAusencia() {
+    return (dados.usuarios || []).filter(function (uma) {
+      return uma.ativo;
+    }).map(function (uma) {
+      return { id: uma.id, nome: uma.nome };
+    });
+  }
+
+  /*
+    Os motivos vêm do catálogo quando a operação os cadastrou; senão, destes
+    quatro. Uma lista vazia travaria o cadastro inteiro no dia da instalação —
+    e obrigar a cadastrar "Férias" antes de poder registrar férias é atrito
+    sem motivo.
+  */
+  function motivosDeAusencia() {
+    var doCatalogo = (dados.motivosDeAusencia || []).map(function (um) {
+      return um.nome;
+    });
+    return doCatalogo.length
+      ? doCatalogo
+      : ['Férias', 'Licença', 'Afastamento', 'Treinamento'];
   }
 
   /* ------------------------------------------------------------ utilidades */

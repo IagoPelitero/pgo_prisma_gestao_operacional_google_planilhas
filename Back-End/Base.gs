@@ -579,6 +579,64 @@ const RECC_ESQUEMA = {
     ]
   },
 
+  /*
+   * AS AUSÊNCIAS — quem está fora, de quando até quando.
+   *
+   * Existe porque `Ativo` em USUARIOS é um interruptor SEM DATA: serve para
+   * quem saiu da operação, não para quem volta dia 3. Usar `Ativo` para férias
+   * custaria duas coisas — perder o motivo (saiu? está de férias? foi
+   * desligado?) e depender de alguém lembrar de religar no dia certo.
+   *
+   * O efeito, decidido pelo PO, é sobre a CONTA e não sobre o acesso: quem
+   * está de férias continua entrando no sistema, e some das metas e das médias
+   * pelos dias em que não tinha como trabalhar.
+   */
+  AUSENCIAS: {
+    aba: 'AUSENCIAS',
+    titulo: 'Ausências',
+    controle: true,
+    reserva: 500,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'UsuarioId', tipo: 'identificador', protegido: true },
+      // Vem do catálogo (AUSENCIA_MOTIVO): férias, licença, afastamento,
+      // treinamento. A operação acrescenta outros sem programador.
+      { cabecalho: 'Motivo', tipo: 'texto', protegido: true },
+      { cabecalho: 'De', tipo: 'data', protegido: true },
+      { cabecalho: 'Ate', tipo: 'data', protegido: true },
+      { cabecalho: 'Observacao', tipo: 'textoLongo', protegido: false }
+    ]
+  },
+
+  /*
+   * OS FERIADOS que o administrador mantém.
+   *
+   * Os NACIONAIS o sistema calcula sozinho, inclusive os móveis — e por isso
+   * NÃO precisam ser cadastrados aqui (ver `feriadosNacionaisDoAno_`). Esta aba
+   * é para o que só a operação sabe: o feriado municipal de São Paulo, o ponto
+   * facultativo que a área de fato não trabalha, a emenda.
+   *
+   * `Trabalha` responde nos dois sentidos. NAO (o padrão) é "este dia não se
+   * trabalha". SIM é o contrário, e serve para o ano em que a operação
+   * trabalhou num feriado que o sistema calculou — sem isso, a única saída
+   * seria mexer no código.
+   */
+  FERIADOS: {
+    aba: 'FERIADOS',
+    titulo: 'Feriados',
+    controle: true,
+    reserva: 300,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Data', tipo: 'data', protegido: true },
+      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
+      // Municipal, Estadual, Facultativo — ou o que a operação chamar. É
+      // rótulo para quem lê a lista; a conta não olha para ele.
+      { cabecalho: 'Tipo', tipo: 'texto', protegido: false },
+      { cabecalho: 'Trabalha', tipo: 'simOuNao', protegido: false }
+    ]
+  },
+
   AUDITORIA: {
     aba: 'AUDITORIA',
     titulo: 'Auditoria',

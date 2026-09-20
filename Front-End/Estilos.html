@@ -1392,6 +1392,34 @@ table.fila tr.importar-igual { color: var(--tenue); }
   grid-column: 1 / -1;
 }
 
+/* --- o calendário: ausências e feriados ---------------------------------- */
+/*
+   A lista de feriados tem DOIS blocos com peso diferente: os nacionais, que o
+   sistema calcula e ninguém edita, e os da operação, que se clicam. Os
+   primeiros vêm em tom mais baixo e sem borda de item — parecer clicável o que
+   não é clica é o tipo de frustração que faz a pessoa achar que a tela travou.
+*/
+.config-lista-cabeca {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.config-lista-cabeca .config-titulo { margin-right: auto; }
+.calendario-cabeca { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--linha); }
+
+.feriados-do-sistema { list-style: none; margin: 10px 0 14px; padding: 0; }
+.feriado-do-sistema {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 0; font-size: 13px; color: var(--texto-suave);
+  border-bottom: 1px dashed var(--linha);
+}
+.feriado-do-sistema .quando {
+  font-variant-numeric: tabular-nums; color: var(--tenue); min-width: 84px;
+}
+.feriado-do-sistema .qual { overflow-wrap: anywhere; }
+/* Cancelado por "a operação trabalha neste dia": continua na lista, riscado,
+   porque some-lo faria parecer que o sistema esqueceu o feriado. */
+.feriado-do-sistema.cancelado .qual { text-decoration: line-through; opacity: .65; }
+
 .config-vazio { color: var(--tenue); font-size: 13.5px; margin: 0; }
 .config-erro {
   margin: 0 0 12px; font-size: 13px; font-weight: 600; line-height: 1.45;

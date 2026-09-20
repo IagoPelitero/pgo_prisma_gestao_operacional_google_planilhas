@@ -1090,11 +1090,49 @@ ocupado?"**, que ninguém pensa em fazer.
 extensão), agora um nível abaixo: os nomes de FUNÇÃO também são únicos no
 projeto inteiro, e nada no Apps Script avisa quando deixam de ser.
 
+### 46 · O teste novo que passou verde com o defeito na tela
+
+**Sintoma.** Nenhum, em teste. Na foto: a seção **Calendário**, recém-criada em
+Configurações, apareceu com **o mesmo ícone do Trabalho**.
+
+**Causa.** `Moldura.icone` tem um padrão:
+
+```js
+var desenho = DESENHOS[tela] || DESENHOS.trabalho;
+```
+
+Chave sem desenho não quebra, não avisa, e sai parecendo outra coisa. Havia um
+teste exatamente para isso — *cada item do menu tem o seu próprio desenho* —,
+escrito depois de a Importação ter entrado repetindo o ícone do Trabalho. Ele
+olhava só o **menu**; as seções de Configurações não estavam no escopo dele.
+
+**E aqui está o que importa.** Eu estendi o teste para as seções, e a extensão
+**passou verde com o ícone do Calendário removido de propósito**. Porque ela
+comparava as seções **entre si** — e o desenho herdado era o do Trabalho, que é
+item de MENU e não está nessa lista. Não havia repetição *entre as seções*, e
+mesmo assim havia defeito.
+
+**Defesa.** Parar de procurar repetição e procurar **o defeito**: nenhuma seção
+pode estar usando o desenho padrão. Uma chave inventada devolve o padrão, então
+basta comparar cada seção com ele:
+
+```js
+const oPadrao = Moldura.icone('chave-que-nao-existe-em-lugar-nenhum');
+const semDesenhoProprio = secoes.filter((s) => Moldura.icone(s.chave) === oPadrao);
+```
+
+**O que ele ensina.** **Um teste novo também precisa ser testado contra o
+defeito que o motivou.** Escrevi essa extensão logo depois de ver o bug na
+tela, com o bug fresco na cabeça, e ainda assim escrevi uma que não o pegava.
+Escrever o teste e vê-lo passar é meia prova: a outra metade é quebrar o código
+de propósito e ver o vermelho. Sem ela, o que se ganhou não foi uma guarda —
+foi a sensação de ter uma.
+
 ---
 
 ## O que esta lista ensina
 
-**São quarenta e cinco achados, e a maioria era silenciosa.** Não davam erro, não
+**São quarenta e seis achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1212,3 +1250,8 @@ Daí as duas práticas que o projeto não abre mão:
     completa do nome antigo e mesmo assim quebrou, porque o nome de chegada já
     pertencia a outra função. Meia busca parece busca inteira: some o que se
     procurava, e o estrago está no que não se procurou.
+29. **Quebre o código de propósito para provar o teste.** O item 46 é o mais
+    incômodo da lista: um teste escrito minutos depois de ver o defeito, para
+    pegar aquele defeito, que não o pegava. Só apareceu porque desliguei o
+    ícone de novo e o vermelho não veio. Todo teste desta suíte que vale
+    alguma coisa passou por isso.

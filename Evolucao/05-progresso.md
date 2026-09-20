@@ -1768,6 +1768,69 @@ propósito, e os dois que deviam ficar vermelhos ficaram.
 combinações de tela × largura, 9 testes de ponta a ponta, o estresse APROVADO
 em 50 mil casos e 14 imagens geradas.
 
+## Etapa 17 — Importação, e o calendário da operação
+
+Duas coisas do PO, sem relação entre si.
+
+### Tombamento virou Importação
+
+*"Esses casos serão incorporados para serem tratados"* — "tombar" dizia só que
+eles mudaram de lugar. A troca pegou tela, chave, ação de permissão, funções,
+CSS, duas colunas da base e os arquivos (`Importacao.html`,
+`testes-importacao.js`). O gênero mudou junto: "do tombamento" virou "da
+importação", e por isso as frases com artigo foram trocadas antes da palavra
+solta — senão o sistema ficaria cheio de "do importação".
+
+E o renomeio **apagou uma função sem dizer nada**: já existia um
+`conferirImportacao` no `Cadastros.gs`, e no escopo global único do Apps Script
+a segunda definição vence. É o achado 45, e dele saíram duas guardas
+permanentes que varrem todos os `.gs` atrás de nome repetido — de `function` e
+de `const`.
+
+### O calendário: dia útil, feriado e férias
+
+O PO trouxe as duas juntas: *"temos meses em que alguns entram de férias (…)
+precisam ficar inativos por determinados dias"* e *"só trabalhamos em dias
+úteis"*. Ele escolheu o efeito: **a pessoa sai das contas de produtividade**,
+não do acesso — quem volta de férias às vezes precisa consultar um caso antes
+de reassumir.
+
+A meta se repartia por **30 dias corridos**. Num mês de 21 dias úteis isso
+cobrava nove dias que não existem, e quem tirava férias aparecia devendo os
+dias em que esteve fora. Agora o denominador são os dias úteis **daquele mês**,
+e a ausência desconta os dias em que a pessoa não tinha como trabalhar. Num mês
+fechado o alvo bate **exatamente** com a meta mensal — é o invariante que um
+teste cobra na vírgula.
+
+Os feriados nacionais o sistema calcula, **inclusive os móveis**, a partir do
+Domingo de Páscoa (algoritmo gregoriano, conferido contra quinze anos de datas
+conhecidas, incluindo 25/04/2038, a Páscoa mais tardia possível). A alternativa
+era uma tabela para alguém preencher todo dezembro. O que só a operação sabe —
+municipal, facultativo, emenda — fica na aba `FERIADOS`, com um `Trabalha` que
+funciona nos dois sentidos.
+
+Duas armadilhas fechadas por teste: **dias sobrepostos contam uma vez** (férias
+emendada com licença não pode devolver mais dias fora do que o período tem), e
+**a férias que atravessa a virada do mês** conta nos dois, cada um pela sua
+parte — é a mais comum, e a que um corte por "começou dentro do período"
+perderia inteira.
+
+### O que só o navegador pegou
+
+O ícone da seção Calendário saiu **igual ao do Trabalho**: `Moldura.icone` cai
+num padrão quando a chave não tem desenho, e cai calado. O teste que guardava
+isso olhava só o MENU. Foi estendido — e a primeira versão da extensão **passou
+verde com o ícone removido**, porque comparava as seções entre si e o desenho
+herdado era de outra lista. A versão que ficou compara cada seção com o próprio
+padrão, que é o defeito de verdade.
+
+O diagnóstico do projeto, esse, pegou sozinho: quatro classes de CSS que a tela
+nova usava e o `Estilos.html` não definia.
+
+**579 testes**, cinco execuções seguidas sem falha, 144 cliques em 8 telas, 96
+combinações de tela × largura, 9 testes ponta a ponta, o estresse APROVADO em
+50 mil casos e 14 imagens geradas.
+
 ---
 
 ## O que ainda está em aberto

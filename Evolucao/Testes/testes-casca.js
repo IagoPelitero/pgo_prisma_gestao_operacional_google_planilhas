@@ -116,6 +116,52 @@ function rodarTestesDaCasca() {
     });
   });
 
+  teste('cada seção de Configurações também tem o seu próprio desenho', () => {
+    /*
+     * O teste acima guardava só o MENU — e por isso não viu o Calendário
+     * entrar em Configurações repetindo o ícone do Trabalho. É o mesmo defeito
+     * que ele foi escrito para pegar, num lugar que ele não olhava: alvo
+     * certo, escopo curto.
+     *
+     * A causa é o `DESENHOS[tela] || DESENHOS.trabalho` do Moldura.icone:
+     * seção sem desenho próprio não quebra nada, não avisa nada, e sai
+     * parecendo outra coisa. O silêncio é o problema.
+     */
+    const { Moldura } = carregarScriptDaTela('Moldura');
+    const secoes = chamar('resumoDasConfiguracoes()').secoes;
+
+    /*
+     * A primeira versão deste teste conferia se as seções repetiam desenho
+     * ENTRE SI — e passou verde com o ícone do Calendário removido, porque o
+     * desenho que ele herdava era o do Trabalho, que é do MENU e não está
+     * nesta lista. Alvo certo, comparação errada.
+     *
+     * O que se cobra é o defeito em si: nenhuma seção pode estar usando o
+     * DESENHO PADRÃO. Uma chave que não existe devolve o padrão — então basta
+     * comparar cada seção com ele.
+     */
+    const oPadrao = Moldura.icone('chave-que-nao-existe-em-lugar-nenhum');
+
+    const semDesenhoProprio = secoes.filter(function (secao) {
+      return Moldura.icone(secao.chave) === oPadrao;
+    }).map(function (secao) { return secao.chave; });
+
+    igual(semDesenhoProprio.join(', '), '',
+      'seção sem desenho próprio herda o padrão calada, e sai parecendo outra');
+
+    // E, já que estamos aqui, que não repitam entre si também.
+    const porDesenho = {};
+    const repetidas = [];
+    secoes.forEach((secao) => {
+      const desenho = Moldura.icone(secao.chave);
+      if (porDesenho[desenho]) {
+        repetidas.push(secao.chave + ' repete o de ' + porDesenho[desenho]);
+      }
+      porDesenho[desenho] = secao.chave;
+    });
+    igual(repetidas.join(' | '), '', 'duas seções com o mesmo desenho');
+  });
+
   teste('o menu não usa peso de fonte que canse a vista', () => {
     // Texto grosso em cima de fundo saturado, lido de relance o dia inteiro,
     // cansa. Só o item atual ganha peso.

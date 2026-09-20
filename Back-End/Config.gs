@@ -116,6 +116,10 @@ function resumoDasConfiguracoes() {
         quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
           return normalizarParaComparar_(linha.Ativo) === 'sim';
         }).length },
+      { chave: 'calendario', titulo: 'Calendário',
+        descricao: 'Férias, ausências e os feriados que a operação não trabalha',
+        quantidade: lerRegistros_('AUSENCIAS').length
+          + lerRegistros_('FERIADOS').length },
       { chave: 'analises', titulo: 'Análises',
         descricao: 'As abas ANALISE_* que o sistema gera na planilha',
         quantidade: lerRegistros_('ANALISES').filter(function (linha) {
@@ -1897,4 +1901,253 @@ function conferirPlanilhaDeCadastros(planilhaId) {
     // mostra isto junto do aviso, para ninguém precisar adivinhar.
     colunasParaEditar: RECC_COLUNAS_PARA_ESCREVER_DE_FORA
   };
+}
+
+// ============================================================================
+//  AS AUSÊNCIAS E OS FERIADOS — O CALENDÁRIO DA OPERAÇÃO
+// ============================================================================
+/*
+ * Duas listas pequenas que mexem numa conta grande: a meta.
+ *
+ * Elas vivem em Configurações porque são DADO da operação, e não estrutura —
+ * férias mudam todo mês, e quem as cadastra é quem monta a escala, não quem
+ * mexe em planilha. Por isso não pedem senha de administrador: pedem a
+ * permissão de configurar, como o resto da tela.
+ */
+
+/**
+ * As ausências cadastradas, da mais recente para a mais antiga.
+ *
+ * Vem com o NOME de quem está fora já resolvido: a aba guarda o Id, que é o
+ * certo, mas uma tela mostrando "0000000007 está de férias" não serve para
+ * ninguém.
+ */
+function listarAusencias() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var nomePorId = {};
+  lerRegistros_('USUARIOS').forEach(function (pessoa) {
+    nomePorId[String(pessoa.Id)] = String(pessoa.Nome || '');
+  });
+
+  var hoje = new Date();
+  hoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+  return lerRegistros_('AUSENCIAS').map(function (linha) {
+    var de = converterParaData_(linha.De);
+    var ate = converterParaData_(linha.Ate);
+
+    return {
+      id: linha.__id,
+      usuarioId: String(linha.UsuarioId || ''),
+      // Nome vazio quer dizer que a pessoa saiu do cadastro. A linha continua
+      // aparecendo — apagá-la da tela esconderia uma ausência que ainda está
+      // descontando dias de alguém.
+      nome: nomePorId[String(linha.UsuarioId || '')] || '(pessoa não cadastrada)',
+      motivo: String(linha.Motivo || ''),
+      de: de ? comoSeEscreve_(de) : '',
+      ate: ate ? comoSeEscreve_(ate) : '',
+      observacao: String(linha.Observacao || ''),
+      diasUteis: (de && ate) ? diasUteisEntre_(de, ate) : 0,
+      // Para a tela separar o que já passou do que está valendo agora.
+      acontecendoAgora: !!(de && ate && de <= hoje && ate >= hoje),
+      jaPassou: !!(ate && ate < hoje)
+    };
+  }).sort(function (um, outro) {
+    return String(outro.de).split('/').reverse().join('')
+      .localeCompare(String(um.de).split('/').reverse().join(''));
+  });
+}
+
+/**
+ * Cadastra ou altera uma ausência.
+ *
+ * As duas datas são obrigatórias e a ordem é conferida aqui. Uma ausência sem
+ * fim ficaria descontando dias para sempre, e uma com as pontas trocadas
+ * descontaria zero — as duas erram a meta em silêncio, que é o que este
+ * cadastro inteiro existe para evitar.
+ */
+function salvarAusencia(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dados || {};
+
+  var usuarioId = converterParaIdentificador_(dados.usuarioId);
+  if (!usuarioId) throw new Error('Diga de quem é a ausência.');
+
+  var pessoa = buscarRegistros_('USUARIOS', 'Id', usuarioId, 1)[0];
+  if (!pessoa) {
+    throw new Error('A pessoa ' + usuarioId + ' não está cadastrada em Usuários.');
+  }
+
+  var de = converterParaData_(dados.de);
+  var ate = converterParaData_(dados.ate);
+  if (!de) throw new Error('Informe o primeiro dia da ausência.');
+  if (!ate) throw new Error('Informe o último dia da ausência.');
+  if (de > ate) {
+    throw new Error('O primeiro dia (' + comoSeEscreve_(de) + ') é depois do '
+      + 'último (' + comoSeEscreve_(ate) + '). Confira as duas datas.');
+  }
+
+  var motivo = String(dados.motivo || '').trim();
+  if (!motivo) throw new Error('Diga o motivo — férias, licença, afastamento.');
+
+  var campos = {
+    UsuarioId: usuarioId,
+    Motivo: motivo,
+    De: de,
+    Ate: ate,
+    Observacao: String(dados.observacao || '')
+  };
+
+  var id = converterParaIdentificador_(dados.id);
+  if (id) {
+    atualizarRegistro_('AUSENCIAS', id, campos);
+    registrarAuditoria_('ausencia.editar', 'AUSENCIAS', id, String(pessoa.Nome));
+    return { id: id };
+  }
+
+  var criada = inserirRegistro_('AUSENCIAS', campos);
+  registrarAuditoria_('ausencia.criar', 'AUSENCIAS', criada.__id,
+    pessoa.Nome + ': ' + motivo + ' de ' + comoSeEscreve_(de)
+    + ' a ' + comoSeEscreve_(ate));
+  return { id: criada.__id };
+}
+
+/** Tira a ausência da conta. Exclusão lógica: a linha fica, some da tela. */
+function excluirAusencia(id) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var alvo = converterParaIdentificador_(id);
+  if (!alvo) throw new Error('Diga qual ausência deve sair.');
+
+  ocultarRegistro_('AUSENCIAS', alvo);
+  registrarAuditoria_('ausencia.excluir', 'AUSENCIAS', alvo, '');
+  return true;
+}
+
+/**
+ * Os feriados: os que o administrador cadastrou E os que o sistema calcula.
+ *
+ * Os dois na mesma resposta, e marcados, porque a pergunta que a tela precisa
+ * responder é "o dia 20 de novembro está coberto?" — e a resposta pode vir de
+ * qualquer um dos dois lados. Mostrar só os cadastrados faria a operação
+ * cadastrar o Natal por via das dúvidas, e depois duvidar do resto.
+ */
+function listarFeriados(ano) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var alvo = Number(ano) || (new Date()).getFullYear();
+
+  var nacionais = feriadosNacionaisDoAno_(alvo);
+  var cadastrados = lerRegistros_('FERIADOS').filter(function (linha) {
+    var quando = converterParaData_(linha.Data);
+    return quando && quando.getFullYear() === alvo;
+  }).map(function (linha) {
+    var quando = converterParaData_(linha.Data);
+    return {
+      id: linha.__id,
+      data: comoSeEscreve_(quando),
+      chave: chaveDoDia_(quando),
+      nome: String(linha.Nome || ''),
+      tipo: String(linha.Tipo || ''),
+      // SIM aqui não é "é feriado": é "neste dia nós TRABALHAMOS", e serve
+      // para cancelar um feriado que o sistema calculou sozinho.
+      trabalha: converterParaSimOuNao_(linha.Trabalha) === 'SIM',
+      doSistema: false
+    };
+  });
+
+  var cancelados = {};
+  cadastrados.forEach(function (um) {
+    if (um.trabalha) cancelados[um.chave] = true;
+  });
+
+  var doSistema = Object.keys(nacionais).sort().map(function (chave) {
+    var partes = chave.split('-');
+    return {
+      id: '',
+      data: partes[2] + '/' + partes[1] + '/' + partes[0],
+      chave: chave,
+      nome: nacionais[chave],
+      tipo: 'Nacional',
+      // Se o administrador marcou Trabalha = SIM neste dia, o nacional está
+      // cancelado — e a tela precisa mostrar isso, não escondê-lo.
+      cancelado: !!cancelados[chave],
+      doSistema: true
+    };
+  });
+
+  return {
+    ano: alvo,
+    anos: anosParaEscolher_(),
+    doSistema: doSistema,
+    cadastrados: cadastrados.sort(function (um, outro) {
+      return um.chave.localeCompare(outro.chave);
+    }),
+    diasUteisNoAno: diasUteisEntre_(new Date(alvo, 0, 1), new Date(alvo, 11, 31))
+  };
+}
+
+/** O ano passado, o corrente e o que vem — que é o que se cadastra. */
+function anosParaEscolher_() {
+  var atual = (new Date()).getFullYear();
+  return [atual - 1, atual, atual + 1];
+}
+
+/**
+ * Cadastra ou altera um feriado da operação.
+ *
+ * Não impede cadastrar em cima de um nacional: cadastrar o mesmo dia com
+ * `Trabalha = NAO` é inofensivo (já era feriado), e com `Trabalha = SIM` é
+ * justamente como se cancela um. Recusar tiraria a única forma de dizer
+ * "neste ano nós trabalhamos no Corpus Christi".
+ */
+function salvarFeriado(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dados || {};
+
+  var quando = converterParaData_(dados.data);
+  if (!quando) throw new Error('Informe a data do feriado.');
+
+  var nome = String(dados.nome || '').trim();
+  if (!nome) throw new Error('Dê um nome ao feriado — é o que a lista mostra.');
+
+  var campos = {
+    Data: quando,
+    Nome: nome,
+    Tipo: String(dados.tipo || 'Municipal'),
+    Trabalha: dados.trabalha === true ? 'SIM' : 'NAO'
+  };
+
+  var id = converterParaIdentificador_(dados.id);
+  var resposta;
+  if (id) {
+    atualizarRegistro_('FERIADOS', id, campos);
+    registrarAuditoria_('feriado.editar', 'FERIADOS', id, nome);
+    resposta = { id: id };
+  } else {
+    var criado = inserirRegistro_('FERIADOS', campos);
+    registrarAuditoria_('feriado.criar', 'FERIADOS', criado.__id,
+      nome + ' em ' + comoSeEscreve_(quando));
+    resposta = { id: criado.__id };
+  }
+
+  // O calendário guardado na execução aponta para o mundo de antes desta
+  // gravação. Sem esquecer, a própria tela que acabou de cadastrar ainda
+  // mostraria o dia como útil.
+  esquecerOCalendario_();
+  return resposta;
+}
+
+/** Tira o feriado da conta. */
+function excluirFeriado(id) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var alvo = converterParaIdentificador_(id);
+  if (!alvo) throw new Error('Diga qual feriado deve sair.');
+
+  ocultarRegistro_('FERIADOS', alvo);
+  registrarAuditoria_('feriado.excluir', 'FERIADOS', alvo, '');
+  esquecerOCalendario_();
+  return true;
 }

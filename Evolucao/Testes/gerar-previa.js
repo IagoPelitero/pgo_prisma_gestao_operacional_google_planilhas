@@ -287,6 +287,13 @@ function pontePreparada(respostas) {
     + '      listarAnalises: function () {\n'
     + '        responder(respostas.configuracoes.analises);\n'
     + '      },\n'
+    + '      listarAusencias: function () {\n'
+    + '        responder(respostas.configuracoes.ausencias);\n'
+    + '      },\n'
+    + '      listarFeriados: function (ano) {\n'
+    + '        responder(respostas.configuracoes.feriados[String(ano)]\n'
+    + '          || respostas.configuracoes.feriados[respostas.configuracoes.anoDoCalendario]);\n'
+    + '      },\n'
     + '      conferirEstruturaDaPlanilha: function () {\n'
     + '        responder(respostas.configuracoes.laudo);\n'
     + '      },\n'
@@ -305,7 +312,8 @@ function pontePreparada(respostas) {
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
       'salvarConfiguracaoDoLegado', 'importarCasos',
-      'salvarConfiguracaoDosCadastros'])
+      'salvarConfiguracaoDosCadastros',
+      'salvarAusencia', 'excluirAusencia', 'salvarFeriado', 'excluirFeriado'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -663,6 +671,11 @@ function gerar(pastaDeSaida) {
     importacao[canal.id] = chamar('opcoesDaImportacaoDeCasos')(canal.id);
   });
 
+  const calendarioPorAno = {};
+  chamar('listarFeriados()').anos.forEach((ano) => {
+    calendarioPorAno[String(ano)] = chamar('listarFeriados')(ano);
+  });
+
   const configuracoes = {
     cards: cards,
     cadastros: chamar('configuracaoDosCadastros()'),
@@ -680,6 +693,12 @@ function gerar(pastaDeSaida) {
     componentes: componentes,
     opcoesDeAnalise: chamar('opcoesDeAnalise()'),
     analises: chamar('listarAnalises()'),
+    ausencias: chamar('listarAusencias()'),
+    // Os TRÊS anos que o seletor oferece, e não só o corrente: na prévia não
+    // há servidor para responder quando alguém troca o ano, e um seletor que
+    // não responde é pior que seletor nenhum.
+    anoDoCalendario: String((new Date()).getFullYear()),
+    feriados: calendarioPorAno,
     diagnostico: chamar('diagnosticoDoSistema()')
   };
 
