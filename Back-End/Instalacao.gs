@@ -305,11 +305,43 @@ function semearDadosIniciais_(emailDoInstalador) {
       Icone: 'diamante',
       Ordem: 2,
       Ativo: true
+    },
+    /*
+     * O VG — VIDA EM GRUPO, o terceiro canal, nascido piloto.
+     *
+     * SEM META e SEM CARTÕES de propósito: o PO pediu para começar assim e
+     * montar os indicadores depois, em Configurações › Painéis. Um cartão
+     * inventado por mim estaria na tela da operação amanhã, medindo o que
+     * ninguém pediu.
+     */
+    {
+      Nome: 'VG',
+      Descricao: 'Vida em Grupo',
+      Aba: 'BASE_VG',
+      ColunaDaData: 'Data do protocolo da solicitação',
+      ColunaDaHora: '',
+      ColunaDoStatus: 'Status',
+      ColunasDaFila: 'Situação: Data do protocolo da solicitação, Status'
+        + '; Vigência: Início da vigência, Meses de vigência'
+        + '; Cliente: CNPJ, Subestipulante, Quantidade de vidas'
+        + '; Financeiro: Prêmio mensal, Margem de contribuição'
+        + '; Responsável: Analista',
+      ColunasDaBusca: 'CNPJ, Subestipulante, SUSEP, TK/Assunto',
+      MetaMensalPorPessoa: 0,
+      // Sem coluna de finalização: nenhum dos seis status do VG é "concluído"
+      // no sentido de encerrar o caso — "Pago" e "Retido" são desfechos, e o
+      // PO não pediu uma data para eles. Fica vazio até ele pedir.
+      ColunaDaFinalizacao: '',
+      ColunaDaAreaResponsavel: '',
+      Icone: 'grupo',
+      Ordem: 3,
+      Ativo: true
     }
   ]);
   contagem.canais = canais.length;
   var idRet = canais[0]['Id'];
   var idCanal = canais[1]['Id'];
+  var idVg = canais[2]['Id'];
 
   // --- catálogo por canal ----------------------------------------------------
   var itens = [];
@@ -346,6 +378,26 @@ function semearDadosIniciais_(emailDoInstalador) {
    ['Concluído na célula', 'destaque', 'Data da finalização']].forEach(function (trio, i) {
     itens.push(novoItemDeCatalogo_('STATUS', idCanal, trio[0], i + 1, trio[1], trio[2]));
   });
+  /*
+   * Os SEIS status do VG, como o PO listou: "reativado, negado, aguardando,
+   * cancelado, pago e retido". Ele confirmou que são seis — "pago" e "retido"
+   * são desfechos distintos.
+   *
+   * NENHUM carimba, e isso é decisão dele por omissão: ele não pediu colunas
+   * de data por status no VG, e criar sete colunas que ninguém pediu encheria
+   * a base para medir o que a operação ainda não decidiu medir. O rastro de
+   * "quando mudou pela última vez e quem mudou" continua existindo, como nos
+   * outros dois canais.
+   */
+  [['Aguardando', 'atencao', ''],
+   ['Reativado', 'bom', ''],
+   ['Retido', 'bom', ''],
+   ['Pago', 'destaque', ''],
+   ['Negado', 'ruim', ''],
+   ['Cancelado', 'ruim', '']].forEach(function (trio, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idVg, trio[0], i + 1, trio[1], trio[2]));
+  });
+
   ['Diamante', 'Demais corretoras', 'Não encontrado'].forEach(function (nome, i) {
     itens.push(novoItemDeCatalogo_('SEGMENTO', '', nome, i + 1));
   });
@@ -383,7 +435,18 @@ function semearDadosIniciais_(emailDoInstalador) {
     PRODUTO: ['1101 - VIDA INDIVIDUAL', '1102 - VIDA EM GRUPO',
       '1103 - PRESTAMISTA', '1104 - ACIDENTES PESSOAIS'],
     ORIGEM: ['Base de inadimplência', 'Central: Pessoa', 'URA', 'Site', 'Chat',
-      'Telefone', 'Corretora']
+      'Telefone', 'Corretora'],
+
+    // --- as três listas do VG, ditadas pelo PO ----------------------------
+    // Só as duas do título da coluna, como ele disse: "é uma lista suspensa
+    // com apenas as opções do título".
+    MOVIMENTACAO: ['MOVSINT', 'MOVESEG'],
+    // De quanto em quanto tempo o cliente paga. O PO descreveu "todo mês, a
+    // cada 3 meses, 6 meses ou anual" e escolheu os nomes do mercado.
+    PERIODICIDADE: ['Mensal', 'Trimestral', 'Semestral', 'Anual'],
+    // De onde veio a oportunidade. "Banguela" é o termo da operação para o
+    // caso que vem sem origem definida — mantido como ele escreveu.
+    LEAD: ['Banguela', 'Reativação', 'Inadimplência', 'Renovação', 'Cobrança']
   };
   Object.keys(listasGlobais).forEach(function (tipo) {
     listasGlobais[tipo].forEach(function (nome, i) {
@@ -418,7 +481,8 @@ function semearDadosIniciais_(emailDoInstalador) {
   // campo ↔ coluna, e não uma segunda verdade que diverge da planilha.
   var campos = []
     .concat(camposDoFormularioDaBase_('BASE_RET', idRet))
-    .concat(camposDoFormularioDaBase_('BASE_MESA', idCanal));
+    .concat(camposDoFormularioDaBase_('BASE_MESA', idCanal))
+    .concat(camposDoFormularioDaBase_('BASE_VG', idVg));
   contagem.campos = inserirVariosRegistros_('CAMPOS', campos).length;
 
   // --- configuração ---------------------------------------------------------
@@ -854,6 +918,61 @@ const RECC_PADRAO_DO_FORMULARIO = {
  * apareceria numa seção "Situação" que na Mesa vem antes do Cliente.
  */
 const RECC_PADRAO_POR_ABA = {
+  /*
+   * O FORMULÁRIO DO VG, na ordem exata em que o PO ditou as colunas.
+   *
+   * A ordem não foi reagrupada por tipo nem "organizada": é a ordem em que a
+   * operação lê e digita, e mexer nela para ficar bonito só atrapalha quem
+   * usa. As seções separam o que se lê de uma vez — o caso, o cliente, a
+   * vigência, o financeiro.
+   *
+   * `mesesdevigencia` NÃO está aqui porque é calculada: o Esquema a marca
+   * `preenchidoPeloSistema`, e isso já a deixa fora do formulário e dentro da
+   * base. Quem a preenche é `preencherColunasCalculadas_`.
+   */
+  BASE_VG: {
+    datadoprotocolodasolicitacao: { secao: 'Caso', ordem: 1,
+      rotulo: 'Data do protocolo da solicitação', obrigatorio: true,
+      valorPadrao: '@HOJE' },
+    analista: { secao: 'Caso', ordem: 2, tipoCampo: 'seletor',
+      listaDe: 'usuarios', valorPadrao: '@EU', travaPara: ['Analista'] },
+    tkassunto: { secao: 'Caso', ordem: 3, rotulo: 'TK/Assunto' },
+    entrada: { secao: 'Caso', ordem: 4, rotulo: 'Entrada' },
+    lead: { secao: 'Caso', ordem: 5, tipoCampo: 'seletor', catalogo: 'LEAD' },
+
+    cnpj: { secao: 'Cliente', ordem: 10, rotulo: 'CNPJ' },
+    subestipulante: { secao: 'Cliente', ordem: 11 },
+    susep: { secao: 'Cliente', ordem: 12, rotulo: 'SUSEP' },
+    quantidadedevidas: { secao: 'Cliente', ordem: 13 },
+
+    // A ÚNICA data do sistema que aceita o futuro, e com razão: uma apólice
+    // que começa a valer mês que vem é rotina em Vida em Grupo. Sem isto o
+    // cadastro recusava o caso com "o caso descreve algo que já aconteceu",
+    // que aqui simplesmente não é verdade.
+    iniciodavigencia: { secao: 'Vigência', ordem: 20,
+      rotulo: 'Início da vigência', aceitaFuturo: true },
+    movsintmoveseg: { secao: 'Vigência', ordem: 21, rotulo: 'MOVSINT/MOVESEG',
+      tipoCampo: 'seletor', catalogo: 'MOVIMENTACAO' },
+    periodicidade: { secao: 'Vigência', ordem: 22,
+      rotulo: 'Mensal/anual', tipoCampo: 'seletor', catalogo: 'PERIODICIDADE' },
+
+    status: { secao: 'Situação', ordem: 30, tipoCampo: 'seletor',
+      catalogo: 'STATUS', obrigatorio: true, valorPadrao: 'Aguardando' },
+    motivodaliberacaoourecusa: { secao: 'Situação', ordem: 31,
+      rotulo: 'Motivo da liberação ou recusa' },
+
+    premiomensal: { secao: 'Financeiro', ordem: 40, rotulo: 'Prêmio mensal' },
+    premioanual: { secao: 'Financeiro', ordem: 41, rotulo: 'Prêmio anual' },
+    // Número, e não porcentagem: o PO escolheu gravar 25,5 e não 0,255. Quem
+    // preenche é o analista — não se calcula a partir dos prêmios.
+    margemdecontribuicao: { secao: 'Financeiro', ordem: 42,
+      rotulo: 'Margem de contribuição (%)' },
+    quantidadedeparcelasvencidas: { secao: 'Financeiro', ordem: 43 },
+
+    meseano: { secao: 'Outros', ordem: 50, rotulo: 'Mês e ano' },
+    obs: { secao: 'Outros', ordem: 51, rotulo: 'Obs' }
+  },
+
   BASE_MESA: {
     analista: { secao: 'Caso', ordem: 3, tipoCampo: 'seletor',
       listaDe: 'usuarios', valorPadrao: '@EU', travaPara: ['Analista'] },
@@ -905,6 +1024,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
     if (padrao.mostrarSe) configuracao.mostrarSe = padrao.mostrarSe;
     if (padrao.travaPara) configuracao.travaPara = padrao.travaPara;
     if (padrao.separaEm) configuracao.separaEm = padrao.separaEm;
+    if (padrao.aceitaFuturo) configuracao.aceitaFuturo = true;
 
     campos.push({
       CanalId: canalId,

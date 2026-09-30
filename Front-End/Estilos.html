@@ -686,6 +686,27 @@ button { font: inherit; color: inherit; }
   escolha CERTA com consequência grande. Uma linha de texto colorido no meio de
   uma tabela de trinta linhas passa batida.
 */
+/*
+  A célula em alerta, na fila do Trabalho.
+
+  Vermelho de TEXTO, e não fundo vermelho: numa fila de trinta linhas, dois ou
+  três valores em fundo pintado viram um bloco de cor que cansa e some no meio
+  do resto. O número em vermelho e em negrito salta sem gritar.
+*/
+/*
+  A ESPECIFICIDADE importa aqui, e me custou uma foto.
+  `table.fila.agrupada .apoio` pinta a célula de --tenue e vale 0-3-1. Um
+  `.fila .em-alerta` (0-2-0) perde para ela: a classe ia para o DOM, a dica
+  aparecia no title, e o número continuava cinza. O alerta existia e não se
+  via — que é o pior dos dois mundos.
+*/
+table.fila .em-alerta,
+table.fila.agrupada .apoio.em-alerta,
+table.fila.agrupada .principal.em-alerta,
+table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
+  color: var(--ruim); font-weight: 700;
+}
+
 .aviso-de-carimbo {
   background: var(--atencao-tenue); color: var(--atencao);
   border-radius: var(--raio-pequeno); padding: 10px 12px; margin-top: 10px;

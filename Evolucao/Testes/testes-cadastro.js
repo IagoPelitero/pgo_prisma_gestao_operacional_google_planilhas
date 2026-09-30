@@ -167,7 +167,10 @@ function rodarTestesDeCadastro() {
     vm.runInContext(fonte, contexto);
 
     const botoes = contexto.SeletorDeCanal.montar(canais, canais[0].id);
-    igual((botoes.match(/<svg/g) || []).length, 2, 'um desenho por canal');
+    // Conta contra o NÚMERO DE CANAIS, e não contra um 2 escrito aqui: no dia
+    // em que o VG nasceu isto dizia 2 enquanto a tela já mostrava 3.
+    igual((botoes.match(/<svg/g) || []).length,
+      chamar('canaisVisiveis_()').length, 'um desenho por canal');
     verdadeiro(botoes.indexOf('M12 15.4c-2-1.3') >= 0, 'o escudo com coração da RET');
     verdadeiro(botoes.indexOf('M7.4 3.6h9.2') >= 0, 'o diamante da Mesa Diamante');
     verdadeiro(botoes.indexOf('class="canal atual"') >= 0, 'o canal escolhida se marca');

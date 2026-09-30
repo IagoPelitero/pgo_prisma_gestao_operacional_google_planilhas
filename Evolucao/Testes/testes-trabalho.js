@@ -8,8 +8,11 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, ehData, lerPeca } =
-  require('./ferramentas');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
+  ehData, lerPeca, scriptDaPeca } = require('./ferramentas');
 
 function rodarTestesDoTrabalho() {
   console.log('\nEtapa 5 — Trabalho');
@@ -936,6 +939,327 @@ function rodarTestesDoTrabalho() {
       verdadeiro(chamada.indexOf(',') > 0,
         nome + ' tem de passar a contagem, não só o conteúdo');
     });
+  });
+
+  secao('O VG — o terceiro canal');
+
+  /*
+   * O VG nasceu piloto, com formulário próprio, base própria e duas regras
+   * que nenhum outro canal tem: uma coluna CALCULADA e um ALERTA na tela.
+   *
+   * O que estes testes cobram é justamente isso — o resto do canal já é
+   * coberto pela máquina que os outros dois usam, e repetir aqui só criaria
+   * teste para manter.
+   */
+
+  const vg = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_VG');
+
+  const mesesAtras = (meses, dias) => {
+    const quando = new Date();
+    quando.setMonth(quando.getMonth() - meses);
+    if (dias) quando.setDate(quando.getDate() - dias);
+    return escrever(quando);
+  };
+
+  teste('o canal VG existe, com a base e o desenho dele', () => {
+    igual(vg.nome, 'VG');
+    igual(vg.aba, 'BASE_VG');
+    igual(vg.icone, 'grupo');
+    // Sem cartões e sem meta: o PO pediu para começar assim e configurar os
+    // indicadores depois. Um cartão inventado estaria na tela dele amanhã.
+    igual(chamar('resumoDoCanal')(vg.id, {}).cartoes.length, 0);
+  });
+
+  teste('o desenho do VG é dele, e não o padrão de outro canal', () => {
+    // Já aconteceu duas vezes neste projeto: chave sem desenho cai num padrão,
+    // calada, e o canal sai parecendo outro. E o `icone` do SeletorDeCanal faz
+    // toLowerCase, então um 'vidaEmGrupo' aqui nunca seria encontrado.
+    const contexto = vm.createContext({ console });
+    vm.runInContext(scriptDaPeca('SeletorDeCanal'), contexto,
+      { filename: 'SeletorDeCanal' });
+    const SeletorDeCanal = contexto.SeletorDeCanal;
+
+    const oPadrao = SeletorDeCanal.icone('chave-que-nao-existe');
+    verdadeiro(SeletorDeCanal.icone('grupo') !== oPadrao,
+      'o VG tem de ter desenho próprio');
+    verdadeiro(SeletorDeCanal.icone('grupo') === SeletorDeCanal.icone('GRUPO'),
+      'e a busca ignora maiúscula, como o canal grava');
+  });
+
+  teste('o formulário do VG traz as colunas na ordem que o PO ditou', () => {
+    const formulario = chamar('formularioDoCanal')(vg.id);
+    const emOrdem = [];
+    (formulario.secoes || []).forEach((secao) => {
+      (secao.campos || []).forEach((campo) => emOrdem.push(campo.rotulo));
+    });
+
+    igual(emOrdem.join(' | '),
+      'Data do protocolo da solicitação | Analista | TK/Assunto | Entrada | Lead'
+      + ' | CNPJ | Subestipulante | SUSEP | Quantidade de vidas'
+      + ' | Início da vigência | MOVSINT/MOVESEG | Mensal/anual'
+      + ' | Status | Motivo da liberação ou recusa'
+      + ' | Prêmio mensal | Prêmio anual | Margem de contribuição (%)'
+      + ' | Quantidade de parcelas vencidas'
+      + ' | Mês e ano | Obs');
+  });
+
+  teste('as três listas do VG têm exatamente as opções pedidas', () => {
+    const formulario = chamar('formularioDoCanal')(vg.id);
+    const opcoesDe = (rotulo) => {
+      let achado = [];
+      (formulario.secoes || []).forEach((secao) => {
+        (secao.campos || []).forEach((campo) => {
+          if (campo.rotulo !== rotulo) return;
+          achado = (campo.opcoes || []).map((uma) =>
+            (uma && uma.valor !== undefined) ? uma.valor : uma);
+        });
+      });
+      return achado.join(', ');
+    };
+
+    igual(opcoesDe('MOVSINT/MOVESEG'), 'MOVSINT, MOVESEG',
+      'só as duas do título, como o PO disse');
+    igual(opcoesDe('Mensal/anual'), 'Mensal, Trimestral, Semestral, Anual');
+    igual(opcoesDe('Lead'),
+      'Banguela, Reativação, Inadimplência, Renovação, Cobrança');
+    igual(opcoesDe('Status'),
+      'Aguardando, Reativado, Retido, Pago, Negado, Cancelado',
+      'seis status — o PO confirmou que "pago" e "retido" são dois');
+  });
+
+  teste('a margem e o prêmio gravam no tipo certo de célula', () => {
+    // O prêmio é dinheiro (soma no Power BI e na planilha); a margem é número
+    // simples, gravando 25,5 — decisão do PO, e não porcentagem 0,255.
+    const esquema = chamar('esquemaDaAba_')('BASE_VG');
+    const tipoDe = (cabecalho) => esquema.colunas
+      .find((coluna) => coluna.cabecalho === cabecalho).tipo;
+
+    igual(tipoDe('Prêmio mensal'), 'dinheiro');
+    igual(tipoDe('Prêmio anual'), 'dinheiro');
+    igual(tipoDe('Margem de contribuição'), 'numero');
+    igual(tipoDe('CNPJ'), 'identificador', 'CNPJ não perde o zero à esquerda');
+    igual(tipoDe('SUSEP'), 'identificador');
+  });
+
+  secao('VG: os meses de vigência, calculados');
+
+  teste('cadastrar calcula os meses a partir do início da vigência', () => {
+    const novo = chamar('cadastrarCaso')(vg.id, {
+      datadoprotocolodasolicitacao: escrever(hoje),
+      analista: 'primeiro.adm',
+      status: 'Aguardando',
+      subestipulante: 'Empresa de 30 meses',
+      iniciodavigencia: mesesAtras(30)
+    });
+
+    const gravado = chamar('buscarRegistros_')('BASE_VG', 'Id', novo.id, 1)[0];
+    igual(Number(gravado['Meses de vigência']), 30,
+      'o analista digita o início; o sistema conta os meses');
+  });
+
+  teste('corrigir a data de início refaz a conta', () => {
+    const novo = chamar('cadastrarCaso')(vg.id, {
+      datadoprotocolodasolicitacao: escrever(hoje),
+      analista: 'primeiro.adm', status: 'Aguardando',
+      subestipulante: 'Empresa corrigida',
+      iniciodavigencia: mesesAtras(30)
+    });
+
+    chamar('editarCaso')(vg.id, novo.id, {
+      datadoprotocolodasolicitacao: escrever(hoje),
+      analista: 'primeiro.adm', status: 'Aguardando',
+      subestipulante: 'Empresa corrigida',
+      iniciodavigencia: mesesAtras(6)
+    });
+
+    const gravado = chamar('buscarRegistros_')('BASE_VG', 'Id', novo.id, 1)[0];
+    igual(Number(gravado['Meses de vigência']), 6,
+      'o número acompanha a correção da data');
+  });
+
+  teste('sem data de início, a coluna fica em branco — e não zero', () => {
+    // Zero diria "zero mês de vigência", que é uma afirmação. Em branco diz
+    // "não sei", que é a verdade quando a data não foi preenchida.
+    const novo = chamar('cadastrarCaso')(vg.id, {
+      datadoprotocolodasolicitacao: escrever(hoje),
+      analista: 'primeiro.adm', status: 'Aguardando',
+      subestipulante: 'Empresa sem vigência'
+    });
+
+    const gravado = chamar('buscarRegistros_')('BASE_VG', 'Id', novo.id, 1)[0];
+    igual(String(gravado['Meses de vigência'] || ''), '');
+  });
+
+  teste('vigência no futuro devolve zero, e não negativo', () => {
+    // Negativo cairia no alerta de "menos de 18" e pintaria de vermelho um
+    // caso que está só adiantado.
+    const daqui = new Date();
+    daqui.setMonth(daqui.getMonth() + 3);
+
+    const novo = chamar('cadastrarCaso')(vg.id, {
+      datadoprotocolodasolicitacao: escrever(hoje),
+      analista: 'primeiro.adm', status: 'Aguardando',
+      subestipulante: 'Empresa adiantada',
+      iniciodavigencia: escrever(daqui)
+    });
+
+    const gravado = chamar('buscarRegistros_')('BASE_VG', 'Id', novo.id, 1)[0];
+    igual(Number(gravado['Meses de vigência']), 0);
+  });
+
+  teste('o mês só conta quando o DIA chega — 18 meses menos um dia são 17', () => {
+    /*
+     * A borda que decide o alerta inteiro.
+     *
+     * Quebrei a conta de propósito para conferir os testes e ela passou verde:
+     * todos usavam o mesmo dia do mês, então o ajuste do dia nunca disparava.
+     * Um caso que começou em 15/03 tem 17 meses em 14/09 do ano seguinte, e 18
+     * só no dia 15 — a diferença entre acender o alerta e não acender.
+     */
+    const dezoitoMeses = new Date();
+    dezoitoMeses.setMonth(dezoitoMeses.getMonth() - 18);
+    // Um dia DEPOIS: o mês ainda não fechou.
+    const faltaUmDia = new Date(dezoitoMeses);
+    faltaUmDia.setDate(faltaUmDia.getDate() + 1);
+
+    igual(chamar('mesesInteirosAteHoje_')(dezoitoMeses), 18,
+      'no dia exato, fecham 18');
+    igual(chamar('mesesInteirosAteHoje_')(faltaUmDia), 17,
+      'um dia antes de fechar, ainda são 17 — e o alerta acende');
+
+    igual(chamar('alertaDaCelula_')('BASE_VG', 'Meses de vigência',
+      chamar('mesesInteirosAteHoje_')(faltaUmDia)),
+      'Vigência de menos de 18 meses',
+      'é esta a borda que a operação olha');
+  });
+
+  teste('só a VIGÊNCIA aceita futuro — o resto do sistema continua recusando', () => {
+    /*
+     * A exceção tinha de ser de UM campo, não uma porta aberta.
+     *
+     * "Data no futuro é recusada" existe porque 10/09/2027 numa data de
+     * protocolo é dedo escorregando no ano — e esse erro passa despercebido
+     * por meses. Afrouxar a regra inteira para atender a vigência teria
+     * custado essa guarda em todos os canais.
+     */
+    const daqui = new Date();
+    daqui.setMonth(daqui.getMonth() + 2);
+
+    // No VG, a data do protocolo continua recusando.
+    lanca(() => chamar('cadastrarCaso')(vg.id, {
+      datadoprotocolodasolicitacao: escrever(daqui),
+      analista: 'primeiro.adm', status: 'Aguardando',
+      subestipulante: 'Protocolo do futuro'
+    }), 'não pode ser no futuro', 'a data do protocolo não aceita futuro');
+
+    // E na RET, nenhuma data aceita.
+    const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    lanca(() => chamar('cadastrarCaso')(ret.id, {
+      analista: 'primeiro.adm',
+      'data de recepção do protocolo': escrever(daqui),
+      'nome do cliente': 'Cliente do futuro'
+    }), 'não pode ser no futuro', 'a RET não ganhou a exceção de tabela');
+
+    // E a marca está em UM campo só, no contrato inteiro.
+    const comAExcecao = chamar('lerRegistros_("CAMPOS")').filter((campo) =>
+      String(campo.Configuracao || '').indexOf('aceitaFuturo') >= 0);
+    igual(comAExcecao.length, 1, 'a exceção é de um campo só');
+    igual(String(comAExcecao[0].Cabecalho), 'Início da vigência');
+  });
+
+  secao('VG: o alerta vermelho, só nas telas');
+
+  teste('vigência abaixo de 18 meses acende; 18 cravados não', () => {
+    const alerta = chamar('alertaDaCelula_');
+    igual(alerta('BASE_VG', 'Meses de vigência', 17), 'Vigência de menos de 18 meses');
+    igual(alerta('BASE_VG', 'Meses de vigência', 18), '',
+      'o limite é ABAIXO de 18 — 18 está dentro');
+    igual(alerta('BASE_VG', 'Meses de vigência', ''), '',
+      'campo em branco não acende: ainda não foi preenchido');
+  });
+
+  teste('margem abaixo de 25,5 acende, e aceita vírgula', () => {
+    const alerta = chamar('alertaDaCelula_');
+    igual(alerta('BASE_VG', 'Margem de contribuição', '25,4'),
+      'Margem abaixo de 25,5%');
+    igual(alerta('BASE_VG', 'Margem de contribuição', '25,5'), '');
+    igual(alerta('BASE_VG', 'Margem de contribuição', 30), '');
+  });
+
+  teste('o alerta é do VG, e não vaza para os outros canais', () => {
+    igual(chamar('alertaDaCelula_')('BASE_RET', 'Margem de contribuição', 1), '');
+    igual(chamar('alertaDaCelula_')('BASE_MESA', 'Meses de vigência', 1), '');
+  });
+
+  teste('a fila do VG entrega o alerta pronto, com o motivo', () => {
+    chamar('cadastrarCaso')(vg.id, {
+      datadoprotocolodasolicitacao: escrever(hoje),
+      analista: 'primeiro.adm', status: 'Aguardando',
+      subestipulante: 'Empresa em alerta',
+      iniciodavigencia: mesesAtras(5),
+      margemdecontribuicao: '20'
+    });
+
+    const fila = chamar('resumoDoCanal')(vg.id, {}).fila;
+    const emAlerta = fila.find((linha) =>
+      JSON.stringify(linha.celulas).indexOf('Empresa em alerta') >= 0);
+
+    const celulas = [];
+    emAlerta.celulas.forEach((grupo) => grupo.forEach((c) => celulas.push(c)));
+
+    const vigencia = celulas.find((c) => c.cabecalho === 'Meses de vigência');
+    const margem = celulas.find((c) => c.cabecalho === 'Margem de contribuição');
+
+    igual(vigencia.alerta, 'Vigência de menos de 18 meses');
+    igual(margem.alerta, 'Margem abaixo de 25,5%');
+  });
+
+  teste('número decimal sai em português, com vírgula', () => {
+    /*
+     * A margem aparecia na fila como "19.8". Estava assim desde sempre, e
+     * nenhum canal tinha mostrado: a RET só tem número INTEIRO na fila, e
+     * inteiro sai igual nos dois idiomas. O VG foi o primeiro com decimal.
+     *
+     * Quem pegou foi a foto da tela — de novo.
+     */
+    igual(chamar('paraTexto_')(19.8, 'numero'), '19,8');
+    igual(chamar('paraTexto_')(25.5, 'numero'), '25,5');
+    igual(chamar('paraTexto_')(27, 'numero'), '27',
+      'inteiro não ganha casas decimais que ninguém pediu');
+    igual(chamar('paraTexto_')('', 'numero'), '');
+
+    // E na fila de verdade, que é onde a operação vê.
+    const fila = chamar('resumoDoCanal')(vg.id, {}).fila;
+    const celulas = [];
+    fila.forEach((linha) => linha.celulas.forEach(
+      (grupo) => grupo.forEach((c) => celulas.push(c))));
+
+    const comPonto = celulas.filter((c) =>
+      c.cabecalho === 'Margem de contribuição' && String(c.valor).indexOf('.') >= 0);
+    igual(comPonto.length, 0,
+      'nenhuma margem pode sair com ponto: ' + JSON.stringify(comPonto));
+  });
+
+  teste('a tela pinta o alerta, e o motivo vai na dica', () => {
+    // Cor sozinha não diz por quê, e quem chegou ontem na operação não
+    // adivinha que 17 é pouco.
+    const tela = lerPeca('Trabalho');
+    contem(tela, 'celula.alerta', 'a tela lê o alerta que o servidor mandou');
+    contem(tela, 'em-alerta', 'e marca a célula');
+    verdadeiro(tela.indexOf("' — ' + celula.alerta") > 0,
+      'o motivo entra na dica, junto do nome da coluna');
+    contem(lerPeca('Estilos'), '.fila .em-alerta', 'com estilo declarado');
+  });
+
+  teste('o vermelho NÃO vai para a planilha — decisão do PO', () => {
+    // Ele foi específico: "só nas telas do PGO". Formatação condicional na
+    // célula ficaria para trás no dia em que alguém arrastasse uma linha.
+    const daInstalacao = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Back-End', 'Instalacao.gs'), 'utf8');
+    verdadeiro(daInstalacao.indexOf('ConditionalFormat') < 0,
+      'nada de formatação condicional na planilha');
+    verdadeiro(daInstalacao.indexOf('setBackground') < 0,
+      'nem célula pintada na gravação');
   });
 }
 

@@ -41,6 +41,9 @@ abaixo com o motivo.
 | **Busca** | Em quais colunas cado canal procura | Canais de trabalho |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
+| **Os limites do alerta vermelho** | `RECC_ALERTAS_DA_LINHA`, no `Base.gs` | Hoje só o VG tem: vigência abaixo de 18 e margem abaixo de 25,5. Acrescentar coluna ou trocar o limite é uma linha. Ainda **não** tem tela |
+| **Campo que aceita data no futuro** | `RECC_PADRAO_POR_ABA`, no `Instalacao.gs` | Só o `Início da vigência` do VG. Todas as outras datas continuam recusando futuro |
+| **Coluna calculada** | `RECC_COLUNAS_CALCULADAS`, no `Base.gs` | Hoje só os meses de vigência do VG. Outra conta é uma linha aqui e um `if` na função |
 | **Ausências** (férias, licença, afastamento) | Configurações › Calendário | Quem, motivo e o período. Sai da meta da pessoa e da média da equipe — não bloqueia o acesso |
 | **Feriados da operação** (municipal, facultativo, emenda) | Configurações › Calendário | Os nacionais o sistema calcula sozinho, móveis inclusive. `Trabalha = SIM` cancela um nacional |
 | **Quais colunas a importação pode preencher** | Configurações › Listas, na coluna `ColunaDeCarimbo` de cada status | O carimbo nunca é sugerido sozinho, mas pode ser escolhido no de-para. Criar um status novo apontando para uma coluna já a torna escolhível |

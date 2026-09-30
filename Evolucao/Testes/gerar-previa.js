@@ -339,6 +339,9 @@ function gerar(pastaDeSaida) {
     return comZero(data.getDate()) + '/' + comZero(data.getMonth() + 1)
       + '/' + data.getFullYear();
   };
+  const escreverData = (data) => comZero(data.getDate()) + '/'
+    + comZero(data.getMonth() + 1) + '/' + data.getFullYear();
+  const mesAnoDeHoje = comZero(hoje.getMonth() + 1) + '/' + hoje.getFullYear();
 
   // Alguns casos no período ANTERIOR, para os cartões terem com o que
   // comparar — senão a prévia mostraria a variação sempre em branco.
@@ -401,6 +404,74 @@ function gerar(pastaDeSaida) {
   ]);
 
   // ------------------------------------------------------------------- RET
+  /*
+   * O VG — Vida em Grupo, o canal piloto.
+   *
+   * Os quatro casos existem para uma coisa que nenhum outro canal mostra: o
+   * ALERTA VERMELHO. Dois estão dentro dos limites e dois estouram — um pela
+   * vigência (menos de 18 meses) e outro pela margem (abaixo de 25,5%). Sem
+   * um caso em alerta na prévia, ninguém consegue CONFERIR o alerta antes de
+   * a operação começar a usar.
+   */
+  const mesesAtras = (meses) => {
+    const quando = new Date();
+    quando.setMonth(quando.getMonth() - meses);
+    return escreverData(quando);
+  };
+
+  chamar('inserirVariosRegistros_')('BASE_VG', [
+    {
+      'Data do protocolo da solicitação': diasAtras(3), Analista: 'Ana Martins',
+      'TK/Assunto': 'TK-88410 · Renovação com reajuste', Entrada: diasAtras(4),
+      CNPJ: '11222333000181', Subestipulante: 'Metalúrgica Andrade',
+      'Início da vigência': mesesAtras(42), 'Meses de vigência': 42,
+      'Quantidade de vidas': 148, 'MOVSINT/MOVESEG': 'MOVSINT',
+      SUSEP: '2233445', Periodicidade: 'Mensal', Lead: 'Renovação',
+      Status: 'Retido', 'Motivo da liberação ou recusa': 'Manteve com reajuste menor',
+      'Prêmio mensal': 14820.5, 'Prêmio anual': 177846,
+      'Margem de contribuição': 31.2, 'Quantidade de parcelas vencidas': 0,
+      Obs: '', 'Mês e ano': mesAnoDeHoje
+    },
+    {
+      // ALERTA pela VIGÊNCIA: 9 meses, abaixo dos 18.
+      'Data do protocolo da solicitação': diasAtras(2), Analista: 'Marcos Vieira',
+      'TK/Assunto': 'TK-88455 · Inadimplência 2 parcelas', Entrada: diasAtras(2),
+      CNPJ: '44555666000122', Subestipulante: 'Transportes Vale Verde',
+      'Início da vigência': mesesAtras(9), 'Meses de vigência': 9,
+      'Quantidade de vidas': 62, 'MOVSINT/MOVESEG': 'MOVESEG',
+      SUSEP: '3344556', Periodicidade: 'Trimestral', Lead: 'Inadimplência',
+      Status: 'Aguardando', 'Motivo da liberação ou recusa': '',
+      'Prêmio mensal': 5240, 'Prêmio anual': 62880,
+      'Margem de contribuição': 28.4, 'Quantidade de parcelas vencidas': 2,
+      Obs: 'Contato agendado com o RH.', 'Mês e ano': mesAnoDeHoje
+    },
+    {
+      // ALERTA pela MARGEM: 19,8%, abaixo dos 25,5%.
+      'Data do protocolo da solicitação': diasAtras(6), Analista: 'Ana Martins',
+      'TK/Assunto': 'TK-88302 · Pedido de cancelamento', Entrada: diasAtras(6),
+      CNPJ: '77888999000155', Subestipulante: 'Clínica São Bento',
+      'Início da vigência': mesesAtras(27), 'Meses de vigência': 27,
+      'Quantidade de vidas': 31, 'MOVSINT/MOVESEG': 'MOVSINT',
+      SUSEP: '4455667', Periodicidade: 'Anual', Lead: 'Cobrança',
+      Status: 'Negado', 'Motivo da liberação ou recusa': 'Margem não comporta desconto',
+      'Prêmio mensal': 2110.75, 'Prêmio anual': 25329,
+      'Margem de contribuição': 19.8, 'Quantidade de parcelas vencidas': 1,
+      Obs: '', 'Mês e ano': mesAnoDeHoje
+    },
+    {
+      'Data do protocolo da solicitação': diasAtras(9), Analista: 'Patrícia Nunes',
+      'TK/Assunto': 'TK-88190 · Reativação', Entrada: diasAtras(10),
+      CNPJ: '99000111000133', Subestipulante: 'Construtora Horizonte',
+      'Início da vigência': mesesAtras(63), 'Meses de vigência': 63,
+      'Quantidade de vidas': 410, 'MOVSINT/MOVESEG': 'MOVESEG',
+      SUSEP: '5566778', Periodicidade: 'Semestral', Lead: 'Reativação',
+      Status: 'Reativado', 'Motivo da liberação ou recusa': 'Cliente quitou o débito',
+      'Prêmio mensal': 39400, 'Prêmio anual': 472800,
+      'Margem de contribuição': 27, 'Quantidade de parcelas vencidas': 0,
+      Obs: '', 'Mês e ano': mesAnoDeHoje
+    }
+  ]);
+
   // A RET trata RETENÇÃO: o cliente pediu para cancelar, e o analista
   // tenta manter. A demanda é outra, e por isso as colunas são outras —
   // proposta, apólice, prêmio, motivo do cancelamento, tentativas de contato.

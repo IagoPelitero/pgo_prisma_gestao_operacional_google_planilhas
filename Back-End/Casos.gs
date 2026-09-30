@@ -120,6 +120,14 @@ function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
     // como { campo: 'chave', valor: 'TEXTO' } — ver o formulário na tela.
     mostrarSe: configuracao.mostrarSe || null,
     largura: Number(configuracao.largura) || 1,
+    /*
+     * Data no futuro é RECUSADA por padrão: o caso descreve algo que já
+     * aconteceu, e "10/09/2027" numa data de protocolo é dedo escorregando no
+     * ano. Mas há campo em que o futuro é rotina — o início da vigência de uma
+     * apólice que começa mês que vem —, e para esses a recusa é que estava
+     * errada. Quem declara a exceção é o campo, em Configurações.
+     */
+    aceitaFuturo: configuracao.aceitaFuturo === true,
     opcoes: opcoesDoCampo_(configuracao, idDoCanal)
   };
 }
@@ -478,7 +486,7 @@ function conferirCampo_(campo, valor) {
   if (campo.tipo === 'data') {
     var data = converterParaData_(texto);
     if (!data) return 'precisa ser uma data no formato dd/mm/aaaa';
-    if (dataEstaNoFuturo_(data)) {
+    if (dataEstaNoFuturo_(data) && !campo.aceitaFuturo) {
       return 'não pode ser no futuro — o caso descreve algo que já aconteceu';
     }
     return '';
@@ -571,6 +579,7 @@ function cadastrarCaso(idDoCanal, valores) {
   preencherEntradaAutomatica_(canal, paraGravar);
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
   carimbarOStatusDeNascimento_(canal, paraGravar);
+  preencherColunasCalculadas_(canal.aba, paraGravar, {});
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
   registrarAuditoria_('caso.criar', canal.aba, gravado.__id, canal.nome);
@@ -603,6 +612,10 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
   // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
   // diálogo, e tem de deixar o mesmo rastro.
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
+
+  // E a conta refaz: é o que faz o número acompanhar quando o analista
+  // corrige a data de início da vigência.
+  preencherColunasCalculadas_(canal.aba, paraGravar, atual);
 
   atualizarRegistro_(canal.aba, alvo, paraGravar);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);

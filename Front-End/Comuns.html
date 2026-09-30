@@ -591,7 +591,18 @@ var SeletorDeCanal = (function () {
     // diamante: o canal prioritária
     diamante:
       '<path d="M7.4 3.6h9.2l4 5.4L12 20.6 3.4 9z"></path>'
-      + '<path d="M3.4 9h17.2M7.4 3.6 12 9l4.6-5.4M12 9v11.6"></path>'
+      + '<path d="M3.4 9h17.2M7.4 3.6 12 9l4.6-5.4M12 9v11.6"></path>',
+    // grupo: três pessoas, uma à frente. É o VG — Vida em Grupo, onde o
+    // segurado não é uma pessoa, é uma empresa com muitas vidas dentro.
+    //
+    // A chave tem de ser MINÚSCULA: o `icone` abaixo faz toLowerCase no nome
+    // que vem da aba CANAIS. Um 'grupoDeVidas' aqui nunca seria encontrado, e
+    // o canal sairia com o losango do diamante sem ninguém ser avisado.
+    grupo:
+      '<path d="M15.8 20.4v-1.8a3.6 3.6 0 0 0-3.6-3.6H6.8a3.6 3.6 0 0 0-3.6 3.6v1.8"></path>'
+      + '<circle cx="9.5" cy="7.6" r="3.4"></circle>'
+      + '<path d="M20.8 20.4v-1.8a3.6 3.6 0 0 0-2.7-3.5"></path>'
+      + '<path d="M15.6 4.4a3.6 3.6 0 0 1 0 6.9"></path>'
   };
 
   /** Nome desconhecido cai no losango: melhor que botão sem desenho. */

@@ -47,6 +47,55 @@ FONTE_TITULO = Font(name='Arial', size=11, bold=True, color='FFFFFF')
 BORDA_BAIXO = Border(bottom=Side(style='thin', color=LINHA))
 
 
+AMARELO = 'FFF3C4'      # a linha que mudou
+VERDE_CLARO = 'E3F3E6'  # a linha que nasceu nesta rodada
+
+# Onde sai a versão SEM as alterações — o código como estava no último commit.
+DESTINO_ANTES = os.path.join(RAIZ, 'Evolucao', 'pacote', 'PGO-codigo-ANTES.xlsx')
+
+
+def como_estava_no_commit(caminho_relativo):
+    """
+    O conteúdo do arquivo no último commit, ou None se ele nasceu agora.
+
+    É daqui que sai tanto a planilha "sem as alterações" quanto a marcação do
+    que mudou. Comparar com o commit, e não com uma cópia guardada à mão, é o
+    que garante que a marca corresponde ao que de fato foi alterado.
+    """
+    try:
+        return subprocess.check_output(
+            ['git', 'show', 'HEAD:' + caminho_relativo],
+            cwd=RAIZ, stderr=subprocess.DEVNULL).decode('utf-8')
+    except subprocess.CalledProcessError:
+        return None
+
+
+def linhas_que_mudaram(antes, agora):
+    """
+    Quais linhas de AGORA são novas ou diferentes, pelo número.
+
+    Devolve um dicionário {numero_da_linha: 'nova' ou 'mudou'}. Arquivo que não
+    existia no commit tem TODAS as linhas como novas — é o caso de um canal
+    recém-criado, e marcar linha por linha ali só polui.
+    """
+    if antes is None:
+        return {}
+
+    import difflib
+    de = antes.split('\n')
+    para = agora.split('\n')
+    marcas = {}
+
+    for etiqueta, _i1, _i2, j1, j2 in difflib.SequenceMatcher(
+            None, de, para, autojunk=False).get_opcodes():
+        if etiqueta == 'equal':
+            continue
+        for j in range(j1, j2):
+            marcas[j + 1] = 'nova' if etiqueta == 'insert' else 'mudou'
+
+    return marcas
+
+
 def arquivos_do_codigo():
     """Os arquivos que a pessoa precisa ter no Apps Script, em ordem de leitura."""
     grupos = [
@@ -64,23 +113,49 @@ def arquivos_do_codigo():
     return achados
 
 
-def escrever_aba_do_arquivo(planilha, pasta, nome, papel):
-    aba = planilha.create_sheet(title=nome[:31])
+def escrever_aba_do_arquivo(planilha, pasta, nome, papel, marcar=True):
+    """
+    Uma aba por arquivo. Com `marcar`, o que mudou desde o último commit sai
+    sinalizado: `*` no nome da aba e na linha, e fundo colorido.
+    """
+    relativo = pasta + '/' + nome
+    caminho = os.path.join(RAIZ, pasta, nome)
+    with open(caminho, encoding='utf-8') as arquivo:
+        agora = arquivo.read()
+
+    antes = como_estava_no_commit(relativo) if marcar else agora
+    nasceu_agora = marcar and antes is None
+    marcas = linhas_que_mudaram(antes, agora) if marcar else {}
+    mexido = nasceu_agora or bool(marcas)
+
+    # O marcador vai na FRENTE do nome, onde o olho bate primeiro ao correr as
+    # abas. Não dá para usar `*`: o Excel recusa asterisco em nome de aba
+    # ("Invalid character * found in sheet title") — ele é curinga de busca
+    # lá dentro. O losango cheio faz o mesmo serviço e é aceito.
+    #
+    # Dentro da aba, no número da linha, o `*` é permitido e é o que se usa.
+    titulo = ('◆ ' + nome) if mexido else nome
+    aba = planilha.create_sheet(title=titulo[:31])
 
     aba['A1'] = 'Linha'
-    aba['B1'] = pasta + '/' + nome
+    aba['B1'] = relativo + ('   ← ALTERADO nesta rodada' if mexido else '')
+    if nasceu_agora:
+        aba['B1'] = relativo + '   ← ARQUIVO NOVO nesta rodada'
     for celula in (aba['A1'], aba['B1']):
         celula.font = FONTE_TITULO
         celula.fill = PatternFill('solid', fgColor=AZUL)
         celula.alignment = Alignment(vertical='center')
     aba.row_dimensions[1].height = 22
 
-    caminho = os.path.join(RAIZ, pasta, nome)
-    with open(caminho, encoding='utf-8') as arquivo:
-        linhas = arquivo.read().split('\n')
+    linhas = agora.split('\n')
 
     for numero, conteudo in enumerate(linhas, start=1):
-        alvo = aba.cell(row=numero + 1, column=1, value=numero)
+        marca = marcas.get(numero, '')
+
+        # O `*` fica GRUDADO no número da linha: quem rola o arquivo à procura
+        # do que mudou varre uma coluna estreita, e não o texto inteiro.
+        alvo = aba.cell(row=numero + 1, column=1,
+                        value=('* ' + str(numero)) if marca else numero)
         alvo.font = FONTE_NUMERO
         alvo.alignment = Alignment(horizontal='right')
 
@@ -89,6 +164,14 @@ def escrever_aba_do_arquivo(planilha, pasta, nome, papel):
         # Uma linha que comece com "=" viraria fórmula. Não há nenhuma hoje,
         # e a trava fica para o dia em que houver.
         codigo.data_type = 's'
+
+        # Fundo para quem confere de relance, `*` para quem usa Ctrl+F. Os
+        # dois, porque cor sozinha não se procura e asterisco sozinho não
+        # salta. Amarelo é linha mexida; verde é linha que nasceu agora.
+        if marca:
+            cor = VERDE_CLARO if marca == 'nova' else AMARELO
+            alvo.fill = PatternFill('solid', fgColor=cor)
+            codigo.fill = PatternFill('solid', fgColor=cor)
         codigo.font = FONTE_CODIGO
         codigo.alignment = Alignment(vertical='top')
 
@@ -171,6 +254,13 @@ def escrever_leia_me(planilha, inventario):
 
 
 def gerar():
+    """
+    Gera as DUAS planilhas: a de hoje, com o que mudou marcado, e a de antes.
+
+    Duas, e não uma com abas dobradas: o PO pediu "com e sem as alterações", e
+    quem compara código abre os dois arquivos lado a lado. Abas alternadas
+    dentro do mesmo arquivo obrigariam a pular de uma para outra o tempo todo.
+    """
     planilha = Workbook()
     planilha.remove(planilha.active)
 
@@ -183,7 +273,64 @@ def gerar():
 
     os.makedirs(os.path.dirname(DESTINO), exist_ok=True)
     planilha.save(DESTINO)
+
+    gerar_a_de_antes()
     return inventario
+
+
+def gerar_a_de_antes():
+    """
+    O código como estava no último commit — a versão SEM as alterações.
+
+    Arquivo que nasceu nesta rodada não entra: ele não existia antes, e uma
+    aba vazia diria o contrário. Quem some da lista é justamente o que é novo,
+    e o LEIA-ME de lá diz isso.
+    """
+    planilha = Workbook()
+    planilha.remove(planilha.active)
+
+    aviso = planilha.create_sheet(title='LEIA-ME', index=0)
+    aviso['A1'] = 'O código ANTES das alterações desta rodada'
+    aviso['A1'].font = FONTE_TITULO
+    aviso['A1'].fill = PatternFill('solid', fgColor=AZUL)
+    aviso['A2'] = ('Esta planilha é o retrato do último commit. Compare com '
+                   'PGO-codigo-completo.xlsx, onde o que mudou está marcado '
+                   'com * e fundo colorido.')
+    aviso['A3'] = ('Arquivos que NASCERAM nesta rodada não aparecem aqui — '
+                   'eles não existiam antes.')
+    aviso.column_dimensions['A'].width = 110
+
+    quantos = 0
+    for pasta, nome, _papel in arquivos_do_codigo():
+        conteudo = como_estava_no_commit(pasta + '/' + nome)
+        if conteudo is None:
+            continue
+
+        aba = planilha.create_sheet(title=nome[:31])
+        aba['A1'] = 'Linha'
+        aba['B1'] = pasta + '/' + nome + '   (antes das alterações)'
+        for celula in (aba['A1'], aba['B1']):
+            celula.font = FONTE_TITULO
+            celula.fill = PatternFill('solid', fgColor=AZUL)
+        aba.row_dimensions[1].height = 22
+
+        for numero, linha in enumerate(conteudo.split('\n'), start=1):
+            alvo = aba.cell(row=numero + 1, column=1, value=numero)
+            alvo.font = FONTE_NUMERO
+            alvo.alignment = Alignment(horizontal='right')
+            codigo = aba.cell(row=numero + 1, column=2)
+            codigo.value = linha
+            codigo.data_type = 's'
+            codigo.font = FONTE_CODIGO
+            codigo.alignment = Alignment(vertical='top')
+
+        aba.column_dimensions['A'].width = 7
+        aba.column_dimensions['B'].width = 120
+        aba.freeze_panes = 'A2'
+        quantos += 1
+
+    planilha.save(DESTINO_ANTES)
+    return quantos
 
 
 if __name__ == '__main__':
@@ -195,4 +342,7 @@ if __name__ == '__main__':
           + str(len(inventario)) + ' arquivos)')
     print('  ' + '{:,}'.format(total).replace(',', '.') + ' linhas de código')
     print('  ' + str(round(os.path.getsize(DESTINO) / 1024)) + ' KB')
+    print('')
+    print('E a versão SEM as alterações em ' + DESTINO_ANTES)
+    print('  ' + str(round(os.path.getsize(DESTINO_ANTES) / 1024)) + ' KB')
     print('')

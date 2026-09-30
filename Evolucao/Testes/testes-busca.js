@@ -47,7 +47,8 @@ function rodarTestesDeBusca() {
 
   teste('a tela abre sabendo onde dá para procurar', () => {
     const opcoes = chamar('opcoesDaBusca()');
-    igual(opcoes.canais.length, 2);
+    igual(opcoes.canais.length, chamar('canaisVisiveis_()').length,
+      'dá para procurar em todos os canais que a pessoa vê');
     igual(opcoes.minimo, 3);
     igual(opcoes.legado.ligado, false, 'instalação nova não tem base legada');
 

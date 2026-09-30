@@ -445,7 +445,8 @@ function rodarTestesDeConfiguracoes() {
 
   teste('o canal vem com as colunas da base, para não digitar nome à mão', () => {
     const canais = chamar('listarCanaisConfiguraveis()');
-    igual(canais.length, 2);
+    igual(canais.length, chamar('lerRegistros_("CANAIS")').length,
+      'a tela lista todos os canais da aba, sem perder nenhum');
     const diamante = canais.find((m) => m.aba === 'BASE_MESA');
     verdadeiro(diamante.abaExiste);
     verdadeiro(diamante.colunasDaBase.indexOf('Status') >= 0);
@@ -468,21 +469,42 @@ function rodarTestesDeConfiguracoes() {
   });
 
   teste('desligar a último canal ativa é recusado', () => {
-    const ret = chamar('listarCanaisConfiguraveis()').find((m) => m.aba === 'BASE_RET');
-    const comoEstava = { id: ret.id, nome: ret.nome, ordem: ret.ordem,
-      colunaDaData: ret.colunaDaData, colunaDaHora: ret.colunaDaHora,
-      colunaDoStatus: ret.colunaDoStatus, colunasDaFila: ret.colunasDaFila,
-      cartoesDoPainel: ret.cartoesDoPainel,
-      colunaDaFinalizacao: ret.colunaDaFinalizacao,
-      colunaDaAreaResponsavel: ret.colunaDaAreaResponsavel };
+    /*
+     * O teste desligava UM canal e esperava que o segundo fosse recusado —
+     * premissa de quando o sistema tinha exatamente dois. No dia em que o VG
+     * nasceu ele passou a desligar dois e deixar um de pé, a recusa não veio,
+     * e a Mesa ficou DESLIGADA para os testes seguintes: quatro falharam
+     * depois com "canal não existe ou está desativado", apontando para longe
+     * daqui.
+     *
+     * Agora desliga TODOS menos um, seja lá quantos existam, e cobra a recusa
+     * no último. É a regra de verdade, e ela continua valendo no quarto canal.
+     */
+    const todos = chamar('listarCanaisConfiguraveis()');
+    const comoEstavam = todos.map((um) => ({
+      id: um.id, nome: um.nome, ordem: um.ordem,
+      colunaDaData: um.colunaDaData, colunaDaHora: um.colunaDaHora,
+      colunaDoStatus: um.colunaDoStatus, colunasDaFila: um.colunasDaFila,
+      cartoesDoPainel: um.cartoesDoPainel,
+      colunaDaFinalizacao: um.colunaDaFinalizacao,
+      colunaDaAreaResponsavel: um.colunaDaAreaResponsavel,
+      ativo: um.ativo
+    }));
 
-    chamar('salvarCanal')(Object.assign({}, comoEstava, { ativo: false }));
+    // Desliga todos menos o último da lista — e guarda quais foram.
+    const desligados = comoEstavam.slice(0, -1).filter((um) => um.ativo);
+    desligados.forEach((um) => {
+      chamar('salvarCanal')(Object.assign({}, um, { ativo: false }));
+    });
 
-    lanca(() => chamar('salvarCanal')({
-      id: canal.id, nome: 'Mesa Diamante', ativo: false
-    }), 'último canal ativa');
+    const ultimo = comoEstavam[comoEstavam.length - 1];
+    lanca(() => chamar('salvarCanal')(Object.assign({}, ultimo, { ativo: false })),
+      'último canal ativa');
 
-    chamar('salvarCanal')(Object.assign({}, comoEstava, { ativo: true }));
+    // Religa SÓ o que este teste desligou. Regravar os outros "por garantia"
+    // enche a auditoria de linhas que não aconteceram — e empurra para fora da
+    // janela as que outro teste vai procurar. Foi o que aconteceu aqui.
+    desligados.forEach((um) => { chamar('salvarCanal')(um); });
   });
 
   teste('mexer nos cartões muda o painel na hora seguinte', () => {

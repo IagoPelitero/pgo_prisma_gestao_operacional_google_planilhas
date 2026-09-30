@@ -598,6 +598,68 @@ a tela que não oferecia, e um de-para montado por fora passava.
 
 ---
 
+## O VG — Vida em Grupo, o terceiro canal
+
+![O VG na fila do Trabalho](Evolucao/imagens/tela-vg.png)
+
+Nasceu **piloto**, e é o primeiro canal criado depois que o sistema já estava
+de pé. O que ele prova é que a máquina aguenta: base própria, formulário
+próprio, listas próprias e seis status próprios, sem mexer em nada dos outros
+dois.
+
+Ele também trouxe duas coisas que nenhum canal tinha.
+
+### Uma coluna calculada
+
+O analista digita o **início da vigência**; o sistema conta os meses até hoje e
+grava o número em **Meses de vigência**. Recalcula a cada gravação — no
+cadastro e em cada edição.
+
+O número na planilha é um **retrato do último salvamento**: ele não se
+atualiza sozinho com o passar dos meses. Foi decisão do PO, e ela é
+consciente — *"ele grava apenas o registro, que pode ser alterado se o analista
+o fizer"*.
+
+O mês só conta quando o **dia** chega: de 15/03 a 14/09 são cinco meses, e o
+sexto fecha no dia 15. Contar pela metade daria 18 a quem tem 17 e meio — e 18
+é exatamente onde o alerta liga.
+
+### Um alerta vermelho, só na tela
+
+| coluna | acende quando |
+|---|---|
+| Meses de vigência | menos de 18 |
+| Margem de contribuição | menos de 25,5% |
+
+**Só nas telas do PGO**, nunca na planilha — decisão do PO. Formatação
+condicional na célula ficaria para trás no dia em que alguém arrastasse uma
+linha, e o alerta sumiria sem avisar.
+
+A cor não vem sozinha: passar o mouse mostra o motivo (*"Vigência de menos de
+18 meses"*). Cor sem motivo é enfeite — quem chegou ontem na operação não
+adivinha que 17 é pouco.
+
+Campo em branco **não** acende. Campo não preenchido é campo não preenchido, e
+pintar de vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
+
+### A única data do sistema que aceita o futuro
+
+Todas as outras são recusadas — *"o caso descreve algo que já aconteceu"* —,
+porque `10/09/2027` numa data de protocolo é dedo escorregando no ano, e esse
+erro passa meses despercebido.
+
+Mas uma apólice que **começa a valer mês que vem** é rotina em Vida em Grupo.
+O `Início da vigência` declara a exceção, e um teste garante que ela é de **um
+campo só**: a data do protocolo do próprio VG continua recusando futuro.
+
+### O que ele ainda não tem
+
+**Cartões e meta**, de propósito. O PO pediu para começar assim e montar os
+indicadores depois, em **Configurações › Painéis**, sem programador. Um cartão
+inventado estaria na tela da operação amanhã, medindo o que ninguém pediu.
+
+---
+
 ## Duas bases: a operacional e a de cadastros
 
 Corretoras, SUSEPs bloqueadas, produtos e as duas listas de analista — Central e

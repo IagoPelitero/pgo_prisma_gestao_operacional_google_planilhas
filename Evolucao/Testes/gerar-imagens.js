@@ -56,6 +56,10 @@ const FOTOS = [
   { arquivo: 'tela-buscar-caso', tela: 'buscarCaso' },
   { arquivo: 'tela-tabela-corretoras', tela: 'tabelaCorretoras', inteira: true },
   { arquivo: 'tela-importacao', tela: 'importacao', inteira: true },
+  // O VG é o terceiro canal do Trabalho, e a foto precisa TROCAR de canal para
+  // chegar nele — senão sai a RET de novo. É também a única foto em que o
+  // alerta vermelho aparece, e por isso ela existe.
+  { arquivo: 'tela-vg', tela: 'trabalho', canal: 'VG', inteira: true },
   { arquivo: 'tela-produtividade', tela: 'produtividade', inteira: true },
   { arquivo: 'tela-configuracoes', tela: 'configuracoes', inteira: true },
 
@@ -92,6 +96,19 @@ async function gerar() {
     if (foto.tema) {
       await pagina.click('[data-tema="' + foto.tema + '"]');
       await pagina.waitForTimeout(500);
+    }
+
+    // Trocar de canal, quando a foto é de um canal específico. Procura pelo
+    // NOME, e não pela posição: no dia em que nascer um quarto canal, a
+    // terceira posição pode ser outra coisa.
+    if (foto.canal) {
+      const botao = pagina.locator('[data-canal]', { hasText: foto.canal }).first();
+      if (!await botao.count()) {
+        throw new Error('a foto "' + foto.arquivo + '" pede o canal "'
+          + foto.canal + '", e ele não está na tela');
+      }
+      await botao.click();
+      await esperarATelaMontar(pagina);
     }
 
     const caminho = path.join(DESTINO, foto.arquivo + '.png');

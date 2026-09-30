@@ -60,7 +60,26 @@ function rodarTestesDaFundacao() {
 
   teste('o formulário nasce mapeado coluna a coluna', () => {
     const campos = chamar('lerRegistros_("CAMPOS")');
-    igual(campos.length, 73, 'campos semeados (48 de RET + 25 da Mesa Diamante)');
+
+    /*
+     * A conta sai do ESQUEMA, e não de um número escrito aqui.
+     *
+     * Ela cravava 73 — "48 de RET + 25 da Mesa" —, e quebrou no dia em que o
+     * VG nasceu. Não havia nada errado: o sistema tinha um canal a mais, e o
+     * teste só sabia contar dois. Um número fixo aqui promete que alguém vai
+     * lembrar de somar à mão no próximo canal, e ninguém lembra.
+     *
+     * A regra que importa é esta: UM CAMPO PARA CADA COLUNA de dado de cada
+     * base, sem contar as de controle. É ela que o teste cobra agora.
+     */
+    const esperados = chamar('lerRegistros_("CANAIS")').reduce((soma, canal) => {
+      const doEsquema = chamar('esquemaDaAba_')(String(canal.Aba));
+      return soma + doEsquema.colunas.filter(
+        (coluna) => coluna.cabecalho.charAt(0) !== '_').length;
+    }, 0);
+
+    igual(campos.length, esperados,
+      'um campo para cada coluna de dado, em cada base');
     const cpf = campos.find((c) => c.Cabecalho === 'Documento (CPF)');
     igual(cpf.Mascara, '000.000.000-00', 'máscara do CPF');
     igual(cpf.TipoCampo, 'documento', 'na tela é campo com máscara');
@@ -346,9 +365,15 @@ function rodarTestesDaFundacao() {
     // Quem vigia o teto de perto é o diagnóstico, que marca atenção acima de
     // 80% e falha acima de 95%, sobre a planilha de verdade. Aqui só se cobra
     // que o ponto de partida seja folgado.
+    //
+    // O limite já subiu duas vezes, e as duas por crescimento de verdade:
+    // 2% → 3% quando CORRETORAS ganhou o Consultor, e 3% → 5% quando o VG
+    // nasceu com uma base inteira (28 colunas × 2.000 de reserva). Subir o
+    // limite quando o contrato cresce é honesto; o que não pode é subir para
+    // calar uma regressão, e por isso cada subida fica escrita aqui.
     const orcamento = chamar('orcamentoDeCelulas_(planilhaAtiva_())');
-    verdadeiro(orcamento.percentual < 3,
-      'a instalação vazia deveria ocupar menos de 3% — ocupou ' +
+    verdadeiro(orcamento.percentual < 5,
+      'a instalação vazia deveria ocupar menos de 5% — ocupou ' +
       orcamento.percentual + '%');
   });
 

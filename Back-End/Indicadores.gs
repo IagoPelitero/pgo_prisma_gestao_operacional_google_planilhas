@@ -1056,10 +1056,22 @@ function montarFila_(registros, canal) {
   return registros.slice().reverse().map(function (registro) {
     var celulas = grupos.map(function (grupo) {
       return grupo.colunas.map(function (coluna) {
+        /*
+         * O ALERTA sai do valor que está na base, na hora de montar a fila.
+         *
+         * No VG são dois: vigência abaixo de 18 meses e margem abaixo de
+         * 25,5. O PO pediu vermelho só aqui, nas telas — nunca na célula da
+         * planilha. `recado` vem junto porque uma cor sozinha não diz o
+         * motivo, e quem chega novo na operação não adivinha.
+         */
+        var alerta = alertaDaCelula_(canal.aba, coluna.cabecalho,
+          registro[coluna.cabecalho]);
+
         return {
           cabecalho: coluna.cabecalho,
           valor: paraTexto_(registro[coluna.cabecalho], coluna.tipo),
-          ehStatus: coluna.ehStatus
+          ehStatus: coluna.ehStatus,
+          alerta: alerta
         };
       });
     });
@@ -1104,6 +1116,25 @@ function paraTexto_(valor, tipo) {
     return 'R$ ' + numero.toFixed(2).replace('.', ',')
       .replace(/\B(?=(\d{3})+(?!\d)(?=,))/g, '.');
   }
+
+  /*
+   * NÚMERO sai em português: vírgula no decimal.
+   *
+   * Isto caía no `String(valor)` e a margem de contribuição aparecia na fila
+   * como "19.8". Nenhum canal tinha mostrado antes: a RET só tem número
+   * inteiro na fila, e inteiro sai igual nos dois idiomas. O VG foi o
+   * primeiro com decimal, e o defeito estava ali desde sempre.
+   *
+   * Sem casas fixas: 27 continua "27", e não "27,00". A coluna guarda tanto
+   * quantidade de vidas quanto porcentagem, e forçar duas casas encheria a
+   * fila de zeros que não dizem nada.
+   */
+  if (tipo === RECC_TIPO_DE_DADO.NUMERO) {
+    var quanto = converterParaNumero_(valor);
+    if (quanto === '') return '';
+    return String(quanto).replace('.', ',');
+  }
+
   return String(valor);
 }
 

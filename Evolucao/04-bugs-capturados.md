@@ -1128,11 +1128,91 @@ Escrever o teste e vê-lo passar é meia prova: a outra metade é quebrar o cód
 de propósito e ver o vermelho. Sem ela, o que se ganhou não foi uma guarda —
 foi a sensação de ter uma.
 
+### 47 · O alerta que estava no DOM e não se via
+
+**Sintoma.** Na foto da fila do VG: o "9" de meses de vigência e o "19.8" de
+margem, os dois abaixo do limite, **em cinza**. O alerta vermelho que o PO
+pediu simplesmente não aparecia.
+
+**Causa.** Não era o servidor, nem a tela. Era **especificidade de CSS**:
+
+```css
+table.fila.agrupada .apoio { color: var(--tenue); }   /* 0-3-1, linha 839 */
+.fila .em-alerta { color: var(--ruim); }              /* 0-2-0, linha 680 */
+```
+
+A classe ia para o DOM, a dica aparecia no `title`, o negrito aplicava — só a
+COR perdia. Corrigi para `table.fila.agrupada .em-alerta` e **ainda perdia**:
+0-3-1 contra 0-3-1 é empate, e empate se decide pela ORDEM — a regra do apoio
+vem 160 linhas depois. Só mirando as duas classes juntas
+(`.apoio.em-alerta`, 0-4-1) é que o vermelho venceu.
+
+**Defesa.** Uma passagem nova no `clicar-em-tudo.js` que **mede a cor
+calculada** de todo `.em-alerta`, canal por canal, e reprova o que não sair
+vermelho.
+
+E ela também não nasceu certa: a primeira versão ficava dentro do laço das
+telas, onde nunca havia um alerta na tela — o Trabalho abre no PRIMEIRO canal
+e o alerta mora no terceiro. Passou verde com o CSS quebrado de propósito. A
+versão que ficou visita canal por canal, e **reprova se não encontrar um único
+alerta**: conferência que não confere nada é pior que nenhuma, porque sai
+verde.
+
+**O que ele ensina.** **Classe no DOM não é cor na tela.** Um teste que
+pergunta "a classe está lá?" responde sim enquanto o usuário olha para cinza.
+A única pergunta que vale é a que o olho faz — e para fazê-la é preciso um
+navegador de verdade e `getComputedStyle`.
+
+---
+
+### 48 · O decimal que saía em inglês, desde sempre
+
+**Sintoma.** Na mesma foto: a margem de contribuição como **"19.8"**, com
+ponto.
+
+**Causa.** O `paraTexto_` formata data, hora e dinheiro com carinho — e o
+número cai num `String(valor)` no fim da função. Está assim desde o primeiro
+dia.
+
+**Por que só apareceu agora.** Nenhum canal tinha mostrado um decimal na fila.
+A RET só leva número inteiro para lá ("tentativas de contato"), e inteiro sai
+igual em português e em inglês. O VG foi o primeiro canal com uma coluna
+decimal na fila, e o defeito de três meses apareceu na primeira foto.
+
+**O que ele ensina.** **Dado novo revela código velho.** O defeito não foi
+introduzido pelo VG: o VG só foi o primeiro a passar por ali. Vale contar
+quantos caminhos do código NUNCA foram exercitados pelo dado que existe — é
+onde mora a próxima leva.
+
+---
+
+### 49 · O teste que cravava "dois canais"
+
+**Sintoma.** Ao criar o VG, **nove testes** quebraram de uma vez. Nenhum deles
+apontava para um defeito: todos diziam alguma variação de `esperado 2, obtido
+3`.
+
+E um deles derrubou outros quatro por tabela. O teste "desligar o último canal
+ativo é recusado" desligava UM canal e esperava a recusa no segundo — premissa
+de quando existiam exatamente dois. Com três, ele desligou dois, a recusa não
+veio, e **a Mesa Diamante ficou desligada** para todo o resto da suíte. Quatro
+testes depois falharam com "canal não existe ou está desativado", apontando
+para bem longe da causa.
+
+**Defesa.** Cada contagem passou a sair da FONTE — da aba `CANAIS`, do
+`RECC_ESQUEMA`, do formulário — em vez de um número escrito à mão. E o teste
+do desligamento passou a desligar *todos menos um*, seja lá quantos existam.
+
+**O que ele ensina.** **Número cravado num teste é uma promessa de que alguém
+vai lembrar de atualizá-lo.** Ninguém lembra. Pior: quando ele quebra, o
+vermelho diz "o sistema mudou", e não "o sistema quebrou" — e são coisas
+opostas que se parecem muito no console.
+
 ---
 
 ## O que esta lista ensina
 
-**São quarenta e seis achados, e a maioria era silenciosa.** Não davam erro, não
+**São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1255,3 +1335,15 @@ Daí as duas práticas que o projeto não abre mão:
     pegar aquele defeito, que não o pegava. Só apareceu porque desliguei o
     ícone de novo e o vermelho não veio. Todo teste desta suíte que vale
     alguma coisa passou por isso.
+30. **Classe no DOM não é cor na tela.** O item 47 tinha a classe certa, a dica
+    certa e o negrito certo — e o número continuava cinza, porque outra regra
+    de CSS vencia por ordem. A pergunta que vale é a que o olho faz, e só um
+    navegador de verdade a responde.
+31. **Dado novo revela código velho.** O item 48 estava lá desde o primeiro
+    dia: nenhum canal tinha mostrado um decimal na fila. Vale perguntar
+    quantos caminhos do código nunca foram exercitados pelo dado que existe —
+    é onde mora a próxima leva de achados.
+32. **Número cravado num teste é uma promessa que ninguém cumpre.** No item 49
+    nove testes quebraram sem defeito nenhum, e um deles derrubou quatro por
+    tabela. Vermelho que diz "mudou" quando devia dizer "quebrou" custa mais
+    caro que teste nenhum: ensina a olhar o console com pressa.

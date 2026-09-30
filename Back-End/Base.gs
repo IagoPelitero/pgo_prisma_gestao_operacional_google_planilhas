@@ -86,6 +86,143 @@ const RECC_FUSO_HORARIO = 'America/Sao_Paulo';
 const RECC_MAIOR_IDENTIFICADOR = 9999999999;
 
 /**
+ * AS COLUNAS CALCULADAS — o valor que o sistema tira de outra coluna.
+ *
+ * Hoje é uma só: os meses de vigência do VG, contados do início até HOJE.
+ *
+ * O PO foi explícito sobre o comportamento: "ele grava apenas o registro, que
+ * pode ser alterado se o analista o fizer". Ou seja, o número na planilha é um
+ * RETRATO do último salvamento — não se atualiza sozinho com o passar dos
+ * meses. Quem precisa estar certo hoje é o ALERTA da tela, e esse é
+ * recalculado na hora em que a tela monta.
+ *
+ * Escrito como declaração, e não como um `if` no meio do cadastro, porque o
+ * próximo canal vai querer a sua própria conta — e aí é uma linha aqui.
+ */
+const RECC_COLUNAS_CALCULADAS = {
+  BASE_VG: [
+    {
+      cabecalho: 'Meses de vigência',
+      daColuna: 'Início da vigência',
+      conta: 'mesesInteirosAteHoje'
+    }
+  ]
+};
+
+/**
+ * Quantos meses INTEIROS se passaram entre a data e hoje.
+ *
+ * Inteiros: de 15/03 até 14/09 são cinco meses, e não seis — o sexto só fecha
+ * no dia 15. Contar o mês pela metade daria 18 a quem tem 17 e meio, e o
+ * alerta de 18 meses, que é justamente o que a operação olha, deixaria passar.
+ *
+ * Data no futuro devolve 0, e não negativo: uma vigência que ainda não começou
+ * tem zero mês de vigência. Negativo cairia no alerta de "menos de 18" e
+ * pintaria de vermelho um caso que está só adiantado.
+ */
+function mesesInteirosAteHoje_(data) {
+  if (!data) return '';
+
+  var hoje = new Date();
+  var meses = (hoje.getFullYear() - data.getFullYear()) * 12
+    + (hoje.getMonth() - data.getMonth());
+
+  // O mês corrente só conta quando o dia já chegou.
+  if (hoje.getDate() < data.getDate()) meses--;
+
+  return meses > 0 ? meses : 0;
+}
+
+/**
+ * Preenche as colunas calculadas da aba, se ela tiver alguma.
+ *
+ * Chamada na criação E na edição: é o que faz o número acompanhar quando o
+ * analista corrige a data de início. Coluna de origem em branco deixa a
+ * calculada em branco — inventar zero diria "zero mês de vigência" para um
+ * caso que só está com a data faltando.
+ */
+function preencherColunasCalculadas_(nomeDaAba, paraGravar, registroAtual) {
+  var regras = RECC_COLUNAS_CALCULADAS[nomeDaAba];
+  if (!regras) return;
+
+  var estrutura = estruturaDaAba_(nomeDaAba);
+
+  regras.forEach(function (regra) {
+    if (posicaoDaColuna_(estrutura, regra.cabecalho) < 0) return;
+
+    // O valor da origem pode vir na gravação ou já estar no registro: numa
+    // edição que não mexe na data de início, ela não vem em `paraGravar`.
+    var origem = paraGravar.hasOwnProperty(regra.daColuna)
+      ? paraGravar[regra.daColuna]
+      : (registroAtual || {})[regra.daColuna];
+
+    var quando = converterParaData_(origem);
+    if (!quando) return;
+
+    if (regra.conta === 'mesesInteirosAteHoje') {
+      paraGravar[regra.cabecalho] = mesesInteirosAteHoje_(quando);
+    }
+  });
+}
+
+/**
+ * OS ALERTAS DA LINHA — quando um valor pede atenção na tela.
+ *
+ * Pedido do PO no VG: vigência abaixo de 18 meses e margem abaixo de 25,5
+ * ficam VERMELHAS. Ele foi específico sobre onde: **só nas telas do PGO**, e
+ * não na planilha.
+ *
+ * A regra mora AQUI, e não espalhada na tela, porque ela vale em dois lugares
+ * — a fila do Trabalho e o caso aberto — e duas cópias divergiriam no primeiro
+ * ajuste de limite.
+ *
+ * `abaixoDe` é o único formato hoje, porque é o único que a operação pediu.
+ * Acrescentar "acima de" é uma linha aqui e um `if` no `alertaDaCelula_`.
+ */
+const RECC_ALERTAS_DA_LINHA = {
+  BASE_VG: [
+    {
+      cabecalho: 'Meses de vigência',
+      abaixoDe: 18,
+      recado: 'Vigência de menos de 18 meses'
+    },
+    {
+      cabecalho: 'Margem de contribuição',
+      abaixoDe: 25.5,
+      recado: 'Margem abaixo de 25,5%'
+    }
+  ]
+};
+
+/**
+ * O alerta desta célula, ou vazio quando não há.
+ *
+ * Compara pelo NOME da coluna, como todo o resto do sistema. Valor em branco
+ * NÃO alerta: campo não preenchido é campo não preenchido, e pintar de
+ * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
+ */
+function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
+  var regras = RECC_ALERTAS_DA_LINHA[nomeDaAba];
+  if (!regras) return '';
+
+  var texto = String(valor === null || valor === undefined ? '' : valor).trim();
+  if (!texto) return '';
+
+  var numero = Number(String(texto).replace(',', '.'));
+  if (isNaN(numero)) return '';
+
+  var achada = null;
+  regras.forEach(function (regra) {
+    if (normalizarParaComparar_(regra.cabecalho) === normalizarParaComparar_(cabecalho)) {
+      achada = regra;
+    }
+  });
+  if (!achada) return '';
+
+  return numero < achada.abaixoDe ? achada.recado : '';
+}
+
+/**
  * Colunas de controle, acrescentadas ao FIM das abas de dado.
  *
  * O prefixo "_" marca coluna de sistema e sinaliza ao Power BI o que ignorar.
@@ -277,6 +414,77 @@ const RECC_ESQUEMA = {
 
       // De qual lote o caso veio. A Mesa importa casos de corretoras para ações
       // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
+      { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+    ]
+  },
+
+  /*
+   * O VG — VIDA EM GRUPO. O terceiro canal, e o primeiro que nasceu piloto.
+   *
+   * As colunas estão na ORDEM que o PO ditou, e não reagrupadas por tipo: é
+   * essa a ordem em que a operação lê e digita, e mexer nela para "ficar mais
+   * organizado" só atrapalha quem usa.
+   *
+   * Duas colunas têm ALERTA nas telas (nunca na planilha, decisão do PO):
+   * "Meses de vigência" abaixo de 18 e "Margem de contribuição" abaixo de
+   * 25,5. Quem declara os limites é `RECC_ALERTAS_DA_LINHA`, logo abaixo.
+   */
+  BASE_VG: {
+    aba: 'BASE_VG',
+    titulo: 'VG — Vida em Grupo',
+    controle: true,
+    reserva: 2000,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Data do protocolo da solicitação', tipo: 'data', protegido: true },
+      { cabecalho: 'Analista', tipo: 'texto', protegido: true },
+      { cabecalho: 'TK/Assunto', tipo: 'texto', protegido: true },
+      { cabecalho: 'Entrada', tipo: 'data', protegido: true },
+      // CNPJ como identificador, e não número: identificador guarda só dígitos
+      // e não perde o zero à esquerda, que é a regra da casa desde o começo.
+      { cabecalho: 'CNPJ', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Subestipulante', tipo: 'texto', protegido: true },
+      { cabecalho: 'Início da vigência', tipo: 'data', protegido: true },
+
+      /*
+       * MESES DE VIGÊNCIA é a única coluna CALCULADA das três bases.
+       *
+       * O analista digita o início; o sistema conta os meses até HOJE e grava
+       * o número aqui, a cada gravação. O PO definiu assim: "ele grava apenas
+       * o registro, que pode ser alterado se o analista o fizer" — ou seja, o
+       * número é um retrato do último salvamento, e não se atualiza sozinho.
+       *
+       * O ALERTA da tela, esse, é recalculado na hora: é ele que precisa estar
+       * certo hoje, porque é ele que a pessoa olha para agir.
+       */
+      { cabecalho: 'Meses de vigência', tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
+
+      { cabecalho: 'Quantidade de vidas', tipo: 'numero', protegido: true },
+      { cabecalho: 'MOVSINT/MOVESEG', tipo: 'texto', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Periodicidade', tipo: 'texto', protegido: true },
+      { cabecalho: 'Lead', tipo: 'texto', protegido: true },
+      { cabecalho: 'Status', tipo: 'texto', protegido: true },
+      { cabecalho: 'Motivo da liberação ou recusa', tipo: 'texto', protegido: true },
+      { cabecalho: 'Prêmio mensal', tipo: 'dinheiro', protegido: true },
+      { cabecalho: 'Prêmio anual', tipo: 'dinheiro', protegido: true },
+      // Número simples, decisão do PO: grava 25,5 e não 0,255. Quem preenche é
+      // o analista — não se calcula a partir dos prêmios.
+      { cabecalho: 'Margem de contribuição', tipo: 'numero', protegido: true },
+      { cabecalho: 'Quantidade de parcelas vencidas', tipo: 'numero', protegido: true },
+      { cabecalho: 'Obs', tipo: 'textoLongo', protegido: false },
+      { cabecalho: 'Mês e ano', tipo: 'texto', protegido: true },
+      // Quando o protocolo entrou no PGO. Diferente da data do protocolo (que
+      // é da solicitação) e da entrada (que é da esteira do VG).
+      { cabecalho: 'Data de inclusão do protocolo', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+
+      // Rastro de status, igual aos outros dois canais. Ver o bloco em
+      // BASE_RET, que explica por que não é na auditoria.
+      { cabecalho: RECC_COLUNA_QUANDO_MUDOU_O_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
+
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]

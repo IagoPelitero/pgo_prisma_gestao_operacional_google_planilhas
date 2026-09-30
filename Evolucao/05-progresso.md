@@ -1884,6 +1884,60 @@ outros — não havia nada errado com eles.
 **589 testes**, cinco execuções seguidas sem falha, 144 cliques em 8 telas, 96
 combinações de tela × largura, 9 testes ponta a ponta e 14 imagens geradas.
 
+## Etapa 19 — o VG, e o que um terceiro canal revelou
+
+O PO ditou 23 colunas, as listas, os seis status e duas regras novas. Antes de
+escrever uma linha, sete perguntas — ele tinha pedido *"na dúvida pergunte
+antes de criar"*, e havia dúvida de verdade em três coisas que o sistema **não
+sabia fazer**: campo calculado, alerta por valor e tipo porcentagem.
+
+As decisões dele fecharam o desenho: os meses de vigência são **calculados e
+gravados a cada salvamento** (não por gatilho mensal); o vermelho é **só nas
+telas**, nunca na planilha; a margem grava **25,5**, e não 0,255; e **seis**
+status, porque "pago" e "retido" são desfechos distintos. Sem cartões — ele
+configura os indicadores depois.
+
+### O que o VG trouxe de novo para o sistema
+
+| peça | onde |
+|---|---|
+| `RECC_COLUNAS_CALCULADAS` | a primeira coluna que o sistema calcula de outra |
+| `RECC_ALERTAS_DA_LINHA` | a primeira regra de "este valor pede atenção" |
+| `aceitaFuturo` no campo | a primeira exceção à recusa de data futura |
+
+As três são **declarações**, num lugar só, e não `if`s espalhados. O quarto
+canal que quiser uma conta própria mexe numa linha.
+
+### Três achados, e os três vieram da foto
+
+**O alerta estava no DOM e não se via** (achado 47). Classe certa, dica certa,
+negrito certo — e cinza, porque `table.fila.agrupada .apoio` vencia por
+especificidade. Corrigi, ainda perdia (empate se decide pela ordem), e só
+mirando as duas classes juntas o vermelho apareceu. Virou uma passagem nova no
+`clicar-em-tudo.js` que **mede a cor calculada**, canal por canal — e que, na
+primeira versão, passou verde com o CSS quebrado de propósito, porque olhava o
+canal errado.
+
+**O decimal saía em inglês** (achado 48): "19.8". Estava assim desde o primeiro
+dia, e nenhum canal tinha mostrado — a RET só leva inteiro para a fila, e
+inteiro sai igual nos dois idiomas.
+
+**Nove testes cravavam "dois canais"** (achado 49). Nenhum apontava defeito:
+todos diziam `esperado 2, obtido 3`. E um deles deixou a Mesa Diamante
+desligada para o resto da suíte, derrubando outros quatro com uma mensagem que
+apontava para longe. Cada contagem passou a sair da fonte — da aba `CANAIS`, do
+`RECC_ESQUEMA` — em vez de um número escrito à mão.
+
+### E um defeito que o VG expôs no resto do sistema
+
+Toda data era recusada no futuro, com a razão *"o caso descreve algo que já
+aconteceu"*. Certo para a data de um protocolo; **errado** para o início de uma
+vigência que começa mês que vem, que é rotina em Vida em Grupo. A exceção é de
+um campo só, e há teste provando que a RET não a herdou.
+
+**605 testes**, cinco execuções seguidas sem falha, 144 cliques em 8 telas e 3
+canais, 96 combinações de tela × largura, 9 testes ponta a ponta e 15 imagens.
+
 ---
 
 ## O que ainda está em aberto

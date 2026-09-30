@@ -1366,8 +1366,14 @@ function rodarTestesDeDiagnostico() {
     chamar('migrarParaCanais()');
 
     const canais = chamar('canaisVisiveis_()');
-    igual(canais.length, 2, 'os dois canais voltaram');
-    igual(canais.map((c) => c.aba).join(','), 'BASE_RET,BASE_MESA');
+    // Contra o ESQUEMA, e não contra um 2: a migração tem de devolver todas as
+    // bases que o contrato declara, sejam duas ou dez.
+    const basesDoContrato = Object.keys(chamar('RECC_ESQUEMA'))
+      .filter((aba) => aba.indexOf('BASE_') === 0);
+    igual(canais.length, basesDoContrato.length,
+      'todos os canais do contrato voltaram');
+    igual(canais.map((c) => c.aba).join(','), basesDoContrato.join(','),
+      'e na ordem em que o contrato as declara');
 
     igual(chamar('lerRegistros_')('BASE_RET')[0]['nome do cliente'],
       'Cliente Antigo', 'o caso antigo continua lá');
@@ -1401,6 +1407,12 @@ function rodarTestesDeDiagnostico() {
       falhasEmTexto(chamar('diagnosticoRECC()')));
   });
 
+  /** Quantas bases de caso o contrato declara. Nunca um número escrito. */
+  function quantasBasesOContratoTem(chamar) {
+    return Object.keys(chamar('RECC_ESQUEMA'))
+      .filter((aba) => aba.indexOf('BASE_') === 0).length;
+  }
+
   teste('rodar a migração duas vezes não estraga nada', () => {
     // Ninguém tem certeza se já rodou. Uma migração que só funciona uma vez
     // obriga a lembrar — e quem não lembra, roda de novo.
@@ -1409,14 +1421,15 @@ function rodarTestesDeDiagnostico() {
     const recado = chamar('migrarParaCanais()');
 
     contem(recado, 'JÁ ESTAVA ASSIM', 'a segunda vez não faz nada');
-    igual(chamar('canaisVisiveis_()').length, 2, 'e os canais continuam de pé');
+    igual(chamar('canaisVisiveis_()').length, quantasBasesOContratoTem(chamar),
+      'e os canais continuam de pé');
     igual(chamar('diagnosticoRECC()').aprovado, true);
   });
 
   teste('numa instalação nova, migrar não faz nada', () => {
     const { chamar } = instalacaoNova();
     chamar('migrarParaCanais()');
-    igual(chamar('canaisVisiveis_()').length, 2);
+    igual(chamar('canaisVisiveis_()').length, quantasBasesOContratoTem(chamar));
     igual(chamar('diagnosticoRECC()').aprovado, true);
   });
 

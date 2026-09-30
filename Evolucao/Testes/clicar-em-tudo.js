@@ -123,6 +123,60 @@ async function varrer() {
     });
   }
 
+  /*
+   * O ALERTA que está no DOM e não se VÊ — uma passagem só para isso.
+   *
+   * A célula em alerta do VG saía com a classe certa, a dica certa e o
+   * negrito certo — e CINZA. `table.fila.agrupada .apoio` pinta de --tenue e
+   * empatava em especificidade com `.em-alerta`; empate se decide pela ordem,
+   * e a regra do apoio vem depois no arquivo. O alerta existia e não aparecia:
+   * ninguém age, e ninguém sabe que deveria.
+   *
+   * Conferir a CLASSE não pegaria — ela estava lá. E conferir dentro do laço
+   * das telas também não: o Trabalho abre no PRIMEIRO canal, e o alerta mora
+   * no terceiro. Por isso esta passagem visita CANAL POR CANAL. É o item 41
+   * outra vez — alvo certo, escopo curto.
+   */
+  async function conferirQueOsAlertasEstaoVermelhos(ondeEstou) {
+    const apagados = await pagina.$$eval('.em-alerta', (celulas) =>
+      celulas.map((celula) => ({
+        texto: celula.textContent.trim(),
+        cor: getComputedStyle(celula).color
+      })).filter((uma) => {
+        // O vermelho do tema tem o canal vermelho bem acima dos outros dois.
+        // Qualquer cinza ou azul cai aqui.
+        const n = (uma.cor.match(/\d+/g) || []).map(Number);
+        return !(n.length >= 3 && n[0] > 120 && n[0] > n[1] * 1.6 && n[0] > n[2] * 1.6);
+      }));
+
+    apagados.forEach((uma) => {
+      erros.push(ondeEstou + ': alerta que NÃO está vermelho — "'
+        + uma.texto + '" saiu ' + uma.cor);
+    });
+    return apagados.length === 0;
+  }
+
+  await pagina.click('[data-tela="trabalho"]');
+  await pagina.waitForTimeout(1200);
+
+  const quantosCanais = await pagina.locator('[data-canal]').count();
+  let alertasVistos = 0;
+  for (let i = 0; i < quantosCanais; i++) {
+    await pagina.locator('[data-canal]').nth(i).click();
+    await pagina.waitForTimeout(1200);
+    const nome = await pagina.locator('[data-canal]').nth(i).innerText();
+    await conferirQueOsAlertasEstaoVermelhos('canal ' + nome.split('\n')[0]);
+    alertasVistos += await pagina.locator('.em-alerta').count();
+  }
+
+  // Se NENHUM canal tinha alerta, esta passagem não conferiu nada — e uma
+  // conferência que não confere nada é pior que nenhuma, porque sai verde.
+  if (!alertasVistos) {
+    erros.push('a passagem dos alertas não encontrou UM alerta sequer nos '
+      + quantosCanais + ' canais — a prévia precisa semear um caso em alerta, '
+      + 'senão esta conferência não confere nada');
+  }
+
   let cliques = 0;
   for (const tela of TELAS) {
     await pagina.click('[data-tela="' + tela + '"]');
@@ -145,6 +199,7 @@ async function varrer() {
     aoAbrir.forEach((recado) => {
       erros.push('a tela ' + tela + ' ABRIU com recado de erro: ' + recado);
     });
+
 
     const antes = cliques;
 
