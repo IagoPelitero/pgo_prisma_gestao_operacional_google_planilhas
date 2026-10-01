@@ -6618,38 +6618,71 @@ var TelaImportacao = (function () {
    * cada analista". Nenhum marcado deixa a coluna de responsável como a origem
    * mandou — que é o certo quando a própria base já traz o analista.
    */
+  /** Quem é deste canal e está de férias ou afastado. Pode vir vazio. */
+  function quemEstaFora() {
+    return (opcoes && opcoes.foraDaDivisao) || [];
+  }
+
+  /*
+    Diz quem NÃO está na lista, e por quê.
+
+    Sem isto, a coordenação procura um nome que ela sabe que trabalha no canal,
+    não acha, e a única conclusão possível é "o sistema está errado" — quando
+    o certo é "ela está de férias, e por isso não recebe". O silêncio aqui
+    custa um chamado e uma desconfiança.
+  */
+  function desenharQuemEstaFora() {
+    var fora = quemEstaFora();
+    if (!fora.length) return '';
+
+    return '<p class="config-dica">Fora da divisão hoje: '
+      + fora.map(function (pessoa) {
+        return '<strong>' + escapar(pessoa.nome) + '</strong> — '
+          + escapar(pessoa.porque);
+      }).join('; ')
+      + '. Continuam com acesso ao sistema; só não recebem lote. '
+      + 'Isso se ajusta em Configurações › Usuários.</p>';
+  }
+
   function desenharAnalistas() {
     if (!opcoes.analistas.length) {
-      return '<p class="config-dica">Ninguém cadastrado e ativo no PGO, então os '
-        + 'casos entram sem responsável. Cadastre em Configurações › Usuários e '
-        + 'importe depois.</p>';
+      /*
+        Lista vazia é RESPOSTA, e a tela tem de dizer qual. São duas causas
+        diferentes, e a saída de cada uma é outra: ou ninguém deste canal foi
+        cadastrado, ou todo mundo está de férias. Um recado só para as duas
+        mandaria metade das pessoas para o lugar errado.
+      */
+      return '<p class="config-dica">' + (quemEstaFora().length
+        ? 'Todo mundo deste canal está fora da divisão hoje ('
+          + escapar(quemEstaFora().map(function (p) {
+            return p.nome + ' — ' + p.porque;
+          }).join('; ')) + '). Os casos entram sem responsável. Ajuste a '
+          + 'disponibilidade em Configurações › Usuários.'
+        : 'Ninguém deste canal está cadastrado e disponível, então os casos '
+          + 'entram sem responsável. Em Configurações › Usuários, escolha o '
+          + 'CANAL de cada analista — a divisão é só entre quem é do canal '
+          + 'que você escolheu aqui em cima.') + '</p>';
     }
 
     var quantos = Object.keys(analistasMarcados).filter(function (nome) {
       return analistasMarcados[nome];
     }).length;
 
-    // Quem atende este canal vem primeiro e marcado como tal. Quem não atende
-    // continua na lista: enquanto a operação está se formando, um analista da
-    // RET pode receber um lote da Mesa, e quem decide isso é a coordenação, não
-    // o sistema. Esconder o nome tiraria a decisão da mão dela.
-    //
-    // Havia aqui uma marca de QUEM ESTÁ DE FÉRIAS, com a data da volta, para
-    // ninguém mandar um lote a quem não vai trabalhá-lo. Saiu com o
-    // calendário, a pedido do PO.
+    // A lista já vem SÓ com quem é deste canal e está disponível — o servidor
+    // filtra, a pedido do PO: "distribua apenas para o canal que escolhi".
+    // A tela não precisa mais marcar "de outro canal", porque de outro canal
+    // não chega aqui.
     return '<h4 class="importacao-titulo">Dividir entre</h4>'
       + '<div class="config-marcadores">'
       + opcoes.analistas.map(function (pessoa) {
-        return '<label class="config-chave'
-          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal') + '">'
+        return '<label class="config-chave">'
           + '<input type="checkbox"'
           + ' data-analista="' + escapar(pessoa.nome) + '"'
           + (analistasMarcados[pessoa.nome] ? ' checked' : '') + '>'
-          + '<span>' + escapar(pessoa.nome)
-          + (pessoa.atendeEsteCanal ? '' : ' <em>de outro canal</em>')
-          + '</span></label>';
+          + '<span>' + escapar(pessoa.nome) + '</span></label>';
       }).join('')
       + '</div>'
+      + desenharQuemEstaFora()
       + '<p class="config-dica">'
       + (quantos
         ? 'Os casos vão ser divididos em partes iguais entre os ' + quantos
@@ -7853,11 +7886,41 @@ var TelaConfiguracoes = (function () {
       + 'equipe nenhuma.</em></label>';
   }
 
+  /*
+    Se a pessoa está recebendo caso HOJE.
+
+    É diferente de "Pode entrar", logo acima, e a tela diz isso em voz alta:
+    quem está de férias CONTINUA entrando no sistema — quem volta precisa
+    consultar um caso antes de reassumir — e só para de receber lote novo.
+
+    As opções vêm do catálogo (Ajustes Gerais › DISPONIBILIDADE), então a
+    operação pode criar "licença médica" ou "treinamento" sem mexer em código.
+    Qualquer opção que não seja a que recebe tira a pessoa da divisão.
+  */
+  function caixaDeDisponibilidade(escolhida) {
+    var opcoes = resumo.disponibilidades || [];
+    if (!opcoes.length) return '';
+
+    var atual = texto(escolhida) || resumo.disponibilidadeQueRecebe;
+    return '<label class="config-campo"><span>Recebendo casos</span>'
+      + '<select id="cfg-disponibilidade">'
+      + opcoes.map(function (opcao) {
+        return '<option value="' + escapar(opcao.nome) + '"'
+          + (texto(opcao.nome) === texto(atual) ? ' selected' : '') + '>'
+          + escapar(opcao.nome) + '</option>';
+      }).join('') + '</select>'
+      + '<em>Só quem está "' + escapar(resumo.disponibilidadeQueRecebe)
+      + '" entra na divisão de um lote na Importação. Férias e afastamento '
+      + 'NÃO tiram o acesso — a pessoa continua entrando no sistema.</em>'
+      + '</label>';
+  }
+
   function desenharPainelDoUsuario(usuario) {
     var ehNovo = !usuario;
     var pessoa = usuario || {
       id: '', nome: '', email: '', canalId: '', cargoId: '',
-      nivelAcessoId: '', ativo: true
+      nivelAcessoId: '', ativo: true,
+      disponibilidade: resumo.disponibilidadeQueRecebe
     };
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-usuario">'
@@ -7874,6 +7937,7 @@ var TelaConfiguracoes = (function () {
         + 'logo acima — dois níveis diferentes no mesmo canal são a mesma '
         + 'equipe.')
       + caixaDeSimNao('ativo', 'Pode entrar', pessoa.ativo !== false)
+      + caixaDeDisponibilidade(pessoa.disponibilidade)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (ehNovo ? '' : '<button type="button" class="botao vazado" id="desativar">'
@@ -7889,7 +7953,8 @@ var TelaConfiguracoes = (function () {
         canalId: valorDe('canal-da-pessoa'),
         cargoId: valorDe('cargo'),
         nivelAcessoId: valorDe('nivel'),
-        ativo: marcado('ativo')
+        ativo: marcado('ativo'),
+        disponibilidade: valorDe('disponibilidade')
       }).entao(function () { avisarSalvo(); carregarUsuarios(); })
         .senao(mostrarErroNoPainel);
     });

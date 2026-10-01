@@ -1250,6 +1250,12 @@ function listarUsuarios() {
       nivelAcesso:
         catalogo[converterParaIdentificador_(usuario.NivelAcessoId)] || 'Sem dados',
       ativo: normalizarParaComparar_(usuario.Ativo) === 'sim',
+      // Vazio volta como "Disponível" para a tela não mostrar um campo em
+      // branco em quem foi cadastrado antes desta coluna existir — e o que
+      // ela mostra é a verdade: vazio recebe caso.
+      disponibilidade: String(usuario.Disponibilidade || '').trim()
+        || RECC_DISPONIBILIDADE_QUE_RECEBE,
+      recebeCasos: estaDisponivelParaReceber_(usuario),
       administrador: ehAdministrador_(usuario.Id),
       dataCadastro: comoDataEHora_(usuario.DataCadastro),
       ultimoAcesso: comoDataEHora_(usuario.UltimoAcesso)
@@ -1323,6 +1329,26 @@ function salvarUsuario(dados) {
     NivelAcessoId: converterParaIdentificador_(dados.nivelAcessoId),
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
   };
+
+  /*
+   * A DISPONIBILIDADE SÓ É GRAVADA SE A COLUNA EXISTIR.
+   *
+   * Numa planilha que ainda não rodou `atualizarPGO()` a coluna não existe, e
+   * gravar nela derruba o salvar com "a aba USUARIOS não tem coluna para:
+   * Disponibilidade". Quem só queria corrigir um e-mail levaria um erro sobre
+   * um campo que nunca viu.
+   *
+   * A migração é RECOMENDADA, não obrigatória: até ela rodar, o cadastro
+   * continua funcionando e todo mundo continua recebendo lote, que é o
+   * comportamento de antes.
+   *
+   * Quem não mandar nada nasce disponível — vale para a tela antiga, que não
+   * conhece o campo, e para qualquer chamada que não o informe.
+   */
+  if (posicaoDaColuna_(estruturaDaAba_('USUARIOS'), 'Disponibilidade') >= 0) {
+    campos.Disponibilidade = String(dados.disponibilidade || '').trim()
+      || RECC_DISPONIBILIDADE_QUE_RECEBE;
+  }
 
   var gravado;
   if (idInformado) {

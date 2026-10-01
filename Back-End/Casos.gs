@@ -2056,6 +2056,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     passaDoLimite: corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
+    foraDaDivisao: quemEstaForaDaDivisao_(canal),
     // Se alguém marcou um analista que está fora, o laudo DIZ, com quantos
     // casos e até quando. Não recusa: o lote pode ser para a volta dela, e o
     // laudo existe justamente para a pessoa ver antes de gravar.
@@ -2193,39 +2194,74 @@ function temAlgumValor_(caso) {
  * Aquele campo saiu do cadastro desde então. A sugestão agora vem do CanalId,
  * que é escolha de lista e não texto digitado.
  *
- * A regra que IMPORTA é outra, e é sobre não perder o caso: o nome tem de
- * existir no cadastro e estar ativo, senão o caso fica no nome de ninguém e
- * some da fila de todo mundo. A que canal a pessoa atende é SUGESTÃO — quem
- * atende este canal aparece primeiro na lista —, e não trava: enquanto a
- * operação está se formando, um analista da RET pode muito bem receber um lote
- * da Mesa, e o sistema não é quem decide isso.
+ * TRÊS REGRAS, e as três são do PO:
+ *
+ *   1. SÓ QUEM É DO CANAL ESCOLHIDO. "Quero que quando for importar escolha o
+ *      canal e ele distribua apenas para o canal que escolhi." Antes o canal
+ *      só ORDENAVA a lista, e todo mundo aparecia — era proposital, para a
+ *      operação em formação poder cruzar canais, e o PO decidiu o contrário.
+ *      Quem administra, sem canal nenhum, também não entra: ele não é "do
+ *      canal escolhido", e receber lote não é trabalho de quem administra.
+ *
+ *   2. SÓ QUEM ESTÁ DISPONÍVEL. Férias e afastamento tiram a pessoa da
+ *      divisão sem tirar o acesso dela — ver `estaDisponivelParaReceber_`.
+ *
+ *   3. SÓ QUEM ESTÁ ATIVO E TEM NOME, que é a regra antiga e a mais
+ *      importante: o nome tem de existir no cadastro, senão o caso fica no
+ *      nome de ninguém e some da fila de todo mundo.
+ *
+ * A lista pode VOLTAR VAZIA, e isso é resposta, não erro: quer dizer que
+ * ninguém deste canal está disponível hoje. Quem explica é a tela.
  */
 function analistasParaDistribuir_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
 
-  /*
-   * Houve aqui uma marca de QUEM ESTÁ DE FÉRIAS, para a coordenação não
-   * distribuir um lote a quem só volta em três semanas. Saiu com o calendário,
-   * a pedido do PO — ele vai tratar isso de outra maneira.
-   */
   return lerRegistros_('USUARIOS')
     .filter(function (usuario) {
-      return normalizarParaComparar_(usuario.Ativo) === 'sim'
-        && String(usuario.Nome || '').trim();
+      if (normalizarParaComparar_(usuario.Ativo) !== 'sim') return false;
+      if (!String(usuario.Nome || '').trim()) return false;
+      if (converterParaIdentificador_(usuario.CanalId) !== doCanal) return false;
+      return estaDisponivelParaReceber_(usuario);
     })
     .map(function (usuario) {
-      var dela = converterParaIdentificador_(usuario.CanalId);
       return {
         nome: String(usuario.Nome),
-        // Vazio é o caso de quem administra: atende as duas, e fica no topo
-        // junto de quem é deste canal.
-        atendeEsteCanal: !dela || dela === doCanal
+        // Continua saindo, e continua sempre true agora que a lista é só
+        // deste canal. A tela mostra a lista como ela vem, e um campo que
+        // some quebraria a tela de quem ainda não recarregou.
+        atendeEsteCanal: true
       };
     })
     .sort(function (um, outro) {
-      if (um.atendeEsteCanal !== outro.atendeEsteCanal) {
-        return um.atendeEsteCanal ? -1 : 1;
-      }
+      return um.nome < outro.nome ? -1 : (um.nome > outro.nome ? 1 : 0);
+    });
+}
+
+/**
+ * Quem é deste canal, está ativo, e NÃO está disponível hoje.
+ *
+ * Vai junto da lista para a tela poder DIZER por que fulano não está lá. Sem
+ * isto, a coordenação abre a Importação, não acha o nome de alguém que ela
+ * sabe que trabalha ali, e a única conclusão possível é "o sistema está
+ * errado" — quando o certo é "ela está de férias, e por isso não recebe".
+ */
+function quemEstaForaDaDivisao_(canal) {
+  var doCanal = converterParaIdentificador_(canal.id);
+
+  return lerRegistros_('USUARIOS')
+    .filter(function (usuario) {
+      return normalizarParaComparar_(usuario.Ativo) === 'sim'
+        && String(usuario.Nome || '').trim()
+        && converterParaIdentificador_(usuario.CanalId) === doCanal
+        && !estaDisponivelParaReceber_(usuario);
+    })
+    .map(function (usuario) {
+      return {
+        nome: String(usuario.Nome),
+        porque: String(usuario.Disponibilidade || '').trim()
+      };
+    })
+    .sort(function (um, outro) {
       return um.nome < outro.nome ? -1 : (um.nome > outro.nome ? 1 : 0);
     });
 }
@@ -2458,10 +2494,31 @@ function analistasEscolhidos_(escolhidos, canal) {
     });
   });
   if (foraDoCadastro.length) {
-    throw new Error('Estes nomes não estão cadastrados e ativos no PGO: '
-      + foraDoCadastro.join(', ') + '. Caso no nome de quem não existe não '
-      + 'aparece na fila de ninguém — fica na planilha e invisível no sistema. '
-      + 'Cadastre em Configurações › Usuários e importe depois.');
+    /*
+     * O RECADO DIZ O MOTIVO CERTO, e isto não é capricho.
+     *
+     * Antes ele dizia sempre "não estão cadastrados e ativos". Depois que a
+     * divisão passou a ser só do canal e só de quem está disponível, esse
+     * texto virou mentira em dois dos três casos: a pessoa está cadastrada,
+     * está ativa, e mesmo assim não pode receber. Quem lesse iria cadastrar
+     * de novo alguém que já existe.
+     */
+    var deFerias = {};
+    quemEstaForaDaDivisao_(canal).forEach(function (um) {
+      deFerias[normalizarParaComparar_(um.nome)] = um.porque || 'indisponível';
+    });
+
+    var explicados = foraDoCadastro.map(function (nome) {
+      var chave = normalizarParaComparar_(nome);
+      if (deFerias[chave]) return nome + ' (' + deFerias[chave] + ')';
+      return nome + ' (não é do canal ' + canal.nome + ', ou não está ativo)';
+    });
+
+    throw new Error('Estes nomes não podem receber casos do canal '
+      + canal.nome + ': ' + explicados.join('; ') + '. Caso no nome de quem '
+      + 'não recebe fica na planilha e invisível na fila. Ajuste em '
+      + 'Configurações › Usuários — o canal da pessoa e a disponibilidade '
+      + 'dela — e importe depois.');
   }
 
   // Devolve com a grafia do CADASTRO, e não a que veio da tela: é o nome do
@@ -2516,6 +2573,9 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
     colunasDoCanal: colunasQueAImportacaoAceita_(canal),
     analistas: analistasParaDistribuir_(canal),
+    // Quem é deste canal e está de férias ou afastado. A tela diz o nome e o
+    // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
+    foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO

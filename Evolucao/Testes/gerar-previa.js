@@ -643,15 +643,26 @@ function gerar(pastaDeSaida) {
   // ninguém — quem cadastra o time é o administrador, em Configurações.
   const nivelOperacao = chamar('lerRegistros_("CATALOGO")')
     .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
-  [['Diego Castilho', 'diego@exemplo.com', 'Corretoras Diamante'],
-   ['Marcos Vieira', 'marcos@exemplo.com', 'Vida Individual'],
-   ['Patrícia Nunes', 'patricia@exemplo.com', 'Vida Coletiva']]
-    .forEach(([nome, email, canal]) => {
+  //
+  // COM CANAL, e um deles de FÉRIAS. As duas coisas são o que a Importação
+  // mostra agora: ela divide o lote só entre quem é do canal escolhido, e
+  // quem está de férias aparece embaixo, fora da divisão, com o motivo. Sem
+  // canal nenhum aqui, a tela da prévia abriria com a lista vazia — que é o
+  // comportamento certo e a pior foto possível para o README.
+  const canalDaRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+  const canalDaMesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+  [['Diego Castilho', 'diego@exemplo.com', canalDaMesa.id, 'Disponível'],
+   ['Marcos Vieira', 'marcos@exemplo.com', canalDaRet.id, 'Disponível'],
+   ['Patrícia Nunes', 'patricia@exemplo.com', canalDaRet.id, 'Férias']]
+    .forEach(([nome, email, canalId, disponibilidade]) => {
       chamar('salvarUsuario')({
-        nome, email,
+        nome, email, canalId, disponibilidade,
         nivelAcessoId: nivelOperacao.Id, ativo: true
       });
     });
+  // E quem abre a prévia é da RET, senão o painel dela nasce sem equipe.
+  chamar('atualizarRegistro_')('USUARIOS', eu.Id, { CanalId: canalDaRet.id });
+  chamar('esquecerEstruturaLida_()');
 
   const pacote = chamar('pacoteDePartida()');
 

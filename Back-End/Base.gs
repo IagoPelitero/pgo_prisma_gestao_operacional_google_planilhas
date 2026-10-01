@@ -513,6 +513,24 @@ const RECC_ESQUEMA = {
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true },
+      /*
+       * A PESSOA ESTÁ RECEBENDO CASO HOJE?
+       *
+       * É DIFERENTE de `Ativo`, e a diferença é a razão desta coluna existir.
+       * `Ativo` é ACESSO: desativado não entra no sistema. Disponibilidade é
+       * DISTRIBUIÇÃO: quem está de férias continua entrando — o PO foi
+       * explícito sobre isso — e só para de receber lote novo.
+       *
+       * Juntar as duas numa coluna só obrigaria a escolher entre tirar o
+       * acesso de quem está de férias ou mandar casos para quem só volta em
+       * três semanas. As duas respostas são erradas.
+       *
+       * Os valores vêm da lista DISPONIBILIDADE, no catálogo, e não escritos
+       * aqui: a operação pode criar "licença médica" ou "treinamento" sem
+       * tocar em código. VAZIO VALE DISPONÍVEL — quem foi cadastrado antes
+       * desta coluna existir continua recebendo, como já recebia.
+       */
+      { cabecalho: 'Disponibilidade', tipo: 'texto', protegido: false },
       { cabecalho: 'DataCadastro', tipo: 'dataHora', protegido: true },
       { cabecalho: 'UltimoAcesso', tipo: 'dataHora', protegido: true }
     ]
@@ -1367,6 +1385,33 @@ function chaveDaSusep_(valor) {
 /** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
 function susepComoSeEscreve_(valor) {
   return String(valor === null || valor === undefined ? '' : valor).trim();
+}
+
+/**
+ * A disponibilidade de quem acabou de ser cadastrado, e a única que recebe
+ * caso na divisão de um lote.
+ *
+ * É o nome de um item da lista DISPONIBILIDADE, no catálogo. Fica numa
+ * constante porque DUAS coisas dependem de ser exatamente este texto: o
+ * semeador, que cria o item, e a divisão do lote, que compara com ele.
+ * Escrito solto nos dois lugares, renomear o item na tela faria a divisão
+ * parar de achar alguém disponível — e em silêncio.
+ */
+var RECC_DISPONIBILIDADE_QUE_RECEBE = 'Disponível';
+
+/**
+ * Esta pessoa entra na divisão de um lote?
+ *
+ * VAZIO É SIM, de propósito: quem foi cadastrado antes desta coluna existir
+ * nunca escolheu "de férias", e tratar o vazio como indisponível esvaziaria a
+ * distribuição de uma operação inteira na primeira importação depois da
+ * atualização.
+ */
+function estaDisponivelParaReceber_(usuario) {
+  var situacao = String((usuario || {}).Disponibilidade || '').trim();
+  if (!situacao) return true;
+  return normalizarParaComparar_(situacao)
+    === normalizarParaComparar_(RECC_DISPONIBILIDADE_QUE_RECEBE);
 }
 
 /** Só os dígitos. É assim que identificador é comparado e gravado. */

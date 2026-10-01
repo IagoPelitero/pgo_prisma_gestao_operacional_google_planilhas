@@ -87,6 +87,29 @@ function resumoDasConfiguracoes() {
     identidade: lerIdentidadeVisual_(),
     titulosDasTelas: titulosDasTelas(),
     /*
+     * As opções de disponibilidade, para o cadastro de usuários.
+     *
+     * Vêm AQUI, e não numa chamada própria, porque este panorama já é lido
+     * uma vez quando Configurações abre — e o catálogo inteiro já está em
+     * memória nesta execução, por causa do `catalogo` ali em cima. Uma
+     * chamada só para isto seria uma ida ao serviço a mais numa tela que
+     * acabou de ser enxugada.
+     */
+    disponibilidades: catalogo
+      .filter(function (item) {
+        return normalizarParaComparar_(item.Tipo) === 'disponibilidade'
+          && normalizarParaComparar_(item.Ativo) === 'sim';
+      })
+      .sort(function (um, outro) {
+        return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
+      })
+      .map(function (item) {
+        return { nome: String(item.Nome), cor: String(item.Cor || '') };
+      }),
+    // Qual delas recebe caso. A tela precisa saber para explicar a escolha,
+    // e tirar isto do servidor evita a tela ter a palavra escrita nela.
+    disponibilidadeQueRecebe: RECC_DISPONIBILIDADE_QUE_RECEBE,
+    /*
       Os títulos são CURTOS de propósito: o menu tem uma coluna só, e um
       título que quebra em duas linhas desalinha a contagem do lado direito.
       O que o título deixou de dizer, a descrição diz — ela aparece inteira

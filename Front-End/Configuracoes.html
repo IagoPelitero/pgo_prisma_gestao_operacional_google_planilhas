@@ -585,11 +585,41 @@ var TelaConfiguracoes = (function () {
       + 'equipe nenhuma.</em></label>';
   }
 
+  /*
+    Se a pessoa está recebendo caso HOJE.
+
+    É diferente de "Pode entrar", logo acima, e a tela diz isso em voz alta:
+    quem está de férias CONTINUA entrando no sistema — quem volta precisa
+    consultar um caso antes de reassumir — e só para de receber lote novo.
+
+    As opções vêm do catálogo (Ajustes Gerais › DISPONIBILIDADE), então a
+    operação pode criar "licença médica" ou "treinamento" sem mexer em código.
+    Qualquer opção que não seja a que recebe tira a pessoa da divisão.
+  */
+  function caixaDeDisponibilidade(escolhida) {
+    var opcoes = resumo.disponibilidades || [];
+    if (!opcoes.length) return '';
+
+    var atual = texto(escolhida) || resumo.disponibilidadeQueRecebe;
+    return '<label class="config-campo"><span>Recebendo casos</span>'
+      + '<select id="cfg-disponibilidade">'
+      + opcoes.map(function (opcao) {
+        return '<option value="' + escapar(opcao.nome) + '"'
+          + (texto(opcao.nome) === texto(atual) ? ' selected' : '') + '>'
+          + escapar(opcao.nome) + '</option>';
+      }).join('') + '</select>'
+      + '<em>Só quem está "' + escapar(resumo.disponibilidadeQueRecebe)
+      + '" entra na divisão de um lote na Importação. Férias e afastamento '
+      + 'NÃO tiram o acesso — a pessoa continua entrando no sistema.</em>'
+      + '</label>';
+  }
+
   function desenharPainelDoUsuario(usuario) {
     var ehNovo = !usuario;
     var pessoa = usuario || {
       id: '', nome: '', email: '', canalId: '', cargoId: '',
-      nivelAcessoId: '', ativo: true
+      nivelAcessoId: '', ativo: true,
+      disponibilidade: resumo.disponibilidadeQueRecebe
     };
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-usuario">'
@@ -606,6 +636,7 @@ var TelaConfiguracoes = (function () {
         + 'logo acima — dois níveis diferentes no mesmo canal são a mesma '
         + 'equipe.')
       + caixaDeSimNao('ativo', 'Pode entrar', pessoa.ativo !== false)
+      + caixaDeDisponibilidade(pessoa.disponibilidade)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (ehNovo ? '' : '<button type="button" class="botao vazado" id="desativar">'
@@ -621,7 +652,8 @@ var TelaConfiguracoes = (function () {
         canalId: valorDe('canal-da-pessoa'),
         cargoId: valorDe('cargo'),
         nivelAcessoId: valorDe('nivel'),
-        ativo: marcado('ativo')
+        ativo: marcado('ativo'),
+        disponibilidade: valorDe('disponibilidade')
       }).entao(function () { avisarSalvo(); carregarUsuarios(); })
         .senao(mostrarErroNoPainel);
     });

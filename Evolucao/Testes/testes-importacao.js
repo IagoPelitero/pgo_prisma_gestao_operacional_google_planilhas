@@ -18,8 +18,8 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro, lanca, comoUsuario, ehData,
-  lerPeca } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
+  ehData, lerPeca } = require('./ferramentas');
 
 function rodarTestesDeImportacao() {
   console.log('\nEtapa 13 — Importação');
@@ -36,12 +36,14 @@ function rodarTestesDeImportacao() {
   const nivelDaOperacao = chamar('lerRegistros_("CATALOGO")')
     .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id;
 
+  // Com CANAL, agora: a divisão de um lote passou a ser só entre quem é do
+  // canal escolhido, a pedido do PO. Analista sem canal não recebe nada.
   ['Marcos Vieira', 'Patrícia Nunes'].forEach((nome) => {
     chamar('salvarUsuario')({
       nome: nome,
       email: nome.split(' ')[0].toLowerCase().normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') + '@exemplo.com',
-      nivelAcessoId: nivelDaOperacao, ativo: true
+      nivelAcessoId: nivelDaOperacao, canalId: ret.id, ativo: true
     });
   });
 
@@ -392,7 +394,7 @@ function rodarTestesDeImportacao() {
       fonte: colado([['CPF'], ['50000000001']]),
       analistas: ['Fulano Que Não Existe'],
       origem: 'Lote sem dono'
-    }), 'não estão cadastrados e ativos');
+    }), 'não podem receber casos do canal');
   });
 
   teste('base em que nada entraria recusa em vez de gravar zero', () => {
@@ -464,72 +466,139 @@ function rodarTestesDeImportacao() {
 
   secao('Quem aparece na lista de analistas');
 
-  teste('quem é de outro canal ainda aparece na lista, marcado', () => {
+  teste('quem é de OUTRO canal não aparece na lista', () => {
     /*
-     * O bug que só o navegador mostrou: a lista só oferecia quem tivesse
-     * "Canal que atende" igual ao NOME do canal, texto digitado. Aquele campo
-     * saiu do cadastro a pedido do PO, e hoje quem responde é o CanalId — mas
-     * a regra que este teste guarda é a mesma: a lista oferece TODO MUNDO
-     * cadastrado e ativo, e só MARCA quem é de outro canal.
+     * A REGRA VIROU, e virou por pedido do PO: "quero que quando for importar
+     * escolha o canal e ele distribua apenas para o canal que escolhi".
      *
-     * Deixar de fora quem é de outro canal faria a tela dizer "nenhum analista
-     * cadastrado" numa operação cheia deles — e, enquanto a operação se forma,
-     * um analista da RET recebe lote da Mesa e vice-versa.
+     * Antes a lista oferecia todo mundo e só MARCAVA quem era de outro canal
+     * — proposital, para a operação em formação poder cruzar. Hoje o canal
+     * TRAVA: quem não é dele não aparece e não pode ser escolhido.
      */
     chamar('salvarUsuario')({
       nome: 'Sandra da Mesa', email: 'sandra@exemplo.com',
       nivelAcessoId: nivelDaOperacao, canalId: mesa.id, ativo: true
     });
 
-    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
-    const sandra = lista.find((p) => p.nome === 'Sandra da Mesa');
-    verdadeiro(sandra !== undefined,
-      'ela precisa aparecer: ' + lista.map((p) => p.nome).join(', '));
-    igual(sandra.atendeEsteCanal, false, 'marcada como de outro canal');
+    const daRet = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
+    verdadeiro(!daRet.some((p) => p.nome === 'Sandra da Mesa'),
+      'ela é da Mesa e não pode aparecer no lote da RET: '
+      + daRet.map((p) => p.nome).join(', '));
+    verdadeiro(daRet.some((p) => p.nome === 'Marcos Vieira'),
+      'e quem é da RET continua aparecendo');
 
-    const marcos = lista.find((p) => p.nome === 'Marcos Vieira');
-    igual(marcos.atendeEsteCanal, true, 'e quem é do canal vem marcado');
+    const daMesa = chamar('opcoesDaImportacaoDeCasos')(mesa.id).analistas;
+    verdadeiro(daMesa.some((p) => p.nome === 'Sandra da Mesa'),
+      'no canal dela, ela aparece');
+    verdadeiro(!daMesa.some((p) => p.nome === 'Marcos Vieira'),
+      'e quem é da RET não aparece no lote da Mesa');
   });
 
-  teste('quem não tem canal declarado conta como de todos os canais', () => {
-    // É o caso de quem administra, e o mais comum numa operação se formando:
-    // ninguém preencheu canal ainda. Essa pessoa aparece no TOPO, junto de
-    // quem é deste canal — tratá-la como "de fora" jogaria para o fim da lista
-    // justamente quem a coordenação mais usa no começo.
+  teste('quem NÃO tem canal declarado não recebe lote de canal nenhum', () => {
+    /*
+     * É o caso de quem administra. Antes ele contava como "de todos os
+     * canais" e aparecia no topo de todas as listas; com o canal travando,
+     * ele não é de nenhum — e receber lote não é trabalho de quem administra.
+     *
+     * Quem quiser receber, escolhe o canal dele em Configurações › Usuários.
+     * O recado da migração diz isso, para a lista não aparecer vazia sem
+     * explicação numa instalação antiga.
+     */
     chamar('salvarUsuario')({
       nome: 'Olívia sem canal', email: 'olivia@exemplo.com',
       nivelAcessoId: nivelDaOperacao, ativo: true
     });
 
     const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
-    const olivia = lista.find((p) => p.nome === 'Olívia sem canal');
-    verdadeiro(olivia !== undefined,
-      'ela precisa aparecer: ' + lista.map((p) => p.nome).join(', '));
-    igual(olivia.atendeEsteCanal, true, 'sem canal declarado, atende todos');
+    verdadeiro(!lista.some((p) => p.nome === 'Olívia sem canal'),
+      'sem canal, não entra na divisão de nenhum: '
+      + lista.map((p) => p.nome).join(', '));
   });
 
-  teste('quem é do canal vem primeiro na lista', () => {
-    // A ordem é a sugestão. Quem atende este canal é a escolha esperada; os
-    // outros continuam disponíveis, mais abaixo.
-    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
-    const primeiroDeFora = lista.findIndex((p) => !p.atendeEsteCanal);
-    const ultimoDeDentro = lista.map((p) => p.atendeEsteCanal).lastIndexOf(true);
-    verdadeiro(primeiroDeFora < 0 || ultimoDeDentro < primeiroDeFora,
-      'ninguém de fora pode aparecer antes de alguém de dentro');
-  });
-
-  teste('importar no nome de quem é de outro canal é PERMITIDO', () => {
-    // Enquanto a operação está se formando, um analista da RET pode receber um
-    // lote da Mesa. Quem decide isso é a coordenação, não o sistema.
-    const resultado = chamar('importarCasos')(ret.id, {
+  teste('importar no nome de quem é de outro canal é RECUSADO, com o motivo', () => {
+    // E o recado diz o motivo certo. Antes dizia sempre "não estão
+    // cadastrados e ativos" — e Sandra está cadastrada E ativa. Quem lesse
+    // iria cadastrar de novo alguém que já existe.
+    lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['80000000001', 'De outro canal']]),
       analistas: ['Sandra da Mesa'],
       origem: 'Lote cruzado'
+    }), 'não é do canal RET');
+  });
+
+  secao('Férias e afastamento tiram da divisão, não do sistema');
+
+  teste('quem está de férias sai da lista, e o acesso dela continua', () => {
+    /*
+     * Pedido do PO: "pode atribuir um flag de ativo ou férias para que ele
+     * NÃO considere o analista e divida apenas por quem está ativo".
+     *
+     * Disponibilidade é DISTRIBUIÇÃO; `Ativo` é ACESSO. São colunas
+     * diferentes de propósito: quem está de férias continua entrando no
+     * sistema — quem volta precisa consultar um caso antes de reassumir.
+     */
+    const patricia = chamar('listarUsuarios()')
+      .find((u) => u.nome === 'Patrícia Nunes');
+    chamar('salvarUsuario')({
+      id: patricia.id, nome: patricia.nome, email: patricia.email,
+      nivelAcessoId: patricia.nivelAcessoId, canalId: ret.id, ativo: true,
+      disponibilidade: 'Férias'
     });
-    igual(resultado.entraram, 1);
-    const caso = casosDaRet().find((linha) =>
-      linha['nome do cliente'] === 'De outro canal');
-    igual(caso.analista, 'Sandra da Mesa');
+
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
+    verdadeiro(!lista.some((p) => p.nome === 'Patrícia Nunes'),
+      'de férias, ela não recebe: ' + lista.map((p) => p.nome).join(', '));
+
+    const depois = chamar('listarUsuarios()')
+      .find((u) => u.nome === 'Patrícia Nunes');
+    igual(depois.ativo, true, 'o ACESSO dela não foi tocado');
+    igual(depois.recebeCasos, false);
+    igual(depois.disponibilidade, 'Férias');
+  });
+
+  teste('a tela diz QUEM ficou de fora e por quê', () => {
+    // Sem isto, a coordenação procura um nome que ela sabe que trabalha ali,
+    // não acha, e a única conclusão possível é "o sistema está errado".
+    const fora = chamar('opcoesDaImportacaoDeCasos')(ret.id).foraDaDivisao;
+    const patricia = fora.find((p) => p.nome === 'Patrícia Nunes');
+    verdadeiro(patricia !== undefined, 'ela precisa aparecer na lista de fora');
+    igual(patricia.porque, 'Férias');
+  });
+
+  teste('marcar quem está de férias é recusado, dizendo o motivo', () => {
+    lanca(() => chamar('importarCasos')(ret.id, {
+      fonte: colado([['CPF'], ['80000000003']]),
+      analistas: ['Patrícia Nunes'],
+      origem: 'Lote para quem está fora'
+    }), 'Férias');
+  });
+
+  teste('de volta das férias, ela recebe de novo', () => {
+    const patricia = chamar('listarUsuarios()')
+      .find((u) => u.nome === 'Patrícia Nunes');
+    chamar('salvarUsuario')({
+      id: patricia.id, nome: patricia.nome, email: patricia.email,
+      nivelAcessoId: patricia.nivelAcessoId, canalId: ret.id, ativo: true,
+      disponibilidade: 'Disponível'
+    });
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
+    verdadeiro(lista.some((p) => p.nome === 'Patrícia Nunes'));
+  });
+
+  teste('disponibilidade em BRANCO recebe — é quem foi cadastrado antes', () => {
+    /*
+     * A trava da migração. Tratar o vazio como indisponível esvaziaria a
+     * distribuição de uma operação inteira na primeira importação depois da
+     * atualização, e ninguém ligaria a causa ao efeito.
+     */
+    const marcos = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Marcos Vieira');
+    chamar('atualizarRegistro_')('USUARIOS', marcos.Id, { Disponibilidade: '' });
+    chamar('esquecerEstruturaLida_()');
+
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
+    verdadeiro(lista.some((p) => p.nome === 'Marcos Vieira'),
+      'vazio vale disponível');
   });
 
   teste('quem foi DESATIVADO sai da lista e é recusado', () => {
@@ -539,15 +608,32 @@ function rodarTestesDeImportacao() {
       .find((u) => u.nome === 'Sandra da Mesa');
     chamar('desativarUsuario')(sandra.id);
 
-    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
+    const lista = chamar('opcoesDaImportacaoDeCasos')(mesa.id).analistas;
     verdadeiro(!lista.some((p) => p.nome === 'Sandra da Mesa'),
-      'saiu da lista');
+      'saiu da lista do canal dela');
 
-    lanca(() => chamar('importarCasos')(ret.id, {
-      fonte: colado([['CPF'], ['80000000002']]),
+    lanca(() => chamar('importarCasos')(mesa.id, {
+      fonte: colado([['SUSEP'], ['RET00J']]),
       analistas: ['Sandra da Mesa'],
       origem: 'Lote para quem saiu'
-    }), 'não estão cadastrados e ativos');
+    }), 'não podem receber casos do canal');
+  });
+
+  teste('a tela mostra quem ficou de fora, e explica a lista vazia', () => {
+    const tela = lerPeca('Importacao');
+    contem(tela, 'function desenharQuemEstaFora');
+    contem(tela, 'opcoes.foraDaDivisao');
+    contem(tela, 'Continuam com acesso ao sistema; só não recebem lote.');
+    contem(tela, 'CANAL de cada analista',
+      'a lista vazia tem de dizer o que fazer');
+  });
+
+  teste('a tela de Usuários tem o campo de disponibilidade', () => {
+    const tela = lerPeca('Configuracoes');
+    contem(tela, 'function caixaDeDisponibilidade');
+    contem(tela, "disponibilidade: valorDe('disponibilidade')");
+    contem(tela, 'NÃO tiram o acesso',
+      'a tela precisa dizer que férias não fecha a entrada');
   });
 
   secao('A Mesa Diamante também importa');

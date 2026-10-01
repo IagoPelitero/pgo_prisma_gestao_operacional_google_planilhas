@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-01 23:09
+   Gerado em 2026-10-01 23:53
    ========================================================================== */
 
 
@@ -531,6 +531,24 @@ const RECC_ESQUEMA = {
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true },
+      /*
+       * A PESSOA ESTÁ RECEBENDO CASO HOJE?
+       *
+       * É DIFERENTE de `Ativo`, e a diferença é a razão desta coluna existir.
+       * `Ativo` é ACESSO: desativado não entra no sistema. Disponibilidade é
+       * DISTRIBUIÇÃO: quem está de férias continua entrando — o PO foi
+       * explícito sobre isso — e só para de receber lote novo.
+       *
+       * Juntar as duas numa coluna só obrigaria a escolher entre tirar o
+       * acesso de quem está de férias ou mandar casos para quem só volta em
+       * três semanas. As duas respostas são erradas.
+       *
+       * Os valores vêm da lista DISPONIBILIDADE, no catálogo, e não escritos
+       * aqui: a operação pode criar "licença médica" ou "treinamento" sem
+       * tocar em código. VAZIO VALE DISPONÍVEL — quem foi cadastrado antes
+       * desta coluna existir continua recebendo, como já recebia.
+       */
+      { cabecalho: 'Disponibilidade', tipo: 'texto', protegido: false },
       { cabecalho: 'DataCadastro', tipo: 'dataHora', protegido: true },
       { cabecalho: 'UltimoAcesso', tipo: 'dataHora', protegido: true }
     ]
@@ -1385,6 +1403,33 @@ function chaveDaSusep_(valor) {
 /** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
 function susepComoSeEscreve_(valor) {
   return String(valor === null || valor === undefined ? '' : valor).trim();
+}
+
+/**
+ * A disponibilidade de quem acabou de ser cadastrado, e a única que recebe
+ * caso na divisão de um lote.
+ *
+ * É o nome de um item da lista DISPONIBILIDADE, no catálogo. Fica numa
+ * constante porque DUAS coisas dependem de ser exatamente este texto: o
+ * semeador, que cria o item, e a divisão do lote, que compara com ele.
+ * Escrito solto nos dois lugares, renomear o item na tela faria a divisão
+ * parar de achar alguém disponível — e em silêncio.
+ */
+var RECC_DISPONIBILIDADE_QUE_RECEBE = 'Disponível';
+
+/**
+ * Esta pessoa entra na divisão de um lote?
+ *
+ * VAZIO É SIM, de propósito: quem foi cadastrado antes desta coluna existir
+ * nunca escolheu "de férias", e tratar o vazio como indisponível esvaziaria a
+ * distribuição de uma operação inteira na primeira importação depois da
+ * atualização.
+ */
+function estaDisponivelParaReceber_(usuario) {
+  var situacao = String((usuario || {}).Disponibilidade || '').trim();
+  if (!situacao) return true;
+  return normalizarParaComparar_(situacao)
+    === normalizarParaComparar_(RECC_DISPONIBILIDADE_QUE_RECEBE);
 }
 
 /** Só os dígitos. É assim que identificador é comparado e gravado. */
@@ -5679,6 +5724,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     passaDoLimite: corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
+    foraDaDivisao: quemEstaForaDaDivisao_(canal),
     // Se alguém marcou um analista que está fora, o laudo DIZ, com quantos
     // casos e até quando. Não recusa: o lote pode ser para a volta dela, e o
     // laudo existe justamente para a pessoa ver antes de gravar.
@@ -5816,39 +5862,74 @@ function temAlgumValor_(caso) {
  * Aquele campo saiu do cadastro desde então. A sugestão agora vem do CanalId,
  * que é escolha de lista e não texto digitado.
  *
- * A regra que IMPORTA é outra, e é sobre não perder o caso: o nome tem de
- * existir no cadastro e estar ativo, senão o caso fica no nome de ninguém e
- * some da fila de todo mundo. A que canal a pessoa atende é SUGESTÃO — quem
- * atende este canal aparece primeiro na lista —, e não trava: enquanto a
- * operação está se formando, um analista da RET pode muito bem receber um lote
- * da Mesa, e o sistema não é quem decide isso.
+ * TRÊS REGRAS, e as três são do PO:
+ *
+ *   1. SÓ QUEM É DO CANAL ESCOLHIDO. "Quero que quando for importar escolha o
+ *      canal e ele distribua apenas para o canal que escolhi." Antes o canal
+ *      só ORDENAVA a lista, e todo mundo aparecia — era proposital, para a
+ *      operação em formação poder cruzar canais, e o PO decidiu o contrário.
+ *      Quem administra, sem canal nenhum, também não entra: ele não é "do
+ *      canal escolhido", e receber lote não é trabalho de quem administra.
+ *
+ *   2. SÓ QUEM ESTÁ DISPONÍVEL. Férias e afastamento tiram a pessoa da
+ *      divisão sem tirar o acesso dela — ver `estaDisponivelParaReceber_`.
+ *
+ *   3. SÓ QUEM ESTÁ ATIVO E TEM NOME, que é a regra antiga e a mais
+ *      importante: o nome tem de existir no cadastro, senão o caso fica no
+ *      nome de ninguém e some da fila de todo mundo.
+ *
+ * A lista pode VOLTAR VAZIA, e isso é resposta, não erro: quer dizer que
+ * ninguém deste canal está disponível hoje. Quem explica é a tela.
  */
 function analistasParaDistribuir_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
 
-  /*
-   * Houve aqui uma marca de QUEM ESTÁ DE FÉRIAS, para a coordenação não
-   * distribuir um lote a quem só volta em três semanas. Saiu com o calendário,
-   * a pedido do PO — ele vai tratar isso de outra maneira.
-   */
   return lerRegistros_('USUARIOS')
     .filter(function (usuario) {
-      return normalizarParaComparar_(usuario.Ativo) === 'sim'
-        && String(usuario.Nome || '').trim();
+      if (normalizarParaComparar_(usuario.Ativo) !== 'sim') return false;
+      if (!String(usuario.Nome || '').trim()) return false;
+      if (converterParaIdentificador_(usuario.CanalId) !== doCanal) return false;
+      return estaDisponivelParaReceber_(usuario);
     })
     .map(function (usuario) {
-      var dela = converterParaIdentificador_(usuario.CanalId);
       return {
         nome: String(usuario.Nome),
-        // Vazio é o caso de quem administra: atende as duas, e fica no topo
-        // junto de quem é deste canal.
-        atendeEsteCanal: !dela || dela === doCanal
+        // Continua saindo, e continua sempre true agora que a lista é só
+        // deste canal. A tela mostra a lista como ela vem, e um campo que
+        // some quebraria a tela de quem ainda não recarregou.
+        atendeEsteCanal: true
       };
     })
     .sort(function (um, outro) {
-      if (um.atendeEsteCanal !== outro.atendeEsteCanal) {
-        return um.atendeEsteCanal ? -1 : 1;
-      }
+      return um.nome < outro.nome ? -1 : (um.nome > outro.nome ? 1 : 0);
+    });
+}
+
+/**
+ * Quem é deste canal, está ativo, e NÃO está disponível hoje.
+ *
+ * Vai junto da lista para a tela poder DIZER por que fulano não está lá. Sem
+ * isto, a coordenação abre a Importação, não acha o nome de alguém que ela
+ * sabe que trabalha ali, e a única conclusão possível é "o sistema está
+ * errado" — quando o certo é "ela está de férias, e por isso não recebe".
+ */
+function quemEstaForaDaDivisao_(canal) {
+  var doCanal = converterParaIdentificador_(canal.id);
+
+  return lerRegistros_('USUARIOS')
+    .filter(function (usuario) {
+      return normalizarParaComparar_(usuario.Ativo) === 'sim'
+        && String(usuario.Nome || '').trim()
+        && converterParaIdentificador_(usuario.CanalId) === doCanal
+        && !estaDisponivelParaReceber_(usuario);
+    })
+    .map(function (usuario) {
+      return {
+        nome: String(usuario.Nome),
+        porque: String(usuario.Disponibilidade || '').trim()
+      };
+    })
+    .sort(function (um, outro) {
       return um.nome < outro.nome ? -1 : (um.nome > outro.nome ? 1 : 0);
     });
 }
@@ -6081,10 +6162,31 @@ function analistasEscolhidos_(escolhidos, canal) {
     });
   });
   if (foraDoCadastro.length) {
-    throw new Error('Estes nomes não estão cadastrados e ativos no PGO: '
-      + foraDoCadastro.join(', ') + '. Caso no nome de quem não existe não '
-      + 'aparece na fila de ninguém — fica na planilha e invisível no sistema. '
-      + 'Cadastre em Configurações › Usuários e importe depois.');
+    /*
+     * O RECADO DIZ O MOTIVO CERTO, e isto não é capricho.
+     *
+     * Antes ele dizia sempre "não estão cadastrados e ativos". Depois que a
+     * divisão passou a ser só do canal e só de quem está disponível, esse
+     * texto virou mentira em dois dos três casos: a pessoa está cadastrada,
+     * está ativa, e mesmo assim não pode receber. Quem lesse iria cadastrar
+     * de novo alguém que já existe.
+     */
+    var deFerias = {};
+    quemEstaForaDaDivisao_(canal).forEach(function (um) {
+      deFerias[normalizarParaComparar_(um.nome)] = um.porque || 'indisponível';
+    });
+
+    var explicados = foraDoCadastro.map(function (nome) {
+      var chave = normalizarParaComparar_(nome);
+      if (deFerias[chave]) return nome + ' (' + deFerias[chave] + ')';
+      return nome + ' (não é do canal ' + canal.nome + ', ou não está ativo)';
+    });
+
+    throw new Error('Estes nomes não podem receber casos do canal '
+      + canal.nome + ': ' + explicados.join('; ') + '. Caso no nome de quem '
+      + 'não recebe fica na planilha e invisível na fila. Ajuste em '
+      + 'Configurações › Usuários — o canal da pessoa e a disponibilidade '
+      + 'dela — e importe depois.');
   }
 
   // Devolve com a grafia do CADASTRO, e não a que veio da tela: é o nome do
@@ -6139,6 +6241,9 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
     colunasDoCanal: colunasQueAImportacaoAceita_(canal),
     analistas: analistasParaDistribuir_(canal),
+    // Quem é deste canal e está de férias ou afastado. A tela diz o nome e o
+    // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
+    foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO
@@ -6236,6 +6341,29 @@ function resumoDasConfiguracoes() {
     senhaDefinida: existeSenhaDeAdministrador_(),
     identidade: lerIdentidadeVisual_(),
     titulosDasTelas: titulosDasTelas(),
+    /*
+     * As opções de disponibilidade, para o cadastro de usuários.
+     *
+     * Vêm AQUI, e não numa chamada própria, porque este panorama já é lido
+     * uma vez quando Configurações abre — e o catálogo inteiro já está em
+     * memória nesta execução, por causa do `catalogo` ali em cima. Uma
+     * chamada só para isto seria uma ida ao serviço a mais numa tela que
+     * acabou de ser enxugada.
+     */
+    disponibilidades: catalogo
+      .filter(function (item) {
+        return normalizarParaComparar_(item.Tipo) === 'disponibilidade'
+          && normalizarParaComparar_(item.Ativo) === 'sim';
+      })
+      .sort(function (um, outro) {
+        return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
+      })
+      .map(function (item) {
+        return { nome: String(item.Nome), cor: String(item.Cor || '') };
+      }),
+    // Qual delas recebe caso. A tela precisa saber para explicar a escolha,
+    // e tirar isto do servidor evita a tela ter a palavra escrita nela.
+    disponibilidadeQueRecebe: RECC_DISPONIBILIDADE_QUE_RECEBE,
     /*
       Os títulos são CURTOS de propósito: o menu tem uma coluna só, e um
       título que quebra em duas linhas desalinha a contagem do lado direito.
@@ -9798,6 +9926,12 @@ function listarUsuarios() {
       nivelAcesso:
         catalogo[converterParaIdentificador_(usuario.NivelAcessoId)] || 'Sem dados',
       ativo: normalizarParaComparar_(usuario.Ativo) === 'sim',
+      // Vazio volta como "Disponível" para a tela não mostrar um campo em
+      // branco em quem foi cadastrado antes desta coluna existir — e o que
+      // ela mostra é a verdade: vazio recebe caso.
+      disponibilidade: String(usuario.Disponibilidade || '').trim()
+        || RECC_DISPONIBILIDADE_QUE_RECEBE,
+      recebeCasos: estaDisponivelParaReceber_(usuario),
       administrador: ehAdministrador_(usuario.Id),
       dataCadastro: comoDataEHora_(usuario.DataCadastro),
       ultimoAcesso: comoDataEHora_(usuario.UltimoAcesso)
@@ -9871,6 +10005,26 @@ function salvarUsuario(dados) {
     NivelAcessoId: converterParaIdentificador_(dados.nivelAcessoId),
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
   };
+
+  /*
+   * A DISPONIBILIDADE SÓ É GRAVADA SE A COLUNA EXISTIR.
+   *
+   * Numa planilha que ainda não rodou `atualizarPGO()` a coluna não existe, e
+   * gravar nela derruba o salvar com "a aba USUARIOS não tem coluna para:
+   * Disponibilidade". Quem só queria corrigir um e-mail levaria um erro sobre
+   * um campo que nunca viu.
+   *
+   * A migração é RECOMENDADA, não obrigatória: até ela rodar, o cadastro
+   * continua funcionando e todo mundo continua recebendo lote, que é o
+   * comportamento de antes.
+   *
+   * Quem não mandar nada nasce disponível — vale para a tela antiga, que não
+   * conhece o campo, e para qualquer chamada que não o informe.
+   */
+  if (posicaoDaColuna_(estruturaDaAba_('USUARIOS'), 'Disponibilidade') >= 0) {
+    campos.Disponibilidade = String(dados.disponibilidade || '').trim()
+      || RECC_DISPONIBILIDADE_QUE_RECEBE;
+  }
 
   var gravado;
   if (idInformado) {
@@ -12676,6 +12830,26 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.cargos = cargos.length;
   var idCargoAdm = cargos[2]['Id'];
 
+  /*
+   * --- disponibilidade -------------------------------------------------------
+   *
+   * Se a pessoa está recebendo caso HOJE. Pedido do PO: "pode atribuir um flag
+   * de ativo ou férias para que ele NÃO considere o analista e divida apenas
+   * por quem está ativo".
+   *
+   * É lista do catálogo, e não duas opções escritas no código, porque a
+   * operação vai querer mais motivos — licença médica, treinamento, um
+   * projeto. Qualquer item NOVO desta lista tira a pessoa da divisão: só
+   * "Disponível" recebe, e é por isso que o nome dele mora numa constante.
+   */
+  var disponibilidades = inserirVariosRegistros_('CATALOGO', [
+    novoItemDeCatalogo_('DISPONIBILIDADE', '',
+      RECC_DISPONIBILIDADE_QUE_RECEBE, 1, 'bom'),
+    novoItemDeCatalogo_('DISPONIBILIDADE', '', 'Férias', 2, 'atencao'),
+    novoItemDeCatalogo_('DISPONIBILIDADE', '', 'Afastado', 3, 'atencao')
+  ]);
+  contagem.disponibilidades = disponibilidades.length;
+
   // --- canais ----------------------------------------------------------------
   var canais = inserirVariosRegistros_('CANAIS', [
     {
@@ -13667,6 +13841,11 @@ function atualizarPGO() {
   // --- 5. a equipe passa a ser o CANAL -------------------------------------
   feito = feito.concat(ligarOCanalDeQuemJaEstaCadastrado_(pulados, paraVoce));
 
+  // --- 5b. a disponibilidade do analista -----------------------------------
+  feito = feito.concat(criarColunasDoContrato_('USUARIOS', pulados));
+  feito = feito.concat(criarAListaDeDisponibilidade_(pulados));
+  feito = feito.concat(avisarQuemPodeFicarSemLote_(canaisSemAnalista_(), paraVoce));
+
   // --- 6. a aba PRODUTOS sai da planilha -----------------------------------
   feito = feito.concat(apagarAAbaDeProdutos_(pulados, paraVoce));
 
@@ -13852,6 +14031,63 @@ function apagarAAbaDeProdutos_(pulados, paraVoce) {
     + ' linha(s). Se precisar dela de volta, ela está em Arquivo › Histórico '
     + 'de versões do Google Planilhas por 30 dias.');
   return feito;
+}
+
+/**
+ * Cria a lista DISPONIBILIDADE no catálogo, se ela ainda não existir.
+ *
+ * Só cria o que FALTA, item por item: quem já renomeou "Afastado" para
+ * "Licença" não pode ver o item antigo renascer ao lado do dele.
+ */
+function criarAListaDeDisponibilidade_(pulados) {
+  var feito = [];
+  var jaTem = {};
+  lerRegistros_('CATALOGO').forEach(function (item) {
+    if (normalizarParaComparar_(item.Tipo) !== 'disponibilidade') return;
+    jaTem[normalizarParaComparar_(item.Nome)] = true;
+  });
+
+  var ordem = 0;
+  [[RECC_DISPONIBILIDADE_QUE_RECEBE, 'bom'],
+   ['Férias', 'atencao'],
+   ['Afastado', 'atencao']].forEach(function (par) {
+    ordem++;
+    if (jaTem[normalizarParaComparar_(par[0])]) {
+      pulados.push('a disponibilidade "' + par[0] + '" já existe');
+      return;
+    }
+    inserirRegistro_('CATALOGO',
+      novoItemDeCatalogo_('DISPONIBILIDADE', '', par[0], ordem, par[1]));
+    feito.push('disponibilidade "' + par[0] + '" criada');
+  });
+  return feito;
+}
+
+/**
+ * Os canais ativos que ficaram sem NINGUÉM para receber lote.
+ *
+ * A importação passou a dividir só entre quem é DO CANAL escolhido. Numa
+ * instalação antiga, em que o canal da pessoa nunca foi preenchido, isso
+ * deixa a lista vazia — e a coordenação descobriria na hora de importar, com
+ * o lote já colado na tela.
+ */
+function canaisSemAnalista_() {
+  var vazios = [];
+  canaisVisiveis_().forEach(function (canal) {
+    if (!analistasParaDistribuir_(canal).length) vazios.push(canal.nome);
+  });
+  return vazios;
+}
+
+/** Transforma essa lista em um recado, quando houver o que dizer. */
+function avisarQuemPodeFicarSemLote_(vazios, paraVoce) {
+  if (!vazios.length) return [];
+  paraVoce.push('A importação agora divide o lote SÓ entre quem é do canal '
+    + 'escolhido e está disponível, a seu pedido. Estes canais estão sem '
+    + 'ninguém nessa condição: ' + vazios.join(', ') + '. Abra Configurações › '
+    + 'Usuários e escolha o canal de cada analista — sem isso a tela de '
+    + 'Importação vai abrir com a lista vazia.');
+  return [];
 }
 
 /**

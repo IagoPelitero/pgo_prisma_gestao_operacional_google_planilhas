@@ -1550,6 +1550,15 @@ function rodarTestesDeDiagnostico() {
       CanalId: '', 'Canal que atende': 'Canal Que Nunca Existiu' });
     chamar('esquecerEstruturaLida_()');
 
+    // 6b. a disponibilidade do analista não existia, nem a lista dela.
+    chamar('removerColuna_')('USUARIOS', 'Disponibilidade');
+    chamar('lerRegistros_("CATALOGO")').forEach((item) => {
+      if (String(item.Tipo) === 'DISPONIBILIDADE') {
+        chamar('apagarRegistroDeVez_')('CATALOGO', item.Id);
+      }
+    });
+    chamar('esquecerEstruturaLida_()');
+
     // 7. a aba PRODUTOS existia, com produto cadastrado.
     const produtos = planilha.insertSheet('PRODUTOS');
     produtos.getRange(1, 1, 1, 3).setValues([['Id', 'Produto', 'CodigoProduto']]);
@@ -1753,6 +1762,75 @@ function rodarTestesDeDiagnostico() {
     contem(recado, 'aba PRODUTOS apagada da planilha, com 2 linha(s)');
     contem(recado, 'Histórico de versões',
       'e o laudo diz de onde ela volta, se ele mudar de ideia');
+  });
+
+  teste('atualizar cria a disponibilidade e a lista dela', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+
+    verdadeiro(chamar('posicaoDaColuna_')(
+      chamar('estruturaDaAba_')('USUARIOS'), 'Disponibilidade') < 0,
+      'a coluna não pode existir antes, senão o teste não prova nada');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'USUARIOS.Disponibilidade criada');
+    contem(recado, 'disponibilidade "Disponível" criada');
+    contem(recado, 'disponibilidade "Férias" criada');
+
+    const lista = chamar('resumoDasConfiguracoes()').disponibilidades;
+    igual(lista.map((d) => d.nome).join(', '), 'Disponível, Férias, Afastado');
+  });
+
+  teste('quem já estava cadastrado continua recebendo lote', () => {
+    /*
+      A trava desta migração. A coluna nasce VAZIA para quem já existia, e
+      vazio tem de valer "disponível" — senão a primeira importação depois da
+      atualização não acharia ninguém para dividir, numa operação inteira, e
+      ninguém ligaria a causa ao efeito.
+    */
+    const { chamar } = comoEraAntesDestaRodada();
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const nivel = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => String(i.Tipo) === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+
+    chamar('salvarUsuario')({ nome: 'Analista De Antes',
+      email: 'antes@exemplo.com', nivelAcessoId: nivel.Id,
+      canalId: daRet.id, ativo: true });
+
+    chamar('atualizarPGO()');
+
+    const lista = chamar('analistasParaDistribuir_')(daRet);
+    verdadeiro(lista.some((p) => p.nome === 'Analista De Antes'),
+      'a coluna nasceu vazia, e vazio recebe');
+  });
+
+  teste('rodar duas vezes não cria a lista de disponibilidade em dobro', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const segunda = chamar('atualizarPGO()');
+
+    contem(segunda, 'a disponibilidade "Férias" já existe');
+    igual(chamar('lerRegistros_("CATALOGO")')
+      .filter((i) => String(i.Tipo) === 'DISPONIBILIDADE').length, 3);
+  });
+
+  teste('a migração avisa o canal que ficou sem ninguém para receber', () => {
+    /*
+      A importação passou a dividir só entre quem é DO CANAL. Numa instalação
+      em que o canal da pessoa nunca foi preenchido, a lista vira vazia — e a
+      coordenação descobriria com o lote já colado na tela.
+    */
+    const { chamar } = comoEraAntesDestaRodada();
+    // Ninguém com canal, e nem com o texto antigo de onde a migração o
+    // tiraria: é a instalação em que o campo nunca foi preenchido.
+    chamar('lerRegistros_("USUARIOS")').forEach((usuario) => {
+      chamar('atualizarRegistro_')('USUARIOS', usuario.Id,
+        { CanalId: '', 'Canal que atende': '' });
+    });
+    chamar('esquecerEstruturaLida_()');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'sem ninguém nessa condição');
+    contem(recado, 'RET');
   });
 
   teste('atualizar não perde usuário, caso nem configuração ajustada', () => {

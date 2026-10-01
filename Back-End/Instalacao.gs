@@ -248,6 +248,26 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.cargos = cargos.length;
   var idCargoAdm = cargos[2]['Id'];
 
+  /*
+   * --- disponibilidade -------------------------------------------------------
+   *
+   * Se a pessoa está recebendo caso HOJE. Pedido do PO: "pode atribuir um flag
+   * de ativo ou férias para que ele NÃO considere o analista e divida apenas
+   * por quem está ativo".
+   *
+   * É lista do catálogo, e não duas opções escritas no código, porque a
+   * operação vai querer mais motivos — licença médica, treinamento, um
+   * projeto. Qualquer item NOVO desta lista tira a pessoa da divisão: só
+   * "Disponível" recebe, e é por isso que o nome dele mora numa constante.
+   */
+  var disponibilidades = inserirVariosRegistros_('CATALOGO', [
+    novoItemDeCatalogo_('DISPONIBILIDADE', '',
+      RECC_DISPONIBILIDADE_QUE_RECEBE, 1, 'bom'),
+    novoItemDeCatalogo_('DISPONIBILIDADE', '', 'Férias', 2, 'atencao'),
+    novoItemDeCatalogo_('DISPONIBILIDADE', '', 'Afastado', 3, 'atencao')
+  ]);
+  contagem.disponibilidades = disponibilidades.length;
+
   // --- canais ----------------------------------------------------------------
   var canais = inserirVariosRegistros_('CANAIS', [
     {
@@ -1239,6 +1259,11 @@ function atualizarPGO() {
   // --- 5. a equipe passa a ser o CANAL -------------------------------------
   feito = feito.concat(ligarOCanalDeQuemJaEstaCadastrado_(pulados, paraVoce));
 
+  // --- 5b. a disponibilidade do analista -----------------------------------
+  feito = feito.concat(criarColunasDoContrato_('USUARIOS', pulados));
+  feito = feito.concat(criarAListaDeDisponibilidade_(pulados));
+  feito = feito.concat(avisarQuemPodeFicarSemLote_(canaisSemAnalista_(), paraVoce));
+
   // --- 6. a aba PRODUTOS sai da planilha -----------------------------------
   feito = feito.concat(apagarAAbaDeProdutos_(pulados, paraVoce));
 
@@ -1424,6 +1449,63 @@ function apagarAAbaDeProdutos_(pulados, paraVoce) {
     + ' linha(s). Se precisar dela de volta, ela está em Arquivo › Histórico '
     + 'de versões do Google Planilhas por 30 dias.');
   return feito;
+}
+
+/**
+ * Cria a lista DISPONIBILIDADE no catálogo, se ela ainda não existir.
+ *
+ * Só cria o que FALTA, item por item: quem já renomeou "Afastado" para
+ * "Licença" não pode ver o item antigo renascer ao lado do dele.
+ */
+function criarAListaDeDisponibilidade_(pulados) {
+  var feito = [];
+  var jaTem = {};
+  lerRegistros_('CATALOGO').forEach(function (item) {
+    if (normalizarParaComparar_(item.Tipo) !== 'disponibilidade') return;
+    jaTem[normalizarParaComparar_(item.Nome)] = true;
+  });
+
+  var ordem = 0;
+  [[RECC_DISPONIBILIDADE_QUE_RECEBE, 'bom'],
+   ['Férias', 'atencao'],
+   ['Afastado', 'atencao']].forEach(function (par) {
+    ordem++;
+    if (jaTem[normalizarParaComparar_(par[0])]) {
+      pulados.push('a disponibilidade "' + par[0] + '" já existe');
+      return;
+    }
+    inserirRegistro_('CATALOGO',
+      novoItemDeCatalogo_('DISPONIBILIDADE', '', par[0], ordem, par[1]));
+    feito.push('disponibilidade "' + par[0] + '" criada');
+  });
+  return feito;
+}
+
+/**
+ * Os canais ativos que ficaram sem NINGUÉM para receber lote.
+ *
+ * A importação passou a dividir só entre quem é DO CANAL escolhido. Numa
+ * instalação antiga, em que o canal da pessoa nunca foi preenchido, isso
+ * deixa a lista vazia — e a coordenação descobriria na hora de importar, com
+ * o lote já colado na tela.
+ */
+function canaisSemAnalista_() {
+  var vazios = [];
+  canaisVisiveis_().forEach(function (canal) {
+    if (!analistasParaDistribuir_(canal).length) vazios.push(canal.nome);
+  });
+  return vazios;
+}
+
+/** Transforma essa lista em um recado, quando houver o que dizer. */
+function avisarQuemPodeFicarSemLote_(vazios, paraVoce) {
+  if (!vazios.length) return [];
+  paraVoce.push('A importação agora divide o lote SÓ entre quem é do canal '
+    + 'escolhido e está disponível, a seu pedido. Estes canais estão sem '
+    + 'ninguém nessa condição: ' + vazios.join(', ') + '. Abra Configurações › '
+    + 'Usuários e escolha o canal de cada analista — sem isso a tela de '
+    + 'Importação vai abrir com a lista vazia.');
+  return [];
 }
 
 /**

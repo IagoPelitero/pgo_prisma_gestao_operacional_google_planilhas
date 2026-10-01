@@ -587,10 +587,38 @@ numa base que já está sendo trabalhada.
 | O que a importação resolve | Como |
 |---|---|
 | Os cabeçalhos são os da OUTRA planilha | Casa nome com nome e sugere; a pessoa corrige o que não reconheceu |
-| A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados |
+| A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados — e só entram na lista quem é **do canal escolhido** e está **disponível** |
 | A base repete toda semana | Escolhendo a coluna que identifica o caso — CPF, nº da proposta —, o que já está dentro é **pulado**, e o laudo diz quantos |
 | O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET |
 | De onde veio cada caso | Grava o **nome do lote** e a **data**, que é o que faz o gráfico existir |
+
+### Quem entra na divisão de um lote
+
+Duas regras, as duas do PO, e as duas sobre não mandar caso para quem não vai
+trabalhá-lo:
+
+**Só quem é do canal escolhido.** *"Quero que quando for importar escolha o
+canal e ele distribua apenas para o canal que escolhi."* Antes o canal só
+ordenava a lista e todo mundo aparecia. Hoje ele trava: analista da Mesa não
+entra na divisão de um lote da RET, e quem administra — que não pertence a
+canal nenhum — também não, porque receber lote não é trabalho de quem
+administra.
+
+**Só quem está disponível.** Cada pessoa tem uma **disponibilidade** em
+Configurações › Usuários: *Disponível*, *Férias* ou *Afastado* — e a operação
+pode criar outros motivos em Ajustes Gerais, porque é lista do catálogo. Só
+quem está "Disponível" recebe lote.
+
+Isso é **diferente de "Pode entrar"**, e a diferença é a razão de serem dois
+campos: quem está de férias **continua entrando no sistema** — quem volta
+precisa consultar um caso antes de reassumir — e só para de receber lote novo.
+Juntar os dois obrigaria a escolher entre tirar o acesso de quem está de férias
+ou mandar casos para quem só volta em três semanas.
+
+Quem ficou de fora **aparece na tela, com o motivo**: "Fora da divisão hoje:
+Patrícia Nunes — Férias". Sem isso, a coordenação procura um nome que ela sabe
+que trabalha ali, não acha, e a única conclusão possível é "o sistema está
+errado".
 
 Na Produtividade RECC, dois gráficos respondem ao que a operação pediu — *"no
 dia 05 incluímos 100 casos da base de inadimplentes Vida Presente"*: **casos
