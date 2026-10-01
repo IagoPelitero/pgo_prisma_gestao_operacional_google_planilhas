@@ -41,7 +41,7 @@ function rodarTestesDeImportacao() {
       nome: nome,
       email: nome.split(' ')[0].toLowerCase().normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') + '@exemplo.com',
-      canalQueAtende: ret.nome, nivelAcessoId: nivelDaOperacao, ativo: true
+      nivelAcessoId: nivelDaOperacao, ativo: true
     });
   });
 
@@ -444,7 +444,7 @@ function rodarTestesDeImportacao() {
       { Configuracao: JSON.stringify(permissoes) });
     chamar('salvarUsuario')({
       nome: 'Analista Comum', email: 'comum@exemplo.com',
-      canalQueAtende: ret.nome, nivelAcessoId: operacao.Id, ativo: true
+      nivelAcessoId: operacao.Id, ativo: true
     });
 
     comoUsuario(ambiente, 'comum@exemplo.com', () => {
@@ -464,26 +464,48 @@ function rodarTestesDeImportacao() {
 
   secao('Quem aparece na lista de analistas');
 
-  teste('"Canal que atende" livre não esvazia a lista de analistas', () => {
-    // O bug que só o navegador mostrou: a lista só oferecia quem tivesse
-    // "Canal que atende" IGUAL ao nome do canal. O campo é de digitar livre, e
-    // a operação escreve nele "Vida Individual", "Vida em Grupo" — quase nunca
-    // o nome do canal do PGO. A tela dizia "nenhum analista cadastrado" numa
-    // operação cheia de analistas.
+  teste('quem é de outro canal ainda aparece na lista, marcado', () => {
+    /*
+     * O bug que só o navegador mostrou: a lista só oferecia quem tivesse
+     * "Canal que atende" igual ao NOME do canal, texto digitado. Aquele campo
+     * saiu do cadastro a pedido do PO, e hoje quem responde é o CanalId — mas
+     * a regra que este teste guarda é a mesma: a lista oferece TODO MUNDO
+     * cadastrado e ativo, e só MARCA quem é de outro canal.
+     *
+     * Deixar de fora quem é de outro canal faria a tela dizer "nenhum analista
+     * cadastrado" numa operação cheia deles — e, enquanto a operação se forma,
+     * um analista da RET recebe lote da Mesa e vice-versa.
+     */
     chamar('salvarUsuario')({
-      nome: 'Sandra do Vida em Grupo', email: 'sandra@exemplo.com',
-      canalQueAtende: 'Vida em Grupo',     // não é o nome de canal nenhum
-      nivelAcessoId: nivelDaOperacao, ativo: true
+      nome: 'Sandra da Mesa', email: 'sandra@exemplo.com',
+      nivelAcessoId: nivelDaOperacao, canalId: mesa.id, ativo: true
     });
 
     const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
-    const sandra = lista.find((p) => p.nome === 'Sandra do Vida em Grupo');
+    const sandra = lista.find((p) => p.nome === 'Sandra da Mesa');
     verdadeiro(sandra !== undefined,
       'ela precisa aparecer: ' + lista.map((p) => p.nome).join(', '));
     igual(sandra.atendeEsteCanal, false, 'marcada como de outro canal');
 
     const marcos = lista.find((p) => p.nome === 'Marcos Vieira');
     igual(marcos.atendeEsteCanal, true, 'e quem é do canal vem marcado');
+  });
+
+  teste('quem não tem canal declarado conta como de todos os canais', () => {
+    // É o caso de quem administra, e o mais comum numa operação se formando:
+    // ninguém preencheu canal ainda. Essa pessoa aparece no TOPO, junto de
+    // quem é deste canal — tratá-la como "de fora" jogaria para o fim da lista
+    // justamente quem a coordenação mais usa no começo.
+    chamar('salvarUsuario')({
+      nome: 'Olívia sem canal', email: 'olivia@exemplo.com',
+      nivelAcessoId: nivelDaOperacao, ativo: true
+    });
+
+    const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
+    const olivia = lista.find((p) => p.nome === 'Olívia sem canal');
+    verdadeiro(olivia !== undefined,
+      'ela precisa aparecer: ' + lista.map((p) => p.nome).join(', '));
+    igual(olivia.atendeEsteCanal, true, 'sem canal declarado, atende todos');
   });
 
   teste('quem é do canal vem primeiro na lista', () => {
@@ -501,29 +523,29 @@ function rodarTestesDeImportacao() {
     // lote da Mesa. Quem decide isso é a coordenação, não o sistema.
     const resultado = chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['80000000001', 'De outro canal']]),
-      analistas: ['Sandra do Vida em Grupo'],
+      analistas: ['Sandra da Mesa'],
       origem: 'Lote cruzado'
     });
     igual(resultado.entraram, 1);
     const caso = casosDaRet().find((linha) =>
       linha['nome do cliente'] === 'De outro canal');
-    igual(caso.analista, 'Sandra do Vida em Grupo');
+    igual(caso.analista, 'Sandra da Mesa');
   });
 
   teste('quem foi DESATIVADO sai da lista e é recusado', () => {
     // Aqui a recusa é certa: caso no nome de quem não entra mais no sistema
     // fica na planilha e invisível na fila de todo mundo.
     const sandra = chamar('listarUsuarios()')
-      .find((u) => u.nome === 'Sandra do Vida em Grupo');
+      .find((u) => u.nome === 'Sandra da Mesa');
     chamar('desativarUsuario')(sandra.id);
 
     const lista = chamar('opcoesDaImportacaoDeCasos')(ret.id).analistas;
-    verdadeiro(!lista.some((p) => p.nome === 'Sandra do Vida em Grupo'),
+    verdadeiro(!lista.some((p) => p.nome === 'Sandra da Mesa'),
       'saiu da lista');
 
     lanca(() => chamar('importarCasos')(ret.id, {
       fonte: colado([['CPF'], ['80000000002']]),
-      analistas: ['Sandra do Vida em Grupo'],
+      analistas: ['Sandra da Mesa'],
       origem: 'Lote para quem saiu'
     }), 'não estão cadastrados e ativos');
   });
@@ -580,128 +602,48 @@ function rodarTestesDeImportacao() {
     igual(doLote.valor, 4);
   });
 
-  secao('Quem está de férias não entra no rodízio');
+  secao('A lista de quem recebe o lote');
 
-  /*
-   * Pedido do PO, depois que o calendário nasceu. O problema é concreto:
-   * importar 300 casos numa segunda com dois analistas fora deixa 75 casos
-   * parados três semanas — e NADA no sistema avisa. Os casos estão lá, no nome
-   * de alguém, dentro do prazo, e ninguém os trabalha. Quem descobre é o
-   * cliente, ligando.
-   */
-
-  const hoje = new Date();
-  const escreverData = (d) => String(d.getDate()).padStart(2, '0') + '/'
-    + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
-  const daquiADias = (dias) => {
-    const quando = new Date(hoje);
-    quando.setDate(quando.getDate() + dias);
-    return escreverData(quando);
-  };
-
-  /** Põe alguém de férias a partir de hoje, e devolve como desfazer. */
-  function ferias(nome, dias) {
-    const pessoa = chamar('lerRegistros_("USUARIOS")')
-      .find((u) => String(u.Nome) === nome);
-    const criada = chamar('salvarAusencia')({
-      usuarioId: pessoa.Id, motivo: 'Férias',
-      de: escreverData(hoje), ate: daquiADias(dias)
-    });
-    return () => chamar('excluirAusencia')(criada.id);
-  }
-
-  teste('quem está fora hoje vai para o FIM da lista, marcado', () => {
-    const desfazer = ferias('Marcos Vieira', 12);
-
-    const lista = chamar('analistasParaDistribuir_')(ret);
-    const marcos = lista.find((um) => um.nome === 'Marcos Vieira');
-
-    igual(marcos.ausente, true);
-    igual(marcos.ausenteAte, daquiADias(12));
-    igual(marcos.motivoDaAusencia, 'Férias');
-    igual(lista[lista.length - 1].nome, 'Marcos Vieira',
-      'a ordem é o primeiro aviso, antes de alguém ler a marca');
-
-    desfazer();
-  });
-
-  teste('quem NÃO está fora continua limpo, sem marca nenhuma', () => {
-    // O contrário também precisa ser verdade: uma marca que aparece em todo
-    // mundo não marca ninguém.
-    const desfazer = ferias('Marcos Vieira', 12);
-
-    const patricia = chamar('analistasParaDistribuir_')(ret)
-      .find((um) => um.nome === 'Patrícia Nunes');
-    igual(patricia.ausente, false);
-    igual(patricia.ausenteAte, '');
-
-    desfazer();
-  });
-
-  teste('a ausência que JÁ PASSOU não marca ninguém', () => {
-    // Férias do mês passado não impedem ninguém de receber caso hoje.
-    const pessoa = chamar('lerRegistros_("USUARIOS")')
-      .find((u) => String(u.Nome) === 'Marcos Vieira');
-    const passada = chamar('salvarAusencia')({
-      usuarioId: pessoa.Id, motivo: 'Férias',
-      de: daquiADias(-40), ate: daquiADias(-20)
-    });
-
-    const marcos = chamar('analistasParaDistribuir_')(ret)
-      .find((um) => um.nome === 'Marcos Vieira');
-    igual(marcos.ausente, false, 'férias que acabou não tira ninguém do rodízio');
-
-    chamar('excluirAusencia')(passada.id);
-  });
-
-  teste('marcar quem está fora NÃO é recusado — mas o laudo diz', () => {
+  teste('a lista não marca mais ninguém como ausente', () => {
     /*
-     * Recusar seria errado: o lote pode ser justamente para quando a pessoa
-     * voltar, e quem decide isso é a coordenação. O que o sistema faz é o que
-     * esta tela inteira existe para fazer — mostrar antes de gravar.
+     * Houve aqui um bloco inteiro de testes: quem estava de férias ia para o
+     * fim da lista, marcado, e o laudo avisava quantos casos ficariam parados.
+     * Saiu com o calendário, a pedido do PO — "pelas regras de negócio ela não
+     * será mais necessária".
+     *
+     * O que fica deste lado é o guarda: a marca não pode ter sobrado pela
+     * metade. Campo que existe na resposta e nunca é preenchido é pior que
+     * campo nenhum — a tela o lê, não encontra nada e não mostra nada, e
+     * ninguém descobre que a regra saiu.
      */
-    const desfazer = ferias('Marcos Vieira', 12);
+    const lista = chamar('analistasParaDistribuir_')(ret);
+    verdadeiro(lista.length > 0, 'a lista continua trazendo gente');
 
-    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
-      fonte: colado([
-        ['CPF', 'nome do cliente'],
-        ['11122233301', 'Cliente de férias 1'],
-        ['11122233302', 'Cliente de férias 2'],
-        ['11122233303', 'Cliente de férias 3'],
-        ['11122233304', 'Cliente de férias 4']
-      ]),
-      analistas: ['Marcos Vieira', 'Patrícia Nunes']
+    lista.forEach((pessoa) => {
+      verdadeiro(pessoa.ausente === undefined,
+        pessoa.nome + ' ainda vem com a marca de ausente');
+      verdadeiro(pessoa.ausenteAte === undefined);
+      verdadeiro(pessoa.motivoDaAusencia === undefined);
     });
 
-    igual(laudo.avisos.length, 1, 'um aviso, para a pessoa que está fora');
-    verdadeiro(laudo.avisos[0].indexOf('Marcos Vieira') === 0,
-      'o aviso começa pelo nome: ' + laudo.avisos[0]);
-    verdadeiro(laudo.avisos[0].indexOf(daquiADias(12)) > 0,
-      'e diz até quando');
-    verdadeiro(laudo.avisos[0].indexOf('2 caso(s)') > 0,
-      'e quantos casos ficam parados: ' + laudo.avisos[0]);
-    verdadeiro(laudo.vaoEntrar > 0, 'e a importação segue possível');
-
-    desfazer();
+    // E a tela não pode ter ficado olhando uma marca que ninguém escreve mais.
+    const tela = lerPeca('Importacao');
+    verdadeiro(tela.indexOf('pessoa.ausente') < 0,
+      'a tela de importação ainda procura a marca de ausente');
+    verdadeiro(tela.indexOf('aviso-de-ausencia') < 0,
+      'e ainda tem o recado de quantos estão fora');
   });
 
-  teste('sem ninguém de férias, o laudo não inventa aviso', () => {
-    // Aviso que aparece sempre deixa de ser lido — e aí o dia em que ele
-    // importa passa batido.
+  teste('o laudo continua com a lista de avisos, agora vazia', () => {
+    // `avisos` fica na resposta de propósito: o laudo já sabe desenhar a lista,
+    // e o próximo aviso que a operação pedir entra sem mexer na tela. O que
+    // não pode é a lista deixar de existir e a tela quebrar ao ler.
     const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['11122233305', 'Sem aviso']]),
-      analistas: ['Marcos Vieira', 'Patrícia Nunes']
+      analistas: ['Marcos Vieira']
     });
+    verdadeiro(Array.isArray(laudo.avisos), 'a lista tem de existir');
     igual(laudo.avisos.length, 0);
-  });
-
-  teste('a tela mostra a marca, e avisa quantos estão fora', () => {
-    const tela = lerPeca('Importacao');
-    verdadeiro(tela.indexOf('pessoa.ausente') > 0, 'a tela olha a marca');
-    verdadeiro(tela.indexOf('pessoa.ausenteAte') > 0, 'e mostra até quando');
-    verdadeiro(tela.indexOf('aviso-de-ausencia') > 0, 'com o recado de quantos');
-    verdadeiro(lerPeca('Estilos').indexOf('.config-chave.esta-fora') > 0,
-      'e a marca tem estilo declarado');
   });
 
   secao('O carimbo trazido da base antiga');

@@ -154,12 +154,12 @@ function rodarTestesDePerformance() {
      * suíte quebraria sozinha na virada do mês, sem nada ter quebrado.
      */
     const mes = chamar('resolverPeriodo_')({ tipo: 'mes', mes: mesDe(0) });
-    const uteisDoMes = chamar('diasUteisDoMesDe_')(mes.ate);
+    const diasDoMes = chamar('diasDoMesDe_')(mes.ate);
 
     const janela = minha(30);
-    const esperadoNaJanela = Math.round((60 / uteisDoMes) * janela.meta.diasUteis);
+    const esperadoNaJanela = Math.round((60 / diasDoMes) * janela.meta.dias);
     igual(janela.meta.alvo, esperadoNaJanela,
-      '60 por mês, na proporção dos dias úteis da janela');
+      '60 por mês, na proporção dos dias da janela');
 
     const metade = minha(15);
     verdadeiro(metade.meta.alvo < janela.meta.alvo,
@@ -174,7 +174,10 @@ function rodarTestesDePerformance() {
     // proporção estivesse errada em qualquer ponto, apareceria aqui.
     const doMes = chamar('minhaPerformance')(ret.id, { tipo: 'mes', mes: mesDe(0) });
     igual(doMes.meta.alvo, 60, 'o mês inteiro pede a meta do mês');
-    igual(doMes.meta.diasAusente, 0, 'e ninguém está ausente neste teste');
+    igual(doMes.meta.dias, new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+      .getDate(), 'e os dias são os do mês de verdade, não 30 cravado');
+    verdadeiro(doMes.meta.diasAusente === undefined,
+      'o desconto por ausência saiu da conta junto com o calendário');
   });
 
   teste('passar da meta enche a barra, e o número diz o resto', () => {
@@ -327,10 +330,10 @@ function rodarTestesDePerformance() {
       { metaMensalPorPessoa: 30 }));
 
     const meta = minha().meta;
-    const uteisDoMes = chamar('diasUteisDoMesDe_')(
+    const diasDoMes = chamar('diasDoMesDe_')(
       chamar('resolverPeriodo_')({ tipo: 'mes', mes: mesDe(0) }).ate);
-    igual(meta.alvo, Math.round((30 / uteisDoMes) * meta.diasUteis),
-      '30 por mês, na proporção dos dias úteis');
+    igual(meta.alvo, Math.round((30 / diasDoMes) * meta.dias),
+      '30 por mês, na proporção dos dias');
     igual(meta.pessoas, 1);
 
     chamar('salvarCanal')(comoEstava);
@@ -371,163 +374,53 @@ function rodarTestesDePerformance() {
     contem(tela, 'podeVerNomes', 'e respeita o alcance no ranking');
   });
 
-  secao('Dia útil, feriado e férias');
+  secao('O calendário saiu, e não deixou peça solta')
 
-  /*
-   * O PO trouxe duas regras de uma vez: "temos meses em que alguns entram de
-   * férias (…) precisam ficar inativos por determinados dias" e "só
-   * trabalhamos em dias úteis". As duas mexem na MESMA conta — quantos dias a
-   * pessoa realmente tinha para trabalhar — e é isso que estes testes cobram.
-   */
+  teste('o calendário saiu INTEIRO: motor, aba, conta e tela', () => {
+    /*
+     * Código morto não dá erro — fica. E depois alguém o chama achando que
+     * ainda vale, porque ele está lá e parece pronto.
+     *
+     * Este calendário saiu em TRÊS pedidos do PO, em rodadas diferentes:
+     * primeiro o motor de dia útil (fim de semana, feriados calculados da
+     * Páscoa, a aba FERIADOS); depois ele voltou a meta para dia corrido; e
+     * agora o calendário inteiro — "pelas regras de negócio ela não será mais
+     * necessária". Em cada rodada sobra o risco de uma peça ficar para trás, e
+     * é isso que este teste cobra: a função, a aba, a conta e a tela.
+     */
+    const servidor = ['Base.gs', 'Casos.gs', 'Config.gs', 'Entrada.gs',
+      'Indicadores.gs', 'Instalacao.gs']
+      .map((nome) => fs.readFileSync(
+        path.join(__dirname, '..', '..', 'Back-End', nome), 'utf8')).join('\n');
 
-  teste('o Domingo de Páscoa bate com o calendário, inclusive nos extremos', () => {
-    // É a data de onde saem Carnaval, Sexta-feira Santa e Corpus Christi:
-    // quatro dias por ano. Errar aqui erra a meta de fevereiro e a de junho, e
-    // erra tão pouco que ninguém desconfia da conta — desconfia da pessoa.
-    const escrever = (d) => String(d.getDate()).padStart(2, '0') + '/'
-      + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
-
-    const conhecidas = {
-      2024: '31/03/2024', 2025: '20/04/2025', 2026: '05/04/2026',
-      2027: '28/03/2027', 2030: '21/04/2030',
-      // Os dois extremos que o calendário gregoriano permite.
-      2038: '25/04/2038', 2035: '25/03/2035'
-    };
-
-    Object.keys(conhecidas).forEach((ano) => {
-      igual(escrever(chamar('domingoDePascoa_')(Number(ano))), conhecidas[ano],
-        'Páscoa de ' + ano);
-    });
-  });
-
-  teste('os feriados móveis saem da Páscoa, e caem no dia certo', () => {
-    const doAno = chamar('feriadosNacionaisDoAno_')(2026);
-    // Páscoa 2026 é 05/04. Carnaval é 47 dias antes, Sexta-feira Santa 2, e
-    // Corpus Christi 60 depois.
-    igual(doAno['2026-02-17'], 'Carnaval (terça)');
-    igual(doAno['2026-04-03'], 'Sexta-feira Santa');
-    igual(doAno['2026-06-04'], 'Corpus Christi');
-  });
-
-  teste('a Consciência Negra só conta de 2024 em diante', () => {
-    // Virou feriado nacional pela Lei 14.759/2023. Contar antes disso tiraria
-    // um dia útil de um ano em que a operação trabalhou.
-    verdadeiro(!chamar('feriadosNacionaisDoAno_')(2023)['2023-11-20'],
-      'em 2023 ainda não era nacional');
-    igual(chamar('feriadosNacionaisDoAno_')(2024)['2024-11-20'], 'Consciência Negra');
-  });
-
-  teste('dia útil não é fim de semana nem feriado', () => {
-    const dia = (a, m, d) => new Date(a, m - 1, d);
-    verdadeiro(chamar('ehDiaUtil_')(dia(2026, 9, 18)), '18/09/2026 é uma sexta comum');
-    verdadeiro(!chamar('ehDiaUtil_')(dia(2026, 9, 19)), 'sábado não');
-    verdadeiro(!chamar('ehDiaUtil_')(dia(2026, 9, 20)), 'domingo não');
-    verdadeiro(!chamar('ehDiaUtil_')(dia(2026, 9, 7)), '7 de setembro não');
-  });
-
-  teste('setembro de 2026 tem 30 dias corridos e 21 úteis', () => {
-    // Conferido na mão: 30 dias, 8 de fim de semana, e o 7 de setembro numa
-    // segunda-feira.
-    const de = new Date(2026, 8, 1);
-    const ate = new Date(2026, 8, 30);
-    igual(chamar('diasEntre_')(de, ate), 30);
-    igual(chamar('diasUteisEntre_')(de, ate), 21);
-  });
-
-  teste('o feriado do administrador tira o dia, e o Trabalha=SIM devolve', () => {
-    // A aba FERIADOS existe para o que só a operação sabe: o municipal, o
-    // facultativo que ela de fato não trabalha, a emenda.
-    const umaQuinta = new Date(2026, 8, 17);
-    verdadeiro(chamar('ehDiaUtil_')(umaQuinta), 'antes de cadastrar, é dia útil');
-
-    const feriado = chamar('inserirRegistro_')('FERIADOS', {
-      Data: '17/09/2026', Nome: 'Aniversário da cidade', Tipo: 'Municipal'
-    });
-    chamar('esquecerOCalendario_()');
-    verdadeiro(!chamar('ehDiaUtil_')(umaQuinta), 'cadastrado, deixa de ser');
-
-    // E o caminho contrário: o ano em que a operação trabalhou num feriado.
-    chamar('atualizarRegistro_')('FERIADOS', feriado.__id, { Trabalha: 'SIM' });
-    chamar('esquecerOCalendario_()');
-    verdadeiro(chamar('ehDiaUtil_')(umaQuinta),
-      'Trabalha = SIM devolve o dia para a conta');
-
-    chamar('ocultarRegistro_')('FERIADOS', feriado.__id);
-    chamar('esquecerOCalendario_()');
-  });
-
-  teste('férias descontam DIA ÚTIL, e não dia corrido', () => {
-    // Uma semana de férias que pega um fim de semana são 5 dias úteis fora, e
-    // não 7. Descontar 7 daria à pessoa uma meta menor do que a justa.
-    const feriasDe = new Date(2026, 8, 7);    // segunda (e feriado!)
-    const feriasAte = new Date(2026, 8, 13);  // domingo
-
-    const fora = chamar('inserirRegistro_')('AUSENCIAS', {
-      UsuarioId: eu.Id, Motivo: 'Férias',
-      De: '07/09/2026', Ate: '13/09/2026'
+    // O motor de dia útil, da primeira rodada.
+    ['ehDiaUtil_', 'diasUteisEntre_', 'domingoDePascoa_',
+      'feriadosNacionaisDoAno_', 'RECC_FERIADOS_MOVEIS',
+      'esquecerOCalendario_'].forEach((peca) => {
+      verdadeiro(servidor.indexOf(peca) < 0, peca + ' ficou para trás');
     });
 
-    // 07/09 é feriado, 12 e 13 são fim de semana: sobram 08, 09, 10 e 11.
-    igual(chamar('diasUteisAusente_')(eu.Id, feriasDe, feriasAte), 4,
-      'o feriado dentro das férias não conta duas vezes');
-
-    chamar('ocultarRegistro_')('AUSENCIAS', fora.__id);
-  });
-
-  teste('duas ausências no mesmo dia contam o dia UMA vez', () => {
-    // Férias emendada com licença, ou a mesma férias cadastrada duas vezes por
-    // engano. Somar as duas devolveria mais dias fora do que o período tem, e
-    // a meta viraria zero sem ninguém entender por quê.
-    const de = new Date(2026, 8, 1);
-    const ate = new Date(2026, 8, 30);
-
-    const uma = chamar('inserirRegistro_')('AUSENCIAS', {
-      UsuarioId: eu.Id, Motivo: 'Férias', De: '01/09/2026', Ate: '10/09/2026'
-    });
-    const outra = chamar('inserirRegistro_')('AUSENCIAS', {
-      UsuarioId: eu.Id, Motivo: 'Licença', De: '05/09/2026', Ate: '15/09/2026'
+    // E as ausências, desta.
+    ['quemEstaAusenteHoje_', 'ausenciasPorNome_', 'ausenciasNoPeriodo_',
+      'diasAusente_', 'diasTrabalhaveis_', 'listarAusencias',
+      'salvarAusencia', 'excluirAusencia', 'AUSENCIA_MOTIVO'].forEach((peca) => {
+      verdadeiro(servidor.indexOf(peca) < 0, peca + ' ficou para trás');
     });
 
-    const sobrepostas = chamar('diasUteisAusente_')(eu.Id, de, ate);
-    igual(sobrepostas, chamar('diasUteisEntre_')(de, new Date(2026, 8, 15)),
-      'o intervalo coberto pelas duas, contado uma vez só');
-    verdadeiro(sobrepostas <= chamar('diasUteisEntre_')(de, ate),
-      'nunca mais dias fora do que o período tem');
+    verdadeiro(!chamar('RECC_ESQUEMA').FERIADOS, 'a aba FERIADOS saiu do contrato');
+    verdadeiro(!chamar('RECC_ESQUEMA').AUSENCIAS, 'a aba AUSENCIAS também');
 
-    chamar('ocultarRegistro_')('AUSENCIAS', uma.__id);
-    chamar('ocultarRegistro_')('AUSENCIAS', outra.__id);
+    // E a tela: nem a seção no menu, nem o ícone que ela usava.
+    const configuracoes = fs.readFileSync(path.join(__dirname, '..', '..',
+      'Front-End', 'Configuracoes.html'), 'utf8');
+    verdadeiro(configuracoes.indexOf('carregarCalendario') < 0,
+      'a seção do calendário ficou na tela de Configurações');
+    verdadeiro(!chamar('resumoDasConfiguracoes()').secoes
+      .some((uma) => uma.chave === 'calendario'),
+      'e o menu ainda oferece a seção');
   });
 
-  teste('a férias que atravessa a virada do mês conta nos dois', () => {
-    // É a mais comum de todas, e a que um corte por "começou dentro do
-    // período" perderia inteira.
-    const atravessa = chamar('inserirRegistro_')('AUSENCIAS', {
-      UsuarioId: eu.Id, Motivo: 'Férias', De: '28/09/2026', Ate: '09/10/2026'
-    });
 
-    const emSetembro = chamar('diasUteisAusente_')(
-      eu.Id, new Date(2026, 8, 1), new Date(2026, 8, 30));
-    const emOutubro = chamar('diasUteisAusente_')(
-      eu.Id, new Date(2026, 9, 1), new Date(2026, 9, 31));
-
-    igual(emSetembro, 3, '28, 29 e 30 de setembro');
-    verdadeiro(emOutubro > 0, 'e o pedaço de outubro também aparece');
-
-    chamar('ocultarRegistro_')('AUSENCIAS', atravessa.__id);
-  });
-
-  teste('ausência maior que o período devolve zero dia trabalhável', () => {
-    // Zero quer dizer "não havia o que cobrar", e não "a meta é zero e você
-    // não cumpriu". A meta tem de acompanhar.
-    const oMesInteiro = chamar('inserirRegistro_')('AUSENCIAS', {
-      UsuarioId: eu.Id, Motivo: 'Afastamento', De: '01/08/2026', Ate: '31/12/2026'
-    });
-
-    igual(chamar('diasUteisTrabalhaveis_')(
-      eu.Id, new Date(2026, 8, 1), new Date(2026, 8, 30)), 0);
-
-    chamar('ocultarRegistro_')('AUSENCIAS', oMesInteiro.__id);
-  });
 }
 
 module.exports = { rodarTestesDePerformance };

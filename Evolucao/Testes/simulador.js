@@ -93,6 +93,13 @@ function converterComoOPlanilhas(valor, formato) {
   return valor;
 }
 
+/** A grade que cabe no conteúdo dado, sem nunca encolher o padrão da aba. */
+function tamanhoQueCabe(linhas) {
+  const quantas = (linhas || []).length;
+  const largura = quantas ? (linhas[0] || []).length : 0;
+  return [Math.max(1000, quantas), Math.max(26, largura)];
+}
+
 class Faixa {
   constructor(aba, linha, coluna, nLinhas, nColunas) {
     this.aba = aba;
@@ -117,6 +124,28 @@ class Faixa {
     return saida;
   }
   getValue() { return this.getValues()[0][0]; }
+  /**
+   * O valor como a pessoa VÊ na tela — sempre texto.
+   *
+   * É o que a importação usa para ler de outra planilha, e a diferença
+   * importa: a SUSEP "RET00J" chega inteira, e uma data chega "13/09/2026"
+   * em vez de "Mon Sep 13 2026 00:00:00 GMT-0300", que é o que
+   * `String(data)` daria e o que `converterParaData_` não sabe ler.
+   *
+   * Faltava aqui, e por isso o caminho "ler outra planilha pelo Id" da
+   * importação nunca tinha sido rodado por teste nenhum — nem o dos casos.
+   */
+  getDisplayValues() {
+    const doisDigitos = (n) => (n < 10 ? '0' : '') + n;
+    return this.getValues().map((linha) => linha.map((valor) => {
+      if (valor === null || valor === undefined || valor === '') return '';
+      if (valor instanceof Date) {
+        return doisDigitos(valor.getDate()) + '/'
+          + doisDigitos(valor.getMonth() + 1) + '/' + valor.getFullYear();
+      }
+      return String(valor);
+    }));
+  }
   setValues(matriz) {
     medidor.idasParaGravar++;
     medidor.celulasGravadas += this.nLinhas * this.nColunas;
@@ -310,8 +339,33 @@ class Planilha {
   getName() { return this.nome || 'Planilha de teste'; }
 
   constructor() { this.abas = []; this.fuso = 'Etc/GMT'; }
-  insertSheet(nome) { const a = new Aba(nome); this.abas.push(a); return a; }
+  /*
+    `linhas` e `colunas` existem porque a aba de uma planilha de VERDADE nasce
+    do tamanho do que foi colado nela: quem joga 2100 corretoras numa aba nova
+    fica com 2100 linhas, e não com as 1000 do padrão. Sem isto, o teste do
+    teto da importação quebrava na grade do simulador antes de chegar ao teto
+    que ele queria provar.
+  */
+  insertSheet(nome, linhas, colunas) {
+    const a = new Aba(nome, linhas, colunas);
+    this.abas.push(a);
+    return a;
+  }
   getSheetByName(nome) { return this.abas.find((a) => a.nome === nome) || null; }
+  /*
+    Apagar aba de verdade, e não marcar como apagada.
+
+    A migração desta rodada apaga a aba PRODUTOS a pedido do PO, e um
+    `deleteSheet` que não apagasse deixaria o teste provar o contrário do que
+    acontece na planilha: `getSheetByName('PRODUTOS')` continuaria achando a
+    aba, e o teste do "rodar duas vezes não estraga nada" passaria por engano.
+  */
+  deleteSheet(aba) {
+    const onde = this.abas.indexOf(aba);
+    if (onde < 0) throw new Error('Essa aba não é desta planilha.');
+    this.abas.splice(onde, 1);
+    return this;
+  }
   getSheets() { return this.abas.slice(); }
   setSpreadsheetTimeZone(f) { this.fuso = f; return this; }
   getSpreadsheetTimeZone() { return this.fuso; }
@@ -369,7 +423,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
      *
      *   criarPlanilhaExterna('Legado 4.x', [[...]])  — UMA aba, para a base
      *     legada, que não tem contrato nenhum;
-     *   criarPlanilhaExterna({ CORRETORAS: [[...]], PRODUTOS: [[...]] })  —
+     *   criarPlanilhaExterna({ CORRETORAS: [[...]], SUSEP_BLOQUEADAS: [[...]] })  —
      *     VÁRIAS abas, para a planilha de cadastros, que tem uma por lista.
      */
     criarPlanilhaExterna(nomeDaAba, linhas) {
@@ -377,15 +431,16 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
 
       if (nomeDaAba && typeof nomeDaAba === 'object') {
         Object.keys(nomeDaAba).forEach((nome) => {
-          const aba = outra.insertSheet(nome);
           const conteudo = nomeDaAba[nome];
+          const aba = outra.insertSheet(nome, ...tamanhoQueCabe(conteudo));
           if (conteudo && conteudo.length) {
             aba.getRange(1, 1, conteudo.length, conteudo[0].length)
               .setValues(conteudo);
           }
         });
       } else {
-        const aba = outra.insertSheet(nomeDaAba || 'Página1');
+        const aba = outra.insertSheet(nomeDaAba || 'Página1',
+          ...tamanhoQueCabe(linhas));
         if (linhas && linhas.length) {
           aba.getRange(1, 1, linhas.length, linhas[0].length).setValues(linhas);
         }

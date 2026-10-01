@@ -165,12 +165,6 @@ var Moldura = (function () {
     // calendário: a folhinha de parede, com os dois furos de cima e um dia
     // marcado. É o desenho que já significa "data" para qualquer pessoa — e
     // esta seção fala de dias: férias, feriados, dias úteis.
-    calendario:
-      '<rect x="3.6" y="5.2" width="16.8" height="15.2" rx="1.8"></rect>'
-      + '<path d="M3.6 10h16.8"></path>'
-      + '<path d="M8.2 3.6v3.2M15.8 3.6v3.2"></path>'
-      + '<rect x="10.6" y="13" width="3.4" height="3.2" rx=".6"></rect>',
-
     // estrutura e auditoria: a prancheta do laudo, com o visto
     estrutura:
       '<path d="M9 4.4H7.4A1.6 1.6 0 0 0 5.8 6v13.2a1.6 1.6 0 0 0 1.6 1.6h9.2a1.6 1.6 0 0 0 1.6-1.6V6a1.6 1.6 0 0 0-1.6-1.6H15"></path>'
@@ -363,7 +357,6 @@ var Moldura = (function () {
   /** "Analista RET · Vida Individual" — o cargo, e o canal quando existe. */
   function descricaoDaPessoa(usuario) {
     var cargo = usuario.cargo || usuario.nivelAcesso || '';
-    if (usuario.canalQueAtende) return cargo + ' · ' + usuario.canalQueAtende;
     return cargo;
   }
 
@@ -638,7 +631,21 @@ var SeletorDeCanal = (function () {
     }
   }
 
-  return { montar: montar, ligar: ligar, icone: icone };
+  /**
+   * Os nomes dos desenhos que existem, para a tela de Configurações oferecer.
+   *
+   * Sai DAQUI, da mesma chave que `icone` consulta, e não de uma lista escrita
+   * à parte: uma segunda lista deixaria oferecer um ícone que não tem desenho,
+   * e o canal nasceria com o losango sem ninguém entender por quê.
+   */
+  function nomesDosIcones() {
+    return Object.keys(DESENHOS);
+  }
+
+  return {
+    montar: montar, ligar: ligar, icone: icone,
+    nomesDosIcones: nomesDosIcones
+  };
 })();
 </script>
 
@@ -951,7 +958,7 @@ var Formulario = (function () {
    * Recebe a RAIZ, e não procura na página inteira: com o modal aberto por
    * cima da tela de cadastro, procurar na página inteira ligaria os dois.
    */
-  function ligar(raiz, prefixo) {
+  function ligar(raiz, prefixo, idDoCanal) {
     /*
      * O CAMPO DE DINHEIRO.
      *
@@ -989,7 +996,9 @@ var Formulario = (function () {
 
     var susep = raiz.querySelector('[data-chave="susep"]');
     if (susep) {
-      var conferir = function () { consultarSusep(raiz, prefixo, susep.value); };
+      var conferir = function () {
+        consultarSusep(raiz, prefixo, susep.value, idDoCanal);
+      };
       susep.addEventListener('change', conferir);
       susep.addEventListener('blur', conferir);
     }
@@ -1013,14 +1022,21 @@ var Formulario = (function () {
 
   /**
    * O selo da SUSEP.
+   *
    * "Não encontrada" é resposta, não erro: é uma corretora que o cadastro não
    * conhece, e quem está atendendo precisa saber disso antes de seguir.
+   *
+   * A SUSEP TEM LETRA — "RET00J", palavra do PO. A guarda abaixo olhava só
+   * dígito (`replace(/\D/g, '')`): uma SUSEP sem nenhum número sairia dali
+   * como texto vazio, o selo se esconderia e NUNCA consultaria o servidor.
+   * Não daria erro — o campo ficaria só sem selo, para sempre, e ninguém
+   * ligaria isso à letra.
    */
-  function consultarSusep(raiz, prefixo, valor) {
+  function consultarSusep(raiz, prefixo, valor, idDoCanal) {
     var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-susep');
     if (!selo) return;
 
-    if (!String(valor || '').replace(/\D/g, '')) {
+    if (!String(valor || '').trim()) {
       selo.hidden = true;
       return;
     }
@@ -1029,7 +1045,10 @@ var Formulario = (function () {
     selo.className = 'selo-susep conferindo';
     selo.textContent = 'Conferindo…';
 
-    Servidor.chamar('consultarSusep', valor)
+    // O CANAL VAI JUNTO: é ele que decide se a lista de SUSEPs bloqueadas é
+    // consultada. A Mesa Diamante não consulta, a pedido do PO, e quem sabe
+    // disso é a coluna do canal — não esta tela.
+    Servidor.chamar('consultarSusep', valor, idDoCanal)
       .entao(function (resposta) {
         var aparencia = {
           OK: 'liberada', BLOQUEADA: 'bloqueada',
@@ -1040,11 +1059,50 @@ var Formulario = (function () {
         selo.textContent = resposta.mensagem
           + (resposta.segmento && resposta.situacao === 'OK'
             ? ' · ' + resposta.segmento : '');
+
+        preencherCorretoraDaSusep(raiz, resposta);
       })
       .senao(function () {
         selo.className = 'selo-susep conferindo';
         selo.textContent = 'Não consegui conferir a SUSEP agora.';
       });
+  }
+
+  /*
+    A corretora, preenchida pela SUSEP.
+
+    Pedido do PO: "o formulário da mesa deve buscar pela susep o nome da
+    corretora automaticamente". A resposta do selo já traz o nome — ela vem do
+    cadastro de Corretoras Diamante —, então isto NÃO custa uma ida a mais ao
+    servidor: é aproveitar o que já voltou.
+
+    QUANDO PREENCHE: quando o campo está vazio, ou quando o que está nele foi
+    este mesmo preenchimento automático que colocou. Escrever por cima do que
+    a pessoa digitou apagaria uma correção feita de propósito — e trocar a
+    SUSEP tem de atualizar a corretora, senão sobra o nome da anterior, que é
+    pior que nome nenhum.
+
+    Guardar o que foi preenchido no próprio campo (`data-veio-da-susep`) é o
+    que distingue os dois casos sem guardar estado solto na tela.
+  */
+  function preencherCorretoraDaSusep(raiz, resposta) {
+    var campo = raiz.querySelector('[data-chave="corretora"]');
+    if (!campo || campo.disabled) return;
+
+    var nome = String((resposta && resposta.corretora) || '').trim();
+    var agora = String(campo.value || '').trim();
+    var oQueEuPreenchi = campo.getAttribute('data-veio-da-susep') || '';
+
+    if (agora !== '' && agora !== oQueEuPreenchi) return;
+    if (!nome) {
+      // SUSEP sem corretora conhecida: limpa só o que eu mesmo escrevi.
+      if (agora === oQueEuPreenchi && agora !== '') campo.value = '';
+      campo.removeAttribute('data-veio-da-susep');
+      return;
+    }
+
+    campo.value = nome;
+    campo.setAttribute('data-veio-da-susep', nome);
   }
 
   /* -------------------------------------------------------------- valores */
@@ -1311,13 +1369,7 @@ var CasoEmModal = (function () {
           + escapar(detalhe.situacao) + '</span>'
         : '')
       + '<div class="modal-pares">'
-      + detalhe.linhas.map(function (linha) {
-        return '<div class="par-do-caso">'
-          + '<span>' + escapar(linha.rotulo) + '</span>'
-          // Travessão, e não vazio: "está em branco" é uma informação.
-          + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
-          + '</div>';
-      }).join('')
+      + desenharParesDoCaso()
       + '</div>'
       + desenharLinhaDoTempo()
       + desenharHistorico();
@@ -1375,6 +1427,37 @@ var CasoEmModal = (function () {
    * esconderia o buraco — e o buraco é informação: quem pulou o 2º contato e
    * foi direto para "Não reteve" contou uma história.
    */
+  /*
+    Os pares do caso, com um aviso antes do que vem direto da planilha.
+
+    O servidor passou a mandar também as colunas PREENCHIDAS que o formulário
+    não pergunta — a origem da importação, os carimbos de contato —, a pedido
+    do PO: "precisa trazer todos os dados que foram preenchidos na planilha".
+
+    Elas entram depois dos campos, atrás de um aviso, e não misturadas: quem
+    lê precisa saber que aquilo o sistema escreveu, e que não se edita no
+    formulário. Sem o aviso, "Quem mudou o status" pareceria um campo que a
+    pessoa esqueceu de preencher.
+  */
+  function desenharParesDoCaso() {
+    var avisoJaSaiu = false;
+
+    return detalhe.linhas.map(function (linha) {
+      var aviso = '';
+      if (linha.doSistema && !avisoJaSaiu) {
+        avisoJaSaiu = true;
+        aviso = '<p class="pares-do-sistema">Também está na planilha — '
+          + 'escrito pelo sistema, não se edita no formulário.</p>';
+      }
+      return aviso
+        + '<div class="par-do-caso' + (linha.doSistema ? ' do-sistema' : '') + '">'
+        + '<span>' + escapar(linha.rotulo) + '</span>'
+        // Travessão, e não vazio: "está em branco" é uma informação.
+        + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
+        + '</div>';
+    }).join('');
+  }
+
   function desenharLinhaDoTempo() {
     if (!detalhe.linhaDoTempo || !detalhe.linhaDoTempo.length) return '';
 
@@ -1433,7 +1516,7 @@ var CasoEmModal = (function () {
             var corpo = corpoDaEdicao();
             if (!corpo) return;
             corpo.innerHTML = Formulario.desenhar(formulario, 'editar-');
-            Formulario.ligar(corpo, 'editar-');
+            Formulario.ligar(corpo, 'editar-', canalAtual);
             Formulario.preencher(corpo, caso.valores);
           })
           .senao(mostrarRecadoDeErro);
@@ -1913,7 +1996,37 @@ var Graficos = (function () {
           + '<td class="direita">' + escapar(numero(ponto.valor, componente.unidade))
           + '</td><td class="direita">' + ponto.casos + '</td></tr>';
       }).join('')
-      + '</tbody></table></div>';
+      + '</tbody>' + rodapeComTotal(componente) + '</table></div>';
+  }
+
+  /**
+   * A linha do TOTAL, no pé da tabela de números.
+   *
+   * Pedido do PO junto do gráfico de valor por situação: ele quer as partes e
+   * quer o total. Vale para toda tabela, porque a pergunta "e no todo, quanto
+   * é?" é a mesma em todas — e somar cinco linhas de cabeça é onde o erro
+   * entra.
+   *
+   * MÉDIA NÃO TEM TOTAL, e por isso a guarda existe: somar médias dá um número
+   * que não quer dizer nada — "média de 200 + média de 150 = 350" não é a
+   * média de nada. Um número sem significado numa linha chamada "Total" é
+   * pior que linha nenhuma, porque alguém vai usá-lo.
+   */
+  function rodapeComTotal(componente) {
+    if (componente.agregacao === 'media') return '';
+    if (!componente.pontos.length) return '';
+
+    var total = componente.pontos.reduce(function (soma, ponto) {
+      return soma + ponto.valor;
+    }, 0);
+    var casos = componente.pontos.reduce(function (soma, ponto) {
+      return soma + ponto.casos;
+    }, 0);
+
+    return '<tfoot><tr><td><strong>Total</strong></td>'
+      + '<td class="direita"><strong>'
+      + escapar(numero(total, componente.unidade)) + '</strong></td>'
+      + '<td class="direita"><strong>' + casos + '</strong></td></tr></tfoot>';
   }
 
   /**

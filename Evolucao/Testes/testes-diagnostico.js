@@ -96,10 +96,10 @@ function rodarTestesDeDiagnostico() {
     // duas versões da regra, há uma curta e uma completa. Se elas pudessem
     // discordar, uma das duas estaria mentindo.
     const { ambiente, chamar } = instalacaoNova();
-    const produtos = ambiente.planilha.getSheetByName('PRODUTOS');
-    ambiente.planilha.abas.splice(ambiente.planilha.abas.indexOf(produtos), 1);
+    const corretoras = ambiente.planilha.getSheetByName('CORRETORAS');
+    ambiente.planilha.abas.splice(ambiente.planilha.abas.indexOf(corretoras), 1);
 
-    contem(chamar('verificarEstruturaRECC()'), 'FALTA A ABA  PRODUTOS');
+    contem(chamar('verificarEstruturaRECC()'), 'FALTA A ABA  CORRETORAS');
     igual(bloco(chamar('diagnosticoRECC()'), 'estrutura').situacao, 'falha');
   });
 
@@ -139,12 +139,12 @@ function rodarTestesDeDiagnostico() {
 
   teste('aba do contrato apagada é falha, e o laudo diz como voltar', () => {
     const { ambiente, chamar } = instalacaoNova();
-    const produtos = ambiente.planilha.getSheetByName('PRODUTOS');
-    ambiente.planilha.abas.splice(ambiente.planilha.abas.indexOf(produtos), 1);
+    const corretoras = ambiente.planilha.getSheetByName('CORRETORAS');
+    ambiente.planilha.abas.splice(ambiente.planilha.abas.indexOf(corretoras), 1);
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, false);
-    contem(falhasEmTexto(laudo), 'A aba PRODUTOS não existe');
+    contem(falhasEmTexto(laudo), 'A aba CORRETORAS não existe');
     contem(falhasEmTexto(laudo), 'instalarRECC',
       'e diz que rodar de novo cria o que falta sem mexer no resto');
   });
@@ -168,10 +168,10 @@ function rodarTestesDeDiagnostico() {
     // o que não conhece. Reprovar por isso ensinaria a operação a ignorar o
     // laudo inteiro.
     const { chamar } = instalacaoNova();
-    const aba = chamar('planilhaAtiva_()').getSheetByName('PRODUTOS');
+    const aba = chamar('planilhaAtiva_()').getSheetByName('CORRETORAS');
     aba.insertColumnsAfter(aba.getMaxColumns(), 1);
     aba.getRange(1, aba.getMaxColumns(), 1, 1).setValues([['Anotação minha']]);
-    chamar('esquecerEstruturaLida_')('PRODUTOS');
+    chamar('esquecerEstruturaLida_')('CORRETORAS');
 
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.aprovado, true, 'coluna a mais não reprova a instalação');
@@ -200,7 +200,7 @@ function rodarTestesDeDiagnostico() {
     const { ambiente, chamar } = instalacaoNova();
     const aba = ambiente.planilha.getSheetByName('CORRETORAS');
     chamar('inserirVariosRegistros_')('CORRETORAS', [
-      { Nome: 'Uma', Canal: 'Corretora', SUSEP: '1234567', Corretora: 'Uma' }
+      { SUSEP: 'RET00J', Corretora: 'Uma', Sucursal: '12' }
     ]);
     aba.getRange(2, 1, 1, 1).setNumberFormat('0');
 
@@ -212,7 +212,7 @@ function rodarTestesDeDiagnostico() {
 
   teste('linha sem Id é atenção — ela existe, só não dá para editar', () => {
     const { ambiente, chamar } = instalacaoNova();
-    const aba = ambiente.planilha.getSheetByName('PRODUTOS');
+    const aba = ambiente.planilha.getSheetByName('CORRETORAS');
     aba.getRange(2, 2, 1, 1).setValues([['Digitado na mão']]);
 
     const laudo = chamar('diagnosticoRECC()');
@@ -1358,8 +1358,8 @@ function rodarTestesDeDiagnostico() {
     const { ambiente, chamar } = comoEraAntesDosCanais();
 
     // Dado de verdade na planilha antiga.
-    chamar('inserirRegistro_')('CANAIS', { Nome: 'Corretora ABC',
-      SUSEP: '1234567', Corretora: 'Corretora ABC', Segmento: 'Diamante' });
+    chamar('inserirRegistro_')('CANAIS', { SUSEP: 'RET00J',
+      Corretora: 'Corretora ABC', Segmento: 'Diamante' });
     chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana',
       'nome do cliente': 'Cliente Antigo' });
 
@@ -1377,9 +1377,9 @@ function rodarTestesDeDiagnostico() {
 
     igual(chamar('lerRegistros_')('BASE_RET')[0]['nome do cliente'],
       'Cliente Antigo', 'o caso antigo continua lá');
-    igual(chamar('lerRegistros_')('CORRETORAS')[0].SUSEP, '1234567',
+    igual(chamar('lerRegistros_')('CORRETORAS')[0].SUSEP, 'RET00J',
       'a corretora mudou de aba, não sumiu');
-    igual(chamar('consultarSusep')('1234567').situacao, 'OK',
+    igual(chamar('consultarSusep')('RET00J').situacao, 'OK',
       'e o selo volta a achá-la');
   });
 
@@ -1431,6 +1431,402 @@ function rodarTestesDeDiagnostico() {
     chamar('migrarParaCanais()');
     igual(chamar('canaisVisiveis_()').length, quantasBasesOContratoTem(chamar));
     igual(chamar('diagnosticoRECC()').aprovado, true);
+  });
+
+
+  secao('A atualização de quem já tem dado');
+
+  /**
+   * Finge uma instalação feita ANTES desta rodada.
+   *
+   * Desfaz na planilha o que `atualizarPGO()` vai refazer: as duas colunas
+   * novas de CANAIS somem, o status "Sem sucesso" é apagado, os campos de
+   * proposta e apólice voltam a ser um por coluna, e a planilha ganha de volta
+   * a coluna Matrícula e a aba FERIADOS, que saíram do contrato.
+   *
+   * Parte de uma instalação DE VERDADE e desfaz, em vez de montar uma planilha
+   * à mão: a planilha montada à mão prova que a migração funciona sobre a
+   * planilha que eu imaginei, e não sobre a que existe.
+   */
+  function comoEraAntesDestaRodada() {
+    const tudo = instalacaoNova();
+    const planilha = tudo.ambiente.planilha;
+    const chamar = tudo.chamar;
+
+    // 1. as duas colunas novas de CANAIS somem.
+    const canais = planilha.getSheetByName('CANAIS');
+    const cabecalhos = canais.getRange(1, 1, 1, canais.getMaxColumns()).getValues()[0];
+    ['ColunaDoValor', 'SituacoesDestacadas'].forEach((coluna) => {
+      const i = cabecalhos.findIndex((c) => String(c) === coluna);
+      if (i >= 0) canais.getRange(1, i + 1).setValue('');
+    });
+    chamar('esquecerEstruturaLida_()');
+
+    // 2. o status "Sem sucesso" não existia.
+    const semSucesso = chamar('lerRegistros_("CATALOGO")')
+      .find((item) => String(item.Nome) === 'Sem sucesso');
+    if (semSucesso) chamar('apagarRegistroDeVez_')('CATALOGO', semSucesso.Id);
+
+    // 3. proposta e apólice voltam a ser um campo por coluna.
+    chamar('lerRegistros_("CAMPOS")').forEach((campo) => {
+      const configuracao = chamar('lerConfiguracaoDoCampo_')(campo);
+      if (!configuracao.partirEm) return;
+      const colunas = configuracao.partirEm.colunas;
+      delete configuracao.partirEm;
+      chamar('atualizarRegistro_')('CAMPOS', campo.Id, {
+        Rotulo: String(campo.Cabecalho),
+        Descricao: '',
+        Configuracao: Object.keys(configuracao).length
+          ? JSON.stringify(configuracao) : ''
+      });
+      // E os companheiros voltam ligados, um campo por coluna.
+      colunas.forEach((cabecalho) => {
+        const companheiro = chamar('lerRegistros_("CAMPOS")').find((um) =>
+          String(um.Cabecalho) === cabecalho);
+        if (companheiro) {
+          chamar('atualizarRegistro_')('CAMPOS', companheiro.Id, { Ativo: 'SIM' });
+        }
+      });
+    });
+    chamar('esquecerEstruturaLida_()');
+
+    // 4. a planilha antiga tinha Matrícula e as abas FERIADOS e AUSENCIAS.
+    chamar('adicionarColuna_')('USUARIOS', 'Matricula', 'texto');
+    const usuario = chamar('lerRegistros_("USUARIOS")')[0];
+    chamar('atualizarRegistro_')('USUARIOS', usuario.Id, { Matricula: 'C123456' });
+    const feriados = planilha.insertSheet('FERIADOS');
+    feriados.getRange(1, 1, 1, 2).setValues([['Data', 'Nome']]);
+    feriados.getRange(2, 1, 1, 2).setValues([['25/12/2026', 'Natal']]);
+    const ausencias = planilha.insertSheet('AUSENCIAS');
+    ausencias.getRange(1, 1, 1, 2).setValues([['UsuarioId', 'Motivo']]);
+    chamar('esquecerEstruturaLida_()');
+
+    // 5. os dois cadastros como o PO os tinha: sem as colunas desta rodada, e
+    //    com as de antes, preenchidas. A SUSEP antiga é só de DÍGITO, porque
+    //    a coluna era `identificador` e o sistema jogava a letra fora — é o
+    //    que está gravado na planilha dele agora, e tem de continuar valendo.
+    chamar('removerColuna_')('CORRETORAS', 'Sucursal');
+    chamar('adicionarColuna_')('CORRETORAS', 'Nome', 'texto');
+    chamar('adicionarColuna_')('CORRETORAS', 'Canal', 'texto');
+    chamar('esquecerEstruturaLida_()');
+    chamar('inserirRegistro_')('CORRETORAS', { SUSEP: '1234567',
+      Corretora: 'Corretora de Antes', Nome: 'Corretora de Antes',
+      Canal: 'Mesa Diamante', Segmento: 'Diamante', Consultor: 'Brook' });
+
+    chamar('removerColuna_')('SUSEP_BLOQUEADAS', 'Sucursal');
+    chamar('removerColuna_')('SUSEP_BLOQUEADAS', 'CoordenadorComercial');
+    chamar('adicionarColuna_')('SUSEP_BLOQUEADAS', 'CpfReincidente', 'texto');
+    chamar('adicionarColuna_')('SUSEP_BLOQUEADAS', 'Motivo', 'texto');
+    chamar('esquecerEstruturaLida_()');
+    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', { SUSEP: '7654321',
+      NomeCorretora: 'Bloqueada de Antes', CpfReincidente: '12345678901',
+      Motivo: 'Fraude confirmada', BloqueadaEm: '01/09/2026' });
+
+    // 6. o canal de quem já está cadastrado estava só na coluna de texto.
+    chamar('adicionarColuna_')('USUARIOS', 'Canal que atende', 'texto');
+    chamar('esquecerEstruturaLida_()');
+    const umCanal = chamar('lerRegistros_("CANAIS")')[0];
+    chamar('salvarUsuario')({
+      nome: 'Nico Robin', email: 'robin@exemplo.com',
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => String(i.Tipo) === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
+      ativo: true
+    });
+    const robin = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Nico Robin');
+    chamar('atualizarRegistro_')('USUARIOS', robin.Id, {
+      CanalId: '', 'Canal que atende': String(umCanal.Nome) });
+    // E uma pessoa com um canal escrito que não existe em CANAIS: ela não
+    // pode ser chutada para o canal mais parecido.
+    chamar('salvarUsuario')({
+      nome: 'Tony Chopper', email: 'chopper@exemplo.com',
+      nivelAcessoId: chamar('lerRegistros_("CATALOGO")')
+        .find((i) => String(i.Tipo) === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id,
+      ativo: true
+    });
+    const chopper = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Tony Chopper');
+    chamar('atualizarRegistro_')('USUARIOS', chopper.Id, {
+      CanalId: '', 'Canal que atende': 'Canal Que Nunca Existiu' });
+    chamar('esquecerEstruturaLida_()');
+
+    // 7. a aba PRODUTOS existia, com produto cadastrado.
+    const produtos = planilha.insertSheet('PRODUTOS');
+    produtos.getRange(1, 1, 1, 3).setValues([['Id', 'Produto', 'CodigoProduto']]);
+    produtos.getRange(2, 1, 2, 3).setValues([
+      ['1', 'Vida Individual', '101'],
+      ['2', 'Auto', '102']
+    ]);
+    chamar('esquecerEstruturaLida_()');
+
+    return tudo;
+  }
+
+  teste('sem atualizar, o que esta rodada trouxe não está lá', () => {
+    // Este teste existe para provar que a atualização é NECESSÁRIA. Sem ele,
+    // ninguém saberia dizer se ela resolve alguma coisa — e uma migração que
+    // não resolve nada passa verde para sempre.
+    const { chamar } = comoEraAntesDestaRodada();
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+
+    igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).valorPorSituacao, null,
+      'sem a coluna do valor declarada, não há gráfico de valor');
+    verdadeiro(!chamar('lerRegistros_("CATALOGO")')
+      .some((item) => String(item.Nome) === 'Sem sucesso'));
+  });
+
+  teste('atualizar traz o gráfico de valor, o status novo e a proposta', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'ATUALIZAÇÃO DO PGO');
+
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+
+    // O gráfico de valor por situação, ligado na coluna certa.
+    const grafico = chamar('produtividadeDaEquipe')(ret.id, {}, 30).valorPorSituacao;
+    verdadeiro(grafico !== null, 'o gráfico de valor tem de existir agora');
+    igual(grafico.medida, 'valor do prêmio');
+    igual(grafico.pontos.map((p) => p.rotulo).join(' | '),
+      'Reteve | Não reteve | Sem sucesso | Demais situações');
+
+    // O status novo, em laranja e sem carimbo.
+    const semSucesso = chamar('lerRegistros_("CATALOGO")')
+      .find((item) => String(item.Nome) === 'Sem sucesso');
+    verdadeiro(semSucesso !== undefined, 'o status tem de ter nascido');
+    igual(String(semSucesso.Cor), 'atencao');
+    igual(String(semSucesso.ColunaDeCarimbo || ''), '');
+
+    // E a proposta já grava em colunas separadas.
+    const salvo = chamar('cadastrarCaso')(ret.id, {
+      nomedocliente: 'Depois de atualizar',
+      numerodaproposta: '58-0000000',
+      numapolice: '12-1391-0000000',
+      status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['Código origem da proposta']), '58');
+    igual(String(linha['número da proposta']), '0000000');
+    igual(String(linha['cod_sucursal']), '12');
+    igual(String(linha['cod_ramo']), '1391');
+    igual(String(linha['Num_apolice']), '0000000');
+
+    // E os campos dos pedaços saíram do formulário: o valor deles vem do
+    // campo único agora. Dois campos pedindo o mesmo pedaço seria a chance de
+    // digitar o código de uma proposta e o número de outra.
+    const naTela = chamar('formularioDoCanal')(ret.id).secoes
+      .reduce((soma, s) => soma.concat(s.campos), []).map((c) => c.chave);
+    verdadeiro(naTela.indexOf('codigoorigemdaproposta') < 0);
+    verdadeiro(naTela.indexOf('codsucursal') < 0);
+    verdadeiro(naTela.indexOf('codramo') < 0);
+    verdadeiro(naTela.indexOf('numerodaproposta') >= 0,
+      'e o campo que hospeda a digitação continua na tela');
+  });
+
+  teste('atualizar NÃO apaga a Matrícula nem a aba de feriados', () => {
+    /*
+     * A promessa que o PO cobrou: "não precise excluir as abas ou criar do
+     * zero". Coluna com dado dentro e aba inteira nunca são apagadas por uma
+     * migração — o sistema só para de olhar para elas, e o laudo diz que a
+     * decisão de apagar é dele.
+     */
+    const { ambiente, chamar } = comoEraAntesDestaRodada();
+    const recado = chamar('atualizarPGO()');
+
+    const usuario = chamar('lerRegistros_("USUARIOS")')[0];
+    igual(String(usuario.Matricula), 'C123456',
+      'a matrícula que já estava gravada continua gravada');
+    verdadeiro(ambiente.planilha.getSheetByName('FERIADOS') !== null,
+      'a aba FERIADOS continua na planilha');
+    igual(chamar('lerRegistros_("FERIADOS")').length, 1,
+      'com o feriado que estava nela');
+
+    contem(recado, 'DECISÃO SUA', 'e o laudo diz o que sobrou para ele decidir');
+    contem(recado, 'Matricula');
+    contem(recado, 'FERIADOS');
+    contem(recado, 'AUSENCIAS');
+
+    // As colunas que saíram do contrato dos dois cadastros nesta rodada: nem
+    // uma delas é apagada, e o dado que estava nelas continua legível.
+    igual(String(chamar('lerRegistros_("CORRETORAS")')
+      .find((uma) => String(uma.SUSEP) === '1234567').Nome),
+      'Corretora de Antes', 'CORRETORAS."Nome" não foi apagada');
+    igual(String(chamar('lerRegistros_("SUSEP_BLOQUEADAS")')
+      .find((uma) => String(uma.SUSEP) === '7654321').Motivo),
+      'Fraude confirmada', 'SUSEP_BLOQUEADAS."Motivo" não foi apagada');
+    contem(recado, 'CORRETORAS."Nome"');
+    contem(recado, 'CORRETORAS."Canal"');
+    contem(recado, 'SUSEP_BLOQUEADAS."Motivo"');
+    contem(recado, 'SUSEP_BLOQUEADAS."CpfReincidente"');
+  });
+
+  teste('atualizar cria as colunas novas dos dois cadastros', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+
+    // Antes: a Sucursal não existe em nenhum dos dois.
+    verdadeiro(chamar('posicaoDaColuna_')(
+      chamar('estruturaDaAba_')('CORRETORAS'), 'Sucursal') < 0,
+      'a coluna não pode existir antes, senão o teste não prova nada');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'CORRETORAS.Sucursal criada');
+    contem(recado, 'SUSEP_BLOQUEADAS.Sucursal criada');
+    contem(recado, 'SUSEP_BLOQUEADAS.CoordenadorComercial criada');
+
+    // E o cadastro que já estava lá continua lá, inteiro.
+    const corretora = chamar('tabelaDeCorretoras')('', '').corretoras
+      .find((uma) => uma.susep === '1234567');
+    igual(corretora.corretora, 'Corretora de Antes');
+    igual(corretora.consultor, 'Brook', 'o consultor de antes não se perdeu');
+    igual(corretora.sucursal, '', 'e a sucursal nova nasce vazia, para ele preencher');
+
+    // A SUSEP antiga é só de dígito, porque a coluna era identificador. O selo
+    // do formulário tem de continuar achando-a — senão a migração "funciona" e
+    // o sistema para de reconhecer o cadastro que já existia.
+    igual(chamar('consultarSusep')('1234567').situacao, 'OK');
+
+    // E a de letra e número, que é o formato de verdade, já entra.
+    chamar('salvarCorretora')({ susep: 'RET00J', corretora: 'Depois',
+      sucursal: '12', segmento: 'Diamante', consultor: 'Nami' });
+    igual(chamar('consultarSusep')('RET00J').situacao, 'OK');
+  });
+
+  teste('atualizar liga o canal de quem já estava cadastrado', () => {
+    /*
+      A equipe passou a ser o CANAL. Quem foi cadastrado antes tinha o canal
+      escrito na coluna de texto e o CanalId em branco — e sem este passo o
+      sistema novo não enxergaria equipe nenhuma para essa pessoa.
+    */
+    const { chamar } = comoEraAntesDestaRodada();
+    const umCanal = chamar('lerRegistros_("CANAIS")')[0];
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'Nico Robin ficou no canal ' + String(umCanal.Nome));
+
+    const robin = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Nico Robin');
+    igual(String(robin.CanalId), String(umCanal.Id),
+      'o canal que ele digitou virou o CanalId');
+  });
+
+  teste('canal escrito que não existe fica para o PO, e não é chutado', () => {
+    // Chutar o canal mais parecido colocaria a pessoa na equipe errada, e
+    // ninguém veria: o painel dela simplesmente mostraria outra gente.
+    const { chamar } = comoEraAntesDestaRodada();
+    const recado = chamar('atualizarPGO()');
+
+    contem(recado, 'Tony Chopper');
+    contem(recado, 'Canal Que Nunca Existiu');
+    const chopper = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Tony Chopper');
+    igual(String(chopper.CanalId || ''), '', 'continua sem canal, de propósito');
+  });
+
+  teste('quem já tem canal escolhido não é sobrescrito pela coluna antiga', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const canais = chamar('lerRegistros_("CANAIS")');
+    const robin = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Nico Robin');
+
+    // Ele tem CanalId do segundo canal e a coluna antiga diz o primeiro. A
+    // escolha mais nova ganha: a coluna de texto é a que saiu do contrato.
+    chamar('atualizarRegistro_')('USUARIOS', robin.Id, {
+      CanalId: String(canais[1].Id), 'Canal que atende': String(canais[0].Nome) });
+    chamar('esquecerEstruturaLida_()');
+    chamar('atualizarPGO()');
+
+    igual(String(chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Nome) === 'Nico Robin').CanalId),
+      String(canais[1].Id));
+  });
+
+  teste('atualizar apaga a aba PRODUTOS, e diz quantas linhas foram', () => {
+    // O único passo que apaga, e está aqui porque o PO pediu as duas pontas:
+    // "Produtos pode eliminar" — a aba da tela e a aba da planilha.
+    const { ambiente, chamar } = comoEraAntesDestaRodada();
+    verdadeiro(ambiente.planilha.getSheetByName('PRODUTOS') !== null,
+      'a aba tem de existir antes, senão o teste não prova nada');
+
+    const recado = chamar('atualizarPGO()');
+    igual(ambiente.planilha.getSheetByName('PRODUTOS'), null,
+      'a aba saiu da planilha');
+    contem(recado, 'aba PRODUTOS apagada da planilha, com 2 linha(s)');
+    contem(recado, 'Histórico de versões',
+      'e o laudo diz de onde ela volta, se ele mudar de ideia');
+  });
+
+  teste('atualizar não perde usuário, caso nem configuração ajustada', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+
+    chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana',
+      'nome do cliente': 'Caso de antes' });
+    const quantosUsuarios = chamar('lerRegistros_("USUARIOS")').length;
+
+    // Uma configuração ajustada à mão, do tipo que uma migração desastrada
+    // sobrescreveria: a meta do canal.
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    chamar('atualizarRegistro_')('CANAIS', ret.id, { MetaMensalPorPessoa: 77 });
+    chamar('esquecerEstruturaLida_()');
+
+    chamar('atualizarPGO()');
+
+    igual(chamar('lerRegistros_("USUARIOS")').length, quantosUsuarios);
+    verdadeiro(chamar('lerRegistros_("BASE_RET")')
+      .some((linha) => String(linha['nome do cliente']) === 'Caso de antes'));
+    igual(Number(chamar('lerRegistros_("CANAIS")')
+      .find((c) => String(c.Aba) === 'BASE_RET').MetaMensalPorPessoa), 77,
+      'a meta ajustada à mão não pode ter sido sobrescrita');
+  });
+
+  teste('quem já escolheu outra coluna de valor não é atropelado', () => {
+    // Uma migração que preenche o que já está preenchido desfaz a escolha de
+    // alguém sem avisar. Esta só preenche o que está em branco.
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    chamar('salvarCanal')(Object.assign({},
+      chamar('listarCanaisConfiguraveis()').find((c) => c.aba === 'BASE_RET'),
+      { colunaDoValor: 'valor do prêmio retido',
+        situacoesDestacadas: 'Reteve, Concluído' }));
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'já tem coluna de valor');
+
+    const depois = chamar('listarCanaisConfiguraveis()')
+      .find((c) => c.aba === 'BASE_RET');
+    igual(depois.colunaDoValor, 'valor do prêmio retido');
+    igual(depois.situacoesDestacadas, 'Reteve, Concluído');
+  });
+
+  teste('rodar a atualização duas vezes não estraga nada', () => {
+    // Ninguém tem certeza se já rodou. Quem não lembra, roda de novo.
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const segunda = chamar('atualizarPGO()');
+
+    contem(segunda, 'JÁ ESTAVA ASSIM');
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    verdadeiro(chamar('produtividadeDaEquipe')(ret.id, {}, 30).valorPorSituacao
+      !== null, 'o gráfico continua de pé');
+    igual(chamar('lerRegistros_("CATALOGO")')
+      .filter((item) => String(item.Nome) === 'Sem sucesso').length, 1,
+      'e o status não pode ter nascido duas vezes');
+  });
+
+  teste('numa instalação nova, atualizar não faz nada', () => {
+    const { chamar } = instalacaoNova();
+    const recado = chamar('atualizarPGO()');
+    igual(recado.indexOf('status "Sem sucesso" criado'), -1,
+      'instalação nova já nasce com tudo');
+    igual(chamar('diagnosticoRECC()').aprovado, true);
+  });
+
+  teste('a atualização aprova no diagnóstico', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    igual(chamar('diagnosticoRECC()').aprovado, true,
+      falhasEmTexto(chamar('diagnosticoRECC()')));
   });
 
   secao('As duas portas');

@@ -226,7 +226,7 @@ function lerConfiguracaoDoCampo_(campo) {
  * As opções de um seletor. Três origens possíveis:
  *
  *   { "catalogo": "STATUS" }      da aba CATALOGO, do canal ou global
- *   { "listaDe": "usuarios" }     de um cadastro: usuários, produtos, canais
+ *   { "listaDe": "usuarios" }     de um cadastro: usuários, corretoras, canais
  *   { "opcoes": ["Sim", "Não"] }  lista escrita à mão na configuração
  */
 function opcoesDoCampo_(configuracao, idDoCanal) {
@@ -282,19 +282,18 @@ function opcoesDeUmCadastro_(qualCadastro) {
       .map(function (nome) { return { valor: nome, rotulo: nome }; });
   }
 
-  if (cadastro === 'produtos') {
-    return lerRegistros_('PRODUTOS').map(function (produto) {
-      return {
-        valor: String(produto.Produto),
-        rotulo: String(produto.Produto),
-        codigo: String(produto.CodigoProduto || '')
-      };
-    });
-  }
-
-  if (cadastro === 'canais') {
-    return lerRegistros_('CORRETORAS').map(function (canal) {
-      return { valor: String(canal.Nome), rotulo: String(canal.Nome) };
+  /*
+   * O cadastro de CORRETORAS. A chave `canais` continua aceita por ser a que
+   * as instalações antigas gravaram em CAMPOS, de quando a aba CORRETORAS se
+   * chamava CANAIS — trocar a chave sem mais apagaria a lista de um campo que
+   * já estava configurado, e ninguém ligaria uma coisa à outra.
+   *
+   * Havia aqui também o cadastro de `produtos`, que saiu a pedido do PO.
+   */
+  if (cadastro === 'corretoras' || cadastro === 'canais') {
+    return lerRegistros_('CORRETORAS').map(function (corretora) {
+      var nome = String(corretora.Corretora || '');
+      return { valor: nome, rotulo: nome };
     });
   }
 
@@ -309,7 +308,7 @@ function opcoesDeUmCadastro_(qualCadastro) {
   }
 
   throw new Error('Cadastro desconhecido em listaDe: "' + qualCadastro + '". ' +
-    'Os cadastros são usuarios, produtos, canais, analistasCentral e ' +
+    'Os cadastros são usuarios, corretoras, analistasCentral e ' +
     'analistasCobranca.');
 }
 
@@ -431,6 +430,24 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
     }
     if (String(bruto).trim() === '') return;
 
+    /*
+     * ESPAÇO DE PONTA NÃO VAI PARA A PLANILHA.
+     *
+     * Quem copia a SUSEP de outra planilha traz " RET00J " junto, e o espaço
+     * é invisível na tela. O selo continuava achando a corretora — ele
+     * compara normalizado —, então nada parecia errado; o estrago aparecia
+     * depois, no Power BI, onde o join é pelo texto cru e " RET00J " não casa
+     * com "RET00J".
+     *
+     * Só as PONTAS. A SUSEP em si fica intacta: letra, dígito, caixa e
+     * pontuação do meio continuam exatamente como a pessoa colou, que é o que
+     * o PO pediu — "devem aceitar e colar exatamente essa susep". E vale para
+     * todo campo de texto, porque colar com espaço não é problema só da SUSEP;
+     * é assim que a importação já tratava, e as duas portas passam a
+     * concordar.
+     */
+    if (typeof bruto === 'string') bruto = bruto.trim();
+
     // Um seletor pode alimentar DUAS colunas. É o caso do produto, que a
     // operação escolhe como "1101 - VIDA INDIVIDUAL" e a planilha guarda
     // separado: o código numa coluna, o nome na outra.
@@ -439,11 +456,32 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
     // uma chance de digitar o código de um produto e o nome de outro; e as
     // colunas separadas são o que deixa o painel agrupar por código e o
     // relatório mostrar o nome.
-    var separa = lerConfiguracaoDoCampo_(campo).separaEm;
+    var configuracaoDoCampo = lerConfiguracaoDoCampo_(campo);
+
+    var separa = configuracaoDoCampo.separaEm;
     if (separa && separa.codigo && separa.nome) {
       var partes = separarCodigoENome_(bruto);
       paraGravar[separa.codigo] = partes.codigo;
       paraGravar[separa.nome] = partes.nome;
+      return;
+    }
+
+    // Um campo pode PARTIR EM várias colunas pelo hífen. É o caso da proposta
+    // e da apólice: digitadas inteiras, gravadas em pedaços. Ver
+    // partirPorHifen_, que é quem recusa o formato errado.
+    var partir = configuracaoDoCampo.partirEm;
+    if (partir && partir.colunas && partir.colunas.length > 1) {
+      var pedacos;
+      try {
+        pedacos = partirPorHifen_(bruto, partir, descricao.rotulo);
+      } catch (erro) {
+        problemas.push({ campo: descricao.chave, rotulo: descricao.rotulo,
+          erro: erro.message });
+        return;
+      }
+      partir.colunas.forEach(function (cabecalho, i) {
+        paraGravar[cabecalho] = pedacos[i];
+      });
       return;
     }
 
@@ -502,7 +540,7 @@ function conferirCampo_(campo, valor) {
   }
 
   // Seletor com lista VAZIA aceita o que for digitado. Um cadastro ainda não
-  // preenchido não pode travar o campo: sem esta linha, escolher "produtos"
+  // preenchido não pode travar o campo: sem esta linha, escolher "corretoras"
   // como origem antes de cadastrar produto nenhum deixaria o campo
   // impossível de preencher e sem explicação na tela.
   if (campo.tipo === 'seletor' && campo.opcoes.length) {
@@ -894,10 +932,12 @@ function casoParaEditar(idDoCanal, idDoCaso) {
   var valores = {};
 
   camposAtivosDoCanal_(canal.id).forEach(function (campo) {
-    var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
-    if (posicao < 0) return;
-    valores[String(campo.ChaveTecnica)] =
-      paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]);
+    // CAMPO GRAVADO EM VÁRIAS COLUNAS volta JUNTO — quem sabe remontar é
+    // `valorDoCampoNaLinha_`. Ler a coluna do próprio campo devolveria um
+    // pedaço só, e salvar em seguida apagaria os outros sem ninguém pedir.
+    var valor = valorDoCampoNaLinha_(registro, campo, estrutura);
+    if (valor === null) return;
+    valores[String(campo.ChaveTecnica)] = valor;
   });
 
   return { id: registro.__id, canal: canal.nome, valores: valores };
@@ -1020,6 +1060,154 @@ function separarCodigoENome_(valor) {
   return { codigo: codigo, nome: nome };
 }
 
+/**
+ * Parte "12-1391-0000000" nos pedaços que vão para colunas separadas.
+ *
+ * Pedido do PO: a proposta e a apólice existem no mundo escritas com hífen, e
+ * é assim que elas chegam ao analista. Na planilha elas precisam estar em
+ * colunas separadas, porque é por elas que o relatório junta.
+ *
+ * O FORMATO É COBRADO, e isto é o ponto da função. "7-0000000" com duas
+ * colunas vale; "70000000" não, porque não há como saber onde o código termina
+ * — e adivinhar colocaria o número de uma proposta no campo do código de
+ * outra, calado. Pedaço com letra também não: a coluna é de identificador, e
+ * o relatório junta por ela.
+ *
+ * O QUE NÃO É COBRADO: quantos dígitos cada pedaço tem. O PO disse que o
+ * código "pode ser 2 números ou um" e não falou do resto — fixar um tamanho
+ * aqui recusaria amanhã uma proposta legítima, e o recado não explicaria nada
+ * a quem a tem na mão.
+ *
+ * Lança o erro com o recado pronto para a tela: quem chama o transforma em
+ * problema do campo, ao lado dele.
+ */
+function partirPorHifen_(valor, partir, rotulo) {
+  var quantas = partir.colunas.length;
+  var texto = String(valor || '').trim();
+  var pedacos = texto.split('-').map(function (pedaco) {
+    return String(pedaco).trim();
+  });
+
+  function recusar(porque) {
+    return new Error(porque + ' Escreva com '
+      + (quantas - 1) + ' hífen' + (quantas > 2 ? 's' : '')
+      + (partir.exemplo ? ', assim: ' + partir.exemplo : '')
+      + '. Cada pedaço vai para uma coluna da planilha: '
+      + partir.colunas.join(', ') + '.');
+  }
+
+  if (pedacos.length !== quantas) {
+    throw recusar('"' + texto + '" tem ' + pedacos.length + ' pedaço(s), e o '
+      + 'campo "' + rotulo + '" pede ' + quantas + '.');
+  }
+
+  for (var i = 0; i < quantas; i++) {
+    if (!pedacos[i]) {
+      throw recusar('O ' + (i + 1) + 'º pedaço de "' + texto + '" está vazio.');
+    }
+    if (!/^[0-9]+$/.test(pedacos[i])) {
+      throw recusar('O pedaço "' + pedacos[i] + '" tem algo que não é dígito.');
+    }
+  }
+  return pedacos;
+}
+
+/**
+ * Junta de volta o que `partirPorHifen_` separou, para o formulário de edição.
+ *
+ * Sem isto, abrir um caso para editar mostraria o campo da proposta VAZIO — o
+ * formulário procura a coluna do próprio campo, e o valor está espalhado em
+ * duas. A pessoa salvaria achando que não mexeu nele, e o campo em branco
+ * apagaria as duas colunas.
+ *
+ * Pedaço faltando não inventa hífen solto: com um dos lados vazio, devolve o
+ * que existe. "7-" na tela pareceria um dado pela metade que alguém digitou,
+ * quando é um dado pela metade que estava na planilha.
+ */
+function juntarComHifen_(registro, partir) {
+  var pedacos = partir.colunas.map(function (cabecalho) {
+    var valor = registro[cabecalho];
+    return String(valor === null || valor === undefined ? '' : valor).trim();
+  }).filter(function (pedaco) { return pedaco !== ''; });
+
+  return pedacos.join('-');
+}
+
+/**
+ * Junta o código e o nome de volta no formato da lista: "1101 - VIDA INDIVIDUAL".
+ *
+ * É o inverso exato de `separarCodigoENome_`, e o espaço em volta do hífen não
+ * é enfeite: é o formato que as opções do seletor usam. Remontar como
+ * "1101-VIDA INDIVIDUAL" devolveria um valor que a lista não tem, e salvar
+ * seria recusado com "não é uma das opções da lista".
+ */
+function juntarCodigoENome_(registro, separa) {
+  var codigo = String(registro[separa.codigo] === null
+    || registro[separa.codigo] === undefined ? '' : registro[separa.codigo]).trim();
+  var nome = String(registro[separa.nome] === null
+    || registro[separa.nome] === undefined ? '' : registro[separa.nome]).trim();
+
+  if (codigo && nome) return codigo + ' - ' + nome;
+  return codigo || nome;
+}
+
+/**
+ * O valor de um campo, remontado a partir das COLUNAS em que ele foi gravado.
+ *
+ * Existe porque um campo pode morar em MAIS DE UMA coluna, e nesse caso ler a
+ * coluna do próprio campo devolve só um pedaço. Eram três casos, tratados em
+ * dois lugares diferentes — e eles divergiram, com dois defeitos que a
+ * operação sentiu:
+ *
+ *   `partirEm`  proposta e apólice. A edição já juntava; "ver detalhes" não,
+ *               e mostrava "0000000" no lugar de "58-0000000".
+ *   `separaEm`  o produto. NENHUM dos dois juntava: "ver detalhes" mostrava só
+ *               "1101", e a edição devolvia "1101" para um seletor cuja lista
+ *               só tem "1101 - VIDA INDIVIDUAL" — então salvar um caso da RET
+ *               com produto era RECUSADO, num campo que a pessoa nem tocou.
+ *
+ * Agora é um lugar só, usado pela leitura e pela edição. Os dois não podem
+ * mais discordar, que era a causa de verdade.
+ */
+function valorDoCampoNaLinha_(registro, campo, estrutura) {
+  var configuracao = lerConfiguracaoDoCampo_(campo);
+
+  var separa = configuracao.separaEm;
+  if (separa && separa.codigo && separa.nome) {
+    return juntarCodigoENome_(registro, separa);
+  }
+
+  var partir = configuracao.partirEm;
+  if (partir && partir.colunas && partir.colunas.length > 1) {
+    return juntarComHifen_(registro, partir);
+  }
+
+  var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
+  if (posicao < 0) return null;   // null = esta coluna não existe nesta aba
+  return paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]);
+}
+
+/**
+ * As colunas da planilha que um campo ocupa — uma, duas ou três.
+ *
+ * Quem pergunta é "ver detalhes", para saber o que o formulário já mostrou
+ * antes de listar o resto da linha. Sem isto, a proposta apareceria duas
+ * vezes: uma como campo ("58-0000000") e outra como coluna solta ("58").
+ */
+function colunasQueOCampoOcupa_(campo) {
+  var configuracao = lerConfiguracaoDoCampo_(campo);
+
+  var separa = configuracao.separaEm;
+  if (separa && separa.codigo && separa.nome) return [separa.codigo, separa.nome];
+
+  var partir = configuracao.partirEm;
+  if (partir && partir.colunas && partir.colunas.length > 1) {
+    return partir.colunas.slice();
+  }
+
+  return [String(campo.Cabecalho)];
+}
+
 /** Data e hora de entrada, decididas pelo servidor, só quando faltam. */
 function preencherEntradaAutomatica_(canal, paraGravar) {
   var agora = new Date();
@@ -1056,11 +1244,11 @@ function preencherResponsavelAutomatico_(canal, paraGravar, quem) {
  *                    é uma corretora que o cadastro não conhece, e a operação
  *                    precisa saber disso antes de seguir
  */
-function consultarSusep(susep) {
-  exigirPermissao_(RECC_ACOES.CRIAR);
+function consultarSusep(susep, idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
 
-  var procurada = converterParaIdentificador_(susep);
-  if (!procurada) {
+  var procurada = susepComoSeEscreve_(susep);
+  if (!chaveDaSusep_(procurada)) {
     return { situacao: 'VAZIA', mensagem: 'Digite a SUSEP.' };
   }
 
@@ -1075,39 +1263,99 @@ function consultarSusep(susep) {
   // buscarRegistros_ lê só a coluna da SUSEP, acha em qual linha ela está, e
   // só então lê aquela linha inteira. É a mesma regra que sustenta a busca de
   // casos: ler a coluna antes de ler as linhas.
+  /*
+   * O CADASTRO DE CORRETORAS É CONSULTADO PRIMEIRO, e isto é decisão do PO.
+   *
+   * "Corretoras Diamante não podem ter status de bloqueada por gentileza mesmo
+   * que o SUSEP esteja na lista de bloqueadas. Pertence a outra lista."
+   *
+   * São duas listas, com dois donos e dois propósitos. Quem está no cadastro
+   * de corretoras é corretora Diamante, e para ela o selo é verde — mesmo que
+   * a mesma SUSEP apareça na lista de bloqueios, que é mantida por outra
+   * área. A ordem da consulta É a regra: o cadastro primeiro, o bloqueio
+   * depois.
+   *
+   * Isso tem um custo que vale dizer em voz alta: uma SUSEP cadastrada por
+   * engano como Diamante passa a sair liberada mesmo estando bloqueada. É o
+   * que o PO pediu, e quem corrige é quem mantém o cadastro — tirando a linha
+   * de Corretoras, na Tabela Corretoras.
+   */
+  var corretora = buscarRegistroVisivel_('CORRETORAS', 'SUSEP', procurada);
+
+  if (corretora) {
+    return {
+      situacao: 'OK',
+      susep: susepComoSeEscreve_(corretora.SUSEP) || procurada,
+      corretora: String(corretora.Corretora || ''),
+      sucursal: String(corretora.Sucursal || ''),
+      segmento: String(corretora.Segmento || 'Não encontrado'),
+      consultor: String(corretora.Consultor || ''),
+      mensagem: 'SUSEP liberada'
+    };
+  }
+
+  /*
+   * A LISTA DE BLOQUEIOS SÓ É CONSULTADA SE O CANAL PEDIR.
+   *
+   * Palavra do PO: "no formulário de Mesa diamante não há necessidade de
+   * verificar se a SUSEP está ou não bloqueada, pode remover esse detalhe".
+   * Quem decide é a coluna CANAIS.ConfereSusepBloqueada, e não o nome do
+   * canal escrito aqui dentro — amanhã a regra muda e ninguém vai querer
+   * mexer em código para isso.
+   *
+   * Sem canal informado, confere. É o caso de quem chama de fora de um
+   * formulário, e na dúvida a resposta mais completa é a mais segura.
+   *
+   * E economiza a leitura mais caro do selo: a coluna da aba de SUSEPs
+   * bloqueadas, que a operação vai encher com 16 mil linhas.
+   */
+  if (!deveConferirOBloqueio_(idDoCanal, quem)) {
+    return {
+      situacao: 'NAO_ENCONTRADA',
+      susep: procurada,
+      segmento: 'Não encontrado',
+      mensagem: 'SUSEP não encontrada no cadastro de corretoras'
+    };
+  }
+
   var bloqueada = buscarRegistroVisivel_('SUSEP_BLOQUEADAS', 'SUSEP', procurada);
 
   if (bloqueada) {
     return {
       situacao: 'BLOQUEADA',
-      susep: procurada,
+      susep: susepComoSeEscreve_(bloqueada.SUSEP) || procurada,
       corretora: String(bloqueada.NomeCorretora || ''),
-      motivo: String(bloqueada.Motivo || ''),
+      sucursal: String(bloqueada.Sucursal || ''),
+      coordenadorComercial: String(bloqueada.CoordenadorComercial || ''),
       mensagem: 'SUSEP bloqueada'
         + (bloqueada.NomeCorretora ? ' — ' + bloqueada.NomeCorretora : '')
     };
   }
 
-  var canal = buscarRegistroVisivel_('CORRETORAS', 'SUSEP', procurada);
-
-  if (!canal) {
-    return {
-      situacao: 'NAO_ENCONTRADA',
-      susep: procurada,
-      segmento: 'Não encontrado',
-      mensagem: 'SUSEP não encontrada no cadastro de canais'
-    };
-  }
-
   return {
-    situacao: 'OK',
+    situacao: 'NAO_ENCONTRADA',
     susep: procurada,
-    corretora: String(canal.Corretora || ''),
-    canal: String(canal.Canal || ''),
-    segmento: String(canal.Segmento || 'Não encontrado'),
-    consultor: String(canal.Consultor || ''),
-    mensagem: 'SUSEP liberada'
+    segmento: 'Não encontrado',
+    mensagem: 'SUSEP não encontrada no cadastro de corretoras'
   };
+}
+
+/**
+ * Este canal confere a lista de SUSEPs bloqueadas?
+ *
+ * Canal que não existe, ou que esta pessoa não enxerga, cai no SIM: a
+ * pergunta "o canal dispensa a conferência?" só tem resposta confiável para
+ * um canal de verdade, e na dúvida conferir é o lado seguro.
+ */
+function deveConferirOBloqueio_(idDoCanal, quem) {
+  var alvo = converterParaIdentificador_(idDoCanal);
+  if (!alvo) return true;
+
+  var canal = canaisQueEuVejo_(quem).filter(function (um) {
+    return converterParaIdentificador_(um.id) === alvo;
+  })[0];
+
+  return canal ? canal.confereSusepBloqueada !== false : true;
 }
 
 /* ############################################################################
@@ -1819,30 +2067,14 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
 /**
  * O que o laudo precisa dizer em voz alta antes de alguém apertar "importar".
  *
- * Hoje é um aviso só — analista de férias recebendo lote —, e a lista existe
- * para o próximo caber sem mexer no formato da resposta.
+ * Está VAZIA hoje, e é de propósito que ela continua existindo. O único aviso
+ * que havia — analista de férias recebendo um lote que ficaria parado — saiu
+ * com o calendário, a pedido do PO. A função fica porque o laudo já a chama e
+ * já sabe desenhar a lista: o próximo aviso que a operação pedir entra aqui,
+ * numa linha, sem mexer no formato da resposta nem na tela.
  */
 function avisosDaImportacao_(escolhidos, canal, quantosEntram) {
-  var lista = Array.isArray(escolhidos) ? escolhidos : [];
-  if (!lista.length || !quantosEntram) return [];
-
-  var ausentes = quemEstaAusenteHoje_();
-  var avisos = [];
-
-  // Divisão em rodízio: cada um recebe a parte dele, arredondada para cima na
-  // primeira sobra. O número não precisa ser exato para o recado servir — ele
-  // precisa dar a ORDEM DE GRANDEZA de quantos casos ficam parados.
-  var porPessoa = Math.ceil(quantosEntram / lista.length);
-
-  lista.forEach(function (nome) {
-    var fora = ausentes[String(nome || '').trim()];
-    if (!fora) return;
-    avisos.push(nome + ' está de ' + fora.motivo.toLowerCase() + ' até '
-      + fora.ate + ' e vai receber cerca de ' + porPessoa + ' caso(s). '
-      + 'Eles ficam parados até a volta.');
-  });
-
-  return avisos;
+  return [];
 }
 
 /**
@@ -1952,11 +2184,14 @@ function temAlgumValor_(caso) {
  * Quem pode receber os casos: TODO MUNDO que está cadastrado e ativo.
  *
  * A primeira versão desta função só oferecia quem tivesse "Canal que atende"
- * igual ao nome do canal. Parecia certo e não funcionava: o campo é de digitar
- * livre, e a operação escreve nele o que faz sentido para ela — "Vida
- * Individual", "Vida em Grupo" —, quase nunca o nome do canal do PGO. O
+ * igual ao nome do canal. Parecia certo e não funcionava: o campo era de
+ * digitar livre, e a operação escrevia nele o que fazia sentido para ela —
+ * "Vida Individual", "Vida em Grupo" —, quase nunca o nome do canal do PGO. O
  * resultado era a tela de Importação dizendo "nenhum analista cadastrado neste
  * canal" numa operação cheia de analistas. Só apareceu abrindo no navegador.
+ *
+ * Aquele campo saiu do cadastro desde então. A sugestão agora vem do CanalId,
+ * que é escolha de lista e não texto digitado.
  *
  * A regra que IMPORTA é outra, e é sobre não perder o caso: o nome tem de
  * existir no cadastro e estar ativo, senão o caso fica no nome de ninguém e
@@ -1966,46 +2201,28 @@ function temAlgumValor_(caso) {
  * da Mesa, e o sistema não é quem decide isso.
  */
 function analistasParaDistribuir_(canal) {
-  var doCanal = normalizarParaComparar_(canal.nome);
+  var doCanal = converterParaIdentificador_(canal.id);
 
   /*
-   * QUEM ESTÁ DE FÉRIAS HOJE NÃO ENTRA NA DIVISÃO.
-   *
-   * Sem isto, importar 300 casos numa segunda-feira com dois analistas fora
-   * deixa 75 casos parados três semanas — e nada no sistema avisa. Os casos
-   * estão lá, no nome de alguém, dentro do prazo, e ninguém os trabalha. É o
-   * tipo de problema que só aparece quando o cliente liga.
-   *
-   * A pessoa continua APARECENDO na lista, marcada e desmarcada: o lote pode
-   * ser justamente para quando ela voltar, e o sistema não é quem decide isso.
-   * O que ele faz é não escolher por ela, e dizer o porquê.
+   * Houve aqui uma marca de QUEM ESTÁ DE FÉRIAS, para a coordenação não
+   * distribuir um lote a quem só volta em três semanas. Saiu com o calendário,
+   * a pedido do PO — ele vai tratar isso de outra maneira.
    */
-  var ausentes = quemEstaAusenteHoje_();
-
   return lerRegistros_('USUARIOS')
     .filter(function (usuario) {
       return normalizarParaComparar_(usuario.Ativo) === 'sim'
         && String(usuario.Nome || '').trim();
     })
     .map(function (usuario) {
-      var dela = normalizarParaComparar_(usuario['Canal que atende']);
-      var nome = String(usuario.Nome);
-      var fora = ausentes[nome];
-
+      var dela = converterParaIdentificador_(usuario.CanalId);
       return {
-        nome: nome,
+        nome: String(usuario.Nome),
         // Vazio é o caso de quem administra: atende as duas, e fica no topo
         // junto de quem é deste canal.
-        atendeEsteCanal: !dela || dela === doCanal,
-        ausente: !!fora,
-        ausenteAte: fora ? fora.ate : '',
-        motivoDaAusencia: fora ? fora.motivo : ''
+        atendeEsteCanal: !dela || dela === doCanal
       };
     })
     .sort(function (um, outro) {
-      // Quem está fora vai para o fim da lista, de qualquer canal: a ordem é o
-      // primeiro aviso, antes mesmo de alguém ler a marca.
-      if (um.ausente !== outro.ausente) return um.ausente ? 1 : -1;
       if (um.atendeEsteCanal !== outro.atendeEsteCanal) {
         return um.atendeEsteCanal ? -1 : 1;
       }

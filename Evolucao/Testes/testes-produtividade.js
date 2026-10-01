@@ -645,12 +645,13 @@ function rodarTestesDaProdutividade() {
     chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
       { Configuracao: JSON.stringify(permissoes) });
 
-    // Três pessoas no mesmo canal, e mais gente na base fora dele.
+    // Duas pessoas NO MESMO CANAL — é o canal que forma a equipe, por decisão
+    // do PO —, e mais gente na base fora dele.
     [['Ana da Equipe', 'ana.eq@exemplo.com'],
      ['Bruno da Equipe', 'bruno.eq@exemplo.com']].forEach((par) => {
       chamar('salvarUsuario')({
-        nome: par[0], email: par[1], canalQueAtende: 'Cobrança ativa',
-        nivelAcessoId: operacao.Id, ativo: true
+        nome: par[0], email: par[1],
+        nivelAcessoId: operacao.Id, canalId: ret.id, ativo: true
       });
     });
     chamar('inserirVariosRegistros_')('BASE_RET', [
@@ -671,7 +672,8 @@ function rodarTestesDaProdutividade() {
     });
 
     igual(quantos.PROPRIOS, 2, 'os dois casos da Ana');
-    igual(quantos.EQUIPE, 3, 'os dela mais o do Bruno, que atende o mesmo canal');
+    igual(quantos.EQUIPE, 3,
+      'os dela mais o do Bruno, que está cadastrado no mesmo canal');
     verdadeiro(quantos.CANAL > quantos.EQUIPE,
       'e o canal inteiro traz também quem não é da equipe dela: '
       + quantos.CANAL + ' contra ' + quantos.EQUIPE);
@@ -733,9 +735,22 @@ function rodarTestesDaProdutividade() {
       .find((n) => n.nome === 'Operação').escopoNaProdutividade, 'EQUIPE');
   });
 
-  secao('Alcance, filtros e exportação');  secao('Alcance, filtros e exportação');
+  secao('Alcance, filtros e exportação');
 
-  teste('o painel só soma o que a pessoa pode ver', () => {
+  teste('a equipe é o CANAL: mesmo canal vê o mesmo painel', () => {
+    /*
+     * A EQUIPE É O CANAL, e este teste é o que cobra isso.
+     *
+     * Ela já foi duas outras coisas. Primeiro o campo "Canal que atende",
+     * texto livre: quem não o preenchesse ficava SEM equipe. Depois o nível de
+     * acesso, por uma rodada. Agora é o canal, a pedido do PO: "se escolhi um
+     * específico já dá para saber a qual equipe pertence".
+     *
+     * O que se cobra são as duas pontas. Primeiro: duas pessoas do mesmo canal
+     * veem O MESMO painel, porque são a mesma equipe. Depois: mudar o canal de
+     * alguém muda a equipe dela na mesma hora — se não mudasse, o canal não
+     * seria a equipe de verdade, só o nome dela.
+     */
     const operacao = chamar('lerRegistros_("CATALOGO")')
       .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
     // O nível de Operação não abre o Painel por padrão; damos a tela a ele
@@ -744,18 +759,56 @@ function rodarTestesDaProdutividade() {
     permissoesDaOperacao.telas.push('produtividade');
     chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
       { Configuracao: JSON.stringify(permissoesDaOperacao) });
+    comAlcance('Operação', 'EQUIPE');
+
     chamar('salvarUsuario')({
       nome: 'Patrícia Nunes', email: 'patricia@exemplo.com',
-      nivelAcessoId: operacao.Id, ativo: true
+      nivelAcessoId: operacao.Id, canalId: ret.id, ativo: true
     });
 
-    // A Patrícia tem escopo "próprios" e alcance EQUIPE na Produtividade —
-    // e sem canal declarado ela não tem equipe, então o alcance normal vale.
+    const totalDe = (email) => {
+      let total;
+      comoUsuario(ambiente, email, () => {
+        total = chamar('produtividadeDaEquipe')(ret.id, {}, 30).total;
+      });
+      return total;
+    };
+
+    // A Ana já está na RET desde o teste dos três alcances. A Patrícia acabou
+    // de entrar no mesmo canal — e o painel das duas tem de ser o mesmo
+    // número, mesmo tendo cada uma os seus próprios casos.
+    igual(totalDe('patricia@exemplo.com'), totalDe('ana.eq@exemplo.com'),
+      'mesmo canal é a mesma equipe, então é o mesmo painel');
+
+    /*
+     * Agora a outra ponta: a Patrícia troca de canal e a equipe troca com ela.
+     * Vai para a Mesa Diamante, onde está sozinha — e o gráfico "Casos por
+     * analista" da RET tem de mostrar UM nome só, o dela, porque os casos
+     * dela continuam na RET e os colegas de antes não são mais equipe.
+     *
+     * Conferir o gráfico, e não só o total, é de propósito: total igual pode
+     * ser coincidência de contagem; um rótulo a mais no gráfico é caso de
+     * outra pessoa aparecendo, e isso não tem como ser coincidência.
+     */
+    const mesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    const patricia = chamar('lerRegistros_("USUARIOS")')
+      .find((u) => String(u.Email) === 'patricia@exemplo.com');
+    chamar('salvarUsuario')({
+      id: patricia.Id, nome: 'Patrícia Nunes', email: 'patricia@exemplo.com',
+      nivelAcessoId: operacao.Id, canalId: mesa.id, ativo: true
+    });
+
     comoUsuario(ambiente, 'patricia@exemplo.com', () => {
-      const dela = chamar('produtividadeDaEquipe')(ret.id, {}, 30);
-      igual(dela.total, chamar('resumoDoCanal')(ret.id, {}).total,
-        'sem equipe, o alcance normal do nível vale — mostrar a base inteira '
-        + 'porque faltou um cadastro seria trocar acesso por descuido');
+      const porAnalista = chamar('produtividadeDaEquipe')(ret.id, {}, 30)
+        .componentes.find((c) => c.titulo.indexOf('Casos por analista') === 0);
+      igual(porAnalista.pontos.map((p) => p.rotulo).join(', '), 'Patrícia Nunes',
+        'sozinha no canal dela, ela é a equipe inteira');
+    });
+
+    // E volta para a RET, senão os testes seguintes herdam a Patrícia na Mesa.
+    chamar('salvarUsuario')({
+      id: patricia.Id, nome: 'Patrícia Nunes', email: 'patricia@exemplo.com',
+      nivelAcessoId: operacao.Id, canalId: ret.id, ativo: true
     });
   });
 
@@ -897,6 +950,167 @@ function rodarTestesDaProdutividade() {
     verdadeiro(estilos.indexOf('--serie-1: #3987E5') >= 0,
       'o tema escuro tem os seus próprios passos');
   });
+
+  /*
+   * ==========================================================================
+   * VALOR POR SITUAÇÃO — o gráfico de dinheiro que o PO pediu
+   * ==========================================================================
+   * "Traga na produtividade RECC gráfico com valor dos retidos, não retidos,
+   * sem sucesso, valor dos demais status e total. O mesmo em minha
+   * performance."
+   *
+   * Gráfico de dinheiro erra do pior jeito: parece certo. Por isso os testes
+   * aqui conferem as CONTAS, baldes vazios inclusive.
+   * ==========================================================================
+   */
+  secao('Valor por situação');
+
+  /*
+   * TODOS OS CASOS DESTE BLOCO SÃO DA ROBIN, e o gráfico é sempre lido com o
+   * filtro do analista nela.
+   *
+   * É de propósito. Os testes acima deste arquivo deixaram casos na BASE_RET
+   * com status "Reteve" e sem valor preenchido — contar a base inteira aqui
+   * daria números que mudam quando alguém acrescenta um teste lá em cima, e a
+   * falha apareceria longe da causa. Com o filtro, estes testes só olham o que
+   * eles mesmos escreveram.
+   */
+  const DELA = 'Nico Robin';
+  const soDaRobin = () => painelDaRet({ analista: DELA }).valorPorSituacao;
+
+  teste('cada situação declarada ganha a sua barra, na ordem declarada', () => {
+    chamar('inserirVariosRegistros_')('BASE_RET', [
+      { analista: DELA, status: 'Reteve',
+        'data de recepção do protocolo': diasAtras(1),
+        'valor do prêmio': 1000, 'nome do cliente': 'V1' },
+      { analista: DELA, status: 'Reteve',
+        'data de recepção do protocolo': diasAtras(1),
+        'valor do prêmio': 500, 'nome do cliente': 'V2' },
+      // 2000 de propósito, MAIOR que a soma dos retidos. Com o não retido
+      // menor, a ordem declarada e a ordem por tamanho dariam a mesma lista,
+      // e o teste de ordem passaria sem provar nada: foi o que aconteceu na
+      // primeira versão dele, e só apareceu quando quebrei o código de
+      // propósito para ver se o teste reclamava. Ele não reclamou.
+      { analista: DELA, status: 'Não reteve',
+        'data de recepção do protocolo': diasAtras(1),
+        'valor do prêmio': 2000, 'nome do cliente': 'V3' },
+      { analista: DELA, status: 'Pendente',
+        'data de recepção do protocolo': diasAtras(1),
+        'valor do prêmio': 200, 'nome do cliente': 'V4' }
+    ]);
+
+    const grafico = soDaRobin();
+    verdadeiro(grafico !== null,
+      'a RET declara a coluna do valor, então tem o gráfico');
+    igual(grafico.pontos.map((p) => p.rotulo).join(' | '),
+      'Reteve | Não reteve | Sem sucesso | Demais situações',
+      'a ordem é a declarada pela operação, e não a do maior para o menor');
+    igual(grafico.unidade, 'dinheiro');
+  });
+
+  teste('a barra soma o valor, e não conta os casos', () => {
+    const porRotulo = {};
+    soDaRobin().pontos.forEach((p) => { porRotulo[p.rotulo] = p; });
+
+    igual(porRotulo['Reteve'].valor, 1500, '1000 + 500');
+    igual(porRotulo['Reteve'].casos, 2, 'e diz de quantos casos veio');
+    igual(porRotulo['Não reteve'].valor, 2000,
+      'maior que o retido, e ainda assim desenhado depois dele');
+    igual(porRotulo['Demais situações'].valor, 200, 'o Pendente, sozinho');
+  });
+
+  teste('situação declarada SEM caso no período aparece valendo zero', () => {
+    /*
+     * A conferência que mais importa deste gráfico. Nenhum caso em "Sem
+     * sucesso" significa uma barra em ZERO, e não uma barra que não existe:
+     * sumir faria o gráfico parecer completo com um pedaço faltando, e quem
+     * olhasse diria "não temos esse problema" quando a verdade é "não
+     * sabemos".
+     */
+    const semSucesso = soDaRobin().pontos.find((p) => p.rotulo === 'Sem sucesso');
+    verdadeiro(semSucesso !== undefined, 'a barra tem de existir mesmo vazia');
+    igual(semSucesso.valor, 0);
+    igual(semSucesso.casos, 0);
+  });
+
+  teste('o total fecha com todas as barras, "Demais" incluída', () => {
+    const grafico = soDaRobin();
+    igual(grafico.total, 3700, '1500 + 2000 + 0 + 200');
+    igual(grafico.total,
+      grafico.pontos.reduce((soma, p) => soma + p.valor, 0),
+      'total que não fecha com as barras é pior que total nenhum');
+    igual(grafico.totalDeCasos, 4);
+  });
+
+  teste('a cor da barra segue a situação, e não a posição', () => {
+    // A mesma regra do resto do sistema: "Reteve" é verde porque o catálogo
+    // diz que é. Sem isso, o gráfico se repintaria a cada filtro.
+    const porRotulo = {};
+    soDaRobin().pontos.forEach((p) => { porRotulo[p.rotulo] = p; });
+    igual(porRotulo['Reteve'].tom, 'bom');
+    igual(porRotulo['Não reteve'].tom, 'ruim');
+    igual(porRotulo['Sem sucesso'].tom, 'atencao', 'o laranja que o PO pediu');
+  });
+
+  teste('canal que não declarou coluna de valor não ganha gráfico nenhum', () => {
+    // Nada é chutado: a Mesa Diamante não mede dinheiro por situação, e a tela
+    // dela simplesmente não mostra o gráfico.
+    const mesa = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+    igual(chamar('produtividadeDaEquipe')(mesa.id, {}, 30).valorPorSituacao, null);
+  });
+
+  teste('coluna de valor que sumiu da planilha vira aviso, e não tela quebrada', () => {
+    const comoEstava = chamar('lerRegistros_("CANAIS")')
+      .find((c) => String(c.Id) === String(ret.id)).ColunaDoValor;
+
+    chamar('atualizarRegistro_')('CANAIS', ret.id,
+      { ColunaDoValor: 'coluna que não existe' });
+    chamar('esquecerEstruturaLida_')();
+
+    const grafico = painelDaRet().valorPorSituacao;
+    contem(grafico.aviso, 'não existe mais na aba');
+    contem(grafico.aviso, 'Canais de trabalho', 'e diz onde ajustar');
+    igual(grafico.pontos.length, 0);
+
+    chamar('atualizarRegistro_')('CANAIS', ret.id, { ColunaDoValor: comoEstava });
+    chamar('esquecerEstruturaLida_')();
+    verdadeiro(painelDaRet().valorPorSituacao.aviso === '', 'e volta ao normal');
+  });
+
+  teste('o mesmo gráfico aparece na Minha Performance, com os meus casos', () => {
+    /*
+     * "O mesmo em minha performance" — e "o mesmo" tem de ser a MESMA conta,
+     * não uma parecida. A diferença é o recorte: lá a equipe, aqui a pessoa.
+     *
+     * A prova é por DIFERENÇA, e não por número absoluto: acrescenta um caso
+     * no nome de quem está olhando e cobra que a barra dela suba exatamente
+     * esse valor. Assim o teste não depende do que os outros testes deixaram
+     * na base.
+     */
+    const euSou = chamar('usuarioAtual_()').usuario.Nome;
+    const retidoAntes = (chamar('minhaPerformance')(ret.id, 30)
+      .valorPorSituacao.pontos.find((p) => p.rotulo === 'Reteve') || {}).valor;
+
+    chamar('inserirRegistro_')('BASE_RET', {
+      analista: euSou, status: 'Reteve',
+      'data de recepção do protocolo': diasAtras(1),
+      'valor do prêmio': 777, 'nome do cliente': 'Meu caso'
+    });
+
+    const minha = chamar('minhaPerformance')(ret.id, 30).valorPorSituacao;
+    verdadeiro(minha !== null, 'a tela da pessoa também tem o gráfico');
+    igual(minha.pontos.find((p) => p.rotulo === 'Reteve').valor,
+      retidoAntes + 777, 'a barra dela subiu exatamente o valor do caso dela');
+
+    const daEquipe = painelDaRet().valorPorSituacao;
+    igual(minha.pontos.map((p) => p.rotulo).join(' | '),
+      daEquipe.pontos.map((p) => p.rotulo).join(' | '),
+      'as mesmas barras, na mesma ordem das duas telas');
+    verdadeiro(minha.total <= daEquipe.total,
+      'e o meu valor nunca passa o do canal: ' + minha.total + ' contra '
+      + daEquipe.total);
+  });
+
 }
 
 module.exports = { rodarTestesDaProdutividade };

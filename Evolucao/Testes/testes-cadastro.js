@@ -105,9 +105,9 @@ function rodarTestesDeCadastro() {
   });
 
   teste('seletor de lista vazia aceita texto livre, em vez de travar', () => {
-    // A aba PRODUTOS nasce vazia. Um seletor apontado para ela não pode
+    // A aba CORRETORAS nasce vazia. Um seletor apontado para ela não pode
     // deixar o campo impossível de preencher e sem explicação.
-    igual(chamar('opcoesDeUmCadastro_')('produtos').length, 0);
+    igual(chamar('opcoesDeUmCadastro_')('corretoras').length, 0);
     igual(chamar('conferirCampo_')(
       { tipo: 'seletor', opcoes: [], obrigatorio: false }, 'Vida Individual'), '');
     igual(chamar('conferirCampo_')(
@@ -120,8 +120,28 @@ function rodarTestesDeCadastro() {
       'Cadastro desconhecido');
     // O recado LISTA os que existem. Sem a lista, quem errou o nome fica
     // adivinhando qual era — e a lista cresce, então ela sai do código.
-    ['usuarios', 'produtos', 'canais', 'analistasCentral', 'analistasCobranca']
+    ['usuarios', 'corretoras', 'analistasCentral', 'analistasCobranca']
       .forEach((qual) => contem(erro.message, qual));
+  });
+
+  teste('a chave antiga "canais" continua achando as corretoras', () => {
+    /*
+     * A aba CORRETORAS já se chamou CANAIS, e as instalações daquela época
+     * gravaram `listaDe: "canais"` em CAMPOS. Trocar a chave sem aceitar a
+     * antiga apagaria a lista de um campo que já estava configurado — e o
+     * sintoma seria um seletor vazio, sem erro nenhum, numa tela só.
+     */
+    chamar('inserirRegistro_')('CORRETORAS', {
+      SUSEP: 'RET00J', Corretora: 'Corretora de Teste',
+      Sucursal: '12', Segmento: 'Diamante'
+    });
+
+    const pelaNova = chamar('opcoesDeUmCadastro_')('corretoras');
+    const pelaAntiga = chamar('opcoesDeUmCadastro_')('canais');
+    igual(pelaNova.map((uma) => uma.valor).join(','), 'Corretora de Teste');
+    igual(pelaAntiga.map((uma) => uma.valor).join(','),
+      pelaNova.map((uma) => uma.valor).join(','),
+      'as duas chaves têm de dar a mesma lista');
   });
 
   teste('as duas listas de analista viram opções de seletor', () => {
@@ -622,34 +642,200 @@ function rodarTestesDeCadastro() {
       'o administrador cadastra em nome de quem for');
   });
 
+  secao('A SUSEP cola EXATA, e a Mesa não confere bloqueio');
+
+  /*
+    Três pedidos do PO, num bloco só, porque são o mesmo campo:
+
+      "todos os campos de susep que peçam esse dado devem aceitar e colar
+       exatamente essa susep"
+      "o formulário da mesa deve buscar pela susep o nome da corretora
+       automaticamente"
+      "no formulário de Mesa diamante não há necessidade de verificar se a
+       SUSEP está ou não bloqueada, pode remover esse detalhe"
+  */
+
+  teste('a SUSEP chega na planilha exatamente como foi colada', () => {
+    // Letra, caixa, hífen e dígito ficam intactos. Era `identificador` antes
+    // desta rodada, e "RET00J" virava "00" sem dar erro nenhum.
+    const escritas = ['RET00J', 'ret00j', 'RET-00J', '1234567', 'R0'];
+
+    canais.forEach((canal) => {
+      escritas.forEach((susep) => {
+        const salvo = chamar('cadastrarCaso')(canal.id, {
+          nomedocliente: 'Teste', nomedosegurado: 'Teste', susep: susep
+        });
+        const id = String(salvo.id || salvo);
+        const linha = chamar('buscarRegistros_')(canal.aba, 'Id', id, 1)[0];
+        igual(String(linha.SUSEP), susep,
+          canal.aba + ' tem de guardar "' + susep + '" sem mexer');
+        igual(chamar('casoParaEditar')(canal.id, id).valores.susep, susep,
+          canal.aba + ': e devolver igual para editar');
+      });
+    });
+  });
+
+  teste('espaço colado junto NÃO vai para a planilha', () => {
+    /*
+      Quem copia a SUSEP de outra planilha traz " RET00J " junto, e o espaço é
+      invisível na tela. O selo continuava achando a corretora — ele compara
+      normalizado —, então nada parecia errado. O estrago aparecia no Power BI,
+      onde o join é pelo texto cru e " RET00J " não casa com "RET00J".
+    */
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Com espaço', susep: '  RET00J  '
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha.SUSEP), 'RET00J', 'só as pontas saem');
+  });
+
+  teste('o selo devolve o nome da corretora, para a tela preencher', () => {
+    chamar('inserirRegistro_')('CORRETORAS', {
+      SUSEP: 'RET77X', Corretora: 'Corretora do Selo', Sucursal: '31',
+      Segmento: 'Diamante', Consultor: 'Jinbe'
+    });
+    const resposta = chamar('consultarSusep')('RET77X', canalDiamante.id);
+    igual(resposta.situacao, 'OK');
+    igual(resposta.corretora, 'Corretora do Selo',
+      'é daqui que a tela tira o nome, sem uma segunda ida ao servidor');
+    igual(resposta.sucursal, '31');
+  });
+
+  teste('a Mesa Diamante NÃO confere a lista de bloqueadas', () => {
+    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
+      SUSEP: 'RET88Y', NomeCorretora: 'Bloqueada de Verdade'
+    });
+
+    igual(chamar('consultarSusep')('RET88Y', canalRet.id).situacao, 'BLOQUEADA',
+      'na RET o bloqueio continua valendo');
+    igual(chamar('consultarSusep')('RET88Y', canalDiamante.id).situacao,
+      'NAO_ENCONTRADA', 'na Mesa Diamante a lista nem é consultada');
+  });
+
+  teste('sem canal informado, confere — o lado seguro', () => {
+    // Quem chama de fora de um formulário não diz o canal. Na dúvida, a
+    // resposta mais completa é a mais segura.
+    igual(chamar('consultarSusep')('RET88Y').situacao, 'BLOQUEADA');
+  });
+
+  teste('quem decide é a COLUNA do canal, não o nome dele', () => {
+    /*
+      A regra mora em CANAIS.ConfereSusepBloqueada. Se estivesse escrita no
+      código com o nome "Mesa Diamante", mudar a regra — ou criar um canal novo
+      que também dispensa a conferência — viraria mexer em código.
+    */
+    const daTela = chamar('listarCanaisConfiguraveis()')
+      .find((c) => c.aba === 'BASE_MESA');
+    igual(daTela.confereSusepBloqueada, false,
+      'a tela de Configurações mostra o campo, para ele poder trocar');
+
+    chamar('salvarCanal')(Object.assign({}, daTela,
+      { confereSusepBloqueada: true }));
+    igual(chamar('consultarSusep')('RET88Y', canalDiamante.id).situacao,
+      'BLOQUEADA', 'marcado, a Mesa volta a conferir');
+
+    chamar('salvarCanal')(Object.assign({}, daTela,
+      { confereSusepBloqueada: false }));
+    igual(chamar('consultarSusep')('RET88Y', canalDiamante.id).situacao,
+      'NAO_ENCONTRADA', 'e desmarcado, volta a não conferir');
+  });
+
+  teste('canal cadastrado ANTES desta coluna continua conferindo', () => {
+    // Vazio vale SIM. Um canal que nunca ouviu falar desta coluna não pode
+    // deixar de conferir por omissão — ele faria menos do que já fazia.
+    const ret = chamar('lerRegistros_("CANAIS")')
+      .find((c) => String(c.Aba) === 'BASE_RET');
+    chamar('atualizarRegistro_')('CANAIS', ret.Id, { ConfereSusepBloqueada: '' });
+    chamar('esquecerEstruturaLida_()');
+
+    igual(chamar('consultarSusep')('RET88Y', canalRet.id).situacao, 'BLOQUEADA');
+    chamar('atualizarRegistro_')('CANAIS', ret.Id, { ConfereSusepBloqueada: 'SIM' });
+    chamar('esquecerEstruturaLida_()');
+  });
+
+  teste('a tela preenche a corretora pela SUSEP, e respeita o que foi digitado', () => {
+    const peca = lerPeca('Comuns');
+    contem(peca, 'function preencherCorretoraDaSusep');
+    contem(peca, "Servidor.chamar('consultarSusep', valor, idDoCanal)");
+    contem(peca, 'data-veio-da-susep',
+      'é o que distingue "campo vazio" de "a pessoa digitou outro nome"');
+    contem(peca, "if (agora !== '' && agora !== oQueEuPreenchi) return;");
+  });
+
   secao('O selo da SUSEP');
 
-  teste('SUSEP no cadastro de canais volta liberada, com o segmento', () => {
+  teste('SUSEP com LETRA é aceita, e volta liberada com o segmento', () => {
+    /*
+     * "Todas as SUSEP's são no formato letras e números, ex: RET00J" — palavra
+     * do PO. A SUSEP era `identificador` no sistema, só dígito: "RET00J"
+     * entrava e a planilha guardava "00". Não dava erro nenhum — a corretora
+     * simplesmente nunca mais era encontrada, e o selo dizia "não encontrada"
+     * para uma corretora cadastrada.
+     */
     chamar('inserirRegistro_')('CORRETORAS', {
-      Nome: 'Corretora ABC', Canal: 'Corretora', SUSEP: '1234567',
-      Corretora: 'Corretora ABC', Segmento: 'Diamante'
+      SUSEP: 'RET00J', Corretora: 'Corretora ABC', Sucursal: '12',
+      Segmento: 'Diamante', Consultor: 'Nami'
     });
-    const resposta = chamar('consultarSusep')('123.456-7');
-    igual(resposta.situacao, 'OK', 'a busca ignora a máscara');
+
+    const resposta = chamar('consultarSusep')('RET00J');
+    igual(resposta.situacao, 'OK');
+    igual(resposta.susep, 'RET00J', 'a letra não pode ter sido jogada fora');
     igual(resposta.segmento, 'Diamante');
+    igual(resposta.sucursal, '12');
+    igual(resposta.consultor, 'Nami');
     contem(resposta.mensagem, 'liberada');
   });
 
-  teste('SUSEP bloqueada vence o cadastro de canais', () => {
-    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
-      SUSEP: '1234567', NomeCorretora: 'Corretora ABC',
-      Motivo: 'CPF reincidente'
-    });
-    const resposta = chamar('consultarSusep')('1234567');
-    igual(resposta.situacao, 'BLOQUEADA');
-    contem(resposta.mensagem, 'bloqueada');
-    igual(resposta.motivo, 'CPF reincidente');
+  teste('a busca da SUSEP ignora caixa e pontuação', () => {
+    // Quem digita "ret-00j" quer dizer a mesma SUSEP. O que se GRAVA é o que
+    // a pessoa escreveu; só a comparação é normalizada.
+    igual(chamar('consultarSusep')('ret00j').situacao, 'OK');
+    igual(chamar('consultarSusep')('ret-00j').situacao, 'OK');
+    igual(chamar('consultarSusep')(' RET00J ').situacao, 'OK');
   });
 
-  teste('SUSEP fora do cadastro responde "não encontrada", que não é erro', () => {
-    const resposta = chamar('consultarSusep')('9999999');
+  teste('CORRETORA DIAMANTE VENCE a lista de bloqueadas', () => {
+    /*
+     * A regra que o PO pediu nesta rodada, com estas palavras: "corretoras
+     * Diamante não podem ter status de bloqueada por gentileza mesmo que o
+     * SUSEP esteja na lista de bloqueadas. Pertence a outra lista".
+     *
+     * Era o contrário: o bloqueio vencia o cadastro. São duas listas, de dois
+     * donos — e a ORDEM da consulta é a regra inteira.
+     */
+    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
+      SUSEP: 'RET00J', NomeCorretora: 'Corretora ABC',
+      Sucursal: '12', CoordenadorComercial: 'Coordenação Sul'
+    });
+
+    const resposta = chamar('consultarSusep')('RET00J');
+    igual(resposta.situacao, 'OK',
+      'está nas duas listas, e o cadastro de corretoras ganha');
+    igual(resposta.segmento, 'Diamante');
+  });
+
+  teste('SUSEP que SÓ está bloqueada volta bloqueada, com o coordenador', () => {
+    // O outro lado da mesma regra: fora do cadastro de corretoras, o bloqueio
+    // vale — senão a lista de bloqueios não serviria para nada.
+    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
+      SUSEP: 'RET99Z', NomeCorretora: 'Corretora Bloqueada',
+      Sucursal: '58', CoordenadorComercial: 'Coordenação Norte'
+    });
+
+    const resposta = chamar('consultarSusep')('RET99Z');
+    igual(resposta.situacao, 'BLOQUEADA');
+    contem(resposta.mensagem, 'bloqueada');
+    igual(resposta.sucursal, '58');
+    igual(resposta.coordenadorComercial, 'Coordenação Norte',
+      'é a quem perguntar quando o selo vermelho aparecer');
+  });
+
+  teste('SUSEP fora das duas listas responde "não encontrada", que não é erro', () => {
+    const resposta = chamar('consultarSusep')('ZZZ999');
     igual(resposta.situacao, 'NAO_ENCONTRADA');
     igual(resposta.segmento, 'Não encontrado');
+    contem(resposta.mensagem, 'cadastro de corretoras');
   });
 
   secao('A máscara, do lado da tela');
@@ -808,6 +994,223 @@ function rodarTestesDeCadastro() {
     // dois formulários existem ao mesmo tempo na página. Sem prefixo, os
     // elementos teriam o mesmo id e editar escreveria no cadastro.
     contem(modal, "Formulario.desenhar(formulario, 'editar-')");
+  });
+
+  /*
+   * ==========================================================================
+   * PROPOSTA E APÓLICE — digitadas inteiras, gravadas em pedaços
+   * ==========================================================================
+   * "No cadastrar caso da RET já traga por padrão o número da proposta e ele
+   * vem separado por 1 hífen ex 7-0000000 ou 58-0000000 podem ser 2 números ou
+   * um mas na planilha deve vir em colunas separadas (...) em apólice faremos
+   * igual a diferença é que serão 2 hífens ex 12-1391-0000000."
+   *
+   * Aqui o erro perigoso não é a recusa: é gravar no lugar errado em silêncio.
+   * O número da proposta de um caso na coluna do código de outro não dá erro
+   * nenhum — só quebra a junção do relatório, meses depois.
+   * ==========================================================================
+   */
+  secao('Proposta e apólice em colunas separadas');
+
+  const campoDaRet = (chave) => chamar('formularioDoCanal')(canalRet.id).secoes
+    .reduce((soma, s) => soma.concat(s.campos), [])
+    .find((campo) => campo.chave === chave);
+
+  teste('o formulário da RET traz UM campo de proposta, com a dica do formato', () => {
+    const proposta = campoDaRet('numerodaproposta');
+    verdadeiro(proposta !== undefined, 'o campo tem de estar no formulário');
+    igual(proposta.rotulo, 'Número da proposta');
+    contem(proposta.descricao, '7-0000000',
+      'a dica mostra o formato na hora de digitar — é o único lugar em que '
+      + 'ela chega a tempo');
+
+    // E o campo do código fica FORA da tela, porque o pedaço dele vem do
+    // mesmo campo. A coluna continua existindo e recebendo o valor.
+    verdadeiro(campoDaRet('codigoorigemdaproposta') === undefined,
+      'o código não é mais um campo separado na tela');
+    verdadeiro(campoDaRet('codsucursal') === undefined);
+    verdadeiro(campoDaRet('codramo') === undefined);
+    verdadeiro(campoDaRet('novocodorigemproposta') === undefined);
+  });
+
+  teste('a proposta com um hífen vai para duas colunas', () => {
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Proposta de um dígito',
+      numerodaproposta: '7-0000000',
+      status: 'Não trabalhado'
+    });
+
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['Código origem da proposta']), '7');
+    igual(String(linha['número da proposta']), '0000000');
+  });
+
+  teste('o código pode ter dois dígitos — era o exemplo do PO', () => {
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Proposta de dois dígitos',
+      numerodaproposta: '58-0000000',
+      status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['Código origem da proposta']), '58');
+    igual(String(linha['número da proposta']), '0000000');
+  });
+
+  teste('a apólice com dois hífens vai para três colunas', () => {
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Com apólice',
+      numapolice: '12-1391-0000000',
+      status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['cod_sucursal']), '12');
+    igual(String(linha['cod_ramo']), '1391');
+    igual(String(linha['Num_apolice']), '0000000');
+  });
+
+  teste('a nova proposta segue a mesma regra da proposta', () => {
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Com nova proposta',
+      novonumerodaproposta: '9-1234567',
+      status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['Novo cod origem proposta']), '9');
+    igual(String(linha['novo numero da proposta']), '1234567');
+  });
+
+  teste('o zero à esquerda do número sobrevive à gravação', () => {
+    /*
+     * A conferência que o Power BI depende. "0000000" lido como número viraria
+     * 0, e a junção com a base da seguradora pararia de casar — sem erro
+     * nenhum, só sem resultado. As colunas são de identificador justamente
+     * por isso, e este teste é o que garante que continuam sendo.
+     */
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Zero à esquerda',
+      numerodaproposta: '7-0012345',
+      status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['número da proposta']), '0012345',
+      'veio "' + linha['número da proposta'] + '"');
+  });
+
+  teste('sem hífen é recusado, e o recado mostra o formato e as colunas', () => {
+    /*
+     * O caso mais importante de todos. "70000000" não dá para partir: ninguém
+     * sabe se o código é "7" ou "70". Adivinhar gravaria errado em silêncio, e
+     * é exatamente o tipo de defeito que só aparece no relatório, meses
+     * depois, quando a junção não casa e ninguém liga uma coisa à outra.
+     */
+    const erro = lanca(() => chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Sem hífen', numerodaproposta: '70000000',
+      status: 'Não trabalhado'
+    }), 'Número da proposta');
+    contem(erro.message, '7-0000000', 'o recado mostra o formato certo');
+    contem(erro.message, 'Código origem da proposta',
+      'e diz para quais colunas cada pedaço vai');
+  });
+
+  teste('pedaço a mais, a menos, vazio ou com letra é recusado', () => {
+    /*
+     * A quantidade de pedaços é cobrada CONTRA O CAMPO, e não em geral:
+     * "12-1391" é um valor legítimo para a proposta, que pede dois pedaços, e
+     * é inválido para a apólice, que pede três. Foi o que a primeira versão
+     * deste teste errou — ela cobrava "12-1391" como torto no campo da
+     * proposta, onde ele está certo.
+     */
+    const tortosDaProposta = ['7-00-000', '7-', '-0000000', '7-ABC0000',
+      '7-00-00-00'];
+    tortosDaProposta.forEach((torto) => {
+      lanca(() => chamar('cadastrarCaso')(canalRet.id, {
+        nomedocliente: 'Torto ' + torto,
+        numerodaproposta: torto, status: 'Não trabalhado'
+      }), 'Escreva com', 'a proposta deveria recusar "' + torto + '"');
+    });
+
+    const tortosDaApolice = ['12-1391', '12-1391-0000000-9', '121391000000',
+      '12-13A1-0000000'];
+    tortosDaApolice.forEach((torto) => {
+      lanca(() => chamar('cadastrarCaso')(canalRet.id, {
+        nomedocliente: 'Torto ' + torto,
+        numapolice: torto, status: 'Não trabalhado'
+      }), 'Escreva com', 'a apólice deveria recusar "' + torto + '"');
+    });
+
+    // E o mesmo texto que a apólice recusa, a proposta ACEITA: a regra é do
+    // campo, não do sistema.
+    const valeNaProposta = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Dois pedaços', numerodaproposta: '12-1391',
+      status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(valeNaProposta.id || valeNaProposta), 1)[0];
+    igual(String(linha['Código origem da proposta']), '12');
+    igual(String(linha['número da proposta']), '1391');
+  });
+
+  teste('recusado é recusado: nada entra pela metade', () => {
+    const antes = chamar('lerRegistros_("BASE_RET")').length;
+    lanca(() => chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Não deve entrar', numerodaproposta: '70000000',
+      status: 'Não trabalhado'
+    }), 'Escreva com');
+    igual(chamar('lerRegistros_("BASE_RET")').length, antes,
+      'nenhuma linha pode ter sido gravada');
+  });
+
+  teste('campo em branco não grava nada, e não recusa', () => {
+    // A proposta não é obrigatória: um caso pode chegar sem ela. Recusar o
+    // vazio obrigaria a inventar um número para cadastrar.
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Sem proposta', status: 'Não trabalhado'
+    });
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id',
+      String(salvo.id || salvo), 1)[0];
+    igual(String(linha['Código origem da proposta'] || ''), '');
+    igual(String(linha['número da proposta'] || ''), '');
+  });
+
+  teste('abrir para editar devolve a proposta JUNTA, com o hífen', () => {
+    /*
+     * Sem isto o campo voltaria VAZIO na edição — ele procura a coluna do
+     * próprio campo, e o valor está em duas. A pessoa salvaria achando que não
+     * mexeu nele, e o vazio apagaria as duas colunas. É o defeito pior desta
+     * mudança: perde dado sem nenhum erro na tela.
+     */
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Para editar', numerodaproposta: '58-7654321',
+      numapolice: '12-1391-0000111', status: 'Não trabalhado'
+    });
+
+    const aberto = chamar('casoParaEditar')(canalRet.id, String(salvo.id || salvo));
+    igual(aberto.valores.numerodaproposta, '58-7654321');
+    igual(aberto.valores.numapolice, '12-1391-0000111');
+  });
+
+  teste('editar e salvar de volta mantém as colunas separadas', () => {
+    const salvo = chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Ida e volta', numerodaproposta: '7-1111111',
+      status: 'Não trabalhado'
+    });
+    const id = String(salvo.id || salvo);
+
+    const aberto = chamar('casoParaEditar')(canalRet.id, id);
+    chamar('editarCaso')(canalRet.id, id, Object.assign({}, aberto.valores, {
+      nomedocliente: 'Ida e volta, editado'
+    }));
+
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id', id, 1)[0];
+    igual(String(linha['Código origem da proposta']), '7',
+      'o código não pode ter se perdido na ida e volta');
+    igual(String(linha['número da proposta']), '1111111');
+    igual(String(linha['nome do cliente']), 'Ida e volta, editado');
   });
 }
 

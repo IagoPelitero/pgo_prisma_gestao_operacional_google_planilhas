@@ -433,16 +433,18 @@ function rodarTestesDaCasca() {
       'apagar o nome volta ao de fábrica, e não a vazio');
   });
 
-  teste('a pessoa aparece com nome e cargo, e o canal quando existe', () => {
+  teste('a pessoa aparece com nome e cargo', () => {
+    // O "Canal que atende" saiu do cadastro a pedido do PO: era texto livre
+    // que duplicava o que o nível de acesso já diz. A barra ficou com o que
+    // identifica a pessoa — nome, cargo e as iniciais.
     const { Moldura } = carregarScriptDaTela('Moldura');
     const pacote = chamar('pacoteDePartida()');
     pacote.usuario.nome = 'Ana Martins';
     pacote.usuario.cargo = 'Analista RET';
-    pacote.usuario.canalQueAtende = 'Vida Individual';
 
     const barra = Moldura.montarSuperior(pacote);
     contem(barra, '<strong>Ana Martins</strong>');
-    contem(barra, 'Analista RET · Vida Individual');
+    contem(barra, 'Analista RET');
     contem(barra, '>AM<', 'as iniciais no círculo');
   });
 

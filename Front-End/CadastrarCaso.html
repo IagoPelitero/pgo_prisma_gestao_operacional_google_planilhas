@@ -45,7 +45,7 @@ var TelaCadastrarCaso = (function () {
     Servidor.chamar('formularioDoCanal', canalEscolhida)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
-        Formulario.ligar(corpo(), '');
+        Formulario.ligar(corpo(), '', canalEscolhida);
         // Só no cadastro NOVO. No caso já gravado quem manda é o valor da
         // planilha — um padrão por cima dele seria perda silenciosa de dado.
         Formulario.aplicarPadroes(corpo(), resposta);

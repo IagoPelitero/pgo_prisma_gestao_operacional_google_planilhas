@@ -298,7 +298,7 @@ const RECC_ESQUEMA = {
       { cabecalho: 'id', tipo: 'identificador', protegido: true },
       { cabecalho: 'data de recepção do protocolo', tipo: 'data', protegido: true },
       { cabecalho: 'analista', tipo: 'texto', protegido: true },
-      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: true },
       { cabecalho: 'segmento', tipo: 'texto', protegido: true },
       { cabecalho: 'Código origem da proposta', tipo: 'identificador', protegido: true },
       { cabecalho: 'número da proposta', tipo: 'identificador', protegido: true },
@@ -397,7 +397,7 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Nome do segurado', tipo: 'texto', protegido: true },
       { cabecalho: 'Documento (CPF)', tipo: 'identificador', protegido: true },
       { cabecalho: 'Corretora', tipo: 'texto', protegido: true },
-      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: true },
       { cabecalho: 'Ramo', tipo: 'texto', protegido: true },
       { cabecalho: 'Assunto', tipo: 'texto', protegido: true },
       { cabecalho: 'Área responsável', tipo: 'texto', protegido: true },
@@ -462,7 +462,7 @@ const RECC_ESQUEMA = {
 
       { cabecalho: 'Quantidade de vidas', tipo: 'numero', protegido: true },
       { cabecalho: 'MOVSINT/MOVESEG', tipo: 'texto', protegido: true },
-      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: true },
       { cabecalho: 'Periodicidade', tipo: 'texto', protegido: true },
       { cabecalho: 'Lead', tipo: 'texto', protegido: true },
       { cabecalho: 'Status', tipo: 'texto', protegido: true },
@@ -500,51 +500,54 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Email', tipo: 'texto', protegido: true },
-      { cabecalho: 'Canal que atende', tipo: 'texto', protegido: false },
       // O canal em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
       // administrador: quem administra não pertence a um canal, atende as
       // duas e delega para quem for. Exigir canal dele obrigaria a inventar
       // uma resposta para uma pergunta que não se aplica.
+      //
+      // Saíram daqui "Canal que atende" e "Matricula", a pedido do PO: o
+      // primeiro era texto livre que duplicava o que o NÍVEL já diz, e o
+      // segundo não tinha uso. A migração tira as duas de quem já instalou,
+      // sem perder o resto do cadastro.
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
-      { cabecalho: 'Matricula', tipo: 'identificador', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true },
       { cabecalho: 'DataCadastro', tipo: 'dataHora', protegido: true },
       { cabecalho: 'UltimoAcesso', tipo: 'dataHora', protegido: true }
     ]
   },
 
+  /*
+   * AS CORRETORAS DIAMANTE — as cinco colunas que o PO pediu, nesta ordem.
+   *
+   * "Ela deve ser SUSEP, Nome corretora, Sucursal, Segmento e consultor."
+   *
+   * Saíram duas: `Nome`, que duplicava `Corretora` sem ninguém saber qual era
+   * qual, e `Canal`, que a operação não usa nesta tabela. Entrou `Sucursal`.
+   *
+   * A SUSEP é TEXTO, e isto é a mudança que mais pega quem leu o código
+   * antigo: ela era `identificador`, só dígito. O PO corrigiu — "todas as
+   * SUSEP's são no formato letras e números, ex: RET00J". Comparar SUSEP
+   * passou a ser comparar TEXTO (`chaveDaSusep_`), e usar
+   * `converterParaIdentificador_` nela hoje jogaria as letras fora em
+   * silêncio: "RET00J" viraria "00".
+   */
   CORRETORAS: {
     aba: 'CORRETORAS',
-    titulo: 'Canais, corretores e agentes',
+    titulo: 'Corretoras Diamante',
     controle: true,
     reserva: 1000,
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
-      { cabecalho: 'Canal', tipo: 'texto', protegido: true },
-      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: true },
       { cabecalho: 'Corretora', tipo: 'texto', protegido: true },
+      { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
       { cabecalho: 'Segmento', tipo: 'texto', protegido: true },
       // Quem atende a corretora. Vem na mesma lista que a operação já mantém
       // fora do sistema — 145 corretoras e mais de 7 mil SUSEPs —, e por isso
       // entra pela importação em lote, não digitado uma linha por vez.
       { cabecalho: 'Consultor', tipo: 'texto', protegido: false }
-    ]
-  },
-
-  // Código e descrição NUNCA dividem a mesma célula. Vale aqui e vale para
-  // proposta, sucursal, ramo e apólice nas bases.
-  PRODUTOS: {
-    aba: 'PRODUTOS',
-    titulo: 'Produtos',
-    controle: true,
-    reserva: 500,
-    colunas: [
-      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'Produto', tipo: 'texto', protegido: true },
-      { cabecalho: 'CodigoProduto', tipo: 'identificador', protegido: true }
     ]
   },
 
@@ -587,6 +590,20 @@ const RECC_ESQUEMA = {
     ]
   },
 
+  /*
+   * AS SUSEPs BLOQUEADAS — outra lista, com outras perguntas.
+   *
+   * "SUSEP's bloqueadas deve pedir: SUSEP, Corretora, Sucursal e coordenador
+   * comercial."
+   *
+   * Saíram do contrato `Motivo` e `CpfReincidente`, que o PO não listou. Numa
+   * planilha que já tem dado elas FICAM onde estão, fora do contrato: o
+   * sistema para de perguntar e de ler, e ninguém perde o que já escreveu.
+   * Apagar coluna com dado dentro nunca é decisão de uma migração.
+   *
+   * `BloqueadaEm` fica porque não é pergunta: é o sistema que a escreve, no
+   * dia em que o bloqueio nasce.
+   */
   SUSEP_BLOQUEADAS: {
     aba: 'SUSEP_BLOQUEADAS',
     titulo: 'SUSEPs bloqueadas',
@@ -594,10 +611,10 @@ const RECC_ESQUEMA = {
     reserva: 500,
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'SUSEP', tipo: 'identificador', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: true },
       { cabecalho: 'NomeCorretora', tipo: 'texto', protegido: true },
-      { cabecalho: 'CpfReincidente', tipo: 'identificador', protegido: true },
-      { cabecalho: 'Motivo', tipo: 'texto', protegido: false },
+      { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
+      { cabecalho: 'CoordenadorComercial', tipo: 'texto', protegido: false },
       { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false }
     ]
   },
@@ -641,6 +658,40 @@ const RECC_ESQUEMA = {
       { cabecalho: 'MetaMensalPorPessoa', tipo: 'numero', protegido: false },
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
+      /*
+       * O DINHEIRO DESTE CANAL, e quais situações merecem barra própria no
+       * gráfico de valor por situação.
+       *
+       * Pedido do PO: "traga na produtividade RECC gráfico com valor dos
+       * retidos, não retidos, sem sucesso, valor dos demais status e total. O
+       * mesmo em minha performance".
+       *
+       * Mora aqui, e não escrito no código, porque é decisão de operação: a
+       * RET mede prêmio, outro canal pode medir outra coisa, e quais situações
+       * são o desfecho que importa muda com o tempo. As DUAS em branco
+       * desligam o gráfico — canal que não declarou o que é valor para ele não
+       * ganha um gráfico de valor inventado.
+       */
+      { cabecalho: 'ColunaDoValor', tipo: 'texto', protegido: false },
+      { cabecalho: 'SituacoesDestacadas', tipo: 'textoLongo', protegido: false },
+      /*
+       * ESTE CANAL CONFERE A LISTA DE SUSEPs BLOQUEADAS?
+       *
+       * Pedido do PO: "no formulário de Mesa diamante não há necessidade de
+       * verificar se a SUSEP está ou não bloqueada, pode remover esse
+       * detalhe". A Mesa atende corretora Diamante; a lista de bloqueios é de
+       * outra área e de outro propósito.
+       *
+       * Mora aqui como coluna, e não escrito no código com o nome "Mesa",
+       * porque é regra de OPERAÇÃO e muda: amanhã um canal novo pode querer a
+       * conferência, e a Mesa pode voltar a querer. Vazio vale SIM — um canal
+       * que nunca ouviu falar desta coluna continua conferindo, que é o
+       * comportamento que já existia.
+       *
+       * Não conferir também custa menos: é uma leitura de coluna a menos na
+       * aba de 16 mil SUSEPs bloqueadas, a cada SUSEP digitada.
+       */
+      { cabecalho: 'ConfereSusepBloqueada', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }
@@ -784,64 +835,6 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
       { cabecalho: 'AtualizadoPor', tipo: 'identificador', protegido: false },
       { cabecalho: 'Data', tipo: 'dataHora', protegido: false }
-    ]
-  },
-
-  /*
-   * AS AUSÊNCIAS — quem está fora, de quando até quando.
-   *
-   * Existe porque `Ativo` em USUARIOS é um interruptor SEM DATA: serve para
-   * quem saiu da operação, não para quem volta dia 3. Usar `Ativo` para férias
-   * custaria duas coisas — perder o motivo (saiu? está de férias? foi
-   * desligado?) e depender de alguém lembrar de religar no dia certo.
-   *
-   * O efeito, decidido pelo PO, é sobre a CONTA e não sobre o acesso: quem
-   * está de férias continua entrando no sistema, e some das metas e das médias
-   * pelos dias em que não tinha como trabalhar.
-   */
-  AUSENCIAS: {
-    aba: 'AUSENCIAS',
-    titulo: 'Ausências',
-    controle: true,
-    reserva: 500,
-    colunas: [
-      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'UsuarioId', tipo: 'identificador', protegido: true },
-      // Vem do catálogo (AUSENCIA_MOTIVO): férias, licença, afastamento,
-      // treinamento. A operação acrescenta outros sem programador.
-      { cabecalho: 'Motivo', tipo: 'texto', protegido: true },
-      { cabecalho: 'De', tipo: 'data', protegido: true },
-      { cabecalho: 'Ate', tipo: 'data', protegido: true },
-      { cabecalho: 'Observacao', tipo: 'textoLongo', protegido: false }
-    ]
-  },
-
-  /*
-   * OS FERIADOS que o administrador mantém.
-   *
-   * Os NACIONAIS o sistema calcula sozinho, inclusive os móveis — e por isso
-   * NÃO precisam ser cadastrados aqui (ver `feriadosNacionaisDoAno_`). Esta aba
-   * é para o que só a operação sabe: o feriado municipal de São Paulo, o ponto
-   * facultativo que a área de fato não trabalha, a emenda.
-   *
-   * `Trabalha` responde nos dois sentidos. NAO (o padrão) é "este dia não se
-   * trabalha". SIM é o contrário, e serve para o ano em que a operação
-   * trabalhou num feriado que o sistema calculou — sem isso, a única saída
-   * seria mexer no código.
-   */
-  FERIADOS: {
-    aba: 'FERIADOS',
-    titulo: 'Feriados',
-    controle: true,
-    reserva: 300,
-    colunas: [
-      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      { cabecalho: 'Data', tipo: 'data', protegido: true },
-      { cabecalho: 'Nome', tipo: 'texto', protegido: true },
-      // Municipal, Estadual, Facultativo — ou o que a operação chamar. É
-      // rótulo para quem lê a lista; a conta não olha para ele.
-      { cabecalho: 'Tipo', tipo: 'texto', protegido: false },
-      { cabecalho: 'Trabalha', tipo: 'simOuNao', protegido: false }
     ]
   },
 
@@ -1221,7 +1214,7 @@ var estruturasJaLidas = {};
  */
 var RECC_ABAS_QUE_VALE_GUARDAR = [
   'CONFIG', 'CATALOGO', 'CORRETORAS', 'CAMPOS', 'PAINEIS', 'ANALISES',
-  'NIVEIS_ACESSO', 'USUARIOS', 'PRODUTOS'
+  'NIVEIS_ACESSO', 'USUARIOS'
 ];
 
 var registrosJaLidos = {};
@@ -1348,6 +1341,32 @@ function normalizarParaComparar_(texto) {
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * A SUSEP em forma de CHAVE, para comparar, indexar e achar.
+ *
+ * A SUSEP é LETRA E NÚMERO — "RET00J", palavra do PO. Por isso ela não passa
+ * por `converterParaIdentificador_`: aquela função guarda só dígito, e
+ * "RET00J" sairia dela como "00", casando com qualquer outra SUSEP que
+ * terminasse em dois zeros. Um bloqueio aplicado à corretora errada não dá
+ * erro nenhum — só recusa a pessoa errada, um dia, no telefone.
+ *
+ * Existe como função com nome, e não como `normalizarParaComparar_` espalhado,
+ * para que quem for mexer nisto daqui a um ano leia POR QUE a SUSEP se compara
+ * assim, em vez de "arrumar" o código de volta para identificador.
+ *
+ * O que se GRAVA na planilha é o que a pessoa escreveu, sem as pontas. Só a
+ * COMPARAÇÃO é normalizada: reescrever a SUSEP de todo mundo em maiúscula
+ * mexeria em dado que ninguém pediu para mexer.
+ */
+function chaveDaSusep_(valor) {
+  return normalizarParaComparar_(valor);
+}
+
+/** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
+function susepComoSeEscreve_(valor) {
+  return String(valor === null || valor === undefined ? '' : valor).trim();
 }
 
 /** Só os dígitos. É assim que identificador é comparado e gravado. */
@@ -1617,7 +1636,6 @@ function formatosDaLinha_(estrutura) {
 const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
   'CORRETORAS',
   'SUSEP_BLOQUEADAS',
-  'PRODUTOS',
   'ANALISTAS_CENTRAL',
   'ANALISTAS_COBRANCA'
 ];
@@ -1629,7 +1647,7 @@ const RECC_CHAVE_DA_PLANILHA_DE_CADASTROS = 'CADASTROS.PLANILHA_ID';
  * A planilha de cadastros aberta, guardada pela execução inteira.
  *
  * `SpreadsheetApp.openById` é uma IDA ao serviço, das caras. Sem isto, uma
- * tela que lê corretoras, produtos e SUSEPs pagaria três aberturas da MESMA
+ * tela que lê corretoras, SUSEPs e analistas pagaria três aberturas da MESMA
  * planilha na mesma execução. Como cada `google.script.run` é uma execução
  * nova, a variável nasce vazia a cada chamada — não há risco de servir uma
  * planilha velha.
@@ -2377,6 +2395,116 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
   esquecerEstruturaLida_();
 
   return { aba: nomeDaAba, cabecalho: texto, tipo: tipo, coluna: nova };
+}
+
+/**
+ * Garante que a aba tenha as quatro colunas de controle do sistema.
+ *
+ * Elas são o que faz a exclusão lógica existir: sem `_Visivel`, "excluir um
+ * caso" só poderia significar apagar a linha, e o PGO não apaga linha de caso.
+ *
+ * NÃO passa por `adicionarColuna_`, de propósito: aquela função registra a
+ * coluna em CAMPOS, e coluna de controle não é campo de formulário — ela
+ * apareceria em Cadastrar Caso pedindo para alguém digitar "_ExcluidoPor".
+ *
+ * Devolve os cabeçalhos que criou. Nada acontece se já estiverem todas lá, e
+ * por isso ela é segura de chamar de novo.
+ */
+function garantirColunasDeControle_(nomeDaAba) {
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
+
+  var criadas = [];
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(25000)) {
+    throw new Error('A planilha está ocupada. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(nomeDaAba);
+    var estrutura = estruturaDaAba_(nomeDaAba, true);
+    var aba = estrutura.aba;
+    var proxima = estrutura.cabecalhos.length;
+
+    RECC_COLUNAS_DE_CONTROLE.forEach(function (coluna) {
+      if (posicaoDaColuna_(estrutura, coluna.cabecalho) >= 0) return;
+      proxima++;
+      if (aba.getMaxColumns() < proxima) {
+        aba.insertColumnsAfter(aba.getMaxColumns(), proxima - aba.getMaxColumns());
+      }
+      aba.getRange(1, proxima).setNumberFormat('@');
+      aba.getRange(1, proxima).setValue(coluna.cabecalho).setFontWeight('bold');
+      var altura = Math.max(aba.getMaxRows() - 1, 1);
+      aba.getRange(2, proxima, altura, 1)
+        .setNumberFormat(RECC_FORMATO_DA_CELULA[coluna.tipo] || '@');
+      criadas.push(coluna.cabecalho);
+      // A estrutura em memória acabou de ficar velha: a próxima conferência
+      // de posição tem de ver a coluna que acabou de nascer.
+      esquecerEstruturaLida_(nomeDaAba);
+      estrutura = estruturaDaAba_(nomeDaAba, true);
+      aba = estrutura.aba;
+    });
+  } finally {
+    trava.releaseLock();
+  }
+
+  esquecerEstruturaLida_();
+  return criadas;
+}
+
+/**
+ * Apaga uma coluna da aba — e, com ela, o que estava gravado nela.
+ *
+ * É a ação mais destrutiva do sistema, e a única que apaga dado de TODOS os
+ * casos de uma vez. Não existe desfazer: a coluna sai da grade, e os valores
+ * de todas as linhas saem junto.
+ *
+ * Por isso ela não é chamada por nenhuma gravação comum. Só o administrador
+ * chega aqui, pela tela, com senha, e depois de confirmar o cabeçalho.
+ *
+ * Devolve quantas linhas tinham algum valor naquela coluna — é o número que a
+ * auditoria guarda, e o único vestígio de quanto dado foi embora.
+ */
+function removerColuna_(nomeDaAba, cabecalho) {
+  exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
+  var texto = String(cabecalho || '').trim();
+  if (!texto) throw new Error('Diga qual coluna deve sair.');
+
+  var quantasTinhamValor = 0;
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(25000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(nomeDaAba);
+    var estrutura = estruturaDaAba_(nomeDaAba, true);
+    var posicao = posicaoDaColuna_(estrutura, texto);
+    if (posicao < 0) {
+      throw new Error('A aba "' + nomeDaAba + '" não tem coluna "' + texto + '".');
+    }
+
+    // Contado ANTES de apagar, porque depois não há de onde contar. Serve de
+    // recado honesto: "saíram 1.248 valores" diz mais que "coluna removida".
+    var aba = estrutura.aba;
+    var altura = Math.max(aba.getMaxRows() - 1, 0);
+    if (altura > 0) {
+      aba.getRange(2, posicao + 1, altura, 1).getValues().forEach(function (linha) {
+        if (String(linha[0] === null || linha[0] === undefined ? '' : linha[0]).trim()) {
+          quantasTinhamValor++;
+        }
+      });
+    }
+
+    aba.deleteColumns(posicao + 1, 1);
+
+    // A grade encolheu de lado: toda POSIÇÃO de coluna guardada em memória
+    // agora aponta para a coluna seguinte. Esquecer é obrigatório, não
+    // higiene — é o mesmo cuidado que apagarRegistroDeVez_ toma com as linhas.
+    esquecerEstruturaLida_(nomeDaAba);
+  } finally {
+    trava.releaseLock();
+  }
+
+  esquecerEstruturaLida_();
+  return { aba: nomeDaAba, cabecalho: texto, linhasComValor: quantasTinhamValor };
 }
 
 /**

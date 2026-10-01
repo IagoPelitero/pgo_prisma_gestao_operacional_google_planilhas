@@ -2,12 +2,12 @@
  * ============================================================================
  * PGO — Cadastros.gs · quem traz o caso para dentro
  * ============================================================================
- * Corretoras, produtos e SUSEPs bloqueadas — e o jeito de trazer essas
+ * Corretoras Diamante e SUSEPs bloqueadas — e o jeito de trazer essas duas
  * listas de fora sem digitar uma a uma.
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. OS TRÊS CADASTROS   (era Corretoras.gs)
+ *   1. OS DOIS CADASTROS   (era Corretoras.gs)
  *   2. COLAR, CONFERIR E APLICAR EM LOTE   (era Importacao.gs)
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
@@ -32,7 +32,6 @@
  * ajustavam abrindo a planilha:
  *
  *   CORRETORAS             corretoras, corretores e agentes, com o segmento
- *   PRODUTOS           o que a operação vende
  *   SUSEP_BLOQUEADAS   quem está impedido, e por quê
  *
  * O QUE FAZ ESTA TELA VALER MAIS QUE UMA LISTA: ela cruza o cadastro com os
@@ -57,40 +56,45 @@ function tabelaDeCorretoras(procurar, segmento) {
   var quem = exigirTela_('tabelaCorretoras');
 
   var volumes = volumePorSusep_();
-  var bloqueadas = mapaDeBloqueadas_();
   var termo = normalizarParaComparar_(procurar);
-  // Os dígitos do termo, SÓ quando ele tem algum. Sem esta guarda, procurar
-  // por "agente" comparava '' contra a SUSEP — e `indexOf('')` é sempre zero,
-  // então a busca casava com o cadastro inteiro e parecia não filtrar nada.
-  var digitos = apenasDigitos_(procurar);
   var segmentoProcurado = normalizarParaComparar_(segmento);
 
   var todas = lerRegistros_('CORRETORAS').map(function (linha) {
-    var susep = converterParaIdentificador_(linha.SUSEP);
-    var bloqueio = bloqueadas[susep];
+    var susep = susepComoSeEscreve_(linha.SUSEP);
     return {
       id: linha.__id,
-      nome: String(linha.Nome || ''),
-      canal: String(linha.Canal || ''),
       susep: susep,
       corretora: String(linha.Corretora || ''),
+      sucursal: String(linha.Sucursal || ''),
       // Cadastro sem segmento não vira "Diamante" por descuido: vira o que
       // ele é, "Não encontrado", e a tela mostra isso.
       segmento: String(linha.Segmento || '') || 'Não encontrado',
-      bloqueada: !!bloqueio,
-      motivoDoBloqueio: bloqueio ? String(bloqueio.Motivo || '') : '',
-      casos: volumes.porSusep[susep] || 0
+      consultor: String(linha.Consultor || ''),
+      casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
     };
   });
 
+  /*
+   * CORRETORA DIAMANTE NÃO TEM STATUS DE BLOQUEADA, e esta tabela não cruza
+   * mais com a lista de bloqueios.
+   *
+   * Decisão do PO: "corretoras Diamante não podem ter status de bloqueada por
+   * gentileza mesmo que o SUSEP esteja na lista de bloqueadas. Pertence a
+   * outra lista". Eram duas listas com dois donos e dois propósitos, e a
+   * pastilha vermelha aqui misturava as duas — quem olhava a tabela Diamante
+   * via um bloqueio que não é dela.
+   *
+   * O mesmo vale no selo do Cadastrar Caso: ver `consultarSusep`.
+   */
   var filtradas = todas.filter(function (uma) {
     if (segmentoProcurado
       && normalizarParaComparar_(uma.segmento) !== segmentoProcurado) return false;
     if (!termo) return true;
-    if (normalizarParaComparar_(uma.nome).indexOf(termo) >= 0) return true;
     if (normalizarParaComparar_(uma.corretora).indexOf(termo) >= 0) return true;
-    if (normalizarParaComparar_(uma.canal).indexOf(termo) >= 0) return true;
-    return !!digitos && apenasDigitos_(uma.susep).indexOf(digitos) >= 0;
+    if (normalizarParaComparar_(uma.sucursal).indexOf(termo) >= 0) return true;
+    if (normalizarParaComparar_(uma.consultor).indexOf(termo) >= 0) return true;
+    // A SUSEP procura por TEXTO, e não por dígito: "RET" acha "RET00J".
+    return chaveDaSusep_(uma.susep).indexOf(termo) >= 0;
   }).sort(function (uma, outra) {
     // Quem mais traz caso primeiro: a tela existe para trabalhar, e o volume
     // é o que dá ordem de importância a uma lista de trezentos nomes.
@@ -107,7 +111,7 @@ function tabelaDeCorretoras(procurar, segmento) {
     // As SUSEPs que os casos citam e o cadastro não conhece. É o achado desta
     // tela: enquanto elas não entram, o selo do formulário diz "não
     // encontrada" toda vez, e ninguém liga uma coisa à outra.
-    foraDoCadastro: susepsForaDoCadastro_(volumes, todas, bloqueadas),
+    foraDoCadastro: susepsForaDoCadastro_(volumes, todas),
     podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR),
     // De onde vieram estes cadastros. A tela precisa dizer: editar achando que
@@ -124,6 +128,9 @@ function tabelaDeCorretoras(procurar, segmento) {
 function volumePorSusep_() {
   var porSusep = {};
   var nomePorSusep = {};
+  // Como a SUSEP aparece ESCRITA nos casos. A chave é normalizada para
+  // comparar; a tela precisa mostrar "RET00J", e não "ret00j".
+  var comoSeEscreve = {};
 
   canaisVisiveis_().forEach(function (canal) {
     var estrutura;
@@ -149,37 +156,46 @@ function volumePorSusep_() {
       ? lerColunaInteira_(canal.aba, colunaDaCorretora) : [];
 
     for (var i = 0; i < suseps.length; i++) {
-      var susep = converterParaIdentificador_(suseps[i]);
+      // A chave é de TEXTO: a SUSEP tem letra. Ver chaveDaSusep_.
+      var susep = chaveDaSusep_(suseps[i]);
       if (!susep) continue;
       porSusep[susep] = (porSusep[susep] || 0) + 1;
+      if (!comoSeEscreve[susep]) comoSeEscreve[susep] = susepComoSeEscreve_(suseps[i]);
       if (!nomePorSusep[susep] && corretoras[i]) {
         nomePorSusep[susep] = String(corretoras[i]);
       }
     }
   });
 
-  return { porSusep: porSusep, nomePorSusep: nomePorSusep };
+  return {
+    porSusep: porSusep,
+    nomePorSusep: nomePorSusep,
+    comoSeEscreve: comoSeEscreve
+  };
 }
 
 /** As SUSEPs que aparecem nos casos e não estão no cadastro de canais. */
-function susepsForaDoCadastro_(volumes, cadastradas, bloqueadas) {
+function susepsForaDoCadastro_(volumes, cadastradas) {
   var conhecidas = {};
   cadastradas.forEach(function (uma) {
-    if (uma.susep) conhecidas[uma.susep] = true;
-  });
-  // Uma SUSEP BLOQUEADA também é conhecida: o selo do formulário mostra o
-  // bloqueio, e não "não encontrada". Listá-la aqui daria um aviso que não
-  // corresponde ao que a pessoa vê na outra tela — e aviso que não bate com
-  // a realidade é o tipo de coisa que a operação aprende a ignorar.
-  Object.keys(bloqueadas || {}).forEach(function (susep) {
-    conhecidas[susep] = true;
+    if (uma.susep) conhecidas[chaveDaSusep_(uma.susep)] = true;
   });
 
+  /*
+   * A LISTA DE BLOQUEADAS NÃO CONTA MAIS COMO "CONHECIDA".
+   *
+   * Contava, enquanto o selo do formulário mostrava o bloqueio: uma SUSEP
+   * bloqueada era reconhecida, e listá-la como "fora do cadastro" seria um
+   * aviso que não batia com a tela. Agora o selo ignora o bloqueio quando a
+   * corretora é Diamante, e as duas listas são de donos diferentes — uma
+   * SUSEP que só está na lista de bloqueios continua FORA do cadastro de
+   * corretoras, e é isso que esta lista existe para dizer.
+   */
   var fora = [];
   Object.keys(volumes.porSusep).forEach(function (susep) {
     if (conhecidas[susep]) return;
     fora.push({
-      susep: susep,
+      susep: volumes.comoSeEscreve[susep] || susep,
       // O nome que os próprios casos usam. É um palpite, e a tela diz que é:
       // ele serve para a pessoa reconhecer a corretora, não para cadastrar
       // no automático.
@@ -189,14 +205,6 @@ function susepsForaDoCadastro_(volumes, cadastradas, bloqueadas) {
   });
 
   return fora.sort(function (uma, outra) { return outra.casos - uma.casos; });
-}
-
-function mapaDeBloqueadas_() {
-  var mapa = {};
-  lerRegistros_('SUSEP_BLOQUEADAS').forEach(function (linha) {
-    mapa[converterParaIdentificador_(linha.SUSEP)] = linha;
-  });
-  return mapa;
 }
 
 /** Os segmentos que aparecem, para o filtro não ser uma lista escrita à mão. */
@@ -227,15 +235,18 @@ function salvarCorretora(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
 
-  var susep = converterParaIdentificador_(dados.susep);
+  var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP — é ela que liga a corretora ao caso.');
 
   var corretora = String(dados.corretora || '').trim();
   if (!corretora) throw new Error('Informe o nome da corretora.');
 
   var id = converterParaIdentificador_(dados.id);
+  // Repetida pela CHAVE, não pelo texto: "ret00j" e "RET00J" são a mesma
+  // SUSEP, e deixar as duas entrarem faria o selo do formulário escolher uma
+  // delas pela ordem da planilha, que ninguém controla.
   var repetida = lerRegistros_('CORRETORAS').filter(function (linha) {
-    return converterParaIdentificador_(linha.SUSEP) === susep
+    return chaveDaSusep_(linha.SUSEP) === chaveDaSusep_(susep)
       && converterParaIdentificador_(linha.Id) !== id;
   })[0];
   if (repetida) {
@@ -245,11 +256,11 @@ function salvarCorretora(dados) {
   }
 
   var campos = {
-    Nome: String(dados.nome || corretora).trim(),
-    Canal: String(dados.canal || '').trim(),
     SUSEP: susep,
     Corretora: corretora,
-    Segmento: String(dados.segmento || '').trim() || 'Não encontrado'
+    Sucursal: String(dados.sucursal || '').trim(),
+    Segmento: String(dados.segmento || '').trim() || 'Não encontrado',
+    Consultor: String(dados.consultor || '').trim()
   };
 
   if (id) {
@@ -286,18 +297,18 @@ function listarSusepsBloqueadas() {
 
   return lerRegistros_('SUSEP_BLOQUEADAS')
     .map(function (linha) {
-      var susep = converterParaIdentificador_(linha.SUSEP);
+      var susep = susepComoSeEscreve_(linha.SUSEP);
       return {
         id: linha.__id,
         susep: susep,
         corretora: String(linha.NomeCorretora || ''),
-        cpfReincidente: converterParaIdentificador_(linha.CpfReincidente),
-        motivo: String(linha.Motivo || ''),
+        sucursal: String(linha.Sucursal || ''),
+        coordenadorComercial: String(linha.CoordenadorComercial || ''),
         bloqueadaEm: linha.BloqueadaEm
           ? Utilities.formatDate(new Date(linha.BloqueadaEm), RECC_FUSO_HORARIO,
             'dd/MM/yyyy')
           : '',
-        casos: volumes.porSusep[susep] || 0
+        casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
       };
     })
     .sort(function (uma, outra) { return outra.casos - uma.casos; });
@@ -315,18 +326,20 @@ function bloquearSusep(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
 
-  var susep = converterParaIdentificador_(dados.susep);
+  var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP a bloquear.');
 
-  var motivo = String(dados.motivo || '').trim();
-  if (!motivo) {
-    throw new Error('Diga o motivo do bloqueio. Sem ele, quem vir o selo ' +
-      'vermelho daqui a seis meses não vai saber o que fazer com a informação.');
-  }
-
+  /*
+   * O MOTIVO SAIU DAS PERGUNTAS, a pedido do PO: "SUSEP's bloqueadas deve
+   * pedir: SUSEP, Corretora, Sucursal e coordenador comercial".
+   *
+   * Ele era obrigatório, e o argumento era bom — quem vê o selo vermelho seis
+   * meses depois precisa saber o que fazer com a informação. Quem responde por
+   * isso agora é o COORDENADOR COMERCIAL: tem nome, e dá para perguntar.
+   */
   var id = converterParaIdentificador_(dados.id);
   var jaBloqueada = lerRegistros_('SUSEP_BLOQUEADAS').filter(function (linha) {
-    return converterParaIdentificador_(linha.SUSEP) === susep
+    return chaveDaSusep_(linha.SUSEP) === chaveDaSusep_(susep)
       && converterParaIdentificador_(linha.Id) !== id;
   })[0];
   if (jaBloqueada) {
@@ -336,8 +349,8 @@ function bloquearSusep(dados) {
   var campos = {
     SUSEP: susep,
     NomeCorretora: String(dados.corretora || '').trim(),
-    CpfReincidente: converterParaIdentificador_(dados.cpfReincidente),
-    Motivo: motivo
+    Sucursal: String(dados.sucursal || '').trim(),
+    CoordenadorComercial: String(dados.coordenadorComercial || '').trim()
   };
 
   if (id) {
@@ -362,87 +375,33 @@ function desbloquearSusep(idDoBloqueio) {
 
   ocultarRegistro_('SUSEP_BLOQUEADAS', alvo, quem.usuario.Id);
   registrarAuditoria_('susep.desbloquear', 'SUSEP_BLOQUEADAS', alvo,
-    converterParaIdentificador_(atual.SUSEP));
+    susepComoSeEscreve_(atual.SUSEP));
   return true;
 }
 
 // ============================================================================
-// OS PRODUTOS
+// DE ONDE VEM CADA CADASTRO
 // ============================================================================
 
 /**
  * De onde vem cada cadastro desta tela, numa chamada só.
  *
- * A tela tem três abas — corretoras, produtos, SUSEPs bloqueadas — e cada uma
- * carrega por conta própria. Perguntar a origem em cada carga seriam três idas
- * ao servidor para uma resposta que não muda enquanto a tela está aberta.
+ * A tela tem duas abas de cadastro — corretoras e SUSEPs bloqueadas — e cada
+ * uma carrega por conta própria. Perguntar a origem em cada carga seriam duas
+ * idas ao servidor para uma resposta que não muda enquanto a tela está aberta.
+ *
+ * Havia aqui uma terceira aba, PRODUTOS, e as funções dela. Saiu a pedido do
+ * PO: "produtos pode eliminar". A aba da planilha é apagada pela migração,
+ * `atualizarPGO()`, porque ele pediu a aba também.
  */
 function origemDosCadastros() {
   exigirTela_('tabelaCorretoras');
 
   var resposta = {};
-  ['CORRETORAS', 'PRODUTOS', 'SUSEP_BLOQUEADAS'].forEach(function (aba) {
+  ['CORRETORAS', 'SUSEP_BLOQUEADAS'].forEach(function (aba) {
     resposta[aba] = deOndeVemAAba_(aba);
   });
   return resposta;
-}
-
-function listarProdutos() {
-  exigirTela_('tabelaCorretoras');
-  return lerRegistros_('PRODUTOS')
-    .map(function (linha) {
-      return {
-        id: linha.__id,
-        produto: String(linha.Produto || ''),
-        codigo: converterParaIdentificador_(linha.CodigoProduto)
-      };
-    })
-    .sort(function (um, outro) { return um.produto < outro.produto ? -1 : 1; });
-}
-
-function salvarProduto(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  exigirTela_('tabelaCorretoras');
-
-  var produto = String(dados.produto || '').trim();
-  if (!produto) throw new Error('Informe o nome do produto.');
-
-  var codigo = converterParaIdentificador_(dados.codigo);
-  var id = converterParaIdentificador_(dados.id);
-
-  if (codigo) {
-    var repetido = lerRegistros_('PRODUTOS').filter(function (linha) {
-      return converterParaIdentificador_(linha.CodigoProduto) === codigo
-        && converterParaIdentificador_(linha.Id) !== id;
-    })[0];
-    if (repetido) {
-      throw new Error('O código ' + codigo + ' já é do produto "' +
-        repetido.Produto + '". O código é o que liga o produto ao caso.');
-    }
-  }
-
-  var campos = { Produto: produto, CodigoProduto: codigo };
-  if (id) {
-    atualizarRegistro_('PRODUTOS', id, campos);
-    registrarAuditoria_('produto.editar', 'PRODUTOS', id, produto);
-    return id;
-  }
-  var criado = inserirRegistro_('PRODUTOS', campos);
-  registrarAuditoria_('produto.criar', 'PRODUTOS', criado.__id, produto);
-  return criado.__id;
-}
-
-function ocultarProduto(idDoProduto) {
-  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  exigirTela_('tabelaCorretoras');
-
-  var alvo = converterParaIdentificador_(idDoProduto);
-  var atual = buscarRegistros_('PRODUTOS', 'Id', alvo, 1)[0];
-  if (!atual) throw new Error('Este produto não existe.');
-
-  ocultarRegistro_('PRODUTOS', alvo, quem.usuario.Id);
-  registrarAuditoria_('produto.ocultar', 'PRODUTOS', alvo, String(atual.Produto));
-  return true;
 }
 
 // ============================================================================
@@ -454,12 +413,12 @@ function exportarCorretoras(procurar, segmento) {
   exigirPermissao_(RECC_ACOES.EXPORTAR);
   var tabela = tabelaDeCorretoras(procurar, segmento);
 
-  var linhas = [['SUSEP', 'Corretora', 'Canal', 'Nome', 'Segmento',
-    'Situação', 'Casos'].join(';')];
+  var linhas = [['SUSEP', 'Corretora', 'Sucursal', 'Segmento', 'Consultor',
+    'Casos'].join(';')];
 
   tabela.corretoras.forEach(function (uma) {
-    linhas.push([uma.susep, uma.corretora, uma.canal, uma.nome, uma.segmento,
-      uma.bloqueada ? 'Bloqueada' : 'Liberada', uma.casos].join(';'));
+    linhas.push([uma.susep, uma.corretora, uma.sucursal, uma.segmento,
+      uma.consultor, uma.casos].join(';'));
   });
 
   registrarAuditoria_('corretoras.exportar', 'CORRETORAS', '',
@@ -487,9 +446,14 @@ function exportarCorretoras(procurar, segmento) {
  *
  * Esta tela resolve isso com três passos, sempre nesta ordem:
  *
- *   1. COLAR    a pessoa copia da planilha dela e cola aqui. Aceita o que o
+ *   1. APONTAR  de dois jeitos, à escolha de quem importa:
+ *               COLANDO — copia da planilha dela e cola aqui. Aceita o que o
  *               Excel e o Google Planilhas colocam na área de transferência —
  *               colunas separadas por TAB — e também ponto e vírgula.
+ *               PELO Id  — informa o Id de outra planilha e o nome da aba, e o
+ *               sistema lê de lá. É o caminho para as listas grandes: colar
+ *               sete mil SUSEPs numa caixa de texto é o que ninguém faz duas
+ *               vezes. Daqui para baixo as duas fontes são a mesma coisa.
  *   2. CONFERIR o servidor lê o texto e devolve o que VAI acontecer com cada
  *               linha, sem gravar nada: nova, atualiza a que existe, ou
  *               recusada — e neste último caso, por quê.
@@ -501,7 +465,7 @@ function exportarCorretoras(procurar, segmento) {
  * sistema: um erro escreve em quinhentas linhas de uma vez. Ver antes é o que
  * transforma "colei a coluna errada" num susto em vez de num estrago.
  *
- * O TERCEIRO PASSO NÃO CONFIA NO SEGUNDO. `aplicarImportacao` lê o TEXTO
+ * O TERCEIRO PASSO NÃO CONFIA NO SEGUNDO. `aplicarImportacao` lê a FONTE
  * de novo e refaz a conferência inteira — não recebe do navegador a lista já
  * conferida. Se recebesse, bastaria alterar a lista no caminho para gravar o
  * que o servidor nunca aprovou.
@@ -529,19 +493,26 @@ var RECC_MAXIMO_DA_IMPORTACAO = 2000;
  */
 var RECC_IMPORTACOES = {
   corretoras: {
-    titulo: 'Corretoras',
+    titulo: 'Corretoras Diamante',
     aba: 'CORRETORAS',
     chave: 'susep',
     explicacao: 'Uma linha por corretora. A SUSEP é o que liga a corretora ao '
-      + 'caso, e é por ela que o sistema sabe se a linha é nova ou já existe.',
+      + 'caso, e é por ela que o sistema sabe se a linha é nova ou já existe. '
+      + 'Ela tem letra e número — por exemplo RET00J.',
     colunas: [
+      // A SUSEP é TEXTO: "RET00J". Com `identificador`, a importação guardaria
+      // "00" e o cadastro inteiro entraria errado de uma vez — o jeito mais
+      // rápido que existe de estragar sete mil linhas.
       { chave: 'susep', titulo: 'SUSEP', coluna: 'SUSEP',
-        tipo: 'identificador', obrigatoria: true },
+        tipo: 'texto', obrigatoria: true },
       { chave: 'corretora', titulo: 'Corretora', coluna: 'Corretora',
         tipo: 'texto', obrigatoria: true },
-      { chave: 'canal', titulo: 'Canal', coluna: 'Canal', tipo: 'texto' },
+      { chave: 'sucursal', titulo: 'Sucursal', coluna: 'Sucursal',
+        tipo: 'texto' },
       { chave: 'segmento', titulo: 'Segmento', coluna: 'Segmento',
-        tipo: 'texto', padrao: 'Não encontrado' }
+        tipo: 'texto', padrao: 'Não encontrado' },
+      { chave: 'consultor', titulo: 'Consultor', coluna: 'Consultor',
+        tipo: 'texto' }
     ]
   },
 
@@ -549,18 +520,18 @@ var RECC_IMPORTACOES = {
     titulo: 'SUSEPs bloqueadas',
     aba: 'SUSEP_BLOQUEADAS',
     chave: 'susep',
-    explicacao: 'Uma linha por SUSEP bloqueada. O motivo é obrigatório: sem '
-      + 'ele, quem vir o selo vermelho daqui a seis meses não saberá o que '
-      + 'fazer com a informação.',
+    explicacao: 'Uma linha por SUSEP bloqueada. É outra lista, de outro dono: '
+      + 'uma SUSEP que esteja no cadastro de corretoras Diamante continua '
+      + 'saindo liberada no selo do formulário.',
     colunas: [
       { chave: 'susep', titulo: 'SUSEP', coluna: 'SUSEP',
-        tipo: 'identificador', obrigatoria: true },
-      { chave: 'motivo', titulo: 'Motivo', coluna: 'Motivo',
         tipo: 'texto', obrigatoria: true },
       { chave: 'corretora', titulo: 'Corretora', coluna: 'NomeCorretora',
         tipo: 'texto' },
-      { chave: 'cpfReincidente', titulo: 'CPF reincidente',
-        coluna: 'CpfReincidente', tipo: 'identificador' }
+      { chave: 'sucursal', titulo: 'Sucursal', coluna: 'Sucursal',
+        tipo: 'texto' },
+      { chave: 'coordenadorComercial', titulo: 'Coordenador comercial',
+        coluna: 'CoordenadorComercial', tipo: 'texto' }
     ]
   }
 };
@@ -597,7 +568,7 @@ function opcoesDaImportacao() {
 }
 
 // ============================================================================
-// LER O TEXTO COLADO
+// LER A FONTE — O TEXTO COLADO OU A ABA DE OUTRA PLANILHA
 // ============================================================================
 
 /**
@@ -661,39 +632,106 @@ function ordemDasColunas_(pedacos, receita) {
 }
 
 /**
- * Transforma o texto colado numa lista de linhas com os campos nomeados.
+ * A grade de uma importação de cadastro: uma lista de { numero, celulas }.
+ *
+ * Existe porque a MESMA conferência passou a servir duas fontes: o texto que a
+ * pessoa cola e uma aba de OUTRA planilha, lida pelo Id. Antes disto, o leitor
+ * só sabia partir texto — e a única forma de aproveitar a conferência inteira
+ * com uma planilha de fora seria remontar as células num texto com separador,
+ * que estraga a primeira corretora chamada "SILVA, SOUZA & CIA".
+ *
+ * `numero` é a linha de verdade — a da planilha de fora, ou a do texto colado
+ * contando as vazias. A pessoa procura "a linha 14" onde o dado dela está, e
+ * não na décima quarta linha que sobrou depois de o sistema pular as brancas.
+ */
+function gradeDoTextoDaImportacao_(texto) {
+  var linhas = String(texto || '').split(/\r\n|\r|\n/);
+
+  var cheias = linhas.filter(function (linha) { return linha.trim().length > 0; });
+  if (!cheias.length) return [];
+  var separador = separadorDoTexto_(cheias[0]);
+
+  var grade = [];
+  for (var i = 0; i < linhas.length; i++) {
+    // A linha NÃO é aparada antes de ser partida. Parecia inofensivo, e não é:
+    // com TAB como separador, aparar come a primeira coluna quando ela vem
+    // vazia — e aí "«vazio» TAB Corretora Alfa" vira uma corretora chamada
+    // "Corretora Alfa" com SUSEP "Corretora Alfa", deslocando a linha inteira.
+    // Quem apara é cada CÉLULA, depois de partida.
+    if (!linhas[i].trim().length) continue;
+    grade.push({
+      numero: i + 1,
+      celulas: linhas[i].split(separador).map(function (celula) {
+        return String(celula).replace(/^"|"$/g, '').trim();
+      })
+    });
+  }
+  return grade;
+}
+
+/**
+ * A grade de uma ABA DE OUTRA PLANILHA, pelo Id.
+ *
+ * Reaproveita `gradeDeOutraPlanilha_`, que é a mesma porta que a importação de
+ * casos usa: uma ida só ao serviço, e `getDisplayValues` para a SUSEP chegar
+ * como a pessoa a VÊ lá — "RET00J" inteiro, e não o que o número viraria.
+ *
+ * Linha toda vazia é pulada, mas sem mexer na contagem: buraco no meio da
+ * planilha de origem é comum e não é erro de ninguém.
+ */
+function gradeDaPlanilhaDaImportacao_(planilhaId, nomeDaAba) {
+  var lida = gradeDeOutraPlanilha_(planilhaId, nomeDaAba);
+  var grade = [];
+  for (var i = 0; i < lida.length; i++) {
+    var celulas = (lida[i] || []).map(function (celula) {
+      return String(celula === null || celula === undefined ? '' : celula).trim();
+    });
+    if (!celulas.join('').length) continue;
+    grade.push({ numero: i + 1, celulas: celulas });
+  }
+  return grade;
+}
+
+/**
+ * A grade, venha ela do texto colado ou de outra planilha.
+ *
+ * Aceita a STRING crua de propósito: `conferirImportacao` e `aplicarImportacao`
+ * nasceram recebendo o texto, e há chamada em tela e em teste que manda só
+ * isso. Quebrar essas chamadas para ganhar um campo `tipo` seria trocar
+ * trabalho de verdade por formalidade.
+ */
+function gradeDaFonteDoCadastro_(fonte) {
+  if (typeof fonte === 'string' || fonte === null || fonte === undefined) {
+    return gradeDoTextoDaImportacao_(fonte);
+  }
+  if (normalizarParaComparar_(fonte.tipo) === 'planilha') {
+    return gradeDaPlanilhaDaImportacao_(fonte.planilhaId, fonte.aba);
+  }
+  return gradeDoTextoDaImportacao_(fonte.texto);
+}
+
+/**
+ * Transforma a grade numa lista de linhas com os campos nomeados.
  *
  * Não decide nada sobre gravar: só lê. Quem decide é `conferirImportacao_`.
  */
-function lerTextoDaImportacao_(texto, receita) {
-  // A linha NÃO é aparada antes de ser partida. Parecia inofensivo, e não é:
-  // com TAB como separador, aparar come a primeira coluna quando ela vem
-  // vazia — e aí "«vazio» TAB Corretora Alfa" vira uma corretora chamada
-  // "Corretora Alfa" com SUSEP "Corretora Alfa", deslocando a linha inteira.
-  // Quem apara é cada CÉLULA, depois de partida.
-  var linhas = String(texto || '')
-    .split(/\r\n|\r|\n/)
-    .filter(function (linha) { return linha.trim().length > 0; });
+function lerGradeDaImportacao_(grade, receita) {
+  if (!grade.length) return { ordem: [], linhas: [], tinhaCabecalho: false };
 
-  if (!linhas.length) return { ordem: [], linhas: [], tinhaCabecalho: false };
-
-  var separador = separadorDoTexto_(linhas[0]);
-  var primeira = linhas[0].split(separador);
+  var primeira = grade[0].celulas;
   var ordem = ordemDasColunas_(primeira, receita);
   var tinhaCabecalho = ehCabecalho_(primeira, receita);
   var comeco = tinhaCabecalho ? 1 : 0;
 
   var lidas = [];
-  for (var i = comeco; i < linhas.length; i++) {
-    var pedacos = linhas[i].split(separador);
+  for (var i = comeco; i < grade.length; i++) {
+    var celulas = grade[i].celulas;
     var valores = {};
     for (var c = 0; c < ordem.length; c++) {
       if (!ordem[c]) continue;
-      valores[ordem[c]] = String(pedacos[c] === undefined ? '' : pedacos[c])
-        .replace(/^"|"$/g, '')
-        .trim();
+      valores[ordem[c]] = String(celulas[c] === undefined ? '' : celulas[c]).trim();
     }
-    lidas.push({ numero: i + 1, valores: valores });
+    lidas.push({ numero: grade[i].numero, valores: valores });
   }
   return { ordem: ordem, linhas: lidas, tinhaCabecalho: tinhaCabecalho };
 }
@@ -708,15 +746,19 @@ function lerTextoDaImportacao_(texto, receita) {
  * É a mesma função que `aplicarImportacao` usa antes de escrever, e é de
  * propósito: conferência e gravação que seguem regras diferentes acabam
  * discordando, e a tela passa a mentir sobre o que o botão faz.
+ *
+ * `fonte` é o texto colado (uma string, ou { tipo: 'colado', texto }) ou uma
+ * aba de outra planilha ({ tipo: 'planilha', planilhaId, aba }). Daqui para
+ * baixo não há diferença entre as duas: o que chega é sempre uma grade.
  */
-function conferirImportacao_(tipo, texto) {
+function conferirImportacao_(tipo, fonte) {
   var receita = RECC_IMPORTACOES[tipo];
   if (!receita) {
     throw new Error('Não sei importar "' + tipo + '". Existem: '
       + Object.keys(RECC_IMPORTACOES).join(', ') + '.');
   }
 
-  var lido = lerTextoDaImportacao_(texto, receita);
+  var lido = lerGradeDaImportacao_(gradeDaFonteDoCadastro_(fonte), receita);
   if (lido.linhas.length > RECC_MAXIMO_DA_IMPORTACAO) {
     throw new Error('São ' + lido.linhas.length + ' linhas, e o limite por vez '
       + 'é ' + RECC_MAXIMO_DA_IMPORTACAO + '. Divida em partes: o Apps Script '
@@ -729,7 +771,7 @@ function conferirImportacao_(tipo, texto) {
   var colunaChave = colunaChaveDaImportacao_(receita);
   var existentes = {};
   lerRegistros_(receita.aba).forEach(function (linha) {
-    var chave = converterParaIdentificador_(linha[colunaChave.coluna]);
+    var chave = chaveDaLinhaDaImportacao_(linha[colunaChave.coluna], colunaChave);
     if (chave) existentes[chave] = linha;
   });
 
@@ -760,6 +802,21 @@ function conferirImportacao_(tipo, texto) {
     // só as primeiras — e nem precisaria delas, já que quem grava é o servidor.
     todas: resultado
   };
+}
+
+/**
+ * A chave de uma linha, para decidir se ela é nova ou atualização.
+ *
+ * Normaliza do mesmo jeito que o resto do sistema compara: identificador por
+ * dígito, texto por `normalizarParaComparar_`. Importa porque a SUSEP é texto
+ * desde que o PO corrigiu o formato — sem isto, "ret00j" colado sobre um
+ * cadastro que tem "RET00J" entraria como linha NOVA, e o cadastro ficaria com
+ * a mesma corretora duas vezes.
+ */
+function chaveDaLinhaDaImportacao_(valor, colunaChave) {
+  return colunaChave.tipo === 'identificador'
+    ? converterParaIdentificador_(valor)
+    : normalizarParaComparar_(valor);
 }
 
 /** A coluna que decide se a linha é nova ou é atualização. */
@@ -802,7 +859,8 @@ function conferirUmaLinha_(linha, receita, existentes, vistas) {
     campos[coluna.chave] = valor;
   });
 
-  var chave = campos[receita.chave];
+  var chave = chaveDaLinhaDaImportacao_(campos[receita.chave],
+    colunaChaveDaImportacao_(receita));
 
   if (problemas.length) {
     return { numero: linha.numero, campos: campos, situacao: 'recusada',
@@ -855,11 +913,11 @@ function mudancasDaLinha_(campos, atual, receita) {
 // ============================================================================
 
 /** Passo 2: o que vai acontecer. Não grava nada. */
-function conferirImportacao(tipo, texto) {
+function conferirImportacao(tipo, fonte) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
 
-  var conferido = conferirImportacao_(tipo, texto);
+  var conferido = conferirImportacao_(tipo, fonte);
   delete conferido.todas;   // a tela não precisa da lista inteira
   return conferido;
 }
@@ -871,13 +929,13 @@ function conferirImportacao(tipo, texto) {
  * sistema que escreve em centenas de linhas com um clique, e o critério para
  * pedir senha sempre foi o alcance, nunca a dificuldade.
  */
-function aplicarImportacao(tipo, texto) {
+function aplicarImportacao(tipo, fonte) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
   exigirSenhaDeAdministrador_();
 
   var receita = RECC_IMPORTACOES[tipo];
-  var conferido = conferirImportacao_(tipo, texto);
+  var conferido = conferirImportacao_(tipo, fonte);
 
   var paraCriar = [];
   var criadas = 0;
@@ -926,10 +984,12 @@ function camposParaAAba_(campos, receita, ehNova) {
     linha[coluna.coluna] = valor || '';
   });
 
-  // As colunas que a importação não pergunta, mas a aba espera.
-  if (ehNova && receita.aba === 'CORRETORAS' && !linha.Nome) {
-    linha.Nome = campos.corretora || '';
-  }
+  // A coluna que a importação não pergunta, mas a aba espera: a data do
+  // bloqueio é do SISTEMA, e não de quem cola a planilha.
+  //
+  // Havia aqui também um `Nome` para a CORRETORAS, copiado do nome da
+  // corretora. A coluna saiu do contrato nesta rodada, a pedido do PO: ela
+  // duplicava `Corretora` e ninguém sabia qual era qual.
   if (ehNova && receita.aba === 'SUSEP_BLOQUEADAS') {
     linha.BloqueadaEm = new Date();
   }

@@ -19,16 +19,30 @@ function rodarTestesDeAcesso() {
   chamar('instalarRECC()');
 
   /** Cadastra alguém e devolve o Id, para os testes não repetirem isso. */
+  /**
+   * Cadastra alguém. O CANAL é pelo nome, e é o que forma a EQUIPE dela —
+   * decisão do PO. Sem canal, a pessoa não pertence a equipe nenhuma, que é o
+   * caso de quem administra.
+   */
   function cadastrar(nome, email, nivel, canal) {
     const niveis = chamar('lerRegistros_("CATALOGO")')
       .filter((item) => item.Tipo === 'NIVEL_ACESSO');
     const escolhido = niveis.find((item) => item.Nome === nivel);
     if (!escolhido) throw new Error('nível inexistente no teste: ' + nivel);
+
+    let canalId = '';
+    if (canal) {
+      const achado = chamar('lerRegistros_("CANAIS")')
+        .find((um) => String(um.Nome) === canal);
+      if (!achado) throw new Error('canal inexistente no teste: ' + canal);
+      canalId = achado.Id;
+    }
+
     return chamar('salvarUsuario')({
       nome: nome,
       email: email,
       nivelAcessoId: escolhido.Id,
-      canalQueAtende: canal || '',
+      canalId: canalId,
       ativo: true
     });
   }
@@ -52,7 +66,7 @@ function rodarTestesDeAcesso() {
   });
 
   teste('usuário desativado é recusado com motivo diferente de não cadastrado', () => {
-    const id = cadastrar('Ana Martins', 'ana@exemplo.com', 'Operação', 'Corretora ABC');
+    const id = cadastrar('Ana Martins', 'ana@exemplo.com', 'Operação', 'Mesa Diamante');
     chamar('atualizarRegistro_')('USUARIOS', id, { Ativo: 'NAO' });
 
     ambiente.definirEmail('ana@exemplo.com');
@@ -98,9 +112,9 @@ function rodarTestesDeAcesso() {
   });
 
   teste('gravar campo sem coluna é erro, não descarte silencioso', () => {
-    lanca(() => chamar('inserirRegistro_')('PRODUTOS', {
-      Produto: 'Vida Individual', CodigoProdutoo: '1234'
-    }), 'não tem coluna para: CodigoProdutoo',
+    lanca(() => chamar('inserirRegistro_')('CORRETORAS', {
+      Corretora: 'Corretora ABC', Sucursall: '12'
+    }), 'não tem coluna para: Sucursall',
     'um cabeçalho digitado errado jogaria o dado fora dizendo "salvo"');
   });
 
@@ -216,8 +230,18 @@ function rodarTestesDeAcesso() {
     igual(chamar('filtrarPeloAlcance_')(todos, 'BASE_MESA', quem).length, todos.length);
   });
 
-  teste('escopo EQUIPE é o canal que a pessoa atende', () => {
-    cadastrar('Diego Castilho', 'diego@exemplo.com', 'Operação', 'Corretora ABC');
+  teste('escopo EQUIPE é o canal em que a pessoa está cadastrada', () => {
+    /*
+     * A EQUIPE É O CANAL, por decisão do PO: "se escolhi um específico já dá
+     * para saber a qual equipe pertence". Ana e Diego estão os dois na Mesa
+     * Diamante, então um enxerga os casos do outro.
+     *
+     * O Diego entra com nível DIFERENTE da Ana de propósito. A equipe já foi o
+     * nível de acesso, por uma rodada; com os dois no mesmo nível E no mesmo
+     * canal, este teste passaria com qualquer das duas regras e não provaria
+     * nenhuma. Nível diferente e canal igual só dá 3 se quem manda é o canal.
+     */
+    cadastrar('Diego Castilho', 'diego@exemplo.com', 'Coordenação', 'Mesa Diamante');
     const niveis = chamar('lerRegistros_("CATALOGO")')
       .filter((item) => item.Tipo === 'NIVEL_ACESSO');
     const operacao = niveis.find((item) => item.Nome === 'Operação');
@@ -553,7 +577,7 @@ function rodarTestesDeAcesso() {
 
   teste('as ações relevantes deixam rastro', () => {
     const antes = chamar('lerRegistros_("AUDITORIA")').length;
-    cadastrar('Luciana Prado', 'luciana@exemplo.com', 'Consulta', 'Site');
+    cadastrar('Luciana Prado', 'luciana@exemplo.com', 'Consulta', 'RET');
     const depois = chamar('lerRegistros_("AUDITORIA")');
     igual(depois.length, antes + 1, 'uma linha de auditoria');
     igual(depois[depois.length - 1].Acao, 'usuario.criar');

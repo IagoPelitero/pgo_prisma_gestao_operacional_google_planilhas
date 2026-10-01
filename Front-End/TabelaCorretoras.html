@@ -2,8 +2,15 @@
 /* ============================================================================
    PGO — TabelaCorretoras.html · quem traz o caso para dentro
    ============================================================================
-   Três cadastros numa tela só, em abas: corretoras e canais, produtos e as
-   SUSEPs bloqueadas. Até aqui, os três só se ajustavam abrindo a planilha.
+   Dois cadastros numa tela só, em abas: as corretoras Diamante e as SUSEPs
+   bloqueadas. Até aqui, os dois só se ajustavam abrindo a planilha.
+
+   SÃO DUAS LISTAS DIFERENTES, com dois donos. Decisão do PO: "corretoras
+   Diamante não podem ter status de bloqueada (...) pertence a outra lista".
+   Por isso a tabela de corretoras não mostra pastilha de bloqueio, e o selo do
+   Cadastrar Caso consulta o cadastro ANTES da lista de bloqueios.
+
+   Havia aqui uma terceira aba, Produtos, que saiu a pedido dele.
 
    O QUE FAZ ESTA TELA VALER MAIS QUE UMA LISTA: o volume ao lado de cada
    corretora, e o aviso das SUSEPs que aparecem nos casos e não estão
@@ -22,6 +29,14 @@ var TelaTabelaCorretoras = (function () {
   var editando = null;      // o item aberto no formulário lateral
   var tipoDaImportacao = '';  // qual lista está sendo importada
   /*
+   * De onde vêm as linhas da importação: do texto colado ou de outra planilha.
+   *
+   * Mora aqui, e não no campo da tela, porque a aba é redesenhada quando a
+   * pessoa troca a lista que está importando — e perder o Id da planilha que
+   * ela acabou de colar nesse redesenho é o tipo de detalhe que faz desistir.
+   */
+  var fonteDaImportacao = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
+  /*
    * De onde vem cada cadastro: desta planilha ou da de cadastros.
    *
    * Lido UMA VEZ, quando a tela abre — a resposta não muda enquanto ela está
@@ -38,8 +53,7 @@ var TelaTabelaCorretoras = (function () {
 
   function montar() {
     return '<div class="config-abas" id="abas-das-corretoras">'
-      + [['corretoras', 'Corretoras e canais'],
-         ['produtos', 'Produtos'],
+      + [['corretoras', 'Corretoras Diamante'],
          ['bloqueadas', 'SUSEPs bloqueadas'],
          ['importar', 'Importar']].map(function (par) {
         return '<button type="button" class="config-aba'
@@ -61,11 +75,6 @@ var TelaTabelaCorretoras = (function () {
     if (abaAtual === 'corretoras') {
       return Servidor.chamar('tabelaDeCorretoras', procurar, segmento)
         .entao(function (resposta) { dados = resposta; desenharCorretoras(); })
-        .senao(falhou);
-    }
-    if (abaAtual === 'produtos') {
-      return Servidor.chamar('listarProdutos')
-        .entao(function (lista) { dados = { produtos: lista }; desenharProdutos(); })
         .senao(falhou);
     }
     if (abaAtual === 'importar') {
@@ -108,7 +117,8 @@ var TelaTabelaCorretoras = (function () {
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<input type="search" id="procurar-corretora" class="busca-do-cadastro"'
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
-      + ' placeholder="Corretora, canal ou SUSEP" aria-label="Procurar corretora">'
+      + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
+      + ' aria-label="Procurar corretora">'
       + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
@@ -175,18 +185,26 @@ var TelaTabelaCorretoras = (function () {
       return '<p class="config-vazio">Nenhuma corretora com esse filtro.</p>';
     }
 
+    /*
+     * SEM PASTILHA DE BLOQUEIO, e isto é o pedido do PO.
+     *
+     * Havia aqui uma coluna "Situação", verde ou vermelha, cruzando esta
+     * tabela com a lista de SUSEPs bloqueadas. "Corretoras Diamante não podem
+     * ter status de bloqueada por gentileza mesmo que o SUSEP esteja na lista
+     * de bloqueadas. Pertence a outra lista."
+     *
+     * No lugar dela entrou o CONSULTOR, que é de quem a operação precisa
+     * quando abre esta tabela: quem atende aquela corretora.
+     */
     var linhas = dados.corretoras.map(function (uma) {
       return '<tr' + (editando && editando.id === uma.id ? ' class="aberta"' : '')
         + '>'
         + '<td><span class="principal">' + escapar(uma.corretora) + '</span>'
         + '<span class="apoio">' + escapar(uma.susep) + '</span></td>'
-        + '<td><span class="principal">' + escapar(uma.canal || '—') + '</span>'
-        + '<span class="apoio">' + escapar(uma.nome || '—') + '</span></td>'
+        + '<td>' + escapar(uma.sucursal || '—') + '</td>'
         + '<td><span class="situacao ' + classeDoSegmento(uma.segmento) + '">'
         + escapar(uma.segmento) + '</span></td>'
-        + '<td><span class="situacao ' + (uma.bloqueada ? 'tom-ruim' : 'tom-bom')
-        + '" title="' + escapar(uma.motivoDoBloqueio) + '">'
-        + (uma.bloqueada ? 'Bloqueada' : 'Liberada') + '</span></td>'
+        + '<td>' + escapar(uma.consultor || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
         + (dados.podeMexer && podeMexerNesta('CORRETORAS')
@@ -197,8 +215,8 @@ var TelaTabelaCorretoras = (function () {
     }).join('');
 
     return '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
-      + '<thead><tr><th>Corretora</th><th>Canal</th><th>Segmento</th>'
-      + '<th>Situação</th><th class="direita">Casos</th>'
+      + '<thead><tr><th>Corretora</th><th>Sucursal</th><th>Segmento</th>'
+      + '<th>Consultor</th><th class="direita">Casos</th>'
       + '<th class="acoes-coluna"></th></tr></thead>'
       + '<tbody>' + linhas + '</tbody></table></div>';
   }
@@ -266,7 +284,7 @@ var TelaTabelaCorretoras = (function () {
       desenharFormularioDaCorretora({
         id: '', susep: botao.getAttribute('data-cadastrar-susep'),
         corretora: botao.getAttribute('data-nome-nos-casos'),
-        nome: '', canal: '', segmento: ''
+        sucursal: '', segmento: '', consultor: ''
       }, true);
     });
   }
@@ -279,24 +297,25 @@ var TelaTabelaCorretoras = (function () {
   }
 
   function desenharFormularioDaCorretora(corretora, veioDosCasos) {
-    var atual = corretora || { id: '', nome: '', canal: '', susep: '',
-      corretora: '', segmento: '' };
+    var atual = corretora || { id: '', susep: '', corretora: '',
+      sucursal: '', segmento: '', consultor: '' };
 
     elemento('corretoras-painel').innerHTML =
       '<form class="config-form" id="form-corretora">'
       + tituloDoPainel(atual.id ? atual.corretora : 'Corretora nova',
-        atual.id ? 'Cadastro de canal' : 'Cadastrar no canal')
+        'Cadastro de corretora')
       + (veioDosCasos
         ? '<p class="config-aviso">O nome veio dos casos que já citam esta '
           + 'SUSEP — confira antes de salvar. É um palpite, não um cadastro.</p>'
         : '')
       + campoDeTexto('susep', 'SUSEP', atual.susep,
-        'Só dígitos. É ela que liga a corretora ao caso.')
-      + campoDeTexto('corretora', 'Corretora', atual.corretora, '')
-      + campoDeTexto('canal', 'Canal', atual.canal,
-        'Corretora, agente, central… como a operação chama.')
-      + campoDeTexto('nome', 'Nome do contato', atual.nome, '')
+        'Letras e números, como a SUSEP é escrita — por exemplo RET00J. É ela '
+        + 'que liga a corretora ao caso.')
+      + campoDeTexto('corretora', 'Nome da corretora', atual.corretora, '')
+      + campoDeTexto('sucursal', 'Sucursal', atual.sucursal, '')
       + caixaDeSegmento(atual.segmento)
+      + campoDeTexto('consultor', 'Consultor', atual.consultor,
+        'Quem atende esta corretora.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (atual.id
@@ -310,9 +329,9 @@ var TelaTabelaCorretoras = (function () {
         id: atual.id,
         susep: valorDe('susep'),
         corretora: valorDe('corretora'),
-        canal: valorDe('canal'),
-        nome: valorDe('nome'),
-        segmento: valorDe('segmento')
+        sucursal: valorDe('sucursal'),
+        segmento: valorDe('segmento'),
+        consultor: valorDe('consultor')
       }).entao(function () {
         avisar('Corretora salva.', 'bom');
         editando = null;
@@ -352,92 +371,6 @@ var TelaTabelaCorretoras = (function () {
       + 'incompleto, e não corretora irregular.</em></label>';
   }
 
-  /* ------------------------------------------------------------- produtos */
-
-  function desenharProdutos() {
-    var linhas = dados.produtos.map(function (um) {
-      return '<li class="config-item' + (editando && editando.id === um.id
-        ? ' atual' : '') + '">'
-        + '<button type="button" class="abrir" data-produto="' + escapar(um.id) + '">'
-        + '<span class="nome">' + escapar(um.produto) + '</span>'
-        + '<span class="detalhe">código ' + escapar(um.codigo || '—')
-        + '</span></button></li>';
-    }).join('');
-
-    elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.produtos.length + ' produtos</span>'
-      + (podeMexerNesta('PRODUTOS')
-        ? '<button type="button" class="botao pequeno" id="novo-produto">'
-          + 'Cadastrar produto</button>' : '')
-      + '</div>'
-      + avisoDeOrigem('PRODUTOS')
-      + '<p class="config-explica">O <strong>código</strong> é o que liga o '
-      + 'produto ao caso — por isso ele é único, e o sistema recusa repetir.</p>'
-      + (dados.produtos.length
-        ? '<ul class="config-itens">' + linhas + '</ul>'
-        : '<p class="config-vazio">Nenhum produto cadastrado. Sem eles, o '
-          + 'campo de produto do formulário fica como caixa de texto livre.</p>');
-
-    // O botão só existe quando a aba aceita escrita. Ligar um ouvinte num
-    // elemento que não está na tela estoura, e o estouro acontece ANTES de
-    // qualquer tratamento — a tela fica em branco sem log. É o achado 27.
-    var novoProduto = elemento('novo-produto');
-    if (novoProduto) novoProduto.addEventListener('click', function () {
-      editando = { id: '' };
-      desenharFormularioDoProduto(null);
-    });
-    ligarCliques('[data-produto]', function (botao) {
-      var id = botao.getAttribute('data-produto');
-      editando = { id: id };
-      desenharProdutos();
-      desenharFormularioDoProduto(acharNaLista(dados.produtos, id));
-    });
-
-    if (!editando) painelVazio('Escolha um produto, ou cadastre um novo.');
-  }
-
-  function desenharFormularioDoProduto(produto) {
-    var atual = produto || { id: '', produto: '', codigo: '' };
-
-    elemento('corretoras-painel').innerHTML =
-      '<form class="config-form" id="form-produto">'
-      + tituloDoPainel(atual.id ? atual.produto : 'Produto novo', 'Cadastro de produto')
-      + campoDeTexto('produto', 'Produto', atual.produto, '')
-      + campoDeTexto('codigo', 'Código', atual.codigo,
-        'Só dígitos. É o que liga o produto ao caso, e ele é único.')
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + (atual.id
-        ? '<button type="button" class="botao vazado perigo" id="tirar-produto">'
-          + 'Tirar do cadastro</button>' : '')
-      + '</div></form>';
-
-    elemento('form-produto').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('salvarProduto', {
-        id: atual.id, produto: valorDe('produto'), codigo: valorDe('codigo')
-      }).entao(function () {
-        avisar('Produto salvo.', 'bom');
-        editando = null;
-        carregar();
-      }).senao(mostrarErro);
-    });
-
-    var tirar = elemento('tirar-produto');
-    if (tirar) {
-      tirar.addEventListener('click', function () {
-        if (!window.confirm('Tirar "' + atual.produto + '" do cadastro?\n\n'
-          + 'A linha permanece na planilha, e os casos continuam intactos.')) return;
-        Servidor.chamar('ocultarProduto', atual.id)
-          .entao(function () {
-            avisar('Produto tirado do cadastro.', 'bom');
-            editando = null;
-            carregar();
-          }).senao(mostrarErro);
-      });
-    }
-  }
-
   /* ----------------------------------------------------------- bloqueadas */
 
   function desenharBloqueadas() {
@@ -445,8 +378,8 @@ var TelaTabelaCorretoras = (function () {
       return '<tr>'
         + '<td><span class="principal">' + escapar(uma.susep) + '</span>'
         + '<span class="apoio">' + escapar(uma.corretora || 'sem nome') + '</span></td>'
-        + '<td>' + escapar(uma.motivo || '—') + '</td>'
-        + '<td>' + escapar(uma.cpfReincidente || '—') + '</td>'
+        + '<td>' + escapar(uma.sucursal || '—') + '</td>'
+        + '<td>' + escapar(uma.coordenadorComercial || '—') + '</td>'
         + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
@@ -465,12 +398,16 @@ var TelaTabelaCorretoras = (function () {
       + '</div>'
       + avisoDeOrigem('SUSEP_BLOQUEADAS')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
-      + 'o formulário passa a mostrar o selo vermelho com o motivo, e quem está '
-      + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa '
-      + 'registrar o caso num caderno, e o sistema perderia o caso de vista.</p>'
+      + 'o formulário passa a mostrar o selo vermelho, e quem está atendendo '
+      + 'decide. Bloqueio que impedisse o cadastro faria a pessoa registrar o '
+      + 'caso num caderno, e o sistema perderia o caso de vista.<br>'
+      + 'Esta lista <strong>não vale para corretora Diamante</strong>: se a '
+      + 'SUSEP está no cadastro de corretoras, o selo sai verde — são duas '
+      + 'listas, de donos diferentes.</p>'
       + (dados.bloqueadas.length
         ? '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
-          + '<thead><tr><th>SUSEP</th><th>Motivo</th><th>CPF reincidente</th>'
+          + '<thead><tr><th>SUSEP</th><th>Sucursal</th>'
+          + '<th>Coordenador comercial</th>'
           + '<th>Desde</th><th class="direita">Casos</th>'
           + '<th class="acoes-coluna"></th></tr></thead>'
           + '<tbody>' + linhas + '</tbody></table></div>'
@@ -495,13 +432,13 @@ var TelaTabelaCorretoras = (function () {
     elemento('corretoras-painel').innerHTML =
       '<form class="config-form" id="form-bloqueio">'
       + tituloDoPainel('Bloquear SUSEP', 'Marca o selo do formulário')
-      + campoDeTexto('susep', 'SUSEP', '', 'Só dígitos.')
-      + campoDeTexto('corretora', 'Nome da corretora', '', '')
-      + campoDeTexto('cpf', 'CPF reincidente', '',
-        'Quando o bloqueio vem de um CPF que se repete.')
-      + campoDeTexto('motivo', 'Motivo', '',
-        'Obrigatório. Quem vir o selo vermelho daqui a seis meses precisa '
-        + 'saber o que fazer com a informação.')
+      + campoDeTexto('susep', 'SUSEP', '',
+        'Letras e números, como a SUSEP é escrita — por exemplo RET00J.')
+      + campoDeTexto('corretora', 'Corretora', '', '')
+      + campoDeTexto('sucursal', 'Sucursal', '', '')
+      + campoDeTexto('coordenador', 'Coordenador comercial', '',
+        'Quem responde por este bloqueio. É a quem perguntar quando o selo '
+        + 'vermelho aparecer daqui a seis meses.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Bloquear</button></div></form>';
 
@@ -509,7 +446,8 @@ var TelaTabelaCorretoras = (function () {
       evento.preventDefault();
       Servidor.chamar('bloquearSusep', {
         susep: valorDe('susep'), corretora: valorDe('corretora'),
-        cpfReincidente: valorDe('cpf'), motivo: valorDe('motivo')
+        sucursal: valorDe('sucursal'),
+        coordenadorComercial: valorDe('coordenador')
       }).entao(function () {
         avisar('SUSEP bloqueada.', 'bom');
         carregar();
@@ -566,6 +504,8 @@ var TelaTabelaCorretoras = (function () {
       return coluna.titulo;
     }).join('\t');
 
+    var colando = fonteDaImportacao.tipo !== 'planilha';
+
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Importar</span>'
       + '<select id="tipo-da-importacao" aria-label="O que importar">'
@@ -576,13 +516,16 @@ var TelaTabelaCorretoras = (function () {
         return '<code>' + escapar(coluna.titulo) + '</code>'
           + (coluna.obrigatoria ? '<em>obrigatória</em>' : '');
       }).join('') + '</div>'
-      + '<p class="config-explica">Copie da sua planilha e cole aqui — com ou '
-      + 'sem a linha de cabeçalho, tanto faz. Se vier com cabeçalho, a ordem '
-      + 'das colunas pode ser outra: o sistema lê pelos nomes. Até '
-      + receita.maximo + ' linhas por vez.</p>'
-      + '<textarea id="texto-da-importacao" class="importar-area" rows="10"'
-      + ' spellcheck="false" aria-label="Cole aqui as linhas"'
-      + ' placeholder="' + escapar(cabecalho) + '"></textarea>'
+      + '<p class="config-explica">Com ou sem a linha de cabeçalho, tanto faz. '
+      + 'Se vier com cabeçalho, a ordem das colunas pode ser outra: o sistema '
+      + 'lê pelos nomes. Até ' + receita.maximo + ' linhas por vez.</p>'
+      + '<div class="config-abas">'
+      + '<button type="button" class="config-aba' + (colando ? ' atual' : '') + '"'
+      + ' data-fonte-da-importacao="colado">Colar da planilha</button>'
+      + '<button type="button" class="config-aba' + (colando ? '' : ' atual') + '"'
+      + ' data-fonte-da-importacao="planilha">Ler outra planilha pelo link</button>'
+      + '</div>'
+      + (colando ? desenharColarCadastro(cabecalho) : desenharLinkDoCadastro())
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="conferir-importacao">'
       + 'Conferir</button>'
@@ -591,31 +534,91 @@ var TelaTabelaCorretoras = (function () {
       + '<div id="resultado-da-importacao"></div>';
 
     elemento('tipo-da-importacao').addEventListener('change', function () {
+      guardarFonteDaImportacao();
       tipoDaImportacao = this.value;
       conferido = null;
       desenharImportacao();
     });
-    elemento('conferir-importacao').addEventListener('click', conferir);
-    elemento('limpar-importacao').addEventListener('click', function () {
-      elemento('texto-da-importacao').value = '';
-      elemento('resultado-da-importacao').innerHTML = '';
+
+    ligarCliques('[data-fonte-da-importacao]', function (botao) {
+      guardarFonteDaImportacao();
+      fonteDaImportacao.tipo = botao.getAttribute('data-fonte-da-importacao');
       conferido = null;
+      desenharImportacao();
     });
 
-    painelVazio('Cole as linhas e aperte Conferir. Nada é gravado até você '
+    elemento('conferir-importacao').addEventListener('click', conferir);
+    elemento('limpar-importacao').addEventListener('click', function () {
+      // Limpar limpa a fonte INTEIRA, e não só o campo que está na tela. O
+      // Id que sobrasse escondido na outra aba seria importado na próxima
+      // conferência sem ninguém ver que ele ainda estava lá.
+      fonteDaImportacao = { tipo: fonteDaImportacao.tipo, texto: '',
+        planilhaId: '', aba: '' };
+      elemento('resultado-da-importacao').innerHTML = '';
+      conferido = null;
+      desenharImportacao();
+    });
+
+    painelVazio('Aponte as linhas e aperte Conferir. Nada é gravado até você '
       + 'apertar Aplicar — e Aplicar pede a senha de administrador.');
   }
 
+  /** A fonte "colar": a caixa de texto de sempre. */
+  function desenharColarCadastro(cabecalho) {
+    return '<textarea id="texto-da-importacao" class="importar-area" rows="10"'
+      + ' spellcheck="false" aria-label="Cole aqui as linhas"'
+      + ' placeholder="' + escapar(cabecalho) + '">'
+      + escapar(fonteDaImportacao.texto) + '</textarea>';
+  }
+
+  /*
+    A fonte "outra planilha": o caminho das listas grandes.
+
+    Colar sete mil SUSEPs bloqueadas numa caixa de texto é o que ninguém faz
+    duas vezes — e é justamente o tamanho que essa lista tem na operação. Aqui
+    a pessoa informa o Id e a aba, e o servidor lê de lá.
+  */
+  function desenharLinkDoCadastro() {
+    return '<div class="grade">'
+      + '<label class="campo"><span>Id da planilha</span>'
+      + '<input type="text" id="planilha-da-importacao"'
+      + ' value="' + escapar(fonteDaImportacao.planilhaId) + '"'
+      + ' placeholder="o pedaço do endereço entre /d/ e /edit"></label>'
+      + '<label class="campo"><span>Nome da aba</span>'
+      + '<input type="text" id="aba-da-importacao"'
+      + ' value="' + escapar(fonteDaImportacao.aba) + '"'
+      + ' placeholder="em branco = a primeira aba"></label>'
+      + '</div>'
+      + '<p class="config-explica">A conta que abre o PGO precisa ter acesso a '
+      + 'essa planilha. Se não tiver, o sistema diz isso em vez de importar '
+      + 'pela metade.</p>';
+  }
+
+  /** O que está nos campos da tela passa para o estado, antes do redesenho. */
+  function guardarFonteDaImportacao() {
+    var caixa = elemento('texto-da-importacao');
+    if (caixa) fonteDaImportacao.texto = caixa.value;
+
+    var planilha = elemento('planilha-da-importacao');
+    if (planilha) fonteDaImportacao.planilhaId = planilha.value.trim();
+
+    var aba = elemento('aba-da-importacao');
+    if (aba) fonteDaImportacao.aba = aba.value.trim();
+    return fonteDaImportacao;
+  }
+
   function conferir() {
-    var texto = elemento('texto-da-importacao').value;
-    if (!texto.trim()) {
-      avisar('Cole alguma coisa antes de conferir.', 'atencao');
+    var fonte = guardarFonteDaImportacao();
+    if (fonte.tipo === 'planilha' ? !fonte.planilhaId : !fonte.texto.trim()) {
+      avisar(fonte.tipo === 'planilha'
+        ? 'Informe o Id da planilha antes de conferir.'
+        : 'Cole alguma coisa antes de conferir.', 'atencao');
       return;
     }
     var onde = elemento('resultado-da-importacao');
     onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
 
-    Servidor.chamar('conferirImportacao', tipoDaImportacao, texto)
+    Servidor.chamar('conferirImportacao', tipoDaImportacao, fonte)
       .entao(function (resposta) {
         conferido = resposta;
         desenharConferencia();
@@ -700,21 +703,22 @@ var TelaTabelaCorretoras = (function () {
   }
 
   /*
-    O texto vai INTEIRO de novo para o servidor, e não a lista já conferida.
+    A FONTE vai inteira de novo para o servidor, e não a lista já conferida.
     Mandar a lista conferida seria mandar o servidor gravar o que ele mesmo
     aprovou — mas passando pelo navegador no caminho, onde qualquer coisa
     pode ter mudado. O servidor confere tudo outra vez antes de escrever.
   */
   function pedirSenhaEAplicar() {
-    var texto = elemento('texto-da-importacao').value;
+    var fonte = guardarFonteDaImportacao();
     SenhaDeAdministrador.pedir(function () {
       elemento('resultado-da-importacao').innerHTML =
         '<p class="carregando-campos">Gravando…</p>';
-      Servidor.chamar('aplicarImportacao', tipoDaImportacao, texto)
+      Servidor.chamar('aplicarImportacao', tipoDaImportacao, fonte)
         .entao(function (feito) {
           avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
             + ' atualizada(s) em ' + feito.titulo + '.', 'bom');
-          elemento('texto-da-importacao').value = '';
+          fonteDaImportacao = { tipo: fonteDaImportacao.tipo, texto: '',
+            planilhaId: '', aba: '' };
           conferido = null;
           carregar();
         })

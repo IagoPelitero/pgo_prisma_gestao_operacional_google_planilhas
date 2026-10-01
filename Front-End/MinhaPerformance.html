@@ -78,6 +78,11 @@ var TelaMinhaPerformance = (function () {
       + (dados.porDia ? cartaoDeGrafico(dados.porDia) : '')
       + (dados.porSituacao ? cartaoDeGrafico(dados.porSituacao) : '')
       + (dados.porCanal ? cartaoDeGrafico(dados.porCanal) : '')
+      // O MESMO gráfico da Produtividade RECC, com os casos da pessoa. Vem
+      // por último porque é o mais largo, e porque é o que fecha a leitura:
+      // "o que eu fiz" acima, "quanto isso valeu" aqui.
+      + (dados.valorPorSituacao
+        ? cartaoDeValorPorSituacao(dados.valorPorSituacao) : '')
       + '</div>'
       + '<div class="performance-baixo">'
       + desenharEquipe() + desenharRecentes() + '</div>';
@@ -164,6 +169,24 @@ var TelaMinhaPerformance = (function () {
       + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
       + '</h3></header>'
       + Graficos.desenhar(componente) + '</section>';
+  }
+
+  /**
+   * O valor por situação, com o gráfico E a tabela.
+   *
+   * A tabela aparece porque os NÚMEROS são o pedido do PO — "valor dos
+   * retidos, não retidos, sem sucesso, valor dos demais status e total" —, e
+   * o total mora no pé dela. É o mesmo desenho da Produtividade RECC; o que
+   * muda são os casos que entraram na conta.
+   */
+  function cartaoDeValorPorSituacao(componente) {
+    return '<section class="cartao grafico largura-2">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
+      + '</h3></header>'
+      + (componente.aviso
+        ? '<p class="grafico-vazio">' + escapar(componente.aviso) + '</p>'
+        : Graficos.desenhar(componente) + Graficos.tabela(componente))
+      + '</section>';
   }
 
   /* -------------------------------------------------------------- equipe */

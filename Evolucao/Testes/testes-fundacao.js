@@ -331,19 +331,21 @@ function rodarTestesDaFundacao() {
   });
 
   teste('a conferência de estrutura aponta coluna que sumiu, sem consertar', () => {
-    const aba = planilha.getSheetByName('PRODUTOS');
-    aba.getRange(1, 3).setValue('');            // apaga o cabeçalho CodigoProduto
+    const aba = planilha.getSheetByName('CORRETORAS');
+    const onde = chamar('posicaoDaColuna_')(
+      chamar('estruturaDaAba_')('CORRETORAS'), 'Sucursal') + 1;
+    aba.getRange(1, onde).setValue('');             // apaga o cabeçalho Sucursal
     chamar('esquecerEstruturaLida_()');
 
     const laudo = chamar('conferirEstrutura_()');
     igual(laudo.ok, false, 'o laudo deveria reprovar');
-    const produtos = laudo.abas.find((a) => a.aba === 'PRODUTOS');
-    igual(produtos.faltando.join(','), 'CodigoProduto');
-    igual(celula(planilha, 'PRODUTOS', 1, 'Produto'), 'Produto',
+    const corretoras = laudo.abas.find((a) => a.aba === 'CORRETORAS');
+    igual(corretoras.faltando.join(','), 'Sucursal');
+    igual(celula(planilha, 'CORRETORAS', 1, 'Corretora'), 'Corretora',
       'a conferência não pode ter mexido em nada');
 
-    aba.getRange(1, 3).setNumberFormat('@');
-    aba.getRange(1, 3).setValue('CodigoProduto');
+    aba.getRange(1, onde).setNumberFormat('@');
+    aba.getRange(1, onde).setValue('Sucursal');
     chamar('esquecerEstruturaLida_()');
   });
 

@@ -675,20 +675,6 @@ button { font: inherit; color: inherit; }
 }
 
 /*
-  Quem está de férias na lista da Importação.
-
-  A marca é em tom de ATENÇÃO, e não de erro: a pessoa pode ser marcada de
-  propósito, para um lote que só vai ser trabalhado quando ela voltar. Vermelho
-  diria "não faça isso", e não é isso que o sistema sabe.
-*/
-.config-chave.esta-fora span { color: var(--suave); }
-.config-chave.esta-fora em.fora {
-  font-style: normal; font-size: 11.5px; font-weight: 600;
-  color: var(--atencao);
-}
-.aviso-de-ausencia { color: var(--atencao); }
-
-/*
   O recado de que a origem vai escrever numa coluna de produtividade.
 
   Fundo, e não só cor de texto: este é o único aviso da tela que fala de uma
@@ -843,6 +829,18 @@ table.fila thead th {
 }
 table.fila tbody tr:last-child td { border-bottom: 0; }
 table.fila tbody tr:hover { background: var(--superficie-2); }
+/*
+   A linha do TOTAL, no pé da tabela de números de um gráfico.
+
+   Fundo igual ao do cabeçalho e um traço em cima: ela precisa se ler como
+   "fecha a conta", e não como mais um item da lista. Sem o traço, o total
+   vira a última linha da tabela — e alguém o soma com as outras.
+*/
+table.fila tfoot td {
+  background: var(--superficie-2);
+  border-top: 2px solid var(--linha-forte);
+  border-bottom: 0;
+}
 table.fila tr.aberta { background: var(--destaque-tenue); }
 table.fila tr.aberta:hover { background: var(--destaque-tenue); }
 
@@ -1342,6 +1340,17 @@ table.fila tr.importar-igual { color: var(--tenue); }
   margin: 6px 0 12px;
 }
 
+/*
+   Os próximos passos de um canal recém-criado. Lista NUMERADA de propósito:
+   a ordem importa — não dá para cadastrar a situação de um canal antes de o
+   campo da situação existir.
+*/
+.config-passos {
+  font-size: 12.5px; color: var(--suave); line-height: 1.6;
+  margin: 6px 0 12px; padding-left: 20px;
+}
+.config-passos li { margin-bottom: 4px; }
+
 .config-itens { list-style: none; margin: 0; padding: 0; }
 .config-item {
   display: flex; align-items: center; gap: 8px;
@@ -1460,22 +1469,6 @@ table.fila tr.importar-igual { color: var(--tenue); }
   margin-bottom: 10px;
 }
 .config-lista-cabeca .config-titulo { margin-right: auto; }
-.calendario-cabeca { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--linha); }
-
-.feriados-do-sistema { list-style: none; margin: 10px 0 14px; padding: 0; }
-.feriado-do-sistema {
-  display: flex; gap: 10px; align-items: baseline;
-  padding: 5px 0; font-size: 13px; color: var(--texto-suave);
-  border-bottom: 1px dashed var(--linha);
-}
-.feriado-do-sistema .quando {
-  font-variant-numeric: tabular-nums; color: var(--tenue); min-width: 84px;
-}
-.feriado-do-sistema .qual { overflow-wrap: anywhere; }
-/* Cancelado por "a operação trabalha neste dia": continua na lista, riscado,
-   porque some-lo faria parecer que o sistema esqueceu o feriado. */
-.feriado-do-sistema.cancelado .qual { text-decoration: line-through; opacity: .65; }
-
 .config-vazio { color: var(--tenue); font-size: 13.5px; margin: 0; }
 .config-erro {
   margin: 0 0 12px; font-size: 13px; font-weight: 600; line-height: 1.45;
@@ -1545,6 +1538,20 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .par-do-caso > strong {
   font-weight: 500; font-size: 14px; overflow-wrap: anywhere;
 }
+/*
+  O que vem direto da planilha, e não de um campo do formulário.
+
+  O aviso atravessa a grade inteira (`grid-column: 1 / -1`) de propósito: ele
+  separa dois blocos, e separador que ocupa só uma coluna vira um par estranho
+  no meio dos outros. O par em si fica mais apagado — é leitura, e competir em
+  peso com o que a pessoa preenche tiraria a atenção do que ela veio ver.
+*/
+.pares-do-sistema {
+  grid-column: 1 / -1; margin: 10px 0 0;
+  padding-top: 14px; border-top: 1px solid var(--linha);
+  font-size: 12px; color: var(--tenue);
+}
+.par-do-caso.do-sistema > strong { font-weight: 400; color: var(--tenue); }
 
 .historico { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linha); }
 .historico h4 { margin: 0 0 14px; font-size: 16px; letter-spacing: -.01em; }
@@ -2327,12 +2334,6 @@ var Moldura = (function () {
     // calendário: a folhinha de parede, com os dois furos de cima e um dia
     // marcado. É o desenho que já significa "data" para qualquer pessoa — e
     // esta seção fala de dias: férias, feriados, dias úteis.
-    calendario:
-      '<rect x="3.6" y="5.2" width="16.8" height="15.2" rx="1.8"></rect>'
-      + '<path d="M3.6 10h16.8"></path>'
-      + '<path d="M8.2 3.6v3.2M15.8 3.6v3.2"></path>'
-      + '<rect x="10.6" y="13" width="3.4" height="3.2" rx=".6"></rect>',
-
     // estrutura e auditoria: a prancheta do laudo, com o visto
     estrutura:
       '<path d="M9 4.4H7.4A1.6 1.6 0 0 0 5.8 6v13.2a1.6 1.6 0 0 0 1.6 1.6h9.2a1.6 1.6 0 0 0 1.6-1.6V6a1.6 1.6 0 0 0-1.6-1.6H15"></path>'
@@ -2525,7 +2526,6 @@ var Moldura = (function () {
   /** "Analista RET · Vida Individual" — o cargo, e o canal quando existe. */
   function descricaoDaPessoa(usuario) {
     var cargo = usuario.cargo || usuario.nivelAcesso || '';
-    if (usuario.canalQueAtende) return cargo + ' · ' + usuario.canalQueAtende;
     return cargo;
   }
 
@@ -2800,7 +2800,21 @@ var SeletorDeCanal = (function () {
     }
   }
 
-  return { montar: montar, ligar: ligar, icone: icone };
+  /**
+   * Os nomes dos desenhos que existem, para a tela de Configurações oferecer.
+   *
+   * Sai DAQUI, da mesma chave que `icone` consulta, e não de uma lista escrita
+   * à parte: uma segunda lista deixaria oferecer um ícone que não tem desenho,
+   * e o canal nasceria com o losango sem ninguém entender por quê.
+   */
+  function nomesDosIcones() {
+    return Object.keys(DESENHOS);
+  }
+
+  return {
+    montar: montar, ligar: ligar, icone: icone,
+    nomesDosIcones: nomesDosIcones
+  };
 })();
 </script>
 
@@ -3113,7 +3127,7 @@ var Formulario = (function () {
    * Recebe a RAIZ, e não procura na página inteira: com o modal aberto por
    * cima da tela de cadastro, procurar na página inteira ligaria os dois.
    */
-  function ligar(raiz, prefixo) {
+  function ligar(raiz, prefixo, idDoCanal) {
     /*
      * O CAMPO DE DINHEIRO.
      *
@@ -3151,7 +3165,9 @@ var Formulario = (function () {
 
     var susep = raiz.querySelector('[data-chave="susep"]');
     if (susep) {
-      var conferir = function () { consultarSusep(raiz, prefixo, susep.value); };
+      var conferir = function () {
+        consultarSusep(raiz, prefixo, susep.value, idDoCanal);
+      };
       susep.addEventListener('change', conferir);
       susep.addEventListener('blur', conferir);
     }
@@ -3175,14 +3191,21 @@ var Formulario = (function () {
 
   /**
    * O selo da SUSEP.
+   *
    * "Não encontrada" é resposta, não erro: é uma corretora que o cadastro não
    * conhece, e quem está atendendo precisa saber disso antes de seguir.
+   *
+   * A SUSEP TEM LETRA — "RET00J", palavra do PO. A guarda abaixo olhava só
+   * dígito (`replace(/\D/g, '')`): uma SUSEP sem nenhum número sairia dali
+   * como texto vazio, o selo se esconderia e NUNCA consultaria o servidor.
+   * Não daria erro — o campo ficaria só sem selo, para sempre, e ninguém
+   * ligaria isso à letra.
    */
-  function consultarSusep(raiz, prefixo, valor) {
+  function consultarSusep(raiz, prefixo, valor, idDoCanal) {
     var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-susep');
     if (!selo) return;
 
-    if (!String(valor || '').replace(/\D/g, '')) {
+    if (!String(valor || '').trim()) {
       selo.hidden = true;
       return;
     }
@@ -3191,7 +3214,10 @@ var Formulario = (function () {
     selo.className = 'selo-susep conferindo';
     selo.textContent = 'Conferindo…';
 
-    Servidor.chamar('consultarSusep', valor)
+    // O CANAL VAI JUNTO: é ele que decide se a lista de SUSEPs bloqueadas é
+    // consultada. A Mesa Diamante não consulta, a pedido do PO, e quem sabe
+    // disso é a coluna do canal — não esta tela.
+    Servidor.chamar('consultarSusep', valor, idDoCanal)
       .entao(function (resposta) {
         var aparencia = {
           OK: 'liberada', BLOQUEADA: 'bloqueada',
@@ -3202,11 +3228,50 @@ var Formulario = (function () {
         selo.textContent = resposta.mensagem
           + (resposta.segmento && resposta.situacao === 'OK'
             ? ' · ' + resposta.segmento : '');
+
+        preencherCorretoraDaSusep(raiz, resposta);
       })
       .senao(function () {
         selo.className = 'selo-susep conferindo';
         selo.textContent = 'Não consegui conferir a SUSEP agora.';
       });
+  }
+
+  /*
+    A corretora, preenchida pela SUSEP.
+
+    Pedido do PO: "o formulário da mesa deve buscar pela susep o nome da
+    corretora automaticamente". A resposta do selo já traz o nome — ela vem do
+    cadastro de Corretoras Diamante —, então isto NÃO custa uma ida a mais ao
+    servidor: é aproveitar o que já voltou.
+
+    QUANDO PREENCHE: quando o campo está vazio, ou quando o que está nele foi
+    este mesmo preenchimento automático que colocou. Escrever por cima do que
+    a pessoa digitou apagaria uma correção feita de propósito — e trocar a
+    SUSEP tem de atualizar a corretora, senão sobra o nome da anterior, que é
+    pior que nome nenhum.
+
+    Guardar o que foi preenchido no próprio campo (`data-veio-da-susep`) é o
+    que distingue os dois casos sem guardar estado solto na tela.
+  */
+  function preencherCorretoraDaSusep(raiz, resposta) {
+    var campo = raiz.querySelector('[data-chave="corretora"]');
+    if (!campo || campo.disabled) return;
+
+    var nome = String((resposta && resposta.corretora) || '').trim();
+    var agora = String(campo.value || '').trim();
+    var oQueEuPreenchi = campo.getAttribute('data-veio-da-susep') || '';
+
+    if (agora !== '' && agora !== oQueEuPreenchi) return;
+    if (!nome) {
+      // SUSEP sem corretora conhecida: limpa só o que eu mesmo escrevi.
+      if (agora === oQueEuPreenchi && agora !== '') campo.value = '';
+      campo.removeAttribute('data-veio-da-susep');
+      return;
+    }
+
+    campo.value = nome;
+    campo.setAttribute('data-veio-da-susep', nome);
   }
 
   /* -------------------------------------------------------------- valores */
@@ -3473,13 +3538,7 @@ var CasoEmModal = (function () {
           + escapar(detalhe.situacao) + '</span>'
         : '')
       + '<div class="modal-pares">'
-      + detalhe.linhas.map(function (linha) {
-        return '<div class="par-do-caso">'
-          + '<span>' + escapar(linha.rotulo) + '</span>'
-          // Travessão, e não vazio: "está em branco" é uma informação.
-          + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
-          + '</div>';
-      }).join('')
+      + desenharParesDoCaso()
       + '</div>'
       + desenharLinhaDoTempo()
       + desenharHistorico();
@@ -3537,6 +3596,37 @@ var CasoEmModal = (function () {
    * esconderia o buraco — e o buraco é informação: quem pulou o 2º contato e
    * foi direto para "Não reteve" contou uma história.
    */
+  /*
+    Os pares do caso, com um aviso antes do que vem direto da planilha.
+
+    O servidor passou a mandar também as colunas PREENCHIDAS que o formulário
+    não pergunta — a origem da importação, os carimbos de contato —, a pedido
+    do PO: "precisa trazer todos os dados que foram preenchidos na planilha".
+
+    Elas entram depois dos campos, atrás de um aviso, e não misturadas: quem
+    lê precisa saber que aquilo o sistema escreveu, e que não se edita no
+    formulário. Sem o aviso, "Quem mudou o status" pareceria um campo que a
+    pessoa esqueceu de preencher.
+  */
+  function desenharParesDoCaso() {
+    var avisoJaSaiu = false;
+
+    return detalhe.linhas.map(function (linha) {
+      var aviso = '';
+      if (linha.doSistema && !avisoJaSaiu) {
+        avisoJaSaiu = true;
+        aviso = '<p class="pares-do-sistema">Também está na planilha — '
+          + 'escrito pelo sistema, não se edita no formulário.</p>';
+      }
+      return aviso
+        + '<div class="par-do-caso' + (linha.doSistema ? ' do-sistema' : '') + '">'
+        + '<span>' + escapar(linha.rotulo) + '</span>'
+        // Travessão, e não vazio: "está em branco" é uma informação.
+        + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
+        + '</div>';
+    }).join('');
+  }
+
   function desenharLinhaDoTempo() {
     if (!detalhe.linhaDoTempo || !detalhe.linhaDoTempo.length) return '';
 
@@ -3595,7 +3685,7 @@ var CasoEmModal = (function () {
             var corpo = corpoDaEdicao();
             if (!corpo) return;
             corpo.innerHTML = Formulario.desenhar(formulario, 'editar-');
-            Formulario.ligar(corpo, 'editar-');
+            Formulario.ligar(corpo, 'editar-', canalAtual);
             Formulario.preencher(corpo, caso.valores);
           })
           .senao(mostrarRecadoDeErro);
@@ -4075,7 +4165,37 @@ var Graficos = (function () {
           + '<td class="direita">' + escapar(numero(ponto.valor, componente.unidade))
           + '</td><td class="direita">' + ponto.casos + '</td></tr>';
       }).join('')
-      + '</tbody></table></div>';
+      + '</tbody>' + rodapeComTotal(componente) + '</table></div>';
+  }
+
+  /**
+   * A linha do TOTAL, no pé da tabela de números.
+   *
+   * Pedido do PO junto do gráfico de valor por situação: ele quer as partes e
+   * quer o total. Vale para toda tabela, porque a pergunta "e no todo, quanto
+   * é?" é a mesma em todas — e somar cinco linhas de cabeça é onde o erro
+   * entra.
+   *
+   * MÉDIA NÃO TEM TOTAL, e por isso a guarda existe: somar médias dá um número
+   * que não quer dizer nada — "média de 200 + média de 150 = 350" não é a
+   * média de nada. Um número sem significado numa linha chamada "Total" é
+   * pior que linha nenhuma, porque alguém vai usá-lo.
+   */
+  function rodapeComTotal(componente) {
+    if (componente.agregacao === 'media') return '';
+    if (!componente.pontos.length) return '';
+
+    var total = componente.pontos.reduce(function (soma, ponto) {
+      return soma + ponto.valor;
+    }, 0);
+    var casos = componente.pontos.reduce(function (soma, ponto) {
+      return soma + ponto.casos;
+    }, 0);
+
+    return '<tfoot><tr><td><strong>Total</strong></td>'
+      + '<td class="direita"><strong>'
+      + escapar(numero(total, componente.unidade)) + '</strong></td>'
+      + '<td class="direita"><strong>' + casos + '</strong></td></tr></tfoot>';
   }
 
   /**
@@ -4686,7 +4806,7 @@ var TelaCadastrarCaso = (function () {
     Servidor.chamar('formularioDoCanal', canalEscolhida)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
-        Formulario.ligar(corpo(), '');
+        Formulario.ligar(corpo(), '', canalEscolhida);
         // Só no cadastro NOVO. No caso já gravado quem manda é o valor da
         // planilha — um padrão por cima dele seria perda silenciosa de dado.
         Formulario.aplicarPadroes(corpo(), resposta);
@@ -4850,6 +4970,11 @@ var TelaMinhaPerformance = (function () {
       + (dados.porDia ? cartaoDeGrafico(dados.porDia) : '')
       + (dados.porSituacao ? cartaoDeGrafico(dados.porSituacao) : '')
       + (dados.porCanal ? cartaoDeGrafico(dados.porCanal) : '')
+      // O MESMO gráfico da Produtividade RECC, com os casos da pessoa. Vem
+      // por último porque é o mais largo, e porque é o que fecha a leitura:
+      // "o que eu fiz" acima, "quanto isso valeu" aqui.
+      + (dados.valorPorSituacao
+        ? cartaoDeValorPorSituacao(dados.valorPorSituacao) : '')
       + '</div>'
       + '<div class="performance-baixo">'
       + desenharEquipe() + desenharRecentes() + '</div>';
@@ -4936,6 +5061,24 @@ var TelaMinhaPerformance = (function () {
       + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
       + '</h3></header>'
       + Graficos.desenhar(componente) + '</section>';
+  }
+
+  /**
+   * O valor por situação, com o gráfico E a tabela.
+   *
+   * A tabela aparece porque os NÚMEROS são o pedido do PO — "valor dos
+   * retidos, não retidos, sem sucesso, valor dos demais status e total" —, e
+   * o total mora no pé dela. É o mesmo desenho da Produtividade RECC; o que
+   * muda são os casos que entraram na conta.
+   */
+  function cartaoDeValorPorSituacao(componente) {
+    return '<section class="cartao grafico largura-2">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
+      + '</h3></header>'
+      + (componente.aviso
+        ? '<p class="grafico-vazio">' + escapar(componente.aviso) + '</p>'
+        : Graficos.desenhar(componente) + Graficos.tabela(componente))
+      + '</section>';
   }
 
   /* -------------------------------------------------------------- equipe */
@@ -5311,8 +5454,15 @@ var TelaBuscarCaso = (function () {
 /* ============================================================================
    PGO — TabelaCorretoras.html · quem traz o caso para dentro
    ============================================================================
-   Três cadastros numa tela só, em abas: corretoras e canais, produtos e as
-   SUSEPs bloqueadas. Até aqui, os três só se ajustavam abrindo a planilha.
+   Dois cadastros numa tela só, em abas: as corretoras Diamante e as SUSEPs
+   bloqueadas. Até aqui, os dois só se ajustavam abrindo a planilha.
+
+   SÃO DUAS LISTAS DIFERENTES, com dois donos. Decisão do PO: "corretoras
+   Diamante não podem ter status de bloqueada (...) pertence a outra lista".
+   Por isso a tabela de corretoras não mostra pastilha de bloqueio, e o selo do
+   Cadastrar Caso consulta o cadastro ANTES da lista de bloqueios.
+
+   Havia aqui uma terceira aba, Produtos, que saiu a pedido dele.
 
    O QUE FAZ ESTA TELA VALER MAIS QUE UMA LISTA: o volume ao lado de cada
    corretora, e o aviso das SUSEPs que aparecem nos casos e não estão
@@ -5331,6 +5481,14 @@ var TelaTabelaCorretoras = (function () {
   var editando = null;      // o item aberto no formulário lateral
   var tipoDaImportacao = '';  // qual lista está sendo importada
   /*
+   * De onde vêm as linhas da importação: do texto colado ou de outra planilha.
+   *
+   * Mora aqui, e não no campo da tela, porque a aba é redesenhada quando a
+   * pessoa troca a lista que está importando — e perder o Id da planilha que
+   * ela acabou de colar nesse redesenho é o tipo de detalhe que faz desistir.
+   */
+  var fonteDaImportacao = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
+  /*
    * De onde vem cada cadastro: desta planilha ou da de cadastros.
    *
    * Lido UMA VEZ, quando a tela abre — a resposta não muda enquanto ela está
@@ -5347,8 +5505,7 @@ var TelaTabelaCorretoras = (function () {
 
   function montar() {
     return '<div class="config-abas" id="abas-das-corretoras">'
-      + [['corretoras', 'Corretoras e canais'],
-         ['produtos', 'Produtos'],
+      + [['corretoras', 'Corretoras Diamante'],
          ['bloqueadas', 'SUSEPs bloqueadas'],
          ['importar', 'Importar']].map(function (par) {
         return '<button type="button" class="config-aba'
@@ -5370,11 +5527,6 @@ var TelaTabelaCorretoras = (function () {
     if (abaAtual === 'corretoras') {
       return Servidor.chamar('tabelaDeCorretoras', procurar, segmento)
         .entao(function (resposta) { dados = resposta; desenharCorretoras(); })
-        .senao(falhou);
-    }
-    if (abaAtual === 'produtos') {
-      return Servidor.chamar('listarProdutos')
-        .entao(function (lista) { dados = { produtos: lista }; desenharProdutos(); })
         .senao(falhou);
     }
     if (abaAtual === 'importar') {
@@ -5417,7 +5569,8 @@ var TelaTabelaCorretoras = (function () {
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<input type="search" id="procurar-corretora" class="busca-do-cadastro"'
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
-      + ' placeholder="Corretora, canal ou SUSEP" aria-label="Procurar corretora">'
+      + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
+      + ' aria-label="Procurar corretora">'
       + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
@@ -5484,18 +5637,26 @@ var TelaTabelaCorretoras = (function () {
       return '<p class="config-vazio">Nenhuma corretora com esse filtro.</p>';
     }
 
+    /*
+     * SEM PASTILHA DE BLOQUEIO, e isto é o pedido do PO.
+     *
+     * Havia aqui uma coluna "Situação", verde ou vermelha, cruzando esta
+     * tabela com a lista de SUSEPs bloqueadas. "Corretoras Diamante não podem
+     * ter status de bloqueada por gentileza mesmo que o SUSEP esteja na lista
+     * de bloqueadas. Pertence a outra lista."
+     *
+     * No lugar dela entrou o CONSULTOR, que é de quem a operação precisa
+     * quando abre esta tabela: quem atende aquela corretora.
+     */
     var linhas = dados.corretoras.map(function (uma) {
       return '<tr' + (editando && editando.id === uma.id ? ' class="aberta"' : '')
         + '>'
         + '<td><span class="principal">' + escapar(uma.corretora) + '</span>'
         + '<span class="apoio">' + escapar(uma.susep) + '</span></td>'
-        + '<td><span class="principal">' + escapar(uma.canal || '—') + '</span>'
-        + '<span class="apoio">' + escapar(uma.nome || '—') + '</span></td>'
+        + '<td>' + escapar(uma.sucursal || '—') + '</td>'
         + '<td><span class="situacao ' + classeDoSegmento(uma.segmento) + '">'
         + escapar(uma.segmento) + '</span></td>'
-        + '<td><span class="situacao ' + (uma.bloqueada ? 'tom-ruim' : 'tom-bom')
-        + '" title="' + escapar(uma.motivoDoBloqueio) + '">'
-        + (uma.bloqueada ? 'Bloqueada' : 'Liberada') + '</span></td>'
+        + '<td>' + escapar(uma.consultor || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
         + (dados.podeMexer && podeMexerNesta('CORRETORAS')
@@ -5506,8 +5667,8 @@ var TelaTabelaCorretoras = (function () {
     }).join('');
 
     return '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
-      + '<thead><tr><th>Corretora</th><th>Canal</th><th>Segmento</th>'
-      + '<th>Situação</th><th class="direita">Casos</th>'
+      + '<thead><tr><th>Corretora</th><th>Sucursal</th><th>Segmento</th>'
+      + '<th>Consultor</th><th class="direita">Casos</th>'
       + '<th class="acoes-coluna"></th></tr></thead>'
       + '<tbody>' + linhas + '</tbody></table></div>';
   }
@@ -5575,7 +5736,7 @@ var TelaTabelaCorretoras = (function () {
       desenharFormularioDaCorretora({
         id: '', susep: botao.getAttribute('data-cadastrar-susep'),
         corretora: botao.getAttribute('data-nome-nos-casos'),
-        nome: '', canal: '', segmento: ''
+        sucursal: '', segmento: '', consultor: ''
       }, true);
     });
   }
@@ -5588,24 +5749,25 @@ var TelaTabelaCorretoras = (function () {
   }
 
   function desenharFormularioDaCorretora(corretora, veioDosCasos) {
-    var atual = corretora || { id: '', nome: '', canal: '', susep: '',
-      corretora: '', segmento: '' };
+    var atual = corretora || { id: '', susep: '', corretora: '',
+      sucursal: '', segmento: '', consultor: '' };
 
     elemento('corretoras-painel').innerHTML =
       '<form class="config-form" id="form-corretora">'
       + tituloDoPainel(atual.id ? atual.corretora : 'Corretora nova',
-        atual.id ? 'Cadastro de canal' : 'Cadastrar no canal')
+        'Cadastro de corretora')
       + (veioDosCasos
         ? '<p class="config-aviso">O nome veio dos casos que já citam esta '
           + 'SUSEP — confira antes de salvar. É um palpite, não um cadastro.</p>'
         : '')
       + campoDeTexto('susep', 'SUSEP', atual.susep,
-        'Só dígitos. É ela que liga a corretora ao caso.')
-      + campoDeTexto('corretora', 'Corretora', atual.corretora, '')
-      + campoDeTexto('canal', 'Canal', atual.canal,
-        'Corretora, agente, central… como a operação chama.')
-      + campoDeTexto('nome', 'Nome do contato', atual.nome, '')
+        'Letras e números, como a SUSEP é escrita — por exemplo RET00J. É ela '
+        + 'que liga a corretora ao caso.')
+      + campoDeTexto('corretora', 'Nome da corretora', atual.corretora, '')
+      + campoDeTexto('sucursal', 'Sucursal', atual.sucursal, '')
       + caixaDeSegmento(atual.segmento)
+      + campoDeTexto('consultor', 'Consultor', atual.consultor,
+        'Quem atende esta corretora.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (atual.id
@@ -5619,9 +5781,9 @@ var TelaTabelaCorretoras = (function () {
         id: atual.id,
         susep: valorDe('susep'),
         corretora: valorDe('corretora'),
-        canal: valorDe('canal'),
-        nome: valorDe('nome'),
-        segmento: valorDe('segmento')
+        sucursal: valorDe('sucursal'),
+        segmento: valorDe('segmento'),
+        consultor: valorDe('consultor')
       }).entao(function () {
         avisar('Corretora salva.', 'bom');
         editando = null;
@@ -5661,92 +5823,6 @@ var TelaTabelaCorretoras = (function () {
       + 'incompleto, e não corretora irregular.</em></label>';
   }
 
-  /* ------------------------------------------------------------- produtos */
-
-  function desenharProdutos() {
-    var linhas = dados.produtos.map(function (um) {
-      return '<li class="config-item' + (editando && editando.id === um.id
-        ? ' atual' : '') + '">'
-        + '<button type="button" class="abrir" data-produto="' + escapar(um.id) + '">'
-        + '<span class="nome">' + escapar(um.produto) + '</span>'
-        + '<span class="detalhe">código ' + escapar(um.codigo || '—')
-        + '</span></button></li>';
-    }).join('');
-
-    elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.produtos.length + ' produtos</span>'
-      + (podeMexerNesta('PRODUTOS')
-        ? '<button type="button" class="botao pequeno" id="novo-produto">'
-          + 'Cadastrar produto</button>' : '')
-      + '</div>'
-      + avisoDeOrigem('PRODUTOS')
-      + '<p class="config-explica">O <strong>código</strong> é o que liga o '
-      + 'produto ao caso — por isso ele é único, e o sistema recusa repetir.</p>'
-      + (dados.produtos.length
-        ? '<ul class="config-itens">' + linhas + '</ul>'
-        : '<p class="config-vazio">Nenhum produto cadastrado. Sem eles, o '
-          + 'campo de produto do formulário fica como caixa de texto livre.</p>');
-
-    // O botão só existe quando a aba aceita escrita. Ligar um ouvinte num
-    // elemento que não está na tela estoura, e o estouro acontece ANTES de
-    // qualquer tratamento — a tela fica em branco sem log. É o achado 27.
-    var novoProduto = elemento('novo-produto');
-    if (novoProduto) novoProduto.addEventListener('click', function () {
-      editando = { id: '' };
-      desenharFormularioDoProduto(null);
-    });
-    ligarCliques('[data-produto]', function (botao) {
-      var id = botao.getAttribute('data-produto');
-      editando = { id: id };
-      desenharProdutos();
-      desenharFormularioDoProduto(acharNaLista(dados.produtos, id));
-    });
-
-    if (!editando) painelVazio('Escolha um produto, ou cadastre um novo.');
-  }
-
-  function desenharFormularioDoProduto(produto) {
-    var atual = produto || { id: '', produto: '', codigo: '' };
-
-    elemento('corretoras-painel').innerHTML =
-      '<form class="config-form" id="form-produto">'
-      + tituloDoPainel(atual.id ? atual.produto : 'Produto novo', 'Cadastro de produto')
-      + campoDeTexto('produto', 'Produto', atual.produto, '')
-      + campoDeTexto('codigo', 'Código', atual.codigo,
-        'Só dígitos. É o que liga o produto ao caso, e ele é único.')
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + (atual.id
-        ? '<button type="button" class="botao vazado perigo" id="tirar-produto">'
-          + 'Tirar do cadastro</button>' : '')
-      + '</div></form>';
-
-    elemento('form-produto').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('salvarProduto', {
-        id: atual.id, produto: valorDe('produto'), codigo: valorDe('codigo')
-      }).entao(function () {
-        avisar('Produto salvo.', 'bom');
-        editando = null;
-        carregar();
-      }).senao(mostrarErro);
-    });
-
-    var tirar = elemento('tirar-produto');
-    if (tirar) {
-      tirar.addEventListener('click', function () {
-        if (!window.confirm('Tirar "' + atual.produto + '" do cadastro?\n\n'
-          + 'A linha permanece na planilha, e os casos continuam intactos.')) return;
-        Servidor.chamar('ocultarProduto', atual.id)
-          .entao(function () {
-            avisar('Produto tirado do cadastro.', 'bom');
-            editando = null;
-            carregar();
-          }).senao(mostrarErro);
-      });
-    }
-  }
-
   /* ----------------------------------------------------------- bloqueadas */
 
   function desenharBloqueadas() {
@@ -5754,8 +5830,8 @@ var TelaTabelaCorretoras = (function () {
       return '<tr>'
         + '<td><span class="principal">' + escapar(uma.susep) + '</span>'
         + '<span class="apoio">' + escapar(uma.corretora || 'sem nome') + '</span></td>'
-        + '<td>' + escapar(uma.motivo || '—') + '</td>'
-        + '<td>' + escapar(uma.cpfReincidente || '—') + '</td>'
+        + '<td>' + escapar(uma.sucursal || '—') + '</td>'
+        + '<td>' + escapar(uma.coordenadorComercial || '—') + '</td>'
         + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
@@ -5774,12 +5850,16 @@ var TelaTabelaCorretoras = (function () {
       + '</div>'
       + avisoDeOrigem('SUSEP_BLOQUEADAS')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
-      + 'o formulário passa a mostrar o selo vermelho com o motivo, e quem está '
-      + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa '
-      + 'registrar o caso num caderno, e o sistema perderia o caso de vista.</p>'
+      + 'o formulário passa a mostrar o selo vermelho, e quem está atendendo '
+      + 'decide. Bloqueio que impedisse o cadastro faria a pessoa registrar o '
+      + 'caso num caderno, e o sistema perderia o caso de vista.<br>'
+      + 'Esta lista <strong>não vale para corretora Diamante</strong>: se a '
+      + 'SUSEP está no cadastro de corretoras, o selo sai verde — são duas '
+      + 'listas, de donos diferentes.</p>'
       + (dados.bloqueadas.length
         ? '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
-          + '<thead><tr><th>SUSEP</th><th>Motivo</th><th>CPF reincidente</th>'
+          + '<thead><tr><th>SUSEP</th><th>Sucursal</th>'
+          + '<th>Coordenador comercial</th>'
           + '<th>Desde</th><th class="direita">Casos</th>'
           + '<th class="acoes-coluna"></th></tr></thead>'
           + '<tbody>' + linhas + '</tbody></table></div>'
@@ -5804,13 +5884,13 @@ var TelaTabelaCorretoras = (function () {
     elemento('corretoras-painel').innerHTML =
       '<form class="config-form" id="form-bloqueio">'
       + tituloDoPainel('Bloquear SUSEP', 'Marca o selo do formulário')
-      + campoDeTexto('susep', 'SUSEP', '', 'Só dígitos.')
-      + campoDeTexto('corretora', 'Nome da corretora', '', '')
-      + campoDeTexto('cpf', 'CPF reincidente', '',
-        'Quando o bloqueio vem de um CPF que se repete.')
-      + campoDeTexto('motivo', 'Motivo', '',
-        'Obrigatório. Quem vir o selo vermelho daqui a seis meses precisa '
-        + 'saber o que fazer com a informação.')
+      + campoDeTexto('susep', 'SUSEP', '',
+        'Letras e números, como a SUSEP é escrita — por exemplo RET00J.')
+      + campoDeTexto('corretora', 'Corretora', '', '')
+      + campoDeTexto('sucursal', 'Sucursal', '', '')
+      + campoDeTexto('coordenador', 'Coordenador comercial', '',
+        'Quem responde por este bloqueio. É a quem perguntar quando o selo '
+        + 'vermelho aparecer daqui a seis meses.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Bloquear</button></div></form>';
 
@@ -5818,7 +5898,8 @@ var TelaTabelaCorretoras = (function () {
       evento.preventDefault();
       Servidor.chamar('bloquearSusep', {
         susep: valorDe('susep'), corretora: valorDe('corretora'),
-        cpfReincidente: valorDe('cpf'), motivo: valorDe('motivo')
+        sucursal: valorDe('sucursal'),
+        coordenadorComercial: valorDe('coordenador')
       }).entao(function () {
         avisar('SUSEP bloqueada.', 'bom');
         carregar();
@@ -5875,6 +5956,8 @@ var TelaTabelaCorretoras = (function () {
       return coluna.titulo;
     }).join('\t');
 
+    var colando = fonteDaImportacao.tipo !== 'planilha';
+
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Importar</span>'
       + '<select id="tipo-da-importacao" aria-label="O que importar">'
@@ -5885,13 +5968,16 @@ var TelaTabelaCorretoras = (function () {
         return '<code>' + escapar(coluna.titulo) + '</code>'
           + (coluna.obrigatoria ? '<em>obrigatória</em>' : '');
       }).join('') + '</div>'
-      + '<p class="config-explica">Copie da sua planilha e cole aqui — com ou '
-      + 'sem a linha de cabeçalho, tanto faz. Se vier com cabeçalho, a ordem '
-      + 'das colunas pode ser outra: o sistema lê pelos nomes. Até '
-      + receita.maximo + ' linhas por vez.</p>'
-      + '<textarea id="texto-da-importacao" class="importar-area" rows="10"'
-      + ' spellcheck="false" aria-label="Cole aqui as linhas"'
-      + ' placeholder="' + escapar(cabecalho) + '"></textarea>'
+      + '<p class="config-explica">Com ou sem a linha de cabeçalho, tanto faz. '
+      + 'Se vier com cabeçalho, a ordem das colunas pode ser outra: o sistema '
+      + 'lê pelos nomes. Até ' + receita.maximo + ' linhas por vez.</p>'
+      + '<div class="config-abas">'
+      + '<button type="button" class="config-aba' + (colando ? ' atual' : '') + '"'
+      + ' data-fonte-da-importacao="colado">Colar da planilha</button>'
+      + '<button type="button" class="config-aba' + (colando ? '' : ' atual') + '"'
+      + ' data-fonte-da-importacao="planilha">Ler outra planilha pelo link</button>'
+      + '</div>'
+      + (colando ? desenharColarCadastro(cabecalho) : desenharLinkDoCadastro())
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="conferir-importacao">'
       + 'Conferir</button>'
@@ -5900,31 +5986,91 @@ var TelaTabelaCorretoras = (function () {
       + '<div id="resultado-da-importacao"></div>';
 
     elemento('tipo-da-importacao').addEventListener('change', function () {
+      guardarFonteDaImportacao();
       tipoDaImportacao = this.value;
       conferido = null;
       desenharImportacao();
     });
-    elemento('conferir-importacao').addEventListener('click', conferir);
-    elemento('limpar-importacao').addEventListener('click', function () {
-      elemento('texto-da-importacao').value = '';
-      elemento('resultado-da-importacao').innerHTML = '';
+
+    ligarCliques('[data-fonte-da-importacao]', function (botao) {
+      guardarFonteDaImportacao();
+      fonteDaImportacao.tipo = botao.getAttribute('data-fonte-da-importacao');
       conferido = null;
+      desenharImportacao();
     });
 
-    painelVazio('Cole as linhas e aperte Conferir. Nada é gravado até você '
+    elemento('conferir-importacao').addEventListener('click', conferir);
+    elemento('limpar-importacao').addEventListener('click', function () {
+      // Limpar limpa a fonte INTEIRA, e não só o campo que está na tela. O
+      // Id que sobrasse escondido na outra aba seria importado na próxima
+      // conferência sem ninguém ver que ele ainda estava lá.
+      fonteDaImportacao = { tipo: fonteDaImportacao.tipo, texto: '',
+        planilhaId: '', aba: '' };
+      elemento('resultado-da-importacao').innerHTML = '';
+      conferido = null;
+      desenharImportacao();
+    });
+
+    painelVazio('Aponte as linhas e aperte Conferir. Nada é gravado até você '
       + 'apertar Aplicar — e Aplicar pede a senha de administrador.');
   }
 
+  /** A fonte "colar": a caixa de texto de sempre. */
+  function desenharColarCadastro(cabecalho) {
+    return '<textarea id="texto-da-importacao" class="importar-area" rows="10"'
+      + ' spellcheck="false" aria-label="Cole aqui as linhas"'
+      + ' placeholder="' + escapar(cabecalho) + '">'
+      + escapar(fonteDaImportacao.texto) + '</textarea>';
+  }
+
+  /*
+    A fonte "outra planilha": o caminho das listas grandes.
+
+    Colar sete mil SUSEPs bloqueadas numa caixa de texto é o que ninguém faz
+    duas vezes — e é justamente o tamanho que essa lista tem na operação. Aqui
+    a pessoa informa o Id e a aba, e o servidor lê de lá.
+  */
+  function desenharLinkDoCadastro() {
+    return '<div class="grade">'
+      + '<label class="campo"><span>Id da planilha</span>'
+      + '<input type="text" id="planilha-da-importacao"'
+      + ' value="' + escapar(fonteDaImportacao.planilhaId) + '"'
+      + ' placeholder="o pedaço do endereço entre /d/ e /edit"></label>'
+      + '<label class="campo"><span>Nome da aba</span>'
+      + '<input type="text" id="aba-da-importacao"'
+      + ' value="' + escapar(fonteDaImportacao.aba) + '"'
+      + ' placeholder="em branco = a primeira aba"></label>'
+      + '</div>'
+      + '<p class="config-explica">A conta que abre o PGO precisa ter acesso a '
+      + 'essa planilha. Se não tiver, o sistema diz isso em vez de importar '
+      + 'pela metade.</p>';
+  }
+
+  /** O que está nos campos da tela passa para o estado, antes do redesenho. */
+  function guardarFonteDaImportacao() {
+    var caixa = elemento('texto-da-importacao');
+    if (caixa) fonteDaImportacao.texto = caixa.value;
+
+    var planilha = elemento('planilha-da-importacao');
+    if (planilha) fonteDaImportacao.planilhaId = planilha.value.trim();
+
+    var aba = elemento('aba-da-importacao');
+    if (aba) fonteDaImportacao.aba = aba.value.trim();
+    return fonteDaImportacao;
+  }
+
   function conferir() {
-    var texto = elemento('texto-da-importacao').value;
-    if (!texto.trim()) {
-      avisar('Cole alguma coisa antes de conferir.', 'atencao');
+    var fonte = guardarFonteDaImportacao();
+    if (fonte.tipo === 'planilha' ? !fonte.planilhaId : !fonte.texto.trim()) {
+      avisar(fonte.tipo === 'planilha'
+        ? 'Informe o Id da planilha antes de conferir.'
+        : 'Cole alguma coisa antes de conferir.', 'atencao');
       return;
     }
     var onde = elemento('resultado-da-importacao');
     onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
 
-    Servidor.chamar('conferirImportacao', tipoDaImportacao, texto)
+    Servidor.chamar('conferirImportacao', tipoDaImportacao, fonte)
       .entao(function (resposta) {
         conferido = resposta;
         desenharConferencia();
@@ -6009,21 +6155,22 @@ var TelaTabelaCorretoras = (function () {
   }
 
   /*
-    O texto vai INTEIRO de novo para o servidor, e não a lista já conferida.
+    A FONTE vai inteira de novo para o servidor, e não a lista já conferida.
     Mandar a lista conferida seria mandar o servidor gravar o que ele mesmo
     aprovou — mas passando pelo navegador no caminho, onde qualquer coisa
     pode ter mudado. O servidor confere tudo outra vez antes de escrever.
   */
   function pedirSenhaEAplicar() {
-    var texto = elemento('texto-da-importacao').value;
+    var fonte = guardarFonteDaImportacao();
     SenhaDeAdministrador.pedir(function () {
       elemento('resultado-da-importacao').innerHTML =
         '<p class="carregando-campos">Gravando…</p>';
-      Servidor.chamar('aplicarImportacao', tipoDaImportacao, texto)
+      Servidor.chamar('aplicarImportacao', tipoDaImportacao, fonte)
         .entao(function (feito) {
           avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
             + ' atualizada(s) em ' + feito.titulo + '.', 'bom');
-          elemento('texto-da-importacao').value = '';
+          fonteDaImportacao = { tipo: fonteDaImportacao.tipo, texto: '',
+            planilhaId: '', aba: '' };
           conferido = null;
           carregar();
         })
@@ -6487,37 +6634,22 @@ var TelaImportacao = (function () {
     // RET pode receber um lote da Mesa, e quem decide isso é a coordenação, não
     // o sistema. Esconder o nome tiraria a decisão da mão dela.
     //
-    // O mesmo vale para QUEM ESTÁ DE FÉRIAS: aparece, no fim da lista, com a
-    // data da volta. Não some — o lote pode ser justamente para quando ela
-    // voltar. O que o sistema faz é dizer, antes de alguém marcar sem querer,
-    // que aqueles casos vão ficar parados até lá.
-    var quantosFora = opcoes.analistas.filter(function (pessoa) {
-      return pessoa.ausente;
-    }).length;
-
+    // Havia aqui uma marca de QUEM ESTÁ DE FÉRIAS, com a data da volta, para
+    // ninguém mandar um lote a quem não vai trabalhá-lo. Saiu com o
+    // calendário, a pedido do PO.
     return '<h4 class="importacao-titulo">Dividir entre</h4>'
       + '<div class="config-marcadores">'
       + opcoes.analistas.map(function (pessoa) {
         return '<label class="config-chave'
-          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal')
-          + (pessoa.ausente ? ' esta-fora' : '') + '">'
+          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal') + '">'
           + '<input type="checkbox"'
           + ' data-analista="' + escapar(pessoa.nome) + '"'
           + (analistasMarcados[pessoa.nome] ? ' checked' : '') + '>'
           + '<span>' + escapar(pessoa.nome)
           + (pessoa.atendeEsteCanal ? '' : ' <em>de outro canal</em>')
-          + (pessoa.ausente
-            ? ' <em class="fora">' + escapar(pessoa.motivoDaAusencia)
-              + ' até ' + escapar(pessoa.ausenteAte) + '</em>'
-            : '')
           + '</span></label>';
       }).join('')
       + '</div>'
-      + (quantosFora
-        ? '<p class="config-dica aviso-de-ausencia">' + quantosFora
-          + ' pessoa(s) estão fora hoje e aparecem no fim da lista. Marcar '
-          + 'alguém que está fora deixa os casos dela parados até a volta.</p>'
-        : '')
       + '<p class="config-dica">'
       + (quantos
         ? 'Os casos vão ser divididos em partes iguais entre os ' + quantos
@@ -6815,6 +6947,10 @@ var TelaProdutividade = (function () {
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
           + 'canal.</strong><p>Um administrador monta os gráficos em '
           + 'Configurações → Painéis.</p></div>')
+      + (painel.valorPorSituacao
+        ? '<div class="graficos">'
+          + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
+        : '')
       + '<div id="detalhe-do-painel"></div>';
     ligarPainel();
   }
@@ -6907,6 +7043,30 @@ var TelaProdutividade = (function () {
       + '</section>';
   }
 
+  /**
+   * O gráfico de VALOR POR SITUAÇÃO — o dinheiro em cada desfecho.
+   *
+   * Desenhado à parte dos outros, e com o gráfico E a tabela ao mesmo tempo:
+   * aqui os NÚMEROS são o pedido ("valor dos retidos, não retidos, sem
+   * sucesso, valor dos demais status e total"), e o desenho é a leitura rápida
+   * deles. Esconder a tabela atrás de um botão faria o que ele pediu depender
+   * de um clique.
+   *
+   * Não tem "Exportar" nem detalhamento por clique, e não é esquecimento: os
+   * dois procuram o gráfico pelo Id dele na aba PAINEIS, e este gráfico não
+   * mora lá — ele sai da configuração do CANAL. Oferecer os botões daria uma
+   * recusa do servidor em vez de uma resposta.
+   */
+  function desenharValorPorSituacao(componente) {
+    return '<section class="cartao grafico largura-2">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
+      + '</h3></header>'
+      + (componente.aviso
+        ? '<p class="grafico-vazio">' + escapar(componente.aviso) + '</p>'
+        : Graficos.desenhar(componente) + Graficos.tabela(componente))
+      + '</section>';
+  }
+
   function rodapeDoGrafico(componente) {
     if (componente.aviso || !componente.pontos.length) return '';
     return '<p class="grafico-pe">'
@@ -6948,8 +7108,13 @@ var TelaProdutividade = (function () {
     ligarCliques('[data-ponto]', function (elementoClicado) {
       var grafico = elementoClicado.closest('.grafico');
       if (!grafico) return;
-      detalhar(grafico.getAttribute('data-grafico'),
-        elementoClicado.getAttribute('data-ponto'));
+      // Gráfico SEM Id não detalha. É o caso do valor por situação, que não
+      // tem linha na aba PAINEIS — chamar `detalharComponente` com Id vazio
+      // devolveria "componente não encontrado" em cima de um clique que
+      // parecia normal.
+      var id = grafico.getAttribute('data-grafico');
+      if (!id) return;
+      detalhar(id, elementoClicado.getAttribute('data-ponto'));
     });
 
     Graficos.ligarDica(elemento('analitico'));
@@ -7134,11 +7299,6 @@ var TelaConfiguracoes = (function () {
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
-  // O ano que a lista de feriados mostra. Fora de `dados` de propósito: `dados`
-  // é esvaziado a cada troca de seção, e o ano escolhido tem de sobreviver a
-  // salvar um feriado — senão a tela pularia de volta para o ano corrente a
-  // cada gravação, no meio de quem está cadastrando o ano que vem.
-  var anoDoCalendario = (new Date()).getFullYear();
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -7268,7 +7428,6 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'catalogo') return carregarListas();
     if (secaoAtual === 'canais') return carregarCanais();
     if (secaoAtual === 'paineis') return carregarPaineis();
-    if (secaoAtual === 'calendario') return carregarCalendario();
     if (secaoAtual === 'analises') return carregarAnalises();
     if (secaoAtual === 'identidade') return desenharIdentidade();
     if (secaoAtual === 'estrutura') return carregarEstrutura();
@@ -7427,11 +7586,106 @@ var TelaConfiguracoes = (function () {
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
-      + '</div></form>';
+      + (podeExcluirEsteCampo(campo)
+        ? '<button type="button" class="botao vazado perigo" id="excluir-campo">'
+          + 'Excluir campo</button>' : '')
+      + '</div>'
+      + porQueNaoDaParaExcluir(campo)
+      + '</form>';
 
     elemento('form-campo').addEventListener('submit', function (evento) {
       evento.preventDefault();
       salvarCampo(campo);
+    });
+    var excluir = elemento('excluir-campo');
+    if (excluir) {
+      excluir.addEventListener('click', function () {
+        abrirExclusaoDoCampo(campo);
+      });
+    }
+  }
+
+  /**
+   * Este campo pode ser excluído?
+   *
+   * Quem decide de verdade é o servidor, em `excluirCampo` — esta função só
+   * evita oferecer um botão que vai ser recusado. Botão escondido nunca foi
+   * segurança, e por isso as duas conferências existem.
+   */
+  function podeExcluirEsteCampo(campo) {
+    if (!resumo.podeMexerNaEstrutura) return false;
+    if (campo.protegido) return false;
+    return !(campo.usadoPeloCanal && campo.usadoPeloCanal.length);
+  }
+
+  /**
+   * Quando não dá, a tela DIZ POR QUE — e diz o caminho.
+   *
+   * Botão que simplesmente não está ali faz a pessoa procurar onde ele foi,
+   * desconfiar da permissão dela e, no fim, perguntar. Uma frase resolve.
+   */
+  function porQueNaoDaParaExcluir(campo) {
+    if (podeExcluirEsteCampo(campo)) return '';
+    if (!resumo.podeMexerNaEstrutura) return '';
+
+    if (campo.protegido) {
+      return '<p class="config-explica">Este campo faz parte do contrato da '
+        + 'aba: o próprio sistema grava nessa coluna, e os relatórios contam '
+        + 'com ela. Para tirá-lo do formulário sem apagar nada, ponha '
+        + '<strong>Aparece no formulário</strong> em Não.</p>';
+    }
+    return '<p class="config-explica">Não dá para excluir enquanto a coluna '
+      + '<strong>' + escapar(campo.cabecalho) + '</strong> estiver sendo usada '
+      + 'em: ' + escapar(campo.usadoPeloCanal.join(', ')) + '. Troque essas '
+      + 'referências em Canais de trabalho e volte aqui.</p>';
+  }
+
+  /**
+   * O painel de exclusão, com a escolha que importa: a COLUNA sai ou fica?
+   *
+   * As duas são sem volta pela tela, e são bem diferentes de tamanho. Tirar o
+   * campo mexe no formulário de amanhã. Apagar a coluna apaga o que já foi
+   * digitado em todos os casos — por isso ela é uma marcação separada, nasce
+   * desmarcada, e o texto não suaviza o que acontece.
+   */
+  function abrirExclusaoDoCampo(campo) {
+    elemento('config-painel').innerHTML =
+      '<form class="config-form" id="form-excluir-campo">'
+      + tituloDoPainel('Excluir "' + campo.rotulo + '"', 'Não tem desfazer')
+      + '<p class="config-aviso forte">O campo sai do formulário de '
+      + '<strong>todos</strong> os canais que o usam e deixa de ser '
+      + 'perguntado. Isto não se desfaz pela tela.</p>'
+      + caixaDeMarcar('apagar-coluna',
+        'Apagar também a coluna "' + campo.cabecalho + '" da planilha', false)
+      + '<p class="config-explica">Desmarcado, a coluna fica onde está, com '
+      + 'tudo o que já foi digitado nela — o sistema só para de gravar ali. '
+      + 'Marcado, a coluna sai da aba e <strong>o que estava gravado nela em '
+      + 'todos os casos vai embora com ela</strong>.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao vazado perigo">Excluir</button>'
+      + '<button type="button" class="botao vazado" id="desistir-exclusao">'
+      + 'Desistir</button>'
+      + '</div></form>';
+
+    elemento('desistir-exclusao').addEventListener('click', function () {
+      desenharPainelDoCampo(campo);
+    });
+    elemento('form-excluir-campo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var apagarAColuna = marcado('apagar-coluna');
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('excluirCampo', canalEscolhida, campo.id, apagarAColuna)
+          .entao(function (saiu) {
+            escolhido = null;
+            avisarSalvo('Campo "' + saiu.rotulo + '" excluído.'
+              + (saiu.colunaApagada
+                ? ' A coluna "' + saiu.cabecalho + '" saiu da planilha, com '
+                  + saiu.linhasComValor + ' valor(es).'
+                : ' A coluna "' + saiu.cabecalho + '" continua na planilha.'));
+            carregarCampos();
+          })
+          .senao(mostrarErroNoPainel);
+      });
     });
   }
 
@@ -7593,16 +7847,17 @@ var TelaConfiguracoes = (function () {
           + (texto(canal.id) === texto(escolhida) ? ' selected' : '') + '>'
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
-      + '<em>Quem administra fica em "todas os canais": pode cadastrar em '
-      + 'qualquer uma e delegar. Escolher um canal é para quem trabalha nela.'
-      + '</em></label>';
+      + '<em>O canal é também a EQUIPE da pessoa: quem está no mesmo canal '
+      + 'aparece junto na Minha Performance. Quem administra fica em "todas os '
+      + 'canais" — pode cadastrar em qualquer uma e delegar, e não entra em '
+      + 'equipe nenhuma.</em></label>';
   }
 
   function desenharPainelDoUsuario(usuario) {
     var ehNovo = !usuario;
     var pessoa = usuario || {
-      id: '', nome: '', email: '', canalQueAtende: '', canalId: '', cargoId: '',
-      nivelAcessoId: '', matricula: '', ativo: true
+      id: '', nome: '', email: '', canalId: '', cargoId: '',
+      nivelAcessoId: '', ativo: true
     };
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-usuario">'
@@ -7611,14 +7866,13 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('nome', 'Nome', pessoa.nome, '')
       + campoDeTexto('email', 'E-mail Google', pessoa.email,
         'É por ele que a pessoa entra. Tem de ser a conta que ela usa.')
-      + campoDeTexto('canal', 'Canal que atende', pessoa.canalQueAtende,
-        'Usado pelo alcance EQUIPE: quem atende o mesmo canal vê os mesmos casos.')
       + caixaDeCanalDaPessoa(pessoa.canalId)
-      + campoDeTexto('matricula', 'Matrícula', pessoa.matricula, '')
       + caixaDeItens('cargo', 'Cargo', dados.cargos, pessoa.cargoId,
         'O cargo é só descrição — quem decide o acesso é o nível abaixo.')
       + caixaDeItens('nivel', 'Nível de acesso', dados.niveis, pessoa.nivelAcessoId,
-        'É isto que define telas, campos, ações e alcance.')
+        'Define telas, campos, ações e alcance. Quem forma a EQUIPE é o CANAL, '
+        + 'logo acima — dois níveis diferentes no mesmo canal são a mesma '
+        + 'equipe.')
       + caixaDeSimNao('ativo', 'Pode entrar', pessoa.ativo !== false)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
@@ -7632,9 +7886,7 @@ var TelaConfiguracoes = (function () {
         id: pessoa.id,
         nome: valorDe('nome'),
         email: valorDe('email'),
-        canalQueAtende: valorDe('canal'),
         canalId: valorDe('canal-da-pessoa'),
-        matricula: valorDe('matricula'),
         cargoId: valorDe('cargo'),
         nivelAcessoId: valorDe('nivel'),
         ativo: marcado('ativo')
@@ -7688,10 +7940,13 @@ var TelaConfiguracoes = (function () {
     }).join('');
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.niveis.length + ' níveis</span></div>'
+      + '<span class="config-titulo">' + dados.niveis.length + ' níveis</span>'
+      + '<button type="button" class="botao pequeno" id="novo-nivel">'
+      + 'Criar nível</button></div>'
       + '<p class="config-explica">O cargo não decide nada. É o nível de acesso '
       + 'que diz quais telas abrem, o que a pessoa pode fazer e até onde ela '
-      + 'enxerga os dados.</p>'
+      + 'enxerga os dados. Quem forma a EQUIPE é o canal da pessoa, em '
+      + 'Usuários.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     ligarCliques('[data-nivel]', function (botao) {
@@ -7699,12 +7954,35 @@ var TelaConfiguracoes = (function () {
       desenharNiveis();
     });
 
+    elemento('novo-nivel').addEventListener('click', function () {
+      escolhido = null;
+      desenharNiveis();
+      desenharPainelDoNivel(null);
+    });
+
     if (escolhido) desenharPainelDoNivel(acharNaLista(dados.niveis, escolhido.id));
-    else painelVazio('Escolha um nível para ver o que ele pode.');
+    else painelVazio('Escolha um nível para ver o que ele pode, ou crie um novo.');
   }
 
+  /**
+   * O painel de um nível — o que existe, ou um NOVO quando vem nulo.
+   *
+   * O nível novo nasce no MAIS FECHADO que existe: nenhuma tela, nenhuma ação,
+   * "até onde enxerga" em PROPRIOS. Não é cerimônia — é a única escolha que
+   * não dá acesso a ninguém por descuido. Abrir é uma marcação de cada vez,
+   * decidida por quem está criando; nascer aberto seria decidir por ela.
+   *
+   * A produtividade nasce em EQUIPE porque é o padrão do sistema, o mesmo que
+   * vale para nível antigo sem alcance declarado — e porque esta tela é a da
+   * equipe, é para isso que ela existe.
+   */
   function desenharPainelDoNivel(nivel) {
-    if (!nivel) return painelVazio('Escolha um nível.');
+    var ehNovo = !nivel;
+    nivel = nivel || {
+      id: '', nome: '', ativo: true, escopo: 'PROPRIOS',
+      canais: [], telas: [], acoes: [], escopoNaProdutividade: 'EQUIPE',
+      campos: {}, pessoas: 0
+    };
     var opcoes = dados.opcoesDeNivel;
 
     var telas = opcoes.telas.map(function (tela) {
@@ -7772,7 +8050,9 @@ var TelaConfiguracoes = (function () {
     }).join('');
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-nivel">'
-      + tituloDoPainel(nivel.nome, nivel.pessoas + ' pessoa(s) neste nível')
+      + tituloDoPainel(ehNovo ? 'Nível novo' : nivel.nome,
+        ehNovo ? 'Nasce fechado: marque o que ele abre'
+          : nivel.pessoas + ' pessoa(s) neste nível')
       + campoDeTexto('nome', 'Nome do nível', nivel.nome, '')
       + caixaDeSimNao('ativo', 'Nível em uso', nivel.ativo)
       + '<fieldset class="config-grupo"><legend>Telas que abrem</legend>'
@@ -7788,7 +8068,18 @@ var TelaConfiguracoes = (function () {
       + 'quer dizer todos</strong>, que é o caso de quem administra.</p>'
       + canaisDoNivel + '</fieldset>'
       + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button></div></form>';
+      + '<button type="submit" class="botao">'
+      + (ehNovo ? 'Criar nível' : 'Salvar') + '</button>'
+      + (ehNovo ? '<button type="button" class="botao vazado" id="desistir-nivel">'
+        + 'Desistir</button>' : '')
+      + '</div></form>';
+
+    var desistirDoNivel = elemento('desistir-nivel');
+    if (desistirDoNivel) {
+      desistirDoNivel.addEventListener('click', function () {
+        painelVazio('Escolha um nível para ver o que ele pode, ou crie um novo.');
+      });
+    }
 
     elemento('form-nivel').addEventListener('submit', function (evento) {
       evento.preventDefault();
@@ -7822,8 +8113,13 @@ var TelaConfiguracoes = (function () {
         escopoNaProdutividade: naProdutividade
           ? naProdutividade.value : (nivel.escopoNaProdutividade || 'EQUIPE'),
         campos: nivel.campos
-      }).entao(function () { avisarSalvo(); carregarNiveis(); })
-        .senao(mostrarErroNoPainel);
+      }).entao(function (idDoNivel) {
+        // Criado, o painel REABRE no nível novo em vez de voltar ao vazio:
+        // quem acabou de criar quase sempre quer conferir o que marcou.
+        if (ehNovo && idDoNivel) escolhido = { id: String(idDoNivel) };
+        avisarSalvo(ehNovo ? 'Nível criado.' : '');
+        carregarNiveis();
+      }).senao(mostrarErroNoPainel);
     });
   }
 
@@ -7979,9 +8275,14 @@ var TelaConfiguracoes = (function () {
     }).join('');
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.canais.length + ' canais</span></div>'
-      + '<p class="config-explica">Aqui se ajusta o que o canal MOSTRA. Onde ela '
-      + 'mora — a aba da planilha — não muda: os casos já gravados estão lá.</p>'
+      + '<span class="config-titulo">' + dados.canais.length + ' canais</span>'
+      + (resumo.podeMexerNaEstrutura
+        ? '<button type="button" class="botao pequeno" id="novo-canal">'
+          + 'Criar canal</button>' : '')
+      + '</div>'
+      + '<p class="config-explica">Aqui se ajusta o que o canal MOSTRA — nome, '
+      + 'ícone, quais colunas viram fila. Onde ele mora, a aba da planilha, '
+      + 'não muda: os casos já gravados estão lá.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     ligarCliques('[data-canal]', function (botao) {
@@ -7989,8 +8290,104 @@ var TelaConfiguracoes = (function () {
       desenharCanais();
     });
 
+    var novoCanal = elemento('novo-canal');
+    if (novoCanal) novoCanal.addEventListener('click', abrirCanalNovo);
+
     if (escolhido) desenharPainelDoCanal(acharNaLista(dados.canais, escolhido.id));
-    else painelVazio('Escolha um canal.');
+    else painelVazio('Escolha um canal, ou crie um novo.');
+  }
+
+  /**
+   * O painel do CANAL NOVO. Cria uma aba na planilha — não tem desfazer.
+   *
+   * Pede só o que ninguém pode decidir pela operação: o nome, o ícone e em que
+   * aba ele grava. Coluna da data, situação, cartão e meta ficam para depois,
+   * cada um na tela onde já se ajusta — e a lista de próximos passos que o
+   * servidor devolve aparece aqui, para a pessoa não ficar com um canal
+   * criado e nenhuma ideia do que fazer em seguida.
+   */
+  function abrirCanalNovo() {
+    escolhido = null;
+    desenharCanais();
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-canal-novo">'
+      + tituloDoPainel('Canal novo', 'Cria uma aba na planilha')
+      + '<p class="config-aviso forte">Isto escreve na planilha de produção e '
+      + '<strong>não tem desfazer</strong>. A aba nasce com a coluna '
+      + '<strong>id</strong> e as de controle; os campos do formulário são '
+      + 'criados depois, em Cadastrar Caso.</p>'
+      + campoDeTexto('nome', 'Nome do canal', '',
+        'É o que aparece no seletor do Trabalho.')
+      + campoDeTexto('descricao', 'Descrição', '',
+        'Uma linha explicando o que este canal trata.')
+      + campoDeTexto('aba', 'Aba da planilha', '',
+        'Em branco, o sistema sugere BASE_ com o nome do canal. Sem acento e '
+        + 'sem espaço — é o nome que o Power BI vai ler.')
+      + caixaDeOpcoes('icone', 'Ícone', SeletorDeCanal.nomesDosIcones(),
+        SeletorDeCanal.nomesDosIcones()[0], '')
+      + caixaDeMarcar('aproveitar-aba',
+        'Aproveitar a aba que já existe, com os dados dela', false,
+        'Marque se a base já está na planilha. O cabeçalho dela não é tocado: '
+        + 'as colunas que já estão lá viram campos, e as de controle são '
+        + 'acrescentadas se faltarem. A aba precisa ter uma coluna "id".')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Criar canal</button>'
+      + '<button type="button" class="botao vazado" id="desistir-canal">'
+      + 'Desistir</button>'
+      + '</div></form>';
+
+    elemento('desistir-canal').addEventListener('click', function () {
+      painelVazio('Escolha um canal, ou crie um novo.');
+    });
+
+    elemento('form-canal-novo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var envio = {
+        nome: valorDe('nome'),
+        descricao: valorDe('descricao'),
+        aba: valorDe('aba'),
+        icone: valorDe('icone'),
+        aproveitarAAba: marcado('aproveitar-aba')
+      };
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('criarCanal', envio)
+          .entao(function (criado) {
+            avisarSalvo('Canal "' + criado.nome + '" criado na aba '
+              + criado.aba + '.');
+            escolhido = { id: String(criado.id) };
+            carregarCanais();
+            mostrarProximosPassos(criado);
+          })
+          .senao(mostrarErroNoPainel);
+      });
+    });
+  }
+
+  /**
+   * O que fazer agora que o canal existe.
+   *
+   * Fica num recado FIXO no painel, e não num aviso flutuante: são quatro
+   * passos em telas diferentes, e aviso que some em três segundos não dá tempo
+   * de ninguém ler quatro passos.
+   */
+  function mostrarProximosPassos(criado) {
+    elemento('config-painel').innerHTML = '<div class="config-form">'
+      + tituloDoPainel(criado.nome, 'Criado na aba ' + criado.aba)
+      + (criado.abaAproveitada
+        ? '<p class="config-explica">A aba já existia, e ficou como estava. '
+          + (criado.colunasRegistradas.length
+            ? escapar(String(criado.colunasRegistradas.length))
+              + ' coluna(s) dela viraram campos do formulário, todas como '
+              + 'texto — troque o tipo de cada uma em Cadastrar Caso.'
+            : 'Nenhuma coluna nova precisou ser registrada.')
+          + '</p>'
+        : '')
+      + '<p class="config-explica"><strong>Próximos passos</strong></p>'
+      + '<ol class="config-passos">'
+      + criado.proximosPassos.map(function (passo) {
+        return '<li>' + escapar(passo) + '</li>';
+      }).join('')
+      + '</ol></div>';
   }
 
   function desenharPainelDoCanal(canal) {
@@ -8022,6 +8419,22 @@ var TelaConfiguracoes = (function () {
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
         colunas, canal.colunaDaAreaResponsavel, '')
+      + caixaDeOpcoes('colunaDoValor', 'Coluna do valor', colunas,
+        canal.colunaDoValor,
+        'A coluna de dinheiro deste canal. É dela que sai o gráfico "Valor por '
+        + 'situação", na Produtividade RECC e na Minha Performance. Em branco, '
+        + 'o gráfico não aparece.')
+      + campoDeTexto('situacoesDestacadas', 'Situações com barra própria',
+        canal.situacoesDestacadas,
+        'Separadas por vírgula, na ordem em que você quer ler — por exemplo '
+        + '"Reteve, Não reteve, Sem sucesso". Todas as outras somam numa barra '
+        + 'só, "Demais situações", e o total fecha a conta. Situação sem caso '
+        + 'no período aparece valendo zero, de propósito: sumir faria a conta '
+        + 'parecer completa com um pedaço faltando.')
+      + caixaDeOpcoes('icone', 'Ícone', SeletorDeCanal.nomesDosIcones(),
+        canal.icone,
+        'O desenho que aparece no seletor do Trabalho. Nome desconhecido cai '
+        + 'no losango.')
       + campoDeTexto('ordem', 'Ordem no seletor', canal.ordem, '')
       + caixaDeSimNao('ativo', 'Canal em uso', canal.ativo)
       + (canal.situacoes.length
@@ -8045,6 +8458,9 @@ var TelaConfiguracoes = (function () {
         metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
+        colunaDoValor: valorDe('colunaDoValor'),
+        situacoesDestacadas: valorDe('situacoesDestacadas'),
+        icone: valorDe('icone'),
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarCanais(); })
@@ -9056,8 +9472,8 @@ var TelaConfiguracoes = (function () {
 
     return '<div class="config-legado">'
       + '<h4>Planilha de cadastros — a segunda base</h4>'
-      + '<p class="config-explica">Corretoras, SUSEPs bloqueadas, produtos e as '
-      + 'duas listas de analista podem morar em OUTRA planilha. O PGO lê dela '
+      + '<p class="config-explica">Corretoras, SUSEPs bloqueadas e as duas '
+      + 'listas de analista podem morar em OUTRA planilha. O PGO lê dela '
       + 'na hora, sem copiar nada: o que mudar lá vale aqui na leitura '
       + 'seguinte. Isso deixa esta planilha mais leve e evita manter o mesmo '
       + 'cadastro em dois lugares. <strong>O PGO só lê</strong> — para editar '
@@ -9279,281 +9695,6 @@ var TelaConfiguracoes = (function () {
       + (ligado ? ' checked' : '') + '>'
       + '<span>' + escapar(rotulo)
       + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</span></label>';
-  }
-
-  /* --------------------------------------------------------- o calendário */
-
-  /*
-    DUAS LISTAS PEQUENAS QUE MEXEM NUMA CONTA GRANDE.
-
-    A meta de cada pessoa se reparte pelos DIAS ÚTEIS do mês, e desconta os
-    dias em que ela esteve fora. Quem cadastra isto é quem monta a escala — não
-    quem mexe em planilha —, e por isso as duas moram aqui.
-
-    Os feriados NACIONAIS aparecem na tela mas não se cadastram: o sistema os
-    calcula, inclusive Carnaval e Corpus Christi, que mudam de data todo ano.
-    Mostrá-los é o que evita a operação cadastrar o Natal por via das dúvidas.
-  */
-
-  function carregarCalendario() {
-    aguarde('Lendo o calendário…');
-    // Três idas ao servidor, encadeadas: quem pode ficar ausente (os usuários),
-    // os motivos que a operação cadastrou, e o calendário em si.
-    Servidor.chamar('listarUsuarios')
-      .entao(function (usuarios) {
-        dados.usuarios = usuarios;
-        Servidor.chamar('listarCatalogo', 'AUSENCIA_MOTIVO', '')
-          .entao(function (motivos) {
-            dados.motivosDeAusencia = motivos.filter(function (um) {
-              return um.ativo;
-            });
-            Servidor.chamar('listarAusencias')
-              .entao(function (ausencias) {
-                dados.ausencias = ausencias;
-                Servidor.chamar('listarFeriados', anoDoCalendario)
-                  .entao(function (feriados) {
-                    dados.feriados = feriados;
-                    desenharCalendario();
-                  })
-                  .senao(falhou);
-              })
-              .senao(falhou);
-          })
-          .senao(falhou);
-      })
-      .senao(falhou);
-  }
-
-  function desenharCalendario() {
-    if (respostaAtrasada('calendario')) return;
-
-    var linhas = dados.ausencias.map(function (uma) {
-      return '<li class="config-item'
-        + (escolhido && escolhido.id === uma.id ? ' atual' : '')
-        + (uma.jaPassou ? ' desligado' : '') + '">'
-        + '<button type="button" class="abrir" data-ausencia="'
-        + escapar(uma.id) + '">'
-        + '<span class="nome">' + escapar(uma.nome) + '</span>'
-        + '<span class="detalhe">' + escapar(uma.motivo) + ' · '
-        + escapar(uma.de) + ' a ' + escapar(uma.ate)
-        + ' · ' + uma.diasUteis + ' dia(s) útil(eis)'
-        + (uma.acontecendoAgora ? ' · fora agora' : '')
-        + '</span></button></li>';
-    }).join('');
-
-    elemento('config-lista').innerHTML =
-      '<div class="config-lista-cabeca">'
-      + '<span class="config-titulo">' + dados.ausencias.length + ' ausência(s)</span>'
-      + '<button type="button" class="botao pequeno" id="nova-ausencia">'
-      + 'Nova ausência</button></div>'
-      + (linhas
-        ? '<ul class="config-itens">' + linhas + '</ul>'
-        : '<p class="config-vazio">Ninguém com ausência cadastrada.</p>')
-      + desenharOsFeriados();
-
-    elemento('nova-ausencia').addEventListener('click', function () {
-      escolhido = null;
-      desenharPainelDaAusencia(null);
-    });
-    ligarCliques('[data-ausencia]', function (botao) {
-      escolhido = { id: botao.getAttribute('data-ausencia') };
-      desenharCalendario();
-    });
-    ligarOsFeriados();
-
-    if (escolhido) {
-      desenharPainelDaAusencia(acharNaLista(dados.ausencias, escolhido.id));
-    } else {
-      painelVazio('Escolha uma ausência, ou cadastre uma nova.');
-    }
-  }
-
-  function desenharOsFeriados() {
-    var calendario = dados.feriados;
-
-    var doSistema = calendario.doSistema.map(function (um) {
-      return '<li class="feriado-do-sistema' + (um.cancelado ? ' cancelado' : '') + '">'
-        + '<span class="quando">' + escapar(um.data) + '</span>'
-        + '<span class="qual">' + escapar(um.nome)
-        + (um.cancelado ? ' — a operação trabalha neste dia' : '') + '</span></li>';
-    }).join('');
-
-    var daOperacao = calendario.cadastrados.map(function (um) {
-      return '<li class="config-item">'
-        + '<button type="button" class="abrir" data-feriado="'
-        + escapar(um.id) + '">'
-        + '<span class="nome">' + escapar(um.data) + ' · ' + escapar(um.nome) + '</span>'
-        + '<span class="detalhe">' + escapar(um.tipo)
-        + (um.trabalha ? ' · a operação TRABALHA neste dia' : ' · não se trabalha')
-        + '</span></button></li>';
-    }).join('');
-
-    return '<div class="config-lista-cabeca calendario-cabeca">'
-      + '<span class="config-titulo">Feriados de ' + calendario.ano
-      + ' · ' + calendario.diasUteisNoAno + ' dias úteis no ano</span>'
-      + '<select id="ano-do-calendario" class="filtro">'
-      + calendario.anos.map(function (ano) {
-        return '<option value="' + ano + '"'
-          + (ano === calendario.ano ? ' selected' : '') + '>' + ano + '</option>';
-      }).join('') + '</select>'
-      + '<button type="button" class="botao pequeno" id="novo-feriado">'
-      + 'Novo feriado</button></div>'
-      + '<p class="config-dica">Os nacionais o sistema calcula sozinho, '
-      + 'inclusive os que mudam de data todo ano. Cadastre só o que é seu: '
-      + 'municipal, facultativo, emenda.</p>'
-      + '<ul class="feriados-do-sistema">' + doSistema + '</ul>'
-      + (daOperacao
-        ? '<ul class="config-itens">' + daOperacao + '</ul>'
-        : '<p class="config-vazio">Nenhum feriado próprio cadastrado.</p>');
-  }
-
-  function ligarOsFeriados() {
-    elemento('ano-do-calendario').addEventListener('change', function () {
-      anoDoCalendario = Number(this.value);
-      escolhido = null;
-      carregarCalendario();
-    });
-    elemento('novo-feriado').addEventListener('click', function () {
-      escolhido = null;
-      desenharPainelDoFeriado(null);
-    });
-    ligarCliques('[data-feriado]', function (botao) {
-      var id = botao.getAttribute('data-feriado');
-      desenharPainelDoFeriado(acharNaLista(dados.feriados.cadastrados, id));
-    });
-  }
-
-  function desenharPainelDaAusencia(ausencia) {
-    var atual = ausencia
-      || { id: '', usuarioId: '', motivo: '', de: '', ate: '', observacao: '' };
-
-    elemento('config-painel').innerHTML =
-      '<form class="config-form" id="form-ausencia">'
-      + tituloDoPainel(atual.id ? atual.nome : 'Nova ausência',
-        'A pessoa continua entrando no sistema. O que muda é a CONTA: '
-        + 'estes dias saem da meta dela e da média da equipe.')
-      + caixaDeItens('au-pessoa', 'Quem', pessoasParaAusencia(), atual.usuarioId, '')
-      + caixaDeOpcoes('au-motivo', 'Motivo', motivosDeAusencia(), atual.motivo, '')
-      + campoDeData('au-de', 'Primeiro dia', atual.de, '')
-      + campoDeData('au-ate', 'Último dia', atual.ate,
-        'As duas pontas entram na conta.')
-      + campoDeTexto('au-obs', 'Observação', atual.observacao, 'Opcional.')
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + (atual.id
-        ? '<button type="button" class="botao suave" id="excluir-ausencia">'
-          + 'Excluir</button>'
-        : '')
-      + '</div></form>';
-
-    elemento('form-ausencia').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      salvarAAusencia(atual.id);
-    });
-    if (atual.id) {
-      elemento('excluir-ausencia').addEventListener('click', function () {
-        Formulario.confirmarExclusao(
-          'Tirar a ausência de ' + atual.nome + '?',
-          'Os dias voltam a contar na meta dela.',
-          function () {
-            Servidor.chamar('excluirAusencia', atual.id)
-              .entao(function () { escolhido = null; carregarCalendario(); })
-              .senao(falhou);
-          });
-      });
-    }
-  }
-
-  function salvarAAusencia(id) {
-    Servidor.chamar('salvarAusencia', {
-      id: id,
-      usuarioId: valorDe('au-pessoa'),
-      motivo: valorDe('au-motivo'),
-      de: dataDe('au-de'),
-      ate: dataDe('au-ate'),
-      observacao: valorDe('au-obs')
-    })
-      .entao(function (resposta) {
-        escolhido = { id: resposta.id };
-        carregarCalendario();
-      })
-      .senao(falhou);
-  }
-
-  function desenharPainelDoFeriado(feriado) {
-    var atual = feriado
-      || { id: '', data: '', nome: '', tipo: 'Municipal', trabalha: false };
-
-    elemento('config-painel').innerHTML =
-      '<form class="config-form" id="form-feriado">'
-      + tituloDoPainel(atual.id ? atual.nome : 'Novo feriado',
-        'Um dia que sai da conta de dias úteis.')
-      + campoDeData('fe-data', 'Data', atual.data, '')
-      + campoDeTexto('fe-nome', 'Nome', atual.nome,
-        'É o que a lista mostra. "Aniversário da cidade", "Emenda de Corpus Christi".')
-      + caixaDeOpcoes('fe-tipo', 'Tipo',
-        ['Municipal', 'Estadual', 'Facultativo', 'Emenda'], atual.tipo,
-        'Só rótulo, para quem lê a lista. A conta não olha para ele.')
-      + caixaDeMarcar('fe-trabalha', 'Neste dia a operação TRABALHA',
-        atual.trabalha,
-        'Marque para CANCELAR um feriado nacional que o sistema calculou — '
-        + 'o ano em que se trabalhou no Corpus Christi, por exemplo.')
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + (atual.id
-        ? '<button type="button" class="botao suave" id="excluir-feriado">'
-          + 'Excluir</button>'
-        : '')
-      + '</div></form>';
-
-    elemento('form-feriado').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('salvarFeriado', {
-        id: atual.id,
-        data: dataDe('fe-data'),
-        nome: valorDe('fe-nome'),
-        tipo: valorDe('fe-tipo'),
-        trabalha: marcado('fe-trabalha')
-      })
-        .entao(function () { escolhido = null; carregarCalendario(); })
-        .senao(falhou);
-    });
-    if (atual.id) {
-      elemento('excluir-feriado').addEventListener('click', function () {
-        Formulario.confirmarExclusao(
-          'Tirar o feriado "' + atual.nome + '"?',
-          'O dia volta a contar como dia útil.',
-          function () {
-            Servidor.chamar('excluirFeriado', atual.id)
-              .entao(function () { escolhido = null; carregarCalendario(); })
-              .senao(falhou);
-          });
-      });
-    }
-  }
-
-  /** Quem pode receber uma ausência: todo mundo que está cadastrado e ativo. */
-  function pessoasParaAusencia() {
-    return (dados.usuarios || []).filter(function (uma) {
-      return uma.ativo;
-    }).map(function (uma) {
-      return { id: uma.id, nome: uma.nome };
-    });
-  }
-
-  /*
-    Os motivos vêm do catálogo quando a operação os cadastrou; senão, destes
-    quatro. Uma lista vazia travaria o cadastro inteiro no dia da instalação —
-    e obrigar a cadastrar "Férias" antes de poder registrar férias é atrito
-    sem motivo.
-  */
-  function motivosDeAusencia() {
-    var doCatalogo = (dados.motivosDeAusencia || []).map(function (um) {
-      return um.nome;
-    });
-    return doCatalogo.length
-      ? doCatalogo
-      : ['Férias', 'Licença', 'Afastamento', 'Treinamento'];
   }
 
   /* ------------------------------------------------------------ utilidades */

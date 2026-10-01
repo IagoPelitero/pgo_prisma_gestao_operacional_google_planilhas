@@ -538,6 +538,132 @@ function rodarTestesDoTrabalho() {
       'a situação de nascimento também é uma chegada, e tem hora');
   });
 
+  secao('Ver detalhes traz TUDO o que está preenchido');
+
+  /*
+    O PO abriu um caso da RET e não viu o que estava gravado. A causa era uma
+    só, com três caras: um campo pode morar em MAIS DE UMA coluna da planilha,
+    e quem lia pegava uma coluna só.
+
+    O pior dos três não era nem o que ele viu: um caso da RET com produto não
+    conseguia ser SALVO. A edição devolvia "1101" para um seletor cuja lista
+    só tem "1101 - VIDA INDIVIDUAL", e salvar era recusado — num campo que a
+    pessoa nem tinha tocado.
+  */
+
+  function umCasoDaRetCompleto(chamarOServidor) {
+    const daRet = chamarOServidor('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const salvo = chamarOServidor('cadastrarCaso')(daRet.id, {
+      nomedocliente: 'Monkey D. Luffy',
+      numerodaproposta: '58-0000000',
+      numapolice: '12-1391-0000000',
+      codproduto: '1101 - VIDA INDIVIDUAL',
+      susep: 'RET00J',
+      status: 'Não trabalhado'
+    });
+    return { daRet: daRet, id: String(salvo.id || salvo) };
+  }
+
+  teste('a proposta e a apólice voltam INTEIRAS, e não só um pedaço', () => {
+    const { daRet, id } = umCasoDaRetCompleto(chamar);
+
+    // Na planilha estão partidas — é o que o PO pediu, para o Power BI.
+    const linha = chamar('buscarRegistros_')('BASE_RET', 'Id', id, 1)[0];
+    igual(String(linha['Código origem da proposta']), '58');
+    igual(String(linha['número da proposta']), '0000000');
+
+    // Mas na tela voltam juntas, do jeito que ele digitou.
+    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
+    const proposta = detalhe.linhas.find((l) => l.chave === 'numerodaproposta');
+    const apolice = detalhe.linhas.find((l) => l.chave === 'numapolice');
+    igual(proposta.valor, '58-0000000', 'antes disto aparecia só "0000000"');
+    igual(apolice.valor, '12-1391-0000000');
+  });
+
+  teste('o produto volta com o código E o nome', () => {
+    const { daRet, id } = umCasoDaRetCompleto(chamar);
+    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
+    const produto = detalhe.linhas.find((l) => l.chave === 'codproduto');
+    igual(produto.valor, '1101 - VIDA INDIVIDUAL', 'antes aparecia só "1101"');
+  });
+
+  teste('abrir e salvar sem mexer em nada não recusa e não perde coluna', () => {
+    // O defeito que travava o trabalho: salvar era RECUSADO por um campo que
+    // a pessoa não tocou, porque a edição devolvia metade do valor dele.
+    const { daRet, id } = umCasoDaRetCompleto(chamar);
+    const vindo = chamar('casoParaEditar')(daRet.id, id);
+
+    igual(vindo.valores.codproduto, '1101 - VIDA INDIVIDUAL');
+    chamar('editarCaso')(daRet.id, id, vindo.valores);
+
+    const depois = chamar('buscarRegistros_')('BASE_RET', 'Id', id, 1)[0];
+    igual(String(depois['cod produto']), '1101', 'o código continua lá');
+    igual(String(depois.produto), 'VIDA INDIVIDUAL', 'e o nome também');
+    igual(String(depois['Código origem da proposta']), '58');
+    igual(String(depois['cod_ramo']), '1391');
+  });
+
+  teste('coluna preenchida que o formulário não pergunta também aparece', () => {
+    /*
+      Palavra do PO: "precisa trazer todos os dados que foram preenchidos na
+      planilha". Um caso importado chega com valor em colunas que o formulário
+      não pergunta — a origem da importação, a data dela, os carimbos. Antes
+      disto esse conteúdo ficava invisível.
+    */
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const novo = chamar('inserirRegistro_')('BASE_RET', {
+      'nome do cliente': 'Nami', analista: 'Ana', status: 'Não trabalhado',
+      'Origem da importação': 'Base de inadimplentes set/2026',
+      'Quem mudou o status': 'Ana'
+    });
+
+    const detalhe = chamar('detalhesDoCaso')(daRet.id, String(novo.id));
+    const extras = detalhe.linhas.filter((l) => l.secao === 'Também está na planilha');
+
+    const origem = extras.find((l) => l.rotulo === 'Origem da importação');
+    verdadeiro(origem !== undefined, 'a origem da importação tem de aparecer');
+    igual(origem.valor, 'Base de inadimplentes set/2026');
+    igual(origem.doSistema, true, 'e vem marcada como leitura');
+  });
+
+  teste('coluna VAZIA que ninguém declarou NÃO entope a tela', () => {
+    // A BASE_RET tem quase cinquenta colunas. Listar as vazias que o
+    // formulário não pergunta encheria o detalhe de travessões e esconderia
+    // justamente o que está preenchido.
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const novo = chamar('inserirRegistro_')('BASE_RET', {
+      'nome do cliente': 'Chopper', analista: 'Ana', status: 'Não trabalhado'
+    });
+    const detalhe = chamar('detalhesDoCaso')(daRet.id, String(novo.id));
+    const extras = detalhe.linhas.filter((l) => l.secao === 'Também está na planilha');
+    verdadeiro(extras.every((l) => String(l.valor).trim() !== ''),
+      'só coluna COM valor entra nesta seção');
+  });
+
+  teste('a coluna que um campo já mostra não aparece DUAS vezes', () => {
+    // Sem esta guarda, a proposta sairia como campo ("58-0000000") e também
+    // como coluna solta ("58"), e quem lê não saberia qual é a verdadeira.
+    const { daRet, id } = umCasoDaRetCompleto(chamar);
+    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
+    const extras = detalhe.linhas.filter((l) => l.secao === 'Também está na planilha');
+
+    ['Código origem da proposta', 'número da proposta', 'cod_sucursal',
+     'cod_ramo', 'Num_apolice', 'cod produto', 'produto'
+    ].forEach((cabecalho) => {
+      verdadeiro(!extras.some((l) => l.rotulo === cabecalho),
+        cabecalho + ' já é mostrada pelo campo, não pode repetir');
+    });
+  });
+
+  teste('as colunas de controle nunca aparecem', () => {
+    const { daRet, id } = umCasoDaRetCompleto(chamar);
+    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
+    verdadeiro(detalhe.linhas.every((l) => String(l.rotulo).charAt(0) !== '_'),
+      '_Visivel, _ExcluidoEm e _Origem são do sistema, não do caso');
+    verdadeiro(!detalhe.linhas.some((l) => l.chave === 'id'),
+      'o Id já vem no topo do detalhe');
+  });
+
   secao('O controle de produtividade da RET');
 
   /*
@@ -570,12 +696,22 @@ function rodarTestesDoTrabalho() {
     const statusDaRet = chamar('lerRegistros_("CATALOGO")').filter((item) =>
       item.Tipo === 'STATUS' && String(item.CanalId) === String(ret.id));
 
-    igual(statusDaRet.length, 8, 'os oito status que a operação pediu');
+    igual(statusDaRet.length, 9, 'os nove status que a operação pediu');
 
+    // Dois não carimbam, e por motivos diferentes. "Não trabalhado" é o estado
+    // de nascimento, e carimbar a hora em que o caso entrou repetiria a data
+    // de recepção. "Sem sucesso" é o status novo desta rodada: o PO o pediu em
+    // laranja e NÃO pediu coluna de data para ele — criar uma coluna que
+    // ninguém pediu enche a base para medir o que a operação não decidiu
+    // medir. Os outros sete carimbam.
     const semCarimbo = statusDaRet.filter((item) =>
       !String(item.ColunaDeCarimbo || '').trim()).map((item) => item.Nome);
-    igual(semCarimbo.join(', '), 'Não trabalhado',
-      'só o estado de nascimento não carimba — os outros sete carimbam');
+    igual(semCarimbo.join(', '), 'Não trabalhado, Sem sucesso');
+
+    const semSucesso = statusDaRet.find((item) => item.Nome === 'Sem sucesso');
+    igual(String(semSucesso.Cor), 'atencao',
+      'laranja, como o PO pediu — e pelo TOM, que segue o tema, nunca por uma '
+      + 'cor escrita à mão');
 
     statusDaRet.forEach((item) => {
       const coluna = String(item.ColunaDeCarimbo || '').trim();
@@ -1038,7 +1174,16 @@ function rodarTestesDoTrabalho() {
     igual(tipoDe('Prêmio anual'), 'dinheiro');
     igual(tipoDe('Margem de contribuição'), 'numero');
     igual(tipoDe('CNPJ'), 'identificador', 'CNPJ não perde o zero à esquerda');
-    igual(tipoDe('SUSEP'), 'identificador');
+    // A SUSEP é TEXTO em TODAS as abas: ela tem letra — "RET00J", palavra do
+    // PO. Com `identificador`, a planilha guardaria só os dígitos e a
+    // corretora nunca mais seria encontrada pelo selo.
+    igual(tipoDe('SUSEP'), 'texto');
+    ['BASE_RET', 'BASE_MESA', 'CORRETORAS', 'SUSEP_BLOQUEADAS']
+      .forEach((aba) => {
+        const coluna = chamar('esquemaDaAba_')(aba).colunas
+          .find((uma) => uma.cabecalho === 'SUSEP');
+        igual(coluna.tipo, 'texto', 'a SUSEP da aba ' + aba);
+      });
   });
 
   secao('VG: os meses de vigência, calculados');

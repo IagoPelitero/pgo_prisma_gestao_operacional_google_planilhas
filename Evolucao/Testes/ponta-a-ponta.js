@@ -294,8 +294,6 @@ async function rodar() {
     const gravado = depois[depois.length - 1];
     igual(String(gravado.Nome), 'Iago Pelitero');
     igual(String(gravado.Email), 'p.iago.ip@exemplo.com');
-    igual(String(gravado['Canal que atende']), 'Corretora');
-    igual(String(gravado.Matricula), '778899');
     verdadeiro(String(gravado.NivelAcessoId).length > 0, 'o nível foi gravado');
     verdadeiro(String(gravado.CanalId).length > 0, 'o canal foi gravada');
     igual(String(gravado.Ativo), 'SIM', 'nasce podendo entrar');

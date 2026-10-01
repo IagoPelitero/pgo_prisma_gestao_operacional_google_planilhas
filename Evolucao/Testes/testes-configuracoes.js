@@ -49,7 +49,15 @@ function rodarTestesDeConfiguracoes() {
     // Conferimos as CHAVES, e não só quantas são: contar 7 continuaria
     // passando se uma seção sumisse e outra nascesse no mesmo commit.
     igual(resumo.secoes.map((s) => s.chave).join(','),
-      'campos,usuarios,niveis,catalogo,canais,identidade,paineis,calendario,analises,estrutura');
+      'campos,usuarios,niveis,catalogo,canais,identidade,paineis,analises,estrutura');
+    // As CHAVES são de código e não mudam; os TÍTULOS são de tela e mudaram a
+    // pedido do PO: "Campos" virou "Cadastrar Caso" ("assim saberei que é onde
+    // ajusto o formulário") e "Listas" virou "Ajustes Gerais" ("que vou
+    // entender que são outros tipos de ajuste").
+    igual(resumo.secoes.find((s) => s.chave === 'campos').titulo,
+      'Cadastrar Caso');
+    igual(resumo.secoes.find((s) => s.chave === 'catalogo').titulo,
+      'Ajustes Gerais');
     igual(resumo.podeMexerNaEstrutura, true);
     igual(resumo.senhaDefinida, false, 'instalação nova ainda não tem senha');
     verdadeiro(resumo.secoes.find((s) => s.chave === 'campos').quantidade >= 55);
@@ -389,17 +397,19 @@ function rodarTestesDeConfiguracoes() {
   secao('A estrutura da planilha');
 
   teste('o laudo mostra o que falta e o que apareceu, sem consertar', () => {
-    const aba = ambiente.planilha.getSheetByName('PRODUTOS');
-    aba.getRange(1, 3).setValue('');
+    const aba = ambiente.planilha.getSheetByName('SUSEP_BLOQUEADAS');
+    const onde = chamar('posicaoDaColuna_')(
+      chamar('estruturaDaAba_')('SUSEP_BLOQUEADAS'), 'CoordenadorComercial') + 1;
+    aba.getRange(1, onde).setValue('');
     chamar('esquecerEstruturaLida_()');
 
     const laudo = chamar('conferirEstruturaDaPlanilha()');
     igual(laudo.ok, false);
-    const produtos = laudo.abas.find((a) => a.aba === 'PRODUTOS');
-    igual(produtos.faltando.join(','), 'CodigoProduto');
+    const bloqueadas = laudo.abas.find((a) => a.aba === 'SUSEP_BLOQUEADAS');
+    igual(bloqueadas.faltando.join(','), 'CoordenadorComercial');
 
-    aba.getRange(1, 3).setNumberFormat('@');
-    aba.getRange(1, 3).setValue('CodigoProduto');
+    aba.getRange(1, onde).setNumberFormat('@');
+    aba.getRange(1, onde).setValue('CoordenadorComercial');
     chamar('esquecerEstruturaLida_()');
   });
 
@@ -725,6 +735,577 @@ function rodarTestesDeConfiguracoes() {
     verdadeiro(trilha.some((l) => l.acao === 'nivel.editar'));
     verdadeiro(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/.test(trilha[0].dataHora),
       'a data vem formatada, veio ' + trilha[0].dataHora);
+  });
+
+  /*
+   * ==========================================================================
+   * EXCLUIR CAMPO — pedido do PO: "devo conseguir excluir definitivamente"
+   * ==========================================================================
+   * Estes testes ficam NO FIM do arquivo de propósito. Eles APAGAM campo e
+   * apagam coluna; posto no meio, um deles mudaria a contagem de campos que
+   * meia dúzia de testes acima confere, e a falha apareceria longe da causa.
+   * Já aconteceu, com os testes de importação.
+   * ==========================================================================
+   */
+  secao('O custo de abrir Cadastrar Caso');
+
+  teste('listar os campos não custa uma ida ao serviço POR CAMPO', () => {
+    /*
+      A DEMORA QUE A OPERAÇÃO RELATOU, e a função que a causava.
+
+      `listarCamposDoCanal` chamava `quemApontaParaAColuna_` uma vez por campo,
+      e cada chamada relia a aba CANAIS e o CATÁLOGO inteiro. Com os 48 campos
+      da RET eram 98 idas ao serviço. No Apps Script cada ida custa cerca de
+      25 ms de pedágio — dois segundos e meio parado, só para a tela abrir.
+
+      O número não aparece lendo `quemApontaParaAColuna_`: ela é barata sozinha.
+      Aparece no LAÇO em volta dela, e é por isso que este teste conta IDAS e
+      não milissegundos. Medir o relógio do Node não diria nada sobre o Apps
+      Script; medir as idas diz tudo.
+    */
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+
+    chamar('esquecerEstruturaLida_')();
+    const antes = ambiente.medidor.idasParaLer + ambiente.medidor.idasParaGravar;
+    const campos = chamar('listarCamposDoCanal')(daRet.id);
+    const idas = ambiente.medidor.idasParaLer + ambiente.medidor.idasParaGravar - antes;
+
+    verdadeiro(campos.length > 30,
+      'esperava a lista cheia da RET, veio ' + campos.length);
+
+    // O limite é por LISTA, não por campo: sobe se alguém acrescentar uma
+    // leitura fixa, e estoura na hora em que uma leitura voltar para dentro do
+    // laço — que é exatamente o defeito que este teste existe para pegar.
+    verdadeiro(idas < 15,
+      'abrir Cadastrar Caso custou ' + idas + ' idas ao serviço para '
+      + campos.length + ' campos. Mais de uma dezena quer dizer que voltou a '
+      + 'haver leitura DENTRO do laço dos campos — leia uma vez antes e passe '
+      + 'em `jaLido`.');
+
+    // E a informação continua certa: é o que impede "otimizar" devolvendo
+    // lista vazia.
+    const status = campos.find((c) => c.cabecalho === 'status');
+    verdadeiro(status.usadoPeloCanal.indexOf('Coluna do status') >= 0,
+      'o campo do status continua dizendo que o canal aponta para ele');
+  });
+
+  teste('quem chama uma vez só continua funcionando sem o `jaLido`', () => {
+    // `excluirCampo` chama a função uma vez, sem passar nada. Ela tem de ler
+    // por conta dela — senão a recusa do excluir pararia de dizer o motivo.
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const apontando = chamar('quemApontaParaAColuna_')(daRet, 'status');
+    verdadeiro(apontando.indexOf('Coluna do status') >= 0,
+      'sem jaLido, a função lê sozinha e responde igual');
+  });
+
+  secao('Excluir campo de vez');
+
+  teste('campo que eu criei sai do sistema, e a coluna fica na planilha', () => {
+    chamar('liberarComSenha')('segredo123');
+    const criado = chamar('criarCampo')(canal.id, { rotulo: 'Para excluir' });
+    igual(criado.cabecalho, 'Para excluir');
+
+    // Com dado dentro, para a conferência valer: o que se promete é que a
+    // coluna e o conteúdo dela continuam lá.
+    chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Ana Martins', 'Para excluir': 'não me apague'
+    });
+
+    const campo = chamar('listarCamposDoCanal')(canal.id)
+      .find((um) => um.cabecalho === 'Para excluir');
+    verdadeiro(campo !== undefined, 'o campo precisa existir antes de sair');
+
+    chamar('liberarComSenha')('segredo123');
+    const saiu = chamar('excluirCampo')(canal.id, campo.id, false);
+    igual(saiu.colunaApagada, false);
+
+    verdadeiro(!chamar('listarCamposDoCanal')(canal.id)
+      .some((um) => um.cabecalho === 'Para excluir'),
+      'o campo não pode mais aparecer na lista');
+    verdadeiro(chamar('estruturaDaAba_')('BASE_MESA').cabecalhos
+      .indexOf('Para excluir') >= 0,
+      'mas a coluna fica: desmarcado, nada é apagado da planilha');
+    igual(chamar('lerRegistros_("BASE_MESA")').pop()['Para excluir'],
+      'não me apague', 'e o que estava gravado continua gravado');
+  });
+
+  teste('marcando a caixa, a coluna sai da aba e o dado vai com ela', () => {
+    chamar('liberarComSenha')('segredo123');
+    chamar('criarCampo')(canal.id, { rotulo: 'Some comigo' });
+    chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Ana Martins', 'Some comigo': 'vai embora'
+    });
+
+    const campo = chamar('listarCamposDoCanal')(canal.id)
+      .find((um) => um.cabecalho === 'Some comigo');
+
+    chamar('liberarComSenha')('segredo123');
+    const saiu = chamar('excluirCampo')(canal.id, campo.id, true);
+    igual(saiu.colunaApagada, true);
+    igual(saiu.linhasComValor, 1,
+      'o recado diz quantos valores foram embora — é o único vestígio');
+
+    verdadeiro(chamar('estruturaDaAba_')('BASE_MESA').cabecalhos
+      .indexOf('Some comigo') < 0, 'a coluna saiu da aba');
+  });
+
+  teste('sai a coluna PEDIDA, e só ela — a vizinha fica inteira', () => {
+    /*
+     * A conferência é "qual coluna saiu", e não "o dado escorregou".
+     *
+     * Escorregar não é possível aqui: `lerRegistros_` lê por CABEÇALHO, e o
+     * cabeçalho sai junto com a coluna — o dado nunca troca de nome. O risco
+     * real é outro e mais banal: errar a posição por um e apagar a coluna
+     * VIZINHA, que é exatamente o que um `posicao` em vez de `posicao + 1`
+     * faz, porque a lista de cabeçalhos começa em 0 e a planilha em 1.
+     *
+     * Por isso o teste cobra as duas metades: a pedida saiu, a vizinha ficou,
+     * e o que estava escrito nela continua escrito.
+     */
+    chamar('liberarComSenha')('segredo123');
+    chamar('criarCampo')(canal.id, { rotulo: 'Do meio' });
+    chamar('criarCampo')(canal.id, { rotulo: 'Depois do meio' });
+    chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Zoro Testador', 'Do meio': 'eu saio',
+      'Depois do meio': 'eu fico'
+    });
+
+    const doMeio = chamar('listarCamposDoCanal')(canal.id)
+      .find((um) => um.cabecalho === 'Do meio');
+    chamar('liberarComSenha')('segredo123');
+    chamar('excluirCampo')(canal.id, doMeio.id, true);
+
+    const cabecalhos = chamar('estruturaDaAba_')('BASE_MESA').cabecalhos;
+    verdadeiro(cabecalhos.indexOf('Do meio') < 0, 'a coluna pedida saiu');
+    verdadeiro(cabecalhos.indexOf('Depois do meio') >= 0,
+      'e a vizinha ficou: errar a posição por um apagaria a coluna errada');
+
+    const linha = chamar('lerRegistros_("BASE_MESA")')
+      .filter((um) => String(um.Analista) === 'Zoro Testador').pop();
+    igual(linha['Depois do meio'], 'eu fico',
+      'com o que estava escrito nela');
+  });
+
+  teste('campo do contrato é recusado, e o recado ensina o que fazer', () => {
+    // Quase toda coluna das bases é do contrato: é ela que o relatório junta.
+    // Recusar sem explicar faria a pessoa achar que é falta de permissão.
+    const protegido = chamar('listarCamposDoCanal')(canal.id)
+      .find((um) => um.protegido);
+    verdadeiro(protegido !== undefined, 'o canal precisa ter campo protegido');
+
+    chamar('liberarComSenha')('segredo123');
+    const erro = lanca(() => chamar('excluirCampo')(canal.id, protegido.id, false),
+      'contrato da aba');
+    contem(erro.message, 'Aparece no formulário',
+      'o recado precisa dizer o caminho que FUNCIONA, e não só o que não dá');
+  });
+
+  teste('coluna que o canal aponta é recusada, dizendo qual ajuste a usa', () => {
+    /*
+     * O caso perigoso. A coluna do status pode não ser protegida — e apagá-la
+     * deixaria o Trabalho sem o chão dele: sem cartão, sem situação, sem
+     * troca de status. O sistema não quebraria na hora da exclusão; quebraria
+     * amanhã, na tela de quem trabalha.
+     */
+    chamar('liberarComSenha')('segredo123');
+    const criado = chamar('criarCampo')(canal.id, { rotulo: 'Situação de teste' });
+    const comoEstava = chamar('lerRegistros_("CANAIS")')
+      .find((um) => String(um.Id) === String(canal.id)).ColunaDoStatus;
+    chamar('atualizarRegistro_')('CANAIS', canal.id,
+      { ColunaDoStatus: 'Situação de teste' });
+    chamar('esquecerEstruturaLida_')();
+
+    const campo = chamar('listarCamposDoCanal')(canal.id)
+      .find((um) => um.cabecalho === 'Situação de teste');
+    igual(campo.usadoPeloCanal.join(', '), 'Coluna do status',
+      'a lista já diz onde a coluna é usada, para a tela explicar ANTES');
+
+    chamar('liberarComSenha')('segredo123');
+    const erro = lanca(() => chamar('excluirCampo')(canal.id, campo.id, true),
+      'Coluna do status');
+    contem(erro.message, 'Canais de trabalho', 'e diz onde trocar a referência');
+
+    verdadeiro(chamar('estruturaDaAba_')('BASE_MESA').cabecalhos
+      .indexOf('Situação de teste') >= 0,
+      'recusado é recusado: a coluna não pode ter saído antes do erro');
+
+    // Devolve o canal ao que era e tira o campo de teste, para não deixar a
+    // configuração do canal apontando para uma coluna de teste.
+    chamar('atualizarRegistro_')('CANAIS', canal.id,
+      { ColunaDoStatus: comoEstava });
+    chamar('esquecerEstruturaLida_')();
+    chamar('liberarComSenha')('segredo123');
+    chamar('excluirCampo')(canal.id, campo.id, true);
+    igual(criado.cabecalho, 'Situação de teste');
+  });
+
+  teste('o carimbo de um status também segura a exclusão da coluna', () => {
+    /*
+     * O mais silencioso de todos. Um status com carimbo apontando para uma
+     * coluna que não existe mais não dá erro NENHUM: o caso muda de status, o
+     * carimbo não é escrito, e a produtividade conta menos do que aconteceu.
+     * Foi exatamente assim que o achado 43 apareceu — pela tela, semanas
+     * depois.
+     */
+    chamar('liberarComSenha')('segredo123');
+    chamar('criarCampo')(canal.id, { rotulo: 'Data de teste', tipo: 'dataHora' });
+
+    const status = chamar('lerRegistros_("CATALOGO")').find((item) =>
+      String(item.Tipo) === 'STATUS'
+      && String(item.CanalId) === String(canal.id));
+    verdadeiro(status !== undefined, 'o canal precisa ter status para carimbar');
+    const carimboAntigo = status.ColunaDeCarimbo;
+    chamar('atualizarRegistro_')('CATALOGO', status.Id,
+      { ColunaDeCarimbo: 'Data de teste' });
+
+    const campo = chamar('listarCamposDoCanal')(canal.id)
+      .find((um) => um.cabecalho === 'Data de teste');
+    contem(campo.usadoPeloCanal.join(', '), 'carimbo do status');
+
+    chamar('liberarComSenha')('segredo123');
+    lanca(() => chamar('excluirCampo')(canal.id, campo.id, true), 'carimbo do status');
+
+    chamar('atualizarRegistro_')('CATALOGO', status.Id,
+      { ColunaDeCarimbo: carimboAntigo });
+    chamar('liberarComSenha')('segredo123');
+    chamar('excluirCampo')(canal.id, campo.id, true);
+  });
+
+  teste('quem não administra não exclui campo nenhum', () => {
+    const algum = chamar('listarCamposDoCanal')(canal.id)[0];
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('excluirCampo')(canal.id, algum.id, false), 'não permite');
+    });
+  });
+
+  teste('a exclusão fica na trilha, dizendo se a coluna foi com ela', () => {
+    // Sem desfazer, a trilha é o único lugar onde "havia um campo chamado X"
+    // continua escrito. Sem ela, alguém vai jurar que o campo nunca existiu.
+    const trilha = chamar('listarAuditoria')(60);
+    const comColuna = trilha.filter((linha) => linha.acao === 'campo.excluir'
+      && String(linha.detalhe || '').indexOf('coluna apagada') >= 0);
+    const semColuna = trilha.filter((linha) => linha.acao === 'campo.excluir'
+      && String(linha.detalhe || '').indexOf('continua na planilha') >= 0);
+    verdadeiro(comColuna.length > 0, 'falta o registro da exclusão COM a coluna');
+    verdadeiro(semColuna.length > 0, 'falta o registro da exclusão SEM a coluna');
+  });
+
+  /*
+   * ==========================================================================
+   * CRIAR NÍVEL — pedido do PO: "não consigo cadastrar novos níveis de acesso"
+   * ==========================================================================
+   * Ficam no FIM pelo mesmo motivo dos testes de excluir campo: eles
+   * ACRESCENTAM nível, e um teste acima confere quantos níveis existem.
+   * ==========================================================================
+   */
+  secao('Criar nível de acesso');
+
+  teste('nível novo nasce da mesma função que edita, e já aparece na lista', () => {
+    const antes = chamar('listarNiveisDeAcesso()').length;
+
+    const id = chamar('salvarNivelDeAcesso')({
+      nome: 'Supervisão de teste', escopo: 'EQUIPE',
+      telas: ['trabalho', 'buscarCaso'], acoes: ['criar', 'editar'],
+      escopoNaProdutividade: 'EQUIPE'
+    });
+    verdadeiro(String(id) !== '', 'criar devolve o Id do nível novo');
+
+    const lista = chamar('listarNiveisDeAcesso()');
+    igual(lista.length, antes + 1);
+
+    const criado = lista.find((um) => um.nome === 'Supervisão de teste');
+    verdadeiro(criado !== undefined, 'o nível novo tem de aparecer na lista');
+    igual(criado.escopo, 'EQUIPE');
+    igual(criado.pessoas, 0, 'nível novo não tem gente');
+    igual(criado.telas.indexOf('produtividade') >= 0, true,
+      'alcance diferente de BLOQUEADO põe a tela, igual na edição');
+    igual(lista[lista.length - 1].nome, 'Supervisão de teste',
+      'e nasce no FIM da ordem, não misturado com os antigos');
+  });
+
+  teste('a pessoa cadastrada no nível novo entra com o que ele permite', () => {
+    // Criar o nível e ninguém conseguir usá-lo seria meio caminho. A prova é
+    // alguém entrar por ele.
+    const nivel = chamar('listarNiveisDeAcesso()')
+      .find((um) => um.nome === 'Supervisão de teste');
+    chamar('salvarUsuario')({
+      nome: 'Nami Supervisora', email: 'nami@exemplo.com',
+      nivelAcessoId: nivel.id, ativo: true
+    });
+
+    comoUsuario(ambiente, 'nami@exemplo.com', () => {
+      const partida = chamar('pacoteDePartida()');
+      igual(partida.disponivel, true, 'ela precisa conseguir entrar');
+      igual(partida.usuario.nivelAcesso, 'Supervisão de teste');
+      verdadeiro(partida.menu.some((uma) => uma.tela === 'trabalho'),
+        'o Trabalho abre, que é o que o nível marcou');
+      verdadeiro(!partida.menu.some((uma) => uma.tela === 'configuracoes'),
+        'e Configurações não, que é o que ele NÃO marcou');
+    });
+  });
+
+  teste('nome repetido é recusado — nível é equipe, e equipe precisa de nome', () => {
+    const erro = lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: 'Supervisão de teste', escopo: 'PROPRIOS',
+      telas: ['trabalho'], acoes: ['criar']
+    }), 'Já existe um nível chamado');
+    contem(erro.message, 'equipe',
+      'o recado precisa dizer POR QUE o nome repetido incomoda');
+
+    // E não é só o nome igualzinho: a comparação ignora acento e caixa, como
+    // todo o resto do sistema.
+    lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: 'SUPERVISAO DE TESTE', escopo: 'PROPRIOS',
+      telas: ['trabalho'], acoes: ['criar']
+    }), 'Já existe um nível chamado');
+  });
+
+  teste('nível sem nome é recusado, dizendo para que o nome serve', () => {
+    const erro = lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: '   ', escopo: 'PROPRIOS', telas: ['trabalho'], acoes: ['criar']
+    }), 'Dê um nome ao nível');
+    contem(erro.message, 'EQUIPE');
+  });
+
+  teste('criar com escopo ou ação inventados é recusado igual à edição', () => {
+    // A trava não pode valer só no caminho da edição: se criar validasse
+    // menos, bastaria criar o nível errado em vez de editar um certo.
+    lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: 'Nível torto', escopo: 'GALAXIA',
+      telas: ['trabalho'], acoes: ['criar']
+    }), 'Escopo desconhecido');
+    lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: 'Nível torto', escopo: 'PROPRIOS',
+      telas: ['trabalho'], acoes: ['voar']
+    }), 'Ação desconhecida');
+    lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: 'Nível torto', escopo: 'PROPRIOS',
+      telas: ['trabalho'], acoes: ['criar'], escopoNaProdutividade: 'SEI_LA'
+    }), 'Alcance desconhecido');
+    lanca(() => chamar('salvarNivelDeAcesso')({
+      nome: 'Nível torto', escopo: 'PROPRIOS',
+      telas: ['trabalho'], acoes: ['criar'], canais: ['9999999999']
+    }), 'não existe mais');
+
+    verdadeiro(!chamar('listarNiveisDeAcesso()').some((um) => um.nome === 'Nível torto'),
+      'recusado é recusado: nada do nível torto pode ter ficado gravado');
+  });
+
+  teste('quem não configura não cria nível, nem chamando direto', () => {
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('salvarNivelDeAcesso')({
+        nome: 'Pela porta dos fundos', escopo: 'TODOS',
+        telas: ['configuracoes'], acoes: ['configurar', 'estrutura']
+      }), 'não permite');
+    });
+  });
+
+  teste('a criação fica na trilha, separada da edição', () => {
+    const trilha = chamar('listarAuditoria')(60);
+    verdadeiro(trilha.some((linha) => linha.acao === 'nivel.criar'),
+      'sem "nivel.criar" na trilha, nível que apareceu do nada não tem autor');
+  });
+
+  /*
+   * ==========================================================================
+   * CRIAR CANAL — pedido do PO: "devo conseguir cadastrar novos canais"
+   * ==========================================================================
+   * No FIM do arquivo, como os outros que escrevem: eles criam ABA, e meia
+   * dúzia de testes acima conta quantos canais e quantas abas existem.
+   * ==========================================================================
+   */
+  secao('Criar canal de trabalho');
+
+  teste('canal novo nasce com a aba, a coluna id e as de controle', () => {
+    chamar('liberarComSenha')('segredo123');
+    const criado = chamar('criarCanal')({
+      nome: 'Auto Frota', descricao: 'Piloto de teste', icone: 'escudo'
+    });
+
+    igual(criado.aba, 'BASE_AUTO_FROTA',
+      'a aba nasce com prefixo BASE_ e o nome sem acento nem espaço');
+    verdadeiro(criado.abaAproveitada === false);
+
+    const cabecalhos = chamar('estruturaDaAba_')(criado.aba).cabecalhos;
+    igual(cabecalhos.join('|'),
+      'id|_Visivel|_ExcluidoEm|_ExcluidoPor|_Origem',
+      'só o id e as de controle: os campos do formulário vêm depois, um a um');
+
+    const naLista = chamar('listarCanaisConfiguraveis()')
+      .find((um) => um.nome === 'Auto Frota');
+    verdadeiro(naLista !== undefined, 'e o canal aparece na lista de canais');
+    igual(naLista.icone, 'escudo');
+    igual(naLista.ativo, true);
+    igual(naLista.colunaDoStatus, '',
+      'nada é chutado: coluna da situação nasce em branco, para alguém '
+      + 'escolher');
+    verdadeiro(criado.proximosPassos.length >= 3,
+      'e a tela recebe o que fazer em seguida, senão fica um canal órfão');
+  });
+
+  teste('o canal novo já aceita caso, e o caso aparece na fila dele', () => {
+    /*
+     * A prova de que o canal nasceu FUNCIONANDO, e não só cadastrado. Sem
+     * isto, "criar canal" poderia ser só uma linha numa aba — e o defeito
+     * apareceria no primeiro dia de uso, na mão de quem trabalha.
+     */
+    const novo = chamar('listarCanaisConfiguraveis()')
+      .find((um) => um.nome === 'Auto Frota');
+
+    chamar('liberarComSenha')('segredo123');
+    chamar('criarCampo')(novo.id, { rotulo: 'Placa' });
+    chamar('liberarComSenha')('segredo123');
+    chamar('criarCampo')(novo.id, { rotulo: 'Responsavel' });
+
+    chamar('salvarCanal')(Object.assign({},
+      chamar('listarCanaisConfiguraveis()').find((um) => um.nome === 'Auto Frota'),
+      { colunasDaFila: 'Placa, Responsavel', colunaDaAreaResponsavel: 'Responsavel' }));
+
+    const salvo = chamar('cadastrarCaso')(novo.id, {
+      placa: 'ABC1D23', responsavel: 'Ana Martins'
+    });
+    verdadeiro(String(salvo.id || salvo) !== '', 'o caso precisa ser gravado');
+
+    const fila = chamar('resumoDoCanal')(novo.id, {});
+    igual(fila.total, 1, 'e aparecer na fila do canal novo');
+  });
+
+  teste('nome de canal ou aba repetidos são recusados', () => {
+    chamar('liberarComSenha')('segredo123');
+    lanca(() => chamar('criarCanal')({ nome: 'Auto Frota' }),
+      'Já existe um canal chamado');
+
+    chamar('liberarComSenha')('segredo123');
+    lanca(() => chamar('criarCanal')({
+      nome: 'Outro nome', aba: 'BASE_AUTO_FROTA'
+    }), 'já é a base do canal');
+  });
+
+  teste('aba reservada do sistema é recusada, dizendo por quê', () => {
+    chamar('liberarComSenha')('segredo123');
+    lanca(() => chamar('criarCanal')({ nome: 'Pela porta', aba: 'BASE_RET' }),
+      'é do contrato do sistema');
+
+    chamar('liberarComSenha')('segredo123');
+    const erro = lanca(() => chamar('criarCanal')({
+      nome: 'Pela porta', aba: 'ANALISE_QUALQUER'
+    }), 'abas de análise');
+    contem(erro.message, 'apaga e refaz',
+      'o recado precisa dizer o que aconteceria, e não só que não dá');
+
+    verdadeiro(!chamar('listarCanaisConfiguraveis()')
+      .some((um) => um.nome === 'Pela porta'),
+      'recusado é recusado: nenhum canal pode ter ficado gravado');
+  });
+
+  teste('aba que já existe com dado só entra se alguém pedir', () => {
+    /*
+     * A trava que protege a base de alguém. `criarAbaDoContrato_` REESCREVE o
+     * cabeçalho e corta a grade no tamanho do contrato — rodar isso sobre uma
+     * aba cheia transformaria os casos de alguém em lixo, em silêncio. Então
+     * aba com dado só entra se quem está criando disser que é isso que quer.
+     */
+    const planilha = chamar('planilhaAtiva_()');
+    const aba = planilha.insertSheet('BASE_COM_DADO');
+    aba.getRange(1, 1, 1, 2).setValues([['id', 'cliente']]);
+    aba.getRange(2, 1, 1, 2).setValues([['1000000001', 'Chopper']]);
+    chamar('esquecerEstruturaLida_')();
+
+    chamar('liberarComSenha')('segredo123');
+    const erro = lanca(() => chamar('criarCanal')({
+      nome: 'Em cima do que existe', aba: 'BASE_COM_DADO'
+    }), 'já existe e tem dado dentro');
+    contem(erro.message, 'aproveitar a aba que já existe',
+      'e o recado diz qual é o caminho que funciona');
+
+    igual(chamar('estruturaDaAba_')('BASE_COM_DADO').cabecalhos.join('|'),
+      'id|cliente', 'recusado é recusado: o cabeçalho não pode ter mudado');
+    igual(chamar('lerRegistros_("BASE_COM_DADO")')[0].cliente, 'Chopper',
+      'nem o dado');
+  });
+
+  teste('aproveitando a aba, o cabeçalho dela não é tocado', () => {
+    /*
+     * O caminho de quem JÁ TEM a base na planilha — o caso do PO, que não
+     * quer "excluir as abas ou criar do zero". O compromisso é explícito: a
+     * aba fica como está, e o que o sistema faz é registrar as colunas dela
+     * como campos e acrescentar as de controle que faltarem.
+     */
+    const planilha = chamar('planilhaAtiva_()');
+    const aba = planilha.insertSheet('BASE_JA_EXISTIA');
+    aba.getRange(1, 1, 1, 3).setValues([['id', 'cliente', 'valor']]);
+    aba.getRange(2, 1, 1, 3).setValues([['1000000001', 'Luffy', '500']]);
+    chamar('esquecerEstruturaLida_')();
+
+    chamar('liberarComSenha')('segredo123');
+    const criado = chamar('criarCanal')({
+      nome: 'Base antiga', aba: 'BASE_JA_EXISTIA', aproveitarAAba: true
+    });
+    igual(criado.abaAproveitada, true);
+    igual(criado.colunasRegistradas.join(', '), 'cliente, valor',
+      'as colunas que já estavam lá viram campos — menos o id e as de controle');
+
+    const cabecalhos = chamar('estruturaDaAba_')('BASE_JA_EXISTIA').cabecalhos;
+    igual(cabecalhos.slice(0, 3).join('|'), 'id|cliente|valor',
+      'as três primeiras colunas ficam onde estavam, na mesma ordem');
+    verdadeiro(cabecalhos.indexOf('_Visivel') >= 0,
+      'e as de controle foram acrescentadas no fim');
+
+    const linha = chamar('lerRegistros_("BASE_JA_EXISTIA")')[0];
+    igual(linha.cliente, 'Luffy', 'o dado que já estava lá continua lá');
+
+    const campos = chamar('listarCamposDoCanal')(criado.id).map((um) => um.cabecalho);
+    igual(campos.join(', '), 'cliente, valor');
+  });
+
+  teste('aba sem coluna de id é recusada ao aproveitar', () => {
+    // Sem id o sistema não sabe de que linha é cada caso: não abre, não edita
+    // e não exclui. Aceitar seria criar um canal que parece funcionar.
+    const planilha = chamar('planilhaAtiva_()');
+    const aba = planilha.insertSheet('BASE_SEM_ID');
+    aba.getRange(1, 1, 1, 2).setValues([['cliente', 'valor']]);
+    aba.getRange(2, 1, 1, 2).setValues([['Zoro', '10']]);
+    chamar('esquecerEstruturaLida_')();
+
+    chamar('liberarComSenha')('segredo123');
+    const erro = lanca(() => chamar('criarCanal')({
+      nome: 'Sem identidade', aba: 'BASE_SEM_ID', aproveitarAAba: true
+    }), 'não tem coluna de Id');
+    contem(erro.message, 'Crie uma coluna chamada "id"',
+      'e o recado diz exatamente o que fazer');
+  });
+
+  teste('trocar o nome do canal não mexe na aba nem nos casos', () => {
+    // Renomear já existia, e continua sendo a operação segura: o nome é da
+    // tela, a aba é de onde o dado mora.
+    const novo = chamar('listarCanaisConfiguraveis()')
+      .find((um) => um.nome === 'Auto Frota');
+    const casosAntes = chamar('lerRegistros_("BASE_AUTO_FROTA")').length;
+
+    chamar('salvarCanal')(Object.assign({}, novo, { nome: 'Auto e Frota' }));
+
+    const depois = chamar('listarCanaisConfiguraveis()')
+      .find((um) => um.id === novo.id);
+    igual(depois.nome, 'Auto e Frota');
+    igual(depois.aba, 'BASE_AUTO_FROTA', 'a aba é a mesma');
+    igual(chamar('lerRegistros_("BASE_AUTO_FROTA")').length, casosAntes,
+      'e nenhum caso se perdeu no caminho');
+  });
+
+  teste('quem não mexe na estrutura não cria canal', () => {
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('criarCanal')({ nome: 'Pela porta dos fundos' }),
+        'não permite');
+    });
+  });
+
+  teste('a criação do canal fica na trilha, com a aba no detalhe', () => {
+    const trilha = chamar('listarAuditoria')(80);
+    const criacoes = trilha.filter((linha) => linha.acao === 'canal.criar');
+    verdadeiro(criacoes.length >= 2, 'duas criações, as duas na trilha');
+    verdadeiro(criacoes.some((linha) =>
+      String(linha.detalhe || '').indexOf('aba aproveitada') >= 0),
+      'e a trilha diz quando a aba foi APROVEITADA, que é o caso delicado');
   });
 }
 

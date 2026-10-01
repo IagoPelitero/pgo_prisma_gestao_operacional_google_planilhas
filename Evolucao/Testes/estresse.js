@@ -217,7 +217,6 @@ function rodar(alvo) {
     Nome: nome,
     Email: nome.toLowerCase().replace(/[^a-z]/g, '.') + '@exemplo.com',
     NivelAcessoId: nivelOperacao.Id,
-    'Canal que atende': ret.nome,
     Ativo: true
   })));
 

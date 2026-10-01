@@ -3,7 +3,7 @@
  * PGO — testes-cadastros-de-fora.js · a Etapa 14
  * ============================================================================
  * Duas bases: a OPERACIONAL, que guarda caso, e a de CADASTROS, que guarda
- * corretora, SUSEP bloqueada, produto e as duas listas de analista.
+ * corretora, SUSEP bloqueada e as duas listas de analista.
  *
  * A segunda existe por dois motivos. O primeiro é tamanho: as 7 mil SUSEPs e
  * as 145 corretoras sozinhas ocupam um pedaço considerável do teto de 10
@@ -36,21 +36,17 @@ function rodarTestesDeCadastrosDeFora() {
       // As colunas de CONTROLE entram: é o que permite ao PGO gravar nelas.
       // Sem elas a aba abre só para leitura, e há testes para esse caso.
       CORRETORAS: [
-        ['Id', 'Nome', 'Canal', 'SUSEP', 'Corretora', 'Segmento', 'Consultor',
+        ['Id', 'SUSEP', 'Corretora', 'Sucursal', 'Segmento', 'Consultor',
           '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
-        ['0000000001', 'Corretora de Fora', 'Corretor', '11122233344',
-          'Corretora de Fora', 'Diamante', 'Consultor Um', 'SIM', '', '', 'PLANILHA']
+        ['0000000001', 'RETF01', 'Corretora de Fora', '12',
+          'Diamante', 'Consultor Um', 'SIM', '', '', 'PLANILHA']
       ],
       SUSEP_BLOQUEADAS: [
-        ['Id', 'SUSEP', 'NomeCorretora', 'CpfReincidente', 'Motivo', 'BloqueadaEm',
+        ['Id', 'SUSEP', 'NomeCorretora', 'Sucursal', 'CoordenadorComercial',
+          'BloqueadaEm',
           '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
-        ['0000000001', '99988877766', 'Bloqueada de Fora', '', 'Fraude',
+        ['0000000001', 'RETF99', 'Bloqueada de Fora', '58', 'Coordenação Sul',
           '01/01/2026', 'SIM', '', '', 'PLANILHA']
-      ],
-      PRODUTOS: [
-        ['Id', 'Produto', 'CodigoProduto',
-          '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem'],
-        ['0000000001', 'Vida de Fora', '9901', 'SIM', '', '', 'PLANILHA']
       ],
       ANALISTAS_CENTRAL: [
         ['Id', 'Nome', 'Matricula', 'Equipe', 'Ativo',
@@ -83,7 +79,13 @@ function rodarTestesDeCadastrosDeFora() {
     const config = chamar('configuracaoDosCadastros()');
     igual(config.ligada, false);
     igual(config.planilhaId, '');
-    verdadeiro(config.abas.length >= 5, 'a tela mostra quais abas podem sair');
+    // Quantas abas podem sair sai do CÓDIGO, e não de um número cravado: a
+    // lista encolheu quando PRODUTOS saiu, e um 5 escrito aqui teria
+    // reprovado uma mudança que o PO pediu.
+    igual(config.abas.length,
+      chamar('RECC_ABAS_QUE_PODEM_VIR_DE_FORA').length,
+      'a tela mostra todas as abas que podem sair, e só elas');
+    verdadeiro(config.abas.length > 0);
 
     // E as abas daqui respondem normalmente.
     verdadeiro(Array.isArray(chamar('lerRegistros_("CORRETORAS")')));
@@ -112,12 +114,14 @@ function rodarTestesDeCadastrosDeFora() {
   });
 
   teste('planilha sem as abas é recusada, dizendo quais faltam', () => {
-    const incompleta = planilhaDeCadastros({ PRODUTOS: null, ANALISTAS_CENTRAL: null });
+    const incompleta = planilhaDeCadastros({
+      SUSEP_BLOQUEADAS: null, ANALISTAS_CENTRAL: null
+    });
     const laudo = chamar('conferirPlanilhaDeCadastros')(incompleta);
 
     igual(laudo.abre, true, 'ela abre — o problema é outro');
     igual(laudo.faltando.length, 2);
-    contem(laudo.faltando.join(' '), 'PRODUTOS');
+    contem(laudo.faltando.join(' '), 'SUSEP_BLOQUEADAS');
     contem(laudo.faltando.join(' '), 'ANALISTAS_CENTRAL');
 
     lanca(() => ligar(incompleta), 'não está pronta',
@@ -128,12 +132,12 @@ function rodarTestesDeCadastrosDeFora() {
     // Id certo apontando para planilha sem as colunas abre sem reclamar e
     // devolve lista vazia depois — o pior dos dois mundos.
     const semColuna = planilhaDeCadastros({
-      PRODUTOS: [['Id', 'Produto'], ['0000000001', 'Sem o código']]
+      CORRETORAS: [['Id', 'SUSEP', 'Corretora'], ['0000000001', 'RETF01', 'X']]
     });
     const laudo = chamar('conferirPlanilhaDeCadastros')(semColuna);
 
     igual(laudo.abre, true);
-    contem(laudo.faltando.join(' '), 'CodigoProduto');
+    contem(laudo.faltando.join(' '), 'Sucursal');
     lanca(() => ligar(semColuna), 'não está pronta');
   });
 
@@ -159,25 +163,25 @@ function rodarTestesDeCadastrosDeFora() {
     // As MESMAS funções de sempre, agora lendo da outra planilha.
     const corretoras = chamar('lerRegistros_("CORRETORAS")');
     igual(corretoras.length, 1);
-    igual(corretoras[0].Nome, 'Corretora de Fora');
-
-    igual(chamar('lerRegistros_("PRODUTOS")')[0].Produto, 'Vida de Fora');
+    igual(corretoras[0].Corretora, 'Corretora de Fora');
+    igual(corretoras[0].SUSEP, 'RETF01');
   });
 
   teste('o selo da SUSEP consulta a base de fora', () => {
     // É a consulta mais sensível das que saem daqui: se ela responder errado,
     // um caso que devia sair com selo vermelho sai limpo.
-    const bloqueada = chamar('consultarSusep')('999.888.777-66');
+    const bloqueada = chamar('consultarSusep')('RETF99');
     igual(bloqueada.situacao, 'BLOQUEADA');
-    contem(bloqueada.motivo, 'Fraude');
-    // A máscara dos dois lados: a planilha de fora guarda só dígito, e quem
-    // digita no formulário digita com ponto. Comparar texto com texto aqui
-    // deixaria toda SUSEP bloqueada passar como liberada.
-    igual(chamar('consultarSusep')('99988877766').situacao, 'BLOQUEADA');
+    igual(bloqueada.coordenadorComercial, 'Coordenação Sul');
+    // A pontuação e a caixa dos dois lados: quem digita no formulário escreve
+    // como der. Comparar texto cru deixaria toda SUSEP bloqueada passar como
+    // liberada.
+    igual(chamar('consultarSusep')('ret-f99').situacao, 'BLOQUEADA');
 
-    const livre = chamar('consultarSusep')('11122233344');
-    verdadeiro(livre.situacao !== 'BLOQUEADA',
-      'e a que não está bloqueada passa, veio ' + livre.situacao);
+    const noCadastro = chamar('consultarSusep')('RETF01');
+    igual(noCadastro.situacao, 'OK',
+      'a que está no cadastro de corretoras sai liberada, veio '
+      + noCadastro.situacao);
   });
 
   teste('as listas de analista vêm de fora, já filtradas', () => {
@@ -191,7 +195,7 @@ function rodarTestesDeCadastrosDeFora() {
 
   teste('a Tabela de Corretoras mostra o que veio de fora', () => {
     const tabela = chamar('tabelaDeCorretoras')('', '');
-    verdadeiro(tabela.corretoras.some((c) => c.nome === 'Corretora de Fora'));
+    verdadeiro(tabela.corretoras.some((c) => c.corretora === 'Corretora de Fora'));
   });
 
   teste('as bases de CASO continuam nesta planilha', () => {
@@ -217,53 +221,56 @@ function rodarTestesDeCadastrosDeFora() {
    * útil em nenhum.
    */
 
-  teste('cadastrar um produto grava na planilha de cadastros', () => {
-    const novo = chamar('salvarProduto')({
-      produto: 'Vida Nova de Fora', codigo: '9902'
+  teste('cadastrar uma corretora grava na planilha de cadastros', () => {
+    const novo = chamar('salvarCorretora')({
+      susep: 'RETF02', corretora: 'Corretora Nova de Fora', sucursal: '12',
+      segmento: 'Diamante'
     });
     verdadeiro(novo, 'o servidor aceitou');
 
     // Foi gravado LÁ, e não aqui: a aba local continua como estava.
-    const deFora = chamar('lerRegistros_("PRODUTOS")');
-    verdadeiro(deFora.some((linha) => linha.Produto === 'Vida Nova de Fora'),
+    const deFora = chamar('lerRegistros_("CORRETORAS")');
+    verdadeiro(deFora.some((linha) => linha.Corretora === 'Corretora Nova de Fora'),
       'aparece na leitura, que vem da planilha de cadastros');
   });
 
   teste('editar uma corretora muda a linha de lá', () => {
     const corretora = chamar('tabelaDeCorretoras')('', '').corretoras
-      .find((c) => c.nome === 'Corretora de Fora');
+      .find((c) => c.corretora === 'Corretora de Fora');
     chamar('salvarCorretora')(Object.assign({}, corretora,
       { segmento: 'Ouro' }));
 
     const depois = chamar('lerRegistros_("CORRETORAS")')
-      .find((linha) => linha.Nome === 'Corretora de Fora');
+      .find((linha) => linha.Corretora === 'Corretora de Fora');
     igual(depois.Segmento, 'Ouro');
   });
 
   teste('bloquear e liberar SUSEP funciona na base de fora', () => {
-    chamar('bloquearSusep')({ susep: '12345678901', motivo: 'Teste de escrita' });
-    igual(chamar('consultarSusep')('12345678901').situacao, 'BLOQUEADA',
+    chamar('bloquearSusep')({ susep: 'RETF50',
+      coordenadorComercial: 'Teste de escrita' });
+    igual(chamar('consultarSusep')('RETF50').situacao, 'BLOQUEADA',
       'o selo já enxerga o bloqueio gravado lá');
 
     const bloqueada = chamar('listarSusepsBloqueadas()')
-      .find((uma) => uma.susep === '12345678901');
+      .find((uma) => uma.susep === 'RETF50');
     chamar('desbloquearSusep')(bloqueada.id);
-    verdadeiro(chamar('consultarSusep')('12345678901').situacao !== 'BLOQUEADA',
+    verdadeiro(chamar('consultarSusep')('RETF50').situacao !== 'BLOQUEADA',
       'e liberar também');
   });
 
   teste('a exclusão continua lógica: a linha fica, some da tela', () => {
     // Apagar linha de uma planilha que é de outra área não é decisão do PGO.
-    const antes = chamar('lerRegistros_("PRODUTOS", { incluirOcultos: true })').length;
-    const produto = chamar('listarProdutos()')
-      .find((um) => um.produto === 'Vida Nova de Fora');
+    const antes = chamar('lerRegistros_("CORRETORAS", { incluirOcultos: true })')
+      .length;
+    const corretora = chamar('tabelaDeCorretoras')('', '').corretoras
+      .find((uma) => uma.corretora === 'Corretora Nova de Fora');
 
-    chamar('ocultarProduto')(produto.id);
+    chamar('ocultarCorretora')(corretora.id);
 
-    verdadeiro(!chamar('listarProdutos()').some((um) => um.id === produto.id),
-      'sumiu da tela');
-    igual(chamar('lerRegistros_("PRODUTOS", { incluirOcultos: true })').length, antes,
-      'e a linha continua lá, com _Visivel = NAO');
+    verdadeiro(!chamar('tabelaDeCorretoras')('', '').corretoras
+      .some((uma) => uma.id === corretora.id), 'sumiu da tela');
+    igual(chamar('lerRegistros_("CORRETORAS", { incluirOcultos: true })').length,
+      antes, 'e a linha continua lá, com _Visivel = NAO');
   });
 
   secao('O Id, que é onde isto podia corromper em silêncio');
@@ -278,16 +285,18 @@ function rodarTestesDeCadastrosDeFora() {
     // planilha de cadastros, com um Id bem acima do que o contador conhece.
     const daPlanilha = ambiente.planilhaExternaPeloId(
       chamar('configuracaoDosCadastros()').planilhaId);
-    const aba = daPlanilha.getSheetByName('PRODUTOS');
+    const aba = daPlanilha.getSheetByName('CORRETORAS');
     const linha = aba.getLastRow() + 1;
     aba.getRange(linha, 1).setValue('0000005000');
-    aba.getRange(linha, 2).setValue('Produto posto à mão');
-    aba.getRange(linha, 3).setValue('5000');
+    aba.getRange(linha, 2).setValue('RETF88');
+    aba.getRange(linha, 3).setValue('Corretora posta à mão');
     chamar('esquecerEstruturaLida_()');
 
-    const novo = chamar('salvarProduto')({ produto: 'Depois do posto', codigo: '5001' });
-    const gravado = chamar('lerRegistros_("PRODUTOS")')
-      .find((um) => um.Produto === 'Depois do posto');
+    const novo = chamar('salvarCorretora')({
+      susep: 'RETF89', corretora: 'Depois do posto', sucursal: '12'
+    });
+    const gravado = chamar('lerRegistros_("CORRETORAS")')
+      .find((um) => um.Corretora === 'Depois do posto');
 
     verdadeiro(Number(gravado.Id) > 5000,
       'o Id novo tem de passar do maior que já existe lá, e veio ' + gravado.Id);
@@ -295,11 +304,13 @@ function rodarTestesDeCadastrosDeFora() {
 
   teste('o contador local desatualizado não reemite Id', () => {
     // O caso da segunda instalação: contador daqui baixo, planilha de lá alta.
-    ambiente.propriedades.set('RECC_SEQ_PRODUTOS', '3');
+    ambiente.propriedades.set('RECC_SEQ_CORRETORAS', '3');
 
-    const novo = chamar('salvarProduto')({ produto: 'Com contador atrasado', codigo: '7' });
-    const gravado = chamar('lerRegistros_("PRODUTOS")')
-      .find((um) => um.Produto === 'Com contador atrasado');
+    const novo = chamar('salvarCorretora')({
+      susep: 'RETF90', corretora: 'Com contador atrasado', sucursal: '12'
+    });
+    const gravado = chamar('lerRegistros_("CORRETORAS")')
+      .find((um) => um.Corretora === 'Com contador atrasado');
 
     verdadeiro(Number(gravado.Id) > 5000,
       'mesmo com o contador em 3, o Id sai acima do que a planilha já tem: '
@@ -312,20 +323,22 @@ function rodarTestesDeCadastrosDeFora() {
     // Uma lista montada por outra área provavelmente não tem _Visivel. Ela
     // continua servindo para ler, que é metade do que se quer dela.
     const semControle = planilhaDeCadastros({
-      PRODUTOS: [
-        ['Id', 'Produto', 'CodigoProduto'],
-        ['0000000001', 'Produto sem controle', '1']
+      CORRETORAS: [
+        ['Id', 'SUSEP', 'Corretora', 'Sucursal', 'Segmento', 'Consultor'],
+        ['0000000001', 'RETG01', 'Corretora sem controle', '12', 'Diamante', '']
       ]
     });
     ligar(semControle);
 
-    igual(chamar('lerRegistros_("PRODUTOS")').length, 1);
-    igual(chamar('listarProdutos()')[0].produto, 'Produto sem controle');
+    igual(chamar('lerRegistros_("CORRETORAS")').length, 1);
+    igual(chamar('tabelaDeCorretoras')('', '').corretoras[0].corretora,
+      'Corretora sem controle');
   });
 
   teste('mas escrever nela é recusado, dizendo QUAIS colunas faltam', () => {
-    const erro = lanca(() => chamar('salvarProduto')(
-      { produto: 'Tentativa', codigo: '2' }), 'ainda não pode ser editada');
+    const erro = lanca(() => chamar('salvarCorretora')(
+      { susep: 'RETG02', corretora: 'Tentativa' }),
+      'ainda não pode ser editada');
     contem(erro.message, '_Visivel', 'o recado nomeia a coluna que falta');
     contem(erro.message, 'continua LENDO',
       'e deixa claro que a leitura segue funcionando');
@@ -334,7 +347,10 @@ function rodarTestesDeCadastrosDeFora() {
   teste('o conferidor avisa ANTES de ligar quais abas ficam só de leitura', () => {
     const laudo = chamar('conferirPlanilhaDeCadastros')(
       planilhaDeCadastros({
-        PRODUTOS: [['Id', 'Produto', 'CodigoProduto'], ['0000000001', 'X', '1']]
+        CORRETORAS: [
+          ['Id', 'SUSEP', 'Corretora', 'Sucursal', 'Segmento', 'Consultor'],
+          ['0000000001', 'RETG01', 'X', '12', 'Diamante', '']
+        ]
       }));
 
     igual(laudo.abre, true);
@@ -343,12 +359,12 @@ function rodarTestesDeCadastrosDeFora() {
     contem(laudo.avisos.join(' '), 'só para LEITURA');
     contem(laudo.recado, 'leitura');
 
-    const produtos = laudo.abas.find((uma) => uma.aba === 'PRODUTOS');
-    igual(produtos.podeEditar, false);
-    contem(produtos.faltaParaEditar.join(','), '_Visivel');
+    const incompleta = laudo.abas.find((uma) => uma.aba === 'CORRETORAS');
+    igual(incompleta.podeEditar, false);
+    contem(incompleta.faltaParaEditar.join(','), '_Visivel');
 
-    const corretoras = laudo.abas.find((uma) => uma.aba === 'CORRETORAS');
-    igual(corretoras.podeEditar, true, 'as completas aceitam edição');
+    const completa = laudo.abas.find((uma) => uma.aba === 'SUSEP_BLOQUEADAS');
+    igual(completa.podeEditar, true, 'as completas aceitam edição');
   });
 
   secao('Quando a outra planilha não abre');
@@ -367,7 +383,8 @@ function rodarTestesDeCadastrosDeFora() {
   teste('a segunda leitura da mesma execução não tenta abrir de novo', () => {
     // Uma tela que lê três cadastros tentaria abrir três vezes a planilha que
     // não abre, e o tempo de espera triplicaria antes do recado aparecer.
-    const erro = lanca(() => chamar('lerRegistros_("PRODUTOS")'), 'não abriu');
+    const erro = lanca(() => chamar('lerRegistros_("SUSEP_BLOQUEADAS")'),
+      'não abriu');
     contem(erro.message, 'nesta execução');
   });
 
@@ -382,8 +399,8 @@ function rodarTestesDeCadastrosDeFora() {
     igual(chamar('abaVemDeOutraPlanilha_')('CORRETORAS'), false);
 
     // E a escrita volta a funcionar.
-    const novo = chamar('inserirRegistro_')('PRODUTOS',
-      { Produto: 'De volta em casa', CodigoProduto: '7777' });
+    const novo = chamar('inserirRegistro_')('CORRETORAS',
+      { SUSEP: 'RETH01', Corretora: 'De volta em casa', Sucursal: '12' });
     verdadeiro(novo.__id, 'gravou aqui');
   });
 
@@ -403,30 +420,32 @@ function rodarTestesDeCadastrosDeFora() {
     // Uma linha que só existe AQUI, gravada com a segunda base desligada.
     chamar('gravarConfiguracao_')('CADASTROS.PLANILHA_ID', '');
     chamar('esquecerEstruturaLida_()');
-    chamar('inserirRegistro_')('PRODUTOS',
-      { Produto: 'Produto só daqui', CodigoProduto: '1001' });
+    chamar('inserirRegistro_')('CORRETORAS',
+      { SUSEP: 'RETH02', Corretora: 'Corretora só daqui', Sucursal: '12' });
 
-    const daqui = () => chamar('lerRegistros_("PRODUTOS")')
-      .map((linha) => linha.Produto);
+    const daqui = () => chamar('lerRegistros_("CORRETORAS")')
+      .map((linha) => linha.Corretora);
 
-    verdadeiro(daqui().indexOf('Produto só daqui') >= 0, 'desligada, lê a daqui');
+    verdadeiro(daqui().indexOf('Corretora só daqui') >= 0,
+      'desligada, lê a daqui');
 
     // Liga: a lista passa a ser a de LÁ, inteira e só ela.
     const idDeFora = planilhaDeCadastros();
     ligar(idDeFora);
     chamar('esquecerEstruturaLida_()');
 
-    verdadeiro(daqui().indexOf('Vida de Fora') >= 0, 'ligada, lê a de fora');
-    verdadeiro(daqui().indexOf('Produto só daqui') < 0,
+    verdadeiro(daqui().indexOf('Corretora de Fora') >= 0,
+      'ligada, lê a de fora');
+    verdadeiro(daqui().indexOf('Corretora só daqui') < 0,
       'a linha daqui NÃO aparece misturada com as de fora');
 
     // Desliga: a linha daqui volta exatamente como estava, e a de fora sai.
     desligar();
     chamar('esquecerEstruturaLida_()');
 
-    verdadeiro(daqui().indexOf('Produto só daqui') >= 0,
+    verdadeiro(daqui().indexOf('Corretora só daqui') >= 0,
       'desligada de novo, a linha daqui está inteira — nada foi perdido');
-    verdadeiro(daqui().indexOf('Vida de Fora') < 0,
+    verdadeiro(daqui().indexOf('Corretora de Fora') < 0,
       'e a de fora não ficou copiada aqui');
   });
 
@@ -435,14 +454,15 @@ function rodarTestesDeCadastrosDeFora() {
     // é um arquivo qualquer no Drive. O PGO não pode escrever nela por engano.
     const idDeFora = planilhaDeCadastros();
     const quantasLa = () => ambiente.planilhaExternaPeloId(idDeFora)
-      .getSheetByName('PRODUTOS').getLastRow();
+      .getSheetByName('CORRETORAS').getLastRow();
 
     const antes = quantasLa();
 
     chamar('gravarConfiguracao_')('CADASTROS.PLANILHA_ID', '');
     chamar('esquecerEstruturaLida_()');
-    chamar('inserirRegistro_')('PRODUTOS',
-      { Produto: 'Gravado com ela desligada', CodigoProduto: '1002' });
+    chamar('inserirRegistro_')('CORRETORAS',
+      { SUSEP: 'RETH03', Corretora: 'Gravado com ela desligada',
+        Sucursal: '12' });
 
     igual(quantasLa(), antes, 'a planilha de fora ficou intacta');
   });
@@ -454,8 +474,8 @@ function rodarTestesDeCadastrosDeFora() {
     const idDeFora = planilhaDeCadastros();
 
     // TODAS as abas que podem sair, não só uma: uma cópia acontece numa aba de
-    // cada vez, e conferir só CORRETORAS deixaria passar a mesma falha em
-    // PRODUTOS. Foi assim que este teste quase não serviu para nada.
+    // cada vez, e conferir só CORRETORAS deixaria passar a mesma falha nas
+    // SUSEPs bloqueadas. Foi assim que este teste quase não serviu para nada.
     const tamanhos = () => chamar('RECC_ABAS_QUE_PODEM_VIR_DE_FORA')
       .map((aba) => aba + '=' + chamar('lerRegistros_')(aba).length).join(', ');
 

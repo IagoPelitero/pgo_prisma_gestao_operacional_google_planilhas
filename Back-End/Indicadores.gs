@@ -353,322 +353,6 @@ function comoSeEscreve_(data) {
   return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
 }
 
-// ============================================================================
-//  O CALENDÁRIO — DIA ÚTIL, FERIADO E AUSÊNCIA
-// ============================================================================
-/*
- * "SÓ TRABALHAMOS EM DIAS ÚTEIS", disse o PO. Isso muda CONTA, não tela.
- *
- * A meta dividia o mês por 30 dias corridos. Num mês com 21 dias úteis, isso
- * pedia trabalho de nove dias que não existem — e a barra de meta acusava um
- * atraso que era só do calendário. Quem tirava férias piorava ainda mais:
- * aparecia devendo os dias em que estava na praia.
- *
- * O dia útil aqui é: não é sábado, não é domingo, e não é feriado. Os feriados
- * NACIONAIS o sistema calcula sozinho — inclusive os móveis —, e o que só a
- * operação sabe (municipal, facultativo, emenda) fica na aba FERIADOS.
- */
-
-/** Sábado e domingo. Domingo é 0 e sábado é 6, como o JavaScript conta. */
-const RECC_DIAS_DE_FIM_DE_SEMANA = [0, 6];
-
-/**
- * Os feriados nacionais que caem sempre no mesmo dia.
- *
- * 20/11 (Consciência Negra) virou nacional pela Lei 14.759/2023, valendo de
- * 2024 em diante. Por isso ele tem `desdeOAno`: contar como feriado em 2023
- * daria um dia útil a menos num ano em que a operação trabalhou.
- */
-const RECC_FERIADOS_NACIONAIS_FIXOS = [
-  { dia: 1,  mes: 1,  nome: 'Confraternização Universal' },
-  { dia: 21, mes: 4,  nome: 'Tiradentes' },
-  { dia: 1,  mes: 5,  nome: 'Dia do Trabalho' },
-  { dia: 7,  mes: 9,  nome: 'Independência' },
-  { dia: 12, mes: 10, nome: 'Nossa Senhora Aparecida' },
-  { dia: 2,  mes: 11, nome: 'Finados' },
-  { dia: 15, mes: 11, nome: 'Proclamação da República' },
-  { dia: 20, mes: 11, nome: 'Consciência Negra', desdeOAno: 2024 },
-  { dia: 25, mes: 12, nome: 'Natal' }
-];
-
-/** Os móveis, contados a partir do Domingo de Páscoa. */
-const RECC_FERIADOS_MOVEIS = [
-  { deslocamento: -48, nome: 'Carnaval (segunda)' },
-  { deslocamento: -47, nome: 'Carnaval (terça)' },
-  { deslocamento: -2,  nome: 'Sexta-feira Santa' },
-  { deslocamento: 60,  nome: 'Corpus Christi' }
-];
-
-/**
- * O Domingo de Páscoa do ano, pelo algoritmo gregoriano de Gauss/Meeus.
- *
- * É o que sustenta Carnaval, Sexta-feira Santa e Corpus Christi — quatro dias
- * por ano que mudam de lugar. A alternativa seria uma tabela que alguém teria
- * de preencher todo dezembro, e esquecer disso uma vez faz a meta de fevereiro
- * sair errada sem ninguém entender por quê.
- *
- * Conferido contra quinze anos de datas conhecidas, incluindo 25/04/2038 — a
- * Páscoa mais tardia que o calendário gregoriano permite.
- */
-function domingoDePascoa_(ano) {
-  var a = ano % 19;
-  var b = Math.floor(ano / 100);
-  var c = ano % 100;
-  var d = Math.floor(b / 4);
-  var e = b % 4;
-  var f = Math.floor((b + 8) / 25);
-  var g = Math.floor((b - f + 1) / 3);
-  var h = (19 * a + b - d - g + 15) % 30;
-  var i = Math.floor(c / 4);
-  var k = c % 4;
-  var l = (32 + 2 * e + 2 * i - h - k) % 7;
-  var m = Math.floor((a + 11 * h + 22 * l) / 451);
-  var mes = Math.floor((h + l - 7 * m + 114) / 31);
-  var dia = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(ano, mes - 1, dia);
-}
-
-/** "aaaa-mm-dd" de uma data — a chave com que o calendário se compara. */
-function chaveDoDia_(data) {
-  return data.getFullYear()
-    + '-' + ('0' + (data.getMonth() + 1)).slice(-2)
-    + '-' + ('0' + data.getDate()).slice(-2);
-}
-
-/**
- * Os feriados nacionais do ano: os fixos mais os móveis.
- *
- * Devolve um objeto chave→nome, e não uma lista, porque quem pergunta sempre
- * pergunta por UM dia. Numa varredura de 30 dias, procurar numa lista de treze
- * seria 390 comparações para responder o que o objeto responde direto.
- */
-function feriadosNacionaisDoAno_(ano) {
-  var doAno = {};
-
-  RECC_FERIADOS_NACIONAIS_FIXOS.forEach(function (feriado) {
-    if (feriado.desdeOAno && ano < feriado.desdeOAno) return;
-    doAno[chaveDoDia_(new Date(ano, feriado.mes - 1, feriado.dia))] = feriado.nome;
-  });
-
-  var pascoa = domingoDePascoa_(ano);
-  RECC_FERIADOS_MOVEIS.forEach(function (feriado) {
-    var quando = new Date(pascoa.getTime());
-    quando.setDate(quando.getDate() + feriado.deslocamento);
-    doAno[chaveDoDia_(quando)] = feriado.nome;
-  });
-
-  return doAno;
-}
-
-/*
- * O calendário montado fica guardado pela execução inteira.
- *
- * Cada `google.script.run` é uma execução nova, então isto não é cache de
- * verdade — é memória de uma chamada só. Mas dentro dela o calendário é
- * perguntado uma vez por dia do período: num "últimos 30 dias" seriam trinta
- * leituras da aba FERIADOS, e é a mesma resposta nas trinta.
- */
-var calendarioDoAno = {};
-
-/** Esquece o calendário — chamado quando a aba FERIADOS muda. */
-function esquecerOCalendario_() {
-  calendarioDoAno = {};
-}
-
-/**
- * Todos os feriados do ano: os nacionais calculados MAIS o que o administrador
- * cadastrou. Uma linha com `Trabalha = SIM` REMOVE o dia da lista, e é assim
- * que a operação diz "neste ano nós trabalhamos no Corpus Christi".
- */
-function feriadosDoAno_(ano) {
-  if (calendarioDoAno[ano]) return calendarioDoAno[ano];
-
-  var doAno = feriadosNacionaisDoAno_(ano);
-
-  lerRegistros_('FERIADOS').forEach(function (linha) {
-    var quando = converterParaData_(linha.Data);
-    if (!quando || quando.getFullYear() !== ano) return;
-
-    var chave = chaveDoDia_(quando);
-    if (converterParaSimOuNao_(linha.Trabalha) === 'SIM') delete doAno[chave];
-    else doAno[chave] = String(linha.Nome || 'Feriado');
-  });
-
-  calendarioDoAno[ano] = doAno;
-  return doAno;
-}
-
-/** Não é sábado, não é domingo e não é feriado. */
-function ehDiaUtil_(data) {
-  if (!data) return false;
-  if (RECC_DIAS_DE_FIM_DE_SEMANA.indexOf(data.getDay()) >= 0) return false;
-  return !feriadosDoAno_(data.getFullYear())[chaveDoDia_(data)];
-}
-
-/**
- * Quantos dias úteis existem entre as duas datas, as DUAS pontas incluídas —
- * a mesma regra do `diasEntre_`, para que os dois números se comparem.
- */
-function diasUteisEntre_(de, ate) {
-  if (!de || !ate || de > ate) return 0;
-
-  var quantos = 0;
-  var caminhando = new Date(de.getFullYear(), de.getMonth(), de.getDate());
-  var ultimo = new Date(ate.getFullYear(), ate.getMonth(), ate.getDate());
-
-  while (caminhando <= ultimo) {
-    if (ehDiaUtil_(caminhando)) quantos++;
-    caminhando.setDate(caminhando.getDate() + 1);
-  }
-  return quantos;
-}
-
-/**
- * As ausências de uma pessoa que encostam no período.
- *
- * Encostar basta: uma férias de 20/09 a 10/10 conta nos dois meses, cada um
- * pela sua parte. Cortar por "começou dentro do período" perderia justamente
- * a férias que atravessa a virada do mês, que é a mais comum de todas.
- */
-function ausenciasNoPeriodo_(usuarioId, de, ate) {
-  var alvo = String(usuarioId || '');
-  if (!alvo || !de || !ate) return [];
-
-  return lerRegistros_('AUSENCIAS').filter(function (linha) {
-    if (String(linha.UsuarioId || '') !== alvo) return false;
-    var comeco = converterParaData_(linha.De);
-    var fim = converterParaData_(linha.Ate);
-    if (!comeco || !fim) return false;
-    // Se uma ponta da ausência cai dentro do período, ou o período inteiro cai
-    // dentro dela, há interseção. É a mesma conta nos dois sentidos.
-    return comeco <= ate && fim >= de;
-  });
-}
-
-/**
- * Quantos DIAS ÚTEIS a pessoa passou ausente dentro deste período.
- *
- * Conta o dia uma vez só: duas ausências que se sobrepõem — férias emendada
- * com licença, ou a mesma férias cadastrada duas vezes por engano — não podem
- * somar dois dias para o mesmo dia do calendário. Foi por isso que a conta
- * marca os DIAS num objeto em vez de somar cada ausência por fora: somar
- * devolveria mais dias ausentes do que o período tem, e a meta viraria zero.
- */
-function diasUteisAusente_(usuarioId, de, ate) {
-  var ausencias = ausenciasNoPeriodo_(usuarioId, de, ate);
-  if (!ausencias.length) return 0;
-
-  var diasMarcados = {};
-
-  ausencias.forEach(function (linha) {
-    var comeco = converterParaData_(linha.De);
-    var fim = converterParaData_(linha.Ate);
-
-    // Só o pedaço que cai DENTRO do período interessa.
-    if (comeco < de) comeco = de;
-    if (fim > ate) fim = ate;
-
-    var caminhando = new Date(comeco.getFullYear(), comeco.getMonth(), comeco.getDate());
-    var ultimo = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate());
-
-    while (caminhando <= ultimo) {
-      if (ehDiaUtil_(caminhando)) diasMarcados[chaveDoDia_(caminhando)] = true;
-      caminhando.setDate(caminhando.getDate() + 1);
-    }
-  });
-
-  return Object.keys(diasMarcados).length;
-}
-
-/**
- * Os dias úteis que a pessoa REALMENTE tinha para trabalhar no período.
- *
- * É este número que a meta usa. Nunca fica negativo: uma ausência maior que o
- * período inteiro devolve zero, e zero quer dizer "não havia o que cobrar" —
- * não "a meta é zero e você não a cumpriu".
- */
-function diasUteisTrabalhaveis_(usuarioId, de, ate) {
-  var uteis = diasUteisEntre_(de, ate);
-  var fora = diasUteisAusente_(usuarioId, de, ate);
-  return Math.max(uteis - fora, 0);
-}
-
-/**
- * Quem está ausente HOJE, por nome.
- *
- * Devolve { nome: { ate, motivo } } — vazio quando não há ninguém fora. É o que
- * a Importação pergunta antes de dividir um lote: distribuir 300 casos entre
- * oito analistas quando dois estão de férias deixa 75 casos parados três
- * semanas, e nada no sistema avisa — os casos estão lá, no nome de alguém,
- * dentro do prazo, e ninguém os está trabalhando.
- *
- * Por NOME, e não por Id, porque é o nome que a coluna de responsável guarda —
- * a mesma ponte do `ausenciasPorNome_`, pelo mesmo motivo.
- */
-function quemEstaAusenteHoje_() {
-  var hoje = new Date();
-  hoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-
-  var nomePorId = {};
-  lerRegistros_('USUARIOS').forEach(function (pessoa) {
-    nomePorId[String(pessoa.Id)] = String(pessoa.Nome || '');
-  });
-
-  var fora = {};
-  lerRegistros_('AUSENCIAS').forEach(function (linha) {
-    var de = converterParaData_(linha.De);
-    var ate = converterParaData_(linha.Ate);
-    if (!de || !ate || de > hoje || ate < hoje) return;
-
-    var nome = nomePorId[String(linha.UsuarioId || '')];
-    if (!nome) return;
-
-    // Quem tem duas ausências emendadas volta na MAIS LONGE das duas. Guardar
-    // a primeira diria que a pessoa volta semana que vem quando ela volta só
-    // no mês seguinte.
-    if (!fora[nome] || ate > fora[nome].quando) {
-      fora[nome] = {
-        quando: ate,
-        ate: comoSeEscreve_(ate),
-        motivo: String(linha.Motivo || 'ausente')
-      };
-    }
-  });
-
-  return fora;
-}
-
-/**
- * Quantos dias úteis cada NOME esteve ausente no período.
- *
- * A ponte que falta: o caso guarda o NOME de quem é responsável — porque é o
- * nome que o Power BI lê e que a pessoa reconhece na planilha —, enquanto a
- * ausência é registrada pelo Id do usuário. Sem esta tradução as duas coisas
- * nunca se encontrariam.
- *
- * O nome é comparado sem acento e sem maiúscula, que é a regra da casa para
- * comparar texto: "Ana Martins" e "ana martins" são a mesma pessoa. Nome que
- * não está cadastrado em USUARIOS devolve zero — é o caso do analista que
- * saiu da operação e cujos casos continuam na base, e ele não tem ausência
- * para descontar.
- */
-function ausenciasPorNome_(nomes, periodo) {
-  var fora = {};
-  if (!periodo || !nomes || !nomes.length) return fora;
-
-  var idPorNome = {};
-  lerRegistros_('USUARIOS').forEach(function (pessoa) {
-    idPorNome[normalizarParaComparar_(pessoa.Nome)] = pessoa.Id;
-  });
-
-  nomes.forEach(function (nome) {
-    var id = idPorNome[normalizarParaComparar_(nome)];
-    fora[nome] = id ? diasUteisAusente_(id, periodo.de, periodo.ate) : 0;
-  });
-
-  return fora;
-}
-
 /** "2026-09" quando o texto é um mês de verdade; vazio quando não é. */
 function mesValido_(texto) {
   var limpo = String(texto || '').trim();
@@ -1155,12 +839,23 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
   var estrutura = estruturaDaAba_(canal.aba);
   var linhas = [];
 
+  // As colunas que algum campo do formulário já mostra. Serve para o segundo
+  // passo não repetir o que o primeiro já disse.
+  var jaMostradas = {};
+
   camposAtivosDoCanal_(canal.id).forEach(function (campo) {
     if (visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica)
       === RECC_VISIBILIDADE.OCULTO) return;
 
-    var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
-    if (posicao < 0) return;
+    // O MESMO remontador que a edição usa. Antes isto lia a coluna do próprio
+    // campo e pronto — e a proposta aparecia como "0000000" em vez de
+    // "58-0000000", porque o "58" mora em outra coluna.
+    var valor = valorDoCampoNaLinha_(registro, campo, estrutura);
+    if (valor === null) return;
+
+    colunasQueOCampoOcupa_(campo).forEach(function (cabecalho) {
+      jaMostradas[normalizarParaComparar_(cabecalho)] = true;
+    });
 
     // Campo vazio aparece com um travessão, e não sumindo. Sumir faria a
     // pessoa achar que o campo não existe naquelo canal, quando na verdade
@@ -1168,8 +863,44 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
     linhas.push({
       chave: String(campo.ChaveTecnica),
       rotulo: String(campo.Rotulo || campo.Cabecalho),
-      valor: paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]),
-      secao: String(campo.Secao || 'Geral')
+      valor: valor,
+      secao: String(campo.Secao || 'Geral'),
+      doSistema: false
+    });
+  });
+
+  /*
+   * E TUDO O MAIS QUE ESTÁ PREENCHIDO NA PLANILHA.
+   *
+   * Pedido do PO, nestas palavras: "precisa trazer todos os dados que foram
+   * preenchidos na planilha". Um caso importado chega com valor em colunas
+   * que o formulário não pergunta — os carimbos de contato, a origem da
+   * importação, a data dela —, e antes disto esse conteúdo ficava invisível:
+   * a pessoa abria o caso e não via o que estava gravado.
+   *
+   * Só o que TEM VALOR entra aqui. Listar coluna vazia que ninguém declarou
+   * no formulário encheria a tela de travessões e esconderia o que importa.
+   *
+   * Vem marcado com `doSistema`, e a tela mostra como leitura. Deixar
+   * reescrever "Quem mudou o status" ou "Data da última mudança de status" à
+   * mão estragaria o carimbo de produtividade — o número da pessoa passaria a
+   * depender do que alguém digitou, e não do que aconteceu.
+   */
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    var nome = String(cabecalho || '');
+    if (!nome || nome.charAt(0) === '_') return;
+    if (normalizarParaComparar_(nome) === 'id') return;
+    if (jaMostradas[normalizarParaComparar_(nome)]) return;
+
+    var valor = paraTexto_(registro[nome], estrutura.tipos[posicao]);
+    if (!String(valor).trim()) return;
+
+    linhas.push({
+      chave: normalizarParaComparar_(nome),
+      rotulo: nome,
+      valor: valor,
+      secao: 'Também está na planilha',
+      doSistema: true
     });
   });
 
@@ -1395,6 +1126,18 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
     filtrosDisponiveis: disponiveis,
     cartoes: contarCartoes_(casos, casosDeAntes, canal, 'produtividade'),
     componentes: componentes,
+    /*
+      O VALOR POR SITUAÇÃO vem FORA de `componentes`, e de propósito.
+      `componentes` é a lista que a tela de Configurações edita — tirar,
+      reordenar, trocar a medida. Este gráfico não se edita ali: as duas
+      coisas que ele precisa saber (a coluna do valor e quais situações
+      destacar) moram na aba CANAIS, porque são do canal e não do painel.
+      Misturá-lo na lista faria aparecer um gráfico que a tela de
+      Configurações mostra e não consegue mexer.
+
+      `null` quando o canal não declarou nada — e aí a tela não desenha nada.
+    */
+    valorPorSituacao: valorPorSituacao_(casos, canal),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }
@@ -2135,7 +1878,7 @@ function minhaPerformance(idDoCanal, periodoPedido) {
   // O que a equipe ainda faz aqui é dar REFERÊNCIA: o bloco "Você e a equipe",
   // mais abaixo, mostra a média e a posição de quem está olhando. Saber que se
   // fez 8 não diz nada sem saber que a média é 6.
-  var minhaEquipe = nomesDaMinhaEquipe_(quem);
+  var minhaEquipe = equipeParaComparar_(quem);
   var olhados = casosDaPessoa_(noPeriodo, coluna, meuNome);
   var olhadosAntes = casosDaPessoa_(anterior, coluna, meuNome);
 
@@ -2145,7 +1888,9 @@ function minhaPerformance(idDoCanal, periodoPedido) {
       nome: meuNome,
       cargo: quem.cargo,
       nivel: quem.nivel,
-      canal: String(quem.usuario['Canal que atende'] || '')
+      // O canal da pessoa, que é a EQUIPE dela — por decisão do PO nesta
+      // rodada. Vazio para quem administra, que não pertence a canal nenhum.
+      canal: nomeDoCanalDaPessoa_(quem)
     },
     periodo: {
       tipo: periodo.tipo,
@@ -2162,15 +1907,18 @@ function minhaPerformance(idDoCanal, periodoPedido) {
     // de mostrar zero — zero pareceria que a pessoa não trabalhou.
     temResponsavel: !!coluna,
     indicadores: indicadoresDaPessoa_(olhados, olhadosAntes, canal),
-    meta: metaDaPessoa_(olhados, canal, periodo, 1, quem.usuario.Id),
+    meta: metaDaPessoa_(olhados, canal, periodo, 1),
     porDia: serieDoPeriodo_(olhados, canal, janela),
     porSituacao: distribuicao_(olhados, canal, canal.colunaDoStatus, 'Situação'),
     porCanal: distribuicao_(olhados, canal, colunaDoCanal_(canal), 'Canal'),
+    // O MESMO gráfico da Produtividade RECC, pela mesma função — a diferença
+    // é que aqui entram só os casos da pessoa. "O mesmo em minha performance"
+    // foi o pedido, e "o mesmo" tem de ser a mesma conta, não uma parecida.
+    valorPorSituacao: valorPorSituacao_(olhados, canal),
     // O ranking compara DENTRO da equipe: é a pergunta "como eu vou em relação
     // a quem faz o mesmo que eu". Rankear contra o canal inteiro colocaria o
     // analista da RET ao lado de quem nem atende RET.
-    equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe,
-      periodo),
+    equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe),
     recentes: oQueEuFiz_(quem, canal)
   };
 }
@@ -2313,7 +2061,7 @@ function resolvidosSemEncaminhar_(casos, canal) {
  * Devolve null quando o canal não declarou meta. Alvo tirado do nada é pior
  * que alvo nenhum: ele parece oficial, e ninguém sabe de onde saiu.
  */
-function metaDaPessoa_(meus, canal, periodo, quantasPessoas, usuarioId) {
+function metaDaPessoa_(meus, canal, periodo, quantasPessoas) {
   var mensal = Number(canal.metaMensalPorPessoa) || 0;
   if (!mensal) return null;
 
@@ -2325,59 +2073,52 @@ function metaDaPessoa_(meus, canal, periodo, quantasPessoas, usuarioId) {
   var pessoas = Number(quantasPessoas) || 1;
 
   /*
-   * A CONTA MUDOU DE DIA CORRIDO PARA DIA ÚTIL, a pedido do PO.
+   * A CONTA É EM DIA CORRIDO, e só.
    *
-   * Antes era `(mensal / 30) * dias`: num mês de 21 dias úteis isso cobrava
-   * trabalho de nove dias que não existem, e a barra acusava um atraso que era
-   * só do calendário. Agora a meta mensal se reparte pelos dias úteis DAQUELE
-   * mês — que variam de 19 a 23 — e o alvo do período é a fatia proporcional.
+   * Houve aqui duas camadas que saíram a pedido do PO, nesta ordem: primeiro o
+   * motor de dia útil, com feriados nacionais calculados e uma aba para os da
+   * operação; depois o desconto de ausência, quando ele eliminou o calendário
+   * ("pelas regras de negócio ela não será mais necessária").
    *
-   * E desconta a AUSÊNCIA: quem tirou 10 dias de férias no meio do período
-   * tinha 11 dias para trabalhar, não 21. Cobrar os 21 transformaria férias em
-   * dívida, que é exatamente o que o PO quis evitar.
+   * O que sobrou é o mais simples de explicar a quem lê a barra: a meta do mês
+   * repartida pelos dias do período, sem exceção nenhuma.
    */
-  var uteisDoMes = diasUteisDoMesDe_(periodo.ate);
-  var meusUteis = diasUteisTrabalhaveis_(usuarioId, periodo.de, periodo.ate);
-  var ausentes = diasUteisAusente_(usuarioId, periodo.de, periodo.ate);
+  var meusDias = diasEntre_(periodo.de, periodo.ate);
 
-  var alvo = Math.round((mensal / uteisDoMes) * meusUteis) * pessoas;
+  /*
+   * O denominador são os dias DAQUELE mês, e não 30 fixo.
+   *
+   * Com 30 cravado, um mês de 31 dias pedia 62 para uma meta de 60, e
+   * fevereiro pedia 56 — a mesma meta mensal virava três números diferentes
+   * conforme o mês. Pelos dias reais, um mês inteiro pede exatamente a meta
+   * do mês, que é o que a palavra "mensal" promete.
+   *
+   * Continua sendo DIA CORRIDO: fim de semana e feriado contam normalmente.
+   */
+  var diasDoMes = diasDoMesDe_(periodo.ate);
+
+  var alvo = Math.round((mensal / diasDoMes) * meusDias) * pessoas;
   var feito = contarConcluidos_(meus, canal);
 
   return {
     alvo: alvo,
     feito: feito,
     pessoas: pessoas,
-    diasUteis: meusUteis,
-    diasAusente: ausentes,
+    dias: meusDias,
     // Passar da meta não vira 140% de barra: a barra enche e o número diz o
     // resto. Barra estourando a caixa é defeito, não conquista.
     percentual: alvo ? Math.min(Math.round((feito / alvo) * 100), 100) : 0,
     percentualReal: alvo ? Math.round((feito / alvo) * 100) : 0,
     mensal: mensal,
-    // O rótulo diz DIA ÚTIL com todas as letras, e diz quantos dias saíram por
-    // ausência. Um alvo menor sem explicação pareceria erro de conta.
-    rotulo: alvo + ' caso(s) em ' + meusUteis + ' dia(s) útil(eis), na proporção '
+    rotulo: alvo + ' caso(s) em ' + meusDias + ' dia(s), na proporção '
       + 'da meta de ' + mensal + ' por mês'
-      + (ausentes ? ' — ' + ausentes + ' dia(s) fora por ausência' : '')
       + (pessoas > 1 ? ' para cada uma das ' + pessoas + ' pessoas' : '')
   };
 }
 
-/**
- * Quantos dias úteis tem o mês a que esta data pertence.
- *
- * É o DENOMINADOR da meta: a meta mensal se reparte por ele. Usar 30 aqui —
- * ou 21 fixo — faria fevereiro e um mês de cinco semanas cobrarem o mesmo
- * ritmo diário, que é justamente o erro que se está corrigindo.
- *
- * Nunca devolve zero: um mês sem dia útil nenhum não existe, mas se a aba
- * FERIADOS for preenchida errado e zerar um mês, dividir por zero levaria
- * Infinity até a barra da tela.
- */
-function diasUteisDoMesDe_(data) {
-  var primeiro = new Date(data.getFullYear(), data.getMonth(), 1);
-  var ultimo = new Date(data.getFullYear(), data.getMonth() + 1, 0);
-  return diasUteisEntre_(primeiro, ultimo) || 1;
+/** Quantos dias tem o mês a que esta data pertence — 28, 29, 30 ou 31. */
+function diasDoMesDe_(data) {
+  return new Date(data.getFullYear(), data.getMonth() + 1, 0).getDate();
 }
 
 // ============================================================================
@@ -2473,6 +2214,114 @@ function distribuicao_(meus, canal, coluna, titulo) {
   };
 }
 
+
+/**
+ * O VALOR POR SITUAÇÃO: quanto dinheiro está em cada desfecho.
+ *
+ * Pedido do PO, nestas palavras: "traga na produtividade RECC gráfico com
+ * valor dos retidos, não retidos, sem sucesso, valor dos demais status e
+ * total. O mesmo em minha performance".
+ *
+ * POR QUE NÃO É UM COMPONENTE DA ABA PAINEIS. O motor de componentes agrupa
+ * pelo valor da coluna e, quando passa do limite, dobra o RESTO pelo tamanho —
+ * os maiores ficam, os menores viram "Demais valores". Aqui a escolha é outra:
+ * quem ganha barra própria são as situações que a operação DECLAROU, estejam
+ * elas grandes ou zeradas. "Sem sucesso" sem nenhum caso no mês tem de
+ * aparecer valendo zero; sumir da tela faria a conta parecer completa quando
+ * ela está com um pedaço faltando.
+ *
+ * UMA FUNÇÃO SÓ para as duas telas. A Produtividade RECC mostra o da equipe e
+ * a Minha Performance o da pessoa — a diferença está em QUAIS casos entram, e
+ * isso quem decide é quem chama. Escrever a conta duas vezes faria as duas
+ * telas discordarem um dia, e aí ninguém saberia qual acreditar.
+ *
+ * Devolve `null` quando o canal não declarou a coluna do valor ou as situações
+ * destacadas: canal sem isso não ganha um gráfico de dinheiro chutado.
+ */
+function valorPorSituacao_(casos, canal) {
+  var colunaDoValor = String(canal.colunaDoValor || '').trim();
+  var colunaDoStatus = String(canal.colunaDoStatus || '').trim();
+  var destacadas = situacoesDestacadas_(canal);
+
+  if (!colunaDoValor || !colunaDoStatus || !destacadas.length) return null;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, colunaDoValor) < 0) {
+    return {
+      titulo: 'Valor por situação', tipo: 'barras', largura: 2,
+      dimensao: colunaDoStatus, medida: colunaDoValor, agregacao: 'soma',
+      unidade: 'dinheiro', ehTempo: false, pontos: [], tendencia: null,
+      total: 0, totalDeCasos: 0,
+      aviso: 'A coluna "' + colunaDoValor + '" não existe mais na aba '
+        + canal.aba + '. Ajuste em Configurações › Canais de trabalho.'
+    };
+  }
+
+  // Um balde por situação declarada, na ORDEM em que ela foi declarada —
+  // "retidos, não retidos, sem sucesso" é como a operação lê o resultado, e
+  // reordenar por tamanho embaralharia a leitura a cada mês.
+  var baldes = destacadas.map(function (nome) {
+    return { chave: nome, rotulo: nome, valor: 0, casos: 0 };
+  });
+  var porNome = {};
+  baldes.forEach(function (balde) {
+    porNome[normalizarParaComparar_(balde.chave)] = balde;
+  });
+
+  var demais = { chave: '__outros', rotulo: 'Demais situações', valor: 0,
+    casos: 0, ehOutros: true };
+
+  casos.forEach(function (caso) {
+    var quanto = converterParaNumero_(caso[colunaDoValor]) || 0;
+    var balde = porNome[normalizarParaComparar_(caso[colunaDoStatus])] || demais;
+    balde.valor += quanto;
+    balde.casos++;
+  });
+
+  var pontos = baldes.concat([demais]);
+  var cores = coresDoCatalogo_(canal);
+
+  return {
+    titulo: 'Valor por situação',
+    tipo: 'barras',
+    largura: 2,
+    dimensao: colunaDoStatus,
+    medida: colunaDoValor,
+    agregacao: 'soma',
+    unidade: 'dinheiro',
+    ehTempo: false,
+    pontos: pontos.map(function (ponto) {
+      return {
+        chave: ponto.chave,
+        rotulo: ponto.rotulo,
+        valor: ponto.valor,
+        casos: ponto.casos,
+        ehOutros: !!ponto.ehOutros,
+        // A cor segue a SITUAÇÃO, como em todo o resto do sistema: "Reteve" é
+        // verde porque o catálogo diz que é, e continua verde em qualquer
+        // filtro e em qualquer tela.
+        tom: cores[normalizarParaComparar_(ponto.chave)] || '',
+        serie: 0
+      };
+    }),
+    tendencia: null,
+    // O TOTAL é pedido explícito, e é a soma de TODAS as situações — inclusive
+    // das que caíram em "Demais". Somar só as barras destacadas daria um total
+    // menor que a realidade, e um total que não fecha é pior que total nenhum.
+    total: pontos.reduce(function (soma, ponto) { return soma + ponto.valor; }, 0),
+    totalDeCasos: pontos.reduce(function (soma, ponto) { return soma + ponto.casos; }, 0),
+    aviso: ''
+  };
+}
+
+/** As situações que o canal declarou destacar, já separadas e limpas. */
+function situacoesDestacadas_(canal) {
+  return String(canal.situacoesDestacadas || '')
+    .split(',')
+    .map(function (pedaco) { return String(pedaco).trim(); })
+    .filter(function (pedaco) { return pedaco !== ''; });
+}
+
 // ============================================================================
 // A EQUIPE
 // ============================================================================
@@ -2488,7 +2337,7 @@ function distribuicao_(meus, canal, coluna, titulo) {
  * Quem pode ver recebe a lista, mas com a MÉDIA marcada: "abaixo da média"
  * sem saber qual é a média não é informação, é só desconforto.
  */
-function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe, periodo) {
+function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe) {
   if (!coluna) return { podeVerNomes: false, disponivel: false };
 
   // Quando a pessoa TEM equipe, o ranking é dentro dela. Antes era dentro do
@@ -2520,41 +2369,29 @@ function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe, p
   if (!nomes.length) return { podeVerNomes: false, disponivel: false };
 
   /*
-   * QUEM ESTEVE AUSENTE SAI DA MÉDIA — pedido do PO: "precisam ficar inativos
-   * por determinados dias devido às férias".
+   * TODO MUNDO QUE APARECE ENTRA NA MÉDIA.
    *
-   * Quem tirou férias o período inteiro nem chega aqui: sem caso no período,
-   * não entra na lista. O caso que interessa é o do MEIO — quem trabalhou dez
-   * dias e tirou onze. Essa pessoa aparece com metade dos casos e puxa a média
-   * da equipe para baixo, fazendo todo mundo parecer melhor do que está; e ela
-   * mesma cai no ranking por um motivo que não é trabalho.
+   * Houve aqui um desconto por ausência: quem tirou férias no meio do período
+   * saía da média e da posição, para não puxar a equipe para baixo por um
+   * motivo que não é trabalho. Saiu junto com o calendário, a pedido do PO —
+   * "pelas regras de negócio ela não será mais necessária".
    *
-   * Então ela sai da MÉDIA e da POSIÇÃO, e continua na lista com o número
-   * dela e a marca de quantos dias esteve fora. Sumir com a pessoa seria pior:
-   * quem procurasse o próprio nome não o acharia, e o que ela produziu nos
-   * dias em que esteve não deixaria de ser trabalho feito.
+   * Com isso a média voltou a ser o que a palavra diz: a soma de todos os que
+   * aparecem, dividida por quantos são. Saíram da resposta os dois números que
+   * só existiam para explicar o desconto — nada na tela os usava.
    */
-  var diasForaPorNome = ausenciasPorNome_(nomes, periodo);
-
   var lista = nomes.map(function (nome) {
     return {
       nome: nome,
       valor: porPessoa[nome],
-      diasAusente: diasForaPorNome[nome] || 0,
       souEu: normalizarParaComparar_(nome) === normalizarParaComparar_(meuNome)
     };
   }).sort(function (um, outro) { return outro.valor - um.valor; });
 
   lista.forEach(function (um, i) { um.posicao = i + 1; });
 
-  var comparaveis = lista.filter(function (um) { return !um.diasAusente; });
-  // Se TODO MUNDO esteve fora, comparar os ausentes entre si é o melhor que dá
-  // — e é melhor que devolver média zero, que se leria como "a equipe não
-  // produziu nada".
-  var paraAMedia = comparaveis.length ? comparaveis : lista;
-
-  var soma = paraAMedia.reduce(function (total, um) { return total + um.valor; }, 0);
-  var media = Math.round((soma / paraAMedia.length) * 10) / 10;
+  var soma = lista.reduce(function (total, um) { return total + um.valor; }, 0);
+  var media = Math.round((soma / lista.length) * 10) / 10;
   var eu = lista.filter(function (um) { return um.souEu; })[0] || null;
 
   var podeVerNomes = quem.permissoes.escopo === RECC_ESCOPOS.TODOS
@@ -2565,11 +2402,6 @@ function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe, p
     disponivel: true,
     podeVerNomes: podeVerNomes,
     quantasPessoas: lista.length,
-    // Quantas entraram na média, que pode ser menos que `quantasPessoas`. A
-    // tela precisa das duas para escrever a frase certa: "a média de 5 é 12,
-    // e 2 pessoas ficaram de fora por ausência".
-    quantasNaMedia: paraAMedia.length,
-    foraPorAusencia: lista.length - paraAMedia.length,
     media: media,
     minhaPosicao: eu ? eu.posicao : null,
     meuValor: eu ? eu.valor : 0,

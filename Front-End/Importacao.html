@@ -306,37 +306,22 @@ var TelaImportacao = (function () {
     // RET pode receber um lote da Mesa, e quem decide isso é a coordenação, não
     // o sistema. Esconder o nome tiraria a decisão da mão dela.
     //
-    // O mesmo vale para QUEM ESTÁ DE FÉRIAS: aparece, no fim da lista, com a
-    // data da volta. Não some — o lote pode ser justamente para quando ela
-    // voltar. O que o sistema faz é dizer, antes de alguém marcar sem querer,
-    // que aqueles casos vão ficar parados até lá.
-    var quantosFora = opcoes.analistas.filter(function (pessoa) {
-      return pessoa.ausente;
-    }).length;
-
+    // Havia aqui uma marca de QUEM ESTÁ DE FÉRIAS, com a data da volta, para
+    // ninguém mandar um lote a quem não vai trabalhá-lo. Saiu com o
+    // calendário, a pedido do PO.
     return '<h4 class="importacao-titulo">Dividir entre</h4>'
       + '<div class="config-marcadores">'
       + opcoes.analistas.map(function (pessoa) {
         return '<label class="config-chave'
-          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal')
-          + (pessoa.ausente ? ' esta-fora' : '') + '">'
+          + (pessoa.atendeEsteCanal ? '' : ' de-outro-canal') + '">'
           + '<input type="checkbox"'
           + ' data-analista="' + escapar(pessoa.nome) + '"'
           + (analistasMarcados[pessoa.nome] ? ' checked' : '') + '>'
           + '<span>' + escapar(pessoa.nome)
           + (pessoa.atendeEsteCanal ? '' : ' <em>de outro canal</em>')
-          + (pessoa.ausente
-            ? ' <em class="fora">' + escapar(pessoa.motivoDaAusencia)
-              + ' até ' + escapar(pessoa.ausenteAte) + '</em>'
-            : '')
           + '</span></label>';
       }).join('')
       + '</div>'
-      + (quantosFora
-        ? '<p class="config-dica aviso-de-ausencia">' + quantosFora
-          + ' pessoa(s) estão fora hoje e aparecem no fim da lista. Marcar '
-          + 'alguém que está fora deixa os casos dela parados até a volta.</p>'
-        : '')
       + '<p class="config-dica">'
       + (quantos
         ? 'Os casos vão ser divididos em partes iguais entre os ' + quantos

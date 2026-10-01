@@ -79,6 +79,10 @@ var TelaProdutividade = (function () {
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
           + 'canal.</strong><p>Um administrador monta os gráficos em '
           + 'Configurações → Painéis.</p></div>')
+      + (painel.valorPorSituacao
+        ? '<div class="graficos">'
+          + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
+        : '')
       + '<div id="detalhe-do-painel"></div>';
     ligarPainel();
   }
@@ -171,6 +175,30 @@ var TelaProdutividade = (function () {
       + '</section>';
   }
 
+  /**
+   * O gráfico de VALOR POR SITUAÇÃO — o dinheiro em cada desfecho.
+   *
+   * Desenhado à parte dos outros, e com o gráfico E a tabela ao mesmo tempo:
+   * aqui os NÚMEROS são o pedido ("valor dos retidos, não retidos, sem
+   * sucesso, valor dos demais status e total"), e o desenho é a leitura rápida
+   * deles. Esconder a tabela atrás de um botão faria o que ele pediu depender
+   * de um clique.
+   *
+   * Não tem "Exportar" nem detalhamento por clique, e não é esquecimento: os
+   * dois procuram o gráfico pelo Id dele na aba PAINEIS, e este gráfico não
+   * mora lá — ele sai da configuração do CANAL. Oferecer os botões daria uma
+   * recusa do servidor em vez de uma resposta.
+   */
+  function desenharValorPorSituacao(componente) {
+    return '<section class="cartao grafico largura-2">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
+      + '</h3></header>'
+      + (componente.aviso
+        ? '<p class="grafico-vazio">' + escapar(componente.aviso) + '</p>'
+        : Graficos.desenhar(componente) + Graficos.tabela(componente))
+      + '</section>';
+  }
+
   function rodapeDoGrafico(componente) {
     if (componente.aviso || !componente.pontos.length) return '';
     return '<p class="grafico-pe">'
@@ -212,8 +240,13 @@ var TelaProdutividade = (function () {
     ligarCliques('[data-ponto]', function (elementoClicado) {
       var grafico = elementoClicado.closest('.grafico');
       if (!grafico) return;
-      detalhar(grafico.getAttribute('data-grafico'),
-        elementoClicado.getAttribute('data-ponto'));
+      // Gráfico SEM Id não detalha. É o caso do valor por situação, que não
+      // tem linha na aba PAINEIS — chamar `detalharComponente` com Id vazio
+      // devolveria "componente não encontrado" em cima de um clique que
+      // parecia normal.
+      var id = grafico.getAttribute('data-grafico');
+      if (!id) return;
+      detalhar(id, elementoClicado.getAttribute('data-ponto'));
     });
 
     Graficos.ligarDica(elemento('analitico'));

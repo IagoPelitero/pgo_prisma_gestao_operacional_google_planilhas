@@ -232,7 +232,7 @@ Dentro de `Evolucao/`:
 rotina do sistema que cria estrutura; depois dela, nenhum caminho do produto
 cria, renomeia, apaga ou reordena aba e coluna por conta própria.
 
-Nenhum dado operacional é semeado: bases, canais, produtos e SUSEPs bloqueadas
+Nenhum dado operacional é semeado: bases, canais e SUSEPs bloqueadas
 nascem vazios.
 
 ---
@@ -334,6 +334,48 @@ sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
 O selo da SUSEP responde três coisas, e as três são informação: **liberada**
 com o segmento, **bloqueada** com o motivo, ou **não encontrada** — que não é
 erro, é uma corretora que o cadastro ainda não conhece.
+
+E o selo faz mais uma coisa: **preenche o nome da corretora**. A resposta dele
+já traz o nome, vindo do cadastro de Corretoras Diamante, então isso não custa
+uma segunda ida ao servidor. Ele preenche quando o campo está vazio — ou
+quando o que está nele foi este mesmo preenchimento. O que a pessoa digitou
+por cima fica: escrever em cima de uma correção feita de propósito é pior que
+não preencher.
+
+**A SUSEP tem letra**: `RET00J`. Todo campo que pede SUSEP aceita e guarda
+exatamente o que foi colado — letra, dígito, caixa e pontuação. Só o espaço
+das pontas sai, e por um motivo concreto: quem copia de outra planilha traz
+`" RET00J "` sem ver, o selo acha a corretora assim mesmo (ele compara
+normalizado), e o estrago só aparece depois no Power BI, onde o join é pelo
+texto cru.
+
+### Proposta e apólice: digitadas inteiras, gravadas em pedaços
+
+A proposta vem com **um hífen** (`7-0000000` ou `58-0000000`) e a apólice com
+**dois** (`12-1391-0000000`). Digita-se inteira, numa caixa só, e a planilha
+recebe em **colunas separadas** — é o que o Power BI precisa. A nova proposta
+segue a regra da proposta.
+
+Abrir o caso de novo faz o caminho de volta: as colunas se juntam e o campo
+mostra o valor inteiro. Vale também para o produto, que é escolhido como
+`1101 - VIDA INDIVIDUAL` e gravado como código numa coluna e nome em outra.
+
+Isso **tem de ser um lugar só** — e por um tempo não foi. A edição juntava a
+proposta e o detalhe não; e o produto, nenhum dos dois juntava. O detalhe
+mostrava `0000000` no lugar de `58-0000000`, e — pior — salvar um caso da RET
+com produto era **recusado**, num campo que a pessoa nem tinha tocado.
+
+### Ver detalhes traz tudo o que está preenchido
+
+Um caso importado chega com valor em colunas que o formulário não pergunta: a
+origem da importação, a data dela, os carimbos de contato. Elas aparecem no
+fim do detalhe, atrás de um aviso, **como leitura**: são escritas pelo
+sistema, e deixar reescrever "Quem mudou o status" à mão faria o número da
+produtividade depender do que alguém digitou, e não do que aconteceu.
+
+Coluna **vazia** que ninguém declarou no formulário não entra — a BASE_RET tem
+quase cinquenta colunas, e listar as vazias encheria a tela de travessões
+escondendo justamente o que está preenchido.
 
 ---
 
@@ -467,48 +509,21 @@ aparecendo, mas como REFERÊNCIA: a média e a minha posição, no bloco de baix
 Saber que se fez 8 não diz nada sem saber que a média é 6. O que ela não faz é
 virar o assunto da tela — para isso existe a Produtividade RECC.
 
-### O calendário: dias úteis, feriados e férias
+### A meta: dias corridos do mês
 
-A operação **só trabalha em dias úteis**, e todo mês alguém entra de férias. As
-duas coisas mexem na mesma conta — quantos dias a pessoa realmente tinha para
-trabalhar — e é essa conta que a meta usa.
+A meta de um canal é **mensal por pessoa**, e o alvo do período se reparte
+pelos **dias corridos** do mês — num período fechado o alvo bate exatamente
+com a meta mensal.
 
-Antes a meta se repartia por **30 dias corridos**. Num mês de 21 dias úteis
-isso cobrava trabalho de nove dias que não existem, e a barra acusava um atraso
-que era só do calendário. Quem tirava férias piorava: aparecia devendo os dias
-em que estava fora.
+O sistema já teve aqui um motor de dias úteis, feriados nacionais calculados
+pela Páscoa e desconto de férias. **Saiu a pedido do PO**, por regra de
+negócio: "vamos eliminar o calendário, pelas regras de negócio ela não será
+mais necessária". Com ele saíram a seção Calendário das Configurações e a
+conta de ausência na média da equipe.
 
-Agora:
-
-| conta | como é hoje |
-|---|---|
-| **Denominador da meta** | Os dias úteis **daquele mês** — que variam de 19 a 23. Num mês fechado o alvo bate exatamente com a meta mensal |
-| **Ausência** | Desconta os dias úteis em que a pessoa esteve fora. Uma semana de férias que pega um fim de semana são 5 dias, não 7 |
-| **Média da equipe** | Quem esteve ausente sai da média e da posição, e continua na lista com a marca de quantos dias ficou fora |
-
-**Os feriados nacionais o sistema calcula sozinho** — inclusive Carnaval,
-Sexta-feira Santa e Corpus Christi, que mudam de data todo ano. Eles saem do
-**Domingo de Páscoa**, pelo algoritmo gregoriano, conferido contra quinze anos
-de datas conhecidas. A alternativa seria uma tabela que alguém teria de
-preencher todo dezembro — e esquecer uma vez faz a meta de fevereiro sair
-errada sem ninguém entender por quê.
-
-A Consciência Negra só conta **de 2024 em diante**, que é quando virou nacional
-(Lei 14.759/2023). Contar antes tiraria um dia útil de um ano em que a operação
-trabalhou.
-
-O que o sistema **não** adivinha — o feriado municipal, o ponto facultativo que
-a área de fato não trabalha, a emenda — fica em **Configurações › Calendário**,
-junto das ausências. E lá também se faz o contrário: marcar *"neste dia a
-operação TRABALHA"* cancela um feriado nacional, para o ano em que se trabalhou
-no Corpus Christi.
-
-**Férias não bloqueiam o acesso.** A pessoa continua entrando no sistema — quem
-volta às vezes precisa consultar um caso antes de reassumir. O que muda é a
-conta, e a **divisão de um lote na Importação**: quem está fora hoje vai para o
-fim da lista, com a data da volta ao lado do nome. Não some — o lote pode ser
-justamente para quando ela voltar —, e se for marcada mesmo assim o laudo diz,
-antes de gravar, quantos casos vão ficar parados e até quando.
+Quem tem a aba `AUSENCIAS` ou `FERIADOS` de instalações anteriores **não
+perde nada**: `atualizarPGO()` deixa as duas intactas na planilha e diz, no
+laudo, que elas saíram do contrato e podem ser apagadas quando você quiser.
 
 ---
 
@@ -516,8 +531,14 @@ antes de gravar, quantos casos vão ficar parados e até quando.
 
 ![A Tabela de Corretoras](Evolucao/imagens/tela-tabela-corretoras.png)
 
-Corretoras, produtos e SUSEPs bloqueadas — três cadastros que até aqui só se
-ajustavam abrindo a planilha.
+Corretoras Diamante e SUSEPs bloqueadas — dois cadastros que até aqui só se
+ajustavam abrindo a planilha. Eram três: **Produtos saiu** a pedido do PO, e
+`atualizarPGO()` apaga a aba da planilha dizendo quantas linhas foram.
+
+As corretoras Diamante pedem **SUSEP, Corretora, Sucursal, Segmento e
+Consultor**. As bloqueadas pedem **SUSEP, Corretora, Sucursal e Coordenador
+comercial**. As duas listas se importam de **outra planilha, pelo Id** — colar
+sete mil SUSEPs numa caixa de texto é o que ninguém faz duas vezes.
 
 O que faz a tela valer mais que uma lista é o **cruzamento com os casos**: o
 volume ao lado de cada corretora, e o aviso das **SUSEPs que aparecem nos casos
@@ -528,6 +549,15 @@ uma pessoa de cada vez, sem ninguém ligar à causa.
 **Bloquear não impede cadastrar**: o formulário mostra o selo vermelho com o
 motivo, e quem atende decide. Bloqueio que impedisse faria a pessoa registrar o
 caso num caderno, e o sistema perderia o caso de vista.
+
+Duas regras do PO mandam no selo, e as duas são de negócio:
+
+- **Corretora Diamante nunca sai bloqueada**, mesmo que a SUSEP esteja na lista
+  de bloqueios: são duas listas, de dois donos. O cadastro é consultado
+  primeiro, e a ordem da consulta **é** a regra.
+- **A Mesa Diamante não consulta a lista de bloqueios.** Quem decide é a coluna
+  `ConfereSusepBloqueada` do canal, em Configurações › Canais de trabalho — não
+  o nome do canal escrito no código. Qualquer canal pode ligar ou desligar.
 
 ---
 
@@ -662,7 +692,7 @@ inventado estaria na tela da operação amanhã, medindo o que ninguém pediu.
 
 ## Duas bases: a operacional e a de cadastros
 
-Corretoras, SUSEPs bloqueadas, produtos e as duas listas de analista — Central e
+Corretoras, SUSEPs bloqueadas e as duas listas de analista — Central e
 Cobrança Ativa — podem morar em **outra planilha**. O PGO lê dela na hora, sem
 copiar nada: o que mudar lá vale aqui na leitura seguinte.
 

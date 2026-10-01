@@ -93,8 +93,18 @@ function resumoDasConfiguracoes() {
       assim que a seção é escolhida.
     */
     secoes: [
-      { chave: 'campos', titulo: 'Campos',
-        descricao: 'O que o cadastro pergunta, em cado canal',
+      /*
+        A SEÇÃO SE CHAMA PELO NOME DA TELA QUE ELA AJUSTA.
+        Era "Campos", e o PO pediu "Cadastrar Caso": "assim saberei que é onde
+        ajusto o formulário". A CHAVE continua `campos` — é ela que o menu, a
+        rota e o ícone usam, e trocá-la seria renomear um nome de código por
+        um motivo de tela.
+
+        As LISTAS continuam seção à parte, com o nome que ele deu: "Ajustes
+        Gerais", "que vou entender que são outros tipos de ajuste".
+      */
+      { chave: 'campos', titulo: 'Cadastrar Caso',
+        descricao: 'Os campos que o formulário pergunta, em cada canal',
         quantidade: lerRegistros_('CAMPOS').length },
       { chave: 'usuarios', titulo: 'Usuários',
         descricao: 'Quem entra no sistema',
@@ -102,8 +112,9 @@ function resumoDasConfiguracoes() {
       { chave: 'niveis', titulo: 'Níveis de acesso',
         descricao: 'O que cada um pode ver e fazer',
         quantidade: quantosDoTipo('nivelacesso') },
-      { chave: 'catalogo', titulo: 'Listas',
-        descricao: 'Situações, canais, motivos, ramos e cargos',
+      { chave: 'catalogo', titulo: 'Ajustes Gerais',
+        descricao: 'Situações, canais, motivos, ramos e cargos — as listas que '
+          + 'os formulários oferecem',
         quantidade: catalogo.length - quantosDoTipo('nivelacesso') },
       { chave: 'canais', titulo: 'Canais de trabalho',
         descricao: 'As bases e o que cada painel mostra',
@@ -116,10 +127,6 @@ function resumoDasConfiguracoes() {
         quantidade: lerRegistros_('PAINEIS').filter(function (linha) {
           return normalizarParaComparar_(linha.Ativo) === 'sim';
         }).length },
-      { chave: 'calendario', titulo: 'Calendário',
-        descricao: 'Férias, ausências e os feriados que a operação não trabalha',
-        quantidade: lerRegistros_('AUSENCIAS').length
-          + lerRegistros_('FERIADOS').length },
       { chave: 'analises', titulo: 'Análises',
         descricao: 'As abas ANALISE_* que o sistema gera na planilha',
         quantidade: lerRegistros_('ANALISES').filter(function (linha) {
@@ -151,6 +158,15 @@ function listarCamposDoCanal(idDoCanal) {
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
 
+  // A aba CANAIS e o CATÁLOGO, lidos UMA VEZ para a lista inteira. Dentro do
+  // laço, isto eram duas idas ao serviço por campo — com 48 campos, 98 idas e
+  // dois segundos e meio de espera para abrir a tela.
+  var jaLido = {
+    linhaDoCanal: buscarRegistros_('CANAIS', 'Id',
+      converterParaIdentificador_(canal.id), 1)[0],
+    catalogo: lerRegistros_('CATALOGO')
+  };
+
   return lerRegistros_('CAMPOS')
     .filter(function (campo) {
       return converterParaIdentificador_(campo.CanalId)
@@ -179,7 +195,15 @@ function listarCamposDoCanal(idDoCanal) {
         largura: Number(configuracao.largura) || 1,
         // Coluna que sumiu da planilha aparece marcada, em vez de o campo
         // simplesmente parar de funcionar sem ninguém entender por quê.
-        colunaExiste: posicaoDaColuna_(estrutura, campo.Cabecalho) >= 0
+        colunaExiste: posicaoDaColuna_(estrutura, campo.Cabecalho) >= 0,
+        /*
+          Em que ajustes do canal esta coluna está citada — vazio quando em
+          nenhum. Vai junto da lista para a tela poder DIZER ANTES por que o
+          botão de excluir não está ali, em vez de deixar a pessoa clicar e
+          receber uma recusa. É a mesma informação que `excluirCampo` usa para
+          recusar; quem manda é o servidor, e a tela só não esconde o motivo.
+        */
+        usadoPeloCanal: quemApontaParaAColuna_(canal, campo.Cabecalho, jaLido)
       };
     });
 }
@@ -190,7 +214,7 @@ function opcoesDeConfiguracaoDeCampo() {
   return {
     tipos: Object.keys(RECC_DO_CAMPO_PARA_O_DADO),
     tons: RECC_TONS,
-    cadastros: ['usuarios', 'produtos', 'canais'],
+    cadastros: ['usuarios', 'corretoras'],
     tiposDeCatalogo: tiposDeCatalogoExistentes_()
   };
 }
@@ -331,6 +355,161 @@ function reordenarCampos(idDoCanal, idsNaOrdem) {
 
   registrarAuditoria_('campo.reordenar', 'CAMPOS', '', canal.nome);
   return true;
+}
+
+/**
+ * Exclui um campo DE VEZ — a linha de CAMPOS sai, e o campo deixa de existir.
+ *
+ * DESLIGAR E EXCLUIR SÃO COISAS DIFERENTES, e as duas foram pedidas.
+ * Desligar ("Aparece no formulário = Não") tira o campo da tela e deixa tudo
+ * no lugar: a coluna fica, o dado fica, e um dia ele volta. É o que se usa
+ * quando a dúvida é "ainda vamos precisar disto?". Excluir é para o campo que
+ * nasceu errado e não volta.
+ *
+ * A COLUNA É UMA SEGUNDA ESCOLHA, e é a parte sem volta:
+ *
+ *   apagarAColuna = false   a coluna fica na planilha, com todo o dado dela.
+ *                           O sistema só para de perguntar e de gravar ali.
+ *   apagarAColuna = true    a coluna sai da aba, e o que estava gravado nela
+ *                           em TODOS os casos vai com ela.
+ *
+ * As duas pedem senha de administrador: a primeira muda o formulário de
+ * produção, a segunda apaga dado de produção.
+ *
+ * O QUE NÃO SAI, e por quê:
+ *
+ *   campo PROTEGIDO        é coluna do contrato da aba — o Id, o analista, o
+ *                          status, as colunas que o Power BI junta. Sem ela o
+ *                          canal para de funcionar. Para tirar do formulário,
+ *                          desligue; o dado continua indo para a planilha.
+ *   coluna APONTADA pelo   se a coluna do status, da data, da finalização ou
+ *   próprio canal          do responsável sair, a tela de Trabalho perde o
+ *                          chão. Primeiro troque a referência em Canais de
+ *                          trabalho, depois exclua.
+ */
+function excluirCampo(idDoCanal, idDoCampo, apagarAColuna) {
+  var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
+  exigirSenhaDeAdministrador_();
+
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var id = converterParaIdentificador_(idDoCampo);
+  var campo = buscarRegistros_('CAMPOS', 'Id', id, 1)[0];
+  if (!campo) throw new Error('Campo ' + id + ' não encontrado.');
+
+  if (converterParaIdentificador_(campo.CanalId)
+    !== converterParaIdentificador_(canal.id)) {
+    throw new Error('O campo "' + campo.Rotulo + '" não é do canal '
+      + canal.nome + '. Escolha o canal dele antes de excluir.');
+  }
+
+  var cabecalho = String(campo.Cabecalho || '');
+
+  if (normalizarParaComparar_(campo.Protegido) === 'sim') {
+    throw new Error('O campo "' + campo.Rotulo + '" faz parte do contrato da '
+      + 'aba ' + canal.aba + ': o próprio sistema grava na coluna "' + cabecalho
+      + '", e os relatórios contam com ela. Ele não pode ser excluído — mas '
+      + 'pode sair do formulário: abra o campo e ponha "Aparece no formulário" '
+      + 'em Não.');
+  }
+
+  var apontando = quemApontaParaAColuna_(canal, cabecalho);
+  if (apontando.length) {
+    throw new Error('A coluna "' + cabecalho + '" é usada pela configuração do '
+      + 'canal ' + canal.nome + ' em: ' + apontando.join(', ') + '. Troque '
+      + 'essas referências em Configurações › Canais de trabalho e exclua '
+      + 'depois — senão a tela de Trabalho fica sem esse chão.');
+  }
+
+  var apagada = null;
+  if (apagarAColuna === true) {
+    apagada = removerColuna_(canal.aba, cabecalho);
+  }
+
+  apagarRegistroDeVez_('CAMPOS', id);
+  esquecerEstruturaLida_();
+
+  registrarAuditoria_('campo.excluir', 'CAMPOS', id,
+    cabecalho + (apagada
+      ? ' — coluna apagada da aba ' + canal.aba + ', com '
+        + apagada.linhasComValor + ' valor(es)'
+      : ' — a coluna continua na planilha'));
+
+  return {
+    rotulo: String(campo.Rotulo || cabecalho),
+    cabecalho: cabecalho,
+    canal: canal.nome,
+    colunaApagada: !!apagada,
+    linhasComValor: apagada ? apagada.linhasComValor : 0
+  };
+}
+
+/**
+ * Em que lugares da configuração do canal esta coluna está citada.
+ *
+ * Pelo NOME de cada ajuste, e não pelo nome da coluna da aba CANAIS: quem lê
+ * o recado é quem vai trocar a referência na tela, e lá está escrito "Coluna
+ * do status", não "ColunaDoStatus".
+ */
+function quemApontaParaAColuna_(canal, cabecalho, jaLido) {
+  /*
+   * `jaLido` é o que faz esta função servir numa LISTA sem custar por item.
+   *
+   * ELA ERA A FUNÇÃO MAIS CARA DO SISTEMA, e por um motivo que não aparecia
+   * lendo o código dela: ela é chamada UMA VEZ POR CAMPO por
+   * `listarCamposDoCanal`, e lia a aba CANAIS e o CATÁLOGO a cada chamada.
+   * Com os 48 campos da RET, eram 98 idas ao serviço — a 25 ms cada, dois
+   * segundos e meio de pedágio só para abrir "Cadastrar Caso". Era a demora
+   * que a operação relatou.
+   *
+   * Agora quem chama em volta de um laço lê as duas coisas UMA vez e passa
+   * aqui. Quem chama uma vez só continua chamando sem o terceiro argumento, e
+   * a função lê por conta dela — nenhuma chamada precisou mudar de forma.
+   */
+  var pronto = jaLido || {};
+  var linha = pronto.linhaDoCanal || buscarRegistros_('CANAIS', 'Id',
+    converterParaIdentificador_(canal.id), 1)[0];
+  if (!linha) return [];
+
+  var procurado = normalizarParaComparar_(cabecalho);
+  var achados = [];
+
+  [['ColunaDaData', 'Coluna da data'],
+   ['ColunaDaHora', 'Coluna da hora'],
+   ['ColunaDoStatus', 'Coluna do status'],
+   ['ColunaDaFinalizacao', 'Coluna da finalização'],
+   ['ColunaDaAreaResponsavel', 'Coluna do responsável']].forEach(function (par) {
+    if (normalizarParaComparar_(linha[par[0]]) === procurado) achados.push(par[1]);
+  });
+
+  [['ColunasDaFila', 'Colunas da fila'],
+   ['ColunasDaBusca', 'Colunas da busca']].forEach(function (par) {
+    var lista = String(linha[par[0]] || '').split(',');
+    for (var i = 0; i < lista.length; i++) {
+      if (normalizarParaComparar_(lista[i]) === procurado) {
+        achados.push(par[1]);
+        return;
+      }
+    }
+  });
+
+  /*
+   * E os CARIMBOS DE STATUS, que são o caso mais traiçoeiro de todos.
+   *
+   * Um status com "Coluna que recebe data e hora" apontando para uma coluna
+   * que não existe mais não dá erro nenhum: o caso muda de status, e o
+   * carimbo simplesmente não é escrito. Ninguém descobre até alguém
+   * estranhar que "Já contatados" está zerado — foi exatamente assim que o
+   * achado 43 apareceu, pela tela de Produtividade.
+   */
+  (pronto.catalogo || lerRegistros_('CATALOGO')).forEach(function (item) {
+    if (normalizarParaComparar_(item.Tipo) !== 'status') return;
+    if (converterParaIdentificador_(item.CanalId)
+      !== converterParaIdentificador_(canal.id)) return;
+    if (normalizarParaComparar_(item.ColunaDeCarimbo) !== procurado) return;
+    achados.push('o carimbo do status "' + item.Nome + '"');
+  });
+
+  return achados;
 }
 
 // ============================================================================
@@ -493,17 +672,54 @@ function listarNiveisDeAcesso() {
 }
 
 /**
- * Altera o que um nível pode.
+ * CRIA ou altera um nível de acesso.
  *
- * Duas travas, e as duas existem para ninguém se trancar do lado de fora:
- * o último nível que abre Configurações não pode perder essa tela, e o
- * último que mexe em estrutura não pode perder essa ação.
+ * Sem `id`, nasce um nível novo; com `id`, muda o que esse nível pode. Criar
+ * pela tela foi pedido pelo PO — "não consigo cadastrar novos níveis de acesso
+ * e preciso ter essa funcionalidade" —, e faz sentido: a operação está se
+ * formando, e os quatro níveis que vêm na instalação são um ponto de partida,
+ * não a estrutura final dela.
+ *
+ * A MESMA FUNÇÃO faz as duas coisas de propósito. Toda a conferência que vale
+ * para editar vale igual para criar: ação que não existe, escopo inventado,
+ * alcance desconhecido, canal que foi apagado. Duas funções separadas
+ * dividiriam essas travas em dois lugares, e um dia uma delas ficaria para
+ * trás — é assim que nasce o caminho que valida menos.
+ *
+ * Duas travas existem para ninguém se trancar do lado de fora: o último nível
+ * que abre Configurações não pode perder essa tela, e o último que mexe em
+ * estrutura não pode perder essa ação. Criar um nível não mexe nelas — nível
+ * novo não tem gente —, mas passa pela mesma porta.
+ *
+ * Devolve o Id do nível, criado ou alterado.
  */
 function salvarNivelDeAcesso(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var id = converterParaIdentificador_(dados.id);
-  var atual = buscarRegistros_('CATALOGO', 'Id', id, 1)[0];
-  if (!atual) throw new Error('Nível ' + id + ' não encontrado.');
+  var atual = id ? buscarRegistros_('CATALOGO', 'Id', id, 1)[0] : null;
+  if (id && !atual) throw new Error('Nível ' + id + ' não encontrado.');
+
+  var nome = String(dados.nome || (atual ? atual.Nome : '')).trim();
+  if (!nome) {
+    throw new Error('Dê um nome ao nível de acesso — é por ele que a pessoa '
+      + 'escolhe o nível ao cadastrar alguém, e é ele que define a EQUIPE.');
+  }
+
+  /*
+   * NOME REPETIDO É RECUSADO, e isto virou importante nesta rodada.
+   *
+   * O nível passou a ser a EQUIPE: quem tem o mesmo nível vê os números do
+   * mesmo grupo. Dois níveis chamados "Operação" seriam duas equipes com o
+   * mesmo nome na tela, e ninguém saberia em qual cadastrou quem.
+   */
+  lerRegistros_('CATALOGO').forEach(function (item) {
+    if (normalizarParaComparar_(item.Tipo) !== 'nivelacesso') return;
+    if (converterParaIdentificador_(item.Id) === id) return;
+    if (normalizarParaComparar_(item.Nome) !== normalizarParaComparar_(nome)) return;
+    throw new Error('Já existe um nível chamado "' + item.Nome + '". '
+      + 'Como o nível também define a equipe, dois com o mesmo nome seriam '
+      + 'duas equipes indistinguíveis na tela.');
+  });
 
   var telas = Array.isArray(dados.telas) ? dados.telas : [];
   var acoes = Array.isArray(dados.acoes) ? dados.acoes : [];
@@ -559,22 +775,51 @@ function salvarNivelDeAcesso(dados) {
 
   exigirQueAlguemContinueEntrando_(id, telas, acoes);
 
+  var configuracao = JSON.stringify({
+    escopo: dados.escopo,
+    canais: canais,
+    telas: telas,
+    acoes: acoes,
+    escopoNaProdutividade: naProdutividade,
+    campos: dados.campos && typeof dados.campos === 'object' ? dados.campos : {},
+    componentes: {}
+  });
+
+  if (!atual) {
+    // A ORDEM nasce no fim da lista. Sem isto o nível novo apareceria
+    // misturado com os antigos, porque `Ordem` vazia lê como zero e zero
+    // vem antes de tudo.
+    var ultima = 0;
+    lerRegistros_('CATALOGO').forEach(function (item) {
+      if (normalizarParaComparar_(item.Tipo) !== 'nivelacesso') return;
+      ultima = Math.max(ultima, Number(item.Ordem) || 0);
+    });
+
+    var criado = inserirRegistro_('CATALOGO', {
+      Tipo: 'NIVEL_ACESSO',
+      CanalId: '',
+      Codigo: '',
+      Nome: nome,
+      Rotulo: nome,
+      PaiId: '',
+      Cor: '',
+      Ordem: ultima + 1,
+      Ativo: dados.ativo === false ? 'NAO' : 'SIM',
+      Configuracao: configuracao
+    });
+    registrarAuditoria_('nivel.criar', 'CATALOGO', criado.__id, nome);
+    return criado.__id;
+  }
+
   atualizarRegistro_('CATALOGO', id, {
-    Nome: String(dados.nome || atual.Nome),
+    Nome: nome,
+    Rotulo: nome,
     Ativo: dados.ativo === false ? 'NAO' : 'SIM',
-    Configuracao: JSON.stringify({
-      escopo: dados.escopo,
-      canais: canais,
-      telas: telas,
-      acoes: acoes,
-      escopoNaProdutividade: naProdutividade,
-      campos: dados.campos && typeof dados.campos === 'object' ? dados.campos : {},
-      componentes: {}
-    })
+    Configuracao: configuracao
   });
 
   registrarAuditoria_('nivel.editar', 'CATALOGO', id, String(atual.Nome));
-  return true;
+  return id;
 }
 
 /**
@@ -727,6 +972,11 @@ function listarCanaisConfiguraveis() {
         metaMensalPorPessoa: Number(canal.MetaMensalPorPessoa) || 0,
         colunaDaFinalizacao: String(canal.ColunaDaFinalizacao || ''),
         colunaDaAreaResponsavel: String(canal.ColunaDaAreaResponsavel || ''),
+        colunaDoValor: String(canal.ColunaDoValor || ''),
+        situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
+        // Vazio vale SIM, igual ao resto do sistema: a tela mostra marcado.
+        confereSusepBloqueada:
+          normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
         icone: String(canal.Icone || ''),
         ordem: Number(canal.Ordem) || 0,
         ativo: normalizarParaComparar_(canal.Ativo) === 'sim',
@@ -761,7 +1011,7 @@ function salvarCanal(dados) {
 
   var estrutura = estruturaDaAba_(String(atual.Aba));
   ['colunaDaData', 'colunaDaHora', 'colunaDoStatus', 'colunaDaFinalizacao',
-    'colunaDaAreaResponsavel'].forEach(function (chave) {
+    'colunaDaAreaResponsavel', 'colunaDoValor'].forEach(function (chave) {
     conferirQueAColunaExiste_(estrutura, dados[chave], atual.Aba);
   });
   // As colunas da fila podem vir agrupadas — "Título: col, col; Título: col".
@@ -802,6 +1052,11 @@ function salvarCanal(dados) {
     MetaMensalPorPessoa: Number(dados.metaMensalPorPessoa) || 0,
     ColunaDaFinalizacao: String(dados.colunaDaFinalizacao || ''),
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
+    ColunaDoValor: String(dados.colunaDoValor || ''),
+    SituacoesDestacadas: String(dados.situacoesDestacadas || ''),
+    // `=== false` e não `!dados...`: a tela que não mandar o campo não pode
+    // desligar a conferência por omissão. Só o "não" explícito desliga.
+    ConfereSusepBloqueada: dados.confereSusepBloqueada === false ? 'NAO' : 'SIM',
     Icone: String(dados.icone || atual.Icone || ''),
     Ordem: Number(dados.ordem) || Number(atual.Ordem) || 0,
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
@@ -810,6 +1065,241 @@ function salvarCanal(dados) {
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+
+/**
+ * Cria um CANAL NOVO: a aba na planilha e a linha dela em CANAIS.
+ *
+ * Pedido do PO: "na canais de trabalho devo conseguir cadastrar novos canais".
+ * Faz sentido — a operação está se formando, e o VG nasceu de um pedido assim.
+ * Até agora nascer um canal exigia mexer no código do instalador.
+ *
+ * DOIS CAMINHOS, e a diferença entre eles é o que já existe na planilha:
+ *
+ *   ABA QUE NÃO EXISTE  nasce com a coluna `id` e as quatro de controle, e
+ *                       nada mais. Os campos do formulário são criados depois,
+ *                       um a um, em Cadastrar Caso — é lá que se escolhe nome,
+ *                       tipo e obrigatoriedade de cada um. Inventar aqui um
+ *                       "analista" e um "status" seria chutar os nomes das
+ *                       colunas de uma operação que ainda não existe.
+ *
+ *   ABA QUE JÁ EXISTE   (com `aproveitarAAba`) o canal passa a apontar para a
+ *                       aba como ela está. O cabeçalho dela NÃO é tocado: as
+ *                       colunas que já estão lá são registradas em CAMPOS, e
+ *                       as de controle são acrescentadas se faltarem. É o
+ *                       caminho de quem já tem a base na planilha e só quer
+ *                       que o PGO a trabalhe.
+ *
+ * O que o canal novo NÃO ganha: cartão, gráfico, status e meta. Nada disso é
+ * chutado. A tela diz os próximos passos, e cada um é uma escolha de quem
+ * conduz a operação.
+ *
+ * Pede senha de administrador, como toda ação que escreve na estrutura.
+ */
+function criarCanal(dados) {
+  var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
+  exigirSenhaDeAdministrador_();
+
+  var nome = String(dados.nome || '').trim();
+  if (!nome) {
+    throw new Error('Dê um nome ao canal — é ele que aparece no seletor do '
+      + 'Trabalho e em todo relatório.');
+  }
+
+  var aproveitar = dados.aproveitarAAba === true;
+  var nomeDaAba = String(dados.aba || '').trim() || nomeDeAbaSugerido_(nome);
+
+  conferirQueONomeDaAbaServe_(nomeDaAba);
+
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    if (normalizarParaComparar_(canal.Nome) === normalizarParaComparar_(nome)) {
+      throw new Error('Já existe um canal chamado "' + canal.Nome + '".');
+    }
+    if (normalizarParaComparar_(canal.Aba) === normalizarParaComparar_(nomeDaAba)) {
+      throw new Error('A aba "' + nomeDaAba + '" já é a base do canal "'
+        + canal.Nome + '". Duas canais na mesma aba mostrariam os mesmos casos '
+        + 'em dois lugares, e cada uma com as suas regras.');
+    }
+  });
+
+  var planilha = planilhaAtiva_();
+  var abaExistente = planilha.getSheetByName(nomeDaAba);
+  var temDado = abaExistente && quantasLinhasPreenchidas_(abaExistente) > 0;
+
+  if (temDado && !aproveitar) {
+    throw new Error('A aba "' + nomeDaAba + '" já existe e tem dado dentro. '
+      + 'Escolha outro nome de aba, ou marque "aproveitar a aba que já existe" '
+      + '— aí o canal passa a trabalhar essa base como ela está, sem mexer no '
+      + 'cabeçalho dela.');
+  }
+
+  if (temDado) {
+    // A aba fica COMO ESTÁ. Só confere o mínimo e acrescenta o que falta.
+    var estrutura = estruturaDaAba_(nomeDaAba, true);
+    if (posicaoDaColuna_(estrutura, 'Id') < 0) {
+      throw new Error('A aba "' + nomeDaAba + '" não tem coluna de Id, e sem '
+        + 'ela o sistema não sabe de qual linha cada caso é — nem para abrir, '
+        + 'nem para editar. Crie uma coluna chamada "id" na aba e tente de '
+        + 'novo.');
+    }
+    garantirColunasDeControle_(nomeDaAba);
+  } else {
+    // Aba nova, ou aba vazia que estava sobrando: nasce no tamanho exato.
+    criarAbaDoContrato_(planilha, {
+      aba: nomeDaAba,
+      titulo: nome,
+      controle: true,
+      // Pré-formatar linha custa célula do orçamento de 10 milhões, e canal
+      // novo começa sem volume. Duzentas é espaço para começar; a grade
+      // cresce sozinha quando encher, em garantirLinhasNaGrade_.
+      reserva: 200,
+      colunas: [{ cabecalho: 'id', tipo: 'identificador', protegido: true }]
+        .concat(RECC_COLUNAS_DE_CONTROLE)
+    });
+  }
+
+  esquecerEstruturaLida_();
+
+  var ultima = 0;
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    ultima = Math.max(ultima, Number(canal.Ordem) || 0);
+  });
+
+  var criado = inserirRegistro_('CANAIS', {
+    Nome: nome,
+    Descricao: String(dados.descricao || ''),
+    Aba: nomeDaAba,
+    ColunaDaData: '',
+    ColunaDaHora: '',
+    ColunaDoStatus: '',
+    ColunasDaFila: '',
+    ColunasDaBusca: '',
+    MetaMensalPorPessoa: 0,
+    ColunaDaFinalizacao: '',
+    ColunaDaAreaResponsavel: '',
+    ColunaDoValor: '',
+    SituacoesDestacadas: '',
+    // Canal novo nasce conferindo: é o lado seguro, e desligar é um clique.
+    ConfereSusepBloqueada: true,
+    Icone: String(dados.icone || ''),
+    Ordem: ultima + 1,
+    Ativo: true
+  });
+
+  esquecerEstruturaLida_();
+
+  /*
+   * AS COLUNAS SÓ SÃO REGISTRADAS AGORA, depois de a linha de CANAIS existir.
+   *
+   * `registrarColunaEmCampos_` descobre o CanalId procurando, em CANAIS, quem
+   * aponta para esta aba. Chamado antes, ele não acha ninguém e grava o campo
+   * com CanalId vazio — o campo existe em CAMPOS e NÃO aparece em Cadastrar
+   * Caso, porque `listarCamposDoCanal` filtra por canal. O canal nasceria com
+   * o formulário vazio e a planilha cheia de colunas, sem nenhum erro no
+   * caminho. Foi exatamente o que aconteceu na primeira versão desta função.
+   */
+  var colunasRegistradas = temDado ? registrarColunasQueJaExistem_(nomeDaAba) : [];
+
+  esquecerEstruturaLida_();
+  registrarAuditoria_('canal.criar', 'CANAIS', criado.__id,
+    nome + ' — aba ' + nomeDaAba + (temDado ? ' (aba aproveitada)' : ''));
+
+  return {
+    id: criado.__id,
+    nome: nome,
+    aba: nomeDaAba,
+    abaAproveitada: !!temDado,
+    colunasRegistradas: colunasRegistradas,
+    proximosPassos: [
+      'Em Cadastrar Caso, crie os campos do formulário deste canal.',
+      'Volte aqui e aponte a coluna da data e a coluna da situação.',
+      'Em Cadastrar Caso › Listas, cadastre as situações deste canal.',
+      'Em Níveis de acesso, marque quem enxerga este canal.'
+    ]
+  };
+}
+
+/**
+ * O nome de aba que o sistema sugere para um canal chamado X.
+ *
+ * `BASE_` na frente porque é assim que se chamam as abas de caso, e o prefixo
+ * é o que separa, de olho, a base do que é cadastro ou configuração.
+ *
+ * Acento e espaço saem: nome de aba com acento atravessa o Apps Script sem
+ * problema, mas atravessa fórmula, exportação e Power BI com tropeço — e
+ * descobrir isso depois custa mais do que o acento ali vale.
+ */
+function nomeDeAbaSugerido_(nome) {
+  // NÃO usa `normalizarParaComparar_` aqui: aquela função também tira os
+  // espaços, e "Auto Frota" sairia como BASE_AUTOFROTA — uma palavra só, que
+  // ninguém reconhece de relance na barra de abas da planilha. Aqui o espaço
+  // precisa virar "_", e não desaparecer.
+  var semAcento = String(nome || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  var limpo = semAcento.toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return 'BASE_' + (limpo || 'NOVO');
+}
+
+/**
+ * Recusa um nome de aba que o sistema não pode usar.
+ *
+ * Os dois prefixos reservados são os que o próprio sistema gera ou espera:
+ * `ANALISE_` é do gerador de análises, que apaga e refaz essas abas; e um
+ * nome que já é do contrato apontaria o canal novo para a base de outro.
+ */
+function conferirQueONomeDaAbaServe_(nomeDaAba) {
+  var nome = String(nomeDaAba || '').trim();
+  if (!nome) throw new Error('Diga em que aba este canal vai gravar.');
+
+  if (nome.indexOf(RECC_PREFIXO_ANALISE) === 0) {
+    throw new Error('O prefixo "' + RECC_PREFIXO_ANALISE + '" é das abas de '
+      + 'análise, que o sistema apaga e refaz. Um canal ali perderia os casos '
+      + 'na próxima geração. Escolha outro nome.');
+  }
+  if (RECC_ESQUEMA[nome]) {
+    throw new Error('A aba "' + nome + '" é do contrato do sistema. Escolha '
+      + 'outro nome: duas coisas na mesma aba sempre acabam em dado perdido.');
+  }
+  if (nome.charAt(0) === '_') {
+    throw new Error('Nome de aba não começa com "_": esse prefixo marca o que '
+      + 'é de sistema, e o Power BI o usa para saber o que ignorar.');
+  }
+}
+
+/**
+ * Registra em CAMPOS as colunas que JÁ EXISTEM numa aba aproveitada.
+ *
+ * Sem isto, o canal apontaria para uma base cheia de colunas e o Cadastrar
+ * Caso dele apareceria vazio: quem lista os campos do formulário é CAMPOS, e
+ * não o cabeçalho da aba.
+ *
+ * As colunas de controle ficam de fora — elas são do sistema, e ninguém as
+ * digita. O tipo de cada coluna nasce TEXTO, que é o padrão seguro: ele
+ * aceita qualquer conteúdo, e quem souber que a coluna é data ou dinheiro
+ * troca o tipo em Cadastrar Caso. Chutar o tipo pela amostra gravaria um
+ * número onde havia um código com zero à esquerda.
+ */
+function registrarColunasQueJaExistem_(nomeDaAba) {
+  var estrutura = estruturaDaAba_(nomeDaAba, true);
+  var jaEmCampos = {};
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Aba) !== normalizarParaComparar_(nomeDaAba)) return;
+    jaEmCampos[normalizarParaComparar_(campo.Cabecalho)] = true;
+  });
+
+  var registradas = [];
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    var texto = String(cabecalho || '').trim();
+    if (!texto || texto.charAt(0) === '_') return;
+    if (normalizarParaComparar_(texto) === 'id') return;
+    if (jaEmCampos[normalizarParaComparar_(texto)]) return;
+
+    registrarColunaEmCampos_(nomeDaAba, texto, RECC_TIPO_DE_DADO.TEXTO, posicao + 1);
+    registradas.push(texto);
+  });
+  return registradas;
 }
 
 /**
@@ -1903,251 +2393,4 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   };
 }
 
-// ============================================================================
-//  AS AUSÊNCIAS E OS FERIADOS — O CALENDÁRIO DA OPERAÇÃO
-// ============================================================================
-/*
- * Duas listas pequenas que mexem numa conta grande: a meta.
- *
- * Elas vivem em Configurações porque são DADO da operação, e não estrutura —
- * férias mudam todo mês, e quem as cadastra é quem monta a escala, não quem
- * mexe em planilha. Por isso não pedem senha de administrador: pedem a
- * permissão de configurar, como o resto da tela.
- */
 
-/**
- * As ausências cadastradas, da mais recente para a mais antiga.
- *
- * Vem com o NOME de quem está fora já resolvido: a aba guarda o Id, que é o
- * certo, mas uma tela mostrando "0000000007 está de férias" não serve para
- * ninguém.
- */
-function listarAusencias() {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-
-  var nomePorId = {};
-  lerRegistros_('USUARIOS').forEach(function (pessoa) {
-    nomePorId[String(pessoa.Id)] = String(pessoa.Nome || '');
-  });
-
-  var hoje = new Date();
-  hoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-
-  return lerRegistros_('AUSENCIAS').map(function (linha) {
-    var de = converterParaData_(linha.De);
-    var ate = converterParaData_(linha.Ate);
-
-    return {
-      id: linha.__id,
-      usuarioId: String(linha.UsuarioId || ''),
-      // Nome vazio quer dizer que a pessoa saiu do cadastro. A linha continua
-      // aparecendo — apagá-la da tela esconderia uma ausência que ainda está
-      // descontando dias de alguém.
-      nome: nomePorId[String(linha.UsuarioId || '')] || '(pessoa não cadastrada)',
-      motivo: String(linha.Motivo || ''),
-      de: de ? comoSeEscreve_(de) : '',
-      ate: ate ? comoSeEscreve_(ate) : '',
-      observacao: String(linha.Observacao || ''),
-      diasUteis: (de && ate) ? diasUteisEntre_(de, ate) : 0,
-      // Para a tela separar o que já passou do que está valendo agora.
-      acontecendoAgora: !!(de && ate && de <= hoje && ate >= hoje),
-      jaPassou: !!(ate && ate < hoje)
-    };
-  }).sort(function (um, outro) {
-    return String(outro.de).split('/').reverse().join('')
-      .localeCompare(String(um.de).split('/').reverse().join(''));
-  });
-}
-
-/**
- * Cadastra ou altera uma ausência.
- *
- * As duas datas são obrigatórias e a ordem é conferida aqui. Uma ausência sem
- * fim ficaria descontando dias para sempre, e uma com as pontas trocadas
- * descontaria zero — as duas erram a meta em silêncio, que é o que este
- * cadastro inteiro existe para evitar.
- */
-function salvarAusencia(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  dados = dados || {};
-
-  var usuarioId = converterParaIdentificador_(dados.usuarioId);
-  if (!usuarioId) throw new Error('Diga de quem é a ausência.');
-
-  var pessoa = buscarRegistros_('USUARIOS', 'Id', usuarioId, 1)[0];
-  if (!pessoa) {
-    throw new Error('A pessoa ' + usuarioId + ' não está cadastrada em Usuários.');
-  }
-
-  var de = converterParaData_(dados.de);
-  var ate = converterParaData_(dados.ate);
-  if (!de) throw new Error('Informe o primeiro dia da ausência.');
-  if (!ate) throw new Error('Informe o último dia da ausência.');
-  if (de > ate) {
-    throw new Error('O primeiro dia (' + comoSeEscreve_(de) + ') é depois do '
-      + 'último (' + comoSeEscreve_(ate) + '). Confira as duas datas.');
-  }
-
-  var motivo = String(dados.motivo || '').trim();
-  if (!motivo) throw new Error('Diga o motivo — férias, licença, afastamento.');
-
-  var campos = {
-    UsuarioId: usuarioId,
-    Motivo: motivo,
-    De: de,
-    Ate: ate,
-    Observacao: String(dados.observacao || '')
-  };
-
-  var id = converterParaIdentificador_(dados.id);
-  if (id) {
-    atualizarRegistro_('AUSENCIAS', id, campos);
-    registrarAuditoria_('ausencia.editar', 'AUSENCIAS', id, String(pessoa.Nome));
-    return { id: id };
-  }
-
-  var criada = inserirRegistro_('AUSENCIAS', campos);
-  registrarAuditoria_('ausencia.criar', 'AUSENCIAS', criada.__id,
-    pessoa.Nome + ': ' + motivo + ' de ' + comoSeEscreve_(de)
-    + ' a ' + comoSeEscreve_(ate));
-  return { id: criada.__id };
-}
-
-/** Tira a ausência da conta. Exclusão lógica: a linha fica, some da tela. */
-function excluirAusencia(id) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-
-  var alvo = converterParaIdentificador_(id);
-  if (!alvo) throw new Error('Diga qual ausência deve sair.');
-
-  ocultarRegistro_('AUSENCIAS', alvo);
-  registrarAuditoria_('ausencia.excluir', 'AUSENCIAS', alvo, '');
-  return true;
-}
-
-/**
- * Os feriados: os que o administrador cadastrou E os que o sistema calcula.
- *
- * Os dois na mesma resposta, e marcados, porque a pergunta que a tela precisa
- * responder é "o dia 20 de novembro está coberto?" — e a resposta pode vir de
- * qualquer um dos dois lados. Mostrar só os cadastrados faria a operação
- * cadastrar o Natal por via das dúvidas, e depois duvidar do resto.
- */
-function listarFeriados(ano) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-
-  var alvo = Number(ano) || (new Date()).getFullYear();
-
-  var nacionais = feriadosNacionaisDoAno_(alvo);
-  var cadastrados = lerRegistros_('FERIADOS').filter(function (linha) {
-    var quando = converterParaData_(linha.Data);
-    return quando && quando.getFullYear() === alvo;
-  }).map(function (linha) {
-    var quando = converterParaData_(linha.Data);
-    return {
-      id: linha.__id,
-      data: comoSeEscreve_(quando),
-      chave: chaveDoDia_(quando),
-      nome: String(linha.Nome || ''),
-      tipo: String(linha.Tipo || ''),
-      // SIM aqui não é "é feriado": é "neste dia nós TRABALHAMOS", e serve
-      // para cancelar um feriado que o sistema calculou sozinho.
-      trabalha: converterParaSimOuNao_(linha.Trabalha) === 'SIM',
-      doSistema: false
-    };
-  });
-
-  var cancelados = {};
-  cadastrados.forEach(function (um) {
-    if (um.trabalha) cancelados[um.chave] = true;
-  });
-
-  var doSistema = Object.keys(nacionais).sort().map(function (chave) {
-    var partes = chave.split('-');
-    return {
-      id: '',
-      data: partes[2] + '/' + partes[1] + '/' + partes[0],
-      chave: chave,
-      nome: nacionais[chave],
-      tipo: 'Nacional',
-      // Se o administrador marcou Trabalha = SIM neste dia, o nacional está
-      // cancelado — e a tela precisa mostrar isso, não escondê-lo.
-      cancelado: !!cancelados[chave],
-      doSistema: true
-    };
-  });
-
-  return {
-    ano: alvo,
-    anos: anosParaEscolher_(),
-    doSistema: doSistema,
-    cadastrados: cadastrados.sort(function (um, outro) {
-      return um.chave.localeCompare(outro.chave);
-    }),
-    diasUteisNoAno: diasUteisEntre_(new Date(alvo, 0, 1), new Date(alvo, 11, 31))
-  };
-}
-
-/** O ano passado, o corrente e o que vem — que é o que se cadastra. */
-function anosParaEscolher_() {
-  var atual = (new Date()).getFullYear();
-  return [atual - 1, atual, atual + 1];
-}
-
-/**
- * Cadastra ou altera um feriado da operação.
- *
- * Não impede cadastrar em cima de um nacional: cadastrar o mesmo dia com
- * `Trabalha = NAO` é inofensivo (já era feriado), e com `Trabalha = SIM` é
- * justamente como se cancela um. Recusar tiraria a única forma de dizer
- * "neste ano nós trabalhamos no Corpus Christi".
- */
-function salvarFeriado(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  dados = dados || {};
-
-  var quando = converterParaData_(dados.data);
-  if (!quando) throw new Error('Informe a data do feriado.');
-
-  var nome = String(dados.nome || '').trim();
-  if (!nome) throw new Error('Dê um nome ao feriado — é o que a lista mostra.');
-
-  var campos = {
-    Data: quando,
-    Nome: nome,
-    Tipo: String(dados.tipo || 'Municipal'),
-    Trabalha: dados.trabalha === true ? 'SIM' : 'NAO'
-  };
-
-  var id = converterParaIdentificador_(dados.id);
-  var resposta;
-  if (id) {
-    atualizarRegistro_('FERIADOS', id, campos);
-    registrarAuditoria_('feriado.editar', 'FERIADOS', id, nome);
-    resposta = { id: id };
-  } else {
-    var criado = inserirRegistro_('FERIADOS', campos);
-    registrarAuditoria_('feriado.criar', 'FERIADOS', criado.__id,
-      nome + ' em ' + comoSeEscreve_(quando));
-    resposta = { id: criado.__id };
-  }
-
-  // O calendário guardado na execução aponta para o mundo de antes desta
-  // gravação. Sem esquecer, a própria tela que acabou de cadastrar ainda
-  // mostraria o dia como útil.
-  esquecerOCalendario_();
-  return resposta;
-}
-
-/** Tira o feriado da conta. */
-function excluirFeriado(id) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-
-  var alvo = converterParaIdentificador_(id);
-  if (!alvo) throw new Error('Diga qual feriado deve sair.');
-
-  ocultarRegistro_('FERIADOS', alvo);
-  registrarAuditoria_('feriado.excluir', 'FERIADOS', alvo, '');
-  esquecerOCalendario_();
-  return true;
-}

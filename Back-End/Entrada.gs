@@ -211,7 +211,6 @@ function montarPacoteDePartida_(quem) {
       email: quem.email,
       cargo: quem.cargo,
       nivelAcesso: quem.nivel,
-      canalQueAtende: quem.usuario['Canal que atende']
     },
     permissoes: {
       telas: quem.permissoes.telas,
@@ -331,6 +330,13 @@ function canaisVisiveis_() {
         metaMensalPorPessoa: Number(canal.MetaMensalPorPessoa) || 0,
         colunaDaFinalizacao: canal.ColunaDaFinalizacao,
         colunaDaAreaResponsavel: canal.ColunaDaAreaResponsavel,
+        colunaDoValor: String(canal.ColunaDoValor || ''),
+        situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
+        // VAZIO VALE SIM, de propósito: um canal cadastrado antes desta coluna
+        // existir continua conferindo o bloqueio, que é o que ele já fazia.
+        // Só quem disser "Não" em letras deixa de conferir.
+        confereSusepBloqueada:
+          normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
         icone: canal.Icone
       };
     });
@@ -879,7 +885,7 @@ function colunaDoResponsavel_(estrutura) {
 /**
  * Filtra os registros pelo alcance do nível.
  *
- * EQUIPE é definida pelo "Canal que atende" do cadastro do usuário — é a
+ * EQUIPE é definida pelo NÍVEL DE ACESSO do usuário — é a
  * única noção de equipe que existe na estrutura hoje. Se a operação passar a
  * ter hierarquia de supervisão, isso vira uma coluna nova em USUARIOS e só
  * esta função muda.
@@ -913,7 +919,7 @@ function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
 }
 
 /**
- * Quem é da MINHA equipe: as pessoas cadastradas no mesmo canal que eu atendo.
+ * Quem é da MINHA equipe: as pessoas cadastradas no MESMO CANAL que eu.
  *
  * Mora aqui, fora do `filtrarPeloAlcance_`, porque duas telas fazem a mesma
  * pergunta por motivos diferentes — o alcance para RECORTAR o que eu vejo, e a
@@ -921,21 +927,82 @@ function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
  * a regra duas vezes faria as duas divergirem, e aí "a minha equipe" na
  * performance não seria a mesma "minha equipe" que o alcance enxerga.
  *
- * Devolve null — e não lista vazia — para quem NÃO PERTENCE a canal nenhum, que
- * é o caso de quem administra. As duas coisas são diferentes: "a minha equipe
- * não tem ninguém" e "eu não tenho equipe" pedem respostas diferentes na tela.
+ * Devolve null — e não lista vazia — para quem NÃO PERTENCE a canal nenhum,
+ * que é o caso de quem administra. As duas coisas são diferentes: "a minha
+ * equipe não tem ninguém" e "eu não tenho equipe" pedem respostas diferentes
+ * na tela, e quem decide o que fazer com cada uma é quem chama.
  */
 function nomesDaMinhaEquipe_(quem) {
-  var meuCanal = normalizarParaComparar_((quem.usuario || {})['Canal que atende']);
+  /*
+   * A EQUIPE É O CANAL, por decisão do PO: "a Equipe deve vir atrelada aos
+   * canais existentes. Se escolhi um específico já dá para saber a qual equipe
+   * pertence".
+   *
+   * Já foram duas outras coisas, e vale saber por quê. Primeiro foi o campo
+   * "Canal que atende" do cadastro — texto livre, que a operação preenchia com
+   * o que fazia sentido para ela ("Vida Individual", "Vida em Grupo"), quase
+   * nunca com o nome do canal do PGO: dois analistas da mesma equipe
+   * escrevendo diferente viravam duas equipes de um. Depois foi o nível de
+   * acesso, por uma rodada.
+   *
+   * O CANAL resolve o problema do texto livre sem o efeito colateral do nível:
+   * é escolha de lista, então não há como divergir por grafia; e separa quem
+   * faz trabalho diferente, o que o nível não fazia — a RET e o VG podem ter
+   * o mesmo nível de acesso e são equipes distintas.
+   */
+  var meuCanal = converterParaIdentificador_((quem.usuario || {}).CanalId);
   if (!meuCanal) return null;
 
   var nomes = [];
   lerRegistros_('USUARIOS').forEach(function (usuario) {
     if (normalizarParaComparar_(usuario.Ativo) !== 'sim') return;
-    if (normalizarParaComparar_(usuario['Canal que atende']) !== meuCanal) return;
+    if (converterParaIdentificador_(usuario.CanalId) !== meuCanal) return;
     nomes.push(String(usuario.Nome));
   });
   return nomes;
+}
+
+/**
+ * O NOME do canal da pessoa — que é o nome da equipe dela.
+ *
+ * A Minha Performance mostra isto ao lado do nome, e precisa do nome e não do
+ * Id: "0000000002" embaixo do próprio nome não diz nada a ninguém. Vazio para
+ * quem administra, que não pertence a canal nenhum, e vazio também para um
+ * canal que foi apagado — melhor o espaço em branco que o Id cru na tela.
+ */
+function nomeDoCanalDaPessoa_(quem) {
+  var meuCanal = converterParaIdentificador_((quem.usuario || {}).CanalId);
+  if (!meuCanal) return '';
+
+  var achado = '';
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    if (converterParaIdentificador_(canal.Id) === meuCanal) {
+      achado = String(canal.Nome || '');
+    }
+  });
+  return achado;
+}
+
+/**
+ * A equipe para COMPARAR — o grupo do ranking da Minha Performance.
+ *
+ * É quase sempre a mesma resposta de `nomesDaMinhaEquipe_`, com uma exceção:
+ * QUEM OLHA DE CIMA compara com o canal inteiro.
+ *
+ * Quem tem escopo TODOS ou CANAL já enxerga os casos de todo mundo no Trabalho
+ * e na Busca — `filtrarPeloAlcance_` nem chega a perguntar quem é a equipe
+ * dessa pessoa. Devolver null aqui é dizer "sem recorte", e o ranking é o do
+ * canal, que é o que faz sentido para quem olha de cima.
+ *
+ * Isto NÃO vale para a Produtividade RECC. Lá o alcance EQUIPE é uma escolha
+ * explícita do nível, feita em Configurações; passar por cima dela faria
+ * "equipe" e "canal" virarem a mesma coisa, e o seletor de alcance perderia
+ * uma das quatro respostas.
+ */
+function equipeParaComparar_(quem) {
+  var escopo = (quem.permissoes || {}).escopo;
+  if (escopo === RECC_ESCOPOS.TODOS || escopo === RECC_ESCOPOS.CANAL) return null;
+  return nomesDaMinhaEquipe_(quem);
 }
 
 // ============================================================================
@@ -1174,7 +1241,6 @@ function listarUsuarios() {
       id: String(usuario.Id || ''),
       nome: String(usuario.Nome || ''),
       email: String(usuario.Email || ''),
-      canalQueAtende: String(usuario['Canal que atende'] || ''),
       canalId: canalId,
       // Sem canal NÃO é falta de dado: é o administrador, que atende todas.
       canal: canalId ? (canais[canalId] || 'Canal desligada') : '',
@@ -1183,7 +1249,6 @@ function listarUsuarios() {
       nivelAcessoId: converterParaIdentificador_(usuario.NivelAcessoId),
       nivelAcesso:
         catalogo[converterParaIdentificador_(usuario.NivelAcessoId)] || 'Sem dados',
-      matricula: converterParaIdentificador_(usuario.Matricula),
       ativo: normalizarParaComparar_(usuario.Ativo) === 'sim',
       administrador: ehAdministrador_(usuario.Id),
       dataCadastro: comoDataEHora_(usuario.DataCadastro),
@@ -1252,12 +1317,10 @@ function salvarUsuario(dados) {
   var campos = {
     Nome: String(dados.nome).trim(),
     Email: email,
-    'Canal que atende': String(dados.canalQueAtende || '').trim(),
     // Canal VAZIA é válida: é o administrador, que atende todas e delega.
     CanalId: converterParaIdentificador_(dados.canalId),
     CargoId: converterParaIdentificador_(dados.cargoId),
     NivelAcessoId: converterParaIdentificador_(dados.nivelAcessoId),
-    Matricula: converterParaIdentificador_(dados.matricula),
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
   };
 

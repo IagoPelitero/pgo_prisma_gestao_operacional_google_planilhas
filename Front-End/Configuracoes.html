@@ -31,11 +31,6 @@ var TelaConfiguracoes = (function () {
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
-  // O ano que a lista de feriados mostra. Fora de `dados` de propósito: `dados`
-  // é esvaziado a cada troca de seção, e o ano escolhido tem de sobreviver a
-  // salvar um feriado — senão a tela pularia de volta para o ano corrente a
-  // cada gravação, no meio de quem está cadastrando o ano que vem.
-  var anoDoCalendario = (new Date()).getFullYear();
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -165,7 +160,6 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'catalogo') return carregarListas();
     if (secaoAtual === 'canais') return carregarCanais();
     if (secaoAtual === 'paineis') return carregarPaineis();
-    if (secaoAtual === 'calendario') return carregarCalendario();
     if (secaoAtual === 'analises') return carregarAnalises();
     if (secaoAtual === 'identidade') return desenharIdentidade();
     if (secaoAtual === 'estrutura') return carregarEstrutura();
@@ -324,11 +318,106 @@ var TelaConfiguracoes = (function () {
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
-      + '</div></form>';
+      + (podeExcluirEsteCampo(campo)
+        ? '<button type="button" class="botao vazado perigo" id="excluir-campo">'
+          + 'Excluir campo</button>' : '')
+      + '</div>'
+      + porQueNaoDaParaExcluir(campo)
+      + '</form>';
 
     elemento('form-campo').addEventListener('submit', function (evento) {
       evento.preventDefault();
       salvarCampo(campo);
+    });
+    var excluir = elemento('excluir-campo');
+    if (excluir) {
+      excluir.addEventListener('click', function () {
+        abrirExclusaoDoCampo(campo);
+      });
+    }
+  }
+
+  /**
+   * Este campo pode ser excluído?
+   *
+   * Quem decide de verdade é o servidor, em `excluirCampo` — esta função só
+   * evita oferecer um botão que vai ser recusado. Botão escondido nunca foi
+   * segurança, e por isso as duas conferências existem.
+   */
+  function podeExcluirEsteCampo(campo) {
+    if (!resumo.podeMexerNaEstrutura) return false;
+    if (campo.protegido) return false;
+    return !(campo.usadoPeloCanal && campo.usadoPeloCanal.length);
+  }
+
+  /**
+   * Quando não dá, a tela DIZ POR QUE — e diz o caminho.
+   *
+   * Botão que simplesmente não está ali faz a pessoa procurar onde ele foi,
+   * desconfiar da permissão dela e, no fim, perguntar. Uma frase resolve.
+   */
+  function porQueNaoDaParaExcluir(campo) {
+    if (podeExcluirEsteCampo(campo)) return '';
+    if (!resumo.podeMexerNaEstrutura) return '';
+
+    if (campo.protegido) {
+      return '<p class="config-explica">Este campo faz parte do contrato da '
+        + 'aba: o próprio sistema grava nessa coluna, e os relatórios contam '
+        + 'com ela. Para tirá-lo do formulário sem apagar nada, ponha '
+        + '<strong>Aparece no formulário</strong> em Não.</p>';
+    }
+    return '<p class="config-explica">Não dá para excluir enquanto a coluna '
+      + '<strong>' + escapar(campo.cabecalho) + '</strong> estiver sendo usada '
+      + 'em: ' + escapar(campo.usadoPeloCanal.join(', ')) + '. Troque essas '
+      + 'referências em Canais de trabalho e volte aqui.</p>';
+  }
+
+  /**
+   * O painel de exclusão, com a escolha que importa: a COLUNA sai ou fica?
+   *
+   * As duas são sem volta pela tela, e são bem diferentes de tamanho. Tirar o
+   * campo mexe no formulário de amanhã. Apagar a coluna apaga o que já foi
+   * digitado em todos os casos — por isso ela é uma marcação separada, nasce
+   * desmarcada, e o texto não suaviza o que acontece.
+   */
+  function abrirExclusaoDoCampo(campo) {
+    elemento('config-painel').innerHTML =
+      '<form class="config-form" id="form-excluir-campo">'
+      + tituloDoPainel('Excluir "' + campo.rotulo + '"', 'Não tem desfazer')
+      + '<p class="config-aviso forte">O campo sai do formulário de '
+      + '<strong>todos</strong> os canais que o usam e deixa de ser '
+      + 'perguntado. Isto não se desfaz pela tela.</p>'
+      + caixaDeMarcar('apagar-coluna',
+        'Apagar também a coluna "' + campo.cabecalho + '" da planilha', false)
+      + '<p class="config-explica">Desmarcado, a coluna fica onde está, com '
+      + 'tudo o que já foi digitado nela — o sistema só para de gravar ali. '
+      + 'Marcado, a coluna sai da aba e <strong>o que estava gravado nela em '
+      + 'todos os casos vai embora com ela</strong>.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao vazado perigo">Excluir</button>'
+      + '<button type="button" class="botao vazado" id="desistir-exclusao">'
+      + 'Desistir</button>'
+      + '</div></form>';
+
+    elemento('desistir-exclusao').addEventListener('click', function () {
+      desenharPainelDoCampo(campo);
+    });
+    elemento('form-excluir-campo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var apagarAColuna = marcado('apagar-coluna');
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('excluirCampo', canalEscolhida, campo.id, apagarAColuna)
+          .entao(function (saiu) {
+            escolhido = null;
+            avisarSalvo('Campo "' + saiu.rotulo + '" excluído.'
+              + (saiu.colunaApagada
+                ? ' A coluna "' + saiu.cabecalho + '" saiu da planilha, com '
+                  + saiu.linhasComValor + ' valor(es).'
+                : ' A coluna "' + saiu.cabecalho + '" continua na planilha.'));
+            carregarCampos();
+          })
+          .senao(mostrarErroNoPainel);
+      });
     });
   }
 
@@ -490,16 +579,17 @@ var TelaConfiguracoes = (function () {
           + (texto(canal.id) === texto(escolhida) ? ' selected' : '') + '>'
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
-      + '<em>Quem administra fica em "todas os canais": pode cadastrar em '
-      + 'qualquer uma e delegar. Escolher um canal é para quem trabalha nela.'
-      + '</em></label>';
+      + '<em>O canal é também a EQUIPE da pessoa: quem está no mesmo canal '
+      + 'aparece junto na Minha Performance. Quem administra fica em "todas os '
+      + 'canais" — pode cadastrar em qualquer uma e delegar, e não entra em '
+      + 'equipe nenhuma.</em></label>';
   }
 
   function desenharPainelDoUsuario(usuario) {
     var ehNovo = !usuario;
     var pessoa = usuario || {
-      id: '', nome: '', email: '', canalQueAtende: '', canalId: '', cargoId: '',
-      nivelAcessoId: '', matricula: '', ativo: true
+      id: '', nome: '', email: '', canalId: '', cargoId: '',
+      nivelAcessoId: '', ativo: true
     };
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-usuario">'
@@ -508,14 +598,13 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('nome', 'Nome', pessoa.nome, '')
       + campoDeTexto('email', 'E-mail Google', pessoa.email,
         'É por ele que a pessoa entra. Tem de ser a conta que ela usa.')
-      + campoDeTexto('canal', 'Canal que atende', pessoa.canalQueAtende,
-        'Usado pelo alcance EQUIPE: quem atende o mesmo canal vê os mesmos casos.')
       + caixaDeCanalDaPessoa(pessoa.canalId)
-      + campoDeTexto('matricula', 'Matrícula', pessoa.matricula, '')
       + caixaDeItens('cargo', 'Cargo', dados.cargos, pessoa.cargoId,
         'O cargo é só descrição — quem decide o acesso é o nível abaixo.')
       + caixaDeItens('nivel', 'Nível de acesso', dados.niveis, pessoa.nivelAcessoId,
-        'É isto que define telas, campos, ações e alcance.')
+        'Define telas, campos, ações e alcance. Quem forma a EQUIPE é o CANAL, '
+        + 'logo acima — dois níveis diferentes no mesmo canal são a mesma '
+        + 'equipe.')
       + caixaDeSimNao('ativo', 'Pode entrar', pessoa.ativo !== false)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
@@ -529,9 +618,7 @@ var TelaConfiguracoes = (function () {
         id: pessoa.id,
         nome: valorDe('nome'),
         email: valorDe('email'),
-        canalQueAtende: valorDe('canal'),
         canalId: valorDe('canal-da-pessoa'),
-        matricula: valorDe('matricula'),
         cargoId: valorDe('cargo'),
         nivelAcessoId: valorDe('nivel'),
         ativo: marcado('ativo')
@@ -585,10 +672,13 @@ var TelaConfiguracoes = (function () {
     }).join('');
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.niveis.length + ' níveis</span></div>'
+      + '<span class="config-titulo">' + dados.niveis.length + ' níveis</span>'
+      + '<button type="button" class="botao pequeno" id="novo-nivel">'
+      + 'Criar nível</button></div>'
       + '<p class="config-explica">O cargo não decide nada. É o nível de acesso '
       + 'que diz quais telas abrem, o que a pessoa pode fazer e até onde ela '
-      + 'enxerga os dados.</p>'
+      + 'enxerga os dados. Quem forma a EQUIPE é o canal da pessoa, em '
+      + 'Usuários.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     ligarCliques('[data-nivel]', function (botao) {
@@ -596,12 +686,35 @@ var TelaConfiguracoes = (function () {
       desenharNiveis();
     });
 
+    elemento('novo-nivel').addEventListener('click', function () {
+      escolhido = null;
+      desenharNiveis();
+      desenharPainelDoNivel(null);
+    });
+
     if (escolhido) desenharPainelDoNivel(acharNaLista(dados.niveis, escolhido.id));
-    else painelVazio('Escolha um nível para ver o que ele pode.');
+    else painelVazio('Escolha um nível para ver o que ele pode, ou crie um novo.');
   }
 
+  /**
+   * O painel de um nível — o que existe, ou um NOVO quando vem nulo.
+   *
+   * O nível novo nasce no MAIS FECHADO que existe: nenhuma tela, nenhuma ação,
+   * "até onde enxerga" em PROPRIOS. Não é cerimônia — é a única escolha que
+   * não dá acesso a ninguém por descuido. Abrir é uma marcação de cada vez,
+   * decidida por quem está criando; nascer aberto seria decidir por ela.
+   *
+   * A produtividade nasce em EQUIPE porque é o padrão do sistema, o mesmo que
+   * vale para nível antigo sem alcance declarado — e porque esta tela é a da
+   * equipe, é para isso que ela existe.
+   */
   function desenharPainelDoNivel(nivel) {
-    if (!nivel) return painelVazio('Escolha um nível.');
+    var ehNovo = !nivel;
+    nivel = nivel || {
+      id: '', nome: '', ativo: true, escopo: 'PROPRIOS',
+      canais: [], telas: [], acoes: [], escopoNaProdutividade: 'EQUIPE',
+      campos: {}, pessoas: 0
+    };
     var opcoes = dados.opcoesDeNivel;
 
     var telas = opcoes.telas.map(function (tela) {
@@ -669,7 +782,9 @@ var TelaConfiguracoes = (function () {
     }).join('');
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-nivel">'
-      + tituloDoPainel(nivel.nome, nivel.pessoas + ' pessoa(s) neste nível')
+      + tituloDoPainel(ehNovo ? 'Nível novo' : nivel.nome,
+        ehNovo ? 'Nasce fechado: marque o que ele abre'
+          : nivel.pessoas + ' pessoa(s) neste nível')
       + campoDeTexto('nome', 'Nome do nível', nivel.nome, '')
       + caixaDeSimNao('ativo', 'Nível em uso', nivel.ativo)
       + '<fieldset class="config-grupo"><legend>Telas que abrem</legend>'
@@ -685,7 +800,18 @@ var TelaConfiguracoes = (function () {
       + 'quer dizer todos</strong>, que é o caso de quem administra.</p>'
       + canaisDoNivel + '</fieldset>'
       + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button></div></form>';
+      + '<button type="submit" class="botao">'
+      + (ehNovo ? 'Criar nível' : 'Salvar') + '</button>'
+      + (ehNovo ? '<button type="button" class="botao vazado" id="desistir-nivel">'
+        + 'Desistir</button>' : '')
+      + '</div></form>';
+
+    var desistirDoNivel = elemento('desistir-nivel');
+    if (desistirDoNivel) {
+      desistirDoNivel.addEventListener('click', function () {
+        painelVazio('Escolha um nível para ver o que ele pode, ou crie um novo.');
+      });
+    }
 
     elemento('form-nivel').addEventListener('submit', function (evento) {
       evento.preventDefault();
@@ -719,8 +845,13 @@ var TelaConfiguracoes = (function () {
         escopoNaProdutividade: naProdutividade
           ? naProdutividade.value : (nivel.escopoNaProdutividade || 'EQUIPE'),
         campos: nivel.campos
-      }).entao(function () { avisarSalvo(); carregarNiveis(); })
-        .senao(mostrarErroNoPainel);
+      }).entao(function (idDoNivel) {
+        // Criado, o painel REABRE no nível novo em vez de voltar ao vazio:
+        // quem acabou de criar quase sempre quer conferir o que marcou.
+        if (ehNovo && idDoNivel) escolhido = { id: String(idDoNivel) };
+        avisarSalvo(ehNovo ? 'Nível criado.' : '');
+        carregarNiveis();
+      }).senao(mostrarErroNoPainel);
     });
   }
 
@@ -876,9 +1007,14 @@ var TelaConfiguracoes = (function () {
     }).join('');
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.canais.length + ' canais</span></div>'
-      + '<p class="config-explica">Aqui se ajusta o que o canal MOSTRA. Onde ela '
-      + 'mora — a aba da planilha — não muda: os casos já gravados estão lá.</p>'
+      + '<span class="config-titulo">' + dados.canais.length + ' canais</span>'
+      + (resumo.podeMexerNaEstrutura
+        ? '<button type="button" class="botao pequeno" id="novo-canal">'
+          + 'Criar canal</button>' : '')
+      + '</div>'
+      + '<p class="config-explica">Aqui se ajusta o que o canal MOSTRA — nome, '
+      + 'ícone, quais colunas viram fila. Onde ele mora, a aba da planilha, '
+      + 'não muda: os casos já gravados estão lá.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     ligarCliques('[data-canal]', function (botao) {
@@ -886,8 +1022,104 @@ var TelaConfiguracoes = (function () {
       desenharCanais();
     });
 
+    var novoCanal = elemento('novo-canal');
+    if (novoCanal) novoCanal.addEventListener('click', abrirCanalNovo);
+
     if (escolhido) desenharPainelDoCanal(acharNaLista(dados.canais, escolhido.id));
-    else painelVazio('Escolha um canal.');
+    else painelVazio('Escolha um canal, ou crie um novo.');
+  }
+
+  /**
+   * O painel do CANAL NOVO. Cria uma aba na planilha — não tem desfazer.
+   *
+   * Pede só o que ninguém pode decidir pela operação: o nome, o ícone e em que
+   * aba ele grava. Coluna da data, situação, cartão e meta ficam para depois,
+   * cada um na tela onde já se ajusta — e a lista de próximos passos que o
+   * servidor devolve aparece aqui, para a pessoa não ficar com um canal
+   * criado e nenhuma ideia do que fazer em seguida.
+   */
+  function abrirCanalNovo() {
+    escolhido = null;
+    desenharCanais();
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-canal-novo">'
+      + tituloDoPainel('Canal novo', 'Cria uma aba na planilha')
+      + '<p class="config-aviso forte">Isto escreve na planilha de produção e '
+      + '<strong>não tem desfazer</strong>. A aba nasce com a coluna '
+      + '<strong>id</strong> e as de controle; os campos do formulário são '
+      + 'criados depois, em Cadastrar Caso.</p>'
+      + campoDeTexto('nome', 'Nome do canal', '',
+        'É o que aparece no seletor do Trabalho.')
+      + campoDeTexto('descricao', 'Descrição', '',
+        'Uma linha explicando o que este canal trata.')
+      + campoDeTexto('aba', 'Aba da planilha', '',
+        'Em branco, o sistema sugere BASE_ com o nome do canal. Sem acento e '
+        + 'sem espaço — é o nome que o Power BI vai ler.')
+      + caixaDeOpcoes('icone', 'Ícone', SeletorDeCanal.nomesDosIcones(),
+        SeletorDeCanal.nomesDosIcones()[0], '')
+      + caixaDeMarcar('aproveitar-aba',
+        'Aproveitar a aba que já existe, com os dados dela', false,
+        'Marque se a base já está na planilha. O cabeçalho dela não é tocado: '
+        + 'as colunas que já estão lá viram campos, e as de controle são '
+        + 'acrescentadas se faltarem. A aba precisa ter uma coluna "id".')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Criar canal</button>'
+      + '<button type="button" class="botao vazado" id="desistir-canal">'
+      + 'Desistir</button>'
+      + '</div></form>';
+
+    elemento('desistir-canal').addEventListener('click', function () {
+      painelVazio('Escolha um canal, ou crie um novo.');
+    });
+
+    elemento('form-canal-novo').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      var envio = {
+        nome: valorDe('nome'),
+        descricao: valorDe('descricao'),
+        aba: valorDe('aba'),
+        icone: valorDe('icone'),
+        aproveitarAAba: marcado('aproveitar-aba')
+      };
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('criarCanal', envio)
+          .entao(function (criado) {
+            avisarSalvo('Canal "' + criado.nome + '" criado na aba '
+              + criado.aba + '.');
+            escolhido = { id: String(criado.id) };
+            carregarCanais();
+            mostrarProximosPassos(criado);
+          })
+          .senao(mostrarErroNoPainel);
+      });
+    });
+  }
+
+  /**
+   * O que fazer agora que o canal existe.
+   *
+   * Fica num recado FIXO no painel, e não num aviso flutuante: são quatro
+   * passos em telas diferentes, e aviso que some em três segundos não dá tempo
+   * de ninguém ler quatro passos.
+   */
+  function mostrarProximosPassos(criado) {
+    elemento('config-painel').innerHTML = '<div class="config-form">'
+      + tituloDoPainel(criado.nome, 'Criado na aba ' + criado.aba)
+      + (criado.abaAproveitada
+        ? '<p class="config-explica">A aba já existia, e ficou como estava. '
+          + (criado.colunasRegistradas.length
+            ? escapar(String(criado.colunasRegistradas.length))
+              + ' coluna(s) dela viraram campos do formulário, todas como '
+              + 'texto — troque o tipo de cada uma em Cadastrar Caso.'
+            : 'Nenhuma coluna nova precisou ser registrada.')
+          + '</p>'
+        : '')
+      + '<p class="config-explica"><strong>Próximos passos</strong></p>'
+      + '<ol class="config-passos">'
+      + criado.proximosPassos.map(function (passo) {
+        return '<li>' + escapar(passo) + '</li>';
+      }).join('')
+      + '</ol></div>';
   }
 
   function desenharPainelDoCanal(canal) {
@@ -919,6 +1151,22 @@ var TelaConfiguracoes = (function () {
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
         colunas, canal.colunaDaAreaResponsavel, '')
+      + caixaDeOpcoes('colunaDoValor', 'Coluna do valor', colunas,
+        canal.colunaDoValor,
+        'A coluna de dinheiro deste canal. É dela que sai o gráfico "Valor por '
+        + 'situação", na Produtividade RECC e na Minha Performance. Em branco, '
+        + 'o gráfico não aparece.')
+      + campoDeTexto('situacoesDestacadas', 'Situações com barra própria',
+        canal.situacoesDestacadas,
+        'Separadas por vírgula, na ordem em que você quer ler — por exemplo '
+        + '"Reteve, Não reteve, Sem sucesso". Todas as outras somam numa barra '
+        + 'só, "Demais situações", e o total fecha a conta. Situação sem caso '
+        + 'no período aparece valendo zero, de propósito: sumir faria a conta '
+        + 'parecer completa com um pedaço faltando.')
+      + caixaDeOpcoes('icone', 'Ícone', SeletorDeCanal.nomesDosIcones(),
+        canal.icone,
+        'O desenho que aparece no seletor do Trabalho. Nome desconhecido cai '
+        + 'no losango.')
       + campoDeTexto('ordem', 'Ordem no seletor', canal.ordem, '')
       + caixaDeSimNao('ativo', 'Canal em uso', canal.ativo)
       + (canal.situacoes.length
@@ -942,6 +1190,9 @@ var TelaConfiguracoes = (function () {
         metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
+        colunaDoValor: valorDe('colunaDoValor'),
+        situacoesDestacadas: valorDe('situacoesDestacadas'),
+        icone: valorDe('icone'),
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarCanais(); })
@@ -1953,8 +2204,8 @@ var TelaConfiguracoes = (function () {
 
     return '<div class="config-legado">'
       + '<h4>Planilha de cadastros — a segunda base</h4>'
-      + '<p class="config-explica">Corretoras, SUSEPs bloqueadas, produtos e as '
-      + 'duas listas de analista podem morar em OUTRA planilha. O PGO lê dela '
+      + '<p class="config-explica">Corretoras, SUSEPs bloqueadas e as duas '
+      + 'listas de analista podem morar em OUTRA planilha. O PGO lê dela '
       + 'na hora, sem copiar nada: o que mudar lá vale aqui na leitura '
       + 'seguinte. Isso deixa esta planilha mais leve e evita manter o mesmo '
       + 'cadastro em dois lugares. <strong>O PGO só lê</strong> — para editar '
@@ -2176,281 +2427,6 @@ var TelaConfiguracoes = (function () {
       + (ligado ? ' checked' : '') + '>'
       + '<span>' + escapar(rotulo)
       + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</span></label>';
-  }
-
-  /* --------------------------------------------------------- o calendário */
-
-  /*
-    DUAS LISTAS PEQUENAS QUE MEXEM NUMA CONTA GRANDE.
-
-    A meta de cada pessoa se reparte pelos DIAS ÚTEIS do mês, e desconta os
-    dias em que ela esteve fora. Quem cadastra isto é quem monta a escala — não
-    quem mexe em planilha —, e por isso as duas moram aqui.
-
-    Os feriados NACIONAIS aparecem na tela mas não se cadastram: o sistema os
-    calcula, inclusive Carnaval e Corpus Christi, que mudam de data todo ano.
-    Mostrá-los é o que evita a operação cadastrar o Natal por via das dúvidas.
-  */
-
-  function carregarCalendario() {
-    aguarde('Lendo o calendário…');
-    // Três idas ao servidor, encadeadas: quem pode ficar ausente (os usuários),
-    // os motivos que a operação cadastrou, e o calendário em si.
-    Servidor.chamar('listarUsuarios')
-      .entao(function (usuarios) {
-        dados.usuarios = usuarios;
-        Servidor.chamar('listarCatalogo', 'AUSENCIA_MOTIVO', '')
-          .entao(function (motivos) {
-            dados.motivosDeAusencia = motivos.filter(function (um) {
-              return um.ativo;
-            });
-            Servidor.chamar('listarAusencias')
-              .entao(function (ausencias) {
-                dados.ausencias = ausencias;
-                Servidor.chamar('listarFeriados', anoDoCalendario)
-                  .entao(function (feriados) {
-                    dados.feriados = feriados;
-                    desenharCalendario();
-                  })
-                  .senao(falhou);
-              })
-              .senao(falhou);
-          })
-          .senao(falhou);
-      })
-      .senao(falhou);
-  }
-
-  function desenharCalendario() {
-    if (respostaAtrasada('calendario')) return;
-
-    var linhas = dados.ausencias.map(function (uma) {
-      return '<li class="config-item'
-        + (escolhido && escolhido.id === uma.id ? ' atual' : '')
-        + (uma.jaPassou ? ' desligado' : '') + '">'
-        + '<button type="button" class="abrir" data-ausencia="'
-        + escapar(uma.id) + '">'
-        + '<span class="nome">' + escapar(uma.nome) + '</span>'
-        + '<span class="detalhe">' + escapar(uma.motivo) + ' · '
-        + escapar(uma.de) + ' a ' + escapar(uma.ate)
-        + ' · ' + uma.diasUteis + ' dia(s) útil(eis)'
-        + (uma.acontecendoAgora ? ' · fora agora' : '')
-        + '</span></button></li>';
-    }).join('');
-
-    elemento('config-lista').innerHTML =
-      '<div class="config-lista-cabeca">'
-      + '<span class="config-titulo">' + dados.ausencias.length + ' ausência(s)</span>'
-      + '<button type="button" class="botao pequeno" id="nova-ausencia">'
-      + 'Nova ausência</button></div>'
-      + (linhas
-        ? '<ul class="config-itens">' + linhas + '</ul>'
-        : '<p class="config-vazio">Ninguém com ausência cadastrada.</p>')
-      + desenharOsFeriados();
-
-    elemento('nova-ausencia').addEventListener('click', function () {
-      escolhido = null;
-      desenharPainelDaAusencia(null);
-    });
-    ligarCliques('[data-ausencia]', function (botao) {
-      escolhido = { id: botao.getAttribute('data-ausencia') };
-      desenharCalendario();
-    });
-    ligarOsFeriados();
-
-    if (escolhido) {
-      desenharPainelDaAusencia(acharNaLista(dados.ausencias, escolhido.id));
-    } else {
-      painelVazio('Escolha uma ausência, ou cadastre uma nova.');
-    }
-  }
-
-  function desenharOsFeriados() {
-    var calendario = dados.feriados;
-
-    var doSistema = calendario.doSistema.map(function (um) {
-      return '<li class="feriado-do-sistema' + (um.cancelado ? ' cancelado' : '') + '">'
-        + '<span class="quando">' + escapar(um.data) + '</span>'
-        + '<span class="qual">' + escapar(um.nome)
-        + (um.cancelado ? ' — a operação trabalha neste dia' : '') + '</span></li>';
-    }).join('');
-
-    var daOperacao = calendario.cadastrados.map(function (um) {
-      return '<li class="config-item">'
-        + '<button type="button" class="abrir" data-feriado="'
-        + escapar(um.id) + '">'
-        + '<span class="nome">' + escapar(um.data) + ' · ' + escapar(um.nome) + '</span>'
-        + '<span class="detalhe">' + escapar(um.tipo)
-        + (um.trabalha ? ' · a operação TRABALHA neste dia' : ' · não se trabalha')
-        + '</span></button></li>';
-    }).join('');
-
-    return '<div class="config-lista-cabeca calendario-cabeca">'
-      + '<span class="config-titulo">Feriados de ' + calendario.ano
-      + ' · ' + calendario.diasUteisNoAno + ' dias úteis no ano</span>'
-      + '<select id="ano-do-calendario" class="filtro">'
-      + calendario.anos.map(function (ano) {
-        return '<option value="' + ano + '"'
-          + (ano === calendario.ano ? ' selected' : '') + '>' + ano + '</option>';
-      }).join('') + '</select>'
-      + '<button type="button" class="botao pequeno" id="novo-feriado">'
-      + 'Novo feriado</button></div>'
-      + '<p class="config-dica">Os nacionais o sistema calcula sozinho, '
-      + 'inclusive os que mudam de data todo ano. Cadastre só o que é seu: '
-      + 'municipal, facultativo, emenda.</p>'
-      + '<ul class="feriados-do-sistema">' + doSistema + '</ul>'
-      + (daOperacao
-        ? '<ul class="config-itens">' + daOperacao + '</ul>'
-        : '<p class="config-vazio">Nenhum feriado próprio cadastrado.</p>');
-  }
-
-  function ligarOsFeriados() {
-    elemento('ano-do-calendario').addEventListener('change', function () {
-      anoDoCalendario = Number(this.value);
-      escolhido = null;
-      carregarCalendario();
-    });
-    elemento('novo-feriado').addEventListener('click', function () {
-      escolhido = null;
-      desenharPainelDoFeriado(null);
-    });
-    ligarCliques('[data-feriado]', function (botao) {
-      var id = botao.getAttribute('data-feriado');
-      desenharPainelDoFeriado(acharNaLista(dados.feriados.cadastrados, id));
-    });
-  }
-
-  function desenharPainelDaAusencia(ausencia) {
-    var atual = ausencia
-      || { id: '', usuarioId: '', motivo: '', de: '', ate: '', observacao: '' };
-
-    elemento('config-painel').innerHTML =
-      '<form class="config-form" id="form-ausencia">'
-      + tituloDoPainel(atual.id ? atual.nome : 'Nova ausência',
-        'A pessoa continua entrando no sistema. O que muda é a CONTA: '
-        + 'estes dias saem da meta dela e da média da equipe.')
-      + caixaDeItens('au-pessoa', 'Quem', pessoasParaAusencia(), atual.usuarioId, '')
-      + caixaDeOpcoes('au-motivo', 'Motivo', motivosDeAusencia(), atual.motivo, '')
-      + campoDeData('au-de', 'Primeiro dia', atual.de, '')
-      + campoDeData('au-ate', 'Último dia', atual.ate,
-        'As duas pontas entram na conta.')
-      + campoDeTexto('au-obs', 'Observação', atual.observacao, 'Opcional.')
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + (atual.id
-        ? '<button type="button" class="botao suave" id="excluir-ausencia">'
-          + 'Excluir</button>'
-        : '')
-      + '</div></form>';
-
-    elemento('form-ausencia').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      salvarAAusencia(atual.id);
-    });
-    if (atual.id) {
-      elemento('excluir-ausencia').addEventListener('click', function () {
-        Formulario.confirmarExclusao(
-          'Tirar a ausência de ' + atual.nome + '?',
-          'Os dias voltam a contar na meta dela.',
-          function () {
-            Servidor.chamar('excluirAusencia', atual.id)
-              .entao(function () { escolhido = null; carregarCalendario(); })
-              .senao(falhou);
-          });
-      });
-    }
-  }
-
-  function salvarAAusencia(id) {
-    Servidor.chamar('salvarAusencia', {
-      id: id,
-      usuarioId: valorDe('au-pessoa'),
-      motivo: valorDe('au-motivo'),
-      de: dataDe('au-de'),
-      ate: dataDe('au-ate'),
-      observacao: valorDe('au-obs')
-    })
-      .entao(function (resposta) {
-        escolhido = { id: resposta.id };
-        carregarCalendario();
-      })
-      .senao(falhou);
-  }
-
-  function desenharPainelDoFeriado(feriado) {
-    var atual = feriado
-      || { id: '', data: '', nome: '', tipo: 'Municipal', trabalha: false };
-
-    elemento('config-painel').innerHTML =
-      '<form class="config-form" id="form-feriado">'
-      + tituloDoPainel(atual.id ? atual.nome : 'Novo feriado',
-        'Um dia que sai da conta de dias úteis.')
-      + campoDeData('fe-data', 'Data', atual.data, '')
-      + campoDeTexto('fe-nome', 'Nome', atual.nome,
-        'É o que a lista mostra. "Aniversário da cidade", "Emenda de Corpus Christi".')
-      + caixaDeOpcoes('fe-tipo', 'Tipo',
-        ['Municipal', 'Estadual', 'Facultativo', 'Emenda'], atual.tipo,
-        'Só rótulo, para quem lê a lista. A conta não olha para ele.')
-      + caixaDeMarcar('fe-trabalha', 'Neste dia a operação TRABALHA',
-        atual.trabalha,
-        'Marque para CANCELAR um feriado nacional que o sistema calculou — '
-        + 'o ano em que se trabalhou no Corpus Christi, por exemplo.')
-      + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + (atual.id
-        ? '<button type="button" class="botao suave" id="excluir-feriado">'
-          + 'Excluir</button>'
-        : '')
-      + '</div></form>';
-
-    elemento('form-feriado').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('salvarFeriado', {
-        id: atual.id,
-        data: dataDe('fe-data'),
-        nome: valorDe('fe-nome'),
-        tipo: valorDe('fe-tipo'),
-        trabalha: marcado('fe-trabalha')
-      })
-        .entao(function () { escolhido = null; carregarCalendario(); })
-        .senao(falhou);
-    });
-    if (atual.id) {
-      elemento('excluir-feriado').addEventListener('click', function () {
-        Formulario.confirmarExclusao(
-          'Tirar o feriado "' + atual.nome + '"?',
-          'O dia volta a contar como dia útil.',
-          function () {
-            Servidor.chamar('excluirFeriado', atual.id)
-              .entao(function () { escolhido = null; carregarCalendario(); })
-              .senao(falhou);
-          });
-      });
-    }
-  }
-
-  /** Quem pode receber uma ausência: todo mundo que está cadastrado e ativo. */
-  function pessoasParaAusencia() {
-    return (dados.usuarios || []).filter(function (uma) {
-      return uma.ativo;
-    }).map(function (uma) {
-      return { id: uma.id, nome: uma.nome };
-    });
-  }
-
-  /*
-    Os motivos vêm do catálogo quando a operação os cadastrou; senão, destes
-    quatro. Uma lista vazia travaria o cadastro inteiro no dia da instalação —
-    e obrigar a cadastrar "Férias" antes de poder registrar férias é atrito
-    sem motivo.
-  */
-  function motivosDeAusencia() {
-    var doCatalogo = (dados.motivosDeAusencia || []).map(function (um) {
-      return um.nome;
-    });
-    return doCatalogo.length
-      ? doCatalogo
-      : ['Férias', 'Licença', 'Afastamento', 'Treinamento'];
   }
 
   /* ------------------------------------------------------------ utilidades */

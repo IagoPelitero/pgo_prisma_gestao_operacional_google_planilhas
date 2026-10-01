@@ -666,20 +666,6 @@ button { font: inherit; color: inherit; }
 }
 
 /*
-  Quem está de férias na lista da Importação.
-
-  A marca é em tom de ATENÇÃO, e não de erro: a pessoa pode ser marcada de
-  propósito, para um lote que só vai ser trabalhado quando ela voltar. Vermelho
-  diria "não faça isso", e não é isso que o sistema sabe.
-*/
-.config-chave.esta-fora span { color: var(--suave); }
-.config-chave.esta-fora em.fora {
-  font-style: normal; font-size: 11.5px; font-weight: 600;
-  color: var(--atencao);
-}
-.aviso-de-ausencia { color: var(--atencao); }
-
-/*
   O recado de que a origem vai escrever numa coluna de produtividade.
 
   Fundo, e não só cor de texto: este é o único aviso da tela que fala de uma
@@ -834,6 +820,18 @@ table.fila thead th {
 }
 table.fila tbody tr:last-child td { border-bottom: 0; }
 table.fila tbody tr:hover { background: var(--superficie-2); }
+/*
+   A linha do TOTAL, no pé da tabela de números de um gráfico.
+
+   Fundo igual ao do cabeçalho e um traço em cima: ela precisa se ler como
+   "fecha a conta", e não como mais um item da lista. Sem o traço, o total
+   vira a última linha da tabela — e alguém o soma com as outras.
+*/
+table.fila tfoot td {
+  background: var(--superficie-2);
+  border-top: 2px solid var(--linha-forte);
+  border-bottom: 0;
+}
 table.fila tr.aberta { background: var(--destaque-tenue); }
 table.fila tr.aberta:hover { background: var(--destaque-tenue); }
 
@@ -1333,6 +1331,17 @@ table.fila tr.importar-igual { color: var(--tenue); }
   margin: 6px 0 12px;
 }
 
+/*
+   Os próximos passos de um canal recém-criado. Lista NUMERADA de propósito:
+   a ordem importa — não dá para cadastrar a situação de um canal antes de o
+   campo da situação existir.
+*/
+.config-passos {
+  font-size: 12.5px; color: var(--suave); line-height: 1.6;
+  margin: 6px 0 12px; padding-left: 20px;
+}
+.config-passos li { margin-bottom: 4px; }
+
 .config-itens { list-style: none; margin: 0; padding: 0; }
 .config-item {
   display: flex; align-items: center; gap: 8px;
@@ -1451,22 +1460,6 @@ table.fila tr.importar-igual { color: var(--tenue); }
   margin-bottom: 10px;
 }
 .config-lista-cabeca .config-titulo { margin-right: auto; }
-.calendario-cabeca { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--linha); }
-
-.feriados-do-sistema { list-style: none; margin: 10px 0 14px; padding: 0; }
-.feriado-do-sistema {
-  display: flex; gap: 10px; align-items: baseline;
-  padding: 5px 0; font-size: 13px; color: var(--texto-suave);
-  border-bottom: 1px dashed var(--linha);
-}
-.feriado-do-sistema .quando {
-  font-variant-numeric: tabular-nums; color: var(--tenue); min-width: 84px;
-}
-.feriado-do-sistema .qual { overflow-wrap: anywhere; }
-/* Cancelado por "a operação trabalha neste dia": continua na lista, riscado,
-   porque some-lo faria parecer que o sistema esqueceu o feriado. */
-.feriado-do-sistema.cancelado .qual { text-decoration: line-through; opacity: .65; }
-
 .config-vazio { color: var(--tenue); font-size: 13.5px; margin: 0; }
 .config-erro {
   margin: 0 0 12px; font-size: 13px; font-weight: 600; line-height: 1.45;
@@ -1536,6 +1529,20 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .par-do-caso > strong {
   font-weight: 500; font-size: 14px; overflow-wrap: anywhere;
 }
+/*
+  O que vem direto da planilha, e não de um campo do formulário.
+
+  O aviso atravessa a grade inteira (`grid-column: 1 / -1`) de propósito: ele
+  separa dois blocos, e separador que ocupa só uma coluna vira um par estranho
+  no meio dos outros. O par em si fica mais apagado — é leitura, e competir em
+  peso com o que a pessoa preenche tiraria a atenção do que ela veio ver.
+*/
+.pares-do-sistema {
+  grid-column: 1 / -1; margin: 10px 0 0;
+  padding-top: 14px; border-top: 1px solid var(--linha);
+  font-size: 12px; color: var(--tenue);
+}
+.par-do-caso.do-sistema > strong { font-weight: 400; color: var(--tenue); }
 
 .historico { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linha); }
 .historico h4 { margin: 0 0 14px; font-size: 16px; letter-spacing: -.01em; }

@@ -65,17 +65,17 @@ function gravacoesRecusadas(nomes) {
 function conferenciasDeExemplo(chamar) {
   const exemplos = {
     corretoras: [
-      'SUSEP\tCorretora\tCanal\tSegmento',
-      '9012345\tCorretora Aurora\tCorretora\tDiamante',
-      '9012346\tSouza & Filhos Seguros\tCorretora\tDiamante',
-      '9012347\tAgência Litoral\tAgente\tDemais corretoras',
-      '\tSem SUSEP nenhuma\tCorretora\tDiamante'
+      'SUSEP\tCorretora\tSucursal\tSegmento\tConsultor',
+      'RET10A\tCorretora Aurora\t12\tDiamante\tMarina Alencar',
+      'RET11B\tSouza & Filhos Seguros\t12\tDiamante\tMarina Alencar',
+      'RET12C\tAgência Litoral\t58\tDemais corretoras\tRogério Pinto',
+      '\tSem SUSEP nenhuma\t12\tDiamante\t'
     ].join('\n'),
     susepsBloqueadas: [
-      'SUSEP;Motivo;Corretora',
-      '9012348;Fraude comprovada em 3 propostas;Corretora Meridiano',
-      '9012349;Documentação reincidente;Corretora Sul',
-      '9012350;;Sem motivo declarado'
+      'SUSEP;Corretora;Sucursal;Coordenador comercial',
+      'RET20D;Corretora Meridiano;12;Coordenação Sul',
+      'RET21E;Corretora Sul;58;Coordenação Norte',
+      ';Sem SUSEP nenhuma;12;Coordenação Sul'
     ].join('\n')
   };
 
@@ -181,9 +181,6 @@ function pontePreparada(respostas) {
     + '      origemDosCadastros: function () {\n'
     + '        responder(respostas.corretoras.origem);\n'
     + '      },\n'
-    + '      listarProdutos: function () {\n'
-    + '        responder(respostas.corretoras.produtos);\n'
-    + '      },\n'
     + '      listarSusepsBloqueadas: function () {\n'
     + '        responder(respostas.corretoras.bloqueadas);\n'
     + '      },\n'
@@ -197,7 +194,19 @@ function pontePreparada(respostas) {
     // servidor que confere na produção, gravada aqui com as respostas de
     // alguns textos de exemplo. Colar outra coisa responde honestamente que a
     // prévia não tem essa resposta, em vez de inventar uma.
-    + '      conferirImportacao: function (tipo, texto) {\n'
+    //
+    // A tela manda uma FONTE desde que o PO pediu importar de outra planilha
+    // pelo Id. A prévia não tem planilha nenhuma atrás dela, então esse
+    // caminho responde dizendo isso — e não "não tenho essa resposta", que
+    // mandaria a pessoa procurar um exemplo que não existe.
+    + '      conferirImportacao: function (tipo, fonte) {\n'
+    + '        var pedido = fonte || {};\n'
+    + '        if (typeof pedido !== "string" && pedido.tipo === "planilha") {\n'
+    + '          return recusar("A prévia não abre outra planilha: ela é uma "\n'
+    + '            + "cópia estática, sem Google Planilhas por trás. No sistema "\n'
+    + '            + "de verdade, o Id e a aba são lidos na hora.");\n'
+    + '        }\n'
+    + '        var texto = typeof pedido === "string" ? pedido : pedido.texto;\n'
     + '        var chave = tipo + "|" + String(texto || "").trim();\n'
     + '        var achado = respostas.corretoras.conferidos[chave];\n'
     + '        if (achado) return responder(achado);\n'
@@ -287,13 +296,7 @@ function pontePreparada(respostas) {
     + '      listarAnalises: function () {\n'
     + '        responder(respostas.configuracoes.analises);\n'
     + '      },\n'
-    + '      listarAusencias: function () {\n'
-    + '        responder(respostas.configuracoes.ausencias);\n'
-    + '      },\n'
-    + '      listarFeriados: function (ano) {\n'
-    + '        responder(respostas.configuracoes.feriados[String(ano)]\n'
-    + '          || respostas.configuracoes.feriados[respostas.configuracoes.anoDoCalendario]);\n'
-    + '      },\n'
+
     + '      conferirEstruturaDaPlanilha: function () {\n'
     + '        responder(respostas.configuracoes.laudo);\n'
     + '      },\n'
@@ -303,7 +306,8 @@ function pontePreparada(respostas) {
     + '      listarAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.trilha);\n'
     + '      },\n'
-    + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'reordenarCampos',
+    + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'excluirCampo', 'reordenarCampos',
+      'criarCanal',
       'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarUsuario',
       'desativarUsuario', 'salvarCanal', 'salvarIdentidade', 'definirLogo',
       'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
@@ -312,8 +316,7 @@ function pontePreparada(respostas) {
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
       'salvarConfiguracaoDoLegado', 'importarCasos',
-      'salvarConfiguracaoDosCadastros',
-      'salvarAusencia', 'excluirAusencia', 'salvarFeriado', 'excluirFeriado'])
+      'salvarConfiguracaoDosCadastros'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -360,7 +363,7 @@ function gerar(pastaDeSaida) {
     { Analista: 'Ana Martins', Status: 'Transmissão pendente', Canal: 'E-mail',
       'Data de entrada': diasAtras(6), 'Horário': '09:14',
       'Nome do segurado': 'Vanessa Duarte Lima', 'Documento (CPF)': '00012345678',
-      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Vida',
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida',
       Assunto: 'Proposta parada na transmissão há três dias' },
     { Analista: 'Ana Martins', Status: 'Pendente', Canal: 'Chat',
       'Data de entrada': diasAtras(5), 'Horário': '11:02',
@@ -370,12 +373,12 @@ function gerar(pastaDeSaida) {
     { Analista: 'Diego Castilho', Status: '1º contato realizado', Canal: 'Telefone',
       'Data de entrada': diasAtras(4), 'Horário': '14:36',
       'Nome do segurado': 'Luciana Prado', 'Documento (CPF)': '00033344455',
-      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Vida',
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida',
       Assunto: 'Retorno sobre documentação pendente' },
     { Analista: 'Diego Castilho', Status: '2º contato realizado', Canal: 'Telefone',
       'Data de entrada': diasAtras(3), 'Horário': '10:20',
       'Nome do segurado': 'Beatriz Nogueira', 'Documento (CPF)': '00077788899',
-      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Residencial',
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Residencial',
       Assunto: 'Segunda tentativa — corretor não retornou' },
     { Analista: 'Ana Martins', Status: 'Não trabalhado', Canal: 'Site',
       'Data de entrada': diasAtras(2), 'Horário': '08:45',
@@ -387,12 +390,12 @@ function gerar(pastaDeSaida) {
     { Analista: 'Diego Castilho', Status: 'Pendente', Canal: 'Corretora',
       'Data de entrada': diasAtras(2), 'Horário': '15:10',
       'Nome do segurado': 'Helena Braga', 'Documento (CPF)': '00044455566',
-      Corretora: 'Corretora Sul Atlântico', SUSEP: '8123456', Ramo: 'Vida',
+      Corretora: 'Corretora Sul Atlântico', SUSEP: 'RET02B', Ramo: 'Vida',
       Assunto: 'Corretora que ainda não está no cadastro' },
     { Analista: 'Ana Martins', Status: 'Concluído', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '16:47',
       'Nome do segurado': 'Ricardo Costa', 'Documento (CPF)': '00055566677',
-      Corretora: 'Corretora ABC', SUSEP: '1234567', Ramo: 'Vida',
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida',
       'Data da finalização': diasAtras(1), 'horário da finalização': '17:30',
       Assunto: 'Resolvido no primeiro contato, sem encaminhar' },
     { Analista: 'Diego Castilho', Status: 'Concluído', Canal: 'Ouvidoria',
@@ -426,7 +429,7 @@ function gerar(pastaDeSaida) {
       CNPJ: '11222333000181', Subestipulante: 'Metalúrgica Andrade',
       'Início da vigência': mesesAtras(42), 'Meses de vigência': 42,
       'Quantidade de vidas': 148, 'MOVSINT/MOVESEG': 'MOVSINT',
-      SUSEP: '2233445', Periodicidade: 'Mensal', Lead: 'Renovação',
+      SUSEP: 'RET00J', Periodicidade: 'Mensal', Lead: 'Renovação',
       Status: 'Retido', 'Motivo da liberação ou recusa': 'Manteve com reajuste menor',
       'Prêmio mensal': 14820.5, 'Prêmio anual': 177846,
       'Margem de contribuição': 31.2, 'Quantidade de parcelas vencidas': 0,
@@ -439,7 +442,7 @@ function gerar(pastaDeSaida) {
       CNPJ: '44555666000122', Subestipulante: 'Transportes Vale Verde',
       'Início da vigência': mesesAtras(9), 'Meses de vigência': 9,
       'Quantidade de vidas': 62, 'MOVSINT/MOVESEG': 'MOVESEG',
-      SUSEP: '3344556', Periodicidade: 'Trimestral', Lead: 'Inadimplência',
+      SUSEP: 'RET01A', Periodicidade: 'Trimestral', Lead: 'Inadimplência',
       Status: 'Aguardando', 'Motivo da liberação ou recusa': '',
       'Prêmio mensal': 5240, 'Prêmio anual': 62880,
       'Margem de contribuição': 28.4, 'Quantidade de parcelas vencidas': 2,
@@ -452,7 +455,7 @@ function gerar(pastaDeSaida) {
       CNPJ: '77888999000155', Subestipulante: 'Clínica São Bento',
       'Início da vigência': mesesAtras(27), 'Meses de vigência': 27,
       'Quantidade de vidas': 31, 'MOVSINT/MOVESEG': 'MOVSINT',
-      SUSEP: '4455667', Periodicidade: 'Anual', Lead: 'Cobrança',
+      SUSEP: 'RET02B', Periodicidade: 'Anual', Lead: 'Cobrança',
       Status: 'Negado', 'Motivo da liberação ou recusa': 'Margem não comporta desconto',
       'Prêmio mensal': 2110.75, 'Prêmio anual': 25329,
       'Margem de contribuição': 19.8, 'Quantidade de parcelas vencidas': 1,
@@ -464,7 +467,7 @@ function gerar(pastaDeSaida) {
       CNPJ: '99000111000133', Subestipulante: 'Construtora Horizonte',
       'Início da vigência': mesesAtras(63), 'Meses de vigência': 63,
       'Quantidade de vidas': 410, 'MOVSINT/MOVESEG': 'MOVESEG',
-      SUSEP: '5566778', Periodicidade: 'Semestral', Lead: 'Reativação',
+      SUSEP: 'RET03C', Periodicidade: 'Semestral', Lead: 'Reativação',
       Status: 'Reativado', 'Motivo da liberação ou recusa': 'Cliente quitou o débito',
       'Prêmio mensal': 39400, 'Prêmio anual': 472800,
       'Margem de contribuição': 27, 'Quantidade de parcelas vencidas': 0,
@@ -487,7 +490,7 @@ function gerar(pastaDeSaida) {
   chamar('inserirVariosRegistros_')('BASE_RET', [
     {
       'data de recepção do protocolo': diasAtras(7), analista: 'Ana Martins',
-      SUSEP: '1234567', segmento: 'Diamante',
+      SUSEP: 'RET00J', segmento: 'Diamante',
       'Código origem da proposta': '0000000101', 'número da proposta': '0000010024',
       'nome do cliente': 'Cliente Fictício 024', 'cod produto': '0000000031',
       produto: 'Prestamista', grupo: 'Vida', sistema: 'SIVIDA',
@@ -518,7 +521,7 @@ function gerar(pastaDeSaida) {
     },
     {
       'data de recepção do protocolo': diasAtras(5), analista: 'Marcos Vieira',
-      SUSEP: '1234567', segmento: 'Diamante',
+      SUSEP: 'RET00J', segmento: 'Diamante',
       'Código origem da proposta': '0000000103', 'número da proposta': '0000010022',
       'nome do cliente': 'Cliente Fictício 022', 'cod produto': '0000000033',
       produto: 'Vida Individual', grupo: 'Vida', sistema: 'SIVIDA',
@@ -534,7 +537,7 @@ function gerar(pastaDeSaida) {
     },
     {
       'data de recepção do protocolo': diasAtras(4), analista: 'Ana Martins',
-      SUSEP: '1234567', segmento: 'Diamante',
+      SUSEP: 'RET00J', segmento: 'Diamante',
       'Código origem da proposta': '0000000104', 'número da proposta': '0000010021',
       'nome do cliente': 'Cliente Fictício 021', 'cod produto': '0000000031',
       produto: 'Prestamista', grupo: 'Vida', sistema: 'SIVIDA',
@@ -566,7 +569,7 @@ function gerar(pastaDeSaida) {
     },
     {
       'data de recepção do protocolo': diasAtras(2), analista: 'Ana Martins',
-      SUSEP: '1234567', segmento: 'Diamante',
+      SUSEP: 'RET00J', segmento: 'Diamante',
       'Código origem da proposta': '0000000106', 'número da proposta': '0000010019',
       'nome do cliente': 'Cliente Fictício 019', 'cod produto': '0000000033',
       produto: 'Vida Individual', grupo: 'Vida', sistema: 'SIVIDA',
@@ -584,7 +587,7 @@ function gerar(pastaDeSaida) {
     },
     {
       'data de recepção do protocolo': diasAtras(1), analista: 'Marcos Vieira',
-      SUSEP: '1234567', segmento: 'Diamante',
+      SUSEP: 'RET00J', segmento: 'Diamante',
       'Código origem da proposta': '0000000107', 'número da proposta': '0000010018',
       'nome do cliente': 'Cliente Fictício 018', 'cod produto': '0000000031',
       produto: 'Prestamista', grupo: 'Vida', sistema: 'SIVIDA',
@@ -633,7 +636,6 @@ function gerar(pastaDeSaida) {
   chamar('atualizarRegistro_')('USUARIOS', eu.Id, {
     Nome: 'Ana Martins',
     CargoId: cargo.Id,
-    'Canal que atende': 'Vida Individual'
   });
 
   // Os outros analistas, para os seletores de responsável terem gente dentro.
@@ -646,7 +648,7 @@ function gerar(pastaDeSaida) {
    ['Patrícia Nunes', 'patricia@exemplo.com', 'Vida Coletiva']]
     .forEach(([nome, email, canal]) => {
       chamar('salvarUsuario')({
-        nome, email, canalQueAtende: canal,
+        nome, email,
         nivelAcessoId: nivelOperacao.Id, ativo: true
       });
     });
@@ -655,27 +657,22 @@ function gerar(pastaDeSaida) {
 
   // O formulário de cado canal e alguns exemplos de SUSEP, para a tela de
   // cadastro funcionar de verdade dentro da prévia.
-  chamar('inserirRegistro_')('CORRETORAS', {
-    Nome: 'Corretora ABC', Canal: 'Corretora', SUSEP: '1234567',
-    Corretora: 'Corretora ABC', Segmento: 'Diamante'
-  });
+  // As SUSEPs vêm com LETRA, como a operação as escreve — "RET00J". É o
+  // formato que o PO confirmou, e a prévia precisa mostrar isso: uma SUSEP só
+  // de dígito na foto do README ensinaria o formato errado.
   chamar('inserirVariosRegistros_')('CORRETORAS', [
-    { Nome: 'Marina Alencar', Canal: 'Corretora', SUSEP: '2345678',
-      Corretora: 'Corretora Horizonte', Segmento: 'Diamante' },
-    { Nome: 'Posto Central', Canal: 'Agente', SUSEP: '3456789',
-      Corretora: 'Agência Central', Segmento: 'Demais corretoras' },
-    { Nome: '', Canal: 'Corretora', SUSEP: '4567890',
-      Corretora: 'Corretora Novo Norte', Segmento: 'Demais corretoras' }
-  ]);
-  chamar('inserirVariosRegistros_')('PRODUTOS', [
-    { Produto: 'Prestamista', CodigoProduto: '0000000031' },
-    { Produto: 'Vida Individual', CodigoProduto: '0000000033' },
-    { Produto: 'Vida Coletiva', CodigoProduto: '0000000032' }
+    { SUSEP: 'RET00J', Corretora: 'Corretora ABC', Sucursal: '12',
+      Segmento: 'Diamante', Consultor: 'Marina Alencar' },
+    { SUSEP: 'RET01A', Corretora: 'Corretora Horizonte', Sucursal: '12',
+      Segmento: 'Diamante', Consultor: 'Marina Alencar' },
+    { SUSEP: 'RET02B', Corretora: 'Agência Central', Sucursal: '58',
+      Segmento: 'Demais corretoras', Consultor: 'Rogério Pinto' },
+    { SUSEP: 'RET03C', Corretora: 'Corretora Novo Norte', Sucursal: '58',
+      Segmento: 'Demais corretoras', Consultor: '' }
   ]);
   chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
-    SUSEP: '7654321', NomeCorretora: 'Corretora XYZ',
-    Motivo: 'CPF reincidente em três propostas no mesmo mês',
-    CpfReincidente: '00011122233', BloqueadaEm: new Date()
+    SUSEP: 'RET99Z', NomeCorretora: 'Corretora XYZ', Sucursal: '12',
+    CoordenadorComercial: 'Coordenação Sul', BloqueadaEm: new Date()
   });
 
   const formularios = {};
@@ -742,11 +739,6 @@ function gerar(pastaDeSaida) {
     importacao[canal.id] = chamar('opcoesDaImportacaoDeCasos')(canal.id);
   });
 
-  const calendarioPorAno = {};
-  chamar('listarFeriados()').anos.forEach((ano) => {
-    calendarioPorAno[String(ano)] = chamar('listarFeriados')(ano);
-  });
-
   const configuracoes = {
     cards: cards,
     cadastros: chamar('configuracaoDosCadastros()'),
@@ -764,12 +756,6 @@ function gerar(pastaDeSaida) {
     componentes: componentes,
     opcoesDeAnalise: chamar('opcoesDeAnalise()'),
     analises: chamar('listarAnalises()'),
-    ausencias: chamar('listarAusencias()'),
-    // Os TRÊS anos que o seletor oferece, e não só o corrente: na prévia não
-    // há servidor para responder quando alguém troca o ano, e um seletor que
-    // não responde é pior que seletor nenhum.
-    anoDoCalendario: String((new Date()).getFullYear()),
-    feriados: calendarioPorAno,
     diagnostico: chamar('diagnosticoDoSistema()')
   };
 
@@ -847,7 +833,6 @@ function gerar(pastaDeSaida) {
   const corretoras = {
     tabelas: tabelasDeCorretoras,
     origem: chamar('origemDosCadastros()'),
-    produtos: chamar('listarProdutos()'),
     bloqueadas: chamar('listarSusepsBloqueadas()'),
     exportado: chamar('exportarCorretoras')('', ''),
     importacoes: chamar('opcoesDaImportacao()'),
