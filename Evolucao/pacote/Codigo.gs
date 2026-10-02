@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-02 08:50
+   Gerado em 2026-10-02 09:05
    ========================================================================== */
 
 
@@ -13835,8 +13835,9 @@ function atualizarPGO() {
 
   esquecerEstruturaLida_();
 
-  // --- 3. o que o PO pediu para a RET --------------------------------------
+  // --- 3. o que o PO pediu para a RET e para a Mesa -------------------------
   feito = feito.concat(ligarOValorPorSituacaoDaRet_(pulados));
+  feito = feito.concat(tirarAConferenciaDeBloqueioDaMesa_(pulados));
   feito = feito.concat(criarOStatusSemSucesso_(pulados));
   feito = feito.concat(ligarAPropostaEAApoliceEmPedacos_(pulados));
 
@@ -14045,6 +14046,46 @@ function apagarAAbaDeProdutos_(pulados, paraVoce) {
   paraVoce.push('A aba PRODUTOS foi apagada, a seu pedido, com ' + quantas
     + ' linha(s). Se precisar dela de volta, ela está em Arquivo › Histórico '
     + 'de versões do Google Planilhas por 30 dias.');
+  return feito;
+}
+
+/**
+ * Deixa a Mesa Diamante de fora da conferência de SUSEP bloqueada.
+ *
+ * Pedido do PO: "no formulário de Mesa diamante não há necessidade de
+ * verificar se a SUSEP está ou não bloqueada, pode remover esse detalhe".
+ *
+ * NÃO BASTA CRIAR A COLUNA. Ela nasce VAZIA, e vazio vale SIM — é o que faz
+ * um canal antigo continuar conferindo, como já conferia. Então, para a
+ * instalação que já existe, criar a coluna deixava a Mesa exatamente como
+ * estava: conferindo. O pedido valia só para quem instalasse do zero.
+ *
+ * Achado conferindo pedido por pedido numa planilha antiga atualizada —
+ * foi o único dos vinte e quatro que não atravessou a migração.
+ *
+ * SÓ MEXE NO QUE ESTÁ EM BRANCO. Quem já marcou alguma coisa ali escolheu de
+ * propósito, e uma migração que passa por cima desfaz o trabalho de alguém
+ * sem avisar.
+ */
+function tirarAConferenciaDeBloqueioDaMesa_(pulados) {
+  var feito = [];
+  var mesa = lerRegistros_('CANAIS').filter(function (canal) {
+    return normalizarParaComparar_(canal.Aba) === 'basemesa';
+  })[0];
+
+  if (!mesa) {
+    pulados.push('não há canal apontando para a BASE_MESA');
+    return feito;
+  }
+  if (String(mesa.ConfereSusepBloqueada || '').trim()) {
+    pulados.push('a Mesa já tem a conferência de bloqueio escolhida ('
+      + mesa.ConfereSusepBloqueada + ')');
+    return feito;
+  }
+
+  atualizarRegistro_('CANAIS', mesa.Id, { ConfereSusepBloqueada: 'NAO' });
+  esquecerEstruturaLida_('CANAIS');
+  feito.push('Mesa Diamante: deixou de conferir a lista de SUSEPs bloqueadas');
   return feito;
 }
 

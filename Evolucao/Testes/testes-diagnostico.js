@@ -1550,6 +1550,10 @@ function rodarTestesDeDiagnostico() {
       CanalId: '', 'Canal que atende': 'Canal Que Nunca Existiu' });
     chamar('esquecerEstruturaLida_()');
 
+    // 6a. a conferência de bloqueio por canal não existia.
+    chamar('removerColuna_')('CANAIS', 'ConfereSusepBloqueada');
+    chamar('esquecerEstruturaLida_()');
+
     // 6b. a disponibilidade do analista não existia, nem a lista dela.
     chamar('removerColuna_')('USUARIOS', 'Disponibilidade');
     chamar('lerRegistros_("CATALOGO")').forEach((item) => {
@@ -1937,6 +1941,49 @@ function rodarTestesDeDiagnostico() {
       .some((uma) => uma.susep === 'RET66N'));
 
     verdadeiro(chamar('listarUsuarios()').length > 0);
+  });
+
+  teste('atualizar tira a conferência de bloqueio da Mesa Diamante', () => {
+    /*
+      CRIAR A COLUNA NÃO BASTA, e foi o único dos pedidos desta rodada que não
+      atravessava a migração.
+
+      A coluna nasce VAZIA, e vazio vale SIM — é o que faz um canal antigo
+      continuar conferindo, como já conferia. Então, para a instalação que já
+      existe, criar a coluna deixava a Mesa exatamente como estava. O pedido
+      do PO valia só para quem instalasse do zero.
+    */
+    const { chamar } = comoEraAntesDestaRodada();
+    const daMesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS',
+      { SUSEP: 'RET99Z', NomeCorretora: 'Bloqueada' });
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'Mesa Diamante: deixou de conferir');
+
+    igual(chamar('consultarSusep')('RET99Z', daMesa.id).situacao, 'NAO_ENCONTRADA',
+      'a Mesa não consulta mais a lista');
+    igual(chamar('consultarSusep')('RET99Z', daRet.id).situacao, 'BLOQUEADA',
+      'e a RET continua consultando');
+  });
+
+  teste('mas respeita quem já escolheu conferir na Mesa', () => {
+    // Migração que passa por cima de uma escolha desfaz o trabalho de alguém
+    // sem avisar.
+    const { chamar } = comoEraAntesDestaRodada();
+    const mesa = chamar('lerRegistros_("CANAIS")')
+      .find((c) => String(c.Aba) === 'BASE_MESA');
+    chamar('adicionarColuna_')('CANAIS', 'ConfereSusepBloqueada', 'simOuNao');
+    chamar('esquecerEstruturaLida_()');
+    chamar('atualizarRegistro_')('CANAIS', mesa.Id, { ConfereSusepBloqueada: 'SIM' });
+    chamar('esquecerEstruturaLida_()');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'a Mesa já tem a conferência de bloqueio escolhida');
+
+    const daMesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    igual(daMesa.confereSusepBloqueada, true, 'a escolha dela ficou de pé');
   });
 
   teste('atualizar não perde usuário, caso nem configuração ajustada', () => {
