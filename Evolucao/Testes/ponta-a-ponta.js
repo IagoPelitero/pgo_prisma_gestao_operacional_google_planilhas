@@ -263,8 +263,6 @@ async function rodar() {
     await pagina.waitForTimeout(400);
     await pagina.fill('#cfg-nome', 'Iago Pelitero');
     await pagina.fill('#cfg-email', 'p.iago.ip@exemplo.com');
-    await pagina.fill('#cfg-canal', 'Corretora');
-    await pagina.fill('#cfg-matricula', '778899');
 
     // O nível é obrigatório: é ele que define o acesso.
     const niveis = await pagina.$$eval('#cfg-nivel option',
@@ -319,14 +317,19 @@ async function rodar() {
     await abertos[abertos.length - 1].click();
     await pagina.waitForTimeout(500);
 
-    await pagina.fill('#cfg-matricula', '112233');
+    const disponibilidades = await pagina.$$eval('#cfg-disponibilidade option',
+      (os) => os.map((o) => o.value));
+    verdadeiro(disponibilidades.length >= 2,
+      'a lista de disponibilidade veio preenchida');
+    const outra = disponibilidades[disponibilidades.length - 1];
+    await pagina.selectOption('#cfg-disponibilidade', outra);
     await pagina.click('#form-usuario button[type="submit"]');
     await pagina.waitForTimeout(900);
 
     const depois = naPlanilha('USUARIOS');
     igual(depois.length, antes, 'editar não pode criar linha nova');
     const alvo = depois.find((u) => String(u.Nome) === 'Iago Pelitero');
-    igual(String(alvo.Matricula), '112233');
+    igual(String(alvo.Disponibilidade), outra, 'a mudança foi para a linha dela');
   });
 
   await teste('tirar o acesso desliga a pessoa e mantém a linha', async () => {
@@ -407,11 +410,15 @@ async function rodar() {
     }
 
     await pagina.click('#salvar-caso');
-    await pagina.waitForTimeout(1200);
+    await pagina.waitForTimeout(1500);
 
-    const recado = await pagina.textContent('#recado-do-caso');
-    igual(naPlanilha('BASE_RET').length, antes + 1,
-      'linha nova na BASE_RET — a tela disse: ' + recado);
+    igual(naPlanilha('BASE_RET').length, antes + 1, 'linha nova na BASE_RET');
+
+    // E a tela foi para o Trabalho — pedido do PO: "após gravar vá para a
+    // tela trabalho". O recado de sucesso não é mais conferido aqui porque
+    // ele não chega a existir: a tela inteira é trocada na mesma hora.
+    const endereco = await pagina.evaluate(() => location.hash);
+    igual(endereco, '#trabalho', 'gravou e levou para o Trabalho');
   });
 
   /* ------------------------------------------------------------- o final -- */

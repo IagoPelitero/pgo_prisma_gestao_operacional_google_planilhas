@@ -11,8 +11,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula, lerPeca, scriptDaPeca, comoUsuario } =
-  require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula, lerPeca,
+  scriptDaPeca, comoUsuario, elementoFalso, pecaRodando } = require('./ferramentas');
 
 function rodarTestesDeCadastro() {
   console.log('\nEtapa 4 — Cadastrar Caso');
@@ -914,6 +914,249 @@ function rodarTestesDeCadastro() {
       'a tecla que não é dígito é barrada antes de entrar');
   });
 
+  teste('o campo de R$ abre com o que está gravado, inclusive o zero', () => {
+    /*
+      O CAMINHO INTEIRO, e não só a conversão: `preencher` é quem o modal de
+      edição chama, e é nele que o defeito morava.
+
+      Pedido do PO: "ao clicar em editar do caso na aba trabalho continua não
+      trazendo o valor do prêmio mensal, total é o retido. Precisa vir pois se
+      for necessário corrigir o valor tem que mostrar o que foi preenchido".
+
+      O servidor manda o dinheiro JÁ FORMATADO — "R$ 1.284,90" —, e são estes
+      quatro casos que chegam aqui. O terceiro é o que o navegador pegou: zero
+      gravado abria o campo em branco, e salvar por cima trocava o zero por
+      vazio na planilha.
+    */
+    const form = pecaRodando('Formulario').Formulario;
+    const raiz = elementoFalso('div');
+    ['valordopremio', 'premiomensalretido', 'valordopremioretido', 'semvalor']
+      .forEach((chave) => {
+        const campo = elementoFalso('input',
+          { 'data-chave': chave, 'data-dinheiro': 'sim' });
+        raiz.por(campo);
+      });
+
+    form.preencher(raiz, {
+      valordopremio: 'R$ 1.284,90',
+      premiomensalretido: 'R$ 107,08',
+      valordopremioretido: 'R$ 0,00',
+      semvalor: ''
+    });
+
+    const valor = (chave) => raiz.querySelector('[data-chave="' + chave + '"]').value;
+    igual(valor('valordopremio'), 'R$ 1.284,90', 'o valor formatado volta inteiro');
+    igual(valor('premiomensalretido'), 'R$ 107,08',
+      'o prêmio mensal também — era ele que abria em branco');
+    igual(valor('valordopremioretido'), 'R$ 0,00',
+      'zero gravado é dado: "não retido" não é "não preenchido"');
+    igual(valor('semvalor'), '', 'célula vazia continua vazia na tela');
+  });
+
+  secao('Os botões: o que trava, o que gira e o que fecha');
+
+  /**
+   * Um formulário de mentira, com os campos que o teste pedir.
+   *
+   * Cada campo é { chave, obrigatorio, valor, travado, escondido }. O
+   * `aria-required` é o que o desenho de verdade põe no campo obrigatório —
+   * ver desenharCampo —, e é por ele que o Formulario procura. Se amanhã o
+   * desenho marcar de outro jeito, estes testes caem, que é o certo.
+   */
+  function formularioDeMentira(campos) {
+    const raiz = elementoFalso('div');
+    campos.forEach((campo) => {
+      const bloco = elementoFalso('div', { 'data-campo': campo.chave });
+      bloco.hidden = !!campo.escondido;
+      const caixa = elementoFalso('input', Object.assign(
+        { 'data-chave': campo.chave },
+        campo.obrigatorio ? { 'aria-required': 'true' } : {}));
+      caixa.value = campo.valor || '';
+      caixa.disabled = !!campo.travado;
+      bloco.por(caixa);
+      raiz.por(bloco);
+    });
+    return raiz;
+  }
+
+  teste('o botão de cadastrar nasce inativo e só acende com os obrigatórios', () => {
+    // Pedido do PO: "o botão deve ficar inativo até os campos obrigatórios
+    // serem devidamente preenchidos".
+    const form = pecaRodando('Formulario').Formulario;
+    const raiz = formularioDeMentira([
+      { chave: 'nomedocliente', obrigatorio: true },
+      { chave: 'susep', obrigatorio: true },
+      { chave: 'observacao' }
+    ]);
+    const botao = elementoFalso('button');
+    botao.innerHTML = 'Cadastrar caso';
+
+    form.vigiarObrigatorios(raiz, botao);
+    verdadeiro(botao.disabled, 'com os dois campos vazios, o botão está travado');
+    contem(botao.title, 'obrigatórios');
+
+    const nome = raiz.querySelector('[data-chave="nomedocliente"]');
+    nome.value = 'Cliente de teste';
+    nome.disparar('input');
+    verdadeiro(botao.disabled, 'ainda falta a SUSEP');
+
+    const susep = raiz.querySelector('[data-chave="susep"]');
+    susep.value = 'RET00J';
+    susep.disparar('input');
+    verdadeiro(!botao.disabled, 'com os dois preenchidos, o botão acende');
+    igual(botao.title, '', 'e o aviso de por que estava travado sai');
+
+    // E volta a travar se a pessoa apagar o que digitou.
+    nome.value = '   ';
+    nome.disparar('change');
+    verdadeiro(botao.disabled, 'espaço em branco não é campo preenchido');
+  });
+
+  teste('campo travado pelo cargo e campo escondido não travam o botão', () => {
+    // Os dois são vazios e obrigatórios, e por motivos opostos nenhum conta:
+    // o travado a pessoa não consegue preencher — esperar por ele deixaria o
+    // botão morto para sempre — e o escondido não é a vez dele.
+    const form = pecaRodando('Formulario').Formulario;
+    const raiz = formularioDeMentira([
+      { chave: 'analista', obrigatorio: true, travado: true },
+      { chave: 'quemtransferiu', obrigatorio: true, escondido: true },
+      { chave: 'nomedocliente', obrigatorio: true, valor: 'Cliente' }
+    ]);
+    const botao = elementoFalso('button');
+
+    form.vigiarObrigatorios(raiz, botao);
+    verdadeiro(!botao.disabled,
+      'só o campo que a pessoa pode preencher, e que está à vista, trava o botão');
+
+    // E o condicional que APARECE passa a contar, sem religar ouvinte nenhum:
+    // o ouvinte mora na raiz, e o evento sobe até ela.
+    const bloco = raiz.querySelectorAll('[data-campo="quemtransferiu"]')[0];
+    bloco.hidden = false;
+    raiz.querySelector('[data-chave="nomedocliente"]').disparar('input');
+    verdadeiro(botao.disabled, 'o campo que apareceu passou a ser exigido');
+  });
+
+  teste('faltaPreencher devolve o campo que falta, para a tela poder focá-lo', () => {
+    // A tela de cadastro usa o retorno para levar o cursor até ele: dizer
+    // "preencha os obrigatórios" sem dizer qual é mandar procurar.
+    const form = pecaRodando('Formulario').Formulario;
+    const raiz = formularioDeMentira([
+      { chave: 'nomedocliente', obrigatorio: true, valor: 'Cliente' },
+      { chave: 'susep', obrigatorio: true }
+    ]);
+    igual(form.faltaPreencher(raiz).getAttribute('data-chave'), 'susep');
+
+    raiz.querySelector('[data-chave="susep"]').value = 'RET00J';
+    igual(form.faltaPreencher(raiz), null, 'nada faltando, nada devolvido');
+  });
+
+  teste('gravando: três pontinhos no botão e nenhum botão clicável', () => {
+    // Pedido do PO: "quando clicar em cadastrar caso ele deve ficar nos 3
+    // pontinhos para que indique esta gravando (...) não deve permitir clicar
+    // botões enquanto grava". Dois cliques gravariam DOIS casos.
+    const form = pecaRodando('Formulario').Formulario;
+    const area = elementoFalso('form');
+    const salvar = elementoFalso('button');
+    salvar.innerHTML = 'Cadastrar caso';
+    const limpar = elementoFalso('button');
+    limpar.innerHTML = 'Limpar';
+    const jaInativo = elementoFalso('button');
+    jaInativo.innerHTML = 'Alterar situação';
+    jaInativo.disabled = true;
+    area.por(salvar, limpar, jaInativo);
+
+    form.comecouAGravar(salvar, area);
+    contem(salvar.innerHTML, 'tres-pontinhos', 'os pontinhos no lugar do nome');
+    verdadeiro(salvar.innerHTML.indexOf('Cadastrar caso') < 0,
+      'o nome sai de cena enquanto grava');
+    igual(salvar.getAttribute('aria-busy'), 'true');
+    igual(salvar.getAttribute('aria-label'), 'Gravando',
+      'leitor de tela não enxerga pontinho');
+    verdadeiro(salvar.disabled && limpar.disabled,
+      'nenhum botão da área aceita clique');
+
+    form.acabouDeGravar(salvar, area);
+    igual(salvar.innerHTML, 'Cadastrar caso', 'o nome volta inteiro');
+    igual(salvar.getAttribute('aria-busy'), null);
+    igual(salvar.getAttribute('aria-label'), null);
+    verdadeiro(!salvar.disabled && !limpar.disabled, 'os dois voltam a aceitar clique');
+    verdadeiro(jaInativo.disabled,
+      'o que já estava inativo antes continua inativo — não acorda liberado');
+  });
+
+  teste('enquanto grava, o vigia dos obrigatórios não mexe no botão', () => {
+    // Duas mãos no mesmo botão: o vigia acenderia o nome de volta no meio da
+    // gravação, e a pessoa clicaria de novo achando que nada tinha saído.
+    const form = pecaRodando('Formulario').Formulario;
+    const raiz = formularioDeMentira([
+      { chave: 'nomedocliente', obrigatorio: true, valor: 'Cliente' }
+    ]);
+    const area = elementoFalso('form');
+    const botao = elementoFalso('button');
+    botao.innerHTML = 'Cadastrar caso';
+    area.por(botao);
+    area.por(raiz);
+
+    form.vigiarObrigatorios(raiz, botao);
+    form.comecouAGravar(botao, area);
+
+    raiz.querySelector('[data-chave="nomedocliente"]').disparar('input');
+    verdadeiro(botao.disabled, 'continua travado durante a gravação');
+    contem(botao.innerHTML, 'tres-pontinhos', 'e continua com os pontinhos');
+  });
+
+  teste('a tela de cadastro vai para o Trabalho depois de gravar', () => {
+    // Pedido do PO: "após gravar vá para a tela trabalho". Fica como
+    // conferência de código porque a navegação é da moldura, não do
+    // formulário — o caminho inteiro é percorrido no navegador, na varredura.
+    const tela = lerPeca('CadastrarCaso');
+    contem(tela, "Aplicacao.irPara('trabalho')");
+    contem(tela, 'Formulario.comecouAGravar',
+      'os três pontinhos ao gravar o cadastro');
+    contem(tela, 'Formulario.vigiarObrigatorios',
+      'o botão inativo até os obrigatórios');
+    contem(tela, 'Formulario.faltaPreencher',
+      'o Enter e o Ctrl+Enter também passam pela conferência');
+    verdadeiro(tela.indexOf('carregarFormulario();\n      })') < 0,
+      'depois de gravar não redesenha o formulário: sai da tela');
+  });
+
+  teste('o modal de edição fecha depois de salvar', () => {
+    // Pedido do PO: "depois de salvar o ajuste precisa fechar o modal senão
+    // fica ruim seguir trabalhando".
+    const modal = lerPeca('CasoEmModal');
+    const salvar = modal.substring(modal.indexOf('function salvar()'));
+    const corpoDoSalvar = salvar.substring(0, salvar.indexOf('\n  }'));
+
+    contem(corpoDoSalvar, 'fechar();', 'o modal sai de cena quando gravou');
+    verdadeiro(corpoDoSalvar.indexOf('carregar();') < 0,
+      'e não volta para a leitura do caso, que era uma ida a mais ao servidor');
+    contem(corpoDoSalvar, 'Formulario.comecouAGravar',
+      'os três pontinhos enquanto grava a edição');
+
+    /*
+      AS DUAS SAÍDAS DO MODAL, UMA A UMA.
+
+      A primeira versão deste teste procurava "if (salvando) return;" no
+      arquivo inteiro. Ele passava com a guarda do Esc APAGADA, porque a do
+      véu continuava lá e a frase era a mesma — o teste dizia "nem o Esc nem o
+      véu", e provava uma só. Quem confia num teste assim fica sem as duas.
+    */
+    function trechoDe(fonte, comecaEm, terminaEm) {
+      const inicio = fonte.indexOf(comecaEm);
+      verdadeiro(inicio >= 0, 'não achei "' + comecaEm + '" no modal');
+      const resto = fonte.substring(inicio);
+      return resto.substring(0, resto.indexOf(terminaEm));
+    }
+
+    contem(trechoDe(modal, 'function aoTeclar(', '\n  }'),
+      'if (salvando) return;',
+      'o Esc não fecha o modal no meio da gravação');
+    contem(trechoDe(modal, "caixa.addEventListener('mousedown'", '});'),
+      'if (salvando) return;',
+      'clicar no véu também não fecha no meio da gravação');
+  });
+
   teste('o servidor recusa valor que não é número, e não grava vazio', () => {
     // A tela barra; o servidor confere de novo. Esconder o campo não é
     // segurança, e impedir a digitação também não: a chamada existe.
@@ -993,7 +1236,11 @@ function rodarTestesDeCadastro() {
     // E o modal usa PREFIXO: com ele aberto por cima da tela de cadastro, os
     // dois formulários existem ao mesmo tempo na página. Sem prefixo, os
     // elementos teriam o mesmo id e editar escreveria no cadastro.
-    contem(modal, "Formulario.desenhar(formulario, 'editar-')");
+    // Pelo formato da chamada, e não pelo nome da variável que vai nela: o
+    // nome mudou quando as duas chamadas do modal passaram a sair juntas, e o
+    // teste caiu por um motivo que não era o dele.
+    verdadeiro(/Formulario\.desenhar\(\w+, 'editar-'\)/.test(modal),
+      'o modal desenha o formulário com o prefixo editar-');
   });
 
   /*

@@ -958,7 +958,7 @@ var Formulario = (function () {
    * Recebe a RAIZ, e não procura na página inteira: com o modal aberto por
    * cima da tela de cadastro, procurar na página inteira ligaria os dois.
    */
-  function ligar(raiz, prefixo, idDoCanal) {
+  function ligar(raiz, prefixo, idDoCanal, comSeloDaSusep) {
     /*
      * O CAMPO DE DINHEIRO.
      *
@@ -994,7 +994,21 @@ var Formulario = (function () {
       });
     }
 
-    var susep = raiz.querySelector('[data-chave="susep"]');
+    /*
+      O SELO DA SUSEP, e quando ele NÃO entra.
+
+      Pedido do PO: "em ver detalhes do diamante não precisa buscar a susep;
+      apenas na RET se faz necessário para controle". Ao EDITAR um caso que já
+      existe, a corretora já está preenchida e a consulta só adiciona espera.
+
+      No CADASTRO ele continua em todo canal — é dele que sai o nome da
+      corretora preenchido automaticamente, que o PO pediu para a Mesa.
+
+      `comSeloDaSusep` não informado vale SIM: é o cadastro, e é quem chama de
+      fora sem saber desta regra. O lado seguro é o selo existir.
+    */
+    var susep = comSeloDaSusep === false
+      ? null : raiz.querySelector('[data-chave="susep"]');
     if (susep) {
       var conferir = function () {
         consultarSusep(raiz, prefixo, susep.value, idDoCanal);
@@ -1136,7 +1150,7 @@ var Formulario = (function () {
       // digitou: R$ 1.234,56. Sem esta linha, abrir um caso para editar
       // mostraria "1234.56" no campo, e salvar de novo gravaria 123456.
       if (controles[i].getAttribute('data-dinheiro')) {
-        valor = aplicarMascaraDeDinheiro(comoNumeroEmCentavos(valor));
+        valor = comoDinheiroQueVeioGravado(valor);
       }
       controles[i].value = valor;
 
@@ -1153,20 +1167,70 @@ var Formulario = (function () {
   }
 
   /**
-   * "1234.56" (como o servidor manda) vira "123456" (o que a máscara espera).
+   * O dinheiro QUE VEIO DA PLANILHA, como ele aparece no campo.
    *
-   * A máscara conta em CENTAVOS, da direita para a esquerda. Mandar "1234.56"
+   * Diferente da máscara de digitação em um ponto só, e o ponto importa: o
+   * ZERO.
+   *
+   * `aplicarMascaraDeDinheiro` devolve vazio para "000" de propósito — sem
+   * isso, digitar e apagar deixaria "R$ 0,00" piscando no campo. Mas aqui o
+   * valor não está sendo digitado: ele JÁ ESTÁ GRAVADO na planilha. E zero
+   * gravado é dado — na RET quer dizer "não retido", que é diferente de "não
+   * preenchido".
+   *
+   * O DEFEITO QUE ISTO CONSERTA foi visto no navegador, num caso da RET com
+   * prêmio retido zerado: os dois campos de retido abriam EM BRANCO. Quem
+   * abrisse o caso para corrigir outro campo e salvasse trocava o zero por
+   * vazio na planilha, sem ver — e vazio e zero não somam igual no Power BI.
+   *
+   * Campo vazio na planilha continua vazio na tela: `comoNumeroEmCentavos`
+   * devolve texto vazio para ele, e é só aí que o campo abre em branco.
+   */
+  function comoDinheiroQueVeioGravado(valor) {
+    var centavos = comoNumeroEmCentavos(valor);
+    if (centavos === '') return '';
+    return aplicarMascaraDeDinheiro(centavos) || 'R$ 0,00';
+  }
+
+  /**
+   * Um valor de dinheiro, venha como vier, vira CENTAVOS — "128490".
+   *
+   * A máscara conta em centavos, da direita para a esquerda. Mandar "1234.56"
    * direto para ela daria R$ 1.234,56 por sorte — os dígitos são os mesmos —,
    * mas "1234.5" daria R$ 123,45 em vez de R$ 1.234,50, e "1234" daria
-   * R$ 12,34 em vez de R$ 1.234,00. Os três casos chegam do servidor.
+   * R$ 12,34 em vez de R$ 1.234,00.
+   *
+   * O DEFEITO QUE ISTO CONSERTA, relatado pela operação: "ao clicar em editar
+   * o caso continua não trazendo o valor do prêmio mensal, total e o retido".
+   *
+   * O servidor manda o dinheiro JÁ FORMATADO — "R$ 1.284,90" —, e a versão
+   * anterior desta função só sabia ler número cru. Com o "R$" na frente a
+   * conta dava NaN, e a função devolvia vazio: o campo abria EM BRANCO. Quem
+   * fosse só corrigir outro campo e salvasse, apagava o valor sem ver.
+   *
+   * Os quatro formatos que chegam aqui, e o que cada um tem de virar:
+   *
+   *   "R$ 1.284,90"   formatado pelo servidor      -> 128490
+   *   "1.284,90"      brasileiro, digitado         -> 128490
+   *   "1284.9"        número cru da célula         -> 128490
+   *   "1284"          inteiro                      -> 128400
+   *
+   * A regra que separa os dois mundos é a VÍRGULA: onde ela existe, ela é o
+   * decimal e o ponto é separador de milhar. Onde não existe, o ponto é o
+   * decimal. Tentar adivinhar de outro jeito é o que fazia "1.284,90" virar
+   * NaN na versão anterior.
    */
   function comoNumeroEmCentavos(valor) {
-    var limpo = String(valor === null || valor === undefined ? '' : valor).trim();
+    // Fora tudo o que não é número nem separador: "R$", espaço, letra.
+    var limpo = String(valor === null || valor === undefined ? '' : valor)
+      .trim().replace(/[^\d.,-]/g, '');
     if (!limpo) return '';
-    var numero = Number(limpo.replace(/\./g, '').replace(',', '.'));
-    if (limpo.indexOf('.') >= 0 || limpo.indexOf(',') >= 0) {
-      numero = Number(limpo.replace(',', '.'));
-    }
+
+    var emPonto = limpo.indexOf(',') >= 0
+      ? limpo.replace(/\./g, '').replace(',', '.')   // brasileiro
+      : limpo;                                       // já com ponto decimal
+
+    var numero = Number(emPonto);
     if (!isFinite(numero)) return '';
     return String(Math.round(numero * 100));
   }
@@ -1209,6 +1273,144 @@ var Formulario = (function () {
     if (primeiro) primeiro.focus();
   }
 
+  /* -------------------------------------------------- o botão que grava */
+
+  /**
+   * O primeiro campo obrigatório que ainda está vazio — ou nada, se já dá
+   * para gravar.
+   *
+   * Pedido do PO: "quando eu estiver na aba cadastrar caso o botão deve ficar
+   * inativo até os campos obrigatórios serem devidamente preenchidos".
+   *
+   * QUEM DIZ QUE O CAMPO É OBRIGATÓRIO é o `aria-required` que o próprio
+   * desenho do campo põe — e não uma segunda lista escrita aqui. Duas listas
+   * da mesma regra é regra que um dia diverge: alguém marcaria o campo como
+   * obrigatório em Configurações e o botão continuaria liberando o cadastro
+   * sem ele, sem ninguém entender por quê.
+   *
+   * DOIS CAMPOS NÃO CONTAM, e por motivos diferentes:
+   *
+   *   TRAVADO     o que o servidor preenche com o nome de quem entrou. A
+   *               pessoa não tem como digitar nele, e esperar por ele
+   *               deixaria o botão morto para sempre.
+   *   ESCONDIDO   o campo condicional que não é a vez dele. Está vazio porque
+   *               não se aplica — e `aplicarCondicoes` limpa o que sobrou.
+   */
+  function faltaPreencher(raiz) {
+    if (!raiz) return null;
+    var exigidos = raiz.querySelectorAll('[aria-required="true"]');
+    for (var i = 0; i < exigidos.length; i++) {
+      var campo = exigidos[i];
+      if (campo.disabled) continue;
+      var bloco = campo.closest ? campo.closest('[data-campo]') : null;
+      if (bloco && bloco.hidden) continue;
+      if (!String(campo.value || '').trim()) return campo;
+    }
+    return null;
+  }
+
+  /**
+   * Trava o botão enquanto faltar campo obrigatório, e o libera quando não
+   * faltar mais.
+   *
+   * O OUVINTE FICA NA RAIZ do formulário, e não um em cada campo: `input` e
+   * `change` sobem até ela, então o campo condicional que aparece depois já
+   * nasce vigiado. Um ouvinte por campo teria de ser religado a cada vez que
+   * o formulário mudasse de forma — e o dia em que alguém esquecesse de
+   * religar, o botão liberaria o cadastro incompleto.
+   *
+   * Enquanto grava, ele não mexe no botão: ali quem manda é `comecouAGravar`,
+   * e duas mãos no mesmo botão acenderiam o nome de volta no meio da
+   * gravação.
+   */
+  function vigiarObrigatorios(raiz, botao) {
+    if (!raiz || !botao) return;
+
+    function conferir() {
+      if (botao.getAttribute('data-gravando') === 'sim') return;
+      var falta = faltaPreencher(raiz);
+      botao.disabled = !!falta;
+      botao.title = falta
+        ? 'Preencha os campos obrigatórios (marcados com *) para cadastrar.'
+        : '';
+    }
+
+    // Religar na mesma raiz duplicaria o ouvinte: "Limpar" redesenha o corpo
+    // do formulário, mas o elemento que o guarda continua sendo este.
+    if (raiz.getAttribute('data-obrigatorios-vigiados') !== 'sim') {
+      raiz.setAttribute('data-obrigatorios-vigiados', 'sim');
+      raiz.addEventListener('input', conferir);
+      raiz.addEventListener('change', conferir);
+    }
+    conferir();
+  }
+
+  /**
+   * Põe e tira os três pontinhos do botão que está gravando, e trava todos os
+   * botões da área enquanto isso.
+   *
+   * Pedido do PO: "quando clicar em cadastrar caso ele deve ficar nos 3
+   * pontinhos para que indique esta gravando (...) não deve permitir clicar
+   * botões enquanto grava".
+   *
+   * TRAVAR TODOS OS BOTÕES DA ÁREA tem motivo de dado, e não de enfeite:
+   * clicar duas vezes em "Cadastrar caso" grava DOIS casos, e apertar
+   * "Desistir" no meio da gravação fecha o formulário com a gravação a
+   * caminho — ela acontece, e quem mandou não vê.
+   *
+   * No fim, destravamos SÓ O QUE FOMOS NÓS QUE TRAVAMOS (`data-travei`): um
+   * botão que já estava inativo antes — o "Cadastrar caso" esperando os
+   * campos obrigatórios — não pode acordar liberado por causa disto.
+   *
+   * `area` é o pedaço da página que está gravando, e não a página inteira: a
+   * tela de cadastro pode estar atrás do caso aberto, e travar os botões dela
+   * por causa de uma gravação no modal travaria o que ninguém pediu.
+   */
+  function mexerNoBotaoQueGrava(botao, estaGravando, area) {
+    if (botao) {
+      if (estaGravando && botao.getAttribute('data-gravando') !== 'sim') {
+        botao.setAttribute('data-nome-de-volta', botao.innerHTML);
+        botao.setAttribute('data-gravando', 'sim');
+        botao.setAttribute('aria-busy', 'true');
+        // Leitor de tela não enxerga pontinho. A ele dizemos com palavra.
+        botao.setAttribute('aria-label', 'Gravando');
+        botao.innerHTML = '<span class="tres-pontinhos" aria-hidden="true">'
+          + '<i></i><i></i><i></i></span>';
+      } else if (!estaGravando
+        && botao.getAttribute('data-gravando') === 'sim') {
+        botao.innerHTML = botao.getAttribute('data-nome-de-volta') || '';
+        botao.removeAttribute('data-nome-de-volta');
+        botao.removeAttribute('data-gravando');
+        botao.removeAttribute('aria-busy');
+        botao.removeAttribute('aria-label');
+      }
+    }
+
+    if (!area) return;
+    var botoes = area.querySelectorAll('button');
+    for (var i = 0; i < botoes.length; i++) {
+      if (estaGravando) {
+        if (botoes[i].disabled) continue;
+        botoes[i].setAttribute('data-travei', 'sim');
+        botoes[i].disabled = true;
+      } else if (botoes[i].getAttribute('data-travei') === 'sim') {
+        botoes[i].removeAttribute('data-travei');
+        botoes[i].disabled = false;
+      }
+    }
+  }
+
+  // Dois nomes para os dois momentos, em vez de um sim/não no meio da
+  // chamada: quem lê `comecouAGravar(botao, area)` entende sem procurar o que
+  // o `true` significava.
+  function comecouAGravar(botao, area) {
+    mexerNoBotaoQueGrava(botao, true, area);
+  }
+
+  function acabouDeGravar(botao, area) {
+    mexerNoBotaoQueGrava(botao, false, area);
+  }
+
   return {
     aplicarMascara: aplicarMascara,
     aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
@@ -1221,7 +1423,11 @@ var Formulario = (function () {
     valores: valores,
     preencher: preencher,
     limparErros: limparErros,
-    mostrarProblemas: mostrarProblemas
+    mostrarProblemas: mostrarProblemas,
+    faltaPreencher: faltaPreencher,
+    vigiarObrigatorios: vigiarObrigatorios,
+    comecouAGravar: comecouAGravar,
+    acabouDeGravar: acabouDeGravar
   };
 })();
 </script>
@@ -1262,6 +1468,18 @@ var CasoEmModal = (function () {
   var detalhe = null;
   var formulario = null;
   var editando = false;
+  /*
+    O FORMULÁRIO DE CADA CANAL, GUARDADO.
+
+    `formularioDoCanal` devolve a mesma coisa enquanto ninguém mexe em
+    Configurações › Cadastrar Caso. Buscá-lo a cada caso aberto é uma ida ao
+    servidor por caso — e abrir dez casos seguidos, que é o trabalho normal da
+    operação, eram dez idas para receber dez vezes a mesma resposta.
+
+    A memória dura enquanto a página estiver aberta. Quem mexer no formulário
+    recarrega a tela, e é o que ele já faz hoje para ver a mudança.
+  */
+  var formularioDeCadaCanal = {};
   var salvando = false;
   var aoFechar = null;        // o que a tela quer fazer quando algo mudou
   var mudouAlgo = false;
@@ -1313,6 +1531,10 @@ var CasoEmModal = (function () {
     caixa.addEventListener('mousedown', function (evento) {
       // Só o véu fecha. Um arrasto que começa dentro e termina fora não é
       // "clicar fora" — e fechar ali perderia o que a pessoa digitou.
+      //
+      // E nada fecha no meio da gravação: a saída pelo véu é a mesma coisa
+      // que o X, e o X está travado. Ver `mexerNoBotaoQueGrava`.
+      if (salvando) return;
       if (evento.target === caixa) fechar();
     });
     document.addEventListener('keydown', aoTeclar);
@@ -1320,6 +1542,19 @@ var CasoEmModal = (function () {
 
   function aoTeclar(evento) {
     if (!elemento('modal-do-caso')) return;
+    /*
+      ENQUANTO GRAVA, O TECLADO TAMBÉM ESPERA.
+
+      O PO pediu que nenhum botão possa ser clicado durante a gravação. Deixar
+      o Esc passar seria a mesma porta com outro nome: o modal sairia da tela
+      com a gravação a caminho, e aí o Trabalho não recarregaria — `fechar`
+      zera o aviso de "mudou algo" antes de a resposta chegar. A pessoa veria
+      a fila velha e acharia que o ajuste não foi gravado.
+
+      A espera é de uma gravação, não eterna: ela termina em sucesso, que
+      fecha o modal, ou em erro, que destrava tudo e mostra o motivo.
+    */
+    if (salvando) return;
     if (evento.key === 'Escape') { evento.preventDefault(); fechar(); return; }
     if (editando && (evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
       evento.preventDefault();
@@ -1505,21 +1740,54 @@ var CasoEmModal = (function () {
     elemento('modal-desistir').addEventListener('click', desenharLeitura);
     elemento('modal-salvar').addEventListener('click', salvar);
 
-    // O formulário e os valores vêm em duas chamadas, e as duas precisam ter
-    // chegado antes de preencher — preencher antes de desenhar não escreve
-    // em lugar nenhum, e é o tipo de erro que só aparece com a rede lenta.
-    Servidor.chamar('formularioDoCanal', canalAtual)
-      .entao(function (definicao) {
-        formulario = definicao;
-        Servidor.chamar('casoParaEditar', canalAtual, idAtual)
-          .entao(function (caso) {
-            var corpo = corpoDaEdicao();
-            if (!corpo) return;
-            corpo.innerHTML = Formulario.desenhar(formulario, 'editar-');
-            Formulario.ligar(corpo, 'editar-', canalAtual);
-            Formulario.preencher(corpo, caso.valores);
-          })
-          .senao(mostrarRecadoDeErro);
+    /*
+      AS DUAS CHAMADAS SAEM JUNTAS, e não uma depois da outra.
+
+      Elas não dependem uma da outra: o formulário é do CANAL, os valores são
+      do CASO. Encadeadas, a tela esperava a primeira voltar para só então
+      perguntar a segunda — duas viagens em fila, e no Apps Script cada
+      viagem é o que a pessoa sente como demora. Juntas, a espera é a da mais
+      lenta das duas, não a soma.
+
+      E o formulário vem da memória quando já foi buscado neste canal: do
+      segundo caso em diante sobra uma viagem só.
+
+      As duas precisam ter chegado antes de preencher — preencher antes de
+      desenhar não escreve em lugar nenhum, e é o tipo de erro que só aparece
+      com a rede lenta. Por isso `quandoAsDuasChegarem`.
+    */
+    var guardado = formularioDeCadaCanal[canalAtual];
+    var oFormulario = null;
+    var osValores = null;
+
+    function quandoAsDuasChegarem() {
+      if (!oFormulario || !osValores) return;
+      var corpo = corpoDaEdicao();
+      if (!corpo) return;
+      formulario = oFormulario;
+      corpo.innerHTML = Formulario.desenhar(oFormulario, 'editar-');
+      // Só o canal que confere a SUSEP ganha o selo na EDIÇÃO. Ver `ligar`.
+      Formulario.ligar(corpo, 'editar-', canalAtual,
+        oFormulario.canal.confereSusepBloqueada !== false);
+      Formulario.preencher(corpo, osValores.valores);
+    }
+
+    if (guardado) {
+      oFormulario = guardado;
+    } else {
+      Servidor.chamar('formularioDoCanal', canalAtual)
+        .entao(function (definicao) {
+          formularioDeCadaCanal[canalAtual] = definicao;
+          oFormulario = definicao;
+          quandoAsDuasChegarem();
+        })
+        .senao(mostrarRecadoDeErro);
+    }
+
+    Servidor.chamar('casoParaEditar', canalAtual, idAtual)
+      .entao(function (caso) {
+        osValores = caso;
+        quandoAsDuasChegarem();
       })
       .senao(mostrarRecadoDeErro);
   }
@@ -1546,23 +1814,45 @@ var CasoEmModal = (function () {
     salvando = true;
     Formulario.limparErros(corpo);
     recado('Gravando…', '');
-    elemento('modal-salvar').disabled = true;
+    // Os três pontinhos no botão, e nenhum botão do modal clicável enquanto a
+    // gravação está a caminho — nem o X, nem o "Desistir".
+    Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo))
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
-        var botao = elemento('modal-salvar');
-        if (botao) botao.disabled = false;
-        carregar();          // volta para a leitura, já com o que foi gravado
+        /*
+          O MODAL FECHA, e não volta para a leitura do caso.
+
+          Pedido do PO: "depois de salvar o ajuste precisa fechar o modal
+          senão fica ruim seguir trabalhando". Antes ele recarregava o caso
+          para mostrar a leitura — um passo a mais, e uma ida ao servidor a
+          mais, para quem vai abrir o próximo caso da fila em seguida.
+
+          `fechar` avisa o Trabalho, porque `mudouAlgo` está marcado: a fila
+          volta já com o que acabou de ser gravado.
+        */
+        destravarOsBotoes();
+        fechar();
       })
       .senao(function (erro) {
         salvando = false;
-        var botao = elemento('modal-salvar');
-        if (botao) botao.disabled = false;
+        destravarOsBotoes();
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo, erro.problemas);
       });
+  }
+
+  /**
+   * Devolve os botões do modal ao normal.
+   *
+   * Nos dois caminhos — gravou e deu erro —, e por isso num lugar só: a
+   * primeira versão destravava em dois lugares, e bastaria esquecer um para o
+   * modal ficar com tudo apagado depois de um erro.
+   */
+  function destravarOsBotoes() {
+    Formulario.acabouDeGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
   }
 
   function botaoFechar() {

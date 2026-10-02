@@ -49,6 +49,18 @@ var TelaCadastrarCaso = (function () {
         // Só no cadastro NOVO. No caso já gravado quem manda é o valor da
         // planilha — um padrão por cima dele seria perda silenciosa de dado.
         Formulario.aplicarPadroes(corpo(), resposta);
+        /*
+          O BOTÃO NASCE INATIVO.
+
+          Pedido do PO: "o botão deve ficar inativo até os campos obrigatórios
+          serem devidamente preenchidos". Quem acende e apaga é o Formulario,
+          olhando os campos marcados com * — ver `vigiarObrigatorios`.
+
+          Ligado DEPOIS dos padrões de propósito: campo que já nasce
+          preenchido conta como preenchido, e o botão acende sozinho quando o
+          formulário não tem mais nada a pedir.
+        */
+        Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'));
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -68,21 +80,51 @@ var TelaCadastrarCaso = (function () {
 
   function salvar() {
     if (salvando) return;
+
+    /*
+      A CONFERÊNCIA DOS OBRIGATÓRIOS FICA AQUI, e não só no botão.
+
+      O botão inativo barra o clique, mas ele não é a única porta: o Enter
+      dentro de um campo envia o formulário, e o Ctrl+Enter chama esta função
+      direto. Sem esta guarda, as duas passariam por cima do botão travado e o
+      cadastro incompleto sairia para o servidor.
+    */
+    var falta = Formulario.faltaPreencher(corpo());
+    if (falta) {
+      recado('Preencha os campos obrigatórios (marcados com *).', 'ruim');
+      falta.focus();
+      return;
+    }
+
     salvando = true;
     Formulario.limparErros(corpo());
     recado('Gravando…', '');
-    elemento('salvar-caso').disabled = true;
+    // Os três pontinhos no botão, e nenhum botão do formulário clicável
+    // enquanto a gravação está a caminho — dois cliques gravariam dois casos.
+    Formulario.comecouAGravar(elemento('salvar-caso'),
+      elemento('formulario-do-caso'));
 
     Servidor.chamar('cadastrarCaso', canalEscolhida, Formulario.valores(corpo()))
-      .entao(function (resposta) {
+      .entao(function () {
         salvando = false;
-        elemento('salvar-caso').disabled = false;
-        recado('Caso ' + resposta.id + ' cadastrado em ' + resposta.canal + '.', 'bom');
-        carregarFormulario();
+        /*
+          GRAVOU: VAI PARA O TRABALHO.
+
+          Pedido do PO: "após gravar vá para a tela trabalho". O caso recém
+          cadastrado está lá, na fila, que é onde ele passa a ser trabalhado —
+          e quem cadastra em sequência volta aqui pelo menu.
+
+          Não destravamos os botões antes de sair: a tela inteira é trocada
+          pelo `irPara`, e os botões vão com ela. `irPara` também confere a
+          permissão de ver o Trabalho, e cai na primeira tela do menu de quem
+          não a tiver — não é esta tela que decide isso.
+        */
+        Aplicacao.irPara('trabalho');
       })
       .senao(function (erro) {
         salvando = false;
-        elemento('salvar-caso').disabled = false;
+        Formulario.acabouDeGravar(elemento('salvar-caso'),
+          elemento('formulario-do-caso'));
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
       });

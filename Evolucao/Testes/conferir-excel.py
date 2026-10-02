@@ -67,34 +67,6 @@ def caminho_do_arquivo(nome):
     return os.path.join(RAIZ, ONDE_MORA[extensao], nome)
 
 
-def conferir_aba_para_colar(aba, titulo):
-    """A aba de colar tem de ser, caractere a caractere, o arquivo do pacote."""
-    nome = titulo.split(' · COLAR ')[1]
-    caminho = os.path.join(RAIZ, 'Evolucao', 'pacote', nome)
-    if not os.path.exists(caminho):
-        return [titulo + ': o arquivo do pacote não existe — rode gerar-pacote.js']
-
-    linhas = []
-    for r in range(1, aba.max_row + 1):
-        valor = aba.cell(row=r, column=1).value
-        linhas.append('' if valor is None else str(valor))
-
-    daAba = '\n'.join(linhas)
-    doPacote = io.open(caminho, encoding='utf-8').read()
-    print('  %-24s %5d linhas  (o que você cola)' % (nome, len(linhas)))
-
-    if daAba == doPacote:
-        return []
-
-    deLa = doPacote.split('\n')
-    onde = 'tamanhos diferentes (%d x %d linhas)' % (len(linhas), len(deLa))
-    for i in range(min(len(linhas), len(deLa))):
-        if linhas[i] != deLa[i]:
-            onde = 'primeira diferença na linha %d' % (i + 1)
-            break
-    return [titulo + ': a aba de colar não é o arquivo do pacote — ' + onde]
-
-
 def main():
     if not os.path.exists(PLANILHA):
         print('A planilha não existe. Rode gerar-excel.py antes.')
@@ -112,14 +84,8 @@ def main():
         if titulo == 'LEIA-ME':
             continue
 
-        # As abas de COLAR são o PACOTE, e não os arquivos-fonte: são elas que
-        # a pessoa copia para o Apps Script, então são as que mais precisam
-        # bater. Coluna A inteira, sem número de linha ao lado.
-        if ' · COLAR ' in titulo:
-            problemas += conferir_aba_para_colar(livro[titulo], titulo)
-            conferidas += 1
-            continue
-
+        # Toda aba é um arquivo-fonte. O losango só marca o que mudou nesta
+        # rodada — ele não faz parte do nome do arquivo.
         nome = titulo.replace('◆ ', '')
         aba = livro[titulo]
         linhas, numeros = codigo_da_aba(aba)

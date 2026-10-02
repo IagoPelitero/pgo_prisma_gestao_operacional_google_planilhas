@@ -207,8 +207,112 @@ function telasDoSistema() {
   return nomes;
 }
 
+/**
+ * Um elemento de página de mentira, com o mínimo que as telas usam.
+ *
+ * POR QUE ELE EXISTE. Três regras pedidas pelo PO moram no navegador, e não no
+ * servidor: o botão de cadastrar que fica inativo até os obrigatórios estarem
+ * preenchidos, os três pontinhos de "estou gravando", e nenhum botão clicável
+ * durante a gravação. Conferir isso lendo o código-fonte com `contem` provaria
+ * que a linha está escrita, não que ela funciona — e foi justamente um "está
+ * escrito, mas não funciona" que trouxe o defeito do valor em branco.
+ *
+ * NÃO É UM NAVEGADOR, e não tenta ser: tem `getAttribute`, `querySelectorAll`
+ * por atributo, `closest`, ouvinte de evento que sobe para o pai, e nada mais.
+ * O navegador de verdade continua sendo olhado pelas varreduras do Playwright;
+ * isto aqui é o que caberia numa suíte que roda com node puro.
+ *
+ * `disparar` sobe o evento pelos pais, como `input` e `change` fazem de
+ * verdade — é disso que depende o ouvinte único na raiz do formulário.
+ */
+function elementoFalso(tag, atributos) {
+  const el = {
+    tag: tag,
+    atributos: Object.assign({}, atributos || {}),
+    filhos: [],
+    pai: null,
+    ouvintes: {},
+    value: '',
+    disabled: false,
+    hidden: false,
+    title: '',
+    innerHTML: '',
+    focado: false,
+
+    getAttribute: (nome) => (Object.prototype.hasOwnProperty.call(el.atributos, nome)
+      ? el.atributos[nome] : null),
+    setAttribute: (nome, valor) => { el.atributos[nome] = String(valor); },
+    removeAttribute: (nome) => { delete el.atributos[nome]; },
+    addEventListener: (tipo, oQueFazer) => {
+      el.ouvintes[tipo] = (el.ouvintes[tipo] || []).concat(oQueFazer);
+    },
+    focus: () => { el.focado = true; },
+
+    /** Combina com 'button' ou com [atributo] / [atributo="valor"]. */
+    combina: (seletor) => {
+      if (seletor === el.tag) return true;
+      const porAtributo = /^\[([^=\]]+)(?:="([^"]*)")?\]$/.exec(seletor);
+      if (!porAtributo) return false;
+      const valor = el.getAttribute(porAtributo[1]);
+      if (valor === null) return false;
+      return porAtributo[2] === undefined || valor === porAtributo[2];
+    },
+
+    querySelectorAll: (seletor) => el.filhos.reduce(
+      (achados, filho) => achados
+        .concat(filho.combina(seletor) ? [filho] : [])
+        .concat(filho.querySelectorAll(seletor)), []),
+
+    querySelector: (seletor) => el.querySelectorAll(seletor)[0] || null,
+
+    closest: (seletor) => {
+      let subindo = el;
+      while (subindo) {
+        if (subindo.combina(seletor)) return subindo;
+        subindo = subindo.pai;
+      }
+      return null;
+    },
+
+    /** Põe um filho dentro, e devolve o pai para encadear. */
+    por: (...filhos) => {
+      filhos.forEach((filho) => { filho.pai = el; el.filhos.push(filho); });
+      return el;
+    },
+
+    /** Dispara o evento aqui e sobe pelos pais, como o navegador faz. */
+    disparar: (tipo) => {
+      let subindo = el;
+      while (subindo) {
+        (subindo.ouvintes[tipo] || []).forEach((oQueFazer) => oQueFazer());
+        subindo = subindo.pai;
+      }
+    }
+  };
+  return el;
+}
+
+/**
+ * Uma peça de tela rodando numa vm, com os vizinhos de que ela precisa.
+ *
+ * Cada teste que precisava de uma peça montava este mesmo contexto à mão, com
+ * um `Moldura.escapar` ligeiramente diferente em cada lugar.
+ */
+function pecaRodando(nome, vizinhos) {
+  const vm = require('vm');
+  const contexto = vm.createContext(Object.assign({
+    document: { getElementById: () => null, createElement: () => elementoFalso('div') },
+    Moldura: { escapar: (texto) => String(texto === undefined ? '' : texto) },
+    Servidor: { chamar: () => ({ entao: () => ({ senao: () => null }) }) },
+    console
+  }, vizinhos || {}));
+  vm.runInContext(scriptDaPeca(nome), contexto, { filename: nome + '.html' });
+  return contexto;
+}
+
 module.exports = {
   telasDoSistema,
   carregar, secao, teste, igual, verdadeiro, contem, lanca, ehData,
-  celula, formatoDaCelula, comoUsuario, resumo, lerPeca, scriptDaPeca
+  celula, formatoDaCelula, comoUsuario, resumo, lerPeca, scriptDaPeca,
+  elementoFalso, pecaRodando
 };

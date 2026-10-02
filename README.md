@@ -321,6 +321,26 @@ Cada linha tem quatro ações: ver, editar, **alterar situação** — um diálo
 com a situação, porque é o gesto mais frequente da operação — e excluir, que
 tira o caso do sistema e **mantém a linha na planilha**.
 
+### Editar: abre com o que está gravado, e fecha quando salva
+
+O formulário de edição abre **já preenchido com o que está na planilha** — os
+valores em R$ inclusive, e o zero inclusive: na RET, "retido R$ 0,00" quer
+dizer *não retido*, que é diferente de *não preenchido*. Por um tempo esses
+campos abriam em branco, e quem abrisse o caso para corrigir outra coisa
+apagava o valor sem ver.
+
+**Salvou, o modal fecha** e a fila volta já com o que mudou. Enquanto grava, o
+botão mostra **três pontinhos** e nada do modal aceita clique — nem o X, nem o
+Esc, nem o clique fora. Dois cliques gravariam duas vezes, e sair no meio
+deixaria a gravação a caminho sem ninguém para ver o resultado.
+
+Abrir a edição custava **duas esperas em fila**: o formulário do canal e
+depois os valores do caso. Hoje as duas perguntas saem juntas, e o formulário
+do canal fica guardado enquanto a página estiver aberta — do segundo caso em
+diante é **uma viagem a menos**. Na edição, só o canal que confere bloqueio de
+SUSEP consulta a SUSEP: na Mesa Diamante a corretora já está preenchida, e a
+consulta só acrescentava espera.
+
 ---
 
 ## O cadastro de casos
@@ -330,6 +350,15 @@ O formulário **não está escrito no código**. Ele é montado a partir da aba
 sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
 
 ![A tela de cadastro](Evolucao/imagens/tela-cadastrar-caso.png)
+
+**O botão fica inativo até os campos obrigatórios estarem preenchidos** — os
+marcados com `*` —, e ao passar o mouse ele diz por quê. O Enter e o
+`Ctrl`+`Enter` passam pela mesma conferência: botão travado não é segurança se
+sobra outra porta.
+
+Ao clicar, o botão vira **três pontinhos** e nenhum botão da tela aceita
+clique até a resposta chegar — dois cliques gravariam dois casos. **Gravou, a
+tela vai para o Trabalho**, que é onde o caso passa a ser trabalhado.
 
 O selo da SUSEP responde três coisas, e as três são informação: **liberada**
 com o segmento, **bloqueada** com o motivo, ou **não encontrada** — que não é

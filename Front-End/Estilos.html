@@ -249,6 +249,65 @@ button { font: inherit; color: inherit; }
 }
 .botao:hover { background: var(--destaque-escuro); border-color: var(--destaque-escuro); }
 
+/* -------------------------------------------- botão inativo e gravando -- */
+/*
+  O BOTÃO INATIVO TEM DE PARECER INATIVO.
+
+  Pedido do PO: na tela de cadastrar caso, "o botão deve ficar inativo até os
+  campos obrigatórios serem devidamente preenchidos". O `disabled` já impede o
+  clique, mas sem estas linhas o botão continuava com a mesma cor e o mesmo
+  dedinho do mouse: a pessoa clicaria, nada aconteceria, e ela concluiria que
+  a tela travou — que é pior do que o botão não existir.
+
+  As três regras de hover abaixo são o mesmo cuidado: botão travado que acende
+  ao passar o mouse promete o que não cumpre. Elas valem mesmo estando ACIMA
+  das regras de hover de cada botão, que vêm mais adiante no arquivo, porque
+  `:disabled:hover` é mais específico que `:hover` — e não por estar antes ou
+  depois.
+*/
+.botao:disabled, .botao-secundario:disabled, .botao.vazado:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.botao:disabled:hover { background: var(--destaque); border-color: var(--destaque); }
+.botao-secundario:disabled:hover { background: var(--superficie); }
+.botao.vazado:disabled:hover { background: transparent; border-color: var(--linha); }
+
+/*
+  OS TRÊS PONTINHOS do botão que está gravando.
+
+  Pedido do PO: "quando clicar em cadastrar caso ele deve ficar nos 3
+  pontinhos para que indique esta gravando". Eles entram no lugar do nome do
+  botão, e não ao lado: trocar o nome é o que impede o botão de mudar de
+  tamanho no meio da gravação e empurrar os vizinhos.
+
+  `currentColor` em vez de uma cor escrita: os pontinhos aparecem tanto no
+  botão cheio (letra clara) quanto no vazado (letra escura), e nos quatro
+  temas. Uma cor fixa acertaria um caso e desapareceria nos outros.
+*/
+.tres-pontinhos {
+  display: inline-flex; align-items: center; gap: 4px;
+  /* A altura de uma linha de texto, para o botão não encolher ao trocar o
+     nome pelos pontinhos. */
+  height: 1.2em;
+}
+.tres-pontinhos i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  animation: pontinho-que-pulsa 1s infinite ease-in-out both;
+}
+.tres-pontinhos i:nth-child(2) { animation-delay: .16s; }
+.tres-pontinhos i:nth-child(3) { animation-delay: .32s; }
+@keyframes pontinho-que-pulsa {
+  0%, 70%, 100% { opacity: .3; }
+  35% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Quem pediu menos movimento continua vendo que algo está em curso: os
+     pontinhos ficam parados, e o botão travado já diz o resto. */
+  .tres-pontinhos i { animation: none; opacity: .55; }
+}
+
 :focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; border-radius: 4px; }
 
 /* ====================================================== abertura ========= */

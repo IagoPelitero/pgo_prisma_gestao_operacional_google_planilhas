@@ -178,7 +178,10 @@ function casoDaRet(i, opcoes) {
     'analista': ANALISTAS[i % ANALISTAS.length],
     'SUSEP': String(1000000 + (i % 900)),
     'segmento': daLista('segmento'),
-    'número da proposta': String(70000000 + i),
+    // COM O HÍFEN, como a operação digita: o campo pede dois pedaços e
+    // grava um em cada coluna. Sem ele o servidor recusa — e recusava aqui,
+    // fazendo a medição de volume reprovar por um motivo que não era volume.
+    'número da proposta': '7-' + String(10000000 + i).slice(1),
     'nome do cliente': 'Cliente ' + i,
     'codproduto': daLista('codproduto'),
     'canal': daLista('canal'),

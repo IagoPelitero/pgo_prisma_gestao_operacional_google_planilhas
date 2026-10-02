@@ -13,14 +13,26 @@ clonar o repositório.
 .xlsx, e vale mais usar a biblioteca certa do que reimplementar o formato.
 
 ----------------------------------------------------------------------------
-UM AVISO QUE PRECISA ESTAR AQUI E NA PRIMEIRA ABA
+ESTA PLANILHA É O TRANSPORTE DE VERDADE — E É POR ISSO QUE ELA TEM DE SER FIEL
 ----------------------------------------------------------------------------
-Excel NÃO é bom transporte de código. Copiar uma coluna de volta para o Apps
-Script costuma trazer o que o Excel achou que era melhor: aspas retas viram
-curvas, uma linha em branco some, o recuo se perde. Para INSTALAR, o caminho
-é `Evolucao/pacote/` — três arquivos de texto, prontos para colar.
+O PO instala e atualiza o PGO copiando daqui para o Apps Script: é o caminho
+que ele tem. Então a planilha não é um enfeite de leitura, e cada cuidado
+abaixo existe porque sem ele o código colado quebra:
 
-Esta planilha serve para LER, revisar e comparar. É para isso que ela é boa.
+  · UMA ABA POR ARQUIVO, com o nome do arquivo. São vinte e uma, e é o modelo
+    combinado com o PO: juntar tudo em três abas dava arquivos de milhares de
+    linhas, impossíveis de manter e de revisar.
+  · O losango ◆ no nome da aba marca o que MUDOU nesta rodada — é por ele que
+    se sabe o que precisa ser colado de novo. O Excel não aceita "*" em nome
+    de aba; dentro da aba, no número da linha, o "*" é o que se usa.
+  · Toda célula de código é gravada como TEXTO (`data_type = 's'`). Sem isso,
+    uma linha que começa com "=" — e há dezenas, por causa do `===` do
+    JavaScript — viraria fórmula, e o que a pessoa colaria seria o resultado
+    dela.
+  · O conferidor `conferir-excel.py` compara aba por aba com o arquivo do
+    repositório, caractere a caractere, e roda os .gs no `node --check`. É o
+    que garante que a planilha entregue é o código de verdade, e não uma
+    versão de alguns commits atrás.
 ============================================================================
 """
 
@@ -183,56 +195,6 @@ def escrever_aba_do_arquivo(planilha, pasta, nome, papel, marcar=True):
     return len(linhas)
 
 
-def escrever_aba_para_colar(planilha, ordem, nome, comoChamarNoAppsScript):
-    """
-    Uma aba por arquivo DO PACOTE, pronta para copiar e colar no Apps Script.
-
-    POR QUE ELAS EXISTEM. O PO instala copiando do Excel — é o transporte
-    dele. Mas as abas por arquivo-fonte são VINTE, e colar vinte vezes é vinte
-    chances de pular uma, inverter duas ou errar um nome. O pacote junta tudo
-    em três arquivos; estas abas põem esses três DENTRO do Excel que ele já
-    baixa, e a conta cai de vinte colagens para três.
-
-    A coluna A tem SÓ o código, da primeira linha à última, sem número de
-    linha ao lado. É de propósito: a pessoa clica no cabeçalho da coluna A,
-    copia, e o que vai para a área de transferência é o arquivo inteiro e nada
-    mais. Com o número na coluna de ao lado, selecionar a coluna errada — ou
-    as duas — colaria lixo no projeto.
-
-    O recado fica na coluna B, longe do que vai ser copiado.
-    """
-    # `ordem - 1` porque o LEIA-ME ainda não existe: ele é criado por último,
-    # no índice 0, e empurra estas três para 1, 2 e 3. Criando-as já em 1, 2 e
-    # 3, a primeira aba de leitura ficava na frente delas.
-    titulo = ('%d · COLAR %s' % (ordem, nome))[:31]
-    aba = planilha.create_sheet(title=titulo, index=ordem - 1)
-
-    caminho = os.path.join(RAIZ, 'Evolucao', 'pacote', nome)
-    with open(caminho, encoding='utf-8') as arquivo:
-        linhas = arquivo.read().split('\n')
-
-    for numero, conteudo in enumerate(linhas, start=1):
-        celula = aba.cell(row=numero, column=1)
-        celula.value = conteudo
-        celula.data_type = 's'
-        celula.font = FONTE_CODIGO
-        celula.alignment = Alignment(vertical='top')
-
-    recado = aba.cell(row=1, column=2)
-    recado.value = ('PASSO ' + str(ordem) + ' de 3 — clique no cabeçalho da '
-                    'COLUNA A, copie, e cole no Apps Script num arquivo '
-                    'chamado "' + comoChamarNoAppsScript + '" (sem extensão, '
-                    'com as maiúsculas iguais). Não copie esta coluna B.')
-    recado.font = FONTE_TITULO
-    recado.fill = PatternFill('solid', fgColor=AZUL)
-    recado.alignment = Alignment(vertical='center', wrap_text=True)
-
-    aba.column_dimensions['A'].width = 110
-    aba.column_dimensions['B'].width = 60
-    aba.row_dimensions[1].height = 46
-    return len(linhas)
-
-
 def escrever_leia_me(planilha, inventario):
     aba = planilha.create_sheet(title='LEIA-ME', index=0)
     aba.column_dimensions['A'].width = 30
@@ -247,24 +209,37 @@ def escrever_leia_me(planilha, inventario):
         ('', '', 'Ler, revisar e comparar o código. Uma aba por arquivo, com o '
                  'número da linha ao lado.'),
         ('', '', ''),
-        ('PARA INSTALAR OU ATUALIZAR: AS TRÊS PRIMEIRAS ABAS', '', ''),
-        ('', '', 'As abas 1, 2 e 3 são o sistema inteiro, já juntado em três '
-                 'arquivos. Em cada uma:'),
-        ('', '', '   clique no cabeçalho da COLUNA A, copie, e cole no Apps '
-                 'Script.'),
+        ('PARA INSTALAR OU ATUALIZAR: UMA ABA POR ARQUIVO', '', ''),
+        ('', '', 'Cada aba é UM arquivo do Apps Script, com o mesmo nome. Em '
+                 'cada uma:'),
+        ('', '', '   selecione a COLUNA B inteira (clique no cabeçalho "B"), '
+                 'copie, e cole no'),
+        ('', '', '   arquivo de mesmo nome no Apps Script. A coluna A é só o '
+                 'número da linha —'),
+        ('', '', '   não copie ela.'),
         ('', '', ''),
-        ('', '', '   1 · COLAR Codigo.gs       ->  arquivo .gs chamado "Codigo"'),
-        ('', '', '   2 · COLAR Index.html      ->  arquivo HTML chamado "Index"'),
-        ('', '', '   3 · COLAR SemAcesso.html  ->  arquivo HTML chamado "SemAcesso"'),
+        ('', '', 'No Apps Script o arquivo se chama "Index", e não '
+                 '"Index.html": sem extensão,'),
+        ('', '', 'sem acento, com as maiúsculas iguais. Os .gs entram como '
+                 'Script; os .html, como HTML.'),
         ('', '', ''),
-        ('', '', 'No Apps Script o arquivo se chama "Index", e não "Index.html": sem '
-                 'extensão, sem acento,'),
-        ('', '', 'com as maiúsculas iguais.'),
+        ('', '', 'A ORDEM NÃO IMPORTA, mas NENHUM ARQUIVO PODE FICAR DE FORA: '
+                 'um .gs que falta faz'),
+        ('', '', 'o projeto inteiro parar de carregar. Depois de colar todos, '
+                 'rode oQueFaltaNoProjeto()'),
+        ('', '', 'de conferir-projeto.gs — ele diz qual ficou para trás.'),
         ('', '', ''),
-        ('', '', 'As outras abas são UMA POR ARQUIVO-FONTE, para ler e revisar. Dá '
-                 'para instalar por elas'),
-        ('', '', 'também — são vinte colagens em vez de três, e vinte chances de '
-                 'pular uma.'),
+        ('O QUE O LOSANGO ◆ NO NOME DA ABA QUER DIZER', '', ''),
+        ('', '', '◆ na frente do nome = este arquivo MUDOU nesta rodada. São '
+                 'esses que precisam ser'),
+        ('', '', 'colados de novo; os outros estão iguais ao que você já tem '
+                 'no Apps Script.'),
+        ('', '', ''),
+        ('', '', 'Dentro da aba, a linha que mudou tem "*" grudado no número e '
+                 'fundo amarelo; a que'),
+        ('', '', 'nasceu agora, fundo verde. (No nome da aba o Excel não '
+                 'aceita "*" — ele é curinga'),
+        ('', '', 'de busca lá dentro —, por isso o losango.)'),
         ('', '', ''),
         ('SE A PLANILHA JÁ ESTÁ EM USO, NÃO REINSTALE', '', ''),
         ('', '', 'Cole o código novo por cima e rode atualizarPGO() no editor. Ela '
@@ -335,13 +310,6 @@ def gerar():
         quantas = escrever_aba_do_arquivo(planilha, pasta, nome, papel)
         inventario.append((pasta, nome, papel, quantas))
 
-    # As três abas de COLAR vêm ANTES das de leitura, logo depois do LEIA-ME:
-    # é o que a pessoa faz primeiro ao abrir o arquivo.
-    for ordem, (nome, noAppsScript) in enumerate(
-            [('Codigo.gs', 'Codigo'), ('Index.html', 'Index'),
-             ('SemAcesso.html', 'SemAcesso')], start=1):
-        escrever_aba_para_colar(planilha, ordem, nome, noAppsScript)
-
     escrever_leia_me(planilha, inventario)
 
     os.makedirs(os.path.dirname(DESTINO), exist_ok=True)
@@ -411,8 +379,8 @@ if __name__ == '__main__':
     total = sum(item[3] for item in inventario)
     print('')
     print('Planilha gerada em ' + DESTINO)
-    print('  ' + str(len(inventario) + 4) + ' abas  (LEIA-ME + 3 de COLAR + '
-          + str(len(inventario)) + ' de leitura)')
+    print('  ' + str(len(inventario) + 1) + ' abas  (LEIA-ME + '
+          + str(len(inventario)) + ', uma por arquivo)')
     print('  ' + '{:,}'.format(total).replace(',', '.') + ' linhas de código')
     print('  ' + str(round(os.path.getsize(DESTINO) / 1024)) + ' KB')
     print('')
