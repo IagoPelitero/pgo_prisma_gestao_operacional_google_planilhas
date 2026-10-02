@@ -2553,22 +2553,34 @@ function removerColuna_(nomeDaAba, cabecalho) {
 }
 
 /**
- * Registra a coluna nova em CAMPOS.
+ * Registra a coluna nova em CAMPOS — quando ela é coluna de um CANAL.
  *
  * Não é burocracia: é onde o tipo da coluna passa a morar. Sem esta linha, na
  * próxima execução a coluna voltaria a ser lida como texto — e uma coluna de
  * moeda guardaria "R$ 2.500,00" em vez de 2500.
+ *
+ * SÓ PARA ABA DE CANAL, e isto é o que impede lixo em CAMPOS.
+ *
+ * CAMPOS é o formulário de CADASTRAR CASO: cada linha é um campo de um canal.
+ * Coluna de aba de controle — USUARIOS, CORRETORAS, SUSEP_BLOQUEADAS — não é
+ * campo de formulário nenhum, e a linha nascia com CanalId vazio: invisível
+ * para `camposAtivosDoCanal_`, inútil para todo mundo, e contada na tela de
+ * Cadastrar Caso.
+ *
+ * Pior: apagada a coluna da planilha, a linha vira um campo apontando para
+ * coluna que não existe, e o diagnóstico REPROVA a instalação. Foi assim que
+ * isto apareceu — ensaiando o PO apagar à mão as colunas que saíram do
+ * contrato, que é justamente o que a migração manda ele fazer quando quiser.
  */
 function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
   if (!planilhaAtiva_().getSheetByName('CAMPOS')) return null;
+  if (!planilhaAtiva_().getSheetByName('CANAIS')) return null;
 
-  var canalId = '';
-  if (planilhaAtiva_().getSheetByName('CANAIS')) {
-    var canal = lerRegistros_('CANAIS').filter(function (m) {
-      return normalizarParaComparar_(m.Aba) === normalizarParaComparar_(nomeDaAba);
-    })[0];
-    if (canal) canalId = canal.Id;
-  }
+  var canal = lerRegistros_('CANAIS').filter(function (m) {
+    return normalizarParaComparar_(m.Aba) === normalizarParaComparar_(nomeDaAba);
+  })[0];
+  if (!canal) return null;
+  var canalId = canal.Id;
 
   return inserirRegistro_('CAMPOS', {
     CanalId: canalId,

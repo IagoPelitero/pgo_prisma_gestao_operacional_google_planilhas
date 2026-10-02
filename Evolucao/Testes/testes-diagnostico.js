@@ -1881,6 +1881,64 @@ function rodarTestesDeDiagnostico() {
       falhasEmTexto(chamar('diagnosticoRECC()')));
   });
 
+  teste('as colunas novas de ABA DE CONTROLE não viram campo de formulário', () => {
+    /*
+      CAMPOS é o formulário de Cadastrar Caso: cada linha é um campo de um
+      canal. Coluna de USUARIOS, CORRETORAS ou SUSEP_BLOQUEADAS não é campo
+      de canal nenhum — e nascia ali com CanalId vazio, invisível para o
+      formulário e contada na tela.
+    */
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+
+    const deControle = chamar('lerRegistros_("CAMPOS")').filter((campo) =>
+      ['USUARIOS', 'CORRETORAS', 'SUSEP_BLOQUEADAS', 'CANAIS', 'CATALOGO']
+        .indexOf(String(campo.Aba)) >= 0);
+
+    igual(deControle.length, 0,
+      'sobrou campo de aba de controle: '
+      + deControle.map((c) => c.Aba + '.' + c.Cabecalho).join(', '));
+  });
+
+  teste('apagar à mão a coluna que saiu do contrato NÃO reprova o sistema', () => {
+    /*
+      O laudo da migração convida o PO a apagar as colunas que saíram do
+      contrato: "apague a coluna na planilha quando quiser". Este teste é o
+      que garante que aceitar o convite não quebra nada — foi ensaiando isso
+      que o campo solto apareceu.
+    */
+    const { ambiente, chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+
+    // O PO apaga, na planilha, as que o laudo listou.
+    [['USUARIOS', 'Matricula'], ['USUARIOS', 'Canal que atende'],
+     ['CORRETORAS', 'Nome'], ['CORRETORAS', 'Canal'],
+     ['SUSEP_BLOQUEADAS', 'Motivo'], ['SUSEP_BLOQUEADAS', 'CpfReincidente']
+    ].forEach(([nomeDaAba, cabecalho]) => {
+      const aba = ambiente.planilha.getSheetByName(nomeDaAba);
+      const cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
+      const onde = cabecalhos.findIndex((c) => String(c) === cabecalho);
+      if (onde >= 0) aba.deleteColumns(onde + 1, 1);
+    });
+    chamar('esquecerEstruturaLida_()');
+
+    igual(chamar('diagnosticoRECC()').aprovado, true,
+      falhasEmTexto(chamar('diagnosticoRECC()')));
+
+    // E o sistema continua funcionando sobre as abas encurtadas.
+    const daRet = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    chamar('salvarCorretora')({ susep: 'RET55M', corretora: 'Depois de apagar',
+      sucursal: '12', segmento: 'Diamante', consultor: 'Brook' });
+    igual(chamar('consultarSusep')('RET55M', daRet.id).situacao, 'OK');
+
+    chamar('bloquearSusep')({ susep: 'RET66N', corretora: 'B',
+      sucursal: '1', coordenadorComercial: 'C' });
+    verdadeiro(chamar('listarSusepsBloqueadas()')
+      .some((uma) => uma.susep === 'RET66N'));
+
+    verdadeiro(chamar('listarUsuarios()').length > 0);
+  });
+
   teste('atualizar não perde usuário, caso nem configuração ajustada', () => {
     const { chamar } = comoEraAntesDestaRodada();
 

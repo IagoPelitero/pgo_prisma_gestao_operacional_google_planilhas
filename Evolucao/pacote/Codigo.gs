@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-02 08:26
+   Gerado em 2026-10-02 08:50
    ========================================================================== */
 
 
@@ -2571,22 +2571,34 @@ function removerColuna_(nomeDaAba, cabecalho) {
 }
 
 /**
- * Registra a coluna nova em CAMPOS.
+ * Registra a coluna nova em CAMPOS — quando ela é coluna de um CANAL.
  *
  * Não é burocracia: é onde o tipo da coluna passa a morar. Sem esta linha, na
  * próxima execução a coluna voltaria a ser lida como texto — e uma coluna de
  * moeda guardaria "R$ 2.500,00" em vez de 2500.
+ *
+ * SÓ PARA ABA DE CANAL, e isto é o que impede lixo em CAMPOS.
+ *
+ * CAMPOS é o formulário de CADASTRAR CASO: cada linha é um campo de um canal.
+ * Coluna de aba de controle — USUARIOS, CORRETORAS, SUSEP_BLOQUEADAS — não é
+ * campo de formulário nenhum, e a linha nascia com CanalId vazio: invisível
+ * para `camposAtivosDoCanal_`, inútil para todo mundo, e contada na tela de
+ * Cadastrar Caso.
+ *
+ * Pior: apagada a coluna da planilha, a linha vira um campo apontando para
+ * coluna que não existe, e o diagnóstico REPROVA a instalação. Foi assim que
+ * isto apareceu — ensaiando o PO apagar à mão as colunas que saíram do
+ * contrato, que é justamente o que a migração manda ele fazer quando quiser.
  */
 function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
   if (!planilhaAtiva_().getSheetByName('CAMPOS')) return null;
+  if (!planilhaAtiva_().getSheetByName('CANAIS')) return null;
 
-  var canalId = '';
-  if (planilhaAtiva_().getSheetByName('CANAIS')) {
-    var canal = lerRegistros_('CANAIS').filter(function (m) {
-      return normalizarParaComparar_(m.Aba) === normalizarParaComparar_(nomeDaAba);
-    })[0];
-    if (canal) canalId = canal.Id;
-  }
+  var canal = lerRegistros_('CANAIS').filter(function (m) {
+    return normalizarParaComparar_(m.Aba) === normalizarParaComparar_(nomeDaAba);
+  })[0];
+  if (!canal) return null;
+  var canalId = canal.Id;
 
   return inserirRegistro_('CAMPOS', {
     CanalId: canalId,
@@ -13849,6 +13861,9 @@ function atualizarPGO() {
   // --- 6. a aba PRODUTOS sai da planilha -----------------------------------
   feito = feito.concat(apagarAAbaDeProdutos_(pulados, paraVoce));
 
+  // --- 6b. o lixo que uma versão desta migração deixou em CAMPOS -----------
+  feito = feito.concat(limparCamposSemCanal_(pulados));
+
   // --- 7. o que SOBROU, e que é decisão sua --------------------------------
   //
   // Nada aqui é apagado pelo sistema. São coisas que saíram do contrato nesta
@@ -14030,6 +14045,51 @@ function apagarAAbaDeProdutos_(pulados, paraVoce) {
   paraVoce.push('A aba PRODUTOS foi apagada, a seu pedido, com ' + quantas
     + ' linha(s). Se precisar dela de volta, ela está em Arquivo › Histórico '
     + 'de versões do Google Planilhas por 30 dias.');
+  return feito;
+}
+
+/**
+ * Apaga as linhas de CAMPOS que apontam para aba de CONTROLE.
+ *
+ * CAMPOS é o formulário de Cadastrar Caso: cada linha é um campo de um canal.
+ * Uma versão desta migração criava linha ali para as colunas novas de
+ * USUARIOS, CORRETORAS e SUSEP_BLOQUEADAS, que não são canal nenhum — elas
+ * nasciam com CanalId vazio, invisíveis para o formulário e contadas na tela.
+ *
+ * `registrarColunaEmCampos_` não cria mais essas linhas. Isto aqui tira as
+ * que já nasceram, e só elas: a condição é ser de uma aba que o contrato
+ * declara como de controle E estar sem canal. Campo de canal, criado pelo PO
+ * na tela, não entra nessa conta em nenhuma hipótese.
+ */
+function limparCamposSemCanal_(pulados) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CAMPOS')) {
+    pulados.push('aba CAMPOS não existe');
+    return feito;
+  }
+
+  var deControle = {};
+  Object.keys(RECC_ESQUEMA).forEach(function (chave) {
+    if (RECC_ESQUEMA[chave].controle === true) {
+      deControle[normalizarParaComparar_(RECC_ESQUEMA[chave].aba)] = true;
+    }
+  });
+
+  var sobrando = lerRegistros_('CAMPOS').filter(function (campo) {
+    return deControle[normalizarParaComparar_(campo.Aba)]
+      && !converterParaIdentificador_(campo.CanalId);
+  });
+
+  if (!sobrando.length) {
+    pulados.push('não há campo apontando para aba de controle');
+    return feito;
+  }
+
+  sobrando.forEach(function (campo) {
+    apagarRegistroDeVez_('CAMPOS', campo.Id);
+    feito.push('campo solto removido: ' + campo.Aba + '.' + campo.Cabecalho);
+  });
+  esquecerEstruturaLida_('CAMPOS');
   return feito;
 }
 
