@@ -1833,6 +1833,54 @@ function rodarTestesDeDiagnostico() {
     contem(recado, 'RET');
   });
 
+  teste('atualizar NÃO atropela a sequência de Id de quem já migrou', () => {
+    /*
+      O DEFEITO QUE O ENSAIO PEGOU, horas antes de a equipe rodar.
+
+      O passo das sequências de `migrarParaCanais` rodava SEMPRE, inclusive
+      numa planilha já migrada — que é a de quem só está atualizando o código.
+      E aí ele fazia o oposto do que existe para evitar: copiava
+      RECC_SEQ_CANAIS (a sequência dos canais, em 2) por cima de
+      RECC_SEQ_CORRETORAS (em 139) e apagava a dos canais.
+
+      A próxima corretora cadastrada nasceria com um Id que já existe. O
+      diagnóstico pegava depois; pegar depois de gravar é tarde.
+    */
+    const { ambiente, chamar } = instalacaoNova();
+    const corretoras = [];
+    for (let i = 0; i < 140; i++) {
+      corretoras.push({ SUSEP: 'RET' + i, Corretora: 'C' + i, Segmento: 'Diamante' });
+    }
+    chamar('inserirVariosRegistros_')('CORRETORAS', corretoras);
+
+    const antesCorretoras = ambiente.propriedades.get('RECC_SEQ_CORRETORAS');
+    const antesCanais = ambiente.propriedades.get('RECC_SEQ_CANAIS');
+    // A sequência guarda o ÚLTIMO índice emitido: 140 linhas param em 139.
+    verdadeiro(Number(antesCorretoras) >= 139,
+      'a sequência tem de estar adiantada antes, senão o teste não prova nada —'
+      + ' está em ' + antesCorretoras);
+    verdadeiro(Number(antesCorretoras) > Number(antesCanais),
+      'e bem acima da dos canais, que é a que atropelava');
+
+    chamar('atualizarPGO()');
+
+    igual(ambiente.propriedades.get('RECC_SEQ_CORRETORAS'), antesCorretoras,
+      'a sequência das corretoras não pode ser atropelada');
+    igual(ambiente.propriedades.get('RECC_SEQ_CANAIS'), antesCanais,
+      'e a dos canais não pode sumir');
+
+    // E a prova que importa: o próximo Id não colide.
+    const novoId = chamar('salvarCorretora')({ susep: 'RETNOVA',
+      corretora: 'Depois da atualização', segmento: 'Diamante' });
+    const todas = chamar('lerRegistros_("CORRETORAS")');
+    const repetidos = todas.filter((uma) =>
+      String(uma.Id) === String(novoId.id || novoId));
+    igual(repetidos.length, 1, 'o Id novo não pode já existir na aba');
+
+    igual(chamar('diagnosticoRECC()').aprovado, true,
+      falhasEmTexto(chamar('diagnosticoRECC()')));
+  });
+
   teste('atualizar não perde usuário, caso nem configuração ajustada', () => {
     const { chamar } = comoEraAntesDestaRodada();
 

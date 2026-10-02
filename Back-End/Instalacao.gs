@@ -1752,9 +1752,15 @@ function migrarParaCanais() {
 
   // Só é a aba de corretoras se tiver a cara dela: uma instalação já migrada
   // tem uma CANAIS que é de canais, e renomeá-la seria desfazer a migração.
+  // GUARDA O QUE FOI RENOMEADO DE VERDADE. O passo 3, das sequências, depende
+  // disto — ver o comentário grande lá embaixo, que conta o estrago.
+  var renomeouCorretoras = false;
+  var renomeouCanais = false;
+
   if (corretoras && !planilha.getSheetByName('CORRETORAS')
     && ehAAbaDeCorretoras_(corretoras)) {
     corretoras.setName('CORRETORAS');
+    renomeouCorretoras = true;
     feito.push('aba CANAIS (corretoras) renomeada para CORRETORAS');
   } else if (planilha.getSheetByName('CORRETORAS')) {
     pulados.push('CORRETORAS já existe');
@@ -1762,6 +1768,7 @@ function migrarParaCanais() {
 
   if (mesas && !planilha.getSheetByName('CANAIS')) {
     mesas.setName('CANAIS');
+    renomeouCanais = true;
     feito.push('aba MESAS renomeada para CANAIS');
   } else if (!mesas) {
     pulados.push('MESAS não existe (já migrada?)');
@@ -1802,10 +1809,31 @@ function migrarParaCanais() {
   //
   // A ordem é a mesma das abas, e pelo mesmo motivo: CANAIS precisa ceder a
   // chave antes de MESAS assumi-la.
+  //
+  // SÓ MOVE A SEQUÊNCIA DA ABA QUE FOI RENOMEADA DE VERDADE.
+  //
+  // Sem esta condição o passo rodava sempre — inclusive numa planilha JÁ
+  // migrada, que é a de quem só está atualizando o código. E aí ele fazia o
+  // oposto do que existe para evitar: copiava RECC_SEQ_CANAIS (a sequência
+  // dos CANAIS, em 2 ou 3) por cima de RECC_SEQ_CORRETORAS (em 139) e
+  // apagava a dos canais. A próxima corretora cadastrada nasceria com o Id 3,
+  // que já existe.
+  //
+  // Achado ensaiando a atualização numa planilha cheia, antes de a equipe
+  // rodar. O diagnóstico pegava depois — "a sequência está ABAIXO do maior Id
+  // gravado" —, mas pegar depois de gravar é tarde.
   var propriedades = PropertiesService.getScriptProperties();
-  [['CANAIS', 'CORRETORAS'], ['MESAS', 'CANAIS']].forEach(function (par) {
-    var chaveVelha = RECC_PREFIXO_DA_SEQUENCIA + par[0];
-    var chaveNova = RECC_PREFIXO_DA_SEQUENCIA + par[1];
+  [['CANAIS', 'CORRETORAS', renomeouCorretoras],
+   ['MESAS', 'CANAIS', renomeouCanais]].forEach(function (trio) {
+    var chaveVelha = RECC_PREFIXO_DA_SEQUENCIA + trio[0];
+    var chaveNova = RECC_PREFIXO_DA_SEQUENCIA + trio[1];
+
+    if (!trio[2]) {
+      pulados.push('a aba ' + trio[0] + ' não foi renomeada agora, então a '
+        + 'sequência ' + chaveVelha + ' fica onde está');
+      return;
+    }
+
     var valor = propriedades.getProperty(chaveVelha);
     if (valor === null || valor === undefined) {
       pulados.push('sequência ' + chaveVelha + ' não existe');
