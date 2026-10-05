@@ -268,31 +268,71 @@ function rodarTestesDoTrabalho() {
 
   secao('A tela');
 
-  teste('a fila abre o caso num modal, e não em outra tela', () => {
+  teste('a linha tem Trabalhar no caso, Alterar status e Excluir — nesta ordem', () => {
+    /*
+     * Pedido do PO: "ao invés de ver detalhes substitua pelo nome de trabalhar
+     * no caso e ele irá já abrir a opção de editar", o lápis vira "alterar
+     * status", e excluir vem por último. A leitura do caso saiu do sistema.
+     */
     const fs = require('fs');
     const path = require('path');
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
     const dashboard = fs.readFileSync(path.join(pasta, 'Trabalho.html'), 'utf8');
+    const acoes = dashboard.slice(dashboard.indexOf('function acoesDaLinha'),
+      dashboard.indexOf('function desenharPainel'));
+
+    const trabalhar = acoes.indexOf('Trabalhar no caso');
+    const status = acoes.indexOf('title="Alterar status"');
+    const excluir = acoes.indexOf('data-excluir');
+    verdadeiro(trabalhar > 0 && status > trabalhar && excluir > status,
+      'a ordem tem de ser Trabalhar no caso, Alterar status, Excluir');
+    verdadeiro(acoes.indexOf('Ver detalhes') < 0, 'o "Ver detalhes" saiu');
+    verdadeiro(acoes.indexOf('data-editar') < 0, 'e o lápis também');
+
+    contem(dashboard, "CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-trabalhar')",
+      'Trabalhar no caso abre o modal');
+    contem(dashboard, 'CasoEmModal.trocarSituacao(canalEscolhida',
+      'Alterar status abre o diálogo de status, sem o formulário inteiro');
+    contem(dashboard, 'Formulario.confirmarExclusao(idDoCaso, function',
+      'e excluir pergunta antes, no aviso de atenção');
+  });
+
+  teste('o modal abre JÁ NA EDIÇÃO — não há mais estado de leitura', () => {
     const modal = lerPeca('CasoEmModal');
-
-    contem(dashboard, 'CasoEmModal.abrir(', 'ver detalhes abre o modal');
-    contem(dashboard, 'data-editar', 'e o lápis abre o mesmo modal, já em edição');
-
-    // As quatro ações do caso existem, e todas passam pelo modal: duas na
-    // linha (ver e editar) e as outras duas no rodapé dele. Quatro botões por
-    // linha comiam a largura da coluna "Responsável".
+    contem(modal, "Servidor.chamar('casoParaEditar'");
     contem(modal, "Servidor.chamar('editarCaso'");
-    contem(modal, "Servidor.chamar('excluirCaso'");
     contem(modal, "Servidor.chamar('alterarSituacaoDoCaso'");
-    verdadeiro(dashboard.indexOf('data-trocar-situacao') < 0
-      && dashboard.indexOf('data-ocultar') < 0,
-      'as duas ações menos frequentes não repetem em toda linha');
+    verdadeiro(modal.indexOf("'detalhesDoCaso'") < 0,
+      'nenhuma chamada à leitura, que saiu do servidor');
+    verdadeiro(modal.indexOf('desenharLeitura') < 0, 'nem o desenho dela');
 
     // Quatro saídas do modal: Esc, o X, o botão e clicar fora. Modal que
     // prende é modal que a pessoa aprende a não abrir.
     contem(modal, "evento.key === 'Escape'");
     contem(modal, "id=\"modal-x\"");
+    contem(modal, "id=\"modal-fechar\"");
     contem(modal, 'evento.target === caixa');
+  });
+
+  teste('o Salvar do modal nasce travado e só destrava com o formulário preenchido', () => {
+    // A regra que o PO pediu para o cadastro: botão que aparece antes do
+    // formulário é botão que alguém clica — e aqui gravaria um caso vazio.
+    const modal = lerPeca('CasoEmModal');
+    contem(modal, 'id="modal-salvar" disabled', 'nasce travado');
+    const chegou = modal.slice(modal.indexOf('function quandoAsDuasChegarem'),
+      modal.indexOf('function falhou'));
+    verdadeiro(chegou.indexOf("elemento('modal-salvar').disabled = false")
+      > chegou.indexOf('Formulario.preencher'),
+      'destrava só DEPOIS de preencher');
+    contem(modal, "if (!corpo || elemento('modal-salvar').disabled) return;",
+      'o Ctrl+Enter não passa por cima do botão travado');
+  });
+
+  teste('a leitura saiu também do servidor', () => {
+    verdadeiro(typeof chamar('typeof detalhesDoCaso === "undefined" ? undefined : 1') === 'undefined',
+      'detalhesDoCaso não existe mais');
+    verdadeiro(typeof chamar('typeof historicoDoCaso_ === "undefined" ? undefined : 1') === 'undefined',
+      'nem o histórico, que só ela usava');
   });
 
   secao('Os filtros');
@@ -364,32 +404,20 @@ function rodarTestesDoTrabalho() {
 
   secao('Abrir e ocultar um caso');
 
-  teste('o detalhe traz o caso inteiro, inclusive o que está em branco', () => {
-    // Campo vazio APARECE, com um travessão. Sumir faria a pessoa achar que
-    // aquele campo não existe neste canal, quando ele existe e está em branco
-    // — e "está em branco" é a informação que ela precisava.
+  teste('Trabalhar no caso traz todos os campos, inclusive os em branco', () => {
+    // Campo vazio vem como caixa vazia, e não sumindo: sumir faria a pessoa
+    // achar que aquele campo não existe neste canal.
     const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
-    const detalhe = chamar('detalhesDoCaso')(canal.id, primeiro.id);
+    const aberto = chamar('casoParaEditar')(canal.id, primeiro.id);
+    const chaves = Object.keys(aberto.valores);
 
-    verdadeiro(detalhe.linhas.length > 0);
-    verdadeiro(detalhe.linhas.some((l) => l.valor === ''),
-      'o caso de exemplo tem campo em branco, e ele precisa constar');
-    verdadeiro(detalhe.linhas.some((l) => l.secao === 'Cliente'));
-    verdadeiro(detalhe.linhas.every((l) => l.chave),
-      'toda linha diz de que campo veio');
+    verdadeiro(chaves.length > 0);
+    verdadeiro(chaves.some((chave) => aberto.valores[chave] === ''),
+      'o caso de exemplo tem campo em branco, e ele precisa vir');
+    verdadeiro(Array.isArray(aberto.doSistema), 'e o resto da planilha, como leitura');
   });
 
-  teste('o detalhe conta a história do caso, tirada da auditoria', () => {
-    const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
-    const detalhe = chamar('detalhesDoCaso')(canal.id, primeiro.id);
-
-    verdadeiro(Array.isArray(detalhe.historico));
-    verdadeiro(/^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}$/.test(detalhe.atualizadoEm)
-      || detalhe.atualizadoEm === '',
-      'a data de atualização vem formatada, veio ' + detalhe.atualizadoEm);
-  });
-
-  teste('trocar a situação é um gesto só, e NÃO vai para a auditoria', () => {
+  teste('trocar o status é um gesto só, e NÃO vai para a auditoria', () => {
     const novo = chamar('cadastrarCaso')(canal.id, {
       analista: 'Ana Martins', status: 'Em andamento',
       datadeentrada: escrever(hoje), nomedosegurado: 'Caso da troca'
@@ -401,16 +429,18 @@ function rodarTestesDoTrabalho() {
 
     chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Concluído');
 
-    const detalhe = chamar('detalhesDoCaso')(canal.id, novo.id);
-    igual(detalhe.situacao, 'Concluído');
+    const gravado = chamar('buscarRegistros_')('BASE_MESA', 'Id', String(novo.id), 1)[0];
+    igual(gravado.Status, 'Concluído');
 
     // Troca de status é o evento mais frequente do sistema: um caso passa por
     // quatro ou cinco antes de fechar. Guardar cada uma na auditoria são
     // quase um milhão de linhas numa base de 200 mil casos, numa aba da qual
     // ninguém tira relatório. O que interessa — QUANDO cada etapa aconteceu —
     // passou a ser carimbado na própria linha do caso.
-    verdadeiro(!detalhe.historico.some((p) => p.acao === 'Situação alterada'),
-      'a troca de status não deve mais entrar na auditoria');
+    verdadeiro(!chamar('lerRegistros_("AUDITORIA")').some((linha) =>
+      String(linha.Acao) === 'caso.status'
+        && String(linha.RegistroId) === String(novo.id)),
+    'a troca de status não deve entrar na auditoria');
 
     lanca(() => chamar('alterarSituacaoDoCaso')(canal.id, novo.id, 'Inventada'),
       'não existe no canal');
@@ -538,7 +568,7 @@ function rodarTestesDoTrabalho() {
       'a situação de nascimento também é uma chegada, e tem hora');
   });
 
-  secao('Ver detalhes traz TUDO o que está preenchido');
+  secao('Trabalhar no caso traz TUDO o que está preenchido');
 
   /*
     O PO abriu um caso da RET e não viu o que estava gravado. A causa era uma
@@ -573,18 +603,15 @@ function rodarTestesDoTrabalho() {
     igual(String(linha['número da proposta']), '0000000');
 
     // Mas na tela voltam juntas, do jeito que ele digitou.
-    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
-    const proposta = detalhe.linhas.find((l) => l.chave === 'numerodaproposta');
-    const apolice = detalhe.linhas.find((l) => l.chave === 'numapolice');
-    igual(proposta.valor, '58-0000000', 'antes disto aparecia só "0000000"');
-    igual(apolice.valor, '12-1391-0000000');
+    const aberto = chamar('casoParaEditar')(daRet.id, id);
+    igual(aberto.valores.numerodaproposta, '58-0000000', 'e não só "0000000"');
+    igual(aberto.valores.numapolice, '12-1391-0000000');
   });
 
   teste('o produto volta com o código E o nome', () => {
     const { daRet, id } = umCasoDaRetCompleto(chamar);
-    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
-    const produto = detalhe.linhas.find((l) => l.chave === 'codproduto');
-    igual(produto.valor, '1101 - VIDA INDIVIDUAL', 'antes aparecia só "1101"');
+    const aberto = chamar('casoParaEditar')(daRet.id, id);
+    igual(aberto.valores.codproduto, '1101 - VIDA INDIVIDUAL', 'e não só "1101"');
   });
 
   teste('abrir e salvar sem mexer em nada não recusa e não perde coluna', () => {
@@ -617,13 +644,11 @@ function rodarTestesDoTrabalho() {
       'Quem mudou o status': 'Ana'
     });
 
-    const detalhe = chamar('detalhesDoCaso')(daRet.id, String(novo.id));
-    const extras = detalhe.linhas.filter((l) => l.secao === 'Também está na planilha');
+    const extras = chamar('casoParaEditar')(daRet.id, String(novo.id)).doSistema;
 
     const origem = extras.find((l) => l.rotulo === 'Origem da importação');
     verdadeiro(origem !== undefined, 'a origem da importação tem de aparecer');
     igual(origem.valor, 'Base de inadimplentes set/2026');
-    igual(origem.doSistema, true, 'e vem marcada como leitura');
   });
 
   teste('coluna VAZIA que ninguém declarou NÃO entope a tela', () => {
@@ -634,8 +659,7 @@ function rodarTestesDoTrabalho() {
     const novo = chamar('inserirRegistro_')('BASE_RET', {
       'nome do cliente': 'Chopper', analista: 'Ana', status: 'Não trabalhado'
     });
-    const detalhe = chamar('detalhesDoCaso')(daRet.id, String(novo.id));
-    const extras = detalhe.linhas.filter((l) => l.secao === 'Também está na planilha');
+    const extras = chamar('casoParaEditar')(daRet.id, String(novo.id)).doSistema;
     verdadeiro(extras.every((l) => String(l.valor).trim() !== ''),
       'só coluna COM valor entra nesta seção');
   });
@@ -644,8 +668,7 @@ function rodarTestesDoTrabalho() {
     // Sem esta guarda, a proposta sairia como campo ("58-0000000") e também
     // como coluna solta ("58"), e quem lê não saberia qual é a verdadeira.
     const { daRet, id } = umCasoDaRetCompleto(chamar);
-    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
-    const extras = detalhe.linhas.filter((l) => l.secao === 'Também está na planilha');
+    const extras = chamar('casoParaEditar')(daRet.id, id).doSistema;
 
     ['Código origem da proposta', 'número da proposta', 'cod_sucursal',
      'cod_ramo', 'Num_apolice', 'cod produto', 'produto'
@@ -657,11 +680,35 @@ function rodarTestesDoTrabalho() {
 
   teste('as colunas de controle nunca aparecem', () => {
     const { daRet, id } = umCasoDaRetCompleto(chamar);
-    const detalhe = chamar('detalhesDoCaso')(daRet.id, id);
-    verdadeiro(detalhe.linhas.every((l) => String(l.rotulo).charAt(0) !== '_'),
+    const extras = chamar('casoParaEditar')(daRet.id, id).doSistema;
+    verdadeiro(extras.every((l) => String(l.rotulo).charAt(0) !== '_'),
       '_Visivel, _ExcluidoEm e _Origem são do sistema, não do caso');
-    verdadeiro(!detalhe.linhas.some((l) => l.chave === 'id'),
-      'o Id já vem no topo do detalhe');
+    verdadeiro(!extras.some((l) => l.rotulo === 'Id'),
+      'o Id já vem no título do caso');
+  });
+
+  teste('campo OCULTO para o nível não vaza pela lista de leitura', () => {
+    /*
+     * A lista de leitura mostra o que o formulário não mostra. Um campo
+     * escondido do nível também não aparece no formulário — e sem cuidado
+     * reapareceria aqui, como "coluna que o formulário não pergunta".
+     */
+    const { daRet, id } = umCasoDaRetCompleto(chamar);
+    const operacao = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+    const configuracao = JSON.parse(operacao.Configuracao);
+    configuracao.campos = { nomedocliente: 'oculto' };
+    chamar('atualizarRegistro_')('CATALOGO', operacao.Id,
+      { Configuracao: JSON.stringify(configuracao) });
+    chamar('salvarUsuario')({ nome: 'Nami Souza', email: 'nami.oculto@exemplo.com',
+      nivelAcessoId: operacao.Id, canalId: daRet.id, ativo: true });
+    chamar('atualizarRegistro_')('BASE_RET', id, { analista: 'Nami Souza' });
+
+    comoUsuario(ambiente, 'nami.oculto@exemplo.com', () => {
+      const aberto = chamar('casoParaEditar')(daRet.id, id);
+      verdadeiro(!aberto.doSistema.some((l) => l.rotulo === 'nome do cliente'),
+        'o nome do cliente está oculto para este nível');
+    });
   });
 
   secao('O controle de produtividade da RET');
@@ -811,43 +858,17 @@ function rodarTestesDoTrabalho() {
       'texto que não é número conta como zero, e a mudança vira a primeira');
   });
 
-  teste('o detalhe do caso mostra só o status atual, e desde quando', () => {
-    // Pedido do PO: "o card pode mostrar apenas o status que está". Antes vinha
-    // a jornada inteira, com "ainda não" em tudo que faltava.
+  teste('as datas de cada etapa continuam gravadas na linha do caso', () => {
+    // A tela de leitura, que listava "onde o caso está", saiu do sistema a
+    // pedido do PO. Os carimbos NÃO saíram com ela: é deles que sai a
+    // produtividade da RET.
     const novo = casoNovoDaRet('Caso da linha do tempo');
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
 
-    const etapas = chamar('detalhesDoCaso')(ret.id, novo.id).linhaDoTempo;
-    igual(etapas.length, 1, 'uma linha só — a do status em que o caso está');
-    igual(etapas[0].status, '1º contato realizado');
-    igual(etapas[0].tom, 'violeta', 'com a cor do catálogo');
-    verdadeiro(/\d{2}\/\d{2}\/\d{4}/.test(etapas[0].quando),
-      'e o "desde quando" vem formatado para ler, veio: ' + etapas[0].quando);
-
-    // Os carimbos continuam gravados na linha: é deles que sai a
-    // produtividade. Só deixaram de ser listados no detalhe.
     const linha = linhaDaRet(novo.id);
     verdadeiro(ehData(linha['Data pendente']) && ehData(linha['Data do 1º contato']),
       'as datas de cada etapa continuam na base, intactas');
-  });
-
-  teste('um desfecho não mostra os outros desfechos como "ainda não"', () => {
-    // O motivo do pedido: um caso Retido nunca vai ser Não retido, e a lista
-    // antiga mostrava "Não retido — ainda não" como se faltasse acontecer.
-    const novo = casoNovoDaRet('Caso retido');
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
-    const etapas = chamar('detalhesDoCaso')(ret.id, novo.id).linhaDoTempo;
-    igual(etapas.map((e) => e.status).join(' | '), 'Retido');
-
-    // Caso recém-cadastrado não mudou de status nenhuma vez, e "Não
-    // trabalhado" não carimba: não há data a mostrar, e inventar uma seria
-    // pior do que não mostrar.
-    const recemNascido = casoNovoDaRet('Caso sem mudança');
-    const soOAtual = chamar('detalhesDoCaso')(ret.id, recemNascido.id).linhaDoTempo;
-    igual(soOAtual.length, 1);
-    igual(soOAtual[0].status, 'Não trabalhado');
-    igual(soOAtual[0].quando, '', 'sem data inventada');
   });
 
   teste('a troca de status da RET continua fora da auditoria', () => {
@@ -888,32 +909,40 @@ function rodarTestesDoTrabalho() {
       'as chaves são as do formulário, não os cabeçalhos da planilha');
   });
 
-  teste('o detalhe respeita o alcance do nível', () => {
+  teste('Trabalhar no caso respeita o alcance do nível', () => {
     const doDiego = chamar('resumoDoCanal')(canal.id, {}).fila
       .find((caso) => JSON.stringify(caso.celulas).includes('Diego Castilho'));
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('detalhesDoCaso')(canal.id, doDiego.id), 'Este caso é de Diego Castilho');
+      lanca(() => chamar('casoParaEditar')(canal.id, doDiego.id), 'Este caso é de Diego Castilho');
     });
   });
 
-  teste('a fila traz o botão de excluir, ao lado de ver e editar', () => {
-    // Pedido do PO: excluir na própria fila, como no PGO 5. A decisão
-    // anterior era outra — excluir vivia só no caso aberto —, e cabe agora
-    // porque é um ícone, não um botão com texto.
+  teste('a fila traz o excluir por último, e pergunta antes', () => {
+    // Pedido do PO: excluir na própria fila, como no PGO 5, por último — e
+    // com um aviso de atenção, porque apaga de vez.
     const fila = lerPeca('Trabalho');
     contem(fila, "data-excluir=", 'o botão tem de existir na linha');
     contem(fila, "Servidor.chamar('excluirCaso'", 'e chamar a exclusão');
-    contem(fila, 'Formulario.confirmarExclusao', 'perguntando antes');
+    contem(fila, 'Formulario.confirmarExclusao(idDoCaso, function',
+      'só depois do aviso de atenção');
   });
 
-  teste('a pergunta antes de excluir NÃO promete desfazer', () => {
-    // Ela promete o contrário, e tem de prometer: a linha sai da planilha.
-    // Dizer "pode ser trazida de volta" faria a pessoa confirmar tranquila e
-    // descobrir depois — que é o pior jeito de descobrir.
+  teste('o aviso de exclusão diz que é definitivo, e não é a caixinha do navegador', () => {
+    // Ele promete o contrário de desfazer, e tem de prometer: a linha sai da
+    // planilha. Dizer "pode ser trazida de volta" faria a pessoa confirmar
+    // tranquila e descobrir depois — que é o pior jeito de descobrir.
     const peca = lerPeca('Formulario');
-    contem(peca, 'A LINHA SAI DA PLANILHA');
-    contem(peca, 'Não dá para desfazer');
+    const aviso = peca.slice(peca.indexOf('function confirmarExclusao'),
+      peca.indexOf('function aplicarPadroes'));
+    contem(aviso, 'apagado definitivamente da planilha');
+    contem(aviso, 'Não dá para desfazer');
+    contem(aviso, 'Excluir definitivamente', 'o botão diz o que faz');
+    contem(aviso, 'role="alertdialog"', 'leitor de tela anuncia como alerta');
+    contem(aviso, "getElementById('cancelar-exclusao').focus()",
+      'o foco nasce em Cancelar: Enter distraído não apaga nada');
+    verdadeiro(aviso.indexOf('window.confirm') < 0,
+      'a caixinha cinza do navegador saiu');
     verdadeiro(peca.indexOf('pode ser trazida de volta') < 0,
       'a promessa antiga não pode ter sobrado');
   });
@@ -1501,22 +1530,28 @@ function rodarTestesDoTrabalho() {
     igual(citadas.join(' | '), 'Código origem da proposta | número da proposta | produto');
   });
 
-  secao('Ver detalhes não lê a auditoria inteira');
+  secao('Trabalhar no caso abre com o mínimo de leitura');
 
-  teste('o histórico lê a coluna do Id e só as linhas do caso', () => {
+  teste('abrir o caso não lê a auditoria — ela não tem mais o que mostrar ali', () => {
     /*
-     * A auditoria só cresce: todo cadastro e toda edição deixam uma linha.
-     * O "ver detalhes" lia a aba INTEIRA para mostrar as três ou quatro de um
-     * caso — com 100 mil linhas, 1,4 milhão de células a cada clique. Agora
-     * lê a coluna RegistroId e depois só as linhas do caso.
+     * A tela de leitura lia a trilha de auditoria para montar o histórico do
+     * caso, e a auditoria só cresce. Com a leitura fora do sistema, abrir um
+     * caso é uma linha da base e o formulário do canal — o tamanho da
+     * auditoria não pode mais pesar no clique.
      */
     const caso = novo.chamar('cadastrarCaso')(daMesa.id, {
-      status: 'Em andamento', nomedosegurado: 'Caso do histórico'
+      status: 'Em andamento', nomedosegurado: 'Caso aberto rápido'
     });
-    const aberto = novo.chamar('casoParaEditar')(daMesa.id, String(caso.id));
-    novo.chamar('editarCaso')(daMesa.id, String(caso.id),
-      Object.assign({}, aberto.valores, { nomedosegurado: 'Caso do histórico, editado' }));
+    const medidor = novo.ambiente.medidor;
+    function celulasParaAbrir() {
+      novo.chamar('esquecerEstruturaLida_()');
+      medidor.zerar();
+      const aberto = novo.chamar('casoParaEditar')(daMesa.id, String(caso.id));
+      igual(aberto.valores.nomedosegurado, 'Caso aberto rápido');
+      return medidor.retrato().celulasLidas;
+    }
 
+    const antes = celulasParaAbrir();
     // Três mil linhas de outros casos: o barulho de meses de operação.
     const outras = [];
     for (let i = 0; i < 3000; i++) {
@@ -1524,36 +1559,10 @@ function rodarTestesDoTrabalho() {
         RegistroId: String(900000 + i), Detalhe: 'outro caso' });
     }
     novo.chamar('inserirVariosRegistros_')('AUDITORIA', outras);
-    const linhasDaAuditoria = novo.chamar('lerRegistros_("AUDITORIA")').length;
+    const depois = celulasParaAbrir();
 
-    const medidor = novo.ambiente.medidor;
-    medidor.zerar();
-    const historico = novo.chamar('historicoDoCaso_')('BASE_MESA', String(caso.id));
-    const lidas = medidor.retrato().celulasLidas;
-
-    igual(historico.map((p) => p.acao).join(' → '), 'Caso cadastrado → Caso alterado',
-      'o mesmo histórico, na mesma ordem — do mais antigo para o mais recente');
-    verdadeiro(lidas < linhasDaAuditoria * 2,
-      'leu ' + lidas + ' células para ' + linhasDaAuditoria + ' linhas de auditoria: '
-      + 'tem de ser a coluna do Id e pouco mais, e não a aba inteira');
-  });
-
-  teste('o "atualizado em" é o último passo do histórico, sem segunda leitura', () => {
-    const caso = novo.chamar('resumoDoCanal')(daMesa.id, {}).fila
-      .find((l) => JSON.stringify(l).indexOf('Caso do histórico') >= 0);
-    const detalhe = novo.chamar('detalhesDoCaso')(daMesa.id, caso.id);
-    igual(detalhe.atualizadoEm, detalhe.historico[detalhe.historico.length - 1].quando);
-  });
-
-  teste('caso de OUTRA aba com o mesmo Id não entra no histórico', () => {
-    // A coluna RegistroId é lida sem olhar a aba; a aba é conferida depois,
-    // nas linhas escolhidas. Os dois filtros têm de continuar valendo.
-    novo.chamar('inserirRegistro_')('AUDITORIA', { DataHora: new Date(),
-      Acao: 'caso.editar', Entidade: 'BASE_RET', RegistroId: '0000000000',
-      Detalhe: 'mesmo Id, outra aba' });
-    const historico = novo.chamar('historicoDoCaso_')('BASE_MESA', '0000000000');
-    verdadeiro(historico.every((p) => p.detalhe !== 'mesmo Id, outra aba'),
-      'o passo da RET não pode aparecer no caso da Mesa');
+    igual(depois, antes, 'três mil linhas a mais na auditoria não podem custar '
+      + 'uma célula a mais para abrir o caso (antes ' + antes + ', depois ' + depois + ')');
   });
 }
 

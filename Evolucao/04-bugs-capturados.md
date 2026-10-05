@@ -1326,6 +1326,36 @@ auditoria, e o histórico sai igual, na mesma ordem.
 
 ---
 
+### 56 · O modal que dizia "Abrindo…" para sempre
+
+**Sintoma.** Palavra do PO: "quando cliquei em alterar cadastro a tela
+travou". Nenhum erro no console, nenhuma tela branca.
+
+**Causa.** Duas coisas juntas, na versão em uso. Aberto pelo lápis, o modal do
+caso ia direto para a edição — e o subtítulo, que dizia "Abrindo…", só era
+trocado pela tela de LEITURA. Na edição ele ficava "Abrindo…" para sempre, com
+o formulário já pronto embaixo. E num caso importado da base antiga com a
+proposta pela metade (só o número, sem o código), salvar era RECUSADO: o modal
+não fechava, e o motivo aparecia só no rodapé. Um modal que diz "Abrindo…" e
+não fecha ao salvar é, para quem está usando, uma tela travada.
+
+**Como apareceu.** Reproduzindo no navegador, com o servidor de verdade e 1,5 s
+de atraso por chamada — o tempo do Apps Script —, os mesmos cliques na versão
+em uso e na nova. O simulador sem atraso não mostrava nada de errado.
+
+**Defesa.** A tela de leitura saiu (pedido do PO) e, com ela, o estado que não
+atualizava o subtítulo: o modal abre já em "Trabalhar no caso · canal". O
+"Salvar alterações" nasce travado e só destrava com o formulário preenchido;
+se o caso não abre, o motivo aparece NO MEIO do modal. Testado também com uma
+função faltando no servidor: a tela avisa qual é, em vez de parar.
+
+**O que continua.** A recusa em si — salvar o formulário inteiro de um caso com
+a proposta ou a apólice pela metade — é a regra de validação, e mudar regra é
+decisão do PO. Enquanto isso, "Alterar status" na fila resolve o gesto mais
+comum sem passar pelo formulário.
+
+---
+
 ## O que esta lista ensina
 
 **São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
@@ -1482,3 +1512,7 @@ Daí as duas práticas que o projeto não abre mão:
     na base de teste; pesava em quanto a operação já tinha trabalhado. Medir
     com o volume de daqui a um ano é o que separa "rápido" de "rápido por
     enquanto".
+39. **"Travou" é um sintoma, não um diagnóstico.** No item 56 não havia laço,
+    erro nem função faltando: havia um texto que não mudava e um botão que não
+    fechava. Só apareceu reproduzindo com o atraso de verdade do Apps Script —
+    no simulador instantâneo, tudo parecia certo.

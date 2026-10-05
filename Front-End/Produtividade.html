@@ -295,10 +295,15 @@ var TelaProdutividade = (function () {
             + '">' + escapar(celula.valor || '—') + '</span>';
         }).join('') + '</td>';
       }).join('');
+      // "Trabalhar no caso", como na fila: abre o caso já no formulário. A
+      // tela de leitura saiu do sistema, a pedido do PO.
       return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao" data-caso-do-painel="'
-        + escapar(caso.id) + '">' + Moldura.icone('olho')
-        + ' Ver detalhes</button></td></tr>';
+        + (detalhe.podeEditar
+          ? '<button type="button" class="acao" data-caso-do-painel="'
+            + escapar(caso.id) + '">' + Moldura.icone('editar')
+            + ' Trabalhar no caso</button>'
+          : '')
+        + '</td></tr>';
     }).join('');
 
     elemento('detalhe-do-painel').innerHTML = '<section class="cartao sem-forro origem">'

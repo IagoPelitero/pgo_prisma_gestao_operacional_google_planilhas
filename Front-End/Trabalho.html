@@ -181,30 +181,34 @@ var TelaTrabalho = (function () {
   }
 
   /**
-   * As ações da linha: ver e editar, e só.
+   * As ações da linha, nesta ordem — pedido do PO, igual em todos os canais:
    *
-   * Alterar situação e excluir moram no rodapé do modal. Quatro botões por
-   * linha, repetidos trinta vezes, tomavam a largura de uma coluna inteira de
-   * dado — e a coluna que sumia era "Responsável". Duas ações na linha, as
-   * outras a um clique, cabem e continuam à mão.
+   *   Trabalhar no caso   abre o caso JÁ NO FORMULÁRIO. Era "Ver detalhes",
+   *                       que abria uma leitura e pedia mais um clique para
+   *                       editar; "não tem necessidade do sistema apenas
+   *                       mostrar o caso", e a leitura saiu do sistema.
+   *   Alterar status      no lugar do lápis. É o gesto mais frequente, e o
+   *                       único que não depende do formulário inteiro — por
+   *                       isso funciona mesmo num caso que veio da base antiga
+   *                       com a proposta ou a apólice pela metade.
+   *   Excluir             por último, longe da mão: apaga de vez, e pergunta
+   *                       antes num aviso de atenção.
+   *
+   * As duas primeiras aparecem só para quem pode editar: o servidor recusaria,
+   * e botão que a chamada recusa ensina a pessoa a desconfiar da tela.
    */
   function acoesDaLinha(caso) {
-    var botoes = '<button type="button" class="acao" data-caso="'
-      + escapar(caso.id) + '">' + Moldura.icone('olho') + ' Ver detalhes</button>';
+    var botoes = '';
 
     if (resumo.podeEditar) {
-      botoes += '<button type="button" class="acao-icone" data-editar="'
-        + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
-        + Moldura.icone('editar') + '</button>';
+      botoes += '<button type="button" class="acao" data-trabalhar="'
+        + escapar(caso.id) + '">' + Moldura.icone('editar')
+        + ' Trabalhar no caso</button>'
+        + '<button type="button" class="acao-icone" data-status-do-caso="'
+        + escapar(caso.id) + '" title="Alterar status" aria-label="Alterar status">'
+        + Moldura.icone('trocarSituacao') + '</button>';
     }
 
-    // Excluir na PRÓPRIA FILA, como no PGO 5 — pedido do PO.
-    //
-    // A decisão anterior era outra: excluir vivia só no caso aberto, para não
-    // comer a largura da coluna "Responsável". Cabe agora porque é um ícone,
-    // e não um botão com texto — os três juntos ocupam menos que "Ver
-    // detalhes" sozinho ocupava antes.
-    //
     // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
     // qualquer canal. É o que o PO pediu, e o servidor combina com isto.
     botoes += '<button type="button" class="acao-icone perigo" data-excluir="'
@@ -276,21 +280,20 @@ var TelaTrabalho = (function () {
       });
     }
 
-    ligarCliques('[data-caso]', function (botao) {
-      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-caso'), carregar);
+    ligarCliques('[data-trabalhar]', function (botao) {
+      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-trabalhar'), carregar);
+    });
+    ligarCliques('[data-status-do-caso]', function (botao) {
+      CasoEmModal.trocarSituacao(canalEscolhida,
+        botao.getAttribute('data-status-do-caso'), carregar);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');
-      if (!Formulario.confirmarExclusao(idDoCaso)) return;
-
-      Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
-        .entao(carregar)
-        .senao(function (erro) { window.alert(erro.message || String(erro)); });
-    });
-
-    ligarCliques('[data-editar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-editar'),
-        carregar, true);
+      Formulario.confirmarExclusao(idDoCaso, function () {
+        Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
+          .entao(carregar)
+          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      });
     });
   }
 

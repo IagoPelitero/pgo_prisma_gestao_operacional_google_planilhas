@@ -123,14 +123,15 @@ Dentro de `Evolucao/`:
 
    **A cada versão nova, rode `atualizarPGO()`.** Ela traz para a planilha em
    uso o que cada rodada mudou, e diz no fim o que fez, o que já estava assim
-   e o que é decisão sua. Nesta rodada ela troca os **destaques da fila** —
-   a proposta inteira e o telefone na RET, o título do e-mail na Mesa — e faz
-   o **CPF da Mesa aceitar CNPJ**. Só onde ainda está como a instalação
-   deixou: grupo da fila ou máscara que alguém personalizou **não é mexido**,
-   e aparece na "DECISÃO SUA" com o texto pronto para colar em Configurações.
-   (Na rodada anterior foi ela que excluiu o "Concluído" da RET e trocou os
+   e o que é decisão sua. A última rodada que mexeu na planilha trocou os
+   **destaques da fila** — a proposta inteira e o telefone na RET, o título do
+   e-mail na Mesa — e fez o **CPF da Mesa aceitar CNPJ**. Só onde ainda estava
+   como a instalação deixou: grupo da fila ou máscara que alguém personalizou
+   **não é mexido**, e aparece na "DECISÃO SUA" com o texto pronto para colar
+   em Configurações. (A anterior a ela excluiu o "Concluído" da RET e trocou os
    nomes dos status para os do PO, inclusive nos casos já gravados.) Rodar
-   duas vezes não muda nada.
+   duas vezes não muda nada. A troca das ações do caso — "Trabalhar no caso",
+   "Alterar status" e o aviso de excluir — é só de tela: basta colar o código.
 
    ### O caminho curto: três arquivos
 
@@ -334,36 +335,36 @@ A proposta inteira sai de uma escrita nova das colunas da fila: `Código origem
 da proposta + número da proposta` junta as duas numa linha só, com hífen — e
 pedaço vazio não deixa hífen solto. É editável em Configurações › Canais de
 trabalho, como o resto da fila. O destaque não quebra linha, para dar para
-varrer com o olho: título de e-mail longo aparece com "…", e inteiro no **Ver
-detalhes**.
+varrer com o olho: título de e-mail longo aparece com "…", e inteiro ao
+**Trabalhar no caso**.
 
-Clicar em **Ver detalhes** abre o caso por cima, e fechar devolve a fila
-exatamente como estava. Campo em branco aparece com um travessão: sumir faria
-a pessoa achar que o campo não existe naquelo canal.
+### As três ações de cada caso
 
-![O caso aberto](Evolucao/imagens/tela-caso-em-modal.png)
+Cada linha da fila tem três ações, nesta ordem, **em todos os canais** — RET,
+Mesa Diamante e VG —, a pedido do PO:
 
-Cada linha tem quatro ações: ver, editar, **alterar situação** — um diálogo só
-com a situação, porque é o gesto mais frequente da operação — e excluir, que
-tira o caso do sistema e **mantém a linha na planilha**.
+| Ação | O que faz |
+|---|---|
+| **Trabalhar no caso** | Abre o caso por cima da fila, **já no formulário**, preenchido com o que está na planilha. Fechar devolve a fila exatamente como estava |
+| **Alterar status** (ícone ao lado) | Um diálogo só com o status — o gesto mais frequente da operação. Não passa pelo formulário inteiro, e por isso funciona mesmo num caso que veio da base antiga com a proposta ou a apólice pela metade |
+| **Excluir** (por último) | Apaga o caso **definitivamente da planilha**. Antes, um **aviso de atenção** em vermelho: o foco nasce em *Cancelar*, Enter e Esc cancelam, e só o botão "Excluir definitivamente" apaga. O que havia no caso fica na auditoria |
 
-### Onde o caso está
+![O caso aberto para trabalhar](Evolucao/imagens/tela-caso-em-modal.png)
 
-O detalhe mostra **só o status em que o caso está, e desde quando** — a pedido
-do PO. Antes vinha a jornada inteira, com "ainda não" em tudo que faltava; só
-que desfecho não é etapa em fila: um caso Retido nunca vai ser Não retido, e a
-lista dizia "Não retido — ainda não". O "desde quando" é a data da última
-mudança de status; caso recém-cadastrado, que nunca mudou, aparece sem data em
-vez de com uma inventada.
+**Não existe mais a tela de só ler o caso.** Era o "Ver detalhes", e o PO tirou:
+"não tem necessidade do sistema apenas mostrar o caso". Quem abria um caso ia
+trabalhar nele — eram dois cliques e uma ida a mais ao servidor para chegar ao
+formulário. Com ela saíram o "Onde o caso está" e o "Histórico do caso"; as
+datas de cada etapa **continuam gravadas na linha do caso** (Data do 1º
+contato, Data do 2º contato…), que é de onde sai a produtividade da RET.
 
-As datas de cada etapa **continuam gravadas na linha do caso** (Data do 1º
-contato, Data do 2º contato…), junto com quem mudou por último e quantas vezes
-o caso andou. É delas que sai a produtividade da RET — só deixaram de ser
-listadas no detalhe.
+"Trabalhar no caso" e "Alterar status" aparecem só para quem tem a ação de
+**editar** no nível de acesso — o servidor recusaria. A Busca, a Produtividade
+RECC e a Minha Performance abrem o caso do mesmo jeito.
 
-### Editar: abre com o que está gravado, e fecha quando salva
+### Trabalhar no caso: abre com o que está gravado, e fecha quando salva
 
-O formulário de edição abre **já preenchido com o que está na planilha** — os
+O formulário abre **já preenchido com o que está na planilha** — os
 valores em R$ inclusive, e o zero inclusive: na RET, "retido R$ 0,00" quer
 dizer *não retido*, que é diferente de *não preenchido*. Por um tempo esses
 campos abriam em branco, e quem abrisse o caso para corrigir outra coisa
@@ -374,10 +375,13 @@ botão mostra **três pontinhos** e nada do modal aceita clique — nem o X, nem
 Esc, nem o clique fora. Dois cliques gravariam duas vezes, e sair no meio
 deixaria a gravação a caminho sem ninguém para ver o resultado.
 
-Abrir a edição custava **duas esperas em fila**: o formulário do canal e
-depois os valores do caso. Hoje as duas perguntas saem juntas, e o formulário
-do canal fica guardado enquanto a página estiver aberta — do segundo caso em
-diante é **uma viagem a menos**. Na edição, só o canal que confere bloqueio de
+Abrir a edição custava **três esperas em fila**: a tela de leitura (que até o
+lápis pagava), o formulário do canal e os valores do caso. Hoje a leitura não
+existe, as outras duas perguntas saem juntas, e o formulário do canal fica
+guardado enquanto a página estiver aberta — do segundo caso em diante é **uma
+viagem só**. O botão "Salvar alterações" nasce travado e destrava só com o
+formulário preenchido, e se o caso não abrir, o motivo aparece no meio do
+modal — e não um "Abrindo…" parado. Na edição, só o canal que confere bloqueio de
 SUSEP consulta a SUSEP: na Mesa Diamante a corretora já está preenchida, e a
 consulta só acrescentava espera.
 
@@ -468,22 +472,21 @@ proposta e o detalhe não; e o produto, nenhum dos dois juntava. O detalhe
 mostrava `0000000` no lugar de `58-0000000`, e — pior — salvar um caso da RET
 com produto era **recusado**, num campo que a pessoa nem tinha tocado.
 
-### Ver detalhes traz tudo o que está preenchido
+### Trabalhar no caso traz tudo o que está preenchido
 
 Um caso importado chega com valor em colunas que o formulário não pergunta: a
-origem da importação, a data dela, os carimbos de contato. Elas aparecem no
-fim do detalhe, atrás de um aviso, **como leitura**: são escritas pelo
+origem da importação, a data dela, os carimbos de contato. Elas aparecem
+**embaixo do formulário**, atrás de um aviso, **como leitura**: são escritas pelo
 sistema, e deixar reescrever "Quem mudou o status" à mão faria o número da
 produtividade depender do que alguém digitou, e não do que aconteceu.
 
 Coluna **vazia** que ninguém declarou no formulário não entra — a BASE_RET tem
 quase cinquenta colunas, e listar as vazias encheria a tela de travessões
-escondendo justamente o que está preenchido.
+escondendo justamente o que está preenchido. E campo **oculto para o nível**
+também não aparece aí: escondido no formulário, escondido na leitura.
 
-O histórico do caso sai da auditoria, e a auditoria só cresce. Por isso o
-detalhe **lê a coluna do Id primeiro e depois só as linhas daquele caso** — a
-mesma regra da busca. Antes ele lia a aba inteira a cada clique: com 100 mil
-linhas de auditoria, 1,45 milhão de células para mostrar três ou quatro.
+Abrir o caso **não lê a auditoria** — ela só servia ao histórico, que saiu com
+a tela de leitura. O tamanho da trilha não pesa mais no clique.
 
 ---
 
@@ -521,8 +524,8 @@ do "1º contato realizado" e hoje está em "Retido" continua tendo sido contatad
 — contar pelo status diria zero, e a operação concluiria que ninguém ligou para
 ninguém. A coluna de carimbo não esquece.
 
-E o carimbo vale para **toda** porta: o diálogo de situação, o formulário
-inteiro aberto pelo lápis e o cadastro de um caso novo. Por um tempo só o
+E o carimbo vale para **toda** porta: o diálogo de alterar status, o
+formulário inteiro de "Trabalhar no caso" e o cadastro de um caso novo. Por um tempo só o
 diálogo carimbava, e o mesmo caso na mesma situação ficava com data ou sem data
 conforme onde a pessoa tivesse clicado — a conta ficava pela metade sem errar
 em nada visível. É o achado 43.
@@ -982,7 +985,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-762 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+766 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

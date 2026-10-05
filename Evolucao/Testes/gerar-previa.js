@@ -143,9 +143,6 @@ function pontePreparada(respostas) {
     + '        }\n'
     + '        responder(resumo);\n'
     + '      },\n'
-    + '      detalhesDoCaso: function (idDoCanal, idDoCaso) {\n'
-    + '        responder(respostas.paineis[idDoCanal].detalhes[idDoCaso]);\n'
-    + '      },\n'
     + '      casoParaEditar: function (idDoCanal, idDoCaso) {\n'
     + '        responder(respostas.paineis[idDoCanal].paraEditar[idDoCaso]);\n'
     + '      },\n'
@@ -716,16 +713,16 @@ function gerar(pastaDeSaida) {
       });
     });
 
-    const detalhes = {};
+    // "Trabalhar no caso" abre direto a edição: a leitura saiu do sistema, e
+    // a prévia não guarda mais a resposta dela.
     const paraEditar = {};
     const situacoes = {};
     base.fila.forEach((caso) => {
-      detalhes[caso.id] = chamar('detalhesDoCaso')(canal.id, caso.id);
       paraEditar[caso.id] = chamar('casoParaEditar')(canal.id, caso.id);
       situacoes[caso.id] = chamar('situacoesParaTrocar')(canal.id, caso.id);
     });
 
-    paineis[canal.id] = { base, variantes, detalhes, paraEditar, situacoes };
+    paineis[canal.id] = { base, variantes, paraEditar, situacoes };
   });
   const suseps = {
     '1234567': chamar('consultarSusep')('1234567'),

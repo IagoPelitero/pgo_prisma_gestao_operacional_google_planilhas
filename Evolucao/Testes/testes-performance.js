@@ -354,6 +354,28 @@ function rodarTestesDePerformance() {
       'o caso deste canal abre; o de outra base, não');
   });
 
+  teste('sem a ação de editar, a lembrança não abre o caso', () => {
+    // Abrir daqui é "Trabalhar no caso", que é a EDIÇÃO — a leitura saiu do
+    // sistema. Para quem não edita, a linha fica só como lembrança.
+    const meuNivel = String(chamar('usuarioAtual_()').usuario.NivelAcessoId);
+    const nivel = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => String(i.Id) === meuNivel);
+    const configuracao = JSON.parse(nivel.Configuracao);
+    const comEditar = configuracao.acoes.slice();
+    configuracao.acoes = comEditar.filter((acao) => acao !== 'editar');
+    chamar('atualizarRegistro_')('CATALOGO', nivel.Id,
+      { Configuracao: JSON.stringify(configuracao) });
+    try {
+      const recentes = chamar('minhaPerformance')(canal.id, 30).recentes;
+      verdadeiro(recentes.length > 0, 'a trilha continua aparecendo');
+      verdadeiro(recentes.every((p) => !p.abre), 'mas nenhuma linha abre o caso');
+    } finally {
+      configuracao.acoes = comEditar;
+      chamar('atualizarRegistro_')('CATALOGO', nivel.Id,
+        { Configuracao: JSON.stringify(configuracao) });
+    }
+  });
+
   secao('A tela');
 
   teste('a página inclui a tela, e a rota chama ela', () => {

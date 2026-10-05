@@ -2025,6 +2025,43 @@ só as novas.
 
 ---
 
+## Etapa 22 — trabalhar no caso, alterar status e excluir com aviso
+
+Uma investigação e três mudanças de tela. A investigação: um integrante da RET
+não conseguia mudar o status de casos em Retido, Não retido e outros. **Não há
+bloqueio no perfil** — o mesmo cenário, num nível "Demandas RET" só com a RET,
+muda qualquer status pelos dois caminhos. A trava era outra: o formulário
+inteiro confere todos os campos ao salvar, e caso importado da base antiga com
+a proposta, a apólice ou o CPF pela metade era recusado.
+
+| pedido | o que ficou |
+|---|---|
+| "Substitua o lápis pelo alterar status" | Ícone **Alterar status** na linha: um diálogo só com o status, que não passa pelo formulário inteiro. Esc fecha, o Salvar trava enquanto grava, e dois cliques não abrem dois diálogos |
+| "Ao invés de ver detalhes, trabalhar no caso, que já abre a opção de editar" | **Trabalhar no caso** abre o caso já no formulário. A tela de leitura saiu do sistema — servidor, tela, prévia e estilos. O que a planilha tem e o formulário não pergunta vem embaixo, como leitura |
+| "Por último excluir caso, que deve excluir definitivamente, com pop-up de atenção" | Excluir por último. O aviso é do sistema, em vermelho, com o foco em Cancelar; Enter e Esc cancelam. A linha sai da planilha e o conteúdo fica na auditoria |
+| "Pode colocar em todos os canais" | RET, Mesa Diamante e VG, e também na Busca. Produtividade RECC e Minha Performance abrem o caso em "Trabalhar no caso" |
+| "Quando cliquei em alterar cadastro a tela travou" | Reproduzido com o atraso do Apps Script: o modal ficava em "Abrindo…" para sempre e não fechava ao salvar um caso importado incompleto (item 56 dos achados). O modal novo não tem esse estado |
+
+"Trabalhar no caso" e "Alterar status" aparecem só para quem tem a ação de
+editar no nível de acesso. Excluir continua aberto a qualquer pessoa
+cadastrada, como o PO decidiu antes.
+
+**766 testes**, cinco execuções seguidas sem falha, cada regra nova quebrada de
+propósito (8 quebras, 8 vermelhos). No navegador, com o servidor de verdade:
+as três ações nos três canais e na Busca, o aviso de exclusão (Cancelar, Esc,
+Enter e o botão que apaga), o caso Retido com a proposta pela metade mudando
+de status, tudo de novo com 1,5 s de atraso por chamada e com três funções
+faltando no servidor, uma de cada vez. 136 cliques em 8 telas, 96 combinações
+de tela × largura e 9 ponta a ponta no repositório e no pacote.
+
+### Em aberto, para o PO decidir
+
+Salvar o formulário inteiro de um caso importado com a proposta, a apólice ou
+o CPF pela metade continua sendo recusado — é a regra de validação. A sugestão
+é conferir, na edição, só os campos que a pessoa mudou.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

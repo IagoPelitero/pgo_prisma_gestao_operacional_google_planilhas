@@ -757,49 +757,6 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
   border-radius: var(--raio-pequeno); padding: 10px 12px; margin-top: 10px;
 }
 
-/*
-  Onde o caso está, dentro do detalhe: o status atual e desde quando.
-
-  Era a jornada inteira, com as etapas que faltavam apagadas no lugar delas. O
-  PO pediu só o status atual — os desfechos não são etapas em fila, e "Não
-  retido — ainda não" num caso Retido dizia o que nunca vai acontecer.
-*/
-.linha-do-tempo { list-style: none; margin: 0; padding: 0; }
-.linha-do-tempo li {
-  display: flex; align-items: baseline; gap: 10px;
-  padding: 7px 0; border-bottom: 1px solid var(--linha);
-  font-size: 14px;
-}
-.linha-do-tempo li:last-child { border-bottom: 0; }
-.linha-do-tempo .marca {
-  width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%;
-  background: var(--linha); margin-top: 5px;
-}
-.linha-do-tempo li.cumprida .marca { background: currentColor; }
-/*
-  Com uma linha só, a COR do status é a única pista de onde o caso está — antes
-  havia o selo "está aqui". Ela vem do tom do catálogo (`--tom`), como em todo
-  o resto do sistema.
-
-  `.historico` na frente porque a lista mora dentro da seção do histórico, e o
-  estilo dela vazava para cá: uma segunda bolinha, azul, ao lado da do status,
-  e o nome do status pequeno e cinza. Com a jornada inteira aquilo passava;
-  com uma linha só, apagava justamente o que ela existe para mostrar.
-*/
-.historico .linha-do-tempo li {
-  border-left: 0; padding-left: 0; color: var(--tom, var(--texto));
-}
-.historico .linha-do-tempo li::before { content: none; }
-.historico .linha-do-tempo .marca,
-.historico .linha-do-tempo .etapa { color: inherit; }
-.historico .linha-do-tempo .etapa { display: inline; font-size: 14px; }
-.historico .linha-do-tempo .quando { display: inline; }
-.linha-do-tempo .etapa { font-weight: 600; }
-.linha-do-tempo .quando {
-  margin-left: auto; color: var(--suave); font-size: 13px;
-  font-variant-numeric: tabular-nums; text-align: right;
-}
-
 .cartao.sem-forro { padding: 0; overflow: hidden; }
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
@@ -844,12 +801,14 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 */
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
 table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
-  /* 235px, e o número foi MEDIDO no navegador, não estimado: "Ver detalhes"
-     ocupa 143, mais dois ícones de 34 com 6 de folga cada, mais o respiro da
-     célula. Com os 190px de antes — de quando eram duas ações —, o terceiro
-     botão ficava cortado pela borda da tabela. Aparecia inteiro no HTML e
-     pela metade na tela, que é o pior dos dois mundos: o teste passava. */
-  width: 235px;
+  /* O número é MEDIDO no navegador, não estimado: "Trabalhar no caso" ocupa
+     181, mais dois ícones de 34 com 6 de folga cada, mais os 24 de respiro
+     da célula — 285, e uma folga para a fonte de cada computador. Já
+     aconteceu de a largura ficar curta — com os 190px de quando eram duas
+     ações, o terceiro botão ficava cortado pela borda da tabela. Aparecia
+     inteiro no HTML e pela metade na tela, que é o pior dos dois mundos: o
+     teste passava. */
+  width: 292px;
 }
 /* Na agrupada o texto PODE quebrar: cada célula já tem várias linhas, então
    quebrar mais uma não desalinha nada — e é o que faz as cinco colunas
@@ -947,7 +906,7 @@ table.fila th.acoes-coluna, table.fila td.acoes-coluna {
 table.fila thead th.acoes-coluna { background: var(--superficie-2); }
 table.fila tbody tr:hover td.acoes-coluna { background: var(--superficie-2); }
 table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
-/* "Ver detalhes" é a ação principal da linha, e por isso é a única cheia. */
+/* "Trabalhar no caso" é a ação principal da linha, e por isso é a única cheia. */
 .acao {
   display: inline-flex; align-items: center; gap: 7px; vertical-align: middle;
   border: 1px solid var(--destaque); background: var(--destaque);
@@ -1584,11 +1543,13 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .modal-fechar:hover { border-color: var(--destaque); color: var(--destaque); }
 
 .modal-corpo { padding: 18px 24px; overflow-y: auto; flex: 1 1 auto; }
-.modal-corpo > .situacao { margin-bottom: 16px; }
 
 /* Duas colunas, e não quantas couberem: o olho lê um par por vez, e três
-   colunas de rótulos curtos viram uma grade que ninguém sabe por onde começar. */
+   colunas de rótulos curtos viram uma grade que ninguém sabe por onde começar.
+   Mora EMBAIXO do formulário, com o que a planilha tem e o formulário não
+   pergunta — por isso o respiro em cima. */
 .modal-pares {
+  margin-top: 22px;
   display: grid; gap: 16px 40px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
@@ -1612,21 +1573,6 @@ table.fila tr.importar-igual { color: var(--tenue); }
 }
 .par-do-caso.do-sistema > strong { font-weight: 400; color: var(--tenue); }
 
-.historico { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linha); }
-.historico h4 { margin: 0 0 14px; font-size: 16px; letter-spacing: -.01em; }
-.historico ul { list-style: none; margin: 0; padding: 0; }
-.historico li {
-  position: relative; padding: 0 0 16px 22px;
-  border-left: 2px solid var(--linha);
-}
-.historico li:last-child { padding-bottom: 0; border-left-color: transparent; }
-.historico li::before {
-  content: ''; position: absolute; left: -6px; top: 4px;
-  width: 10px; height: 10px; border-radius: 50%; background: var(--destaque);
-}
-.historico strong { display: block; font-size: 13.5px; }
-.historico em { display: block; font-style: normal; font-size: 12.5px; color: var(--suave); }
-.historico span { display: block; font-size: 12px; color: var(--tenue); }
 
 .modal-pe {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
@@ -1656,6 +1602,27 @@ table.fila tr.importar-igual { color: var(--tenue); }
 }
 .dialogo-erro {
   margin: 10px 0 0; font-size: 12.5px; font-weight: 600; color: var(--ruim);
+}
+
+/*
+  O AVISO DE ATENÇÃO de excluir. Pedido do PO: excluir apaga a linha da
+  planilha de vez, e o aviso tem de parecer o que é. A faixa vermelha em cima
+  e o título no tom "ruim" separam esta caixa de qualquer outra pergunta do
+  sistema; o botão que apaga é o único vermelho cheio da tela.
+*/
+.dialogo-caixa.atencao { max-width: 440px; border-top: 4px solid var(--ruim); }
+.dialogo-caixa.atencao h3 {
+  display: flex; align-items: center; gap: 8px; color: var(--ruim);
+}
+.dialogo-caixa.atencao h3 svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.dialogo-caixa.atencao p strong { color: var(--texto); }
+/* A letra é a cor da SUPERFÍCIE, e não branco: no tema escuro o vermelho
+   clareia, e letra branca em cima dele some. Superfície é clara onde o
+   vermelho é escuro, e escura onde ele é claro — tema a tema. */
+.botao.perigo { background: var(--ruim); border-color: var(--ruim); color: var(--superficie); }
+.botao.perigo:hover {
+  background: color-mix(in srgb, var(--ruim) 85%, black);
+  border-color: color-mix(in srgb, var(--ruim) 85%, black);
 }
 
 /*

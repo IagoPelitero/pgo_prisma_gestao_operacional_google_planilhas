@@ -21,6 +21,7 @@ var TelaBuscarCaso = (function () {
   var incluirLegado = false;
   var procurando = false;
   var ultimoTermo = '';
+  var podeEditar = false;        // vem com a resposta da busca
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -128,6 +129,7 @@ var TelaBuscarCaso = (function () {
       return;
     }
 
+    podeEditar = resposta.podeEditar === true;
     elemento('resultado-da-busca').innerHTML =
       '<p class="busca-contagem">' + resposta.total + ' caso(s) para "'
       + escapar(resposta.termo) + '"</p>'
@@ -186,9 +188,7 @@ var TelaBuscarCaso = (function () {
       }).join('');
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao" data-achado="'
-        + escapar(caso.id) + '" data-canal="' + escapar(origem.id) + '">'
-        + Moldura.icone('olho') + ' Ver detalhes</button></td></tr>';
+        + acoesDoAchado(caso, origem) + '</td></tr>';
     }).join('');
 
     return '<div class="rolagem-tabela"><table class="fila agrupada">'
@@ -220,18 +220,50 @@ var TelaBuscarCaso = (function () {
       + '<tbody>' + linhas + '</tbody></table></div>';
   }
 
+  /**
+   * As MESMAS três ações da fila do Trabalho, na mesma ordem: quem acha um
+   * caso aqui quer fazer com ele o que faria lá, e aprender duas telas para o
+   * mesmo caso é uma a mais do que o necessário. Ver `acoesDaLinha`, no
+   * Trabalho.
+   */
+  function acoesDoAchado(caso, origem) {
+    var ids = '="' + escapar(caso.id) + '" data-canal="' + escapar(origem.id) + '"';
+    return (podeEditar
+      ? '<button type="button" class="acao" data-achado' + ids + '>'
+        + Moldura.icone('editar') + ' Trabalhar no caso</button>'
+        + '<button type="button" class="acao-icone" data-status-do-achado' + ids
+        + ' title="Alterar status" aria-label="Alterar status">'
+        + Moldura.icone('trocarSituacao') + '</button>'
+      : '')
+      + '<button type="button" class="acao-icone perigo" data-excluir-achado' + ids
+      + ' title="Excluir caso" aria-label="Excluir caso">'
+      + Moldura.icone('ocultar') + '</button>';
+  }
+
   function ligarResultado() {
-    var botoes = document.querySelectorAll('[data-achado]');
+    // Mexeu no caso, a busca roda de novo: o resultado mostra o que ficou.
+    function procurarDeNovo() { if (ultimoTermo) procurar(); }
+
+    cliques('[data-achado]', function (canal, caso) {
+      CasoEmModal.abrir(canal, caso, procurarDeNovo);
+    }, 'data-achado');
+    cliques('[data-status-do-achado]', function (canal, caso) {
+      CasoEmModal.trocarSituacao(canal, caso, procurarDeNovo);
+    }, 'data-status-do-achado');
+    cliques('[data-excluir-achado]', function (canal, caso) {
+      Formulario.confirmarExclusao(caso, function () {
+        Servidor.chamar('excluirCaso', canal, caso)
+          .entao(procurarDeNovo)
+          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      });
+    }, 'data-excluir-achado');
+  }
+
+  function cliques(seletor, oQueFazer, atributoDoCaso) {
+    var botoes = document.querySelectorAll(seletor);
     for (var i = 0; i < botoes.length; i++) {
       botoes[i].addEventListener('click', function () {
-        var canal = this.getAttribute('data-canal');
-        var caso = this.getAttribute('data-achado');
-        // O mesmo modal do Trabalho: quem acha um caso aqui quer as mesmas
-        // ações que teria lá, e aprender duas telas para o mesmo caso é uma
-        // a mais do que o necessário.
-        CasoEmModal.abrir(canal, caso, function () {
-          if (ultimoTermo) procurar();
-        });
+        oQueFazer(this.getAttribute('data-canal'), this.getAttribute(atributoDoCaso));
       });
     }
   }

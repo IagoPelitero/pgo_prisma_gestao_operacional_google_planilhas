@@ -225,6 +225,20 @@ function rodarTestesDaProdutividade() {
     verdadeiro(detalhe.colunas.length > 0, 'e vem com as colunas da fila');
   });
 
+  teste('o caso do detalhamento abre em "Trabalhar no caso" — só para quem edita', () => {
+    // A leitura do caso saiu do sistema, a pedido do PO: o botão da lista
+    // abre a EDIÇÃO. Quem não pode editar não ganha um botão que a chamada
+    // recusaria.
+    const pizza = acharGrafico('Situação dos casos');
+    const ponto = pizza.pontos.find((p) => p.rotulo === 'Pago');
+    igual(chamar('detalharComponente')(ret.id, pizza.id, ponto.chave, {}, 30).podeEditar,
+      true);
+    const tela = lerPeca('Produtividade');
+    contem(tela, 'Trabalhar no caso');
+    contem(tela, 'detalhe.podeEditar');
+    verdadeiro(tela.indexOf('Ver detalhes') < 0, 'o "Ver detalhes" saiu');
+  });
+
   teste('"Demais valores" devolve exatamente o que não está nas outras fatias', () => {
     const lista = chamar('listarComponentesDoPainel')(ret.id);
     chamar('salvarComponentesDoPainel')(ret.id, lista.map((grafico) =>

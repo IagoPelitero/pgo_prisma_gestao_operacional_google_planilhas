@@ -928,10 +928,15 @@ function situacoesParaTrocar(idDoCanal, idDoCaso) {
 }
 
 /**
- * Os valores de um caso, prontos para o formulário de edição.
+ * O caso aberto em "Trabalhar no caso": os valores do formulário, e o resto
+ * da linha como leitura.
  *
- * Devolve pelo CHAVE TÉCNICA do campo, que é como o formulário identifica
- * cada caixa — o mesmo formato que `cadastrarCaso` recebe de volta.
+ * Os valores vêm pela CHAVE TÉCNICA do campo, que é como o formulário
+ * identifica cada caixa — o mesmo formato que `cadastrarCaso` recebe de volta.
+ *
+ * Desde que o PO tirou a tela de leitura ("não tem necessidade do sistema
+ * apenas mostrar o caso"), é aqui que o caso inteiro chega à tela. Por isso
+ * vem também `doSistema` — ver abaixo.
  */
 function casoParaEditar(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
@@ -946,8 +951,15 @@ function casoParaEditar(idDoCanal, idDoCaso) {
 
   var estrutura = estruturaDaAba_(canal.aba);
   var valores = {};
+  // As colunas que algum campo ocupa — inclusive o campo OCULTO para este
+  // nível. Elas não podem reaparecer na lista de leitura abaixo: um campo
+  // escondido do nível viraria visível pela porta dos fundos.
+  var deAlgumCampo = {};
 
   camposAtivosDoCanal_(canal.id).forEach(function (campo) {
+    colunasQueOCampoOcupa_(campo).forEach(function (cabecalho) {
+      deAlgumCampo[normalizarParaComparar_(cabecalho)] = true;
+    });
     // CAMPO GRAVADO EM VÁRIAS COLUNAS volta JUNTO — quem sabe remontar é
     // `valorDoCampoNaLinha_`. Ler a coluna do próprio campo devolveria um
     // pedaço só, e salvar em seguida apagaria os outros sem ninguém pedir.
@@ -956,10 +968,43 @@ function casoParaEditar(idDoCanal, idDoCaso) {
     valores[String(campo.ChaveTecnica)] = valor;
   });
 
-  return { id: registro.__id, canal: canal.nome, valores: valores };
+  /*
+   * E TUDO O MAIS QUE ESTÁ PREENCHIDO NA PLANILHA, como leitura.
+   *
+   * Pedido antigo do PO, que a tela de leitura atendia e não podia sumir com
+   * ela: "precisa trazer todos os dados que foram preenchidos na planilha".
+   * Um caso importado chega com valor em colunas que o formulário não
+   * pergunta — os carimbos de contato, a origem da importação, a data dela.
+   *
+   * Só o que TEM VALOR entra. Coluna vazia que ninguém declarou encheria a
+   * tela de travessões e esconderia o que importa.
+   *
+   * É LEITURA, e não campo: deixar reescrever "Quem mudou o status" ou "Data
+   * da última mudança de status" à mão estragaria o carimbo de produtividade
+   * — o número da pessoa passaria a depender do que alguém digitou, e não do
+   * que aconteceu.
+   */
+  var doSistema = [];
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    var nome = String(cabecalho || '');
+    if (!nome || nome.charAt(0) === '_') return;
+    if (normalizarParaComparar_(nome) === 'id') return;
+    if (deAlgumCampo[normalizarParaComparar_(nome)]) return;
+
+    var valor = paraTexto_(registro[nome], estrutura.tipos[posicao]);
+    if (!String(valor).trim()) return;
+    doSistema.push({ rotulo: nome, valor: valor });
+  });
+
+  return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema };
 }
 
-/** Tira o caso da tela. A linha permanece na planilha, e volta editando _Visivel. */
+/**
+ * Exclui o caso DEFINITIVAMENTE: a linha sai da planilha.
+ *
+ * Não há desfazer. Por isso a tela pergunta antes, num aviso de atenção (ver
+ * `Formulario.confirmarExclusao`), e a auditoria guarda o que havia no caso.
+ */
 function excluirCaso(idDoCanal, idDoCaso) {
   // QUALQUER pessoa cadastrada exclui, em QUALQUER canal. Decisão do PO:
   // "todos os canais e níveis de acesso podem excluir um caso criado".
@@ -1175,15 +1220,15 @@ function juntarCodigoENome_(registro, separa) {
  * dois lugares diferentes — e eles divergiram, com dois defeitos que a
  * operação sentiu:
  *
- *   `partirEm`  proposta e apólice. A edição já juntava; "ver detalhes" não,
- *               e mostrava "0000000" no lugar de "58-0000000".
- *   `separaEm`  o produto. NENHUM dos dois juntava: "ver detalhes" mostrava só
+ *   `partirEm`  proposta e apólice. A edição já juntava; a antiga tela de
+ *               leitura não, e mostrava "0000000" no lugar de "58-0000000".
+ *   `separaEm`  o produto. NENHUMA das duas juntava: a leitura mostrava só
  *               "1101", e a edição devolvia "1101" para um seletor cuja lista
  *               só tem "1101 - VIDA INDIVIDUAL" — então salvar um caso da RET
  *               com produto era RECUSADO, num campo que a pessoa nem tocou.
  *
- * Agora é um lugar só, usado pela leitura e pela edição. Os dois não podem
- * mais discordar, que era a causa de verdade.
+ * Agora é um lugar só. A tela de leitura saiu do sistema ("Trabalhar no caso"
+ * abre direto a edição), e a regra continua num ponto só.
  */
 function valorDoCampoNaLinha_(registro, campo, estrutura) {
   var configuracao = lerConfiguracaoDoCampo_(campo);
@@ -1206,8 +1251,8 @@ function valorDoCampoNaLinha_(registro, campo, estrutura) {
 /**
  * As colunas da planilha que um campo ocupa — uma, duas ou três.
  *
- * Quem pergunta é "ver detalhes", para saber o que o formulário já mostrou
- * antes de listar o resto da linha. Sem isto, a proposta apareceria duas
+ * Quem pergunta é `casoParaEditar`, para saber o que o formulário já mostra
+ * antes de listar o resto da linha como leitura. Sem isto, a proposta apareceria duas
  * vezes: uma como campo ("58-0000000") e outra como coluna solta ("58").
  */
 function colunasQueOCampoOcupa_(campo) {
@@ -1608,7 +1653,14 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
   }, 0);
 
   registrarAuditoria_('busca', 'BUSCA', '', procurado);
-  return { termo: procurado, total: total, origens: resultados };
+  return {
+    termo: procurado,
+    total: total,
+    origens: resultados,
+    // A mesma resposta da fila do Trabalho: "Trabalhar no caso" e "Alterar
+    // status" aparecem só para quem pode editar — o servidor recusaria.
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
+  };
 }
 
 // ============================================================================

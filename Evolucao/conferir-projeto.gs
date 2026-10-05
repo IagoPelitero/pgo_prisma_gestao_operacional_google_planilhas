@@ -30,7 +30,7 @@ function oQueFaltaNoProjeto() {
     'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'conferirImportacaoDeCasos', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'importarCasos', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
     'Config.gs': ['conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'definirSenhaDeAdministrador', 'excluirCampo', 'gerarAnalise', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'ocultarAnalise', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
-    'Indicadores.gs': ['detalharComponente', 'detalhesDoCaso', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'salvarComponentesDoPainel'],
+    'Indicadores.gs': ['detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'salvarComponentesDoPainel'],
     'Instalacao.gs': ['diagnosticoDoSistema']
   };
 
@@ -48,7 +48,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 73 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 72 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

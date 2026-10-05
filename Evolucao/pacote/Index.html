@@ -766,49 +766,6 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
   border-radius: var(--raio-pequeno); padding: 10px 12px; margin-top: 10px;
 }
 
-/*
-  Onde o caso está, dentro do detalhe: o status atual e desde quando.
-
-  Era a jornada inteira, com as etapas que faltavam apagadas no lugar delas. O
-  PO pediu só o status atual — os desfechos não são etapas em fila, e "Não
-  retido — ainda não" num caso Retido dizia o que nunca vai acontecer.
-*/
-.linha-do-tempo { list-style: none; margin: 0; padding: 0; }
-.linha-do-tempo li {
-  display: flex; align-items: baseline; gap: 10px;
-  padding: 7px 0; border-bottom: 1px solid var(--linha);
-  font-size: 14px;
-}
-.linha-do-tempo li:last-child { border-bottom: 0; }
-.linha-do-tempo .marca {
-  width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%;
-  background: var(--linha); margin-top: 5px;
-}
-.linha-do-tempo li.cumprida .marca { background: currentColor; }
-/*
-  Com uma linha só, a COR do status é a única pista de onde o caso está — antes
-  havia o selo "está aqui". Ela vem do tom do catálogo (`--tom`), como em todo
-  o resto do sistema.
-
-  `.historico` na frente porque a lista mora dentro da seção do histórico, e o
-  estilo dela vazava para cá: uma segunda bolinha, azul, ao lado da do status,
-  e o nome do status pequeno e cinza. Com a jornada inteira aquilo passava;
-  com uma linha só, apagava justamente o que ela existe para mostrar.
-*/
-.historico .linha-do-tempo li {
-  border-left: 0; padding-left: 0; color: var(--tom, var(--texto));
-}
-.historico .linha-do-tempo li::before { content: none; }
-.historico .linha-do-tempo .marca,
-.historico .linha-do-tempo .etapa { color: inherit; }
-.historico .linha-do-tempo .etapa { display: inline; font-size: 14px; }
-.historico .linha-do-tempo .quando { display: inline; }
-.linha-do-tempo .etapa { font-weight: 600; }
-.linha-do-tempo .quando {
-  margin-left: auto; color: var(--suave); font-size: 13px;
-  font-variant-numeric: tabular-nums; text-align: right;
-}
-
 .cartao.sem-forro { padding: 0; overflow: hidden; }
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
@@ -853,12 +810,14 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 */
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
 table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
-  /* 235px, e o número foi MEDIDO no navegador, não estimado: "Ver detalhes"
-     ocupa 143, mais dois ícones de 34 com 6 de folga cada, mais o respiro da
-     célula. Com os 190px de antes — de quando eram duas ações —, o terceiro
-     botão ficava cortado pela borda da tabela. Aparecia inteiro no HTML e
-     pela metade na tela, que é o pior dos dois mundos: o teste passava. */
-  width: 235px;
+  /* O número é MEDIDO no navegador, não estimado: "Trabalhar no caso" ocupa
+     181, mais dois ícones de 34 com 6 de folga cada, mais os 24 de respiro
+     da célula — 285, e uma folga para a fonte de cada computador. Já
+     aconteceu de a largura ficar curta — com os 190px de quando eram duas
+     ações, o terceiro botão ficava cortado pela borda da tabela. Aparecia
+     inteiro no HTML e pela metade na tela, que é o pior dos dois mundos: o
+     teste passava. */
+  width: 292px;
 }
 /* Na agrupada o texto PODE quebrar: cada célula já tem várias linhas, então
    quebrar mais uma não desalinha nada — e é o que faz as cinco colunas
@@ -956,7 +915,7 @@ table.fila th.acoes-coluna, table.fila td.acoes-coluna {
 table.fila thead th.acoes-coluna { background: var(--superficie-2); }
 table.fila tbody tr:hover td.acoes-coluna { background: var(--superficie-2); }
 table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
-/* "Ver detalhes" é a ação principal da linha, e por isso é a única cheia. */
+/* "Trabalhar no caso" é a ação principal da linha, e por isso é a única cheia. */
 .acao {
   display: inline-flex; align-items: center; gap: 7px; vertical-align: middle;
   border: 1px solid var(--destaque); background: var(--destaque);
@@ -1593,11 +1552,13 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .modal-fechar:hover { border-color: var(--destaque); color: var(--destaque); }
 
 .modal-corpo { padding: 18px 24px; overflow-y: auto; flex: 1 1 auto; }
-.modal-corpo > .situacao { margin-bottom: 16px; }
 
 /* Duas colunas, e não quantas couberem: o olho lê um par por vez, e três
-   colunas de rótulos curtos viram uma grade que ninguém sabe por onde começar. */
+   colunas de rótulos curtos viram uma grade que ninguém sabe por onde começar.
+   Mora EMBAIXO do formulário, com o que a planilha tem e o formulário não
+   pergunta — por isso o respiro em cima. */
 .modal-pares {
+  margin-top: 22px;
   display: grid; gap: 16px 40px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
@@ -1621,21 +1582,6 @@ table.fila tr.importar-igual { color: var(--tenue); }
 }
 .par-do-caso.do-sistema > strong { font-weight: 400; color: var(--tenue); }
 
-.historico { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linha); }
-.historico h4 { margin: 0 0 14px; font-size: 16px; letter-spacing: -.01em; }
-.historico ul { list-style: none; margin: 0; padding: 0; }
-.historico li {
-  position: relative; padding: 0 0 16px 22px;
-  border-left: 2px solid var(--linha);
-}
-.historico li:last-child { padding-bottom: 0; border-left-color: transparent; }
-.historico li::before {
-  content: ''; position: absolute; left: -6px; top: 4px;
-  width: 10px; height: 10px; border-radius: 50%; background: var(--destaque);
-}
-.historico strong { display: block; font-size: 13.5px; }
-.historico em { display: block; font-style: normal; font-size: 12.5px; color: var(--suave); }
-.historico span { display: block; font-size: 12px; color: var(--tenue); }
 
 .modal-pe {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
@@ -1665,6 +1611,27 @@ table.fila tr.importar-igual { color: var(--tenue); }
 }
 .dialogo-erro {
   margin: 10px 0 0; font-size: 12.5px; font-weight: 600; color: var(--ruim);
+}
+
+/*
+  O AVISO DE ATENÇÃO de excluir. Pedido do PO: excluir apaga a linha da
+  planilha de vez, e o aviso tem de parecer o que é. A faixa vermelha em cima
+  e o título no tom "ruim" separam esta caixa de qualquer outra pergunta do
+  sistema; o botão que apaga é o único vermelho cheio da tela.
+*/
+.dialogo-caixa.atencao { max-width: 440px; border-top: 4px solid var(--ruim); }
+.dialogo-caixa.atencao h3 {
+  display: flex; align-items: center; gap: 8px; color: var(--ruim);
+}
+.dialogo-caixa.atencao h3 svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.dialogo-caixa.atencao p strong { color: var(--texto); }
+/* A letra é a cor da SUPERFÍCIE, e não branco: no tema escuro o vermelho
+   clareia, e letra branca em cima dele some. Superfície é clara onde o
+   vermelho é escuro, e escura onde ele é claro — tema a tema. */
+.botao.perigo { background: var(--ruim); border-color: var(--ruim); color: var(--superficie); }
+.botao.perigo:hover {
+  background: color-mix(in srgb, var(--ruim) 85%, black);
+  border-color: color-mix(in srgb, var(--ruim) 85%, black);
 }
 
 /*
@@ -3125,21 +3092,65 @@ var Formulario = (function () {
   }
 
   /**
-   * A pergunta antes de apagar, escrita num lugar só.
+   * O AVISO DE ATENÇÃO antes de excluir, escrito num lugar só.
    *
-   * O texto mudou quando a exclusão passou a apagar a linha de verdade. Ele
-   * DIZ ISSO, em letras: prometer que dá para desfazer quando não dá é pior
-   * que não avisar nada — a pessoa confirma tranquila e descobre depois.
+   * Pedido do PO: excluir apaga o caso DEFINITIVAMENTE da planilha, e por isso
+   * "deve ter um pop up de atenção". Antes era a caixinha do navegador
+   * (`window.confirm`): cinza, com o botão OK no lugar de sempre, igual a
+   * qualquer outra pergunta boba — o tipo de caixa que a mão confirma antes de
+   * o olho ler.
    *
-   * Mora aqui porque dois lugares perguntam: a fila e o caso aberto. Duas
-   * cópias divergiriam no dia em que só uma fosse corrigida.
+   * Agora é um aviso do próprio sistema, que diz em letras o que vai
+   * acontecer, e foi desenhado para o clique distraído não apagar nada:
+   *   · o foco nasce em CANCELAR — Enter e espaço cancelam;
+   *   · o botão que apaga é vermelho e diz "Excluir definitivamente";
+   *   · Esc e clicar fora também cancelam.
+   *
+   * `aoConfirmar` só é chamado se a pessoa escolher excluir. Mora aqui porque
+   * mais de uma tela pergunta — a fila do Trabalho e a Busca —, e duas cópias
+   * divergiriam no dia em que só uma fosse corrigida.
    */
-  function confirmarExclusao(idDoCaso) {
-    return window.confirm('Excluir o caso ' + idDoCaso + '?\n\n'
-      + 'A LINHA SAI DA PLANILHA. Não dá para desfazer, nem por um '
-      + 'administrador.\n\n'
-      + 'O que foi apagado fica registrado na auditoria — quem, quando, e o '
-      + 'que havia no caso.');
+  function confirmarExclusao(idDoCaso, aoConfirmar) {
+    if (document.getElementById('dialogo-exclusao')) return;
+
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-exclusao';
+    caixa.innerHTML = '<div class="dialogo-caixa atencao" role="alertdialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-exclusao"'
+      + ' aria-describedby="texto-exclusao">'
+      + '<h3 id="titulo-exclusao">' + Moldura.icone('ocultar')
+      + ' Atenção: excluir o caso ' + Moldura.escapar(idDoCaso) + '</h3>'
+      + '<div id="texto-exclusao">'
+      + '<p><strong>O caso será apagado definitivamente da planilha.</strong> '
+      + 'Não dá para desfazer, nem por um administrador.</p>'
+      + '<p>O que havia no caso fica registrado na auditoria — quem excluiu, '
+      + 'quando, e o que estava gravado.</p></div>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="cancelar-exclusao">'
+      + 'Cancelar</button>'
+      + '<button type="button" class="botao perigo" id="confirmar-exclusao">'
+      + 'Excluir definitivamente</button>'
+      + '</div></div>';
+    document.body.appendChild(caixa);
+
+    function sair() {
+      if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+      document.removeEventListener('keydown', aoTeclar);
+    }
+    function aoTeclar(evento) {
+      if (evento.key === 'Escape') { evento.preventDefault(); sair(); }
+    }
+    document.addEventListener('keydown', aoTeclar);
+    document.getElementById('cancelar-exclusao').addEventListener('click', sair);
+    caixa.addEventListener('mousedown', function (evento) {
+      if (evento.target === caixa) sair();
+    });
+    document.getElementById('confirmar-exclusao').addEventListener('click', function () {
+      sair();
+      if (aoConfirmar) aoConfirmar();
+    });
+    document.getElementById('cancelar-exclusao').focus();
   }
 
   /**
@@ -3265,7 +3276,8 @@ var Formulario = (function () {
       O SELO DA SUSEP, e quando ele NÃO entra.
 
       Pedido do PO: "em ver detalhes do diamante não precisa buscar a susep;
-      apenas na RET se faz necessário para controle". Ao EDITAR um caso que já
+      apenas na RET se faz necessário para controle" — hoje é o "Trabalhar no
+      caso", que abre direto a edição. Ao EDITAR um caso que já
       existe, a corretora já está preenchida e a consulta só adiciona espera.
 
       No CADASTRO ele continua em todo canal — é dele que sai o nome da
@@ -3781,22 +3793,25 @@ var Formulario = (function () {
 
 <script>
 /* ============================================================================
-   PGO — CasoEmModal.html · o caso aberto por cima da fila
+   PGO — CasoEmModal.html · o caso aberto para trabalhar, por cima da fila
    ============================================================================
-   Clicar em "Ver detalhes" na fila não leva a pessoa para outra tela: abre o
-   caso por cima, e fechar devolve a fila exatamente como estava — mesma
-   rolagem, mesmo filtro, mesma linha. Sair e voltar faria perder o lugar
-   dezenas de vezes por dia.
+   "Trabalhar no caso", na fila, não leva a pessoa para outra tela: abre o
+   caso por cima, JÁ NO FORMULÁRIO, e fechar devolve a fila exatamente como
+   estava — mesma rolagem, mesmo filtro, mesma linha. Sair e voltar faria
+   perder o lugar dezenas de vezes por dia.
 
-   O modal tem dois estados, e é o mesmo modal:
+   NÃO HÁ MAIS UM ESTADO DE LEITURA. Pedido do PO: "não tem necessidade do
+   sistema apenas mostrar o caso". O modal tinha dois estados — ler e editar —
+   e quem abria um caso quase sempre ia trabalhar nele: eram dois cliques e
+   uma ida a mais ao servidor para chegar ao formulário. Agora abrir é editar.
 
-     LEITURA  o caso inteiro, campo a campo, com a história embaixo. Campo em
-              branco aparece com um travessão — sumir faria a pessoa achar
-              que o campo não existe neste canal.
+   O que a leitura mostrava e o formulário não pergunta — as colunas que o
+   sistema escreve, como a origem da importação e os carimbos de contato —
+   vem embaixo do formulário, como leitura (ver `casoParaEditar`).
 
-     EDIÇÃO   o mesmo formulário de Cadastrar Caso, montado pelo Formulario,
-              já preenchido. Com PREFIXO, porque a tela de cadastro pode
-              estar atrás e os dois não podem disputar os mesmos ids.
+   O formulário é o mesmo de Cadastrar Caso, montado pelo Formulario, já
+   preenchido. Com PREFIXO, porque a tela de cadastro pode estar atrás e os
+   dois não podem disputar os mesmos ids.
 
    Fechar com Esc, com o X, com o botão e clicando fora. Quatro saídas: modal
    que prende é modal que a pessoa aprende a não abrir.
@@ -3806,9 +3821,7 @@ var CasoEmModal = (function () {
 
   var canalAtual = '';
   var idAtual = '';
-  var detalhe = null;
   var formulario = null;
-  var editando = false;
   /*
     O FORMULÁRIO DE CADA CANAL, GUARDADO.
 
@@ -3832,20 +3845,19 @@ var CasoEmModal = (function () {
   /* ------------------------------------------------------------- abrir */
 
   /**
-   * Abre o caso. `quandoMudar` é chamado no fim, e só se algo mudou — assim o
-   * Trabalho recarrega quando precisa, e fica quieto quando a pessoa só
-   * olhou e fechou.
+   * Abre o caso para trabalhar. `quandoMudar` é chamado no fim, e só se algo
+   * foi gravado — assim a fila recarrega quando precisa, e fica quieta quando
+   * a pessoa abriu e fechou.
    */
-  function abrir(idDoCanal, idDoCaso, quandoMudar, jaEditando) {
+  function abrir(idDoCanal, idDoCaso, quandoMudar) {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
     aoFechar = quandoMudar || null;
-    editando = !!jaEditando;
     mudouAlgo = false;
-    detalhe = null;
+    salvando = false;
 
     desenharCasca();
-    carregar();
+    abrirEdicao();
   }
 
   function desenharCasca() {
@@ -3863,12 +3875,24 @@ var CasoEmModal = (function () {
       + ' aria-label="Fechar">✕</button>'
       + '</header>'
       + '<div class="modal-corpo" id="modal-corpo">'
-      + '<p class="carregando-campos">Abrindo o caso…</p></div>'
-      + '<footer class="modal-pe" id="modal-pe"></footer>'
+      + '<form class="formulario no-modal" id="form-do-caso" novalidate>'
+      + '<div id="corpo-da-edicao"><p class="carregando-campos">'
+      + 'Abrindo o caso…</p></div></form>'
+      + '<div id="modal-do-sistema"></div></div>'
+      // "Salvar" nasce TRAVADO e só destrava com o formulário preenchido. É a
+      // regra que o PO pediu para o cadastro: botão que aparece antes do
+      // formulário é botão que alguém clica — e aqui gravaria um caso vazio.
+      + '<footer class="modal-pe" id="modal-pe">'
+      + '<span class="recado" id="recado-do-modal" hidden></span>'
+      + '<button type="button" class="botao vazado" id="modal-fechar">Fechar</button>'
+      + '<button type="button" class="botao" id="modal-salvar" disabled>'
+      + 'Salvar alterações</button></footer>'
       + '</div>';
     document.body.appendChild(caixa);
 
     elemento('modal-x').addEventListener('click', function () { fechar(); });
+    elemento('modal-fechar').addEventListener('click', function () { fechar(); });
+    elemento('modal-salvar').addEventListener('click', salvar);
     caixa.addEventListener('mousedown', function (evento) {
       // Só o véu fecha. Um arrasto que começa dentro e termina fora não é
       // "clicar fora" — e fechar ali perderia o que a pessoa digitou.
@@ -3883,6 +3907,9 @@ var CasoEmModal = (function () {
 
   function aoTeclar(evento) {
     if (!elemento('modal-do-caso')) return;
+    // Com um diálogo POR CIMA do caso (o de status, o de excluir), o teclado
+    // é dele: o Esc fecha o de cima, e não o caso inteiro por baixo.
+    if (elemento('dialogo-situacao') || elemento('dialogo-exclusao')) return;
     /*
       ENQUANTO GRAVA, O TECLADO TAMBÉM ESPERA.
 
@@ -3897,7 +3924,7 @@ var CasoEmModal = (function () {
     */
     if (salvando) return;
     if (evento.key === 'Escape') { evento.preventDefault(); fechar(); return; }
-    if (editando && (evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
+    if ((evento.ctrlKey || evento.metaKey) && evento.key === 'Enter') {
       evento.preventDefault();
       salvar();
     }
@@ -3909,181 +3936,12 @@ var CasoEmModal = (function () {
     document.removeEventListener('keydown', aoTeclar);
 
     if (!semAvisar && mudouAlgo && aoFechar) aoFechar();
-    if (!semAvisar) { aoFechar = null; mudouAlgo = false; editando = false; }
-  }
-
-  /* ----------------------------------------------------------- carregar */
-
-  function carregar() {
-    Servidor.chamar('detalhesDoCaso', canalAtual, idAtual)
-      .entao(function (resposta) {
-        detalhe = resposta;
-        if (editando) abrirEdicao();
-        else desenharLeitura();
-      })
-      .senao(function (erro) {
-        var corpo = elemento('modal-corpo');
-        if (!corpo) return;
-        corpo.innerHTML = '<p class="carregando-campos erro-carga">'
-          + escapar(erro.message || String(erro)) + '</p>';
-        elemento('modal-pe').innerHTML = botaoFechar();
-        ligarPe();
-      });
-  }
-
-  /* ------------------------------------------------------------ leitura */
-
-  function desenharLeitura() {
-    editando = false;
-    elemento('modal-subtitulo').textContent = detalhe.atualizadoEm
-      ? 'Atualizado em ' + detalhe.atualizadoEm
-      : detalhe.canal;
-
-    elemento('modal-corpo').innerHTML =
-      (detalhe.situacao
-        ? '<span class="situacao tom-' + escapar(detalhe.tom) + '">'
-          + escapar(detalhe.situacao) + '</span>'
-        : '')
-      + '<div class="modal-pares">'
-      + desenharParesDoCaso()
-      + '</div>'
-      + desenharLinhaDoTempo()
-      + desenharHistorico();
-
-    // As quatro ações do caso vivem aqui. Excluir também está na fila, desde
-    // que o PO pediu — aqui ela fica junto das outras, para quem abriu o caso
-    // e decidiu no meio da leitura.
-    //
-    // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
-    // qualquer canal. O servidor combina com isto, e a fila também — as três
-    // pontas precisam concordar, senão o botão aparece e a chamada recusa.
-    elemento('modal-pe').innerHTML = botaoFechar()
-      + '<button type="button" class="botao vazado perigo" id="modal-excluir">'
-      + Moldura.icone('ocultar') + ' Excluir</button>'
-      + (detalhe.podeEditar
-        ? '<button type="button" class="botao vazado" id="modal-situacao">'
-          + Moldura.icone('trocarSituacao') + ' Alterar situação</button>' : '')
-      + (detalhe.podeEditar
-        ? '<button type="button" class="botao" id="modal-editar">'
-          + Moldura.icone('editar') + ' Editar caso</button>' : '');
-    ligarPe();
-
-    var editar = elemento('modal-editar');
-    if (editar) editar.addEventListener('click', abrirEdicao);
-
-    var situacao = elemento('modal-situacao');
-    if (situacao) {
-      situacao.addEventListener('click', function () {
-        trocarSituacao(canalAtual, idAtual, function () {
-          mudouAlgo = true;
-          carregar();
-        });
-      });
-    }
-
-    var excluir = elemento('modal-excluir');
-    if (excluir) excluir.addEventListener('click', function () {
-      if (!Formulario.confirmarExclusao(idAtual)) return;
-
-      Servidor.chamar('excluirCaso', canalAtual, idAtual)
-        .entao(function () { mudouAlgo = true; fechar(); })
-        .senao(function (erro) { window.alert(erro.message || String(erro)); });
-    });
-  }
-
-  /**
-   * Por onde o caso passou, e quando.
-   *
-   * Vem dos CARIMBOS — cada status grava a data e a hora em que o caso chegou
-   * nele —, e é a resposta para "a data e a hora de cada contato" sem abrir a
-   * planilha. Fica ACIMA do histórico de auditoria de propósito: a jornada é o
-   * que a operação lê todo dia; a auditoria é para quando algo não fecha.
-   *
-   * A etapa que não aconteceu aparece apagada, no lugar dela. Sumir com ela
-   * esconderia o buraco — e o buraco é informação: quem pulou o 2º contato e
-   * foi direto para "Não reteve" contou uma história.
-   */
-  /*
-    Os pares do caso, com um aviso antes do que vem direto da planilha.
-
-    O servidor passou a mandar também as colunas PREENCHIDAS que o formulário
-    não pergunta — a origem da importação, os carimbos de contato —, a pedido
-    do PO: "precisa trazer todos os dados que foram preenchidos na planilha".
-
-    Elas entram depois dos campos, atrás de um aviso, e não misturadas: quem
-    lê precisa saber que aquilo o sistema escreveu, e que não se edita no
-    formulário. Sem o aviso, "Quem mudou o status" pareceria um campo que a
-    pessoa esqueceu de preencher.
-  */
-  function desenharParesDoCaso() {
-    var avisoJaSaiu = false;
-
-    return detalhe.linhas.map(function (linha) {
-      var aviso = '';
-      if (linha.doSistema && !avisoJaSaiu) {
-        avisoJaSaiu = true;
-        aviso = '<p class="pares-do-sistema">Também está na planilha — '
-          + 'escrito pelo sistema, não se edita no formulário.</p>';
-      }
-      return aviso
-        + '<div class="par-do-caso' + (linha.doSistema ? ' do-sistema' : '') + '">'
-        + '<span>' + escapar(linha.rotulo) + '</span>'
-        // Travessão, e não vazio: "está em branco" é uma informação.
-        + '<strong>' + (linha.valor ? escapar(linha.valor) : '—') + '</strong>'
-        + '</div>';
-    }).join('');
-  }
-
-  /*
-    Só o status em que o caso está, e desde quando — pedido do PO. Sem a
-    jornada inteira, sem "ainda não" e sem o selo "está aqui": com uma linha
-    só, não há outra para apontar. Ver linhaDoTempoDoCaso_, no servidor.
-  */
-  function desenharLinhaDoTempo() {
-    if (!detalhe.linhaDoTempo || !detalhe.linhaDoTempo.length) return '';
-
-    return '<section class="historico">'
-      + '<h4>Onde o caso está</h4>'
-      + '<ul class="linha-do-tempo">' + detalhe.linhaDoTempo.map(function (etapa) {
-        return '<li class="tom-' + escapar(etapa.tom || 'neutro') + ' cumprida">'
-          + '<span class="marca" aria-hidden="true"></span>'
-          + '<span class="etapa">' + escapar(etapa.status) + '</span>'
-          + (etapa.quando
-            ? '<span class="quando">desde ' + escapar(etapa.quando) + '</span>' : '')
-          + '</li>';
-      }).join('') + '</ul></section>';
-  }
-
-  function desenharHistorico() {
-    if (!detalhe.historico.length) return '';
-    return '<section class="historico">'
-      + '<h4>Histórico do caso</h4>'
-      + '<ul>' + detalhe.historico.map(function (passo) {
-        return '<li><strong>' + escapar(passo.acao) + '</strong>'
-          + (passo.detalhe ? '<em>' + escapar(passo.detalhe) + '</em>' : '')
-          + '<span>' + escapar(passo.quando) + ' · ' + escapar(passo.quem)
-          + '</span></li>';
-      }).join('') + '</ul></section>';
+    if (!semAvisar) { aoFechar = null; mudouAlgo = false; }
   }
 
   /* ------------------------------------------------------------- edição */
 
   function abrirEdicao() {
-    editando = true;
-    elemento('modal-corpo').innerHTML =
-      '<form class="formulario no-modal" id="form-do-caso" novalidate>'
-      + '<div id="corpo-da-edicao"><p class="carregando-campos">'
-      + 'Montando o formulário…</p></div></form>';
-    elemento('modal-pe').innerHTML =
-      '<span class="recado" id="recado-do-modal" hidden></span>'
-      + '<button type="button" class="botao vazado" id="modal-desistir">'
-      + 'Desistir</button>'
-      + '<button type="button" class="botao" id="modal-salvar">'
-      + 'Salvar alterações</button>';
-
-    elemento('modal-desistir').addEventListener('click', desenharLeitura);
-    elemento('modal-salvar').addEventListener('click', salvar);
-
     /*
       AS DUAS CHAMADAS SAEM JUNTAS, e não uma depois da outra.
 
@@ -4094,7 +3952,9 @@ var CasoEmModal = (function () {
       lenta das duas, não a soma.
 
       E o formulário vem da memória quando já foi buscado neste canal: do
-      segundo caso em diante sobra uma viagem só.
+      segundo caso em diante sobra uma viagem só. Antes desta versão ainda
+      havia uma TERCEIRA na frente das duas — a da tela de leitura, que o
+      lápis também pagava —, e ela saiu junto com a leitura.
 
       As duas precisam ter chegado antes de preencher — preencher antes de
       desenhar não escreve em lugar nenhum, e é o tipo de erro que só aparece
@@ -4103,12 +3963,15 @@ var CasoEmModal = (function () {
     var guardado = formularioDeCadaCanal[canalAtual];
     var oFormulario = null;
     var osValores = null;
+    var deuErro = false;
 
     function quandoAsDuasChegarem() {
-      if (!oFormulario || !osValores) return;
+      if (deuErro || !oFormulario || !osValores) return;
       var corpo = corpoDaEdicao();
-      if (!corpo) return;
+      if (!corpo) return;   // a pessoa fechou antes de chegar
       formulario = oFormulario;
+      elemento('modal-subtitulo').textContent = 'Trabalhar no caso · '
+        + (osValores.canal || oFormulario.canal.nome || '');
       corpo.innerHTML = Formulario.desenhar(oFormulario, 'editar-');
       // Só o canal que confere a SUSEP ganha o selo na EDIÇÃO. Ver `ligar`.
       // O Id do caso vai junto para o selo da proposta: na edição, o próprio
@@ -4116,6 +3979,13 @@ var CasoEmModal = (function () {
       Formulario.ligar(corpo, 'editar-', canalAtual,
         oFormulario.canal.confereSusepBloqueada !== false, idAtual);
       Formulario.preencher(corpo, osValores.valores);
+      elemento('modal-do-sistema').innerHTML = desenharDoSistema(osValores.doSistema);
+      elemento('modal-salvar').disabled = false;
+    }
+
+    function falhou(erro) {
+      deuErro = true;
+      mostrarRecadoDeErro(erro);
     }
 
     if (guardado) {
@@ -4127,7 +3997,7 @@ var CasoEmModal = (function () {
           oFormulario = definicao;
           quandoAsDuasChegarem();
         })
-        .senao(mostrarRecadoDeErro);
+        .senao(falhou);
     }
 
     Servidor.chamar('casoParaEditar', canalAtual, idAtual)
@@ -4135,13 +4005,46 @@ var CasoEmModal = (function () {
         osValores = caso;
         quandoAsDuasChegarem();
       })
-      .senao(mostrarRecadoDeErro);
+      .senao(falhou);
   }
 
+  /*
+    O que está na planilha e o formulário não pergunta, embaixo, como leitura.
+
+    Atrás de um aviso, e não misturado aos campos: quem lê precisa saber que
+    aquilo o sistema escreveu, e que não se edita no formulário. Sem o aviso,
+    "Quem mudou o status" pareceria um campo que a pessoa esqueceu de
+    preencher.
+  */
+  function desenharDoSistema(linhas) {
+    if (!linhas || !linhas.length) return '';
+    return '<section class="modal-pares">'
+      + '<p class="pares-do-sistema">Também está na planilha — escrito pelo '
+      + 'sistema, não se edita no formulário.</p>'
+      + linhas.map(function (linha) {
+        return '<div class="par-do-caso do-sistema">'
+          + '<span>' + escapar(linha.rotulo) + '</span>'
+          + '<strong>' + escapar(linha.valor) + '</strong></div>';
+      }).join('')
+      + '</section>';
+  }
+
+  /**
+   * O caso não abriu: o motivo no lugar do formulário, e só o Fechar.
+   *
+   * O motivo vai no CORPO, e não só no rodapé. "Abrindo o caso…" parado no
+   * meio da tela, com o motivo escondido num canto, é o que se lê como "a tela
+   * travou".
+   */
   function mostrarRecadoDeErro(erro) {
-    recado(erro.message || String(erro), 'ruim');
     var corpo = corpoDaEdicao();
-    if (corpo) corpo.innerHTML = '';
+    if (!corpo) return;
+    corpo.innerHTML = '<p class="carregando-campos erro-carga">'
+      + escapar(erro.message || String(erro)) + '</p>';
+    var subtitulo = elemento('modal-subtitulo');
+    if (subtitulo) subtitulo.textContent = 'Não deu para abrir';
+    var salvarBotao = elemento('modal-salvar');
+    if (salvarBotao) salvarBotao.disabled = true;
   }
 
   function recado(texto, tipo) {
@@ -4155,13 +4058,15 @@ var CasoEmModal = (function () {
   function salvar() {
     if (salvando) return;
     var corpo = corpoDaEdicao();
-    if (!corpo) return;
+    // Formulário ainda não chegou: o botão está travado, e o Ctrl+Enter não
+    // pode ser a porta dos fundos que grava um caso vazio.
+    if (!corpo || elemento('modal-salvar').disabled) return;
 
     salvando = true;
     Formulario.limparErros(corpo);
     recado('Gravando…', '');
     // Os três pontinhos no botão, e nenhum botão do modal clicável enquanto a
-    // gravação está a caminho — nem o X, nem o "Desistir".
+    // gravação está a caminho — nem o X, nem o "Fechar".
     Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo))
@@ -4169,15 +4074,12 @@ var CasoEmModal = (function () {
         salvando = false;
         mudouAlgo = true;
         /*
-          O MODAL FECHA, e não volta para a leitura do caso.
+          O MODAL FECHA depois de gravar.
 
           Pedido do PO: "depois de salvar o ajuste precisa fechar o modal
-          senão fica ruim seguir trabalhando". Antes ele recarregava o caso
-          para mostrar a leitura — um passo a mais, e uma ida ao servidor a
-          mais, para quem vai abrir o próximo caso da fila em seguida.
-
-          `fechar` avisa o Trabalho, porque `mudouAlgo` está marcado: a fila
-          volta já com o que acabou de ser gravado.
+          senão fica ruim seguir trabalhando". `fechar` avisa o Trabalho,
+          porque `mudouAlgo` está marcado: a fila volta já com o que acabou de
+          ser gravado.
         */
         destravarOsBotoes();
         fechar();
@@ -4201,36 +4103,37 @@ var CasoEmModal = (function () {
     Formulario.acabouDeGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
   }
 
-  function botaoFechar() {
-    return '<button type="button" class="botao vazado" id="modal-fechar">'
-      + 'Fechar</button>';
-  }
+  /* ================================================== alterar o status */
 
-  function ligarPe() {
-    var botao = elemento('modal-fechar');
-    if (botao) botao.addEventListener('click', function () { fechar(); });
-  }
-
-  /* ================================================ trocar a situação */
+  var abrindoOStatus = false;
 
   /**
-   * O diálogo de trocar situação, que é o gesto mais frequente da operação.
+   * O diálogo de alterar o status, que é o gesto mais frequente da operação.
    *
-   * Separado do formulário inteiro de propósito: abrir trinta e cinco campos
-   * para mexer num só é atrito que se paga dezenas de vezes por dia.
+   * Mora na FILA, ao lado de "Trabalhar no caso", desde que o PO trocou o
+   * lápis por ele: é o caminho curto que não depende do formulário inteiro.
+   * O formulário confere todos os campos ao salvar; este diálogo mexe só no
+   * status, e por isso funciona mesmo num caso que veio da base antiga com a
+   * proposta ou a apólice pela metade.
    */
   function trocarSituacao(idDoCanal, idDoCaso, quandoMudar) {
+    // Um clique enquanto o primeiro ainda busca as opções não abre dois
+    // diálogos um em cima do outro.
+    if (abrindoOStatus || elemento('dialogo-situacao')) return;
+    abrindoOStatus = true;
+
     Servidor.chamar('situacoesParaTrocar', idDoCanal, idDoCaso)
       .entao(function (resposta) {
+        abrindoOStatus = false;
         var caixa = document.createElement('div');
         caixa.className = 'dialogo';
         caixa.id = 'dialogo-situacao';
         caixa.innerHTML = '<div class="dialogo-caixa" role="dialog"'
           + ' aria-modal="true" aria-labelledby="titulo-situacao">'
-          + '<h3 id="titulo-situacao">Alterar situação</h3>'
+          + '<h3 id="titulo-situacao">Alterar status</h3>'
           + '<p>Caso ' + escapar(idDoCaso) + '</p>'
           + '<form id="form-situacao">'
-          + '<label class="config-campo"><span>Situação</span>'
+          + '<label class="config-campo"><span>Status</span>'
           + '<select id="situacao-nova">'
           + resposta.opcoes.map(function (opcao) {
             return '<option value="' + escapar(opcao.valor) + '"'
@@ -4240,32 +4143,54 @@ var CasoEmModal = (function () {
           + '</select></label>'
           + '<p class="dialogo-erro" id="erro-situacao" hidden></p>'
           + '<div class="config-acoes">'
-          + '<button type="submit" class="botao">Salvar</button>'
+          + '<button type="submit" class="botao" id="salvar-situacao">Salvar</button>'
           + '<button type="button" class="botao vazado" id="cancelar-situacao">'
           + 'Cancelar</button></div></form></div>';
         document.body.appendChild(caixa);
 
+        var gravando = false;
         function sair() {
+          if (gravando) return;
           if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+          document.removeEventListener('keydown', aoTeclarNoStatus);
         }
+        function aoTeclarNoStatus(evento) {
+          if (evento.key === 'Escape') { evento.preventDefault(); sair(); }
+        }
+        document.addEventListener('keydown', aoTeclarNoStatus);
         elemento('cancelar-situacao').addEventListener('click', sair);
         caixa.addEventListener('mousedown', function (evento) {
           if (evento.target === caixa) sair();
         });
+        elemento('situacao-nova').focus();
 
         elemento('form-situacao').addEventListener('submit', function (evento) {
           evento.preventDefault();
+          if (gravando) return;
+          gravando = true;
+          // Os três pontinhos, e nada clicável até a resposta: dois cliques
+          // gravariam duas mudanças, e o contador de mudanças contaria duas.
+          Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
             elemento('situacao-nova').value)
-            .entao(function () { sair(); if (quandoMudar) quandoMudar(); })
+            .entao(function () {
+              gravando = false;
+              sair();
+              if (quandoMudar) quandoMudar();
+            })
             .senao(function (erro) {
+              gravando = false;
+              Formulario.acabouDeGravar(elemento('salvar-situacao'), caixa);
               var aviso = elemento('erro-situacao');
               aviso.textContent = erro.message || String(erro);
               aviso.hidden = false;
             });
         });
       })
-      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      .senao(function (erro) {
+        abrindoOStatus = false;
+        window.alert(erro.message || String(erro));
+      });
   }
 
   return { abrir: abrir, fechar: fechar, trocarSituacao: trocarSituacao };
@@ -5091,30 +5016,34 @@ var TelaTrabalho = (function () {
   }
 
   /**
-   * As ações da linha: ver e editar, e só.
+   * As ações da linha, nesta ordem — pedido do PO, igual em todos os canais:
    *
-   * Alterar situação e excluir moram no rodapé do modal. Quatro botões por
-   * linha, repetidos trinta vezes, tomavam a largura de uma coluna inteira de
-   * dado — e a coluna que sumia era "Responsável". Duas ações na linha, as
-   * outras a um clique, cabem e continuam à mão.
+   *   Trabalhar no caso   abre o caso JÁ NO FORMULÁRIO. Era "Ver detalhes",
+   *                       que abria uma leitura e pedia mais um clique para
+   *                       editar; "não tem necessidade do sistema apenas
+   *                       mostrar o caso", e a leitura saiu do sistema.
+   *   Alterar status      no lugar do lápis. É o gesto mais frequente, e o
+   *                       único que não depende do formulário inteiro — por
+   *                       isso funciona mesmo num caso que veio da base antiga
+   *                       com a proposta ou a apólice pela metade.
+   *   Excluir             por último, longe da mão: apaga de vez, e pergunta
+   *                       antes num aviso de atenção.
+   *
+   * As duas primeiras aparecem só para quem pode editar: o servidor recusaria,
+   * e botão que a chamada recusa ensina a pessoa a desconfiar da tela.
    */
   function acoesDaLinha(caso) {
-    var botoes = '<button type="button" class="acao" data-caso="'
-      + escapar(caso.id) + '">' + Moldura.icone('olho') + ' Ver detalhes</button>';
+    var botoes = '';
 
     if (resumo.podeEditar) {
-      botoes += '<button type="button" class="acao-icone" data-editar="'
-        + escapar(caso.id) + '" title="Editar caso" aria-label="Editar caso">'
-        + Moldura.icone('editar') + '</button>';
+      botoes += '<button type="button" class="acao" data-trabalhar="'
+        + escapar(caso.id) + '">' + Moldura.icone('editar')
+        + ' Trabalhar no caso</button>'
+        + '<button type="button" class="acao-icone" data-status-do-caso="'
+        + escapar(caso.id) + '" title="Alterar status" aria-label="Alterar status">'
+        + Moldura.icone('trocarSituacao') + '</button>';
     }
 
-    // Excluir na PRÓPRIA FILA, como no PGO 5 — pedido do PO.
-    //
-    // A decisão anterior era outra: excluir vivia só no caso aberto, para não
-    // comer a largura da coluna "Responsável". Cabe agora porque é um ícone,
-    // e não um botão com texto — os três juntos ocupam menos que "Ver
-    // detalhes" sozinho ocupava antes.
-    //
     // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
     // qualquer canal. É o que o PO pediu, e o servidor combina com isto.
     botoes += '<button type="button" class="acao-icone perigo" data-excluir="'
@@ -5186,21 +5115,20 @@ var TelaTrabalho = (function () {
       });
     }
 
-    ligarCliques('[data-caso]', function (botao) {
-      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-caso'), carregar);
+    ligarCliques('[data-trabalhar]', function (botao) {
+      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-trabalhar'), carregar);
+    });
+    ligarCliques('[data-status-do-caso]', function (botao) {
+      CasoEmModal.trocarSituacao(canalEscolhida,
+        botao.getAttribute('data-status-do-caso'), carregar);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');
-      if (!Formulario.confirmarExclusao(idDoCaso)) return;
-
-      Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
-        .entao(carregar)
-        .senao(function (erro) { window.alert(erro.message || String(erro)); });
-    });
-
-    ligarCliques('[data-editar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-editar'),
-        carregar, true);
+      Formulario.confirmarExclusao(idDoCaso, function () {
+        Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
+          .entao(carregar)
+          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      });
     });
   }
 
@@ -5730,6 +5658,7 @@ var TelaBuscarCaso = (function () {
   var incluirLegado = false;
   var procurando = false;
   var ultimoTermo = '';
+  var podeEditar = false;        // vem com a resposta da busca
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -5837,6 +5766,7 @@ var TelaBuscarCaso = (function () {
       return;
     }
 
+    podeEditar = resposta.podeEditar === true;
     elemento('resultado-da-busca').innerHTML =
       '<p class="busca-contagem">' + resposta.total + ' caso(s) para "'
       + escapar(resposta.termo) + '"</p>'
@@ -5895,9 +5825,7 @@ var TelaBuscarCaso = (function () {
       }).join('');
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao" data-achado="'
-        + escapar(caso.id) + '" data-canal="' + escapar(origem.id) + '">'
-        + Moldura.icone('olho') + ' Ver detalhes</button></td></tr>';
+        + acoesDoAchado(caso, origem) + '</td></tr>';
     }).join('');
 
     return '<div class="rolagem-tabela"><table class="fila agrupada">'
@@ -5929,18 +5857,50 @@ var TelaBuscarCaso = (function () {
       + '<tbody>' + linhas + '</tbody></table></div>';
   }
 
+  /**
+   * As MESMAS três ações da fila do Trabalho, na mesma ordem: quem acha um
+   * caso aqui quer fazer com ele o que faria lá, e aprender duas telas para o
+   * mesmo caso é uma a mais do que o necessário. Ver `acoesDaLinha`, no
+   * Trabalho.
+   */
+  function acoesDoAchado(caso, origem) {
+    var ids = '="' + escapar(caso.id) + '" data-canal="' + escapar(origem.id) + '"';
+    return (podeEditar
+      ? '<button type="button" class="acao" data-achado' + ids + '>'
+        + Moldura.icone('editar') + ' Trabalhar no caso</button>'
+        + '<button type="button" class="acao-icone" data-status-do-achado' + ids
+        + ' title="Alterar status" aria-label="Alterar status">'
+        + Moldura.icone('trocarSituacao') + '</button>'
+      : '')
+      + '<button type="button" class="acao-icone perigo" data-excluir-achado' + ids
+      + ' title="Excluir caso" aria-label="Excluir caso">'
+      + Moldura.icone('ocultar') + '</button>';
+  }
+
   function ligarResultado() {
-    var botoes = document.querySelectorAll('[data-achado]');
+    // Mexeu no caso, a busca roda de novo: o resultado mostra o que ficou.
+    function procurarDeNovo() { if (ultimoTermo) procurar(); }
+
+    cliques('[data-achado]', function (canal, caso) {
+      CasoEmModal.abrir(canal, caso, procurarDeNovo);
+    }, 'data-achado');
+    cliques('[data-status-do-achado]', function (canal, caso) {
+      CasoEmModal.trocarSituacao(canal, caso, procurarDeNovo);
+    }, 'data-status-do-achado');
+    cliques('[data-excluir-achado]', function (canal, caso) {
+      Formulario.confirmarExclusao(caso, function () {
+        Servidor.chamar('excluirCaso', canal, caso)
+          .entao(procurarDeNovo)
+          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      });
+    }, 'data-excluir-achado');
+  }
+
+  function cliques(seletor, oQueFazer, atributoDoCaso) {
+    var botoes = document.querySelectorAll(seletor);
     for (var i = 0; i < botoes.length; i++) {
       botoes[i].addEventListener('click', function () {
-        var canal = this.getAttribute('data-canal');
-        var caso = this.getAttribute('data-achado');
-        // O mesmo modal do Trabalho: quem acha um caso aqui quer as mesmas
-        // ações que teria lá, e aprender duas telas para o mesmo caso é uma
-        // a mais do que o necessário.
-        CasoEmModal.abrir(canal, caso, function () {
-          if (ultimoTermo) procurar();
-        });
+        oQueFazer(this.getAttribute('data-canal'), this.getAttribute(atributoDoCaso));
       });
     }
   }
@@ -7741,10 +7701,15 @@ var TelaProdutividade = (function () {
             + '">' + escapar(celula.valor || '—') + '</span>';
         }).join('') + '</td>';
       }).join('');
+      // "Trabalhar no caso", como na fila: abre o caso já no formulário. A
+      // tela de leitura saiu do sistema, a pedido do PO.
       return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + '<button type="button" class="acao" data-caso-do-painel="'
-        + escapar(caso.id) + '">' + Moldura.icone('olho')
-        + ' Ver detalhes</button></td></tr>';
+        + (detalhe.podeEditar
+          ? '<button type="button" class="acao" data-caso-do-painel="'
+            + escapar(caso.id) + '">' + Moldura.icone('editar')
+            + ' Trabalhar no caso</button>'
+          : '')
+        + '</td></tr>';
     }).join('');
 
     elemento('detalhe-do-painel').innerHTML = '<section class="cartao sem-forro origem">'

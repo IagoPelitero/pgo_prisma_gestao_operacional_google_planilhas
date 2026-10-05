@@ -856,216 +856,6 @@ function paraTexto_(valor, tipo) {
   return String(valor);
 }
 
-/**
- * Um caso inteiro, para a fila abrir sem recarregar a tela.
- * Devolve só o que o nível pode ver — a mesma regra do formulário.
- */
-function detalhesDoCaso(idDoCanal, idDoCaso) {
-  var quem = exigirTela_('trabalho');
-  var canal = canalQueEuPossoVer_(idDoCanal, quem);
-
-  var registro = buscarRegistros_(canal.aba, 'Id', idDoCaso, 1)[0];
-  if (!registro) {
-    throw new Error('O caso ' + idDoCaso + ' não existe no canal ' + canal.nome + '.');
-  }
-  exigirAlcanceSobre_(registro, canal, quem);
-
-  var estrutura = estruturaDaAba_(canal.aba);
-  var linhas = [];
-
-  // As colunas que algum campo do formulário já mostra. Serve para o segundo
-  // passo não repetir o que o primeiro já disse.
-  var jaMostradas = {};
-
-  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
-    if (visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica)
-      === RECC_VISIBILIDADE.OCULTO) return;
-
-    // O MESMO remontador que a edição usa. Antes isto lia a coluna do próprio
-    // campo e pronto — e a proposta aparecia como "0000000" em vez de
-    // "58-0000000", porque o "58" mora em outra coluna.
-    var valor = valorDoCampoNaLinha_(registro, campo, estrutura);
-    if (valor === null) return;
-
-    colunasQueOCampoOcupa_(campo).forEach(function (cabecalho) {
-      jaMostradas[normalizarParaComparar_(cabecalho)] = true;
-    });
-
-    // Campo vazio aparece com um travessão, e não sumindo. Sumir faria a
-    // pessoa achar que o campo não existe naquelo canal, quando na verdade
-    // ele existe e está em branco — que é uma informação.
-    linhas.push({
-      chave: String(campo.ChaveTecnica),
-      rotulo: String(campo.Rotulo || campo.Cabecalho),
-      valor: valor,
-      secao: String(campo.Secao || 'Geral'),
-      doSistema: false
-    });
-  });
-
-  /*
-   * E TUDO O MAIS QUE ESTÁ PREENCHIDO NA PLANILHA.
-   *
-   * Pedido do PO, nestas palavras: "precisa trazer todos os dados que foram
-   * preenchidos na planilha". Um caso importado chega com valor em colunas
-   * que o formulário não pergunta — os carimbos de contato, a origem da
-   * importação, a data dela —, e antes disto esse conteúdo ficava invisível:
-   * a pessoa abria o caso e não via o que estava gravado.
-   *
-   * Só o que TEM VALOR entra aqui. Listar coluna vazia que ninguém declarou
-   * no formulário encheria a tela de travessões e esconderia o que importa.
-   *
-   * Vem marcado com `doSistema`, e a tela mostra como leitura. Deixar
-   * reescrever "Quem mudou o status" ou "Data da última mudança de status" à
-   * mão estragaria o carimbo de produtividade — o número da pessoa passaria a
-   * depender do que alguém digitou, e não do que aconteceu.
-   */
-  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
-    var nome = String(cabecalho || '');
-    if (!nome || nome.charAt(0) === '_') return;
-    if (normalizarParaComparar_(nome) === 'id') return;
-    if (jaMostradas[normalizarParaComparar_(nome)]) return;
-
-    var valor = paraTexto_(registro[nome], estrutura.tipos[posicao]);
-    if (!String(valor).trim()) return;
-
-    linhas.push({
-      chave: normalizarParaComparar_(nome),
-      rotulo: nome,
-      valor: valor,
-      secao: 'Também está na planilha',
-      doSistema: true
-    });
-  });
-
-  var situacao = canal.colunaDoStatus
-    ? String(registro[canal.colunaDoStatus] || '') : '';
-  var tom = 'neutro';
-  situacoesDoCanal_(canal).forEach(function (uma) {
-    if (uma.chave === normalizarParaComparar_(situacao)) tom = uma.tom;
-  });
-  var historico = historicoDoCaso_(canal.aba, registro.__id);
-
-  return {
-    id: registro.__id,
-    canal: canal.nome,
-    situacao: situacao,
-    tom: tom,
-    // O histórico é calculado UMA vez: o "atualizado em" é o último passo dele.
-    // Antes eram duas leituras da mesma trilha para a mesma tela.
-    atualizadoEm: historico.length ? historico[historico.length - 1].quando : '',
-    linhas: linhas,
-    linhaDoTempo: linhaDoTempoDoCaso_(registro, canal),
-    historico: historico,
-    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
-  };
-}
-
-/**
- * Onde o caso está agora, e desde quando.
- *
- * Pedido do PO: "o card pode mostrar apenas o status que está". Antes vinha a
- * jornada inteira — todo status com coluna de carimbo, na ordem do catálogo,
- * com "ainda não" nas etapas que faltavam. Só que os desfechos não são
- * etapas em fila: um caso Retido nunca vai ser Não retido, e a lista
- * mostrava "Não retido — ainda não" como se faltasse acontecer.
- *
- * Volta UMA linha só (numa lista, que é o formato que a tela já desenha).
- *
- * O "DESDE QUANDO" sai, nesta ordem, de:
- *
- *   1. "Data da última mudança de status" — é exatamente quando o caso chegou
- *      ao status em que está, mesmo que já tenha passado por ele antes;
- *   2. o carimbo do próprio status — que guarda a PRIMEIRA vez que o caso
- *      chegou nele, e serve quando a coluna acima está vazia;
- *   3. nada. Caso recém-cadastrado em "Não trabalhado" não tem data de
- *      mudança nenhuma, e inventar uma seria pior que não mostrar.
- *
- * Os carimbos continuam gravados na linha do caso, intactos: é deles que sai a
- * produtividade. Só deixaram de ser listados aqui.
- */
-function linhaDoTempoDoCaso_(registro, canal) {
-  if (!canal.colunaDoStatus) return [];
-  var atual = String(registro[canal.colunaDoStatus] || '').trim();
-  if (!atual) return [];
-
-  var estrutura = estruturaDaAba_(canal.aba);
-  function comoTexto(cabecalho) {
-    var posicao = cabecalho ? posicaoDaColuna_(estrutura, cabecalho) : -1;
-    if (posicao < 0) return '';
-    var valor = registro[cabecalho];
-    if (valor === null || valor === undefined || String(valor).trim() === '') return '';
-    return paraTexto_(valor, estrutura.tipos[posicao]);
-  }
-
-  var doCatalogo = situacaoDoCanalPeloValor_(canal, atual);
-  return [{
-    status: doCatalogo ? doCatalogo.nome : atual,
-    tom: doCatalogo ? doCatalogo.tom : 'neutro',
-    quando: comoTexto(RECC_COLUNA_QUANDO_MUDOU_O_STATUS)
-      || comoTexto(doCatalogo ? doCatalogo.colunaDeCarimbo : '')
-  }];
-}
-
-/**
- * O que já aconteceu com este caso, do mais antigo para o mais recente.
- *
- * Sai da trilha de auditoria, e não de uma coluna de histórico na base: a
- * trilha já registra quem fez o quê e quando, e uma segunda memória da mesma
- * coisa é uma que um dia diverge da outra.
- */
-function historicoDoCaso_(nomeDaAba, idDoCaso) {
-  var nomes = {};
-  lerRegistros_('USUARIOS').forEach(function (usuario) {
-    nomes[usuario.__id] = String(usuario.Nome);
-  });
-
-  var comoSeChama = {
-    'caso.criar': 'Caso cadastrado',
-    'caso.editar': 'Caso alterado',
-    'caso.status': 'Situação alterada',
-    'caso.ocultar': 'Caso ocultado'
-  };
-
-  /*
-    LER A COLUNA ANTES DE LER AS LINHAS — a regra da busca, agora aqui.
-
-    Antes esta função lia a aba AUDITORIA INTEIRA a cada "ver detalhes". A
-    auditoria só cresce — todo cadastro e toda edição deixam uma linha —, então
-    o detalhe ficava mais lento a cada semana de operação: com 100 mil linhas
-    eram 1,4 milhão de células para mostrar as três ou quatro de um caso.
-
-    Agora: só a coluna RegistroId, e depois só as linhas deste caso. O
-    histórico sai igual, na mesma ordem (a da planilha, do mais antigo para o
-    mais recente).
-  */
-  var alvo = converterParaIdentificador_(idDoCaso);
-  if (!alvo) return [];
-  var linhasDoCaso = [];
-  lerColunaInteira_('AUDITORIA', 'RegistroId').forEach(function (valor, i) {
-    if (converterParaIdentificador_(valor) === alvo) linhasDoCaso.push(i + 2);
-  });
-  if (!linhasDoCaso.length) return [];
-
-  return lerLinhasEspecificas_('AUDITORIA', linhasDoCaso)
-    .filter(function (linha) {
-      return normalizarParaComparar_(linha.Entidade)
-        === normalizarParaComparar_(nomeDaAba);
-    })
-    .map(function (linha) {
-      var acao = String(linha.Acao || '');
-      return {
-        acao: comoSeChama[acao] || acao,
-        detalhe: String(linha.Detalhe || ''),
-        quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || 'Sem dados',
-        quando: linha.DataHora
-          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,
-            'dd/MM/yyyy, HH:mm')
-          : ''
-      };
-    });
-}
-
 /* ############################################################################
    #
    #  SEÇÃO 2 de 3 · OS GRÁFICOS DA OPERAÇÃO
@@ -1658,7 +1448,10 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
       : (procurado === '__outros' ? 'Demais valores' : procurado),
     colunas: colunasDaFila_(canal),
     casos: montarFila_(escolhidos, canal),
-    total: escolhidos.length
+    total: escolhidos.length,
+    // "Trabalhar no caso" abre a EDIÇÃO; quem não pode editar não ganha o
+    // botão, em vez de ganhar um botão que a chamada recusa.
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 
@@ -2520,6 +2313,9 @@ function oQueEuFiz_(quem, canal) {
   };
 
   var meuId = converterParaIdentificador_(quem.usuario.Id);
+  // Abrir o caso daqui é "Trabalhar no caso", que é a EDIÇÃO — a leitura
+  // saiu do sistema. Sem a ação de editar, a linha fica só como lembrança.
+  var podeAbrir = podeFazer_(quem.permissoes, RECC_ACOES.EDITAR);
 
   return lerRegistros_('AUDITORIA', { ultimas: 400 })
     .filter(function (linha) {
@@ -2539,7 +2335,7 @@ function oQueEuFiz_(quem, canal) {
         entidade: String(linha.Entidade || ''),
         // O caso só abre quando é deste canal: um Id da outra base abriria a
         // tela errada, ou nada.
-        abre: normalizarParaComparar_(linha.Entidade)
+        abre: podeAbrir && normalizarParaComparar_(linha.Entidade)
           === normalizarParaComparar_(canal.aba) && !!linha.RegistroId,
         quando: linha.DataHora
           ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,

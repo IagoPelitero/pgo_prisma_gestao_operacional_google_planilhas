@@ -233,6 +233,40 @@ function rodarTestesDeBusca() {
     verdadeiro(montar.indexOf('Servidor.chamar') < 0,
       'montar não pode pedir dado: abrir a busca tem de custar zero');
   });
+
+  secao('As ações do caso achado — as mesmas da fila');
+
+  teste('o resultado traz Trabalhar no caso, Alterar status e Excluir, nesta ordem', () => {
+    // Quem acha um caso aqui quer fazer com ele o que faria no Trabalho. O
+    // "Ver detalhes" saiu do sistema, a pedido do PO.
+    const tela = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'Front-End', 'BuscarCaso.html'), 'utf8');
+    const acoes = tela.slice(tela.indexOf('function acoesDoAchado'),
+      tela.indexOf('function ligarResultado'));
+    const trabalhar = acoes.indexOf('Trabalhar no caso');
+    const status = acoes.indexOf('title="Alterar status"');
+    const excluir = acoes.indexOf('data-excluir-achado');
+    verdadeiro(trabalhar > 0 && status > trabalhar && excluir > status,
+      'a ordem tem de ser a mesma da fila');
+    verdadeiro(tela.indexOf('Ver detalhes') < 0, 'o "Ver detalhes" saiu da busca');
+    contem(tela, 'CasoEmModal.trocarSituacao(canal, caso');
+    contem(tela, 'Formulario.confirmarExclusao(caso, function',
+      'excluir pela busca também passa pelo aviso de atenção');
+  });
+
+  teste('a busca diz se a pessoa pode editar — e a tela esconde o que ela não pode', () => {
+    igual(chamar('buscarCasos')('Vanessa', [], false).podeEditar, true,
+      'o administrador edita');
+
+    const consulta = chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Consulta');
+    chamar('salvarUsuario')({ nome: 'Usopp Consulta', email: 'usopp@exemplo.com',
+      nivelAcessoId: consulta.Id, ativo: true });
+    comoUsuario(ambiente, 'usopp@exemplo.com', () => {
+      igual(chamar('buscarCasos')('Vanessa', [], false).podeEditar, false,
+        'a Consulta não edita: não ganha Trabalhar no caso nem Alterar status');
+    });
+  });
 }
 
 module.exports = { rodarTestesDeBusca };
