@@ -37,7 +37,10 @@ var TelaImportacao = (function () {
   var fonte = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
   var deParaEscolhido = null; // o que a pessoa ajustou na tela
   var analistasMarcados = {};
-  var colunaQueIdentifica = '';
+  // null = ninguém escolheu ainda neste canal: aí vale o que o servidor
+  // sugere (a proposta no mesmo mês, na RET). Vazio é escolha de verdade —
+  // "trazer tudo" —, e por isso não pode servir de "não escolhido".
+  var colunaQueIdentifica = null;
   var nomeDoLote = '';
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -61,6 +64,9 @@ var TelaImportacao = (function () {
     Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhida)
       .entao(function (resposta) {
         opcoes = resposta;
+        if (colunaQueIdentifica === null) {
+          colunaQueIdentifica = resposta.repeticaoPadrao || '';
+        }
         laudo = null;
         resultado = null;
         deParaEscolhido = null;
@@ -264,6 +270,14 @@ var TelaImportacao = (function () {
       + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
       + '<select class="filtro" id="coluna-que-identifica">'
       + ['<option value="">— trazer tudo, mesmo repetido —</option>']
+        // Pedido do PO para a RET: a mesma proposta no mesmo mês não entra na
+        // divisão. Vem marcada; trocar ou desmarcar continua na mão de quem
+        // importa.
+        .concat(opcoes.repeticaoPelaProposta
+          ? ['<option value="@PROPOSTA_NO_MES"'
+            + (colunaQueIdentifica === '@PROPOSTA_NO_MES' ? ' selected' : '')
+            + '>Proposta no mesmo mês</option>']
+          : [])
         .concat(opcoes.colunasDoCanal.map(function (coluna) {
           return '<option value="' + escapar(coluna) + '"'
             + (colunaQueIdentifica === coluna ? ' selected' : '') + '>'
@@ -273,7 +287,13 @@ var TelaImportacao = (function () {
       + '</div>'
       + '<p class="config-dica">A base é atualizada toda semana e boa parte dela '
       + 'repete. Escolhendo uma coluna que identifica o caso — o CPF, o número da '
-      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.</p>'
+      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.'
+      + (opcoes.repeticaoPelaProposta
+        ? ' Aqui já vem marcada a <strong>proposta no mesmo mês</strong>: a mesma '
+          + 'proposta (código e número), já cadastrada no mês do caso ou repetida '
+          + 'no arquivo, não entra na divisão.'
+        : '')
+      + '</p>'
       + desenharAnalistas()
       + (opcoes.statusPadrao
         ? '<p class="config-dica">Os casos vão nascer com o status '
@@ -408,7 +428,7 @@ var TelaImportacao = (function () {
       canalEscolhida = id;
       fonte = { tipo: fonte.tipo, texto: '', planilhaId: '', aba: '' };
       analistasMarcados = {};
-      colunaQueIdentifica = '';
+      colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
       nomeDoLote = '';
       desenharSeletor();
       carregar();
@@ -510,7 +530,7 @@ var TelaImportacao = (function () {
     Servidor.chamar('conferirImportacaoDeCasos', canalEscolhida, {
       fonte: fonte,
       dePara: deParaEscolhido,
-      colunaQueIdentifica: colunaQueIdentifica
+      colunaQueIdentifica: colunaQueIdentifica || ''
     })
       .entao(function (resposta) {
         laudo = resposta;
@@ -544,7 +564,7 @@ var TelaImportacao = (function () {
     Servidor.chamar('importarCasos', canalEscolhida, {
       fonte: fonte,
       dePara: deParaEscolhido || laudo.dePara,
-      colunaQueIdentifica: colunaQueIdentifica,
+      colunaQueIdentifica: colunaQueIdentifica || '',
       analistas: escolhidos,
       origem: nomeDoLote
     })

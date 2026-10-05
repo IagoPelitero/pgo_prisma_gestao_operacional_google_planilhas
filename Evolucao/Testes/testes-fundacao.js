@@ -81,7 +81,8 @@ function rodarTestesDaFundacao() {
     igual(campos.length, esperados,
       'um campo para cada coluna de dado, em cada base');
     const cpf = campos.find((c) => c.Cabecalho === 'Documento (CPF)');
-    igual(cpf.Mascara, '000.000.000-00', 'máscara do CPF');
+    igual(cpf.Mascara, '000.000.000-00|00.000.000/0000-00',
+      'máscara do CPF ou CNPJ — as duas formas, a pedido do PO');
     igual(cpf.TipoCampo, 'documento', 'na tela é campo com máscara');
     igual(chamar('RECC_DO_CAMPO_PARA_O_DADO')[cpf.TipoCampo], 'identificador',
       'e na célula continua sendo identificador — texto, só dígitos');

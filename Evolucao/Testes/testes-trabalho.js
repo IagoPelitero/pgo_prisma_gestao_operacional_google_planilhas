@@ -1409,6 +1409,152 @@ function rodarTestesDoTrabalho() {
     verdadeiro(daInstalacao.indexOf('setBackground') < 0,
       'nem célula pintada na gravação');
   });
+
+  secao('Os destaques da fila, a pedido do PO');
+
+  /*
+   * Ambiente NOVO de propósito: um teste lá de cima reescreve as colunas da
+   * fila da RET para provar a escrita plana. Aqui interessa a fila de fábrica.
+   */
+  const novo = carregar('primeiro.adm@exemplo.com');
+  novo.chamar('instalarRECC()');
+  const daRet = novo.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  const daMesa = novo.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+
+  /** Os valores de um grupo da fila, na ordem — o primeiro é o destaque. */
+  function grupoNaFila(resumo, titulo, linha) {
+    const posicao = resumo.colunas.findIndex((g) => g.titulo === titulo);
+    verdadeiro(posicao >= 0, 'o grupo "' + titulo + '" tem de existir');
+    return {
+      cabecalhos: resumo.colunas[posicao].colunas.map((c) => c.cabecalho),
+      valores: resumo.fila[linha].celulas[posicao].map((c) => c.valor)
+    };
+  }
+
+  function linhaDe(resumo, trecho) {
+    return resumo.fila.findIndex((l) => JSON.stringify(l).indexOf(trecho) >= 0);
+  }
+
+  novo.chamar('inserirRegistro_')('BASE_RET', {
+    analista: 'Ana Martins', status: 'Não trabalhado',
+    'data de recepção do protocolo': diasAtras(1),
+    protocolo: '998877', 'Código origem da proposta': '7',
+    'número da proposta': '0000123', Num_apolice: '555', produto: 'Vida',
+    'telefones de contato': '11 98888-7777', 'nome do cliente': 'Cliente da fila'
+  });
+
+  teste('RET · "Dados da proposta" abre com a proposta inteira, sem protocolo', () => {
+    const resumo = novo.chamar('resumoDoCanal')(daRet.id, {});
+    const grupo = grupoNaFila(resumo, 'Dados da proposta', linhaDe(resumo, 'Cliente da fila'));
+    igual(grupo.valores[0], '7-0000123', 'código e número juntos, com o hífen');
+    igual(grupo.cabecalhos[0], 'Código origem da proposta + número da proposta');
+    verdadeiro(grupo.cabecalhos.indexOf('protocolo') < 0,
+      'o protocolo saiu do grupo — não é usado no dia a dia');
+    igual(grupo.valores.slice(1).join(' | '), '555 | Vida', 'apólice e produto continuam');
+  });
+
+  teste('RET · proposta sem código não deixa hífen solto', () => {
+    novo.chamar('inserirRegistro_')('BASE_RET', {
+      analista: 'Ana Martins', status: 'Não trabalhado',
+      'data de recepção do protocolo': diasAtras(0),
+      'número da proposta': '0000456', 'nome do cliente': 'Sem código'
+    });
+    const resumo = novo.chamar('resumoDoCanal')(daRet.id, {});
+    igual(grupoNaFila(resumo, 'Dados da proposta', linhaDe(resumo, 'Sem código')).valores[0],
+      '0000456');
+  });
+
+  teste('RET · "Dados cadastrais" abre com o telefone', () => {
+    const resumo = novo.chamar('resumoDoCanal')(daRet.id, {});
+    const grupo = grupoNaFila(resumo, 'Dados cadastrais', linhaDe(resumo, 'Cliente da fila'));
+    igual(grupo.cabecalhos[0], 'telefones de contato', 'o telefone é o destaque');
+    igual(grupo.valores[0], '11988887777', 'só dígitos, como o sistema guarda telefone');
+    igual(grupo.cabecalhos[1], 'nome do cliente', 'o nome continua, logo abaixo');
+  });
+
+  teste('Mesa · "Dados do caso" abre com o título do e-mail', () => {
+    novo.chamar('inserirRegistro_')('BASE_MESA', {
+      Analista: 'Ana Martins', Status: 'Em andamento',
+      'Data de entrada': diasAtras(0), 'Título do e-mail': 'Endosso urgente — apólice 123',
+      Ramo: 'Auto', Assunto: 'Endosso'
+    });
+    const resumo = novo.chamar('resumoDoCanal')(daMesa.id, {});
+    const grupo = grupoNaFila(resumo, 'Dados do caso', linhaDe(resumo, 'Endosso urgente'));
+    igual(grupo.cabecalhos.join(', '), 'Título do e-mail, Ramo, Assunto');
+    igual(grupo.valores[0], 'Endosso urgente — apólice 123');
+  });
+
+  teste('Configurações aceita "A + B" e recusa quando uma das partes não existe', () => {
+    const base = { id: daRet.id, nome: daRet.nome, colunaDaData: daRet.colunaDaData,
+      colunaDoStatus: daRet.colunaDoStatus };
+    novo.chamar('salvarCanal')(Object.assign({}, base, {
+      colunasDaFila: 'Proposta: Código origem da proposta + número da proposta' }));
+    lanca(() => novo.chamar('salvarCanal')(Object.assign({}, base, {
+      colunasDaFila: 'Proposta: Código origem da proposta + coluna inventada' })),
+    'coluna inventada');
+  });
+
+  teste('o diagnóstico confere cada parte da junção', () => {
+    // A fila de fábrica, com "+", não pode virar um aviso falso no diagnóstico.
+    const citadas = novo.chamar('colunasCitadas_')(
+      'Dados: Código origem da proposta + número da proposta, produto');
+    igual(citadas.join(' | '), 'Código origem da proposta | número da proposta | produto');
+  });
+
+  secao('Ver detalhes não lê a auditoria inteira');
+
+  teste('o histórico lê a coluna do Id e só as linhas do caso', () => {
+    /*
+     * A auditoria só cresce: todo cadastro e toda edição deixam uma linha.
+     * O "ver detalhes" lia a aba INTEIRA para mostrar as três ou quatro de um
+     * caso — com 100 mil linhas, 1,4 milhão de células a cada clique. Agora
+     * lê a coluna RegistroId e depois só as linhas do caso.
+     */
+    const caso = novo.chamar('cadastrarCaso')(daMesa.id, {
+      status: 'Em andamento', nomedosegurado: 'Caso do histórico'
+    });
+    const aberto = novo.chamar('casoParaEditar')(daMesa.id, String(caso.id));
+    novo.chamar('editarCaso')(daMesa.id, String(caso.id),
+      Object.assign({}, aberto.valores, { nomedosegurado: 'Caso do histórico, editado' }));
+
+    // Três mil linhas de outros casos: o barulho de meses de operação.
+    const outras = [];
+    for (let i = 0; i < 3000; i++) {
+      outras.push({ DataHora: new Date(), Acao: 'caso.editar', Entidade: 'BASE_RET',
+        RegistroId: String(900000 + i), Detalhe: 'outro caso' });
+    }
+    novo.chamar('inserirVariosRegistros_')('AUDITORIA', outras);
+    const linhasDaAuditoria = novo.chamar('lerRegistros_("AUDITORIA")').length;
+
+    const medidor = novo.ambiente.medidor;
+    medidor.zerar();
+    const historico = novo.chamar('historicoDoCaso_')('BASE_MESA', String(caso.id));
+    const lidas = medidor.retrato().celulasLidas;
+
+    igual(historico.map((p) => p.acao).join(' → '), 'Caso cadastrado → Caso alterado',
+      'o mesmo histórico, na mesma ordem — do mais antigo para o mais recente');
+    verdadeiro(lidas < linhasDaAuditoria * 2,
+      'leu ' + lidas + ' células para ' + linhasDaAuditoria + ' linhas de auditoria: '
+      + 'tem de ser a coluna do Id e pouco mais, e não a aba inteira');
+  });
+
+  teste('o "atualizado em" é o último passo do histórico, sem segunda leitura', () => {
+    const caso = novo.chamar('resumoDoCanal')(daMesa.id, {}).fila
+      .find((l) => JSON.stringify(l).indexOf('Caso do histórico') >= 0);
+    const detalhe = novo.chamar('detalhesDoCaso')(daMesa.id, caso.id);
+    igual(detalhe.atualizadoEm, detalhe.historico[detalhe.historico.length - 1].quando);
+  });
+
+  teste('caso de OUTRA aba com o mesmo Id não entra no histórico', () => {
+    // A coluna RegistroId é lida sem olhar a aba; a aba é conferida depois,
+    // nas linhas escolhidas. Os dois filtros têm de continuar valendo.
+    novo.chamar('inserirRegistro_')('AUDITORIA', { DataHora: new Date(),
+      Acao: 'caso.editar', Entidade: 'BASE_RET', RegistroId: '0000000000',
+      Detalhe: 'mesmo Id, outra aba' });
+    const historico = novo.chamar('historicoDoCaso_')('BASE_MESA', '0000000000');
+    verdadeiro(historico.every((p) => p.detalhe !== 'mesmo Id, outra aba'),
+      'o passo da RET não pode aparecer no caso da Mesa');
+  });
 }
 
 module.exports = { rodarTestesDoTrabalho };

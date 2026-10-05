@@ -2930,6 +2930,7 @@ var Formulario = (function () {
   function aplicarMascara(valor, mascara) {
     var digitos = String(valor || '').replace(/\D/g, '');
     if (!mascara) return digitos;
+    if (mascara.indexOf('|') >= 0) mascara = mascaraEmQueCabe(digitos, mascara);
 
     var saida = '';
     var proximo = 0;
@@ -2942,6 +2943,24 @@ var Formulario = (function () {
       }
     }
     return saida;
+  }
+
+  /**
+   * Entre máscaras alternativas — "000.000.000-00|00.000.000/0000-00" —, a
+   * primeira em que os dígitos cabem.
+   *
+   * Pedido do PO para a Mesa: o campo do CPF aceita CNPJ também. Até 11
+   * dígitos ele se desenha como CPF; do 12º em diante vira CNPJ. Sem isto, um
+   * CNPJ colado com pontos e barra era cortado em 11 dígitos e virava um CPF
+   * que não existe — sem erro nenhum na tela.
+   */
+  function mascaraEmQueCabe(digitos, mascara) {
+    var opcoes = String(mascara).split('|');
+    for (var i = 0; i < opcoes.length; i++) {
+      var cabem = (opcoes[i].match(/0/g) || []).length;
+      if (digitos.length <= cabem) return opcoes[i];
+    }
+    return opcoes[opcoes.length - 1];
   }
 
   function usaMascara(campo) {
@@ -3062,7 +3081,9 @@ var Formulario = (function () {
         + (dinheiro ? ' data-dinheiro="sim" inputmode="decimal"' : '')
         + (dinheiro ? ' placeholder="R$ 0,00"' : '')
         + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
-        + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
+        // Duas máscaras ("CPF|CNPJ") aparecem como as duas formas aceitas.
+        + (campo.mascara ? ' placeholder="'
+          + escapar(campo.mascara.split('|').join(' ou ')) + '"' : '')
         // A coluna de data do canal: é dela que o selo da proposta tira o mês.
         + (colunaDaData && campo.cabecalho === colunaDaData
           ? ' data-data-do-caso="sim"' : '')
@@ -6869,7 +6890,10 @@ var TelaImportacao = (function () {
   var fonte = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
   var deParaEscolhido = null; // o que a pessoa ajustou na tela
   var analistasMarcados = {};
-  var colunaQueIdentifica = '';
+  // null = ninguém escolheu ainda neste canal: aí vale o que o servidor
+  // sugere (a proposta no mesmo mês, na RET). Vazio é escolha de verdade —
+  // "trazer tudo" —, e por isso não pode servir de "não escolhido".
+  var colunaQueIdentifica = null;
   var nomeDoLote = '';
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -6893,6 +6917,9 @@ var TelaImportacao = (function () {
     Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhida)
       .entao(function (resposta) {
         opcoes = resposta;
+        if (colunaQueIdentifica === null) {
+          colunaQueIdentifica = resposta.repeticaoPadrao || '';
+        }
         laudo = null;
         resultado = null;
         deParaEscolhido = null;
@@ -7096,6 +7123,14 @@ var TelaImportacao = (function () {
       + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
       + '<select class="filtro" id="coluna-que-identifica">'
       + ['<option value="">— trazer tudo, mesmo repetido —</option>']
+        // Pedido do PO para a RET: a mesma proposta no mesmo mês não entra na
+        // divisão. Vem marcada; trocar ou desmarcar continua na mão de quem
+        // importa.
+        .concat(opcoes.repeticaoPelaProposta
+          ? ['<option value="@PROPOSTA_NO_MES"'
+            + (colunaQueIdentifica === '@PROPOSTA_NO_MES' ? ' selected' : '')
+            + '>Proposta no mesmo mês</option>']
+          : [])
         .concat(opcoes.colunasDoCanal.map(function (coluna) {
           return '<option value="' + escapar(coluna) + '"'
             + (colunaQueIdentifica === coluna ? ' selected' : '') + '>'
@@ -7105,7 +7140,13 @@ var TelaImportacao = (function () {
       + '</div>'
       + '<p class="config-dica">A base é atualizada toda semana e boa parte dela '
       + 'repete. Escolhendo uma coluna que identifica o caso — o CPF, o número da '
-      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.</p>'
+      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.'
+      + (opcoes.repeticaoPelaProposta
+        ? ' Aqui já vem marcada a <strong>proposta no mesmo mês</strong>: a mesma '
+          + 'proposta (código e número), já cadastrada no mês do caso ou repetida '
+          + 'no arquivo, não entra na divisão.'
+        : '')
+      + '</p>'
       + desenharAnalistas()
       + (opcoes.statusPadrao
         ? '<p class="config-dica">Os casos vão nascer com o status '
@@ -7240,7 +7281,7 @@ var TelaImportacao = (function () {
       canalEscolhida = id;
       fonte = { tipo: fonte.tipo, texto: '', planilhaId: '', aba: '' };
       analistasMarcados = {};
-      colunaQueIdentifica = '';
+      colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
       nomeDoLote = '';
       desenharSeletor();
       carregar();
@@ -7342,7 +7383,7 @@ var TelaImportacao = (function () {
     Servidor.chamar('conferirImportacaoDeCasos', canalEscolhida, {
       fonte: fonte,
       dePara: deParaEscolhido,
-      colunaQueIdentifica: colunaQueIdentifica
+      colunaQueIdentifica: colunaQueIdentifica || ''
     })
       .entao(function (resposta) {
         laudo = resposta;
@@ -7376,7 +7417,7 @@ var TelaImportacao = (function () {
     Servidor.chamar('importarCasos', canalEscolhida, {
       fonte: fonte,
       dePara: deParaEscolhido || laudo.dePara,
-      colunaQueIdentifica: colunaQueIdentifica,
+      colunaQueIdentifica: colunaQueIdentifica || '',
       analistas: escolhidos,
       origem: nomeDoLote
     })
@@ -8112,7 +8153,9 @@ var TelaConfiguracoes = (function () {
         'Campos com a mesma seção aparecem juntos.')
       + caixaDeOpcoes('tipo', 'Tipo', opcoes.tipos, campo.tipo, '')
       + campoDeTexto('mascara', 'Máscara', campo.mascara,
-        'Ex.: 000.000.000-00. A planilha recebe só os dígitos.')
+        'Ex.: 000.000.000-00. A planilha recebe só os dígitos. Duas máscaras '
+        + 'separadas por | aceitam as duas formas — '
+        + '000.000.000-00|00.000.000/0000-00 é CPF ou CNPJ.')
       + caixaDeOpcoes('catalogo', 'Lista do catálogo',
         [''].concat(opcoes.tiposDeCatalogo), campo.catalogo,
         'Preenche as opções a partir da aba CATALOGO.')
@@ -8992,7 +9035,9 @@ var TelaConfiguracoes = (function () {
         canal.colunaDoStatus, 'É por ela que os cartões do painel contam.')
       + campoDeTexto('colunasDaFila', 'Colunas da fila', canal.colunasDaFila,
         'Grupos separados por ponto e vírgula: "Título: coluna, coluna". '
-        + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela.')
+        + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela. '
+        + 'Com "+", duas colunas saem juntas numa linha só, com hífen: '
+        + '"Código origem da proposta + número da proposta" mostra 7-0000000.')
       + campoDeTexto('colunasDaBusca', 'Colunas em que a busca procura',
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '

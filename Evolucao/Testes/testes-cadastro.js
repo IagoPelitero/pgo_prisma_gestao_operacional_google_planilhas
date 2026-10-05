@@ -62,12 +62,15 @@ function rodarTestesDeCadastro() {
       'URA é da RET, não da Mesa Diamante');
   });
 
-  teste('o CPF nasce com máscara, e a máscara diz quantos dígitos ele quer', () => {
+  teste('o CPF da Mesa nasce como CPF ou CNPJ, e a máscara diz os dois tamanhos', () => {
+    // Pedido do PO: "o input do cpf aceite CNPJ também".
     const formulario = chamar('formularioDoCanal')(canalDiamante.id);
     const todos = formulario.secoes.reduce((soma, s) => soma.concat(s.campos), []);
     const cpf = todos.find((campo) => campo.chave === 'documentocpf');
-    igual(cpf.mascara, '000.000.000-00');
-    igual(chamar('quantosDigitosAMascaraPede_')(cpf.mascara), 11);
+    igual(cpf.mascara, '000.000.000-00|00.000.000/0000-00');
+    igual(cpf.rotulo, 'CPF ou CNPJ');
+    igual(cpf.mascara.split('|').map(chamar('quantosDigitosAMascaraPede_')).join(' ou '),
+      '11 ou 14');
   });
 
   teste('o analista é um seletor com quem está cadastrado e ativo', () => {
@@ -315,7 +318,8 @@ function rodarTestesDeCadastro() {
       'esperava ao menos 3 problemas, veio ' + erro.problemas.length);
     const porCampo = {};
     erro.problemas.forEach((p) => { porCampo[p.campo] = p.erro; });
-    contem(porCampo.documentocpf, 'precisa ter 11 dígitos');
+    contem(porCampo.documentocpf, 'precisa ter 11 ou 14 dígitos',
+      'o recado diz os dois tamanhos aceitos — CPF ou CNPJ');
     contem(porCampo.dataresposta, 'não pode ser no futuro');
     igual(porCampo.nomedosegurado, 'é obrigatório');
   });
@@ -1574,6 +1578,90 @@ function rodarTestesDeCadastro() {
       'o código não pode ter se perdido na ida e volta');
     igual(String(linha['número da proposta']), '1111111');
     igual(String(linha['nome do cliente']), 'Ida e volta, editado');
+  });
+
+  secao('Mesa: CPF ou CNPJ, digitado de qualquer jeito, gravado só com dígitos');
+
+  /*
+   * Pedido do PO: o campo do CPF da Mesa aceita CNPJ também, com pontos,
+   * traços e o que vier junto. A formatação é só da tela; na planilha o
+   * documento entra limpo.
+   */
+  function documentoGravado(id) {
+    return chamar('buscarRegistros_')('BASE_MESA', 'Id', id, 1)[0]['Documento (CPF)'];
+  }
+
+  teste('CNPJ com pontos, barra e traço entra só com os 14 dígitos', () => {
+    const salvo = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Empresa Exemplo Ltda',
+      documentocpf: '12.345.678/0001-90'
+    });
+    igual(documentoGravado(String(salvo.id)), '12345678000190');
+  });
+
+  teste('CPF com pontos e traço entra só com os 11 dígitos, como antes', () => {
+    const salvo = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Pessoa Física',
+      documentocpf: '123.456.789-01'
+    });
+    igual(documentoGravado(String(salvo.id)), '12345678901');
+  });
+
+  teste('qualquer outro caractere colado junto também sai', () => {
+    const salvo = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Colado do e-mail',
+      documentocpf: ' CNPJ: 12 345 678 0001 90. '
+    });
+    igual(documentoGravado(String(salvo.id)), '12345678000190');
+  });
+
+  teste('editar com CNPJ formatado também grava só os dígitos', () => {
+    const salvo = chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Vai virar empresa',
+      documentocpf: '123.456.789-01'
+    });
+    const id = String(salvo.id);
+    const aberto = chamar('casoParaEditar')(canalDiamante.id, id);
+    chamar('editarCaso')(canalDiamante.id, id, Object.assign({}, aberto.valores, {
+      documentocpf: '98.765.432/0001-10'
+    }));
+    igual(documentoGravado(id), '98765432000110');
+  });
+
+  teste('tamanho que não é CPF nem CNPJ é recusado, dizendo os dois', () => {
+    const erro = lanca(() => chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Documento torto',
+      documentocpf: '1234567890123'
+    }));
+    contem(JSON.stringify(erro.problemas || erro.message), '11 ou 14 dígitos');
+  });
+
+  teste('o CPF da RET continua só CPF — o pedido foi da Mesa', () => {
+    const formulario = chamar('formularioDoCanal')(canalRet.id);
+    const todos = formulario.secoes.reduce((soma, s) => soma.concat(s.campos), []);
+    todos.filter((campo) => campo.tipo === 'documento').forEach((campo) => {
+      verdadeiro(String(campo.mascara || '').indexOf('|') < 0,
+        campo.rotulo + ' da RET não pode ter ganhado o CNPJ');
+    });
+  });
+
+  teste('a tela troca a máscara sozinha quando passa de 11 dígitos', () => {
+    const form = pecaRodando('Formulario').Formulario;
+    const dupla = '000.000.000-00|00.000.000/0000-00';
+    igual(form.aplicarMascara('12345678901', dupla), '123.456.789-01', 'até 11, CPF');
+    igual(form.aplicarMascara('123456789012', dupla), '12.345.678/9012',
+      'no 12º dígito, vira CNPJ');
+    igual(form.aplicarMascara('12345678000190', dupla), '12.345.678/0001-90');
+    igual(form.aplicarMascara('12.345.678/0001-90', dupla), '12.345.678/0001-90',
+      'colado já formatado, continua igual');
+    igual(form.aplicarMascara('123456780001901234', dupla), '12.345.678/0001-90',
+      'digitar demais não estoura a máscara');
+  });
+
+  teste('o campo diz na dica que aceita os dois formatos', () => {
+    const fonte = lerPeca('Formulario');
+    contem(fonte, "campo.mascara.split('|').join(' ou ')",
+      'a dica mostra CPF ou CNPJ, e não a máscara com a barra vertical');
   });
 }
 

@@ -17,7 +17,7 @@ abaixo com o motivo.
 
 | Assunto | O que dá para fazer | Onde |
 |---|---|---|
-| **Campos do formulário** | Rótulo, dica, seção, tipo, máscara, obrigatoriedade, ordem, lista de origem, ligar e desligar | Campos do formulário |
+| **Campos do formulário** | Rótulo, dica, seção, tipo, máscara, obrigatoriedade, ordem, lista de origem, ligar e desligar. A máscara aceita **formas alternativas separadas por `\|`** — `000.000.000-00\|00.000.000/0000-00` é CPF ou CNPJ: a tela troca pelo tamanho, e o servidor aceita qualquer um dos tamanhos | Campos do formulário |
 | **Coluna nova na base** | Criar campo, que cria a coluna na planilha | Campos do formulário · **pede senha** |
 | **Usuários** | Cadastrar, editar, trocar cargo e nível, canal que atende, tirar o acesso | Usuários |
 | **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga, quais canais | Níveis de acesso |
@@ -25,7 +25,8 @@ abaixo com o motivo.
 | **Listas** | Situações, canais, motivos, ramos, áreas, cargos, formas de pagamento, origens: criar, renomear o rótulo, recolorir, reordenar, desligar | Listas |
 | **Em qual coluna cada status carimba** | Um status pode gravar data e hora numa coluna da base quando o caso chega nele. É o controle de produtividade — e o administrador aponta status novos para colunas novas, sem programador | Listas → Situações |
 | **Quais status fecham o caso** | A marca "Fecha o caso (status final)" de cada status. O que é final entra em "Concluídos" e na meta, e sai de "Ainda em aberto". Não trava o caso. Na RET são Não retido, Retido, Sem sucesso de contato, Cancelado e Pago; na Mesa, Concluído, Concluído na mesa e Sem retorno; no VG, o PO ainda vai decidir — é aqui que ele decide | Listas → Situações |
-| **Canais de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar | Canais de trabalho |
+| **Canais de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar. O **primeiro item de cada grupo é o destaque**, e `A + B` junta duas colunas numa linha só, com hífen — é assim que a RET mostra a proposta inteira (`Código origem da proposta + número da proposta`) | Canais de trabalho |
+| **Repetição na importação** | Na hora de importar, quem importa escolhe como reconhecer o repetido: uma coluna, a **proposta no mesmo mês** (canais com proposta em pedaços — hoje a RET, onde ela já vem marcada) ou trazer tudo | Importação, no passo de conferir |
 | **Cartões do Trabalho** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por tela | Painéis → Cards do Trabalho |
 | **Cartões da Produtividade RECC** | A mesma coisa, numa **lista separada**: o Trabalho mostra o que ainda dá trabalho, a Produtividade mostra o que já foi entregue | Painéis → Cartões da Produtividade |
 | **O que um cartão conta** | O total, uma situação, os finalizados na célula, ou **"já passaram por"** — que lê a coluna de carimbo e por isso não zera quando o caso avança | Painéis |

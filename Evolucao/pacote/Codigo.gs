@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-05 11:00
+   Gerado em 2026-10-05 15:58
    ========================================================================== */
 
 
@@ -4176,6 +4176,12 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
       return;
     }
 
+    // Documento é UM documento, e vai para a planilha só com os dígitos. Sem
+    // isto, a barra do CNPJ ("12.345.678/0001-90") seria lida como separador
+    // de lista — a regra dos telefones — e a célula receberia
+    // "12345678;000190". Apareceu quando a Mesa passou a aceitar CNPJ.
+    if (descricao.tipo === 'documento') bruto = apenasDigitos_(bruto);
+
     paraGravar[descricao.cabecalho] = bruto;
   });
 
@@ -4199,10 +4205,15 @@ function conferirCampo_(campo, valor) {
   if (campo.tipo === 'identificador' || campo.tipo === 'documento') {
     var digitos = converterParaIdentificador_(texto);
     if (!digitos) return 'precisa ter ao menos um dígito';
-    var esperados = quantosDigitosAMascaraPede_(campo.mascara);
-    if (esperados && digitos.replace(/;/g, '').length !== esperados) {
-      return 'precisa ter ' + esperados + ' dígitos (veio com '
-        + digitos.replace(/;/g, '').length + ')';
+    // Máscaras alternativas, separadas por "|", aceitam qualquer um dos
+    // tamanhos: "000.000.000-00|00.000.000/0000-00" é CPF (11) ou CNPJ (14).
+    var aceitos = String(campo.mascara || '').split('|')
+      .map(quantosDigitosAMascaraPede_)
+      .filter(function (quantos) { return quantos > 0; });
+    var veio = digitos.replace(/;/g, '').length;
+    if (aceitos.length && aceitos.indexOf(veio) < 0) {
+      return 'precisa ter ' + aceitos.join(' ou ') + ' dígitos (veio com '
+        + veio + ')';
     }
     return '';
   }
@@ -5853,10 +5864,9 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     ? pedido.dePara
     : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
 
-  var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
-  var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
+  var regra = regraDeRepeticao_(canal, pedido.colunaQueIdentifica);
   var contagem = contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte,
-    deParaEscolhido, chaveParaNaoRepetir, jaEstaDentro);
+    deParaEscolhido, regra);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
@@ -5902,6 +5912,132 @@ function avisosDaImportacao_(escolhidos, canal, quantosEntram) {
 }
 
 /**
+ * A opção "proposta no mesmo mês" da importação, como a tela a envia.
+ *
+ * Começa com @ porque não pode ser confundida com o nome de uma coluna — as
+ * outras opções da mesma lista são cabeçalhos da base.
+ */
+const RECC_REPETIR_PELA_PROPOSTA_NO_MES = '@PROPOSTA_NO_MES';
+
+/**
+ * Como a importação reconhece um caso REPETIDO — ou null, para trazer tudo.
+ *
+ * Duas regras, escolhidas na tela:
+ *
+ *   UMA COLUNA         a que já existia. O valor daquela coluna está na base,
+ *                      em qualquer mês, ou repete dentro do próprio arquivo.
+ *
+ *   PROPOSTA NO MÊS    pedido do PO para a RET: "casos importados com a mesma
+ *                      proposta não irem para divisão". Código E número iguais,
+ *                      no MESMO MÊS do caso — a mesma regra do selo do
+ *                      cadastro, perguntada e escolhida: a mesma proposta em
+ *                      outro mês é pedido novo do cliente, e entra.
+ *
+ * O laudo e a gravação usam esta MESMA regra (ver ehRepetido_). Se o laudo
+ * contasse por uma e a gravação gravasse por outra, a tela prometeria um
+ * número e a base receberia outro.
+ */
+function regraDeRepeticao_(canal, escolha) {
+  var escolhida = String(escolha || '').trim();
+  if (!escolhida) return null;
+
+  if (escolhida !== RECC_REPETIR_PELA_PROPOSTA_NO_MES) {
+    return { coluna: escolhida, jaDentro: jaEstaNaBase_(canal, escolhida) };
+  }
+
+  var partir = partirDaPropostaDoCanal_(canal);
+  if (!partir) {
+    throw new Error('O canal ' + canal.nome + ' não tem campo de proposta, então '
+      + 'não dá para conferir repetição pela proposta. Escolha uma coluna.');
+  }
+
+  // O caso IMPORTADO costuma chegar sem a data do canal — a importação não a
+  // inventa. O mês dele é então o da importação, a mesma conta que o lado do
+  // arquivo faz com "hoje". Sem esta reserva, a segunda importação da mesma
+  // proposta no mês passaria, porque a primeira estaria "sem mês".
+  var reserva = posicaoDaColuna_(estruturaDaAba_(canal.aba),
+    RECC_COLUNA_DATA_DA_IMPORTACAO) >= 0 ? RECC_COLUNA_DATA_DA_IMPORTACAO : '';
+
+  // A base, lida pelas COLUNAS: os pedaços da proposta e as datas do caso.
+  // Poucas idas ao serviço, e não uma por linha.
+  var colunas = {};
+  partir.colunas
+    .concat(canal.colunaDaData ? [canal.colunaDaData] : [])
+    .concat(reserva ? [reserva] : [])
+    .forEach(function (cabecalho) {
+      colunas[cabecalho] = lerColunaInteira_(canal.aba, cabecalho);
+    });
+
+  var jaDentro = {};
+  var quantas = colunas[partir.colunas[0]].length;
+  for (var i = 0; i < quantas; i++) {
+    var naBase = {};
+    partir.colunas.forEach(function (cabecalho) {
+      naBase[cabecalho] = colunas[cabecalho][i];
+    });
+    var daData = canal.colunaDaData ? converterParaData_(colunas[canal.colunaDaData][i]) : '';
+    naBase.__mes = daData || (reserva ? converterParaData_(colunas[reserva][i]) : '');
+    // Caso da base sem data NENHUMA não está em mês nenhum: não pode ser
+    // repetição "no mesmo mês" de ninguém.
+    var chave = chaveDaPropostaNoMes_(naBase, partir, '__mes', null);
+    if (chave) jaDentro[chave] = true;
+  }
+
+  return {
+    partir: partir,
+    colunaDaData: canal.colunaDaData,
+    hoje: new Date(),
+    jaDentro: jaDentro
+  };
+}
+
+/**
+ * "7-0000123|2026-10": os pedaços da proposta e o mês do caso.
+ *
+ * Vazio quando não há número — sem número, não há proposta a comparar, e o
+ * caso entra. Sem data, vale o mês de `hoje`; com `hoje` nulo (o lado da
+ * base), caso sem data fica de fora.
+ */
+function chaveDaPropostaNoMes_(registro, partir, colunaDaData, hoje) {
+  var pedacos = partir.colunas.map(function (cabecalho) {
+    return converterParaIdentificador_(registro[cabecalho]);
+  });
+  if (!pedacos[pedacos.length - 1]) return '';
+
+  var quando = colunaDaData ? converterParaData_(registro[colunaDaData]) : '';
+  if (!quando) quando = hoje;
+  if (!quando) return '';
+  return pedacos.join('-') + '|' + quando.getFullYear() + '-' + (quando.getMonth() + 1);
+}
+
+/**
+ * O caso repete? E, se não repete, fica anotado para a próxima linha do
+ * MESMO arquivo — duas linhas iguais no lote também são repetição.
+ */
+function ehRepetido_(regra, caso, vistosNestaLeva) {
+  if (!regra) return false;
+
+  if (regra.partir) {
+    var chaveDoMes = chaveDaPropostaNoMes_(caso, regra.partir, regra.colunaDaData,
+      regra.hoje);
+    if (!chaveDoMes) return false;
+    if (regra.jaDentro[chaveDoMes] || vistosNestaLeva[chaveDoMes]) return true;
+    vistosNestaLeva[chaveDoMes] = true;
+    return false;
+  }
+
+  var chave = normalizarParaComparar_(caso[regra.coluna]);
+  var soDigitos = apenasDigitos_(caso[regra.coluna]);
+  // As duas formas são conferidas porque não sabemos aqui se a coluna é
+  // identificador: a base pode ter sido lida com um tipo e a fonte trazer o
+  // valor com máscara. Pular por qualquer das duas é o lado seguro.
+  if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])
+    || vistosNestaLeva[chave || soDigitos]) return true;
+  vistosNestaLeva[chave || soDigitos] = true;
+  return false;
+}
+
+/**
  * Os valores que já estão na base, na coluna que identifica o caso.
  *
  * Lê a COLUNA inteira, e não as linhas: é a regra de desempenho da casa — uma
@@ -5940,8 +6076,7 @@ function jaEstaNaBase_(canal, cabecalho) {
  * outra, o laudo prometeria um número e a base receberia outro — e ninguém
  * descobre isso olhando a tela.
  */
-function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara,
-  chaveParaNaoRepetir, jaEstaDentro) {
+function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra) {
   var motivos = { vazia: 0, repetida: 0 };
   var amostra = [];
   var entram = 0;
@@ -5952,18 +6087,9 @@ function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara,
 
     if (!temAlgumValor_(caso)) { motivos.vazia++; continue; }
 
-    if (chaveParaNaoRepetir) {
-      var chave = normalizarParaComparar_(caso[chaveParaNaoRepetir]);
-      var soDigitos = apenasDigitos_(caso[chaveParaNaoRepetir]);
-      // As duas formas são conferidas porque não sabemos aqui se a coluna é
-      // identificador: a base pode ter sido lida com um tipo e a fonte trazer
-      // o valor com máscara. Pular por qualquer das duas é o lado seguro.
-      if (jaEstaDentro[chave] || (soDigitos && jaEstaDentro[soDigitos])
-        || vistosNestaLeva[chave || soDigitos]) {
-        motivos.repetida++;
-        continue;
-      }
-      vistosNestaLeva[chave || soDigitos] = true;
+    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
+      motivos.repetida++;
+      continue;
     }
 
     entram++;
@@ -6161,8 +6287,7 @@ function importarCasos(idDoCanal, pedido) {
     : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
   exigirQueODeParaLeveAAlgumLugar_(dePara, canal);
 
-  var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
-  var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
+  var regra = regraDeRepeticao_(canal, pedido.colunaQueIdentifica);
 
   var analistas = analistasEscolhidos_(pedido.analistas, canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
@@ -6177,15 +6302,11 @@ function importarCasos(idDoCanal, pedido) {
     var caso = linhaDaFonteParaOCaso_(corpo[i], cabecalhosDaFonte, dePara);
     if (!temAlgumValor_(caso)) { pulados.vazia++; continue; }
 
-    if (chaveParaNaoRepetir) {
-      var chave = normalizarParaComparar_(caso[chaveParaNaoRepetir]);
-      var soDigitos = apenasDigitos_(caso[chaveParaNaoRepetir]);
-      if (jaEstaDentro[chave] || (soDigitos && jaEstaDentro[soDigitos])
-        || vistosNestaLeva[chave || soDigitos]) {
-        pulados.repetida++;
-        continue;
-      }
-      vistosNestaLeva[chave || soDigitos] = true;
+    // ANTES da divisão: o repetido não chega a analista nenhum. Era o que o
+    // PO viu acontecer — a mesma proposta indo para duas pessoas.
+    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
+      pulados.repetida++;
+      continue;
     }
 
     if (colunaDoAnalista && analistas.length && !caso[colunaDoAnalista]) {
@@ -6391,6 +6512,7 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var repeticaoPelaProposta = !!partirDaPropostaDoCanal_(canal);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
@@ -6401,7 +6523,11 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
-    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
+    // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.
+    repeticaoPelaProposta: repeticaoPelaProposta,
+    repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
 }
 
@@ -7463,8 +7589,11 @@ function salvarCanal(dados) {
   String(dados.colunasDaFila || '').split(';').forEach(function (grupo) {
     var lista = grupo.indexOf(':') > 0
       ? grupo.substring(grupo.indexOf(':') + 1) : grupo;
+    // "A + B" junta duas colunas numa linha só: as DUAS precisam existir.
     lista.split(',').forEach(function (pedaco) {
-      conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
+      pedaco.split('+').forEach(function (parte) {
+        conferirQueAColunaExiste_(estrutura, parte, atual.Aba);
+      });
     });
   });
 
@@ -10938,6 +11067,11 @@ function contarFinalizadosNaCelula_(registros, canal) {
  * se leem de uma vez só — proposta com apólice, nome com CPF — resolve as
  * duas coisas.
  *
+ * DUAS COLUNAS NUMA LINHA SÓ: "Código origem da proposta + número da
+ * proposta" mostra "7-0000000". Pedido do PO para a fila da RET — a proposta
+ * inteira em destaque, e não só o número. Os pedaços saem juntos com o hífen,
+ * que é como a proposta é escrita no mundo; pedaço vazio não deixa hífen solto.
+ *
  * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
  * descuido: a fila é leitura, e derrubar o Trabalho inteiro porque alguém
  * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
@@ -10959,6 +11093,38 @@ function colunasDaFila_(canal) {
     .filter(function (grupo) { return grupo && grupo.colunas.length; });
 }
 
+/**
+ * Uma entrada da lista de um grupo — uma coluna, ou várias juntas com "+".
+ * Null quando nenhuma das colunas citadas existe na aba.
+ */
+function colunaDaFila_(texto, estrutura, canal) {
+  var existentes = String(texto || '').split('+')
+    .map(function (nome) { return nome.trim(); })
+    .filter(function (nome) {
+      return nome !== '' && posicaoDaColuna_(estrutura, nome) >= 0;
+    })
+    .map(function (nome) {
+      var posicao = posicaoDaColuna_(estrutura, nome);
+      return { cabecalho: estrutura.cabecalhos[posicao], tipo: estrutura.tipos[posicao] };
+    });
+  if (!existentes.length) return null;
+
+  if (existentes.length === 1) {
+    return {
+      cabecalho: existentes[0].cabecalho,
+      tipo: existentes[0].tipo,
+      ehStatus: normalizarParaComparar_(existentes[0].cabecalho)
+        === normalizarParaComparar_(canal.colunaDoStatus)
+    };
+  }
+  return {
+    cabecalho: existentes.map(function (uma) { return uma.cabecalho; }).join(' + '),
+    tipo: existentes[0].tipo,
+    ehStatus: false,
+    juntar: existentes
+  };
+}
+
 /** Um pedaço de `ColunasDaFila` vira um grupo com o seu título. */
 function grupoDaFila_(pedaco, estrutura, canal) {
   var texto = String(pedaco || '').trim();
@@ -10973,19 +11139,8 @@ function grupoDaFila_(pedaco, estrutura, canal) {
   }
 
   var colunas = lista.split(',')
-    .map(function (nome) { return nome.trim(); })
-    .filter(function (nome) {
-      return nome !== '' && posicaoDaColuna_(estrutura, nome) >= 0;
-    })
-    .map(function (nome) {
-      var posicao = posicaoDaColuna_(estrutura, nome);
-      return {
-        cabecalho: estrutura.cabecalhos[posicao],
-        tipo: estrutura.tipos[posicao],
-        ehStatus: normalizarParaComparar_(nome)
-          === normalizarParaComparar_(canal.colunaDoStatus)
-      };
-    });
+    .map(function (nome) { return colunaDaFila_(nome, estrutura, canal); })
+    .filter(function (coluna) { return coluna !== null; });
 
   return {
     // Sem título declarado, o grupo se chama como a sua única coluna — é o
@@ -11020,9 +11175,16 @@ function montarFila_(registros, canal) {
         var alerta = alertaDaCelula_(canal.aba, coluna.cabecalho,
           registro[coluna.cabecalho]);
 
+        // Colunas juntas ("código + número") saem numa linha só, com hífen.
+        var valor = coluna.juntar
+          ? coluna.juntar.map(function (pedaco) {
+            return paraTexto_(registro[pedaco.cabecalho], pedaco.tipo);
+          }).filter(function (texto) { return texto !== ''; }).join('-')
+          : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+
         return {
           cabecalho: coluna.cabecalho,
-          valor: paraTexto_(registro[coluna.cabecalho], coluna.tipo),
+          valor: valor,
           ehStatus: coluna.ehStatus,
           alerta: alerta
         };
@@ -11179,16 +11341,19 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
   situacoesDoCanal_(canal).forEach(function (uma) {
     if (uma.chave === normalizarParaComparar_(situacao)) tom = uma.tom;
   });
+  var historico = historicoDoCaso_(canal.aba, registro.__id);
 
   return {
     id: registro.__id,
     canal: canal.nome,
     situacao: situacao,
     tom: tom,
-    atualizadoEm: quandoFoiMexido_(canal.aba, registro.__id),
+    // O histórico é calculado UMA vez: o "atualizado em" é o último passo dele.
+    // Antes eram duas leituras da mesma trilha para a mesma tela.
+    atualizadoEm: historico.length ? historico[historico.length - 1].quando : '',
     linhas: linhas,
     linhaDoTempo: linhaDoTempoDoCaso_(registro, canal),
-    historico: historicoDoCaso_(canal.aba, registro.__id),
+    historico: historico,
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
@@ -11259,12 +11424,30 @@ function historicoDoCaso_(nomeDaAba, idDoCaso) {
     'caso.ocultar': 'Caso ocultado'
   };
 
-  return lerRegistros_('AUDITORIA')
+  /*
+    LER A COLUNA ANTES DE LER AS LINHAS — a regra da busca, agora aqui.
+
+    Antes esta função lia a aba AUDITORIA INTEIRA a cada "ver detalhes". A
+    auditoria só cresce — todo cadastro e toda edição deixam uma linha —, então
+    o detalhe ficava mais lento a cada semana de operação: com 100 mil linhas
+    eram 1,4 milhão de células para mostrar as três ou quatro de um caso.
+
+    Agora: só a coluna RegistroId, e depois só as linhas deste caso. O
+    histórico sai igual, na mesma ordem (a da planilha, do mais antigo para o
+    mais recente).
+  */
+  var alvo = converterParaIdentificador_(idDoCaso);
+  if (!alvo) return [];
+  var linhasDoCaso = [];
+  lerColunaInteira_('AUDITORIA', 'RegistroId').forEach(function (valor, i) {
+    if (converterParaIdentificador_(valor) === alvo) linhasDoCaso.push(i + 2);
+  });
+  if (!linhasDoCaso.length) return [];
+
+  return lerLinhasEspecificas_('AUDITORIA', linhasDoCaso)
     .filter(function (linha) {
-      if (normalizarParaComparar_(linha.Entidade)
-        !== normalizarParaComparar_(nomeDaAba)) return false;
-      return converterParaIdentificador_(linha.RegistroId)
-        === converterParaIdentificador_(idDoCaso);
+      return normalizarParaComparar_(linha.Entidade)
+        === normalizarParaComparar_(nomeDaAba);
     })
     .map(function (linha) {
       var acao = String(linha.Acao || '');
@@ -11278,12 +11461,6 @@ function historicoDoCaso_(nomeDaAba, idDoCaso) {
           : ''
       };
     });
-}
-
-/** Quando o caso foi mexido pela última vez, segundo a trilha. */
-function quandoFoiMexido_(nomeDaAba, idDoCaso) {
-  var passos = historicoDoCaso_(nomeDaAba, idDoCaso);
-  return passos.length ? passos[passos.length - 1].quando : '';
 }
 
 /* ############################################################################
@@ -13054,9 +13231,13 @@ function semearDadosIniciais_(emailDoInstalador) {
       // Fila agrupada: cinco colunas na tela, e cada uma junta o que a
       // pessoa lê de uma vez só. Trinta e cinco colunas lado a lado não
       // cabem, e escolher seis perde o resto.
+      // "Dados da proposta" abre com a proposta INTEIRA (7-0000000) e não
+      // tem mais protocolo — "não é usado", palavra do PO. "Dados
+      // cadastrais" abre com o telefone, também a pedido dele.
       ColunasDaFila: 'Situação: data de recepção do protocolo, status'
-        + '; Dados da proposta: protocolo, número da proposta, Num_apolice, produto'
-        + '; Dados cadastrais: nome do cliente, CPF, e-mail'
+        + '; Dados da proposta: Código origem da proposta + número da proposta'
+        + ', Num_apolice, produto'
+        + '; Dados cadastrais: telefones de contato, nome do cliente, CPF, e-mail'
         + '; Motivo / assunto: motivo do cancelamento'
         + '; Responsável: analista',
       ColunasDaBusca: 'protocolo, CPF, Num_apolice, número da proposta, '
@@ -13092,8 +13273,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
       ColunaDoStatus: 'Status',
+      // O título do e-mail abre "Dados do caso": é por ele que a Mesa acha o
+      // caso no dia a dia, palavra do PO.
       ColunasDaFila: 'Situação: Data de entrada, Status'
-        + '; Dados do caso: Ramo, Assunto'
+        + '; Dados do caso: Título do e-mail, Ramo, Assunto'
         + '; Dados cadastrais: Nome do segurado, Documento (CPF)'
         + '; Corretora: Corretora, SUSEP'
         + '; Responsável: Analista',
@@ -13797,8 +13980,11 @@ const RECC_PADRAO_DO_FORMULARIO = {
   // --- Cliente
   nomedosegurado: { secao: 'Cliente', ordem: 20, rotulo: 'Nome',
     obrigatorio: true, largura: 2 },
-  documentocpf: { secao: 'Cliente', ordem: 21, rotulo: 'CPF',
-    tipoCampo: 'documento', mascara: '000.000.000-00' },
+  // CPF OU CNPJ, a pedido do PO: a máscara se ajusta pelo tamanho, e a
+  // planilha recebe só os números. A coluna continua "Documento (CPF)" —
+  // nome de coluna é contrato com o Power BI.
+  documentocpf: { secao: 'Cliente', ordem: 21, rotulo: 'CPF ou CNPJ',
+    tipoCampo: 'documento', mascara: '000.000.000-00|00.000.000/0000-00' },
 
   // --- Corretora
   corretora: { secao: 'Corretora', ordem: 31, rotulo: 'Nome da corretora' },
@@ -14051,6 +14237,8 @@ function atualizarPGO() {
   feito = feito.concat(criarOStatusSemSucesso_(pulados));
   feito = feito.concat(aplicarOsStatusDoPO_(pulados, paraVoce));
   feito = feito.concat(ligarAPropostaEAApoliceEmPedacos_(pulados));
+  feito = feito.concat(ajustarAsColunasDaFila_(pulados, paraVoce));
+  feito = feito.concat(aceitarCnpjNaMesa_(pulados, paraVoce));
 
   // --- 4. as colunas novas dos dois cadastros ------------------------------
   //
@@ -14735,6 +14923,145 @@ function trocarStatusNasDestacadas_(canal, antigo, novo) {
   if (!mexeu) return;
   canal.SituacoesDestacadas = nova.join(', ');
   atualizarRegistro_('CANAIS', canal.Id, { SituacoesDestacadas: canal.SituacoesDestacadas });
+}
+
+/**
+ * Os grupos da fila que o PO pediu, como estavam e como ficam.
+ *
+ * "Na aba trabalho em dados da proposta tire do destaque o protocolo pois não
+ * é usado e substitua pelo cod da proposta e proposta e na coluna de dados
+ * cadastrais inclua também o telefone e deixe o em destaque" — e, na Mesa, o
+ * título do e-mail em destaque. O primeiro item de cada grupo é o destaque.
+ */
+const RECC_FILA_DO_PO = [
+  { aba: 'BASE_RET', grupo: 'Dados da proposta',
+    de: 'protocolo, número da proposta, Num_apolice, produto',
+    para: 'Código origem da proposta + número da proposta, Num_apolice, produto' },
+  { aba: 'BASE_RET', grupo: 'Dados cadastrais',
+    de: 'nome do cliente, CPF, e-mail',
+    para: 'telefones de contato, nome do cliente, CPF, e-mail' },
+  { aba: 'BASE_MESA', grupo: 'Dados do caso',
+    de: 'Ramo, Assunto',
+    para: 'Título do e-mail, Ramo, Assunto' }
+];
+
+/**
+ * Aplica RECC_FILA_DO_PO na planilha em uso, grupo por grupo.
+ *
+ * TROCA SÓ O GRUPO QUE ESTÁ COMO A INSTALAÇÃO DEIXOU. As colunas da fila são
+ * editáveis em Configurações › Canais, e um grupo que alguém já reescreveu foi
+ * reescrito de propósito: passar por cima seria desfazer o trabalho de alguém
+ * sem avisar. Esse vai para a "DECISÃO SUA", com o texto pronto para colar.
+ *
+ * Os outros grupos e o título do grupo ficam exatamente como estão.
+ */
+function ajustarAsColunasDaFila_(pulados, paraVoce) {
+  var feito = [];
+  function comoLista(texto) {
+    return String(texto || '').split(',').map(function (nome) {
+      return normalizarParaComparar_(nome);
+    }).filter(function (nome) { return nome !== ''; }).join(',');
+  }
+
+  RECC_FILA_DO_PO.forEach(function (regra) {
+    var canal = lerRegistros_('CANAIS').filter(function (um) {
+      return normalizarParaComparar_(um.Aba) === normalizarParaComparar_(regra.aba);
+    })[0];
+    if (!canal) {
+      pulados.push('não há canal apontando para a ' + regra.aba);
+      return;
+    }
+    var nome = String(canal.Nome);
+    var pedido = '"' + regra.grupo + ': ' + regra.para + '"';
+
+    var pedacos = String(canal.ColunasDaFila || '').split(';');
+    var onde = -1;
+    pedacos.forEach(function (pedaco, i) {
+      var corte = pedaco.indexOf(':');
+      if (corte > 0 && normalizarParaComparar_(pedaco.substring(0, corte))
+        === normalizarParaComparar_(regra.grupo)) onde = i;
+    });
+    if (onde < 0) {
+      paraVoce.push(nome + ': a fila não tem o grupo "' + regra.grupo + '". Para '
+        + 'ficar como o PO pediu, acrescente em Configurações › Canais de trabalho '
+        + '› Colunas da fila: ' + pedido + '.');
+      return;
+    }
+
+    var corte = pedacos[onde].indexOf(':');
+    var titulo = pedacos[onde].substring(0, corte).trim();
+    var lista = pedacos[onde].substring(corte + 1);
+    if (comoLista(lista) === comoLista(regra.para)) {
+      pulados.push(nome + ': o grupo "' + regra.grupo + '" da fila já está como pedido');
+      return;
+    }
+    if (comoLista(lista) !== comoLista(regra.de)) {
+      paraVoce.push(nome + ': o grupo "' + regra.grupo + '" da fila foi personalizado '
+        + '("' + lista.trim() + '") e ficou como está. Para ficar como o PO pediu, '
+        + 'escreva em Configurações › Canais de trabalho › Colunas da fila: '
+        + pedido + '.');
+      return;
+    }
+
+    pedacos[onde] = titulo + ': ' + regra.para;
+    atualizarRegistro_('CANAIS', canal.Id, {
+      ColunasDaFila: pedacos.map(function (pedaco) { return pedaco.trim(); })
+        .filter(function (pedaco) { return pedaco !== ''; }).join('; ')
+    });
+    esquecerEstruturaLida_();
+    feito.push(nome + ': fila — "' + regra.grupo + '" agora abre com '
+      + regra.para.split(',')[0].trim());
+  });
+  return feito;
+}
+
+/**
+ * O campo CPF da Mesa Diamante passa a aceitar CNPJ — na planilha em uso.
+ *
+ * Só se a máscara ainda for a da instalação. Máscara personalizada foi
+ * escolhida por alguém, e vai para a "DECISÃO SUA" com o valor a usar. O
+ * rótulo vira "CPF ou CNPJ" só se ainda for "CPF": rótulo reescrito também foi
+ * escolha de alguém.
+ */
+function aceitarCnpjNaMesa_(pulados, paraVoce) {
+  var feito = [];
+  var novaMascara = '000.000.000-00|00.000.000/0000-00';
+  var mesa = lerRegistros_('CANAIS').filter(function (canal) {
+    return normalizarParaComparar_(canal.Aba) === 'basemesa';
+  })[0];
+  if (!mesa) {
+    pulados.push('não há canal apontando para a BASE_MESA');
+    return feito;
+  }
+  var campo = lerRegistros_('CAMPOS').filter(function (um) {
+    return converterParaIdentificador_(um.CanalId) === converterParaIdentificador_(mesa.Id)
+      && normalizarParaComparar_(um.ChaveTecnica) === 'documentocpf';
+  })[0];
+  if (!campo) {
+    pulados.push('a Mesa Diamante não tem o campo do CPF');
+    return feito;
+  }
+
+  var mascara = String(campo.Mascara || '').trim();
+  if (mascara === novaMascara) {
+    pulados.push('o campo CPF da Mesa Diamante já aceita CNPJ');
+    return feito;
+  }
+  if (mascara && mascara !== '000.000.000-00') {
+    paraVoce.push('Mesa Diamante: o campo CPF tem uma máscara personalizada ("'
+      + mascara + '") e ficou como está. Para aceitar CNPJ, use em Configurações › '
+      + 'Campos do formulário a máscara ' + novaMascara + '.');
+    return feito;
+  }
+
+  var mudanca = { Mascara: novaMascara };
+  var rotulo = String(campo.Rotulo || '').trim();
+  if (!rotulo || normalizarParaComparar_(rotulo) === 'cpf') mudanca.Rotulo = 'CPF ou CNPJ';
+  atualizarRegistro_('CAMPOS', campo.__id, mudanca);
+  esquecerEstruturaLida_();
+  feito.push('Mesa Diamante: o campo do CPF aceita CNPJ'
+    + (mudanca.Rotulo ? ', com o nome "CPF ou CNPJ"' : ''));
+  return feito;
 }
 
 /**
@@ -15611,7 +15938,8 @@ function colunasCitadas_(texto) {
       return corte < 0 ? grupo : grupo.substring(corte + 1);
     }).join(',').split(',');
 
-  return pedacos
+  // "A + B" é a junção da fila: cita as duas colunas, e as duas são conferidas.
+  return pedacos.join('+').split('+')
     .map(function (um) { return um.trim(); })
     .filter(function (um) { return um.length > 0; });
 }

@@ -307,7 +307,9 @@ var TelaConfiguracoes = (function () {
         'Campos com a mesma seção aparecem juntos.')
       + caixaDeOpcoes('tipo', 'Tipo', opcoes.tipos, campo.tipo, '')
       + campoDeTexto('mascara', 'Máscara', campo.mascara,
-        'Ex.: 000.000.000-00. A planilha recebe só os dígitos.')
+        'Ex.: 000.000.000-00. A planilha recebe só os dígitos. Duas máscaras '
+        + 'separadas por | aceitam as duas formas — '
+        + '000.000.000-00|00.000.000/0000-00 é CPF ou CNPJ.')
       + caixaDeOpcoes('catalogo', 'Lista do catálogo',
         [''].concat(opcoes.tiposDeCatalogo), campo.catalogo,
         'Preenche as opções a partir da aba CATALOGO.')
@@ -1187,7 +1189,9 @@ var TelaConfiguracoes = (function () {
         canal.colunaDoStatus, 'É por ela que os cartões do painel contam.')
       + campoDeTexto('colunasDaFila', 'Colunas da fila', canal.colunasDaFila,
         'Grupos separados por ponto e vírgula: "Título: coluna, coluna". '
-        + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela.')
+        + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela. '
+        + 'Com "+", duas colunas saem juntas numa linha só, com hífen: '
+        + '"Código origem da proposta + número da proposta" mostra 7-0000000.')
       + campoDeTexto('colunasDaBusca', 'Colunas em que a busca procura',
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '

@@ -485,6 +485,12 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
       return;
     }
 
+    // Documento é UM documento, e vai para a planilha só com os dígitos. Sem
+    // isto, a barra do CNPJ ("12.345.678/0001-90") seria lida como separador
+    // de lista — a regra dos telefones — e a célula receberia
+    // "12345678;000190". Apareceu quando a Mesa passou a aceitar CNPJ.
+    if (descricao.tipo === 'documento') bruto = apenasDigitos_(bruto);
+
     paraGravar[descricao.cabecalho] = bruto;
   });
 
@@ -508,10 +514,15 @@ function conferirCampo_(campo, valor) {
   if (campo.tipo === 'identificador' || campo.tipo === 'documento') {
     var digitos = converterParaIdentificador_(texto);
     if (!digitos) return 'precisa ter ao menos um dígito';
-    var esperados = quantosDigitosAMascaraPede_(campo.mascara);
-    if (esperados && digitos.replace(/;/g, '').length !== esperados) {
-      return 'precisa ter ' + esperados + ' dígitos (veio com '
-        + digitos.replace(/;/g, '').length + ')';
+    // Máscaras alternativas, separadas por "|", aceitam qualquer um dos
+    // tamanhos: "000.000.000-00|00.000.000/0000-00" é CPF (11) ou CNPJ (14).
+    var aceitos = String(campo.mascara || '').split('|')
+      .map(quantosDigitosAMascaraPede_)
+      .filter(function (quantos) { return quantos > 0; });
+    var veio = digitos.replace(/;/g, '').length;
+    if (aceitos.length && aceitos.indexOf(veio) < 0) {
+      return 'precisa ter ' + aceitos.join(' ou ') + ' dígitos (veio com '
+        + veio + ')';
     }
     return '';
   }
@@ -2162,10 +2173,9 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     ? pedido.dePara
     : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
 
-  var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
-  var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
+  var regra = regraDeRepeticao_(canal, pedido.colunaQueIdentifica);
   var contagem = contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte,
-    deParaEscolhido, chaveParaNaoRepetir, jaEstaDentro);
+    deParaEscolhido, regra);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
@@ -2211,6 +2221,132 @@ function avisosDaImportacao_(escolhidos, canal, quantosEntram) {
 }
 
 /**
+ * A opção "proposta no mesmo mês" da importação, como a tela a envia.
+ *
+ * Começa com @ porque não pode ser confundida com o nome de uma coluna — as
+ * outras opções da mesma lista são cabeçalhos da base.
+ */
+const RECC_REPETIR_PELA_PROPOSTA_NO_MES = '@PROPOSTA_NO_MES';
+
+/**
+ * Como a importação reconhece um caso REPETIDO — ou null, para trazer tudo.
+ *
+ * Duas regras, escolhidas na tela:
+ *
+ *   UMA COLUNA         a que já existia. O valor daquela coluna está na base,
+ *                      em qualquer mês, ou repete dentro do próprio arquivo.
+ *
+ *   PROPOSTA NO MÊS    pedido do PO para a RET: "casos importados com a mesma
+ *                      proposta não irem para divisão". Código E número iguais,
+ *                      no MESMO MÊS do caso — a mesma regra do selo do
+ *                      cadastro, perguntada e escolhida: a mesma proposta em
+ *                      outro mês é pedido novo do cliente, e entra.
+ *
+ * O laudo e a gravação usam esta MESMA regra (ver ehRepetido_). Se o laudo
+ * contasse por uma e a gravação gravasse por outra, a tela prometeria um
+ * número e a base receberia outro.
+ */
+function regraDeRepeticao_(canal, escolha) {
+  var escolhida = String(escolha || '').trim();
+  if (!escolhida) return null;
+
+  if (escolhida !== RECC_REPETIR_PELA_PROPOSTA_NO_MES) {
+    return { coluna: escolhida, jaDentro: jaEstaNaBase_(canal, escolhida) };
+  }
+
+  var partir = partirDaPropostaDoCanal_(canal);
+  if (!partir) {
+    throw new Error('O canal ' + canal.nome + ' não tem campo de proposta, então '
+      + 'não dá para conferir repetição pela proposta. Escolha uma coluna.');
+  }
+
+  // O caso IMPORTADO costuma chegar sem a data do canal — a importação não a
+  // inventa. O mês dele é então o da importação, a mesma conta que o lado do
+  // arquivo faz com "hoje". Sem esta reserva, a segunda importação da mesma
+  // proposta no mês passaria, porque a primeira estaria "sem mês".
+  var reserva = posicaoDaColuna_(estruturaDaAba_(canal.aba),
+    RECC_COLUNA_DATA_DA_IMPORTACAO) >= 0 ? RECC_COLUNA_DATA_DA_IMPORTACAO : '';
+
+  // A base, lida pelas COLUNAS: os pedaços da proposta e as datas do caso.
+  // Poucas idas ao serviço, e não uma por linha.
+  var colunas = {};
+  partir.colunas
+    .concat(canal.colunaDaData ? [canal.colunaDaData] : [])
+    .concat(reserva ? [reserva] : [])
+    .forEach(function (cabecalho) {
+      colunas[cabecalho] = lerColunaInteira_(canal.aba, cabecalho);
+    });
+
+  var jaDentro = {};
+  var quantas = colunas[partir.colunas[0]].length;
+  for (var i = 0; i < quantas; i++) {
+    var naBase = {};
+    partir.colunas.forEach(function (cabecalho) {
+      naBase[cabecalho] = colunas[cabecalho][i];
+    });
+    var daData = canal.colunaDaData ? converterParaData_(colunas[canal.colunaDaData][i]) : '';
+    naBase.__mes = daData || (reserva ? converterParaData_(colunas[reserva][i]) : '');
+    // Caso da base sem data NENHUMA não está em mês nenhum: não pode ser
+    // repetição "no mesmo mês" de ninguém.
+    var chave = chaveDaPropostaNoMes_(naBase, partir, '__mes', null);
+    if (chave) jaDentro[chave] = true;
+  }
+
+  return {
+    partir: partir,
+    colunaDaData: canal.colunaDaData,
+    hoje: new Date(),
+    jaDentro: jaDentro
+  };
+}
+
+/**
+ * "7-0000123|2026-10": os pedaços da proposta e o mês do caso.
+ *
+ * Vazio quando não há número — sem número, não há proposta a comparar, e o
+ * caso entra. Sem data, vale o mês de `hoje`; com `hoje` nulo (o lado da
+ * base), caso sem data fica de fora.
+ */
+function chaveDaPropostaNoMes_(registro, partir, colunaDaData, hoje) {
+  var pedacos = partir.colunas.map(function (cabecalho) {
+    return converterParaIdentificador_(registro[cabecalho]);
+  });
+  if (!pedacos[pedacos.length - 1]) return '';
+
+  var quando = colunaDaData ? converterParaData_(registro[colunaDaData]) : '';
+  if (!quando) quando = hoje;
+  if (!quando) return '';
+  return pedacos.join('-') + '|' + quando.getFullYear() + '-' + (quando.getMonth() + 1);
+}
+
+/**
+ * O caso repete? E, se não repete, fica anotado para a próxima linha do
+ * MESMO arquivo — duas linhas iguais no lote também são repetição.
+ */
+function ehRepetido_(regra, caso, vistosNestaLeva) {
+  if (!regra) return false;
+
+  if (regra.partir) {
+    var chaveDoMes = chaveDaPropostaNoMes_(caso, regra.partir, regra.colunaDaData,
+      regra.hoje);
+    if (!chaveDoMes) return false;
+    if (regra.jaDentro[chaveDoMes] || vistosNestaLeva[chaveDoMes]) return true;
+    vistosNestaLeva[chaveDoMes] = true;
+    return false;
+  }
+
+  var chave = normalizarParaComparar_(caso[regra.coluna]);
+  var soDigitos = apenasDigitos_(caso[regra.coluna]);
+  // As duas formas são conferidas porque não sabemos aqui se a coluna é
+  // identificador: a base pode ter sido lida com um tipo e a fonte trazer o
+  // valor com máscara. Pular por qualquer das duas é o lado seguro.
+  if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])
+    || vistosNestaLeva[chave || soDigitos]) return true;
+  vistosNestaLeva[chave || soDigitos] = true;
+  return false;
+}
+
+/**
  * Os valores que já estão na base, na coluna que identifica o caso.
  *
  * Lê a COLUNA inteira, e não as linhas: é a regra de desempenho da casa — uma
@@ -2249,8 +2385,7 @@ function jaEstaNaBase_(canal, cabecalho) {
  * outra, o laudo prometeria um número e a base receberia outro — e ninguém
  * descobre isso olhando a tela.
  */
-function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara,
-  chaveParaNaoRepetir, jaEstaDentro) {
+function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra) {
   var motivos = { vazia: 0, repetida: 0 };
   var amostra = [];
   var entram = 0;
@@ -2261,18 +2396,9 @@ function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara,
 
     if (!temAlgumValor_(caso)) { motivos.vazia++; continue; }
 
-    if (chaveParaNaoRepetir) {
-      var chave = normalizarParaComparar_(caso[chaveParaNaoRepetir]);
-      var soDigitos = apenasDigitos_(caso[chaveParaNaoRepetir]);
-      // As duas formas são conferidas porque não sabemos aqui se a coluna é
-      // identificador: a base pode ter sido lida com um tipo e a fonte trazer
-      // o valor com máscara. Pular por qualquer das duas é o lado seguro.
-      if (jaEstaDentro[chave] || (soDigitos && jaEstaDentro[soDigitos])
-        || vistosNestaLeva[chave || soDigitos]) {
-        motivos.repetida++;
-        continue;
-      }
-      vistosNestaLeva[chave || soDigitos] = true;
+    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
+      motivos.repetida++;
+      continue;
     }
 
     entram++;
@@ -2470,8 +2596,7 @@ function importarCasos(idDoCanal, pedido) {
     : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
   exigirQueODeParaLeveAAlgumLugar_(dePara, canal);
 
-  var chaveParaNaoRepetir = String(pedido.colunaQueIdentifica || '').trim();
-  var jaEstaDentro = jaEstaNaBase_(canal, chaveParaNaoRepetir);
+  var regra = regraDeRepeticao_(canal, pedido.colunaQueIdentifica);
 
   var analistas = analistasEscolhidos_(pedido.analistas, canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
@@ -2486,15 +2611,11 @@ function importarCasos(idDoCanal, pedido) {
     var caso = linhaDaFonteParaOCaso_(corpo[i], cabecalhosDaFonte, dePara);
     if (!temAlgumValor_(caso)) { pulados.vazia++; continue; }
 
-    if (chaveParaNaoRepetir) {
-      var chave = normalizarParaComparar_(caso[chaveParaNaoRepetir]);
-      var soDigitos = apenasDigitos_(caso[chaveParaNaoRepetir]);
-      if (jaEstaDentro[chave] || (soDigitos && jaEstaDentro[soDigitos])
-        || vistosNestaLeva[chave || soDigitos]) {
-        pulados.repetida++;
-        continue;
-      }
-      vistosNestaLeva[chave || soDigitos] = true;
+    // ANTES da divisão: o repetido não chega a analista nenhum. Era o que o
+    // PO viu acontecer — a mesma proposta indo para duas pessoas.
+    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
+      pulados.repetida++;
+      continue;
     }
 
     if (colunaDoAnalista && analistas.length && !caso[colunaDoAnalista]) {
@@ -2700,6 +2821,7 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var repeticaoPelaProposta = !!partirDaPropostaDoCanal_(canal);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
@@ -2710,6 +2832,10 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
-    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
+    // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.
+    repeticaoPelaProposta: repeticaoPelaProposta,
+    repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
 }

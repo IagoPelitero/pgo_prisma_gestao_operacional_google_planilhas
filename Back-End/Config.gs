@@ -1053,8 +1053,11 @@ function salvarCanal(dados) {
   String(dados.colunasDaFila || '').split(';').forEach(function (grupo) {
     var lista = grupo.indexOf(':') > 0
       ? grupo.substring(grupo.indexOf(':') + 1) : grupo;
+    // "A + B" junta duas colunas numa linha só: as DUAS precisam existir.
     lista.split(',').forEach(function (pedaco) {
-      conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
+      pedaco.split('+').forEach(function (parte) {
+        conferirQueAColunaExiste_(estrutura, parte, atual.Aba);
+      });
     });
   });
 

@@ -1606,6 +1606,28 @@ function rodarTestesDeDiagnostico() {
     ]);
     chamar('esquecerEstruturaLida_()');
 
+    // 8. a fila e o campo de documento como eram antes do pedido do PO: o
+    //    protocolo abrindo "Dados da proposta", o nome abrindo "Dados
+    //    cadastrais", a Mesa sem o título do e-mail e o CPF só CPF.
+    const comoEraAFila = {
+      BASE_RET: [['Código origem da proposta + número da proposta, Num_apolice, produto',
+        'protocolo, número da proposta, Num_apolice, produto'],
+      ['telefones de contato, nome do cliente, CPF, e-mail', 'nome do cliente, CPF, e-mail']],
+      BASE_MESA: [['Título do e-mail, Ramo, Assunto', 'Ramo, Assunto']]
+    };
+    chamar('lerRegistros_("CANAIS")').forEach((um) => {
+      const trocas = comoEraAFila[String(um.Aba)];
+      if (!trocas) return;
+      let fila = String(um.ColunasDaFila);
+      trocas.forEach(([hoje, antes]) => { fila = fila.replace(hoje, antes); });
+      chamar('atualizarRegistro_')('CANAIS', um.Id, { ColunasDaFila: fila });
+    });
+    const cpfDaMesa = chamar('lerRegistros_("CAMPOS")').find((um) =>
+      String(um.ChaveTecnica) === 'documentocpf');
+    chamar('atualizarRegistro_')('CAMPOS', cpfDaMesa.Id,
+      { Mascara: '000.000.000-00', Rotulo: 'CPF' });
+    chamar('esquecerEstruturaLida_()');
+
     return tudo;
   }
 
@@ -2156,6 +2178,86 @@ function rodarTestesDeDiagnostico() {
 
     const daMesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
     igual(daMesa.confereSusepBloqueada, true, 'a escolha dela ficou de pé');
+  });
+
+  /** As colunas de um grupo da fila, como estão na planilha agora. */
+  function grupoDaFilaNaPlanilha(chamar, aba, grupo) {
+    const canal = chamar('lerRegistros_("CANAIS")').find((um) => String(um.Aba) === aba);
+    const pedaco = String(canal.ColunasDaFila).split(';')
+      .find((um) => um.split(':')[0].trim() === grupo);
+    return pedaco ? pedaco.substring(pedaco.indexOf(':') + 1).trim() : null;
+  }
+
+  teste('sem atualizar, a fila e o CPF ainda estão como antes do pedido', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_RET', 'Dados da proposta'),
+      'protocolo, número da proposta, Num_apolice, produto');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_MESA', 'Dados do caso'), 'Ramo, Assunto');
+    const cpf = chamar('lerRegistros_("CAMPOS")')
+      .find((um) => String(um.ChaveTecnica) === 'documentocpf');
+    igual(String(cpf.Mascara), '000.000.000-00');
+  });
+
+  teste('atualizar põe a proposta inteira, o telefone e o título do e-mail em destaque', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const recado = chamar('atualizarPGO()');
+    contem(recado, '"Dados da proposta" agora abre com');
+
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_RET', 'Dados da proposta'),
+      'Código origem da proposta + número da proposta, Num_apolice, produto');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_RET', 'Dados cadastrais'),
+      'telefones de contato, nome do cliente, CPF, e-mail');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_MESA', 'Dados do caso'),
+      'Título do e-mail, Ramo, Assunto');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_RET', 'Responsável'), 'analista',
+      'os outros grupos ficam exatamente como estavam');
+  });
+
+  teste('atualizar faz o CPF da Mesa aceitar CNPJ', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const mesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    const salvo = chamar('cadastrarCaso')(mesa.id, {
+      status: 'Em andamento', nomedosegurado: 'Empresa depois de atualizar',
+      documentocpf: '12.345.678/0001-90'
+    });
+    igual(chamar('buscarRegistros_')('BASE_MESA', 'Id', String(salvo.id), 1)[0]
+      ['Documento (CPF)'], '12345678000190');
+    const cpf = chamar('lerRegistros_("CAMPOS")')
+      .find((um) => String(um.ChaveTecnica) === 'documentocpf');
+    igual(String(cpf.Rotulo), 'CPF ou CNPJ');
+  });
+
+  teste('grupo da fila personalizado vai para a DECISÃO SUA, e não é mexido', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const ret = chamar('lerRegistros_("CANAIS")').find((um) => String(um.Aba) === 'BASE_RET');
+    chamar('atualizarRegistro_')('CANAIS', ret.Id, { ColunasDaFila:
+      String(ret.ColunasDaFila).replace('nome do cliente, CPF, e-mail', 'CPF, nome do cliente') });
+    const cpf = chamar('lerRegistros_("CAMPOS")')
+      .find((um) => String(um.ChaveTecnica) === 'documentocpf');
+    chamar('atualizarRegistro_')('CAMPOS', cpf.Id, { Mascara: '000.000.000.00' });
+    chamar('esquecerEstruturaLida_()');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'DECISÃO SUA');
+    contem(recado, '"Dados cadastrais" da fila foi personalizado');
+    contem(recado, 'máscara personalizada');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_RET', 'Dados cadastrais'),
+      'CPF, nome do cliente', 'a escolha de quem personalizou ficou de pé');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_RET', 'Dados da proposta'),
+      'Código origem da proposta + número da proposta, Num_apolice, produto',
+      'e o grupo que estava de fábrica foi trocado normalmente');
+  });
+
+  teste('rodar de novo não mexe na fila nem no CPF outra vez', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const filaDepois = chamar('lerRegistros_("CANAIS")').map((um) => String(um.ColunasDaFila));
+    const segunda = chamar('atualizarPGO()');
+    contem(segunda, 'já está como pedido');
+    contem(segunda, 'já aceita CNPJ');
+    igual(chamar('lerRegistros_("CANAIS")').map((um) => String(um.ColunasDaFila)).join('#'),
+      filaDepois.join('#'));
   });
 
   teste('atualizar não perde usuário, caso nem configuração ajustada', () => {

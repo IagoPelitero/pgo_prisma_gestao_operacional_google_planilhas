@@ -670,6 +670,11 @@ function contarFinalizadosNaCelula_(registros, canal) {
  * se leem de uma vez só — proposta com apólice, nome com CPF — resolve as
  * duas coisas.
  *
+ * DUAS COLUNAS NUMA LINHA SÓ: "Código origem da proposta + número da
+ * proposta" mostra "7-0000000". Pedido do PO para a fila da RET — a proposta
+ * inteira em destaque, e não só o número. Os pedaços saem juntos com o hífen,
+ * que é como a proposta é escrita no mundo; pedaço vazio não deixa hífen solto.
+ *
  * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
  * descuido: a fila é leitura, e derrubar o Trabalho inteiro porque alguém
  * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
@@ -691,6 +696,38 @@ function colunasDaFila_(canal) {
     .filter(function (grupo) { return grupo && grupo.colunas.length; });
 }
 
+/**
+ * Uma entrada da lista de um grupo — uma coluna, ou várias juntas com "+".
+ * Null quando nenhuma das colunas citadas existe na aba.
+ */
+function colunaDaFila_(texto, estrutura, canal) {
+  var existentes = String(texto || '').split('+')
+    .map(function (nome) { return nome.trim(); })
+    .filter(function (nome) {
+      return nome !== '' && posicaoDaColuna_(estrutura, nome) >= 0;
+    })
+    .map(function (nome) {
+      var posicao = posicaoDaColuna_(estrutura, nome);
+      return { cabecalho: estrutura.cabecalhos[posicao], tipo: estrutura.tipos[posicao] };
+    });
+  if (!existentes.length) return null;
+
+  if (existentes.length === 1) {
+    return {
+      cabecalho: existentes[0].cabecalho,
+      tipo: existentes[0].tipo,
+      ehStatus: normalizarParaComparar_(existentes[0].cabecalho)
+        === normalizarParaComparar_(canal.colunaDoStatus)
+    };
+  }
+  return {
+    cabecalho: existentes.map(function (uma) { return uma.cabecalho; }).join(' + '),
+    tipo: existentes[0].tipo,
+    ehStatus: false,
+    juntar: existentes
+  };
+}
+
 /** Um pedaço de `ColunasDaFila` vira um grupo com o seu título. */
 function grupoDaFila_(pedaco, estrutura, canal) {
   var texto = String(pedaco || '').trim();
@@ -705,19 +742,8 @@ function grupoDaFila_(pedaco, estrutura, canal) {
   }
 
   var colunas = lista.split(',')
-    .map(function (nome) { return nome.trim(); })
-    .filter(function (nome) {
-      return nome !== '' && posicaoDaColuna_(estrutura, nome) >= 0;
-    })
-    .map(function (nome) {
-      var posicao = posicaoDaColuna_(estrutura, nome);
-      return {
-        cabecalho: estrutura.cabecalhos[posicao],
-        tipo: estrutura.tipos[posicao],
-        ehStatus: normalizarParaComparar_(nome)
-          === normalizarParaComparar_(canal.colunaDoStatus)
-      };
-    });
+    .map(function (nome) { return colunaDaFila_(nome, estrutura, canal); })
+    .filter(function (coluna) { return coluna !== null; });
 
   return {
     // Sem título declarado, o grupo se chama como a sua única coluna — é o
@@ -752,9 +778,16 @@ function montarFila_(registros, canal) {
         var alerta = alertaDaCelula_(canal.aba, coluna.cabecalho,
           registro[coluna.cabecalho]);
 
+        // Colunas juntas ("código + número") saem numa linha só, com hífen.
+        var valor = coluna.juntar
+          ? coluna.juntar.map(function (pedaco) {
+            return paraTexto_(registro[pedaco.cabecalho], pedaco.tipo);
+          }).filter(function (texto) { return texto !== ''; }).join('-')
+          : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+
         return {
           cabecalho: coluna.cabecalho,
-          valor: paraTexto_(registro[coluna.cabecalho], coluna.tipo),
+          valor: valor,
           ehStatus: coluna.ehStatus,
           alerta: alerta
         };
@@ -911,16 +944,19 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
   situacoesDoCanal_(canal).forEach(function (uma) {
     if (uma.chave === normalizarParaComparar_(situacao)) tom = uma.tom;
   });
+  var historico = historicoDoCaso_(canal.aba, registro.__id);
 
   return {
     id: registro.__id,
     canal: canal.nome,
     situacao: situacao,
     tom: tom,
-    atualizadoEm: quandoFoiMexido_(canal.aba, registro.__id),
+    // O histórico é calculado UMA vez: o "atualizado em" é o último passo dele.
+    // Antes eram duas leituras da mesma trilha para a mesma tela.
+    atualizadoEm: historico.length ? historico[historico.length - 1].quando : '',
     linhas: linhas,
     linhaDoTempo: linhaDoTempoDoCaso_(registro, canal),
-    historico: historicoDoCaso_(canal.aba, registro.__id),
+    historico: historico,
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
@@ -991,12 +1027,30 @@ function historicoDoCaso_(nomeDaAba, idDoCaso) {
     'caso.ocultar': 'Caso ocultado'
   };
 
-  return lerRegistros_('AUDITORIA')
+  /*
+    LER A COLUNA ANTES DE LER AS LINHAS — a regra da busca, agora aqui.
+
+    Antes esta função lia a aba AUDITORIA INTEIRA a cada "ver detalhes". A
+    auditoria só cresce — todo cadastro e toda edição deixam uma linha —, então
+    o detalhe ficava mais lento a cada semana de operação: com 100 mil linhas
+    eram 1,4 milhão de células para mostrar as três ou quatro de um caso.
+
+    Agora: só a coluna RegistroId, e depois só as linhas deste caso. O
+    histórico sai igual, na mesma ordem (a da planilha, do mais antigo para o
+    mais recente).
+  */
+  var alvo = converterParaIdentificador_(idDoCaso);
+  if (!alvo) return [];
+  var linhasDoCaso = [];
+  lerColunaInteira_('AUDITORIA', 'RegistroId').forEach(function (valor, i) {
+    if (converterParaIdentificador_(valor) === alvo) linhasDoCaso.push(i + 2);
+  });
+  if (!linhasDoCaso.length) return [];
+
+  return lerLinhasEspecificas_('AUDITORIA', linhasDoCaso)
     .filter(function (linha) {
-      if (normalizarParaComparar_(linha.Entidade)
-        !== normalizarParaComparar_(nomeDaAba)) return false;
-      return converterParaIdentificador_(linha.RegistroId)
-        === converterParaIdentificador_(idDoCaso);
+      return normalizarParaComparar_(linha.Entidade)
+        === normalizarParaComparar_(nomeDaAba);
     })
     .map(function (linha) {
       var acao = String(linha.Acao || '');
@@ -1010,12 +1064,6 @@ function historicoDoCaso_(nomeDaAba, idDoCaso) {
           : ''
       };
     });
-}
-
-/** Quando o caso foi mexido pela última vez, segundo a trilha. */
-function quandoFoiMexido_(nomeDaAba, idDoCaso) {
-  var passos = historicoDoCaso_(nomeDaAba, idDoCaso);
-  return passos.length ? passos[passos.length - 1].quando : '';
 }
 
 /* ############################################################################

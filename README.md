@@ -123,13 +123,14 @@ Dentro de `Evolucao/`:
 
    **A cada versão nova, rode `atualizarPGO()`.** Ela traz para a planilha em
    uso o que cada rodada mudou, e diz no fim o que fez, o que já estava assim
-   e o que é decisão sua. Nesta rodada, por exemplo, ela cria a coluna
-   `Final` no catálogo, **exclui o "Concluído" da RET**, troca os nomes dos
-   status para os do PO — no catálogo, **nos casos já gravados**, nos cartões
-   e nas situações destacadas, para nenhum número parar de contar — e marca
-   quais status fecham o caso. Caso que ainda esteja em "Concluído" **não é
-   mexido**: aparece na "DECISÃO SUA" com a contagem. Rodar duas vezes não
-   muda nada.
+   e o que é decisão sua. Nesta rodada ela troca os **destaques da fila** —
+   a proposta inteira e o telefone na RET, o título do e-mail na Mesa — e faz
+   o **CPF da Mesa aceitar CNPJ**. Só onde ainda está como a instalação
+   deixou: grupo da fila ou máscara que alguém personalizou **não é mexido**,
+   e aparece na "DECISÃO SUA" com o texto pronto para colar em Configurações.
+   (Na rodada anterior foi ela que excluiu o "Concluído" da RET e trocou os
+   nomes dos status para os do PO, inclusive nos casos já gravados.) Rodar
+   duas vezes não muda nada.
 
    ### O caminho curto: três arquivos
 
@@ -321,6 +322,21 @@ A fila vem em **grupos**: várias colunas debaixo de um título só, com a
 primeira em destaque. Um caso da RET tem trinta e cinco colunas — seis lado a
 lado perdem o resto, e trinta e cinco não cabem.
 
+Os destaques são os que a operação procura ao varrer a fila, a pedido do PO:
+
+| Canal | Grupo | O destaque |
+|---|---|---|
+| RET | Dados da proposta | a **proposta inteira**, `7-0000123` (código e número juntos); depois apólice e produto. O protocolo saiu — "não é usado" — e continua na busca |
+| RET | Dados cadastrais | o **telefone**; nome, CPF e e-mail logo abaixo |
+| Mesa Diamante | Dados do caso | o **título do e-mail**; depois ramo e assunto |
+
+A proposta inteira sai de uma escrita nova das colunas da fila: `Código origem
+da proposta + número da proposta` junta as duas numa linha só, com hífen — e
+pedaço vazio não deixa hífen solto. É editável em Configurações › Canais de
+trabalho, como o resto da fila. O destaque não quebra linha, para dar para
+varrer com o olho: título de e-mail longo aparece com "…", e inteiro no **Ver
+detalhes**.
+
 Clicar em **Ver detalhes** abre o caso por cima, e fechar devolve a fila
 exatamente como estava. Campo em branco aparece com um travessão: sumir faria
 a pessoa achar que o campo não existe naquelo canal.
@@ -400,6 +416,14 @@ quando o que está nele foi este mesmo preenchimento. O que a pessoa digitou
 por cima fica: escrever em cima de uma correção feita de propósito é pior que
 não preencher.
 
+**CPF ou CNPJ, na Mesa.** O campo do documento aceita os dois: a máscara é
+de CPF até 11 dígitos e vira de CNPJ no 12º, e dá para **colar do jeito que
+vier** — com pontos, barra, traço, até com "CNPJ:" na frente. A formatação é
+só da tela: a planilha recebe **só os números** (`12345678000190`), na mesma
+coluna "Documento (CPF)" de sempre — nome de coluna é contrato com o Power BI.
+O servidor aceita 11 ou 14 dígitos e diz os dois no recado quando vem outro
+tamanho. Na RET o CPF continua só CPF.
+
 **A SUSEP tem letra**: `RET00J`. Todo campo que pede SUSEP aceita e guarda
 exatamente o que foi colado — letra, dígito, caixa e pontuação. Só o espaço
 das pontas sai, e por um motivo concreto: quem copia de outra planilha traz
@@ -455,6 +479,11 @@ produtividade depender do que alguém digitou, e não do que aconteceu.
 Coluna **vazia** que ninguém declarou no formulário não entra — a BASE_RET tem
 quase cinquenta colunas, e listar as vazias encheria a tela de travessões
 escondendo justamente o que está preenchido.
+
+O histórico do caso sai da auditoria, e a auditoria só cresce. Por isso o
+detalhe **lê a coluna do Id primeiro e depois só as linhas daquele caso** — a
+mesma regra da busca. Antes ele lia a aba inteira a cada clique: com 100 mil
+linhas de auditoria, 1,45 milhão de células para mostrar três ou quatro.
 
 ---
 
@@ -698,9 +727,28 @@ numa base que já está sendo trabalhada.
 |---|---|
 | Os cabeçalhos são os da OUTRA planilha | Casa nome com nome e sugere; a pessoa corrige o que não reconheceu |
 | A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados — e só entram na lista quem é **do canal escolhido** e está **disponível** |
-| A base repete toda semana | Escolhendo a coluna que identifica o caso — CPF, nº da proposta —, o que já está dentro é **pulado**, e o laudo diz quantos |
+| A base repete toda semana | Escolhendo a coluna que identifica o caso — CPF, nº da proposta —, o que já está dentro é **pulado**, e o laudo diz quantos. Na RET já vem marcada a **proposta no mesmo mês** (ver abaixo) |
 | O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET |
 | De onde veio cada caso | Grava o **nome do lote** e a **data**, que é o que faz o gráfico existir |
+
+### A mesma proposta não vai para a divisão duas vezes
+
+Na RET aconteceu: a mesma proposta foi incluída duas vezes, para pessoas
+diferentes. Agora a Importação da RET já abre com **"Proposta no mesmo mês"**
+marcada em "Não repetir o que já entrou":
+
+- **Código e número iguais, no mesmo mês do caso**, são a mesma proposta. Se
+  ela já está na base naquele mês, ou aparece de novo **no próprio arquivo**,
+  a linha é pulada **antes do rodízio** — não chega a analista nenhum, e não
+  ocupa a vez de ninguém na divisão.
+- **Outro mês é pedido novo**, e entra — a mesma regra do selo do cadastro.
+  `7-0000123` e `8-0000123` são propostas diferentes.
+- O mês é o da **data de recepção do protocolo**. Caso sem essa data conta
+  pelo mês em que foi importado — senão a segunda leva do mês passaria.
+- O laudo diz quantas foram puladas, e o número que ele promete é o que a
+  gravação faz.
+- **Dá para desmarcar** ("trazer tudo") ou trocar por uma coluna. Canal sem
+  proposta em pedaços (a Mesa, o VG) não tem a opção.
 
 ### Quem entra na divisão de um lote
 
@@ -934,7 +982,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-531 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+762 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

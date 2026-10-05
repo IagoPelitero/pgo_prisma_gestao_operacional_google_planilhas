@@ -280,9 +280,13 @@ function semearDadosIniciais_(emailDoInstalador) {
       // Fila agrupada: cinco colunas na tela, e cada uma junta o que a
       // pessoa lê de uma vez só. Trinta e cinco colunas lado a lado não
       // cabem, e escolher seis perde o resto.
+      // "Dados da proposta" abre com a proposta INTEIRA (7-0000000) e não
+      // tem mais protocolo — "não é usado", palavra do PO. "Dados
+      // cadastrais" abre com o telefone, também a pedido dele.
       ColunasDaFila: 'Situação: data de recepção do protocolo, status'
-        + '; Dados da proposta: protocolo, número da proposta, Num_apolice, produto'
-        + '; Dados cadastrais: nome do cliente, CPF, e-mail'
+        + '; Dados da proposta: Código origem da proposta + número da proposta'
+        + ', Num_apolice, produto'
+        + '; Dados cadastrais: telefones de contato, nome do cliente, CPF, e-mail'
         + '; Motivo / assunto: motivo do cancelamento'
         + '; Responsável: analista',
       ColunasDaBusca: 'protocolo, CPF, Num_apolice, número da proposta, '
@@ -318,8 +322,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
       ColunaDoStatus: 'Status',
+      // O título do e-mail abre "Dados do caso": é por ele que a Mesa acha o
+      // caso no dia a dia, palavra do PO.
       ColunasDaFila: 'Situação: Data de entrada, Status'
-        + '; Dados do caso: Ramo, Assunto'
+        + '; Dados do caso: Título do e-mail, Ramo, Assunto'
         + '; Dados cadastrais: Nome do segurado, Documento (CPF)'
         + '; Corretora: Corretora, SUSEP'
         + '; Responsável: Analista',
@@ -1023,8 +1029,11 @@ const RECC_PADRAO_DO_FORMULARIO = {
   // --- Cliente
   nomedosegurado: { secao: 'Cliente', ordem: 20, rotulo: 'Nome',
     obrigatorio: true, largura: 2 },
-  documentocpf: { secao: 'Cliente', ordem: 21, rotulo: 'CPF',
-    tipoCampo: 'documento', mascara: '000.000.000-00' },
+  // CPF OU CNPJ, a pedido do PO: a máscara se ajusta pelo tamanho, e a
+  // planilha recebe só os números. A coluna continua "Documento (CPF)" —
+  // nome de coluna é contrato com o Power BI.
+  documentocpf: { secao: 'Cliente', ordem: 21, rotulo: 'CPF ou CNPJ',
+    tipoCampo: 'documento', mascara: '000.000.000-00|00.000.000/0000-00' },
 
   // --- Corretora
   corretora: { secao: 'Corretora', ordem: 31, rotulo: 'Nome da corretora' },
@@ -1277,6 +1286,8 @@ function atualizarPGO() {
   feito = feito.concat(criarOStatusSemSucesso_(pulados));
   feito = feito.concat(aplicarOsStatusDoPO_(pulados, paraVoce));
   feito = feito.concat(ligarAPropostaEAApoliceEmPedacos_(pulados));
+  feito = feito.concat(ajustarAsColunasDaFila_(pulados, paraVoce));
+  feito = feito.concat(aceitarCnpjNaMesa_(pulados, paraVoce));
 
   // --- 4. as colunas novas dos dois cadastros ------------------------------
   //
@@ -1961,6 +1972,145 @@ function trocarStatusNasDestacadas_(canal, antigo, novo) {
   if (!mexeu) return;
   canal.SituacoesDestacadas = nova.join(', ');
   atualizarRegistro_('CANAIS', canal.Id, { SituacoesDestacadas: canal.SituacoesDestacadas });
+}
+
+/**
+ * Os grupos da fila que o PO pediu, como estavam e como ficam.
+ *
+ * "Na aba trabalho em dados da proposta tire do destaque o protocolo pois não
+ * é usado e substitua pelo cod da proposta e proposta e na coluna de dados
+ * cadastrais inclua também o telefone e deixe o em destaque" — e, na Mesa, o
+ * título do e-mail em destaque. O primeiro item de cada grupo é o destaque.
+ */
+const RECC_FILA_DO_PO = [
+  { aba: 'BASE_RET', grupo: 'Dados da proposta',
+    de: 'protocolo, número da proposta, Num_apolice, produto',
+    para: 'Código origem da proposta + número da proposta, Num_apolice, produto' },
+  { aba: 'BASE_RET', grupo: 'Dados cadastrais',
+    de: 'nome do cliente, CPF, e-mail',
+    para: 'telefones de contato, nome do cliente, CPF, e-mail' },
+  { aba: 'BASE_MESA', grupo: 'Dados do caso',
+    de: 'Ramo, Assunto',
+    para: 'Título do e-mail, Ramo, Assunto' }
+];
+
+/**
+ * Aplica RECC_FILA_DO_PO na planilha em uso, grupo por grupo.
+ *
+ * TROCA SÓ O GRUPO QUE ESTÁ COMO A INSTALAÇÃO DEIXOU. As colunas da fila são
+ * editáveis em Configurações › Canais, e um grupo que alguém já reescreveu foi
+ * reescrito de propósito: passar por cima seria desfazer o trabalho de alguém
+ * sem avisar. Esse vai para a "DECISÃO SUA", com o texto pronto para colar.
+ *
+ * Os outros grupos e o título do grupo ficam exatamente como estão.
+ */
+function ajustarAsColunasDaFila_(pulados, paraVoce) {
+  var feito = [];
+  function comoLista(texto) {
+    return String(texto || '').split(',').map(function (nome) {
+      return normalizarParaComparar_(nome);
+    }).filter(function (nome) { return nome !== ''; }).join(',');
+  }
+
+  RECC_FILA_DO_PO.forEach(function (regra) {
+    var canal = lerRegistros_('CANAIS').filter(function (um) {
+      return normalizarParaComparar_(um.Aba) === normalizarParaComparar_(regra.aba);
+    })[0];
+    if (!canal) {
+      pulados.push('não há canal apontando para a ' + regra.aba);
+      return;
+    }
+    var nome = String(canal.Nome);
+    var pedido = '"' + regra.grupo + ': ' + regra.para + '"';
+
+    var pedacos = String(canal.ColunasDaFila || '').split(';');
+    var onde = -1;
+    pedacos.forEach(function (pedaco, i) {
+      var corte = pedaco.indexOf(':');
+      if (corte > 0 && normalizarParaComparar_(pedaco.substring(0, corte))
+        === normalizarParaComparar_(regra.grupo)) onde = i;
+    });
+    if (onde < 0) {
+      paraVoce.push(nome + ': a fila não tem o grupo "' + regra.grupo + '". Para '
+        + 'ficar como o PO pediu, acrescente em Configurações › Canais de trabalho '
+        + '› Colunas da fila: ' + pedido + '.');
+      return;
+    }
+
+    var corte = pedacos[onde].indexOf(':');
+    var titulo = pedacos[onde].substring(0, corte).trim();
+    var lista = pedacos[onde].substring(corte + 1);
+    if (comoLista(lista) === comoLista(regra.para)) {
+      pulados.push(nome + ': o grupo "' + regra.grupo + '" da fila já está como pedido');
+      return;
+    }
+    if (comoLista(lista) !== comoLista(regra.de)) {
+      paraVoce.push(nome + ': o grupo "' + regra.grupo + '" da fila foi personalizado '
+        + '("' + lista.trim() + '") e ficou como está. Para ficar como o PO pediu, '
+        + 'escreva em Configurações › Canais de trabalho › Colunas da fila: '
+        + pedido + '.');
+      return;
+    }
+
+    pedacos[onde] = titulo + ': ' + regra.para;
+    atualizarRegistro_('CANAIS', canal.Id, {
+      ColunasDaFila: pedacos.map(function (pedaco) { return pedaco.trim(); })
+        .filter(function (pedaco) { return pedaco !== ''; }).join('; ')
+    });
+    esquecerEstruturaLida_();
+    feito.push(nome + ': fila — "' + regra.grupo + '" agora abre com '
+      + regra.para.split(',')[0].trim());
+  });
+  return feito;
+}
+
+/**
+ * O campo CPF da Mesa Diamante passa a aceitar CNPJ — na planilha em uso.
+ *
+ * Só se a máscara ainda for a da instalação. Máscara personalizada foi
+ * escolhida por alguém, e vai para a "DECISÃO SUA" com o valor a usar. O
+ * rótulo vira "CPF ou CNPJ" só se ainda for "CPF": rótulo reescrito também foi
+ * escolha de alguém.
+ */
+function aceitarCnpjNaMesa_(pulados, paraVoce) {
+  var feito = [];
+  var novaMascara = '000.000.000-00|00.000.000/0000-00';
+  var mesa = lerRegistros_('CANAIS').filter(function (canal) {
+    return normalizarParaComparar_(canal.Aba) === 'basemesa';
+  })[0];
+  if (!mesa) {
+    pulados.push('não há canal apontando para a BASE_MESA');
+    return feito;
+  }
+  var campo = lerRegistros_('CAMPOS').filter(function (um) {
+    return converterParaIdentificador_(um.CanalId) === converterParaIdentificador_(mesa.Id)
+      && normalizarParaComparar_(um.ChaveTecnica) === 'documentocpf';
+  })[0];
+  if (!campo) {
+    pulados.push('a Mesa Diamante não tem o campo do CPF');
+    return feito;
+  }
+
+  var mascara = String(campo.Mascara || '').trim();
+  if (mascara === novaMascara) {
+    pulados.push('o campo CPF da Mesa Diamante já aceita CNPJ');
+    return feito;
+  }
+  if (mascara && mascara !== '000.000.000-00') {
+    paraVoce.push('Mesa Diamante: o campo CPF tem uma máscara personalizada ("'
+      + mascara + '") e ficou como está. Para aceitar CNPJ, use em Configurações › '
+      + 'Campos do formulário a máscara ' + novaMascara + '.');
+    return feito;
+  }
+
+  var mudanca = { Mascara: novaMascara };
+  var rotulo = String(campo.Rotulo || '').trim();
+  if (!rotulo || normalizarParaComparar_(rotulo) === 'cpf') mudanca.Rotulo = 'CPF ou CNPJ';
+  atualizarRegistro_('CAMPOS', campo.__id, mudanca);
+  esquecerEstruturaLida_();
+  feito.push('Mesa Diamante: o campo do CPF aceita CNPJ'
+    + (mudanca.Rotulo ? ', com o nome "CPF ou CNPJ"' : ''));
+  return feito;
 }
 
 /**
@@ -2837,7 +2987,8 @@ function colunasCitadas_(texto) {
       return corte < 0 ? grupo : grupo.substring(corte + 1);
     }).join(',').split(',');
 
-  return pedacos
+  // "A + B" é a junção da fila: cita as duas colunas, e as duas são conferidas.
+  return pedacos.join('+').split('+')
     .map(function (um) { return um.trim(); })
     .filter(function (um) { return um.length > 0; });
 }

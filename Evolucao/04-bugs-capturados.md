@@ -1263,6 +1263,69 @@ ela não está — ou errada onde está certa, que custa a mesma investigação.
 
 ---
 
+### 53 · A barra do CNPJ que virava dois documentos
+
+**Sintoma.** Teste novo, primeira execução: o CNPJ `12.345.678/0001-90`
+digitado no campo da Mesa chegava à planilha como **`12345678;000190`** — dois
+"documentos" de oito e seis dígitos. O laudo da conferência aprovava (a conta
+de dígitos tira o `;`), e a célula ficava errada.
+
+**Causa.** `converterParaIdentificador_` trata `;` **e `/`** como separador de
+lista. É a regra dos telefones — "11 9999-0000 / 11 8888-0000" são dois — e
+estava certa enquanto nenhum documento tinha barra. O CPF não tem; o CNPJ tem.
+
+**Como apareceu.** Escrevendo o teste do pedido ("aceite com pontos, traços e
+demais caracteres"), com o CNPJ do jeito que ele é escrito no mundo.
+
+**Defesa.** Campo do tipo `documento` é UM documento: vai para a planilha com
+`apenasDigitos_`, antes da conversão da coluna. Cadastro e edição passam pelo
+mesmo ponto. Os telefones continuam aceitando lista.
+
+---
+
+### 54 · O caso importado que não tinha mês
+
+**Sintoma.** Nenhum — ainda. Relendo a regra nova da importação ("a mesma
+proposta no mesmo mês não vai para a divisão") antes de testar: a primeira
+leva de outubro entrava; a **segunda leva de outubro, com a mesma proposta,
+também entraria**, e iria para outra pessoa. Exatamente o que o PO viu
+acontecer.
+
+**Causa.** O mês do caso vem da coluna de data do canal ("data de recepção do
+protocolo"). A importação não inventa essa data, então o caso importado sem ela
+fica na base **sem mês nenhum** — e caso sem mês não é repetição de ninguém.
+
+**Defesa.** Do lado da base, caso sem a data do canal vale pela **Data da
+importação**, que toda linha importada tem. É a mesma conta que o lado do
+arquivo já fazia (sem data, vale o mês de hoje, o mês em que ele entra). Teste:
+"caso SEM data conta pelo mês em que entrou — e repete o da base", que fica
+vermelho sem a reserva.
+
+---
+
+### 55 · O "ver detalhes" que lia a auditoria inteira
+
+**Sintoma.** Nenhum vermelho, e o sistema rápido — com a base de teste. Medido
+com 50 mil casos e 100 mil linhas de auditoria, abrir um caso lia **1,45
+milhão de células** (~1,7 s só nisso), e o número crescia a cada cadastro e a
+cada edição da operação.
+
+**Causa.** `historicoDoCaso_` lia a aba `AUDITORIA` inteira para achar as três
+ou quatro linhas de um caso. E o "atualizado em" chamava a mesma função de
+novo: duas leituras inteiras por clique.
+
+**Como apareceu.** O PO pediu para verificar se dava para deixar mais rápido
+"sem afetar a qualidade". Medi as idas ao serviço e as células de cada ação da
+tela, e esta era a única que crescia com o tempo de uso.
+
+**Defesa.** A regra da busca: **ler a coluna antes de ler as linhas** — só
+`RegistroId`, e depois só as linhas daquele caso (155 mil células, ~0,6 s, e
+cresce uma coluna por vez). O "atualizado em" sai do mesmo histórico. Teste com
+três mil linhas de outros casos: lê menos que duas células por linha da
+auditoria, e o histórico sai igual, na mesma ordem.
+
+---
+
 ## O que esta lista ensina
 
 **São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
@@ -1409,3 +1472,13 @@ Daí as duas práticas que o projeto não abre mão:
     o plural, só o teste achou.
 35. **A prévia é tão confiável quanto o substituto dela.** No item 52 a tela
     estava certa e a prévia dizia que não.
+36. **Teste com o dado do mundo, não com o dado do código.** O item 53 só
+    apareceu porque o CNPJ do teste foi escrito com a barra, como ele é. Com
+    "12345678000190" o teste passaria, e a Mesa gravaria errado no primeiro dia.
+37. **Releia a regra nova pelo caminho que não passa pela tela.** No item 54 a
+    regra estava certa para o caso cadastrado e furada para o importado — que é
+    justamente onde o PO viu o problema.
+38. **O que é rápido hoje pode ser o que cresce amanhã.** O item 55 não pesava
+    na base de teste; pesava em quanto a operação já tinha trabalhado. Medir
+    com o volume de daqui a um ano é o que separa "rápido" de "rápido por
+    enquanto".

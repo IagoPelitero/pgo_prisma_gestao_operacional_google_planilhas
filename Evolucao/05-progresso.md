@@ -1971,6 +1971,60 @@ de tela × largura, 9 testes ponta a ponta.
 
 ---
 
+## Etapa 21 — a proposta que não se divide duas vezes, e os destaques do dia a dia
+
+Quatro pedidos e uma verificação de velocidade. As dúvidas foram perguntadas
+antes de mexer, e as respostas do PO decidiram cada regra.
+
+| pedido | o que ficou |
+|---|---|
+| Casos importados com a mesma proposta não irem para a divisão | Opção nova na Importação, **já marcada na RET**: "Proposta no mesmo mês". Código **e** número iguais, no mês do caso — já na base ou repetidos no próprio arquivo — são pulados **antes** do rodízio. Dá para desmarcar |
+| Trabalho da RET: tirar o protocolo, destacar código e proposta | "Dados da proposta" abre com a proposta inteira, `7-0000123`; depois apólice e produto. O protocolo saiu da fila e continua na busca |
+| Trabalho da RET: telefone em destaque | "Dados cadastrais" abre com o telefone; nome, CPF e e-mail logo abaixo |
+| Mesa Diamante: título do e-mail | Primeiro item de "Dados do caso", antes de Ramo e Assunto. O campo já existia no formulário |
+| Mesa: CPF aceitar CNPJ, com qualquer formatação | O campo virou **"CPF ou CNPJ"**: a máscara troca sozinha no 12º dígito, aceita colar com pontos, barra, traço e o que vier junto, e a planilha recebe só os números. A coluna continua "Documento (CPF)" |
+| Velocidade | Medido ação por ação. O "ver detalhes" lia a auditoria inteira a cada clique: passou a ler só a coluna do Id e as linhas do caso (de 1,45 milhão para 155 mil células com 100 mil linhas de auditoria). O resto já estava no custo fixo de cada chamada |
+
+### Respostas do PO
+
+- **Importação:** "só o mesmo mês, já marcado" — a mesma regra do selo do
+  cadastro; a mesma proposta em outro mês é pedido novo.
+- **Fila da RET:** "proposta inteira, sem protocolo".
+- **Mesa:** "na fila, em destaque".
+- **CPF/CNPJ:** rótulo "CPF ou CNPJ".
+
+### Duas sintaxes novas, as duas configuráveis
+
+- Nas **colunas da fila**, `A + B` mostra duas colunas numa linha só, unidas
+  por hífen — é assim que a proposta aparece inteira. Configurações recusa se
+  uma das partes não existir, e o diagnóstico confere cada uma.
+- Na **máscara** de um campo, `|` separa formas aceitas:
+  `000.000.000-00|00.000.000/0000-00` é CPF ou CNPJ. A tela escolhe pelo
+  tamanho, o servidor aceita 11 ou 14 dígitos e diz os dois no recado.
+
+### Para quem já usa
+
+`atualizarPGO()` troca os três grupos da fila e a máscara do CPF da Mesa **só
+onde ainda estão como a instalação deixou**. Grupo ou máscara personalizados
+vão para a "DECISÃO SUA", com o texto pronto para colar em Configurações.
+Rodar duas vezes não muda nada.
+
+### Os achados que vieram junto
+
+Três, nos itens 53 a 55 dos achados: a barra do CNPJ virava separador de lista
+(achado pelo teste novo, antes de chegar à operação); o caso importado sem data
+ficava "sem mês" e escaparia da regra nova na segunda leva; e o "ver detalhes"
+que lia a auditoria inteira.
+
+**762 testes**, cinco execuções seguidas sem falha, cada regra nova quebrada de
+propósito (11 quebras, 11 vermelhos), 136 cliques em 8 telas, 96 combinações
+de tela × largura, 9 testes ponta a ponta (no repositório e no pacote) e o
+roteiro desta rodada no navegador com o servidor de verdade: fila da RET e da
+Mesa, CNPJ colado e gravado, e uma importação com proposta repetida dividindo
+só as novas.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

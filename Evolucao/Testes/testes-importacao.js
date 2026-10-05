@@ -361,6 +361,167 @@ function rodarTestesDeImportacao() {
     igual(casosDaRet().length, antes + 1);
   });
 
+  secao('A mesma proposta no mesmo mês não vai para a divisão');
+
+  /*
+   * Pedido do PO: na RET, a mesma proposta foi incluída duas vezes, para
+   * pessoas diferentes. A regra escolhida: código E número iguais, no MESMO
+   * MÊS do caso — já na base ou repetidos no próprio arquivo. A opção vem
+   * marcada na RET, e dá para desmarcar.
+   */
+  const cabecalhoDaProposta = ['Código origem da proposta', 'número da proposta',
+    'data de recepção do protocolo', 'nome do cliente'];
+  const esteMes = new Date();
+  const dia = (d) => String(d).padStart(2, '0') + '/'
+    + String(esteMes.getMonth() + 1).padStart(2, '0') + '/' + esteMes.getFullYear();
+  const mesPassado = '15/' + String(((esteMes.getMonth() + 11) % 12) + 1).padStart(2, '0')
+    + '/' + (esteMes.getMonth() === 0 ? esteMes.getFullYear() - 1 : esteMes.getFullYear());
+
+  teste('a RET oferece a regra da proposta, e ela já vem MARCADA', () => {
+    const opcoes = chamar('opcoesDaImportacaoDeCasos')(ret.id);
+    verdadeiro(opcoes.repeticaoPelaProposta, 'a RET tem proposta em pedaços');
+    igual(opcoes.repeticaoPadrao, '@PROPOSTA_NO_MES', 'escolha do PO: já marcado');
+  });
+
+  teste('a Mesa não tem proposta, e não ganha a opção', () => {
+    const opcoes = chamar('opcoesDaImportacaoDeCasos')(mesa.id);
+    igual(opcoes.repeticaoPelaProposta, false);
+    igual(opcoes.repeticaoPadrao, '', 'na Mesa nada vem marcado, como antes');
+  });
+
+  teste('a mesma proposta repetida no ARQUIVO entra uma vez só', () => {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([
+        cabecalhoDaProposta,
+        ['7', '4100001', dia(2), 'Primeira vez'],
+        ['7', '4100001', dia(3), 'Mesma proposta, mesmo mês'],
+        ['7', '4100002', dia(3), 'Outra proposta']
+      ]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.vaoEntrar, 2);
+    igual(laudo.motivosParaPular.repetida, 1);
+  });
+
+  teste('o repetido NÃO chega a analista nenhum — a divisão é só dos novos', () => {
+    const antes = casosDaRet().length;
+    const resultado = chamar('importarCasos')(ret.id, {
+      fonte: colado([
+        cabecalhoDaProposta,
+        ['7', '4200001', dia(2), 'Proposta A'],
+        ['7', '4200001', dia(2), 'Proposta A de novo'],
+        ['7', '4200002', dia(2), 'Proposta B'],
+        ['7', '4200002', dia(4), 'Proposta B de novo']
+      ]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES',
+      analistas: ['Marcos Vieira', 'Patrícia Nunes'],
+      origem: 'Leva com proposta repetida'
+    });
+
+    igual(resultado.entraram, 2);
+    igual(resultado.pulados.repetida, 2);
+    igual(casosDaRet().length, antes + 2);
+
+    const daLeva = casosDaRet().filter((caso) =>
+      caso['Origem da importação'] === 'Leva com proposta repetida');
+    igual(daLeva.map((c) => c['nome do cliente']).sort().join('|'),
+      'Proposta A|Proposta B', 'entra a PRIMEIRA de cada proposta');
+    igual(daLeva.map((c) => c.analista).sort().join('|'),
+      'Marcos Vieira|Patrícia Nunes',
+      'uma para cada analista: a duplicata não ocupou a vez de ninguém');
+  });
+
+  teste('o que já está na base no mesmo mês é pulado', () => {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([cabecalhoDaProposta, ['7', '4200001', dia(9), 'Já entrou']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.vaoEntrar, 0);
+    igual(laudo.motivosParaPular.repetida, 1);
+  });
+
+  teste('a mesma proposta em OUTRO mês é pedido novo, e entra', () => {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([cabecalhoDaProposta, ['7', '4200001', mesPassado, 'Mês passado']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.vaoEntrar, 1);
+    igual(laudo.motivosParaPular.repetida, 0);
+  });
+
+  teste('mesmo número com OUTRO código é outra proposta, e entra', () => {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([cabecalhoDaProposta, ['8', '4200001', dia(9), 'Outro código']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.vaoEntrar, 1);
+  });
+
+  teste('a proposta com ponto é a MESMA proposta', () => {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([cabecalhoDaProposta, ['7', '4.200.001', dia(9), 'Com ponto']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.motivosParaPular.repetida, 1);
+  });
+
+  teste('caso SEM data conta pelo mês em que entrou — e repete o da base', () => {
+    // O arquivo sem a data de recepção: o mês do caso é o de hoje, o mês em
+    // que ele entra. E o da base que entrou sem data vale pela data da
+    // importação — senão a segunda leva do mês passaria.
+    const semData = ['Código origem da proposta', 'número da proposta', 'nome do cliente'];
+    chamar('importarCasos')(ret.id, {
+      fonte: colado([semData, ['7', '4300001', 'Sem data, primeira leva']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES',
+      origem: 'Leva sem data 1'
+    });
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([semData, ['7', '4300001', 'Sem data, segunda leva']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.vaoEntrar, 0, 'a segunda leva do mês não pode dividir a mesma proposta');
+    igual(laudo.motivosParaPular.repetida, 1);
+  });
+
+  teste('o laudo promete o que a gravação faz, também nesta regra', () => {
+    const fonte = colado([
+      cabecalhoDaProposta,
+      ['7', '4200002', dia(5), 'Já na base'],
+      ['7', '4400001', dia(5), 'Nova'],
+      ['7', '4400001', dia(6), 'Nova de novo'],
+      ['7', '4200002', mesPassado, 'Outro mês']
+    ]);
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id,
+      { fonte: fonte, colunaQueIdentifica: '@PROPOSTA_NO_MES' });
+    const resultado = chamar('importarCasos')(ret.id, {
+      fonte: fonte, colunaQueIdentifica: '@PROPOSTA_NO_MES',
+      origem: 'Leva conferida pela proposta'
+    });
+    igual(laudo.vaoEntrar, 2);
+    igual(resultado.entraram, laudo.vaoEntrar, 'o laudo prometeu e a base cumpriu');
+  });
+
+  teste('DESMARCADA a opção, tudo entra — a escolha é de quem importa', () => {
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([cabecalhoDaProposta, ['7', '4200001', dia(9), 'Já entrou']]),
+      colunaQueIdentifica: ''
+    });
+    igual(laudo.vaoEntrar, 1);
+  });
+
+  teste('a regra da proposta num canal sem proposta é recusada, dizendo o motivo', () => {
+    lanca(() => chamar('conferirImportacaoDeCasos')(mesa.id, {
+      fonte: colado([['Título do e-mail'], ['Qualquer']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    }), 'não tem campo de proposta');
+  });
+
+  teste('a tela oferece a opção e a deixa marcada quando o servidor manda', () => {
+    const tela = lerPeca('Importacao');
+    contem(tela, '@PROPOSTA_NO_MES', 'a opção está na lista da tela');
+    contem(tela, 'resposta.repeticaoPadrao', 'a marcação vem do servidor, não da tela');
+  });
+
   secao('As recusas');
 
   teste('lote sem nome é recusado — o gráfico não teria o que dizer', () => {
