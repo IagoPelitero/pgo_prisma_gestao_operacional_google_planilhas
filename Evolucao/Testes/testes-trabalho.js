@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
-  ehData, lerPeca, scriptDaPeca } = require('./ferramentas');
+  ehData, lerPeca, scriptDaPeca, pecaRodando } = require('./ferramentas');
 
 function rodarTestesDoTrabalho() {
   console.log('\nEtapa 5 — Trabalho');
@@ -1423,8 +1423,10 @@ function rodarTestesDoTrabalho() {
     const tela = lerPeca('Trabalho');
     contem(tela, 'celula.alerta', 'a tela lê o alerta que o servidor mandou');
     contem(tela, 'em-alerta', 'e marca a célula');
-    verdadeiro(tela.indexOf("' — ' + celula.alerta") > 0,
-      'o motivo entra na dica, junto do nome da coluna');
+    const moldura = pecaRodando('Moldura').Moldura;
+    igual(moldura.dicaDaCelula({ cabecalho: 'Meses de vigência', valor: '12',
+      alerta: 'abaixo de 18 meses' }), 'Meses de vigência: 12 — abaixo de 18 meses',
+    'o motivo entra na dica, junto do nome da coluna');
     contem(lerPeca('Estilos'), '.fila .em-alerta', 'com estilo declarado');
   });
 
@@ -1511,6 +1513,30 @@ function rodarTestesDoTrabalho() {
     const grupo = grupoNaFila(resumo, 'Dados do caso', linhaDe(resumo, 'Endosso urgente'));
     igual(grupo.cabecalhos.join(', '), 'Título do e-mail, Ramo, Assunto');
     igual(grupo.valores[0], 'Endosso urgente — apólice 123');
+  });
+
+  teste('texto grande cortado com "…" aparece inteiro ao passar o cursor', () => {
+    /*
+     * Pedido do PO: "ser possível arrastar o cursor caso o texto seja grande".
+     * O destaque não quebra linha — o título do e-mail longo sai com "…" — e
+     * a dica da célula traz o texto inteiro, com o nome da coluna.
+     */
+    const moldura = pecaRodando('Moldura').Moldura;
+    const titulo = 'Endosso urgente da apólice 12-1391-0000111 do segurado Nami';
+    igual(moldura.dicaDaCelula({ cabecalho: 'Título do e-mail', valor: titulo }),
+      'Título do e-mail: ' + titulo, 'o texto INTEIRO, e não o cortado');
+    igual(moldura.dicaDaCelula({ cabecalho: 'Código origem da proposta + número da proposta',
+      valor: '7-0000123' }), 'Código origem da proposta e número da proposta: 7-0000123',
+    'a junção da fila lê-se com "e"');
+    igual(moldura.dicaDaCelula({ cabecalho: 'Ramo', valor: '' }), 'Ramo',
+      'célula vazia diz só a coluna');
+  });
+
+  teste('as três filas usam a mesma dica — Trabalho, Busca e Produtividade', () => {
+    ['Trabalho', 'BuscarCaso', 'Produtividade'].forEach((nome) => {
+      contem(lerPeca(nome), 'escapar(Moldura.dicaDaCelula(celula))',
+        nome + ' põe a dica com o texto inteiro em cada célula');
+    });
   });
 
   teste('Configurações aceita "A + B" e recusa quando uma das partes não existe', () => {

@@ -2427,6 +2427,28 @@ var Moldura = (function () {
       + ' aria-hidden="true">' + desenho + '</svg>';
   }
 
+  /**
+   * A dica de uma célula da fila: o nome da coluna e o valor INTEIRO.
+   *
+   * Pedido do PO: texto grande cortado com "…" na fila — o título do e-mail,
+   * um nome longo — tem de poder ser lido passando o cursor por cima. A dica
+   * é a do próprio navegador (`title`): aparece em qualquer tela, sem peça
+   * nova, e some sozinha quando o cursor sai.
+   *
+   * Mora aqui porque três filas desenham células — o Trabalho, a Busca e o
+   * detalhamento da Produtividade — e três cópias divergiriam no primeiro
+   * ajuste. O alerta (o vermelho do VG) vem junto, com o motivo: cor sozinha
+   * não diz por quê.
+   */
+  function dicaDaCelula(celula) {
+    // "Código origem da proposta + número da proposta" é a junção da fila;
+    // na dica, lê-se melhor com "e".
+    var coluna = String(celula.cabecalho || '').split(' + ').join(' e ');
+    var valor = String(celula.valor || '').trim();
+    var dica = valor ? coluna + ': ' + valor : coluna;
+    return celula.alerta ? dica + ' — ' + celula.alerta : dica;
+  }
+
   /** As iniciais do nome, para o círculo da barra superior. */
   function iniciais(nome) {
     var partes = String(nome || '').trim().split(/\s+/);
@@ -2640,6 +2662,7 @@ var Moldura = (function () {
     // espessura, senão a tela parece montada com peças de dois conjuntos.
     icone: icone,
     escapar: escapar,
+    dicaDaCelula: dicaDaCelula,
     iniciais: iniciais
   };
 })();
@@ -5003,14 +5026,12 @@ var TelaTrabalho = (function () {
       var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
 
       // O ALERTA vem do servidor já resolvido — a tela não conhece o limite de
-      // 18 meses nem o de 25,5%. O `title` leva o motivo: cor sozinha não diz
-      // por quê, e quem chegou ontem na operação não adivinha.
+      // 18 meses nem o de 25,5%. A dica leva o motivo, e o texto INTEIRO: o
+      // destaque não quebra linha, e o que passa da largura aparece com "…".
       if (celula.alerta) classe += ' em-alerta';
-      var dica = celula.alerta
-        ? celula.cabecalho + ' — ' + celula.alerta
-        : celula.cabecalho;
 
-      return '<span class="' + classe + '" title="' + escapar(dica)
+      return '<span class="' + classe + '" title="'
+        + escapar(Moldura.dicaDaCelula(celula))
         + '">' + escapar(celula.valor || '—') + '</span>';
     }).join('');
   }
@@ -5819,7 +5840,9 @@ var TelaBuscarCaso = (function () {
               + '">' + escapar(celula.valor || '—') + '</span>';
           }
           var classe = (j === 0 && i !== 0) ? 'principal' : 'apoio';
-          return '<span class="' + classe + '">'
+          // Passar o cursor mostra o texto inteiro — o que é cortado com "…".
+          return '<span class="' + classe + '" title="'
+            + escapar(Moldura.dicaDaCelula(celula)) + '">'
             + escapar(celula.valor || '—') + '</span>';
         }).join('') + '</td>';
       }).join('');
@@ -7697,8 +7720,10 @@ var TelaProdutividade = (function () {
             return '<span class="situacao tom-' + escapar(caso.tom || 'neutro')
               + '">' + escapar(celula.valor || '—') + '</span>';
           }
+          // Passar o cursor mostra o texto inteiro — o que é cortado com "…".
           return '<span class="' + ((j === 0 && i !== 0) ? 'principal' : 'apoio')
-            + '">' + escapar(celula.valor || '—') + '</span>';
+            + '" title="' + escapar(Moldura.dicaDaCelula(celula)) + '">'
+            + escapar(celula.valor || '—') + '</span>';
         }).join('') + '</td>';
       }).join('');
       // "Trabalhar no caso", como na fila: abre o caso já no formulário. A

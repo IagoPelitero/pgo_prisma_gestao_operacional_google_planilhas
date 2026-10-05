@@ -168,14 +168,12 @@ var TelaTrabalho = (function () {
       var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
 
       // O ALERTA vem do servidor já resolvido — a tela não conhece o limite de
-      // 18 meses nem o de 25,5%. O `title` leva o motivo: cor sozinha não diz
-      // por quê, e quem chegou ontem na operação não adivinha.
+      // 18 meses nem o de 25,5%. A dica leva o motivo, e o texto INTEIRO: o
+      // destaque não quebra linha, e o que passa da largura aparece com "…".
       if (celula.alerta) classe += ' em-alerta';
-      var dica = celula.alerta
-        ? celula.cabecalho + ' — ' + celula.alerta
-        : celula.cabecalho;
 
-      return '<span class="' + classe + '" title="' + escapar(dica)
+      return '<span class="' + classe + '" title="'
+        + escapar(Moldura.dicaDaCelula(celula))
         + '">' + escapar(celula.valor || '—') + '</span>';
     }).join('');
   }

@@ -182,7 +182,9 @@ var TelaBuscarCaso = (function () {
               + '">' + escapar(celula.valor || '—') + '</span>';
           }
           var classe = (j === 0 && i !== 0) ? 'principal' : 'apoio';
-          return '<span class="' + classe + '">'
+          // Passar o cursor mostra o texto inteiro — o que é cortado com "…".
+          return '<span class="' + classe + '" title="'
+            + escapar(Moldura.dicaDaCelula(celula)) + '">'
             + escapar(celula.valor || '—') + '</span>';
         }).join('') + '</td>';
       }).join('');

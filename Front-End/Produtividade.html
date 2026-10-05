@@ -291,8 +291,10 @@ var TelaProdutividade = (function () {
             return '<span class="situacao tom-' + escapar(caso.tom || 'neutro')
               + '">' + escapar(celula.valor || '—') + '</span>';
           }
+          // Passar o cursor mostra o texto inteiro — o que é cortado com "…".
           return '<span class="' + ((j === 0 && i !== 0) ? 'principal' : 'apoio')
-            + '">' + escapar(celula.valor || '—') + '</span>';
+            + '" title="' + escapar(Moldura.dicaDaCelula(celula)) + '">'
+            + escapar(celula.valor || '—') + '</span>';
         }).join('') + '</td>';
       }).join('');
       // "Trabalhar no caso", como na fila: abre o caso já no formulário. A

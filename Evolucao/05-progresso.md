@@ -2040,14 +2040,15 @@ a proposta, a apólice ou o CPF pela metade era recusado.
 | "Ao invés de ver detalhes, trabalhar no caso, que já abre a opção de editar" | **Trabalhar no caso** abre o caso já no formulário. A tela de leitura saiu do sistema — servidor, tela, prévia e estilos. O que a planilha tem e o formulário não pergunta vem embaixo, como leitura |
 | "Por último excluir caso, que deve excluir definitivamente, com pop-up de atenção" | Excluir por último. O aviso é do sistema, em vermelho, com o foco em Cancelar; Enter e Esc cancelam. A linha sai da planilha e o conteúdo fica na auditoria |
 | "Pode colocar em todos os canais" | RET, Mesa Diamante e VG, e também na Busca. Produtividade RECC e Minha Performance abrem o caso em "Trabalhar no caso" |
+| "Ser possível arrastar o cursor caso o texto seja grande" | Na fila, o texto cortado com "…" aparece inteiro na dica ao passar o cursor, com o nome da coluna — Trabalho, Busca e detalhamento da Produtividade, por uma peça só (`Moldura.dicaDaCelula`) |
 | "Quando cliquei em alterar cadastro a tela travou" | Reproduzido com o atraso do Apps Script: o modal ficava em "Abrindo…" para sempre e não fechava ao salvar um caso importado incompleto (item 56 dos achados). O modal novo não tem esse estado |
 
 "Trabalhar no caso" e "Alterar status" aparecem só para quem tem a ação de
 editar no nível de acesso. Excluir continua aberto a qualquer pessoa
 cadastrada, como o PO decidiu antes.
 
-**766 testes**, cinco execuções seguidas sem falha, cada regra nova quebrada de
-propósito (8 quebras, 8 vermelhos). No navegador, com o servidor de verdade:
+**768 testes**, cinco execuções seguidas sem falha, cada regra nova quebrada de
+propósito (10 quebras, 10 vermelhos). No navegador, com o servidor de verdade:
 as três ações nos três canais e na Busca, o aviso de exclusão (Cancelar, Esc,
 Enter e o botão que apaga), o caso Retido com a proposta pela metade mudando
 de status, tudo de novo com 1,5 s de atraso por chamada e com três funções

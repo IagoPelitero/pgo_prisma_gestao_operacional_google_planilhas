@@ -3,7 +3,7 @@
 ============================================================================
 PGO — gerar-excel.py · o código inteiro numa planilha, um arquivo por aba
 ============================================================================
-    python3 Evolucao/Testes/gerar-excel.py
+    python3 Evolucao/Testes/gerar-excel.py [referencia]
 
 Gera `Evolucao/pacote/PGO-codigo-completo.xlsx`: uma aba por arquivo, com o
 número da linha ao lado do código, para conferir e copiar de onde não dá para
@@ -65,6 +65,12 @@ VERDE_CLARO = 'E3F3E6'  # a linha que nasceu nesta rodada
 # Onde sai a versão SEM as alterações — o código como estava no último commit.
 DESTINO_ANTES = os.path.join(RAIZ, 'Evolucao', 'pacote', 'PGO-codigo-ANTES.xlsx')
 
+# Contra o que o losango ◆ compara. O padrão é o último commit. Uma referência
+# mais antiga marca as rodadas que ainda não foram coladas no Apps Script: se a
+# entrega anterior não chegou a ser colada, o ◆ precisa mostrar as duas juntas,
+# senão o arquivo que só mudou na anterior fica sem marca e para trás.
+REFERENCIA = sys.argv[1] if len(sys.argv) > 1 else 'HEAD'
+
 
 def como_estava_no_commit(caminho_relativo):
     """
@@ -76,7 +82,7 @@ def como_estava_no_commit(caminho_relativo):
     """
     try:
         return subprocess.check_output(
-            ['git', 'show', 'HEAD:' + caminho_relativo],
+            ['git', 'show', REFERENCIA + ':' + caminho_relativo],
             cwd=RAIZ, stderr=subprocess.DEVNULL).decode('utf-8')
     except subprocess.CalledProcessError:
         return None
