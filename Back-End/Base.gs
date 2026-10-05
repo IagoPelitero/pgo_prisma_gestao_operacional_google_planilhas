@@ -768,6 +768,17 @@ const RECC_ESQUEMA = {
       // Vazio quer dizer "este status não carimba nada", que é o normal para
       // a maioria deles.
       { cabecalho: 'ColunaDeCarimbo', tipo: 'texto', protegido: false },
+      // SÓ PARA ITENS DE STATUS: SIM quando o status FECHA o caso.
+      //
+      // Pedido do PO: o que é "concluído" muda de canal para canal. Na RET é
+      // Cancelado, Pago, Não retido, Retido ou Sem sucesso de contato; na Mesa
+      // Diamante, Concluído, Concluído na mesa ou Sem retorno; no VG ele ainda
+      // vai decidir. Antes o sistema adivinhava pelo nome — status que começa
+      // com "conclu" — e um caso Retido aparecia como "ainda em aberto".
+      //
+      // Final NÃO TRAVA o caso: ele continua aceitando mudança de status. Só
+      // diz o que entra na conta de "Concluídos". Vazio quer dizer não.
+      { cabecalho: 'Final', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Configuracao', tipo: 'textoLongo', protegido: false }

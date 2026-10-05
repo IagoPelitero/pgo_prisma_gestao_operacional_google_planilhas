@@ -45,7 +45,7 @@ function rodarTestesDeCadastro() {
 
     const status = todos.find((campo) => campo.chave === 'status');
     igual(status.tipo, 'seletor');
-    igual(status.opcoes.length, 3, 'os três status da Mesa Diamante');
+    igual(status.opcoes.length, 4, 'os quatro status da Mesa Diamante');
     igual(status.opcoes[0].valor, 'Em andamento');
     igual(status.valorPadrao, 'Em andamento',
       'o caso começa em andamento, sem ninguém escolher o óbvio');
@@ -836,6 +836,122 @@ function rodarTestesDeCadastro() {
     igual(resposta.situacao, 'NAO_ENCONTRADA');
     igual(resposta.segmento, 'Não encontrado');
     contem(resposta.mensagem, 'cadastro de corretoras');
+  });
+
+  secao('O selo da proposta repetida no mês');
+
+  /*
+   * Pedido do PO: "na RET queria que houvesse um identificador de propostas
+   * duplicadas num único mês e/ou que identificasse quando aquela proposta
+   * está com o analista (...) tipo os das SUSEPs bloqueadas".
+   *
+   * As linhas entram direto na base, com a data escolhida: o mês é o coração
+   * da regra, e o cadastro pelo formulário sempre usaria o mês de hoje.
+   */
+  function casoDaRetComProposta(codigo, numero, quando, analista) {
+    return chamar('inserirRegistro_')('BASE_RET', {
+      'Código origem da proposta': codigo, 'número da proposta': numero,
+      'data de recepção do protocolo': quando, analista: analista,
+      status: 'Pendente', 'nome do cliente': 'Cliente da proposta ' + numero
+    });
+  }
+  const agora = new Date();
+  const doisMesesAtras = new Date(agora.getFullYear(), agora.getMonth() - 2, 10);
+
+  teste('a mesma proposta no mesmo mês acende o selo, dizendo com quem está', () => {
+    const existente = casoDaRetComProposta('7', '0004401', agora, 'Patrícia Nunes');
+
+    const resposta = chamar('conferirPropostaRepetida')('7-0004401', canalRet.id, '', '');
+    igual(resposta.situacao, 'REPETIDA');
+    contem(resposta.mensagem, 'com Patrícia Nunes',
+      'quem está com ela é a pergunta que o PO fez');
+    contem(resposta.mensagem, existente.__id, 'e qual é o caso');
+    contem(resposta.mensagem, 'Pendente', 'e em que status ele está');
+  });
+
+  teste('a mesma proposta em OUTRO mês não acende', () => {
+    // A regra é "num único mês": a mesma proposta voltar meses depois é um
+    // pedido novo do cliente, e não cadastro em dobro.
+    casoDaRetComProposta('7', '0004402', doisMesesAtras, 'Ana Martins');
+    const resposta = chamar('conferirPropostaRepetida')('7-0004402', canalRet.id, '', '');
+    igual(resposta.situacao, 'UNICA');
+    contem(resposta.mensagem, 'Nenhuma outra');
+
+    // E com a data do formulário no mês daquele caso, acende.
+    const naqueleMes = doisMesesAtras.getFullYear() + '-'
+      + String(doisMesesAtras.getMonth() + 1).padStart(2, '0') + '-20';
+    igual(chamar('conferirPropostaRepetida')('7-0004402', canalRet.id, naqueleMes, '')
+      .situacao, 'REPETIDA', 'o mês vem da data do caso, quando ela está preenchida');
+  });
+
+  teste('o mesmo número com outro código de origem é outra proposta', () => {
+    casoDaRetComProposta('58', '0004403', agora, 'Ana Martins');
+    igual(chamar('conferirPropostaRepetida')('7-0004403', canalRet.id, '', '').situacao,
+      'UNICA', 'os dois pedaços precisam bater, não só o número');
+  });
+
+  teste('na edição, o próprio caso não conta como repetição dele mesmo', () => {
+    const unico = casoDaRetComProposta('7', '0004404', agora, 'Ana Martins');
+    igual(chamar('conferirPropostaRepetida')('7-0004404', canalRet.id, '', unico.__id)
+      .situacao, 'UNICA');
+
+    const segundo = casoDaRetComProposta('7', '0004404', agora, 'Diego Castilho');
+    const doPrimeiro = chamar('conferirPropostaRepetida')('7-0004404', canalRet.id, '',
+      unico.__id);
+    igual(doPrimeiro.situacao, 'REPETIDA', 'com um segundo caso, aí sim');
+    contem(doPrimeiro.mensagem, segundo.__id);
+    verdadeiro(doPrimeiro.mensagem.indexOf(unico.__id) < 0,
+      'e o caso aberto não aparece na lista');
+  });
+
+  teste('proposta pela metade e canal sem proposta ficam calados', () => {
+    // O formato errado já é recusado ao salvar, com a explicação inteira. O
+    // selo não repete a bronca: só fica escondido.
+    igual(chamar('conferirPropostaRepetida')('70004405', canalRet.id, '', '').situacao,
+      'VAZIA');
+    igual(chamar('conferirPropostaRepetida')('', canalRet.id, '', '').situacao, 'VAZIA');
+    igual(chamar('conferirPropostaRepetida')('7-0004401', canalDiamante.id, '', '')
+      .situacao, 'SEM_PROPOSTA', 'a Mesa Diamante não tem coluna de proposta');
+  });
+
+  teste('o selo SINALIZA e não impede: o cadastro repetido grava', () => {
+    casoDaRetComProposta('7', '0004406', agora, 'Ana Martins');
+    const antes = chamar('lerRegistros_("BASE_RET")').length;
+    chamar('cadastrarCaso')(canalRet.id, {
+      nomedocliente: 'Segundo pedido do mesmo cliente', numerodaproposta: '7-0004406'
+    });
+    igual(chamar('lerRegistros_("BASE_RET")').length, antes + 1,
+      'quem decide se é engano é quem está atendendo');
+  });
+
+  teste('a tela desenha o selo da proposta e marca a data do caso', () => {
+    const form = pecaRodando('Formulario').Formulario;
+    const html = form.desenhar(chamar('formularioDoCanal')(canalRet.id), '');
+    contem(html, 'id="selo-proposta"', 'o selo mora logo abaixo do campo');
+    contem(html, 'data-data-do-caso="sim"',
+      'a data do caso é marcada: é dela que sai o mês');
+    const daMesa = form.desenhar(chamar('formularioDoCanal')(canalDiamante.id), '');
+    verdadeiro(daMesa.indexOf('selo-proposta') < 0, 'canal sem proposta, sem selo');
+  });
+
+  secao('Cadastrar caso: os botões só com o formulário pronto');
+
+  teste('Cadastrar e Limpar só aparecem quando o formulário terminou de montar', () => {
+    // Pedido do PO: nos testes, a equipe via os botões enquanto o formulário
+    // carregava e achava que devia clicar.
+    const tela = lerPeca('CadastrarCaso');
+    contem(tela, '<div class="acoes" id="acoes-do-caso" hidden>',
+      'as ações nascem escondidas');
+    const carregar = tela.substring(tela.indexOf('function carregarFormulario()'));
+    const corpo = carregar.substring(0, carregar.indexOf('\n  }\n'));
+    verdadeiro(corpo.indexOf('mostrarAsAcoes(false)')
+      < corpo.indexOf("Servidor.chamar('formularioDoCanal'"),
+      'escondem ANTES de pedir o formulário — o "Limpar" recarrega');
+    verdadeiro(corpo.indexOf('Formulario.vigiarObrigatorios')
+      < corpo.indexOf('mostrarAsAcoes(true)'),
+      'e aparecem só DEPOIS de o formulário estar desenhado e ligado');
+    contem(tela, "if (elemento('acoes-do-caso').hidden) return;",
+      'o Ctrl+Enter não grava nada enquanto o formulário carrega');
   });
 
   secao('A máscara, do lado da tela');

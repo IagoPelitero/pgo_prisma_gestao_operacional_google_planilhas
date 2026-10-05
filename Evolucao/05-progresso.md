@@ -1940,6 +1940,37 @@ canais, 96 combinações de tela × largura, 9 testes ponta a ponta e 15 imagens
 
 ---
 
+## Etapa 20 — o que os testes com a equipe mostraram
+
+Quatro mudanças pedidas depois da primeira semana de testes reais, e duas
+perguntas respondidas sem mexer em código.
+
+| pedido | o que ficou |
+|---|---|
+| Os botões do cadastro apareciam antes do formulário | "Cadastrar caso" e "Limpar" só aparecem com o formulário montado; o `Ctrl`+`Enter` espera junto |
+| A linha do tempo mostrava "Concluído" na RET | O detalhe mostra **só o status atual, e desde quando**. Os carimbos de cada etapa continuam na linha do caso |
+| Os status finais e os nomes | Coluna `Final` no catálogo; RET sem "Concluído", com Não retido, Retido, Sem sucesso de contato, Cancelado e Pago; Mesa com Concluído na mesa e Sem retorno; VG à espera do PO |
+| Proposta repetida no mês | Selo abaixo do campo, como o da SUSEP: vermelho com quem está, verde quando é única. Sinaliza, não impede |
+
+A pergunta de dúvida antes de mexer foi feita: o que aparece no detalhe e o que
+fazer com os nomes. A resposta — "exclui da planilha e prepara para que ele
+altere no código que já tenho funcional" — virou a etapa nova de
+`atualizarPGO()`, que troca os nomes em quatro lugares e não toca em caso que
+ainda esteja em "Concluído".
+
+### O achado que veio junto
+
+"Concluído" era decidido pelo nome do status (o item 50 dos achados): um caso
+Retido aparecia como em aberto, e a meta da RET contava um status que a RET
+não usa. **O número da meta e de "Concluídos" da RET muda** com esta versão —
+passa a contar o que a operação considera fechado.
+
+**727 testes**, cinco execuções seguidas sem falha, cada regra nova quebrada de
+propósito (12 quebras, 12 vermelhos), 136 cliques em 8 telas, 96 combinações
+de tela × largura, 9 testes ponta a ponta.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

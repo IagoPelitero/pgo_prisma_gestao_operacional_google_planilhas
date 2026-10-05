@@ -958,7 +958,7 @@ var TelaConfiguracoes = (function () {
     var ehNovo = !item;
     var atual = item || {
       id: '', nome: '', rotulo: '', cor: 'neutro', ordem: dados.itens.length + 1,
-      ativo: true, codigo: '', colunaDeCarimbo: ''
+      ativo: true, codigo: '', colunaDeCarimbo: '', final: false
     };
 
     /** Só a lista de STATUS carimba data e hora. */
@@ -984,6 +984,21 @@ var TelaConfiguracoes = (function () {
         + 'volta a este status guarda a data da primeira vez.');
     }
 
+    /*
+      O status que FECHA o caso. Pedido do PO: o que é "concluído" muda de
+      canal para canal — e no VG ele ainda vai decidir. É daqui que ele decide,
+      sem código: marcado, o status entra em "Concluídos" e sai de "Ainda em
+      aberto" em Minha Performance, e conta para a meta.
+
+      Não trava nada: um caso num status final continua aceitando mudança.
+    */
+    function finalDoStatus(item) {
+      if (!ehStatus()) return '';
+      return caixaDeMarcar('final', 'Fecha o caso (status final)', item.final,
+        'Entra em "Concluídos" e na meta. O caso continua aceitando mudança '
+        + 'de status.');
+    }
+
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-item">'
       + tituloDoPainel(ehNovo ? 'Item novo' : atual.rotulo,
         'Lista ' + tipoDeListaEscolhido)
@@ -995,6 +1010,7 @@ var TelaConfiguracoes = (function () {
         'O tom acompanha o tema: escolher "ruim" fica vermelho no claro e no '
         + 'escuro, sem ninguém precisar mexer.')
       + carimboDoStatus(atual)
+      + finalDoStatus(atual)
       + campoDeTexto('ordem', 'Ordem', atual.ordem, '')
       + caixaDeSimNao('ativo', 'Aparece nas listas', atual.ativo)
       + '<div class="config-acoes">'
@@ -1010,6 +1026,7 @@ var TelaConfiguracoes = (function () {
         codigo: valorDe('codigo'),
         cor: valorDe('cor'),
         colunaDeCarimbo: ehStatus() ? valorDe('coluna-de-carimbo') : '',
+        final: ehStatus() ? marcado('final') : false,
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarListas(); })

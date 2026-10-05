@@ -40,15 +40,15 @@ function rodarTestesDePerformance() {
   chamar('atualizarRegistro_')('USUARIOS', eu.Id, { Nome: 'Ana Martins' });
 
   chamar('inserirVariosRegistros_')('BASE_RET', [
-    { analista: 'Ana Martins', status: 'Concluído', canal: 'E-mail',
+    { analista: 'Ana Martins', status: 'Retido', canal: 'E-mail',
       'data de recepção do protocolo': diasAtras(4),
       'data da transmissão': diasAtras(2), 'nome do cliente': 'A1' },
-    { analista: 'Ana Martins', status: 'Concluído', canal: 'E-mail',
+    { analista: 'Ana Martins', status: 'Retido', canal: 'E-mail',
       'data de recepção do protocolo': diasAtras(3),
       'data da transmissão': diasAtras(1), 'nome do cliente': 'A2' },
     { analista: 'Ana Martins', status: 'Pendente', canal: 'Chat',
       'data de recepção do protocolo': diasAtras(2), 'nome do cliente': 'A3' },
-    { analista: 'Diego Castilho', status: 'Concluído', canal: 'Chat',
+    { analista: 'Diego Castilho', status: 'Retido', canal: 'Chat',
       'data de recepção do protocolo': diasAtras(3),
       'data da transmissão': diasAtras(3), 'nome do cliente': 'D1' },
     { analista: 'Carla Souza', status: 'Pendente', canal: 'Site',
@@ -215,8 +215,8 @@ function rodarTestesDePerformance() {
 
   teste('a distribuição usa a cor do catálogo, e não a posição', () => {
     const porSituacao = minha().porSituacao;
-    const concluido = porSituacao.pontos.find((p) => p.rotulo === 'Concluído');
-    igual(concluido.tom, 'bom', '"Concluído" é verde porque o catálogo diz');
+    const concluido = porSituacao.pontos.find((p) => p.rotulo === 'Retido');
+    igual(concluido.tom, 'bom', '"Retido" é verde porque o catálogo diz');
     igual(porSituacao.tipo, 'pizza');
     verdadeiro(porSituacao.pontos.length <= 6);
   });
@@ -420,6 +420,60 @@ function rodarTestesDePerformance() {
       'e o menu ainda oferece a seção');
   });
 
+
+  secao('O que é "concluído" muda de canal para canal');
+
+  /*
+   * Pedido do PO: "um caso concluído é cancelado, pago, não retido, retido ou
+   * sem sucesso de contato" na RET; "concluído, concluído na mesa e sem
+   * retorno" na Mesa; "do VG ainda vou resolver". Antes o sistema adivinhava
+   * pelo nome — status que começa com "conclu" —, e um caso Retido aparecia
+   * como "ainda em aberto" em Minha Performance e fora da meta.
+   */
+  const comStatus = (lista) => lista.map((status) => ({ status: status, Status: status }));
+  const vg = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_VG');
+
+  teste('na RET, os cinco desfechos contam como concluído, e só eles', () => {
+    const casos = comStatus(['Retido', 'Não retido', 'Sem sucesso de contato',
+      'Cancelado', 'Pago', 'Pendente', '1º contato realizado', 'Não trabalhado']);
+    igual(chamar('contarConcluidos_')(casos, ret), 5);
+  });
+
+  teste('na Mesa, "Sem retorno" conta — e não começa com "conclu"', () => {
+    const casos = comStatus(['Concluído', 'Concluído na mesa', 'Sem retorno',
+      'Em andamento']);
+    igual(chamar('contarConcluidos_')(casos, canal), 3,
+      'a regra antiga, do nome, deixaria o Sem retorno de fora');
+  });
+
+  teste('no VG, sem nada marcado como final, nada conta como concluído', () => {
+    // É verdade, e não defeito: o PO ainda não disse o que fecha um caso lá.
+    const casos = comStatus(['Pago', 'Retido', 'Cancelado']);
+    igual(chamar('contarConcluidos_')(casos, vg), 0);
+  });
+
+  teste('marcar um status como final em Configurações já muda a conta', () => {
+    // É por aqui que o PO vai decidir o VG, sem código.
+    const itemPago = chamar('listarCatalogo')('STATUS', vg.id)
+      .find((item) => item.nome === 'Pago');
+    chamar('salvarItemDoCatalogo')(Object.assign({}, itemPago,
+      { tipo: 'STATUS', canalId: vg.id, final: true }));
+    igual(chamar('contarConcluidos_')(comStatus(['Pago', 'Retido']), vg), 1);
+    verdadeiro(chamar('listarCatalogo')('STATUS', vg.id)
+      .find((item) => item.nome === 'Pago').final, 'e a tela lê a marca de volta');
+
+    // E desmarcar desfaz — Final não é caminho sem volta.
+    chamar('salvarItemDoCatalogo')(Object.assign({}, itemPago,
+      { tipo: 'STATUS', canalId: vg.id, final: false }));
+    igual(chamar('contarConcluidos_')(comStatus(['Pago']), vg), 0);
+  });
+
+  teste('status final NÃO trava o caso: ele continua mudando de status', () => {
+    const novo = chamar('cadastrarCaso')(ret.id, { nomedocliente: 'Caso que reabre' });
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
+    igual(chamar('buscarRegistros_')('BASE_RET', 'Id', novo.id, 1)[0].status, 'Pendente');
+  });
 
 }
 

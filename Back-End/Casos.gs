@@ -702,6 +702,11 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
 
   // Concluir preenche a data de finalização quando o canal tem essa coluna e
   // ela ainda está vazia — é o que a operação faria à mão logo em seguida.
+  //
+  // Continua pelo NOME ("conclu…"), e não pela coluna Final do catálogo, de
+  // propósito: na RET a coluna de finalização do canal é a "data da
+  // transmissão", e trocar para Final faria Retido, Pago e os outros
+  // desfechos escreverem uma data de transmissão que não aconteceu.
   if (canal.colunaDaFinalizacao && !atual[canal.colunaDaFinalizacao]
     && normalizarParaComparar_(achada.gravadoComo).indexOf('conclu') === 0) {
     alteracao[canal.colunaDaFinalizacao] = new Date();
@@ -1356,6 +1361,133 @@ function deveConferirOBloqueio_(idDoCanal, quem) {
   })[0];
 
   return canal ? canal.confereSusepBloqueada !== false : true;
+}
+
+// ============================================================================
+// O SELO DA PROPOSTA
+// ============================================================================
+
+/**
+ * A mesma proposta já cadastrada no MESMO MÊS, e com quem ela está.
+ *
+ * Pedido do PO: "na RET queria que houvesse um identificador de propostas
+ * duplicadas num único mês e/ou que identificasse quando aquela proposta está
+ * com o analista (...) algo pequeno mas que sinalizasse, tipo os das SUSEPs
+ * bloqueadas".
+ *
+ * SINALIZA, NÃO IMPEDE. O selo aparece abaixo do campo, como o da SUSEP, e o
+ * cadastro segue normal. Quem decide se a repetição é erro ou é um segundo
+ * pedido do mesmo cliente é quem está atendendo — o sistema só não deixa
+ * passar sem ninguém ver.
+ *
+ * QUAL CANAL: o que tem o campo da proposta gravando em pedaços (o
+ * `partirEm` do campo `numerodaproposta`) — hoje, só a RET. Não há coluna
+ * nova em CANAIS para ligar isto: canal sem proposta não tem o que repetir.
+ *
+ * QUAL MÊS: o da data do caso, que é a coluna de data do canal. Com a data
+ * ainda em branco no formulário, vale o mês de hoje — é nele que o servidor
+ * vai carimbar a entrada do caso (ver preencherEntradaAutomatica_).
+ *
+ * NA EDIÇÃO, o próprio caso não conta: `idDoCasoAberto` sai da conta, senão
+ * todo caso aberto acusaria a si mesmo.
+ *
+ * O CUSTO segue a regra da busca — ler a coluna antes de ler as linhas: lê a
+ * coluna do NÚMERO da proposta, e só as linhas em que ele bateu, que costumam
+ * ser nenhuma ou uma.
+ */
+function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+
+  var partir = partirDaPropostaDoCanal_(canal);
+  if (!partir) return { situacao: 'SEM_PROPOSTA', mensagem: '' };
+
+  // Proposta pela metade não é conferida: o formato errado já é recusado ao
+  // salvar, com a mensagem que diz como escrever. O selo só ficaria calado.
+  var pedacos;
+  try {
+    pedacos = partirPorHifen_(proposta, partir, 'Número da proposta');
+  } catch (erro) {
+    return { situacao: 'VAZIA', mensagem: '' };
+  }
+
+  var mes = converterParaData_(dataDoCaso) || new Date();
+  var nomeDoMes = RECC_NOMES_DOS_MESES[mes.getMonth()] + ' de ' + mes.getFullYear();
+
+  // 1. Só a coluna do número — o último pedaço, o que distingue a proposta.
+  var colunaDoNumero = partir.colunas[partir.colunas.length - 1];
+  var numero = pedacos[pedacos.length - 1];
+  var linhas = [];
+  lerColunaInteira_(canal.aba, colunaDoNumero).forEach(function (valor, i) {
+    if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
+  });
+
+  // 2. Só as linhas em que bateu: confere os outros pedaços, o mês e o Id.
+  var estrutura = estruturaDaAba_(canal.aba);
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+  var abertoAgora = converterParaIdentificador_(idDoCasoAberto);
+
+  var repetidas = lerLinhasEspecificas_(canal.aba, linhas).filter(function (registro) {
+    if (normalizarParaComparar_(registro._Visivel) === 'nao') return false;
+    if (abertoAgora && registro.__id === abertoAgora) return false;
+
+    var mesmosPedacos = partir.colunas.every(function (cabecalho, i) {
+      return converterParaIdentificador_(registro[cabecalho]) === pedacos[i];
+    });
+    if (!mesmosPedacos) return false;
+
+    var quando = canal.colunaDaData ? converterParaData_(registro[canal.colunaDaData]) : '';
+    return quando !== '' && quando.getMonth() === mes.getMonth()
+      && quando.getFullYear() === mes.getFullYear();
+  }).map(function (registro) {
+    return {
+      id: registro.__id,
+      analista: colunaDoAnalista ? String(registro[colunaDoAnalista] || '').trim() : '',
+      situacao: canal.colunaDoStatus
+        ? String(registro[canal.colunaDoStatus] || '').trim() : ''
+    };
+  });
+
+  if (!repetidas.length) {
+    return {
+      situacao: 'UNICA',
+      mensagem: 'Nenhuma outra com esta proposta em ' + nomeDoMes + '.'
+    };
+  }
+
+  // "com a Ana Martins (caso 0000000012, Pendente)" — quem está com ela é a
+  // pergunta que o PO fez, então é a primeira coisa que o selo responde.
+  var quais = repetidas.map(function (uma) {
+    return (uma.analista ? 'com ' + uma.analista : 'sem analista')
+      + ' (caso ' + uma.id + (uma.situacao ? ', ' + uma.situacao : '') + ')';
+  });
+  return {
+    situacao: 'REPETIDA',
+    mensagem: 'Já cadastrada em ' + nomeDoMes + ': ' + quais.join('; ') + '.',
+    casos: repetidas
+  };
+}
+
+/**
+ * Como o canal parte a proposta em colunas — ou null, se ele não tem proposta.
+ *
+ * Vem do campo, e não de uma lista de nomes de coluna escrita aqui: quem
+ * mudar as colunas da proposta em Configurações muda também a conferência.
+ */
+function partirDaPropostaDoCanal_(canal) {
+  var campo = camposAtivosDoCanal_(canal.id).filter(function (um) {
+    return normalizarParaComparar_(um.ChaveTecnica) === 'numerodaproposta';
+  })[0];
+  if (!campo) return null;
+
+  var partir = lerConfiguracaoDoCampo_(campo).partirEm;
+  if (!partir || !partir.colunas || partir.colunas.length < 2) return null;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var todasExistem = partir.colunas.every(function (cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) >= 0;
+  });
+  return todasExistem ? partir : null;
 }
 
 /* ############################################################################

@@ -624,7 +624,8 @@ function situacoesDoCanal_(canal) {
         nome: String(item.Rotulo || item.Nome),
         gravadoComo: String(item.Nome),
         tom: tomValido_(item.Cor),
-        colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim()
+        colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim(),
+        final: normalizarParaComparar_(item.Final) === 'sim'
       };
     });
 }
@@ -925,41 +926,49 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
 }
 
 /**
- * Por onde este caso passou, e quando.
+ * Onde o caso está agora, e desde quando.
  *
- * Sai dos CARIMBOS: cada status diz, no catálogo, em qual coluna ele grava a
- * data e a hora de quando o caso chegou nele. É o que responde a pergunta da
- * operação — "a data e a hora de cada contato" — sem abrir a planilha.
+ * Pedido do PO: "o card pode mostrar apenas o status que está". Antes vinha a
+ * jornada inteira — todo status com coluna de carimbo, na ordem do catálogo,
+ * com "ainda não" nas etapas que faltavam. Só que os desfechos não são
+ * etapas em fila: um caso Retido nunca vai ser Não retido, e a lista
+ * mostrava "Não retido — ainda não" como se faltasse acontecer.
  *
- * Vem na ordem do CATÁLOGO, e não na ordem das datas. A ordem do catálogo é a
- * jornada como a operação a desenhou, então uma etapa que ficou para trás
- * aparece no lugar dela, vazia, e se lê como o que é: um buraco. Ordenar por
- * data esconderia isso, porque o que não tem data não teria onde ficar.
+ * Volta UMA linha só (numa lista, que é o formato que a tela já desenha).
  *
- * Status sem coluna de carimbo fica de fora: ele não tem o que contar.
+ * O "DESDE QUANDO" sai, nesta ordem, de:
+ *
+ *   1. "Data da última mudança de status" — é exatamente quando o caso chegou
+ *      ao status em que está, mesmo que já tenha passado por ele antes;
+ *   2. o carimbo do próprio status — que guarda a PRIMEIRA vez que o caso
+ *      chegou nele, e serve quando a coluna acima está vazia;
+ *   3. nada. Caso recém-cadastrado em "Não trabalhado" não tem data de
+ *      mudança nenhuma, e inventar uma seria pior que não mostrar.
+ *
+ * Os carimbos continuam gravados na linha do caso, intactos: é deles que sai a
+ * produtividade. Só deixaram de ser listados aqui.
  */
 function linhaDoTempoDoCaso_(registro, canal) {
+  if (!canal.colunaDoStatus) return [];
+  var atual = String(registro[canal.colunaDoStatus] || '').trim();
+  if (!atual) return [];
+
   var estrutura = estruturaDaAba_(canal.aba);
-  var agora = normalizarParaComparar_(canal.colunaDoStatus
-    ? registro[canal.colunaDoStatus] : '');
+  function comoTexto(cabecalho) {
+    var posicao = cabecalho ? posicaoDaColuna_(estrutura, cabecalho) : -1;
+    if (posicao < 0) return '';
+    var valor = registro[cabecalho];
+    if (valor === null || valor === undefined || String(valor).trim() === '') return '';
+    return paraTexto_(valor, estrutura.tipos[posicao]);
+  }
 
-  var etapas = [];
-  situacoesDoCanal_(canal).forEach(function (situacao) {
-    if (!situacao.colunaDeCarimbo) return;
-
-    var posicao = posicaoDaColuna_(estrutura, situacao.colunaDeCarimbo);
-    if (posicao < 0) return;
-
-    var valor = registro[situacao.colunaDeCarimbo];
-    etapas.push({
-      status: situacao.nome,
-      tom: situacao.tom,
-      quando: paraTexto_(valor, estrutura.tipos[posicao]),
-      cumprida: String(valor === null || valor === undefined ? '' : valor).trim() !== '',
-      ehOndeEstaAgora: situacao.chave === agora
-    });
-  });
-  return etapas;
+  var doCatalogo = situacaoDoCanalPeloValor_(canal, atual);
+  return [{
+    status: doCatalogo ? doCatalogo.nome : atual,
+    tom: doCatalogo ? doCatalogo.tom : 'neutro',
+    quando: comoTexto(RECC_COLUNA_QUANDO_MUDOU_O_STATUS)
+      || comoTexto(doCatalogo ? doCatalogo.colunaDeCarimbo : '')
+  }];
 }
 
 /**
@@ -2015,9 +2024,30 @@ function indicador_(chave, rotulo, valor, anterior, unidade, explicacao, menorEh
 /** Uma situação conta como conclusão quando o nome dela começa com "conclu". */
 function contarConcluidos_(casos, canal) {
   if (!canal.colunaDoStatus) return 0;
+  var finais = statusFinaisDoCanal_(canal);
   return casos.filter(function (caso) {
-    return normalizarParaComparar_(caso[canal.colunaDoStatus]).indexOf('conclu') === 0;
+    var status = normalizarParaComparar_(caso[canal.colunaDoStatus]);
+    return finais ? finais.indexOf(status) >= 0 : status.indexOf('conclu') === 0;
   }).length;
+}
+
+/**
+ * Os status que FECHAM o caso neste canal — os marcados como Final no
+ * catálogo —, já normalizados para comparar com o que está gravado.
+ *
+ * Devolve null numa planilha que ainda não tem a coluna Final (quem colou o
+ * código novo e ainda não rodou atualizarPGO). Aí vale a regra antiga, do
+ * nome que começa com "conclu": sem ela, a Mesa passaria a mostrar zero
+ * concluídos até a atualização rodar, e o número errado pareceria defeito.
+ *
+ * Canal sem nenhum status final marcado — o VG, por enquanto — conta zero
+ * concluídos. É verdade: ninguém disse ainda o que fecha um caso ali.
+ */
+function statusFinaisDoCanal_(canal) {
+  if (posicaoDaColuna_(estruturaDaAba_('CATALOGO'), 'Final') < 0) return null;
+  return situacoesDoCanal_(canal)
+    .filter(function (situacao) { return situacao.final; })
+    .map(function (situacao) { return situacao.chave; });
 }
 
 /**

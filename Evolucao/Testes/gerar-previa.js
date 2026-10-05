@@ -118,6 +118,15 @@ function pontePreparada(respostas) {
     + '          mensagem: "SUSEP não encontrada no cadastro de canais"\n'
     + '        });\n'
     + '      },\n'
+    + '      conferirPropostaRepetida: function (proposta, idDoCanal, data, idDoCaso) {\n'
+    // Proposta pela metade o servidor não confere: devolve VAZIA. O substituto
+    // diz o mesmo, senão a prévia mostraria um selo que o sistema não mostra.
+    + '        if (!/^\\d+-\\d+$/.test(String(proposta || "").trim())) {\n'
+    + '          return responder({ situacao: "VAZIA", mensagem: "" });\n'
+    + '        }\n'
+    + '        responder(respostas.propostas[String(proposta) + "|" + (idDoCaso || "")]\n'
+    + '          || respostas.propostas.avulsa || { situacao: "VAZIA", mensagem: "" });\n'
+    + '      },\n'
     + '      resumoDoCanal: function (idDoCanal, filtros) {\n'
     + '        var painel = respostas.paineis[idDoCanal];\n'
     + '        var chave = "";\n'
@@ -723,6 +732,25 @@ function gerar(pastaDeSaida) {
     '7654321': chamar('consultarSusep')('7654321')
   };
 
+  // O selo da proposta repetida, respondido pelo servidor de verdade para a
+  // proposta de cada caso da prévia — no cadastro (sem Id) e na edição do
+  // próprio caso (com o Id, que sai da conta). Proposta que não está na base
+  // da prévia é única de verdade, e a resposta dela também vem do servidor.
+  const propostas = { avulsa: null };
+  pacote.canais.forEach((canal) => {
+    const paraEditar = (paineis[canal.id] || {}).paraEditar || {};
+    Object.keys(paraEditar).forEach((id) => {
+      const proposta = String((paraEditar[id].valores || {}).numerodaproposta || '');
+      if (!proposta) return;
+      propostas[proposta + '|'] = chamar('conferirPropostaRepetida')(proposta, canal.id, '', '');
+      propostas[proposta + '|' + id] =
+        chamar('conferirPropostaRepetida')(proposta, canal.id, '', id);
+      if (!propostas.avulsa) {
+        propostas.avulsa = chamar('conferirPropostaRepetida')('9-9999999', canal.id, '', '');
+      }
+    });
+  });
+
   // Uma senha de administrador, só na prévia, para o diálogo das ações sem
   // desfazer aparecer. O instalador de verdade não define senha nenhuma —
   // quem define é o primeiro administrador, na própria tela.
@@ -858,7 +886,7 @@ function gerar(pastaDeSaida) {
   const paginaDoSistema = chamar('doGet()').getContent().replace(
     '</head>',
     pontePreparada({
-      pacoteDePartida: pacote, formularios, suseps, paineis, configuracoes,
+      pacoteDePartida: pacote, formularios, suseps, propostas, paineis, configuracoes,
       busca, analitico, performance, corretoras, importacao
     })
       + '</head>');

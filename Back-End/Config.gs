@@ -564,6 +564,7 @@ function listarCatalogo(tipo, idDoCanal) {
         rotulo: String(item.Rotulo || item.Nome),
         cor: tomValido_(item.Cor),
         colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim(),
+        final: normalizarParaComparar_(item.Final) === 'sim',
         ordem: Number(item.Ordem) || 0,
         ativo: normalizarParaComparar_(item.Ativo) === 'sim'
       };
@@ -602,6 +603,12 @@ function salvarItemDoCatalogo(dados) {
   // que configuração faltando, porque alguém a preenche e espera efeito.
   if (tipo === 'STATUS') {
     campos.ColunaDeCarimbo = String(dados.colunaDeCarimbo || '').trim();
+    // Status FINAL: fecha o caso e entra em "Concluídos". Só grava se a
+    // planilha já tem a coluna — antes de rodar atualizarPGO ela não existe,
+    // e campo sem coluna é recusado, o que impediria salvar o status inteiro.
+    if (posicaoDaColuna_(estruturaDaAba_('CATALOGO'), 'Final') >= 0) {
+      campos.Final = dados.final === true ? 'SIM' : 'NAO';
+    }
   }
 
   var id = converterParaIdentificador_(dados.id);

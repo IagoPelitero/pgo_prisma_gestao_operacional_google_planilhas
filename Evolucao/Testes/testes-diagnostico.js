@@ -1440,9 +1440,11 @@ function rodarTestesDeDiagnostico() {
    * Finge uma instalação feita ANTES desta rodada.
    *
    * Desfaz na planilha o que `atualizarPGO()` vai refazer: as duas colunas
-   * novas de CANAIS somem, o status "Sem sucesso" é apagado, os campos de
-   * proposta e apólice voltam a ser um por coluna, e a planilha ganha de volta
-   * a coluna Matrícula e a aba FERIADOS, que saíram do contrato.
+   * novas de CANAIS somem, os status voltam aos nomes antigos (com o
+   * "Concluído" na RET, sem Cancelado, Pago e Sem retorno, sem a coluna Final
+   * e sem o "Sem sucesso"), os campos de proposta e apólice voltam a ser um
+   * por coluna, e a planilha ganha de volta a coluna Matrícula e a aba
+   * FERIADOS, que saíram do contrato.
    *
    * Parte de uma instalação DE VERDADE e desfaz, em vez de montar uma planilha
    * à mão: a planilha montada à mão prova que a migração funciona sobre a
@@ -1462,10 +1464,42 @@ function rodarTestesDeDiagnostico() {
     });
     chamar('esquecerEstruturaLida_()');
 
-    // 2. o status "Sem sucesso" não existia.
-    const semSucesso = chamar('lerRegistros_("CATALOGO")')
-      .find((item) => String(item.Nome) === 'Sem sucesso');
-    if (semSucesso) chamar('apagarRegistroDeVez_')('CATALOGO', semSucesso.Id);
+    // 2. os status como eram: os nomes antigos, o "Concluído" na RET, sem
+    //    Cancelado, Pago e Sem retorno, sem a coluna Final — e, de uma rodada
+    //    ainda mais antiga, sem o "Sem sucesso".
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const mesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    const doCanal = (item, canal) => String(item.CanalId) === String(canal.id);
+    chamar('lerRegistros_("CATALOGO")').forEach((item) => {
+      if (String(item.Tipo) !== 'STATUS') return;
+      const nome = String(item.Nome);
+      const voltaPara = (doCanal(item, ret) && { 'Não retido': 'Não reteve',
+        'Retido': 'Reteve' }[nome])
+        || (doCanal(item, mesa) && { 'Concluído na mesa': 'Concluído na célula' }[nome]);
+      if (voltaPara) {
+        chamar('atualizarRegistro_')('CATALOGO', item.Id, { Nome: voltaPara, Rotulo: voltaPara });
+      }
+      const naoExistia = (doCanal(item, ret)
+        && ['Cancelado', 'Pago', 'Sem sucesso de contato'].indexOf(nome) >= 0)
+        || (doCanal(item, mesa) && nome === 'Sem retorno');
+      if (naoExistia) chamar('apagarRegistroDeVez_')('CATALOGO', item.Id);
+    });
+    chamar('inserirRegistro_')('CATALOGO', chamar('novoItemDeCatalogo_')(
+      'STATUS', ret.id, 'Concluído', 8, 'bom', 'Data concluído'));
+    chamar('lerRegistros_("PAINEIS")').forEach((painel) => {
+      const antigo = { 'Retido': 'Reteve', 'Não retido': 'Não reteve',
+        'Concluído na mesa': 'Concluído na célula',
+        'Concluídos na mesa': 'Concluídos na célula' };
+      const mudanca = {};
+      if (antigo[String(painel.Filtro)]) mudanca.Filtro = antigo[String(painel.Filtro)];
+      if (antigo[String(painel.Titulo)]) mudanca.Titulo = antigo[String(painel.Titulo)];
+      if (Object.keys(mudanca).length) chamar('atualizarRegistro_')('PAINEIS', painel.Id, mudanca);
+    });
+    const catalogo = planilha.getSheetByName('CATALOGO');
+    const deCatalogo = catalogo.getRange(1, 1, 1, catalogo.getMaxColumns()).getValues()[0];
+    const colunaFinal = deCatalogo.findIndex((c) => String(c) === 'Final');
+    if (colunaFinal >= 0) catalogo.getRange(1, colunaFinal + 1).setValue('');
+    chamar('esquecerEstruturaLida_()');
 
     // 3. proposta e apólice voltam a ser um campo por coluna.
     chamar('lerRegistros_("CAMPOS")').forEach((campo) => {
@@ -1585,7 +1619,10 @@ function rodarTestesDeDiagnostico() {
     igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).valorPorSituacao, null,
       'sem a coluna do valor declarada, não há gráfico de valor');
     verdadeiro(!chamar('lerRegistros_("CATALOGO")')
-      .some((item) => String(item.Nome) === 'Sem sucesso'));
+      .some((item) => /^Sem sucesso/.test(String(item.Nome))));
+    verdadeiro(chamar('lerRegistros_("CATALOGO")')
+      .some((item) => String(item.Nome) === 'Reteve'),
+      'o catálogo de antes tinha os nomes antigos');
   });
 
   teste('atualizar traz o gráfico de valor, o status novo e a proposta', () => {
@@ -1600,11 +1637,11 @@ function rodarTestesDeDiagnostico() {
     verdadeiro(grafico !== null, 'o gráfico de valor tem de existir agora');
     igual(grafico.medida, 'valor do prêmio');
     igual(grafico.pontos.map((p) => p.rotulo).join(' | '),
-      'Reteve | Não reteve | Sem sucesso | Demais situações');
+      'Retido | Não retido | Sem sucesso de contato | Demais situações');
 
-    // O status novo, em laranja e sem carimbo.
+    // O status novo, em laranja e sem carimbo — já com o nome do PO.
     const semSucesso = chamar('lerRegistros_("CATALOGO")')
-      .find((item) => String(item.Nome) === 'Sem sucesso');
+      .find((item) => String(item.Nome) === 'Sem sucesso de contato');
     verdadeiro(semSucesso !== undefined, 'o status tem de ter nascido');
     igual(String(semSucesso.Cor), 'atencao');
     igual(String(semSucesso.ColunaDeCarimbo || ''), '');
@@ -1634,6 +1671,141 @@ function rodarTestesDeDiagnostico() {
     verdadeiro(naTela.indexOf('codramo') < 0);
     verdadeiro(naTela.indexOf('numerodaproposta') >= 0,
       'e o campo que hospeda a digitação continua na tela');
+  });
+
+  /*
+   * OS STATUS COM OS NOMES DO PO, na planilha que já está em uso.
+   *
+   * "Exclui da planilha e prepara para que ele altere no código que já tenho
+   * funcional aceitando o que te mandei." Trocar um nome é trocar em quatro
+   * lugares — catálogo, casos gravados, cartões e destacadas —, e cada um dos
+   * quatro tem a sua conferência aqui: trocar só o catálogo deixaria os casos
+   * antigos "fora da lista" e o cartão "Reteve" contando zero, sem erro.
+   */
+  function statusDoCanal(chamar, aba) {
+    const canal = chamar('canaisVisiveis_()').find((c) => c.aba === aba);
+    return chamar('lerRegistros_("CATALOGO")').filter((item) =>
+      String(item.Tipo) === 'STATUS' && String(item.CanalId) === String(canal.id));
+  }
+
+  teste('atualizar troca os nomes dos status nos quatro lugares', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const mesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    // Um "Sem sucesso" de quem rodou a atualização da rodada passada.
+    chamar('inserirRegistro_')('CATALOGO', chamar('novoItemDeCatalogo_')(
+      'STATUS', ret.id, 'Sem sucesso', 20, 'atencao', ''));
+    // E as destacadas com os nomes antigos, como a rodada passada deixou. As
+    // duas colunas voltam primeiro: o "antes" as tirou, e quem rodou a
+    // atualização da rodada passada as tem.
+    chamar('adicionarColuna_')('CANAIS', 'ColunaDoValor', 'texto');
+    chamar('adicionarColuna_')('CANAIS', 'SituacoesDestacadas', 'textoLongo');
+    chamar('esquecerEstruturaLida_()');
+    chamar('atualizarRegistro_')('CANAIS', ret.id, {
+      ColunaDoValor: 'valor do prêmio',
+      SituacoesDestacadas: 'Reteve, Não reteve, Sem sucesso'
+    });
+    chamar('inserirVariosRegistros_')('BASE_RET', [
+      { status: 'Reteve', 'nome do cliente': 'Antigo 1' },
+      { status: 'Reteve', 'nome do cliente': 'Antigo 2' },
+      { status: 'Não reteve', 'nome do cliente': 'Antigo 3' },
+      { status: 'Sem sucesso', 'nome do cliente': 'Antigo 4' },
+      { status: 'Pendente', 'nome do cliente': 'Antigo 5' }
+    ]);
+    chamar('inserirRegistro_')('BASE_MESA', { Status: 'Concluído na célula' });
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, '"Reteve" virou "Retido"');
+
+    // 1. o catálogo
+    const nomes = statusDoCanal(chamar, 'BASE_RET').map((item) => String(item.Nome));
+    ['Retido', 'Não retido', 'Sem sucesso de contato'].forEach((nome) => {
+      verdadeiro(nomes.indexOf(nome) >= 0, 'faltou "' + nome + '" no catálogo');
+    });
+    ['Reteve', 'Não reteve', 'Sem sucesso'].forEach((nome) => {
+      verdadeiro(nomes.indexOf(nome) < 0, '"' + nome + '" continuou no catálogo');
+    });
+
+    // 2. os casos já gravados
+    const porCliente = {};
+    chamar('lerRegistros_("BASE_RET")').forEach((caso) => {
+      porCliente[caso['nome do cliente']] = caso.status;
+    });
+    igual(porCliente['Antigo 1'], 'Retido');
+    igual(porCliente['Antigo 2'], 'Retido');
+    igual(porCliente['Antigo 3'], 'Não retido');
+    igual(porCliente['Antigo 4'], 'Sem sucesso de contato');
+    igual(porCliente['Antigo 5'], 'Pendente', 'o que não foi trocado não é tocado');
+    verdadeiro(chamar('lerRegistros_("BASE_MESA")')
+      .some((caso) => caso.Status === 'Concluído na mesa'), 'e a Mesa também');
+
+    // 3. os cartões e gráficos
+    const paineisDaRet = chamar('lerRegistros_("PAINEIS")')
+      .filter((p) => String(p.CanalId) === String(ret.id));
+    verdadeiro(paineisDaRet.some((p) => p.Titulo === 'Retido' && p.Filtro === 'Retido'),
+      'o cartão da Produtividade acompanha — senão contaria zero, calado');
+    verdadeiro(!paineisDaRet.some((p) => p.Filtro === 'Reteve' || p.Filtro === 'Não reteve'));
+    verdadeiro(chamar('lerRegistros_("PAINEIS")').some((p) =>
+      String(p.CanalId) === String(mesa.id) && p.Filtro === 'Concluído na mesa'
+      && p.Titulo === 'Concluídos na mesa'),
+      'o cartão da Mesa acompanha, no filtro e no título — que está no plural');
+
+    // 4. as destacadas do gráfico de valor
+    const destacadas = chamar('listarCanaisConfiguraveis()')
+      .find((c) => c.aba === 'BASE_RET').situacoesDestacadas;
+    igual(destacadas, 'Retido, Não retido, Sem sucesso de contato');
+
+    // E os números continuam fechando: o cartão Retido conta os dois antigos.
+    const cartao = chamar('produtividadeDaEquipe')(ret.id, {}, 400).cartoes
+      .find((c) => c.rotulo === 'Retido');
+    verdadeiro(cartao && cartao.valor >= 2, 'o cartão Retido conta os casos renomeados');
+  });
+
+  teste('atualizar exclui o Concluído da RET, cria o que faltava e marca os finais', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+
+    const daRet = statusDoCanal(chamar, 'BASE_RET');
+    verdadeiro(!daRet.some((item) => item.Nome === 'Concluído'),
+      '"exclui da planilha", palavra do PO');
+    igual(daRet.filter((item) => String(item.Final) === 'SIM').map((item) => item.Nome)
+      .sort().join(', '),
+      'Cancelado, Não retido, Pago, Retido, Sem sucesso de contato');
+
+    const daMesa = statusDoCanal(chamar, 'BASE_MESA');
+    igual(daMesa.filter((item) => String(item.Final) === 'SIM').map((item) => item.Nome)
+      .sort().join(', '), 'Concluído, Concluído na mesa, Sem retorno');
+    verdadeiro(!daMesa.some((item) => item.Nome === 'Em andamento'
+      && String(item.Final) === 'SIM'), 'Em andamento não fecha nada');
+
+    verdadeiro(!statusDoCanal(chamar, 'BASE_VG').some((item) => String(item.Final) === 'SIM'),
+      'o VG fica sem final até o PO decidir');
+  });
+
+  teste('caso que ainda está em "Concluído" vai para a DECISÃO SUA, e não é mexido', () => {
+    // Escolher o status novo de um caso é decisão de quem conhece o caso.
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('inserirRegistro_')('BASE_RET', { status: 'Concluído', 'nome do cliente': 'Já fechado' });
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'DECISÃO SUA');
+    contem(recado, '1 caso(s) continuam com o status "Concluído"');
+    verdadeiro(chamar('lerRegistros_("BASE_RET")')
+      .some((caso) => caso['nome do cliente'] === 'Já fechado' && caso.status === 'Concluído'),
+      'o caso continua como estava');
+  });
+
+  teste('quem marcou NÃO num status final não é atropelado na segunda rodada', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const pago = statusDoCanal(chamar, 'BASE_RET').find((item) => item.Nome === 'Pago');
+    chamar('atualizarRegistro_')('CATALOGO', pago.Id, { Final: 'NAO' });
+
+    const segunda = chamar('atualizarPGO()');
+    igual(String(statusDoCanal(chamar, 'BASE_RET').find((item) => item.Nome === 'Pago').Final),
+      'NAO', 'a escolha de alguém não se desfaz por rodar a atualização');
+    igual(segunda.indexOf('virou'), -1, 'na segunda rodada não há nome a trocar');
+    igual(segunda.indexOf('excluído do catálogo'), -1, 'nem status a excluir');
   });
 
   teste('atualizar NÃO apaga a Matrícula nem a aba de feriados', () => {
@@ -2019,7 +2191,7 @@ function rodarTestesDeDiagnostico() {
     chamar('salvarCanal')(Object.assign({},
       chamar('listarCanaisConfiguraveis()').find((c) => c.aba === 'BASE_RET'),
       { colunaDoValor: 'valor do prêmio retido',
-        situacoesDestacadas: 'Reteve, Concluído' }));
+        situacoesDestacadas: 'Retido, Pago' }));
 
     const recado = chamar('atualizarPGO()');
     contem(recado, 'já tem coluna de valor');
@@ -2027,7 +2199,7 @@ function rodarTestesDeDiagnostico() {
     const depois = chamar('listarCanaisConfiguraveis()')
       .find((c) => c.aba === 'BASE_RET');
     igual(depois.colunaDoValor, 'valor do prêmio retido');
-    igual(depois.situacoesDestacadas, 'Reteve, Concluído');
+    igual(depois.situacoesDestacadas, 'Retido, Pago');
   });
 
   teste('rodar a atualização duas vezes não estraga nada', () => {
@@ -2041,15 +2213,20 @@ function rodarTestesDeDiagnostico() {
     verdadeiro(chamar('produtividadeDaEquipe')(ret.id, {}, 30).valorPorSituacao
       !== null, 'o gráfico continua de pé');
     igual(chamar('lerRegistros_("CATALOGO")')
-      .filter((item) => String(item.Nome) === 'Sem sucesso').length, 1,
+      .filter((item) => String(item.Nome) === 'Sem sucesso de contato').length, 1,
       'e o status não pode ter nascido duas vezes');
+    igual(chamar('lerRegistros_("CATALOGO")')
+      .filter((item) => String(item.Nome) === 'Sem sucesso').length, 0,
+      'nem voltado com o nome antigo');
   });
 
   teste('numa instalação nova, atualizar não faz nada', () => {
     const { chamar } = instalacaoNova();
     const recado = chamar('atualizarPGO()');
-    igual(recado.indexOf('status "Sem sucesso" criado'), -1,
+    igual(recado.indexOf('status "Sem sucesso de contato" criado'), -1,
       'instalação nova já nasce com tudo');
+    igual(recado.indexOf('virou'), -1, 'e com os nomes do PO: nada a renomear');
+    igual(recado.indexOf('excluído do catálogo'), -1, 'nem a excluir');
     igual(chamar('diagnosticoRECC()').aprovado, true);
   });
 

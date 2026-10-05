@@ -767,12 +767,11 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
 }
 
 /*
-  A linha do tempo do caso, dentro do detalhe.
+  Onde o caso está, dentro do detalhe: o status atual e desde quando.
 
-  Cada etapa é um status que carimba data e hora. A etapa que ainda não
-  aconteceu aparece apagada, no LUGAR dela — e não escondida: um buraco no meio
-  da jornada é informação ("passou do 1º contato direto para Reteve"), e
-  esconder transformaria isso em nada.
+  Era a jornada inteira, com as etapas que faltavam apagadas no lugar delas. O
+  PO pediu só o status atual — os desfechos não são etapas em fila, e "Não
+  retido — ainda não" num caso Retido dizia o que nunca vai acontecer.
 */
 .linha-do-tempo { list-style: none; margin: 0; padding: 0; }
 .linha-do-tempo li {
@@ -786,18 +785,28 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
   background: var(--linha); margin-top: 5px;
 }
 .linha-do-tempo li.cumprida .marca { background: currentColor; }
+/*
+  Com uma linha só, a COR do status é a única pista de onde o caso está — antes
+  havia o selo "está aqui". Ela vem do tom do catálogo (`--tom`), como em todo
+  o resto do sistema.
+
+  `.historico` na frente porque a lista mora dentro da seção do histórico, e o
+  estilo dela vazava para cá: uma segunda bolinha, azul, ao lado da do status,
+  e o nome do status pequeno e cinza. Com a jornada inteira aquilo passava;
+  com uma linha só, apagava justamente o que ela existe para mostrar.
+*/
+.historico .linha-do-tempo li {
+  border-left: 0; padding-left: 0; color: var(--tom, var(--texto));
+}
+.historico .linha-do-tempo li::before { content: none; }
+.historico .linha-do-tempo .marca,
+.historico .linha-do-tempo .etapa { color: inherit; }
+.historico .linha-do-tempo .etapa { display: inline; font-size: 14px; }
+.historico .linha-do-tempo .quando { display: inline; }
 .linha-do-tempo .etapa { font-weight: 600; }
-.linha-do-tempo li.pendente { color: var(--suave); }
-.linha-do-tempo li.pendente .etapa { font-weight: 500; }
 .linha-do-tempo .quando {
   margin-left: auto; color: var(--suave); font-size: 13px;
   font-variant-numeric: tabular-nums; text-align: right;
-}
-.linha-do-tempo li.agora .etapa::after {
-  content: 'está aqui'; margin-left: 8px; font-size: 11px; font-weight: 700;
-  letter-spacing: .04em; text-transform: uppercase;
-  padding: 2px 6px; border-radius: 999px;
-  background: var(--destaque); color: var(--destaque-sobre);
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }
@@ -2991,7 +3000,7 @@ var Formulario = (function () {
 
   /* -------------------------------------------------------------- desenhar */
 
-  function desenharCampo(campo, prefixo) {
+  function desenharCampo(campo, prefixo, colunaDaData) {
     var id = prefixo + 'campo-' + campo.chave;
     var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
     /*
@@ -3054,6 +3063,9 @@ var Formulario = (function () {
         + (dinheiro ? ' placeholder="R$ 0,00"' : '')
         + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
         + (campo.mascara ? ' placeholder="' + escapar(campo.mascara) + '"' : '')
+        // A coluna de data do canal: é dela que o selo da proposta tira o mês.
+        + (colunaDaData && campo.cabecalho === colunaDaData
+          ? ' data-data-do-caso="sim"' : '')
         + ' autocomplete="off"' + exigido + travado + '>';
     }
 
@@ -3061,6 +3073,11 @@ var Formulario = (function () {
       ? '<small class="ajuda">' + escapar(campo.descricao) + '</small>' : '';
     var selo = campo.chave === 'susep'
       ? '<div class="selo-susep" id="' + prefixo + 'selo-susep" hidden></div>' : '';
+    // O selo da proposta usa a MESMA aparência do da SUSEP — o PO pediu "tipo
+    // os das SUSEPs bloqueadas". Ver consultarProposta.
+    if (campo.chave === 'numerodaproposta') {
+      selo = '<div class="selo-susep" id="' + prefixo + 'selo-proposta" hidden></div>';
+    }
 
     // A condição de visibilidade viaja no HTML, e não numa variável do
     // módulo: o formulário é desenhado em dois lugares — a tela de cadastro e
@@ -3172,7 +3189,8 @@ var Formulario = (function () {
         + '<legend>' + escapar(secao.nome) + '</legend>'
         + '<div class="grade">'
         + secao.campos.map(function (campo) {
-          return desenharCampo(campo, prefixo || '');
+          return desenharCampo(campo, prefixo || '',
+            formulario.canal && formulario.canal.colunaDaData);
         }).join('')
         + '</div></fieldset>';
     }).join('');
@@ -3186,7 +3204,7 @@ var Formulario = (function () {
    * Recebe a RAIZ, e não procura na página inteira: com o modal aberto por
    * cima da tela de cadastro, procurar na página inteira ligaria os dois.
    */
-  function ligar(raiz, prefixo, idDoCanal, comSeloDaSusep) {
+  function ligar(raiz, prefixo, idDoCanal, comSeloDaSusep, idDoCasoAberto) {
     /*
      * O CAMPO DE DINHEIRO.
      *
@@ -3243,6 +3261,32 @@ var Formulario = (function () {
       };
       susep.addEventListener('change', conferir);
       susep.addEventListener('blur', conferir);
+    }
+
+    /*
+      O SELO DA PROPOSTA: a mesma proposta já cadastrada no mesmo mês, e com
+      quem ela está. Pedido do PO para a RET — e só aparece onde o formulário
+      tem o campo da proposta, que hoje é só a RET.
+
+      Só no `change`, e não no `blur` como a SUSEP: na edição a pessoa passa
+      pelo campo sem mexer nele o tempo todo, e cada passada seria uma ida ao
+      servidor para responder o que já se sabia.
+
+      Trocar a DATA do caso troca o mês, e a resposta pode mudar — por isso a
+      data também confere de novo, quando já há proposta escrita.
+    */
+    var proposta = raiz.querySelector('[data-chave="numerodaproposta"]');
+    if (proposta) {
+      var conferirProposta = function () {
+        consultarProposta(raiz, prefixo, idDoCanal, idDoCasoAberto);
+      };
+      proposta.addEventListener('change', conferirProposta);
+      var dataDoCaso = raiz.querySelector('[data-data-do-caso]');
+      if (dataDoCaso) {
+        dataDoCaso.addEventListener('change', function () {
+          if (String(proposta.value || '').trim()) conferirProposta();
+        });
+      }
     }
 
     // Os campos condicionais reagem ao campo de que dependem. O ouvinte fica
@@ -3307,6 +3351,54 @@ var Formulario = (function () {
       .senao(function () {
         selo.className = 'selo-susep conferindo';
         selo.textContent = 'Não consegui conferir a SUSEP agora.';
+      });
+  }
+
+  /**
+   * O selo da proposta.
+   *
+   * SINALIZA, NÃO IMPEDE: vermelho quando a mesma proposta já existe no mês,
+   * dizendo com quem ela está; verde quando não há outra. O cadastro segue
+   * nos dois casos — quem decide é quem está atendendo.
+   *
+   * A resposta que chega DEPOIS de a pessoa trocar a proposta é descartada:
+   * duas propostas digitadas em seguida voltam em qualquer ordem, e a
+   * resposta da primeira não pode pintar o selo da segunda.
+   */
+  function consultarProposta(raiz, prefixo, idDoCanal, idDoCasoAberto) {
+    var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-proposta');
+    var campo = raiz.querySelector('[data-chave="numerodaproposta"]');
+    if (!selo || !campo) return;
+
+    var perguntada = String(campo.value || '').trim();
+    if (!perguntada) {
+      selo.hidden = true;
+      return;
+    }
+
+    var data = raiz.querySelector('[data-data-do-caso]');
+    selo.hidden = false;
+    selo.className = 'selo-susep conferindo';
+    selo.textContent = 'Conferindo a proposta…';
+
+    Servidor.chamar('conferirPropostaRepetida', perguntada, idDoCanal,
+      data ? data.value : '', idDoCasoAberto || '')
+      .entao(function (resposta) {
+        if (String(campo.value || '').trim() !== perguntada) return;
+        if (resposta.situacao === 'REPETIDA' || resposta.situacao === 'UNICA') {
+          selo.className = 'selo-susep '
+            + (resposta.situacao === 'REPETIDA' ? 'bloqueada' : 'liberada');
+          selo.textContent = resposta.mensagem;
+        } else {
+          // Proposta pela metade, ou canal sem proposta: nada a dizer. O
+          // formato errado é recusado ao salvar, com a explicação inteira.
+          selo.hidden = true;
+        }
+      })
+      .senao(function () {
+        if (String(campo.value || '').trim() !== perguntada) return;
+        selo.className = 'selo-susep conferindo';
+        selo.textContent = 'Não consegui conferir a proposta agora.';
       });
   }
 
@@ -3921,19 +4013,22 @@ var CasoEmModal = (function () {
     }).join('');
   }
 
+  /*
+    Só o status em que o caso está, e desde quando — pedido do PO. Sem a
+    jornada inteira, sem "ainda não" e sem o selo "está aqui": com uma linha
+    só, não há outra para apontar. Ver linhaDoTempoDoCaso_, no servidor.
+  */
   function desenharLinhaDoTempo() {
     if (!detalhe.linhaDoTempo || !detalhe.linhaDoTempo.length) return '';
 
     return '<section class="historico">'
-      + '<h4>Por onde o caso passou</h4>'
+      + '<h4>Onde o caso está</h4>'
       + '<ul class="linha-do-tempo">' + detalhe.linhaDoTempo.map(function (etapa) {
-        return '<li class="tom-' + escapar(etapa.tom || 'neutro')
-          + (etapa.cumprida ? ' cumprida' : ' pendente')
-          + (etapa.ehOndeEstaAgora ? ' agora' : '') + '">'
+        return '<li class="tom-' + escapar(etapa.tom || 'neutro') + ' cumprida">'
           + '<span class="marca" aria-hidden="true"></span>'
           + '<span class="etapa">' + escapar(etapa.status) + '</span>'
-          + '<span class="quando">'
-          + escapar(etapa.cumprida ? etapa.quando : 'ainda não') + '</span>'
+          + (etapa.quando
+            ? '<span class="quando">desde ' + escapar(etapa.quando) + '</span>' : '')
           + '</li>';
       }).join('') + '</ul></section>';
   }
@@ -3995,8 +4090,10 @@ var CasoEmModal = (function () {
       formulario = oFormulario;
       corpo.innerHTML = Formulario.desenhar(oFormulario, 'editar-');
       // Só o canal que confere a SUSEP ganha o selo na EDIÇÃO. Ver `ligar`.
+      // O Id do caso vai junto para o selo da proposta: na edição, o próprio
+      // caso não conta como repetição dele mesmo.
       Formulario.ligar(corpo, 'editar-', canalAtual,
-        oFormulario.canal.confereSusepBloqueada !== false);
+        oFormulario.canal.confereSusepBloqueada !== false, idAtual);
       Formulario.preencher(corpo, osValores.valores);
     }
 
@@ -5139,7 +5236,10 @@ var TelaCadastrarCaso = (function () {
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
-      + '<div class="acoes">'
+      // As ações nascem ESCONDIDAS e só aparecem com o formulário montado.
+      // Pedido do PO: nos testes, a equipe via "Cadastrar caso" e "Limpar"
+      // enquanto o formulário ainda carregava e achava que devia clicar.
+      + '<div class="acoes" id="acoes-do-caso" hidden>'
       + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
       + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
       + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
@@ -5151,6 +5251,7 @@ var TelaCadastrarCaso = (function () {
 
   function carregarFormulario() {
     corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
+    mostrarAsAcoes(false);
 
     Servidor.chamar('formularioDoCanal', canalEscolhida)
       .entao(function (resposta) {
@@ -5171,6 +5272,10 @@ var TelaCadastrarCaso = (function () {
           formulário não tem mais nada a pedir.
         */
         Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'));
+        // Só AGORA o formulário está inteiro — desenhado, ligado e com os
+        // padrões. Se der erro na carga, os botões continuam escondidos: não
+        // há o que cadastrar, e o recado do erro é o que importa ler.
+        mostrarAsAcoes(true);
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -5179,6 +5284,11 @@ var TelaCadastrarCaso = (function () {
         corpo().innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
+  }
+
+  function mostrarAsAcoes(mostrar) {
+    var acoes = elemento('acoes-do-caso');
+    if (acoes) acoes.hidden = !mostrar;
   }
 
   function recado(texto, tipo) {
@@ -5190,6 +5300,9 @@ var TelaCadastrarCaso = (function () {
 
   function salvar() {
     if (salvando) return;
+    // Formulário ainda carregando: os botões estão escondidos, e o Ctrl+Enter
+    // não pode ser a porta dos fundos que manda um cadastro vazio.
+    if (elemento('acoes-do-caso').hidden) return;
 
     /*
       A CONFERÊNCIA DOS OBRIGATÓRIOS FICA AQUI, e não só no botão.
@@ -8650,7 +8763,7 @@ var TelaConfiguracoes = (function () {
     var ehNovo = !item;
     var atual = item || {
       id: '', nome: '', rotulo: '', cor: 'neutro', ordem: dados.itens.length + 1,
-      ativo: true, codigo: '', colunaDeCarimbo: ''
+      ativo: true, codigo: '', colunaDeCarimbo: '', final: false
     };
 
     /** Só a lista de STATUS carimba data e hora. */
@@ -8676,6 +8789,21 @@ var TelaConfiguracoes = (function () {
         + 'volta a este status guarda a data da primeira vez.');
     }
 
+    /*
+      O status que FECHA o caso. Pedido do PO: o que é "concluído" muda de
+      canal para canal — e no VG ele ainda vai decidir. É daqui que ele decide,
+      sem código: marcado, o status entra em "Concluídos" e sai de "Ainda em
+      aberto" em Minha Performance, e conta para a meta.
+
+      Não trava nada: um caso num status final continua aceitando mudança.
+    */
+    function finalDoStatus(item) {
+      if (!ehStatus()) return '';
+      return caixaDeMarcar('final', 'Fecha o caso (status final)', item.final,
+        'Entra em "Concluídos" e na meta. O caso continua aceitando mudança '
+        + 'de status.');
+    }
+
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-item">'
       + tituloDoPainel(ehNovo ? 'Item novo' : atual.rotulo,
         'Lista ' + tipoDeListaEscolhido)
@@ -8687,6 +8815,7 @@ var TelaConfiguracoes = (function () {
         'O tom acompanha o tema: escolher "ruim" fica vermelho no claro e no '
         + 'escuro, sem ninguém precisar mexer.')
       + carimboDoStatus(atual)
+      + finalDoStatus(atual)
       + campoDeTexto('ordem', 'Ordem', atual.ordem, '')
       + caixaDeSimNao('ativo', 'Aparece nas listas', atual.ativo)
       + '<div class="config-acoes">'
@@ -8702,6 +8831,7 @@ var TelaConfiguracoes = (function () {
         codigo: valorDe('codigo'),
         cor: valorDe('cor'),
         colunaDeCarimbo: ehStatus() ? valorDe('coluna-de-carimbo') : '',
+        final: ehStatus() ? marcado('final') : false,
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarListas(); })

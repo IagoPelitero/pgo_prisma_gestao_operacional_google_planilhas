@@ -29,7 +29,10 @@ var TelaCadastrarCaso = (function () {
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
-      + '<div class="acoes">'
+      // As ações nascem ESCONDIDAS e só aparecem com o formulário montado.
+      // Pedido do PO: nos testes, a equipe via "Cadastrar caso" e "Limpar"
+      // enquanto o formulário ainda carregava e achava que devia clicar.
+      + '<div class="acoes" id="acoes-do-caso" hidden>'
       + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
       + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
       + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
@@ -41,6 +44,7 @@ var TelaCadastrarCaso = (function () {
 
   function carregarFormulario() {
     corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
+    mostrarAsAcoes(false);
 
     Servidor.chamar('formularioDoCanal', canalEscolhida)
       .entao(function (resposta) {
@@ -61,6 +65,10 @@ var TelaCadastrarCaso = (function () {
           formulário não tem mais nada a pedir.
         */
         Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'));
+        // Só AGORA o formulário está inteiro — desenhado, ligado e com os
+        // padrões. Se der erro na carga, os botões continuam escondidos: não
+        // há o que cadastrar, e o recado do erro é o que importa ler.
+        mostrarAsAcoes(true);
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -69,6 +77,11 @@ var TelaCadastrarCaso = (function () {
         corpo().innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
+  }
+
+  function mostrarAsAcoes(mostrar) {
+    var acoes = elemento('acoes-do-caso');
+    if (acoes) acoes.hidden = !mostrar;
   }
 
   function recado(texto, tipo) {
@@ -80,6 +93,9 @@ var TelaCadastrarCaso = (function () {
 
   function salvar() {
     if (salvando) return;
+    // Formulário ainda carregando: os botões estão escondidos, e o Ctrl+Enter
+    // não pode ser a porta dos fundos que manda um cadastro vazio.
+    if (elemento('acoes-do-caso').hidden) return;
 
     /*
       A CONFERÊNCIA DOS OBRIGATÓRIOS FICA AQUI, e não só no botão.

@@ -121,6 +121,16 @@ Dentro de `Evolucao/`:
    > silêncio. Para pegar os padrões novos, ajuste em Configurações, ou
    > instale numa planilha vazia.
 
+   **A cada versão nova, rode `atualizarPGO()`.** Ela traz para a planilha em
+   uso o que cada rodada mudou, e diz no fim o que fez, o que já estava assim
+   e o que é decisão sua. Nesta rodada, por exemplo, ela cria a coluna
+   `Final` no catálogo, **exclui o "Concluído" da RET**, troca os nomes dos
+   status para os do PO — no catálogo, **nos casos já gravados**, nos cartões
+   e nas situações destacadas, para nenhum número parar de contar — e marca
+   quais status fecham o caso. Caso que ainda esteja em "Concluído" **não é
+   mexido**: aparece na "DECISÃO SUA" com a contagem. Rodar duas vezes não
+   muda nada.
+
    ### O caminho curto: três arquivos
 
    A pasta **[`Evolucao/pacote/`](Evolucao/pacote/)** tem o sistema inteiro
@@ -321,6 +331,20 @@ Cada linha tem quatro ações: ver, editar, **alterar situação** — um diálo
 com a situação, porque é o gesto mais frequente da operação — e excluir, que
 tira o caso do sistema e **mantém a linha na planilha**.
 
+### Onde o caso está
+
+O detalhe mostra **só o status em que o caso está, e desde quando** — a pedido
+do PO. Antes vinha a jornada inteira, com "ainda não" em tudo que faltava; só
+que desfecho não é etapa em fila: um caso Retido nunca vai ser Não retido, e a
+lista dizia "Não retido — ainda não". O "desde quando" é a data da última
+mudança de status; caso recém-cadastrado, que nunca mudou, aparece sem data em
+vez de com uma inventada.
+
+As datas de cada etapa **continuam gravadas na linha do caso** (Data do 1º
+contato, Data do 2º contato…), junto com quem mudou por último e quantas vezes
+o caso andou. É delas que sai a produtividade da RET — só deixaram de ser
+listadas no detalhe.
+
 ### Editar: abre com o que está gravado, e fecha quando salva
 
 O formulário de edição abre **já preenchido com o que está na planilha** — os
@@ -351,6 +375,11 @@ sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
 
 ![A tela de cadastro](Evolucao/imagens/tela-cadastrar-caso.png)
 
+**Os botões só aparecem com o formulário pronto.** Enquanto o formulário
+carrega, "Cadastrar caso" e "Limpar" ficam escondidos — nos testes com a
+equipe, quem via os botões achava que devia clicar. O `Ctrl`+`Enter` também
+espera.
+
 **O botão fica inativo até os campos obrigatórios estarem preenchidos** — os
 marcados com `*` —, e ao passar o mouse ele diz por quê. O Enter e o
 `Ctrl`+`Enter` passam pela mesma conferência: botão travado não é segurança se
@@ -377,6 +406,27 @@ das pontas sai, e por um motivo concreto: quem copia de outra planilha traz
 `" RET00J "` sem ver, o selo acha a corretora assim mesmo (ele compara
 normalizado), e o estrago só aparece depois no Power BI, onde o join é pelo
 texto cru.
+
+### A proposta repetida no mês
+
+Na RET, ao digitar a proposta aparece um selo logo abaixo do campo, do mesmo
+jeito que o da SUSEP: **vermelho** quando a mesma proposta já foi cadastrada
+**no mesmo mês**, dizendo **com quem ela está** — "Já cadastrada em outubro de
+2026: com Ana Martins (caso 0000000012, Pendente)" —, e verde quando não há
+outra.
+
+- **Sinaliza, não impede.** O cadastro segue: quem decide se é engano ou um
+  segundo pedido do cliente é quem está atendendo.
+- **O mês é o da data do caso**; com a data em branco, o de hoje. A mesma
+  proposta em outro mês não acende — voltar meses depois é pedido novo.
+- **Os dois pedaços precisam bater**: `7-0000123` e `58-0000123` são propostas
+  diferentes.
+- **Na edição, o próprio caso não conta** como repetição dele mesmo.
+- Aparece só onde o formulário tem o campo da proposta — hoje, a RET. Não há
+  configuração nova: canal sem proposta não tem o que repetir.
+
+A conferência lê **só a coluna do número da proposta** e, depois, só as linhas
+em que ele bateu — a mesma regra da busca, para não pesar numa base grande.
 
 ### Proposta e apólice: digitadas inteiras, gravadas em pedaços
 
@@ -438,7 +488,7 @@ quantos estão **cadastrados** e quantos **pendentes**. O gráfico vem depois, e
 a explicação.
 
 "Já contatados" sai do **carimbo**, e não do status de hoje. Um caso que passou
-do "1º contato realizado" e hoje está em "Reteve" continua tendo sido contatado
+do "1º contato realizado" e hoje está em "Retido" continua tendo sido contatado
 — contar pelo status diria zero, e a operação concluiria que ninguém ligou para
 ninguém. A coluna de carimbo não esquece.
 
@@ -537,6 +587,37 @@ aqui, atrapalha alguém.
 aparecendo, mas como REFERÊNCIA: a média e a minha posição, no bloco de baixo.
 Saber que se fez 8 não diz nada sem saber que a média é 6. O que ela não faz é
 virar o assunto da tela — para isso existe a Produtividade RECC.
+
+### O que é "concluído", canal a canal
+
+"Concluídos", "Ainda em aberto" e a meta contam os casos que chegaram a um
+**status final** — e o que é final muda de canal para canal, palavra do PO:
+
+| Canal | Status que fecham o caso |
+|---|---|
+| RET | Não retido · Retido · Sem sucesso de contato · Cancelado · Pago |
+| Mesa Diamante | Concluído · Concluído na mesa · Sem retorno |
+| VG | nenhum ainda — o PO vai decidir |
+
+Quem diz é a coluna **`Final`** do catálogo, marcada em Configurações › Listas
+› (o status) › **"Fecha o caso"**. É por ali que o VG vai ganhar os dele, sem
+código. **Final não trava nada**: um caso fechado continua aceitando mudança de
+status.
+
+Antes o sistema adivinhava pelo nome — status que começa com "conclu". Um caso
+**Retido** aparecia como *em aberto*, um **Sem retorno** da Mesa também, e a
+meta da RET contava só "Concluído", um status que a RET não usa: o progresso
+dela ficava praticamente zerado. Com os finais marcados, **o número da meta e
+de "Concluídos" da RET muda** — passa a contar o que a operação considera
+fechado.
+
+**Na RET não existe mais "Concluído"**, e os nomes são os do PO: Não reteve →
+**Não retido**, Reteve → **Retido**, Sem sucesso → **Sem sucesso de contato**,
+mais **Cancelado** e **Pago**. Na Mesa, Concluído na célula → **Concluído na
+mesa**, mais **Sem retorno**. Quem já tem o PGO em uso recebe tudo isso
+rodando `atualizarPGO()` — ver a seção de instalação. As colunas de carimbo
+"Data reteve" e "Data não reteve" **mantêm o nome**: coluna da base é contrato
+com o Power BI.
 
 ### A meta: dias corridos do mês
 

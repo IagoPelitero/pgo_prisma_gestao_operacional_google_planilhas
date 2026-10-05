@@ -1210,6 +1210,59 @@ opostas que se parecem muito no console.
 
 ---
 
+### 50 · "Concluído" adivinhado pelo nome
+
+**Sintoma.** Nenhum vermelho, nenhum erro. Em Minha Performance, um caso
+**Retido** da RET contava como *ainda em aberto*; um **Sem retorno** da Mesa
+também. E a meta da RET contava como feito só o status "Concluído" — que a RET
+não usa. O progresso da meta da RET ficava praticamente em zero, e parecia
+certo.
+
+**Causa.** `contarConcluidos_` decidia o que é concluído pelo NOME: status que
+começa com "conclu". Servia para a Mesa do primeiro dia, que tinha dois
+"Concluído…". Quando a RET nasceu com Reteve e Não reteve, a regra continuou
+valendo — calada.
+
+**Como apareceu.** O PO perguntou por que a RET tinha uma opção "Concluído",
+se esse status não existe lá: "um caso concluído é cancelado, pago, não retido,
+retido ou sem sucesso de contato". Procurando quem usava "concluído", achei a
+regra do nome.
+
+**Defesa.** A coluna `Final` no catálogo, marcada em Configurações, e a conta
+lendo dela. Sem a coluna (planilha que ainda não rodou a atualização), vale a
+regra antiga — para o número não despencar no intervalo entre colar o código e
+rodar `atualizarPGO()`.
+
+---
+
+### 51 · O cartão no plural que a troca de nome não achava
+
+**Sintoma.** Teste da atualização: depois de trocar "Concluído na célula" por
+"Concluído na mesa", o cartão da Produtividade da Mesa passou a contar certo —
+e continuou se chamando **"Concluídos na célula"**.
+
+**Causa.** A troca acha o título pelo nome do status. O cartão estava no
+plural.
+
+**Defesa.** O plural vai declarado na regra da troca, ao lado do nome. Uma
+regra de "pluralizar" automática acertaria este e erraria o próximo.
+
+---
+
+### 52 · O substituto da prévia que respondia o que o servidor não responde
+
+**Sintoma.** No navegador, proposta pela metade ("70000") acendia o selo
+verde. No servidor de verdade ela devolve VAZIA, e o teste da suíte provava.
+
+**Causa.** O substituto do `google.script.run` na prévia respondia a qualquer
+proposta com a resposta guardada, sem conferir o formato.
+
+**O que ele ensina.** **A prévia é tão confiável quanto o substituto dela.** Um
+substituto que responde mais do que o servidor faz a tela parecer certa onde
+ela não está — ou errada onde está certa, que custa a mesma investigação.
+
+---
+
 ## O que esta lista ensina
 
 **São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
@@ -1347,3 +1400,12 @@ Daí as duas práticas que o projeto não abre mão:
     nove testes quebraram sem defeito nenhum, e um deles derrubou quatro por
     tabela. Vermelho que diz "mudou" quando devia dizer "quebrou" custa mais
     caro que teste nenhum: ensina a olhar o console com pressa.
+33. **Regra pelo nome é regra que ninguém vê.** O item 50 não deu erro em
+    momento nenhum: só contou errado, por meses, porque decidia "concluído"
+    pelas letras do status. O que é regra de negócio mora numa coluna que
+    alguém marca, e não num prefixo que alguém um dia escolheu.
+34. **Trocar um nome é trocar em todo lugar que guarda o nome.** No item 51
+    eram quatro: catálogo, casos gravados, cartões e destacadas — e o quinto,
+    o plural, só o teste achou.
+35. **A prévia é tão confiável quanto o substituto dela.** No item 52 a tela
+    estava certa e a prévia dizia que não.

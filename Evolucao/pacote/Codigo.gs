@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-02 12:31
+   Gerado em 2026-10-05 11:00
    ========================================================================== */
 
 
@@ -786,6 +786,17 @@ const RECC_ESQUEMA = {
       // Vazio quer dizer "este status não carimba nada", que é o normal para
       // a maioria deles.
       { cabecalho: 'ColunaDeCarimbo', tipo: 'texto', protegido: false },
+      // SÓ PARA ITENS DE STATUS: SIM quando o status FECHA o caso.
+      //
+      // Pedido do PO: o que é "concluído" muda de canal para canal. Na RET é
+      // Cancelado, Pago, Não retido, Retido ou Sem sucesso de contato; na Mesa
+      // Diamante, Concluído, Concluído na mesa ou Sem retorno; no VG ele ainda
+      // vai decidir. Antes o sistema adivinhava pelo nome — status que começa
+      // com "conclu" — e um caso Retido aparecia como "ainda em aberto".
+      //
+      // Final NÃO TRAVA o caso: ele continua aceitando mudança de status. Só
+      // diz o que entra na conta de "Concluídos". Vazio quer dizer não.
+      { cabecalho: 'Final', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Configuracao', tipo: 'textoLongo', protegido: false }
@@ -4382,6 +4393,11 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
 
   // Concluir preenche a data de finalização quando o canal tem essa coluna e
   // ela ainda está vazia — é o que a operação faria à mão logo em seguida.
+  //
+  // Continua pelo NOME ("conclu…"), e não pela coluna Final do catálogo, de
+  // propósito: na RET a coluna de finalização do canal é a "data da
+  // transmissão", e trocar para Final faria Retido, Pago e os outros
+  // desfechos escreverem uma data de transmissão que não aconteceu.
   if (canal.colunaDaFinalizacao && !atual[canal.colunaDaFinalizacao]
     && normalizarParaComparar_(achada.gravadoComo).indexOf('conclu') === 0) {
     alteracao[canal.colunaDaFinalizacao] = new Date();
@@ -5036,6 +5052,133 @@ function deveConferirOBloqueio_(idDoCanal, quem) {
   })[0];
 
   return canal ? canal.confereSusepBloqueada !== false : true;
+}
+
+// ============================================================================
+// O SELO DA PROPOSTA
+// ============================================================================
+
+/**
+ * A mesma proposta já cadastrada no MESMO MÊS, e com quem ela está.
+ *
+ * Pedido do PO: "na RET queria que houvesse um identificador de propostas
+ * duplicadas num único mês e/ou que identificasse quando aquela proposta está
+ * com o analista (...) algo pequeno mas que sinalizasse, tipo os das SUSEPs
+ * bloqueadas".
+ *
+ * SINALIZA, NÃO IMPEDE. O selo aparece abaixo do campo, como o da SUSEP, e o
+ * cadastro segue normal. Quem decide se a repetição é erro ou é um segundo
+ * pedido do mesmo cliente é quem está atendendo — o sistema só não deixa
+ * passar sem ninguém ver.
+ *
+ * QUAL CANAL: o que tem o campo da proposta gravando em pedaços (o
+ * `partirEm` do campo `numerodaproposta`) — hoje, só a RET. Não há coluna
+ * nova em CANAIS para ligar isto: canal sem proposta não tem o que repetir.
+ *
+ * QUAL MÊS: o da data do caso, que é a coluna de data do canal. Com a data
+ * ainda em branco no formulário, vale o mês de hoje — é nele que o servidor
+ * vai carimbar a entrada do caso (ver preencherEntradaAutomatica_).
+ *
+ * NA EDIÇÃO, o próprio caso não conta: `idDoCasoAberto` sai da conta, senão
+ * todo caso aberto acusaria a si mesmo.
+ *
+ * O CUSTO segue a regra da busca — ler a coluna antes de ler as linhas: lê a
+ * coluna do NÚMERO da proposta, e só as linhas em que ele bateu, que costumam
+ * ser nenhuma ou uma.
+ */
+function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+
+  var partir = partirDaPropostaDoCanal_(canal);
+  if (!partir) return { situacao: 'SEM_PROPOSTA', mensagem: '' };
+
+  // Proposta pela metade não é conferida: o formato errado já é recusado ao
+  // salvar, com a mensagem que diz como escrever. O selo só ficaria calado.
+  var pedacos;
+  try {
+    pedacos = partirPorHifen_(proposta, partir, 'Número da proposta');
+  } catch (erro) {
+    return { situacao: 'VAZIA', mensagem: '' };
+  }
+
+  var mes = converterParaData_(dataDoCaso) || new Date();
+  var nomeDoMes = RECC_NOMES_DOS_MESES[mes.getMonth()] + ' de ' + mes.getFullYear();
+
+  // 1. Só a coluna do número — o último pedaço, o que distingue a proposta.
+  var colunaDoNumero = partir.colunas[partir.colunas.length - 1];
+  var numero = pedacos[pedacos.length - 1];
+  var linhas = [];
+  lerColunaInteira_(canal.aba, colunaDoNumero).forEach(function (valor, i) {
+    if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
+  });
+
+  // 2. Só as linhas em que bateu: confere os outros pedaços, o mês e o Id.
+  var estrutura = estruturaDaAba_(canal.aba);
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+  var abertoAgora = converterParaIdentificador_(idDoCasoAberto);
+
+  var repetidas = lerLinhasEspecificas_(canal.aba, linhas).filter(function (registro) {
+    if (normalizarParaComparar_(registro._Visivel) === 'nao') return false;
+    if (abertoAgora && registro.__id === abertoAgora) return false;
+
+    var mesmosPedacos = partir.colunas.every(function (cabecalho, i) {
+      return converterParaIdentificador_(registro[cabecalho]) === pedacos[i];
+    });
+    if (!mesmosPedacos) return false;
+
+    var quando = canal.colunaDaData ? converterParaData_(registro[canal.colunaDaData]) : '';
+    return quando !== '' && quando.getMonth() === mes.getMonth()
+      && quando.getFullYear() === mes.getFullYear();
+  }).map(function (registro) {
+    return {
+      id: registro.__id,
+      analista: colunaDoAnalista ? String(registro[colunaDoAnalista] || '').trim() : '',
+      situacao: canal.colunaDoStatus
+        ? String(registro[canal.colunaDoStatus] || '').trim() : ''
+    };
+  });
+
+  if (!repetidas.length) {
+    return {
+      situacao: 'UNICA',
+      mensagem: 'Nenhuma outra com esta proposta em ' + nomeDoMes + '.'
+    };
+  }
+
+  // "com a Ana Martins (caso 0000000012, Pendente)" — quem está com ela é a
+  // pergunta que o PO fez, então é a primeira coisa que o selo responde.
+  var quais = repetidas.map(function (uma) {
+    return (uma.analista ? 'com ' + uma.analista : 'sem analista')
+      + ' (caso ' + uma.id + (uma.situacao ? ', ' + uma.situacao : '') + ')';
+  });
+  return {
+    situacao: 'REPETIDA',
+    mensagem: 'Já cadastrada em ' + nomeDoMes + ': ' + quais.join('; ') + '.',
+    casos: repetidas
+  };
+}
+
+/**
+ * Como o canal parte a proposta em colunas — ou null, se ele não tem proposta.
+ *
+ * Vem do campo, e não de uma lista de nomes de coluna escrita aqui: quem
+ * mudar as colunas da proposta em Configurações muda também a conferência.
+ */
+function partirDaPropostaDoCanal_(canal) {
+  var campo = camposAtivosDoCanal_(canal.id).filter(function (um) {
+    return normalizarParaComparar_(um.ChaveTecnica) === 'numerodaproposta';
+  })[0];
+  if (!campo) return null;
+
+  var partir = lerConfiguracaoDoCampo_(campo).partirEm;
+  if (!partir || !partir.colunas || partir.colunas.length < 2) return null;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var todasExistem = partir.colunas.every(function (cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) >= 0;
+  });
+  return todasExistem ? partir : null;
 }
 
 /* ############################################################################
@@ -6831,6 +6974,7 @@ function listarCatalogo(tipo, idDoCanal) {
         rotulo: String(item.Rotulo || item.Nome),
         cor: tomValido_(item.Cor),
         colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim(),
+        final: normalizarParaComparar_(item.Final) === 'sim',
         ordem: Number(item.Ordem) || 0,
         ativo: normalizarParaComparar_(item.Ativo) === 'sim'
       };
@@ -6869,6 +7013,12 @@ function salvarItemDoCatalogo(dados) {
   // que configuração faltando, porque alguém a preenche e espera efeito.
   if (tipo === 'STATUS') {
     campos.ColunaDeCarimbo = String(dados.colunaDeCarimbo || '').trim();
+    // Status FINAL: fecha o caso e entra em "Concluídos". Só grava se a
+    // planilha já tem a coluna — antes de rodar atualizarPGO ela não existe,
+    // e campo sem coluna é recusado, o que impediria salvar o status inteiro.
+    if (posicaoDaColuna_(estruturaDaAba_('CATALOGO'), 'Final') >= 0) {
+      campos.Final = dados.final === true ? 'SIM' : 'NAO';
+    }
   }
 
   var id = converterParaIdentificador_(dados.id);
@@ -10742,7 +10892,8 @@ function situacoesDoCanal_(canal) {
         nome: String(item.Rotulo || item.Nome),
         gravadoComo: String(item.Nome),
         tom: tomValido_(item.Cor),
-        colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim()
+        colunaDeCarimbo: String(item.ColunaDeCarimbo || '').trim(),
+        final: normalizarParaComparar_(item.Final) === 'sim'
       };
     });
 }
@@ -11043,41 +11194,49 @@ function detalhesDoCaso(idDoCanal, idDoCaso) {
 }
 
 /**
- * Por onde este caso passou, e quando.
+ * Onde o caso está agora, e desde quando.
  *
- * Sai dos CARIMBOS: cada status diz, no catálogo, em qual coluna ele grava a
- * data e a hora de quando o caso chegou nele. É o que responde a pergunta da
- * operação — "a data e a hora de cada contato" — sem abrir a planilha.
+ * Pedido do PO: "o card pode mostrar apenas o status que está". Antes vinha a
+ * jornada inteira — todo status com coluna de carimbo, na ordem do catálogo,
+ * com "ainda não" nas etapas que faltavam. Só que os desfechos não são
+ * etapas em fila: um caso Retido nunca vai ser Não retido, e a lista
+ * mostrava "Não retido — ainda não" como se faltasse acontecer.
  *
- * Vem na ordem do CATÁLOGO, e não na ordem das datas. A ordem do catálogo é a
- * jornada como a operação a desenhou, então uma etapa que ficou para trás
- * aparece no lugar dela, vazia, e se lê como o que é: um buraco. Ordenar por
- * data esconderia isso, porque o que não tem data não teria onde ficar.
+ * Volta UMA linha só (numa lista, que é o formato que a tela já desenha).
  *
- * Status sem coluna de carimbo fica de fora: ele não tem o que contar.
+ * O "DESDE QUANDO" sai, nesta ordem, de:
+ *
+ *   1. "Data da última mudança de status" — é exatamente quando o caso chegou
+ *      ao status em que está, mesmo que já tenha passado por ele antes;
+ *   2. o carimbo do próprio status — que guarda a PRIMEIRA vez que o caso
+ *      chegou nele, e serve quando a coluna acima está vazia;
+ *   3. nada. Caso recém-cadastrado em "Não trabalhado" não tem data de
+ *      mudança nenhuma, e inventar uma seria pior que não mostrar.
+ *
+ * Os carimbos continuam gravados na linha do caso, intactos: é deles que sai a
+ * produtividade. Só deixaram de ser listados aqui.
  */
 function linhaDoTempoDoCaso_(registro, canal) {
+  if (!canal.colunaDoStatus) return [];
+  var atual = String(registro[canal.colunaDoStatus] || '').trim();
+  if (!atual) return [];
+
   var estrutura = estruturaDaAba_(canal.aba);
-  var agora = normalizarParaComparar_(canal.colunaDoStatus
-    ? registro[canal.colunaDoStatus] : '');
+  function comoTexto(cabecalho) {
+    var posicao = cabecalho ? posicaoDaColuna_(estrutura, cabecalho) : -1;
+    if (posicao < 0) return '';
+    var valor = registro[cabecalho];
+    if (valor === null || valor === undefined || String(valor).trim() === '') return '';
+    return paraTexto_(valor, estrutura.tipos[posicao]);
+  }
 
-  var etapas = [];
-  situacoesDoCanal_(canal).forEach(function (situacao) {
-    if (!situacao.colunaDeCarimbo) return;
-
-    var posicao = posicaoDaColuna_(estrutura, situacao.colunaDeCarimbo);
-    if (posicao < 0) return;
-
-    var valor = registro[situacao.colunaDeCarimbo];
-    etapas.push({
-      status: situacao.nome,
-      tom: situacao.tom,
-      quando: paraTexto_(valor, estrutura.tipos[posicao]),
-      cumprida: String(valor === null || valor === undefined ? '' : valor).trim() !== '',
-      ehOndeEstaAgora: situacao.chave === agora
-    });
-  });
-  return etapas;
+  var doCatalogo = situacaoDoCanalPeloValor_(canal, atual);
+  return [{
+    status: doCatalogo ? doCatalogo.nome : atual,
+    tom: doCatalogo ? doCatalogo.tom : 'neutro',
+    quando: comoTexto(RECC_COLUNA_QUANDO_MUDOU_O_STATUS)
+      || comoTexto(doCatalogo ? doCatalogo.colunaDeCarimbo : '')
+  }];
 }
 
 /**
@@ -12133,9 +12292,30 @@ function indicador_(chave, rotulo, valor, anterior, unidade, explicacao, menorEh
 /** Uma situação conta como conclusão quando o nome dela começa com "conclu". */
 function contarConcluidos_(casos, canal) {
   if (!canal.colunaDoStatus) return 0;
+  var finais = statusFinaisDoCanal_(canal);
   return casos.filter(function (caso) {
-    return normalizarParaComparar_(caso[canal.colunaDoStatus]).indexOf('conclu') === 0;
+    var status = normalizarParaComparar_(caso[canal.colunaDoStatus]);
+    return finais ? finais.indexOf(status) >= 0 : status.indexOf('conclu') === 0;
   }).length;
+}
+
+/**
+ * Os status que FECHAM o caso neste canal — os marcados como Final no
+ * catálogo —, já normalizados para comparar com o que está gravado.
+ *
+ * Devolve null numa planilha que ainda não tem a coluna Final (quem colou o
+ * código novo e ainda não rodou atualizarPGO). Aí vale a regra antiga, do
+ * nome que começa com "conclu": sem ela, a Mesa passaria a mostrar zero
+ * concluídos até a atualização rodar, e o número errado pareceria defeito.
+ *
+ * Canal sem nenhum status final marcado — o VG, por enquanto — conta zero
+ * concluídos. É verdade: ninguém disse ainda o que fecha um caso ali.
+ */
+function statusFinaisDoCanal_(canal) {
+  if (posicaoDaColuna_(estruturaDaAba_('CATALOGO'), 'Final') < 0) return null;
+  return situacoesDoCanal_(canal)
+    .filter(function (situacao) { return situacao.final; })
+    .map(function (situacao) { return situacao.chave; });
 }
 
 /**
@@ -12891,14 +13071,14 @@ function semearDadosIniciais_(emailDoInstalador) {
        * A coluna é `valor do prêmio`, e não `valor do prêmio retido`. É o
        * prêmio EM JOGO em cada caso, e é a única leitura em que as cinco
        * contas que ele pediu querem dizer algo: com a coluna do retido, a
-       * barra de "Não reteve" seria sempre zero — caso não retido não tem
+       * barra de "Não retido" seria sempre zero — caso não retido não tem
        * prêmio retido —, e o gráfico pareceria quebrado.
        *
        * As duas são editáveis em Configurações › Canais de trabalho. Se a
        * operação medir outra coisa, troca ali, sem código.
        */
       ColunaDoValor: 'valor do prêmio',
-      SituacoesDestacadas: 'Reteve, Não reteve, Sem sucesso',
+      SituacoesDestacadas: 'Retido, Não retido, Sem sucesso de contato',
       // A RET trabalha inadimplência, e para ela o bloqueio importa.
       ConfereSusepBloqueada: true,
       Icone: 'escudo',
@@ -13001,37 +13181,54 @@ function semearDadosIniciais_(emailDoInstalador) {
   // "Não trabalhado" é o estado de nascimento e não carimba nada: carimbar a
   // hora em que o caso entrou seria repetir a data de recepção.
   //
-  // "SEM SUCESSO" é o status que o PO pediu nesta rodada, em LARANJA
-  // (`atencao`): nem o caso foi retido, nem foi perdido — a tentativa de
-  // contato não chegou a ninguém. Fica no FIM da lista, e não ao lado de "Não
-  // reteve", porque a ordem aqui é a mesma que a migração usa numa instalação
-  // que já existe: lá ele entra depois dos que já estão lá, e duas ordens
-  // diferentes para o mesmo status confundiriam quem olha as duas planilhas.
-  // A ordem é editável em Cadastrar Caso › Listas.
+  // "SEM SUCESSO DE CONTATO", em LARANJA (`atencao`): nem o caso foi retido,
+  // nem foi perdido — a tentativa de contato não chegou a ninguém. Fica depois
+  // dos desfechos que já existiam, na mesma ordem que a migração usa numa
+  // instalação em uso: duas ordens diferentes para o mesmo status confundiriam
+  // quem olha as duas planilhas. A ordem é editável em Cadastrar Caso › Listas.
   //
-  // Não carimba data: o PO não pediu coluna para ele, e criar uma coluna que
-  // ninguém pediu enche a base para medir o que a operação não decidiu medir.
+  // OS DESFECHOS, com os nomes do PO: "um caso concluído é cancelado, pago,
+  // não retido, retido ou sem sucesso de contato". São os cinco marcados como
+  // FINAL (o quarto item de cada linha). NÃO EXISTE "Concluído" na RET — o PO
+  // pediu para tirar: concluir é chegar a um desses cinco.
+  //
+  // Os carimbos de Não retido e Retido continuam nas colunas "Data não reteve"
+  // e "Data reteve": coluna da base é contrato com o Power BI, e mudar o nome
+  // dela por causa do nome do status quebraria o relatório. Sem sucesso,
+  // Cancelado e Pago não carimbam: o PO não pediu coluna para eles, e criar
+  // coluna que ninguém pediu enche a base para medir o que não se decidiu
+  // medir. A data da última mudança de status registra os cinco do mesmo jeito.
   [['Não trabalhado', 'ruim', ''],
    ['Aguardando transmissão', 'destaque', 'Data aguardando transmissão'],
    ['Pendente', 'atencao', 'Data pendente'],
    ['1º contato realizado', 'violeta', 'Data do 1º contato'],
    ['2º contato realizado', 'violeta', 'Data do 2º contato'],
-   ['Não reteve', 'ruim', 'Data não reteve'],
-   ['Reteve', 'bom', 'Data reteve'],
-   ['Concluído', 'bom', 'Data concluído'],
-   ['Sem sucesso', 'atencao', '']].forEach(function (trio, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idRet, trio[0], i + 1, trio[1], trio[2]));
+   ['Não retido', 'ruim', 'Data não reteve', true],
+   ['Retido', 'bom', 'Data reteve', true],
+   ['Sem sucesso de contato', 'atencao', '', true],
+   ['Cancelado', 'ruim', '', true],
+   ['Pago', 'bom', '', true]].forEach(function (linha, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idRet, linha[0], i + 1, linha[1],
+      linha[2], linha[3]));
   });
-  // A Mesa Diamante tem três status, e só três. O formulário nasce com
-  // "Em andamento" já escolhido — é o estado em que todo caso começa, e
-  // deixar em branco obrigaria a escolher o óbvio em toda abertura.
+  // A Mesa Diamante tem quatro status. O formulário nasce com "Em andamento"
+  // já escolhido — é o estado em que todo caso começa, e deixar em branco
+  // obrigaria a escolher o óbvio em toda abertura.
   //
-  // "Concluído na célula" é diferente de "Concluído": a célula resolveu sem
-  // devolver para a área. A operação mede os dois separados.
+  // "Concluído na mesa" é diferente de "Concluído": a mesa resolveu sem
+  // devolver para a área. A operação mede os dois separados. Os três últimos
+  // FECHAM o caso, palavra do PO: "concluído, concluído na mesa e sem
+  // retorno".
+  //
+  // "Sem retorno" NÃO carimba a data da finalização, embora seja final: a
+  // conta de "Finalizados na célula" é finalização preenchida sem área
+  // responsável, e um caso sem retorno entraria ali como resolvido.
   [['Em andamento', 'atencao', ''],
-   ['Concluído', 'bom', 'Data da finalização'],
-   ['Concluído na célula', 'destaque', 'Data da finalização']].forEach(function (trio, i) {
-    itens.push(novoItemDeCatalogo_('STATUS', idCanal, trio[0], i + 1, trio[1], trio[2]));
+   ['Concluído', 'bom', 'Data da finalização', true],
+   ['Concluído na mesa', 'destaque', 'Data da finalização', true],
+   ['Sem retorno', 'atencao', '', true]].forEach(function (linha, i) {
+    itens.push(novoItemDeCatalogo_('STATUS', idCanal, linha[0], i + 1, linha[1],
+      linha[2], linha[3]));
   });
   /*
    * Os SEIS status do VG, como o PO listou: "reativado, negado, aguardando,
@@ -13255,10 +13452,10 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     };
   }
 
-  // A RET mostra o total e as cinco situações que ainda pedem trabalho.
-  // "Concluído" existe como situação, mas NÃO ganha cartão: o Trabalho
-  // responde "o que eu tenho que trabalhar hoje", e caso concluído não é
-  // trabalho. Quem quiser o número acrescenta o cartão em Configurações.
+  // A RET mostra o total e as cinco situações que ainda pedem trabalho. Os
+  // desfechos (Retido, Não retido e os outros finais) NÃO ganham cartão: o
+  // Trabalho responde "o que eu tenho que trabalhar hoje", e caso fechado não
+  // é trabalho. Quem quiser o número acrescenta o cartão em Configurações.
   cartoes.push(novoCartao(idRet, 'Total de casos', 'total', '', 'destaque', 1));
   [['Aguardando transmissão', 'destaque'], ['Pendente', 'atencao'],
    ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
@@ -13286,7 +13483,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   // foram contatados.
   //
   // Contatados sai do CARIMBO, e não do status. Um caso que já passou do "1º
-  // contato realizado" e hoje está em "Reteve" continua tendo sido contatado —
+  // contato realizado" e hoje está em "Retido" continua tendo sido contatado —
   // mas não conta mais em status nenhum. A coluna de carimbo não esquece.
 
   function cartaoDaProdutividade(canalId, titulo, dimensao, filtro, cor, ordem) {
@@ -13295,8 +13492,8 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   }
 
   cartoes.push(cartaoDaProdutividade(idRet, 'Casos cadastrados', 'total', '', 'destaque', 1));
-  cartoes.push(cartaoDaProdutividade(idRet, 'Reteve', 'situacao', 'Reteve', 'bom', 2));
-  cartoes.push(cartaoDaProdutividade(idRet, 'Não reteve', 'situacao', 'Não reteve', 'ruim', 3));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Retido', 'situacao', 'Retido', 'bom', 2));
+  cartoes.push(cartaoDaProdutividade(idRet, 'Não retido', 'situacao', 'Não retido', 'ruim', 3));
   cartoes.push(cartaoDaProdutividade(idRet, 'Já contatados', 'preenchido',
     'Data do 1º contato', 'violeta', 4));
   cartoes.push(cartaoDaProdutividade(idRet, 'Com 2º contato', 'preenchido',
@@ -13307,8 +13504,8 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
 
   cartoes.push(cartaoDaProdutividade(idCanal, 'Casos cadastrados', 'total', '', 'destaque', 1));
   cartoes.push(cartaoDaProdutividade(idCanal, 'Concluídos', 'situacao', 'Concluído', 'bom', 2));
-  cartoes.push(cartaoDaProdutividade(idCanal, 'Concluídos na célula', 'situacao',
-    'Concluído na célula', 'bom', 3));
+  cartoes.push(cartaoDaProdutividade(idCanal, 'Concluídos na mesa', 'situacao',
+    'Concluído na mesa', 'bom', 3));
   cartoes.push(cartaoDaProdutividade(idCanal, 'Em andamento', 'situacao',
     'Em andamento', 'atencao', 4));
 
@@ -13379,8 +13576,8 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   return cartoes;
 }
 
-function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor, colunaDeCarimbo) {
-  return {
+function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor, colunaDeCarimbo, ehFinal) {
+  var item = {
     CanalId: canalId,
     Tipo: tipo,
     Codigo: '',
@@ -13395,6 +13592,15 @@ function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor, colunaDeCarimbo) {
     Ativo: true,
     Configuracao: ''
   };
+  // SIM quando o status FECHA o caso — é o que entra em "Concluídos". Vazio é
+  // não: o VG nasce sem nenhum, porque o PO ainda vai decidir.
+  //
+  // A chave só vai quando é SIM. Uma planilha que ainda não rodou a
+  // atualização não tem a coluna Final, e campo sem coluna é recusado ao
+  // gravar — um cargo ou uma disponibilidade novos estourariam ali por causa
+  // de uma coluna que nem é deles.
+  if (ehFinal) item.Final = true;
+  return item;
 }
 
 function novaConfiguracao_(chave, valor, descricao) {
@@ -13836,9 +14042,14 @@ function atualizarPGO() {
   esquecerEstruturaLida_();
 
   // --- 3. o que o PO pediu para a RET e para a Mesa -------------------------
+  //
+  // A coluna Final do catálogo vem PRIMEIRO: as etapas abaixo criam status
+  // finais, e gravar um campo sem coluna é recusado.
+  feito = feito.concat(criarColunasDoContrato_('CATALOGO', pulados));
   feito = feito.concat(ligarOValorPorSituacaoDaRet_(pulados));
   feito = feito.concat(tirarAConferenciaDeBloqueioDaMesa_(pulados));
   feito = feito.concat(criarOStatusSemSucesso_(pulados));
+  feito = feito.concat(aplicarOsStatusDoPO_(pulados, paraVoce));
   feito = feito.concat(ligarAPropostaEAApoliceEmPedacos_(pulados));
 
   // --- 4. as colunas novas dos dois cadastros ------------------------------
@@ -14224,15 +14435,22 @@ function ligarOValorPorSituacaoDaRet_(pulados) {
   atualizarRegistro_('CANAIS', ret.Id, {
     ColunaDoValor: 'valor do prêmio',
     SituacoesDestacadas: String(ret.SituacoesDestacadas || '').trim()
-      || 'Reteve, Não reteve, Sem sucesso'
+      || 'Retido, Não retido, Sem sucesso de contato'
   });
   esquecerEstruturaLida_();
   feito.push('RET: gráfico de valor por situação ligado em "valor do prêmio", '
-    + 'destacando Reteve, Não reteve e Sem sucesso');
+    + 'destacando Retido, Não retido e Sem sucesso de contato');
   return feito;
 }
 
-/** O status "Sem sucesso" da RET, em laranja, como o PO pediu. */
+/**
+ * O status "Sem sucesso de contato" da RET, em laranja, como o PO pediu.
+ *
+ * Nasceu como "Sem sucesso" e o PO renomeou depois. Os DOIS nomes contam como
+ * "já existe": procurar só o nome novo faria esta etapa recriar o antigo numa
+ * planilha que ainda não passou pela troca de nomes — e procurar só o antigo
+ * o recriaria em toda atualização depois da troca.
+ */
 function criarOStatusSemSucesso_(pulados) {
   var feito = [];
   var ret = lerRegistros_('CANAIS').filter(function (canal) {
@@ -14251,21 +14469,272 @@ function criarOStatusSemSucesso_(pulados) {
     // "semsucesso". Comparar com 'sem sucesso' nunca casaria, e o status
     // nasceria de novo a cada atualização — foi o que aconteceu na primeira
     // versão, e quem pegou foi o teste de rodar duas vezes.
-    if (normalizarParaComparar_(item.Nome)
-      === normalizarParaComparar_('Sem sucesso')) jaExiste = true;
+    var nome = normalizarParaComparar_(item.Nome);
+    if (nome === normalizarParaComparar_('Sem sucesso')
+      || nome === normalizarParaComparar_('Sem sucesso de contato')) jaExiste = true;
   });
 
   if (jaExiste) {
-    pulados.push('o status "Sem sucesso" já existe na RET');
+    pulados.push('o status "Sem sucesso de contato" já existe na RET');
     return feito;
   }
 
-  // Sem coluna de carimbo: o PO não pediu data para este status.
+  // Sem coluna de carimbo: o PO não pediu data para este status. Final, sim:
+  // é um dos desfechos que ele listou.
   inserirRegistro_('CATALOGO', novoItemDeCatalogo_('STATUS', ret.Id,
-    'Sem sucesso', ultimaOrdem + 1, 'atencao', ''));
+    'Sem sucesso de contato', ultimaOrdem + 1, 'atencao', '', true));
   esquecerEstruturaLida_();
-  feito.push('RET: status "Sem sucesso" criado, em laranja');
+  feito.push('RET: status "Sem sucesso de contato" criado, em laranja');
   return feito;
+}
+
+/**
+ * Os status da RET e da Mesa Diamante com os NOMES DO PO, e quais FECHAM o
+ * caso.
+ *
+ * Pedido do PO: "na RET não precisa ter a opção concluído pois não existe esse
+ * status. Um caso concluído é cancelado, pago, não retido, retido ou sem
+ * sucesso de contato (...) Na mesa temos concluído, concluído na mesa e sem
+ * retorno. Do VG ainda vou resolver". E, perguntado: "exclui da planilha e
+ * prepara para que ele altere no código que já tenho funcional".
+ *
+ * O VG fica de fora até o PO decidir.
+ */
+const RECC_STATUS_DO_PO = [
+  {
+    aba: 'BASE_RET',
+    trocar: [['Não reteve', 'Não retido'], ['Reteve', 'Retido'],
+      ['Sem sucesso', 'Sem sucesso de contato']],
+    excluir: ['Concluído'],
+    criar: [['Cancelado', 'ruim'], ['Pago', 'bom']],
+    finais: ['Não retido', 'Retido', 'Sem sucesso de contato', 'Cancelado', 'Pago']
+  },
+  {
+    aba: 'BASE_MESA',
+    trocar: [['Concluído na célula', 'Concluído na mesa']],
+    // O cartão da Produtividade tem o nome no PLURAL — "Concluídos na
+    // célula" — e por isso não é achado pelo nome do status. Vai declarado.
+    titulos: [['Concluídos na célula', 'Concluídos na mesa']],
+    excluir: [],
+    criar: [['Sem retorno', 'atencao']],
+    finais: ['Concluído', 'Concluído na mesa', 'Sem retorno']
+  }
+];
+
+/**
+ * Aplica RECC_STATUS_DO_PO na planilha que já está em uso.
+ *
+ * TROCAR UM NOME É TROCAR EM QUATRO LUGARES, e esta etapa troca nos quatro:
+ *
+ *   1. o catálogo (Nome e, se ninguém tinha personalizado, o Rótulo);
+ *   2. os CASOS já gravados na base — senão os antigos ficariam "fora da
+ *      lista", sem cor e fora de toda conta;
+ *   3. os cartões e gráficos que filtram por aquele status — o cartão
+ *      "Reteve" da Produtividade pararia de contar no dia da troca, calado;
+ *   4. as situações destacadas do gráfico de valor do canal.
+ *
+ * Trocar só o catálogo deixaria o sistema inteiro discordando de si mesmo, e
+ * o número errado não daria erro nenhum.
+ *
+ * EXCLUIR apaga a linha do catálogo — "exclui da planilha", palavra do PO. Se
+ * algum caso ainda estiver naquele status, ele NÃO é mexido: vai para a
+ * "DECISÃO SUA" com a contagem, porque escolher o status novo de um caso é
+ * decisão de quem conhece o caso.
+ *
+ * FINAL é marcado só onde a célula está EM BRANCO. Quem já escreveu NÃO num
+ * deles escolheu, e rodar a atualização de novo não pode desfazer isso.
+ *
+ * RODAR DUAS VEZES NÃO MUDA NADA: na segunda, todo nome novo já existe, todo
+ * excluído já sumiu e todo final já está marcado.
+ */
+function aplicarOsStatusDoPO_(pulados, paraVoce) {
+  var feito = [];
+
+  RECC_STATUS_DO_PO.forEach(function (regra) {
+    var canal = lerRegistros_('CANAIS').filter(function (um) {
+      return normalizarParaComparar_(um.Aba) === normalizarParaComparar_(regra.aba);
+    })[0];
+    if (!canal) {
+      pulados.push('não há canal apontando para a ' + regra.aba);
+      return;
+    }
+    var nomeDoCanal = String(canal.Nome);
+    var doCanal = converterParaIdentificador_(canal.Id);
+
+    function acharStatus(nome) {
+      return lerRegistros_('CATALOGO').filter(function (item) {
+        return normalizarParaComparar_(item.Tipo) === 'status'
+          && converterParaIdentificador_(item.CanalId) === doCanal
+          && normalizarParaComparar_(item.Nome) === normalizarParaComparar_(nome);
+      })[0];
+    }
+
+    // 1. os nomes trocados, nos quatro lugares
+    regra.trocar.forEach(function (par) {
+      var antigo = par[0];
+      var novo = par[1];
+      if (acharStatus(novo)) {
+        pulados.push(nomeDoCanal + ': o status "' + novo + '" já existe');
+        return;
+      }
+      var item = acharStatus(antigo);
+      if (!item) return;   // nem o antigo nem o novo: a etapa 3 cria, se for o caso
+
+      var rotulo = String(item.Rotulo || '').trim();
+      atualizarRegistro_('CATALOGO', item.__id, {
+        Nome: novo,
+        Rotulo: !rotulo || normalizarParaComparar_(rotulo) === normalizarParaComparar_(antigo)
+          ? novo : rotulo
+      });
+      var casos = trocarStatusNosCasos_(canal, antigo, novo);
+      var paineis = trocarStatusNosPaineis_(doCanal, antigo, novo, regra.titulos);
+      trocarStatusNasDestacadas_(canal, antigo, novo);
+      esquecerEstruturaLida_();
+      feito.push(nomeDoCanal + ': "' + antigo + '" virou "' + novo + '" — no catálogo, em '
+        + casos + ' caso(s) e em ' + paineis + ' cartão(ões)/gráfico(s)');
+    });
+
+    // 2. os que saem
+    regra.excluir.forEach(function (nome) {
+      var item = acharStatus(nome);
+      if (!item) {
+        pulados.push(nomeDoCanal + ': o status "' + nome + '" já não existe');
+        return;
+      }
+      apagarRegistroDeVez_('CATALOGO', item.__id);
+      trocarStatusNasDestacadas_(canal, nome, '');
+      esquecerEstruturaLida_();
+      feito.push(nomeDoCanal + ': status "' + nome + '" excluído do catálogo');
+
+      var aindaNele = contarCasosNoStatus_(canal, nome);
+      if (aindaNele) {
+        paraVoce.push(nomeDoCanal + ': ' + aindaNele + ' caso(s) continuam com o status "'
+          + nome + '", que saiu do catálogo. Eles aparecem como "fora da lista" até '
+          + 'alguém escolher o status certo de cada um no Trabalho.');
+      }
+    });
+
+    // 3. os que faltam, no fim da lista
+    regra.criar.forEach(function (par) {
+      if (acharStatus(par[0])) {
+        pulados.push(nomeDoCanal + ': o status "' + par[0] + '" já existe');
+        return;
+      }
+      var ultimaOrdem = 0;
+      lerRegistros_('CATALOGO').forEach(function (item) {
+        if (normalizarParaComparar_(item.Tipo) !== 'status') return;
+        if (converterParaIdentificador_(item.CanalId) !== doCanal) return;
+        ultimaOrdem = Math.max(ultimaOrdem, Number(item.Ordem) || 0);
+      });
+      inserirRegistro_('CATALOGO', novoItemDeCatalogo_('STATUS', canal.Id,
+        par[0], ultimaOrdem + 1, par[1], '', true));
+      esquecerEstruturaLida_();
+      feito.push(nomeDoCanal + ': status "' + par[0] + '" criado');
+    });
+
+    // 4. o que fecha o caso
+    var marcados = [];
+    regra.finais.forEach(function (nome) {
+      var item = acharStatus(nome);
+      if (!item || String(item.Final === null || item.Final === undefined
+        ? '' : item.Final).trim() !== '') return;
+      atualizarRegistro_('CATALOGO', item.__id, { Final: true });
+      marcados.push(nome);
+    });
+    esquecerEstruturaLida_();
+    if (marcados.length) {
+      feito.push(nomeDoCanal + ': status finais marcados — ' + marcados.join(', '));
+    } else {
+      pulados.push(nomeDoCanal + ': os status finais já estavam decididos');
+    }
+  });
+
+  return feito;
+}
+
+/**
+ * Troca o status nos casos já gravados do canal. Devolve quantos mudaram.
+ *
+ * Lê só a coluna do status e escreve só ela, e só se algo mudou: numa base de
+ * 200 mil casos, reescrever a aba inteira para trocar uma palavra seria o
+ * tipo de gravação que estoura o tempo do Apps Script no meio.
+ */
+function trocarStatusNosCasos_(canal, antigo, novo) {
+  var aba = String(canal.Aba);
+  var coluna = String(canal.ColunaDoStatus || '');
+  var estrutura = estruturaDaAba_(aba);
+  var posicao = coluna ? posicaoDaColuna_(estrutura, coluna) : -1;
+  if (posicao < 0) return 0;
+
+  var procurado = normalizarParaComparar_(antigo);
+  var trocados = 0;
+  var valores = lerColunaInteira_(aba, coluna).map(function (valor) {
+    if (normalizarParaComparar_(valor) !== procurado) return [valor];
+    trocados++;
+    return [novo];
+  });
+  if (trocados) {
+    estrutura.aba.getRange(2, posicao + 1, valores.length, 1).setValues(valores);
+    esquecerEstruturaLida_(aba);
+  }
+  return trocados;
+}
+
+/** Quantos casos do canal estão num status. */
+function contarCasosNoStatus_(canal, nome) {
+  var coluna = String(canal.ColunaDoStatus || '');
+  if (!coluna || posicaoDaColuna_(estruturaDaAba_(String(canal.Aba)), coluna) < 0) return 0;
+  var procurado = normalizarParaComparar_(nome);
+  return lerColunaInteira_(String(canal.Aba), coluna).filter(function (valor) {
+    return normalizarParaComparar_(valor) === procurado;
+  }).length;
+}
+
+/**
+ * Troca o status nos cartões e gráficos do canal: no filtro, que é o que conta,
+ * e no título, quando o título era o próprio nome do status ou um dos
+ * `titulos` declarados na regra (o plural de um cartão, por exemplo).
+ */
+function trocarStatusNosPaineis_(doCanal, antigo, novo, titulos) {
+  var procurado = normalizarParaComparar_(antigo);
+  var titulosTrocados = {};
+  (titulos || []).forEach(function (par) {
+    titulosTrocados[normalizarParaComparar_(par[0])] = par[1];
+  });
+  var trocados = 0;
+  lerRegistros_('PAINEIS').forEach(function (painel) {
+    if (converterParaIdentificador_(painel.CanalId) !== doCanal) return;
+    var mudanca = {};
+    var titulo = normalizarParaComparar_(painel.Titulo);
+    if (normalizarParaComparar_(painel.Filtro) === procurado) mudanca.Filtro = novo;
+    if (titulo === procurado) mudanca.Titulo = novo;
+    else if (titulosTrocados[titulo]) mudanca.Titulo = titulosTrocados[titulo];
+    if (!Object.keys(mudanca).length) return;
+    atualizarRegistro_('PAINEIS', painel.__id, mudanca);
+    trocados++;
+  });
+  return trocados;
+}
+
+/**
+ * Troca (ou tira, com `novo` vazio) um status da lista de situações destacadas
+ * do gráfico de valor do canal — a lista é texto separado por vírgula.
+ */
+function trocarStatusNasDestacadas_(canal, antigo, novo) {
+  var lista = String(canal.SituacoesDestacadas || '').trim();
+  if (!lista) return;
+  var procurado = normalizarParaComparar_(antigo);
+  var mexeu = false;
+  var nova = lista.split(',').map(function (nome) { return nome.trim(); })
+    .map(function (nome) {
+      if (normalizarParaComparar_(nome) !== procurado) return nome;
+      mexeu = true;
+      return novo;
+    })
+    .filter(function (nome) { return nome !== ''; });
+  if (!mexeu) return;
+  canal.SituacoesDestacadas = nova.join(', ');
+  atualizarRegistro_('CANAIS', canal.Id, { SituacoesDestacadas: canal.SituacoesDestacadas });
 }
 
 /**

@@ -46,7 +46,7 @@ function rodarTestesDaProdutividade() {
       canal: 'E-mail', 'motivo do cancelamento': 'Portabilidade',
       'data de recepção do protocolo': diasAtras(1),
       'valor do prêmio retido': 300, 'nome do cliente': 'Dois' },
-    { analista: 'Patrícia Nunes', status: 'Concluído', produto: 'Vida Individual',
+    { analista: 'Patrícia Nunes', status: 'Pago', produto: 'Vida Individual',
       canal: 'Chat', 'motivo do cancelamento': 'Coberturas',
       'data de recepção do protocolo': diasAtras(2),
       'valor do prêmio retido': 500, 'nome do cliente': 'Três' }
@@ -161,22 +161,22 @@ function rodarTestesDaProdutividade() {
   secao('A cor');
 
   teste('a cor segue a entidade, e não a posição no gráfico', () => {
-    // "Concluído" é verde porque o CATÁLOGO diz que é. Se a cor viesse da
-    // posição, um filtro que jogasse Concluído do primeiro para o quarto
+    // "Pago" é verde porque o CATÁLOGO diz que é. Se a cor viesse da
+    // posição, um filtro que jogasse Pago do primeiro para o quarto
     // lugar repintaria o gráfico inteiro, e ninguém compararia duas telas.
     const antes = acharGrafico('Situação dos casos').pontos
-      .find((p) => p.rotulo === 'Concluído');
+      .find((p) => p.rotulo === 'Pago');
     igual(antes.tom, 'bom');
 
     chamar('inserirVariosRegistros_')('BASE_RET', [
-      { analista: 'Marcos Vieira', status: 'Concluído',
+      { analista: 'Marcos Vieira', status: 'Pago',
         'data de recepção do protocolo': diasAtras(1), 'nome do cliente': 'A' },
-      { analista: 'Marcos Vieira', status: 'Concluído',
+      { analista: 'Marcos Vieira', status: 'Pago',
         'data de recepção do protocolo': diasAtras(1), 'nome do cliente': 'B' }
     ]);
 
     const depois = acharGrafico('Situação dos casos').pontos
-      .find((p) => p.rotulo === 'Concluído');
+      .find((p) => p.rotulo === 'Pago');
     verdadeiro(depois.valor > antes.valor, 'ele mudou de posição no gráfico');
     igual(depois.tom, 'bom', 'e continua verde');
   });
@@ -215,13 +215,13 @@ function rodarTestesDaProdutividade() {
 
   teste('clicar num ponto devolve os casos que o formam', () => {
     const pizza = acharGrafico('Situação dos casos');
-    const concluido = pizza.pontos.find((p) => p.rotulo === 'Concluído');
+    const concluido = pizza.pontos.find((p) => p.rotulo === 'Pago');
 
     const detalhe = chamar('detalharComponente')(ret.id, pizza.id,
       concluido.chave, {}, 30);
     igual(detalhe.total, concluido.casos,
       'o número do gráfico e a lista de casos saem da mesma conta');
-    igual(detalhe.ponto, 'Concluído');
+    igual(detalhe.ponto, 'Pago');
     verdadeiro(detalhe.colunas.length > 0, 'e vem com as colunas da fila');
   });
 
@@ -279,7 +279,7 @@ function rodarTestesDaProdutividade() {
   teste('a Produtividade RECC abre com os cartões que a RET pediu', () => {
     const rotulos = painelDaRet().cartoes.map((c) => c.rotulo);
     igual(rotulos.join(' | '),
-      'Casos cadastrados | Reteve | Não reteve | Já contatados | '
+      'Casos cadastrados | Retido | Não retido | Já contatados | '
       + 'Com 2º contato | Pendentes | Não trabalhados');
   });
 
@@ -292,25 +292,25 @@ function rodarTestesDaProdutividade() {
     const daProdutividade = chamar('cartoesDoCanal_')(ret, 'produtividade')
       .map((c) => c.titulo).join(' | ');
     verdadeiro(doTrabalho !== daProdutividade, 'as duas listas não podem ser iguais');
-    verdadeiro(doTrabalho.indexOf('Reteve') < 0, 'o Trabalho não mostra Reteve');
-    verdadeiro(daProdutividade.indexOf('Reteve') >= 0, 'a Produtividade mostra');
+    verdadeiro(doTrabalho.indexOf('Retido') < 0, 'o Trabalho não mostra Retido');
+    verdadeiro(daProdutividade.indexOf('Retido') >= 0, 'a Produtividade mostra');
   });
 
   teste('"já contatados" sai do carimbo, e não do status', () => {
     // A diferença que importa: um caso que já passou do "1º contato realizado"
-    // e hoje está em "Reteve" continua tendo sido contatado. Contar pelo status
+    // e hoje está em "Retido" continua tendo sido contatado. Contar pelo status
     // diria zero — e a operação concluiria que ninguém ligou para ninguém.
     const novo = chamar('cadastrarCaso')(ret.id, {
       status: 'Não trabalhado', nomedocliente: 'Caso que andou',
       datadereceptodoprotocolo: diasAtras(1)
     });
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Reteve');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
 
     const cartoes = painelDaRet().cartoes;
     const acharCartao = (rotulo) => cartoes.find((c) => c.rotulo === rotulo);
 
-    igual(acharCartao('Reteve').valor, 1, 'o status de hoje é Reteve');
+    igual(acharCartao('Retido').valor, 1, 'o status de hoje é Retido');
     igual(acharCartao('Já contatados').valor, 1,
       'e ele continua contando como contatado, porque o carimbo não some');
   });
@@ -813,7 +813,7 @@ function rodarTestesDaProdutividade() {
   });
 
   teste('o filtro vale para todos os gráficos ao mesmo tempo', () => {
-    const filtrado = painelDaRet({ status: 'Concluído' });
+    const filtrado = painelDaRet({ status: 'Pago' });
     verdadeiro(filtrado.total < painelDaRet().total);
     filtrado.componentes.forEach((componente) => {
       if (componente.aviso || !componente.pontos.length) return;
@@ -970,7 +970,7 @@ function rodarTestesDaProdutividade() {
    * filtro do analista nela.
    *
    * É de propósito. Os testes acima deste arquivo deixaram casos na BASE_RET
-   * com status "Reteve" e sem valor preenchido — contar a base inteira aqui
+   * com status "Retido" e sem valor preenchido — contar a base inteira aqui
    * daria números que mudam quando alguém acrescenta um teste lá em cima, e a
    * falha apareceria longe da causa. Com o filtro, estes testes só olham o que
    * eles mesmos escreveram.
@@ -980,10 +980,10 @@ function rodarTestesDaProdutividade() {
 
   teste('cada situação declarada ganha a sua barra, na ordem declarada', () => {
     chamar('inserirVariosRegistros_')('BASE_RET', [
-      { analista: DELA, status: 'Reteve',
+      { analista: DELA, status: 'Retido',
         'data de recepção do protocolo': diasAtras(1),
         'valor do prêmio': 1000, 'nome do cliente': 'V1' },
-      { analista: DELA, status: 'Reteve',
+      { analista: DELA, status: 'Retido',
         'data de recepção do protocolo': diasAtras(1),
         'valor do prêmio': 500, 'nome do cliente': 'V2' },
       // 2000 de propósito, MAIOR que a soma dos retidos. Com o não retido
@@ -991,7 +991,7 @@ function rodarTestesDaProdutividade() {
       // e o teste de ordem passaria sem provar nada: foi o que aconteceu na
       // primeira versão dele, e só apareceu quando quebrei o código de
       // propósito para ver se o teste reclamava. Ele não reclamou.
-      { analista: DELA, status: 'Não reteve',
+      { analista: DELA, status: 'Não retido',
         'data de recepção do protocolo': diasAtras(1),
         'valor do prêmio': 2000, 'nome do cliente': 'V3' },
       { analista: DELA, status: 'Pendente',
@@ -1003,7 +1003,7 @@ function rodarTestesDaProdutividade() {
     verdadeiro(grafico !== null,
       'a RET declara a coluna do valor, então tem o gráfico');
     igual(grafico.pontos.map((p) => p.rotulo).join(' | '),
-      'Reteve | Não reteve | Sem sucesso | Demais situações',
+      'Retido | Não retido | Sem sucesso de contato | Demais situações',
       'a ordem é a declarada pela operação, e não a do maior para o menor');
     igual(grafico.unidade, 'dinheiro');
   });
@@ -1012,9 +1012,9 @@ function rodarTestesDaProdutividade() {
     const porRotulo = {};
     soDaRobin().pontos.forEach((p) => { porRotulo[p.rotulo] = p; });
 
-    igual(porRotulo['Reteve'].valor, 1500, '1000 + 500');
-    igual(porRotulo['Reteve'].casos, 2, 'e diz de quantos casos veio');
-    igual(porRotulo['Não reteve'].valor, 2000,
+    igual(porRotulo['Retido'].valor, 1500, '1000 + 500');
+    igual(porRotulo['Retido'].casos, 2, 'e diz de quantos casos veio');
+    igual(porRotulo['Não retido'].valor, 2000,
       'maior que o retido, e ainda assim desenhado depois dele');
     igual(porRotulo['Demais situações'].valor, 200, 'o Pendente, sozinho');
   });
@@ -1027,7 +1027,7 @@ function rodarTestesDaProdutividade() {
      * olhasse diria "não temos esse problema" quando a verdade é "não
      * sabemos".
      */
-    const semSucesso = soDaRobin().pontos.find((p) => p.rotulo === 'Sem sucesso');
+    const semSucesso = soDaRobin().pontos.find((p) => p.rotulo === 'Sem sucesso de contato');
     verdadeiro(semSucesso !== undefined, 'a barra tem de existir mesmo vazia');
     igual(semSucesso.valor, 0);
     igual(semSucesso.casos, 0);
@@ -1043,13 +1043,13 @@ function rodarTestesDaProdutividade() {
   });
 
   teste('a cor da barra segue a situação, e não a posição', () => {
-    // A mesma regra do resto do sistema: "Reteve" é verde porque o catálogo
+    // A mesma regra do resto do sistema: "Retido" é verde porque o catálogo
     // diz que é. Sem isso, o gráfico se repintaria a cada filtro.
     const porRotulo = {};
     soDaRobin().pontos.forEach((p) => { porRotulo[p.rotulo] = p; });
-    igual(porRotulo['Reteve'].tom, 'bom');
-    igual(porRotulo['Não reteve'].tom, 'ruim');
-    igual(porRotulo['Sem sucesso'].tom, 'atencao', 'o laranja que o PO pediu');
+    igual(porRotulo['Retido'].tom, 'bom');
+    igual(porRotulo['Não retido'].tom, 'ruim');
+    igual(porRotulo['Sem sucesso de contato'].tom, 'atencao', 'o laranja que o PO pediu');
   });
 
   teste('canal que não declarou coluna de valor não ganha gráfico nenhum', () => {
@@ -1089,17 +1089,17 @@ function rodarTestesDaProdutividade() {
      */
     const euSou = chamar('usuarioAtual_()').usuario.Nome;
     const retidoAntes = (chamar('minhaPerformance')(ret.id, 30)
-      .valorPorSituacao.pontos.find((p) => p.rotulo === 'Reteve') || {}).valor;
+      .valorPorSituacao.pontos.find((p) => p.rotulo === 'Retido') || {}).valor;
 
     chamar('inserirRegistro_')('BASE_RET', {
-      analista: euSou, status: 'Reteve',
+      analista: euSou, status: 'Retido',
       'data de recepção do protocolo': diasAtras(1),
       'valor do prêmio': 777, 'nome do cliente': 'Meu caso'
     });
 
     const minha = chamar('minhaPerformance')(ret.id, 30).valorPorSituacao;
     verdadeiro(minha !== null, 'a tela da pessoa também tem o gráfico');
-    igual(minha.pontos.find((p) => p.rotulo === 'Reteve').valor,
+    igual(minha.pontos.find((p) => p.rotulo === 'Retido').valor,
       retidoAntes + 777, 'a barra dela subiu exatamente o valor do caso dela');
 
     const daEquipe = painelDaRet().valorPorSituacao;

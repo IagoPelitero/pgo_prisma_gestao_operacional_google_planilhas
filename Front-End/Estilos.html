@@ -758,12 +758,11 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
 }
 
 /*
-  A linha do tempo do caso, dentro do detalhe.
+  Onde o caso está, dentro do detalhe: o status atual e desde quando.
 
-  Cada etapa é um status que carimba data e hora. A etapa que ainda não
-  aconteceu aparece apagada, no LUGAR dela — e não escondida: um buraco no meio
-  da jornada é informação ("passou do 1º contato direto para Reteve"), e
-  esconder transformaria isso em nada.
+  Era a jornada inteira, com as etapas que faltavam apagadas no lugar delas. O
+  PO pediu só o status atual — os desfechos não são etapas em fila, e "Não
+  retido — ainda não" num caso Retido dizia o que nunca vai acontecer.
 */
 .linha-do-tempo { list-style: none; margin: 0; padding: 0; }
 .linha-do-tempo li {
@@ -777,18 +776,28 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
   background: var(--linha); margin-top: 5px;
 }
 .linha-do-tempo li.cumprida .marca { background: currentColor; }
+/*
+  Com uma linha só, a COR do status é a única pista de onde o caso está — antes
+  havia o selo "está aqui". Ela vem do tom do catálogo (`--tom`), como em todo
+  o resto do sistema.
+
+  `.historico` na frente porque a lista mora dentro da seção do histórico, e o
+  estilo dela vazava para cá: uma segunda bolinha, azul, ao lado da do status,
+  e o nome do status pequeno e cinza. Com a jornada inteira aquilo passava;
+  com uma linha só, apagava justamente o que ela existe para mostrar.
+*/
+.historico .linha-do-tempo li {
+  border-left: 0; padding-left: 0; color: var(--tom, var(--texto));
+}
+.historico .linha-do-tempo li::before { content: none; }
+.historico .linha-do-tempo .marca,
+.historico .linha-do-tempo .etapa { color: inherit; }
+.historico .linha-do-tempo .etapa { display: inline; font-size: 14px; }
+.historico .linha-do-tempo .quando { display: inline; }
 .linha-do-tempo .etapa { font-weight: 600; }
-.linha-do-tempo li.pendente { color: var(--suave); }
-.linha-do-tempo li.pendente .etapa { font-weight: 500; }
 .linha-do-tempo .quando {
   margin-left: auto; color: var(--suave); font-size: 13px;
   font-variant-numeric: tabular-nums; text-align: right;
-}
-.linha-do-tempo li.agora .etapa::after {
-  content: 'está aqui'; margin-left: 8px; font-size: 11px; font-weight: 700;
-  letter-spacing: .04em; text-transform: uppercase;
-  padding: 2px 6px; border-radius: 999px;
-  background: var(--destaque); color: var(--destaque-sobre);
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }

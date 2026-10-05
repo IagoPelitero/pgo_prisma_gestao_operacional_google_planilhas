@@ -696,19 +696,27 @@ function rodarTestesDoTrabalho() {
     const statusDaRet = chamar('lerRegistros_("CATALOGO")').filter((item) =>
       item.Tipo === 'STATUS' && String(item.CanalId) === String(ret.id));
 
-    igual(statusDaRet.length, 9, 'os nove status que a operação pediu');
+    igual(statusDaRet.length, 10, 'os dez status que a operação pediu');
+    verdadeiro(!statusDaRet.some((item) => item.Nome === 'Concluído'),
+      'a RET não tem "Concluído" — palavra do PO: esse status não existe lá');
 
-    // Dois não carimbam, e por motivos diferentes. "Não trabalhado" é o estado
-    // de nascimento, e carimbar a hora em que o caso entrou repetiria a data
-    // de recepção. "Sem sucesso" é o status novo desta rodada: o PO o pediu em
-    // laranja e NÃO pediu coluna de data para ele — criar uma coluna que
-    // ninguém pediu enche a base para medir o que a operação não decidiu
-    // medir. Os outros sete carimbam.
+    // Os cinco DESFECHOS fecham o caso, palavra do PO: "um caso concluído é
+    // cancelado, pago, não retido, retido ou sem sucesso de contato".
+    const finais = statusDaRet.filter((item) => String(item.Final) === 'SIM')
+      .map((item) => item.Nome);
+    igual(finais.join(', '),
+      'Não retido, Retido, Sem sucesso de contato, Cancelado, Pago');
+
+    // Quatro não carimbam. "Não trabalhado" é o estado de nascimento, e
+    // carimbar a hora em que o caso entrou repetiria a data de recepção. Os
+    // outros três o PO pediu sem coluna de data — criar uma coluna que ninguém
+    // pediu enche a base para medir o que a operação não decidiu medir.
     const semCarimbo = statusDaRet.filter((item) =>
       !String(item.ColunaDeCarimbo || '').trim()).map((item) => item.Nome);
-    igual(semCarimbo.join(', '), 'Não trabalhado, Sem sucesso');
+    igual(semCarimbo.join(', '),
+      'Não trabalhado, Sem sucesso de contato, Cancelado, Pago');
 
-    const semSucesso = statusDaRet.find((item) => item.Nome === 'Sem sucesso');
+    const semSucesso = statusDaRet.find((item) => item.Nome === 'Sem sucesso de contato');
     igual(String(semSucesso.Cor), 'atencao',
       'laranja, como o PO pediu — e pelo TOM, que segue o tema, nunca por uma '
       + 'cor escrita à mão');
@@ -742,7 +750,9 @@ function rodarTestesDoTrabalho() {
       ['Pendente', 'Data pendente'],
       ['1º contato realizado', 'Data do 1º contato'],
       ['2º contato realizado', 'Data do 2º contato'],
-      ['Reteve', 'Data reteve']
+      // O status se chama "Retido"; a coluna continua "Data reteve" — coluna
+      // da base é contrato com o Power BI, e não muda por causa do nome.
+      ['Retido', 'Data reteve']
     ];
 
     caminho.forEach((passo) => {
@@ -801,50 +811,43 @@ function rodarTestesDoTrabalho() {
       'texto que não é número conta como zero, e a mudança vira a primeira');
   });
 
-  teste('o detalhe do caso mostra por onde ele passou, com data e hora', () => {
-    // É o pedido literal da operação: "a data e a hora de cada contato". Sem
-    // isto, responder isso exigiria abrir a planilha e procurar a coluna certa
-    // numa base de cinquenta colunas.
+  teste('o detalhe do caso mostra só o status atual, e desde quando', () => {
+    // Pedido do PO: "o card pode mostrar apenas o status que está". Antes vinha
+    // a jornada inteira, com "ainda não" em tudo que faltava.
     const novo = casoNovoDaRet('Caso da linha do tempo');
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
 
     const etapas = chamar('detalhesDoCaso')(ret.id, novo.id).linhaDoTempo;
-    const porStatus = {};
-    etapas.forEach((etapa) => { porStatus[etapa.status] = etapa; });
+    igual(etapas.length, 1, 'uma linha só — a do status em que o caso está');
+    igual(etapas[0].status, '1º contato realizado');
+    igual(etapas[0].tom, 'violeta', 'com a cor do catálogo');
+    verdadeiro(/\d{2}\/\d{2}\/\d{4}/.test(etapas[0].quando),
+      'e o "desde quando" vem formatado para ler, veio: ' + etapas[0].quando);
 
-    igual(etapas.length, 7,
-      'os sete status da RET que carimbam — "Não trabalhado" não carimba');
-    verdadeiro(porStatus['Pendente'].cumprida, 'passou por Pendente');
-    verdadeiro(/\d{2}\/\d{2}\/\d{4}/.test(porStatus['Pendente'].quando),
-      'e a data vem formatada para ler, veio: ' + porStatus['Pendente'].quando);
-    verdadeiro(porStatus['1º contato realizado'].ehOndeEstaAgora,
-      'o status de hoje vem marcado, para a tela destacar');
-
-    // A etapa que não aconteceu vem no LUGAR dela, vazia. Sumir esconderia o
-    // buraco — e o buraco é informação.
-    verdadeiro(!porStatus['2º contato realizado'].cumprida);
-    igual(porStatus['2º contato realizado'].quando, '');
-    verdadeiro(porStatus['Reteve'] !== undefined,
-      'Reteve aparece mesmo sem ter acontecido');
+    // Os carimbos continuam gravados na linha: é deles que sai a
+    // produtividade. Só deixaram de ser listados no detalhe.
+    const linha = linhaDaRet(novo.id);
+    verdadeiro(ehData(linha['Data pendente']) && ehData(linha['Data do 1º contato']),
+      'as datas de cada etapa continuam na base, intactas');
   });
 
-  teste('a ordem da linha do tempo é a do catálogo, não a das datas', () => {
-    // A ordem do catálogo é a jornada como a operação a desenhou. Ordenar por
-    // data deixaria a etapa sem data sem lugar nenhum — e ela é justamente a
-    // que se quer ver faltando.
-    const doCatalogo = chamar('lerRegistros_("CATALOGO")')
-      .filter((item) => item.Tipo === 'STATUS'
-        && String(item.CanalId) === String(ret.id)
-        && String(item.ColunaDeCarimbo || '').trim())
-      .sort((um, outro) => Number(um.Ordem) - Number(outro.Ordem))
-      .map((item) => item.Nome);
-
-    const novo = casoNovoDaRet('Caso da ordem');
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Reteve');
+  teste('um desfecho não mostra os outros desfechos como "ainda não"', () => {
+    // O motivo do pedido: um caso Retido nunca vai ser Não retido, e a lista
+    // antiga mostrava "Não retido — ainda não" como se faltasse acontecer.
+    const novo = casoNovoDaRet('Caso retido');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
     const etapas = chamar('detalhesDoCaso')(ret.id, novo.id).linhaDoTempo;
+    igual(etapas.map((e) => e.status).join(' | '), 'Retido');
 
-    igual(etapas.map((e) => e.status).join(' | '), doCatalogo.join(' | '));
+    // Caso recém-cadastrado não mudou de status nenhuma vez, e "Não
+    // trabalhado" não carimba: não há data a mostrar, e inventar uma seria
+    // pior do que não mostrar.
+    const recemNascido = casoNovoDaRet('Caso sem mudança');
+    const soOAtual = chamar('detalhesDoCaso')(ret.id, recemNascido.id).linhaDoTempo;
+    igual(soOAtual.length, 1);
+    igual(soOAtual[0].status, 'Não trabalhado');
+    igual(soOAtual[0].quando, '', 'sem data inventada');
   });
 
   teste('a troca de status da RET continua fora da auditoria', () => {
@@ -854,7 +857,7 @@ function rodarTestesDoTrabalho() {
     const novo = casoNovoDaRet('Caso fora da auditoria');
     const antes = chamar('lerRegistros_("AUDITORIA")').length;
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Reteve');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
     igual(chamar('lerRegistros_("AUDITORIA")').length, antes,
       'duas trocas de status não podem ter escrito nada na auditoria');
   });
