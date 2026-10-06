@@ -1628,6 +1628,19 @@ function rodarTestesDeDiagnostico() {
       { Mascara: '000.000.000-00', Rotulo: 'CPF' });
     chamar('esquecerEstruturaLida_()');
 
+    // 9. o SLA e a vigência do VG como eram antes do pedido: CANAIS sem as
+    //    cinco colunas do SLA, e a Vigência abrindo pelo início, não pelos
+    //    meses.
+    ['SlaHorasUteis', 'InicioDoExpediente', 'FimDoExpediente', 'ColunaDaPrimeiraResposta',
+      'ColunaDaHoraDaPrimeiraResposta']
+      .forEach((coluna) => chamar('removerColuna_')('CANAIS', coluna));
+    chamar('esquecerEstruturaLida_()');
+    const doVg = chamar('lerRegistros_("CANAIS")').find((um) => String(um.Aba) === 'BASE_VG');
+    chamar('atualizarRegistro_')('CANAIS', doVg.Id, { ColunasDaFila: String(doVg.ColunasDaFila)
+      .replace('Vigência: Meses de vigência, Início da vigência',
+        'Vigência: Início da vigência, Meses de vigência') });
+    chamar('esquecerEstruturaLida_()');
+
     return tudo;
   }
 
@@ -2258,6 +2271,60 @@ function rodarTestesDeDiagnostico() {
     contem(segunda, 'já aceita CNPJ');
     igual(chamar('lerRegistros_("CANAIS")').map((um) => String(um.ColunasDaFila)).join('#'),
       filaDepois.join('#'));
+  });
+
+  teste('sem atualizar, a Mesa não tem SLA e a Vigência abre pelo início', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const mesa = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    igual(mesa.slaHorasUteis, 0, 'sem as colunas, não há SLA');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_VG', 'Vigência'),
+      'Início da vigência, Meses de vigência');
+  });
+
+  teste('atualizar liga o SLA da Mesa e põe os meses de vigência em destaque', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'Mesa Diamante: SLA de 6 horas úteis, das 08:15 às 18:30');
+    contem(recado, 'até a primeira resposta');
+
+    const canais = chamar('canaisVisiveis_()');
+    const mesa = canais.find((c) => c.aba === 'BASE_MESA');
+    igual(mesa.slaHorasUteis, 6);
+    igual(mesa.inicioDoExpediente, '08:15');
+    igual(mesa.fimDoExpediente, '18:30');
+    igual(mesa.colunaDaPrimeiraResposta, 'Data resposta');
+    igual(mesa.colunaDaHoraDaPrimeiraResposta, 'Hora resposta');
+    igual(canais.find((c) => c.aba === 'BASE_RET').slaHorasUteis, 0,
+      'a RET não pediu SLA, e continua sem');
+    igual(grupoDaFilaNaPlanilha(chamar, 'BASE_VG', 'Vigência'),
+      'Meses de vigência, Início da vigência');
+
+    chamar('cadastrarCaso')(mesa.id, { status: 'Em andamento',
+      nomedosegurado: 'Caso depois de atualizar' });
+    verdadeiro(chamar('resumoDoCanal')(mesa.id, {}).fila[0].sla !== null,
+      'e a fila da Mesa já sai com o selo');
+  });
+
+  teste('quem já declarou SLA na Mesa não é atropelado', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('adicionarColuna_')('CANAIS', 'SlaHorasUteis', 'numero');
+    chamar('esquecerEstruturaLida_()');
+    const mesa = chamar('lerRegistros_("CANAIS")').find((c) => String(c.Aba) === 'BASE_MESA');
+    chamar('atualizarRegistro_')('CANAIS', mesa.Id, { SlaHorasUteis: 8 });
+    chamar('esquecerEstruturaLida_()');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'a Mesa já tem SLA declarado (8 horas úteis)');
+    igual(chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA').slaHorasUteis, 8);
+  });
+
+  teste('rodar de novo não liga o SLA outra vez', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const segunda = chamar('atualizarPGO()');
+    contem(segunda, 'a Mesa já tem SLA declarado (6 horas úteis)');
+    verdadeiro(segunda.indexOf('Mesa Diamante: SLA de 6 horas úteis') < 0,
+      'na segunda rodada, nada a fazer');
   });
 
   teste('atualizar não perde usuário, caso nem configuração ajustada', () => {

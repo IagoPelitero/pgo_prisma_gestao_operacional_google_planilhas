@@ -100,21 +100,34 @@ var TelaTrabalho = (function () {
       return filtrosEscolhidos[chave];
     });
 
-    // O PERÍODO vem primeiro, e é o mesmo seletor das outras duas telas — a
-    // peça é compartilhada de propósito: três cópias divergiriam no primeiro
-    // ajuste, e aí "setembro" significaria uma coisa aqui e outra na
-    // Produtividade.
+    // A BUSCA DIGITADA vem primeiro — pedido do PO: "o filtro por busca
+    // digitada para cada canal". É um filtro como os outros: vai no mesmo
+    // pacote de filtros, e trocar de canal limpa junto. Busca ao apertar Enter
+    // (ou ao sair do campo), e não a cada letra: cada busca é uma ida ao
+    // servidor, e uma por letra seria uma fila de idas que a pessoa não pediu.
     //
+    // Depois vem o PERÍODO, o mesmo seletor das outras duas telas — a peça é
+    // compartilhada de propósito: três cópias divergiriam no primeiro ajuste,
+    // e aí "setembro" significaria uma coisa aqui e outra na Produtividade.
     // A caixa existe mesmo sem filtro de lista nenhum: o período sozinho já é
     // um recorte, e ele precisa estar em algum lugar.
+    var busca = '<input type="search" class="filtro busca-na-fila" data-filtro="busca"'
+      + ' id="busca-na-fila" autocomplete="off"'
+      + ' placeholder="Buscar neste canal e apertar Enter"'
+      + ' aria-label="Buscar neste canal"'
+      + ' value="' + escapar(filtrosEscolhidos.busca || '') + '">';
+
     return Moldura.caixaDeFiltros(
-      SeletorDePeriodo.desenhar(resumo)
+      busca
+        + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
         + (algumAtivo
           ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
             + 'Limpar filtros</button>'
           : ''),
-      resumo.total + ' de ' + resumo.totalNoPeriodo
+      (resumo.fila.length < resumo.total
+        ? 'mostrando ' + resumo.fila.length + ' de ' + resumo.total
+        : resumo.total + ' de ' + resumo.totalNoPeriodo)
         + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
 
@@ -124,7 +137,8 @@ var TelaTrabalho = (function () {
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
           ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
-            + 'pelos filtros escolhidos.'
+            + (filtrosEscolhidos.busca ? 'pela busca e pelos filtros escolhidos.'
+              : 'pelos filtros escolhidos.')
           // O recado diz o período que a tela OLHOU, com as palavras do
           // próprio filtro. Antes falava sempre "nos N dias mais recentes":
           // com "setembro de 2026" escolhido, era mentira.
@@ -139,17 +153,30 @@ var TelaTrabalho = (function () {
 
     var linhas = resumo.fila.map(function (caso) {
       var celulas = caso.celulas.map(function (grupo, i) {
-        return '<td>' + desenharGrupo(grupo, caso, i === 0) + '</td>';
+        // O selo do SLA mora junto da situação, no primeiro grupo: é onde o
+        // olho já procura "como este caso está".
+        return '<td>' + desenharGrupo(grupo, caso, i === 0)
+          + (i === 0 ? seloDoSla(caso.sla) : '') + '</td>';
       }).join('');
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
         + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
+    // A fila mostra só os mais recentes (pedido do PO); o recado diz quantos
+    // ficaram de fora e como chegar neles — sem ele, cinco linhas e um cartão
+    // dizendo 37 pareceriam um defeito.
+    var deFora = resumo.total - resumo.fila.length;
+    var recado = deFora > 0
+      ? '<p class="fila-recorte">Mostrando os ' + resumo.fila.length
+        + ' casos mais recentes de ' + resumo.total + '. Para achar os outros, '
+        + 'use a busca ou os filtros acima.</p>'
+      : '';
+
     return '<div class="cartao sem-forro">'
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div></div>';
+      + '<tbody>' + linhas + '</tbody></table></div>' + recado + '</div>';
   }
 
   /**
@@ -167,10 +194,14 @@ var TelaTrabalho = (function () {
       }
       var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
 
-      // O ALERTA vem do servidor já resolvido — a tela não conhece o limite de
-      // 18 meses nem o de 25,5%. A dica leva o motivo, e o texto INTEIRO: o
-      // destaque não quebra linha, e o que passa da largura aparece com "…".
-      if (celula.alerta) classe += ' em-alerta';
+      // A COR vem do servidor já resolvida — a tela não conhece o limite de
+      // 18 meses nem o de 25,5%. Vermelho é o alerta de sempre; amarelo e
+      // verde são as outras duas faixas da vigência do VG, pedido do PO. A
+      // dica leva o motivo, e o texto INTEIRO: o destaque não quebra linha.
+      if (celula.alerta) {
+        classe += { atencao: ' em-atencao', bom: ' em-bom' }[celula.tomDoAlerta]
+          || ' em-alerta';
+      }
 
       return '<span class="' + classe + '" title="'
         + escapar(Moldura.dicaDaCelula(celula))
@@ -216,6 +247,31 @@ var TelaTrabalho = (function () {
     return botoes;
   }
 
+  var focarABusca = false;
+
+  /**
+   * O selo do SLA — pedido do PO para a Mesa Diamante: "No prazo · faltam
+   * 2h10" em verde, "Fora do prazo · 1h30 além" em vermelho; caso já
+   * respondido, "SLA cumprido" ou "SLA estourado". A conta é do servidor; a
+   * tela só pinta, e a dica diz até onde o prazo foi contado.
+   * Canal sem SLA não manda nada, e não aparece nada.
+   */
+  var ATE_ONDE_O_SLA_CONTOU = {
+    resposta: 'contado até a primeira resposta',
+    encerramento: 'contado até o encerramento: o caso foi encerrado sem a primeira resposta',
+    agora: 'ainda correndo: o caso não teve a primeira resposta'
+  };
+
+  function seloDoSla(sla) {
+    if (!sla) return '';
+    return '<span class="selo-sla tom-' + escapar(sla.tom) + '"'
+      + ' title="' + escapar(sla.texto) + ' — SLA de '
+      + escapar(String(sla.prazo / 60).replace('.', ','))
+      + ' horas úteis, de segunda a sexta, no expediente, '
+      + escapar(ATE_ONDE_O_SLA_CONTOU[sla.parouEm] || '') + '">'
+      + escapar(sla.texto) + '</span>';
+  }
+
   function desenharPainel() {
     // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
     // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
@@ -224,6 +280,12 @@ var TelaTrabalho = (function () {
       Moldura.avisoDeJanela(resumo, 'Estes números e esta fila')
       + desenharCartoes() + desenharFiltros() + desenharFila();
     ligarPainel();
+    var busca = elemento('busca-na-fila');
+    if (focarABusca && busca) {
+      busca.focus();
+      busca.setSelectionRange(busca.value.length, busca.value.length);
+    }
+    focarABusca = false;
   }
 
   /* ---------------------------------------------------------- comportamento */
@@ -254,9 +316,18 @@ var TelaTrabalho = (function () {
           if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
           return;
         }
-        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
+        if (this.getAttribute('data-filtro') === 'busca') { buscar(this); return; }
+        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value.trim();
         carregar();
       });
+    }
+
+    // O "x" do campo de busca apaga o texto sem disparar o `change` — sem
+    // isto, a fila continuava filtrada pelo termo que a pessoa acabou de
+    // apagar, até ela clicar fora. O evento `search` vem do "x" e do Enter.
+    var campoDaBusca = elemento('busca-na-fila');
+    if (campoDaBusca) {
+      campoDaBusca.addEventListener('search', function () { buscar(this); });
     }
 
     var limpar = elemento('limpar-filtros');
@@ -293,6 +364,21 @@ var TelaTrabalho = (function () {
           .senao(function (erro) { window.alert(erro.message || String(erro)); });
       });
     });
+  }
+
+  /**
+   * Aplica o termo digitado. O Enter dispara dois eventos (`change` e
+   * `search`); o termo igual ao que já está valendo não vai ao servidor de
+   * novo.
+   */
+  function buscar(campo) {
+    var termo = campo.value.trim();
+    if (termo === (filtrosEscolhidos.busca || '')) return;
+    filtrosEscolhidos.busca = termo;
+    // A busca redesenha a caixa inteira; o cursor volta para ela, para a
+    // pessoa poder corrigir o termo sem clicar de novo.
+    focarABusca = true;
+    carregar();
   }
 
   function ligarCliques(seletor, oQueFazer) {

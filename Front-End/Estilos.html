@@ -684,7 +684,9 @@ button { font: inherit; color: inherit; }
 .ate-do-periodo { font-size: 13.5px; color: var(--suave); }
 /* Campo de data não precisa dos 230px das caixas de filtro, e sobrando espaço
    ele empurra os outros filtros para a linha de baixo sem necessidade. */
-.filtro[type="date"] { max-width: 165px; }
+.filtro[data-mascara-de-data] { max-width: 130px; }
+/* A busca digitada do Trabalho é a caixa mais larga: é nela que se escreve. */
+.filtro.busca-na-fila { flex: 1 1 260px; max-width: 340px; }
 
 .limpar-filtros {
   border: 0; background: transparent; color: var(--destaque);
@@ -751,6 +753,29 @@ table.fila.agrupada .principal.em-alerta,
 table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
   color: var(--ruim); font-weight: 700;
 }
+/* As outras duas faixas da vigência do VG: 18 exatos em amarelo, acima de 18
+   em verde. Mesma especificidade do vermelho, pelo mesmo motivo. */
+table.fila .em-atencao,
+table.fila.agrupada .apoio.em-atencao,
+table.fila.agrupada .principal.em-atencao,
+table.fila.agrupada td:first-child .apoio.em-atencao:first-child {
+  color: var(--atencao); font-weight: 700;
+}
+table.fila .em-bom,
+table.fila.agrupada .apoio.em-bom,
+table.fila.agrupada .principal.em-bom,
+table.fila.agrupada td:first-child .apoio.em-bom:first-child {
+  color: var(--bom); font-weight: 700;
+}
+
+/* O SLA da Mesa, embaixo do status: o tempo pintado de verde ou vermelho. */
+/* Quebra linha em vez de cortar: na coluna estreita da situação, o corte
+   comia justamente o "4h13 além", que é a parte que importa. */
+.selo-sla {
+  display: block; margin-top: 7px;
+  font-size: 12px; font-weight: 700; line-height: 1.35;
+  color: var(--tom, var(--suave));
+}
 
 .aviso-de-carimbo {
   background: var(--atencao-tenue); color: var(--atencao);
@@ -758,6 +783,11 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }
+/* O recado embaixo da fila de 5: quantos ficaram de fora, e como achar. */
+.fila-recorte {
+  margin: 0; padding: 11px 16px; border-top: 1px solid var(--linha);
+  font-size: 13px; color: var(--suave); background: var(--superficie-2);
+}
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
 .cartao.vazio p { margin: 0 auto; max-width: 46ch; color: var(--suave); }
@@ -1053,19 +1083,6 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   .campo, .campo.largura-2 { flex-basis: 100%; }
   .recado { margin-left: 0; flex-basis: 100%; }
 }
-
-.emconstrucao { max-width: 620px; }
-.emconstrucao .fita {
-  display: inline-block; margin-bottom: 12px;
-  font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
-  color: var(--atencao); background: var(--atencao-tenue);
-  border: 1px solid color-mix(in srgb, var(--atencao) 30%, transparent);
-  border-radius: 3px; padding: 3px 9px;
-}
-.emconstrucao h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.015em; }
-.emconstrucao p { margin: 0 0 14px; color: var(--suave); }
-.emconstrucao ul { margin: 0; padding-left: 20px; color: var(--suave); }
-.emconstrucao li { margin-bottom: 5px; }
 
 .veu { display: none; }
 

@@ -1356,6 +1356,110 @@ comum sem passar pelo formulário.
 
 ---
 
+### 57 · A data que o navegador lia de trás para frente
+
+**Sintoma.** Uma analista registrou datas como mm/dd/aaaa. Nenhum erro: 05/10
+virou 10 de maio, que é uma data válida, e foi gravado assim. E a primeira
+data do formulário aparecia **vazia**, embora o servidor mandasse "hoje".
+
+**Causa.** O campo era o calendário do navegador (`type="date"`), que mostra e
+pede a data no formato do **idioma do navegador** — num Chrome em inglês,
+mm/dd/aaaa. E esse campo só aceita valor em `aaaa-mm-dd`: o "06/10/2026" que o
+servidor manda como padrão era descartado em silêncio.
+
+**Como apareceu.** Pelo PO, vendo a planilha. O teste não pegava porque o
+simulador não tem idioma de navegador, e o servidor recebia uma data válida.
+
+**Defesa.** Toda data, nos formulários e no de/até dos filtros, é texto com
+máscara `dd/mm/aaaa` — o mesmo em qualquer navegador, e o padrão de hoje entra
+direto. Teste que varre as telas e cobra que nenhuma usa mais `type="date"`,
+e a verificação no navegador de verdade, digitando.
+
+---
+
+### 58 · O 31 de fevereiro que virava 3 de março
+
+**Sintoma.** Nenhum, ainda — apareceu junto do 57. Com a data digitada,
+"31/02/2026" pode chegar ao servidor, e seria gravado como **03/03/2026**.
+
+**Causa.** `new Date(2026, 1, 31)` não reclama: rola para o mês seguinte.
+Enquanto o calendário do navegador escolhia o dia, esse valor nunca chegava.
+
+**Defesa.** `converterParaData_` confere se o dia existe no calendário
+(`diaQueExiste_`) e devolve vazio — e vazio é recusado com "precisa ser uma
+data no formato dd/mm/aaaa". Na tela, o de/até só recarrega com duas datas que
+existem.
+
+---
+
+### 59 · A caixa de busca que não fazia nada
+
+**Sintoma.** Palavra do PO: "tem um campo de busca na tela superior que não
+funciona". Digitar e apertar Enter não acontecia nada.
+
+**Causa.** A caixa era desenho: nasceu na casca, antes do Buscar Caso, e nunca
+foi ligada a nada.
+
+**Defesa.** Enter leva ao Buscar Caso já procurando o termo; a caixa só
+aparece para quem tem o Buscar Caso no menu. Teste que cobra a ligação.
+
+---
+
+### 60 · Salvar a Mesa religava a conferência de SUSEP
+
+**Sintoma.** Nenhum visível na hora. Bastava salvar a Mesa Diamante em
+Configurações › Canais de trabalho — para trocar uma descrição — e o
+formulário da Mesa voltava a consultar a lista de SUSEPs bloqueadas, que o PO
+tinha pedido para tirar.
+
+**Causa.** A tela de Configurações não tem o campo "confere SUSEP bloqueada",
+e o servidor gravava SIM sempre que o campo não vinha. O comentário cuidava de
+um lado só: "a tela que não mandar o campo não pode **desligar** a
+conferência" — e ela ligava.
+
+**Como apareceu.** Na varredura de Configurações pedida pelo PO, comparando o
+que a tela manda com o que o servidor grava, campo a campo.
+
+**Defesa.** Campo que a tela não manda fica como está, nos dois sentidos — a
+mesma regra dos campos novos do SLA. Teste que salva a Mesa como a tela salva e
+cobra que ela continua sem conferir.
+
+---
+
+### 61 · "Últimos 7 dias" na caixa, 279 na conta
+
+**Sintoma.** Depois de filtrar "Por data" (01/01 até hoje) e voltar para "Por
+dias", a caixa mostrava "Últimos 7 dias" e o resumo dizia "últimos 279 dias".
+Os números eram dos 279.
+
+**Causa.** Ao trocar a maneira de escolher, o seletor levava junto os dias do
+período anterior — 279, ou 31 vindo de um mês —, que não são opção da lista.
+A caixa, sem a opção, mostrava a primeira.
+
+**Como apareceu.** Na foto da verificação no navegador desta rodada: o texto do
+resumo não batia com a caixa.
+
+**Defesa.** Os dias só são aproveitados quando são um dos atalhos; senão vale o
+padrão da configuração. Vale para as três telas que filtram. Teste da peça e
+verificação no navegador.
+
+---
+
+### 62 · O "x" da busca e o selo cortado
+
+**Sintoma.** Dois defeitos do próprio código desta rodada, pegos antes de
+sair. O "x" do campo de busca apagava o texto, mas a fila continuava filtrada
+pelo termo apagado até a pessoa clicar fora. E o selo do SLA aparecia como
+"Fora do prazo · 4h1…" — o corte comia justamente o quanto passou.
+
+**Causa.** O "x" não dispara o `change`, só o `search`. O selo herdou o estilo
+do destaque da fila, que não quebra linha.
+
+**Defesa.** A busca ouve o `search` (e não vai duas vezes ao servidor quando o
+Enter dispara os dois); o selo quebra linha. Os dois conferidos no navegador.
+
+---
+
 ## O que esta lista ensina
 
 **São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não

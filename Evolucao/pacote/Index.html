@@ -693,7 +693,9 @@ button { font: inherit; color: inherit; }
 .ate-do-periodo { font-size: 13.5px; color: var(--suave); }
 /* Campo de data não precisa dos 230px das caixas de filtro, e sobrando espaço
    ele empurra os outros filtros para a linha de baixo sem necessidade. */
-.filtro[type="date"] { max-width: 165px; }
+.filtro[data-mascara-de-data] { max-width: 130px; }
+/* A busca digitada do Trabalho é a caixa mais larga: é nela que se escreve. */
+.filtro.busca-na-fila { flex: 1 1 260px; max-width: 340px; }
 
 .limpar-filtros {
   border: 0; background: transparent; color: var(--destaque);
@@ -760,6 +762,29 @@ table.fila.agrupada .principal.em-alerta,
 table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
   color: var(--ruim); font-weight: 700;
 }
+/* As outras duas faixas da vigência do VG: 18 exatos em amarelo, acima de 18
+   em verde. Mesma especificidade do vermelho, pelo mesmo motivo. */
+table.fila .em-atencao,
+table.fila.agrupada .apoio.em-atencao,
+table.fila.agrupada .principal.em-atencao,
+table.fila.agrupada td:first-child .apoio.em-atencao:first-child {
+  color: var(--atencao); font-weight: 700;
+}
+table.fila .em-bom,
+table.fila.agrupada .apoio.em-bom,
+table.fila.agrupada .principal.em-bom,
+table.fila.agrupada td:first-child .apoio.em-bom:first-child {
+  color: var(--bom); font-weight: 700;
+}
+
+/* O SLA da Mesa, embaixo do status: o tempo pintado de verde ou vermelho. */
+/* Quebra linha em vez de cortar: na coluna estreita da situação, o corte
+   comia justamente o "4h13 além", que é a parte que importa. */
+.selo-sla {
+  display: block; margin-top: 7px;
+  font-size: 12px; font-weight: 700; line-height: 1.35;
+  color: var(--tom, var(--suave));
+}
 
 .aviso-de-carimbo {
   background: var(--atencao-tenue); color: var(--atencao);
@@ -767,6 +792,11 @@ table.fila.agrupada td:first-child .apoio.em-alerta:first-child {
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }
+/* O recado embaixo da fila de 5: quantos ficaram de fora, e como achar. */
+.fila-recorte {
+  margin: 0; padding: 11px 16px; border-top: 1px solid var(--linha);
+  font-size: 13px; color: var(--suave); background: var(--superficie-2);
+}
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
 .cartao.vazio p { margin: 0 auto; max-width: 46ch; color: var(--suave); }
@@ -1062,19 +1092,6 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   .campo, .campo.largura-2 { flex-basis: 100%; }
   .recado { margin-left: 0; flex-basis: 100%; }
 }
-
-.emconstrucao { max-width: 620px; }
-.emconstrucao .fita {
-  display: inline-block; margin-bottom: 12px;
-  font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
-  color: var(--atencao); background: var(--atencao-tenue);
-  border: 1px solid color-mix(in srgb, var(--atencao) 30%, transparent);
-  border-radius: 3px; padding: 3px 9px;
-}
-.emconstrucao h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.015em; }
-.emconstrucao p { margin: 0 0 14px; color: var(--suave); }
-.emconstrucao ul { margin: 0; padding-left: 20px; color: var(--suave); }
-.emconstrucao li { margin-bottom: 5px; }
 
 .veu { display: none; }
 
@@ -2521,6 +2538,10 @@ var Moldura = (function () {
    * O nome da TELA não fica aqui: ele fica no topo do conteúdo, junto do que
    * ele nomeia.
    */
+  function podeAbrirOBuscar(pacote) {
+    return (pacote.menu || []).some(function (item) { return item.tela === 'buscarCaso'; });
+  }
+
   function montarSuperior(pacote) {
     var bolinhas = TEMAS.map(function (tema) {
       var marcado = tema.chave === pacote.tema ? 'true' : 'false';
@@ -2544,15 +2565,27 @@ var Moldura = (function () {
       + '<p>' + escapar(pacote.identidade.operacao) + '</p>'
       + '</div>'
 
-      + '<div class="busca">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
-      + ' stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle>'
-      + '<path d="M20 20l-4.2-4.2"></path></svg>'
-      + '<input type="search" id="busca-global" autocomplete="off"'
-      + ' placeholder="Buscar por apólice, segurado ou protocolo…"'
-      + ' aria-label="Busca geral">'
-      + '<kbd>Ctrl K</kbd>'
-      + '</div>'
+      /*
+        A BUSCA DA BARRA leva ao Buscar Caso, já procurando o termo — escolha
+        do PO. Por anos este campo foi só desenho: aparecia em toda tela e
+        não fazia nada ao apertar Enter. Agora faz o que promete, em todos os
+        canais e também nos casos antigos, fora da janela do Trabalho.
+
+        Só aparece para quem abre o Buscar Caso: campo que leva a uma tela
+        proibida seria outra caixa que não funciona.
+      */
+      + (podeAbrirOBuscar(pacote)
+        ? '<div class="busca">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+          + ' stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle>'
+          + '<path d="M20 20l-4.2-4.2"></path></svg>'
+          + '<input type="search" id="busca-global" autocomplete="off"'
+          + ' placeholder="Buscar por apólice, segurado ou protocolo…"'
+          + ' title="Digite e aperte Enter: abre o Buscar Caso com o termo"'
+          + ' aria-label="Buscar caso em todos os canais">'
+          + '<kbd>Ctrl K</kbd>'
+          + '</div>'
+        : '')
 
       // Recarregar a TELA, não a página.
       //
@@ -2953,12 +2986,6 @@ var Formulario = (function () {
     return opcoes[opcoes.length - 1];
   }
 
-  function usaMascara(campo) {
-    return !!campo.mascara
-      && (campo.tipo === 'documento' || campo.tipo === 'identificador'
-        || campo.tipo === 'telefone');
-  }
-
   /* --------------------------------------------------------------- dinheiro */
 
   /** Até onde o campo de valor vai: R$ 999.999.999,99. */
@@ -3054,10 +3081,32 @@ var Formulario = (function () {
       controle = '<textarea id="' + id + '" rows="3"' + exigido
         + ' data-chave="' + escapar(campo.chave) + '"' + travado + '></textarea>';
 
+    } else if (campo.tipo === 'data') {
+      /*
+        DATA É TEXTO COM MÁSCARA dd/mm/aaaa, e não o calendário do navegador.
+
+        O calendário (type="date") mostra a data no formato do IDIOMA DO
+        NAVEGADOR: num Chrome em inglês ele pede mm/dd/aaaa. Uma analista
+        digitou 05/10 achando que era 5 de outubro, e gravou 10 de maio — sem
+        erro nenhum, porque 10 de maio é uma data válida. Pedido do PO: "precisa
+        ser no formato dd/mm/aaaa em todos que solicitam data".
+
+        Com a máscara, digitar 06102026 mostra 06/10/2026, em qualquer
+        navegador. E o valor padrão do servidor ("hoje", em dd/mm/aaaa) entra
+        direto no campo — no calendário ele não entrava, e a primeira data do
+        formulário aparecia vazia.
+      */
+      controle = '<input type="text" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '"'
+        + ' data-mascara="00/00/0000" data-data="sim" inputmode="numeric"'
+        + ' maxlength="10" placeholder="dd/mm/aaaa"'
+        + (colunaDaData && campo.cabecalho === colunaDaData
+          ? ' data-data-do-caso="sim"' : '')
+        + ' autocomplete="off"' + exigido + travado + '>';
+
     } else {
       var htmlTipo = 'text';
-      if (campo.tipo === 'data') htmlTipo = 'date';
-      else if (campo.tipo === 'hora') htmlTipo = 'time';
+      if (campo.tipo === 'hora') htmlTipo = 'time';
       else if (campo.tipo === 'email') htmlTipo = 'email';
       else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
         || campo.tipo === 'percentual') htmlTipo = 'text';
@@ -3510,9 +3559,8 @@ var Formulario = (function () {
   /**
    * Preenche o formulário com o que o caso tem hoje.
    *
-   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê; a caixa
-   * de data do navegador só entende aaaa-mm-dd. A conversão é aqui, e não no
-   * servidor, porque é uma exigência do controle e não do dado.
+   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê — e é como
+   * o campo de data mostra, desde que ele virou texto com máscara.
    */
   function preencher(raiz, valoresDoCaso) {
     var controles = raiz.querySelectorAll('[data-chave]');
@@ -3520,7 +3568,6 @@ var Formulario = (function () {
       var chave = controles[i].getAttribute('data-chave');
       var valor = texto(valoresDoCaso[chave]);
 
-      if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
       // O dinheiro volta do servidor como NÚMERO — 1234.56 —, porque é assim
       // que ele mora na célula. Na tela ele tem de aparecer como a pessoa
       // digitou: R$ 1.234,56. Sem esta linha, abrir um caso para editar
@@ -3609,12 +3656,6 @@ var Formulario = (function () {
     var numero = Number(emPonto);
     if (!isFinite(numero)) return '';
     return String(Math.round(numero * 100));
-  }
-
-  function paraCaixaDeData(valor) {
-    var brasileira = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valor || ''));
-    if (!brasileira) return valor;
-    return brasileira[3] + '-' + brasileira[2] + '-' + brasileira[1];
   }
 
   /* ---------------------------------------------------------------- erros */
@@ -3791,7 +3832,6 @@ var Formulario = (function () {
     aplicarMascara: aplicarMascara,
     aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
     ehCampoDeDinheiro: ehCampoDeDinheiro,
-    usaMascara: usaMascara,
     desenhar: desenhar,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
@@ -4739,8 +4779,11 @@ var SeletorDePeriodo = (function () {
         : (tipo === 'mes' ? porMes(resposta) : porDias(periodo)));
   }
 
+  /** Os atalhos de "Por dias". */
+  var DIAS_OFERECIDOS = [7, 15, 30, 60, 90, 180, 365];
+
   function porDias(periodo) {
-    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
+    var opcoes = DIAS_OFERECIDOS.map(function (quantos) {
       return '<option value="' + quantos + '"'
         + (periodo.dias === quantos ? ' selected' : '') + '>'
         + 'Últimos ' + quantos + ' dias</option>';
@@ -4751,18 +4794,36 @@ var SeletorDePeriodo = (function () {
   }
 
   /*
-   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
-   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
-   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que o servidor lê sem
-   * ambiguidade — 03/04 é 3 de abril aqui e 4 de março em outros lugares, e
-   * essa confusão não pode entrar num fechamento.
+   * O de/até é TEXTO COM MÁSCARA dd/mm/aaaa, como as datas dos formulários.
+   *
+   * Era o calendário do navegador (type="date"), e ele mostra a data no
+   * formato do idioma do navegador: num Chrome em inglês, mm/dd/aaaa. Pedido
+   * do PO: dd/mm/aaaa "em todos que solicitam data". Só recarrega com as duas
+   * datas completas e válidas — ver `mudou`.
    */
   function deAte(periodo) {
-    return '<input type="date" class="filtro" data-periodo="de"'
+    var comum = ' class="filtro" data-mascara-de-data="sim" inputmode="numeric"'
+      + ' maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off"';
+    return '<input type="text"' + comum + ' data-periodo="de"'
       + ' aria-label="Data inicial" value="' + escapar(paraOCampo(periodo.de)) + '">'
       + '<span class="ate-do-periodo">até</span>'
-      + '<input type="date" class="filtro" data-periodo="ate"'
+      + '<input type="text"' + comum + ' data-periodo="ate"'
       + ' aria-label="Data final" value="' + escapar(paraOCampo(periodo.ate)) + '">';
+  }
+
+  /*
+   * A máscara do de/até, ligada UMA vez no documento, e não a cada desenho: as
+   * três telas que filtram redesenham a caixa de filtros a cada recarga, e
+   * ligar de novo a cada vez empilharia ouvintes.
+   */
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('input', aoDigitarUmaData);
+  }
+  function aoDigitarUmaData(evento) {
+    var caixa = evento.target;
+    if (!caixa || !caixa.getAttribute
+      || caixa.getAttribute('data-mascara-de-data') !== 'sim') return;
+    caixa.value = Formulario.aplicarMascara(caixa.value, '00/00/0000');
   }
 
   function porMes(resposta) {
@@ -4792,7 +4853,13 @@ var SeletorDePeriodo = (function () {
     var periodo = resposta.periodo || {};
 
     if (qual === 'como') {
-      var novo = { tipo: caixa.value, dias: periodo.dias, de: '', ate: '', mes: '' };
+      // Os dias do período que estava valendo só servem se forem um dos
+      // atalhos. Voltando de "Por data" (279 dias) ou de "Por mês" (31), a
+      // caixa mostrava "Últimos 7 dias" e a conta somava os 279. Zero é "o
+      // padrão da configuração", que o servidor resolve.
+      var dias = DIAS_OFERECIDOS.indexOf(Number(periodo.dias)) >= 0
+        ? Number(periodo.dias) : 0;
+      var novo = { tipo: caixa.value, dias: dias, de: '', ate: '', mes: '' };
       if (novo.tipo === 'mes') {
         var meses = resposta.mesesDisponiveis || [];
         if (meses.length) novo.mes = meses[0].valor;   // o mês corrente
@@ -4828,24 +4895,38 @@ var SeletorDePeriodo = (function () {
     return (intervalo.de && intervalo.ate) ? intervalo : false;
   }
 
-  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
+  /**
+   * A data do servidor, como o campo mostra: dd/mm/aaaa dos dois lados, desde
+   * que o campo virou texto com máscara. Só passa o que é data de verdade.
+   */
   function paraOCampo(texto) {
-    var partes = String(texto || '').split('/');
-    if (partes.length !== 3) return '';
-    return partes[2] + '-' + partes[1] + '-' + partes[0];
+    return dataDeVerdade(texto) ? String(texto).trim() : '';
   }
 
-  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
+  /**
+   * O que a pessoa digitou, pronto para o servidor — ou vazio, enquanto a data
+   * estiver pela metade ou for impossível (31/02). Vazio é o que faz o de/até
+   * esperar, em vez de recarregar com um intervalo torto.
+   */
   function paraOServidor(texto) {
-    var partes = String(texto || '').split('-');
-    if (partes.length !== 3) return '';
-    return partes[2] + '/' + partes[1] + '/' + partes[0];
+    return dataDeVerdade(texto) ? String(texto).trim() : '';
+  }
+
+  /** dd/mm/aaaa completo, e um dia que existe no calendário. */
+  function dataDeVerdade(texto) {
+    var partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(texto || '').trim());
+    if (!partes) return false;
+    var dia = Number(partes[1]);
+    var mes = Number(partes[2]);
+    var ano = Number(partes[3]);
+    var data = new Date(ano, mes - 1, dia);
+    return data.getFullYear() === ano && data.getMonth() === mes - 1
+      && data.getDate() === dia;
   }
 
   // `paraOCampo` e `paraOServidor` saem daqui porque QUALQUER tela com campo
-  // de data precisa das duas: o servidor fala dd/mm/aaaa (que é como a
-  // planilha guarda e como a operação lê) e o <input type="date"> só
-  // entende aaaa-mm-dd. Uma segunda cópia divergiria na primeira correção.
+  // de data precisa das duas. Hoje as duas só conferem; uma segunda cópia da
+  // conferência divergiria na primeira correção.
   return {
     padrao: padrao, desenhar: desenhar, mudou: mudou,
     paraOCampo: paraOCampo, paraOServidor: paraOServidor
@@ -4958,21 +5039,34 @@ var TelaTrabalho = (function () {
       return filtrosEscolhidos[chave];
     });
 
-    // O PERÍODO vem primeiro, e é o mesmo seletor das outras duas telas — a
-    // peça é compartilhada de propósito: três cópias divergiriam no primeiro
-    // ajuste, e aí "setembro" significaria uma coisa aqui e outra na
-    // Produtividade.
+    // A BUSCA DIGITADA vem primeiro — pedido do PO: "o filtro por busca
+    // digitada para cada canal". É um filtro como os outros: vai no mesmo
+    // pacote de filtros, e trocar de canal limpa junto. Busca ao apertar Enter
+    // (ou ao sair do campo), e não a cada letra: cada busca é uma ida ao
+    // servidor, e uma por letra seria uma fila de idas que a pessoa não pediu.
     //
+    // Depois vem o PERÍODO, o mesmo seletor das outras duas telas — a peça é
+    // compartilhada de propósito: três cópias divergiriam no primeiro ajuste,
+    // e aí "setembro" significaria uma coisa aqui e outra na Produtividade.
     // A caixa existe mesmo sem filtro de lista nenhum: o período sozinho já é
     // um recorte, e ele precisa estar em algum lugar.
+    var busca = '<input type="search" class="filtro busca-na-fila" data-filtro="busca"'
+      + ' id="busca-na-fila" autocomplete="off"'
+      + ' placeholder="Buscar neste canal e apertar Enter"'
+      + ' aria-label="Buscar neste canal"'
+      + ' value="' + escapar(filtrosEscolhidos.busca || '') + '">';
+
     return Moldura.caixaDeFiltros(
-      SeletorDePeriodo.desenhar(resumo)
+      busca
+        + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
         + (algumAtivo
           ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
             + 'Limpar filtros</button>'
           : ''),
-      resumo.total + ' de ' + resumo.totalNoPeriodo
+      (resumo.fila.length < resumo.total
+        ? 'mostrando ' + resumo.fila.length + ' de ' + resumo.total
+        : resumo.total + ' de ' + resumo.totalNoPeriodo)
         + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
 
@@ -4982,7 +5076,8 @@ var TelaTrabalho = (function () {
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
           ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
-            + 'pelos filtros escolhidos.'
+            + (filtrosEscolhidos.busca ? 'pela busca e pelos filtros escolhidos.'
+              : 'pelos filtros escolhidos.')
           // O recado diz o período que a tela OLHOU, com as palavras do
           // próprio filtro. Antes falava sempre "nos N dias mais recentes":
           // com "setembro de 2026" escolhido, era mentira.
@@ -4997,17 +5092,30 @@ var TelaTrabalho = (function () {
 
     var linhas = resumo.fila.map(function (caso) {
       var celulas = caso.celulas.map(function (grupo, i) {
-        return '<td>' + desenharGrupo(grupo, caso, i === 0) + '</td>';
+        // O selo do SLA mora junto da situação, no primeiro grupo: é onde o
+        // olho já procura "como este caso está".
+        return '<td>' + desenharGrupo(grupo, caso, i === 0)
+          + (i === 0 ? seloDoSla(caso.sla) : '') + '</td>';
       }).join('');
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
         + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
+    // A fila mostra só os mais recentes (pedido do PO); o recado diz quantos
+    // ficaram de fora e como chegar neles — sem ele, cinco linhas e um cartão
+    // dizendo 37 pareceriam um defeito.
+    var deFora = resumo.total - resumo.fila.length;
+    var recado = deFora > 0
+      ? '<p class="fila-recorte">Mostrando os ' + resumo.fila.length
+        + ' casos mais recentes de ' + resumo.total + '. Para achar os outros, '
+        + 'use a busca ou os filtros acima.</p>'
+      : '';
+
     return '<div class="cartao sem-forro">'
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div></div>';
+      + '<tbody>' + linhas + '</tbody></table></div>' + recado + '</div>';
   }
 
   /**
@@ -5025,10 +5133,14 @@ var TelaTrabalho = (function () {
       }
       var classe = (i === 0 && !ehOPrimeiro) ? 'principal' : 'apoio';
 
-      // O ALERTA vem do servidor já resolvido — a tela não conhece o limite de
-      // 18 meses nem o de 25,5%. A dica leva o motivo, e o texto INTEIRO: o
-      // destaque não quebra linha, e o que passa da largura aparece com "…".
-      if (celula.alerta) classe += ' em-alerta';
+      // A COR vem do servidor já resolvida — a tela não conhece o limite de
+      // 18 meses nem o de 25,5%. Vermelho é o alerta de sempre; amarelo e
+      // verde são as outras duas faixas da vigência do VG, pedido do PO. A
+      // dica leva o motivo, e o texto INTEIRO: o destaque não quebra linha.
+      if (celula.alerta) {
+        classe += { atencao: ' em-atencao', bom: ' em-bom' }[celula.tomDoAlerta]
+          || ' em-alerta';
+      }
 
       return '<span class="' + classe + '" title="'
         + escapar(Moldura.dicaDaCelula(celula))
@@ -5074,6 +5186,31 @@ var TelaTrabalho = (function () {
     return botoes;
   }
 
+  var focarABusca = false;
+
+  /**
+   * O selo do SLA — pedido do PO para a Mesa Diamante: "No prazo · faltam
+   * 2h10" em verde, "Fora do prazo · 1h30 além" em vermelho; caso já
+   * respondido, "SLA cumprido" ou "SLA estourado". A conta é do servidor; a
+   * tela só pinta, e a dica diz até onde o prazo foi contado.
+   * Canal sem SLA não manda nada, e não aparece nada.
+   */
+  var ATE_ONDE_O_SLA_CONTOU = {
+    resposta: 'contado até a primeira resposta',
+    encerramento: 'contado até o encerramento: o caso foi encerrado sem a primeira resposta',
+    agora: 'ainda correndo: o caso não teve a primeira resposta'
+  };
+
+  function seloDoSla(sla) {
+    if (!sla) return '';
+    return '<span class="selo-sla tom-' + escapar(sla.tom) + '"'
+      + ' title="' + escapar(sla.texto) + ' — SLA de '
+      + escapar(String(sla.prazo / 60).replace('.', ','))
+      + ' horas úteis, de segunda a sexta, no expediente, '
+      + escapar(ATE_ONDE_O_SLA_CONTOU[sla.parouEm] || '') + '">'
+      + escapar(sla.texto) + '</span>';
+  }
+
   function desenharPainel() {
     // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
     // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
@@ -5082,6 +5219,12 @@ var TelaTrabalho = (function () {
       Moldura.avisoDeJanela(resumo, 'Estes números e esta fila')
       + desenharCartoes() + desenharFiltros() + desenharFila();
     ligarPainel();
+    var busca = elemento('busca-na-fila');
+    if (focarABusca && busca) {
+      busca.focus();
+      busca.setSelectionRange(busca.value.length, busca.value.length);
+    }
+    focarABusca = false;
   }
 
   /* ---------------------------------------------------------- comportamento */
@@ -5112,9 +5255,18 @@ var TelaTrabalho = (function () {
           if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
           return;
         }
-        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value;
+        if (this.getAttribute('data-filtro') === 'busca') { buscar(this); return; }
+        filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value.trim();
         carregar();
       });
+    }
+
+    // O "x" do campo de busca apaga o texto sem disparar o `change` — sem
+    // isto, a fila continuava filtrada pelo termo que a pessoa acabou de
+    // apagar, até ela clicar fora. O evento `search` vem do "x" e do Enter.
+    var campoDaBusca = elemento('busca-na-fila');
+    if (campoDaBusca) {
+      campoDaBusca.addEventListener('search', function () { buscar(this); });
     }
 
     var limpar = elemento('limpar-filtros');
@@ -5151,6 +5303,21 @@ var TelaTrabalho = (function () {
           .senao(function (erro) { window.alert(erro.message || String(erro)); });
       });
     });
+  }
+
+  /**
+   * Aplica o termo digitado. O Enter dispara dois eventos (`change` e
+   * `search`); o termo igual ao que já está valendo não vai ao servidor de
+   * novo.
+   */
+  function buscar(campo) {
+    var termo = campo.value.trim();
+    if (termo === (filtrosEscolhidos.busca || '')) return;
+    filtrosEscolhidos.busca = termo;
+    // A busca redesenha a caixa inteira; o cursor volta para ela, para a
+    // pessoa poder corrigir o termo sem clicar de novo.
+    focarABusca = true;
+    carregar();
   }
 
   function ligarCliques(seletor, oQueFazer) {
@@ -5680,6 +5847,9 @@ var TelaBuscarCaso = (function () {
   var procurando = false;
   var ultimoTermo = '';
   var podeEditar = false;        // vem com a resposta da busca
+  // O termo que veio da busca da barra superior, para a tela já abrir
+  // procurando. Vale uma vez: é usado e esquecido.
+  var termoPedido = '';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -5944,6 +6114,11 @@ var TelaBuscarCaso = (function () {
         opcoes.canais.forEach(function (canal) { canaisEscolhidas[canal.id] = true; });
         desenharOnde();
         elemento('termo-da-busca').focus();
+        if (termoPedido) {
+          elemento('termo-da-busca').value = termoPedido;
+          termoPedido = '';
+          procurar();
+        }
       })
       .senao(function (erro) {
         elemento('onde-procurar').innerHTML =
@@ -5952,7 +6127,10 @@ var TelaBuscarCaso = (function () {
       });
   }
 
-  return { montar: montar, ligar: ligar };
+  /** Chamado pela busca da barra superior, antes de abrir esta tela. */
+  function procurarPor(termo) { termoPedido = String(termo || '').trim(); }
+
+  return { montar: montar, ligar: ligar, procurarPor: procurarPor };
 })();
 </script>
 
@@ -9040,6 +9218,21 @@ var TelaConfiguracoes = (function () {
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
         colunas, canal.colunaDaAreaResponsavel, '')
+      + campoDeTexto('slaHorasUteis', 'SLA em horas úteis', canal.slaHorasUteis,
+        'Prazo do caso, contado de segunda a sexta e só dentro do expediente '
+        + 'abaixo. Começa na data e hora de entrada e para na primeira resposta '
+        + '(caso encerrado sem resposta para no encerramento). Aparece como selo '
+        + 'na fila do Trabalho. Zero desliga.')
+      + campoDeTexto('inicioDoExpediente', 'Início do expediente',
+        canal.inicioDoExpediente, 'Como 08:15.')
+      + campoDeTexto('fimDoExpediente', 'Fim do expediente',
+        canal.fimDoExpediente, 'Como 18:30.')
+      + caixaDeOpcoes('colunaDaPrimeiraResposta', 'Coluna da primeira resposta',
+        colunas, canal.colunaDaPrimeiraResposta,
+        'A data em que o caso teve a primeira resposta: é nela que o prazo do SLA para.')
+      + caixaDeOpcoes('colunaDaHoraDaPrimeiraResposta',
+        'Coluna da hora da primeira resposta', colunas,
+        canal.colunaDaHoraDaPrimeiraResposta, '')
       + caixaDeOpcoes('colunaDoValor', 'Coluna do valor', colunas,
         canal.colunaDoValor,
         'A coluna de dinheiro deste canal. É dela que sai o gráfico "Valor por '
@@ -9079,6 +9272,11 @@ var TelaConfiguracoes = (function () {
         metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
+        slaHorasUteis: valorDe('slaHorasUteis'),
+        inicioDoExpediente: valorDe('inicioDoExpediente'),
+        fimDoExpediente: valorDe('fimDoExpediente'),
+        colunaDaPrimeiraResposta: valorDe('colunaDaPrimeiraResposta'),
+        colunaDaHoraDaPrimeiraResposta: valorDe('colunaDaHoraDaPrimeiraResposta'),
         colunaDoValor: valorDe('colunaDoValor'),
         situacoesDestacadas: valorDe('situacoesDestacadas'),
         icone: valorDe('icone'),
@@ -10283,26 +10481,6 @@ var TelaConfiguracoes = (function () {
       + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
   }
 
-  /**
-   * Um campo de data.
-   *
-   * Recebe e devolve dd/mm/aaaa, que é como o servidor fala; a conversão para
-   * o formato do <input type="date"> é do SeletorDePeriodo, que já a fazia
-   * para o filtro de período. Uma segunda cópia da conversão é uma segunda
-   * chance de errar o fuso na virada do dia.
-   */
-  function campoDeData(nome, rotulo, valor, dica) {
-    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
-      + '<input type="date" id="cfg-' + nome + '" value="'
-      + escapar(SeletorDePeriodo.paraOCampo(valor)) + '">'
-      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
-  }
-
-  /** O valor de um campo de data, já em dd/mm/aaaa para o servidor. */
-  function dataDe(nome) {
-    return SeletorDePeriodo.paraOServidor(valorDe(nome));
-  }
-
   function caixaDeSimNao(nome, rotulo, ligado) {
     return '<label class="config-chave">'
       + '<input type="checkbox" id="cfg-' + nome + '"'
@@ -10568,24 +10746,6 @@ var Servidor = (function () {
 /* ----------------------------------------------------------------- rotas */
 var Rotas = (function () {
 
-  /**
-   * Enquanto a tela de verdade não chega, o miolo diz com honestidade o que
-   * vai ter ali e em que etapa. Tela em branco faria todo mundo achar que
-   * quebrou.
-   */
-  function emConstrucao(etapa, itens) {
-    var lista = itens.map(function (item) {
-      return '<li>' + Moldura.escapar(item) + '</li>';
-    }).join('');
-    // Sem repetir o nome da tela: quem nomeia é o cabeçalho, logo acima.
-    return '<div class="cartao emconstrucao">'
-      + '<span class="fita">chega na etapa ' + etapa + '</span>'
-      + '<p>A casca já está pronta: menu, barra superior, temas e a troca de '
-      + 'telas funcionam. O que ainda não existe é o miolo desta tela.</p>'
-      + '<ul>' + lista + '</ul>'
-      + '</div>';
-  }
-
   var TELAS = {
     trabalho: {
       titulo: 'Trabalho',
@@ -10795,6 +10955,17 @@ var Aplicacao = (function () {
 
     var abrir = elemento('abrir-menu');
     if (abrir) abrir.addEventListener('click', abrirMenu);
+
+    // A busca da barra: Enter leva ao Buscar Caso, que já abre procurando.
+    var buscaGlobal = elemento('busca-global');
+    if (buscaGlobal) buscaGlobal.addEventListener('keydown', function (evento) {
+      if (evento.key !== 'Enter') return;
+      evento.preventDefault();
+      var termo = this.value.trim();
+      if (!termo) return;
+      TelaBuscarCaso.procurarPor(termo);
+      irPara('buscarCaso');
+    });
 
     var recarregar = elemento('recarregar');
     if (recarregar) recarregar.addEventListener('click', function () {

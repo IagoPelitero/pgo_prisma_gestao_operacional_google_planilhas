@@ -168,24 +168,6 @@ var Servidor = (function () {
 /* ----------------------------------------------------------------- rotas */
 var Rotas = (function () {
 
-  /**
-   * Enquanto a tela de verdade não chega, o miolo diz com honestidade o que
-   * vai ter ali e em que etapa. Tela em branco faria todo mundo achar que
-   * quebrou.
-   */
-  function emConstrucao(etapa, itens) {
-    var lista = itens.map(function (item) {
-      return '<li>' + Moldura.escapar(item) + '</li>';
-    }).join('');
-    // Sem repetir o nome da tela: quem nomeia é o cabeçalho, logo acima.
-    return '<div class="cartao emconstrucao">'
-      + '<span class="fita">chega na etapa ' + etapa + '</span>'
-      + '<p>A casca já está pronta: menu, barra superior, temas e a troca de '
-      + 'telas funcionam. O que ainda não existe é o miolo desta tela.</p>'
-      + '<ul>' + lista + '</ul>'
-      + '</div>';
-  }
-
   var TELAS = {
     trabalho: {
       titulo: 'Trabalho',
@@ -395,6 +377,17 @@ var Aplicacao = (function () {
 
     var abrir = elemento('abrir-menu');
     if (abrir) abrir.addEventListener('click', abrirMenu);
+
+    // A busca da barra: Enter leva ao Buscar Caso, que já abre procurando.
+    var buscaGlobal = elemento('busca-global');
+    if (buscaGlobal) buscaGlobal.addEventListener('keydown', function (evento) {
+      if (evento.key !== 'Enter') return;
+      evento.preventDefault();
+      var termo = this.value.trim();
+      if (!termo) return;
+      TelaBuscarCaso.procurarPor(termo);
+      irPara('buscarCaso');
+    });
 
     var recarregar = elemento('recarregar');
     if (recarregar) recarregar.addEventListener('click', function () {

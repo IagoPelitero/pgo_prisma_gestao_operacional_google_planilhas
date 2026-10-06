@@ -60,6 +60,20 @@
  */
 const RECC_LINHAS_DO_PAINEL_PADRAO = 5000;
 
+/**
+ * Quantos casos a FILA do Trabalho mostra: os mais recentes.
+ *
+ * Pedido do PO: "limite a visualização dos casos para mostrar apenas os 5 mais
+ * recentes", em todos os canais. Os CARTÕES continuam contando todos os casos
+ * do período e dos filtros — escolha dele —, e a tela diz "mostrando 5 de N"
+ * para ninguém achar que só existem cinco. Os outros se acham pela busca e
+ * pelos filtros, que procuram em todos.
+ *
+ * A conta do painel não muda (ele continua lendo as mesmas linhas); o que
+ * encolhe é o que atravessa para o navegador e o que a tela desenha.
+ */
+const RECC_CASOS_NA_FILA = 5;
+
 function linhasQueOPainelOlha_() {
   var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
   if (isFinite(declarado) && declarado > 0) return Math.floor(declarado);
@@ -118,8 +132,13 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
-  var filtrados = aplicarFiltros_(meus, disponiveis, filtros || {});
-  var anterioresFiltrados = aplicarFiltros_(anterior, disponiveis, filtros || {});
+  // A BUSCA DIGITADA entra junto com os filtros, e vale para os cartões E para
+  // a fila: o número do cartão continua sendo o dos casos que a busca achou.
+  var termo = String((filtros || {}).busca || '').trim();
+  var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
+    canal, termo);
+  var anterioresFiltrados = aplicarBusca_(
+    aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
 
   return {
     canal: canal,
@@ -135,7 +154,8 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
-    fila: montarFila_(filtrados, canal),
+    // Os mais recentes estão no FIM: a base só acrescenta no fim.
+    fila: montarFila_(filtrados.slice(-RECC_CASOS_NA_FILA), canal),
     total: filtrados.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,
@@ -438,6 +458,69 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
       }
     }
     return true;
+  });
+}
+
+/**
+ * A busca digitada do Trabalho: os casos em que o termo aparece.
+ *
+ * Pedido do PO: "o filtro por busca digitada para cada canal". Procura em
+ * DOIS conjuntos de colunas, juntos:
+ *
+ *   · as que a FILA mostra — quem lê "Endosso urgente" na fila espera achar o
+ *     caso digitando "endosso";
+ *   · as COLUNAS DA BUSCA do canal (Configurações › Canais de trabalho) — as
+ *     mesmas do Buscar Caso: CPF, apólice, protocolo.
+ *
+ * A comparação é a do Buscar Caso (`casaComOTermo_`): sem acento e sem caixa,
+ * e só os dígitos nas colunas de identificador — "123.456.789-01" acha
+ * "12345678901". A proposta da fila, que junta código e número, também é
+ * procurada inteira: digitar "7-0000123" acha o caso.
+ *
+ * Procura só no que o período e os filtros já separaram, em memória: a base
+ * já foi lida para montar o painel, e procurar de novo na planilha seria
+ * pagar a leitura duas vezes.
+ */
+function aplicarBusca_(registros, canal, termo) {
+  if (!termo) return registros;
+
+  var onde = [];
+  var jaTem = {};
+  function guardar(coluna) {
+    var chave = normalizarParaComparar_(coluna.cabecalho);
+    if (jaTem[chave]) return;
+    jaTem[chave] = true;
+    onde.push(coluna);
+  }
+  colunasDaFila_(canal).forEach(function (grupo) {
+    grupo.colunas.forEach(function (coluna) {
+      if (coluna.juntar) {
+        coluna.juntar.forEach(guardar);
+        onde.push({ juntar: coluna.juntar });
+      } else {
+        guardar(coluna);
+      }
+    });
+  });
+  colunasDaBusca_(canal).forEach(guardar);
+
+  return registros.filter(function (registro) {
+    return onde.some(function (coluna) {
+      if (coluna.juntar) {
+        var inteira = coluna.juntar.map(function (pedaco) {
+          return String(registro[pedaco.cabecalho] === undefined
+            ? '' : registro[pedaco.cabecalho]);
+        }).filter(function (texto) { return texto !== ''; }).join('-');
+        return casaComOTermo_(inteira, termo, '');
+      }
+      // Pelo TEXTO da coluna, como a fila mostra, e não pelo valor cru: uma
+      // data crua vira "Mon Oct 06 2026…", e buscar "Mon" de "Monkey"
+      // acharia todo caso que tem data.
+      var valor = coluna.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR
+        ? registro[coluna.cabecalho]
+        : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+      return casaComOTermo_(valor, termo, coluna.tipo);
+    });
   });
 }
 
@@ -757,11 +840,18 @@ function grupoDaFila_(pedaco, estrutura, canal) {
 function montarFila_(registros, canal) {
   var grupos = colunasDaFila_(canal);
 
+  // O SLA só existe em canal que declara um. Os status finais e o "agora" são
+  // calculados uma vez por fila, e não uma por caso.
+  var comSla = Number(canal.slaHorasUteis) > 0;
+  var finais = {};
+  var agora = comSla ? relogioDeParede_(new Date()) : null;
+
   // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
   // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
   var tons = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
     tons[situacao.chave] = situacao.tom;
+    if (situacao.final) finais[situacao.chave] = true;
   });
 
   return registros.slice().reverse().map(function (registro) {
@@ -775,7 +865,7 @@ function montarFila_(registros, canal) {
          * planilha. `recado` vem junto porque uma cor sozinha não diz o
          * motivo, e quem chega novo na operação não adivinha.
          */
-        var alerta = alertaDaCelula_(canal.aba, coluna.cabecalho,
+        var faixa = faixaDaCelula_(canal.aba, coluna.cabecalho,
           registro[coluna.cabecalho]);
 
         // Colunas juntas ("código + número") saem numa linha só, com hífen.
@@ -789,7 +879,10 @@ function montarFila_(registros, canal) {
           cabecalho: coluna.cabecalho,
           valor: valor,
           ehStatus: coluna.ehStatus,
-          alerta: alerta
+          // O motivo da cor, para a dica; e a cor: vermelho ("ruim"), amarelo
+          // ("atencao") ou verde ("bom") — as duas últimas, só na vigência do VG.
+          alerta: faixa ? faixa.recado : '',
+          tomDoAlerta: faixa ? faixa.tom : ''
         };
       });
     });
@@ -799,9 +892,165 @@ function montarFila_(registros, canal) {
       id: registro.__id,
       celulas: celulas,
       situacao: situacao,
-      tom: tons[normalizarParaComparar_(situacao)] || 'neutro'
+      tom: tons[normalizarParaComparar_(situacao)] || 'neutro',
+      // O SLA, quando o canal declara um (hoje, a Mesa Diamante).
+      sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null
     };
   });
+}
+
+/* ============================================================================
+   O SLA EM HORAS ÚTEIS
+   ============================================================================
+   Pedido do PO para a Mesa Diamante: "não mostra se o caso está dentro da SLA
+   de 6 horas úteis. A célula funciona das 08:15 às 18:30". De segunda a
+   sexta, escolha dele — e sem feriados, porque o sistema não tem mais a lista.
+
+   A CONTA É FEITA NO RELÓGIO DE PAREDE de São Paulo, em minutos do dia, e não
+   em milissegundos: "08:15" é 08:15 em qualquer dia, e misturar fuso com hora
+   de planilha (que o Sheets ancora numa data antiga) foi o que já deslocou
+   horários em minutos neste sistema.
+
+   COMEÇA na data e hora de entrada. Caso que chega fora do expediente — às
+   20h, no sábado — começa a contar na próxima abertura. Sem a hora, conta da
+   abertura daquele dia.
+
+   PARA NA PRIMEIRA RESPOSTA — palavra do PO: "a SLA conta até a data da
+   primeira resposta". Sem a hora dela, vale a hora guardada junto da data; sem
+   nenhuma das duas, o fim do expediente daquele dia.
+
+   SEM RESPOSTA, PARA NO ENCERRAMENTO — decisão do PO, perguntada: caso que foi
+   encerrado sem a primeira resposta preenchida para na mudança para o status
+   final ou, sem ela, na data da finalização. Senão ficaria "fora do prazo"
+   crescendo para sempre, num caso que ninguém mais vai trabalhar. O resto
+   conta até agora.
+   ============================================================================ */
+
+/** O dia e o minuto do dia, no relógio de São Paulo. */
+function relogioDeParede_(data) {
+  var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm');
+  var partes = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(texto);
+  return {
+    dia: Math.round(Date.UTC(Number(partes[1]), Number(partes[2]) - 1,
+      Number(partes[3])) / 86400000),
+    minuto: Number(partes[4]) * 60 + Number(partes[5])
+  };
+}
+
+/** Os minutos do dia de uma hora da planilha, ou de um texto "14:30". */
+function minutoDaHora_(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return isNaN(valor.getTime()) ? null : relogioDeParede_(valor).minuto;
+  }
+  var partes = /^(\d{1,2}):(\d{2})/.exec(String(valor).trim());
+  return partes ? Number(partes[1]) * 60 + Number(partes[2]) : null;
+}
+
+/** Minutos ÚTEIS entre dois pontos do relógio — segunda a sexta, no expediente. */
+function minutosUteisEntre_(de, ate, abre, fecha) {
+  if (ate.dia < de.dia || (ate.dia === de.dia && ate.minuto <= de.minuto)) return 0;
+  var total = 0;
+  for (var dia = de.dia; dia <= ate.dia; dia++) {
+    var semana = new Date(dia * 86400000).getUTCDay();   // 0 domingo, 6 sábado
+    if (semana === 0 || semana === 6) continue;
+    var inicio = dia === de.dia ? Math.max(abre, de.minuto) : abre;
+    var fim = dia === ate.dia ? Math.min(fecha, ate.minuto) : fecha;
+    if (fim > inicio) total += fim - inicio;
+  }
+  return total;
+}
+
+/**
+ * O ponto do relógio em que o prazo parou: o dia da data e a hora da coluna
+ * de hora. Sem a hora, vale a guardada junto da data (quem conclui pelo
+ * diálogo grava data e hora numa célula só); sem nenhuma, o fim do expediente.
+ */
+function pontoDoFim_(data, hora, fecha) {
+  var relogio = relogioDeParede_(data);
+  var minuto = minutoDaHora_(hora);
+  if (minuto === null) minuto = relogio.minuto || fecha;
+  return { dia: relogio.dia, minuto: minuto };
+}
+
+/** "2h10", "45min", e a partir de um expediente inteiro, "3 dias úteis". */
+function duracaoParaLer_(minutos, expediente) {
+  if (minutos >= expediente) {
+    var dias = Math.floor(minutos / expediente);
+    return dias + (dias === 1 ? ' dia útil' : ' dias úteis');
+  }
+  if (minutos < 60) return minutos + 'min';
+  var horas = Math.floor(minutos / 60);
+  var resto = minutos % 60;
+  return horas + 'h' + (resto ? (resto < 10 ? '0' : '') + resto : '');
+}
+
+/**
+ * O SLA de um caso, pronto para o selo da fila — ou null, quando não dá para
+ * contar (sem data de entrada, ou canal sem expediente válido).
+ */
+function slaDoCaso_(registro, canal, finais, agora) {
+  var abre = minutoDaHora_(canal.inicioDoExpediente);
+  var fecha = minutoDaHora_(canal.fimDoExpediente);
+  if (abre === null || fecha === null || fecha <= abre) return null;
+
+  var entrada = converterParaData_(registro[canal.colunaDaData]);
+  if (!entrada) return null;
+  var horaDaEntrada = canal.colunaDaHora
+    ? minutoDaHora_(registro[canal.colunaDaHora]) : null;
+  var de = {
+    dia: relogioDeParede_(entrada).dia,
+    minuto: horaDaEntrada === null ? abre : horaDaEntrada
+  };
+
+  // Onde o prazo parou: na primeira resposta, no encerramento ou em lugar
+  // nenhum ainda ("agora"). A tela usa para explicar o selo na dica.
+  var ate = agora;
+  var parouEm = 'agora';
+  var resposta = canal.colunaDaPrimeiraResposta
+    ? converterParaData_(registro[canal.colunaDaPrimeiraResposta]) : '';
+  if (resposta) {
+    parouEm = 'resposta';
+    ate = pontoDoFim_(resposta, canal.colunaDaHoraDaPrimeiraResposta
+      ? registro[canal.colunaDaHoraDaPrimeiraResposta] : '', fecha);
+  } else {
+    var situacao = canal.colunaDoStatus
+      ? normalizarParaComparar_(registro[canal.colunaDoStatus]) : '';
+    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+    var finalizadoEm = canal.colunaDaFinalizacao
+      ? converterParaData_(registro[canal.colunaDaFinalizacao]) : '';
+    if (finais[situacao] && mudou) {
+      parouEm = 'encerramento';
+      ate = relogioDeParede_(mudou);
+    } else if (finalizadoEm) {
+      parouEm = 'encerramento';
+      ate = pontoDoFim_(finalizadoEm, '', fecha);
+    }
+  }
+  var parou = parouEm !== 'agora';
+
+  var prazo = Math.round(Number(canal.slaHorasUteis) * 60);
+  var gasto = minutosUteisEntre_(de, ate, abre, fecha);
+  var expediente = fecha - abre;
+  var dentro = gasto <= prazo;
+
+  var texto;
+  if (parou) {
+    texto = dentro ? 'SLA cumprido · em ' + duracaoParaLer_(gasto, expediente)
+      : 'SLA estourado · ' + duracaoParaLer_(gasto - prazo, expediente) + ' além';
+  } else {
+    texto = dentro ? 'No prazo · faltam ' + duracaoParaLer_(prazo - gasto, expediente)
+      : 'Fora do prazo · ' + duracaoParaLer_(gasto - prazo, expediente) + ' além';
+  }
+  return {
+    dentro: dentro,
+    parou: parou,
+    parouEm: parouEm,
+    tom: dentro ? 'bom' : 'ruim',
+    texto: texto,
+    minutosUteis: gasto,
+    prazo: prazo
+  };
 }
 
 

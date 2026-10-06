@@ -176,15 +176,20 @@ function preencherColunasCalculadas_(nomeDaAba, paraGravar, registroAtual) {
  * — a fila do Trabalho e o caso aberto — e duas cópias divergiriam no primeiro
  * ajuste de limite.
  *
- * `abaixoDe` é o único formato hoje, porque é o único que a operação pediu.
- * Acrescentar "acima de" é uma linha aqui e um `if` no `alertaDaCelula_`.
+ * `abaixoDe` é o vermelho. `noLimite` e `acima` são as outras duas cores, para
+ * a regra que tem três faixas: pedido do PO para a vigência do VG — "abaixo de
+ * 18 meses fica em vermelho, 18 meses exato fica amarelo e mais que 18 meses
+ * fica verde, assim os analistas conseguem ver com mais facilidade". Regra sem
+ * as duas continua só com o vermelho, como a margem.
  */
 const RECC_ALERTAS_DA_LINHA = {
   BASE_VG: [
     {
       cabecalho: 'Meses de vigência',
       abaixoDe: 18,
-      recado: 'Vigência de menos de 18 meses'
+      recado: 'Vigência de menos de 18 meses',
+      noLimite: { tom: 'atencao', recado: 'Vigência de exatamente 18 meses' },
+      acima: { tom: 'bom', recado: 'Vigência acima de 18 meses' }
     },
     {
       cabecalho: 'Margem de contribuição',
@@ -202,14 +207,25 @@ const RECC_ALERTAS_DA_LINHA = {
  * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
  */
 function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
+  var faixa = faixaDaCelula_(nomeDaAba, cabecalho, valor);
+  return faixa && faixa.tom === 'ruim' ? faixa.recado : '';
+}
+
+/**
+ * A cor desta célula e o motivo — vermelho, amarelo ou verde —, ou null.
+ *
+ * O vermelho é o alerta de sempre (`abaixoDe`). O amarelo e o verde só existem
+ * na regra que os declara: a vigência do VG. Valor em branco não ganha cor.
+ */
+function faixaDaCelula_(nomeDaAba, cabecalho, valor) {
   var regras = RECC_ALERTAS_DA_LINHA[nomeDaAba];
-  if (!regras) return '';
+  if (!regras) return null;
 
   var texto = String(valor === null || valor === undefined ? '' : valor).trim();
-  if (!texto) return '';
+  if (!texto) return null;
 
   var numero = Number(String(texto).replace(',', '.'));
-  if (isNaN(numero)) return '';
+  if (isNaN(numero)) return null;
 
   var achada = null;
   regras.forEach(function (regra) {
@@ -217,9 +233,12 @@ function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
       achada = regra;
     }
   });
-  if (!achada) return '';
+  if (!achada) return null;
 
-  return numero < achada.abaixoDe ? achada.recado : '';
+  if (numero < achada.abaixoDe) return { tom: 'ruim', recado: achada.recado };
+  if (numero === achada.abaixoDe && achada.noLimite) return achada.noLimite;
+  if (numero > achada.abaixoDe && achada.acima) return achada.acima;
+  return null;
 }
 
 /**
@@ -710,6 +729,29 @@ const RECC_ESQUEMA = {
        * aba de 16 mil SUSEPs bloqueadas, a cada SUSEP digitada.
        */
       { cabecalho: 'ConfereSusepBloqueada', tipo: 'simOuNao', protegido: false },
+      /*
+       * O SLA DO CANAL, em horas ÚTEIS — pedido do PO para a Mesa Diamante:
+       * "6 horas úteis; a célula funciona das 08:15 às 18:30". Conta de
+       * segunda a sexta, só dentro do expediente.
+       *
+       * Mora aqui, e não escrito no código com o nome "Mesa", porque é regra
+       * de operação: o prazo, o expediente e o canal que tem prazo mudam.
+       * Zero ou vazio desliga — canal sem SLA declarado não ganha um selo
+       * inventado na fila.
+       *
+       * O expediente é TEXTO ("08:15"), e não hora: é configuração que a
+       * pessoa lê e escreve, e uma hora de planilha atravessa fusos.
+       *
+       * O prazo PARA NA PRIMEIRA RESPOSTA — palavra do PO: "a SLA conta até a
+       * data da primeira resposta". As duas colunas dizem onde a base guarda
+       * a data e a hora dessa resposta; declaradas, e não adivinhadas, como as
+       * outras. Caso encerrado sem resposta para no encerramento.
+       */
+      { cabecalho: 'SlaHorasUteis', tipo: 'numero', protegido: false },
+      { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaPrimeiraResposta', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaHoraDaPrimeiraResposta', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }
@@ -1583,10 +1625,24 @@ function converterParaData_(valor) {
   }
   var texto = String(valor).trim();
   var br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (br) return new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+  if (br) return diaQueExiste_(Number(br[3]), Number(br[2]), Number(br[1]));
   var iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  if (iso) return diaQueExiste_(Number(iso[1]), Number(iso[2]), Number(iso[3]));
   return '';
+}
+
+/**
+ * A data, se o dia existe no calendário — ou vazio.
+ *
+ * `new Date(2026, 1, 31)` não reclama: devolve 3 de março. Com o calendário do
+ * navegador isso não chegava aqui; desde que a data é digitada com máscara,
+ * "31/02/2026" pode chegar, e virar outro dia calado é o pior jeito de errar.
+ */
+function diaQueExiste_(ano, mes, dia) {
+  var data = new Date(ano, mes - 1, dia);
+  if (data.getFullYear() !== ano || data.getMonth() !== mes - 1
+    || data.getDate() !== dia) return '';
+  return data;
 }
 
 /**

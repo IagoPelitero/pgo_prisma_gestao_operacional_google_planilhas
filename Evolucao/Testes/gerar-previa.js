@@ -131,7 +131,7 @@ function pontePreparada(respostas) {
     + '        var painel = respostas.paineis[idDoCanal];\n'
     + '        var chave = "";\n'
     + '        Object.keys(filtros || {}).forEach(function (campo) {\n'
-    + '          if (filtros[campo]) chave = campo + "=" + filtros[campo];\n'
+    + '          if (filtros[campo] && campo !== "busca") chave = campo + "=" + filtros[campo];\n'
     + '        });\n'
     + '        var variante = painel.variantes[chave];\n'
     + '        var resumo = {};\n'
@@ -140,6 +140,15 @@ function pontePreparada(respostas) {
     + '          resumo.cartoes = variante.cartoes;\n'
     + '          resumo.fila = variante.fila;\n'
     + '          resumo.total = variante.total;\n'
+    + '        }\n'
+    // A busca digitada, aproximada: a prévia não tem a base, só a fila que
+    // guardou — procura nela, para a caixa de busca responder alguma coisa.
+    + '        var termo = String((filtros || {}).busca || "").trim().toLowerCase();\n'
+    + '        if (termo) {\n'
+    + '          resumo.fila = resumo.fila.filter(function (caso) {\n'
+    + '            return JSON.stringify(caso.celulas).toLowerCase().indexOf(termo) >= 0;\n'
+    + '          });\n'
+    + '          resumo.total = resumo.fila.length;\n'
     + '        }\n'
     + '        responder(resumo);\n'
     + '      },\n'
@@ -477,6 +486,20 @@ function gerar(pastaDeSaida) {
       Status: 'Reativado', 'Motivo da liberação ou recusa': 'Cliente quitou o débito',
       'Prêmio mensal': 39400, 'Prêmio anual': 472800,
       'Margem de contribuição': 27, 'Quantidade de parcelas vencidas': 0,
+      Obs: '', 'Mês e ano': mesAnoDeHoje
+    },
+    {
+      // EXATAMENTE 18 meses: a vigência sai em AMARELO — a faixa do meio,
+      // pedido do PO. Sem ele, a prévia só mostraria o vermelho e o verde.
+      'Data do protocolo da solicitação': diasAtras(1), Analista: 'Marcos Vieira',
+      'TK/Assunto': 'TK-88501 · Revisão de reajuste', Entrada: diasAtras(1),
+      CNPJ: '22333444000166', Subestipulante: 'Padaria Grand Line',
+      'Início da vigência': mesesAtras(18), 'Meses de vigência': 18,
+      'Quantidade de vidas': 24, 'MOVSINT/MOVESEG': 'MOVSINT',
+      SUSEP: 'RET04D', Periodicidade: 'Mensal', Lead: 'Renovação',
+      Status: 'Aguardando', 'Motivo da liberação ou recusa': '',
+      'Prêmio mensal': 1890, 'Prêmio anual': 22680,
+      'Margem de contribuição': 29.5, 'Quantidade de parcelas vencidas': 0,
       Obs: '', 'Mês e ano': mesAnoDeHoje
     }
   ]);

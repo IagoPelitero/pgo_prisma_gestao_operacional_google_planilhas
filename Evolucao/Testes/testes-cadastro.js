@@ -1663,6 +1663,104 @@ function rodarTestesDeCadastro() {
     contem(fonte, "campo.mascara.split('|').join(' ou ')",
       'a dica mostra CPF ou CNPJ, e não a máscara com a barra vertical');
   });
+  secao('Datas: dd/mm/aaaa com máscara, e a primeira já com hoje');
+
+  /*
+   * Pedido do PO: uma analista gravou datas como mm/dd/aaaa. O calendário do
+   * navegador (type="date") segue o IDIOMA do navegador — num Chrome em
+   * inglês, 05/10 é 10 de maio. A data virou texto com máscara dd/mm/aaaa,
+   * nos formulários e nos filtros de período.
+   */
+  const hojeAqui = (() => {
+    const agora = new Date();
+    const dois = (n) => (n < 10 ? '0' : '') + n;
+    return dois(agora.getDate()) + '/' + dois(agora.getMonth() + 1) + '/' + agora.getFullYear();
+  })();
+
+  teste('a primeira data de cada formulário já vem com hoje, e recusa o futuro', () => {
+    chamar('canaisVisiveis_()').forEach((umCanal) => {
+      const campos = chamar('formularioDoCanal')(umCanal.id).secoes
+        .reduce((soma, s) => soma.concat(s.campos), []);
+      const primeiraData = campos.find((c) => c.tipo === 'data');
+      verdadeiro(primeiraData !== undefined, umCanal.nome + ' tem uma data');
+      igual(primeiraData.valorPadrao, hojeAqui, umCanal.nome + ': a primeira data é hoje');
+      igual(primeiraData.aceitaFuturo, false, umCanal.nome + ': e não aceita futuro');
+    });
+  });
+
+  teste('o campo de data é texto com máscara, e não o calendário do navegador', () => {
+    const form = pecaRodando('Formulario').Formulario;
+    const html = form.desenhar(chamar('formularioDoCanal')(canalDiamante.id), '');
+    contem(html, 'data-mascara="00/00/0000"');
+    contem(html, 'placeholder="dd/mm/aaaa"');
+    contem(html, 'inputmode="numeric"', 'o celular abre o teclado de números');
+    verdadeiro(html.indexOf('type="date"') < 0, 'o calendário saiu do formulário');
+  });
+
+  teste('digitar só os números já sai dd/mm/aaaa', () => {
+    const form = pecaRodando('Formulario').Formulario;
+    igual(form.aplicarMascara('06102026', '00/00/0000'), '06/10/2026');
+    igual(form.aplicarMascara('0610', '00/00/0000'), '06/10');
+  });
+
+  teste('o padrão de hoje entra no campo como veio, sem conversão', () => {
+    // No calendário, "06/10/2026" não entrava — o campo pedia 2026-10-06 — e a
+    // primeira data aparecia vazia. Agora o padrão entra direto.
+    const peca = lerPeca('Formulario');
+    const aplicar = peca.substring(peca.indexOf('function aplicarPadroes'));
+    contem(aplicar.substring(0, 500), 'caixa.value = campo.valorPadrao');
+    verdadeiro(peca.indexOf('paraCaixaDeData') < 0,
+      'a conversão para o formato do calendário saiu');
+  });
+
+  teste('dia que não existe é recusado, e não vira outro dia calado', () => {
+    igual(chamar('converterParaData_')('31/02/2026'), '',
+      'new Date(2026, 1, 31) seria 3 de março sem reclamar');
+    igual(chamar('converterParaData_')('2026-02-30'), '');
+    verdadeiro(chamar('converterParaData_')('28/02/2026') !== '');
+    lanca(() => chamar('cadastrarCaso')(canalDiamante.id, {
+      status: 'Em andamento', nomedosegurado: 'Data impossível',
+      datadeentrada: '31/02/2026'
+    }), 'dd/mm/aaaa');
+  });
+
+  teste('nenhuma tela usa mais o calendário do navegador', () => {
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    fs.readdirSync(pasta).filter((n) => n.endsWith('.html')).forEach((arquivo) => {
+      const texto = fs.readFileSync(path.join(pasta, arquivo), 'utf8')
+        // Os comentários que explicam por que ele saiu não contam.
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+      verdadeiro(texto.indexOf('type="date"') < 0, arquivo + ' ainda tem type="date"');
+    });
+  });
+
+  teste('o de/até dos filtros também é dd/mm/aaaa, e só vale com data inteira', () => {
+    const periodo = pecaRodando('SeletorDePeriodo').SeletorDePeriodo;
+    igual(periodo.paraOServidor('06/10/2026'), '06/10/2026');
+    igual(periodo.paraOServidor('06/10/20'), '', 'pela metade, espera');
+    igual(periodo.paraOServidor('31/02/2026'), '', 'dia impossível, espera');
+    igual(periodo.paraOServidor('2026-10-06'), '', 'o formato do calendário não passa');
+    const peca = lerPeca('SeletorDePeriodo');
+    contem(peca, 'data-mascara-de-data="sim"');
+    contem(peca, 'placeholder="dd/mm/aaaa"');
+  });
+
+  teste('voltar para "Por dias" não carrega os dias do intervalo escondidos', () => {
+    /*
+     * Achado da varredura: de "Por data" (01/01 a hoje, 279 dias) de volta
+     * para "Por dias", a caixa mostrava "Últimos 7 dias" — 279 não é uma das
+     * opções — e a conta continuava somando os 279.
+     */
+    const periodo = pecaRodando('SeletorDePeriodo').SeletorDePeriodo;
+    const como = elementoFalso('select', { 'data-periodo': 'como' });
+    como.value = 'dias';
+    igual(periodo.mudou(como, { periodo: { tipo: 'intervalo', dias: 279 } }).dias, 0,
+      'zero: o servidor usa o padrão da configuração');
+    igual(periodo.mudou(como, { periodo: { tipo: 'mes', dias: 31 } }).dias, 0);
+    igual(periodo.mudou(como, { periodo: { tipo: 'mes', dias: 30 } }).dias, 30,
+      'quando os dias são um dos atalhos, eles ficam');
+  });
+
 }
 
 module.exports = { rodarTestesDeCadastro };

@@ -123,15 +123,17 @@ Dentro de `Evolucao/`:
 
    **A cada versão nova, rode `atualizarPGO()`.** Ela traz para a planilha em
    uso o que cada rodada mudou, e diz no fim o que fez, o que já estava assim
-   e o que é decisão sua. A última rodada que mexeu na planilha trocou os
-   **destaques da fila** — a proposta inteira e o telefone na RET, o título do
-   e-mail na Mesa — e fez o **CPF da Mesa aceitar CNPJ**. Só onde ainda estava
-   como a instalação deixou: grupo da fila ou máscara que alguém personalizou
-   **não é mexido**, e aparece na "DECISÃO SUA" com o texto pronto para colar
-   em Configurações. (A anterior a ela excluiu o "Concluído" da RET e trocou os
-   nomes dos status para os do PO, inclusive nos casos já gravados.) Rodar
-   duas vezes não muda nada. A troca das ações do caso — "Trabalhar no caso",
-   "Alterar status" e o aviso de excluir — é só de tela: basta colar o código.
+   e o que é decisão sua. A última rodada que mexeu na planilha criou as
+   cinco colunas do **SLA** em `CANAIS`, ligou o **SLA da Mesa Diamante** (6
+   horas úteis, das 08:15 às 18:30, até a primeira resposta — só se a Mesa
+   ainda não tiver um SLA declarado) e fez o grupo **Vigência do VG abrir pelos meses**. A anterior
+   trocou os **destaques da fila** — a proposta inteira e o telefone na RET, o
+   título do e-mail na Mesa — e fez o **CPF da Mesa aceitar CNPJ**. Só onde
+   ainda estava como a instalação deixou: grupo da fila ou máscara que alguém
+   personalizou **não é mexido**, e aparece na "DECISÃO SUA" com o texto
+   pronto para colar em Configurações. Rodar duas vezes não muda nada. A busca
+   do Trabalho, a fila de 5, as datas com máscara e as cores da vigência são só
+   de tela e de servidor: basta colar o código.
 
    ### O caminho curto: três arquivos
 
@@ -309,10 +311,26 @@ RECC —, desenhada por uma peça só (`Moldura.caixaDeFiltros`). A contagem ao
 lado do título é o que evita a leitura errada mais comum: um filtro esquecido
 ligado, a tela com três casos, e ninguém entendendo por quê.
 
-O primeiro filtro é o **período**, nas mesmas três maneiras da Produtividade
-RECC (ver adiante): por dias, por data e por mês. Antes o Trabalho olhava só a
-janela fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem
-precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
+O primeiro filtro é a **busca digitada**, do canal escolhido — pedido do PO.
+Digite e aperte **Enter**: a fila e os cartões passam a contar só os casos em
+que o termo aparece. Procura nas colunas que a fila mostra e nas **colunas da
+busca** do canal (Configurações › Canais de trabalho), do mesmo jeito do
+Buscar Caso: sem acento, sem maiúscula, e o documento com ou sem pontuação —
+`123.456.789-01` acha `12345678901`. A proposta inteira (`7-0000123`) também
+acha. O "x" do campo limpa a busca na hora, e trocar de canal limpa junto com
+os outros filtros. É uma ida ao servidor por Enter, e não uma por letra.
+
+Depois vem o **período**, nas mesmas três maneiras da Produtividade RECC (ver
+adiante): por dias, por data e por mês. Antes o Trabalho olhava só a janela
+fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem precisasse
+fechar uma semana ou um mês tinha de exportar e contar fora.
+
+**A fila mostra só os 5 casos mais recentes**, o mais novo em cima, em todos
+os canais — pedido do PO, para a tela abrir mais leve. **Os cartões continuam
+contando todos.** Embaixo da fila, um recado diz quantos ficaram de fora
+("Mostrando os 5 casos mais recentes de 37") e como chegar neles: a busca e os
+filtros procuram em **todos** os casos do período, não só nos cinco. O número
+mora numa constante (`RECC_CASOS_NA_FILA`, em `Indicadores.gs`).
 
 Quando a fila sai vazia, o recado diz **o período que ela olhou**, com as
 palavras do próprio filtro: "nada foi registrado no período escolhido —
@@ -338,6 +356,36 @@ trabalho, como o resto da fila. O destaque não quebra linha, para dar para
 varrer com o olho: título de e-mail longo aparece com "…". **Passar o cursor
 por cima mostra o texto inteiro**, com o nome da coluna — a pedido do PO, e
 igual nas três filas: Trabalho, Busca e o detalhamento da Produtividade RECC.
+
+### O SLA da Mesa Diamante
+
+Cada caso da Mesa tem um **selo de SLA** embaixo da situação — pedido do PO:
+*"6 horas úteis; a célula funciona das 08:15 às 18:30"*, de segunda a sexta,
+e *"a SLA conta até a data da primeira resposta"*.
+
+| O caso está | O selo diz |
+|---|---|
+| sem resposta, dentro do prazo | **No prazo · faltam 2h10** — em verde |
+| sem resposta, fora do prazo | **Fora do prazo · 1h30 além** — em vermelho |
+| respondido no prazo | **SLA cumprido · em 3h** — em verde |
+| respondido fora do prazo | **SLA estourado · 7h15 além** — em vermelho |
+
+O prazo **começa** na data e hora de entrada (sem a hora, na abertura daquele
+dia; caso que chega às 20h ou no sábado começa a contar na próxima abertura) e
+**para na primeira resposta** — na Mesa, as colunas "Data resposta" e "Hora
+resposta" (sem a hora, vale o fim do expediente daquele dia). A finalização
+não conta: respondido às 10h e finalizado no dia seguinte, o SLA é das 10h.
+**Caso encerrado sem a primeira resposta** — decisão do PO — para no
+encerramento: a mudança para o status final ou, sem ela, a data da
+finalização; senão ficaria "fora do prazo" crescendo para sempre. Só conta o
+que cai dentro do expediente, de segunda a sexta — sem feriados, porque o
+sistema não tem mais a lista. Passado um expediente inteiro, o selo fala em
+dias úteis, e a dica diz até onde o prazo foi contado.
+
+Tudo é **configurável** em Configurações › Canais de trabalho: horas (zero
+desliga), início e fim do expediente e as colunas da data e da hora da
+primeira resposta. A RET e o VG nascem sem SLA, e o selo simplesmente não
+aparece neles.
 
 ### As três ações de cada caso
 
@@ -429,6 +477,17 @@ coluna "Documento (CPF)" de sempre — nome de coluna é contrato com o Power BI
 O servidor aceita 11 ou 14 dígitos e diz os dois no recado quando vem outro
 tamanho. Na RET o CPF continua só CPF.
 
+**As datas são dd/mm/aaaa, em qualquer navegador.** Uma analista gravou
+datas como mm/dd/aaaa: o calendário do navegador segue o **idioma do
+navegador**, e num Chrome em inglês 05/10 é 10 de maio — sem erro nenhum,
+porque 10 de maio é uma data válida. Agora toda data, nos formulários e no
+de/até dos filtros, é um campo de texto com máscara: digitar `06102026` mostra
+`06/10/2026`. **A primeira data de cada formulário já vem com hoje** e recusa
+o futuro (a data do protocolo da RET, a de recepção da Mesa e a do protocolo
+do VG); no calendário o valor de hoje não entrava, e o campo aparecia vazio.
+Dia que não existe — `31/02/2026` — é recusado, em vez de virar 3 de março
+calado.
+
 **A SUSEP tem letra**: `RET00J`. Todo campo que pede SUSEP aceita e guarda
 exatamente o que foi colado — letra, dígito, caixa e pontuação. Só o espaço
 das pontas sai, e por um motivo concreto: quem copia de outra planilha traz
@@ -495,6 +554,10 @@ a tela de leitura. O tamanho da trilha não pesa mais no clique.
 
 O Trabalho mostra os últimos 30 dias, de propósito. Quando o cliente liga
 citando um protocolo de abril, é aqui que se procura.
+
+**A busca da barra superior** leva para cá: digite e aperte Enter, de qualquer
+tela, e o Buscar Caso abre já procurando o termo. Antes a caixa estava lá e
+não fazia nada. Quem não tem o Buscar Caso no menu não vê a caixa.
 
 ![A busca](Evolucao/imagens/tela-buscar-caso.png)
 
@@ -564,7 +627,7 @@ fazendo a mesma pergunta.
 | Maneira | Para quê |
 |---|---|
 | **Por dias** | "Últimos 30 dias". É o do dia a dia, e continua sendo a abertura |
-| **Por data** | Duas datas, de/até. Responde uma pergunta específica: a semana da campanha, os dias da virada |
+| **Por data** | Duas datas, de/até, digitadas em dd/mm/aaaa (com máscara, como nos formulários). Responde uma pergunta específica: a semana da campanha, os dias da virada |
 | **Por mês** | "Setembro de 2026". É como a operação REPORTA — e é diferente de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias pegam metade de setembro e metade de outubro, e nenhum fechamento se faz assim |
 
 Quem resolve as três é o **servidor**. Se a tela calculasse as datas, o dia do
@@ -827,7 +890,9 @@ de pé. O que ele prova é que a máquina aguenta: base própria, formulário
 próprio, listas próprias e seis status próprios, sem mexer em nada dos outros
 dois.
 
-Ele também trouxe duas coisas que nenhum canal tinha.
+Ele também trouxe duas coisas que nenhum canal tinha. Na fila, o grupo
+**Vigência abre pelos meses**, em destaque — pedido do PO, para a equipe ver
+de longe.
 
 ### Uma coluna calculada
 
@@ -844,19 +909,23 @@ O mês só conta quando o **dia** chega: de 15/03 a 14/09 são cinco meses, e o
 sexto fecha no dia 15. Contar pela metade daria 18 a quem tem 17 e meio — e 18
 é exatamente onde o alerta liga.
 
-### Um alerta vermelho, só na tela
+### As cores da vigência e da margem, só na tela
 
-| coluna | acende quando |
-|---|---|
-| Meses de vigência | menos de 18 |
-| Margem de contribuição | menos de 25,5% |
+| coluna | vermelho | amarelo | verde |
+|---|---|---|---|
+| Meses de vigência | menos de 18 | exatamente 18 | mais de 18 |
+| Margem de contribuição | menos de 25,5% | — | — |
+
+As três cores da vigência são pedido do PO. A margem continua só com o
+vermelho: ele não pediu as outras duas para ela.
 
 **Só nas telas do PGO**, nunca na planilha — decisão do PO. Formatação
 condicional na célula ficaria para trás no dia em que alguém arrastasse uma
 linha, e o alerta sumiria sem avisar.
 
 A cor não vem sozinha: passar o mouse mostra o motivo (*"Vigência de menos de
-18 meses"*). Cor sem motivo é enfeite — quem chegou ontem na operação não
+18 meses"*, *"Vigência de exatamente 18 meses"*, *"Vigência acima de 18
+meses"*). Cor sem motivo é enfeite — quem chegou ontem na operação não
 adivinha que 17 é pouco.
 
 Campo em branco **não** acende. Campo não preenchido é campo não preenchido, e
@@ -986,7 +1055,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-768 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+821 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

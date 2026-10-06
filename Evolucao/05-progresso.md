@@ -2063,6 +2063,78 @@ o CPF pela metade continua sendo recusado — é a regra de validação. A suges
 
 ---
 
+## Etapa 23 — busca no Trabalho, fila de 5, SLA da Mesa, datas e as cores da vigência
+
+Cinco pedidos e uma varredura. As escolhas que eram do PO foram perguntadas
+antes: a busca da barra superior leva ao Buscar Caso; os cartões contam todos
+os casos, e só a fila mostra cinco; o SLA conta de segunda a sexta; verde no
+prazo e vermelho fora; datas com máscara nos formulários **e** nos filtros.
+
+| pedido | o que ficou |
+|---|---|
+| "O filtro por busca digitada para cada canal" | Caixa de busca como primeiro filtro do Trabalho. Enter aplica; a fila e os cartões contam só os casos com o termo. Procura nas colunas da fila e nas colunas da busca do canal, sem acento e com o documento com ou sem pontuação. O "x" limpa na hora; trocar de canal limpa junto |
+| "Tem um campo de busca na tela superior que não funciona" | Enter leva ao Buscar Caso já procurando o termo (item 59 dos achados) |
+| "Mostrar apenas os 5 mais recentes, em todos os canais" | A fila traz os 5 mais novos, o mais novo em cima; os cartões contam todos. Um recado embaixo diz quantos ficaram de fora e que a busca e os filtros alcançam os outros |
+| "SLA de 6 horas úteis, a célula funciona das 08:15 às 18:30"; "a SLA conta até a data da primeira resposta" | Selo em cada caso da Mesa: "No prazo · faltam 2h10" em verde, "Fora do prazo · 1h30 além" em vermelho; respondido, "SLA cumprido" ou "SLA estourado". De segunda a sexta, só dentro do expediente, até a primeira resposta. Configurável por canal |
+| "A primeira data com hoje, sem futuro; dd/mm/aaaa em todos que pedem data" | Toda data virou texto com máscara dd/mm/aaaa, nos formulários e no de/até. A primeira data de cada formulário já vem com hoje e recusa o futuro. 31/02 é recusado (itens 57 e 58) |
+| "No VG, o período de vigência em destaque: abaixo de 18 vermelho, 18 amarelo, acima verde" | O grupo Vigência abre pelos meses, com as três cores e o motivo na dica. A margem continua só com o vermelho |
+| "Vasculhe Trabalho, Cadastro e Configurações" | Dois defeitos de antes corrigidos — salvar a Mesa religava a conferência de SUSEP (60) e o período que voltava para "Por dias" com a conta errada (61) —, dois do próprio código desta rodada (62), e quatro funções que ninguém chamava, removidas |
+
+### O SLA, por dentro
+
+A conta é em **minutos do relógio de São Paulo**, dia a dia: de cada dia útil
+entre a entrada e o fim, soma só o pedaço que cai no expediente. Começa na data
+e hora de entrada (sem hora, na abertura). **Para na primeira resposta** —
+correção do PO depois da primeira versão, que parava na finalização: "a SLA
+conta até a data da primeira resposta" (data e hora da resposta; sem a hora, a
+guardada junto da data; sem nada, o fim do expediente). **Sem resposta, para
+no encerramento** — perguntado ao PO: a mudança para um status final ou, sem
+ela, a data da finalização. Senão, conta até agora. Sem feriados — a lista
+saiu do sistema na Etapa 20.
+
+Cinco colunas novas em `CANAIS`: `SlaHorasUteis`, `InicioDoExpediente`,
+`FimDoExpediente`, `ColunaDaPrimeiraResposta` e
+`ColunaDaHoraDaPrimeiraResposta` (na Mesa, "Data resposta" e "Hora resposta").
+Zero horas desliga.
+
+### O código que saiu
+
+`emConstrucao` (a tela provisória da casca, sem uso desde que todas as telas
+existem), `campoDeData` e `dataDe` em Configurações (o último `type="date"`
+do sistema, sem nenhum campo usando) e `Formulario.usaMascara` (exportada e
+nunca chamada), com o estilo `.emconstrucao`. Ficaram `reexibirRegistro_` e
+`normalizarIdentificadoresDaAba_`: não são chamadas pelo sistema, mas são
+ferramentas de manutenção rodadas à mão, descritas no
+[`03-manutencao.md`](03-manutencao.md).
+
+### Para quem já usa
+
+`atualizarPGO()` cria as cinco colunas do SLA, liga o SLA da Mesa (6 horas,
+08:15 às 18:30, até a primeira resposta) **só se a Mesa ainda não tiver um**, e troca a ordem do grupo
+Vigência do VG **só se ele ainda estiver de fábrica**. Rodar duas vezes não
+muda nada. O resto é código: basta colar.
+
+**821 testes**, cinco execuções seguidas sem falha, cada regra
+nova quebrada de propósito (20 quebras, 20 vermelhos). No navegador, com o
+servidor de verdade, em 1440 e 390 px: a fila de 5 com o recado, o selo do SLA
+em cada linha, a busca (Enter, cursor de volta, o "x", trocar de canal), o
+de/até com máscara e a volta para "Por dias", as três cores da vigência, a
+busca da barra superior, a data de hoje no cadastro, futuro e 31/02 recusados,
+o caso respondido com "SLA cumprido" e o SLA em Configurações. 136 cliques em 8 telas, 96 combinações de tela ×
+largura e 9 ponta a ponta no repositório e no pacote.
+
+### Em aberto, para o PO decidir
+
+- Os campos de **hora** (`type="time"`) ainda seguem o idioma do navegador:
+  num Chrome em inglês, aparecem com AM/PM. O pedido foi sobre datas; a mesma
+  máscara serve para hora, se o PO quiser.
+- O SLA não conta feriados, porque o sistema não tem mais a lista. Feriado em
+  dia útil conta como dia de expediente.
+- Continua: salvar o formulário inteiro de um caso importado com a proposta, a
+  apólice ou o CPF pela metade é recusado (Etapa 22).
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

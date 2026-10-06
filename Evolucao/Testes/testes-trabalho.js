@@ -910,7 +910,9 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('Trabalhar no caso respeita o alcance do nível', () => {
-    const doDiego = chamar('resumoDoCanal')(canal.id, {}).fila
+    // Pela busca: a fila mostra só os cinco mais recentes, e o caso do Diego
+    // pode não estar entre eles.
+    const doDiego = chamar('resumoDoCanal')(canal.id, { busca: 'Diego Castilho' }).fila
       .find((caso) => JSON.stringify(caso.celulas).includes('Diego Castilho'));
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
@@ -953,7 +955,11 @@ function rodarTestesDoTrabalho() {
 
     const depois = chamar('resumoDoCanal')(canal.id, {});
     igual(depois.total, antes.total - 1);
-    igual(depois.fila.length, antes.fila.length - 1);
+    // A fila mostra só os mais recentes: com mais de cinco casos, o sexto
+    // sobe para o lugar do que saiu, e ela continua com cinco.
+    igual(depois.fila.length, Math.min(antes.total - 1, chamar('RECC_CASOS_NA_FILA')));
+    verdadeiro(!depois.fila.some((caso) => caso.id === antes.fila[0].id),
+      'o caso excluído não pode continuar na fila');
     igual(depois.cartoes[0].valor, antes.cartoes[0].valor - 1);
   });
 
@@ -1590,6 +1596,369 @@ function rodarTestesDoTrabalho() {
     igual(depois, antes, 'três mil linhas a mais na auditoria não podem custar '
       + 'uma célula a mais para abrir o caso (antes ' + antes + ', depois ' + depois + ')');
   });
+  secao('A busca digitada no Trabalho');
+
+  /*
+   * Pedido do PO: "o filtro por busca digitada para cada canal". Ambiente
+   * NOVO: os testes de cima mexem nas colunas da fila e da busca, e aqui
+   * interessa a configuração de fábrica.
+   */
+  const comBusca = carregar('primeiro.adm@exemplo.com');
+  comBusca.chamar('instalarRECC()');
+  const mesaDaBusca = comBusca.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  const retDaBusca = comBusca.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+  [
+    { nomedosegurado: 'Roronoa Zoro', titulodoemail: 'Endosso urgente',
+      documentocpf: '123.456.789-01' },
+    { nomedosegurado: 'Nami Navegadora', titulodoemail: 'Renovação da apólice' },
+    { nomedosegurado: 'Usopp Atirador', titulodoemail: 'Sinistro' }
+  ].forEach((caso) => {
+    comBusca.chamar('cadastrarCaso')(mesaDaBusca.id,
+      Object.assign({ status: 'Em andamento' }, caso));
+  });
+  comBusca.chamar('cadastrarCaso')(retDaBusca.id, {
+    nomedocliente: 'Franky Ciborgue', protocolo: 'PROT-98765',
+    numerodaproposta: '7-0004406', status: 'Não trabalhado'
+  });
+
+  const buscar = (canalDaBusca, termo) =>
+    comBusca.chamar('resumoDoCanal')(canalDaBusca.id, { busca: termo });
+
+  teste('o termo filtra a fila e os cartões juntos', () => {
+    const resumo = buscar(mesaDaBusca, 'zoro');
+    igual(resumo.total, 1, 'só o caso do Zoro');
+    igual(resumo.fila.length, 1);
+    contem(JSON.stringify(resumo.fila[0].celulas), 'Roronoa Zoro');
+    igual(resumo.cartoes[0].valor, 1,
+      'o cartão conta o mesmo recorte que a fila mostra');
+  });
+
+  teste('procura no que a fila mostra, sem acento e sem caixa', () => {
+    igual(buscar(mesaDaBusca, 'RENOVACAO').total, 1,
+      '"Renovação da apólice" é achada sem o acento');
+    igual(buscar(mesaDaBusca, 'endosso').total, 1);
+  });
+
+  teste('documento acha com ou sem pontuação', () => {
+    igual(buscar(mesaDaBusca, '123.456.789-01').total, 1);
+    igual(buscar(mesaDaBusca, '12345678901').total, 1);
+  });
+
+  teste('procura também nas colunas da busca do canal, fora da fila', () => {
+    // O protocolo saiu da fila da RET, mas continua nas colunas da busca.
+    igual(buscar(retDaBusca, '98765').total, 1);
+  });
+
+  teste('a proposta inteira, do jeito que a fila mostra, também acha', () => {
+    igual(buscar(retDaBusca, '7-0004406').total, 1);
+    igual(buscar(retDaBusca, '0004406').total, 1);
+  });
+
+  teste('data crua não vira resultado falso', () => {
+    // Uma data guardada vira "Tue Oct 06 2026 … GMT" se for lida crua; buscar
+    // "GMT" acharia todo caso que tem data.
+    igual(buscar(mesaDaBusca, 'GMT').total, 0);
+    igual(buscar(mesaDaBusca, escrever(hoje)).total, 3,
+      'a data como a fila mostra, essa sim, acha');
+  });
+
+  teste('termo sem caso nenhum dá fila vazia, e não a fila inteira', () => {
+    const resumo = buscar(mesaDaBusca, 'Barba Branca');
+    igual(resumo.total, 0);
+    igual(resumo.fila.length, 0);
+    verdadeiro(resumo.totalNoPeriodo >= 3, 'o período continua com os casos');
+  });
+
+  teste('busca vazia ou só com espaços é o mesmo que nenhuma', () => {
+    igual(buscar(mesaDaBusca, '').total, 3);
+    igual(buscar(mesaDaBusca, '   ').total, 3);
+  });
+
+  teste('a tela tem a busca, que aplica no Enter e no "x" do campo', () => {
+    const tela = lerPeca('Trabalho');
+    contem(tela, 'data-filtro="busca"', 'a busca vai no mesmo pacote dos filtros');
+    contem(tela, "addEventListener('search'",
+      'o "x" do campo limpa a busca na hora');
+    contem(tela, "if (termo === (filtrosEscolhidos.busca || '')) return;",
+      'o Enter dispara dois eventos, e o termo igual não vai duas vezes ao servidor');
+    const trocaDeCanal = tela.substring(tela.indexOf('SeletorDeCanal.ligar('));
+    contem(trocaDeCanal.substring(0, 200), 'filtrosEscolhidos = {};',
+      'trocar de canal limpa a busca junto com os filtros');
+  });
+
+  teste('a busca da barra superior leva ao Buscar Caso com o termo', () => {
+    const aplicacao = lerPeca('Aplicacao');
+    contem(aplicacao, 'TelaBuscarCaso.procurarPor(termo)');
+    contem(aplicacao, "irPara('buscarCaso')");
+    const telaDaBusca = lerPeca('BuscarCaso');
+    contem(telaDaBusca, 'procurarPor: procurarPor', 'a tela de busca recebe o termo');
+    const moldura = lerPeca('Moldura');
+    contem(moldura, 'podeAbrirOBuscar(pacote)',
+      'quem não tem o Buscar Caso no menu não vê a caixa');
+  });
+
+  secao('A fila mostra só os 5 mais recentes');
+
+  const curta = carregar('primeiro.adm@exemplo.com');
+  curta.chamar('instalarRECC()');
+  const mesaCurta = curta.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+  for (let i = 1; i <= 7; i++) {
+    curta.chamar('cadastrarCaso')(mesaCurta.id, {
+      status: 'Em andamento', nomedosegurado: 'Caso número ' + i
+    });
+  }
+
+  teste('a fila traz 5, e os cartões contam todos', () => {
+    const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id, {});
+    igual(curta.chamar('RECC_CASOS_NA_FILA'), 5);
+    igual(resumo.fila.length, 5);
+    igual(resumo.total, 7, 'o total é de todos — palavra do PO');
+    igual(resumo.cartoes[0].valor, 7);
+  });
+
+  teste('os 5 são os mais recentes, o mais novo em cima', () => {
+    const fila = curta.chamar('resumoDoCanal')(mesaCurta.id, {}).fila;
+    contem(JSON.stringify(fila[0].celulas), 'Caso número 7');
+    const naFila = JSON.stringify(fila);
+    verdadeiro(naFila.indexOf('Caso número 1"') < 0, 'o mais antigo ficou de fora');
+    verdadeiro(naFila.indexOf('Caso número 2"') < 0);
+  });
+
+  teste('a busca alcança o caso que ficou fora dos 5', () => {
+    const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id,
+      { busca: 'Caso número 1' });
+    igual(resumo.total, 1);
+    contem(JSON.stringify(resumo.fila), 'Caso número 1');
+  });
+
+  teste('a tela diz quantos ficaram de fora e como chegar neles', () => {
+    const tela = lerPeca('Trabalho');
+    contem(tela, "Mostrando os ' + resumo.fila.length");
+    contem(tela, 'casos mais recentes de');
+    contem(tela, 'use a busca ou os filtros acima');
+  });
+
+  secao('O SLA da Mesa Diamante');
+
+  /*
+   * Pedido do PO: 6 horas úteis, das 08:15 às 18:30, de segunda a sexta, até a
+   * PRIMEIRA RESPOSTA ("a SLA conta até a data da primeira resposta"). A
+   * conta é testada com um "agora" fixo — o relógio de verdade faria o teste
+   * passar de manhã e falhar à tarde.
+   *
+   * Outubro de 2026: dia 2 é sexta, 5 é segunda e 6 é terça.
+   */
+  const relogio = (dia, hora, minuto) =>
+    chamar('relogioDeParede_')(new Date(2026, 9, dia, hora, minuto || 0));
+  const ABRE = 8 * 60 + 15;
+  const FECHA = 18 * 60 + 30;
+  const canalComSla = {
+    slaHorasUteis: 6, inicioDoExpediente: '08:15', fimDoExpediente: '18:30',
+    colunaDaData: 'Data de entrada', colunaDaHora: 'Horário',
+    colunaDaFinalizacao: 'Data da finalização',
+    colunaDaPrimeiraResposta: 'Data resposta',
+    colunaDaHoraDaPrimeiraResposta: 'Hora resposta', colunaDoStatus: 'Status'
+  };
+  const sla = (registro, agora, finais) =>
+    chamar('slaDoCaso_')(registro, canalComSla, finais || {}, agora);
+
+  teste('as horas úteis pulam a noite e o fim de semana', () => {
+    const uteis = chamar('minutosUteisEntre_');
+    igual(uteis(relogio(2, 17), relogio(5, 9, 15), ABRE, FECHA), 150,
+      'sexta 17:00 até segunda 09:15: 1h30 na sexta e 1h na segunda');
+    igual(uteis(relogio(6, 9), relogio(6, 11, 30), ABRE, FECHA), 150,
+      'no mesmo dia, dentro do expediente');
+  });
+
+  teste('fora do expediente, conta da próxima abertura', () => {
+    const uteis = chamar('minutosUteisEntre_');
+    igual(uteis(relogio(3, 10), relogio(5, 10, 15), ABRE, FECHA), 120,
+      'chegou no sábado: começa segunda às 08:15');
+    igual(uteis(relogio(6, 7), relogio(6, 8, 45), ABRE, FECHA), 30,
+      'chegou antes de abrir: começa às 08:15');
+    igual(uteis(relogio(6, 11), relogio(6, 9), ABRE, FECHA), 0,
+      'fim antes do começo não vira número negativo');
+  });
+
+  teste('caso aberto, dentro do prazo: verde, com o que falta', () => {
+    const r = sla({ 'Data de entrada': '06/10/2026', 'Horário': '09:00' },
+      relogio(6, 13, 50));
+    igual(r.dentro, true);
+    igual(r.tom, 'bom');
+    igual(r.texto, 'No prazo · faltam 1h10');
+    igual(r.parouEm, 'agora', 'sem resposta, o prazo ainda corre');
+  });
+
+  teste('caso aberto, fora do prazo: vermelho, com o quanto passou', () => {
+    const r = sla({ 'Data de entrada': '02/10/2026', 'Horário': '10:00' },
+      relogio(5, 10));
+    igual(r.dentro, false);
+    igual(r.tom, 'ruim');
+    igual(r.texto, 'Fora do prazo · 4h15 além',
+      'sexta 10:00–18:30 (8h30) e segunda 08:15–10:00 (1h45): 10h15, 4h15 além das 6h');
+  });
+
+  teste('respondido no prazo: SLA cumprido', () => {
+    const r = sla({ 'Data de entrada': '06/10/2026', 'Horário': '09:00',
+      'Data resposta': '06/10/2026', 'Hora resposta': '12:00' },
+    relogio(6, 23));
+    igual(r.parou, true);
+    igual(r.parouEm, 'resposta');
+    igual(r.texto, 'SLA cumprido · em 3h', 'o relógio parou na primeira resposta');
+  });
+
+  teste('respondido fora do prazo: SLA estourado', () => {
+    const r = sla({ 'Data de entrada': '05/10/2026', 'Horário': '09:00',
+      'Data resposta': '06/10/2026', 'Hora resposta': '12:00' },
+    relogio(6, 23));
+    igual(r.tom, 'ruim');
+    igual(r.texto, 'SLA estourado · 7h15 além');
+  });
+
+  teste('a primeira resposta manda, e não a finalização', () => {
+    // Respondido às 10h, finalizado só no dia seguinte: o SLA é da resposta.
+    const r = sla({ 'Data de entrada': '06/10/2026', 'Horário': '09:00',
+      'Data resposta': '06/10/2026', 'Hora resposta': '10:00',
+      'Data da finalização': '07/10/2026', Status: 'Concluído' },
+    relogio(8, 12));
+    igual(r.parouEm, 'resposta');
+    igual(r.texto, 'SLA cumprido · em 1h');
+  });
+
+  teste('respondido sem a hora: vale o fim do expediente do dia da resposta', () => {
+    igual(sla({ 'Data de entrada': '06/10/2026', 'Horário': '09:00',
+      'Data resposta': '06/10/2026' }, relogio(7, 12)).texto,
+    'SLA estourado · 3h30 além', 'das 09:00 às 18:30: 9h30, 3h30 além das 6h');
+  });
+
+  teste('encerrado sem a primeira resposta para na finalização', () => {
+    // Decisão do PO: caso encerrado sem resposta não fica "fora do prazo"
+    // crescendo para sempre.
+    const r = sla({ 'Data de entrada': '06/10/2026', 'Horário': '09:00',
+      'Data da finalização': '06/10/2026' }, relogio(20, 12));
+    igual(r.parouEm, 'encerramento');
+    igual(r.texto, 'SLA estourado · 3h30 além',
+      'sem hora na finalização, vale o fim do expediente daquele dia');
+  });
+
+  teste('sem a hora de entrada, conta da abertura daquele dia', () => {
+    igual(sla({ 'Data de entrada': '06/10/2026' }, relogio(6, 10, 15)).texto,
+      'No prazo · faltam 4h');
+  });
+
+  teste('status final sem data de finalização para na mudança de status', () => {
+    const registro = { 'Data de entrada': '06/10/2026', 'Horário': '09:00',
+      Status: 'Sem retorno' };
+    registro[chamar('RECC_COLUNA_QUANDO_MUDOU_O_STATUS')] = new Date(2026, 9, 6, 11, 0);
+    const finais = {};
+    finais[chamar('normalizarParaComparar_')('Sem retorno')] = true;
+    const r = sla(registro, relogio(7, 18), finais);
+    igual(r.parouEm, 'encerramento');
+    igual(r.texto, 'SLA cumprido · em 2h', 'das 09:00 às 11:00, quando o status mudou');
+  });
+
+  teste('passou de um expediente inteiro, diz em dias úteis', () => {
+    igual(chamar('duracaoParaLer_')(1300, FECHA - ABRE), '2 dias úteis');
+    igual(chamar('duracaoParaLer_')(45, FECHA - ABRE), '45min');
+  });
+
+  teste('sem data de entrada ou sem expediente, não inventa SLA', () => {
+    igual(sla({}, relogio(6, 10)), null);
+    igual(chamar('slaDoCaso_')({ 'Data de entrada': '06/10/2026' },
+      Object.assign({}, canalComSla, { fimDoExpediente: '' }), {}, relogio(6, 10)), null);
+  });
+
+  teste('a fila da Mesa traz o selo; a da RET e a do VG, não', () => {
+    const doTeste = carregar('primeiro.adm@exemplo.com');
+    doTeste.chamar('instalarRECC()');
+    const canais = doTeste.chamar('canaisVisiveis_()');
+    const daMesa = canais.find((m) => m.aba === 'BASE_MESA');
+    const daRet = canais.find((m) => m.aba === 'BASE_RET');
+    igual(daMesa.slaHorasUteis, 6);
+    doTeste.chamar('cadastrarCaso')(daMesa.id, {
+      status: 'Em andamento', nomedosegurado: 'Caso com prazo' });
+    doTeste.chamar('cadastrarCaso')(daRet.id, {
+      nomedocliente: 'Caso sem prazo', status: 'Não trabalhado' });
+
+    const linhaDaMesa = doTeste.chamar('resumoDoCanal')(daMesa.id, {}).fila[0];
+    verdadeiro(linhaDaMesa.sla !== null, 'a Mesa tem SLA');
+    verdadeiro(/^(No prazo|Fora do prazo)/.test(linhaDaMesa.sla.texto), linhaDaMesa.sla.texto);
+    igual(doTeste.chamar('resumoDoCanal')(daRet.id, {}).fila[0].sla, null,
+      'canal sem SLA não manda nada');
+  });
+
+  teste('a tela pinta o selo com a cor que o servidor mandou', () => {
+    const tela = lerPeca('Trabalho');
+    contem(tela, 'seloDoSla(caso.sla)');
+    contem(tela, "resposta: 'contado até a primeira resposta'",
+      'a dica diz até onde o prazo foi contado');
+    contem(tela, "'<span class=\"selo-sla tom-' + escapar(sla.tom)");
+    contem(lerPeca('Estilos'), '.selo-sla');
+  });
+
+  secao('VG: a vigência em vermelho, amarelo e verde');
+
+  teste('abaixo de 18 vermelho, 18 amarelo, acima verde', () => {
+    const faixa = chamar('faixaDaCelula_');
+    igual(faixa('BASE_VG', 'Meses de vigência', 17).tom, 'ruim');
+    igual(faixa('BASE_VG', 'Meses de vigência', 18).tom, 'atencao');
+    igual(faixa('BASE_VG', 'Meses de vigência', 18).recado, 'Vigência de exatamente 18 meses');
+    igual(faixa('BASE_VG', 'Meses de vigência', 19).tom, 'bom');
+    igual(faixa('BASE_VG', 'Meses de vigência', ''), null, 'em branco não pinta');
+  });
+
+  teste('a margem continua só com o vermelho', () => {
+    const faixa = chamar('faixaDaCelula_');
+    igual(faixa('BASE_VG', 'Margem de contribuição', 20).tom, 'ruim');
+    igual(faixa('BASE_VG', 'Margem de contribuição', 30), null,
+      'o PO não pediu verde para a margem');
+  });
+
+  teste('o alerta antigo continua sendo só o vermelho', () => {
+    igual(chamar('alertaDaCelula_')('BASE_VG', 'Meses de vigência', 18), '');
+    igual(chamar('alertaDaCelula_')('BASE_VG', 'Meses de vigência', 24), '');
+  });
+
+  teste('a fila do VG abre a Vigência pelos meses, já com a cor', () => {
+    const doTeste = carregar('primeiro.adm@exemplo.com');
+    doTeste.chamar('instalarRECC()');
+    const doVg = doTeste.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_VG');
+    const meses = (quantos) => {
+      const quando = new Date();
+      quando.setMonth(quando.getMonth() - quantos);
+      return escrever(quando);
+    };
+    [[5, 'Empresa de 5'], [18, 'Empresa de 18'], [24, 'Empresa de 24']]
+      .forEach(([quantos, nome]) => {
+        doTeste.chamar('cadastrarCaso')(doVg.id, {
+          datadoprotocolodasolicitacao: escrever(hoje), analista: 'primeiro.adm',
+          status: 'Aguardando', subestipulante: nome, iniciodavigencia: meses(quantos)
+        });
+      });
+
+    const resumo = doTeste.chamar('resumoDoCanal')(doVg.id, {});
+    const posicao = resumo.colunas.findIndex((g) => g.titulo === 'Vigência');
+    verdadeiro(posicao >= 0, 'o grupo Vigência existe');
+    igual(resumo.colunas[posicao].colunas[0].cabecalho, 'Meses de vigência',
+      'os meses abrem o grupo: é o destaque');
+
+    const tomDe = (nome) => {
+      const linha = resumo.fila.find((l) => JSON.stringify(l.celulas).indexOf(nome) >= 0);
+      return linha.celulas[posicao][0].tomDoAlerta;
+    };
+    igual(tomDe('Empresa de 5'), 'ruim');
+    igual(tomDe('Empresa de 18'), 'atencao');
+    igual(tomDe('Empresa de 24'), 'bom');
+  });
+
+  teste('a tela pinta as três cores, com estilo declarado', () => {
+    const tela = lerPeca('Trabalho');
+    contem(tela, "{ atencao: ' em-atencao', bom: ' em-bom' }[celula.tomDoAlerta]");
+    const estilos = lerPeca('Estilos');
+    contem(estilos, '.fila .em-atencao');
+    contem(estilos, '.fila .em-bom');
+  });
+
 }
 
 module.exports = { rodarTestesDoTrabalho };

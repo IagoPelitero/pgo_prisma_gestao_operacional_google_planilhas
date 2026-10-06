@@ -1007,6 +1007,11 @@ function listarCanaisConfiguraveis() {
         // Vazio vale SIM, igual ao resto do sistema: a tela mostra marcado.
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
+        slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
+        inicioDoExpediente: horaDoExpediente_(canal.InicioDoExpediente),
+        fimDoExpediente: horaDoExpediente_(canal.FimDoExpediente),
+        colunaDaPrimeiraResposta: String(canal.ColunaDaPrimeiraResposta || ''),
+        colunaDaHoraDaPrimeiraResposta: String(canal.ColunaDaHoraDaPrimeiraResposta || ''),
         icone: String(canal.Icone || ''),
         ordem: Number(canal.Ordem) || 0,
         ativo: normalizarParaComparar_(canal.Ativo) === 'sim',
@@ -1029,7 +1034,7 @@ function salvarCanal(dados) {
 
   var id = converterParaIdentificador_(dados.id);
   var atual = buscarRegistros_('CANAIS', 'Id', id, 1)[0];
-  if (!atual) throw new Error('Canal ' + id + ' não encontrada.');
+  if (!atual) throw new Error('Canal ' + id + ' não encontrado.');
 
   if (dados.aba && String(dados.aba) !== String(atual.Aba)) {
     throw new Error('A aba de um canal não muda por aqui: os casos já ' +
@@ -1041,7 +1046,8 @@ function salvarCanal(dados) {
 
   var estrutura = estruturaDaAba_(String(atual.Aba));
   ['colunaDaData', 'colunaDaHora', 'colunaDoStatus', 'colunaDaFinalizacao',
-    'colunaDaAreaResponsavel', 'colunaDoValor'].forEach(function (chave) {
+    'colunaDaAreaResponsavel', 'colunaDoValor',
+    'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'].forEach(function (chave) {
     conferirQueAColunaExiste_(estrutura, dados[chave], atual.Aba);
   });
   // As colunas da fila podem vir agrupadas — "Título: col, col; Título: col".
@@ -1069,12 +1075,14 @@ function salvarCanal(dados) {
         && normalizarParaComparar_(canal.Ativo) === 'sim';
     });
     if (!outrasAtivas.length) {
-      throw new Error('Esta é a último canal ativa. Desligá-la deixaria o ' +
+      throw new Error('Este é o último canal ativo. Desligá-lo deixaria o ' +
         'Trabalho e o cadastro sem nenhuma base para trabalhar.');
     }
   }
 
-  atualizarRegistro_('CANAIS', id, {
+  var sla = slaDoFormulario_(dados, atual);
+
+  atualizarRegistro_('CANAIS', id, Object.assign(sla, {
     Nome: nome,
     Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
     ColunaDaData: String(dados.colunaDaData || ''),
@@ -1087,17 +1095,84 @@ function salvarCanal(dados) {
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
     ColunaDoValor: String(dados.colunaDoValor || ''),
     SituacoesDestacadas: String(dados.situacoesDestacadas || ''),
-    // `=== false` e não `!dados...`: a tela que não mandar o campo não pode
-    // desligar a conferência por omissão. Só o "não" explícito desliga.
-    ConfereSusepBloqueada: dados.confereSusepBloqueada === false ? 'NAO' : 'SIM',
+    // A tela que não mandar o campo não mexe nele — nem para desligar, nem
+    // para LIGAR. A tela de Configurações não tem esse campo: antes, salvar a
+    // Mesa Diamante por ela gravava SIM e religava, sem aviso, a conferência
+    // de SUSEP bloqueada que a Mesa não faz.
+    ConfereSusepBloqueada: dados.confereSusepBloqueada === undefined
+      ? String(atual.ConfereSusepBloqueada === undefined ? '' : atual.ConfereSusepBloqueada)
+      : (dados.confereSusepBloqueada === false ? 'NAO' : 'SIM'),
     Icone: String(dados.icone || atual.Icone || ''),
     Ordem: Number(dados.ordem) || Number(atual.Ordem) || 0,
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
-  });
+  }));
 
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+/**
+ * Os campos do SLA vindos de Configurações, conferidos — ou nada, numa
+ * planilha que ainda não rodou a atualização e não tem as colunas.
+ *
+ * Campo que a tela não mandou fica como está: quem salva o canal por outro
+ * caminho não pode desligar o SLA da Mesa por omissão.
+ */
+function slaDoFormulario_(dados, atual) {
+  var colunasDeCanais = estruturaDaAba_('CANAIS');
+  if (posicaoDaColuna_(colunasDeCanais, 'SlaHorasUteis') < 0) return {};
+
+  function ouOAtual(chave, cabecalho) {
+    return dados[chave] === undefined ? atual[cabecalho] : dados[chave];
+  }
+  var horas = Number(String(ouOAtual('slaHorasUteis', 'SlaHorasUteis') || 0)
+    .replace(',', '.'));
+  if (!isFinite(horas) || horas < 0) {
+    throw new Error('O SLA é em horas úteis: um número, como 6. Zero desliga.');
+  }
+  var inicio = horaDoExpediente_(ouOAtual('inicioDoExpediente', 'InicioDoExpediente'));
+  var fim = horaDoExpediente_(ouOAtual('fimDoExpediente', 'FimDoExpediente'));
+  if (horas > 0) {
+    if (!inicio || !fim) {
+      throw new Error('Com SLA, o expediente precisa de início e fim, no formato '
+        + '08:15 e 18:30 — é só dentro dele que o prazo corre.');
+    }
+    if (minutosDaHoraDoExpediente_(inicio) >= minutosDaHoraDoExpediente_(fim)) {
+      throw new Error('O expediente termina antes de começar: ' + inicio + ' até ' + fim + '.');
+    }
+  }
+  return {
+    SlaHorasUteis: horas,
+    InicioDoExpediente: inicio,
+    FimDoExpediente: fim,
+    ColunaDaPrimeiraResposta: String(ouOAtual('colunaDaPrimeiraResposta',
+      'ColunaDaPrimeiraResposta') || ''),
+    ColunaDaHoraDaPrimeiraResposta: String(ouOAtual('colunaDaHoraDaPrimeiraResposta',
+      'ColunaDaHoraDaPrimeiraResposta') || '')
+  };
+}
+
+/**
+ * "8:15", "08:15" ou uma hora de planilha viram "08:15". Vazio ou torto: "".
+ */
+function horaDoExpediente_(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return isNaN(valor.getTime()) ? ''
+      : Utilities.formatDate(valor, RECC_FUSO_HORARIO, 'HH:mm');
+  }
+  var partes = /^(\d{1,2})[:h](\d{2})$/.exec(String(valor).trim());
+  if (!partes) return '';
+  var hora = Number(partes[1]);
+  var minuto = Number(partes[2]);
+  if (hora > 23 || minuto > 59) return '';
+  return (hora < 10 ? '0' : '') + hora + ':' + partes[2];
+}
+
+function minutosDaHoraDoExpediente_(texto) {
+  var partes = String(texto || '').split(':');
+  return Number(partes[0]) * 60 + Number(partes[1]);
 }
 
 

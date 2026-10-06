@@ -317,6 +317,10 @@ var Moldura = (function () {
    * O nome da TELA não fica aqui: ele fica no topo do conteúdo, junto do que
    * ele nomeia.
    */
+  function podeAbrirOBuscar(pacote) {
+    return (pacote.menu || []).some(function (item) { return item.tela === 'buscarCaso'; });
+  }
+
   function montarSuperior(pacote) {
     var bolinhas = TEMAS.map(function (tema) {
       var marcado = tema.chave === pacote.tema ? 'true' : 'false';
@@ -340,15 +344,27 @@ var Moldura = (function () {
       + '<p>' + escapar(pacote.identidade.operacao) + '</p>'
       + '</div>'
 
-      + '<div class="busca">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
-      + ' stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle>'
-      + '<path d="M20 20l-4.2-4.2"></path></svg>'
-      + '<input type="search" id="busca-global" autocomplete="off"'
-      + ' placeholder="Buscar por apólice, segurado ou protocolo…"'
-      + ' aria-label="Busca geral">'
-      + '<kbd>Ctrl K</kbd>'
-      + '</div>'
+      /*
+        A BUSCA DA BARRA leva ao Buscar Caso, já procurando o termo — escolha
+        do PO. Por anos este campo foi só desenho: aparecia em toda tela e
+        não fazia nada ao apertar Enter. Agora faz o que promete, em todos os
+        canais e também nos casos antigos, fora da janela do Trabalho.
+
+        Só aparece para quem abre o Buscar Caso: campo que leva a uma tela
+        proibida seria outra caixa que não funciona.
+      */
+      + (podeAbrirOBuscar(pacote)
+        ? '<div class="busca">'
+          + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+          + ' stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle>'
+          + '<path d="M20 20l-4.2-4.2"></path></svg>'
+          + '<input type="search" id="busca-global" autocomplete="off"'
+          + ' placeholder="Buscar por apólice, segurado ou protocolo…"'
+          + ' title="Digite e aperte Enter: abre o Buscar Caso com o termo"'
+          + ' aria-label="Buscar caso em todos os canais">'
+          + '<kbd>Ctrl K</kbd>'
+          + '</div>'
+        : '')
 
       // Recarregar a TELA, não a página.
       //
@@ -749,12 +765,6 @@ var Formulario = (function () {
     return opcoes[opcoes.length - 1];
   }
 
-  function usaMascara(campo) {
-    return !!campo.mascara
-      && (campo.tipo === 'documento' || campo.tipo === 'identificador'
-        || campo.tipo === 'telefone');
-  }
-
   /* --------------------------------------------------------------- dinheiro */
 
   /** Até onde o campo de valor vai: R$ 999.999.999,99. */
@@ -850,10 +860,32 @@ var Formulario = (function () {
       controle = '<textarea id="' + id + '" rows="3"' + exigido
         + ' data-chave="' + escapar(campo.chave) + '"' + travado + '></textarea>';
 
+    } else if (campo.tipo === 'data') {
+      /*
+        DATA É TEXTO COM MÁSCARA dd/mm/aaaa, e não o calendário do navegador.
+
+        O calendário (type="date") mostra a data no formato do IDIOMA DO
+        NAVEGADOR: num Chrome em inglês ele pede mm/dd/aaaa. Uma analista
+        digitou 05/10 achando que era 5 de outubro, e gravou 10 de maio — sem
+        erro nenhum, porque 10 de maio é uma data válida. Pedido do PO: "precisa
+        ser no formato dd/mm/aaaa em todos que solicitam data".
+
+        Com a máscara, digitar 06102026 mostra 06/10/2026, em qualquer
+        navegador. E o valor padrão do servidor ("hoje", em dd/mm/aaaa) entra
+        direto no campo — no calendário ele não entrava, e a primeira data do
+        formulário aparecia vazia.
+      */
+      controle = '<input type="text" id="' + id + '"'
+        + ' data-chave="' + escapar(campo.chave) + '"'
+        + ' data-mascara="00/00/0000" data-data="sim" inputmode="numeric"'
+        + ' maxlength="10" placeholder="dd/mm/aaaa"'
+        + (colunaDaData && campo.cabecalho === colunaDaData
+          ? ' data-data-do-caso="sim"' : '')
+        + ' autocomplete="off"' + exigido + travado + '>';
+
     } else {
       var htmlTipo = 'text';
-      if (campo.tipo === 'data') htmlTipo = 'date';
-      else if (campo.tipo === 'hora') htmlTipo = 'time';
+      if (campo.tipo === 'hora') htmlTipo = 'time';
       else if (campo.tipo === 'email') htmlTipo = 'email';
       else if (campo.tipo === 'numero' || campo.tipo === 'moeda'
         || campo.tipo === 'percentual') htmlTipo = 'text';
@@ -1306,9 +1338,8 @@ var Formulario = (function () {
   /**
    * Preenche o formulário com o que o caso tem hoje.
    *
-   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê; a caixa
-   * de data do navegador só entende aaaa-mm-dd. A conversão é aqui, e não no
-   * servidor, porque é uma exigência do controle e não do dado.
+   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê — e é como
+   * o campo de data mostra, desde que ele virou texto com máscara.
    */
   function preencher(raiz, valoresDoCaso) {
     var controles = raiz.querySelectorAll('[data-chave]');
@@ -1316,7 +1347,6 @@ var Formulario = (function () {
       var chave = controles[i].getAttribute('data-chave');
       var valor = texto(valoresDoCaso[chave]);
 
-      if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
       // O dinheiro volta do servidor como NÚMERO — 1234.56 —, porque é assim
       // que ele mora na célula. Na tela ele tem de aparecer como a pessoa
       // digitou: R$ 1.234,56. Sem esta linha, abrir um caso para editar
@@ -1405,12 +1435,6 @@ var Formulario = (function () {
     var numero = Number(emPonto);
     if (!isFinite(numero)) return '';
     return String(Math.round(numero * 100));
-  }
-
-  function paraCaixaDeData(valor) {
-    var brasileira = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valor || ''));
-    if (!brasileira) return valor;
-    return brasileira[3] + '-' + brasileira[2] + '-' + brasileira[1];
   }
 
   /* ---------------------------------------------------------------- erros */
@@ -1587,7 +1611,6 @@ var Formulario = (function () {
     aplicarMascara: aplicarMascara,
     aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
     ehCampoDeDinheiro: ehCampoDeDinheiro,
-    usaMascara: usaMascara,
     desenhar: desenhar,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
@@ -2535,8 +2558,11 @@ var SeletorDePeriodo = (function () {
         : (tipo === 'mes' ? porMes(resposta) : porDias(periodo)));
   }
 
+  /** Os atalhos de "Por dias". */
+  var DIAS_OFERECIDOS = [7, 15, 30, 60, 90, 180, 365];
+
   function porDias(periodo) {
-    var opcoes = [7, 15, 30, 60, 90, 180, 365].map(function (quantos) {
+    var opcoes = DIAS_OFERECIDOS.map(function (quantos) {
       return '<option value="' + quantos + '"'
         + (periodo.dias === quantos ? ' selected' : '') + '>'
         + 'Últimos ' + quantos + ' dias</option>';
@@ -2547,18 +2573,36 @@ var SeletorDePeriodo = (function () {
   }
 
   /*
-   * Campo de data do navegador (type="date"), e não texto com máscara: ele já
-   * traz o calendário, já recusa 31/02 e já respeita o formato de quem está
-   * olhando. O valor que ele guarda é sempre aaaa-mm-dd, que o servidor lê sem
-   * ambiguidade — 03/04 é 3 de abril aqui e 4 de março em outros lugares, e
-   * essa confusão não pode entrar num fechamento.
+   * O de/até é TEXTO COM MÁSCARA dd/mm/aaaa, como as datas dos formulários.
+   *
+   * Era o calendário do navegador (type="date"), e ele mostra a data no
+   * formato do idioma do navegador: num Chrome em inglês, mm/dd/aaaa. Pedido
+   * do PO: dd/mm/aaaa "em todos que solicitam data". Só recarrega com as duas
+   * datas completas e válidas — ver `mudou`.
    */
   function deAte(periodo) {
-    return '<input type="date" class="filtro" data-periodo="de"'
+    var comum = ' class="filtro" data-mascara-de-data="sim" inputmode="numeric"'
+      + ' maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off"';
+    return '<input type="text"' + comum + ' data-periodo="de"'
       + ' aria-label="Data inicial" value="' + escapar(paraOCampo(periodo.de)) + '">'
       + '<span class="ate-do-periodo">até</span>'
-      + '<input type="date" class="filtro" data-periodo="ate"'
+      + '<input type="text"' + comum + ' data-periodo="ate"'
       + ' aria-label="Data final" value="' + escapar(paraOCampo(periodo.ate)) + '">';
+  }
+
+  /*
+   * A máscara do de/até, ligada UMA vez no documento, e não a cada desenho: as
+   * três telas que filtram redesenham a caixa de filtros a cada recarga, e
+   * ligar de novo a cada vez empilharia ouvintes.
+   */
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('input', aoDigitarUmaData);
+  }
+  function aoDigitarUmaData(evento) {
+    var caixa = evento.target;
+    if (!caixa || !caixa.getAttribute
+      || caixa.getAttribute('data-mascara-de-data') !== 'sim') return;
+    caixa.value = Formulario.aplicarMascara(caixa.value, '00/00/0000');
   }
 
   function porMes(resposta) {
@@ -2588,7 +2632,13 @@ var SeletorDePeriodo = (function () {
     var periodo = resposta.periodo || {};
 
     if (qual === 'como') {
-      var novo = { tipo: caixa.value, dias: periodo.dias, de: '', ate: '', mes: '' };
+      // Os dias do período que estava valendo só servem se forem um dos
+      // atalhos. Voltando de "Por data" (279 dias) ou de "Por mês" (31), a
+      // caixa mostrava "Últimos 7 dias" e a conta somava os 279. Zero é "o
+      // padrão da configuração", que o servidor resolve.
+      var dias = DIAS_OFERECIDOS.indexOf(Number(periodo.dias)) >= 0
+        ? Number(periodo.dias) : 0;
+      var novo = { tipo: caixa.value, dias: dias, de: '', ate: '', mes: '' };
       if (novo.tipo === 'mes') {
         var meses = resposta.mesesDisponiveis || [];
         if (meses.length) novo.mes = meses[0].valor;   // o mês corrente
@@ -2624,24 +2674,38 @@ var SeletorDePeriodo = (function () {
     return (intervalo.de && intervalo.ate) ? intervalo : false;
   }
 
-  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
+  /**
+   * A data do servidor, como o campo mostra: dd/mm/aaaa dos dois lados, desde
+   * que o campo virou texto com máscara. Só passa o que é data de verdade.
+   */
   function paraOCampo(texto) {
-    var partes = String(texto || '').split('/');
-    if (partes.length !== 3) return '';
-    return partes[2] + '-' + partes[1] + '-' + partes[0];
+    return dataDeVerdade(texto) ? String(texto).trim() : '';
   }
 
-  /** aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). */
+  /**
+   * O que a pessoa digitou, pronto para o servidor — ou vazio, enquanto a data
+   * estiver pela metade ou for impossível (31/02). Vazio é o que faz o de/até
+   * esperar, em vez de recarregar com um intervalo torto.
+   */
   function paraOServidor(texto) {
-    var partes = String(texto || '').split('-');
-    if (partes.length !== 3) return '';
-    return partes[2] + '/' + partes[1] + '/' + partes[0];
+    return dataDeVerdade(texto) ? String(texto).trim() : '';
+  }
+
+  /** dd/mm/aaaa completo, e um dia que existe no calendário. */
+  function dataDeVerdade(texto) {
+    var partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(texto || '').trim());
+    if (!partes) return false;
+    var dia = Number(partes[1]);
+    var mes = Number(partes[2]);
+    var ano = Number(partes[3]);
+    var data = new Date(ano, mes - 1, dia);
+    return data.getFullYear() === ano && data.getMonth() === mes - 1
+      && data.getDate() === dia;
   }
 
   // `paraOCampo` e `paraOServidor` saem daqui porque QUALQUER tela com campo
-  // de data precisa das duas: o servidor fala dd/mm/aaaa (que é como a
-  // planilha guarda e como a operação lê) e o <input type="date"> só
-  // entende aaaa-mm-dd. Uma segunda cópia divergiria na primeira correção.
+  // de data precisa das duas. Hoje as duas só conferem; uma segunda cópia da
+  // conferência divergiria na primeira correção.
   return {
     padrao: padrao, desenhar: desenhar, mudou: mudou,
     paraOCampo: paraOCampo, paraOServidor: paraOServidor

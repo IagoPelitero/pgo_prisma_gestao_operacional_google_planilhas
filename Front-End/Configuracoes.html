@@ -1204,6 +1204,21 @@ var TelaConfiguracoes = (function () {
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
         colunas, canal.colunaDaAreaResponsavel, '')
+      + campoDeTexto('slaHorasUteis', 'SLA em horas úteis', canal.slaHorasUteis,
+        'Prazo do caso, contado de segunda a sexta e só dentro do expediente '
+        + 'abaixo. Começa na data e hora de entrada e para na primeira resposta '
+        + '(caso encerrado sem resposta para no encerramento). Aparece como selo '
+        + 'na fila do Trabalho. Zero desliga.')
+      + campoDeTexto('inicioDoExpediente', 'Início do expediente',
+        canal.inicioDoExpediente, 'Como 08:15.')
+      + campoDeTexto('fimDoExpediente', 'Fim do expediente',
+        canal.fimDoExpediente, 'Como 18:30.')
+      + caixaDeOpcoes('colunaDaPrimeiraResposta', 'Coluna da primeira resposta',
+        colunas, canal.colunaDaPrimeiraResposta,
+        'A data em que o caso teve a primeira resposta: é nela que o prazo do SLA para.')
+      + caixaDeOpcoes('colunaDaHoraDaPrimeiraResposta',
+        'Coluna da hora da primeira resposta', colunas,
+        canal.colunaDaHoraDaPrimeiraResposta, '')
       + caixaDeOpcoes('colunaDoValor', 'Coluna do valor', colunas,
         canal.colunaDoValor,
         'A coluna de dinheiro deste canal. É dela que sai o gráfico "Valor por '
@@ -1243,6 +1258,11 @@ var TelaConfiguracoes = (function () {
         metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
+        slaHorasUteis: valorDe('slaHorasUteis'),
+        inicioDoExpediente: valorDe('inicioDoExpediente'),
+        fimDoExpediente: valorDe('fimDoExpediente'),
+        colunaDaPrimeiraResposta: valorDe('colunaDaPrimeiraResposta'),
+        colunaDaHoraDaPrimeiraResposta: valorDe('colunaDaHoraDaPrimeiraResposta'),
         colunaDoValor: valorDe('colunaDoValor'),
         situacoesDestacadas: valorDe('situacoesDestacadas'),
         icone: valorDe('icone'),
@@ -2445,26 +2465,6 @@ var TelaConfiguracoes = (function () {
           + escapar(item.nome) + '</option>';
       }).join('') + '</select>'
       + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
-  }
-
-  /**
-   * Um campo de data.
-   *
-   * Recebe e devolve dd/mm/aaaa, que é como o servidor fala; a conversão para
-   * o formato do <input type="date"> é do SeletorDePeriodo, que já a fazia
-   * para o filtro de período. Uma segunda cópia da conversão é uma segunda
-   * chance de errar o fuso na virada do dia.
-   */
-  function campoDeData(nome, rotulo, valor, dica) {
-    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
-      + '<input type="date" id="cfg-' + nome + '" value="'
-      + escapar(SeletorDePeriodo.paraOCampo(valor)) + '">'
-      + (dica ? '<em>' + escapar(dica) + '</em>' : '') + '</label>';
-  }
-
-  /** O valor de um campo de data, já em dd/mm/aaaa para o servidor. */
-  function dataDe(nome) {
-    return SeletorDePeriodo.paraOServidor(valorDe(nome));
   }
 
   function caixaDeSimNao(nome, rotulo, ligado) {

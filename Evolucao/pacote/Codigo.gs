@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-05 17:34
+   Gerado em 2026-10-06 22:16
    ========================================================================== */
 
 
@@ -194,15 +194,20 @@ function preencherColunasCalculadas_(nomeDaAba, paraGravar, registroAtual) {
  * — a fila do Trabalho e o caso aberto — e duas cópias divergiriam no primeiro
  * ajuste de limite.
  *
- * `abaixoDe` é o único formato hoje, porque é o único que a operação pediu.
- * Acrescentar "acima de" é uma linha aqui e um `if` no `alertaDaCelula_`.
+ * `abaixoDe` é o vermelho. `noLimite` e `acima` são as outras duas cores, para
+ * a regra que tem três faixas: pedido do PO para a vigência do VG — "abaixo de
+ * 18 meses fica em vermelho, 18 meses exato fica amarelo e mais que 18 meses
+ * fica verde, assim os analistas conseguem ver com mais facilidade". Regra sem
+ * as duas continua só com o vermelho, como a margem.
  */
 const RECC_ALERTAS_DA_LINHA = {
   BASE_VG: [
     {
       cabecalho: 'Meses de vigência',
       abaixoDe: 18,
-      recado: 'Vigência de menos de 18 meses'
+      recado: 'Vigência de menos de 18 meses',
+      noLimite: { tom: 'atencao', recado: 'Vigência de exatamente 18 meses' },
+      acima: { tom: 'bom', recado: 'Vigência acima de 18 meses' }
     },
     {
       cabecalho: 'Margem de contribuição',
@@ -220,14 +225,25 @@ const RECC_ALERTAS_DA_LINHA = {
  * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
  */
 function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
+  var faixa = faixaDaCelula_(nomeDaAba, cabecalho, valor);
+  return faixa && faixa.tom === 'ruim' ? faixa.recado : '';
+}
+
+/**
+ * A cor desta célula e o motivo — vermelho, amarelo ou verde —, ou null.
+ *
+ * O vermelho é o alerta de sempre (`abaixoDe`). O amarelo e o verde só existem
+ * na regra que os declara: a vigência do VG. Valor em branco não ganha cor.
+ */
+function faixaDaCelula_(nomeDaAba, cabecalho, valor) {
   var regras = RECC_ALERTAS_DA_LINHA[nomeDaAba];
-  if (!regras) return '';
+  if (!regras) return null;
 
   var texto = String(valor === null || valor === undefined ? '' : valor).trim();
-  if (!texto) return '';
+  if (!texto) return null;
 
   var numero = Number(String(texto).replace(',', '.'));
-  if (isNaN(numero)) return '';
+  if (isNaN(numero)) return null;
 
   var achada = null;
   regras.forEach(function (regra) {
@@ -235,9 +251,12 @@ function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
       achada = regra;
     }
   });
-  if (!achada) return '';
+  if (!achada) return null;
 
-  return numero < achada.abaixoDe ? achada.recado : '';
+  if (numero < achada.abaixoDe) return { tom: 'ruim', recado: achada.recado };
+  if (numero === achada.abaixoDe && achada.noLimite) return achada.noLimite;
+  if (numero > achada.abaixoDe && achada.acima) return achada.acima;
+  return null;
 }
 
 /**
@@ -728,6 +747,29 @@ const RECC_ESQUEMA = {
        * aba de 16 mil SUSEPs bloqueadas, a cada SUSEP digitada.
        */
       { cabecalho: 'ConfereSusepBloqueada', tipo: 'simOuNao', protegido: false },
+      /*
+       * O SLA DO CANAL, em horas ÚTEIS — pedido do PO para a Mesa Diamante:
+       * "6 horas úteis; a célula funciona das 08:15 às 18:30". Conta de
+       * segunda a sexta, só dentro do expediente.
+       *
+       * Mora aqui, e não escrito no código com o nome "Mesa", porque é regra
+       * de operação: o prazo, o expediente e o canal que tem prazo mudam.
+       * Zero ou vazio desliga — canal sem SLA declarado não ganha um selo
+       * inventado na fila.
+       *
+       * O expediente é TEXTO ("08:15"), e não hora: é configuração que a
+       * pessoa lê e escreve, e uma hora de planilha atravessa fusos.
+       *
+       * O prazo PARA NA PRIMEIRA RESPOSTA — palavra do PO: "a SLA conta até a
+       * data da primeira resposta". As duas colunas dizem onde a base guarda
+       * a data e a hora dessa resposta; declaradas, e não adivinhadas, como as
+       * outras. Caso encerrado sem resposta para no encerramento.
+       */
+      { cabecalho: 'SlaHorasUteis', tipo: 'numero', protegido: false },
+      { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaPrimeiraResposta', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaHoraDaPrimeiraResposta', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }
@@ -1601,10 +1643,24 @@ function converterParaData_(valor) {
   }
   var texto = String(valor).trim();
   var br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (br) return new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+  if (br) return diaQueExiste_(Number(br[3]), Number(br[2]), Number(br[1]));
   var iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+  if (iso) return diaQueExiste_(Number(iso[1]), Number(iso[2]), Number(iso[3]));
   return '';
+}
+
+/**
+ * A data, se o dia existe no calendário — ou vazio.
+ *
+ * `new Date(2026, 1, 31)` não reclama: devolve 3 de março. Com o calendário do
+ * navegador isso não chegava aqui; desde que a data é digitada com máscara,
+ * "31/02/2026" pode chegar, e virar outro dia calado é o pior jeito de errar.
+ */
+function diaQueExiste_(ano, mes, dia) {
+  var data = new Date(ano, mes - 1, dia);
+  if (data.getFullYear() !== ano || data.getMonth() !== mes - 1
+    || data.getDate() !== dia) return '';
+  return data;
 }
 
 /**
@@ -7595,6 +7651,11 @@ function listarCanaisConfiguraveis() {
         // Vazio vale SIM, igual ao resto do sistema: a tela mostra marcado.
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
+        slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
+        inicioDoExpediente: horaDoExpediente_(canal.InicioDoExpediente),
+        fimDoExpediente: horaDoExpediente_(canal.FimDoExpediente),
+        colunaDaPrimeiraResposta: String(canal.ColunaDaPrimeiraResposta || ''),
+        colunaDaHoraDaPrimeiraResposta: String(canal.ColunaDaHoraDaPrimeiraResposta || ''),
         icone: String(canal.Icone || ''),
         ordem: Number(canal.Ordem) || 0,
         ativo: normalizarParaComparar_(canal.Ativo) === 'sim',
@@ -7617,7 +7678,7 @@ function salvarCanal(dados) {
 
   var id = converterParaIdentificador_(dados.id);
   var atual = buscarRegistros_('CANAIS', 'Id', id, 1)[0];
-  if (!atual) throw new Error('Canal ' + id + ' não encontrada.');
+  if (!atual) throw new Error('Canal ' + id + ' não encontrado.');
 
   if (dados.aba && String(dados.aba) !== String(atual.Aba)) {
     throw new Error('A aba de um canal não muda por aqui: os casos já ' +
@@ -7629,7 +7690,8 @@ function salvarCanal(dados) {
 
   var estrutura = estruturaDaAba_(String(atual.Aba));
   ['colunaDaData', 'colunaDaHora', 'colunaDoStatus', 'colunaDaFinalizacao',
-    'colunaDaAreaResponsavel', 'colunaDoValor'].forEach(function (chave) {
+    'colunaDaAreaResponsavel', 'colunaDoValor',
+    'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'].forEach(function (chave) {
     conferirQueAColunaExiste_(estrutura, dados[chave], atual.Aba);
   });
   // As colunas da fila podem vir agrupadas — "Título: col, col; Título: col".
@@ -7657,12 +7719,14 @@ function salvarCanal(dados) {
         && normalizarParaComparar_(canal.Ativo) === 'sim';
     });
     if (!outrasAtivas.length) {
-      throw new Error('Esta é a último canal ativa. Desligá-la deixaria o ' +
+      throw new Error('Este é o último canal ativo. Desligá-lo deixaria o ' +
         'Trabalho e o cadastro sem nenhuma base para trabalhar.');
     }
   }
 
-  atualizarRegistro_('CANAIS', id, {
+  var sla = slaDoFormulario_(dados, atual);
+
+  atualizarRegistro_('CANAIS', id, Object.assign(sla, {
     Nome: nome,
     Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
     ColunaDaData: String(dados.colunaDaData || ''),
@@ -7675,17 +7739,84 @@ function salvarCanal(dados) {
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
     ColunaDoValor: String(dados.colunaDoValor || ''),
     SituacoesDestacadas: String(dados.situacoesDestacadas || ''),
-    // `=== false` e não `!dados...`: a tela que não mandar o campo não pode
-    // desligar a conferência por omissão. Só o "não" explícito desliga.
-    ConfereSusepBloqueada: dados.confereSusepBloqueada === false ? 'NAO' : 'SIM',
+    // A tela que não mandar o campo não mexe nele — nem para desligar, nem
+    // para LIGAR. A tela de Configurações não tem esse campo: antes, salvar a
+    // Mesa Diamante por ela gravava SIM e religava, sem aviso, a conferência
+    // de SUSEP bloqueada que a Mesa não faz.
+    ConfereSusepBloqueada: dados.confereSusepBloqueada === undefined
+      ? String(atual.ConfereSusepBloqueada === undefined ? '' : atual.ConfereSusepBloqueada)
+      : (dados.confereSusepBloqueada === false ? 'NAO' : 'SIM'),
     Icone: String(dados.icone || atual.Icone || ''),
     Ordem: Number(dados.ordem) || Number(atual.Ordem) || 0,
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
-  });
+  }));
 
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+/**
+ * Os campos do SLA vindos de Configurações, conferidos — ou nada, numa
+ * planilha que ainda não rodou a atualização e não tem as colunas.
+ *
+ * Campo que a tela não mandou fica como está: quem salva o canal por outro
+ * caminho não pode desligar o SLA da Mesa por omissão.
+ */
+function slaDoFormulario_(dados, atual) {
+  var colunasDeCanais = estruturaDaAba_('CANAIS');
+  if (posicaoDaColuna_(colunasDeCanais, 'SlaHorasUteis') < 0) return {};
+
+  function ouOAtual(chave, cabecalho) {
+    return dados[chave] === undefined ? atual[cabecalho] : dados[chave];
+  }
+  var horas = Number(String(ouOAtual('slaHorasUteis', 'SlaHorasUteis') || 0)
+    .replace(',', '.'));
+  if (!isFinite(horas) || horas < 0) {
+    throw new Error('O SLA é em horas úteis: um número, como 6. Zero desliga.');
+  }
+  var inicio = horaDoExpediente_(ouOAtual('inicioDoExpediente', 'InicioDoExpediente'));
+  var fim = horaDoExpediente_(ouOAtual('fimDoExpediente', 'FimDoExpediente'));
+  if (horas > 0) {
+    if (!inicio || !fim) {
+      throw new Error('Com SLA, o expediente precisa de início e fim, no formato '
+        + '08:15 e 18:30 — é só dentro dele que o prazo corre.');
+    }
+    if (minutosDaHoraDoExpediente_(inicio) >= minutosDaHoraDoExpediente_(fim)) {
+      throw new Error('O expediente termina antes de começar: ' + inicio + ' até ' + fim + '.');
+    }
+  }
+  return {
+    SlaHorasUteis: horas,
+    InicioDoExpediente: inicio,
+    FimDoExpediente: fim,
+    ColunaDaPrimeiraResposta: String(ouOAtual('colunaDaPrimeiraResposta',
+      'ColunaDaPrimeiraResposta') || ''),
+    ColunaDaHoraDaPrimeiraResposta: String(ouOAtual('colunaDaHoraDaPrimeiraResposta',
+      'ColunaDaHoraDaPrimeiraResposta') || '')
+  };
+}
+
+/**
+ * "8:15", "08:15" ou uma hora de planilha viram "08:15". Vazio ou torto: "".
+ */
+function horaDoExpediente_(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return isNaN(valor.getTime()) ? ''
+      : Utilities.formatDate(valor, RECC_FUSO_HORARIO, 'HH:mm');
+  }
+  var partes = /^(\d{1,2})[:h](\d{2})$/.exec(String(valor).trim());
+  if (!partes) return '';
+  var hora = Number(partes[1]);
+  var minuto = Number(partes[2]);
+  if (hora > 23 || minuto > 59) return '';
+  return (hora < 10 ? '0' : '') + hora + ':' + partes[2];
+}
+
+function minutosDaHoraDoExpediente_(texto) {
+  var partes = String(texto || '').split(':');
+  return Number(partes[0]) * 60 + Number(partes[1]);
 }
 
 
@@ -9356,6 +9487,12 @@ function canaisVisiveis_() {
         // Só quem disser "Não" em letras deixa de conferir.
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
+        // O SLA em horas úteis. Zero ou vazio: canal sem prazo, e sem selo.
+        slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
+        inicioDoExpediente: canal.InicioDoExpediente,
+        fimDoExpediente: canal.FimDoExpediente,
+        colunaDaPrimeiraResposta: String(canal.ColunaDaPrimeiraResposta || ''),
+        colunaDaHoraDaPrimeiraResposta: String(canal.ColunaDaHoraDaPrimeiraResposta || ''),
         icone: canal.Icone
       };
     });
@@ -10509,6 +10646,20 @@ function registrarUltimoAcesso_(usuario) {
  */
 const RECC_LINHAS_DO_PAINEL_PADRAO = 5000;
 
+/**
+ * Quantos casos a FILA do Trabalho mostra: os mais recentes.
+ *
+ * Pedido do PO: "limite a visualização dos casos para mostrar apenas os 5 mais
+ * recentes", em todos os canais. Os CARTÕES continuam contando todos os casos
+ * do período e dos filtros — escolha dele —, e a tela diz "mostrando 5 de N"
+ * para ninguém achar que só existem cinco. Os outros se acham pela busca e
+ * pelos filtros, que procuram em todos.
+ *
+ * A conta do painel não muda (ele continua lendo as mesmas linhas); o que
+ * encolhe é o que atravessa para o navegador e o que a tela desenha.
+ */
+const RECC_CASOS_NA_FILA = 5;
+
 function linhasQueOPainelOlha_() {
   var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
   if (isFinite(declarado) && declarado > 0) return Math.floor(declarado);
@@ -10567,8 +10718,13 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
-  var filtrados = aplicarFiltros_(meus, disponiveis, filtros || {});
-  var anterioresFiltrados = aplicarFiltros_(anterior, disponiveis, filtros || {});
+  // A BUSCA DIGITADA entra junto com os filtros, e vale para os cartões E para
+  // a fila: o número do cartão continua sendo o dos casos que a busca achou.
+  var termo = String((filtros || {}).busca || '').trim();
+  var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
+    canal, termo);
+  var anterioresFiltrados = aplicarBusca_(
+    aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
 
   return {
     canal: canal,
@@ -10584,7 +10740,8 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
-    fila: montarFila_(filtrados, canal),
+    // Os mais recentes estão no FIM: a base só acrescenta no fim.
+    fila: montarFila_(filtrados.slice(-RECC_CASOS_NA_FILA), canal),
     total: filtrados.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,
@@ -10887,6 +11044,69 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
       }
     }
     return true;
+  });
+}
+
+/**
+ * A busca digitada do Trabalho: os casos em que o termo aparece.
+ *
+ * Pedido do PO: "o filtro por busca digitada para cada canal". Procura em
+ * DOIS conjuntos de colunas, juntos:
+ *
+ *   · as que a FILA mostra — quem lê "Endosso urgente" na fila espera achar o
+ *     caso digitando "endosso";
+ *   · as COLUNAS DA BUSCA do canal (Configurações › Canais de trabalho) — as
+ *     mesmas do Buscar Caso: CPF, apólice, protocolo.
+ *
+ * A comparação é a do Buscar Caso (`casaComOTermo_`): sem acento e sem caixa,
+ * e só os dígitos nas colunas de identificador — "123.456.789-01" acha
+ * "12345678901". A proposta da fila, que junta código e número, também é
+ * procurada inteira: digitar "7-0000123" acha o caso.
+ *
+ * Procura só no que o período e os filtros já separaram, em memória: a base
+ * já foi lida para montar o painel, e procurar de novo na planilha seria
+ * pagar a leitura duas vezes.
+ */
+function aplicarBusca_(registros, canal, termo) {
+  if (!termo) return registros;
+
+  var onde = [];
+  var jaTem = {};
+  function guardar(coluna) {
+    var chave = normalizarParaComparar_(coluna.cabecalho);
+    if (jaTem[chave]) return;
+    jaTem[chave] = true;
+    onde.push(coluna);
+  }
+  colunasDaFila_(canal).forEach(function (grupo) {
+    grupo.colunas.forEach(function (coluna) {
+      if (coluna.juntar) {
+        coluna.juntar.forEach(guardar);
+        onde.push({ juntar: coluna.juntar });
+      } else {
+        guardar(coluna);
+      }
+    });
+  });
+  colunasDaBusca_(canal).forEach(guardar);
+
+  return registros.filter(function (registro) {
+    return onde.some(function (coluna) {
+      if (coluna.juntar) {
+        var inteira = coluna.juntar.map(function (pedaco) {
+          return String(registro[pedaco.cabecalho] === undefined
+            ? '' : registro[pedaco.cabecalho]);
+        }).filter(function (texto) { return texto !== ''; }).join('-');
+        return casaComOTermo_(inteira, termo, '');
+      }
+      // Pelo TEXTO da coluna, como a fila mostra, e não pelo valor cru: uma
+      // data crua vira "Mon Oct 06 2026…", e buscar "Mon" de "Monkey"
+      // acharia todo caso que tem data.
+      var valor = coluna.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR
+        ? registro[coluna.cabecalho]
+        : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+      return casaComOTermo_(valor, termo, coluna.tipo);
+    });
   });
 }
 
@@ -11206,11 +11426,18 @@ function grupoDaFila_(pedaco, estrutura, canal) {
 function montarFila_(registros, canal) {
   var grupos = colunasDaFila_(canal);
 
+  // O SLA só existe em canal que declara um. Os status finais e o "agora" são
+  // calculados uma vez por fila, e não uma por caso.
+  var comSla = Number(canal.slaHorasUteis) > 0;
+  var finais = {};
+  var agora = comSla ? relogioDeParede_(new Date()) : null;
+
   // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
   // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
   var tons = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
     tons[situacao.chave] = situacao.tom;
+    if (situacao.final) finais[situacao.chave] = true;
   });
 
   return registros.slice().reverse().map(function (registro) {
@@ -11224,7 +11451,7 @@ function montarFila_(registros, canal) {
          * planilha. `recado` vem junto porque uma cor sozinha não diz o
          * motivo, e quem chega novo na operação não adivinha.
          */
-        var alerta = alertaDaCelula_(canal.aba, coluna.cabecalho,
+        var faixa = faixaDaCelula_(canal.aba, coluna.cabecalho,
           registro[coluna.cabecalho]);
 
         // Colunas juntas ("código + número") saem numa linha só, com hífen.
@@ -11238,7 +11465,10 @@ function montarFila_(registros, canal) {
           cabecalho: coluna.cabecalho,
           valor: valor,
           ehStatus: coluna.ehStatus,
-          alerta: alerta
+          // O motivo da cor, para a dica; e a cor: vermelho ("ruim"), amarelo
+          // ("atencao") ou verde ("bom") — as duas últimas, só na vigência do VG.
+          alerta: faixa ? faixa.recado : '',
+          tomDoAlerta: faixa ? faixa.tom : ''
         };
       });
     });
@@ -11248,9 +11478,165 @@ function montarFila_(registros, canal) {
       id: registro.__id,
       celulas: celulas,
       situacao: situacao,
-      tom: tons[normalizarParaComparar_(situacao)] || 'neutro'
+      tom: tons[normalizarParaComparar_(situacao)] || 'neutro',
+      // O SLA, quando o canal declara um (hoje, a Mesa Diamante).
+      sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null
     };
   });
+}
+
+/* ============================================================================
+   O SLA EM HORAS ÚTEIS
+   ============================================================================
+   Pedido do PO para a Mesa Diamante: "não mostra se o caso está dentro da SLA
+   de 6 horas úteis. A célula funciona das 08:15 às 18:30". De segunda a
+   sexta, escolha dele — e sem feriados, porque o sistema não tem mais a lista.
+
+   A CONTA É FEITA NO RELÓGIO DE PAREDE de São Paulo, em minutos do dia, e não
+   em milissegundos: "08:15" é 08:15 em qualquer dia, e misturar fuso com hora
+   de planilha (que o Sheets ancora numa data antiga) foi o que já deslocou
+   horários em minutos neste sistema.
+
+   COMEÇA na data e hora de entrada. Caso que chega fora do expediente — às
+   20h, no sábado — começa a contar na próxima abertura. Sem a hora, conta da
+   abertura daquele dia.
+
+   PARA NA PRIMEIRA RESPOSTA — palavra do PO: "a SLA conta até a data da
+   primeira resposta". Sem a hora dela, vale a hora guardada junto da data; sem
+   nenhuma das duas, o fim do expediente daquele dia.
+
+   SEM RESPOSTA, PARA NO ENCERRAMENTO — decisão do PO, perguntada: caso que foi
+   encerrado sem a primeira resposta preenchida para na mudança para o status
+   final ou, sem ela, na data da finalização. Senão ficaria "fora do prazo"
+   crescendo para sempre, num caso que ninguém mais vai trabalhar. O resto
+   conta até agora.
+   ============================================================================ */
+
+/** O dia e o minuto do dia, no relógio de São Paulo. */
+function relogioDeParede_(data) {
+  var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm');
+  var partes = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(texto);
+  return {
+    dia: Math.round(Date.UTC(Number(partes[1]), Number(partes[2]) - 1,
+      Number(partes[3])) / 86400000),
+    minuto: Number(partes[4]) * 60 + Number(partes[5])
+  };
+}
+
+/** Os minutos do dia de uma hora da planilha, ou de um texto "14:30". */
+function minutoDaHora_(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return isNaN(valor.getTime()) ? null : relogioDeParede_(valor).minuto;
+  }
+  var partes = /^(\d{1,2}):(\d{2})/.exec(String(valor).trim());
+  return partes ? Number(partes[1]) * 60 + Number(partes[2]) : null;
+}
+
+/** Minutos ÚTEIS entre dois pontos do relógio — segunda a sexta, no expediente. */
+function minutosUteisEntre_(de, ate, abre, fecha) {
+  if (ate.dia < de.dia || (ate.dia === de.dia && ate.minuto <= de.minuto)) return 0;
+  var total = 0;
+  for (var dia = de.dia; dia <= ate.dia; dia++) {
+    var semana = new Date(dia * 86400000).getUTCDay();   // 0 domingo, 6 sábado
+    if (semana === 0 || semana === 6) continue;
+    var inicio = dia === de.dia ? Math.max(abre, de.minuto) : abre;
+    var fim = dia === ate.dia ? Math.min(fecha, ate.minuto) : fecha;
+    if (fim > inicio) total += fim - inicio;
+  }
+  return total;
+}
+
+/**
+ * O ponto do relógio em que o prazo parou: o dia da data e a hora da coluna
+ * de hora. Sem a hora, vale a guardada junto da data (quem conclui pelo
+ * diálogo grava data e hora numa célula só); sem nenhuma, o fim do expediente.
+ */
+function pontoDoFim_(data, hora, fecha) {
+  var relogio = relogioDeParede_(data);
+  var minuto = minutoDaHora_(hora);
+  if (minuto === null) minuto = relogio.minuto || fecha;
+  return { dia: relogio.dia, minuto: minuto };
+}
+
+/** "2h10", "45min", e a partir de um expediente inteiro, "3 dias úteis". */
+function duracaoParaLer_(minutos, expediente) {
+  if (minutos >= expediente) {
+    var dias = Math.floor(minutos / expediente);
+    return dias + (dias === 1 ? ' dia útil' : ' dias úteis');
+  }
+  if (minutos < 60) return minutos + 'min';
+  var horas = Math.floor(minutos / 60);
+  var resto = minutos % 60;
+  return horas + 'h' + (resto ? (resto < 10 ? '0' : '') + resto : '');
+}
+
+/**
+ * O SLA de um caso, pronto para o selo da fila — ou null, quando não dá para
+ * contar (sem data de entrada, ou canal sem expediente válido).
+ */
+function slaDoCaso_(registro, canal, finais, agora) {
+  var abre = minutoDaHora_(canal.inicioDoExpediente);
+  var fecha = minutoDaHora_(canal.fimDoExpediente);
+  if (abre === null || fecha === null || fecha <= abre) return null;
+
+  var entrada = converterParaData_(registro[canal.colunaDaData]);
+  if (!entrada) return null;
+  var horaDaEntrada = canal.colunaDaHora
+    ? minutoDaHora_(registro[canal.colunaDaHora]) : null;
+  var de = {
+    dia: relogioDeParede_(entrada).dia,
+    minuto: horaDaEntrada === null ? abre : horaDaEntrada
+  };
+
+  // Onde o prazo parou: na primeira resposta, no encerramento ou em lugar
+  // nenhum ainda ("agora"). A tela usa para explicar o selo na dica.
+  var ate = agora;
+  var parouEm = 'agora';
+  var resposta = canal.colunaDaPrimeiraResposta
+    ? converterParaData_(registro[canal.colunaDaPrimeiraResposta]) : '';
+  if (resposta) {
+    parouEm = 'resposta';
+    ate = pontoDoFim_(resposta, canal.colunaDaHoraDaPrimeiraResposta
+      ? registro[canal.colunaDaHoraDaPrimeiraResposta] : '', fecha);
+  } else {
+    var situacao = canal.colunaDoStatus
+      ? normalizarParaComparar_(registro[canal.colunaDoStatus]) : '';
+    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+    var finalizadoEm = canal.colunaDaFinalizacao
+      ? converterParaData_(registro[canal.colunaDaFinalizacao]) : '';
+    if (finais[situacao] && mudou) {
+      parouEm = 'encerramento';
+      ate = relogioDeParede_(mudou);
+    } else if (finalizadoEm) {
+      parouEm = 'encerramento';
+      ate = pontoDoFim_(finalizadoEm, '', fecha);
+    }
+  }
+  var parou = parouEm !== 'agora';
+
+  var prazo = Math.round(Number(canal.slaHorasUteis) * 60);
+  var gasto = minutosUteisEntre_(de, ate, abre, fecha);
+  var expediente = fecha - abre;
+  var dentro = gasto <= prazo;
+
+  var texto;
+  if (parou) {
+    texto = dentro ? 'SLA cumprido · em ' + duracaoParaLer_(gasto, expediente)
+      : 'SLA estourado · ' + duracaoParaLer_(gasto - prazo, expediente) + ' além';
+  } else {
+    texto = dentro ? 'No prazo · faltam ' + duracaoParaLer_(prazo - gasto, expediente)
+      : 'Fora do prazo · ' + duracaoParaLer_(gasto - prazo, expediente) + ' além';
+  }
+  return {
+    dentro: dentro,
+    parou: parou,
+    parouEm: parouEm,
+    tom: dentro ? 'bom' : 'ruim',
+    texto: texto,
+    minutosUteis: gasto,
+    prazo: prazo
+  };
 }
 
 
@@ -13110,6 +13496,12 @@ function semearDadosIniciais_(emailDoInstalador) {
       SituacoesDestacadas: 'Retido, Não retido, Sem sucesso de contato',
       // A RET trabalha inadimplência, e para ela o bloqueio importa.
       ConfereSusepBloqueada: true,
+      // Sem SLA: a RET não pediu prazo em horas.
+      SlaHorasUteis: 0,
+      InicioDoExpediente: '',
+      FimDoExpediente: '',
+      ColunaDaPrimeiraResposta: '',
+      ColunaDaHoraDaPrimeiraResposta: '',
       Icone: 'escudo',
       Ordem: 1,
       Ativo: true
@@ -13148,6 +13540,18 @@ function semearDadosIniciais_(emailDoInstalador) {
        * conferir, é marcar lá.
        */
       ConfereSusepBloqueada: false,
+      /*
+       * O SLA DA MESA, pedido do PO: "6 horas úteis; a célula funciona das
+       * 08:15 às 18:30". Segunda a sexta. O prazo começa na data e na hora de
+       * entrada e para na PRIMEIRA RESPOSTA ("a SLA conta até a data da
+       * primeira resposta"). Tudo editável em Configurações › Canais de
+       * trabalho.
+       */
+      SlaHorasUteis: 6,
+      InicioDoExpediente: '08:15',
+      FimDoExpediente: '18:30',
+      ColunaDaPrimeiraResposta: 'Data resposta',
+      ColunaDaHoraDaPrimeiraResposta: 'Hora resposta',
       Icone: 'diamante',
       Ordem: 2,
       Ativo: true
@@ -13167,8 +13571,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data do protocolo da solicitação',
       ColunaDaHora: '',
       ColunaDoStatus: 'Status',
+      // "Vigência" abre com os MESES, em destaque e com cor — vermelho abaixo
+      // de 18, amarelo em 18, verde acima. Pedido do PO.
       ColunasDaFila: 'Situação: Data do protocolo da solicitação, Status'
-        + '; Vigência: Início da vigência, Meses de vigência'
+        + '; Vigência: Meses de vigência, Início da vigência'
         + '; Cliente: CNPJ, Subestipulante, Quantidade de vidas'
         + '; Financeiro: Prêmio mensal, Margem de contribuição'
         + '; Responsável: Analista',
@@ -13187,6 +13593,11 @@ function semearDadosIniciais_(emailDoInstalador) {
       // O VG é piloto e o PO não disse o contrário: segue conferindo, que é o
       // padrão de quem não declarou nada.
       ConfereSusepBloqueada: true,
+      SlaHorasUteis: 0,
+      InicioDoExpediente: '',
+      FimDoExpediente: '',
+      ColunaDaPrimeiraResposta: '',
+      ColunaDaHoraDaPrimeiraResposta: '',
       Icone: 'grupo',
       Ordem: 3,
       Ativo: true
@@ -14062,7 +14473,13 @@ function atualizarPGO() {
   // coluna de dinheiro do canal e quais situações ganham barra própria.
   [['CANAIS', 'ColunaDoValor', 'texto'],
    ['CANAIS', 'SituacoesDestacadas', 'textoLongo'],
-   ['CANAIS', 'ConfereSusepBloqueada', 'simOuNao']].forEach(function (trio) {
+   ['CANAIS', 'ConfereSusepBloqueada', 'simOuNao'],
+   // O SLA por canal — pedido do PO para a Mesa Diamante.
+   ['CANAIS', 'SlaHorasUteis', 'numero'],
+   ['CANAIS', 'InicioDoExpediente', 'texto'],
+   ['CANAIS', 'FimDoExpediente', 'texto'],
+   ['CANAIS', 'ColunaDaPrimeiraResposta', 'texto'],
+   ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto']].forEach(function (trio) {
     var aba = planilhaAtiva_().getSheetByName(trio[0]);
     if (!aba) { pulados.push('aba ' + trio[0] + ' não existe'); return; }
     if (posicaoDaColuna_(estruturaDaAba_(trio[0]), trio[1]) >= 0) {
@@ -14087,6 +14504,7 @@ function atualizarPGO() {
   feito = feito.concat(ligarAPropostaEAApoliceEmPedacos_(pulados));
   feito = feito.concat(ajustarAsColunasDaFila_(pulados, paraVoce));
   feito = feito.concat(aceitarCnpjNaMesa_(pulados, paraVoce));
+  feito = feito.concat(ligarOSlaDaMesa_(pulados));
 
   // --- 4. as colunas novas dos dois cadastros ------------------------------
   //
@@ -14779,7 +15197,8 @@ function trocarStatusNasDestacadas_(canal, antigo, novo) {
  * "Na aba trabalho em dados da proposta tire do destaque o protocolo pois não
  * é usado e substitua pelo cod da proposta e proposta e na coluna de dados
  * cadastrais inclua também o telefone e deixe o em destaque" — e, na Mesa, o
- * título do e-mail em destaque. O primeiro item de cada grupo é o destaque.
+ * título do e-mail em destaque. Depois, no VG: "deixe em destaque o período de
+ * vigência". O primeiro item de cada grupo é o destaque.
  */
 const RECC_FILA_DO_PO = [
   { aba: 'BASE_RET', grupo: 'Dados da proposta',
@@ -14790,7 +15209,11 @@ const RECC_FILA_DO_PO = [
     para: 'telefones de contato, nome do cliente, CPF, e-mail' },
   { aba: 'BASE_MESA', grupo: 'Dados do caso',
     de: 'Ramo, Assunto',
-    para: 'Título do e-mail, Ramo, Assunto' }
+    para: 'Título do e-mail, Ramo, Assunto' },
+  // VG: os meses de vigência em destaque, com a cor das três faixas.
+  { aba: 'BASE_VG', grupo: 'Vigência',
+    de: 'Início da vigência, Meses de vigência',
+    para: 'Meses de vigência, Início da vigência' }
 ];
 
 /**
@@ -14871,6 +15294,52 @@ function ajustarAsColunasDaFila_(pulados, paraVoce) {
  * rótulo vira "CPF ou CNPJ" só se ainda for "CPF": rótulo reescrito também foi
  * escolha de alguém.
  */
+/**
+ * O SLA da Mesa Diamante na planilha em uso: 6 horas úteis, das 08:15 às
+ * 18:30, pedido do PO.
+ *
+ * As colunas nascem vazias, e vazio é "sem SLA" — criar a coluna sozinha
+ * deixaria a Mesa sem selo, e o pedido valeria só para quem instalasse do
+ * zero — a mesma lição da conferência de bloqueio da Mesa, logo abaixo. Por
+ * isso preenche.
+ *
+ * SÓ PREENCHE O QUE ESTÁ EM BRANCO: SLA que alguém já escreveu foi escolhido.
+ */
+function ligarOSlaDaMesa_(pulados) {
+  var feito = [];
+  var mesa = lerRegistros_('CANAIS').filter(function (canal) {
+    return normalizarParaComparar_(canal.Aba) === 'basemesa';
+  })[0];
+  if (!mesa) {
+    pulados.push('não há canal apontando para a BASE_MESA');
+    return feito;
+  }
+  if (String(mesa.SlaHorasUteis === undefined ? '' : mesa.SlaHorasUteis).trim()) {
+    pulados.push('a Mesa já tem SLA declarado (' + mesa.SlaHorasUteis + ' horas úteis)');
+    return feito;
+  }
+  // A primeira resposta mora em "Data resposta" e "Hora resposta" — só se a
+  // base da Mesa tiver as duas com esse nome. Coluna que não existe não é
+  // apontada: o diagnóstico reprovaria o canal.
+  var estruturaDaMesa = estruturaDaAba_(String(mesa.Aba));
+  function seExistir(cabecalho) {
+    return posicaoDaColuna_(estruturaDaMesa, cabecalho) >= 0 ? cabecalho : '';
+  }
+  atualizarRegistro_('CANAIS', mesa.Id, {
+    SlaHorasUteis: 6,
+    InicioDoExpediente: String(mesa.InicioDoExpediente || '').trim() || '08:15',
+    FimDoExpediente: String(mesa.FimDoExpediente || '').trim() || '18:30',
+    ColunaDaPrimeiraResposta: String(mesa.ColunaDaPrimeiraResposta || '').trim()
+      || seExistir('Data resposta'),
+    ColunaDaHoraDaPrimeiraResposta: String(mesa.ColunaDaHoraDaPrimeiraResposta || '').trim()
+      || seExistir('Hora resposta')
+  });
+  esquecerEstruturaLida_('CANAIS');
+  feito.push('Mesa Diamante: SLA de 6 horas úteis, das 08:15 às 18:30, de segunda a sexta, '
+    + 'até a primeira resposta');
+  return feito;
+}
+
 function aceitarCnpjNaMesa_(pulados, paraVoce) {
   var feito = [];
   var novaMascara = '000.000.000-00|00.000.000/0000-00';
@@ -15724,6 +16193,8 @@ function blocoDasCanais_() {
 
     [['ColunaDaData', 'coluna da data'],
      ['ColunaDaHora', 'coluna da hora'],
+     ['ColunaDaPrimeiraResposta', 'coluna da primeira resposta'],
+     ['ColunaDaHoraDaPrimeiraResposta', 'coluna da hora da primeira resposta'],
      ['ColunaDoStatus', 'coluna da situação'],
      ['ColunaDaFinalizacao', 'coluna da finalização'],
      ['ColunaDaAreaResponsavel', 'coluna da área responsável']

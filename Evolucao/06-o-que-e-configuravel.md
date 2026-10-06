@@ -32,6 +32,7 @@ abaixo com o motivo.
 | **O que um cartão conta** | O total, uma situação, os finalizados na célula, ou **"já passaram por"** — que lê a coluna de carimbo e por isso não zera quando o caso avança | Painéis |
 | **Gráficos da Produtividade RECC** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
 | **Meta por pessoa** | Quantos casos por mês se espera de alguém no canal. Zero desliga a barra de progresso | Canais de trabalho |
+| **SLA em horas úteis** | Por canal: quantas horas úteis (zero desliga), início e fim do expediente (como 08:15 e 18:30) e as colunas da data e da hora da **primeira resposta**, que é onde o prazo para (caso encerrado sem resposta para no encerramento). Conta de segunda a sexta, só dentro do expediente. A Mesa Diamante nasce com 6 horas, das 08:15 às 18:30, até "Data resposta" e "Hora resposta"; RET e VG, sem SLA. A tela recusa expediente que termina antes de começar | Canais de trabalho |
 | **Corretoras e canais** | Cadastrar, editar o segmento, tirar do cadastro — e cadastrar direto as SUSEPs que os casos citam | Tabela de Corretoras |
 | **Produtos** | Nome e código, que é único | Tabela de Corretoras |
 | **SUSEPs bloqueadas** | Bloquear com motivo, liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
@@ -40,10 +41,11 @@ abaixo com o motivo.
 | **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
 | **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade e segurança |
 | **Senha de administrador** | Definir e trocar | Identidade e segurança |
-| **Busca** | Em quais colunas cado canal procura | Canais de trabalho |
+| **Busca** | Em quais colunas cado canal procura. Vale para o Buscar Caso **e** para a busca digitada do Trabalho, que procura também nas colunas da fila | Canais de trabalho |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
-| **Os limites do alerta vermelho** | `RECC_ALERTAS_DA_LINHA`, no `Base.gs` | Hoje só o VG tem: vigência abaixo de 18 e margem abaixo de 25,5. Acrescentar coluna ou trocar o limite é uma linha. Ainda **não** tem tela |
+| **Os limites e as cores do alerta** | `RECC_ALERTAS_DA_LINHA`, no `Base.gs` | Hoje só o VG tem: vigência abaixo de 18 em vermelho, exatamente 18 em amarelo (`noLimite`), acima de 18 em verde (`acima`); margem abaixo de 25,5 em vermelho. Acrescentar coluna, trocar o limite ou a faixa é uma linha. Ainda **não** tem tela |
+| **Quantos casos a fila do Trabalho mostra** | `RECC_CASOS_NA_FILA`, no `Indicadores.gs` | 5, pedido do PO. Os cartões, a busca e os filtros continuam olhando todos os casos do período. Um número só, para todos os canais |
 | **Campo que aceita data no futuro** | `RECC_PADRAO_POR_ABA`, no `Instalacao.gs` | Só o `Início da vigência` do VG. Todas as outras datas continuam recusando futuro |
 | **Coluna calculada** | `RECC_COLUNAS_CALCULADAS`, no `Base.gs` | Hoje só os meses de vigência do VG. Outra conta é uma linha aqui e um `if` na função |
 | **Ausências** (férias, licença, afastamento) | Configurações › Calendário | Quem, motivo e o período. Sai da meta da pessoa e da média da equipe — não bloqueia o acesso |

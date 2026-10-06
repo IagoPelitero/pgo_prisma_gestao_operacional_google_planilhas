@@ -311,6 +311,12 @@ function semearDadosIniciais_(emailDoInstalador) {
       SituacoesDestacadas: 'Retido, Não retido, Sem sucesso de contato',
       // A RET trabalha inadimplência, e para ela o bloqueio importa.
       ConfereSusepBloqueada: true,
+      // Sem SLA: a RET não pediu prazo em horas.
+      SlaHorasUteis: 0,
+      InicioDoExpediente: '',
+      FimDoExpediente: '',
+      ColunaDaPrimeiraResposta: '',
+      ColunaDaHoraDaPrimeiraResposta: '',
       Icone: 'escudo',
       Ordem: 1,
       Ativo: true
@@ -349,6 +355,18 @@ function semearDadosIniciais_(emailDoInstalador) {
        * conferir, é marcar lá.
        */
       ConfereSusepBloqueada: false,
+      /*
+       * O SLA DA MESA, pedido do PO: "6 horas úteis; a célula funciona das
+       * 08:15 às 18:30". Segunda a sexta. O prazo começa na data e na hora de
+       * entrada e para na PRIMEIRA RESPOSTA ("a SLA conta até a data da
+       * primeira resposta"). Tudo editável em Configurações › Canais de
+       * trabalho.
+       */
+      SlaHorasUteis: 6,
+      InicioDoExpediente: '08:15',
+      FimDoExpediente: '18:30',
+      ColunaDaPrimeiraResposta: 'Data resposta',
+      ColunaDaHoraDaPrimeiraResposta: 'Hora resposta',
       Icone: 'diamante',
       Ordem: 2,
       Ativo: true
@@ -368,8 +386,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data do protocolo da solicitação',
       ColunaDaHora: '',
       ColunaDoStatus: 'Status',
+      // "Vigência" abre com os MESES, em destaque e com cor — vermelho abaixo
+      // de 18, amarelo em 18, verde acima. Pedido do PO.
       ColunasDaFila: 'Situação: Data do protocolo da solicitação, Status'
-        + '; Vigência: Início da vigência, Meses de vigência'
+        + '; Vigência: Meses de vigência, Início da vigência'
         + '; Cliente: CNPJ, Subestipulante, Quantidade de vidas'
         + '; Financeiro: Prêmio mensal, Margem de contribuição'
         + '; Responsável: Analista',
@@ -388,6 +408,11 @@ function semearDadosIniciais_(emailDoInstalador) {
       // O VG é piloto e o PO não disse o contrário: segue conferindo, que é o
       // padrão de quem não declarou nada.
       ConfereSusepBloqueada: true,
+      SlaHorasUteis: 0,
+      InicioDoExpediente: '',
+      FimDoExpediente: '',
+      ColunaDaPrimeiraResposta: '',
+      ColunaDaHoraDaPrimeiraResposta: '',
       Icone: 'grupo',
       Ordem: 3,
       Ativo: true
@@ -1263,7 +1288,13 @@ function atualizarPGO() {
   // coluna de dinheiro do canal e quais situações ganham barra própria.
   [['CANAIS', 'ColunaDoValor', 'texto'],
    ['CANAIS', 'SituacoesDestacadas', 'textoLongo'],
-   ['CANAIS', 'ConfereSusepBloqueada', 'simOuNao']].forEach(function (trio) {
+   ['CANAIS', 'ConfereSusepBloqueada', 'simOuNao'],
+   // O SLA por canal — pedido do PO para a Mesa Diamante.
+   ['CANAIS', 'SlaHorasUteis', 'numero'],
+   ['CANAIS', 'InicioDoExpediente', 'texto'],
+   ['CANAIS', 'FimDoExpediente', 'texto'],
+   ['CANAIS', 'ColunaDaPrimeiraResposta', 'texto'],
+   ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto']].forEach(function (trio) {
     var aba = planilhaAtiva_().getSheetByName(trio[0]);
     if (!aba) { pulados.push('aba ' + trio[0] + ' não existe'); return; }
     if (posicaoDaColuna_(estruturaDaAba_(trio[0]), trio[1]) >= 0) {
@@ -1288,6 +1319,7 @@ function atualizarPGO() {
   feito = feito.concat(ligarAPropostaEAApoliceEmPedacos_(pulados));
   feito = feito.concat(ajustarAsColunasDaFila_(pulados, paraVoce));
   feito = feito.concat(aceitarCnpjNaMesa_(pulados, paraVoce));
+  feito = feito.concat(ligarOSlaDaMesa_(pulados));
 
   // --- 4. as colunas novas dos dois cadastros ------------------------------
   //
@@ -1980,7 +2012,8 @@ function trocarStatusNasDestacadas_(canal, antigo, novo) {
  * "Na aba trabalho em dados da proposta tire do destaque o protocolo pois não
  * é usado e substitua pelo cod da proposta e proposta e na coluna de dados
  * cadastrais inclua também o telefone e deixe o em destaque" — e, na Mesa, o
- * título do e-mail em destaque. O primeiro item de cada grupo é o destaque.
+ * título do e-mail em destaque. Depois, no VG: "deixe em destaque o período de
+ * vigência". O primeiro item de cada grupo é o destaque.
  */
 const RECC_FILA_DO_PO = [
   { aba: 'BASE_RET', grupo: 'Dados da proposta',
@@ -1991,7 +2024,11 @@ const RECC_FILA_DO_PO = [
     para: 'telefones de contato, nome do cliente, CPF, e-mail' },
   { aba: 'BASE_MESA', grupo: 'Dados do caso',
     de: 'Ramo, Assunto',
-    para: 'Título do e-mail, Ramo, Assunto' }
+    para: 'Título do e-mail, Ramo, Assunto' },
+  // VG: os meses de vigência em destaque, com a cor das três faixas.
+  { aba: 'BASE_VG', grupo: 'Vigência',
+    de: 'Início da vigência, Meses de vigência',
+    para: 'Meses de vigência, Início da vigência' }
 ];
 
 /**
@@ -2072,6 +2109,52 @@ function ajustarAsColunasDaFila_(pulados, paraVoce) {
  * rótulo vira "CPF ou CNPJ" só se ainda for "CPF": rótulo reescrito também foi
  * escolha de alguém.
  */
+/**
+ * O SLA da Mesa Diamante na planilha em uso: 6 horas úteis, das 08:15 às
+ * 18:30, pedido do PO.
+ *
+ * As colunas nascem vazias, e vazio é "sem SLA" — criar a coluna sozinha
+ * deixaria a Mesa sem selo, e o pedido valeria só para quem instalasse do
+ * zero — a mesma lição da conferência de bloqueio da Mesa, logo abaixo. Por
+ * isso preenche.
+ *
+ * SÓ PREENCHE O QUE ESTÁ EM BRANCO: SLA que alguém já escreveu foi escolhido.
+ */
+function ligarOSlaDaMesa_(pulados) {
+  var feito = [];
+  var mesa = lerRegistros_('CANAIS').filter(function (canal) {
+    return normalizarParaComparar_(canal.Aba) === 'basemesa';
+  })[0];
+  if (!mesa) {
+    pulados.push('não há canal apontando para a BASE_MESA');
+    return feito;
+  }
+  if (String(mesa.SlaHorasUteis === undefined ? '' : mesa.SlaHorasUteis).trim()) {
+    pulados.push('a Mesa já tem SLA declarado (' + mesa.SlaHorasUteis + ' horas úteis)');
+    return feito;
+  }
+  // A primeira resposta mora em "Data resposta" e "Hora resposta" — só se a
+  // base da Mesa tiver as duas com esse nome. Coluna que não existe não é
+  // apontada: o diagnóstico reprovaria o canal.
+  var estruturaDaMesa = estruturaDaAba_(String(mesa.Aba));
+  function seExistir(cabecalho) {
+    return posicaoDaColuna_(estruturaDaMesa, cabecalho) >= 0 ? cabecalho : '';
+  }
+  atualizarRegistro_('CANAIS', mesa.Id, {
+    SlaHorasUteis: 6,
+    InicioDoExpediente: String(mesa.InicioDoExpediente || '').trim() || '08:15',
+    FimDoExpediente: String(mesa.FimDoExpediente || '').trim() || '18:30',
+    ColunaDaPrimeiraResposta: String(mesa.ColunaDaPrimeiraResposta || '').trim()
+      || seExistir('Data resposta'),
+    ColunaDaHoraDaPrimeiraResposta: String(mesa.ColunaDaHoraDaPrimeiraResposta || '').trim()
+      || seExistir('Hora resposta')
+  });
+  esquecerEstruturaLida_('CANAIS');
+  feito.push('Mesa Diamante: SLA de 6 horas úteis, das 08:15 às 18:30, de segunda a sexta, '
+    + 'até a primeira resposta');
+  return feito;
+}
+
 function aceitarCnpjNaMesa_(pulados, paraVoce) {
   var feito = [];
   var novaMascara = '000.000.000-00|00.000.000/0000-00';
@@ -2925,6 +3008,8 @@ function blocoDasCanais_() {
 
     [['ColunaDaData', 'coluna da data'],
      ['ColunaDaHora', 'coluna da hora'],
+     ['ColunaDaPrimeiraResposta', 'coluna da primeira resposta'],
+     ['ColunaDaHoraDaPrimeiraResposta', 'coluna da hora da primeira resposta'],
      ['ColunaDoStatus', 'coluna da situação'],
      ['ColunaDaFinalizacao', 'coluna da finalização'],
      ['ColunaDaAreaResponsavel', 'coluna da área responsável']

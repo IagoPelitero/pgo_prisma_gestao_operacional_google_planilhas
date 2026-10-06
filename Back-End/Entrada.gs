@@ -337,6 +337,12 @@ function canaisVisiveis_() {
         // Só quem disser "Não" em letras deixa de conferir.
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
+        // O SLA em horas úteis. Zero ou vazio: canal sem prazo, e sem selo.
+        slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
+        inicioDoExpediente: canal.InicioDoExpediente,
+        fimDoExpediente: canal.FimDoExpediente,
+        colunaDaPrimeiraResposta: String(canal.ColunaDaPrimeiraResposta || ''),
+        colunaDaHoraDaPrimeiraResposta: String(canal.ColunaDaHoraDaPrimeiraResposta || ''),
         icone: canal.Icone
       };
     });

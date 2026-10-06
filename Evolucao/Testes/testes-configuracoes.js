@@ -478,7 +478,7 @@ function rodarTestesDeConfiguracoes() {
     }), 'não muda por aqui');
   });
 
-  teste('desligar a último canal ativa é recusado', () => {
+  teste('desligar o último canal ativo é recusado', () => {
     /*
      * O teste desligava UM canal e esperava que o segundo fosse recusado —
      * premissa de quando o sistema tinha exatamente dois. No dia em que o VG
@@ -509,7 +509,7 @@ function rodarTestesDeConfiguracoes() {
 
     const ultimo = comoEstavam[comoEstavam.length - 1];
     lanca(() => chamar('salvarCanal')(Object.assign({}, ultimo, { ativo: false })),
-      'último canal ativa');
+      'último canal ativo');
 
     // Religa SÓ o que este teste desligou. Regravar os outros "por garantia"
     // enche a auditoria de linhas que não aconteceram — e empurra para fora da
@@ -1307,6 +1307,118 @@ function rodarTestesDeConfiguracoes() {
       String(linha.detalhe || '').indexOf('aba aproveitada') >= 0),
       'e a trilha diz quando a aba foi APROVEITADA, que é o caso delicado');
   });
+  secao('Canais de trabalho: o SLA e o que a tela não manda');
+
+  /*
+   * Ambiente NOVO: o teste do "último canal ativo" regrava os canais com
+   * metade dos campos, e aqui interessa o canal como a instalação deixa.
+   */
+  const doSla = carregar('primeiro.adm@exemplo.com');
+  doSla.chamar('instalarRECC()');
+  const canalDaTela = (aba) => doSla.chamar('listarCanaisConfiguraveis()')
+    .find((um) => um.aba === aba);
+  /** O que o formulário de Configurações manda ao salvar — campo por campo. */
+  const comoATelaManda = (canal, mudancas) => Object.assign({
+    id: canal.id, nome: canal.nome, descricao: canal.descricao,
+    colunaDaData: canal.colunaDaData, colunaDaHora: canal.colunaDaHora,
+    colunaDoStatus: canal.colunaDoStatus, colunasDaFila: canal.colunasDaFila,
+    colunasDaBusca: canal.colunasDaBusca, metaMensalPorPessoa: canal.metaMensalPorPessoa,
+    colunaDaFinalizacao: canal.colunaDaFinalizacao,
+    colunaDaAreaResponsavel: canal.colunaDaAreaResponsavel,
+    slaHorasUteis: canal.slaHorasUteis, inicioDoExpediente: canal.inicioDoExpediente,
+    fimDoExpediente: canal.fimDoExpediente,
+    colunaDaPrimeiraResposta: canal.colunaDaPrimeiraResposta,
+    colunaDaHoraDaPrimeiraResposta: canal.colunaDaHoraDaPrimeiraResposta,
+    colunaDoValor: canal.colunaDoValor, situacoesDestacadas: canal.situacoesDestacadas,
+    icone: canal.icone, ordem: canal.ordem, ativo: canal.ativo
+  }, mudancas || {});
+
+  teste('a Mesa chega na tela com o SLA de fábrica', () => {
+    const mesa = canalDaTela('BASE_MESA');
+    igual(mesa.slaHorasUteis, 6);
+    igual(mesa.inicioDoExpediente, '08:15');
+    igual(mesa.fimDoExpediente, '18:30');
+    igual(mesa.colunaDaPrimeiraResposta, 'Data resposta', 'o SLA para na primeira resposta');
+    igual(mesa.colunaDaHoraDaPrimeiraResposta, 'Hora resposta');
+    igual(canalDaTela('BASE_RET').slaHorasUteis, 0, 'a RET nasce sem SLA');
+  });
+
+  teste('o SLA se troca pela tela, e o expediente aceita 8:15', () => {
+    const mesa = canalDaTela('BASE_MESA');
+    doSla.chamar('salvarCanal')(comoATelaManda(mesa,
+      { slaHorasUteis: '8', inicioDoExpediente: '8:00', fimDoExpediente: '17:45' }));
+    const depois = canalDaTela('BASE_MESA');
+    igual(depois.slaHorasUteis, 8);
+    igual(depois.inicioDoExpediente, '08:00');
+    igual(depois.fimDoExpediente, '17:45');
+    doSla.chamar('salvarCanal')(comoATelaManda(depois,
+      { slaHorasUteis: 6, inicioDoExpediente: '08:15', fimDoExpediente: '18:30' }));
+  });
+
+  teste('SLA torto é recusado, dizendo o formato', () => {
+    const mesa = canalDaTela('BASE_MESA');
+    lanca(() => doSla.chamar('salvarCanal')(comoATelaManda(mesa, { slaHorasUteis: '-2' })),
+      'horas úteis');
+    lanca(() => doSla.chamar('salvarCanal')(comoATelaManda(mesa,
+      { inicioDoExpediente: '18:30', fimDoExpediente: '08:15' })), 'termina antes de começar');
+    lanca(() => doSla.chamar('salvarCanal')(comoATelaManda(mesa,
+      { inicioDoExpediente: '' })), 'início e fim');
+    lanca(() => doSla.chamar('salvarCanal')(comoATelaManda(mesa,
+      { colunaDaPrimeiraResposta: 'Coluna que não existe' })), 'Coluna que não existe');
+    lanca(() => doSla.chamar('salvarCanal')(comoATelaManda(mesa,
+      { colunaDaHoraDaPrimeiraResposta: 'Outra que não existe' })), 'Outra que não existe');
+  });
+
+  teste('zero desliga o SLA, e aí o expediente pode ficar em branco', () => {
+    const ret = canalDaTela('BASE_RET');
+    doSla.chamar('salvarCanal')(comoATelaManda(ret,
+      { slaHorasUteis: 0, inicioDoExpediente: '', fimDoExpediente: '' }));
+    igual(canalDaTela('BASE_RET').slaHorasUteis, 0);
+  });
+
+  teste('salvar a Mesa pela tela não religa a conferência de SUSEP bloqueada', () => {
+    /*
+     * Achado da varredura: a tela de Configurações não tem o campo "Confere
+     * SUSEP bloqueada", e o servidor gravava SIM quando ele não vinha. Salvar
+     * a Mesa Diamante por ali religava, sem aviso, a conferência que o PO
+     * pediu para tirar dela.
+     */
+    const mesa = canalDaTela('BASE_MESA');
+    igual(mesa.confereSusepBloqueada, false, 'a Mesa nasce sem conferir');
+    doSla.chamar('salvarCanal')(comoATelaManda(mesa, { descricao: 'Mudei só a descrição' }));
+    igual(canalDaTela('BASE_MESA').confereSusepBloqueada, false,
+      'continua sem conferir depois de salvar pela tela');
+    igual(canalDaTela('BASE_RET').confereSusepBloqueada, true);
+    doSla.chamar('salvarCanal')(comoATelaManda(canalDaTela('BASE_RET')));
+    igual(canalDaTela('BASE_RET').confereSusepBloqueada, true,
+      'e a RET continua conferindo');
+    // Quem manda o campo explicitamente ainda decide.
+    doSla.chamar('salvarCanal')(comoATelaManda(canalDaTela('BASE_MESA'),
+      { confereSusepBloqueada: true }));
+    igual(canalDaTela('BASE_MESA').confereSusepBloqueada, true);
+  });
+
+  teste('a tela de Configurações tem os cinco campos do SLA, e manda os cinco', () => {
+    const tela = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Configuracoes.html'), 'utf8');
+    [['slaHorasUteis', 'campoDeTexto'], ['inicioDoExpediente', 'campoDeTexto'],
+      ['fimDoExpediente', 'campoDeTexto'], ['colunaDaPrimeiraResposta', 'caixaDeOpcoes'],
+      ['colunaDaHoraDaPrimeiraResposta', 'caixaDeOpcoes']]
+      .forEach(([campo, desenho]) => {
+        contem(tela, desenho + "('" + campo + "'", campo + ' aparece no formulário');
+        contem(tela, campo + ": valorDe('" + campo + "')", campo + ' vai para o servidor');
+      });
+  });
+
+  teste('as funções que ninguém chamava saíram', () => {
+    const tela = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Configuracoes.html'), 'utf8');
+    verdadeiro(tela.indexOf('function campoDeData') < 0, 'campoDeData (era type="date")');
+    verdadeiro(tela.indexOf('function dataDe(') < 0);
+    const aplicacao = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Aplicacao.html'), 'utf8');
+    verdadeiro(aplicacao.indexOf('function emConstrucao') < 0);
+    const comuns = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Comuns.html'), 'utf8');
+    verdadeiro(comuns.indexOf('function usaMascara') < 0);
+  });
+
 }
 
 module.exports = { rodarTestesDeConfiguracoes };
