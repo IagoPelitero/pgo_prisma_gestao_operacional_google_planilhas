@@ -325,16 +325,16 @@ adiante): por dias, por data e por mês. Antes o Trabalho olhava só a janela
 fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem precisasse
 fechar uma semana ou um mês tinha de exportar e contar fora.
 
-**A fila abre com os 5 casos mais recentes**, o mais novo em cima, em todos
-os canais, e o seletor **"Mostrar"**, nos filtros, troca para **10, 20, 50,
-100 ou todos** — pedido do PO: um seletor, e não um limite fixo. A escolha
-continua valendo ao trocar de canal, e o "Limpar filtros" não mexe nela: não é
-filtro, é quanto da fila aparece. **Os cartões continuam contando todos.**
-Embaixo da fila, um recado diz quantos ficaram de fora ("Mostrando os 5 casos
-mais recentes de 37") e como chegar neles: o "Mostrar", a busca e os filtros
-procuram em **todos** os casos do período. As opções e o padrão moram em
-`Indicadores.gs` (`RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`), e o
-servidor recusa número fora da lista.
+**A fila mostra 5 casos de cara**, os mais recentes, em todos os canais. Logo
+em cima da tabela, uma barra diz quantos aparecem e oferece o resto:
+"Mostrando os 5 casos mais recentes de 37 · Mostrar **5 · 10 · 20 · Todos
+(37)**". As opções são as do PO — 5, 10, 20, 50 e 100 —, **só até a
+quantidade que existe**: com 12 casos aparecem 5, 10 e Todos (12); com 5 ou
+menos, a barra nem aparece. Trocar é **na hora**: o servidor já mandou a fila
+inteira, e a tela só mostra mais ou menos. **Não é filtro** — fica fora da
+caixa de filtros, não muda os cartões, e a escolha continua valendo ao trocar
+de canal ou limpar os filtros. As opções e o padrão moram em `Indicadores.gs`
+(`RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`).
 
 Quando a fila sai vazia, o recado diz **o período que ela olhou**, com as
 palavras do próprio filtro: "nada foi registrado no período escolhido —
@@ -1064,7 +1064,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-827 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+826 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

@@ -783,10 +783,28 @@ table.fila.agrupada td:first-child .apoio.em-bom:first-child {
 }
 
 .cartao.sem-forro { padding: 0; overflow: hidden; }
-/* O recado embaixo da fila de 5: quantos ficaram de fora, e como achar. */
-.fila-recorte {
-  margin: 0; padding: 11px 16px; border-top: 1px solid var(--linha);
+/*
+  O "MOSTRAR" DA FILA: quantos casos aparecem — 5 de cara, e mais sob pedido.
+  Mora colado na tabela, e não na caixa de filtros: não é filtro, é quanto da
+  fila se vê (palavra do PO). O botão ligado tem a cor do botão principal.
+*/
+.fila-mostrar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 16px; padding: 10px 16px; border-bottom: 1px solid var(--linha);
   font-size: 13px; color: var(--suave); background: var(--superficie-2);
+}
+/* Quantos aparecem, de quantos: é a leitura principal da barra. */
+.fila-mostrando { color: var(--texto); }
+.mostrar-grupo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mostrar-grupo > span { font-weight: 600; margin-right: 2px; }
+.mostrar-quantos {
+  min-width: 40px; padding: 5px 11px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto); font: inherit; font-weight: 600;
+}
+.mostrar-quantos:hover { border-color: var(--destaque); color: var(--destaque); }
+.mostrar-quantos[aria-pressed="true"] {
+  background: var(--destaque); border-color: var(--destaque); color: var(--destaque-sobre);
 }
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }

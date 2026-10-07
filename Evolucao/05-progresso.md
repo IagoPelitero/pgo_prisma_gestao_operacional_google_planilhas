@@ -2141,14 +2141,19 @@ Três ajustes de tela, pedidos logo depois da Etapa 23.
 
 | pedido | o que ficou |
 |---|---|
-| "Não apenas as 5 mais recentes: deve ser possível escolher 5, 10, 20, 50, 100 ou todos os casos — um seletor, não um limite" | Seletor **"Mostrar"** na caixa de filtros do Trabalho, em todos os canais. Abre em 5; a escolha continua ao trocar de canal, e o "Limpar filtros" não mexe nela. Os cartões contam todos, como antes. O servidor só aceita as opções da lista — número fora dela vira o padrão |
+| "Não apenas as 5 mais recentes: deve ser possível escolher 5, 10, 20, 50, 100 ou todos" — e, na correção do PO, "não queria um filtro; queria que visualmente mostrasse 5, mas fosse possível mostrar todos, limitando nas opções que eu informei caso tenha a quantidade" | A fila mostra 5, e uma barra **em cima da tabela** oferece o resto: "Mostrando os 5 casos mais recentes de 37 · Mostrar 5 · 10 · 20 · Todos (37)" — só as opções que o canal tem. O servidor manda a fila inteira e a tela troca **na hora**, sem outra ida ao servidor. Fica fora da caixa de filtros, não muda os cartões, e a escolha continua ao trocar de canal |
 | "Os formulários da aba Trabalho centralizados na tela" | Perguntado o que centralizar, o PO escolheu **o modal do caso**. O "Trabalhar no caso", o "Alterar status" e os outros diálogos abrem no centro da área de trabalho, à direita do menu — aberto (248 px) ou encolhido (72 px). No celular o menu é gaveta, e o diálogo fica no centro da tela. Só CSS, pelo `:has` |
 | "Centraliza a aba cadastro" | O Cadastrar Caso sai numa coluna de 1080 px no centro da área de trabalho: título, canais e formulário alinhados. Antes o formulário encostava à esquerda, com um vazio à direita em monitor largo. Em tela menor que a coluna, nada muda |
 
-**827 testes**, cinco execuções seguidas sem falha, cada regra nova
-quebrada de propósito (4 quebras, 4 vermelhos). No navegador, com o servidor
-de verdade: as seis opções do seletor, "todos" sem recado, a escolha que fica
-ao trocar de canal, o centro do modal medido em pixels — 844 px em 1440 com o
+A primeira versão do "Mostrar" foi um seletor dentro da caixa de filtros, que
+pedia ao servidor só os casos escolhidos. O PO corrigiu — "não queria um
+filtro" —, e ela saiu antes de chegar à operação: a barra em cima da tabela
+mostra a fila que já está na tela.
+
+**826 testes**, cinco execuções seguidas sem falha, cada regra nova
+quebrada de propósito (7 quebras, 7 vermelhos). No navegador, com o servidor
+de verdade: a barra com 7 casos (5 e Todos) e com 8, a troca sem nenhuma ida
+ao servidor, o foco que fica no botão, a escolha que fica ao trocar de canal, o centro do modal medido em pixels — 844 px em 1440 com o
 menu aberto, 756 px encolhido, 1084 px em 1920 e 195 px no celular de 390 — e
 a coluna do cadastro, centralizada em 1920 e 1440 e inteira no celular.
 

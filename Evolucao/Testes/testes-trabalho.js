@@ -955,9 +955,7 @@ function rodarTestesDoTrabalho() {
 
     const depois = chamar('resumoDoCanal')(canal.id, {});
     igual(depois.total, antes.total - 1);
-    // A fila mostra só os mais recentes: com mais de cinco casos, o sexto
-    // sobe para o lugar do que saiu, e ela continua com cinco.
-    igual(depois.fila.length, Math.min(antes.total - 1, chamar('RECC_CASOS_NA_FILA')));
+    igual(depois.fila.length, antes.fila.length - 1);
     verdadeiro(!depois.fila.some((caso) => caso.id === antes.fila[0].id),
       'o caso excluído não pode continuar na fila');
     igual(depois.cartoes[0].valor, antes.cartoes[0].valor - 1);
@@ -1697,8 +1695,14 @@ function rodarTestesDoTrabalho() {
       'quem não tem o Buscar Caso no menu não vê a caixa');
   });
 
-  secao('A fila: 5, 10, 20, 50, 100 ou todos, à escolha');
+  secao('A fila: 5 de cara, e mais quando houver');
 
+  /*
+   * Pedido do PO, na versão que vale: "não queria um filtro; queria que
+   * visualmente mostrasse 5, mas fosse possível mostrar todos, limitando nas
+   * opções que eu informei (5, 10, 20, 50, 100) caso tenha a quantidade".
+   * O servidor manda a fila inteira; a tela mostra 5 e oferece o resto.
+   */
   const curta = carregar('primeiro.adm@exemplo.com');
   curta.chamar('instalarRECC()');
   const mesaCurta = curta.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
@@ -1708,79 +1712,70 @@ function rodarTestesDoTrabalho() {
     });
   }
 
-  teste('a fila abre com 5, e os cartões contam todos', () => {
+  teste('o servidor manda a fila inteira, e diz que a tela abre com 5', () => {
     const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id, {});
-    igual(curta.chamar('RECC_CASOS_NA_FILA'), 5);
-    igual(resumo.fila.length, 5);
-    igual(resumo.total, 7, 'o total é de todos — palavra do PO');
-    igual(resumo.cartoes[0].valor, 7);
+    igual(resumo.fila.length, 7, 'a fila inteira: quem mostra 5 é a tela');
+    igual(resumo.total, 7);
+    igual(resumo.cartoes[0].valor, 7, 'os cartões contam todos');
+    igual(resumo.mostrarNaFila.padrao, 5);
+    igual(JSON.stringify(resumo.mostrarNaFila.opcoes), '[5,10,20,50,100]');
   });
 
-  teste('os 5 são os mais recentes, o mais novo em cima', () => {
+  teste('a fila vem do mais recente para o mais antigo', () => {
+    // A tela mostra os primeiros: são eles que precisam ser os mais novos.
     const fila = curta.chamar('resumoDoCanal')(mesaCurta.id, {}).fila;
     contem(JSON.stringify(fila[0].celulas), 'Caso número 7');
-    const naFila = JSON.stringify(fila);
-    verdadeiro(naFila.indexOf('Caso número 1"') < 0, 'o mais antigo ficou de fora');
-    verdadeiro(naFila.indexOf('Caso número 2"') < 0);
+    const primeirosCinco = JSON.stringify(fila.slice(0, 5));
+    verdadeiro(primeirosCinco.indexOf('Caso número 1"') < 0, 'o mais antigo fica depois dos cinco');
+    verdadeiro(primeirosCinco.indexOf('Caso número 2"') < 0);
   });
 
-  teste('a busca alcança o caso que ficou fora dos 5', () => {
+  teste('a busca continua procurando em todos', () => {
     const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id,
       { busca: 'Caso número 1' });
     igual(resumo.total, 1);
     contem(JSON.stringify(resumo.fila), 'Caso número 1');
   });
 
-  teste('a tela diz quantos ficaram de fora e como chegar neles', () => {
+  teste('as opções aparecem só até a quantidade que existe', () => {
+    // "Limitando nas opções que eu informei, caso tenha a quantidade."
+    const tela = pecaRodando('Trabalho', { SeletorDePeriodo: { padrao: () => ({}) } }).TelaTrabalho;
+    const opcoes = (total) => JSON.stringify(tela.opcoesDeMostrar(total, [5, 10, 20, 50, 100]));
+    igual(opcoes(3), '[]', 'com 3 casos não há o que escolher');
+    igual(opcoes(5), '[]', 'nem com 5: já aparecem todos');
+    igual(opcoes(6), '[5,"todos"]');
+    igual(opcoes(12), '[5,10,"todos"]', 'com 12: 5, 10 e todos');
+    igual(opcoes(20), '[5,10,"todos"]', '20 com 20 casos seria o "todos" com outro nome');
+    igual(opcoes(37), '[5,10,20,"todos"]');
+    igual(opcoes(150), '[5,10,20,50,100,"todos"]');
+  });
+
+  teste('o "Mostrar" mora em cima da tabela, e não na caixa de filtros', () => {
     const tela = lerPeca('Trabalho');
-    contem(tela, "Mostrando os ' + resumo.fila.length");
-    contem(tela, 'casos mais recentes de');
-    contem(tela, 'em "Mostrar", nos filtros — ou use a busca');
+    const filtros = tela.substring(tela.indexOf('function desenharFiltros'), tela.indexOf('function limiteDaFila'));
+    verdadeiro(filtros.indexOf('Mostrar') < 0 && filtros.indexOf('barraDeMostrar') < 0,
+      'não é filtro: não entra na caixa de filtros');
+    contem(tela, "+ barraDeMostrar(visiveis)\n      + '<div class=\"rolagem-tabela\">",
+      'a barra vem antes da tabela');
+    contem(tela, "'Mostrando os ' + visiveis + ' casos mais recentes de ' + total");
+    contem(tela, "'Todos (' + total + ')'", 'o "todos" diz quantos são');
+    contem(lerPeca('Estilos'), '.mostrar-quantos[aria-pressed="true"]');
   });
 
-  teste('o seletor escolhe quantos: 10, 20, 50, 100 ou todos', () => {
-    // Pedido do PO: "deve ser possível escolher 5, 10, 20, 50, 100 ou todos
-    // os casos" — e não um limite fixo de cinco.
-    for (let i = 8; i <= 25; i++) {
-      curta.chamar('cadastrarCaso')(mesaCurta.id, {
-        status: 'Em andamento', nomedosegurado: 'Caso número ' + i
-      });
-    }
-    const quantos = (escolha) => curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, escolha);
-    igual(quantos(10).fila.length, 10);
-    igual(quantos(20).fila.length, 20);
-    igual(quantos(50).fila.length, 25, 'pedir 50 com 25 casos traz os 25');
-    igual(quantos('todos').fila.length, 25);
-    igual(quantos('todos').casosNaFila, 0, 'zero é "todos" na resposta');
-    igual(quantos(10).casosNaFila, 10);
-    contem(JSON.stringify(quantos(10).fila[0].celulas), 'Caso número 25',
-      'sempre os mais recentes, o mais novo em cima');
-    igual(JSON.stringify(quantos(5).opcoesDeCasosNaFila), '[5,10,20,50,100]');
-  });
-
-  teste('o seletor muda só a fila: os cartões contam o mesmo', () => {
-    const cinco = curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, 5);
-    const todos = curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, 'todos');
-    igual(cinco.total, todos.total);
-    igual(cinco.cartoes[0].valor, todos.cartoes[0].valor);
-  });
-
-  teste('escolha fora da lista vira o padrão de 5', () => {
-    const quantos = (escolha) => curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, escolha)
-      .fila.length;
-    igual(quantos(undefined), 5, 'sem escolha, o padrão');
-    igual(quantos(''), 5);
-    igual(quantos(3), 5, 'a tela não inventa opção');
-    igual(quantos(1000000), 5, 'um número enorme seria o "todos" por outra porta');
-    igual(quantos('Todos'), 25, '"todos" sem ligar para a caixa');
-  });
-
-  teste('a tela tem o seletor "Mostrar", que não é filtro', () => {
+  teste('trocar a quantidade não volta ao servidor', () => {
+    // É visual: a fila inteira já veio. Uma ida ao servidor por clique seria
+    // um a três segundos de espera para ver o que já está na tela.
     const tela = lerPeca('Trabalho');
-    contem(tela, 'data-casos-na-fila="sim"');
-    contem(tela, 'Mostrar todos os casos');
-    contem(tela, "Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo,\n      quantosNaFila)");
-    // "Limpar filtros" e a troca de canal zeram os filtros, não o seletor.
+    const clique = tela.substring(tela.indexOf("ligarCliques('[data-mostrar]'"));
+    const corpo = clique.substring(0, clique.indexOf('});'));
+    contem(corpo, 'desenharPainel();');
+    verdadeiro(corpo.indexOf('carregar()') < 0, 'não chama o servidor');
+    contem(tela, "Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)\n",
+      'o servidor não recebe mais quantos mostrar');
+  });
+
+  teste('limpar filtros e trocar de canal não mexem no "Mostrar"', () => {
+    const tela = lerPeca('Trabalho');
     const limpar = tela.substring(tela.indexOf("addEventListener('click', function () {\n        filtrosEscolhidos = {};"));
     verdadeiro(limpar.substring(0, 150).indexOf('quantosNaFila') < 0,
       'limpar filtros não mexe em quantos mostrar');
