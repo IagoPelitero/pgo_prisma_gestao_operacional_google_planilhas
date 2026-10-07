@@ -2135,6 +2135,25 @@ largura e 9 ponta a ponta no repositório e no pacote.
 
 ---
 
+## Etapa 24 — quantos casos mostrar, e o modal e o cadastro no centro
+
+Três ajustes de tela, pedidos logo depois da Etapa 23.
+
+| pedido | o que ficou |
+|---|---|
+| "Não apenas as 5 mais recentes: deve ser possível escolher 5, 10, 20, 50, 100 ou todos os casos — um seletor, não um limite" | Seletor **"Mostrar"** na caixa de filtros do Trabalho, em todos os canais. Abre em 5; a escolha continua ao trocar de canal, e o "Limpar filtros" não mexe nela. Os cartões contam todos, como antes. O servidor só aceita as opções da lista — número fora dela vira o padrão |
+| "Os formulários da aba Trabalho centralizados na tela" | Perguntado o que centralizar, o PO escolheu **o modal do caso**. O "Trabalhar no caso", o "Alterar status" e os outros diálogos abrem no centro da área de trabalho, à direita do menu — aberto (248 px) ou encolhido (72 px). No celular o menu é gaveta, e o diálogo fica no centro da tela. Só CSS, pelo `:has` |
+| "Centraliza a aba cadastro" | O Cadastrar Caso sai numa coluna de 1080 px no centro da área de trabalho: título, canais e formulário alinhados. Antes o formulário encostava à esquerda, com um vazio à direita em monitor largo. Em tela menor que a coluna, nada muda |
+
+**827 testes**, cinco execuções seguidas sem falha, cada regra nova
+quebrada de propósito (4 quebras, 4 vermelhos). No navegador, com o servidor
+de verdade: as seis opções do seletor, "todos" sem recado, a escolha que fica
+ao trocar de canal, o centro do modal medido em pixels — 844 px em 1440 com o
+menu aberto, 756 px encolhido, 1084 px em 1920 e 195 px no celular de 390 — e
+a coluna do cadastro, centralizada em 1920 e 1440 e inteira no celular.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

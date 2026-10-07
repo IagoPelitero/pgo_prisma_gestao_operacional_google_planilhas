@@ -1697,7 +1697,7 @@ function rodarTestesDoTrabalho() {
       'quem não tem o Buscar Caso no menu não vê a caixa');
   });
 
-  secao('A fila mostra só os 5 mais recentes');
+  secao('A fila: 5, 10, 20, 50, 100 ou todos, à escolha');
 
   const curta = carregar('primeiro.adm@exemplo.com');
   curta.chamar('instalarRECC()');
@@ -1708,7 +1708,7 @@ function rodarTestesDoTrabalho() {
     });
   }
 
-  teste('a fila traz 5, e os cartões contam todos', () => {
+  teste('a fila abre com 5, e os cartões contam todos', () => {
     const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id, {});
     igual(curta.chamar('RECC_CASOS_NA_FILA'), 5);
     igual(resumo.fila.length, 5);
@@ -1735,7 +1735,71 @@ function rodarTestesDoTrabalho() {
     const tela = lerPeca('Trabalho');
     contem(tela, "Mostrando os ' + resumo.fila.length");
     contem(tela, 'casos mais recentes de');
-    contem(tela, 'use a busca ou os filtros acima');
+    contem(tela, 'em "Mostrar", nos filtros — ou use a busca');
+  });
+
+  teste('o seletor escolhe quantos: 10, 20, 50, 100 ou todos', () => {
+    // Pedido do PO: "deve ser possível escolher 5, 10, 20, 50, 100 ou todos
+    // os casos" — e não um limite fixo de cinco.
+    for (let i = 8; i <= 25; i++) {
+      curta.chamar('cadastrarCaso')(mesaCurta.id, {
+        status: 'Em andamento', nomedosegurado: 'Caso número ' + i
+      });
+    }
+    const quantos = (escolha) => curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, escolha);
+    igual(quantos(10).fila.length, 10);
+    igual(quantos(20).fila.length, 20);
+    igual(quantos(50).fila.length, 25, 'pedir 50 com 25 casos traz os 25');
+    igual(quantos('todos').fila.length, 25);
+    igual(quantos('todos').casosNaFila, 0, 'zero é "todos" na resposta');
+    igual(quantos(10).casosNaFila, 10);
+    contem(JSON.stringify(quantos(10).fila[0].celulas), 'Caso número 25',
+      'sempre os mais recentes, o mais novo em cima');
+    igual(JSON.stringify(quantos(5).opcoesDeCasosNaFila), '[5,10,20,50,100]');
+  });
+
+  teste('o seletor muda só a fila: os cartões contam o mesmo', () => {
+    const cinco = curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, 5);
+    const todos = curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, 'todos');
+    igual(cinco.total, todos.total);
+    igual(cinco.cartoes[0].valor, todos.cartoes[0].valor);
+  });
+
+  teste('escolha fora da lista vira o padrão de 5', () => {
+    const quantos = (escolha) => curta.chamar('resumoDoCanal')(mesaCurta.id, {}, undefined, escolha)
+      .fila.length;
+    igual(quantos(undefined), 5, 'sem escolha, o padrão');
+    igual(quantos(''), 5);
+    igual(quantos(3), 5, 'a tela não inventa opção');
+    igual(quantos(1000000), 5, 'um número enorme seria o "todos" por outra porta');
+    igual(quantos('Todos'), 25, '"todos" sem ligar para a caixa');
+  });
+
+  teste('a tela tem o seletor "Mostrar", que não é filtro', () => {
+    const tela = lerPeca('Trabalho');
+    contem(tela, 'data-casos-na-fila="sim"');
+    contem(tela, 'Mostrar todos os casos');
+    contem(tela, "Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo,\n      quantosNaFila)");
+    // "Limpar filtros" e a troca de canal zeram os filtros, não o seletor.
+    const limpar = tela.substring(tela.indexOf("addEventListener('click', function () {\n        filtrosEscolhidos = {};"));
+    verdadeiro(limpar.substring(0, 150).indexOf('quantosNaFila') < 0,
+      'limpar filtros não mexe em quantos mostrar');
+    const trocaDeCanal = tela.substring(tela.indexOf('SeletorDeCanal.ligar('));
+    verdadeiro(trocaDeCanal.substring(0, 200).indexOf('quantosNaFila') < 0,
+      'trocar de canal mantém a escolha');
+  });
+
+  secao('O modal no centro da área de trabalho');
+
+  teste('o diálogo desconta a largura do menu, aberto ou encolhido', () => {
+    // Pedido do PO: o "Trabalhar no caso" no centro da área de trabalho, à
+    // direita do menu, e não da tela inteira.
+    const estilos = lerPeca('Estilos');
+    contem(estilos, 'body:has(.aplicacao) .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }');
+    contem(estilos, 'body:has(.aplicacao.encolhida) .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }');
+    const estreita = estilos.substring(estilos.indexOf('@media (max-width: 900px) {\n  /* O menu vira gaveta'));
+    contem(estreita.substring(0, 300), 'body:has(.aplicacao.encolhida) .dialogo { padding-left: 20px; }',
+      'no celular o menu é gaveta, e o diálogo volta ao centro da tela');
   });
 
   secao('O SLA da Mesa Diamante');

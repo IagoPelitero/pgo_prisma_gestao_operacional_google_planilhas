@@ -325,12 +325,16 @@ adiante): por dias, por data e por mês. Antes o Trabalho olhava só a janela
 fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem precisasse
 fechar uma semana ou um mês tinha de exportar e contar fora.
 
-**A fila mostra só os 5 casos mais recentes**, o mais novo em cima, em todos
-os canais — pedido do PO, para a tela abrir mais leve. **Os cartões continuam
-contando todos.** Embaixo da fila, um recado diz quantos ficaram de fora
-("Mostrando os 5 casos mais recentes de 37") e como chegar neles: a busca e os
-filtros procuram em **todos** os casos do período, não só nos cinco. O número
-mora numa constante (`RECC_CASOS_NA_FILA`, em `Indicadores.gs`).
+**A fila abre com os 5 casos mais recentes**, o mais novo em cima, em todos
+os canais, e o seletor **"Mostrar"**, nos filtros, troca para **10, 20, 50,
+100 ou todos** — pedido do PO: um seletor, e não um limite fixo. A escolha
+continua valendo ao trocar de canal, e o "Limpar filtros" não mexe nela: não é
+filtro, é quanto da fila aparece. **Os cartões continuam contando todos.**
+Embaixo da fila, um recado diz quantos ficaram de fora ("Mostrando os 5 casos
+mais recentes de 37") e como chegar neles: o "Mostrar", a busca e os filtros
+procuram em **todos** os casos do período. As opções e o padrão moram em
+`Indicadores.gs` (`RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`), e o
+servidor recusa número fora da lista.
 
 Quando a fila sai vazia, o recado diz **o período que ela olhou**, com as
 palavras do próprio filtro: "nada foi registrado no período escolhido —
@@ -394,7 +398,7 @@ Mesa Diamante e VG —, a pedido do PO:
 
 | Ação | O que faz |
 |---|---|
-| **Trabalhar no caso** | Abre o caso por cima da fila, **já no formulário**, preenchido com o que está na planilha. Fechar devolve a fila exatamente como estava |
+| **Trabalhar no caso** | Abre o caso por cima da fila, **já no formulário**, preenchido com o que está na planilha, **no centro da área de trabalho** — à direita do menu, aberto ou encolhido; no celular, no centro da tela. Fechar devolve a fila exatamente como estava |
 | **Alterar status** (ícone ao lado) | Um diálogo só com o status — o gesto mais frequente da operação. Não passa pelo formulário inteiro, e por isso funciona mesmo num caso que veio da base antiga com a proposta ou a apólice pela metade |
 | **Excluir** (por último) | Apaga o caso **definitivamente da planilha**. Antes, um **aviso de atenção** em vermelho: o foco nasce em *Cancelar*, Enter e Esc cancelam, e só o botão "Excluir definitivamente" apaga. O que havia no caso fica na auditoria |
 
@@ -443,6 +447,11 @@ O formulário **não está escrito no código**. Ele é montado a partir da aba
 sozinho, e campo oculto para o nível de acesso nem chega ao navegador.
 
 ![A tela de cadastro](Evolucao/imagens/tela-cadastrar-caso.png)
+
+**A tela fica numa coluna no centro da área de trabalho** — título, canais e
+formulário, com 1080 px de largura, a pedido do PO. Antes o formulário ficava
+encostado à esquerda, com um vazio à direita em monitor largo. Em tela menor,
+ocupa a largura toda, como sempre.
 
 **Os botões só aparecem com o formulário pronto.** Enquanto o formulário
 carrega, "Cadastrar caso" e "Limpar" ficam escondidos — nos testes com a
@@ -1055,7 +1064,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-821 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+827 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

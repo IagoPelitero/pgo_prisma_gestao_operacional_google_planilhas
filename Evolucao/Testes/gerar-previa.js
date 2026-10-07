@@ -127,7 +127,7 @@ function pontePreparada(respostas) {
     + '        responder(respostas.propostas[String(proposta) + "|" + (idDoCaso || "")]\n'
     + '          || respostas.propostas.avulsa || { situacao: "VAZIA", mensagem: "" });\n'
     + '      },\n'
-    + '      resumoDoCanal: function (idDoCanal, filtros) {\n'
+    + '      resumoDoCanal: function (idDoCanal, filtros, periodo, casosNaFila) {\n'
     + '        var painel = respostas.paineis[idDoCanal];\n'
     + '        var chave = "";\n'
     + '        Object.keys(filtros || {}).forEach(function (campo) {\n'
@@ -150,6 +150,13 @@ function pontePreparada(respostas) {
     + '          });\n'
     + '          resumo.total = resumo.fila.length;\n'
     + '        }\n'
+    // O seletor "Mostrar": a prévia guarda a fila inteira e corta aqui, do
+    // mesmo jeito que o servidor — os mais recentes, que vêm em cima.
+    + '        var quantos = String(casosNaFila) === "todos" ? 0\n'
+    + '          : (resumo.opcoesDeCasosNaFila.indexOf(Number(casosNaFila)) >= 0\n'
+    + '            ? Number(casosNaFila) : 5);\n'
+    + '        resumo.casosNaFila = quantos;\n'
+    + '        if (quantos) resumo.fila = resumo.fila.slice(0, quantos);\n'
     + '        responder(resumo);\n'
     + '      },\n'
     + '      casoParaEditar: function (idDoCanal, idDoCaso) {\n'
@@ -723,13 +730,15 @@ function gerar(pastaDeSaida) {
     // O painel sem filtro, e uma variação por opção de cada filtro. Guardar
     // só o que muda (cartões, fila e totais) evita repetir as listas de
     // opções em dezenas de cópias.
-    const base = chamar('resumoDoCanal')(canal.id, {});
+    // Com a fila INTEIRA ("todos"): quem corta pelo seletor "Mostrar" é o
+    // substituto, na hora.
+    const base = chamar('resumoDoCanal')(canal.id, {}, undefined, 'todos');
     const variantes = {};
     base.filtrosDisponiveis.forEach((filtro) => {
       filtro.opcoes.forEach((opcao) => {
         const escolha = {};
         escolha[filtro.chave] = opcao.valor;
-        const resumo = chamar('resumoDoCanal')(canal.id, escolha);
+        const resumo = chamar('resumoDoCanal')(canal.id, escolha, undefined, 'todos');
         variantes[filtro.chave + '=' + opcao.valor] = {
           cartoes: resumo.cartoes, fila: resumo.fila, total: resumo.total
         };

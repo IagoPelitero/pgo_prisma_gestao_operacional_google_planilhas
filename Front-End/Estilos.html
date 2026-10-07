@@ -1009,6 +1009,17 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 .canal.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
 
 .formulario { max-width: 1080px; }
+/*
+  O CADASTRO NUMA COLUNA CENTRALIZADA — pedido do PO: "centraliza a aba
+  cadastro". O formulário já tinha largura máxima (1080 px, para a linha não
+  ficar longa demais de ler) e ficava encostado à esquerda, com um vazio à
+  direita em monitor largo. Agora título, canais e formulário saem numa coluna
+  só, no meio da área de trabalho. Em tela menor que a coluna, nada muda.
+
+  Pelo `:has`, como o diálogo: o miolo é o mesmo para todas as telas, e só o
+  do cadastro tem o formulário do caso como filho direto.
+*/
+.miolo:has(> #formulario-do-caso) > * { max-width: 1080px; margin-inline: auto; }
 
 .secao { border: 0; padding: 0; margin: 0 0 26px; }
 .secao:last-of-type { margin-bottom: 8px; }
@@ -1538,6 +1549,18 @@ table.fila tr.importar-igual { color: var(--tenue); }
   display: grid; place-items: center; padding: 20px;
   background: rgba(6, 14, 28, .55);
 }
+/*
+  O diálogo fica no centro da ÁREA DE TRABALHO, à direita do menu — pedido do
+  PO para o "Trabalhar no caso". O véu continua cobrindo a tela toda; só a
+  caixa desconta a largura do menu, aberto ou encolhido.
+
+  Pelo `:has`, e não por classe posta no código: o diálogo mora direto no
+  `body`, fora da casca, e a tela de acesso negado não tem menu — sem a casca,
+  nada muda. Navegador que não conhece `:has` mostra no centro da tela, como
+  antes.
+*/
+body:has(.aplicacao) .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }
+body:has(.aplicacao.encolhida) .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }
 /* O modal do caso é o mesmo diálogo, mais largo e com cabeça e pé fixos: o
    miolo rola, e os botões de Fechar e Editar ficam sempre à mão. */
 .dialogo-caixa.larga {
@@ -2097,6 +2120,9 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
+  /* O menu vira gaveta e some da frente: o diálogo volta ao centro da tela. */
+  body:has(.aplicacao) .dialogo,
+  body:has(.aplicacao.encolhida) .dialogo { padding-left: 20px; }
   .lateral {
     position: fixed; left: 0; top: 0; z-index: 40;
     transform: translateX(-100%);

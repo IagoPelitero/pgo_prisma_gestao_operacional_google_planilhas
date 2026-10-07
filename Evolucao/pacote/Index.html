@@ -1018,6 +1018,17 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 .canal.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
 
 .formulario { max-width: 1080px; }
+/*
+  O CADASTRO NUMA COLUNA CENTRALIZADA — pedido do PO: "centraliza a aba
+  cadastro". O formulário já tinha largura máxima (1080 px, para a linha não
+  ficar longa demais de ler) e ficava encostado à esquerda, com um vazio à
+  direita em monitor largo. Agora título, canais e formulário saem numa coluna
+  só, no meio da área de trabalho. Em tela menor que a coluna, nada muda.
+
+  Pelo `:has`, como o diálogo: o miolo é o mesmo para todas as telas, e só o
+  do cadastro tem o formulário do caso como filho direto.
+*/
+.miolo:has(> #formulario-do-caso) > * { max-width: 1080px; margin-inline: auto; }
 
 .secao { border: 0; padding: 0; margin: 0 0 26px; }
 .secao:last-of-type { margin-bottom: 8px; }
@@ -1547,6 +1558,18 @@ table.fila tr.importar-igual { color: var(--tenue); }
   display: grid; place-items: center; padding: 20px;
   background: rgba(6, 14, 28, .55);
 }
+/*
+  O diálogo fica no centro da ÁREA DE TRABALHO, à direita do menu — pedido do
+  PO para o "Trabalhar no caso". O véu continua cobrindo a tela toda; só a
+  caixa desconta a largura do menu, aberto ou encolhido.
+
+  Pelo `:has`, e não por classe posta no código: o diálogo mora direto no
+  `body`, fora da casca, e a tela de acesso negado não tem menu — sem a casca,
+  nada muda. Navegador que não conhece `:has` mostra no centro da tela, como
+  antes.
+*/
+body:has(.aplicacao) .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }
+body:has(.aplicacao.encolhida) .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }
 /* O modal do caso é o mesmo diálogo, mais largo e com cabeça e pé fixos: o
    miolo rola, e os botões de Fechar e Editar ficam sempre à mão. */
 .dialogo-caixa.larga {
@@ -2106,6 +2129,9 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
+  /* O menu vira gaveta e some da frente: o diálogo volta ao centro da tela. */
+  body:has(.aplicacao) .dialogo,
+  body:has(.aplicacao.encolhida) .dialogo { padding-left: 20px; }
   .lateral {
     position: fixed; left: 0; top: 0; z-index: 40;
     transform: translateX(-100%);
@@ -4956,6 +4982,10 @@ var TelaTrabalho = (function () {
   // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
   // conta sairia do relógio da planilha.
   var periodo = SeletorDePeriodo.padrao();
+  // Quantos casos a fila mostra — o seletor "Mostrar". Vazio é o padrão do
+  // servidor (5). Não é filtro: não muda os cartões, o "Limpar filtros" não
+  // mexe nele, e trocar de canal mantém a escolha.
+  var quantosNaFila = '';
   var resumo = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -5060,6 +5090,7 @@ var TelaTrabalho = (function () {
       busca
         + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
+        + seletorDeQuantos()
         + (algumAtivo
           ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
             + 'Limpar filtros</button>'
@@ -5068,6 +5099,23 @@ var TelaTrabalho = (function () {
         ? 'mostrando ' + resumo.fila.length + ' de ' + resumo.total
         : resumo.total + ' de ' + resumo.totalNoPeriodo)
         + ' casos · ' + escapar(resumo.periodo.rotulo));
+  }
+
+  /**
+   * O seletor "Mostrar" — pedido do PO: "deve ser possível escolher 5, 10, 20,
+   * 50, 100 ou todos os casos", e não um limite fixo de cinco. As opções vêm
+   * do servidor, que também confere a escolha.
+   */
+  function seletorDeQuantos() {
+    var opcoes = (resumo.opcoesDeCasosNaFila || []).map(function (quantos) {
+      return '<option value="' + quantos + '"'
+        + (resumo.casosNaFila === quantos ? ' selected' : '') + '>'
+        + 'Mostrar ' + quantos + ' casos</option>';
+    });
+    opcoes.push('<option value="todos"' + (resumo.casosNaFila === 0 ? ' selected' : '')
+      + '>Mostrar todos os casos</option>');
+    return '<select class="filtro" data-casos-na-fila="sim"'
+      + ' aria-label="Quantos casos mostrar na fila">' + opcoes.join('') + '</select>';
   }
 
   function desenharFila() {
@@ -5102,14 +5150,14 @@ var TelaTrabalho = (function () {
         + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
-    // A fila mostra só os mais recentes (pedido do PO); o recado diz quantos
-    // ficaram de fora e como chegar neles — sem ele, cinco linhas e um cartão
-    // dizendo 37 pareceriam um defeito.
+    // A fila mostra os mais recentes, quantos o seletor pedir; o recado diz
+    // quantos ficaram de fora e como chegar neles — sem ele, cinco linhas e um
+    // cartão dizendo 37 pareceriam um defeito.
     var deFora = resumo.total - resumo.fila.length;
     var recado = deFora > 0
       ? '<p class="fila-recorte">Mostrando os ' + resumo.fila.length
-        + ' casos mais recentes de ' + resumo.total + '. Para achar os outros, '
-        + 'use a busca ou os filtros acima.</p>'
+        + ' casos mais recentes de ' + resumo.total + '. Para ver mais, escolha '
+        + 'em "Mostrar", nos filtros — ou use a busca.</p>'
       : '';
 
     return '<div class="cartao sem-forro">'
@@ -5233,7 +5281,8 @@ var TelaTrabalho = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)
+    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo,
+      quantosNaFila)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -5248,6 +5297,11 @@ var TelaTrabalho = (function () {
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
+        if (this.getAttribute('data-casos-na-fila')) {
+          quantosNaFila = this.value;
+          carregar();
+          return;
+        }
         var novoPeriodo = SeletorDePeriodo.mudou(this, resumo, 'painel');
         if (novoPeriodo !== null) {
           // `false` quer dizer "é do período, mas ainda incompleto" — o de/até

@@ -63,16 +63,32 @@ const RECC_LINHAS_DO_PAINEL_PADRAO = 5000;
 /**
  * Quantos casos a FILA do Trabalho mostra: os mais recentes.
  *
- * Pedido do PO: "limite a visualização dos casos para mostrar apenas os 5 mais
- * recentes", em todos os canais. Os CARTÕES continuam contando todos os casos
- * do período e dos filtros — escolha dele —, e a tela diz "mostrando 5 de N"
- * para ninguém achar que só existem cinco. Os outros se acham pela busca e
- * pelos filtros, que procuram em todos.
+ * Pedido do PO, em duas etapas. Primeiro: "mostrar apenas os 5 mais
+ * recentes", em todos os canais. Depois: "deve ser possível escolher, por
+ * exemplo, 5, 10, 20, 50, 100 ou todos os casos" — um seletor na tela, e não
+ * um limite fixo. Cinco continua sendo o que a tela abre mostrando.
+ *
+ * Os CARTÕES continuam contando todos os casos do período e dos filtros —
+ * escolha dele —, e a tela diz "mostrando 5 de N" para ninguém achar que só
+ * existem cinco. A busca e os filtros procuram em todos.
  *
  * A conta do painel não muda (ele continua lendo as mesmas linhas); o que
  * encolhe é o que atravessa para o navegador e o que a tela desenha.
  */
 const RECC_CASOS_NA_FILA = 5;
+const RECC_OPCOES_DE_CASOS_NA_FILA = [5, 10, 20, 50, 100];
+
+/**
+ * A escolha do seletor "Mostrar", conferida: um número da lista, ou zero para
+ * "todos". O que não for nenhum dos dois — vazio, 3, um milhão — vira o
+ * padrão: a tela não inventa opção, e um número enorme seria o "todos" por
+ * outra porta.
+ */
+function casosNaFilaPedidos_(pedido) {
+  if (normalizarParaComparar_(pedido) === 'todos') return 0;
+  var numero = Number(pedido);
+  return RECC_OPCOES_DE_CASOS_NA_FILA.indexOf(numero) >= 0 ? numero : RECC_CASOS_NA_FILA;
+}
 
 function linhasQueOPainelOlha_() {
   var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
@@ -100,8 +116,11 @@ function tomValido_(cor) {
  * `filtros` é um objeto simples: { chaveDoCampo: valorEscolhido }. As chaves
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
+ *
+ * `casosNaFila` é o seletor "Mostrar": 5, 10, 20, 50, 100 ou "todos". Muda só
+ * a fila; os cartões contam tudo. Ver `casosNaFilaPedidos_`.
  */
-function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, casosNaFila) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -135,6 +154,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
   // A BUSCA DIGITADA entra junto com os filtros, e vale para os cartões E para
   // a fila: o número do cartão continua sendo o dos casos que a busca achou.
   var termo = String((filtros || {}).busca || '').trim();
+  var quantosNaFila = casosNaFilaPedidos_(casosNaFila);
   var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
@@ -154,8 +174,11 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
-    // Os mais recentes estão no FIM: a base só acrescenta no fim.
-    fila: montarFila_(filtrados.slice(-RECC_CASOS_NA_FILA), canal),
+    // Os mais recentes estão no FIM: a base só acrescenta no fim. Zero é
+    // "todos" — e `slice(-0)` também daria todos, mas por acaso.
+    fila: montarFila_(quantosNaFila ? filtrados.slice(-quantosNaFila) : filtrados, canal),
+    casosNaFila: quantosNaFila,
+    opcoesDeCasosNaFila: RECC_OPCOES_DE_CASOS_NA_FILA,
     total: filtrados.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,

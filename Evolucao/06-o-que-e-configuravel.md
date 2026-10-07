@@ -45,7 +45,7 @@ abaixo com o motivo.
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
 | **Os limites e as cores do alerta** | `RECC_ALERTAS_DA_LINHA`, no `Base.gs` | Hoje só o VG tem: vigência abaixo de 18 em vermelho, exatamente 18 em amarelo (`noLimite`), acima de 18 em verde (`acima`); margem abaixo de 25,5 em vermelho. Acrescentar coluna, trocar o limite ou a faixa é uma linha. Ainda **não** tem tela |
-| **Quantos casos a fila do Trabalho mostra** | `RECC_CASOS_NA_FILA`, no `Indicadores.gs` | 5, pedido do PO. Os cartões, a busca e os filtros continuam olhando todos os casos do período. Um número só, para todos os canais |
+| **Quantos casos a fila do Trabalho pode mostrar** | `RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`, no `Indicadores.gs` | Quem está olhando escolhe no seletor "Mostrar" do Trabalho: 5, 10, 20, 50, 100 ou todos. As opções e o padrão (5) são estas duas linhas — trocar ou acrescentar uma opção é mexer só nelas. Os cartões, a busca e os filtros olham todos os casos do período |
 | **Campo que aceita data no futuro** | `RECC_PADRAO_POR_ABA`, no `Instalacao.gs` | Só o `Início da vigência` do VG. Todas as outras datas continuam recusando futuro |
 | **Coluna calculada** | `RECC_COLUNAS_CALCULADAS`, no `Base.gs` | Hoje só os meses de vigência do VG. Outra conta é uma linha aqui e um `if` na função |
 | **Ausências** (férias, licença, afastamento) | Configurações › Calendário | Quem, motivo e o período. Sai da meta da pessoa e da média da equipe — não bloqueia o acesso |

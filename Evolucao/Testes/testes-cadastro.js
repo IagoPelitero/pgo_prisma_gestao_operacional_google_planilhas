@@ -1761,6 +1761,21 @@ function rodarTestesDeCadastro() {
       'quando os dias são um dos atalhos, eles ficam');
   });
 
+
+  secao('O cadastro numa coluna centralizada');
+
+  teste('título, canais e formulário saem no meio da área de trabalho', () => {
+    // Pedido do PO: "centraliza a aba cadastro". O formulário tinha 1080 px e
+    // ficava encostado à esquerda, com um vazio à direita em monitor largo.
+    const estilos = lerPeca('Estilos');
+    contem(estilos, '.miolo:has(> #formulario-do-caso) > * { max-width: 1080px; margin-inline: auto; }');
+    // A regra procura o formulário como filho DIRETO do miolo: se ele passar
+    // a morar dentro de outra caixa, a coluna desmancha calada.
+    const tela = lerPeca('CadastrarCaso');
+    const montar = tela.substring(tela.indexOf('function montar('), tela.indexOf('function carregarFormulario'));
+    contem(montar, "return SeletorDeCanal.montar(pacote.canais, canalEscolhida)\n      + '<form class=\"cartao formulario\" id=\"formulario-do-caso\"",
+      'o formulário sai logo depois dos canais, direto no miolo');
+  });
 }
 
 module.exports = { rodarTestesDeCadastro };

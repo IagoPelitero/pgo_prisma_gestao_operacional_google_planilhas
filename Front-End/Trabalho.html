@@ -17,6 +17,10 @@ var TelaTrabalho = (function () {
   // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
   // conta sairia do relógio da planilha.
   var periodo = SeletorDePeriodo.padrao();
+  // Quantos casos a fila mostra — o seletor "Mostrar". Vazio é o padrão do
+  // servidor (5). Não é filtro: não muda os cartões, o "Limpar filtros" não
+  // mexe nele, e trocar de canal mantém a escolha.
+  var quantosNaFila = '';
   var resumo = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -121,6 +125,7 @@ var TelaTrabalho = (function () {
       busca
         + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
+        + seletorDeQuantos()
         + (algumAtivo
           ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
             + 'Limpar filtros</button>'
@@ -129,6 +134,23 @@ var TelaTrabalho = (function () {
         ? 'mostrando ' + resumo.fila.length + ' de ' + resumo.total
         : resumo.total + ' de ' + resumo.totalNoPeriodo)
         + ' casos · ' + escapar(resumo.periodo.rotulo));
+  }
+
+  /**
+   * O seletor "Mostrar" — pedido do PO: "deve ser possível escolher 5, 10, 20,
+   * 50, 100 ou todos os casos", e não um limite fixo de cinco. As opções vêm
+   * do servidor, que também confere a escolha.
+   */
+  function seletorDeQuantos() {
+    var opcoes = (resumo.opcoesDeCasosNaFila || []).map(function (quantos) {
+      return '<option value="' + quantos + '"'
+        + (resumo.casosNaFila === quantos ? ' selected' : '') + '>'
+        + 'Mostrar ' + quantos + ' casos</option>';
+    });
+    opcoes.push('<option value="todos"' + (resumo.casosNaFila === 0 ? ' selected' : '')
+      + '>Mostrar todos os casos</option>');
+    return '<select class="filtro" data-casos-na-fila="sim"'
+      + ' aria-label="Quantos casos mostrar na fila">' + opcoes.join('') + '</select>';
   }
 
   function desenharFila() {
@@ -163,14 +185,14 @@ var TelaTrabalho = (function () {
         + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
-    // A fila mostra só os mais recentes (pedido do PO); o recado diz quantos
-    // ficaram de fora e como chegar neles — sem ele, cinco linhas e um cartão
-    // dizendo 37 pareceriam um defeito.
+    // A fila mostra os mais recentes, quantos o seletor pedir; o recado diz
+    // quantos ficaram de fora e como chegar neles — sem ele, cinco linhas e um
+    // cartão dizendo 37 pareceriam um defeito.
     var deFora = resumo.total - resumo.fila.length;
     var recado = deFora > 0
       ? '<p class="fila-recorte">Mostrando os ' + resumo.fila.length
-        + ' casos mais recentes de ' + resumo.total + '. Para achar os outros, '
-        + 'use a busca ou os filtros acima.</p>'
+        + ' casos mais recentes de ' + resumo.total + '. Para ver mais, escolha '
+        + 'em "Mostrar", nos filtros — ou use a busca.</p>'
       : '';
 
     return '<div class="cartao sem-forro">'
@@ -294,7 +316,8 @@ var TelaTrabalho = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)
+    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo,
+      quantosNaFila)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -309,6 +332,11 @@ var TelaTrabalho = (function () {
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
+        if (this.getAttribute('data-casos-na-fila')) {
+          quantosNaFila = this.value;
+          carregar();
+          return;
+        }
         var novoPeriodo = SeletorDePeriodo.mudou(this, resumo, 'painel');
         if (novoPeriodo !== null) {
           // `false` quer dizer "é do período, mas ainda incompleto" — o de/até
