@@ -323,7 +323,9 @@ function pontePreparada(respostas) {
     + '      },\n'
     + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'excluirCampo', 'reordenarCampos',
       'criarCanal',
-      'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarUsuario',
+      'salvarItemDoCatalogo', 'criarLista', 'renomearLista', 'excluirLista',
+      'usoDoItemDoCatalogo', 'excluirItemDoCatalogo',
+      'salvarNivelDeAcesso', 'salvarUsuario',
       'desativarUsuario', 'salvarCanal', 'salvarIdentidade', 'definirLogo',
       'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
       'editarCaso', 'alterarSituacaoDoCaso', 'salvarComponentesDoPainel',

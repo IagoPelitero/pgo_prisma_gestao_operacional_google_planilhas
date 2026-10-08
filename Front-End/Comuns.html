@@ -862,26 +862,27 @@ var Formulario = (function () {
 
     } else if (campo.tipo === 'data') {
       /*
-        DATA É TEXTO COM MÁSCARA dd/mm/aaaa, e não o calendário do navegador.
+        DATA É O CALENDÁRIO DO NAVEGADOR (type="date").
 
-        O calendário (type="date") mostra a data no formato do IDIOMA DO
-        NAVEGADOR: num Chrome em inglês ele pede mm/dd/aaaa. Uma analista
-        digitou 05/10 achando que era 5 de outubro, e gravou 10 de maio — sem
-        erro nenhum, porque 10 de maio é uma data válida. Pedido do PO: "precisa
-        ser no formato dd/mm/aaaa em todos que solicitam data".
+        Por uma rodada ela foi texto com máscara dd/mm/aaaa, e ficou ruim para
+        os analistas — pedido do PO: "reajustar para ficar como data de novo".
+        O calendário mostra a data no formato do IDIOMA DO NAVEGADOR: com o
+        Chrome em português, dd/mm/aaaa; em inglês, mm/dd/aaaa.
 
-        Com a máscara, digitar 06102026 mostra 06/10/2026, em qualquer
-        navegador. E o valor padrão do servidor ("hoje", em dd/mm/aaaa) entra
-        direto no campo — no calendário ele não entrava, e a primeira data do
-        formulário aparecia vazia.
+        FUTURO: o calendário não deixa escolher depois de hoje (`max`), a não
+        ser no campo que aceita futuro (o início da vigência do VG). O servidor
+        recusa do mesmo jeito — o `max` é para a pessoa nem chegar lá.
+
+        O valor do campo é sempre aaaa-mm-dd; o "hoje" que o servidor manda em
+        dd/mm/aaaa é convertido ao entrar (ver `aplicarPadroes`). Sem isso a
+        primeira data aparecia vazia, que foi o defeito da primeira versão.
       */
-      controle = '<input type="text" id="' + id + '"'
+      controle = '<input type="date" id="' + id + '"'
         + ' data-chave="' + escapar(campo.chave) + '"'
-        + ' data-mascara="00/00/0000" data-data="sim" inputmode="numeric"'
-        + ' maxlength="10" placeholder="dd/mm/aaaa"'
+        + (campo.aceitaFuturo ? '' : ' max="' + hojeNoCalendario() + '"')
         + (colunaDaData && campo.cabecalho === colunaDaData
           ? ' data-data-do-caso="sim"' : '')
-        + ' autocomplete="off"' + exigido + travado + '>';
+        + exigido + travado + '>';
 
     } else {
       var htmlTipo = 'text';
@@ -962,6 +963,23 @@ var Formulario = (function () {
    * divergiriam no dia em que só uma fosse corrigida.
    */
   function confirmarExclusao(idDoCaso, aoConfirmar) {
+    confirmarAtencao('Atenção: excluir o caso ' + Moldura.escapar(idDoCaso),
+      '<p><strong>O caso será apagado definitivamente da planilha.</strong> '
+      + 'Não dá para desfazer, nem por um administrador.</p>'
+      + '<p>O que havia no caso fica registrado na auditoria — quem excluiu, '
+      + 'quando, e o que estava gravado.</p>',
+      'Excluir definitivamente', aoConfirmar);
+  }
+
+  /**
+   * O aviso de atenção, para tudo o que se exclui de vez — o caso, um item de
+   * lista, uma lista inteira. Um só desenho: o foco nasce em Cancelar, Enter
+   * e Esc cancelam, e só o botão vermelho confirma.
+   *
+   * `titulo` e `textoHtml` chegam JÁ escapados — quem chama sabe o que é
+   * texto da pessoa e o que é marcação.
+   */
+  function confirmarAtencao(titulo, textoHtml, rotuloDoBotao, aoConfirmar) {
     if (document.getElementById('dialogo-exclusao')) return;
 
     var caixa = document.createElement('div');
@@ -970,18 +988,13 @@ var Formulario = (function () {
     caixa.innerHTML = '<div class="dialogo-caixa atencao" role="alertdialog"'
       + ' aria-modal="true" aria-labelledby="titulo-exclusao"'
       + ' aria-describedby="texto-exclusao">'
-      + '<h3 id="titulo-exclusao">' + Moldura.icone('ocultar')
-      + ' Atenção: excluir o caso ' + Moldura.escapar(idDoCaso) + '</h3>'
-      + '<div id="texto-exclusao">'
-      + '<p><strong>O caso será apagado definitivamente da planilha.</strong> '
-      + 'Não dá para desfazer, nem por um administrador.</p>'
-      + '<p>O que havia no caso fica registrado na auditoria — quem excluiu, '
-      + 'quando, e o que estava gravado.</p></div>'
+      + '<h3 id="titulo-exclusao">' + Moldura.icone('ocultar') + ' ' + titulo + '</h3>'
+      + '<div id="texto-exclusao">' + textoHtml + '</div>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao vazado" id="cancelar-exclusao">'
       + 'Cancelar</button>'
       + '<button type="button" class="botao perigo" id="confirmar-exclusao">'
-      + 'Excluir definitivamente</button>'
+      + Moldura.escapar(rotuloDoBotao) + '</button>'
       + '</div></div>';
     document.body.appendChild(caixa);
 
@@ -1016,7 +1029,10 @@ var Formulario = (function () {
       secao.campos.forEach(function (campo) {
         if (!campo.valorPadrao) return;
         var caixa = raiz.querySelector('[data-chave="' + campo.chave + '"]');
-        if (caixa && !caixa.value) caixa.value = campo.valorPadrao;
+        if (caixa && !caixa.value) {
+          caixa.value = caixa.type === 'date'
+            ? paraCaixaDeData(campo.valorPadrao) : campo.valorPadrao;
+        }
       });
     });
     aplicarCondicoes(raiz);
@@ -1338,8 +1354,9 @@ var Formulario = (function () {
   /**
    * Preenche o formulário com o que o caso tem hoje.
    *
-   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê — e é como
-   * o campo de data mostra, desde que ele virou texto com máscara.
+   * A data chega do servidor em dd/mm/aaaa, que é como a pessoa lê; o
+   * calendário do navegador só entende aaaa-mm-dd. A conversão é aqui, e não
+   * no servidor, porque é uma exigência do controle e não do dado.
    */
   function preencher(raiz, valoresDoCaso) {
     var controles = raiz.querySelectorAll('[data-chave]');
@@ -1354,6 +1371,7 @@ var Formulario = (function () {
       if (controles[i].getAttribute('data-dinheiro')) {
         valor = comoDinheiroQueVeioGravado(valor);
       }
+      if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
       controles[i].value = valor;
 
       // Valor que não está entre as opções: o seletor ficaria em branco e a
@@ -1435,6 +1453,20 @@ var Formulario = (function () {
     var numero = Number(emPonto);
     if (!isFinite(numero)) return '';
     return String(Math.round(numero * 100));
+  }
+
+  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o calendário lê). */
+  function paraCaixaDeData(valor) {
+    var brasileira = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(valor || '').trim());
+    if (!brasileira) return valor;
+    return brasileira[3] + '-' + brasileira[2] + '-' + brasileira[1];
+  }
+
+  /** Hoje, como o calendário lê — o limite do `max`. */
+  function hojeNoCalendario() {
+    var agora = new Date();
+    var dois = function (n) { return (n < 10 ? '0' : '') + n; };
+    return agora.getFullYear() + '-' + dois(agora.getMonth() + 1) + '-' + dois(agora.getDate());
   }
 
   /* ---------------------------------------------------------------- erros */
@@ -1615,6 +1647,7 @@ var Formulario = (function () {
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
     confirmarExclusao: confirmarExclusao,
+    confirmarAtencao: confirmarAtencao,
     valores: valores,
     preencher: preencher,
     limparErros: limparErros,
@@ -2573,36 +2606,26 @@ var SeletorDePeriodo = (function () {
   }
 
   /*
-   * O de/até é TEXTO COM MÁSCARA dd/mm/aaaa, como as datas dos formulários.
-   *
-   * Era o calendário do navegador (type="date"), e ele mostra a data no
-   * formato do idioma do navegador: num Chrome em inglês, mm/dd/aaaa. Pedido
-   * do PO: dd/mm/aaaa "em todos que solicitam data". Só recarrega com as duas
-   * datas completas e válidas — ver `mudou`.
+   * O de/até é o CALENDÁRIO do navegador (type="date"), como as datas dos
+   * formulários — pedido do PO, que preferiu o calendário à máscara. Ele já
+   * recusa 31/02 e não deixa passar de hoje (`max`). O valor que ele guarda é
+   * sempre aaaa-mm-dd, que o servidor lê sem ambiguidade. Só recarrega com as
+   * duas datas preenchidas — ver `mudou`.
    */
   function deAte(periodo) {
-    var comum = ' class="filtro" data-mascara-de-data="sim" inputmode="numeric"'
-      + ' maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off"';
-    return '<input type="text"' + comum + ' data-periodo="de"'
+    var comum = ' class="filtro" max="' + hojeNoCalendario() + '"';
+    return '<input type="date"' + comum + ' data-periodo="de"'
       + ' aria-label="Data inicial" value="' + escapar(paraOCampo(periodo.de)) + '">'
       + '<span class="ate-do-periodo">até</span>'
-      + '<input type="text"' + comum + ' data-periodo="ate"'
+      + '<input type="date"' + comum + ' data-periodo="ate"'
       + ' aria-label="Data final" value="' + escapar(paraOCampo(periodo.ate)) + '">';
   }
 
-  /*
-   * A máscara do de/até, ligada UMA vez no documento, e não a cada desenho: as
-   * três telas que filtram redesenham a caixa de filtros a cada recarga, e
-   * ligar de novo a cada vez empilharia ouvintes.
-   */
-  if (typeof document !== 'undefined' && document.addEventListener) {
-    document.addEventListener('input', aoDigitarUmaData);
-  }
-  function aoDigitarUmaData(evento) {
-    var caixa = evento.target;
-    if (!caixa || !caixa.getAttribute
-      || caixa.getAttribute('data-mascara-de-data') !== 'sim') return;
-    caixa.value = Formulario.aplicarMascara(caixa.value, '00/00/0000');
+  /** Hoje, como o calendário lê — o limite do `max`. */
+  function hojeNoCalendario() {
+    var agora = new Date();
+    var dois = function (n) { return (n < 10 ? '0' : '') + n; };
+    return agora.getFullYear() + '-' + dois(agora.getMonth() + 1) + '-' + dois(agora.getDate());
   }
 
   function porMes(resposta) {
@@ -2674,38 +2697,26 @@ var SeletorDePeriodo = (function () {
     return (intervalo.de && intervalo.ate) ? intervalo : false;
   }
 
-  /**
-   * A data do servidor, como o campo mostra: dd/mm/aaaa dos dois lados, desde
-   * que o campo virou texto com máscara. Só passa o que é data de verdade.
-   */
+  /** dd/mm/aaaa (como o servidor escreve) vira aaaa-mm-dd (como o campo lê). */
   function paraOCampo(texto) {
-    return dataDeVerdade(texto) ? String(texto).trim() : '';
+    var partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(texto || '').trim());
+    return partes ? partes[3] + '-' + partes[2] + '-' + partes[1] : '';
   }
 
   /**
-   * O que a pessoa digitou, pronto para o servidor — ou vazio, enquanto a data
-   * estiver pela metade ou for impossível (31/02). Vazio é o que faz o de/até
-   * esperar, em vez de recarregar com um intervalo torto.
+   * aaaa-mm-dd (como o campo guarda) vira dd/mm/aaaa (como o servidor lê). O
+   * calendário devolve vazio enquanto a data está pela metade — e vazio é o
+   * que faz o de/até esperar, em vez de recarregar com um intervalo torto.
    */
   function paraOServidor(texto) {
-    return dataDeVerdade(texto) ? String(texto).trim() : '';
-  }
-
-  /** dd/mm/aaaa completo, e um dia que existe no calendário. */
-  function dataDeVerdade(texto) {
-    var partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(texto || '').trim());
-    if (!partes) return false;
-    var dia = Number(partes[1]);
-    var mes = Number(partes[2]);
-    var ano = Number(partes[3]);
-    var data = new Date(ano, mes - 1, dia);
-    return data.getFullYear() === ano && data.getMonth() === mes - 1
-      && data.getDate() === dia;
+    var partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(texto || '').trim());
+    return partes ? partes[3] + '/' + partes[2] + '/' + partes[1] : '';
   }
 
   // `paraOCampo` e `paraOServidor` saem daqui porque QUALQUER tela com campo
-  // de data precisa das duas. Hoje as duas só conferem; uma segunda cópia da
-  // conferência divergiria na primeira correção.
+  // de data precisa das duas: o servidor fala dd/mm/aaaa (que é como a
+  // planilha guarda e como a operação lê) e o <input type="date"> só
+  // entende aaaa-mm-dd. Uma segunda cópia divergiria na primeira correção.
   return {
     padrao: padrao, desenhar: desenhar, mudou: mudou,
     paraOCampo: paraOCampo, paraOServidor: paraOServidor

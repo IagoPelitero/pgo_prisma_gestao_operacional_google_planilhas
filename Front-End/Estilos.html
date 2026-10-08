@@ -684,7 +684,7 @@ button { font: inherit; color: inherit; }
 .ate-do-periodo { font-size: 13.5px; color: var(--suave); }
 /* Campo de data não precisa dos 230px das caixas de filtro, e sobrando espaço
    ele empurra os outros filtros para a linha de baixo sem necessidade. */
-.filtro[data-mascara-de-data] { max-width: 130px; }
+.filtro[type="date"] { max-width: 165px; }
 /* A busca digitada do Trabalho é a caixa mais larga: é nela que se escreve. */
 .filtro.busca-na-fila { flex: 1 1 260px; max-width: 340px; }
 
@@ -1372,11 +1372,29 @@ table.fila tr.importar-igual { color: var(--tenue); }
   padding: 7px 13px; font-size: 13px;
 }
 .config-cabeca .botao.pequeno { margin-left: auto; }
+/* Ajustes Gerais: "Nova lista" e "Novo item" juntos, à direita do seletor. */
+.config-cabeca-acoes { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+.config-cabeca-acoes .botao.pequeno { margin-left: 0; }
+.botao-secundario.pequeno { padding: 7px 13px; font-size: 13px; }
+/* O que a lista é e onde ela aparece, com renomear e excluir logo abaixo. */
+.config-sobre-lista {
+  margin: 10px 0 4px; padding: 10px 12px;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie-2);
+}
+.config-sobre-lista .config-explica { margin-top: 0; }
+.config-sobre-lista .config-acoes { margin-top: 8px; padding-top: 0; border-top: 0; }
 .botao.vazado {
   background: var(--superficie); color: var(--texto); border-color: var(--linha);
 }
 .botao.vazado:hover { background: var(--superficie-2); border-color: var(--linha-forte); }
-.botao.vazado.perigo { color: var(--ruim); border-color: color-mix(in srgb, var(--ruim) 32%, transparent); }
+/* O fundo é dito AQUI de propósito: `.botao.perigo`, mais adiante no arquivo,
+   pinta o fundo de vermelho, e sem esta linha o "Excluir" vazado ficava
+   vermelho escrito em vermelho — um bloco sem texto. */
+.botao.vazado.perigo {
+  background: var(--superficie); color: var(--ruim);
+  border-color: color-mix(in srgb, var(--ruim) 32%, transparent);
+}
 .botao.vazado.perigo:hover { background: var(--ruim-tenue); border-color: var(--ruim); }
 
 /*

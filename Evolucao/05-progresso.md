@@ -2159,6 +2159,36 @@ a coluna do cadastro, centralizada em 1920 e 1440 e inteira no celular.
 
 ---
 
+## Etapa 25 — Parte 1: Ajustes Gerais completo e a data de volta ao calendário
+
+Primeira de quatro partes, combinadas com o PO: (1) listas e data, (2) SUSEP
+companhia/corretora e arquivamento da auditoria, (3) editor visual da fila do
+Trabalho, (4) varredura de código, responsividade e bugs.
+
+| pedido | o que ficou |
+|---|---|
+| "Em Ajustes Gerais quero incluir, excluir ou editar quaisquer listas" | Criar lista (aparece mesmo vazia), renomear (só o nome na tela; a chave fica), excluir a que nenhum campo usa. Itens: criar, editar e **excluir**, com aviso de atenção que diz em quantos casos o item está — os casos mantêm o texto, decisão do PO. Status, cargo, disponibilidade e segmento: os itens se mexem, a lista não |
+| "Aonde fica produto, assunto" | Cada lista mostra o nome legível e em quais campos é usada: "Usada em: Assunto (Mesa Diamante)". O campo seletor escolhe a lista pelo nome |
+| "Fui criar um input select e não conseguia criar uma lista" | A lista se cria em Ajustes Gerais e se escolhe no campo, em "Lista de opções" — escolha do PO |
+| "Avalie se os botões estão com as cores certas" | O "Excluir" vazado era vermelho escrito em vermelho (item 63 dos achados). Corrigido |
+| "Reajustar o input de data para ficar como data de novo, com a data de hoje, e impedir datas futuras" | Calendário do navegador nos formulários e no de/até. A primeira data vem com hoje (convertida para o calendário — sem isso ela aparecia vazia), e o calendário não passa de hoje; o servidor recusa do mesmo jeito |
+
+**835 testes**, cinco execuções seguidas sem falha, cada regra nova
+quebrada de propósito (8 quebras, 8 vermelhos). No navegador, com o servidor
+de verdade, em 1440 e 390 px: nomes legíveis e "usada em", criar a lista
+"Classificação" com dois itens, escolhê-la num campo, excluir um item gravado
+num caso (o aviso diz 1 caso, o foco nasce em Cancelar, o caso guarda o texto),
+excluir a lista nova, a data de hoje no calendário com o limite em hoje,
+gravar e reabrir o caso com a data certa, e o de/até pelo calendário.
+
+### Em aberto, para o PO
+
+- **"Classificar"** não foi achado no sistema. Se é uma lista nova, agora ela
+  se cria em Ajustes Gerais.
+- O calendário segue o idioma do navegador: num Chrome em inglês, mm/dd/aaaa.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

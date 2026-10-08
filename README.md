@@ -486,16 +486,17 @@ coluna "Documento (CPF)" de sempre — nome de coluna é contrato com o Power BI
 O servidor aceita 11 ou 14 dígitos e diz os dois no recado quando vem outro
 tamanho. Na RET o CPF continua só CPF.
 
-**As datas são dd/mm/aaaa, em qualquer navegador.** Uma analista gravou
-datas como mm/dd/aaaa: o calendário do navegador segue o **idioma do
-navegador**, e num Chrome em inglês 05/10 é 10 de maio — sem erro nenhum,
-porque 10 de maio é uma data válida. Agora toda data, nos formulários e no
-de/até dos filtros, é um campo de texto com máscara: digitar `06102026` mostra
-`06/10/2026`. **A primeira data de cada formulário já vem com hoje** e recusa
-o futuro (a data do protocolo da RET, a de recepção da Mesa e a do protocolo
-do VG); no calendário o valor de hoje não entrava, e o campo aparecia vazio.
-Dia que não existe — `31/02/2026` — é recusado, em vez de virar 3 de março
-calado.
+**As datas são o calendário do navegador**, nos formulários e no de/até dos
+filtros. **A primeira data de cada formulário já vem com hoje** (a do
+protocolo da RET, a de recepção da Mesa e a do protocolo do VG), e o
+calendário **não deixa escolher depois de hoje** — o servidor recusa do mesmo
+jeito. A exceção é o início da vigência do VG, que aceita o mês que vem. Por
+uma rodada as datas foram texto com máscara dd/mm/aaaa; ficou ruim para os
+analistas, e o PO pediu o calendário de volta. O calendário mostra a data no
+formato do **idioma do navegador**: com o Chrome em português, dd/mm/aaaa —
+num Chrome em inglês ele pede mm/dd/aaaa, e foi assim que uma analista gravou
+10 de maio achando que era 5 de outubro. Dia que não existe — `31/02/2026` —
+é recusado pelo servidor, em vez de virar 3 de março calado.
 
 **A SUSEP tem letra**: `RET00J`. Todo campo que pede SUSEP aceita e guarda
 exatamente o que foi colado — letra, dígito, caixa e pontuação. Só o espaço
@@ -636,7 +637,7 @@ fazendo a mesma pergunta.
 | Maneira | Para quê |
 |---|---|
 | **Por dias** | "Últimos 30 dias". É o do dia a dia, e continua sendo a abertura |
-| **Por data** | Duas datas, de/até, digitadas em dd/mm/aaaa (com máscara, como nos formulários). Responde uma pergunta específica: a semana da campanha, os dias da virada |
+| **Por data** | Duas datas, de/até, no calendário do navegador (até hoje). Responde uma pergunta específica: a semana da campanha, os dias da virada |
 | **Por mês** | "Setembro de 2026". É como a operação REPORTA — e é diferente de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias pegam metade de setembro e metade de outubro, e nenhum fechamento se faz assim |
 
 Quem resolve as três é o **servidor**. Se a tela calculasse as datas, o dia do
@@ -1000,6 +1001,19 @@ Salvar.
 
 ![A tela de Configurações](Evolucao/imagens/tela-configuracoes.png)
 
+**Ajustes Gerais são as listas** que os campos seletores oferecem — assunto,
+produto, motivo, canal de origem e as que a operação criar. Cada lista aparece
+com o nome legível e **em quais campos é usada** ("Usada em: Assunto (Mesa
+Diamante)"). Dá para **criar uma lista nova** (ela aparece mesmo vazia, e o
+campo seletor já pode escolhê-la), **renomear** (muda só o nome na tela; os
+itens, campos e casos continuam ligados) e **excluir** a lista que nenhum
+campo usa — a que um campo usa é recusada, dizendo qual. Status, cargo,
+disponibilidade e segmento são usados por dentro do sistema: os itens se
+mexem, a lista não. **Item se cria, edita e exclui**; excluir um item já
+gravado em casos passa por um aviso de atenção que diz em quantos, e os casos
+**mantêm o texto** — decisão do PO. Para um campo seletor novo: crie a lista
+em Ajustes Gerais e escolha-a no campo, em "Lista de opções".
+
 Cada ação carrega a guarda que o estrago dela pede:
 
 | O que se mexe | Guarda | Exemplo |
@@ -1064,7 +1078,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-826 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+835 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

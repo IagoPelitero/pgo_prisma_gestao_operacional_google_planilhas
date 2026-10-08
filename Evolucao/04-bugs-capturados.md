@@ -1460,6 +1460,39 @@ Enter dispara os dois); o selo quebra linha. Os dois conferidos no navegador.
 
 ---
 
+### 63 · O "Excluir" que era um bloco vermelho sem texto
+
+**Sintoma.** Palavra do PO: "avalie se os botões estão com as cores certas".
+Em Configurações, o botão "Excluir campo" aparecia como um retângulo vermelho
+sem nada escrito.
+
+**Causa.** O botão vazado de perigo dizia a cor do TEXTO (vermelho) e não a
+do fundo. A regra do botão de perigo cheio, mais adiante no arquivo, pintava
+o fundo de vermelho: vermelho escrito em vermelho.
+
+**Como apareceu.** Na foto da Parte 1, ao criar o "Excluir lista" e o
+"Excluir item" com o mesmo estilo.
+
+**Defesa.** O vazado de perigo diz o fundo também. Teste do estilo, e a
+verificação no navegador confere que o texto e o fundo têm cores diferentes.
+
+---
+
+### 64 · A lista nova que a tela não mostrava
+
+**Sintoma.** Palavra do PO: "as listas que podem ser usadas como select não é
+possível criá-las e tive que criar uma à mão".
+
+**Causa.** A tela de listas montava o seletor com os tipos que JÁ tinham algum
+item. Uma lista sem item não existia em lugar nenhum, então não havia como
+criá-la pela tela — nem escolhê-la no campo.
+
+**Defesa.** A lista ganhou um registro próprio na aba CATALOGO (tipo LISTA),
+que a mantém visível mesmo vazia, com o nome legível. Testes de criar,
+renomear e excluir, e a verificação no navegador do caminho inteiro.
+
+---
+
 ## O que esta lista ensina
 
 **São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não

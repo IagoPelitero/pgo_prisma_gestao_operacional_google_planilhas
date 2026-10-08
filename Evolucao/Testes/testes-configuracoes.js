@@ -1419,6 +1419,115 @@ function rodarTestesDeConfiguracoes() {
     verdadeiro(comuns.indexOf('function usaMascara') < 0);
   });
 
+
+  secao('Ajustes Gerais: criar, renomear e excluir listas e itens');
+
+  /*
+   * Pedido do PO: "na aba Ajustes Gerais quero que seja possível incluir,
+   * excluir ou editar quaisquer" listas. Antes, lista nova só à mão na
+   * planilha, e item só se desligava.
+   */
+  const lis = carregar('primeiro.adm@exemplo.com');
+  lis.chamar('instalarRECC()');
+  const listas = () => lis.chamar('opcoesDeConfiguracaoDeCampo()').listas;
+  const aLista = (chave) => listas().find((l) => l.chave === chave);
+
+  teste('as listas aparecem com nome legível e onde são usadas', () => {
+    const assunto = aLista('ASSUNTO');
+    igual(assunto.nome, 'Assunto');
+    verdadeiro(assunto.usadaEm.some((onde) => onde.indexOf('Mesa Diamante') >= 0),
+      'o Assunto é da Mesa: ' + JSON.stringify(assunto.usadaEm));
+    igual(aLista('CANAL_ORIGEM').nome, 'Canal origem');
+    verdadeiro(!aLista('NIVEL_ACESSO') && !aLista('LISTA'), 'o que não é lista de formulário fica de fora');
+    igual(aLista('STATUS').doSistema, true);
+  });
+
+  teste('criar uma lista nova, que aparece mesmo vazia', () => {
+    const chave = lis.chamar('criarLista')('Classificação do caso');
+    igual(chave, 'CLASSIFICACAO_DO_CASO');
+    const criada = aLista(chave);
+    igual(criada.nome, 'Classificação do caso', 'o nome com acento, como foi escrito');
+    igual(criada.quantos, 0);
+    verdadeiro(lis.chamar('opcoesDeConfiguracaoDeCampo()').tiposDeCatalogo.indexOf(chave) >= 0,
+      'e o campo seletor já pode escolhê-la');
+    lanca(() => lis.chamar('criarLista')('classificacao do caso'), 'Já existe');
+    lanca(() => lis.chamar('criarLista')('  '), 'Dê um nome');
+    lanca(() => lis.chamar('criarLista')('Lista'), 'reservado');
+  });
+
+  teste('itens entram na lista nova, e um campo seletor a usa', () => {
+    lis.chamar('salvarItemDoCatalogo')({ tipo: 'CLASSIFICACAO_DO_CASO', nome: 'Urgente', ordem: 1 });
+    lis.chamar('salvarItemDoCatalogo')({ tipo: 'CLASSIFICACAO_DO_CASO', nome: 'Normal', ordem: 2 });
+    igual(aLista('CLASSIFICACAO_DO_CASO').quantos, 2);
+    const nomes = lis.chamar('listarCatalogo')('CLASSIFICACAO_DO_CASO', '').map((i) => i.nome);
+    igual(nomes.join(', '), 'Urgente, Normal');
+  });
+
+  teste('renomear muda só o nome na tela; a chave fica', () => {
+    lis.chamar('renomearLista')('CLASSIFICACAO_DO_CASO', 'Classificação');
+    igual(aLista('CLASSIFICACAO_DO_CASO').nome, 'Classificação');
+    // Lista da instalação, sem registro, também se renomeia.
+    lis.chamar('renomearLista')('CANAL_ORIGEM', 'Canal de origem');
+    igual(aLista('CANAL_ORIGEM').nome, 'Canal de origem');
+    igual(aLista('CANAL_ORIGEM').quantos, 4, 'os itens continuam lá');
+  });
+
+  teste('excluir um item em uso: sai da lista, e o caso guarda o texto', () => {
+    const mesa = lis.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
+    const caso = lis.chamar('cadastrarCaso')(mesa.id, { status: 'Em andamento',
+      nomedosegurado: 'Caso com sinistro', assunto: 'Sinistro' });
+    const sinistro = lis.chamar('listarCatalogo')('ASSUNTO', '').find((i) => i.nome === 'Sinistro');
+    igual(lis.chamar('usoDoItemDoCatalogo')(sinistro.id).casos, 1, 'o aviso diz em quantos casos');
+    const saiu = lis.chamar('excluirItemDoCatalogo')(sinistro.id);
+    igual(saiu.casos, 1);
+    verdadeiro(!lis.chamar('listarCatalogo')('ASSUNTO', '').some((i) => i.nome === 'Sinistro'),
+      'o item saiu da lista');
+    igual(String(lis.chamar('buscarRegistros_')('BASE_MESA', 'Id', String(caso.id), 1)[0].Assunto),
+      'Sinistro', 'o caso continua com o texto');
+    verdadeiro(lis.chamar('lerRegistros_("AUDITORIA")').some((a) =>
+      String(a.Acao) === 'catalogo.excluir' && String(a.Detalhe).indexOf('Sinistro') >= 0),
+    'a exclusão fica na trilha');
+  });
+
+  teste('excluir a lista que um campo usa é recusado, dizendo qual', () => {
+    lanca(() => lis.chamar('excluirLista')('ASSUNTO'), 'Troque a lista desse campo');
+    lanca(() => lis.chamar('excluirLista')('STATUS'), 'usada por dentro do sistema');
+  });
+
+  teste('excluir a lista que ninguém usa leva os itens junto', () => {
+    const saiu = lis.chamar('excluirLista')('CLASSIFICACAO_DO_CASO');
+    igual(saiu.itens, 2);
+    igual(aLista('CLASSIFICACAO_DO_CASO'), undefined);
+    verdadeiro(!lis.chamar('lerRegistros_("CATALOGO")').some((i) =>
+      String(i.Tipo) === 'CLASSIFICACAO_DO_CASO'
+      || (String(i.Tipo) === 'LISTA' && String(i.Nome) === 'CLASSIFICACAO_DO_CASO')),
+    'nem item, nem registro');
+  });
+
+  teste('quem não configura não mexe em lista nenhuma', () => {
+    comoUsuario(lis.ambiente, 'ana@exemplo.com', () => {
+      lanca(() => lis.chamar('criarLista')('Qualquer'), '');
+    });
+  });
+
+  teste('a tela tem nova lista, renomear, excluir e o aviso de atenção', () => {
+    const tela = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Configuracoes.html'), 'utf8');
+    contem(tela, 'id="nova-lista"');
+    contem(tela, 'id="renomear-lista"');
+    contem(tela, 'id="excluir-lista"');
+    contem(tela, 'id="excluir-item"');
+    contem(tela, "Formulario.confirmarAtencao('Atenção: excluir o item");
+    contem(tela, "caixaDeItens('catalogo', 'Lista de opções'",
+      'o campo seletor escolhe a lista pelo nome legível');
+  });
+
+  teste('o "Excluir" vazado tem fundo próprio, e o texto aparece', () => {
+    // Achado da Parte 1: `.botao.perigo` pinta o fundo de vermelho, e o
+    // "Excluir campo", o "Excluir item" e o "Excluir lista" ficavam vermelho
+    // escrito em vermelho — um bloco sem texto.
+    const estilos = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Estilos.html'), 'utf8');
+    contem(estilos, '.botao.vazado.perigo {\n  background: var(--superficie); color: var(--ruim);');
+  });
 }
 
 module.exports = { rodarTestesDeConfiguracoes };

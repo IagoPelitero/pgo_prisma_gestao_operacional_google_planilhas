@@ -138,7 +138,7 @@ function resumoDasConfiguracoes() {
       { chave: 'catalogo', titulo: 'Ajustes Gerais',
         descricao: 'Situações, canais, motivos, ramos e cargos — as listas que '
           + 'os formulários oferecem',
-        quantidade: catalogo.length - quantosDoTipo('nivelacesso') },
+        quantidade: catalogo.length - quantosDoTipo('nivelacesso') - quantosDoTipo('lista') },
       { chave: 'canais', titulo: 'Canais de trabalho',
         descricao: 'As bases e o que cada painel mostra',
         quantidade: lerRegistros_('CANAIS').length },
@@ -238,17 +238,17 @@ function opcoesDeConfiguracaoDeCampo() {
     tipos: Object.keys(RECC_DO_CAMPO_PARA_O_DADO),
     tons: RECC_TONS,
     cadastros: ['usuarios', 'corretoras'],
-    tiposDeCatalogo: tiposDeCatalogoExistentes_()
+    tiposDeCatalogo: tiposDeCatalogoExistentes_(),
+    listas: listasDeAjustes_()
   };
 }
 
+/**
+ * As chaves de todas as listas: as que têm item e as criadas em Ajustes
+ * Gerais que ainda estão vazias (o registro LISTA).
+ */
 function tiposDeCatalogoExistentes_() {
-  var vistos = {};
-  lerRegistros_('CATALOGO').forEach(function (item) {
-    var tipo = String(item.Tipo || '').trim();
-    if (tipo && tipo !== 'NIVEL_ACESSO') vistos[tipo] = true;
-  });
-  return Object.keys(vistos).sort();
+  return listasDeAjustes_().map(function (lista) { return lista.chave; });
 }
 
 /**
@@ -661,6 +661,207 @@ function quantosCasosUsam_(item) {
     });
   });
   return quantos;
+}
+
+/* ============================================================================
+   AS LISTAS EM SI — criar, renomear e excluir
+   ============================================================================
+   Pedido do PO: "na aba Ajustes Gerais quero que seja possível incluir,
+   excluir ou editar quaisquer" listas. Antes só os ITENS se mexiam pela tela:
+   uma lista nova tinha de ser criada à mão na planilha, porque a tela só
+   mostrava as listas que já tinham algum item.
+
+   A LISTA vira um registro na própria aba CATALOGO, com o tipo LISTA: o NOME
+   é a chave (ASSUNTO, CLASSIFICACAO), que é o que os campos e os itens
+   guardam; o RÓTULO é o nome que a pessoa lê ("Classificação"). É o que deixa
+   uma lista recém-criada, ainda sem item, aparecer na tela.
+
+   A CHAVE NÃO MUDA depois de criada: os itens e os campos apontam para ela, e
+   trocá-la seria trocar em três lugares. Renomear troca só o nome na tela.
+   ============================================================================ */
+
+const RECC_TIPO_LISTA = 'LISTA';
+
+/**
+ * As listas que o próprio sistema usa por dentro — status, cargo,
+ * disponibilidade e segmento. Os itens delas se editam e se excluem; a lista
+ * inteira, não: sem ela, o cadastro de usuários, o de corretoras ou os
+ * cartões do Trabalho perderiam o chão.
+ */
+const RECC_LISTAS_DO_SISTEMA = ['STATUS', 'CARGO', 'DISPONIBILIDADE', 'SEGMENTO'];
+
+/** Tipos da aba CATALOGO que não são listas de formulário. */
+const RECC_TIPOS_FORA_DAS_LISTAS = ['NIVEL_ACESSO', RECC_TIPO_LISTA];
+
+/** "CANAL_ORIGEM" vira "Canal origem": o nome de quem ainda não ganhou um. */
+function nomeLegivelDaLista_(chave) {
+  var texto = String(chave || '').toLowerCase().replace(/_/g, ' ');
+  return texto.charAt(0).toUpperCase() + texto.substring(1);
+}
+
+/** "Classificação do caso" vira "CLASSIFICACAO_DO_CASO". */
+function chaveDaLista_(nome) {
+  return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+/**
+ * Todas as listas, com o nome na tela, quantos itens têm e em quais campos
+ * aparecem — "usada em Assunto (Mesa Diamante)" é o que responde "onde fica".
+ */
+function listasDeAjustes_() {
+  var catalogo = lerRegistros_('CATALOGO');
+  var porChave = {};
+  function lista(chave) {
+    if (!porChave[chave]) {
+      porChave[chave] = { chave: chave, nome: '', idDoRegistro: '', quantos: 0,
+        usadaEm: [], doSistema: RECC_LISTAS_DO_SISTEMA.indexOf(chave) >= 0 };
+    }
+    return porChave[chave];
+  }
+
+  catalogo.forEach(function (item) {
+    var tipo = String(item.Tipo || '').trim().toUpperCase();
+    if (!tipo || tipo === 'NIVEL_ACESSO') return;
+    if (tipo === RECC_TIPO_LISTA) {
+      var registrada = lista(String(item.Nome || '').trim().toUpperCase());
+      registrada.nome = String(item.Rotulo || '').trim();
+      registrada.idDoRegistro = item.__id;
+      return;
+    }
+    lista(tipo).quantos++;
+  });
+
+  var nomesDosCanais = {};
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    nomesDosCanais[converterParaIdentificador_(canal.Id)] = String(canal.Nome || '');
+  });
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    var chave = String(lerConfiguracaoDoCampo_(campo).catalogo || '').trim().toUpperCase();
+    if (!chave || !porChave[chave]) return;
+    var canal = nomesDosCanais[converterParaIdentificador_(campo.CanalId)];
+    porChave[chave].usadaEm.push(String(campo.Rotulo || campo.Cabecalho)
+      + (canal ? ' (' + canal + ')' : ''));
+  });
+
+  return Object.keys(porChave).map(function (chave) {
+    var uma = porChave[chave];
+    if (!uma.nome) uma.nome = nomeLegivelDaLista_(chave);
+    return uma;
+  }).sort(function (uma, outra) { return uma.nome.localeCompare(outra.nome, 'pt-BR'); });
+}
+
+function acharLista_(chave) {
+  var procurada = String(chave || '').trim().toUpperCase();
+  var achada = listasDeAjustes_().filter(function (lista) {
+    return lista.chave === procurada;
+  })[0];
+  if (!achada) throw new Error('A lista ' + procurada + ' não existe.');
+  return achada;
+}
+
+/** Cria uma lista vazia. Devolve a chave, que é o que os campos guardam. */
+function criarLista(nome) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var legivel = String(nome || '').trim();
+  if (!legivel) throw new Error('Dê um nome à lista.');
+  var chave = chaveDaLista_(legivel);
+  if (!chave) throw new Error('O nome da lista precisa ter ao menos uma letra ou número.');
+  if (RECC_TIPOS_FORA_DAS_LISTAS.indexOf(chave) >= 0) {
+    throw new Error('"' + legivel + '" é um nome reservado do sistema. Escolha outro.');
+  }
+  var existente = listasDeAjustes_().filter(function (lista) {
+    return lista.chave === chave;
+  })[0];
+  if (existente) {
+    throw new Error('Já existe a lista "' + existente.nome + '". Escolha outro nome.');
+  }
+
+  var criado = inserirRegistro_('CATALOGO', novoItemDeCatalogo_(RECC_TIPO_LISTA, '',
+    chave, 0, ''));
+  atualizarRegistro_('CATALOGO', criado.__id, { Rotulo: legivel });
+  registrarAuditoria_('lista.criar', 'CATALOGO', criado.__id, chave + ' — ' + legivel);
+  return chave;
+}
+
+/** Troca o nome que aparece na tela. A chave fica: os campos apontam para ela. */
+function renomearLista(chave, nome) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var legivel = String(nome || '').trim();
+  if (!legivel) throw new Error('Dê um nome à lista.');
+  var lista = acharLista_(chave);
+  if (lista.idDoRegistro) {
+    atualizarRegistro_('CATALOGO', lista.idDoRegistro, { Rotulo: legivel });
+  } else {
+    // Lista que veio da instalação, sem registro: ganha um agora.
+    var criado = inserirRegistro_('CATALOGO', novoItemDeCatalogo_(RECC_TIPO_LISTA, '',
+      lista.chave, 0, ''));
+    atualizarRegistro_('CATALOGO', criado.__id, { Rotulo: legivel });
+  }
+  registrarAuditoria_('lista.renomear', 'CATALOGO', lista.idDoRegistro, lista.chave
+    + ' — ' + lista.nome + ' → ' + legivel);
+  return true;
+}
+
+/**
+ * Exclui a lista inteira, com todos os itens.
+ *
+ * Recusa a lista do sistema e a lista que algum campo usa — o campo ficaria
+ * um seletor sem opção nenhuma. Os casos gravados não mudam: guardam o texto.
+ */
+function excluirLista(chave) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var lista = acharLista_(chave);
+  if (lista.doSistema) {
+    throw new Error('A lista "' + lista.nome + '" é usada por dentro do sistema e não '
+      + 'pode ser excluída. Os itens dela se editam e se excluem um a um.');
+  }
+  if (lista.usadaEm.length) {
+    throw new Error('A lista "' + lista.nome + '" é usada pelo campo ' + lista.usadaEm.join(', ')
+      + '. Troque a lista desse campo em Cadastrar Caso, e exclua depois.');
+  }
+  var apagados = 0;
+  lerRegistros_('CATALOGO').forEach(function (item) {
+    var tipo = String(item.Tipo || '').trim().toUpperCase();
+    var ehOItem = tipo === lista.chave;
+    var ehORegistro = tipo === RECC_TIPO_LISTA
+      && String(item.Nome || '').trim().toUpperCase() === lista.chave;
+    if (!ehOItem && !ehORegistro) return;
+    apagarRegistroDeVez_('CATALOGO', item.__id);
+    if (ehOItem) apagados++;
+  });
+  registrarAuditoria_('lista.excluir', 'CATALOGO', '', lista.chave + ' — ' + lista.nome
+    + ', com ' + apagados + ' item(ns)');
+  return { nome: lista.nome, itens: apagados };
+}
+
+/** Em quantos casos o item está gravado — para o aviso antes de excluir. */
+function usoDoItemDoCatalogo(id) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var item = buscarRegistros_('CATALOGO', 'Id', converterParaIdentificador_(id), 1)[0];
+  if (!item) throw new Error('Item ' + id + ' não encontrado.');
+  return { nome: String(item.Rotulo || item.Nome), casos: quantosCasosUsam_(item) };
+}
+
+/**
+ * Exclui um item da lista, de vez — decisão do PO: "exclui, e os casos
+ * mantêm o texto". O item some da lista e do formulário; o que já está
+ * gravado nos casos fica como está. A tela avisa antes, dizendo em quantos.
+ */
+function excluirItemDoCatalogo(id) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var alvo = converterParaIdentificador_(id);
+  var item = buscarRegistros_('CATALOGO', 'Id', alvo, 1)[0];
+  if (!item) throw new Error('Item ' + id + ' não encontrado.');
+  var tipo = String(item.Tipo || '').trim().toUpperCase();
+  if (RECC_TIPOS_FORA_DAS_LISTAS.indexOf(tipo) >= 0) {
+    throw new Error('Este registro não é um item de lista.');
+  }
+  var casos = quantosCasosUsam_(item);
+  apagarRegistroDeVez_('CATALOGO', alvo);
+  registrarAuditoria_('catalogo.excluir', 'CATALOGO', alvo, tipo + ' — ' + item.Nome
+    + (casos ? ' (gravado em ' + casos + ' caso(s), que mantêm o texto)' : ''));
+  return { nome: String(item.Rotulo || item.Nome), casos: casos };
 }
 
 // ============================================================================

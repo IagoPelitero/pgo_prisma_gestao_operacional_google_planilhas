@@ -310,9 +310,12 @@ var TelaConfiguracoes = (function () {
         'Ex.: 000.000.000-00. A planilha recebe só os dígitos. Duas máscaras '
         + 'separadas por | aceitam as duas formas — '
         + '000.000.000-00|00.000.000/0000-00 é CPF ou CNPJ.')
-      + caixaDeOpcoes('catalogo', 'Lista do catálogo',
-        [''].concat(opcoes.tiposDeCatalogo), campo.catalogo,
-        'Preenche as opções a partir da aba CATALOGO.')
+      + caixaDeItens('catalogo', 'Lista de opções',
+        (opcoes.listas || []).map(function (lista) {
+          return { id: lista.chave, nome: lista.nome };
+        }), campo.catalogo,
+        'As opções do seletor. Para criar uma lista nova ou mudar as opções, '
+        + 'use Configurações › Ajustes Gerais.')
       + caixaDeOpcoes('listaDe', 'Lista de um cadastro',
         [''].concat(opcoes.cadastros), campo.listaDe,
         'Preenche as opções a partir de um cadastro do sistema.')
@@ -891,14 +894,32 @@ var TelaConfiguracoes = (function () {
 
   /* --------------------------------------------------------------- listas */
 
+  /*
+   * AJUSTES GERAIS — as listas e os itens delas.
+   *
+   * Pedido do PO: "quero que seja possível incluir, excluir ou editar
+   * quaisquer". Antes só os itens se mexiam: lista nova era criada à mão na
+   * planilha, e item só se desligava. Agora: criar lista, renomear, excluir
+   * (a que nenhum campo usa), e criar, editar e excluir item. A lista mostra
+   * o nome legível e em quais campos aparece — é o que responde "onde fica o
+   * Assunto".
+   */
   function carregarListas() {
     aguarde('Lendo as listas…');
     Servidor.chamar('opcoesDeConfiguracaoDeCampo')
       .entao(function (opcoes) {
-        dados.tipos = opcoes.tiposDeCatalogo;
+        dados.listas = opcoes.listas;
         dados.tons = opcoes.tons;
-        if (!tipoDeListaEscolhido && dados.tipos.length) {
-          tipoDeListaEscolhido = dados.tipos[0];
+        var aindaExiste = dados.listas.some(function (lista) {
+          return lista.chave === tipoDeListaEscolhido;
+        });
+        if (!aindaExiste) {
+          tipoDeListaEscolhido = dados.listas.length ? dados.listas[0].chave : '';
+        }
+        if (!tipoDeListaEscolhido) {
+          dados.itens = [];
+          desenharListas();
+          return;
         }
         Servidor.chamar('listarCatalogo', tipoDeListaEscolhido, '')
           .entao(function (itens) {
@@ -922,30 +943,59 @@ var TelaConfiguracoes = (function () {
         + (item.ativo ? '' : ' · desligado') + '</span></button></li>';
     }).join('');
 
+    var lista = listaEscolhida();
+
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
-      + '<select id="tipo-da-lista" aria-label="Tipo de lista">'
-      + dados.tipos.map(function (tipo) {
-        return '<option value="' + escapar(tipo) + '"'
-          + (tipo === tipoDeListaEscolhido ? ' selected' : '') + '>'
-          + escapar(tipo) + '</option>';
+      + '<select id="tipo-da-lista" aria-label="Lista">'
+      + dados.listas.map(function (uma) {
+        return '<option value="' + escapar(uma.chave) + '"'
+          + (uma.chave === tipoDeListaEscolhido ? ' selected' : '') + '>'
+          + escapar(uma.nome) + '</option>';
       }).join('') + '</select>'
-      + '<button type="button" class="botao pequeno" id="novo-item">'
-      + 'Novo item</button></div>'
+      + '<div class="config-cabeca-acoes">'
+      + '<button type="button" class="botao-secundario pequeno" id="nova-lista">'
+      + 'Nova lista</button>'
+      + (lista ? '<button type="button" class="botao pequeno" id="novo-item">'
+        + 'Novo item</button>' : '')
+      + '</div></div>'
+      + (lista ? sobreALista(lista) : '<p class="config-explica">Nenhuma lista '
+        + 'ainda. Crie a primeira em "Nova lista".</p>')
       + '<p class="config-explica">O <strong>nome</strong> é o que fica gravado '
       + 'no caso; o <strong>rótulo</strong> é o que aparece na tela. Por isso '
       + 'trocar o rótulo é sempre seguro, e trocar o nome de um item já usado '
       + 'é recusado.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
-    elemento('tipo-da-lista').addEventListener('change', function () {
-      tipoDeListaEscolhido = this.value;
-      escolhido = null;
-      carregarListas();
-    });
-    elemento('novo-item').addEventListener('click', function () {
+    var trocaDeLista = elemento('tipo-da-lista');
+    if (trocaDeLista) {
+      trocaDeLista.addEventListener('change', function () {
+        tipoDeListaEscolhido = this.value;
+        escolhido = null;
+        carregarListas();
+      });
+    }
+    elemento('nova-lista').addEventListener('click', function () {
       escolhido = null;
       desenharListas();
-      desenharPainelDoItem(null);
+      desenharPainelDaListaNova();
+    });
+    var novoItem = elemento('novo-item');
+    if (novoItem) {
+      novoItem.addEventListener('click', function () {
+        escolhido = null;
+        desenharListas();
+        desenharPainelDoItem(null);
+      });
+    }
+    var renomear = elemento('renomear-lista');
+    if (renomear) renomear.addEventListener('click', function () {
+      escolhido = null;
+      desenharListas();
+      desenharPainelDeRenomear(lista);
+    });
+    var excluirAqui = elemento('excluir-lista');
+    if (excluirAqui) excluirAqui.addEventListener('click', function () {
+      excluirALista(lista);
     });
     ligarCliques('[data-item]', function (botao) {
       escolhido = { id: botao.getAttribute('data-item') };
@@ -954,6 +1004,116 @@ var TelaConfiguracoes = (function () {
 
     if (escolhido) desenharPainelDoItem(acharNaLista(dados.itens, escolhido.id));
     else painelVazio('Escolha um item, ou crie um novo.');
+  }
+
+  function listaEscolhida() {
+    return acharNaListaPorChave(dados.listas, tipoDeListaEscolhido);
+  }
+
+  function acharNaListaPorChave(listas, chave) {
+    return (listas || []).filter(function (uma) { return uma.chave === chave; })[0] || null;
+  }
+
+  /**
+   * O que a lista é e onde ela aparece. "Usada em Assunto (Mesa Diamante)" é
+   * a resposta para "onde fica o Assunto"; a lista que ninguém usa diz como
+   * ligá-la a um campo.
+   */
+  function sobreALista(lista) {
+    return '<div class="config-sobre-lista">'
+      + '<p class="config-explica">' + (lista.usadaEm.length
+        ? 'Usada em: <strong>' + escapar(lista.usadaEm.join(', ')) + '</strong>.'
+        : 'Nenhum campo usa esta lista ainda. Para usar, escolha-a no campo, em '
+          + 'Configurações › Cadastrar Caso.')
+      + (lista.doSistema ? ' É uma lista que o sistema usa por dentro: os itens '
+        + 'se editam e se excluem, a lista não.' : '') + '</p>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao-secundario pequeno" id="renomear-lista">'
+      + 'Renomear lista</button>'
+      + (lista.doSistema ? '' : '<button type="button" class="botao vazado perigo pequeno"'
+        + ' id="excluir-lista">Excluir lista</button>')
+      + '</div></div>';
+  }
+
+  function desenharPainelDaListaNova() {
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-lista">'
+      + tituloDoPainel('Lista nova', 'Ajustes Gerais')
+      + campoDeTexto('nome-da-lista', 'Nome da lista', '',
+        'Como ela aparece aqui e no campo — por exemplo "Classificação". Depois '
+        + 'de criar, acrescente os itens em "Novo item".')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Criar lista</button></div></form>';
+    elemento('form-lista').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('criarLista', valorDe('nome-da-lista'))
+        .entao(function (chave) {
+          tipoDeListaEscolhido = chave;
+          avisarSalvo('Lista criada. Agora acrescente os itens.');
+          carregarListas();
+        })
+        .senao(mostrarErroNoPainel);
+    });
+  }
+
+  function desenharPainelDeRenomear(lista) {
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-renomear-lista">'
+      + tituloDoPainel('Renomear lista', lista.nome)
+      + campoDeTexto('nome-da-lista', 'Nome na tela', lista.nome,
+        'Muda só o nome que aparece. Os itens, os campos e os casos continuam '
+        + 'ligados a ela.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button></div></form>';
+    elemento('form-renomear-lista').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('renomearLista', lista.chave, valorDe('nome-da-lista'))
+        .entao(function () { avisarSalvo(); carregarListas(); })
+        .senao(mostrarErroNoPainel);
+    });
+  }
+
+  function excluirALista(lista) {
+    Formulario.confirmarAtencao('Atenção: excluir a lista "' + escapar(lista.nome) + '"',
+      '<p><strong>A lista e os ' + escapar(String(lista.quantos))
+      + ' item(ns) dela saem da planilha.</strong> Não dá para desfazer.</p>'
+      + '<p>Os casos já gravados não mudam: continuam com o texto que tinham.</p>',
+      'Excluir lista', function () {
+        Servidor.chamar('excluirLista', lista.chave)
+          .entao(function (saiu) {
+            tipoDeListaEscolhido = '';
+            escolhido = null;
+            avisarSalvo('Lista "' + saiu.nome + '" excluída.');
+            carregarListas();
+          })
+          .senao(mostrarErroNoPainel);
+      });
+  }
+
+  /**
+   * Exclui o item de vez — decisão do PO: os casos mantêm o texto. Antes do
+   * aviso, pergunta ao servidor em quantos casos ele está, para o aviso dizer.
+   */
+  function excluirOItem(item) {
+    Servidor.chamar('usoDoItemDoCatalogo', item.id)
+      .entao(function (uso) {
+        Formulario.confirmarAtencao('Atenção: excluir o item "' + escapar(uso.nome) + '"',
+          '<p><strong>O item sai da lista e do formulário.</strong> Não dá para '
+          + 'desfazer.</p>'
+          + (uso.casos
+            ? '<p>Ele está gravado em <strong>' + escapar(String(uso.casos))
+              + ' caso(s)</strong>. Esses casos continuam com o texto "'
+              + escapar(item.nome) + '".</p>'
+            : '<p>Nenhum caso usa este item.</p>'),
+          'Excluir item', function () {
+            Servidor.chamar('excluirItemDoCatalogo', item.id)
+              .entao(function () {
+                escolhido = null;
+                avisarSalvo('Item excluído.');
+                carregarListas();
+              })
+              .senao(mostrarErroNoPainel);
+          });
+      })
+      .senao(mostrarErroNoPainel);
   }
 
   function desenharPainelDoItem(item) {
@@ -1001,9 +1161,10 @@ var TelaConfiguracoes = (function () {
         + 'de status.');
     }
 
+    var lista = listaEscolhida();
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-item">'
       + tituloDoPainel(ehNovo ? 'Item novo' : atual.rotulo,
-        'Lista ' + tipoDeListaEscolhido)
+        'Lista ' + (lista ? lista.nome : tipoDeListaEscolhido))
       + campoDeTexto('nome', 'Nome gravado no caso', atual.nome,
         'É este texto que vai para a célula da planilha.')
       + campoDeTexto('rotulo', 'Rótulo na tela', atual.rotulo, '')
@@ -1016,7 +1177,13 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('ordem', 'Ordem', atual.ordem, '')
       + caixaDeSimNao('ativo', 'Aparece nas listas', atual.ativo)
       + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Salvar</button></div></form>';
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (ehNovo ? '' : '<button type="button" class="botao vazado perigo" id="excluir-item">'
+        + 'Excluir item</button>')
+      + '</div></form>';
+
+    var excluir = elemento('excluir-item');
+    if (excluir) excluir.addEventListener('click', function () { excluirOItem(atual); });
 
     elemento('form-item').addEventListener('submit', function (evento) {
       evento.preventDefault();
