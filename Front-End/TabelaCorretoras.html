@@ -373,18 +373,33 @@ var TelaTabelaCorretoras = (function () {
 
   /* ----------------------------------------------------------- bloqueadas */
 
+  /*
+   * QUEM BLOQUEOU, com a mesma cor do selo do formulário: companhia em
+   * vermelho, corretora em violeta. "Sem tipo" são as linhas de antes da
+   * coluna existir — decisão do PO: ficam assim até alguém editar.
+   */
+  function etiquetaDeQuemBloqueou(por) {
+    if (por === 'Companhia') return '<span class="situacao tom-ruim">Companhia</span>';
+    if (por === 'Corretora') return '<span class="situacao tom-violeta">Corretora</span>';
+    return '<span class="situacao tom-neutro">Sem tipo</span>';
+  }
+
   function desenharBloqueadas() {
+    var podeMexerAqui = dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS');
     var linhas = dados.bloqueadas.map(function (uma) {
       return '<tr>'
         + '<td><span class="principal">' + escapar(uma.susep) + '</span>'
         + '<span class="apoio">' + escapar(uma.corretora || 'sem nome') + '</span></td>'
+        + '<td>' + etiquetaDeQuemBloqueou(uma.bloqueadaPor) + '</td>'
         + '<td>' + escapar(uma.sucursal || '—') + '</td>'
         + '<td>' + escapar(uma.coordenadorComercial || '—') + '</td>'
         + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
-        + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
-          ? '<button type="button" class="botao-texto" data-liberar="'
+        + (podeMexerAqui
+          ? '<button type="button" class="botao-texto" data-editar-bloqueio="'
+            + escapar(uma.id) + '">Editar</button>'
+            + '<button type="button" class="botao-texto" data-liberar="'
             + escapar(uma.id) + '">Liberar</button>' : '')
         + '</td></tr>';
     }).join('');
@@ -398,15 +413,16 @@ var TelaTabelaCorretoras = (function () {
       + '</div>'
       + avisoDeOrigem('SUSEP_BLOQUEADAS')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
-      + 'o formulário passa a mostrar o selo vermelho, e quem está atendendo '
-      + 'decide. Bloqueio que impedisse o cadastro faria a pessoa registrar o '
+      + 'o formulário passa a mostrar o selo — vermelho quando quem bloqueou '
+      + 'foi a companhia, violeta quando foi a corretora —, e quem está '
+      + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa registrar o '
       + 'caso num caderno, e o sistema perderia o caso de vista.<br>'
       + 'Esta lista <strong>não vale para corretora Diamante</strong>: se a '
       + 'SUSEP está no cadastro de corretoras, o selo sai verde — são duas '
       + 'listas, de donos diferentes.</p>'
       + (dados.bloqueadas.length
         ? '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
-          + '<thead><tr><th>SUSEP</th><th>Sucursal</th>'
+          + '<thead><tr><th>SUSEP</th><th>Bloqueada por</th><th>Sucursal</th>'
           + '<th>Coordenador comercial</th>'
           + '<th>Desde</th><th class="direita">Casos</th>'
           + '<th class="acoes-coluna"></th></tr></thead>'
@@ -416,9 +432,13 @@ var TelaTabelaCorretoras = (function () {
     var nova = elemento('nova-bloqueada');
     if (nova) {
       nova.addEventListener('click', function () {
-        desenharFormularioDoBloqueio();
+        desenharFormularioDoBloqueio(null);
       });
     }
+    ligarCliques('[data-editar-bloqueio]', function (botao) {
+      desenharFormularioDoBloqueio(
+        acharNaLista(dados.bloqueadas, botao.getAttribute('data-editar-bloqueio')));
+    });
     ligarCliques('[data-liberar]', function (botao) {
       liberar(botao.getAttribute('data-liberar'));
     });
@@ -428,31 +448,59 @@ var TelaTabelaCorretoras = (function () {
       : 'O seu nível de acesso vê a lista, mas não mexe nela.');
   }
 
-  function desenharFormularioDoBloqueio() {
+  /**
+   * O formulário do bloqueio: novo, ou a edição de um que já existe.
+   *
+   * Editar existe para dar tipo às linhas antigas — elas ficaram "sem tipo",
+   * decisão do PO — e para corrigir um dado escrito errado.
+   */
+  function desenharFormularioDoBloqueio(bloqueio) {
+    var atual = bloqueio || { id: '', susep: '', corretora: '', sucursal: '',
+      coordenadorComercial: '', bloqueadaPor: '' };
+
     elemento('corretoras-painel').innerHTML =
       '<form class="config-form" id="form-bloqueio">'
-      + tituloDoPainel('Bloquear SUSEP', 'Marca o selo do formulário')
-      + campoDeTexto('susep', 'SUSEP', '',
+      + tituloDoPainel(atual.id ? 'Editar bloqueio' : 'Bloquear SUSEP',
+        'Marca o selo do formulário')
+      + campoDeTexto('susep', 'SUSEP', atual.susep,
         'Letras e números, como a SUSEP é escrita — por exemplo RET00J.')
-      + campoDeTexto('corretora', 'Corretora', '', '')
-      + campoDeTexto('sucursal', 'Sucursal', '', '')
-      + campoDeTexto('coordenador', 'Coordenador comercial', '',
+      + caixaDeQuemBloqueou(atual.bloqueadaPor)
+      + campoDeTexto('corretora', 'Corretora', atual.corretora, '')
+      + campoDeTexto('sucursal', 'Sucursal', atual.sucursal, '')
+      + campoDeTexto('coordenador', 'Coordenador comercial',
+        atual.coordenadorComercial,
         'Quem responde por este bloqueio. É a quem perguntar quando o selo '
-        + 'vermelho aparecer daqui a seis meses.')
+        + 'aparecer daqui a seis meses.')
       + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Bloquear</button></div></form>';
+      + '<button type="submit" class="botao">'
+      + (atual.id ? 'Salvar' : 'Bloquear') + '</button></div></form>';
 
     elemento('form-bloqueio').addEventListener('submit', function (evento) {
       evento.preventDefault();
       Servidor.chamar('bloquearSusep', {
+        id: atual.id,
         susep: valorDe('susep'), corretora: valorDe('corretora'),
         sucursal: valorDe('sucursal'),
-        coordenadorComercial: valorDe('coordenador')
+        coordenadorComercial: valorDe('coordenador'),
+        bloqueadaPor: valorDe('bloqueada-por')
       }).entao(function () {
-        avisar('SUSEP bloqueada.', 'bom');
+        avisar(atual.id ? 'Bloqueio salvo.' : 'SUSEP bloqueada.', 'bom');
         carregar();
       }).senao(mostrarErro);
     });
+  }
+
+  /** Companhia ou corretora. Sem escolha não grava — o servidor recusa. */
+  function caixaDeQuemBloqueou(escolhido) {
+    return '<label class="config-campo"><span>Bloqueada por</span>'
+      + '<select id="cfg-bloqueada-por">'
+      + '<option value=""' + (escolhido ? '' : ' selected') + '>Escolha…</option>'
+      + ['Companhia', 'Corretora'].map(function (um) {
+        return '<option value="' + um + '"'
+          + (um === escolhido ? ' selected' : '') + '>' + um + '</option>';
+      }).join('') + '</select>'
+      + '<em>Pela companhia o selo do formulário sai vermelho; pela corretora, '
+      + 'violeta.</em></label>';
   }
 
   function liberar(id) {

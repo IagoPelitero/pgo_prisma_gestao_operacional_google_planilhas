@@ -1528,6 +1528,177 @@ function rodarTestesDeConfiguracoes() {
     const estilos = fs.readFileSync(path.join(PASTA_DAS_TELAS, 'Estilos.html'), 'utf8');
     contem(estilos, '.botao.vazado.perigo {\n  background: var(--superficie); color: var(--ruim);');
   });
+
+  secao('O arquivo da auditoria: o que tem mais de 2 meses vai para outra planilha');
+
+  /*
+   * Pedido do PO: "vamos implementar um arquivamento dos dados de auditoria
+   * para cada 2 meses. Eu incluo o id da planilha destino e o sistema
+   * transporta os dados e em seguida apaga da planilha principal." Vai o que
+   * tem MAIS de 2 meses — decisão dele.
+   */
+  const arq = carregar('primeiro.adm@exemplo.com');
+  arq.chamar('instalarRECC()');
+  const diasAtras = (dias) => new Date(Date.now() - dias * 86400000);
+
+  // A auditoria de uma planilha em uso: as linhas mais velhas em cima. A
+  // quinta é velha, mas está DEPOIS de uma nova — e fica: o arquivamento leva
+  // o bloco do começo, e não caça linha velha no meio.
+  for (let i = 1; i <= 6; i++) {
+    arq.chamar('registrarAuditoria_')('teste.semente', 'CONFIG', '', 'linha ' + i);
+  }
+  const trilhaInicial = arq.chamar('lerRegistros_')('AUDITORIA');
+  [100, 90, 70, 30, 100].forEach((dias, i) => {
+    arq.chamar('atualizarRegistro_')('AUDITORIA', trilhaInicial[i].__id,
+      { DataHora: diasAtras(dias) });
+  });
+  const idsVelhos = trilhaInicial.slice(0, 3).map((linha) => linha.__id);
+
+  teste('sem a planilha de arquivo, arquivar pede o Id', () => {
+    lanca(() => arq.chamar('arquivarAuditoriaAgora()'), 'Informe antes o Id');
+    igual(arq.chamar('arquivarAuditoriaAgendada()').arquivou, false,
+      'e o acionador não faz nada nem reclama');
+  });
+
+  teste('o Id é conferido antes de ser guardado', () => {
+    lanca(() => arq.chamar('salvarArquivoDaAuditoria')('nao-existe'),
+      'Não consegui abrir');
+    lanca(() => arq.chamar('salvarArquivoDaAuditoria')('planilha-principal'),
+      'precisa ser OUTRA planilha');
+    igual(arq.chamar('configuracaoDoArquivoDaAuditoria()').planilhaId, '',
+      'nada foi guardado');
+  });
+
+  const idDoArquivo = arq.ambiente.criarPlanilhaExterna({});
+
+  teste('arquivar copia o que tem mais de 2 meses e apaga daqui', () => {
+    const configurado = arq.chamar('salvarArquivoDaAuditoria')(idDoArquivo);
+    igual(configurado.planilhaId, idDoArquivo);
+
+    const feito = arq.chamar('arquivarAuditoriaAgora()');
+    igual(feito.arquivadas, 3, 'as três linhas velhas do começo');
+
+    const la = arq.ambiente.planilhaExternaPeloId(idDoArquivo)
+      .getSheetByName('AUDITORIA');
+    verdadeiro(!!la, 'a aba AUDITORIA nasceu na planilha de arquivo');
+    igual(la.getLastRow(), 4, 'cabeçalho + 3 linhas');
+    const cabecalho = la.getRange(1, 1, 1, 7).getValues()[0];
+    igual(cabecalho.join('|'), 'Id|DataHora|UsuarioId|Acao|Entidade|RegistroId|Detalhe');
+    const idsLa = la.getRange(2, 1, 3, 1).getValues().map((l) => l[0]);
+    igual(idsLa.join('|'), idsVelhos.join('|'),
+      'os Ids chegam com os zeros à esquerda — em texto, como saíram daqui');
+    verdadeiro(la.getRange(2, 2).getValues()[0][0] instanceof Date,
+      'a data chega como data');
+
+    const aqui = arq.chamar('lerRegistros_')('AUDITORIA').map((l) => l.__id);
+    verdadeiro(idsVelhos.every((id) => aqui.indexOf(id) < 0), 'e saíram daqui');
+    verdadeiro(aqui.indexOf(trilhaInicial[3].__id) >= 0, 'a de 30 dias ficou');
+    verdadeiro(aqui.indexOf(trilhaInicial[4].__id) >= 0,
+      'a velha que estava depois de uma nova também ficou');
+    verdadeiro(arq.chamar('lerRegistros_')('AUDITORIA')
+      .some((l) => l.Acao === 'auditoria.arquivar'), 'e o arquivamento deixa rastro');
+
+    const depois = arq.chamar('configuracaoDoArquivoDaAuditoria()');
+    igual(depois.ultimoQuantas, 3);
+    verdadeiro(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/.test(depois.ultimoEm),
+      'a tela mostra quando foi, veio ' + depois.ultimoEm);
+  });
+
+  teste('arquivar de novo não repete linha no arquivo', () => {
+    igual(arq.chamar('arquivarAuditoriaAgora()').arquivadas, 0);
+    igual(arq.ambiente.planilhaExternaPeloId(idDoArquivo)
+      .getSheetByName('AUDITORIA').getLastRow(), 4);
+  });
+
+  teste('o segundo arquivamento soma no fim do arquivo, sem outro cabeçalho', () => {
+    arq.chamar('atualizarRegistro_')('AUDITORIA', trilhaInicial[3].__id,
+      { DataHora: diasAtras(80) });
+    igual(arq.chamar('arquivarAuditoriaAgora()').arquivadas, 2,
+      'agora as duas do começo são velhas');
+    const la = arq.ambiente.planilhaExternaPeloId(idDoArquivo)
+      .getSheetByName('AUDITORIA');
+    igual(la.getLastRow(), 6);
+    igual(la.getRange(5, 1).getValues()[0][0], trilhaInicial[3].__id);
+  });
+
+  teste('o acionador só arquiva de 2 em 2 meses, contando por mês', () => {
+    igual(arq.chamar('arquivarAuditoriaAgendada()').arquivou, false,
+      'acabou de arquivar');
+
+    // O último foi há dois meses do calendário.
+    const hoje = new Date();
+    const doisMesesAntes = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
+    const texto = doisMesesAntes.getFullYear() + '-'
+      + String(doisMesesAntes.getMonth() + 1).padStart(2, '0') + '-01 08:00';
+    arq.chamar('gravarConfiguracao_')('AUDITORIA.ARQUIVADA_EM', texto);
+    const rodou = arq.chamar('arquivarAuditoriaAgendada()');
+    igual(rodou.arquivou, true);
+
+    // E um mês só não basta.
+    const umMesAntes = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 28);
+    arq.chamar('gravarConfiguracao_')('AUDITORIA.ARQUIVADA_EM',
+      umMesAntes.getFullYear() + '-'
+      + String(umMesAntes.getMonth() + 1).padStart(2, '0') + '-28 23:59');
+    igual(arq.chamar('arquivarAuditoriaAgendada()').arquivou, false);
+  });
+
+  teste('arquivo com cabeçalho em outra ordem recebe cada valor na sua coluna', () => {
+    const outro = carregar('primeiro.adm@exemplo.com');
+    outro.chamar('instalarRECC()');
+    outro.chamar('registrarAuditoria_')('teste.semente', 'CONFIG', '', 'a velha');
+    const primeira = outro.chamar('lerRegistros_')('AUDITORIA')[0];
+    outro.chamar('atualizarRegistro_')('AUDITORIA', primeira.__id,
+      { DataHora: diasAtras(120) });
+    const id = outro.ambiente.criarPlanilhaExterna({
+      AUDITORIA: [['Acao', 'Id', 'Observação de quem cuida do arquivo']]
+    });
+    outro.chamar('salvarArquivoDaAuditoria')(id);
+    igual(outro.chamar('arquivarAuditoriaAgora()').arquivadas, 1);
+
+    const la = outro.ambiente.planilhaExternaPeloId(id).getSheetByName('AUDITORIA');
+    const cab = la.getRange(1, 1, 1, la.getLastColumn()).getValues()[0];
+    igual(cab.slice(0, 3).join('|'), 'Acao|Id|Observação de quem cuida do arquivo',
+      'o que já estava lá não sai do lugar');
+    verdadeiro(cab.indexOf('DataHora') > 2, 'o que faltava entra no fim');
+    const linha = la.getRange(2, 1, 1, cab.length).getValues()[0];
+    igual(linha[0], String(primeira.Acao));
+    igual(linha[1], primeira.__id);
+    igual(linha[2], '', 'a coluna de lá fica em branco');
+  });
+
+  teste('quem não configura não arquiva nem aponta a planilha — nem com a senha', () => {
+    // Alguém da operação que soubesse a senha de administrador: a senha
+    // libera mudança de estrutura, e não a tela que o nível dele não tem.
+    const operacao = arq.chamar('lerRegistros_("CATALOGO")')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+    arq.chamar('salvarUsuario')({ nome: 'Ana Martins', email: 'ana@exemplo.com',
+      nivelAcessoId: operacao.Id, ativo: true });
+    arq.chamar('definirSenhaDeAdministrador')('segredo123', '');
+    const ultimoAntes = arq.chamar('valorDaConfiguracao_')('AUDITORIA.ARQUIVADA_EM', '');
+    comoUsuario(arq.ambiente, 'ana@exemplo.com', () => {
+      // A senha liberada, como se ela a tivesse digitado — a porta da senha
+      // passa, e quem barra tem de ser a do nível de acesso.
+      arq.ambiente.propriedadesDoUsuario.set('RECC_SENHA_LIBERADA_ATE',
+        String(Date.now() + 600000));
+      lanca(() => arq.chamar('arquivarAuditoriaAgora()'), 'não permite configurar');
+      lanca(() => arq.chamar('salvarArquivoDaAuditoria')(idDoArquivo),
+        'não permite configurar');
+      lanca(() => arq.chamar('configuracaoDoArquivoDaAuditoria()'),
+        'não permite configurar');
+    });
+    // Barrar DEPOIS de arquivar não serve: a porta é a primeira coisa.
+    igual(arq.chamar('valorDaConfiguracao_')('AUDITORIA.ARQUIVADA_EM', ''),
+      ultimoAntes, 'nenhum arquivamento rodou');
+  });
+
+  teste('a tela mostra o bloco, com o passo do acionador', () => {
+    const tela = lerTela('Configuracoes.html');
+    contem(tela, "Servidor.chamar('configuracaoDoArquivoDaAuditoria')");
+    contem(tela, "Servidor.chamar('salvarArquivoDaAuditoria'");
+    contem(tela, "Servidor.chamar('arquivarAuditoriaAgora')");
+    contem(tela, 'arquivarAuditoriaAgendada', 'o nome da função para o acionador');
+    contem(tela, 'id="arquivar-agora"');
+  });
 }
 
 module.exports = { rodarTestesDeConfiguracoes };

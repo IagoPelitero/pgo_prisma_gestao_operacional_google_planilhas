@@ -1075,13 +1075,15 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 
 /* O selo da SUSEP. "Desconhecida" tem cor própria de propósito: não é erro
    nem sucesso — é uma corretora fora do cadastro, e quem atende precisa
-   perceber isso sem confundir com bloqueio. */
+   perceber isso sem confundir com bloqueio. O bloqueio PELA CORRETORA também
+   tem a sua, violeta, para não se confundir com o da companhia (vermelho). */
 .selo-susep {
   font-size: 12.5px; font-weight: 600; border-radius: 999px;
   padding: 4px 11px; align-self: flex-start;
 }
 .selo-susep.liberada    { color: var(--bom); background: var(--bom-tenue); }
 .selo-susep.bloqueada   { color: var(--ruim); background: var(--ruim-tenue); }
+.selo-susep.bloqueada-corretora { color: var(--violeta); background: var(--violeta-tenue); }
 .selo-susep.desconhecida{ color: var(--atencao); background: var(--atencao-tenue); }
 .selo-susep.conferindo  { color: var(--suave); background: var(--superficie-2); }
 
@@ -2116,6 +2118,27 @@ table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-n
 .busca-do-cadastro:focus { border-color: var(--destaque); }
 
 table.fila.cadastro { min-width: 720px; }
+/* As tabelas de cadastro têm colunas curtas e ações de texto. A largura fixa
+   da fila agrupada — medida para os três botões do Trabalho — reservava 292px
+   para "Editar  Liberar" e espremia o resto: a etiqueta "Companhia" passava
+   por cima da Sucursal, e "COORDENADOR" por cima de "DESDE". Aqui cada coluna
+   mede o próprio conteúdo, e o que não couber faz a tabela rolar. */
+table.fila.agrupada.cadastro { table-layout: auto; }
+table.fila.agrupada.cadastro th,
+table.fila.agrupada.cadastro td { padding-left: 10px; padding-right: 10px; }
+/* O nome da corretora pode quebrar em duas linhas: sem isso a soma das
+   colunas passava da largura do cartão e o lápis de editar ficava cortado.
+   Quebra só no ESPAÇO: "RET90A" partido em "RET9 / 0A" deixa de ser SUSEP. */
+table.fila.agrupada.cadastro td:first-child > span:first-child,
+table.fila.agrupada.cadastro .principal,
+table.fila.agrupada.cadastro .apoio { white-space: normal; overflow-wrap: normal; }
+/* E as ações voltam a ficar presas à direita: quando a tabela rola — no
+   celular, sempre —, editar e liberar continuam ao alcance. */
+table.fila.agrupada.cadastro th.acoes-coluna,
+table.fila.agrupada.cadastro td.acoes-coluna {
+  width: auto; position: sticky; right: 0;
+  box-shadow: -10px 0 10px -10px rgba(0, 0, 0, .22);
+}
 table.fila.cadastro .direita { text-align: right; font-variant-numeric: tabular-nums; }
 table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 

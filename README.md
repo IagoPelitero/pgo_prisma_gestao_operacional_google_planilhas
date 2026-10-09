@@ -752,8 +752,8 @@ ajustavam abrindo a planilha. Eram três: **Produtos saiu** a pedido do PO, e
 `atualizarPGO()` apaga a aba da planilha dizendo quantas linhas foram.
 
 As corretoras Diamante pedem **SUSEP, Corretora, Sucursal, Segmento e
-Consultor**. As bloqueadas pedem **SUSEP, Corretora, Sucursal e Coordenador
-comercial**. As duas listas se importam de **outra planilha, pelo Id** — colar
+Consultor**. As bloqueadas pedem **SUSEP, quem bloqueou, Corretora, Sucursal e
+Coordenador comercial**. As duas listas se importam de **outra planilha, pelo Id** — colar
 sete mil SUSEPs numa caixa de texto é o que ninguém faz duas vezes.
 
 O que faz a tela valer mais que uma lista é o **cruzamento com os casos**: o
@@ -762,9 +762,24 @@ e não estão cadastradas**. Enquanto uma delas fica de fora, o selo do
 formulário diz "não encontrada" toda vez — e o sintoma aparece em outra tela,
 uma pessoa de cada vez, sem ninguém ligar à causa.
 
-**Bloquear não impede cadastrar**: o formulário mostra o selo vermelho com o
-motivo, e quem atende decide. Bloqueio que impedisse faria a pessoa registrar o
-caso num caderno, e o sistema perderia o caso de vista.
+**Bloquear não impede cadastrar**: o formulário mostra o selo, e quem atende
+decide. Bloqueio que impedisse faria a pessoa registrar o caso num caderno, e o
+sistema perderia o caso de vista.
+
+**Quem bloqueou: a companhia ou a corretora.** São os dois tipos de bloqueio, e
+cada um tem o seu sinal — no selo do formulário e na lista:
+
+| Bloqueada por | Selo do formulário | Na planilha (`BloqueadaPor`) |
+|---|---|---|
+| Companhia | vermelho, "SUSEP bloqueada pela companhia" | `Companhia` |
+| Corretora | violeta, "SUSEP bloqueada pela corretora" | `Corretora` |
+| sem tipo | vermelho, "SUSEP bloqueada" | em branco |
+
+Todo bloqueio novo pede o tipo. Os que **já existiam ficam sem tipo** —
+decisão do PO — até alguém abrir **Editar** na lista e escolher. A planilha
+grava sempre `Companhia` ou `Corretora`, escritos igual, para o filtro dela
+ter dois valores e não dez. A importação aceita a coluna **"Bloqueada por"**
+(em branco entra sem tipo; outro valor é recusado na conferência).
 
 Duas regras do PO mandam no selo, e as duas são de negócio:
 
@@ -1041,6 +1056,25 @@ lê a coluna de carimbo, e por isso não zera quando o caso avança.
 
 ![Os cartões e os gráficos](Evolucao/imagens/tela-configuracoes-paineis.png)
 
+### O arquivo da auditoria
+
+A auditoria só cresce. Em Configurações › Estrutura, o bloco **Arquivo da
+auditoria** leva para **outra planilha** o que tem **mais de 2 meses** — os 2
+últimos meses ficam. O PO informa o Id da planilha de destino (o pedaço do
+endereço entre `/d/` e `/edit`); o sistema confere que ela abre e que não é
+esta mesma, e pede a senha de administrador.
+
+A ordem é a regra: **copia, confere a cópia, e só então apaga daqui**. As
+linhas vão para a aba `AUDITORIA` da planilha de destino, que nasce sozinha no
+primeiro arquivamento; as colunas casam pelo nome. O botão **Arquivar agora**
+faz na hora — com aviso de atenção e senha.
+
+**Para arquivar sozinho, a cada 2 meses:** no editor do Apps Script, em
+*Acionadores*, crie um acionador **por tempo, mensal**, apontando para a função
+`arquivarAuditoriaAgendada`. Ela roda todo mês e só arquiva quando o último
+arquivamento foi há 2 meses ou mais. Sem planilha de destino informada, ela
+não faz nada.
+
 **Configurações permite ajustar tudo?** Quase — e a lista completa, com o que
 ainda falta e por quê, está em
 [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md).
@@ -1078,7 +1112,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-835 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+854 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

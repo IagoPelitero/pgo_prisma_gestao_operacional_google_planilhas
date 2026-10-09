@@ -291,6 +291,45 @@ function ocultarCorretora(idDaCorretora) {
 // AS SUSEPs BLOQUEADAS
 // ============================================================================
 
+/*
+ * QUEM BLOQUEOU: A COMPANHIA OU A CORRETORA.
+ *
+ * Pedido do PO: "as suseps bloqueadas são por 2 tipos: bloqueadas pela
+ * companhia e bloqueada pela corretora". O valor gravado na coluna
+ * `BloqueadaPor` é um destes dois, escrito sempre igual — a planilha filtra
+ * por ele, e "companhia", "Cia" e "COMPANHIA" seriam três tipos para o filtro.
+ *
+ * Em branco é o terceiro estado, e é de propósito: as linhas que já existiam
+ * antes da coluna ficam SEM TIPO, decisão do PO, até alguém editar e escolher.
+ */
+var RECC_QUEM_BLOQUEOU = ['Companhia', 'Corretora'];
+
+/** 'companhia', 'CORRETORA ' → 'Companhia', 'Corretora'. O resto vira ''. */
+function quemBloqueou_(texto) {
+  var procurado = normalizarParaComparar_(texto);
+  return RECC_QUEM_BLOQUEOU.filter(function (tipo) {
+    return normalizarParaComparar_(tipo) === procurado;
+  })[0] || '';
+}
+
+/** A aba já tem a coluna? Planilha que não rodou `atualizarPGO()` ainda não. */
+function abaTemBloqueadaPor_() {
+  return posicaoDaColuna_(estruturaDaAba_('SUSEP_BLOQUEADAS'), 'BloqueadaPor') >= 0;
+}
+
+/**
+ * Como criar a coluna que falta. Depende de onde a aba mora: aqui, o
+ * `atualizarPGO()` cria; na planilha de cadastros de fora, quem cria é quem
+ * cuida dela — o PGO não mexe na estrutura de uma planilha que não é sua.
+ */
+function comoCriarAColuna_(nomeDaAba, cabecalho) {
+  return abaVemDeOutraPlanilha_(nomeDaAba)
+    ? 'A aba ' + nomeDaAba + ' da planilha de cadastros ainda não tem a coluna "'
+      + cabecalho + '". Acrescente essa coluna lá, na primeira linha.'
+    : 'A aba ' + nomeDaAba + ' ainda não tem a coluna "' + cabecalho
+      + '". Peça ao administrador para rodar atualizarPGO().';
+}
+
 function listarSusepsBloqueadas() {
   exigirTela_('tabelaCorretoras');
   var volumes = volumePorSusep_();
@@ -304,6 +343,7 @@ function listarSusepsBloqueadas() {
         corretora: String(linha.NomeCorretora || ''),
         sucursal: String(linha.Sucursal || ''),
         coordenadorComercial: String(linha.CoordenadorComercial || ''),
+        bloqueadaPor: quemBloqueou_(linha.BloqueadaPor),
         bloqueadaEm: linha.BloqueadaEm
           ? Utilities.formatDate(new Date(linha.BloqueadaEm), RECC_FUSO_HORARIO,
             'dd/MM/yyyy')
@@ -352,6 +392,23 @@ function bloquearSusep(dados) {
     Sucursal: String(dados.sucursal || '').trim(),
     CoordenadorComercial: String(dados.coordenadorComercial || '').trim()
   };
+
+  /*
+   * QUEM BLOQUEOU é obrigatório em todo bloqueio NOVO. Na edição, só muda se
+   * vier: quem chama sem o campo não está mexendo nele, e apagar o tipo em
+   * silêncio seria perder a resposta que alguém já deu.
+   */
+  var vieramOTipo = dados.bloqueadaPor !== undefined;
+  var tipo = quemBloqueou_(dados.bloqueadaPor);
+  if ((!id || vieramOTipo) && !tipo) {
+    throw new Error('Informe quem bloqueou a SUSEP: a companhia ou a corretora.');
+  }
+  if (tipo) {
+    if (!abaTemBloqueadaPor_()) {
+      throw new Error(comoCriarAColuna_('SUSEP_BLOQUEADAS', 'BloqueadaPor'));
+    }
+    campos.BloqueadaPor = tipo;
+  }
 
   if (id) {
     atualizarRegistro_('SUSEP_BLOQUEADAS', id, campos);
@@ -531,7 +588,11 @@ var RECC_IMPORTACOES = {
       { chave: 'sucursal', titulo: 'Sucursal', coluna: 'Sucursal',
         tipo: 'texto' },
       { chave: 'coordenadorComercial', titulo: 'Coordenador comercial',
-        coluna: 'CoordenadorComercial', tipo: 'texto' }
+        coluna: 'CoordenadorComercial', tipo: 'texto' },
+      // "Companhia" ou "Corretora". Fora disso a linha é recusada — o tipo
+      // escrito de três jeitos viraria três tipos no filtro da planilha.
+      { chave: 'bloqueadaPor', titulo: 'Bloqueada por', coluna: 'BloqueadaPor',
+        tipo: 'quemBloqueou' }
     ]
   }
 };
@@ -850,6 +911,14 @@ function conferirUmaLinha_(linha, receita, existentes, vistas) {
       ? converterParaIdentificador_(bruto)
       : String(bruto === undefined ? '' : bruto).trim();
 
+    if (coluna.tipo === 'quemBloqueou' && valor) {
+      if (!quemBloqueou_(valor)) {
+        problemas.push(coluna.titulo + ' "' + valor
+          + '" — use Companhia ou Corretora');
+      }
+      valor = quemBloqueou_(valor);
+    }
+
     if (!valor && coluna.padrao) valor = coluna.padrao;
     if (!valor && coluna.obrigatoria) {
       problemas.push(coluna.tipo === 'identificador' && String(bruto || '').trim()
@@ -937,16 +1006,30 @@ function aplicarImportacao(tipo, fonte) {
   var receita = RECC_IMPORTACOES[tipo];
   var conferido = conferirImportacao_(tipo, fonte);
 
+  /*
+   * COLUNA QUE A ABA AINDA NÃO TEM — a `BloqueadaPor`, numa planilha que não
+   * rodou `atualizarPGO()`. Em branco no arquivo, é só não escrever nela. Com
+   * valor, para ANTES de gravar a primeira linha: parar no meio deixaria
+   * metade do arquivo gravada e a outra metade não.
+   */
+  var faltando = colunasDaImportacaoQueFaltam_(receita);
+  var perderia = faltando.filter(function (coluna) {
+    return conferido.todas.some(function (linha) {
+      return linha.situacao !== 'recusada' && linha.campos[coluna.chave];
+    });
+  })[0];
+  if (perderia) throw new Error(comoCriarAColuna_(receita.aba, perderia.coluna));
+
   var paraCriar = [];
   var criadas = 0;
   var atualizadas = 0;
 
   conferido.todas.forEach(function (linha) {
     if (linha.situacao === 'nova') {
-      paraCriar.push(camposParaAAba_(linha.campos, receita, true));
+      paraCriar.push(camposParaAAba_(linha.campos, receita, true, faltando));
     } else if (linha.situacao === 'atualiza') {
       atualizarRegistro_(receita.aba, linha.id,
-        camposParaAAba_(linha.campos, receita, false));
+        camposParaAAba_(linha.campos, receita, false, faltando));
       atualizadas++;
     }
   });
@@ -969,6 +1052,14 @@ function aplicarImportacao(tipo, fonte) {
   };
 }
 
+/** As colunas da importação que a aba de destino não tem. */
+function colunasDaImportacaoQueFaltam_(receita) {
+  var estrutura = estruturaDaAba_(receita.aba);
+  return receita.colunas.filter(function (coluna) {
+    return posicaoDaColuna_(estrutura, coluna.coluna) < 0;
+  });
+}
+
 /**
  * Traduz os campos da importação para os nomes de coluna da aba.
  *
@@ -976,9 +1067,10 @@ function aplicarImportacao(tipo, fonte) {
  * faz a regra do "vazio não apaga" valer também na hora de escrever, e não só
  * na hora de conferir.
  */
-function camposParaAAba_(campos, receita, ehNova) {
+function camposParaAAba_(campos, receita, ehNova, faltando) {
   var linha = {};
   receita.colunas.forEach(function (coluna) {
+    if ((faltando || []).indexOf(coluna) >= 0) return;
     var valor = campos[coluna.chave];
     if (!valor && !ehNova) return;
     linha[coluna.coluna] = valor || '';

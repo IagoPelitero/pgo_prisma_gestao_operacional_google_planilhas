@@ -2260,10 +2260,15 @@ var TelaConfiguracoes = (function () {
             Servidor.chamar('configuracaoDosCadastros')
               .entao(function (cadastros) {
                 dados.cadastros = cadastros;
-                Servidor.chamar('listarAuditoria', 40)
-                  .entao(function (trilha) {
-                    dados.trilha = trilha;
-                    desenharEstrutura();
+                Servidor.chamar('configuracaoDoArquivoDaAuditoria')
+                  .entao(function (arquivo) {
+                    dados.arquivoDaAuditoria = arquivo;
+                    Servidor.chamar('listarAuditoria', 40)
+                      .entao(function (trilha) {
+                        dados.trilha = trilha;
+                        desenharEstrutura();
+                      })
+                      .senao(falhou);
                   })
                   .senao(falhou);
               })
@@ -2304,9 +2309,10 @@ var TelaConfiguracoes = (function () {
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
     elemento('config-lista').innerHTML += desenharDiagnostico()
-      + desenharCadastros() + desenharLegado();
+      + desenharCadastros() + desenharArquivoDaAuditoria() + desenharLegado();
     ligarDiagnostico();
     ligarCadastros();
+    ligarArquivoDaAuditoria();
     ligarLegado();
 
     elemento('config-painel').innerHTML = '<div class="config-form">'
@@ -2523,6 +2529,93 @@ var TelaConfiguracoes = (function () {
             avisar(erro.message || String(erro), 'ruim');
           });
       });
+    });
+  }
+
+  /**
+   * O arquivo da auditoria: o que tem mais de 2 meses vai para outra planilha.
+   *
+   * Pedido do PO: "eu incluo o id da planilha destino e o sistema transporta
+   * os dados e em seguida apaga da planilha principal". O botão "Arquivar
+   * agora" existe para o primeiro arquivamento e para quem não quer esperar o
+   * acionador — os dois pedem a senha, porque apagam linha da planilha.
+   */
+  function desenharArquivoDaAuditoria() {
+    var arquivo = dados.arquivoDaAuditoria || { planilhaId: '', meses: 2,
+      ultimoEm: '', ultimoQuantas: 0, linhasNaAuditoria: 0, arquivariaAte: '' };
+
+    return '<div class="config-legado" id="caixa-do-arquivo">'
+      + '<h4>Arquivo da auditoria</h4>'
+      + '<p class="config-explica">A auditoria só cresce. A cada '
+      + arquivo.meses + ' meses, o que tem <strong>mais de ' + arquivo.meses
+      + ' meses</strong> é copiado para a aba AUDITORIA de outra planilha, '
+      + 'conferido lá, e só então apagado daqui. Os ' + arquivo.meses
+      + ' últimos meses ficam.</p>'
+      + '<p class="config-explica">Hoje: <strong>' + arquivo.linhasNaAuditoria
+      + '</strong> linha(s) na auditoria. Arquivar agora levaria as de antes de '
+      + '<strong>' + escapar(arquivo.arquivariaAte) + '</strong>. '
+      + (arquivo.ultimoEm
+        ? 'Último arquivamento: ' + escapar(arquivo.ultimoEm) + ', '
+          + arquivo.ultimoQuantas + ' linha(s).'
+        : 'Nenhum arquivamento feito ainda.') + '</p>'
+      + '<form class="config-form" id="form-arquivo-da-auditoria">'
+      + campoDeTexto('arquivoId', 'Id da planilha de arquivo', arquivo.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha, '
+        + 'e a conta que roda o sistema precisa ter acesso a ela.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (arquivo.planilhaId
+        ? '<button type="button" class="botao vazado" id="arquivar-agora">'
+          + 'Arquivar agora</button>' : '')
+      + '</div></form>'
+      + '<details class="config-explica"><summary>Para arquivar sozinho, a cada '
+      + arquivo.meses + ' meses</summary>'
+      + '<p>No editor do Apps Script, em Acionadores, crie um acionador '
+      + '<strong>por tempo, mensal</strong>, para a função '
+      + '<code>arquivarAuditoriaAgendada</code>. Ela roda todo mês e só '
+      + 'arquiva quando o último arquivamento foi há ' + arquivo.meses
+      + ' meses ou mais.</p></details>'
+      + '</div>';
+  }
+
+  function ligarArquivoDaAuditoria() {
+    elemento('form-arquivo-da-auditoria').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarArquivoDaAuditoria', valorDe('arquivoId'))
+          .entao(function (novo) {
+            dados.arquivoDaAuditoria = novo;
+            avisarSalvo(novo.planilhaId
+              ? 'Planilha de arquivo da auditoria conferida e salva.'
+              : 'Arquivo da auditoria desligado.');
+            carregarEstrutura();
+          })
+          .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+      });
+    });
+
+    var agora = elemento('arquivar-agora');
+    if (!agora) return;
+    agora.addEventListener('click', function () {
+      var arquivo = dados.arquivoDaAuditoria;
+      Formulario.confirmarAtencao('Arquivar a auditoria agora?',
+        'As linhas de antes de <strong>' + escapar(arquivo.arquivariaAte)
+        + '</strong> vão para a planilha de arquivo e são <strong>apagadas '
+        + 'daqui</strong> depois de conferidas lá.',
+        'Arquivar', function () {
+          comSenhaDeAdministrador(function () {
+            Servidor.chamar('arquivarAuditoriaAgora')
+              .entao(function (resultado) {
+                dados.arquivoDaAuditoria = resultado.configuracao;
+                avisarSalvo(resultado.arquivadas
+                  ? resultado.arquivadas + ' linha(s) arquivada(s).'
+                  : 'Nada a arquivar: nenhuma linha de antes de '
+                    + resultado.ate + '.');
+                carregarEstrutura();
+              })
+              .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+          });
+        });
     });
   }
 

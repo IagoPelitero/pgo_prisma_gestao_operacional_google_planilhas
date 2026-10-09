@@ -130,7 +130,8 @@ function rodarTestesDeCorretoras() {
       .some((uma) => uma.susep === 'RET98Y'), 'antes de bloquear, ela aparece');
 
     chamar('bloquearSusep')({ susep: 'RET98Y', corretora: 'Bloqueada Ltda',
-      sucursal: '12', coordenadorComercial: 'Coordenação Sul' });
+      sucursal: '12', coordenadorComercial: 'Coordenação Sul',
+      bloqueadaPor: 'Companhia' });
     verdadeiro(chamar('tabelaDeCorretoras')('', '').foraDoCadastro
       .some((uma) => uma.susep === 'RET98Y'),
       'depois de bloquear, ela CONTINUA fora do cadastro de corretoras');
@@ -198,7 +199,8 @@ function rodarTestesDeCorretoras() {
      */
     chamar('bloquearSusep')({
       susep: 'RET01A', corretora: 'Agência Central',
-      sucursal: '58', coordenadorComercial: 'Coordenação Norte'
+      sucursal: '58', coordenadorComercial: 'Coordenação Norte',
+      bloqueadaPor: 'Companhia'
     });
 
     const uma = chamar('listarSusepsBloqueadas()')
@@ -209,12 +211,17 @@ function rodarTestesDeCorretoras() {
     verdadeiro(uma.motivo === undefined, 'o motivo não é mais pedido nem lido');
   });
 
-  teste('bloquear sem SUSEP é recusado; sem o resto, aceito', () => {
+  teste('bloquear sem SUSEP ou sem quem bloqueou é recusado; sem o resto, aceito', () => {
     // A SUSEP é a única coisa sem a qual o bloqueio não quer dizer nada: é por
     // ela que o selo acha a linha.
-    lanca(() => chamar('bloquearSusep')({ corretora: 'Sem SUSEP' }),
-      'Informe a SUSEP a bloquear');
-    const id = chamar('bloquearSusep')({ susep: 'RET50M' });
+    lanca(() => chamar('bloquearSusep')({ corretora: 'Sem SUSEP',
+      bloqueadaPor: 'Companhia' }), 'Informe a SUSEP a bloquear');
+    // E quem bloqueou, desde o pedido do PO: é o que muda a cor do selo.
+    lanca(() => chamar('bloquearSusep')({ susep: 'RET50M' }),
+      'Informe quem bloqueou');
+    lanca(() => chamar('bloquearSusep')({ susep: 'RET50M', bloqueadaPor: 'Cia' }),
+      'Informe quem bloqueou');
+    const id = chamar('bloquearSusep')({ susep: 'RET50M', bloqueadaPor: 'Corretora' });
     verdadeiro(!!id, 'o resto a operação completa depois');
   });
 
@@ -273,6 +280,82 @@ function rodarTestesDeCorretoras() {
     const naPlanilha = chamar('lerRegistros_')('SUSEP_BLOQUEADAS',
       { incluirOcultos: true }).find((linha) => linha.__id === bloqueada.id);
     verdadeiro(!!naPlanilha, 'o registro do bloqueio permanece, com a data');
+  });
+
+  secao('Quem bloqueou: a companhia ou a corretora');
+
+  teste('o selo diz quem bloqueou, e a lista também', () => {
+    // Pedido do PO: "as suseps bloqueadas são por 2 tipos: bloqueadas pela
+    // companhia e bloqueada pela corretora".
+    chamar('bloquearSusep')({ susep: 'RET60P', corretora: 'Pela Cia',
+      bloqueadaPor: 'Companhia' });
+    chamar('bloquearSusep')({ susep: 'RET61Q', corretora: 'Pela Própria',
+      bloqueadaPor: 'Corretora' });
+
+    const daCia = chamar('consultarSusep')('RET60P');
+    igual(daCia.situacao, 'BLOQUEADA');
+    igual(daCia.bloqueadaPor, 'Companhia');
+    contem(daCia.mensagem, 'SUSEP bloqueada pela companhia');
+
+    const daCorretora = chamar('consultarSusep')('RET61Q');
+    igual(daCorretora.bloqueadaPor, 'Corretora');
+    contem(daCorretora.mensagem, 'SUSEP bloqueada pela corretora');
+
+    const lista = chamar('listarSusepsBloqueadas()');
+    igual(lista.find((uma) => uma.susep === 'RET60P').bloqueadaPor, 'Companhia');
+    igual(lista.find((uma) => uma.susep === 'RET61Q').bloqueadaPor, 'Corretora');
+  });
+
+  teste('o tipo é gravado sempre do mesmo jeito na planilha', () => {
+    // A planilha filtra por esta coluna: "companhia", "COMPANHIA " e
+    // "Companhia" seriam três tipos no filtro.
+    chamar('bloquearSusep')({ susep: 'RET62R', bloqueadaPor: '  companhia ' });
+    const linha = chamar('lerRegistros_')('SUSEP_BLOQUEADAS')
+      .find((uma) => uma.SUSEP === 'RET62R');
+    igual(linha.BloqueadaPor, 'Companhia');
+  });
+
+  teste('linha antiga fica sem tipo, e editar dá o tipo a ela', () => {
+    // As que já existiam ficam sem tipo — decisão do PO — até alguém editar.
+    chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', { SUSEP: 'RET63S',
+      NomeCorretora: 'Antiga', BloqueadaEm: new Date() });
+    const antiga = chamar('listarSusepsBloqueadas()')
+      .find((uma) => uma.susep === 'RET63S');
+    igual(antiga.bloqueadaPor, '');
+    const selo = chamar('consultarSusep')('RET63S');
+    igual(selo.situacao, 'BLOQUEADA', 'sem tipo continua bloqueada');
+    igual(selo.mensagem, 'SUSEP bloqueada — Antiga', 'e não inventa por quem');
+
+    chamar('bloquearSusep')({ id: antiga.id, susep: 'RET63S',
+      corretora: 'Antiga', bloqueadaPor: 'Corretora' });
+    igual(chamar('listarSusepsBloqueadas()')
+      .find((uma) => uma.susep === 'RET63S').bloqueadaPor, 'Corretora');
+  });
+
+  teste('editar sem mandar o tipo não apaga o tipo; mandar em branco é recusado', () => {
+    const uma = chamar('listarSusepsBloqueadas()')
+      .find((linha) => linha.susep === 'RET63S');
+    chamar('bloquearSusep')({ id: uma.id, susep: 'RET63S', corretora: 'Antiga',
+      sucursal: '77' });
+    const depois = chamar('listarSusepsBloqueadas()')
+      .find((linha) => linha.susep === 'RET63S');
+    igual(depois.sucursal, '77');
+    igual(depois.bloqueadaPor, 'Corretora', 'o tipo de antes ficou');
+
+    lanca(() => chamar('bloquearSusep')({ id: uma.id, susep: 'RET63S',
+      bloqueadaPor: '' }), 'Informe quem bloqueou');
+  });
+
+  teste('planilha que não rodou atualizarPGO: bloquear explica o que fazer', () => {
+    const { chamar: noVelho } = carregar('primeiro.adm@exemplo.com');
+    noVelho('instalarRECC()');
+    noVelho('removerColuna_')('SUSEP_BLOQUEADAS', 'BloqueadaPor');
+    noVelho('esquecerEstruturaLida_()');
+
+    lanca(() => noVelho('bloquearSusep')({ susep: 'RET64T',
+      bloqueadaPor: 'Companhia' }), 'rodar atualizarPGO()');
+    igual(noVelho('listarSusepsBloqueadas()').length, 0,
+      'e a lista continua abrindo');
   });
 
   secao('Permissão');
@@ -524,6 +607,55 @@ function rodarTestesDeCorretoras() {
       'está no cadastro de corretoras, e o cadastro ganha');
   });
 
+  teste('importar traz quem bloqueou, escrito do jeito certo', () => {
+    chamar('liberarComSenha')('segredo123');
+    const feito = chamar('aplicarImportacao')('susepsBloqueadas',
+      'SUSEP;Corretora;Sucursal;Coordenador comercial;Bloqueada por\n'
+      + 'RET72X;Uma;12;Coordenação Sul;companhia\n'
+      + 'RET73Y;Outra;12;Coordenação Sul;CORRETORA\n'
+      + 'RET76Z;Sem dizer;12;Coordenação Sul;');
+    igual(feito.criadas, 3);
+
+    const lista = chamar('listarSusepsBloqueadas')();
+    igual(lista.find((b) => b.susep === 'RET72X').bloqueadaPor, 'Companhia');
+    igual(lista.find((b) => b.susep === 'RET73Y').bloqueadaPor, 'Corretora');
+    igual(lista.find((b) => b.susep === 'RET76Z').bloqueadaPor, '',
+      'em branco entra sem tipo, como as antigas');
+
+    // E NA PLANILHA está escrito do jeito certo — é ela que a operação filtra.
+    const naPlanilha = chamar('lerRegistros_')('SUSEP_BLOQUEADAS');
+    igual(naPlanilha.find((l) => l.SUSEP === 'RET72X').BloqueadaPor, 'Companhia');
+    igual(naPlanilha.find((l) => l.SUSEP === 'RET73Y').BloqueadaPor, 'Corretora');
+  });
+
+  teste('importar com quem bloqueou desconhecido recusa a linha', () => {
+    const conferido = chamar('conferirImportacao')('susepsBloqueadas',
+      'SUSEP;Corretora;Sucursal;Coordenador comercial;Bloqueada por\n'
+      + 'RET77A;Uma;12;Coordenação Sul;Cia');
+    igual(conferido.resumo.recusadas, 1);
+    contem(conferido.linhas[0].porque, 'use Companhia ou Corretora');
+  });
+
+  teste('importar em planilha sem a coluna: com tipo recusa ANTES de gravar; sem tipo, grava', () => {
+    const { chamar: noVelho } = carregar('primeiro.adm@exemplo.com');
+    noVelho('instalarRECC()');
+    noVelho('definirSenhaDeAdministrador')('segredo123', '');
+    noVelho('liberarComSenha')('segredo123');
+    noVelho('removerColuna_')('SUSEP_BLOQUEADAS', 'BloqueadaPor');
+    noVelho('esquecerEstruturaLida_()');
+
+    lanca(() => noVelho('aplicarImportacao')('susepsBloqueadas',
+      'SUSEP;Corretora;Sucursal;Coordenador comercial;Bloqueada por\n'
+      + 'RET78B;Uma;12;C;\n'
+      + 'RET79C;Outra;12;C;Companhia'), 'rodar atualizarPGO()');
+    igual(noVelho('listarSusepsBloqueadas()').length, 0,
+      'nem a primeira linha, que não tinha tipo, foi gravada');
+
+    const feito = noVelho('aplicarImportacao')('susepsBloqueadas',
+      'SUSEP;Corretora\nRET78B;Uma');
+    igual(feito.criadas, 1, 'o arquivo de antes, sem a coluna, continua entrando');
+  });
+
   teste('acima do teto, recusa antes de gravar metade', () => {
     // Apps Script tem tempo máximo de execução. Uma importação interrompida
     // no meio grava metade, e ninguém sabe qual metade.
@@ -768,6 +900,20 @@ function rodarTestesDeCorretoras() {
     contem(tela, 'corretora irregular',
       'o motivo fica escrito junto da regra, para quem mexer daqui a um ano');
     contem(tela, 'tom-destaque', 'e Diamante tem o seu próprio tom');
+  });
+
+  teste('quem bloqueou tem sinal próprio: companhia vermelho, corretora violeta', () => {
+    const pasta = path.join(__dirname, '..', '..', 'Front-End');
+    const tela = fs.readFileSync(path.join(pasta, 'TabelaCorretoras.html'), 'utf8');
+    const comuns = fs.readFileSync(path.join(pasta, 'Comuns.html'), 'utf8');
+    const estilos = fs.readFileSync(path.join(pasta, 'Estilos.html'), 'utf8');
+    contem(tela, '<th>Bloqueada por</th>', 'a lista tem a coluna');
+    contem(tela, 'tom-violeta', 'corretora em violeta na lista');
+    contem(tela, 'Sem tipo', 'e as antigas aparecem como sem tipo');
+    contem(tela, 'id="cfg-bloqueada-por"', 'o formulário pergunta');
+    contem(tela, 'data-editar-bloqueio', 'e dá para editar, para tipar as antigas');
+    contem(comuns, "'bloqueada-corretora'", 'o selo do formulário muda de classe');
+    contem(estilos, '.selo-susep.bloqueada-corretora', 'e a classe tem estilo');
   });
 }
 

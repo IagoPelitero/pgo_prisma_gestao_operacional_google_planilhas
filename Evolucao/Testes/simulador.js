@@ -338,7 +338,12 @@ class Planilha {
   /** O nome da planilha. O laudo dos cadastros mostra qual foi aberta. */
   getName() { return this.nome || 'Planilha de teste'; }
 
-  constructor() { this.abas = []; this.fuso = 'Etc/GMT'; }
+  constructor(id = 'planilha-principal') {
+    this.abas = []; this.fuso = 'Etc/GMT'; this.id = id;
+  }
+  /* O Sheets de verdade tem Id, e o arquivo da auditoria se apoia nele para
+     recusar o Id da própria planilha como destino. */
+  getId() { return this.id; }
   /*
     `linhas` e `colunas` existem porque a aba de uma planilha de VERDADE nasce
     do tamanho do que foi colado nela: quem joga 2100 corretoras numa aba nova
@@ -447,6 +452,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       }
 
       const id = 'planilha-externa-' + (planilhasExternas.size + 1);
+      outra.id = id;
       planilhasExternas.set(id, outra);
       return id;
     },
@@ -466,6 +472,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       SpreadsheetApp: {
         getActive: () => planilha,
         openById: (id) => {
+          // Abrir a PRÓPRIA planilha pelo Id funciona no Sheets de verdade.
+          if (id === planilha.getId()) return planilha;
           if (!planilhasExternas.has(id)) {
             throw new Error('Unexpected error while getting the method or '
               + 'property openById on object SpreadsheetApp.');

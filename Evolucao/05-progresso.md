@@ -2189,6 +2189,42 @@ gravar e reabrir o caso com a data certa, e o de/até pelo calendário.
 
 ---
 
+## Etapa 26 — Parte 2: SUSEP bloqueada pela companhia ou pela corretora, e o arquivo da auditoria
+
+| pedido | o que ficou |
+|---|---|
+| "As SUSEPs bloqueadas são por 2 tipos: pela companhia e pela corretora. Sinalização diferenciada e uma coluna na planilha" | Coluna `BloqueadaPor` em SUSEP_BLOQUEADAS (`atualizarPGO()` cria), gravada sempre como `Companhia` ou `Corretora`. Selo do formulário: companhia **vermelho**, corretora **violeta** (o âmbar já é da "não encontrada"). Na lista, a coluna "Bloqueada por" com a mesma cor. Todo bloqueio novo pede o tipo; os antigos **ficam sem tipo**, decisão do PO, e ganham o tipo pelo novo botão **Editar**. A importação aceita a coluna "Bloqueada por" |
+| "Arquivamento da auditoria a cada 2 meses. Eu incluo o id da planilha destino e o sistema transporta e apaga da principal" | Configurações › Estrutura › **Arquivo da auditoria**: o Id (conferido; não pode ser esta planilha) e **Arquivar agora**, os dois com senha. Vai o que tem **mais de 2 meses** — decisão do PO. Copia, confere a cópia pelos Ids e só então apaga. Para ser automático: acionador mensal para `arquivarAuditoriaAgendada`, que só arquiva de 2 em 2 meses |
+
+Dois cuidados que não estavam no pedido e que ele pedia sem dizer:
+
+- **A planilha de cadastros de fora** (a segunda base) não tem a coluna nova.
+  Ela não pode deixar de ligar por isso: é aviso, e não falta (achado 66).
+- **As tabelas de cadastro se sobrepunham** — a etiqueta "Companhia" por cima
+  da Sucursal. Era em parte antigo, e a coluna nova piorou. As três tabelas
+  da Tabela de Corretoras passaram a medir as colunas pelo conteúdo (achado
+  65). É o tipo de sobreposição da Parte 4; esta foi resolvida aqui porque a
+  Parte 2 a agravou.
+
+**854 testes**, cinco execuções seguidas sem falha, cada regra nova quebrada
+de propósito (16 quebras, 16 vermelhos — duas só depois de reescrever o
+teste, ver a lição 40). No navegador, com o servidor de verdade, em 1440, 1280
+e 390 px: as três etiquetas da lista com três cores, editar a antiga sem
+tipo, bloquear sem tipo recusado e com tipo gravado, o selo do formulário da
+RET vermelho e violeta, nenhuma célula invadindo a vizinha, e o arquivamento
+inteiro — salvar o Id com senha, o aviso de atenção, e as 2 linhas velhas na
+outra planilha.
+
+### Em aberto, para o PO
+
+- O **acionador** do arquivamento é criado à mão no editor do Apps Script,
+  como o das análises: criar pelo código pediria uma permissão nova ao
+  instalar.
+- Na planilha de cadastros de fora, quem quiser o tipo do bloqueio acrescenta
+  a coluna `BloqueadaPor` lá.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

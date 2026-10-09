@@ -1493,6 +1493,49 @@ renomear e excluir, e a verificação no navegador do caminho inteiro.
 
 ---
 
+### 65 · A etiqueta "Companhia" por cima da Sucursal
+
+**Sintoma.** Na foto da Parte 2, a lista de SUSEPs bloqueadas tinha a
+etiqueta "Companhia" desenhada por cima do número da sucursal, o cabeçalho
+"COORDENADOR" por cima de "DESDE", e a SUSEP cortada em "RET…". É o tipo de
+sobreposição que o PO apontou nas telas.
+
+**Causa.** As tabelas de cadastro usavam a largura FIXA da fila do Trabalho,
+que reserva 292 px para os três botões de ação de lá. Num cadastro, com
+"Editar  Liberar", sobrava pouco para as outras colunas, e o que não cabia
+transbordava para a vizinha. "COORDENADOR" × "DESDE" já existia; a coluna
+nova "Bloqueada por" apertou o resto até a etiqueta invadir.
+
+**Como apareceu.** Olhando a foto — o teste e o roteiro de navegador
+passavam. Depois de consertar, uma segunda foto mostrou o lápis de editar
+cortado na borda do cartão, e uma terceira, em 1280 px, a SUSEP partida em
+"RET9 / 0A".
+
+**Defesa.** As tabelas de cadastro medem cada coluna pelo conteúdo, o nome
+quebra só no espaço (código não parte) e as ações ficam presas à direita
+quando a tabela rola. O roteiro de navegador da Parte 2 confere, em 1440,
+1280 e 390 px, que nenhuma célula invade a vizinha, que nenhuma SUSEP parte
+e que nenhum botão de ação fica cortado — e foi visto falhando com o CSS
+antigo.
+
+---
+
+### 66 · A coluna nova que travaria a segunda base
+
+**Sintoma.** Nenhum para o PO, porque foi pego antes: 14 testes da planilha
+de cadastros de fora ficaram vermelhos ao criar a coluna `BloqueadaPor`.
+
+**Causa.** A conferência da segunda base cobra todas as colunas do contrato.
+Uma planilha de cadastros montada antes desta rodada não tem a coluna nova e
+passaria a ser recusada — ao ligar de novo, ou ao clicar em Conferir.
+
+**Defesa.** A coluna é marcada como opcional na base de fora: a conferência
+avisa, e não recusa. Sem ela, os bloqueios aparecem "sem tipo", e bloquear
+pelo PGO diz exatamente onde criar a coluna — lá, e não com `atualizarPGO()`,
+que não mexe em planilha de outro dono. Teste dos dois lados.
+
+---
+
 ## O que esta lista ensina
 
 **São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
@@ -1653,3 +1696,8 @@ Daí as duas práticas que o projeto não abre mão:
     erro nem função faltando: havia um texto que não mudava e um botão que não
     fechava. Só apareceu reproduzindo com o atraso de verdade do Apps Script —
     no simulador instantâneo, tudo parecia certo.
+40. **Teste que passa com a quebra é teste a reescrever, não a comemorar.** Na
+    Parte 2, duas das dezesseis quebras de propósito passaram verde: a
+    importação era conferida pela leitura, que já normaliza, e não pela
+    planilha; e a permissão do arquivamento era conferida pela mensagem de um
+    erro que vinha DEPOIS de o arquivamento já ter rodado.

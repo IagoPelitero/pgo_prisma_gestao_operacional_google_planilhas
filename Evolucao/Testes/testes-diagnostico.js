@@ -1549,6 +1549,8 @@ function rodarTestesDeDiagnostico() {
 
     chamar('removerColuna_')('SUSEP_BLOQUEADAS', 'Sucursal');
     chamar('removerColuna_')('SUSEP_BLOQUEADAS', 'CoordenadorComercial');
+    // Quem bloqueou (companhia ou corretora) também não existia.
+    chamar('removerColuna_')('SUSEP_BLOQUEADAS', 'BloqueadaPor');
     chamar('adicionarColuna_')('SUSEP_BLOQUEADAS', 'CpfReincidente', 'texto');
     chamar('adicionarColuna_')('SUSEP_BLOQUEADAS', 'Motivo', 'texto');
     chamar('esquecerEstruturaLida_()');
@@ -1892,6 +1894,16 @@ function rodarTestesDeDiagnostico() {
     contem(recado, 'CORRETORAS.Sucursal criada');
     contem(recado, 'SUSEP_BLOQUEADAS.Sucursal criada');
     contem(recado, 'SUSEP_BLOQUEADAS.CoordenadorComercial criada');
+    contem(recado, 'SUSEP_BLOQUEADAS.BloqueadaPor criada');
+
+    // A SUSEP que já estava bloqueada fica SEM TIPO — decisão do PO —, e o
+    // selo continua vermelho, sem dizer por quem.
+    const antiga = chamar('listarSusepsBloqueadas()')
+      .find((uma) => uma.susep === '7654321');
+    igual(antiga.bloqueadaPor, '', 'sem tipo, até alguém editar');
+    const seloDaAntiga = chamar('consultarSusep')('7654321');
+    igual(seloDaAntiga.situacao, 'BLOQUEADA');
+    igual(seloDaAntiga.bloqueadaPor, '');
 
     // E o cadastro que já estava lá continua lá, inteiro.
     const corretora = chamar('tabelaDeCorretoras')('', '').corretoras
@@ -2143,7 +2155,7 @@ function rodarTestesDeDiagnostico() {
     igual(chamar('consultarSusep')('RET55M', daRet.id).situacao, 'OK');
 
     chamar('bloquearSusep')({ susep: 'RET66N', corretora: 'B',
-      sucursal: '1', coordenadorComercial: 'C' });
+      sucursal: '1', coordenadorComercial: 'C', bloqueadaPor: 'Companhia' });
     verdadeiro(chamar('listarSusepsBloqueadas()')
       .some((uma) => uma.susep === 'RET66N'));
 

@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-08 22:36
+   Gerado em 2026-10-09 00:47
    ========================================================================== */
 
 
@@ -658,6 +658,11 @@ const RECC_ESQUEMA = {
    *
    * `BloqueadaEm` fica porque não é pergunta: é o sistema que a escreve, no
    * dia em que o bloqueio nasce.
+   *
+   * `BloqueadaPor` diz QUEM bloqueou: a companhia ou a própria corretora.
+   * Pedido do PO: "as suseps bloqueadas são por 2 tipos". Vale 'Companhia' ou
+   * 'Corretora'. As linhas que já existiam antes dela ficam em branco — "sem
+   * tipo", decisão do PO — até alguém editar e escolher.
    */
   SUSEP_BLOQUEADAS: {
     aba: 'SUSEP_BLOQUEADAS',
@@ -670,7 +675,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'NomeCorretora', tipo: 'texto', protegido: true },
       { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
       { cabecalho: 'CoordenadorComercial', tipo: 'texto', protegido: false },
-      { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false }
+      { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false },
+      // Na planilha de cadastros de fora ela é AVISO, e não falta: quem já
+      // ligou a segunda base não pode ficar travado por uma coluna nova.
+      { cabecalho: 'BloqueadaPor', tipo: 'texto', protegido: false,
+        opcionalNaBaseDeFora: true }
     ]
   },
 
@@ -3037,6 +3046,45 @@ function ocultarCorretora(idDaCorretora) {
 // AS SUSEPs BLOQUEADAS
 // ============================================================================
 
+/*
+ * QUEM BLOQUEOU: A COMPANHIA OU A CORRETORA.
+ *
+ * Pedido do PO: "as suseps bloqueadas são por 2 tipos: bloqueadas pela
+ * companhia e bloqueada pela corretora". O valor gravado na coluna
+ * `BloqueadaPor` é um destes dois, escrito sempre igual — a planilha filtra
+ * por ele, e "companhia", "Cia" e "COMPANHIA" seriam três tipos para o filtro.
+ *
+ * Em branco é o terceiro estado, e é de propósito: as linhas que já existiam
+ * antes da coluna ficam SEM TIPO, decisão do PO, até alguém editar e escolher.
+ */
+var RECC_QUEM_BLOQUEOU = ['Companhia', 'Corretora'];
+
+/** 'companhia', 'CORRETORA ' → 'Companhia', 'Corretora'. O resto vira ''. */
+function quemBloqueou_(texto) {
+  var procurado = normalizarParaComparar_(texto);
+  return RECC_QUEM_BLOQUEOU.filter(function (tipo) {
+    return normalizarParaComparar_(tipo) === procurado;
+  })[0] || '';
+}
+
+/** A aba já tem a coluna? Planilha que não rodou `atualizarPGO()` ainda não. */
+function abaTemBloqueadaPor_() {
+  return posicaoDaColuna_(estruturaDaAba_('SUSEP_BLOQUEADAS'), 'BloqueadaPor') >= 0;
+}
+
+/**
+ * Como criar a coluna que falta. Depende de onde a aba mora: aqui, o
+ * `atualizarPGO()` cria; na planilha de cadastros de fora, quem cria é quem
+ * cuida dela — o PGO não mexe na estrutura de uma planilha que não é sua.
+ */
+function comoCriarAColuna_(nomeDaAba, cabecalho) {
+  return abaVemDeOutraPlanilha_(nomeDaAba)
+    ? 'A aba ' + nomeDaAba + ' da planilha de cadastros ainda não tem a coluna "'
+      + cabecalho + '". Acrescente essa coluna lá, na primeira linha.'
+    : 'A aba ' + nomeDaAba + ' ainda não tem a coluna "' + cabecalho
+      + '". Peça ao administrador para rodar atualizarPGO().';
+}
+
 function listarSusepsBloqueadas() {
   exigirTela_('tabelaCorretoras');
   var volumes = volumePorSusep_();
@@ -3050,6 +3098,7 @@ function listarSusepsBloqueadas() {
         corretora: String(linha.NomeCorretora || ''),
         sucursal: String(linha.Sucursal || ''),
         coordenadorComercial: String(linha.CoordenadorComercial || ''),
+        bloqueadaPor: quemBloqueou_(linha.BloqueadaPor),
         bloqueadaEm: linha.BloqueadaEm
           ? Utilities.formatDate(new Date(linha.BloqueadaEm), RECC_FUSO_HORARIO,
             'dd/MM/yyyy')
@@ -3098,6 +3147,23 @@ function bloquearSusep(dados) {
     Sucursal: String(dados.sucursal || '').trim(),
     CoordenadorComercial: String(dados.coordenadorComercial || '').trim()
   };
+
+  /*
+   * QUEM BLOQUEOU é obrigatório em todo bloqueio NOVO. Na edição, só muda se
+   * vier: quem chama sem o campo não está mexendo nele, e apagar o tipo em
+   * silêncio seria perder a resposta que alguém já deu.
+   */
+  var vieramOTipo = dados.bloqueadaPor !== undefined;
+  var tipo = quemBloqueou_(dados.bloqueadaPor);
+  if ((!id || vieramOTipo) && !tipo) {
+    throw new Error('Informe quem bloqueou a SUSEP: a companhia ou a corretora.');
+  }
+  if (tipo) {
+    if (!abaTemBloqueadaPor_()) {
+      throw new Error(comoCriarAColuna_('SUSEP_BLOQUEADAS', 'BloqueadaPor'));
+    }
+    campos.BloqueadaPor = tipo;
+  }
 
   if (id) {
     atualizarRegistro_('SUSEP_BLOQUEADAS', id, campos);
@@ -3277,7 +3343,11 @@ var RECC_IMPORTACOES = {
       { chave: 'sucursal', titulo: 'Sucursal', coluna: 'Sucursal',
         tipo: 'texto' },
       { chave: 'coordenadorComercial', titulo: 'Coordenador comercial',
-        coluna: 'CoordenadorComercial', tipo: 'texto' }
+        coluna: 'CoordenadorComercial', tipo: 'texto' },
+      // "Companhia" ou "Corretora". Fora disso a linha é recusada — o tipo
+      // escrito de três jeitos viraria três tipos no filtro da planilha.
+      { chave: 'bloqueadaPor', titulo: 'Bloqueada por', coluna: 'BloqueadaPor',
+        tipo: 'quemBloqueou' }
     ]
   }
 };
@@ -3596,6 +3666,14 @@ function conferirUmaLinha_(linha, receita, existentes, vistas) {
       ? converterParaIdentificador_(bruto)
       : String(bruto === undefined ? '' : bruto).trim();
 
+    if (coluna.tipo === 'quemBloqueou' && valor) {
+      if (!quemBloqueou_(valor)) {
+        problemas.push(coluna.titulo + ' "' + valor
+          + '" — use Companhia ou Corretora');
+      }
+      valor = quemBloqueou_(valor);
+    }
+
     if (!valor && coluna.padrao) valor = coluna.padrao;
     if (!valor && coluna.obrigatoria) {
       problemas.push(coluna.tipo === 'identificador' && String(bruto || '').trim()
@@ -3683,16 +3761,30 @@ function aplicarImportacao(tipo, fonte) {
   var receita = RECC_IMPORTACOES[tipo];
   var conferido = conferirImportacao_(tipo, fonte);
 
+  /*
+   * COLUNA QUE A ABA AINDA NÃO TEM — a `BloqueadaPor`, numa planilha que não
+   * rodou `atualizarPGO()`. Em branco no arquivo, é só não escrever nela. Com
+   * valor, para ANTES de gravar a primeira linha: parar no meio deixaria
+   * metade do arquivo gravada e a outra metade não.
+   */
+  var faltando = colunasDaImportacaoQueFaltam_(receita);
+  var perderia = faltando.filter(function (coluna) {
+    return conferido.todas.some(function (linha) {
+      return linha.situacao !== 'recusada' && linha.campos[coluna.chave];
+    });
+  })[0];
+  if (perderia) throw new Error(comoCriarAColuna_(receita.aba, perderia.coluna));
+
   var paraCriar = [];
   var criadas = 0;
   var atualizadas = 0;
 
   conferido.todas.forEach(function (linha) {
     if (linha.situacao === 'nova') {
-      paraCriar.push(camposParaAAba_(linha.campos, receita, true));
+      paraCriar.push(camposParaAAba_(linha.campos, receita, true, faltando));
     } else if (linha.situacao === 'atualiza') {
       atualizarRegistro_(receita.aba, linha.id,
-        camposParaAAba_(linha.campos, receita, false));
+        camposParaAAba_(linha.campos, receita, false, faltando));
       atualizadas++;
     }
   });
@@ -3715,6 +3807,14 @@ function aplicarImportacao(tipo, fonte) {
   };
 }
 
+/** As colunas da importação que a aba de destino não tem. */
+function colunasDaImportacaoQueFaltam_(receita) {
+  var estrutura = estruturaDaAba_(receita.aba);
+  return receita.colunas.filter(function (coluna) {
+    return posicaoDaColuna_(estrutura, coluna.coluna) < 0;
+  });
+}
+
 /**
  * Traduz os campos da importação para os nomes de coluna da aba.
  *
@@ -3722,9 +3822,10 @@ function aplicarImportacao(tipo, fonte) {
  * faz a regra do "vazio não apaga" valer também na hora de escrever, e não só
  * na hora de conferir.
  */
-function camposParaAAba_(campos, receita, ehNova) {
+function camposParaAAba_(campos, receita, ehNova, faltando) {
   var linha = {};
   receita.colunas.forEach(function (coluna) {
+    if ((faltando || []).indexOf(coluna) >= 0) return;
     var valor = campos[coluna.chave];
     if (!valor && !ehNova) return;
     linha[coluna.coluna] = valor || '';
@@ -5129,13 +5230,19 @@ function consultarSusep(susep, idDoCanal) {
   var bloqueada = buscarRegistroVisivel_('SUSEP_BLOQUEADAS', 'SUSEP', procurada);
 
   if (bloqueada) {
+    // Quem bloqueou muda o selo: pela companhia é vermelho, pela corretora é
+    // âmbar. Sem tipo — linha antiga, que ninguém classificou — fica vermelho,
+    // que é o lado seguro.
+    var por = quemBloqueou_(bloqueada.BloqueadaPor);
     return {
       situacao: 'BLOQUEADA',
+      bloqueadaPor: por,
       susep: susepComoSeEscreve_(bloqueada.SUSEP) || procurada,
       corretora: String(bloqueada.NomeCorretora || ''),
       sucursal: String(bloqueada.Sucursal || ''),
       coordenadorComercial: String(bloqueada.CoordenadorComercial || ''),
       mensagem: 'SUSEP bloqueada'
+        + (por ? ' pela ' + por.toLowerCase() : '')
         + (bloqueada.NomeCorretora ? ' — ' + bloqueada.NomeCorretora : '')
     };
   }
@@ -8639,6 +8746,280 @@ function listarAuditoria(quantas) {
     });
 }
 
+// ============================================================================
+// O ARQUIVO DA AUDITORIA — o que tem mais de 2 meses vai para outra planilha
+// ============================================================================
+
+/*
+ * POR QUE EXISTE. Pedido do PO: "vamos implementar um arquivamento dos dados
+ * de auditoria para cada 2 meses. Eu incluo o id da planilha destino e o
+ * sistema transporta os dados e em seguida apaga da planilha principal."
+ *
+ * A auditoria só cresce: cada ajuste de configuração, cada importação e cada
+ * exclusão vira uma linha. Ela não pesa na tela — a trilha lê só as últimas —,
+ * mas ocupa célula do teto de 10 milhões da planilha.
+ *
+ * O QUE VAI: as linhas com mais de 2 meses (decisão do PO). Os 2 últimos
+ * meses ficam, que é o que alguém costuma vir procurar.
+ *
+ * A ORDEM É A REGRA: copia, CONFERE a cópia, e só então apaga. Se a cópia
+ * falhar no meio, nada é apagado — a auditoria fica com as linhas e o arquivo
+ * pode ficar com parte delas repetida, que é o erro que dá para consertar.
+ * O contrário (apagar e depois copiar) perderia o rastro de vez.
+ */
+var RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA = 'AUDITORIA.ARQUIVO_ID';
+var RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO = 'AUDITORIA.ARQUIVADA_EM';
+var RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO = 'AUDITORIA.ARQUIVADAS';
+var RECC_MESES_QUE_A_AUDITORIA_GUARDA = 2;
+
+/** O que a tela mostra: o Id, o último arquivamento e até quando iria hoje. */
+function configuracaoDoArquivoDaAuditoria() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var ultimo = dataDoUltimoArquivamento_();
+  return {
+    planilhaId: String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim(),
+    meses: RECC_MESES_QUE_A_AUDITORIA_GUARDA,
+    ultimoEm: ultimo
+      ? Utilities.formatDate(ultimo, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm') : '',
+    ultimoQuantas: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO, 0)) || 0,
+    linhasNaAuditoria: Math.max(
+      ultimaLinhaComConteudo_(estruturaDaAba_('AUDITORIA')) - 1, 0),
+    arquivariaAte: Utilities.formatDate(limiteDoArquivamento_(new Date()),
+      RECC_FUSO_HORARIO, 'dd/MM/yyyy')
+  };
+}
+
+/**
+ * Aponta a planilha de arquivo — ou desliga, com o Id em branco.
+ *
+ * Confere antes de gravar, como a planilha de cadastros: guardar um Id que
+ * não abre faria o arquivamento falhar só daqui a dois meses, quando ninguém
+ * lembra mais o que foi digitado.
+ */
+function salvarArquivoDaAuditoria(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+
+  var id = String(planilhaId || '').trim();
+  if (id) abrirArquivoDaAuditoria_(id);
+
+  gravarConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, id);
+  registrarAuditoria_('auditoria.configurar', 'CONFIG', '',
+    id ? 'arquivo em ' + id : 'arquivo desligado');
+  return configuracaoDoArquivoDaAuditoria();
+}
+
+/** O botão "Arquivar agora". Pede a senha: apaga linha da planilha. */
+function arquivarAuditoriaAgora() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+
+  var resultado = arquivarAuditoria_(new Date());
+  return {
+    arquivadas: resultado.arquivadas,
+    ate: resultado.ate,
+    configuracao: configuracaoDoArquivoDaAuditoria()
+  };
+}
+
+/**
+ * Para o ACIONADOR DE TEMPO — o PO cria no editor do Apps Script, mensal.
+ *
+ * Roda de 2 em 2 meses: o acionador mensal chama todo mês, e esta função só
+ * arquiva quando o último arquivamento foi há 2 meses ou mais. Conta por MÊS
+ * do calendário, e não por milissegundo: o acionador do dia 1º às 8h pode
+ * disparar às 8h01 num mês e às 7h59 no outro, e contar no relógio faria um
+ * arquivamento escorregar um mês inteiro por dois minutos.
+ *
+ * Sem planilha de arquivo apontada, não faz nada e não reclama — o acionador
+ * pode estar ligado numa instalação que ainda não decidiu para onde mandar.
+ *
+ * Mesmo chamada por fora do acionador, ela não faz nada que o acionador não
+ * faria: obedece aos mesmos 2 meses, e copia antes de apagar.
+ */
+function arquivarAuditoriaAgendada() {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim();
+  if (!id) return { arquivou: false, motivo: 'sem planilha de arquivo' };
+
+  var agora = new Date();
+  var ultimo = dataDoUltimoArquivamento_();
+  if (ultimo) {
+    var meses = (agora.getFullYear() * 12 + agora.getMonth())
+      - (ultimo.getFullYear() * 12 + ultimo.getMonth());
+    if (meses < RECC_MESES_QUE_A_AUDITORIA_GUARDA) {
+      return { arquivou: false, motivo: 'o último foi há menos de 2 meses' };
+    }
+  }
+
+  var resultado = arquivarAuditoria_(agora);
+  return { arquivou: true, arquivadas: resultado.arquivadas, ate: resultado.ate };
+}
+
+/** Linha com DataHora ANTES deste dia vai para o arquivo. */
+function limiteDoArquivamento_(agora) {
+  return new Date(agora.getFullYear(),
+    agora.getMonth() - RECC_MESES_QUE_A_AUDITORIA_GUARDA, agora.getDate());
+}
+
+function dataDoUltimoArquivamento_() {
+  var guardado = valorDaConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO, '');
+  if (Object.prototype.toString.call(guardado) === '[object Date]') return guardado;
+  var m = String(guardado).match(/^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}))?/);
+  if (!m) return '';
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+    Number(m[4] || 0), Number(m[5] || 0));
+}
+
+/** Abre a planilha de arquivo, ou explica por que não abriu. */
+function abrirArquivoDaAuditoria_(id) {
+  var planilha;
+  try {
+    planilha = SpreadsheetApp.openById(id);
+  } catch (erro) {
+    throw new Error('Não consegui abrir a planilha de arquivo da auditoria: '
+      + (erro.message || erro) + ' Confira o Id (o pedaço do endereço entre '
+      + '/d/ e /edit) e se esta conta tem acesso a ela.');
+  }
+  // Apontar para a própria planilha não arquivaria nada: copiaria a linha
+  // para o fim da mesma aba e apagaria do começo.
+  if (planilha.getId() === planilhaAtiva_().getId()) {
+    throw new Error('Esse é o Id desta mesma planilha. O arquivo da auditoria '
+      + 'precisa ser OUTRA planilha.');
+  }
+  return planilha;
+}
+
+/**
+ * O arquivamento em si: copia, confere, apaga.
+ *
+ * Só as linhas do COMEÇO da aba: a auditoria é escrita sempre no fim, então
+ * as mais velhas estão em cima. Parar na primeira linha nova — em vez de
+ * caçar linha velha no meio — deixa o apagar num bloco só, que é uma ida à
+ * planilha em vez de uma por linha.
+ */
+function arquivarAuditoria_(agora) {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim();
+  if (!id) {
+    throw new Error('Informe antes o Id da planilha de arquivo da auditoria.');
+  }
+  var destino = abrirArquivoDaAuditoria_(id);
+  var limite = limiteDoArquivamento_(agora);
+  var quantas = 0;
+
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(30000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_('AUDITORIA');
+    var estrutura = estruturaDaAba_('AUDITORIA', true);
+    var iData = exigirPosicaoDaColuna_(estrutura, 'DataHora');
+    var iId = exigirPosicaoDaColuna_(estrutura, 'Id');
+    var total = ultimaLinhaComConteudo_(estrutura) - 1;
+    var largura = estrutura.cabecalhos.length;
+
+    var valores = total > 0
+      ? estrutura.aba.getRange(2, 1, total, largura).getValues() : [];
+    while (quantas < valores.length) {
+      var quando = converterParaDataEHora_(valores[quantas][iData]);
+      if (!quando || quando.getTime() >= limite.getTime()) break;
+      quantas++;
+    }
+
+    if (quantas) {
+      var velhas = valores.slice(0, quantas);
+      copiarParaOArquivo_(destino, estrutura, velhas, iId);
+
+      // Apagar TODAS as linhas de dados com a grade justa daria erro no
+      // Sheets ("não dá para apagar todas as linhas não congeladas").
+      garantirLinhasNaGrade_(estrutura.aba, quantas + 2);
+      estrutura.aba.deleteRows(2, quantas);
+      // A grade encolheu: toda posição guardada aponta para outra linha.
+      esquecerEstruturaLida_('AUDITORIA');
+    }
+  } finally {
+    trava.releaseLock();
+  }
+
+  var ate = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO,
+    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm'));
+  gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO, String(quantas));
+  registrarAuditoria_('auditoria.arquivar', 'AUDITORIA', '',
+    quantas + ' linha(s) de antes de ' + ate + ' → ' + id);
+
+  return { arquivadas: quantas, ate: ate };
+}
+
+/**
+ * Escreve as linhas na aba AUDITORIA da planilha de arquivo, e confere.
+ *
+ * As colunas casam pelo NOME, como em todo o sistema: se a auditoria ganhar
+ * uma coluna um dia, ela nasce no fim do cabeçalho do arquivo, e as linhas
+ * antigas de lá ficam em branco nela — nada escorrega para a coluna vizinha.
+ */
+function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
+  var aba = destino.getSheetByName('AUDITORIA')
+    || destino.insertSheet('AUDITORIA');
+
+  var larguraLa = aba.getLastColumn();
+  var cabecalhoLa = larguraLa
+    ? aba.getRange(1, 1, 1, larguraLa).getValues()[0].map(function (v) {
+      return String(v === null || v === undefined ? '' : v).trim();
+    })
+    : [];
+  var ondeLa = {};
+  cabecalhoLa.forEach(function (cab, i) {
+    if (cab) ondeLa[normalizarParaComparar_(cab)] = i;
+  });
+
+  var formatosDaqui = formatosDaLinha_(estrutura);
+  var formatosLa = cabecalhoLa.map(function () { return '@'; });
+  estrutura.cabecalhos.forEach(function (cab, i) {
+    var chave = normalizarParaComparar_(cab);
+    if (!cab || ondeLa[chave] !== undefined) {
+      if (cab) formatosLa[ondeLa[chave]] = formatosDaqui[i];
+      return;
+    }
+    ondeLa[chave] = cabecalhoLa.length;
+    cabecalhoLa.push(cab);
+    formatosLa.push(formatosDaqui[i]);
+  });
+
+  if (aba.getMaxColumns() < cabecalhoLa.length) {
+    aba.insertColumnsAfter(aba.getMaxColumns(),
+      cabecalhoLa.length - aba.getMaxColumns());
+  }
+  aba.getRange(1, 1, 1, cabecalhoLa.length).setNumberFormat('@')
+    .setValues([cabecalhoLa]);
+
+  var paraEscrever = linhas.map(function (linha) {
+    var saida = cabecalhoLa.map(function () { return ''; });
+    estrutura.cabecalhos.forEach(function (cab, i) {
+      if (cab) saida[ondeLa[normalizarParaComparar_(cab)]] = linha[i];
+    });
+    return saida;
+  });
+
+  var inicio = Math.max(aba.getLastRow(), 1) + 1;
+  garantirLinhasNaGrade_(aba, inicio + linhas.length - 1);
+  var faixa = aba.getRange(inicio, 1, linhas.length, cabecalhoLa.length);
+  faixa.setNumberFormats(paraEscrever.map(function () { return formatosLa; }));
+  faixa.setValues(paraEscrever);
+
+  // CONFERE antes de quem chamou apagar: relê os Ids que acabaram de ir.
+  var iIdLa = ondeLa[normalizarParaComparar_(estrutura.cabecalhos[iId])];
+  var lidos = aba.getRange(inicio, iIdLa + 1, linhas.length, 1).getValues();
+  for (var i = 0; i < linhas.length; i++) {
+    if (converterParaIdentificador_(lidos[i][0])
+      !== converterParaIdentificador_(linhas[i][iId])) {
+      throw new Error('A cópia para a planilha de arquivo não confere na linha '
+        + (inicio + i) + '. Nada foi apagado da auditoria.');
+    }
+  }
+}
+
 /* ############################################################################
    #
    #  SEÇÃO 2 de 2 · AS ABAS ANALISE_* QUE O SISTEMA GERA
@@ -9291,7 +9672,15 @@ function conferirPlanilhaDeCadastros(planilhaId) {
       .filter(function (coluna) {
         if (coluna.cabecalho.charAt(0) === '_') return false;
         return cabecalhos.indexOf(normalizarParaComparar_(coluna.cabecalho)) < 0;
-      })
+      });
+    // Coluna nova que a segunda base pode ainda não ter: vira aviso.
+    ausentes.filter(function (coluna) { return coluna.opcionalNaBaseDeFora; })
+      .forEach(function (coluna) {
+        avisos.push('• A aba "' + nome + '" está sem a coluna ' + coluna.cabecalho
+          + '. Ela funciona sem; acrescente a coluna para usar o que ela guarda.');
+      });
+    ausentes = ausentes
+      .filter(function (coluna) { return !coluna.opcionalNaBaseDeFora; })
       .map(function (coluna) { return coluna.cabecalho; });
 
     if (ausentes.length) {

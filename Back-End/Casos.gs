@@ -1382,13 +1382,19 @@ function consultarSusep(susep, idDoCanal) {
   var bloqueada = buscarRegistroVisivel_('SUSEP_BLOQUEADAS', 'SUSEP', procurada);
 
   if (bloqueada) {
+    // Quem bloqueou muda o selo: pela companhia é vermelho, pela corretora é
+    // âmbar. Sem tipo — linha antiga, que ninguém classificou — fica vermelho,
+    // que é o lado seguro.
+    var por = quemBloqueou_(bloqueada.BloqueadaPor);
     return {
       situacao: 'BLOQUEADA',
+      bloqueadaPor: por,
       susep: susepComoSeEscreve_(bloqueada.SUSEP) || procurada,
       corretora: String(bloqueada.NomeCorretora || ''),
       sucursal: String(bloqueada.Sucursal || ''),
       coordenadorComercial: String(bloqueada.CoordenadorComercial || ''),
       mensagem: 'SUSEP bloqueada'
+        + (por ? ' pela ' + por.toLowerCase() : '')
         + (bloqueada.NomeCorretora ? ' — ' + bloqueada.NomeCorretora : '')
     };
   }

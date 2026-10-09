@@ -1084,13 +1084,15 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 
 /* O selo da SUSEP. "Desconhecida" tem cor própria de propósito: não é erro
    nem sucesso — é uma corretora fora do cadastro, e quem atende precisa
-   perceber isso sem confundir com bloqueio. */
+   perceber isso sem confundir com bloqueio. O bloqueio PELA CORRETORA também
+   tem a sua, violeta, para não se confundir com o da companhia (vermelho). */
 .selo-susep {
   font-size: 12.5px; font-weight: 600; border-radius: 999px;
   padding: 4px 11px; align-self: flex-start;
 }
 .selo-susep.liberada    { color: var(--bom); background: var(--bom-tenue); }
 .selo-susep.bloqueada   { color: var(--ruim); background: var(--ruim-tenue); }
+.selo-susep.bloqueada-corretora { color: var(--violeta); background: var(--violeta-tenue); }
 .selo-susep.desconhecida{ color: var(--atencao); background: var(--atencao-tenue); }
 .selo-susep.conferindo  { color: var(--suave); background: var(--superficie-2); }
 
@@ -2125,6 +2127,27 @@ table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-n
 .busca-do-cadastro:focus { border-color: var(--destaque); }
 
 table.fila.cadastro { min-width: 720px; }
+/* As tabelas de cadastro têm colunas curtas e ações de texto. A largura fixa
+   da fila agrupada — medida para os três botões do Trabalho — reservava 292px
+   para "Editar  Liberar" e espremia o resto: a etiqueta "Companhia" passava
+   por cima da Sucursal, e "COORDENADOR" por cima de "DESDE". Aqui cada coluna
+   mede o próprio conteúdo, e o que não couber faz a tabela rolar. */
+table.fila.agrupada.cadastro { table-layout: auto; }
+table.fila.agrupada.cadastro th,
+table.fila.agrupada.cadastro td { padding-left: 10px; padding-right: 10px; }
+/* O nome da corretora pode quebrar em duas linhas: sem isso a soma das
+   colunas passava da largura do cartão e o lápis de editar ficava cortado.
+   Quebra só no ESPAÇO: "RET90A" partido em "RET9 / 0A" deixa de ser SUSEP. */
+table.fila.agrupada.cadastro td:first-child > span:first-child,
+table.fila.agrupada.cadastro .principal,
+table.fila.agrupada.cadastro .apoio { white-space: normal; overflow-wrap: normal; }
+/* E as ações voltam a ficar presas à direita: quando a tabela rola — no
+   celular, sempre —, editar e liberar continuam ao alcance. */
+table.fila.agrupada.cadastro th.acoes-coluna,
+table.fila.agrupada.cadastro td.acoes-coluna {
+  width: auto; position: sticky; right: 0;
+  box-shadow: -10px 0 10px -10px rgba(0, 0, 0, .22);
+}
 table.fila.cadastro .direita { text-align: right; font-variant-numeric: tabular-nums; }
 table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 
@@ -3523,6 +3546,9 @@ var Formulario = (function () {
           OK: 'liberada', BLOQUEADA: 'bloqueada',
           NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
         }[resposta.situacao] || 'conferindo';
+        // Os dois bloqueios têm sinal próprio, a pedido do PO: pela companhia
+        // é vermelho; pela corretora, violeta. Sem tipo fica vermelho.
+        if (resposta.bloqueadaPor === 'Corretora') aparencia = 'bloqueada-corretora';
 
         selo.className = 'selo-susep ' + aparencia;
         selo.textContent = resposta.mensagem
@@ -6641,18 +6667,33 @@ var TelaTabelaCorretoras = (function () {
 
   /* ----------------------------------------------------------- bloqueadas */
 
+  /*
+   * QUEM BLOQUEOU, com a mesma cor do selo do formulário: companhia em
+   * vermelho, corretora em violeta. "Sem tipo" são as linhas de antes da
+   * coluna existir — decisão do PO: ficam assim até alguém editar.
+   */
+  function etiquetaDeQuemBloqueou(por) {
+    if (por === 'Companhia') return '<span class="situacao tom-ruim">Companhia</span>';
+    if (por === 'Corretora') return '<span class="situacao tom-violeta">Corretora</span>';
+    return '<span class="situacao tom-neutro">Sem tipo</span>';
+  }
+
   function desenharBloqueadas() {
+    var podeMexerAqui = dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS');
     var linhas = dados.bloqueadas.map(function (uma) {
       return '<tr>'
         + '<td><span class="principal">' + escapar(uma.susep) + '</span>'
         + '<span class="apoio">' + escapar(uma.corretora || 'sem nome') + '</span></td>'
+        + '<td>' + etiquetaDeQuemBloqueou(uma.bloqueadaPor) + '</td>'
         + '<td>' + escapar(uma.sucursal || '—') + '</td>'
         + '<td>' + escapar(uma.coordenadorComercial || '—') + '</td>'
         + '<td>' + escapar(uma.bloqueadaEm || '—') + '</td>'
         + '<td class="direita">' + uma.casos + '</td>'
         + '<td class="acoes-coluna">'
-        + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
-          ? '<button type="button" class="botao-texto" data-liberar="'
+        + (podeMexerAqui
+          ? '<button type="button" class="botao-texto" data-editar-bloqueio="'
+            + escapar(uma.id) + '">Editar</button>'
+            + '<button type="button" class="botao-texto" data-liberar="'
             + escapar(uma.id) + '">Liberar</button>' : '')
         + '</td></tr>';
     }).join('');
@@ -6666,15 +6707,16 @@ var TelaTabelaCorretoras = (function () {
       + '</div>'
       + avisoDeOrigem('SUSEP_BLOQUEADAS')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
-      + 'o formulário passa a mostrar o selo vermelho, e quem está atendendo '
-      + 'decide. Bloqueio que impedisse o cadastro faria a pessoa registrar o '
+      + 'o formulário passa a mostrar o selo — vermelho quando quem bloqueou '
+      + 'foi a companhia, violeta quando foi a corretora —, e quem está '
+      + 'atendendo decide. Bloqueio que impedisse o cadastro faria a pessoa registrar o '
       + 'caso num caderno, e o sistema perderia o caso de vista.<br>'
       + 'Esta lista <strong>não vale para corretora Diamante</strong>: se a '
       + 'SUSEP está no cadastro de corretoras, o selo sai verde — são duas '
       + 'listas, de donos diferentes.</p>'
       + (dados.bloqueadas.length
         ? '<div class="rolagem-tabela"><table class="fila agrupada cadastro">'
-          + '<thead><tr><th>SUSEP</th><th>Sucursal</th>'
+          + '<thead><tr><th>SUSEP</th><th>Bloqueada por</th><th>Sucursal</th>'
           + '<th>Coordenador comercial</th>'
           + '<th>Desde</th><th class="direita">Casos</th>'
           + '<th class="acoes-coluna"></th></tr></thead>'
@@ -6684,9 +6726,13 @@ var TelaTabelaCorretoras = (function () {
     var nova = elemento('nova-bloqueada');
     if (nova) {
       nova.addEventListener('click', function () {
-        desenharFormularioDoBloqueio();
+        desenharFormularioDoBloqueio(null);
       });
     }
+    ligarCliques('[data-editar-bloqueio]', function (botao) {
+      desenharFormularioDoBloqueio(
+        acharNaLista(dados.bloqueadas, botao.getAttribute('data-editar-bloqueio')));
+    });
     ligarCliques('[data-liberar]', function (botao) {
       liberar(botao.getAttribute('data-liberar'));
     });
@@ -6696,31 +6742,59 @@ var TelaTabelaCorretoras = (function () {
       : 'O seu nível de acesso vê a lista, mas não mexe nela.');
   }
 
-  function desenharFormularioDoBloqueio() {
+  /**
+   * O formulário do bloqueio: novo, ou a edição de um que já existe.
+   *
+   * Editar existe para dar tipo às linhas antigas — elas ficaram "sem tipo",
+   * decisão do PO — e para corrigir um dado escrito errado.
+   */
+  function desenharFormularioDoBloqueio(bloqueio) {
+    var atual = bloqueio || { id: '', susep: '', corretora: '', sucursal: '',
+      coordenadorComercial: '', bloqueadaPor: '' };
+
     elemento('corretoras-painel').innerHTML =
       '<form class="config-form" id="form-bloqueio">'
-      + tituloDoPainel('Bloquear SUSEP', 'Marca o selo do formulário')
-      + campoDeTexto('susep', 'SUSEP', '',
+      + tituloDoPainel(atual.id ? 'Editar bloqueio' : 'Bloquear SUSEP',
+        'Marca o selo do formulário')
+      + campoDeTexto('susep', 'SUSEP', atual.susep,
         'Letras e números, como a SUSEP é escrita — por exemplo RET00J.')
-      + campoDeTexto('corretora', 'Corretora', '', '')
-      + campoDeTexto('sucursal', 'Sucursal', '', '')
-      + campoDeTexto('coordenador', 'Coordenador comercial', '',
+      + caixaDeQuemBloqueou(atual.bloqueadaPor)
+      + campoDeTexto('corretora', 'Corretora', atual.corretora, '')
+      + campoDeTexto('sucursal', 'Sucursal', atual.sucursal, '')
+      + campoDeTexto('coordenador', 'Coordenador comercial',
+        atual.coordenadorComercial,
         'Quem responde por este bloqueio. É a quem perguntar quando o selo '
-        + 'vermelho aparecer daqui a seis meses.')
+        + 'aparecer daqui a seis meses.')
       + '<div class="config-acoes">'
-      + '<button type="submit" class="botao">Bloquear</button></div></form>';
+      + '<button type="submit" class="botao">'
+      + (atual.id ? 'Salvar' : 'Bloquear') + '</button></div></form>';
 
     elemento('form-bloqueio').addEventListener('submit', function (evento) {
       evento.preventDefault();
       Servidor.chamar('bloquearSusep', {
+        id: atual.id,
         susep: valorDe('susep'), corretora: valorDe('corretora'),
         sucursal: valorDe('sucursal'),
-        coordenadorComercial: valorDe('coordenador')
+        coordenadorComercial: valorDe('coordenador'),
+        bloqueadaPor: valorDe('bloqueada-por')
       }).entao(function () {
-        avisar('SUSEP bloqueada.', 'bom');
+        avisar(atual.id ? 'Bloqueio salvo.' : 'SUSEP bloqueada.', 'bom');
         carregar();
       }).senao(mostrarErro);
     });
+  }
+
+  /** Companhia ou corretora. Sem escolha não grava — o servidor recusa. */
+  function caixaDeQuemBloqueou(escolhido) {
+    return '<label class="config-campo"><span>Bloqueada por</span>'
+      + '<select id="cfg-bloqueada-por">'
+      + '<option value=""' + (escolhido ? '' : ' selected') + '>Escolha…</option>'
+      + ['Companhia', 'Corretora'].map(function (um) {
+        return '<option value="' + um + '"'
+          + (um === escolhido ? ' selected' : '') + '>' + um + '</option>';
+      }).join('') + '</select>'
+      + '<em>Pela companhia o selo do formulário sai vermelho; pela corretora, '
+      + 'violeta.</em></label>';
   }
 
   function liberar(id) {
@@ -10404,10 +10478,15 @@ var TelaConfiguracoes = (function () {
             Servidor.chamar('configuracaoDosCadastros')
               .entao(function (cadastros) {
                 dados.cadastros = cadastros;
-                Servidor.chamar('listarAuditoria', 40)
-                  .entao(function (trilha) {
-                    dados.trilha = trilha;
-                    desenharEstrutura();
+                Servidor.chamar('configuracaoDoArquivoDaAuditoria')
+                  .entao(function (arquivo) {
+                    dados.arquivoDaAuditoria = arquivo;
+                    Servidor.chamar('listarAuditoria', 40)
+                      .entao(function (trilha) {
+                        dados.trilha = trilha;
+                        desenharEstrutura();
+                      })
+                      .senao(falhou);
                   })
                   .senao(falhou);
               })
@@ -10448,9 +10527,10 @@ var TelaConfiguracoes = (function () {
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
     elemento('config-lista').innerHTML += desenharDiagnostico()
-      + desenharCadastros() + desenharLegado();
+      + desenharCadastros() + desenharArquivoDaAuditoria() + desenharLegado();
     ligarDiagnostico();
     ligarCadastros();
+    ligarArquivoDaAuditoria();
     ligarLegado();
 
     elemento('config-painel').innerHTML = '<div class="config-form">'
@@ -10667,6 +10747,93 @@ var TelaConfiguracoes = (function () {
             avisar(erro.message || String(erro), 'ruim');
           });
       });
+    });
+  }
+
+  /**
+   * O arquivo da auditoria: o que tem mais de 2 meses vai para outra planilha.
+   *
+   * Pedido do PO: "eu incluo o id da planilha destino e o sistema transporta
+   * os dados e em seguida apaga da planilha principal". O botão "Arquivar
+   * agora" existe para o primeiro arquivamento e para quem não quer esperar o
+   * acionador — os dois pedem a senha, porque apagam linha da planilha.
+   */
+  function desenharArquivoDaAuditoria() {
+    var arquivo = dados.arquivoDaAuditoria || { planilhaId: '', meses: 2,
+      ultimoEm: '', ultimoQuantas: 0, linhasNaAuditoria: 0, arquivariaAte: '' };
+
+    return '<div class="config-legado" id="caixa-do-arquivo">'
+      + '<h4>Arquivo da auditoria</h4>'
+      + '<p class="config-explica">A auditoria só cresce. A cada '
+      + arquivo.meses + ' meses, o que tem <strong>mais de ' + arquivo.meses
+      + ' meses</strong> é copiado para a aba AUDITORIA de outra planilha, '
+      + 'conferido lá, e só então apagado daqui. Os ' + arquivo.meses
+      + ' últimos meses ficam.</p>'
+      + '<p class="config-explica">Hoje: <strong>' + arquivo.linhasNaAuditoria
+      + '</strong> linha(s) na auditoria. Arquivar agora levaria as de antes de '
+      + '<strong>' + escapar(arquivo.arquivariaAte) + '</strong>. '
+      + (arquivo.ultimoEm
+        ? 'Último arquivamento: ' + escapar(arquivo.ultimoEm) + ', '
+          + arquivo.ultimoQuantas + ' linha(s).'
+        : 'Nenhum arquivamento feito ainda.') + '</p>'
+      + '<form class="config-form" id="form-arquivo-da-auditoria">'
+      + campoDeTexto('arquivoId', 'Id da planilha de arquivo', arquivo.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha, '
+        + 'e a conta que roda o sistema precisa ter acesso a ela.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (arquivo.planilhaId
+        ? '<button type="button" class="botao vazado" id="arquivar-agora">'
+          + 'Arquivar agora</button>' : '')
+      + '</div></form>'
+      + '<details class="config-explica"><summary>Para arquivar sozinho, a cada '
+      + arquivo.meses + ' meses</summary>'
+      + '<p>No editor do Apps Script, em Acionadores, crie um acionador '
+      + '<strong>por tempo, mensal</strong>, para a função '
+      + '<code>arquivarAuditoriaAgendada</code>. Ela roda todo mês e só '
+      + 'arquiva quando o último arquivamento foi há ' + arquivo.meses
+      + ' meses ou mais.</p></details>'
+      + '</div>';
+  }
+
+  function ligarArquivoDaAuditoria() {
+    elemento('form-arquivo-da-auditoria').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarArquivoDaAuditoria', valorDe('arquivoId'))
+          .entao(function (novo) {
+            dados.arquivoDaAuditoria = novo;
+            avisarSalvo(novo.planilhaId
+              ? 'Planilha de arquivo da auditoria conferida e salva.'
+              : 'Arquivo da auditoria desligado.');
+            carregarEstrutura();
+          })
+          .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+      });
+    });
+
+    var agora = elemento('arquivar-agora');
+    if (!agora) return;
+    agora.addEventListener('click', function () {
+      var arquivo = dados.arquivoDaAuditoria;
+      Formulario.confirmarAtencao('Arquivar a auditoria agora?',
+        'As linhas de antes de <strong>' + escapar(arquivo.arquivariaAte)
+        + '</strong> vão para a planilha de arquivo e são <strong>apagadas '
+        + 'daqui</strong> depois de conferidas lá.',
+        'Arquivar', function () {
+          comSenhaDeAdministrador(function () {
+            Servidor.chamar('arquivarAuditoriaAgora')
+              .entao(function (resultado) {
+                dados.arquivoDaAuditoria = resultado.configuracao;
+                avisarSalvo(resultado.arquivadas
+                  ? resultado.arquivadas + ' linha(s) arquivada(s).'
+                  : 'Nada a arquivar: nenhuma linha de antes de '
+                    + resultado.ate + '.');
+                carregarEstrutura();
+              })
+              .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+          });
+        });
     });
   }
 

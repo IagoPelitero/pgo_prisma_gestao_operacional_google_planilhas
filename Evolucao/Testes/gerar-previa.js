@@ -321,6 +321,9 @@ function pontePreparada(respostas) {
     + '      listarAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.trilha);\n'
     + '      },\n'
+    + '      configuracaoDoArquivoDaAuditoria: function () {\n'
+    + '        responder(respostas.configuracoes.arquivoDaAuditoria);\n'
+    + '      },\n'
     + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'excluirCampo', 'reordenarCampos',
       'criarCanal',
       'salvarItemDoCatalogo', 'criarLista', 'renomearLista', 'excluirLista',
@@ -333,7 +336,8 @@ function pontePreparada(respostas) {
       'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
       'salvarConfiguracaoDoLegado', 'importarCasos',
-      'salvarConfiguracaoDosCadastros'])
+      'salvarConfiguracaoDosCadastros', 'salvarArquivoDaAuditoria',
+      'arquivarAuditoriaAgora'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -712,9 +716,21 @@ function gerar(pastaDeSaida) {
     { SUSEP: 'RET03C', Corretora: 'Corretora Novo Norte', Sucursal: '58',
       Segmento: 'Demais corretoras', Consultor: '' }
   ]);
+  // Os dois tipos de bloqueio e uma linha antiga, sem tipo — as três
+  // etiquetas que a lista mostra.
   chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
     SUSEP: 'RET99Z', NomeCorretora: 'Corretora XYZ', Sucursal: '12',
-    CoordenadorComercial: 'Coordenação Sul', BloqueadaEm: new Date()
+    CoordenadorComercial: 'Coordenação Sul', BloqueadaEm: new Date(),
+    BloqueadaPor: 'Companhia'
+  });
+  chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
+    SUSEP: 'RET98Y', NomeCorretora: 'Corretora Litoral', Sucursal: '58',
+    CoordenadorComercial: 'Coordenação Norte', BloqueadaEm: new Date(),
+    BloqueadaPor: 'Corretora'
+  });
+  chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
+    SUSEP: 'RET97X', NomeCorretora: 'Corretora Antiga', Sucursal: '12',
+    CoordenadorComercial: '', BloqueadaEm: new Date()
   });
 
   const formularios = {};
@@ -803,6 +819,7 @@ function gerar(pastaDeSaida) {
   const configuracoes = {
     cards: cards,
     cadastros: chamar('configuracaoDosCadastros()'),
+    arquivoDaAuditoria: chamar('configuracaoDoArquivoDaAuditoria()'),
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,
     opcoesDeNivel: chamar('opcoesDeNivelDeAcesso()'),

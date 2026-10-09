@@ -245,9 +245,37 @@ function rodarTestesDeCadastrosDeFora() {
     igual(depois.Segmento, 'Ouro');
   });
 
+  teste('base de fora sem a coluna BloqueadaPor: aviso no conferir, recado ao bloquear', () => {
+    // A planilha de cadastros que a operação já montou não tem a coluna nova.
+    // Ela não pode deixar de ligar por isso: é AVISO, e não falta.
+    const laudo = chamar('conferirPlanilhaDeCadastros')(
+      chamar('configuracaoDosCadastros()').planilhaId);
+    igual(laudo.faltando.length, 0, 'não é falta');
+    verdadeiro(laudo.avisos.some((a) => a.indexOf('BloqueadaPor') >= 0),
+      'mas avisa');
+
+    // A linha que já existia lá aparece "sem tipo".
+    igual(chamar('listarSusepsBloqueadas()')
+      .find((uma) => uma.susep === 'RETF99').bloqueadaPor, '');
+
+    // Bloquear pede a coluna — e o recado diz ONDE criar: lá, não aqui.
+    lanca(() => chamar('bloquearSusep')({ susep: 'RETF50',
+      bloqueadaPor: 'Corretora' }), 'da planilha de cadastros');
+
+    // Quem cuida da planilha de lá acrescenta a coluna, e passa a funcionar.
+    const aba = ambiente.planilhaExternaPeloId(
+      chamar('configuracaoDosCadastros()').planilhaId)
+      .getSheetByName('SUSEP_BLOQUEADAS');
+    aba.getRange(1, aba.getLastColumn() + 1).setValue('BloqueadaPor');
+    chamar('esquecerEstruturaLida_()');
+  });
+
   teste('bloquear e liberar SUSEP funciona na base de fora', () => {
     chamar('bloquearSusep')({ susep: 'RETF50',
-      coordenadorComercial: 'Teste de escrita' });
+      coordenadorComercial: 'Teste de escrita', bloqueadaPor: 'Corretora' });
+    igual(chamar('listarSusepsBloqueadas()')
+      .find((uma) => uma.susep === 'RETF50').bloqueadaPor, 'Corretora',
+    'o tipo foi gravado lá');
     igual(chamar('consultarSusep')('RETF50').situacao, 'BLOQUEADA',
       'o selo já enxerga o bloqueio gravado lá');
 

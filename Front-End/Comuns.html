@@ -1240,6 +1240,9 @@ var Formulario = (function () {
           OK: 'liberada', BLOQUEADA: 'bloqueada',
           NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
         }[resposta.situacao] || 'conferindo';
+        // Os dois bloqueios têm sinal próprio, a pedido do PO: pela companhia
+        // é vermelho; pela corretora, violeta. Sem tipo fica vermelho.
+        if (resposta.bloqueadaPor === 'Corretora') aparencia = 'bloqueada-corretora';
 
         selo.className = 'selo-susep ' + aparencia;
         selo.textContent = resposta.mensagem

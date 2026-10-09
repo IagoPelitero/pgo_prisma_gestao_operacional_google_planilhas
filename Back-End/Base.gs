@@ -640,6 +640,11 @@ const RECC_ESQUEMA = {
    *
    * `BloqueadaEm` fica porque não é pergunta: é o sistema que a escreve, no
    * dia em que o bloqueio nasce.
+   *
+   * `BloqueadaPor` diz QUEM bloqueou: a companhia ou a própria corretora.
+   * Pedido do PO: "as suseps bloqueadas são por 2 tipos". Vale 'Companhia' ou
+   * 'Corretora'. As linhas que já existiam antes dela ficam em branco — "sem
+   * tipo", decisão do PO — até alguém editar e escolher.
    */
   SUSEP_BLOQUEADAS: {
     aba: 'SUSEP_BLOQUEADAS',
@@ -652,7 +657,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'NomeCorretora', tipo: 'texto', protegido: true },
       { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
       { cabecalho: 'CoordenadorComercial', tipo: 'texto', protegido: false },
-      { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false }
+      { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false },
+      // Na planilha de cadastros de fora ela é AVISO, e não falta: quem já
+      // ligou a segunda base não pode ficar travado por uma coluna nova.
+      { cabecalho: 'BloqueadaPor', tipo: 'texto', protegido: false,
+        opcionalNaBaseDeFora: true }
     ]
   },
 
