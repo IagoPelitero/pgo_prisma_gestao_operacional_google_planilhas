@@ -11,8 +11,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, scriptDaPeca } =
-  require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, scriptDaPeca,
+  pecaRodando } = require('./ferramentas');
 
 const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
 
@@ -1698,6 +1698,99 @@ function rodarTestesDeConfiguracoes() {
     contem(tela, "Servidor.chamar('arquivarAuditoriaAgora')");
     contem(tela, 'arquivarAuditoriaAgendada', 'o nome da função para o acionador');
     contem(tela, 'id="arquivar-agora"');
+  });
+
+  secao('O editor das colunas da fila');
+
+  /*
+   * Pedido do PO: configurar a fila do Trabalho escolhendo a ordem e as
+   * colunas, por canal, com os grupos e com a junção "A + B". O texto gravado
+   * em CANAIS.ColunasDaFila NÃO mudou de formato: o editor lê e escreve o
+   * mesmo texto. A prova que vale é a do servidor: a fila montada com o texto
+   * escrito pelo editor tem de ser IGUAL à montada com o texto de antes.
+   */
+  const editor = pecaRodando('Configuracoes').EditorDaFila;
+  const fil = carregar('primeiro.adm@exemplo.com');
+  fil.chamar('instalarRECC()');
+  const filaDoServidor = (canal, texto) => JSON.stringify(
+    fil.chamar('colunasDaFila_')(Object.assign({}, canal, { colunasDaFila: texto })));
+  const escapar = (t) => String(t === undefined ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+  teste('o que cada canal já tem abre no editor e volta igual para a fila', () => {
+    const canais = fil.chamar('canaisVisiveis_()');
+    verdadeiro(canais.length >= 3);
+    canais.forEach((canal) => {
+      const deVolta = editor.escrever(editor.ler(canal.colunasDaFila));
+      igual(filaDoServidor(canal, deVolta), filaDoServidor(canal, canal.colunasDaFila),
+        canal.nome + ': a fila mudou ao passar pelo editor');
+    });
+  });
+
+  teste('a junção "A + B" da RET sobrevive ao editor', () => {
+    const ret = fil.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    const modelo = editor.ler(ret.colunasDaFila);
+    const juntado = modelo.some((g) => g.itens.some((item) => item.length === 2
+      && item[0] === 'Código origem da proposta'));
+    verdadeiro(juntado, 'a proposta inteira é um item de duas colunas');
+    contem(editor.escrever(modelo), 'Código origem da proposta + número da proposta');
+  });
+
+  teste('a escrita plana, de canal antigo, vira um grupo por coluna — e a fila não muda', () => {
+    const mesa = fil.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    const plana = 'Data de entrada, Status, Nome do segurado';
+    const modelo = editor.ler(plana);
+    igual(modelo.map((g) => g.titulo).join(' | '), 'Data de entrada | Status | Nome do segurado');
+    igual(filaDoServidor(mesa, editor.escrever(modelo)), filaDoServidor(mesa, plana));
+  });
+
+  teste('escreve sempre com título, e o título não desmonta o texto', () => {
+    const texto = editor.escrever([
+      { titulo: 'Situação; urgente: hoje, já', itens: [['Status']] },
+      { titulo: '', itens: [['Data de entrada'], ['Hora']] },
+      { titulo: 'Vazio', itens: [] }
+    ]);
+    igual(texto, 'Situação urgente hoje já: Status; Data de entrada: Data de entrada, Hora',
+      'os sinais do título viram espaço, o grupo sem nome leva o da 1ª coluna, e o vazio sai');
+    igual(editor.ler(texto).length, 2);
+  });
+
+  teste('o desenho: destaque na 1ª linha, coluna ausente em vermelho, só oferece as livres', () => {
+    const html = editor.desenhar(editor.ler('Situação: Status, Coluna Que Sumiu; Outro: Data'),
+      ['Status', 'Data', 'Hora'], escapar);
+    igual((html.match(/fila-destaque/g) || []).length, 2, 'um destaque por grupo');
+    contem(html, 'fila-parte ausente', 'a coluna que não existe mais aparece marcada');
+    contem(html, 'não existe na aba');
+    verdadeiro(html.indexOf('<option value="Hora">') >= 0, 'Hora está livre');
+    verdadeiro(html.indexOf('<option value="Status">') < 0, 'Status já está na fila: não se oferece de novo');
+    contem(html, 'data-novo-grupo');
+    contem(html, 'data-juntar="0.0"', 'cada linha oferece juntar');
+  });
+
+  teste('salvar o canal com o texto do editor grava e a fila obedece à nova ordem', () => {
+    const mesa = fil.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    const modelo = editor.ler(mesa.colunasDaFila);
+    modelo.reverse();                                        // o último grupo vem primeiro
+    modelo[0].itens.push(['Data resposta', 'Hora resposta']);   // "+ juntar…"
+    const texto = editor.escrever(modelo);
+    const daTela = fil.chamar('listarCanaisConfiguraveis()').find((c) => c.id === mesa.id);
+    fil.chamar('salvarCanal')(Object.assign({}, daTela, { colunasDaFila: texto }));
+    const depois = fil.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+    igual(depois.colunasDaFila, texto);
+    const fila = fil.chamar('colunasDaFila_')(depois);
+    igual(fila[0].titulo, modelo[0].titulo, 'o grupo que subiu é o primeiro da fila');
+    const ultima = fila[0].colunas[fila[0].colunas.length - 1];
+    igual(ultima.cabecalho, 'Data resposta + Hora resposta', 'e a linha juntada sai junta');
+    igual(ultima.juntar.length, 2);
+  });
+
+  teste('a tela usa o editor no lugar do campo de texto', () => {
+    const tela = lerTela('Configuracoes.html');
+    verdadeiro(tela.indexOf("campoDeTexto('colunasDaFila'") < 0, 'o campo de texto saiu');
+    contem(tela, 'id="editor-da-fila"');
+    contem(tela, '<input type="hidden" id="cfg-colunasDaFila">',
+      'o texto gravado segue num campo escondido, e o salvar não mudou');
+    contem(tela, 'EditorDaFila.montar(');
   });
 }
 

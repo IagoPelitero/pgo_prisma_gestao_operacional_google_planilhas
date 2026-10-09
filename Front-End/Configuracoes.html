@@ -22,6 +22,247 @@
    senha.
    ============================================================================ */
 
+/* ============================================================================
+   O EDITOR DA FILA — as colunas que o Trabalho mostra, sem escrever sintaxe
+   ============================================================================
+   Pedido do PO: "temos como configurar a aba Trabalho? Assim escolho a ordem
+   que deve ficar os dados". Antes era um campo de texto com regra própria —
+   "Título: coluna, coluna; Título: coluna", com "+" para juntar duas. Funciona,
+   mas um ponto e vírgula a menos desmontava a fila inteira, e ninguém da
+   operação deveria ter de aprender isso.
+
+   O QUE ESTÁ GRAVADO NÃO MUDOU: `CANAIS.ColunasDaFila` continua sendo o mesmo
+   texto, e a fila, o servidor e a migração continuam lendo como sempre. Este
+   editor só LÊ o texto, mostra como grupos e colunas, e ESCREVE o texto de
+   volta. Por isso não há migração: o que o PO já montou abre no editor.
+
+   O que o PO decidiu: por canal; com os grupos ("são o suficiente ali"); e
+   oferecendo a junção "A + B", que é como a RET mostra a proposta inteira.
+
+   O modelo é uma lista de grupos, e cada grupo uma lista de ITENS — e um item
+   é uma lista de colunas, porque "A + B" é um item de duas:
+
+     [{ titulo: 'Dados da proposta',
+        itens: [['Código origem da proposta', 'número da proposta'], ['Produto']] }]
+   ============================================================================ */
+
+var EditorDaFila = (function () {
+
+  /** O texto gravado vira o modelo. Entende a escrita plana e a agrupada. */
+  function ler(textoGravado) {
+    var declarado = String(textoGravado || '');
+    var plana = declarado.indexOf(':') < 0;
+    var pedacos = plana ? declarado.split(',') : declarado.split(';');
+
+    return pedacos.map(function (pedaco) {
+      var texto = String(pedaco || '').trim();
+      if (!texto) return null;
+      var titulo = '';
+      var lista = texto;
+      var doisPontos = texto.indexOf(':');
+      if (!plana && doisPontos > 0) {
+        titulo = texto.substring(0, doisPontos).trim();
+        lista = texto.substring(doisPontos + 1);
+      }
+      var itens = lista.split(',').map(function (item) {
+        return item.split('+').map(function (nome) { return nome.trim(); })
+          .filter(function (nome) { return nome !== ''; });
+      }).filter(function (item) { return item.length; });
+      if (!itens.length) return null;
+      // Na escrita plana cada coluna é um grupo com o próprio nome — é como
+      // a fila sempre a leu.
+      return { titulo: titulo || itens[0].join(' + '), itens: itens };
+    }).filter(function (grupo) { return grupo !== null; });
+  }
+
+  /*
+   * Título é texto livre, mas três caracteres têm significado no texto
+   * gravado: ":" separa o título, ";" separa os grupos, "," separa as
+   * colunas. Um deles no título desmontaria a fila — então viram espaço.
+   */
+  function tituloLimpo(titulo) {
+    return String(titulo || '').replace(/[:;,+]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * O modelo vira o texto gravado. Sempre na escrita AGRUPADA, e sempre com
+   * título: sem nenhum dois-pontos o texto seria lido como a escrita plana, e
+   * cada coluna viraria um grupo. Grupo sem título leva o nome da 1ª coluna,
+   * que é o que a fila mostraria de qualquer jeito. Grupo vazio não é gravado.
+   */
+  function escrever(modelo) {
+    return (modelo || []).filter(function (grupo) {
+      return grupo.itens.length;
+    }).map(function (grupo) {
+      var titulo = tituloLimpo(grupo.titulo) || tituloLimpo(grupo.itens[0].join(' '));
+      return titulo + ': ' + grupo.itens.map(function (item) {
+        return item.join(' + ');
+      }).join(', ');
+    }).join('; ');
+  }
+
+  /** As colunas que o modelo já usa, em qualquer grupo. */
+  function usadas(modelo) {
+    var lista = [];
+    modelo.forEach(function (grupo) {
+      grupo.itens.forEach(function (item) { lista = lista.concat(item); });
+    });
+    return lista;
+  }
+
+  function mover(lista, de, passo) {
+    var para = de + passo;
+    if (para < 0 || para >= lista.length) return;
+    var item = lista.splice(de, 1)[0];
+    lista.splice(para, 0, item);
+  }
+
+  /* ------------------------------------------------------------ o desenho */
+
+  function desenhar(modelo, colunasDaBase, escapar) {
+    var livres = colunasDaBase.filter(function (coluna) {
+      return usadas(modelo).indexOf(coluna) < 0;
+    });
+    var opcoesLivres = livres.map(function (coluna) {
+      return '<option value="' + escapar(coluna) + '">' + escapar(coluna) + '</option>';
+    }).join('');
+
+    var grupos = modelo.map(function (grupo, g) {
+      var itens = grupo.itens.map(function (item, i) {
+        var partes = item.map(function (coluna, p) {
+          var existe = colunasDaBase.indexOf(coluna) >= 0;
+          return '<span class="fila-parte' + (existe ? '' : ' ausente') + '">'
+            + escapar(coluna)
+            + (existe ? '' : ' <em>(não existe na aba)</em>')
+            + (item.length > 1
+              ? '<button type="button" class="fila-tirar-parte" data-tirar-parte="'
+                + g + '.' + i + '.' + p + '" aria-label="Separar ' + escapar(coluna)
+                + '">×</button>' : '')
+            + '</span>';
+        }).join('<span class="fila-mais">+</span>');
+
+        return '<li class="fila-item">'
+          + '<div class="fila-item-nome">' + partes
+          + (i === 0 ? '<span class="fila-destaque">destaque</span>' : '') + '</div>'
+          + '<div class="fila-item-acoes">'
+          + (livres.length
+            ? '<select class="fila-juntar" data-juntar="' + g + '.' + i + '"'
+              + ' aria-label="Juntar outra coluna nesta linha">'
+              + '<option value="">+ juntar…</option>' + opcoesLivres + '</select>'
+            : '')
+          + '<button type="button" class="seta" data-subir-item="' + g + '.' + i + '"'
+          + (i === 0 ? ' disabled' : '') + ' title="Subir" aria-label="Subir">↑</button>'
+          + '<button type="button" class="seta" data-descer-item="' + g + '.' + i + '"'
+          + (i === grupo.itens.length - 1 ? ' disabled' : '')
+          + ' title="Descer" aria-label="Descer">↓</button>'
+          + '<button type="button" class="seta perigo" data-tirar-item="' + g + '.' + i + '"'
+          + ' title="Tirar da fila" aria-label="Tirar da fila">×</button>'
+          + '</div></li>';
+      }).join('');
+
+      return '<div class="fila-grupo">'
+        + '<div class="fila-grupo-cabeca">'
+        + '<input type="text" class="fila-grupo-titulo" data-titulo="' + g + '"'
+        + ' value="' + escapar(grupo.titulo) + '" aria-label="Nome do grupo">'
+        + '<button type="button" class="seta" data-subir-grupo="' + g + '"'
+        + (g === 0 ? ' disabled' : '') + ' title="Subir o grupo" aria-label="Subir o grupo">↑</button>'
+        + '<button type="button" class="seta" data-descer-grupo="' + g + '"'
+        + (g === modelo.length - 1 ? ' disabled' : '')
+        + ' title="Descer o grupo" aria-label="Descer o grupo">↓</button>'
+        + '<button type="button" class="seta perigo" data-tirar-grupo="' + g + '"'
+        + ' title="Tirar o grupo" aria-label="Tirar o grupo">×</button>'
+        + '</div>'
+        + (itens ? '<ol class="fila-itens">' + itens + '</ol>'
+          : '<p class="fila-vazio">Grupo sem coluna: não aparece na fila.</p>')
+        + (livres.length
+          ? '<select class="fila-acrescentar" data-acrescentar="' + g + '"'
+            + ' aria-label="Acrescentar coluna ao grupo">'
+            + '<option value="">+ Acrescentar coluna…</option>' + opcoesLivres + '</select>'
+          : '')
+        + '</div>';
+    }).join('');
+
+    return (grupos || '<p class="fila-vazio">Nenhum grupo: a fila fica sem colunas.</p>')
+      + '<button type="button" class="botao-secundario pequeno" data-novo-grupo>'
+      + 'Novo grupo</button>';
+  }
+
+  /* ---------------------------------------------------------- ligar à tela */
+
+  /**
+   * Monta o editor dentro de `caixa` e mantém `campo` (um input escondido)
+   * com o texto gravado. Quem salva lê o campo, como lia o de texto.
+   */
+  function montar(caixa, campo, textoGravado, colunasDaBase, escapar) {
+    var modelo = ler(textoGravado);
+
+    function redesenhar() {
+      caixa.innerHTML = desenhar(modelo, colunasDaBase, escapar);
+      campo.value = escrever(modelo);
+    }
+    function posicao(texto) {
+      return String(texto).split('.').map(Number);
+    }
+
+    caixa.addEventListener('click', function (evento) {
+      var botao = evento.target.closest ? evento.target.closest('button') : null;
+      if (!botao || !caixa.contains(botao)) return;
+      var p;
+      if (botao.hasAttribute('data-novo-grupo')) {
+        modelo.push({ titulo: 'Novo grupo', itens: [] });
+      } else if (botao.hasAttribute('data-subir-grupo')) {
+        mover(modelo, Number(botao.getAttribute('data-subir-grupo')), -1);
+      } else if (botao.hasAttribute('data-descer-grupo')) {
+        mover(modelo, Number(botao.getAttribute('data-descer-grupo')), 1);
+      } else if (botao.hasAttribute('data-tirar-grupo')) {
+        modelo.splice(Number(botao.getAttribute('data-tirar-grupo')), 1);
+      } else if (botao.hasAttribute('data-subir-item')) {
+        p = posicao(botao.getAttribute('data-subir-item'));
+        mover(modelo[p[0]].itens, p[1], -1);
+      } else if (botao.hasAttribute('data-descer-item')) {
+        p = posicao(botao.getAttribute('data-descer-item'));
+        mover(modelo[p[0]].itens, p[1], 1);
+      } else if (botao.hasAttribute('data-tirar-item')) {
+        p = posicao(botao.getAttribute('data-tirar-item'));
+        modelo[p[0]].itens.splice(p[1], 1);
+      } else if (botao.hasAttribute('data-tirar-parte')) {
+        p = posicao(botao.getAttribute('data-tirar-parte'));
+        modelo[p[0]].itens[p[1]].splice(p[2], 1);
+      } else {
+        return;
+      }
+      redesenhar();
+    });
+
+    caixa.addEventListener('change', function (evento) {
+      var caixaDeEscolha = evento.target;
+      var coluna = caixaDeEscolha.value;
+      if (!coluna) return;
+      if (caixaDeEscolha.hasAttribute('data-acrescentar')) {
+        modelo[Number(caixaDeEscolha.getAttribute('data-acrescentar'))].itens.push([coluna]);
+      } else if (caixaDeEscolha.hasAttribute('data-juntar')) {
+        var p = posicao(caixaDeEscolha.getAttribute('data-juntar'));
+        modelo[p[0]].itens[p[1]].push(coluna);
+      } else {
+        return;
+      }
+      redesenhar();
+    });
+
+    // O título muda o texto gravado a cada letra, SEM redesenhar: redesenhar
+    // tiraria o cursor da caixa no meio da palavra.
+    caixa.addEventListener('input', function (evento) {
+      if (!evento.target.hasAttribute('data-titulo')) return;
+      modelo[Number(evento.target.getAttribute('data-titulo'))].titulo = evento.target.value;
+      campo.value = escrever(modelo);
+    });
+
+    redesenhar();
+  }
+
+  return { ler: ler, escrever: escrever, desenhar: desenhar, montar: montar };
+})();
+
 var TelaConfiguracoes = (function () {
 
   var resumo = null;
@@ -1354,11 +1595,13 @@ var TelaConfiguracoes = (function () {
       + caixaDeOpcoes('colunaDaHora', 'Coluna da hora', colunas, canal.colunaDaHora, '')
       + caixaDeOpcoes('colunaDoStatus', 'Coluna da situação', colunas,
         canal.colunaDoStatus, 'É por ela que os cartões do painel contam.')
-      + campoDeTexto('colunasDaFila', 'Colunas da fila', canal.colunasDaFila,
-        'Grupos separados por ponto e vírgula: "Título: coluna, coluna". '
-        + 'Sem os dois-pontos, cada coluna vira uma coluna da tabela. '
-        + 'Com "+", duas colunas saem juntas numa linha só, com hífen: '
-        + '"Código origem da proposta + número da proposta" mostra 7-0000000.')
+      + '<div class="config-campo"><span>Colunas da fila</span>'
+      + '<div class="editor-da-fila" id="editor-da-fila"></div>'
+      + '<input type="hidden" id="cfg-colunasDaFila">'
+      + '<em>Cada grupo é uma coluna da tabela do Trabalho, na ordem daqui. A '
+      + 'primeira linha de cada grupo é o destaque. "+ juntar…" põe duas '
+      + 'colunas na mesma linha, com hífen — é assim que a proposta da RET sai '
+      + 'inteira, 7-0000000.</em></div>'
       + campoDeTexto('colunasDaBusca', 'Colunas em que a busca procura',
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
@@ -1410,6 +1653,9 @@ var TelaConfiguracoes = (function () {
         : '')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button></div></form>';
+
+    EditorDaFila.montar(elemento('editor-da-fila'), elemento('cfg-colunasDaFila'),
+      canal.colunasDaFila, canal.colunasDaBase, escapar);
 
     elemento('form-canal').addEventListener('submit', function (evento) {
       evento.preventDefault();

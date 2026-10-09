@@ -2225,6 +2225,41 @@ outra planilha.
 
 ---
 
+## Etapa 27 — Parte 3: o editor visual das colunas da fila
+
+Pedido do PO: "temos como configurar a aba Trabalho? Assim escolho a ordem que
+deve ficar os dados". Até aqui a fila era um campo de texto com regra própria
+— `Título: coluna, coluna; Título: coluna`, com `+` para juntar.
+
+| decisão do PO | o que ficou |
+|---|---|
+| "Vale para cada canal" | O editor mora no formulário de cada canal, em Configurações › Canais de trabalho, no lugar do campo de texto |
+| "Quero manter os grupos" | Cada grupo é um cartão: renomear, subir, descer, tirar e criar grupo novo. Dentro dele, acrescentar coluna (só as que ainda não estão na fila), subir, descer e tirar linha. A primeira linha leva a etiqueta "destaque" |
+| "Deve oferecer" a junção A + B | "+ juntar…" em cada linha põe outra coluna na mesma linha, e o "×" de cada pedaço separa de novo |
+
+**O que está gravado não mudou.** `CANAIS.ColunasDaFila` continua sendo o
+mesmo texto; o editor lê esse texto, mostra, e escreve de volta. Por isso não
+há migração, e a fila, a busca e o servidor seguem como estavam. O teste que
+prova isso: para os três canais instalados, a fila que o servidor monta com o
+texto de antes é idêntica à montada com o texto que o editor devolve. O título
+não consegue mais desmontar a fila (`:` `;` `,` `+` viram espaço), grupo sem
+coluna não é gravado, e coluna que sumiu da aba aparece em vermelho.
+
+**861 testes**, cinco execuções seguidas sem falha, 8 quebras de propósito, 8
+vermelhos. No navegador, com o servidor de verdade, em 1440, 1280 e 390 px:
+abrir a Mesa com os 5 grupos, subir "Responsável" ao topo, acrescentar "Data
+resposta", juntar "Hora resposta", separar, mover e tirar, renomear, criar o
+grupo "Resposta", salvar — e o Trabalho mostrar a fila na ordem nova.
+
+### Em aberto, para o PO
+
+- **As colunas `_ExcluidoEm` e `_ExcluidoPor` nas bases de caso.** Desde que
+  o caso é excluído de vez, elas ficam vazias para sempre na RET, na Mesa e no
+  VG. Proposta: tirá-las das bases de caso (mantendo nos cadastros, onde ainda
+  explicam a linha oculta) na Parte 4 — aguardando o aval do PO.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

@@ -353,10 +353,19 @@ Os destaques são os que a operação procura ao varrer a fila, a pedido do PO:
 | RET | Dados cadastrais | o **telefone**; nome, CPF e e-mail logo abaixo |
 | Mesa Diamante | Dados do caso | o **título do e-mail**; depois ramo e assunto |
 
-A proposta inteira sai de uma escrita nova das colunas da fila: `Código origem
-da proposta + número da proposta` junta as duas numa linha só, com hífen — e
-pedaço vazio não deixa hífen solto. É editável em Configurações › Canais de
-trabalho, como o resto da fila. O destaque não quebra linha, para dar para
+A proposta inteira sai da **junção** de duas colunas: `Código origem da
+proposta + número da proposta` junta as duas numa linha só, com hífen — e
+pedaço vazio não deixa hífen solto.
+
+**A fila se monta na tela, canal a canal**, em Configurações › Canais de
+trabalho › Colunas da fila — sem escrever nada. Cada grupo é um cartão: dá
+para renomear, subir e descer o grupo, acrescentar coluna, mudar a ordem das
+linhas, tirar uma linha, **"+ juntar…"** outra coluna na mesma linha (e
+separar de novo) e criar um grupo novo. A primeira linha de cada grupo leva a
+etiqueta "destaque". Coluna que sumiu da aba aparece em vermelho, para ser
+tirada. O que fica gravado na planilha (`CANAIS.ColunasDaFila`) é o mesmo
+texto de sempre — o editor só lê e escreve esse texto, e por isso o que já
+estava montado abre igual. O destaque não quebra linha, para dar para
 varrer com o olho: título de e-mail longo aparece com "…". **Passar o cursor
 por cima mostra o texto inteiro**, com o nome da coluna — a pedido do PO, e
 igual nas três filas: Trabalho, Busca e o detalhamento da Produtividade RECC.
@@ -1112,7 +1121,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-854 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+861 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

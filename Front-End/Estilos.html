@@ -1472,6 +1472,55 @@ table.fila tr.importar-igual { color: var(--tenue); }
 .config-item .seta:hover:not(:disabled) { background: var(--superficie-2); color: var(--texto); }
 .config-item .seta:disabled { opacity: .3; cursor: default; }
 
+/* O editor das colunas da fila, em Configurações › Canais de trabalho. Cada
+   grupo é um cartão: o nome em cima, as linhas numeradas, e as setas que já
+   são as da lista de campos — o mesmo gesto para a mesma ideia de "ordem". */
+.editor-da-fila { display: grid; gap: 10px; }
+.fila-grupo {
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie-2); padding: 10px; display: grid; gap: 8px;
+  min-width: 0;
+}
+.fila-grupo-cabeca { display: flex; gap: 4px; align-items: center; }
+.editor-da-fila .fila-grupo-titulo { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.fila-itens { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fila-item {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 6px; background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: var(--raio-pequeno); padding: 6px 8px;
+}
+.fila-item-nome {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  font-size: 13px; min-width: 0; flex: 1 1 160px;
+}
+.fila-parte { display: inline-flex; align-items: center; gap: 2px; overflow-wrap: anywhere; }
+.fila-parte.ausente { color: var(--ruim); font-weight: 600; }
+.fila-parte em { font-style: normal; font-size: 11.5px; }
+.fila-mais { color: var(--tenue); font-weight: 700; }
+.fila-tirar-parte {
+  border: 0; background: none; color: var(--tenue); cursor: pointer;
+  padding: 0 3px; font-size: 14px; line-height: 1;
+}
+.fila-tirar-parte:hover { color: var(--ruim); }
+.fila-destaque {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--destaque); background: var(--destaque-tenue);
+  border-radius: 999px; padding: 1px 7px;
+}
+.fila-item-acoes { display: flex; align-items: center; gap: 3px; flex: none; }
+.editor-da-fila select.fila-juntar { width: auto; max-width: 140px; padding: 3px 6px; font-size: 12.5px; }
+.editor-da-fila select.fila-acrescentar { font-size: 13px; }
+.fila-vazio { margin: 0; font-size: 12.5px; color: var(--tenue); }
+.editor-da-fila .seta {
+  width: 26px; height: 26px; flex: none; cursor: pointer;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 4px; color: var(--suave); line-height: 1;
+}
+.editor-da-fila .seta:hover:not(:disabled) { color: var(--texto); border-color: var(--linha-forte); }
+.editor-da-fila .seta.perigo:hover:not(:disabled) { color: var(--ruim); border-color: var(--ruim); }
+.editor-da-fila .seta:disabled { opacity: .3; cursor: default; }
+.editor-da-fila > .botao-secundario { justify-self: start; }
+
 /* ------------------------------------------------ o painel de propriedades */
 .config-painel-cabeca { margin-bottom: 14px; }
 .config-painel-cabeca h3 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
