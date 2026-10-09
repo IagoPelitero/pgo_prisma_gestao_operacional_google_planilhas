@@ -1115,7 +1115,7 @@ function opcoesDeNivelDeAcesso() {
     PROPRIOS: 'Só os casos em que a pessoa é a responsável',
     EQUIPE: 'Os casos de quem atende o mesmo canal que ela',
     CANAL: 'Todos os casos dos canais que ela enxerga',
-    TODOS: 'Todos os casos, de todas os canais'
+    TODOS: 'Todos os casos, de todos os canais'
   };
 
   return {
@@ -1184,7 +1184,7 @@ function listarCanaisConfiguraveis() {
           return item.nome;
         });
       } catch (erro) {
-        // Aba que não existe não derruba a tela: o canal aparece marcada, e o
+        // Aba que não existe não derruba a tela: o canal aparece marcado, e o
         // administrador vê qual é o problema em vez de uma página branca.
         colunas = [];
       }
@@ -1228,7 +1228,7 @@ function listarCanaisConfiguraveis() {
  * Muda o que o canal MOSTRA — nome, ícone, quais colunas viram fila, quais
  * situações viram cartão. Não muda onde ela mora: a aba é escolhida quando a
  * canal nasce, e trocá-la apontaria todos os casos já gravados para o lugar
- * errado. Criar canal nova é estrutura, e ainda não passa por aqui.
+ * errado. Criar canal novo é estrutura, e ainda não passa por aqui.
  */
 function salvarCanal(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
@@ -1268,7 +1268,7 @@ function salvarCanal(dados) {
     });
   });
 
-  // Desligar a último canal ativa deixaria o Trabalho sem nada para mostrar,
+  // Desligar o último canal ativo deixaria o Trabalho sem nada para mostrar,
   // e o cadastro sem formulário — o sistema inteiro pareceria quebrado.
   if (dados.ativo === false) {
     var outrasAtivas = lerRegistros_('CANAIS').filter(function (canal) {
@@ -1452,7 +1452,7 @@ function criarCanal(dados) {
         + 'nem para editar. Crie uma coluna chamada "id" na aba e tente de '
         + 'novo.');
     }
-    garantirColunasDeControle_(nomeDaAba);
+    garantirColunasDeControle_(nomeDaAba, true);
   } else {
     // Aba nova, ou aba vazia que estava sobrando: nasce no tamanho exato.
     criarAbaDoContrato_(planilha, {
@@ -1464,7 +1464,7 @@ function criarCanal(dados) {
       // cresce sozinha quando encher, em garantirLinhasNaGrade_.
       reserva: 200,
       colunas: [{ cabecalho: 'id', tipo: 'identificador', protegido: true }]
-        .concat(RECC_COLUNAS_DE_CONTROLE)
+        .concat(colunasDeControleDe_(true))
     });
   }
 

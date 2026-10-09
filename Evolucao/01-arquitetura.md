@@ -161,6 +161,10 @@ Toda aba de dados ganha colunas de controle no fim, prefixadas com `_`:
 | `_ExcluidoPor` | ID do usuário | Quem tirou |
 | `_Origem` | `SISTEMA` / `PLANILHA` | Se a linha nasceu na tela ou digitada direto |
 
+As bases de **caso** levam só `_Visivel` e `_Origem`: caso é apagado de verdade
+(a exceção logo abaixo), então o carimbo de quando e quem ocultou não teria
+uso. Saiu delas na Parte 4, a pedido do PO; nos cadastros ele continua.
+
 O `_Visivel` é editável **na mão, direto na planilha** — é assim que uma linha
 volta a aparecer. O prefixo `_` marca coluna de sistema e sinaliza ao Power BI
 o que ignorar.

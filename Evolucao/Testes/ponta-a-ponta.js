@@ -274,13 +274,13 @@ async function rodar() {
     const cargos = await pagina.$$eval('#cfg-cargo option', (os) => os.map((o) => o.value));
     await pagina.selectOption('#cfg-cargo', cargos[1]);
 
-    // O canal: a primeira opção é "todas os canais" (o administrador), e as
+    // O canal: a primeira opção é "todos os canais" (o administrador), e as
     // seguintes são os canais de verdade.
     const canais = await pagina.$$eval('#cfg-canal-da-pessoa option',
       (os) => os.map((o) => ({ valor: o.value, nome: o.textContent })));
-    verdadeiro(canais.length >= 3, 'o seletor traz "todas os canais" e os canais');
+    verdadeiro(canais.length >= 3, 'o seletor traz "todos os canais" e os canais');
     igual(canais[0].valor, '', 'a primeira opção é não ter canal');
-    contem(canais[0].nome, 'todas os canais');
+    contem(canais[0].nome, 'todos os canais');
     await pagina.selectOption('#cfg-canal-da-pessoa', canais[1].valor);
 
     await pagina.click('#form-usuario button[type="submit"]');
@@ -302,10 +302,10 @@ async function rodar() {
     contem(lista, canais[1].nome.trim(), 'e com o canal');
   });
 
-  await teste('quem administra aparece como "todas os canais"', async () => {
+  await teste('quem administra aparece como "todos os canais"', async () => {
     // O primeiro usuário, o que instala tudo, não pertence o canal nenhuma.
     // Em branco pareceria cadastro pela metade; dizer é melhor.
-    contem(await pagina.textContent('#config-lista'), 'todas os canais');
+    contem(await pagina.textContent('#config-lista'), 'todos os canais');
   });
 
   await teste('editar a pessoa muda a linha, e não cria outra', async () => {

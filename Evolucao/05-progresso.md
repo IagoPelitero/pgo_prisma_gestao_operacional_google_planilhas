@@ -215,7 +215,7 @@ não existe desfazer.
 - **Nome de coluna é escolhido numa lista**, nunca digitado: o nome que não
   existe é recusado dizendo quais existem, em vez de deixar o painel em branco
   dias depois
-- **Desligar a último canal ativa é recusado** — o Trabalho e o cadastro
+- **Desligar o último canal ativo é recusado** — o Trabalho e o cadastro
   ficariam sem base nenhuma
 - **A lista de telas é uma só.** `RECC_TELAS_DO_SISTEMA` alimenta o menu e a
   tela de níveis ao mesmo tempo; duas listas divergiriam, e a tela nova
@@ -311,7 +311,7 @@ protocolo estoura o tempo do Apps Script e a cota da conta.
 | 1. Ler só as **colunas de busca** e anotar em quais linhas o termo aparece | 5 colunas × 200 mil = 1 milhão de células |
 | 2. Ler **inteiras** só as linhas que casaram | quase sempre uma ou duas |
 
-Quais colunas cado canal lê está em `CANAIS.ColunasDaBusca`, e se ajusta em
+Quais colunas cada canal lê está em `CANAIS.ColunasDaBusca`, e se ajusta em
 Configurações. Canal que não declara nenhuma **avisa** em vez de ler a base
 toda.
 
@@ -1051,7 +1051,7 @@ Três mudanças pedidas pela operação, e uma que veio junto.
 `USUARIOS` ganhou a coluna **`CanalId`** — a décima quarta do contrato — e o
 formulário ganhou o campo. **Vazio é válido**, e é o caso de quem administra:
 quem cuida do sistema não pertence a um canal, atende as duas e delega. Na
-lista isso aparece como *"todas os canais"*, e não em branco — em branco parece
+lista isso aparece como *"todos os canais"*, e não em branco — em branco parece
 cadastro pela metade.
 
 Canal preenchida tem de existir. Um canal que sumiu deixaria a pessoa apontando
@@ -2260,6 +2260,44 @@ grupo "Resposta", salvar — e o Trabalho mostrar a fila na ordem nova.
 
 ---
 
+## Etapa 28 — Parte 4: a varredura
+
+Pedido do PO: "faça uma varredura se há alguma função que ficou para trás e
+não se usa mais, textos que possam poluir o código, avalie a semântica e se o
+sistema está responsivo, pois notei que nas telas tem elementos que estão
+sobrepondo. Procure por bugs, quebras e garanta que o sistema está funcional
+em Apps Script." E, aprovado por ele: tirar `_ExcluidoEm` e `_ExcluidoPor` das
+bases de caso.
+
+| frente | o que a varredura achou | o que ficou |
+|---|---|---|
+| **Sobreposição** | A etiqueta da situação passava por cima da coluna vizinha na fila do Trabalho (e no Buscar Caso e na Produtividade, que usam a mesma tabela), de 1440 px para baixo | A etiqueta quebra dentro da própria coluna (achado 67). O `conferir-responsividade.js` passou a procurar elemento em cima de elemento — e foi visto pegando o defeito antigo |
+| **Funções sem uso** | `alertaDaCelula_` (trocada por `faixaDaCelula_`, só os testes chamavam) e a constante `RECC_TIPOS_DE_PERIODO` | Removidas. `reexibirRegistro_`, `normalizarIdentificadoresDaAba_` e `verificarEstruturaRECC` ficam: são ferramentas de manutenção, documentadas para rodar à mão |
+| **CSS e textos que poluem** | CSS do calendário e do "Ver detalhes", que saíram do sistema; dois substitutos da prévia de Produtos; o comentário de um ícone que não existe; ~50 restos da troca de "mesa" por "canal" — vários **na tela**: "Esto canal não tem…", "— todas os canais —", "O canal escolhida não existe mais. Escolha outra" | Tudo limpo, sem renomear variável nenhuma |
+| **Semântica** | 172 controles conferidos no navegador: todo campo e botão com nome, nenhum id repetido, nada clicável que não seja botão | Nada a mudar |
+| **Segurança** | `atualizarPGO()` e `migrarParaCanais()` mexem na estrutura e podiam ser chamadas pelo navegador por qualquer pessoa | A porta do editor: fora do editor, só administrador (achado 68) |
+| **Apps Script** | Três regras de CSS com `:has()`, que a regra 9 do 03 proíbe | Trocadas por marcas que o roteador põe (achado 69). Os sete `.gs` carregam nas 5.040 ordens possíveis; nenhum nome repetido no escopo global; nenhuma sintaxe que o V8 do Apps Script não tenha. O README passou a pedir o motor V8 |
+| **O carimbo nas bases de caso** | `_ExcluidoEm` e `_ExcluidoPor` ficavam vazias para sempre na RET, na Mesa e no VG | Saem do contrato das bases de caso (canal novo também nasce sem). `atualizarPGO()` tira a coluna **só se estiver vazia**; com valor, fica e vira "DECISÃO SUA". Nos cadastros, o carimbo continua |
+| **Edição de SUSEP antiga** | Corrigir só a sucursal de uma SUSEP "sem tipo" obrigava a escolher quem bloqueou | Editar sem escolher mantém sem tipo, como o PO decidiu; bloqueio novo continua pedindo |
+
+**866 testes**, cinco execuções seguidas sem falha, 8 quebras de propósito, 8
+vermelhos. No navegador: 96 combinações de tela sem quebra e sem sobreposição,
+136 cliques, ponta a ponta 9/9 (repositório e pacote), os roteiros das Partes
+1, 2 e 3 em 1440 e 390 px, e o centro do modal e do cadastro medidos depois de
+tirar o `:has()`.
+
+### Em aberto, para o PO
+
+- **A barra superior em 1280 px** não sobrepõe nada, mas o crachá do usuário
+  desce para uma segunda linha, e a barra fica com o dobro da altura. Dá para
+  caber numa linha só estreitando a busca e o nome do sistema — é mudança de
+  desenho, e espera o seu aval.
+- **`color-mix()` nas cores** pede Chrome ou Edge 111 (2023) em diante. O
+  navegador corporativo atualizado já é; se alguém da operação usar um muito
+  antigo, as cores de destaque somem. Trocar exige mexer em dezenas de regras.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
@@ -2267,5 +2305,5 @@ grupo "Resposta", salvar — e o Trabalho mostrar a fila na ordem nova.
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
-| **Criar e apagar canal** | A tela ajusta os canais que existem. Criar um canal nova é estrutura (cria aba), e ainda não passa por Configurações |
+| **Criar e apagar canal** | A tela ajusta os canais que existem. Criar um canal novo é estrutura (cria aba), e ainda não passa por Configurações |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

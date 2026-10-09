@@ -333,7 +333,7 @@ function pontePreparada(respostas) {
       'definirSenhaDeAdministrador', 'liberarComSenha', 'salvarCardsDoPainel',
       'editarCaso', 'alterarSituacaoDoCaso', 'salvarComponentesDoPainel',
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
-      'desbloquearSusep', 'salvarProduto', 'ocultarProduto',
+      'desbloquearSusep',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
       'salvarConfiguracaoDoLegado', 'importarCasos',
       'salvarConfiguracaoDosCadastros', 'salvarArquivoDaAuditoria',

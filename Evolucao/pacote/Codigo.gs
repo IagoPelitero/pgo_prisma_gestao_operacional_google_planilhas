@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-09 08:14
+   Gerado em 2026-10-09 09:28
    ========================================================================== */
 
 
@@ -218,22 +218,14 @@ const RECC_ALERTAS_DA_LINHA = {
 };
 
 /**
- * O alerta desta célula, ou vazio quando não há.
- *
- * Compara pelo NOME da coluna, como todo o resto do sistema. Valor em branco
- * NÃO alerta: campo não preenchido é campo não preenchido, e pintar de
- * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
- */
-function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
-  var faixa = faixaDaCelula_(nomeDaAba, cabecalho, valor);
-  return faixa && faixa.tom === 'ruim' ? faixa.recado : '';
-}
-
-/**
  * A cor desta célula e o motivo — vermelho, amarelo ou verde —, ou null.
  *
  * O vermelho é o alerta de sempre (`abaixoDe`). O amarelo e o verde só existem
- * na regra que os declara: a vigência do VG. Valor em branco não ganha cor.
+ * na regra que os declara: a vigência do VG.
+ *
+ * Compara pelo NOME da coluna, como todo o resto do sistema. Valor em branco
+ * NÃO ganha cor: campo não preenchido é campo não preenchido, e pintar de
+ * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
  */
 function faixaDaCelula_(nomeDaAba, cabecalho, valor) {
   var regras = RECC_ALERTAS_DA_LINHA[nomeDaAba];
@@ -272,6 +264,24 @@ const RECC_COLUNAS_DE_CONTROLE = [
   { cabecalho: '_ExcluidoPor', tipo: 'identificador', protegido: true },
   { cabecalho: '_Origem', tipo: 'texto', protegido: true }
 ];
+
+/*
+ * O CARIMBO DA EXCLUSÃO — quando e quem ocultou — não existe nas bases de
+ * CASO. Desde que o caso é excluído de vez (decisão do PO), ninguém oculta
+ * caso, e as duas colunas ficavam vazias para sempre: numa base que caminha
+ * para 200 mil linhas, 400 mil células reservadas sem uso. Pedido do PO:
+ * "pode seguir e incluir". Nos cadastros elas continuam — lá a linha oculta
+ * ainda existe, e o carimbo é o que explica por que ela está NAO depois que a
+ * auditoria vai para o arquivo.
+ */
+const RECC_CARIMBO_DE_EXCLUSAO = ['_ExcluidoEm', '_ExcluidoPor'];
+
+/** As colunas de controle de uma aba: base de caso não leva o carimbo. */
+function colunasDeControleDe_(ehBaseDeCaso) {
+  return RECC_COLUNAS_DE_CONTROLE.filter(function (coluna) {
+    return !ehBaseDeCaso || RECC_CARIMBO_DE_EXCLUSAO.indexOf(coluna.cabecalho) < 0;
+  });
+}
 
 /*
  * `preenchidoPeloSistema: true` numa coluna quer dizer: a coluna é de DADO —
@@ -319,6 +329,8 @@ const RECC_ORIGEM_PLANILHA = 'PLANILHA';
  *
  * `controle: true`  → recebe as colunas _Visivel / _ExcluidoEm / _ExcluidoPor /
  *                     _Origem, e exclusão vira ocultação.
+ * `baseDeCaso: true` → base de caso: das de controle, só _Visivel e _Origem —
+ *                     caso é excluído de vez, e o carimbo não teria uso.
  * `reserva`         → quantas linhas a aba nasce tendo. Célula vazia também
  *                     consome o teto de 10 milhões da planilha, então o
  *                     instalador corta o que sobra. Ver Instalacao.gs.
@@ -328,6 +340,7 @@ const RECC_ESQUEMA = {
   // ------------------------------------------------------------------ bases
   BASE_RET: {
     aba: 'BASE_RET',
+    baseDeCaso: true,
     titulo: 'Retenção Vida',
     controle: true,
     reserva: 2000,
@@ -418,6 +431,7 @@ const RECC_ESQUEMA = {
 
   BASE_MESA: {
     aba: 'BASE_MESA',
+    baseDeCaso: true,
     titulo: 'Mesa Diamante',
     controle: true,
     reserva: 2000,
@@ -469,6 +483,7 @@ const RECC_ESQUEMA = {
    */
   BASE_VG: {
     aba: 'BASE_VG',
+    baseDeCaso: true,
     titulo: 'VG — Vida em Grupo',
     controle: true,
     reserva: 2000,
@@ -696,11 +711,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Aba', tipo: 'texto', protegido: true },
       // Quais colunas da base guardam quando o caso entrou. É daqui que sai a
       // "data do último registro" da barra superior. Ficam declaradas, e não
-      // adivinhadas, porque cado canal nomeia essa coluna do seu jeito.
+      // adivinhadas, porque cada canal nomeia essa coluna do seu jeito.
       { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
       // O painel precisa saber onde o canal guarda cada coisa. Declarado, e
-      // não adivinhado pelo nome: cado canal batiza a coluna do seu jeito, e
+      // não adivinhado pelo nome: cada canal batiza a coluna do seu jeito, e
       // adivinhar acerta hoje e erra no canal que vier depois.
       { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
       // As colunas da fila. Aceita duas escritas:
@@ -1005,9 +1020,7 @@ function esquemaDaAba_(nomeDaAba) {
   }
   var colunas = definicao.colunas.slice();
   if (definicao.controle) {
-    for (var i = 0; i < RECC_COLUNAS_DE_CONTROLE.length; i++) {
-      colunas.push(RECC_COLUNAS_DE_CONTROLE[i]);
-    }
+    colunas = colunas.concat(colunasDeControleDe_(definicao.baseDeCaso));
   }
   return {
     aba: definicao.aba,
@@ -2412,11 +2425,24 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
       'não possui a coluna _Visivel. Em abas de catálogo, o que desliga um ' +
       'item é a coluna Ativo.');
   }
-  return atualizarRegistro_(nomeDaAba, id, {
+  return atualizarRegistro_(nomeDaAba, id, comCarimboSeHouver_(nomeDaAba, {
     _Visivel: RECC_VISIVEL_NAO,
     _ExcluidoEm: new Date(),
     _ExcluidoPor: usuarioId || ''
+  }));
+}
+
+/**
+ * Tira do que vai ser gravado o carimbo da exclusão que a aba não tem — a
+ * base de caso, desde que o carimbo saiu dela. `atualizarRegistro_` recusa
+ * coluna que não existe, e ocultar não pode quebrar por falta de carimbo.
+ */
+function comCarimboSeHouver_(nomeDaAba, campos) {
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  RECC_CARIMBO_DE_EXCLUSAO.forEach(function (cabecalho) {
+    if (posicaoDaColuna_(estrutura, cabecalho) < 0) delete campos[cabecalho];
   });
+  return campos;
 }
 
 /**
@@ -2472,11 +2498,11 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
 }
 
 function reexibirRegistro_(nomeDaAba, id) {
-  return atualizarRegistro_(nomeDaAba, id, {
+  return atualizarRegistro_(nomeDaAba, id, comCarimboSeHouver_(nomeDaAba, {
     _Visivel: RECC_VISIVEL_SIM,
     _ExcluidoEm: '',
     _ExcluidoPor: ''
-  });
+  }));
 }
 
 // ============================================================================
@@ -2537,7 +2563,8 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
 }
 
 /**
- * Garante que a aba tenha as quatro colunas de controle do sistema.
+ * Garante que a aba tenha as colunas de controle do sistema — numa base de
+ * caso, só `_Visivel` e `_Origem`.
  *
  * Elas são o que faz a exclusão lógica existir: sem `_Visivel`, "excluir um
  * caso" só poderia significar apagar a linha, e o PGO não apaga linha de caso.
@@ -2549,7 +2576,7 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
  * Devolve os cabeçalhos que criou. Nada acontece se já estiverem todas lá, e
  * por isso ela é segura de chamar de novo.
  */
-function garantirColunasDeControle_(nomeDaAba) {
+function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
 
   var criadas = [];
@@ -2563,7 +2590,7 @@ function garantirColunasDeControle_(nomeDaAba) {
     var aba = estrutura.aba;
     var proxima = estrutura.cabecalhos.length;
 
-    RECC_COLUNAS_DE_CONTROLE.forEach(function (coluna) {
+    colunasDeControleDe_(ehBaseDeCaso).forEach(function (coluna) {
       if (posicaoDaColuna_(estrutura, coluna.cabecalho) >= 0) return;
       proxima++;
       if (aba.getMaxColumns() < proxima) {
@@ -5561,7 +5588,7 @@ function procurarNoCanal_(canal, termo, quem) {
       icone: canal.icone,
       colunas: [],
       casos: [],
-      aviso: 'Esto canal não declarou em quais colunas procurar. ' +
+      aviso: 'Este canal não declarou em quais colunas procurar. ' +
         'Isso se ajusta em Configurações → Canais de trabalho.'
     };
   }
@@ -7866,7 +7893,7 @@ function opcoesDeNivelDeAcesso() {
     PROPRIOS: 'Só os casos em que a pessoa é a responsável',
     EQUIPE: 'Os casos de quem atende o mesmo canal que ela',
     CANAL: 'Todos os casos dos canais que ela enxerga',
-    TODOS: 'Todos os casos, de todas os canais'
+    TODOS: 'Todos os casos, de todos os canais'
   };
 
   return {
@@ -7935,7 +7962,7 @@ function listarCanaisConfiguraveis() {
           return item.nome;
         });
       } catch (erro) {
-        // Aba que não existe não derruba a tela: o canal aparece marcada, e o
+        // Aba que não existe não derruba a tela: o canal aparece marcado, e o
         // administrador vê qual é o problema em vez de uma página branca.
         colunas = [];
       }
@@ -7979,7 +8006,7 @@ function listarCanaisConfiguraveis() {
  * Muda o que o canal MOSTRA — nome, ícone, quais colunas viram fila, quais
  * situações viram cartão. Não muda onde ela mora: a aba é escolhida quando a
  * canal nasce, e trocá-la apontaria todos os casos já gravados para o lugar
- * errado. Criar canal nova é estrutura, e ainda não passa por aqui.
+ * errado. Criar canal novo é estrutura, e ainda não passa por aqui.
  */
 function salvarCanal(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
@@ -8019,7 +8046,7 @@ function salvarCanal(dados) {
     });
   });
 
-  // Desligar a último canal ativa deixaria o Trabalho sem nada para mostrar,
+  // Desligar o último canal ativo deixaria o Trabalho sem nada para mostrar,
   // e o cadastro sem formulário — o sistema inteiro pareceria quebrado.
   if (dados.ativo === false) {
     var outrasAtivas = lerRegistros_('CANAIS').filter(function (canal) {
@@ -8203,7 +8230,7 @@ function criarCanal(dados) {
         + 'nem para editar. Crie uma coluna chamada "id" na aba e tente de '
         + 'novo.');
     }
-    garantirColunasDeControle_(nomeDaAba);
+    garantirColunasDeControle_(nomeDaAba, true);
   } else {
     // Aba nova, ou aba vazia que estava sobrando: nasce no tamanho exato.
     criarAbaDoContrato_(planilha, {
@@ -8215,7 +8242,7 @@ function criarCanal(dados) {
       // cresce sozinha quando encher, em garantirLinhasNaGrade_.
       reserva: 200,
       colunas: [{ cabecalho: 'id', tipo: 'identificador', protegido: true }]
-        .concat(RECC_COLUNAS_DE_CONTROLE)
+        .concat(colunasDeControleDe_(true))
     });
   }
 
@@ -10026,7 +10053,7 @@ function montarMenu_(permissoes) {
     });
 }
 
-/** Os canais ativas, na ordem definida na aba CANAIS. */
+/** Os canais ativos, na ordem definida na aba CANAIS. */
 /**
  * Os canais que ESTA pessoa enxerga.
  *
@@ -10093,14 +10120,14 @@ function canaisVisiveis_() {
 // ============================================================================
 
 /**
- * Quando entrou o caso mais recente, entre todas os canais ativas.
+ * Quando entrou o caso mais recente, entre todos os canais ativos.
  *
  * Fica na barra superior e responde a uma pergunta que a operação faz o dia
  * inteiro: "a base está atualizada?". Data velha ali é aviso de que alguma
  * carga não rodou.
  *
  * Custa pouco: a base só acrescenta no fim, então basta olhar as últimas
- * linhas de cado canal — não se percorre a base para descobrir isso.
+ * linhas de cada canal — não se percorre a base para descobrir isso.
  */
 function dataDoUltimoRegistro_(quem) {
   // Sem quem, pergunta. Chamar sem argumento e receber "nenhum canal" seria o
@@ -11048,7 +11075,7 @@ function salvarUsuario(dados) {
       return converterParaIdentificador_(canal.Id) === canalEscolhida;
     })[0];
     if (!existe) {
-      throw new Error('O canal escolhida não existe mais. Escolha outra, ou ' +
+      throw new Error('O canal escolhido não existe mais. Escolha outro, ou ' +
         'deixe em branco — quem administra não pertence a um canal.');
     }
   }
@@ -11414,8 +11441,6 @@ function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
  * está olhando e o da planilha —, e num fechamento de mês essa diferença é um
  * dia inteiro de casos.
  */
-const RECC_TIPOS_DE_PERIODO = { dias: 'Atalho', intervalo: 'De / até', mes: 'Mês fechado' };
-
 /** Quantos meses fechados a tela oferece para trás. */
 const RECC_MESES_PARA_TRAS = 12;
 
@@ -11950,7 +11975,7 @@ function colunasDaFila_(canal) {
   var declarado = String(canal.colunasDaFila || '');
 
   // Sem nenhum dois-pontos, é a escrita plana: cada coluna vira um grupo com
-  // o próprio nome. É o que faz um canal antiga continuar funcionando igual,
+  // o próprio nome. É o que faz um canal antigo continuar funcionando igual,
   // sem ninguém precisar reescrever a linha dela na planilha.
   var pedacos = declarado.indexOf(':') < 0
     ? declarado.split(',')
@@ -14579,7 +14604,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'canal', 'contagem', '', 6, 1, 5));
   // Por analista: a mesma pergunta do "por área", uma camada abaixo. O
   // recorte por área já existe sem gráfico nenhum — é o seletor de canal no
-  // alto da tela, e cado canal tem os gráficos dela. O que faltava era ver a
+  // alto da tela, e cada canal tem os gráficos dela. O que faltava era ver a
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
@@ -15051,11 +15076,13 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
  *
  * O QUE ELA NÃO FAZ, de propósito: não cria coluna que falta nas bases de
  * caso, não mexe nos cartões, nos gráficos e nas listas que você ajustou, e
- * não apaga nada que saiu do contrato. O laudo diz o que sobrou para você
+ * não apaga nada que saiu do contrato. A única coluna que ela tira é a que
+ * está VAZIA e o PO mandou tirar: o carimbo da exclusão das bases de caso. O laudo diz o que sobrou para você
  * decidir, e `diagnosticoRECC()` mostra o resto.
  * ----------------------------------------------------------------------------
  */
 function atualizarPGO() {
+  exigirPortaDoEditor_('atualizarPGO');
   var feito = [];
   var pulados = [];
   var paraVoce = [];
@@ -15126,6 +15153,9 @@ function atualizarPGO() {
   // --- 6b. o lixo que uma versão desta migração deixou em CAMPOS -----------
   feito = feito.concat(limparCamposSemCanal_(pulados));
 
+  // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
+  feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
+
   // --- 7. o que SOBROU, e que é decisão sua --------------------------------
   //
   // Nada aqui é apagado pelo sistema. São coisas que saíram do contrato nesta
@@ -15173,6 +15203,83 @@ function atualizarPGO() {
     + '\n\nAgora rode diagnosticoRECC() para conferir o que sobrou.';
   Logger.log(recado);
   return recado;
+}
+
+/**
+ * A PORTA DO EDITOR — quem pode rodar as funções que mexem na estrutura.
+ *
+ * `atualizarPGO()` e `migrarParaCanais()` são feitas para o editor do Apps
+ * Script. Só que toda função sem "_" no fim também pode ser chamada pelo
+ * navegador, por qualquer pessoa com o sistema aberto: o `google.script.run`
+ * não sabe quais funções a tela usa. Achado 68.
+ *
+ * O aplicativo roda "como você" (o dono). Por isso a conta que EXECUTA é
+ * sempre a do dono, e a que CHAMA é a de quem está do outro lado:
+ *
+ *   no editor          quem chama = quem executa      → passa
+ *   pelo navegador     quem chama ≠ quem executa      → só administrador
+ *
+ * Administrador cadastrado (permissão de estrutura) passa pelas duas, que é
+ * o que ele já podia fazer pela tela. Não pede permissão nova ao instalar:
+ * ler o e-mail de quem executa usa a mesma que o sistema já tem.
+ */
+function exigirPortaDoEditor_(nomeDaFuncao) {
+  var quemChama = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  var quemExecuta = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
+  if (quemChama && quemChama === quemExecuta) return true;
+
+  var quem = usuarioAtual_();
+  if (quem.cadastrado && podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA)) return true;
+  throw new Error(nomeDaFuncao + '() mexe na estrutura da planilha: rode pelo '
+    + 'editor do Apps Script, ou peça a um administrador.');
+}
+
+/**
+ * Tira `_ExcluidoEm` e `_ExcluidoPor` das bases de caso — só se estiverem
+ * VAZIAS.
+ *
+ * Desde que o caso é excluído de vez, ninguém mais oculta caso e as duas
+ * colunas não recebem nada. Pedido do PO: tirá-las das bases de caso e
+ * mantê-las nos cadastros.
+ *
+ * Coluna com valor FICA, e vira decisão do PO: é caso que foi ocultado antes
+ * da exclusão definitiva, e apagar o carimbo dele é decisão de gente, não de
+ * migração. Vale para toda aba de canal — as três de fábrica e as que o PO
+ * criou pela tela.
+ */
+function tirarOCarimboDasBasesDeCaso_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('aba CANAIS não existe');
+    return feito;
+  }
+  var abas = [];
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    var aba = String(canal.Aba || '').trim();
+    if (aba && abas.indexOf(aba) < 0 && planilhaAtiva_().getSheetByName(aba)) abas.push(aba);
+  });
+
+  abas.forEach(function (aba) {
+    RECC_CARIMBO_DE_EXCLUSAO.forEach(function (cabecalho) {
+      esquecerEstruturaLida_(aba);
+      if (posicaoDaColuna_(estruturaDaAba_(aba, true), cabecalho) < 0) {
+        pulados.push(aba + '.' + cabecalho + ' já não existe');
+        return;
+      }
+      var preenchidas = lerColunaInteira_(aba, cabecalho).filter(function (valor) {
+        return String(valor === null || valor === undefined ? '' : valor).trim() !== '';
+      }).length;
+      if (preenchidas) {
+        paraVoce.push(aba + '."' + cabecalho + '" tem ' + preenchidas + ' linha(s) '
+          + 'preenchida(s) — casos ocultados antes da exclusão definitiva — e por '
+          + 'isso ficou. Apague a coluna na planilha quando decidir.');
+        return;
+      }
+      removerColuna_(aba, cabecalho);
+      feito.push(aba + '.' + cabecalho + ' removida (estava vazia)');
+    });
+  });
+  return feito;
 }
 
 /**
@@ -16130,6 +16237,7 @@ function camposDaAbaPorCabecalho_(nomeDaAba) {
  * ----------------------------------------------------------------------------
  */
 function migrarParaCanais() {
+  exigirPortaDoEditor_('migrarParaCanais');
   var planilha = planilhaAtiva_();
   var feito = [];
   var pulados = [];

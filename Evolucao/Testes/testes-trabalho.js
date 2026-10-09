@@ -1308,8 +1308,8 @@ function rodarTestesDoTrabalho() {
     igual(chamar('mesesInteirosAteHoje_')(faltaUmDia), 17,
       'um dia antes de fechar, ainda são 17 — e o alerta acende');
 
-    igual(chamar('alertaDaCelula_')('BASE_VG', 'Meses de vigência',
-      chamar('mesesInteirosAteHoje_')(faltaUmDia)),
+    igual(chamar('faixaDaCelula_')('BASE_VG', 'Meses de vigência',
+      chamar('mesesInteirosAteHoje_')(faltaUmDia)).recado,
       'Vigência de menos de 18 meses',
       'é esta a borda que a operação olha');
   });
@@ -1350,8 +1350,14 @@ function rodarTestesDoTrabalho() {
 
   secao('VG: o alerta vermelho, só nas telas');
 
+  // O vermelho de uma célula: o recado quando a faixa é "ruim", senão vazio.
+  const vermelhoDe = (aba, coluna, valor) => {
+    const faixa = chamar('faixaDaCelula_')(aba, coluna, valor);
+    return faixa && faixa.tom === 'ruim' ? faixa.recado : '';
+  };
+
   teste('vigência abaixo de 18 meses acende; 18 cravados não', () => {
-    const alerta = chamar('alertaDaCelula_');
+    const alerta = vermelhoDe;
     igual(alerta('BASE_VG', 'Meses de vigência', 17), 'Vigência de menos de 18 meses');
     igual(alerta('BASE_VG', 'Meses de vigência', 18), '',
       'o limite é ABAIXO de 18 — 18 está dentro');
@@ -1360,7 +1366,7 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('margem abaixo de 25,5 acende, e aceita vírgula', () => {
-    const alerta = chamar('alertaDaCelula_');
+    const alerta = vermelhoDe;
     igual(alerta('BASE_VG', 'Margem de contribuição', '25,4'),
       'Margem abaixo de 25,5%');
     igual(alerta('BASE_VG', 'Margem de contribuição', '25,5'), '');
@@ -1368,8 +1374,8 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('o alerta é do VG, e não vaza para os outros canais', () => {
-    igual(chamar('alertaDaCelula_')('BASE_RET', 'Margem de contribuição', 1), '');
-    igual(chamar('alertaDaCelula_')('BASE_MESA', 'Meses de vigência', 1), '');
+    igual(chamar('faixaDaCelula_')('BASE_RET', 'Margem de contribuição', 1), null);
+    igual(chamar('faixaDaCelula_')('BASE_MESA', 'Meses de vigência', 1), null);
   });
 
   teste('a fila do VG entrega o alerta pronto, com o motivo', () => {
@@ -1790,11 +1796,15 @@ function rodarTestesDoTrabalho() {
     // Pedido do PO: o "Trabalhar no caso" no centro da área de trabalho, à
     // direita do menu, e não da tela inteira.
     const estilos = lerPeca('Estilos');
-    contem(estilos, 'body:has(.aplicacao) .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }');
-    contem(estilos, 'body:has(.aplicacao.encolhida) .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }');
+    contem(estilos, 'body.com-casca .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }');
+    contem(estilos, 'body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }');
     const estreita = estilos.substring(estilos.indexOf('@media (max-width: 900px) {\n  /* O menu vira gaveta'));
-    contem(estreita.substring(0, 300), 'body:has(.aplicacao.encolhida) .dialogo { padding-left: 20px; }',
+    contem(estreita.substring(0, 300), 'body.com-casca.menu-encolhido .dialogo { padding-left: 20px; }',
       'no celular o menu é gaveta, e o diálogo volta ao centro da tela');
+    // Quem põe as classes no body é o Aplicacao — inclusive ao encolher.
+    const aplicacao = lerPeca('Aplicacao');
+    contem(aplicacao, "document.body.classList.add('com-casca');");
+    contem(aplicacao, "document.body.classList.toggle('menu-encolhido', encolhida);");
   });
 
   secao('O SLA da Mesa Diamante');
@@ -1973,9 +1983,19 @@ function rodarTestesDoTrabalho() {
       'o PO não pediu verde para a margem');
   });
 
-  teste('o alerta antigo continua sendo só o vermelho', () => {
-    igual(chamar('alertaDaCelula_')('BASE_VG', 'Meses de vigência', 18), '');
-    igual(chamar('alertaDaCelula_')('BASE_VG', 'Meses de vigência', 24), '');
+  teste('a etiqueta da situação não passa por cima da coluna vizinha', () => {
+    // Achado 67: "Aguardando transmissão" não quebrava e invadia "Dados da
+    // proposta". O conferir-responsividade.js pega isso no navegador; aqui
+    // fica a guarda da regra, para quem não roda o navegador.
+    const estilos = require('fs').readFileSync(require('path').join(__dirname, '..', '..',
+      'Front-End', 'Estilos.html'), 'utf8');
+    contem(estilos, 'table.fila.agrupada td > span.situacao {\n'
+      + '  display: inline-flex; max-width: 100%; white-space: normal;');
+  });
+
+  teste('amarelo e verde não contam como vermelho', () => {
+    igual(vermelhoDe('BASE_VG', 'Meses de vigência', 18), '');
+    igual(vermelhoDe('BASE_VG', 'Meses de vigência', 24), '');
   });
 
   teste('a fila do VG abre a Vigência pelos meses, já com a cor', () => {

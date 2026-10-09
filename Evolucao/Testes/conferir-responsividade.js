@@ -6,10 +6,11 @@
  *
  * Abre a prévia num navegador de verdade e percorre TODAS as telas em TODAS
  * as larguras que importam — do monitor de 1600 ao celular de 320. Em cada
- * combinação, procura duas coisas:
+ * combinação, procura três coisas:
  *
  *   a página rolando na horizontal, que é o sintoma;
- *   o elemento que escapou da janela, que é a causa.
+ *   o elemento que escapou da janela, que é a causa;
+ *   um texto ou controle por cima de outro, dentro da janela.
  *
  * Tabela larga dentro de uma caixa que rola de propósito NÃO conta: rolar a
  * tabela é a solução, e não o problema. A conferência sobe pelos pais do
@@ -133,7 +134,88 @@ async function conferir() {
             });
           });
 
+        /*
+          E O QUE ESTÁ POR CIMA DE OUTRA COISA.
+
+          As duas conferências acima pegam o que escapa da janela. Elas não
+          pegavam o defeito que o PO apontou: "nas telas tem elementos que estão
+          sobrepondo". Uma etiqueta de situação larga passava por cima do texto
+          da coluna vizinha, dentro da janela, sem rolar nada — e as duas
+          diziam que estava tudo certo.
+
+          Aqui cada pedaço de texto e cada controle visível vira um retângulo,
+          já RECORTADO pelas caixas que o cortam (texto com reticências não
+          invade nada). Dois retângulos de elementos diferentes, que não estão
+          um dentro do outro, não podem se cruzar. O que é preso à tela de
+          propósito (a coluna de ações, a barra superior) só se compara com o
+          que é preso junto: o que rola passa por baixo dele, e isso é desenho.
+        */
+        const visivel = (el) => {
+          for (let e = el; e && e !== document.body; e = e.parentElement) {
+            const s = getComputedStyle(e);
+            if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
+            if (e.parentElement && e.parentElement.tagName === 'DETAILS'
+              && !e.parentElement.open && e.tagName !== 'SUMMARY') return false;
+          }
+          return true;
+        };
+        const presoEm = (el) => {
+          for (let e = el; e && e !== document.body; e = e.parentElement) {
+            const p = getComputedStyle(e).position;
+            if (p === 'sticky' || p === 'fixed') return e;
+          }
+          return null;
+        };
+        const recortado = (r, el) => {
+          let x1 = r.left, y1 = r.top, x2 = r.right, y2 = r.bottom;
+          for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+            const s = getComputedStyle(e);
+            if (s.overflowX !== 'visible' || s.overflowY !== 'visible') {
+              const c = e.getBoundingClientRect();
+              x1 = Math.max(x1, c.left); y1 = Math.max(y1, c.top);
+              x2 = Math.min(x2, c.right); y2 = Math.min(y2, c.bottom);
+            }
+          }
+          return x2 > x1 && y2 > y1 ? { x1, y1, x2, y2 } : null;
+        };
+        const pedacos = [];
+        const miolo = document.getElementById('miolo') || document.body;
+        const andar = document.createTreeWalker(miolo, NodeFilter.SHOW_TEXT);
+        let no;
+        while ((no = andar.nextNode())) {
+          const el = no.parentElement;
+          if (!no.textContent.trim() || !el || el.closest('script,style,option,select')
+            || !visivel(el)) continue;
+          const faixa = document.createRange();
+          faixa.selectNodeContents(no);
+          Array.from(faixa.getClientRects()).forEach((r) => {
+            const v = recortado(r, el);
+            if (v) pedacos.push({ el, v, texto: no.textContent.trim().slice(0, 24) });
+          });
+        }
+        miolo.querySelectorAll('input:not([type=hidden]), select, button, textarea')
+          .forEach((el) => {
+            if (!visivel(el)) return;
+            const v = recortado(el.getBoundingClientRect(), el.parentElement);
+            if (v) pedacos.push({ el, v, texto: '<' + el.tagName.toLowerCase() + '>' });
+          });
+        const sobrepostos = [];
+        for (let i = 0; i < pedacos.length && sobrepostos.length < 3; i++) {
+          for (let j = i + 1; j < pedacos.length; j++) {
+            const a = pedacos[i], b = pedacos[j];
+            if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+            if (presoEm(a.el) !== presoEm(b.el)) continue;
+            const largura = Math.min(a.v.x2, b.v.x2) - Math.max(a.v.x1, b.v.x1);
+            const altura = Math.min(a.v.y2, b.v.y2) - Math.max(a.v.y1, b.v.y1);
+            if (largura > 2 && altura > 2) {
+              sobrepostos.push('"' + a.texto + '" × "' + b.texto + '"');
+              break;
+            }
+          }
+        }
+
         return {
+          sobrepostos: sobrepostos,
           rola: document.body.scrollWidth > window.innerWidth,
           fora: escapou.slice(0, 3).map((el) => el.tagName.toLowerCase() + '.'
             + String(el.className.baseVal !== undefined
@@ -144,9 +226,12 @@ async function conferir() {
         };
       });
 
-      if (medida.rola || medida.fora.length || medida.cortados.length) {
+      if (medida.rola || medida.fora.length || medida.cortados.length
+        || medida.sobrepostos.length) {
         problemas.push(largura + 'px · ' + tela
           + (medida.rola ? ' · a página rola na horizontal' : '')
+          + (medida.sobrepostos.length
+            ? ' · um por cima do outro: ' + medida.sobrepostos.join(', ') : '')
           + (medida.fora.length ? ' · escapa: ' + medida.fora.join(', ') : '')
           + (medida.cortados.length
             ? ' · botão cortado pela coluna: ' + medida.cortados.join(', ') : ''));

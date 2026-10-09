@@ -1536,9 +1536,63 @@ que não mexe em planilha de outro dono. Teste dos dois lados.
 
 ---
 
+### 67 · A etiqueta da situação por cima da coluna vizinha
+
+**Sintoma.** Palavra do PO: "notei que nas telas tem elementos que estão
+sobrepondo". Na fila do Trabalho, de 1440 px para baixo, "Aguardando
+transmissão" passava por cima do número e do produto em "Dados da proposta".
+
+**Causa.** A etiqueta não quebrava linha, e a fila agrupada tem colunas de
+largura fixa. O que não cabia transbordava para a coluna do lado.
+
+**Como apareceu.** O conferidor de responsividade dizia "nenhuma quebra": ele
+procurava página rolando e elemento saindo da janela, e não elemento em cima
+de outro, dentro da janela.
+
+**Defesa.** A etiqueta quebra em duas linhas dentro da própria coluna. O
+`conferir-responsividade.js` passou a procurar sobreposição — cada pedaço de
+texto e cada controle visível vira um retângulo recortado pela caixa que o
+corta, e dois não podem se cruzar —, e foi visto acusando o defeito com o CSS
+antigo em 1280, 1024 e 900 px.
+
+---
+
+### 68 · As funções de estrutura abertas ao navegador
+
+**Sintoma.** Nenhum para o PO: achado na varredura da Parte 4.
+
+**Causa.** `atualizarPGO()` e `migrarParaCanais()` são feitas para o editor do
+Apps Script e não conferiam quem chamava ("quem abre o editor já tem acesso a
+tudo"). Só que toda função sem "_" no fim também pode ser chamada pelo
+navegador, por qualquer pessoa com o sistema aberto — e nesta rodada o
+`atualizarPGO()` passou a apagar coluna (vazia).
+
+**Defesa.** A porta do editor: como o aplicativo roda "como você", no editor
+quem chama e quem executa são a mesma conta; pelo navegador, não. Fora do
+editor, só administrador passa. Testes com a operação, com alguém sem
+cadastro, com outro administrador e com o dono.
+
+---
+
+### 69 · O `:has()` que a própria regra do projeto proibia
+
+**Sintoma.** Nenhum visível no Chrome atual. Em navegador anterior a 2022 (e
+Firefox até o fim de 2023), o modal sairia centrado na tela inteira e o
+cadastro ocuparia a largura toda.
+
+**Causa.** As regras que centralizam o modal à direita do menu e o cadastro no
+meio usavam `:has()` — exatamente a armadilha 9 do `03-manutencao.md`.
+
+**Defesa.** O roteador marca o miolo com `data-tela`, e o `body` com
+`com-casca` e `menu-encolhido`; o CSS lê as marcas. Medido no navegador: o
+centro do modal e o do cadastro continuam no centro da área de trabalho, com
+o menu aberto e encolhido. Um teste confere que nenhuma regra usa `:has()`.
+
+---
+
 ## O que esta lista ensina
 
-**São quarenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
+**São sessenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1701,3 +1755,8 @@ Daí as duas práticas que o projeto não abre mão:
     importação era conferida pela leitura, que já normaliza, e não pela
     planilha; e a permissão do arquivamento era conferida pela mensagem de um
     erro que vinha DEPOIS de o arquivamento já ter rodado.
+41. **O conferidor só acha o que foi ensinado a procurar.** O item 67 passou
+    por noventa e seis combinações de tela "sem nenhuma quebra", porque a
+    pergunta era se algo saía da janela, e não se algo estava em cima de
+    outra coisa. Quando o PO aponta um sintoma que a ferramenta diz não
+    existir, é a ferramenta que precisa aprender.

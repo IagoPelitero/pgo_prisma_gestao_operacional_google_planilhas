@@ -477,13 +477,19 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('form-bloqueio').addEventListener('submit', function (evento) {
       evento.preventDefault();
-      Servidor.chamar('bloquearSusep', {
+      var envio = {
         id: atual.id,
         susep: valorDe('susep'), corretora: valorDe('corretora'),
         sucursal: valorDe('sucursal'),
         coordenadorComercial: valorDe('coordenador'),
         bloqueadaPor: valorDe('bloqueada-por')
-      }).entao(function () {
+      };
+      // Editar a linha antiga sem escolher o tipo MANTÉM sem tipo — decisão
+      // do PO: as antigas "ficam sem tipo". Sem isto, corrigir só a sucursal
+      // dela obrigaria a inventar quem bloqueou. No bloqueio novo, o tipo vai
+      // sempre, e o servidor recusa o vazio.
+      if (atual.id && !envio.bloqueadaPor) delete envio.bloqueadaPor;
+      Servidor.chamar('bloquearSusep', envio).entao(function () {
         avisar(atual.id ? 'Bloqueio salvo.' : 'SUSEP bloqueada.', 'bom');
         carregar();
       }).senao(mostrarErro);

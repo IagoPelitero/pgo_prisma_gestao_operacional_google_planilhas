@@ -536,7 +536,13 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
           releaseLock: () => {}
         })
       },
-      Session: { getActiveUser: () => ({ getEmail: () => emailAtual }) },
+      // Quem EXECUTA é o dono — quem criou o ambiente, como no editor. O
+      // `comoUsuario` dos testes troca só quem CHAMA, que é o que acontece
+      // quando outra pessoa usa o aplicativo publicado "como você".
+      Session: {
+        getActiveUser: () => ({ getEmail: () => emailAtual }),
+        getEffectiveUser: () => ({ getEmail: () => email })
+      },
       Logger: { log: (m) => registros.push(String(m)) },
       Utilities: {
         /**

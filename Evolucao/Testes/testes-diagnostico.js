@@ -1643,6 +1643,16 @@ function rodarTestesDeDiagnostico() {
         'Vigência: Início da vigência, Meses de vigência') });
     chamar('esquecerEstruturaLida_()');
 
+    // 10. as bases de caso ainda com o carimbo da exclusão — e a Mesa com um
+    //     caso ocultado de antes da exclusão definitiva, carimbo preenchido.
+    ['BASE_RET', 'BASE_MESA', 'BASE_VG'].forEach((aba) =>
+      chamar('garantirColunasDeControle_')(aba, false));
+    chamar('esquecerEstruturaLida_()');
+    const oculto = chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Ana',
+      Status: 'Em andamento', 'Nome do segurado': 'Ocultado antes' });
+    chamar('ocultarRegistro_')('BASE_MESA', oculto.__id, '0000000001');
+    chamar('esquecerEstruturaLida_()');
+
     return tudo;
   }
 
@@ -2315,6 +2325,61 @@ function rodarTestesDeDiagnostico() {
       nomedosegurado: 'Caso depois de atualizar' });
     verdadeiro(chamar('resumoDoCanal')(mesa.id, {}).fila[0].sla !== null,
       'e a fila da Mesa já sai com o selo');
+  });
+
+  teste('atualizar tira o carimbo vazio das bases de caso, e deixa o preenchido', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    const tem = (aba, col) => chamar('posicaoDaColuna_')(chamar('estruturaDaAba_')(aba, true), col) >= 0;
+    verdadeiro(tem('BASE_RET', '_ExcluidoEm') && tem('BASE_MESA', '_ExcluidoPor'),
+      'antes, as bases têm o carimbo — senão o teste não prova nada');
+
+    const recado = chamar('atualizarPGO()');
+    contem(recado, 'BASE_RET._ExcluidoEm removida (estava vazia)');
+    contem(recado, 'BASE_VG._ExcluidoPor removida (estava vazia)');
+    verdadeiro(!tem('BASE_RET', '_ExcluidoEm') && !tem('BASE_VG', '_ExcluidoPor'));
+
+    // Na Mesa há um caso ocultado de antes: as duas colunas têm valor e FICAM.
+    verdadeiro(tem('BASE_MESA', '_ExcluidoEm') && tem('BASE_MESA', '_ExcluidoPor'));
+    contem(recado, 'BASE_MESA."_ExcluidoEm" tem 1 linha(s) preenchida(s)');
+
+    // Os cadastros não são base de caso: continuam com o carimbo.
+    verdadeiro(tem('CORRETORAS', '_ExcluidoEm') && tem('USUARIOS', '_ExcluidoPor'));
+    // E a base sem carimbo continua gravando e lendo caso.
+    const gravado = chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana',
+      protocolo: '9-0000000001' });
+    verdadeiro(chamar('lerRegistros_')('BASE_RET').some((l) => l.__id === gravado.__id),
+      'grava e lê sem o carimbo');
+  });
+
+  teste('rodar de novo não tira mais nada', () => {
+    const { chamar } = comoEraAntesDestaRodada();
+    chamar('atualizarPGO()');
+    const segunda = chamar('atualizarPGO()');
+    contem(segunda, 'BASE_RET._ExcluidoEm já não existe');
+    verdadeiro(segunda.indexOf('removida (estava vazia)') < 0);
+  });
+
+  teste('atualizar é porta do editor: quem não administra não roda pelo navegador', () => {
+    const { ambiente, chamar } = instalacaoNova();
+    const nivel = (nome) => chamar('lerRegistros_("CATALOGO")')
+      .find((i) => String(i.Tipo) === 'NIVEL_ACESSO' && i.Nome === nome).Id;
+    chamar('salvarUsuario')({ nome: 'Ana Operação', email: 'ana@exemplo.com',
+      nivelAcessoId: nivel('Operação'), ativo: true });
+    chamar('salvarUsuario')({ nome: 'Outro Adm', email: 'outro.adm@exemplo.com',
+      nivelAcessoId: nivel('Administrador'), ativo: true });
+
+    comoUsuario(ambiente, 'ana@exemplo.com', () => {
+      lanca(() => chamar('atualizarPGO()'), 'rode pelo editor');
+      lanca(() => chamar('migrarParaCanais()'), 'rode pelo editor');
+    });
+    comoUsuario(ambiente, 'ninguem@exemplo.com', () => {
+      lanca(() => chamar('atualizarPGO()'), 'rode pelo editor');
+    });
+    comoUsuario(ambiente, 'outro.adm@exemplo.com', () => {
+      contem(chamar('atualizarPGO()'), 'ATUALIZAÇÃO DO PGO', 'administrador passa');
+    });
+    contem(chamar('atualizarPGO()'), 'ATUALIZAÇÃO DO PGO',
+      'quem é dono, no editor, passa sem precisar de cadastro nenhum');
   });
 
   teste('quem já declarou SLA na Mesa não é atropelado', () => {

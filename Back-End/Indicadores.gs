@@ -238,8 +238,6 @@ function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
  * está olhando e o da planilha —, e num fechamento de mês essa diferença é um
  * dia inteiro de casos.
  */
-const RECC_TIPOS_DE_PERIODO = { dias: 'Atalho', intervalo: 'De / até', mes: 'Mês fechado' };
-
 /** Quantos meses fechados a tela oferece para trás. */
 const RECC_MESES_PARA_TRAS = 12;
 
@@ -774,7 +772,7 @@ function colunasDaFila_(canal) {
   var declarado = String(canal.colunasDaFila || '');
 
   // Sem nenhum dois-pontos, é a escrita plana: cada coluna vira um grupo com
-  // o próprio nome. É o que faz um canal antiga continuar funcionando igual,
+  // o próprio nome. É o que faz um canal antigo continuar funcionando igual,
   // sem ninguém precisar reescrever a linha dela na planilha.
   var pedacos = declarado.indexOf(':') < 0
     ? declarado.split(',')

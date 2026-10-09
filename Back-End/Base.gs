@@ -200,22 +200,14 @@ const RECC_ALERTAS_DA_LINHA = {
 };
 
 /**
- * O alerta desta célula, ou vazio quando não há.
- *
- * Compara pelo NOME da coluna, como todo o resto do sistema. Valor em branco
- * NÃO alerta: campo não preenchido é campo não preenchido, e pintar de
- * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
- */
-function alertaDaCelula_(nomeDaAba, cabecalho, valor) {
-  var faixa = faixaDaCelula_(nomeDaAba, cabecalho, valor);
-  return faixa && faixa.tom === 'ruim' ? faixa.recado : '';
-}
-
-/**
  * A cor desta célula e o motivo — vermelho, amarelo ou verde —, ou null.
  *
  * O vermelho é o alerta de sempre (`abaixoDe`). O amarelo e o verde só existem
- * na regra que os declara: a vigência do VG. Valor em branco não ganha cor.
+ * na regra que os declara: a vigência do VG.
+ *
+ * Compara pelo NOME da coluna, como todo o resto do sistema. Valor em branco
+ * NÃO ganha cor: campo não preenchido é campo não preenchido, e pintar de
+ * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
  */
 function faixaDaCelula_(nomeDaAba, cabecalho, valor) {
   var regras = RECC_ALERTAS_DA_LINHA[nomeDaAba];
@@ -254,6 +246,24 @@ const RECC_COLUNAS_DE_CONTROLE = [
   { cabecalho: '_ExcluidoPor', tipo: 'identificador', protegido: true },
   { cabecalho: '_Origem', tipo: 'texto', protegido: true }
 ];
+
+/*
+ * O CARIMBO DA EXCLUSÃO — quando e quem ocultou — não existe nas bases de
+ * CASO. Desde que o caso é excluído de vez (decisão do PO), ninguém oculta
+ * caso, e as duas colunas ficavam vazias para sempre: numa base que caminha
+ * para 200 mil linhas, 400 mil células reservadas sem uso. Pedido do PO:
+ * "pode seguir e incluir". Nos cadastros elas continuam — lá a linha oculta
+ * ainda existe, e o carimbo é o que explica por que ela está NAO depois que a
+ * auditoria vai para o arquivo.
+ */
+const RECC_CARIMBO_DE_EXCLUSAO = ['_ExcluidoEm', '_ExcluidoPor'];
+
+/** As colunas de controle de uma aba: base de caso não leva o carimbo. */
+function colunasDeControleDe_(ehBaseDeCaso) {
+  return RECC_COLUNAS_DE_CONTROLE.filter(function (coluna) {
+    return !ehBaseDeCaso || RECC_CARIMBO_DE_EXCLUSAO.indexOf(coluna.cabecalho) < 0;
+  });
+}
 
 /*
  * `preenchidoPeloSistema: true` numa coluna quer dizer: a coluna é de DADO —
@@ -301,6 +311,8 @@ const RECC_ORIGEM_PLANILHA = 'PLANILHA';
  *
  * `controle: true`  → recebe as colunas _Visivel / _ExcluidoEm / _ExcluidoPor /
  *                     _Origem, e exclusão vira ocultação.
+ * `baseDeCaso: true` → base de caso: das de controle, só _Visivel e _Origem —
+ *                     caso é excluído de vez, e o carimbo não teria uso.
  * `reserva`         → quantas linhas a aba nasce tendo. Célula vazia também
  *                     consome o teto de 10 milhões da planilha, então o
  *                     instalador corta o que sobra. Ver Instalacao.gs.
@@ -310,6 +322,7 @@ const RECC_ESQUEMA = {
   // ------------------------------------------------------------------ bases
   BASE_RET: {
     aba: 'BASE_RET',
+    baseDeCaso: true,
     titulo: 'Retenção Vida',
     controle: true,
     reserva: 2000,
@@ -400,6 +413,7 @@ const RECC_ESQUEMA = {
 
   BASE_MESA: {
     aba: 'BASE_MESA',
+    baseDeCaso: true,
     titulo: 'Mesa Diamante',
     controle: true,
     reserva: 2000,
@@ -451,6 +465,7 @@ const RECC_ESQUEMA = {
    */
   BASE_VG: {
     aba: 'BASE_VG',
+    baseDeCaso: true,
     titulo: 'VG — Vida em Grupo',
     controle: true,
     reserva: 2000,
@@ -678,11 +693,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Aba', tipo: 'texto', protegido: true },
       // Quais colunas da base guardam quando o caso entrou. É daqui que sai a
       // "data do último registro" da barra superior. Ficam declaradas, e não
-      // adivinhadas, porque cado canal nomeia essa coluna do seu jeito.
+      // adivinhadas, porque cada canal nomeia essa coluna do seu jeito.
       { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
       // O painel precisa saber onde o canal guarda cada coisa. Declarado, e
-      // não adivinhado pelo nome: cado canal batiza a coluna do seu jeito, e
+      // não adivinhado pelo nome: cada canal batiza a coluna do seu jeito, e
       // adivinhar acerta hoje e erra no canal que vier depois.
       { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
       // As colunas da fila. Aceita duas escritas:
@@ -987,9 +1002,7 @@ function esquemaDaAba_(nomeDaAba) {
   }
   var colunas = definicao.colunas.slice();
   if (definicao.controle) {
-    for (var i = 0; i < RECC_COLUNAS_DE_CONTROLE.length; i++) {
-      colunas.push(RECC_COLUNAS_DE_CONTROLE[i]);
-    }
+    colunas = colunas.concat(colunasDeControleDe_(definicao.baseDeCaso));
   }
   return {
     aba: definicao.aba,
@@ -2394,11 +2407,24 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
       'não possui a coluna _Visivel. Em abas de catálogo, o que desliga um ' +
       'item é a coluna Ativo.');
   }
-  return atualizarRegistro_(nomeDaAba, id, {
+  return atualizarRegistro_(nomeDaAba, id, comCarimboSeHouver_(nomeDaAba, {
     _Visivel: RECC_VISIVEL_NAO,
     _ExcluidoEm: new Date(),
     _ExcluidoPor: usuarioId || ''
+  }));
+}
+
+/**
+ * Tira do que vai ser gravado o carimbo da exclusão que a aba não tem — a
+ * base de caso, desde que o carimbo saiu dela. `atualizarRegistro_` recusa
+ * coluna que não existe, e ocultar não pode quebrar por falta de carimbo.
+ */
+function comCarimboSeHouver_(nomeDaAba, campos) {
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  RECC_CARIMBO_DE_EXCLUSAO.forEach(function (cabecalho) {
+    if (posicaoDaColuna_(estrutura, cabecalho) < 0) delete campos[cabecalho];
   });
+  return campos;
 }
 
 /**
@@ -2454,11 +2480,11 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
 }
 
 function reexibirRegistro_(nomeDaAba, id) {
-  return atualizarRegistro_(nomeDaAba, id, {
+  return atualizarRegistro_(nomeDaAba, id, comCarimboSeHouver_(nomeDaAba, {
     _Visivel: RECC_VISIVEL_SIM,
     _ExcluidoEm: '',
     _ExcluidoPor: ''
-  });
+  }));
 }
 
 // ============================================================================
@@ -2519,7 +2545,8 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
 }
 
 /**
- * Garante que a aba tenha as quatro colunas de controle do sistema.
+ * Garante que a aba tenha as colunas de controle do sistema — numa base de
+ * caso, só `_Visivel` e `_Origem`.
  *
  * Elas são o que faz a exclusão lógica existir: sem `_Visivel`, "excluir um
  * caso" só poderia significar apagar a linha, e o PGO não apaga linha de caso.
@@ -2531,7 +2558,7 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
  * Devolve os cabeçalhos que criou. Nada acontece se já estiverem todas lá, e
  * por isso ela é segura de chamar de novo.
  */
-function garantirColunasDeControle_(nomeDaAba) {
+function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
 
   var criadas = [];
@@ -2545,7 +2572,7 @@ function garantirColunasDeControle_(nomeDaAba) {
     var aba = estrutura.aba;
     var proxima = estrutura.cabecalhos.length;
 
-    RECC_COLUNAS_DE_CONTROLE.forEach(function (coluna) {
+    colunasDeControleDe_(ehBaseDeCaso).forEach(function (coluna) {
       if (posicaoDaColuna_(estrutura, coluna.cabecalho) >= 0) return;
       proxima++;
       if (aba.getMaxColumns() < proxima) {

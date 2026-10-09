@@ -912,6 +912,8 @@ function rodarTestesDeCorretoras() {
     contem(tela, 'Sem tipo', 'e as antigas aparecem como sem tipo');
     contem(tela, 'id="cfg-bloqueada-por"', 'o formulário pergunta');
     contem(tela, 'data-editar-bloqueio', 'e dá para editar, para tipar as antigas');
+    contem(tela, 'if (atual.id && !envio.bloqueadaPor) delete envio.bloqueadaPor;',
+      'editar a antiga sem escolher o tipo mantém sem tipo, em vez de recusar');
     contem(comuns, "'bloqueada-corretora'", 'o selo do formulário muda de classe');
     contem(estilos, '.selo-susep.bloqueada-corretora', 'e a classe tem estilo');
   });

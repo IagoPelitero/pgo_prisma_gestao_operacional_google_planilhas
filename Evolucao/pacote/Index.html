@@ -713,9 +713,6 @@ button { font: inherit; color: inherit; }
   do meio — conferir — é a razão de a tela existir: separá-lo visualmente é o
   que impede alguém de rolar direto até o botão de gravar.
 */
-.importacao-passo { margin-bottom: 16px; }
-.importacao-passo .grade { margin-bottom: 12px; }
-.importacao-passo .cartoes { margin-bottom: 14px; }
 .importacao-titulo {
   margin: 20px 0 8px; font-size: 14px; font-weight: 700;
   color: var(--suave); letter-spacing: .01em;
@@ -728,12 +725,6 @@ button { font: inherit; color: inherit; }
   font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
 }
 .importacao-depara select { max-width: 100%; }
-/* Quem não atende este canal continua na lista, só mais discreto: a escolha é
-   da coordenação, e o sistema apenas diz qual é a opção esperada. */
-.config-chave.de-outro-canal span { color: var(--suave); }
-.config-chave.de-outro-canal em {
-  font-style: normal; font-size: 11.5px; color: var(--tenue);
-}
 
 /*
   O recado de que a origem vai escrever numa coluna de produtividade.
@@ -927,8 +918,13 @@ table.fila tr.aberta:hover { background: var(--destaque-tenue); }
 */
 table.fila.agrupada td { vertical-align: top; padding: 13px 12px; }
 table.fila.agrupada td > span { display: block; }
-/* A etiqueta de situação é do tamanho do texto dela, e não da coluna. */
-table.fila.agrupada td > span.situacao { display: inline-flex; }
+/* A etiqueta de situação é do tamanho do texto dela, e não da coluna — mas
+   nunca MAIOR que a coluna. Sem o limite, "Aguardando transmissão" não
+   quebrava e passava por cima da coluna vizinha (achado 67). Quebra em duas
+   linhas dentro da própria etiqueta. */
+table.fila.agrupada td > span.situacao {
+  display: inline-flex; max-width: 100%; white-space: normal; border-radius: 13px;
+}
 table.fila.agrupada .principal { font-weight: 600; }
 table.fila.agrupada .apoio { font-size: 12.5px; color: var(--tenue); }
 table.fila.agrupada td:first-child .apoio:first-child {
@@ -987,21 +983,6 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
   border-color: var(--ruim); color: var(--ruim); background: var(--ruim-tenue);
 }
 
-tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
-.detalhe-secoes {
-  display: grid; gap: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-}
-.detalhe-secao h4 {
-  margin: 0 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .09em;
-  text-transform: uppercase; color: var(--tenue);
-}
-.detalhe-secao .par {
-  display: flex; flex-direction: column; gap: 1px; margin-bottom: 8px;
-}
-.detalhe-secao .par span { font-size: 12.5px; color: var(--suave); }
-.detalhe-secao .par strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-
 @media (max-width: 560px) {
   .filtro { max-width: none; flex: 1 1 100%; }
   .filtros .contagem { margin-left: 0; flex-basis: 100%; }
@@ -1025,7 +1006,7 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
 .canal .dizeres span { font-size: 13px; color: var(--suave); }
 .canal:hover { border-color: var(--linha-forte); }
 
-/* O canal escolhida usa o azul do menu, escurecido — é o mesmo azul da casa,
+/* O canal escolhido usa o azul do menu, escurecido — é o mesmo azul da casa,
    e escuro o bastante para a letra branca ficar legível em cima dele. */
 .canal.atual {
   background: color-mix(in srgb, var(--lateral-fundo) 68%, black);
@@ -1043,10 +1024,11 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   direita em monitor largo. Agora título, canais e formulário saem numa coluna
   só, no meio da área de trabalho. Em tela menor que a coluna, nada muda.
 
-  Pelo `:has`, como o diálogo: o miolo é o mesmo para todas as telas, e só o
-  do cadastro tem o formulário do caso como filho direto.
+  Pela marca `data-tela` que o roteador põe no miolo, e não por `:has()`: o
+  `:has()` não existe em navegador anterior a 2022, que ignora a regra calado
+  (achado 69 e a armadilha 9 do 03-manutencao.md).
 */
-.miolo:has(> #formulario-do-caso) > * { max-width: 1080px; margin-inline: auto; }
+.miolo[data-tela="cadastrarCaso"] > * { max-width: 1080px; margin-inline: auto; }
 
 .secao { border: 0; padding: 0; margin: 0 0 26px; }
 .secao:last-of-type { margin-bottom: 8px; }
@@ -1056,7 +1038,7 @@ tr.detalhe td { background: var(--superficie-2); padding: 18px 16px; }
   text-transform: uppercase; color: var(--tenue);
 }
 
-/* Grade em flex, e não em colunas fixas: cado canal pergunta um conjunto
+/* Grade em flex, e não em colunas fixas: cada canal pergunta um conjunto
    diferente de campos, e span fixo deixaria a linha pela metade. */
 .grade { display: flex; flex-wrap: wrap; gap: 14px; }
 .campo { display: flex; flex-direction: column; gap: 5px; flex: 1 1 220px; }
@@ -1599,18 +1581,6 @@ table.fila tr.importar-igual { color: var(--tenue); }
   grid-column: 1 / -1;
 }
 
-/* --- o calendário: ausências e feriados ---------------------------------- */
-/*
-   A lista de feriados tem DOIS blocos com peso diferente: os nacionais, que o
-   sistema calcula e ninguém edita, e os da operação, que se clicam. Os
-   primeiros vêm em tom mais baixo e sem borda de item — parecer clicável o que
-   não é clica é o tipo de frustração que faz a pessoa achar que a tela travou.
-*/
-.config-lista-cabeca {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  margin-bottom: 10px;
-}
-.config-lista-cabeca .config-titulo { margin-right: auto; }
 .config-vazio { color: var(--tenue); font-size: 13.5px; margin: 0; }
 .config-erro {
   margin: 0 0 12px; font-size: 13px; font-weight: 600; line-height: 1.45;
@@ -1650,13 +1620,14 @@ table.fila tr.importar-igual { color: var(--tenue); }
   PO para o "Trabalhar no caso". O véu continua cobrindo a tela toda; só a
   caixa desconta a largura do menu, aberto ou encolhido.
 
-  Pelo `:has`, e não por classe posta no código: o diálogo mora direto no
-  `body`, fora da casca, e a tela de acesso negado não tem menu — sem a casca,
-  nada muda. Navegador que não conhece `:has` mostra no centro da tela, como
-  antes.
+  O diálogo mora direto no `body`, fora da casca. Quem diz que a casca está na
+  tela — e se o menu está encolhido — são as classes `com-casca` e
+  `menu-encolhido`, que o Aplicacao.html põe no `body`. A tela de acesso
+  negado não tem casca, e nada muda nela. Era um `:has()`, que navegador
+  anterior a 2022 ignora calado (achado 69).
 */
-body:has(.aplicacao) .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }
-body:has(.aplicacao.encolhida) .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }
+body.com-casca .dialogo { padding-left: calc(var(--lateral-largura) + 20px); }
+body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolhida) + 20px); }
 /* O modal do caso é o mesmo diálogo, mais largo e com cabeça e pé fixos: o
    miolo rola, e os botões de Fechar e Editar ficam sempre à mão. */
 .dialogo-caixa.larga {
@@ -2238,8 +2209,8 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 /* ============================================== telas estreitas ========== */
 @media (max-width: 900px) {
   /* O menu vira gaveta e some da frente: o diálogo volta ao centro da tela. */
-  body:has(.aplicacao) .dialogo,
-  body:has(.aplicacao.encolhida) .dialogo { padding-left: 20px; }
+  body.com-casca .dialogo,
+  body.com-casca.menu-encolhido .dialogo { padding-left: 20px; }
   .lateral {
     position: fixed; left: 0; top: 0; z-index: 40;
     transform: translateX(-100%);
@@ -2517,9 +2488,6 @@ var Moldura = (function () {
       + '<path d="M3.4 14.4h17.2"></path>'
       + '<path d="M9.4 9.2v10.4M15 9.2v10.4"></path>',
 
-    // calendário: a folhinha de parede, com os dois furos de cima e um dia
-    // marcado. É o desenho que já significa "data" para qualquer pessoa — e
-    // esta seção fala de dias: férias, feriados, dias úteis.
     // estrutura e auditoria: a prancheta do laudo, com o visto
     estrutura:
       '<path d="M9 4.4H7.4A1.6 1.6 0 0 0 5.8 6v13.2a1.6 1.6 0 0 0 1.6 1.6h9.2a1.6 1.6 0 0 0 1.6-1.6V6a1.6 1.6 0 0 0-1.6-1.6H15"></path>'
@@ -2960,10 +2928,10 @@ var SenhaDeAdministrador = (function () {
    PGO — SeletorDeCanal.html · a escolha do canal de trabalho
    ============================================================================
    Aparece no Trabalho e no Cadastrar Caso, e é a mesma peça nos dois. Duas
-   cópias divergiriam na primeira mudança — bastaria um canal nova ganhar
+   cópias divergiriam na primeira mudança — bastaria um canal novo ganhar
    ícone só num dos lugares.
 
-   O desenho de cado canal vem da coluna `Icone`, na aba CANAIS: canal nova
+   O desenho de cada canal vem da coluna `Icone`, na aba CANAIS: canal novo
    escolhe o dela sem passar por código.
    ============================================================================ */
 
@@ -5801,7 +5769,7 @@ var TelaMinhaPerformance = (function () {
   function desenhar() {
     if (!dados.temResponsavel) {
       elemento('performance').innerHTML = '<div class="cartao vazio">'
-        + '<strong>Esto canal não diz quem é o responsável por cada caso.</strong>'
+        + '<strong>Este canal não diz quem é o responsável por cada caso.</strong>'
         + '<p>Sem uma coluna de responsável não há "os meus casos" para somar. '
         + 'Um administrador aponta essa coluna em Configurações → Canais de '
         + 'trabalho.</p></div>';
@@ -6039,7 +6007,7 @@ var TelaMinhaPerformance = (function () {
    carrega lista, não pré-carrega base: abrir esta tela não custa nada, e é
    por isso que dá para deixá-la aberta o dia inteiro.
 
-   O resultado vem separado POR ORIGEM — cado canal, e a base legada — porque
+   O resultado vem separado POR ORIGEM — cada canal, e a base legada — porque
    um caso da Mesa Diamante e uma linha do sistema antigo não são a mesma
    coisa e não devem aparecer misturados numa lista só.
    ============================================================================ */
@@ -6820,13 +6788,19 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('form-bloqueio').addEventListener('submit', function (evento) {
       evento.preventDefault();
-      Servidor.chamar('bloquearSusep', {
+      var envio = {
         id: atual.id,
         susep: valorDe('susep'), corretora: valorDe('corretora'),
         sucursal: valorDe('sucursal'),
         coordenadorComercial: valorDe('coordenador'),
         bloqueadaPor: valorDe('bloqueada-por')
-      }).entao(function () {
+      };
+      // Editar a linha antiga sem escolher o tipo MANTÉM sem tipo — decisão
+      // do PO: as antigas "ficam sem tipo". Sem isto, corrigir só a sucursal
+      // dela obrigaria a inventar quem bloqueou. No bloqueio novo, o tipo vai
+      // sempre, e o servidor recusa o vazio.
+      if (atual.id && !envio.bloqueadaPor) delete envio.bloqueadaPor;
+      Servidor.chamar('bloquearSusep', envio).entao(function () {
         avisar(atual.id ? 'Bloqueio salvo.' : 'SUSEP bloqueada.', 'bom');
         carregar();
       }).senao(mostrarErro);
@@ -9046,7 +9020,7 @@ var TelaConfiguracoes = (function () {
           ? ' · ' + escapar(usuario.cargo) : '')
         // Sem canal é o administrador, e dizer isso é melhor que deixar em
         // branco: em branco parece cadastro pela metade.
-        + ' · ' + escapar(usuario.canal || 'todas os canais')
+        + ' · ' + escapar(usuario.canal || 'todos os canais')
         + (usuario.ativo ? '' : ' · sem acesso') + '</span></button></li>';
     }).join('');
 
@@ -9086,14 +9060,14 @@ var TelaConfiguracoes = (function () {
     return '<label class="config-campo"><span>Canal</span>'
       + '<select id="cfg-canal-da-pessoa">'
       + '<option value=""' + (escolhida ? '' : ' selected') + '>'
-      + '— todas os canais —</option>'
+      + '— todos os canais —</option>'
       + canais.map(function (canal) {
         return '<option value="' + escapar(canal.id) + '"'
           + (texto(canal.id) === texto(escolhida) ? ' selected' : '') + '>'
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
       + '<em>O canal é também a EQUIPE da pessoa: quem está no mesmo canal '
-      + 'aparece junto na Minha Performance. Quem administra fica em "todas os '
+      + 'aparece junto na Minha Performance. Quem administra fica em "todos os '
       + 'canais" — pode cadastrar em qualquer uma e delegar, e não entra em '
       + 'equipe nenhuma.</em></label>';
   }
@@ -10605,7 +10579,7 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('an-dias', 'Últimos N dias', atual.dias,
         canal.temColunaDeData
           ? '0 traz tudo. Conta pela coluna "' + canal.colunaDaData + '".'
-          : 'Esto canal não tem coluna de data, então a janela não se aplica.')
+          : 'Este canal não tem coluna de data, então a janela não se aplica.')
       + '<div class="config-campo"><span>Colunas</span>'
       + '<div class="config-marcadores" id="colunas-da-analise">'
       + canal.colunas.map(function (coluna, i) {
@@ -10717,7 +10691,7 @@ var TelaConfiguracoes = (function () {
 
   function desenharFiltrosDaAnalise(canal, filtros) {
     if (!canal.filtros.length) {
-      return '<p class="config-vazio">Esto canal não tem nenhum campo em '
+      return '<p class="config-vazio">Este canal não tem nenhum campo em '
         + 'formato de lista, então não há por onde filtrar.</p>';
     }
     return canal.filtros.map(function (filtro) {
@@ -11649,6 +11623,11 @@ var Aplicacao = (function () {
 
     elemento('superior').innerHTML = Moldura.montarSuperior(pacote);
     elemento('lateral').innerHTML = Moldura.montarLateral(pacote, tela);
+    // As marcas que o CSS lê no lugar de `:has()`: qual tela está no miolo,
+    // e que a casca (com o menu) está na frente — o diálogo, que mora fora
+    // dela, se centra à direita do menu por isso.
+    elemento('miolo').setAttribute('data-tela', tela);
+    document.body.classList.add('com-casca');
     elemento('miolo').innerHTML = '<div class="cabecalho-da-tela">'
       + '<h2>' + Moldura.escapar(comoSeChama) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
@@ -11677,6 +11656,7 @@ var Aplicacao = (function () {
   function alternarEncolhido() {
     var aplicacao = elemento('aplicacao');
     var encolhida = aplicacao.classList.toggle('encolhida');
+    document.body.classList.toggle('menu-encolhido', encolhida);
     try {
       localStorage.setItem('recc.menuEncolhido', encolhida ? 'sim' : 'nao');
     } catch (erro) {
@@ -11689,6 +11669,7 @@ var Aplicacao = (function () {
     try {
       if (localStorage.getItem('recc.menuEncolhido') === 'sim') {
         elemento('aplicacao').classList.add('encolhida');
+        document.body.classList.add('menu-encolhido');
       }
     } catch (erro) { /* idem */ }
   }

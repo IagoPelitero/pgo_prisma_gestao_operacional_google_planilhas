@@ -183,7 +183,7 @@ function rodarTestesDeCadastro() {
     chamar('esquecerEstruturaLida_()');
   });
 
-  teste('cado canal aparece com o seu desenho, vindo da aba CANAIS', () => {
+  teste('cada canal aparece com o seu desenho, vindo da aba CANAIS', () => {
     const fonte = scriptDaPeca('SeletorDeCanal');
     const contexto = vm.createContext({
       Moldura: { escapar: (t) => String(t) }, document: {}, console });
@@ -196,7 +196,7 @@ function rodarTestesDeCadastro() {
       chamar('canaisVisiveis_()').length, 'um desenho por canal');
     verdadeiro(botoes.indexOf('M12 15.4c-2-1.3') >= 0, 'o escudo com coração da RET');
     verdadeiro(botoes.indexOf('M7.4 3.6h9.2') >= 0, 'o diamante da Mesa Diamante');
-    verdadeiro(botoes.indexOf('class="canal atual"') >= 0, 'o canal escolhida se marca');
+    verdadeiro(botoes.indexOf('class="canal atual"') >= 0, 'o canal escolhido se marca');
   });
 
   teste('o seletor de canal é uma peça só, usada pelas duas telas', () => {
@@ -1760,9 +1760,12 @@ function rodarTestesDeCadastro() {
     // Pedido do PO: "centraliza a aba cadastro". O formulário tinha 1080 px e
     // ficava encostado à esquerda, com um vazio à direita em monitor largo.
     const estilos = lerPeca('Estilos');
-    contem(estilos, '.miolo:has(> #formulario-do-caso) > * { max-width: 1080px; margin-inline: auto; }');
-    // A regra procura o formulário como filho DIRETO do miolo: se ele passar
-    // a morar dentro de outra caixa, a coluna desmancha calada.
+    contem(estilos, '.miolo[data-tela="cadastrarCaso"] > * { max-width: 1080px; margin-inline: auto; }');
+    // Sem `:has()`, que navegador anterior a 2022 ignora calado (achado 69):
+    // a marca é o data-tela que o roteador põe no miolo.
+    contem(lerPeca('Aplicacao'), "elemento('miolo').setAttribute('data-tela', tela);");
+    verdadeiro(estilos.indexOf(':has(') < 0 || /:has\(/.test(estilos.replace(/\/\*[\s\S]*?\*\//g, '')) === false,
+      'nenhuma regra de CSS usa :has()');
     const tela = lerPeca('CadastrarCaso');
     const montar = tela.substring(tela.indexOf('function montar('), tela.indexOf('function carregarFormulario'));
     contem(montar, "return SeletorDeCanal.montar(pacote.canais, canalEscolhida)\n      + '<form class=\"cartao formulario\" id=\"formulario-do-caso\"",

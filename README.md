@@ -202,7 +202,10 @@ Dentro de `Evolucao/`:
    clasp push
    ```
 
-3. Publique como **aplicativo da web** (executar como você).
+3. Publique como **aplicativo da web** (executar como você). Em
+   *Configurações do projeto*, deixe marcado **"Ativar o ambiente de execução
+   do Chrome V8"** — projeto novo já nasce assim; um projeto antigo pode estar
+   no motor legado, e nele o PGO não abre.
 
 4. No editor, execute **`instalarRECC()`** uma vez. Ela cria as 13 abas, semeia
    o catálogo e **cadastra você como o primeiro administrador**.
@@ -1121,7 +1124,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-861 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+866 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

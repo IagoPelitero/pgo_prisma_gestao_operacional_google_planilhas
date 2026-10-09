@@ -779,7 +779,7 @@ var TelaConfiguracoes = (function () {
           ? ' · ' + escapar(usuario.cargo) : '')
         // Sem canal é o administrador, e dizer isso é melhor que deixar em
         // branco: em branco parece cadastro pela metade.
-        + ' · ' + escapar(usuario.canal || 'todas os canais')
+        + ' · ' + escapar(usuario.canal || 'todos os canais')
         + (usuario.ativo ? '' : ' · sem acesso') + '</span></button></li>';
     }).join('');
 
@@ -819,14 +819,14 @@ var TelaConfiguracoes = (function () {
     return '<label class="config-campo"><span>Canal</span>'
       + '<select id="cfg-canal-da-pessoa">'
       + '<option value=""' + (escolhida ? '' : ' selected') + '>'
-      + '— todas os canais —</option>'
+      + '— todos os canais —</option>'
       + canais.map(function (canal) {
         return '<option value="' + escapar(canal.id) + '"'
           + (texto(canal.id) === texto(escolhida) ? ' selected' : '') + '>'
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
       + '<em>O canal é também a EQUIPE da pessoa: quem está no mesmo canal '
-      + 'aparece junto na Minha Performance. Quem administra fica em "todas os '
+      + 'aparece junto na Minha Performance. Quem administra fica em "todos os '
       + 'canais" — pode cadastrar em qualquer uma e delegar, e não entra em '
       + 'equipe nenhuma.</em></label>';
   }
@@ -2338,7 +2338,7 @@ var TelaConfiguracoes = (function () {
       + campoDeTexto('an-dias', 'Últimos N dias', atual.dias,
         canal.temColunaDeData
           ? '0 traz tudo. Conta pela coluna "' + canal.colunaDaData + '".'
-          : 'Esto canal não tem coluna de data, então a janela não se aplica.')
+          : 'Este canal não tem coluna de data, então a janela não se aplica.')
       + '<div class="config-campo"><span>Colunas</span>'
       + '<div class="config-marcadores" id="colunas-da-analise">'
       + canal.colunas.map(function (coluna, i) {
@@ -2450,7 +2450,7 @@ var TelaConfiguracoes = (function () {
 
   function desenharFiltrosDaAnalise(canal, filtros) {
     if (!canal.filtros.length) {
-      return '<p class="config-vazio">Esto canal não tem nenhum campo em '
+      return '<p class="config-vazio">Este canal não tem nenhum campo em '
         + 'formato de lista, então não há por onde filtrar.</p>';
     }
     return canal.filtros.map(function (filtro) {

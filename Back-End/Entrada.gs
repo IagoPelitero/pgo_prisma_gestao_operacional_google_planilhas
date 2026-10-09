@@ -286,7 +286,7 @@ function montarMenu_(permissoes) {
     });
 }
 
-/** Os canais ativas, na ordem definida na aba CANAIS. */
+/** Os canais ativos, na ordem definida na aba CANAIS. */
 /**
  * Os canais que ESTA pessoa enxerga.
  *
@@ -353,14 +353,14 @@ function canaisVisiveis_() {
 // ============================================================================
 
 /**
- * Quando entrou o caso mais recente, entre todas os canais ativas.
+ * Quando entrou o caso mais recente, entre todos os canais ativos.
  *
  * Fica na barra superior e responde a uma pergunta que a operação faz o dia
  * inteiro: "a base está atualizada?". Data velha ali é aviso de que alguma
  * carga não rodou.
  *
  * Custa pouco: a base só acrescenta no fim, então basta olhar as últimas
- * linhas de cado canal — não se percorre a base para descobrir isso.
+ * linhas de cada canal — não se percorre a base para descobrir isso.
  */
 function dataDoUltimoRegistro_(quem) {
   // Sem quem, pergunta. Chamar sem argumento e receber "nenhum canal" seria o
@@ -1308,7 +1308,7 @@ function salvarUsuario(dados) {
       return converterParaIdentificador_(canal.Id) === canalEscolhida;
     })[0];
     if (!existe) {
-      throw new Error('O canal escolhida não existe mais. Escolha outra, ou ' +
+      throw new Error('O canal escolhido não existe mais. Escolha outro, ou ' +
         'deixe em branco — quem administra não pertence a um canal.');
     }
   }

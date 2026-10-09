@@ -88,7 +88,9 @@ reexibirRegistro_('BASE_MESA', '0000000042');
 ```
 
 Some do sistema, permanece na planilha. Dá para reverter editando `_Visivel`
-na mão, direto na célula.
+na mão, direto na célula. Nos cadastros, `_ExcluidoEm` e `_ExcluidoPor` guardam
+quando e quem ocultou; nas bases de caso esse carimbo não existe (caso é
+apagado de vez), e ocultar mexe só no `_Visivel`.
 
 ### Quero ver as telas sem publicar no Apps Script
 
@@ -171,7 +173,7 @@ que a anterior não pega.
 |---|---|---|
 | **1. A suíte** | `node Evolucao/Testes/rodar.js` | Regra de negócio, conversão de tipo, permissão. E erro de sintaxe em qualquer `.gs`: o simulador avalia os sete para poder rodar, então um arquivo quebrado derruba tudo na primeira linha |
 | **2. Os dois mundos** | (dentro da suíte, bloco *O projeto do Apps Script*) | `.gs` usando `document`; `.html` chamando `SpreadsheetApp`; `require` em qualquer um dos dois; `<script>` sem fechar; nome de arquivo que colide ignorando a extensão |
-| **3. O navegador** | `conferir-responsividade.js`, `clicar-em-tudo.js`, `ponta-a-ponta.js` | O que só aparece com a tela montada: botão cortado, classe de CSS que não existe, clique que estoura, `undefined` escrito na tela |
+| **3. O navegador** | `conferir-responsividade.js`, `clicar-em-tudo.js`, `ponta-a-ponta.js` | O que só aparece com a tela montada: botão cortado, **um elemento por cima do outro**, classe de CSS que não existe, clique que estoura, `undefined` escrito na tela |
 | **4. Lá dentro** | `diagnosticoRECC()` no editor | O que depende da INSTALAÇÃO: arquivo que ficou para trás na cópia, aba apagada, coluna fora do contrato, fuso horário do projeto, sequência de Id corrompida |
 
 **As três primeiras rodam aqui e não provam a quarta.** É por isso que a
@@ -209,8 +211,15 @@ dispara num trecho escrito em português.
   `Configuracoes.gs` não convivem — foi o achado 26, e por isso o arquivo do
   servidor se chama `Config.gs`.
 - **Os `.gs` compartilham UM escopo global.** Duas funções com o mesmo nome em
-  arquivos diferentes: vence a do arquivo avaliado por último, em ordem
-  alfabética, e sem aviso.
+  arquivos diferentes: vence a do arquivo avaliado por último, sem aviso. E a
+  ordem é a dos arquivos **no projeto**, não a alfabética — na Parte 4 os
+  sete arquivos foram carregados nas 5.040 ordens possíveis, sem erro.
+- **Toda função sem "_" no fim pode ser chamada pelo navegador**, por quem
+  estiver com o sistema aberto — o `google.script.run` não sabe quais funções
+  a tela usa. Função feita só para o editor confere a porta:
+  `exigirPortaDoEditor_()` (achado 68).
+- **Motor V8.** O servidor usa recursos que o motor antigo não tem. Projeto
+  novo já nasce em V8; confira em *Configurações do projeto*.
 - **Cada `google.script.run` é uma EXECUÇÃO NOVA.** Nada sobrevive entre uma
   chamada e outra além do que está na planilha ou no PropertiesService. É isso
   que torna seguro o memo por execução do `Base.gs`.
@@ -243,7 +252,10 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
    ambientes, e o erro só aparece em produção. A guarda da camada 2 pega.
 9. **Usar CSS que só existe em navegador recente** — `:has()`, por exemplo.
    Regra que o navegador não entende ele ignora CALADO: fica desalinhado em
-   algumas máquinas e certo nas outras, e o defeito só chega por relato.
+   algumas máquinas e certo nas outras, e o defeito só chega por relato. (O
+   achado 69 tirou os `:has()` que tinham entrado. As cores usam
+   `color-mix()`, de 2023: o navegador mínimo é **Chrome ou Edge 111**, o que
+   o navegador corporativo atualizado já é.)
 
 ---
 

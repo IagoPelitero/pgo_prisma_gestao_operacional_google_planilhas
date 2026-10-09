@@ -254,7 +254,7 @@ function rodarTestesDeConfiguracoes() {
     const eu = chamar('listarUsuarios()')
       .find((u) => u.email === 'primeiro.adm@exemplo.com');
     igual(eu.canalId, '', 'nasce sem canal');
-    igual(eu.canal, '', 'e a tela mostra isso como "todas os canais"');
+    igual(eu.canal, '', 'e a tela mostra isso como "todos os canais"');
     igual(eu.administrador, true);
   });
 
@@ -311,7 +311,7 @@ function rodarTestesDeConfiguracoes() {
     ].forEach((par) => {
       contem(tela, par[0], 'falta o campo "' + par[1] + '" no formulário');
     });
-    contem(tela, 'todas os canais',
+    contem(tela, 'todos os canais',
       'e a opção de não ter canal aparece por escrito');
   });
 
@@ -1128,8 +1128,9 @@ function rodarTestesDeConfiguracoes() {
 
     const cabecalhos = chamar('estruturaDaAba_')(criado.aba).cabecalhos;
     igual(cabecalhos.join('|'),
-      'id|_Visivel|_ExcluidoEm|_ExcluidoPor|_Origem',
-      'só o id e as de controle: os campos do formulário vêm depois, um a um');
+      'id|_Visivel|_Origem',
+      'só o id e as de controle (sem o carimbo da exclusão, que base de caso '
+      + 'não usa): os campos do formulário vêm depois, um a um');
 
     const naLista = chamar('listarCanaisConfiguraveis()')
       .find((um) => um.nome === 'Auto Frota');

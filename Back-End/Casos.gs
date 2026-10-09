@@ -1713,7 +1713,7 @@ function procurarNoCanal_(canal, termo, quem) {
       icone: canal.icone,
       colunas: [],
       casos: [],
-      aviso: 'Esto canal não declarou em quais colunas procurar. ' +
+      aviso: 'Este canal não declarou em quais colunas procurar. ' +
         'Isso se ajusta em Configurações → Canais de trabalho.'
     };
   }

@@ -798,7 +798,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'canal', 'contagem', '', 6, 1, 5));
   // Por analista: a mesma pergunta do "por área", uma camada abaixo. O
   // recorte por área já existe sem gráfico nenhum — é o seletor de canal no
-  // alto da tela, e cado canal tem os gráficos dela. O que faltava era ver a
+  // alto da tela, e cada canal tem os gráficos dela. O que faltava era ver a
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
@@ -1270,11 +1270,13 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
  *
  * O QUE ELA NÃO FAZ, de propósito: não cria coluna que falta nas bases de
  * caso, não mexe nos cartões, nos gráficos e nas listas que você ajustou, e
- * não apaga nada que saiu do contrato. O laudo diz o que sobrou para você
+ * não apaga nada que saiu do contrato. A única coluna que ela tira é a que
+ * está VAZIA e o PO mandou tirar: o carimbo da exclusão das bases de caso. O laudo diz o que sobrou para você
  * decidir, e `diagnosticoRECC()` mostra o resto.
  * ----------------------------------------------------------------------------
  */
 function atualizarPGO() {
+  exigirPortaDoEditor_('atualizarPGO');
   var feito = [];
   var pulados = [];
   var paraVoce = [];
@@ -1345,6 +1347,9 @@ function atualizarPGO() {
   // --- 6b. o lixo que uma versão desta migração deixou em CAMPOS -----------
   feito = feito.concat(limparCamposSemCanal_(pulados));
 
+  // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
+  feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
+
   // --- 7. o que SOBROU, e que é decisão sua --------------------------------
   //
   // Nada aqui é apagado pelo sistema. São coisas que saíram do contrato nesta
@@ -1392,6 +1397,83 @@ function atualizarPGO() {
     + '\n\nAgora rode diagnosticoRECC() para conferir o que sobrou.';
   Logger.log(recado);
   return recado;
+}
+
+/**
+ * A PORTA DO EDITOR — quem pode rodar as funções que mexem na estrutura.
+ *
+ * `atualizarPGO()` e `migrarParaCanais()` são feitas para o editor do Apps
+ * Script. Só que toda função sem "_" no fim também pode ser chamada pelo
+ * navegador, por qualquer pessoa com o sistema aberto: o `google.script.run`
+ * não sabe quais funções a tela usa. Achado 68.
+ *
+ * O aplicativo roda "como você" (o dono). Por isso a conta que EXECUTA é
+ * sempre a do dono, e a que CHAMA é a de quem está do outro lado:
+ *
+ *   no editor          quem chama = quem executa      → passa
+ *   pelo navegador     quem chama ≠ quem executa      → só administrador
+ *
+ * Administrador cadastrado (permissão de estrutura) passa pelas duas, que é
+ * o que ele já podia fazer pela tela. Não pede permissão nova ao instalar:
+ * ler o e-mail de quem executa usa a mesma que o sistema já tem.
+ */
+function exigirPortaDoEditor_(nomeDaFuncao) {
+  var quemChama = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  var quemExecuta = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
+  if (quemChama && quemChama === quemExecuta) return true;
+
+  var quem = usuarioAtual_();
+  if (quem.cadastrado && podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA)) return true;
+  throw new Error(nomeDaFuncao + '() mexe na estrutura da planilha: rode pelo '
+    + 'editor do Apps Script, ou peça a um administrador.');
+}
+
+/**
+ * Tira `_ExcluidoEm` e `_ExcluidoPor` das bases de caso — só se estiverem
+ * VAZIAS.
+ *
+ * Desde que o caso é excluído de vez, ninguém mais oculta caso e as duas
+ * colunas não recebem nada. Pedido do PO: tirá-las das bases de caso e
+ * mantê-las nos cadastros.
+ *
+ * Coluna com valor FICA, e vira decisão do PO: é caso que foi ocultado antes
+ * da exclusão definitiva, e apagar o carimbo dele é decisão de gente, não de
+ * migração. Vale para toda aba de canal — as três de fábrica e as que o PO
+ * criou pela tela.
+ */
+function tirarOCarimboDasBasesDeCaso_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('aba CANAIS não existe');
+    return feito;
+  }
+  var abas = [];
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    var aba = String(canal.Aba || '').trim();
+    if (aba && abas.indexOf(aba) < 0 && planilhaAtiva_().getSheetByName(aba)) abas.push(aba);
+  });
+
+  abas.forEach(function (aba) {
+    RECC_CARIMBO_DE_EXCLUSAO.forEach(function (cabecalho) {
+      esquecerEstruturaLida_(aba);
+      if (posicaoDaColuna_(estruturaDaAba_(aba, true), cabecalho) < 0) {
+        pulados.push(aba + '.' + cabecalho + ' já não existe');
+        return;
+      }
+      var preenchidas = lerColunaInteira_(aba, cabecalho).filter(function (valor) {
+        return String(valor === null || valor === undefined ? '' : valor).trim() !== '';
+      }).length;
+      if (preenchidas) {
+        paraVoce.push(aba + '."' + cabecalho + '" tem ' + preenchidas + ' linha(s) '
+          + 'preenchida(s) — casos ocultados antes da exclusão definitiva — e por '
+          + 'isso ficou. Apague a coluna na planilha quando decidir.');
+        return;
+      }
+      removerColuna_(aba, cabecalho);
+      feito.push(aba + '.' + cabecalho + ' removida (estava vazia)');
+    });
+  });
+  return feito;
 }
 
 /**
@@ -2349,6 +2431,7 @@ function camposDaAbaPorCabecalho_(nomeDaAba) {
  * ----------------------------------------------------------------------------
  */
 function migrarParaCanais() {
+  exigirPortaDoEditor_('migrarParaCanais');
   var planilha = planilhaAtiva_();
   var feito = [];
   var pulados = [];

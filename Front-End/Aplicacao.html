@@ -312,6 +312,11 @@ var Aplicacao = (function () {
 
     elemento('superior').innerHTML = Moldura.montarSuperior(pacote);
     elemento('lateral').innerHTML = Moldura.montarLateral(pacote, tela);
+    // As marcas que o CSS lê no lugar de `:has()`: qual tela está no miolo,
+    // e que a casca (com o menu) está na frente — o diálogo, que mora fora
+    // dela, se centra à direita do menu por isso.
+    elemento('miolo').setAttribute('data-tela', tela);
+    document.body.classList.add('com-casca');
     elemento('miolo').innerHTML = '<div class="cabecalho-da-tela">'
       + '<h2>' + Moldura.escapar(comoSeChama) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
@@ -340,6 +345,7 @@ var Aplicacao = (function () {
   function alternarEncolhido() {
     var aplicacao = elemento('aplicacao');
     var encolhida = aplicacao.classList.toggle('encolhida');
+    document.body.classList.toggle('menu-encolhido', encolhida);
     try {
       localStorage.setItem('recc.menuEncolhido', encolhida ? 'sim' : 'nao');
     } catch (erro) {
@@ -352,6 +358,7 @@ var Aplicacao = (function () {
     try {
       if (localStorage.getItem('recc.menuEncolhido') === 'sim') {
         elemento('aplicacao').classList.add('encolhida');
+        document.body.classList.add('menu-encolhido');
       }
     } catch (erro) { /* idem */ }
   }

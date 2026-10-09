@@ -29,15 +29,22 @@ function rodarTestesDaFundacao() {
 
   teste('cada aba é cortada ao tamanho do contrato', () => {
     const base = planilha.getSheetByName('BASE_RET');
-    igual(base.getMaxColumns(), 52, 'colunas de BASE_RET (48 + 4 de controle)');
+    // Base de caso leva 2 de controle (_Visivel e _Origem): o carimbo da
+    // exclusão saiu delas, a pedido do PO — caso é excluído de vez.
+    igual(base.getMaxColumns(), 50, 'colunas de BASE_RET (48 + 2 de controle)');
     igual(base.getMaxRows(), 2001, 'linhas de BASE_RET (reserva 2000 + cabeçalho)');
     const canal = planilha.getSheetByName('BASE_MESA');
-    igual(canal.getMaxColumns(), 29, 'colunas de BASE_MESA (25 + 4 de controle)');
+    igual(canal.getMaxColumns(), 27, 'colunas de BASE_MESA (25 + 2 de controle)');
+    // Os cadastros continuam com as 4: lá a linha oculta ainda existe.
+    const corretoras = planilha.getSheetByName('CORRETORAS');
+    const deControle = corretoras.getRange(1, 1, 1, corretoras.getMaxColumns()).getValues()[0]
+      .filter((c) => String(c).charAt(0) === '_');
+    igual(deControle.join('|'), '_Visivel|_ExcluidoEm|_ExcluidoPor|_Origem');
   });
 
   teste('os cabeçalhos saem na ordem e na grafia do contrato', () => {
     const canal = planilha.getSheetByName('BASE_MESA');
-    const cabecalhos = canal.getRange(1, 1, 1, 29).getValues()[0];
+    const cabecalhos = canal.getRange(1, 1, 1, 27).getValues()[0];
     igual(cabecalhos[0], 'ID');
     igual(cabecalhos[7], 'Abertura indevida');
     igual(cabecalhos[15], 'Área responsável');
@@ -48,6 +55,7 @@ function rodarTestesDaFundacao() {
     igual(cabecalhos[23], 'Origem da importação');
     igual(cabecalhos[24], 'Data da importação');
     igual(cabecalhos[25], '_Visivel');
+    igual(cabecalhos[26], '_Origem');
   });
 
   teste('quem instalou vira o primeiro Administrador', () => {
@@ -294,7 +302,20 @@ function rodarTestesDaFundacao() {
   teste('reexibir traz a linha de volta', () => {
     chamar('reexibirRegistro_("BASE_MESA", "0000000000")');
     igual(celula(planilha, 'BASE_MESA', 2, '_Visivel'), 'SIM');
-    igual(celula(planilha, 'BASE_MESA', 2, '_ExcluidoEm'), '');
+  });
+
+  teste('no cadastro, ocultar carimba quando e quem; reexibir limpa o carimbo', () => {
+    const criada = chamar('inserirRegistro_')('CORRETORAS', { SUSEP: 'RET01F',
+      Corretora: 'Carimbada' });
+    chamar('ocultarRegistro_')('CORRETORAS', criada.__id, '0000000007');
+    const oculta = chamar('lerRegistros_')('CORRETORAS', { incluirOcultos: true })
+      .find((l) => l.__id === criada.__id);
+    igual(String(oculta._Visivel), 'NAO');
+    verdadeiro(!!oculta._ExcluidoEm, 'quando');
+    igual(String(oculta._ExcluidoPor), '0000000007', 'quem');
+    chamar('reexibirRegistro_')('CORRETORAS', criada.__id);
+    const devolta = chamar('lerRegistros_')('CORRETORAS').find((l) => l.__id === criada.__id);
+    igual(String(devolta._ExcluidoEm || ''), '', 'o carimbo sai junto');
   });
 
   teste('_Visivel editado na mão, direto na planilha, é obedecido', () => {
