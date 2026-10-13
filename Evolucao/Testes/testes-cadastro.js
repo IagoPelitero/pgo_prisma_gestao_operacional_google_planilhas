@@ -1050,7 +1050,7 @@ function rodarTestesDeCadastro() {
     */
     const form = pecaRodando('Formulario').Formulario;
     const raiz = elementoFalso('div');
-    ['valordopremio', 'premiomensalretido', 'valordopremioretido', 'semvalor']
+    ['valordopremio', 'premiomensal', 'valordopremioretido', 'semvalor']
       .forEach((chave) => {
         const campo = elementoFalso('input',
           { 'data-chave': chave, 'data-dinheiro': 'sim' });
@@ -1059,14 +1059,14 @@ function rodarTestesDeCadastro() {
 
     form.preencher(raiz, {
       valordopremio: 'R$ 1.284,90',
-      premiomensalretido: 'R$ 107,08',
+      premiomensal: 'R$ 107,08',
       valordopremioretido: 'R$ 0,00',
       semvalor: ''
     });
 
     const valor = (chave) => raiz.querySelector('[data-chave="' + chave + '"]').value;
     igual(valor('valordopremio'), 'R$ 1.284,90', 'o valor formatado volta inteiro');
-    igual(valor('premiomensalretido'), 'R$ 107,08',
+    igual(valor('premiomensal'), 'R$ 107,08',
       'o prêmio mensal também — era ele que abria em branco');
     igual(valor('valordopremioretido'), 'R$ 0,00',
       'zero gravado é dado: "não retido" não é "não preenchido"');

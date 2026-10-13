@@ -110,8 +110,9 @@ function rodarTestesDaParadaDaRet() {
   /* ----------------------------------------------------------------------- */
   secao('O relógio: quem para, e quando');
 
-  // A RET conta da data de recepção, SEGUNDA 05/10/2026, sem hora: abre às
-  // 08:15. Três dias úteis são 1845 minutos, e acabam na QUINTA às 08:15.
+  // A RET conta da PRIMEIRA MUDANÇA DE STATUS — aqui, SEGUNDA 05/10/2026, só a
+  // data: abre às 08:15. Três dias úteis são 1845 minutos, e acabam na QUINTA
+  // às 08:15.
   const t = retComAParada();
   const ret = t.ret;
   const sinalizador = t.chamar('sinalizadoresDoCanal_')(ret)[0];
@@ -122,6 +123,7 @@ function rodarTestesDaParadaDaRet() {
   };
   const caso = (extra) => Object.assign({
     'data de recepção do protocolo': new Date(2026, 9, 5), status: 'Retido',
+    'Data da primeira mudança de status': new Date(2026, 9, 5),
     'Status proposta': '', 'Data do status proposta': '' }, extra);
   const em = (dia, hora, registro) =>
     t.chamar('sinalDoCaso_')(registro, ret, sinalizador, situacoes, quando(dia, hora));
@@ -247,10 +249,11 @@ function rodarTestesDaParadaDaRet() {
     const dias = (n) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(0, 0, 0, 0); return d; };
     const aguardando = x.chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana Martins',
       'nome do cliente': 'Aguardando', status: 'Retido', 'Status proposta': 'Aguardando transmissão',
-      'data de recepção do protocolo': dias(30) });
+      'data de recepção do protocolo': dias(30), 'Data da primeira mudança de status': dias(30) });
     const transmitido = x.chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana Martins',
       'nome do cliente': 'Transmitido', status: 'Retido', 'Status proposta': 'Transmitido',
-      'Data do status proposta': dias(29), 'data de recepção do protocolo': dias(30) });
+      'Data do status proposta': dias(29), 'data de recepção do protocolo': dias(30),
+      'Data da primeira mudança de status': dias(30) });
     const fila = x.chamar('resumoDoCanal')(x.ret.id, {}, 90).fila;
     const sinais = (r) => fila.find((c) => String(c.id) === String(r.__id)).sinais[0];
     igual(sinais(aguardando).encerrado, false);
@@ -264,7 +267,7 @@ function rodarTestesDaParadaDaRet() {
     const antigo = new Date(); antigo.setDate(antigo.getDate() - 30);
     x.chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana Martins', 'nome do cliente': 'X',
       status: 'Retido', 'Status proposta': 'Aguardando transmissão',
-      'data de recepção do protocolo': antigo });
+      'data de recepção do protocolo': antigo, 'Data da primeira mudança de status': antigo });
     const p = x.chamar('produtividadeDaEquipe')(x.ret.id, {}, 90).prazos.sinalizadores[0];
     verdadeiro(p.fora >= 1, 'o Retido que não foi transmitido está fora');
     verdadeiro(p.porAnalista.some((a) => a.analista === 'Ana Martins'),

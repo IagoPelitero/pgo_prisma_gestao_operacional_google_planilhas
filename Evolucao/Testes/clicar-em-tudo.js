@@ -156,14 +156,36 @@ async function varrer() {
     return apagados.length === 0;
   }
 
+  /*
+   * O AVISO DOS CASOS PERTO DE VENCER abre ao entrar num canal do Trabalho, e
+   * o véu dele cobre a tela. Fecha pelo "Entendi" — o caminho que a pessoa
+   * usa —, e conta quantas vezes apareceu: a prévia tem caso no amarelo, então
+   * um aviso que nunca abre também é defeito.
+   */
+  let avisosDePrazo = 0;
+  async function fecharOAvisoDePrazo() {
+    if (await pagina.locator('#dialogo-prazo').count()) {
+      avisosDePrazo++;
+      await pagina.click('#fechar-aviso-de-prazo');
+      await pagina.waitForTimeout(200);
+      if (await pagina.locator('#dialogo-prazo').count()) {
+        erros.push('o "Entendi" não fechou o aviso dos casos perto de vencer');
+      }
+    }
+  }
+
+  // O Trabalho é a tela de abertura: o aviso já pode estar na tela.
+  await fecharOAvisoDePrazo();
   await pagina.click('[data-tela="trabalho"]');
   await pagina.waitForTimeout(1200);
+  await fecharOAvisoDePrazo();
 
   const quantosCanais = await pagina.locator('[data-canal]').count();
   let alertasVistos = 0;
   for (let i = 0; i < quantosCanais; i++) {
     await pagina.locator('[data-canal]').nth(i).click();
     await pagina.waitForTimeout(1200);
+    await fecharOAvisoDePrazo();
     const nome = await pagina.locator('[data-canal]').nth(i).innerText();
     await conferirQueOsAlertasEstaoVermelhos('canal ' + nome.split('\n')[0]);
     alertasVistos += await pagina.locator('.em-alerta').count();
@@ -177,10 +199,16 @@ async function varrer() {
       + 'senão esta conferência não confere nada');
   }
 
+  if (!avisosDePrazo) {
+    erros.push('o aviso dos casos perto de vencer não abriu em canal nenhum — a prévia '
+      + 'tem caso no amarelo, então ele deveria ter aparecido');
+  }
+
   let cliques = 0;
   for (const tela of TELAS) {
     await pagina.click('[data-tela="' + tela + '"]');
     await pagina.waitForTimeout(1400);
+    await fecharOAvisoDePrazo();
 
     /*
      * A TELA RECÉM-ABERTA é conferida AQUI, antes de clicar em nada.

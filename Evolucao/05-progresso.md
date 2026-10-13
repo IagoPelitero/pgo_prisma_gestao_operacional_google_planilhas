@@ -2465,6 +2465,81 @@ que mudam o que já existe, e que são **decisão sua**:
 
 ---
 
+## Etapa 32 — A Descrição na edição, o prêmio mensal, o prazo que espera o caso andar e o aviso
+
+Pedido do PO, numa mensagem só ("considere que o sistema já está 100%
+funcional; não refatore sem necessidade; não invente, na dúvida questione"):
+
+1. **"Na aba Trabalho, ao clicar em Trabalhar no caso, a Descrição não vem junto
+   para ser editada."** E: **"Todos os canais devem poder editar as descrições."**
+2. **"A coluna prêmio mensal retido está com nome errado e deve ser prêmio
+   mensal."**
+3. **"A SLA de 3 dias úteis da RET deve ser somente se o caso mudar de status.
+   Casos não trabalhados ficam com a SLA cheia."**
+4. **"Confira se a Mesa está contando a SLA de 48 horas úteis quando o status
+   for em andamento."**
+5. **"Todo canal que tiver com a SLA próxima deve ter um pop-up sinalizando qual
+   caso está próximo de vencer."**
+6. **"Procure se há mais bugs no sistema, quebras ou erros que possam
+   comprometer."**
+
+| Parte | O que ficou |
+|---|---|
+| **1 · Descrição** | Defeito de verdade (achado 88): a edição lia a coluna pelo nome exato de CAMPOS ("descrição"), e a planilha a tem como "Descrição". Abria vazio — e salvar **apagava** o texto. Hoje lê pela grafia da aba, em todo campo e todo canal. RET (*descrição*) e VG (*Obs*) editam; a **Mesa não tem coluna de descrição**, e o sistema não cria coluna sozinho — o PO cria o campo em Configurações › Cadastrar Caso (teste prova que abre e salva) |
+| **2 · Prêmio mensal** | O contrato chama a coluna de **prêmio mensal**. `atualizarPGO()` renomeia o cabeçalho na BASE_RET (o dado fica), o campo (chave `premiomensal`), a permissão do campo em cada nível, a condição de outro campo que dependa dele e o que citava o nome em canais, gráficos, análises e sinalizadores. Com as duas colunas na planilha, não mexe em nada e vira DECISÃO SUA. O rótulo na tela continua "Valor do prêmio mensal". O laudo lembra do Power BI |
+| **3 · RET** | Coluna nova do sistema, **`Data da primeira mudança de status`**: carimbada quando o caso sai de "Não trabalhado" pela primeira vez (diálogo, formulário, ou cadastro direto num status de trabalho; a importação não carimba). O sinalizador da RET conta dela. Sem ela e ainda em "Não trabalhado", o selo diz **"prazo cheio, 3 dias úteis"**. `atualizarPGO()` cria a coluna, aponta o sinalizador de fábrica (o que o PO mudou fica) e dá aos casos que **já andaram** a data mais antiga que a linha guardava |
+| **4 · Mesa** | Conferido, sem mudança: nasce em Em andamento, carimba `Data em andamento` no cadastro, conta 48 horas úteis (2.880 minutos de expediente, sem fim de semana) e para em Concluído, Concluído na mesa ou Sem retorno. Ficou um teste para cada uma dessas coisas |
+| **5 · Aviso** | Ao entrar num canal do Trabalho, um aviso lista os casos no **amarelo** do sinalizador — caso, status, quanto falta e "Trabalhar no caso". Uma vez por canal enquanto a página estiver aberta; sai da mesma resposta da fila (o alcance vale); vermelho e prazo cheio não entram; canal sem sinalizador ligado não abre nada |
+| **6 · Varredura** | Ver "O que a varredura achou", abaixo |
+
+O que **ficou de propósito**, para o PO confirmar:
+
+- **"Perto de vencer" é o amarelo** de cada sinalizador ("amarelo quando
+  faltar…", em Configurações › Sinalizadores): o último dia na RET, as últimas
+  10 horas na Mesa. O SLA de 6 horas da Mesa não tem amarelo — é só dentro ou
+  fora —, por isso não entra no aviso.
+- **O aviso sai uma vez por canal** a cada vez que a página abre. Recarregar a
+  página mostra de novo.
+- **Casos antigos da RET que já andaram** ganham a data mais antiga da linha.
+  Se a primeira mudança foi para um status sem carimbo (Cancelado, Pago, Sem
+  sucesso), a data achada pode ser posterior à verdadeira: o caso ganha prazo a
+  mais, nunca a menos.
+- **A importação não carimba** a primeira mudança: caso importado em "Não
+  trabalhado" fica com prazo cheio; importado já em outro status fica sem selo
+  até a próxima troca.
+
+### O que a varredura achou
+
+| Grau | Achado | O que foi feito |
+|---|---|---|
+| **Alto** | A edição lia campos pelo nome exato de CAMPOS — abria vazio e apagava ao salvar quando a grafia da planilha diferia (achado 88) | **Corrigido** |
+| **Médio** | Caso da Mesa que entra pela **importação** não ganha `Data em andamento` (a importação não carimba o status de nascimento, de propósito) e fica **sem o selo das 48 horas** | **Pergunta ao PO**: contar da hora da importação? |
+| **Médio (latente)** | As colunas que o canal declara (status, data de entrada, finalização…) são lidas pelo nome exato em cerca de 45 lugares. Hoje batem com a planilha; trocar só maiúscula ou acento de um desses cabeçalhos quebraria status, prazos e indicadores sem erro | **Pergunta ao PO**: endurecer (mexe em vários arquivos) ou deixar como está |
+| **Baixo** | O diagnóstico diz "os campos apontam para colunas que existem" mesmo quando a grafia difere — foi o que escondeu o achado 88 | **Pergunta ao PO**: o diagnóstico passar a avisar |
+| **Baixo** | A fila (e por isso o aviso) mostra os casos do período escolhido, contado pela data de entrada. Um caso da RET recebido há mais de 30 dias e trabalhado só agora pode estar no amarelo fora da janela padrão | Registrado; é o comportamento da fila desde sempre |
+
+**1070 testes** (35 novos, em `testes-descricao-e-inicio-do-prazo.js`), cinco
+execuções seguidas sem falha, **13 quebras de propósito, 13 vermelhos**. No
+navegador: 96 combinações de tela sem quebra, 152 cliques sem erro (o roteiro
+aprendeu a fechar o aviso pelo "Entendi", e acusa se ele nunca abrir), ponta a
+ponta **15/15** no repositório e no pacote — com um teste novo que põe o
+cabeçalho "Descrição" na planilha, abre o caso no navegador, confere a caixa
+preenchida e salva sem apagar. O aviso foi visto em 1440 e 390 px.
+
+### Para quem já usa
+
+Cole os arquivos marcados e rode `atualizarPGO()`. O laudo avisa:
+
+- **A coluna "prêmio mensal retido" passou a se chamar "prêmio mensal"** —
+  atualize o Power BI.
+- **O prazo da RET passou a contar da primeira mudança de status**, e quantos
+  casos ganharam a data. Se você tinha apontado o sinalizador para outra coluna,
+  ele fica como está e o laudo diz como ligar.
+- **Quantos casos da RET já andaram e não guardam data nenhuma**: ficam sem selo
+  até a próxima troca de status.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

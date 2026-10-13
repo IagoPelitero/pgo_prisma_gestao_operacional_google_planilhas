@@ -1002,6 +1002,11 @@ function carimbarOStatusDeNascimento_(canal, paraGravar) {
   // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
   // o que veio manda. O carimbo nunca reescreve o que alguém informou.
   carimbarOStatus_(canal, achada, paraGravar, paraGravar);
+
+  // Caso que já NASCE trabalhado (cadastrado direto em "1º contato
+  // realizado", por exemplo) começa o prazo agora: ele não ficou parado em
+  // "Não trabalhado" nem um minuto.
+  carimbarAPrimeiraMudancaDeStatus_(canal, null, paraGravar, estruturaDaAba_(canal.aba));
 }
 
 /**
@@ -1113,6 +1118,7 @@ function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
     // Power BI, onde um Id de dez dígitos não diz quem trabalhou o caso.
     alteracao[RECC_COLUNA_QUEM_MUDOU_O_STATUS] = quem.email || '';
   }
+  carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estrutura);
   if (temAColuna(RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS)) {
     // O valor guardado pode chegar como número, como texto ou vazio — a
     // coluna é editável na planilha. Number('') é 0, e Number('abc') é NaN:
@@ -1121,6 +1127,32 @@ function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
     if (!quantas || quantas < 0) quantas = 0;
     alteracao[RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS] = Math.floor(quantas) + 1;
   }
+}
+
+/**
+ * Carimba a PRIMEIRA vez que o caso sai do status em que nasce.
+ *
+ * É o início dos 3 dias úteis da RET — "a SLA deve ser somente se o caso mudar
+ * de status; casos não trabalhados ficam com a SLA cheia", palavra do PO. Ver
+ * `RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS`.
+ *
+ * Uma vez só: já carimbado, nada mexe nele — nem o caso que volta para "Não
+ * trabalhado" (o prazo já começou e continua correndo). E ir PARA o status de
+ * nascimento não é começar: uma linha antiga com o status em branco que passa
+ * a "Não trabalhado" continua sem prazo começado.
+ *
+ * Base sem a coluna (as que não são da RET, ou quem não rodou `atualizarPGO()`)
+ * segue gravando, sem carimbo.
+ */
+function carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estrutura) {
+  var coluna = RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS;
+  if (!canal.colunaDoStatus || posicaoDaColuna_(estrutura, coluna) < 0) return;
+  if (registroAtual && String(registroAtual[coluna] || '').trim()) return;
+  if (String(alteracao[coluna] || '').trim()) return;
+
+  var novo = normalizarParaComparar_(alteracao[canal.colunaDoStatus]);
+  if (!novo || novo === normalizarParaComparar_(statusPadraoDoCanal_(canal))) return;
+  alteracao[coluna] = new Date();
 }
 
 /**
@@ -1438,9 +1470,9 @@ function partirPorHifen_(valor, partir, rotulo) {
  * que existe. "7-" na tela pareceria um dado pela metade que alguém digitou,
  * quando é um dado pela metade que estava na planilha.
  */
-function juntarComHifen_(registro, partir) {
+function juntarComHifen_(registro, partir, estrutura) {
   var pedacos = partir.colunas.map(function (cabecalho) {
-    var valor = registro[cabecalho];
+    var valor = valorPelaGrafiaDaAba_(registro, estrutura, cabecalho);
     return String(valor === null || valor === undefined ? '' : valor).trim();
   }).filter(function (pedaco) { return pedaco !== ''; });
 
@@ -1455,11 +1487,11 @@ function juntarComHifen_(registro, partir) {
  * "1101-VIDA INDIVIDUAL" devolveria um valor que a lista não tem, e salvar
  * seria recusado com "não é uma das opções da lista".
  */
-function juntarCodigoENome_(registro, separa) {
-  var codigo = String(registro[separa.codigo] === null
-    || registro[separa.codigo] === undefined ? '' : registro[separa.codigo]).trim();
-  var nome = String(registro[separa.nome] === null
-    || registro[separa.nome] === undefined ? '' : registro[separa.nome]).trim();
+function juntarCodigoENome_(registro, separa, estrutura) {
+  var noCodigo = valorPelaGrafiaDaAba_(registro, estrutura, separa.codigo);
+  var noNome = valorPelaGrafiaDaAba_(registro, estrutura, separa.nome);
+  var codigo = String(noCodigo === null || noCodigo === undefined ? '' : noCodigo).trim();
+  var nome = String(noNome === null || noNome === undefined ? '' : noNome).trim();
 
   if (codigo && nome) return codigo + ' - ' + nome;
   return codigo || nome;
@@ -1488,17 +1520,37 @@ function valorDoCampoNaLinha_(registro, campo, estrutura) {
 
   var separa = configuracao.separaEm;
   if (separa && separa.codigo && separa.nome) {
-    return juntarCodigoENome_(registro, separa);
+    return juntarCodigoENome_(registro, separa, estrutura);
   }
 
   var partir = configuracao.partirEm;
   if (partir && partir.colunas && partir.colunas.length > 1) {
-    return juntarComHifen_(registro, partir);
+    return juntarComHifen_(registro, partir, estrutura);
   }
 
   var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
   if (posicao < 0) return null;   // null = esta coluna não existe nesta aba
-  return paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]);
+  return paraTexto_(registro[estrutura.cabecalhos[posicao]], estrutura.tipos[posicao]);
+}
+
+/**
+ * O valor de uma coluna pela GRAFIA QUE ESTÁ NA ABA, e não pela que está em
+ * CAMPOS.
+ *
+ * O DEFEITO QUE ISTO CONSERTA, relatado pelo PO: "na aba Trabalho, ao clicar
+ * em Trabalhar no caso, a Descrição não vem junto para ser editada". O campo
+ * em CAMPOS se chama "descrição"; na planilha, a coluna pode estar escrita
+ * "Descrição" ou "DESCRIÇÃO". Gravar sempre funcionou — a gravação procura a
+ * coluna sem ligar para maiúscula, acento ou espaço —, mas o registro lido da
+ * planilha tem as chaves EXATAMENTE como estão no cabeçalho, e ler
+ * `registro['descrição']` devolvia nada. O campo abria vazio e, pior, salvar o
+ * caso em seguida APAGAVA a descrição, porque campo esvaziado na edição é
+ * apagado na planilha.
+ */
+function valorPelaGrafiaDaAba_(registro, estrutura, cabecalho) {
+  if (!estrutura) return registro[cabecalho];
+  var posicao = posicaoDaColuna_(estrutura, cabecalho);
+  return posicao < 0 ? undefined : registro[estrutura.cabecalhos[posicao]];
 }
 
 /**

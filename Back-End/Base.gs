@@ -325,6 +325,18 @@ const RECC_COLUNA_DATA_EM_ANDAMENTO = 'Data em andamento';
 const RECC_COLUNA_DATA_DO_STATUS_PROPOSTA = 'Data do status proposta';
 
 /**
+ * QUANDO o caso mudou de status PELA PRIMEIRA VEZ — saiu do status em que
+ * nasce ("Não trabalhado", o valor padrão do campo Status). Carimbado pelo
+ * SISTEMA uma vez só: as mudanças seguintes não mexem nele.
+ *
+ * É daqui que os 3 dias úteis da RET contam. Pedido do PO: "a SLA de 3 dias
+ * úteis da RET deve ser somente se o caso mudar de status. Casos não
+ * trabalhados ficam com a SLA cheia". Enquanto esta coluna está vazia e o caso
+ * continua no status de nascimento, o selo mostra o prazo cheio.
+ */
+const RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS = 'Data da primeira mudança de status';
+
+/**
  * O expediente que um sinalizador usa quando não declarou o dele: de segunda
  * a sexta, das 08:15 às 18:30 — o da célula, palavra do PO. É o mesmo da
  * Mesa Diamante, e mora aqui para a RET não precisar repeti-lo em canal.
@@ -371,7 +383,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'sistema', tipo: 'texto', protegido: true },
       { cabecalho: 'valor do prêmio', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
-      { cabecalho: 'prêmio mensal retido', tipo: 'dinheiro', protegido: true },
+      // Era "prêmio mensal retido" — nome errado, palavra do PO: "deve ser
+      // prêmio mensal". O retido é a coluna de cima. `atualizarPGO` renomeia.
+      { cabecalho: 'prêmio mensal', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'agente da central', tipo: 'texto', protegido: true },
       // Quem passou o caso adiante. Só aparece no formulário quando o canal
       // de origem é a Central — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO.
@@ -439,7 +453,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       // QUANDO o Status proposta encerrou o prazo do Retido. O sistema carimba.
-      { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // QUANDO o caso saiu de "Não trabalhado" pela primeira vez. O sistema
+      // carimba, e é daqui que os 3 dias úteis da RET contam.
+      { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 

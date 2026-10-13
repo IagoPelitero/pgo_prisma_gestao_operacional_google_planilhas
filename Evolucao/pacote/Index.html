@@ -1763,6 +1763,30 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 }
 .dialogo-caixa.atencao h3 svg { width: 18px; height: 18px; flex: 0 0 18px; }
 .dialogo-caixa.atencao p strong { color: var(--texto); }
+/*
+  O AVISO DOS CASOS PERTO DE VENCER, que o Trabalho abre ao entrar no canal.
+  A faixa é AMARELA, e não vermelha: não é perigo, é o último dia do prazo. A
+  lista rola dentro da caixa quando os casos não cabem — o botão de fechar
+  fica sempre à vista.
+*/
+.dialogo-caixa.aviso-de-prazo {
+  max-width: 560px; border-top: 4px solid var(--atencao);
+  display: flex; flex-direction: column; max-height: min(86vh, 720px);
+}
+.dialogo-caixa.aviso-de-prazo h3 { color: var(--atencao); }
+.lista-de-prazo {
+  list-style: none; margin: 0 0 14px; padding: 0; overflow-y: auto; flex: 1 1 auto;
+  border-top: 1px solid var(--linha);
+}
+.lista-de-prazo li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--linha);
+}
+.caso-do-prazo { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
+.caso-do-prazo strong { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.caso-do-prazo small { font-size: 12px; color: var(--tenue); }
+.lista-de-prazo .selo-prazo { margin: 0 0 0 auto; }
+.lista-de-prazo .botao-secundario { flex: none; }
 /* A letra é a cor da SUPERFÍCIE, e não branco: no tema escuro o vermelho
    clareia, e letra branca em cima dele some. Superfície é clara onde o
    vermelho é escuro, e escura onde ele é claro — tema a tema. */
@@ -5146,6 +5170,11 @@ var TelaTrabalho = (function () {
   var quantosNaFila = 0;
   var focarNoMostrar = '';
   var resumo = null;
+  // O aviso dos casos perto de vencer sai UMA VEZ por canal, quando a pessoa
+  // entra nele — não a cada filtro, nem depois de cada gravação. Ver
+  // `avisarDosQueVencem`.
+  var jaAvisouNoCanal = {};
+  var avisarQuandoChegar = false;
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -5452,11 +5481,95 @@ var TelaTrabalho = (function () {
         + ' title="' + escapar(sinal.texto) + ' — ' + escapar(sinal.regra)
         + ', de segunda a sexta, no expediente. '
         + (sinal.encerrado ? 'Contado até o caso chegar a um status final.'
-          : 'Ainda correndo: o caso não chegou a um status final.') + '">'
+          : sinal.naoComecou ? 'Ainda não começou: conta da primeira mudança de status.'
+            : 'Ainda correndo: o caso não chegou a um status final.') + '">'
         + escapar(sinal.texto)
         + '<span class="so-leitor"> (' + escapar(LEITURA_DO_TOM_DO_PRAZO[sinal.tom] || '')
         + ')</span></span>';
     }).join('');
+  }
+
+  /*
+    O AVISO DOS CASOS PERTO DE VENCER.
+
+    Pedido do PO: "todo canal que tiver com a SLA próxima deve ter um pop-up
+    sinalizando qual caso está próximo de vencer". Perto de vencer é o AMARELO
+    do sinalizador — o "amarelo quando faltar…" que cada canal declara em
+    Configurações › Sinalizadores. O vermelho já venceu, e o caso parado em
+    "Não trabalhado" na RET está com o prazo cheio: nenhum dos dois entra.
+
+    Sai da MESMA resposta que desenhou a fila: são os casos que esta pessoa
+    enxerga (o alcance do nível já cortou o resto), sem ir ao servidor de novo.
+    Canal sem sinalizador ligado, ou sem nenhum caso no amarelo, não abre nada.
+  */
+  function casosPertoDeVencer(fila) {
+    var achados = [];
+    (fila || []).forEach(function (caso) {
+      (caso.sinais || []).forEach(function (sinal) {
+        if (sinal.tom === 'atencao' && !sinal.encerrado) {
+          achados.push({ caso: caso, sinal: sinal });
+        }
+      });
+    });
+    return achados;
+  }
+
+  /** Como o caso aparece no aviso: a 1ª coluna do 2º grupo da fila, como na Produtividade. */
+  function rotuloDoCaso(caso) {
+    var grupo = caso.celulas.length > 1 ? caso.celulas[1] : caso.celulas[0];
+    var valor = grupo && grupo[0] ? String(grupo[0].valor || '').trim() : '';
+    return valor || String(caso.id);
+  }
+
+  function avisarDosQueVencem() {
+    var achados = casosPertoDeVencer(resumo && resumo.fila);
+    if (!achados.length || document.getElementById('dialogo-prazo')) return;
+
+    var nomeDoCanal = resumo.canal && resumo.canal.nome ? resumo.canal.nome : '';
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-prazo';
+    caixa.innerHTML = '<div class="dialogo-caixa aviso-de-prazo" role="alertdialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-prazo" aria-describedby="texto-prazo">'
+      + '<h3 id="titulo-prazo">' + achados.length
+      + (achados.length === 1 ? ' caso perto de vencer' : ' casos perto de vencer')
+      + (nomeDoCanal ? ' · ' + escapar(nomeDoCanal) : '') + '</h3>'
+      + '<p id="texto-prazo">Estão no amarelo do prazo. Trabalhe antes que fiquem vermelhos.</p>'
+      + '<ul class="lista-de-prazo">'
+      + achados.map(function (um) {
+        return '<li><span class="caso-do-prazo"><strong>' + escapar(rotuloDoCaso(um.caso))
+          + '</strong><small>' + escapar(um.caso.id)
+          + (um.caso.situacao ? ' · ' + escapar(um.caso.situacao) : '') + '</small></span>'
+          + '<span class="selo-prazo tom-atencao">' + escapar(um.sinal.texto) + '</span>'
+          + '<button type="button" class="botao-secundario pequeno" data-trabalhar-do-aviso="'
+          + escapar(um.caso.id) + '">Trabalhar no caso</button></li>';
+      }).join('')
+      + '</ul>'
+      + '<div class="config-acoes"><button type="button" class="botao" id="fechar-aviso-de-prazo">'
+      + 'Entendi</button></div></div>';
+    document.body.appendChild(caixa);
+
+    function sair() {
+      if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+      document.removeEventListener('keydown', aoTeclar);
+    }
+    function aoTeclar(evento) {
+      if (evento.key === 'Escape') { evento.preventDefault(); sair(); }
+    }
+    document.addEventListener('keydown', aoTeclar);
+    document.getElementById('fechar-aviso-de-prazo').addEventListener('click', sair);
+    caixa.addEventListener('mousedown', function (evento) {
+      if (evento.target === caixa) sair();
+    });
+    var botoes = caixa.querySelectorAll('[data-trabalhar-do-aviso]');
+    for (var i = 0; i < botoes.length; i++) {
+      botoes[i].addEventListener('click', function () {
+        var idDoCaso = this.getAttribute('data-trabalhar-do-aviso');
+        sair();
+        CasoEmModal.abrir(canalEscolhido, idDoCaso, carregar);
+      });
+    }
+    document.getElementById('fechar-aviso-de-prazo').focus();
   }
 
   function desenharPainel() {
@@ -5490,6 +5603,11 @@ var TelaTrabalho = (function () {
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
+        if (avisarQuandoChegar) {
+          avisarQuandoChegar = false;
+          jaAvisouNoCanal[canalEscolhido] = true;
+          avisarDosQueVencem();
+        }
       })
       .senao(function (erro) {
         elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
@@ -5594,12 +5712,17 @@ var TelaTrabalho = (function () {
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });
+    // A primeira carga do canal traz o aviso dos que vencem; as seguintes
+    // (filtro, gravação, período) não.
+    avisarQuandoChegar = !jaAvisouNoCanal[canalEscolhido];
     carregar();
   }
 
   // `opcoesDeMostrar` sai para o teste: é a regra do PO, "caso tenha a
-  // quantidade", e vale conferir sem desenhar a tela.
-  return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar };
+  // quantidade", e vale conferir sem desenhar a tela. `casosPertoDeVencer`
+  // também: é quem decide o que entra no aviso.
+  return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar,
+    casosPertoDeVencer: casosPertoDeVencer };
 })();
 </script>
 

@@ -473,6 +473,38 @@ async function rodar() {
       'apagado na tela, apagado na planilha');
   });
 
+  await teste('a Descrição vem junto no "Trabalhar no caso", mesmo escrita "Descrição" na planilha', async () => {
+    // O defeito que o PO relatou: CAMPOS diz "descrição", a planilha diz
+    // "Descrição", e a caixa abria vazia — e salvar apagava o texto.
+    vm.runInContext(`(function () {
+      var aba = planilhaAtiva_().getSheetByName('BASE_RET');
+      var cabecalhos = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+      aba.getRange(1, cabecalhos.indexOf('descrição') + 1).setValue('Descrição');
+      esquecerEstruturaLida_();
+      var ultimo = lerRegistros_('BASE_RET').pop();
+      atualizarRegistro_('BASE_RET', ultimo.__id, { 'Descrição': 'Texto que veio da planilha' });
+    })()`, contexto);
+
+    await pagina.click('[data-trabalhar]');
+    await pagina.waitForFunction(() => {
+      const salvar = document.getElementById('modal-salvar');
+      return salvar && !salvar.disabled;
+    }, { timeout: 10000 });
+    igual(await pagina.inputValue('#editar-campo-descricao'), 'Texto que veio da planilha');
+
+    await pagina.click('#modal-salvar');
+    await pagina.waitForTimeout(1200);
+    const ultimo = naPlanilha('BASE_RET').pop();
+    igual(ultimo['Descrição'], 'Texto que veio da planilha', 'salvar sem mexer não apaga');
+
+    vm.runInContext(`(function () {
+      var aba = planilhaAtiva_().getSheetByName('BASE_RET');
+      var cabecalhos = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+      aba.getRange(1, cabecalhos.indexOf('Descrição') + 1).setValue('descrição');
+      esquecerEstruturaLida_();
+    })()`, contexto);
+  });
+
   await teste('o Status proposta aparece só com Retido, grava, e o prazo do Retido para', async () => {
     // O PO monta pelas telas de Configurações: lista, campo, "só quando o Status
     // for Retido" e a parada do prazo. Aqui o servidor de verdade faz o mesmo.

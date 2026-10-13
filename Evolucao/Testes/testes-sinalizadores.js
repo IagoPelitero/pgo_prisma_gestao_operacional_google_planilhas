@@ -92,7 +92,8 @@ function rodarTestesDeSinalizadores() {
 
   teste('a regra sai por extenso, para a tela e para a Produtividade', () => {
     igual(chamar('regraDoSinalizador_')(doCanal(ret)[0]),
-      '3 dias úteis · amarelo quando faltar 1 dia útil');
+      '3 dias úteis · amarelo quando faltar 1 dia útil'
+      + ' · conta da primeira mudança de status (antes dela, prazo cheio)');
     igual(chamar('regraDoSinalizador_')(doCanal(mesa)[0]),
       '48 horas úteis · amarelo quando faltar 10 horas úteis');
   });
@@ -129,7 +130,11 @@ function rodarTestesDeSinalizadores() {
    */
   const sinalDaRet = doCanal(ret)[0];
   const situacoes = chamar('situacoesPorChave_')(ret);
-  const nascido = { 'data de recepção do protocolo': new Date(2026, 9, 5), status: 'Pendente' };
+  // Desde o pedido "a SLA de 3 dias úteis da RET deve ser somente se o caso
+  // mudar de status", o prazo conta da PRIMEIRA MUDANÇA DE STATUS. O caso daqui
+  // mudou no mesmo dia em que chegou, só com a data — e por isso conta das 08:15.
+  const nascido = { 'data de recepção do protocolo': new Date(2026, 9, 5),
+    'Data da primeira mudança de status': new Date(2026, 9, 5), status: 'Pendente' };
   const quando = (dia, hora) => {
     const [h, m] = hora.split(':').map(Number);
     return { dia: Math.round(Date.UTC(2026, 9, dia) / 86400000), minuto: h * 60 + m };
@@ -170,7 +175,8 @@ function rodarTestesDeSinalizadores() {
   });
 
   teste('o caso cadastrado numa sexta passa o fim de semana inteiro no prazo', () => {
-    const naSexta = { 'data de recepção do protocolo': new Date(2026, 9, 9), status: 'Pendente' };
+    const naSexta = { 'data de recepção do protocolo': new Date(2026, 9, 9),
+      'Data da primeira mudança de status': new Date(2026, 9, 9), status: 'Pendente' };
     const em = (dia, hora) =>
       chamar('sinalDoCaso_')(naSexta, ret, sinalDaRet, situacoes, quando(dia, hora));
     igual(em(10, '10:00').tom, 'bom', 'sábado: só a sexta contou');
@@ -191,6 +197,7 @@ function rodarTestesDeSinalizadores() {
 
   const fechado = (status, mudouEm, extra) => Object.assign({
     'data de recepção do protocolo': new Date(2026, 9, 5), status: status,
+    'Data da primeira mudança de status': new Date(2026, 9, 5),
     'Data da última mudança de status': mudouEm
   }, extra || {});
   const hoje = quando(30, '12:00');
@@ -421,9 +428,13 @@ function rodarTestesDeSinalizadores() {
   /* ----------------------------------------------------------------------- */
   secao('O Trabalho: o selo embaixo da situação');
 
+  // O caso já trabalhado tem a data da primeira mudança de status — aqui, a
+  // mesma da recepção, para as contas abaixo continuarem as mesmas.
   const casoDaRet = (extra) => chamar('inserirRegistro_')('BASE_RET', Object.assign({
     analista: 'Ana Martins', 'nome do cliente': 'Cliente de teste',
-    status: 'Pendente' }, extra));
+    status: 'Pendente',
+    'Data da primeira mudança de status': (extra || {})['data de recepção do protocolo'] || ''
+  }, extra));
   const filaDaRet = () => chamar('resumoDoCanal')(ret.id, {}, 90).fila;
   const sinaisDe = (fila, registro) => fila.find((c) => String(c.id) === String(registro.__id)).sinais;
 
@@ -561,7 +572,8 @@ function rodarTestesDeSinalizadores() {
     const lote = [];
     for (let i = 0; i < 55; i++) {
       lote.push({ analista: 'Ana', 'nome do cliente': 'C' + i, status: 'Pendente',
-        'data de recepção do protocolo': diasAtras(60) });
+        'data de recepção do protocolo': diasAtras(60),
+        'Data da primeira mudança de status': diasAtras(60) });
     }
     cheia.chamar('inserirVariosRegistros_')('BASE_RET', lote);
     const s = cheia.chamar('produtividadeDaEquipe')(r.id, {}, 90).prazos.sinalizadores[0];
@@ -626,7 +638,8 @@ function rodarTestesDeSinalizadores() {
     const lista = chamar('listarSinalizadores()');
     igual(lista.length, 3);
     const daRet = lista.find((s) => s.canalNome === 'RET');
-    igual(daRet.regra, '3 dias úteis · amarelo quando faltar 1 dia útil');
+    igual(daRet.regra, '3 dias úteis · amarelo quando faltar 1 dia útil'
+      + ' · conta da primeira mudança de status (antes dela, prazo cheio)');
     igual(daRet.ativo, true);
     const doVg = lista.find((s) => s.canalNome === 'VG');
     igual(doVg.ativo, false);

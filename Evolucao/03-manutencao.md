@@ -105,6 +105,16 @@ sistema — ele a carimba quando a condição passa a valer
 (`carimbarAParadaDoPrazo_`, no `Casos.gs`) — e precisa existir na base como data e
 hora (`Data do status proposta`, na RET; `atualizarPGO()` a cria).
 
+### O prazo deve começar só quando o caso muda de status
+
+É o caso da RET. O sinalizador conta de **`Data da primeira mudança de status`**
+(Configurações › Sinalizadores › de onde conta). O sistema a carimba na primeira
+vez que o caso sai do status em que nasce — o valor padrão do campo Status
+(`carimbarAPrimeiraMudancaDeStatus_`, no `Casos.gs`). Sem ela e ainda no status
+de nascimento, o selo mostra o prazo cheio (`prazoQueNaoComecou_`, no
+`Indicadores.gs`). Outro canal que queira o mesmo precisa da coluna na base
+(data e hora, do sistema) e de apontar o sinalizador para ela.
+
 ### Tirei um registro de cadastro e quero de volta
 
 Nos cadastros (usuários, corretoras, SUSEPs, itens de configuração), tirar
@@ -280,6 +290,11 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
    achado 69 tirou os `:has()` que tinham entrado. As cores usam
    `color-mix()`, de 2023: o navegador mínimo é **Chrome ou Edge 111**, o que
    o navegador corporativo atualizado já é.)
+10. **Ler um registro pelo nome que está em CAMPOS ou em CANAIS.** O registro
+    tem as chaves como estão no cabeçalho da planilha; CAMPOS pode ter outra
+    grafia ("descrição" × "Descrição"). Ache a posição com `posicaoDaColuna_`
+    e leia `registro[estrutura.cabecalhos[posicao]]` — ou use
+    `valorPelaGrafiaDaAba_`. O achado 88 apagava a descrição assim.
 
 ---
 

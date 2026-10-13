@@ -1754,6 +1754,30 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 }
 .dialogo-caixa.atencao h3 svg { width: 18px; height: 18px; flex: 0 0 18px; }
 .dialogo-caixa.atencao p strong { color: var(--texto); }
+/*
+  O AVISO DOS CASOS PERTO DE VENCER, que o Trabalho abre ao entrar no canal.
+  A faixa é AMARELA, e não vermelha: não é perigo, é o último dia do prazo. A
+  lista rola dentro da caixa quando os casos não cabem — o botão de fechar
+  fica sempre à vista.
+*/
+.dialogo-caixa.aviso-de-prazo {
+  max-width: 560px; border-top: 4px solid var(--atencao);
+  display: flex; flex-direction: column; max-height: min(86vh, 720px);
+}
+.dialogo-caixa.aviso-de-prazo h3 { color: var(--atencao); }
+.lista-de-prazo {
+  list-style: none; margin: 0 0 14px; padding: 0; overflow-y: auto; flex: 1 1 auto;
+  border-top: 1px solid var(--linha);
+}
+.lista-de-prazo li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--linha);
+}
+.caso-do-prazo { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
+.caso-do-prazo strong { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.caso-do-prazo small { font-size: 12px; color: var(--tenue); }
+.lista-de-prazo .selo-prazo { margin: 0 0 0 auto; }
+.lista-de-prazo .botao-secundario { flex: none; }
 /* A letra é a cor da SUPERFÍCIE, e não branco: no tema escuro o vermelho
    clareia, e letra branca em cima dele some. Superfície é clara onde o
    vermelho é escuro, e escura onde ele é claro — tema a tema. */

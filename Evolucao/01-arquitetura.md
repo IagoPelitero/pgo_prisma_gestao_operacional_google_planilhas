@@ -209,7 +209,7 @@ começar.
 id | data de recepção do protocolo | analista | SUSEP | segmento |
 Código origem da proposta | número da proposta | nome do cliente |
 cod produto | produto | grupo | sistema | valor do prêmio |
-valor do prêmio retido | prêmio mensal retido | agente da central | canal |
+valor do prêmio retido | prêmio mensal | agente da central | canal |
 relacionamento | contato | protocolo | cod_sucursal | cod_ramo |
 Num_apolice | CPF | status | Forma de pagamento | dados do pagamento |
 descrição | telefones de contato | e-mail | Novo cod origem proposta |
@@ -222,7 +222,9 @@ tentativas de contato
   `número da proposta`, `cod produto`, `protocolo`, `cod_sucursal`, `cod_ramo`,
   `Num_apolice`, `CPF`, `Novo cod origem proposta`, `novo numero da proposta`.
 - Dinheiro em número com formato `R$ #,##0.00`: `valor do prêmio`,
-  `valor do prêmio retido`, `prêmio mensal retido`.
+  `valor do prêmio retido`, `prêmio mensal`. A última se chamava *prêmio mensal
+  retido* — nome errado, palavra do PO; `atualizarPGO` renomeia o cabeçalho, o
+  campo (chave `premiomensal`), a permissão de cada nível e o que citava o nome.
 - Medida em número puro: `tentativas de contato`.
 
 #### `BASE_MESA` — Mesa Diamante (20 colunas + controle)
@@ -259,6 +261,14 @@ sem a data — e sem prazo inventado; a atualização diz quantos são.
 proposta chegou num valor que encerra o prazo do Retido. O Status proposta é um
 campo que a operação cria, e campo guarda o valor, não a data em que mudou — por
 isso o sistema carimba aqui, na gravação.
+
+**`Data da primeira mudança de status`** (`BASE_RET`, ao fim): o momento em que
+o caso saiu do status em que nasce ("Não trabalhado", o valor padrão do campo
+Status) pela **primeira** vez. É de onde contam os 3 dias úteis da RET; enquanto
+está vazia e o caso continua em "Não trabalhado", o selo mostra o **prazo
+cheio**. Carimba nas duas portas (diálogo de status e formulário) e no cadastro
+de um caso que já nasce trabalhado; a importação não carimba. As trocas
+seguintes não mexem nela.
 
 ### 3.2 Cadastros
 

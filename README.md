@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1035 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1070 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -212,6 +212,11 @@ São duas situações, e cada uma tem o seu caminho:
    - **JÁ ESTAVA EM DIA** — o que ela conferiu e não precisou mexer.
 3. **Execute `diagnosticoRECC`** para conferir o resto.
 
+> **Nesta versão o `atualizarPGO` troca o nome de uma coluna**: na RET,
+> *prêmio mensal retido* passa a ser **prêmio mensal** (o dado continua lá).
+> Relatório que lê a planilha pelo nome da coluna — o Power BI — precisa do
+> nome novo.
+
 Até rodar o `atualizarPGO`, o sistema continua abrindo: o que é novo só
 aparece depois. O que cada versão mudou está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
@@ -261,7 +266,7 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-1035 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1070 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -401,7 +406,7 @@ SLA da Mesa). O selo aparece embaixo da situação, ao lado do SLA:
 
 | Canal | O prazo | Conta desde | Amarelo |
 |---|---|---|---|
-| **RET** | **3 dias úteis** para o caso chegar a um desfecho. Não retido, pago, cancelado e sem sucesso de contato **param o relógio sozinhos**; o **Retido** só para quando o *Status proposta* for **Transmitido** ou **Sem alteração** | a data de recepção do protocolo | no 3º dia útil |
+| **RET** | **3 dias úteis** para o caso chegar a um desfecho. Não retido, pago, cancelado e sem sucesso de contato **param o relógio sozinhos**; o **Retido** só para quando o *Status proposta* for **Transmitido** ou **Sem alteração** | a **primeira mudança de status** — *Data da primeira mudança de status*, que o sistema carimba quando o caso sai de "Não trabalhado". Até lá, **prazo cheio** | no 3º dia útil |
 | **Mesa** | **48 horas úteis** para o caso ser concluído. Para quando o status vira Concluído (ou Concluído na mesa, ou Sem retorno) | **Data em andamento**, que o sistema carimba quando o caso entra no status Em andamento — e todo caso novo da Mesa nasce assim | nas últimas 10 horas |
 | **VG** | ainda não definido: a linha existe, **desligada**, para o PO preencher | — | — |
 
@@ -413,6 +418,20 @@ ensinaria a ignorar o vermelho. O mesmo vale para o caso da Mesa que já estava
 em andamento antes de o sistema carimbar o Em andamento: sem a data, sem selo
 (a atualização diz quantos são, e a coluna se preenche na planilha).
 
+**RET: o prazo só começa quando o caso muda de status.** Pedido do PO: *"a SLA
+de 3 dias úteis da RET deve ser somente se o caso mudar de status. Casos não
+trabalhados ficam com a SLA cheia"*. O caso em **Não trabalhado** mostra
+*Prazo de retorno · prazo cheio, 3 dias úteis* — por mais antiga que seja a
+recepção. Na primeira troca de status (pelo diálogo ou pelo formulário), o
+sistema carimba a data e o relógio começa. As trocas seguintes não mexem nela,
+nem voltar para "Não trabalhado": o prazo já começou. O caso cadastrado direto
+num status de trabalho (*1º contato realizado*, por exemplo) começa no
+cadastro. A importação não carimba: caso importado em "Não trabalhado" fica com
+o prazo cheio. Na atualização, os casos que **já tinham saído** de "Não
+trabalhado" ganham a data mais antiga que a própria linha guardava (a última
+mudança de status ou o carimbo de qualquer status); quem não guardava data
+nenhuma fica sem selo, e o laudo diz quantos são.
+
 **O Retido e o Status proposta.** Na RET, "Retido" é um desfecho, mas o caso só
 termina quando a proposta chega ao fim do caminho. Enquanto o Status proposta
 estiver em *Aguardando transmissão* (ou vazio), o relógio **segue correndo**:
@@ -420,6 +439,18 @@ amarelo no 3º dia, vermelho depois, e o analista aparece na Produtividade. Ao
 escolher *Transmitido* ou *Sem alteração*, o sistema carimba o momento em
 *Data do status proposta* e o prazo para ali — cumprido ou estourado. Trocar o
 status de Retido para outro esvazia o Status proposta e o carimbo.
+
+**O aviso dos casos perto de vencer.** Pedido do PO: *"todo canal que tiver com
+a SLA próxima deve ter um pop-up sinalizando qual caso está próximo de
+vencer"*. Ao entrar num canal do Trabalho, se algum caso estiver no **amarelo**
+do sinalizador, abre um aviso com a lista: o caso, o status, quanto falta e um
+botão **Trabalhar no caso** em cada um. Sai **uma vez por canal** enquanto a
+página estiver aberta — não a cada filtro nem depois de cada gravação. Entram só
+os casos que a pessoa enxerga na fila (o alcance do nível vale aqui também).
+O vermelho já venceu e não entra; o caso parado com prazo cheio também não.
+Canal sem sinalizador ligado (o VG, hoje) não abre aviso.
+
+![O aviso dos casos perto de vencer](Evolucao/imagens/tela-aviso-de-prazo.png)
 
 **Na Produtividade RECC**, o bloco **Controle de prazos** mostra quantos casos
 estão no prazo, vencendo, fora e encerrados dentro e fora; o **nome de quem deixou
@@ -461,11 +492,21 @@ RECC e a Minha Performance abrem o caso do mesmo jeito.
 
 ### Trabalhar no caso: abre com o que está gravado, e fecha quando salva
 
-O formulário abre **já preenchido com o que está na planilha** — os
-valores em R$ inclusive, e o zero inclusive: na RET, "retido R$ 0,00" quer
+O formulário abre **já preenchido com o que está na planilha** — a
+**Descrição** inclusive, os valores em R$ inclusive, e o zero inclusive: na RET, "retido R$ 0,00" quer
 dizer *não retido*, que é diferente de *não preenchido*. Por um tempo esses
 campos abriam em branco, e quem abrisse o caso para corrigir outra coisa
 apagava o valor sem ver.
+
+**A Descrição que não vinha.** O PO viu a Descrição abrir vazia no "Trabalhar no
+caso". O campo se chama *descrição* em CAMPOS, e a coluna na planilha pode
+estar escrita *Descrição* ou *DESCRIÇÃO*: gravar sempre achou a coluna (compara
+sem maiúscula, acento e espaço), mas abrir para editar lia pelo nome exato e
+voltava vazio — e salvar em seguida **apagava** o texto. Hoje a edição lê pela
+grafia que está na planilha, em todos os campos e em todos os canais. Todos
+os canais editam a descrição deles: *descrição* na RET, *Obs* no VG. A Mesa
+Diamante não tem coluna de descrição — crie o campo em Configurações ›
+Cadastrar Caso, e ele abre e salva como os outros.
 
 **Salvou, o modal fecha** e a fila volta já com o que mudou. Enquanto grava, o
 botão mostra **três pontinhos** e nada do modal aceita clique — nem o X, nem o
@@ -1186,7 +1227,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1035 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1070 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

@@ -1108,7 +1108,17 @@ function sinalizadoresDoCanal_(canal) {
     })
     .map(sinalizadorDaLinha_)
     .filter(function (sinalizador) { return sinalizador.prazo > 0; })
-    .sort(function (um, outro) { return um.ordem - outro.ordem; });
+    .sort(function (um, outro) { return um.ordem - outro.ordem; })
+    .map(function (sinalizador) {
+      // O prazo que conta da PRIMEIRA MUDANÇA DE STATUS fica cheio enquanto o
+      // caso não sai do status em que nasce. Para saber qual é esse status,
+      // uma leitura por canal, e não uma por caso.
+      if (normalizarParaComparar_(sinalizador.colunaDaData)
+        === normalizarParaComparar_(RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS)) {
+        sinalizador.statusDeNascimento = normalizarParaComparar_(statusPadraoDoCanal_(canal));
+      }
+      return sinalizador;
+    });
 }
 
 /**
@@ -1218,6 +1228,9 @@ function regraDoSinalizador_(sinalizador) {
   }
   return quanto(sinalizador.prazo)
     + (sinalizador.aviso > 0 ? ' · amarelo quando faltar ' + quanto(sinalizador.aviso) : '')
+    + (normalizarParaComparar_(sinalizador.colunaDaData)
+      === normalizarParaComparar_(RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS)
+      ? ' · conta da primeira mudança de status (antes dela, prazo cheio)' : '')
     + (sinalizador.colunaQueLiga
       ? ' · só com "' + sinalizador.colunaQueLiga + '" preenchida' : '')
     + (temCondicaoDeParada_(sinalizador)
@@ -1242,7 +1255,7 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
   var colunaDaHora = sinalizador.colunaDaHora
     || (sinalizador.colunaDaData ? '' : canal.colunaDaHora);
   var inicio = colunaDaData ? converterParaData_(registro[colunaDaData]) : '';
-  if (!inicio) return null;
+  if (!inicio) return prazoQueNaoComecou_(registro, canal, sinalizador);
 
   var relogio = relogioDeParede_(inicio);
   var minutoDaHora = colunaDaHora ? minutoDaHora_(registro[colunaDaHora]) : null;
@@ -1318,6 +1331,38 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
     dentro: dentro,
     encerrado: encerrado,
     alem: dentro ? 0 : gasto - prazo,
+    expediente: expediente
+  };
+}
+
+/**
+ * O selo do caso cujo prazo AINDA NÃO COMEÇOU: "Prazo de retorno · prazo cheio,
+ * 3 dias úteis". Ou null, quando não é o caso.
+ *
+ * Só vale para o sinalizador que conta da primeira mudança de status (o da RET)
+ * e para o caso que continua no status em que nasce — "casos não trabalhados
+ * ficam com a SLA cheia", palavra do PO. Caso em outro status sem a data (uma
+ * linha antiga que ninguém soube datar) fica sem selo, como sempre: dizer
+ * "prazo cheio" para ele seria mentir.
+ */
+function prazoQueNaoComecou_(registro, canal, sinalizador) {
+  if (sinalizador.statusDeNascimento === undefined || !canal.colunaDoStatus) return null;
+  var status = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+  if (status && status !== sinalizador.statusDeNascimento) return null;
+
+  var expediente = sinalizador.fecha - sinalizador.abre;
+  var prazo = Math.round(sinalizador.prazo * minutosDeUmaUnidade_(sinalizador));
+  return {
+    id: sinalizador.id,
+    nome: sinalizador.nome,
+    tom: 'bom',
+    texto: sinalizador.nome + ' · prazo cheio, '
+      + duracaoDoPrazo_(prazo, expediente, sinalizador.unidade === 'horas'),
+    regra: regraDoSinalizador_(sinalizador),
+    dentro: true,
+    encerrado: false,
+    naoComecou: true,
+    alem: 0,
     expediente: expediente
   };
 }

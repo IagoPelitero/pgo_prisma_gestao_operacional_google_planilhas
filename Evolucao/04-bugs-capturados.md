@@ -1848,6 +1848,34 @@ sinalizador já tem. Pedido com algum (mesmo vazio) é a tela nova falando, e va
 
 ---
 
+### 88 · A Descrição que abria vazia — e sumia ao salvar
+
+**Sintoma.** Relatado pelo PO: "na aba Trabalho, ao clicar em Trabalhar no caso,
+a Descrição não vem junto para ser editada".
+
+**Causa.** O campo se chama "descrição" em CAMPOS (veio do contrato); na
+planilha, a coluna pode estar escrita "Descrição" ou "DESCRIÇÃO". Gravar acha a
+coluna sem ligar para maiúscula, acento e espaço — por isso cadastrar sempre
+funcionou. Mas o registro lido da planilha tem as chaves exatamente como estão
+no cabeçalho, e a edição lia `registro[campo.Cabecalho]`: nada. O campo abria
+vazio, e como campo esvaziado na edição é apagado na planilha, **salvar o caso
+apagava a descrição**. O diagnóstico não via: ele também compara sem grafia, e
+dizia que o campo apontava para uma coluna que existe.
+
+**Defesa.** A edição lê pela grafia que está na aba (`valorPelaGrafiaDaAba_`),
+para o campo simples e para os que moram em várias colunas (proposta, apólice,
+produto). Teste no servidor e ponta a ponta: cabeçalho "Descrição" na planilha,
+a caixa abre preenchida, e salvar sem mexer não apaga.
+
+**Ainda em aberto, de propósito.** O mesmo jeito de ler pelo nome exato existe
+para as colunas que o canal declara (status, data de entrada, finalização…), em
+cerca de 45 lugares. Hoje elas batem letra por letra com a planilha — senão o
+status já não funcionaria —, mas renomear um desses cabeçalhos só na caixa
+quebraria em silêncio. Endurecer isso é mexer em muitos arquivos: fica para o
+PO decidir.
+
+---
+
 ## O que esta lista ensina
 
 **São oitenta e sete achados, e a maioria era silenciosa.** Não davam erro, não
@@ -2037,3 +2065,7 @@ Daí as duas práticas que o projeto não abre mão:
     ideia era esvaziar todo campo escondido. Dado importado mora justamente em
     campo que a tela esconde. O que se esvazia é o que a PESSOA acabou de
     tornar sem sentido, e só nesse momento.
+47. **Comparar sem grafia num lado só é meio contrato.** No item 88 a gravação e
+    o diagnóstico comparavam sem maiúscula e acento; a leitura, não. Cada lado
+    estava certo sozinho, e juntos apagavam a descrição. Quando uma regra de
+    comparação existe, ela vale para quem grava, quem lê e quem confere.

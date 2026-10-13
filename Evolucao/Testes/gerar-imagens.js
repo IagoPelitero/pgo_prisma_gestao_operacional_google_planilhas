@@ -63,8 +63,20 @@ const FOTOS = [
   { arquivo: 'tela-produtividade', tela: 'produtividade', inteira: true },
   { arquivo: 'tela-configuracoes', tela: 'configuracoes', inteira: true },
 
-  { arquivo: 'sistema-no-celular', tela: 'trabalho', janela: CELULAR, inteira: true }
+  { arquivo: 'sistema-no-celular', tela: 'trabalho', janela: CELULAR, inteira: true },
+
+  // O aviso dos casos perto de vencer, que o Trabalho abre ao entrar no canal.
+  // Nas outras fotos ele é fechado antes de clicar e de fotografar.
+  { arquivo: 'tela-aviso-de-prazo', tela: 'trabalho', comOAviso: true }
 ];
+
+/** Fecha o aviso dos casos perto de vencer, se ele abriu: o véu cobre a tela. */
+async function fecharOAvisoDePrazo(pagina) {
+  if (await pagina.locator('#dialogo-prazo').count()) {
+    await pagina.click('#fechar-aviso-de-prazo');
+    await pagina.waitForTimeout(200);
+  }
+}
 
 async function esperarATelaMontar(pagina) {
   // A prévia responde na hora, mas o desenho dos gráficos acontece depois. Sem
@@ -92,6 +104,10 @@ async function gerar() {
     const pagina = await navegador.newPage({ viewport: foto.janela || TELA_CHEIA });
     await pagina.goto(endereco + '#' + foto.tela);
     await esperarATelaMontar(pagina);
+    if (foto.comOAviso && !await pagina.locator('#dialogo-prazo').count()) {
+      throw new Error('a foto "' + foto.arquivo + '" é do aviso de prazo, e ele não abriu');
+    }
+    if (!foto.comOAviso) await fecharOAvisoDePrazo(pagina);
 
     if (foto.tema) {
       await pagina.click('[data-tema="' + foto.tema + '"]');
@@ -109,6 +125,7 @@ async function gerar() {
       }
       await botao.click();
       await esperarATelaMontar(pagina);
+      await fecharOAvisoDePrazo(pagina);
     }
 
     const caminho = path.join(DESTINO, foto.arquivo + '.png');

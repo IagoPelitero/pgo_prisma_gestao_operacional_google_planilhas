@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-13 13:46
+   Gerado em 2026-10-13 21:54
    ========================================================================== */
 
 
@@ -343,6 +343,18 @@ const RECC_COLUNA_DATA_EM_ANDAMENTO = 'Data em andamento';
 const RECC_COLUNA_DATA_DO_STATUS_PROPOSTA = 'Data do status proposta';
 
 /**
+ * QUANDO o caso mudou de status PELA PRIMEIRA VEZ — saiu do status em que
+ * nasce ("Não trabalhado", o valor padrão do campo Status). Carimbado pelo
+ * SISTEMA uma vez só: as mudanças seguintes não mexem nele.
+ *
+ * É daqui que os 3 dias úteis da RET contam. Pedido do PO: "a SLA de 3 dias
+ * úteis da RET deve ser somente se o caso mudar de status. Casos não
+ * trabalhados ficam com a SLA cheia". Enquanto esta coluna está vazia e o caso
+ * continua no status de nascimento, o selo mostra o prazo cheio.
+ */
+const RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS = 'Data da primeira mudança de status';
+
+/**
  * O expediente que um sinalizador usa quando não declarou o dele: de segunda
  * a sexta, das 08:15 às 18:30 — o da célula, palavra do PO. É o mesmo da
  * Mesa Diamante, e mora aqui para a RET não precisar repeti-lo em canal.
@@ -389,7 +401,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'sistema', tipo: 'texto', protegido: true },
       { cabecalho: 'valor do prêmio', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
-      { cabecalho: 'prêmio mensal retido', tipo: 'dinheiro', protegido: true },
+      // Era "prêmio mensal retido" — nome errado, palavra do PO: "deve ser
+      // prêmio mensal". O retido é a coluna de cima. `atualizarPGO` renomeia.
+      { cabecalho: 'prêmio mensal', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'agente da central', tipo: 'texto', protegido: true },
       // Quem passou o caso adiante. Só aparece no formulário quando o canal
       // de origem é a Central — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO.
@@ -457,7 +471,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       // QUANDO o Status proposta encerrou o prazo do Retido. O sistema carimba.
-      { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // QUANDO o caso saiu de "Não trabalhado" pela primeira vez. O sistema
+      // carimba, e é daqui que os 3 dias úteis da RET contam.
+      { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -4983,6 +5000,11 @@ function carimbarOStatusDeNascimento_(canal, paraGravar) {
   // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
   // o que veio manda. O carimbo nunca reescreve o que alguém informou.
   carimbarOStatus_(canal, achada, paraGravar, paraGravar);
+
+  // Caso que já NASCE trabalhado (cadastrado direto em "1º contato
+  // realizado", por exemplo) começa o prazo agora: ele não ficou parado em
+  // "Não trabalhado" nem um minuto.
+  carimbarAPrimeiraMudancaDeStatus_(canal, null, paraGravar, estruturaDaAba_(canal.aba));
 }
 
 /**
@@ -5094,6 +5116,7 @@ function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
     // Power BI, onde um Id de dez dígitos não diz quem trabalhou o caso.
     alteracao[RECC_COLUNA_QUEM_MUDOU_O_STATUS] = quem.email || '';
   }
+  carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estrutura);
   if (temAColuna(RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS)) {
     // O valor guardado pode chegar como número, como texto ou vazio — a
     // coluna é editável na planilha. Number('') é 0, e Number('abc') é NaN:
@@ -5102,6 +5125,32 @@ function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
     if (!quantas || quantas < 0) quantas = 0;
     alteracao[RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS] = Math.floor(quantas) + 1;
   }
+}
+
+/**
+ * Carimba a PRIMEIRA vez que o caso sai do status em que nasce.
+ *
+ * É o início dos 3 dias úteis da RET — "a SLA deve ser somente se o caso mudar
+ * de status; casos não trabalhados ficam com a SLA cheia", palavra do PO. Ver
+ * `RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS`.
+ *
+ * Uma vez só: já carimbado, nada mexe nele — nem o caso que volta para "Não
+ * trabalhado" (o prazo já começou e continua correndo). E ir PARA o status de
+ * nascimento não é começar: uma linha antiga com o status em branco que passa
+ * a "Não trabalhado" continua sem prazo começado.
+ *
+ * Base sem a coluna (as que não são da RET, ou quem não rodou `atualizarPGO()`)
+ * segue gravando, sem carimbo.
+ */
+function carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estrutura) {
+  var coluna = RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS;
+  if (!canal.colunaDoStatus || posicaoDaColuna_(estrutura, coluna) < 0) return;
+  if (registroAtual && String(registroAtual[coluna] || '').trim()) return;
+  if (String(alteracao[coluna] || '').trim()) return;
+
+  var novo = normalizarParaComparar_(alteracao[canal.colunaDoStatus]);
+  if (!novo || novo === normalizarParaComparar_(statusPadraoDoCanal_(canal))) return;
+  alteracao[coluna] = new Date();
 }
 
 /**
@@ -5419,9 +5468,9 @@ function partirPorHifen_(valor, partir, rotulo) {
  * que existe. "7-" na tela pareceria um dado pela metade que alguém digitou,
  * quando é um dado pela metade que estava na planilha.
  */
-function juntarComHifen_(registro, partir) {
+function juntarComHifen_(registro, partir, estrutura) {
   var pedacos = partir.colunas.map(function (cabecalho) {
-    var valor = registro[cabecalho];
+    var valor = valorPelaGrafiaDaAba_(registro, estrutura, cabecalho);
     return String(valor === null || valor === undefined ? '' : valor).trim();
   }).filter(function (pedaco) { return pedaco !== ''; });
 
@@ -5436,11 +5485,11 @@ function juntarComHifen_(registro, partir) {
  * "1101-VIDA INDIVIDUAL" devolveria um valor que a lista não tem, e salvar
  * seria recusado com "não é uma das opções da lista".
  */
-function juntarCodigoENome_(registro, separa) {
-  var codigo = String(registro[separa.codigo] === null
-    || registro[separa.codigo] === undefined ? '' : registro[separa.codigo]).trim();
-  var nome = String(registro[separa.nome] === null
-    || registro[separa.nome] === undefined ? '' : registro[separa.nome]).trim();
+function juntarCodigoENome_(registro, separa, estrutura) {
+  var noCodigo = valorPelaGrafiaDaAba_(registro, estrutura, separa.codigo);
+  var noNome = valorPelaGrafiaDaAba_(registro, estrutura, separa.nome);
+  var codigo = String(noCodigo === null || noCodigo === undefined ? '' : noCodigo).trim();
+  var nome = String(noNome === null || noNome === undefined ? '' : noNome).trim();
 
   if (codigo && nome) return codigo + ' - ' + nome;
   return codigo || nome;
@@ -5469,17 +5518,37 @@ function valorDoCampoNaLinha_(registro, campo, estrutura) {
 
   var separa = configuracao.separaEm;
   if (separa && separa.codigo && separa.nome) {
-    return juntarCodigoENome_(registro, separa);
+    return juntarCodigoENome_(registro, separa, estrutura);
   }
 
   var partir = configuracao.partirEm;
   if (partir && partir.colunas && partir.colunas.length > 1) {
-    return juntarComHifen_(registro, partir);
+    return juntarComHifen_(registro, partir, estrutura);
   }
 
   var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
   if (posicao < 0) return null;   // null = esta coluna não existe nesta aba
-  return paraTexto_(registro[campo.Cabecalho], estrutura.tipos[posicao]);
+  return paraTexto_(registro[estrutura.cabecalhos[posicao]], estrutura.tipos[posicao]);
+}
+
+/**
+ * O valor de uma coluna pela GRAFIA QUE ESTÁ NA ABA, e não pela que está em
+ * CAMPOS.
+ *
+ * O DEFEITO QUE ISTO CONSERTA, relatado pelo PO: "na aba Trabalho, ao clicar
+ * em Trabalhar no caso, a Descrição não vem junto para ser editada". O campo
+ * em CAMPOS se chama "descrição"; na planilha, a coluna pode estar escrita
+ * "Descrição" ou "DESCRIÇÃO". Gravar sempre funcionou — a gravação procura a
+ * coluna sem ligar para maiúscula, acento ou espaço —, mas o registro lido da
+ * planilha tem as chaves EXATAMENTE como estão no cabeçalho, e ler
+ * `registro['descrição']` devolvia nada. O campo abria vazio e, pior, salvar o
+ * caso em seguida APAGAVA a descrição, porque campo esvaziado na edição é
+ * apagado na planilha.
+ */
+function valorPelaGrafiaDaAba_(registro, estrutura, cabecalho) {
+  if (!estrutura) return registro[cabecalho];
+  var posicao = posicaoDaColuna_(estrutura, cabecalho);
+  return posicao < 0 ? undefined : registro[estrutura.cabecalhos[posicao]];
 }
 
 /**
@@ -13075,7 +13144,17 @@ function sinalizadoresDoCanal_(canal) {
     })
     .map(sinalizadorDaLinha_)
     .filter(function (sinalizador) { return sinalizador.prazo > 0; })
-    .sort(function (um, outro) { return um.ordem - outro.ordem; });
+    .sort(function (um, outro) { return um.ordem - outro.ordem; })
+    .map(function (sinalizador) {
+      // O prazo que conta da PRIMEIRA MUDANÇA DE STATUS fica cheio enquanto o
+      // caso não sai do status em que nasce. Para saber qual é esse status,
+      // uma leitura por canal, e não uma por caso.
+      if (normalizarParaComparar_(sinalizador.colunaDaData)
+        === normalizarParaComparar_(RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS)) {
+        sinalizador.statusDeNascimento = normalizarParaComparar_(statusPadraoDoCanal_(canal));
+      }
+      return sinalizador;
+    });
 }
 
 /**
@@ -13185,6 +13264,9 @@ function regraDoSinalizador_(sinalizador) {
   }
   return quanto(sinalizador.prazo)
     + (sinalizador.aviso > 0 ? ' · amarelo quando faltar ' + quanto(sinalizador.aviso) : '')
+    + (normalizarParaComparar_(sinalizador.colunaDaData)
+      === normalizarParaComparar_(RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS)
+      ? ' · conta da primeira mudança de status (antes dela, prazo cheio)' : '')
     + (sinalizador.colunaQueLiga
       ? ' · só com "' + sinalizador.colunaQueLiga + '" preenchida' : '')
     + (temCondicaoDeParada_(sinalizador)
@@ -13209,7 +13291,7 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
   var colunaDaHora = sinalizador.colunaDaHora
     || (sinalizador.colunaDaData ? '' : canal.colunaDaHora);
   var inicio = colunaDaData ? converterParaData_(registro[colunaDaData]) : '';
-  if (!inicio) return null;
+  if (!inicio) return prazoQueNaoComecou_(registro, canal, sinalizador);
 
   var relogio = relogioDeParede_(inicio);
   var minutoDaHora = colunaDaHora ? minutoDaHora_(registro[colunaDaHora]) : null;
@@ -13285,6 +13367,38 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
     dentro: dentro,
     encerrado: encerrado,
     alem: dentro ? 0 : gasto - prazo,
+    expediente: expediente
+  };
+}
+
+/**
+ * O selo do caso cujo prazo AINDA NÃO COMEÇOU: "Prazo de retorno · prazo cheio,
+ * 3 dias úteis". Ou null, quando não é o caso.
+ *
+ * Só vale para o sinalizador que conta da primeira mudança de status (o da RET)
+ * e para o caso que continua no status em que nasce — "casos não trabalhados
+ * ficam com a SLA cheia", palavra do PO. Caso em outro status sem a data (uma
+ * linha antiga que ninguém soube datar) fica sem selo, como sempre: dizer
+ * "prazo cheio" para ele seria mentir.
+ */
+function prazoQueNaoComecou_(registro, canal, sinalizador) {
+  if (sinalizador.statusDeNascimento === undefined || !canal.colunaDoStatus) return null;
+  var status = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+  if (status && status !== sinalizador.statusDeNascimento) return null;
+
+  var expediente = sinalizador.fecha - sinalizador.abre;
+  var prazo = Math.round(sinalizador.prazo * minutosDeUmaUnidade_(sinalizador));
+  return {
+    id: sinalizador.id,
+    nome: sinalizador.nome,
+    tom: 'bom',
+    texto: sinalizador.nome + ' · prazo cheio, '
+      + duracaoDoPrazo_(prazo, expediente, sinalizador.unidade === 'horas'),
+    regra: regraDoSinalizador_(sinalizador),
+    dentro: true,
+    encerrado: false,
+    naoComecou: true,
+    alem: 0,
     expediente: expediente
   };
 }
@@ -15950,7 +16064,7 @@ const RECC_PADRAO_DO_FORMULARIO = {
       exemplo: '12-1391-0000000'
     } },
   valordopremio: { secao: 'Seguro', ordem: 27, rotulo: 'Valor do prêmio anual' },
-  premiomensalretido: { secao: 'Seguro', ordem: 28,
+  premiomensal: { secao: 'Seguro', ordem: 28,
     rotulo: 'Valor do prêmio mensal' },
   valordopremioretido: { secao: 'Seguro', ordem: 29,
     rotulo: 'Valor do prêmio retido' },
@@ -16334,6 +16448,15 @@ function atualizarPGO() {
     'o sistema carimba quando o Status proposta encerra o prazo', pulados));
   feito = feito.concat(ligarAParadaDoRetido_(pulados, paraVoce));
 
+  // --- 6b5. o prazo da RET conta da primeira mudança de status --------------
+  feito = feito.concat(criarUmaColunaDoSistema_('BASE_RET',
+    RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS,
+    'o sistema carimba quando o caso sai de "Não trabalhado"', pulados));
+  feito = feito.concat(ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce));
+
+  // --- 6b6. a coluna "prêmio mensal retido" da RET vira "prêmio mensal" -------
+  feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
+
   // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
   feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
 
@@ -16683,7 +16806,8 @@ function limparCamposSemCanal_(pulados) {
  * Os sinalizadores com que o sistema nasce — palavra do PO.
  *
  *   RET   "temos até 3 dias para alterar para o status final": 3 dias úteis,
- *         do cadastro até um dos cinco desfechos. Verde nos dois primeiros
+ *         da PRIMEIRA MUDANÇA DE STATUS até um dos cinco desfechos — "casos
+ *         não trabalhados ficam com a SLA cheia". Verde nos dois primeiros
  *         dias, amarelo no terceiro (o último), vermelho depois.
  *   MESA  o caso tem 48 horas úteis para ser concluído, contadas do momento
  *         em que ele entrou em "Em andamento" (o carimbo do status). Para
@@ -16706,7 +16830,8 @@ function sinalizadoresDeFabrica_(idRet, idMesa, idVg) {
     };
   }
   return [
-    linha(idRet, 'Prazo de retorno', 3, 'dias', 1, '', '', 1, true),
+    linha(idRet, 'Prazo de retorno', 3, 'dias', 1,
+      '', RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, 1, true),
     linha(idMesa, 'Retorno da área', 48, 'horas', 10,
       '', RECC_COLUNA_DATA_EM_ANDAMENTO, 1, true),
     linha(idVg, 'Prazo de retorno', 0, 'dias', 1, '', '', 1, false)
@@ -17014,6 +17139,259 @@ function ligarAParadaDoRetido_(pulados, paraVoce) {
       + 'não sabe QUANDO o Status proposta foi preenchido. O que for preenchido de agora em '
       + 'diante já é carimbado.');
   }
+  return feito;
+}
+
+/**
+ * O prazo da RET passa a contar da PRIMEIRA MUDANÇA DE STATUS, e não da
+ * recepção do protocolo. Pedido do PO: "a SLA de 3 dias úteis da RET deve ser
+ * somente se o caso mudar de status. Casos não trabalhados ficam com a SLA
+ * cheia".
+ *
+ * Três passos, e nenhum atropela o que o PO ajustou:
+ *   1. o sinalizador da RET, se ainda conta da data de entrada do canal (o de
+ *      fábrica), passa a contar de `Data da primeira mudança de status`. Se o
+ *      PO já o apontou para outra coluna, fica como está e vira DECISÃO SUA;
+ *   2. os casos que JÁ SAÍRAM de "Não trabalhado" ganham a data — a MAIS
+ *      ANTIGA que a própria linha já guarda: a última mudança de status ou o
+ *      carimbo de qualquer status ("Data do 1º contato", "Data reteve"…).
+ *      Não é data inventada: é um momento em que o caso comprovadamente já
+ *      tinha mudado. Se a primeira mudança foi para um status sem carimbo, a
+ *      data achada pode ser POSTERIOR à verdadeira — o caso ganha prazo a mais,
+ *      nunca a menos;
+ *   3. avisa quantos ficaram sem data nenhuma (sem carimbo e sem última
+ *      mudança): esses ficam sem selo, porque não há o que contar.
+ *
+ * Os casos em "Não trabalhado" não ganham data: ficam com o prazo cheio, que é
+ * exatamente o pedido.
+ */
+function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  if (!planilha.getSheetByName('CANAIS') || !planilha.getSheetByName('BASE_RET')
+    || !planilha.getSheetByName('SINALIZADORES')) {
+    pulados.push('a RET ainda não tem as abas do prazo');
+    return feito;
+  }
+  var COLUNA = RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS;
+  var ret = lerRegistros_('CANAIS').filter(function (canal) {
+    return String(canal.Aba) === 'BASE_RET';
+  })[0];
+  if (!ret) { pulados.push('o canal BASE_RET não está cadastrado'); return feito; }
+
+  // --- 1. o sinalizador
+  var linha = lerRegistros_('SINALIZADORES').filter(function (outra) {
+    return converterParaIdentificador_(outra.CanalId) === converterParaIdentificador_(ret.Id);
+  })[0];
+  if (!linha) {
+    pulados.push('a RET não tem sinalizador');
+  } else {
+    var desde = String(linha.ColunaDaData || '').trim();
+    var hora = String(linha.ColunaDaHora || '').trim();
+    var mesmaColuna = function (uma, outra) {
+      return normalizarParaComparar_(uma) === normalizarParaComparar_(outra);
+    };
+    if (mesmaColuna(desde, COLUNA)) {
+      pulados.push('RET: o prazo já conta da primeira mudança de status');
+    } else if ((!desde || mesmaColuna(desde, ret.ColunaDaData))
+      && (!hora || mesmaColuna(hora, ret.ColunaDaHora))) {
+      atualizarRegistro_('SINALIZADORES', linha.__id, { ColunaDaData: COLUNA, ColunaDaHora: '' });
+      feito.push('RET: o "' + linha.Nome + '" conta da primeira mudança de status; caso em '
+        + '"Não trabalhado" fica com o prazo cheio');
+    } else {
+      paraVoce.push('RET: o "' + linha.Nome + '" conta de "' + desde + '", que você escolheu, e '
+        + 'ficou assim. Para os 3 dias úteis contarem só depois que o caso muda de status, '
+        + 'escolha "' + COLUNA + '" em Configurações › Sinalizadores.');
+    }
+  }
+
+  // --- 2. a data dos casos que já saíram de "Não trabalhado"
+  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+  esquecerEstruturaLida_('BASE_RET');
+  var estrutura = estruturaDaAba_('BASE_RET', true);
+  var posicaoDaData = posicaoDaColuna_(estrutura, COLUNA);
+  if (!canal || !canal.colunaDoStatus || posicaoDaData < 0
+    || posicaoDaColuna_(estrutura, canal.colunaDoStatus) < 0) {
+    pulados.push('RET: sem coluna de status ou de data para datar os casos antigos');
+    return feito;
+  }
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return feito;
+
+  var nascimento = normalizarParaComparar_(statusPadraoDoCanal_(canal));
+  var deOndeTirar = [RECC_COLUNA_QUANDO_MUDOU_O_STATUS];
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    if (situacao.colunaDeCarimbo) deOndeTirar.push(situacao.colunaDeCarimbo);
+  });
+  deOndeTirar = deOndeTirar.filter(function (cabecalho, i) {
+    return posicaoDaColuna_(estrutura, cabecalho) >= 0 && deOndeTirar.indexOf(cabecalho) === i;
+  });
+
+  var status = lerColunaInteira_('BASE_RET', canal.colunaDoStatus);
+  var datas = lerColunaInteira_('BASE_RET', COLUNA);
+  var fontes = deOndeTirar.map(function (cabecalho) {
+    return lerColunaInteira_('BASE_RET', cabecalho);
+  });
+  function comoMomento(valor) {
+    if (Object.prototype.toString.call(valor) === '[object Date]') {
+      return isNaN(valor.getTime()) ? null : valor;
+    }
+    var data = converterParaData_(valor);
+    return data ? data : null;
+  }
+
+  var datados = 0;
+  var semData = 0;
+  var novas = datas.map(function (atual, i) {
+    if (String(atual === null || atual === undefined ? '' : atual).trim()) return [atual];
+    var oStatus = normalizarParaComparar_(status[i]);
+    if (!oStatus || oStatus === nascimento) return [atual];
+    var maisAntiga = null;
+    fontes.forEach(function (coluna) {
+      var momento = comoMomento(coluna[i]);
+      if (momento && (!maisAntiga || momento.getTime() < maisAntiga.getTime())) maisAntiga = momento;
+    });
+    if (!maisAntiga) { semData++; return [atual]; }
+    datados++;
+    return [maisAntiga];
+  });
+  if (datados) {
+    estrutura.aba.getRange(2, posicaoDaData + 1, total, 1).setValues(novas);
+    feito.push('RET: ' + datados + ' caso(s) que já tinham saído de "Não trabalhado" ganharam a '
+      + 'data da primeira mudança de status (a mais antiga que a linha já guardava)');
+  }
+  if (semData) {
+    paraVoce.push('RET: ' + semData + ' caso(s) já saíram de "Não trabalhado", mas a linha não '
+      + 'guarda data nenhuma de mudança de status. Ficam sem selo de prazo — o sistema não '
+      + 'inventa a data. A próxima mudança de status de cada um carimba a data, e o prazo '
+      + 'passa a contar dali; se quiser antes, preencha "' + COLUNA + '" na planilha.');
+  }
+  return feito;
+}
+
+/**
+ * A coluna "prêmio mensal retido" da RET passa a se chamar "prêmio mensal".
+ *
+ * Pedido do PO: "a coluna prêmio mensal retido está com nome errado e deve ser
+ * prêmio mensal". O dado dentro dela NÃO muda — é a mesma coluna, com o nome
+ * certo. O retido continua na "valor do prêmio retido".
+ *
+ * Cada passo confere antes e vale sozinho, para a função poder rodar de novo
+ * sem estrago — inclusive se o PO já tiver trocado o cabeçalho à mão:
+ *   1. o CABEÇALHO, na aba BASE_RET;
+ *   2. o CAMPO em CAMPOS: cabeçalho e chave técnica (premiomensal), que é a
+ *      que o instalador daria hoje;
+ *   3. o que cita a chave antiga: a permissão do campo em cada nível e a
+ *      condição "aparece só quando" de outro campo;
+ *   4. o que cita o NOME antigo em texto: colunas da fila e da busca, coluna
+ *      de valor, gráficos, análises e sinalizadores.
+ *
+ * Se as DUAS colunas existirem, nada é mexido: juntar duas colunas com dado é
+ * decisão do PO, e vira DECISÃO SUA.
+ */
+function renomearOPremioMensalDaRet_(pulados, paraVoce) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  var aba = planilha.getSheetByName('BASE_RET');
+  if (!aba) { pulados.push('aba BASE_RET não existe'); return feito; }
+
+  var ANTIGO = 'prêmio mensal retido';
+  var NOVO = 'prêmio mensal';
+  var CHAVE_ANTIGA = normalizarParaComparar_(ANTIGO);
+  var CHAVE_NOVA = normalizarParaComparar_(NOVO);
+
+  // --- 1. o cabeçalho
+  esquecerEstruturaLida_('BASE_RET');
+  var estrutura = estruturaDaAba_('BASE_RET', true);
+  var naAntiga = posicaoDaColuna_(estrutura, ANTIGO);
+  var naNova = posicaoDaColuna_(estrutura, NOVO);
+  if (naAntiga >= 0 && naNova >= 0) {
+    paraVoce.push('RET: a base tem as DUAS colunas, "' + estrutura.cabecalhos[naAntiga]
+      + '" e "' + estrutura.cabecalhos[naNova] + '". Nada foi mexido: passe o que estiver '
+      + 'na antiga para a nova, apague a antiga e rode atualizarPGO() de novo.');
+    return feito;
+  }
+  if (naAntiga >= 0) {
+    aba.getRange(1, naAntiga + 1).setValue(NOVO);
+    esquecerEstruturaLida_();
+    feito.push('RET: a coluna "' + estrutura.cabecalhos[naAntiga] + '" agora se chama "'
+      + NOVO + '" (o dado dentro dela não mudou)');
+    paraVoce.push('RET: a coluna "' + estrutura.cabecalhos[naAntiga] + '" passou a se chamar "'
+      + NOVO + '". Relatório que lê a planilha pelo nome da coluna — o Power BI, por exemplo — '
+      + 'precisa do nome novo.');
+  } else if (naNova >= 0) {
+    pulados.push('BASE_RET."' + NOVO + '" já existe');
+  } else {
+    pulados.push('a RET não tem a coluna "' + ANTIGO + '" nem "' + NOVO + '"');
+    return feito;
+  }
+
+  // --- 2. o campo
+  var chaveTrocou = false;
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (String(campo.Aba) !== 'BASE_RET'
+      || normalizarParaComparar_(campo.Cabecalho) !== CHAVE_ANTIGA) return;
+    var mudanca = { Cabecalho: NOVO };
+    if (normalizarParaComparar_(campo.ChaveTecnica) === CHAVE_ANTIGA) {
+      mudanca.ChaveTecnica = CHAVE_NOVA;
+      chaveTrocou = true;
+    }
+    // O rótulo é do PO. Só acompanha quando era o próprio nome antigo.
+    if (normalizarParaComparar_(campo.Rotulo) === CHAVE_ANTIGA) mudanca.Rotulo = NOVO;
+    atualizarRegistro_('CAMPOS', campo.__id, mudanca);
+    feito.push('CAMPOS: o campo da RET aponta para "' + NOVO + '"');
+  });
+
+  // --- 3. quem cita a chave antiga
+  if (chaveTrocou) {
+    // Os níveis de acesso moram no CATALOGO, com Tipo NIVEL_ACESSO.
+    lerRegistros_('CATALOGO').forEach(function (nivel) {
+      if (normalizarParaComparar_(nivel.Tipo) !== 'nivelacesso') return;
+      var lido;
+      try { lido = JSON.parse(String(nivel.Configuracao || '')); } catch (erro) { return; }
+      if (!lido || !lido.campos || !(CHAVE_ANTIGA in lido.campos)) return;
+      if (!(CHAVE_NOVA in lido.campos)) lido.campos[CHAVE_NOVA] = lido.campos[CHAVE_ANTIGA];
+      delete lido.campos[CHAVE_ANTIGA];
+      atualizarRegistro_('CATALOGO', nivel.__id, { Configuracao: JSON.stringify(lido) });
+      feito.push('Nível "' + nivel.Nome + '" mantém a permissão do campo, com a chave nova');
+    });
+    lerRegistros_('CAMPOS').forEach(function (campo) {
+      if (String(campo.Aba) !== 'BASE_RET') return;
+      var configuracao = lerConfiguracaoDoCampo_(campo);
+      if (!configuracao.mostrarSe || configuracao.mostrarSe.campo !== CHAVE_ANTIGA) return;
+      configuracao.mostrarSe.campo = CHAVE_NOVA;
+      atualizarRegistro_('CAMPOS', campo.__id, { Configuracao: JSON.stringify(configuracao) });
+      feito.push('CAMPOS: "' + (campo.Rotulo || campo.Cabecalho)
+        + '" continua aparecendo conforme o prêmio mensal');
+    });
+  }
+
+  // --- 4. quem cita o nome antigo em texto
+  var nomeAntigo = /pr[eê]mio mensal retido/gi;
+  [['CANAIS', ['ColunasDaFila', 'ColunasDaBusca', 'ColunaDoValor', 'ColunaDaData',
+    'ColunaDaFinalizacao', 'ColunaDaAreaResponsavel']],
+   ['PAINEIS', ['CampoDimensao', 'CampoMedida']],
+   ['ANALISES', ['Colunas', 'Filtros']],
+   ['SINALIZADORES', ['ColunaQueLiga', 'ColunaDaData', 'ColunaDaHora',
+     'ColunaDaCondicao', 'ColunaDaDataDaCondicao']]].forEach(function (par) {
+    if (!planilha.getSheetByName(par[0])) return;
+    var daAba = estruturaDaAba_(par[0]);
+    lerRegistros_(par[0]).forEach(function (linha) {
+      var mudanca = {};
+      par[1].forEach(function (coluna) {
+        var posicao = posicaoDaColuna_(daAba, coluna);
+        if (posicao < 0) return;
+        var texto = String(linha[daAba.cabecalhos[posicao]] || '');
+        if (texto.search(nomeAntigo) < 0) return;
+        mudanca[daAba.cabecalhos[posicao]] = texto.replace(nomeAntigo, NOVO);
+      });
+      if (!Object.keys(mudanca).length) return;
+      atualizarRegistro_(par[0], linha.__id, mudanca);
+      feito.push(par[0] + ': "' + (linha.Nome || linha.Titulo || linha.__id)
+        + '" passou a citar "' + NOVO + '"');
+    });
+  });
+
   return feito;
 }
 
