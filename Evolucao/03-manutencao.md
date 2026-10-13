@@ -294,7 +294,10 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
     tem as chaves como estão no cabeçalho da planilha; CAMPOS pode ter outra
     grafia ("descrição" × "Descrição"). Ache a posição com `posicaoDaColuna_`
     e leia `registro[estrutura.cabecalhos[posicao]]` — ou use
-    `valorPelaGrafiaDaAba_`. O achado 88 apagava a descrição assim.
+    `valorPelaGrafiaDaAba_` / `grafiaDaColuna_`. O canal que vem de
+    `canalPeloId_` já chega com as colunas na grafia da planilha; quem percorre
+    vários canais por `canaisVisiveis_` chama `comAGrafiaDaAba_(canal)` antes
+    de ler. O achado 88 apagava a descrição assim.
 
 ---
 

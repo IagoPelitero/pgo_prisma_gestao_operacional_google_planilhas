@@ -251,8 +251,10 @@ Hoje é dado (e Power BI): o prazo da Mesa não conta mais dele.
 
 **`Data em andamento`** (logo depois): o momento em que o caso entrou no status
 **Em andamento** — o carimbo do próprio status (`CATALOGO.ColunaDeCarimbo`),
-como as datas de status da RET. Todo caso novo da Mesa nasce Em andamento, e
-nasce carimbado. É de onde conta o prazo de 48 horas úteis, até um status que
+como as datas de status da RET. Todo caso cadastrado pela tela nasce Em
+andamento, e nasce carimbado. O caso **importado** entra **sem status** (a
+importação não põe status padrão que carimba data — `statusDaImportacaoDoCanal_`)
+e ganha a data quando alguém o põe em Em andamento. É de onde conta o prazo de 48 horas úteis, até um status que
 fecha o caso. Só a **primeira** entrada carimba: voltar para Em andamento não
 reinicia o relógio. Caso que já estava em andamento antes da coluna existir fica
 sem a data — e sem prazo inventado; a atualização diz quantos são.

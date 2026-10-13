@@ -368,7 +368,11 @@ var TelaTrabalho = (function () {
     return achados;
   }
 
-  /** Como o caso aparece no aviso: a 1ª coluna do 2º grupo da fila, como na Produtividade. */
+  /**
+   * Como o caso aparece no aviso: a 1ª coluna do 2º grupo da fila — a mesma
+   * regra da Produtividade (na RET, a proposta; na Mesa, o título do e-mail).
+   * Vazia, fica o Id.
+   */
   function rotuloDoCaso(caso) {
     var grupo = caso.celulas.length > 1 ? caso.celulas[1] : caso.celulas[0];
     var valor = grupo && grupo[0] ? String(grupo[0].valor || '').trim() : '';
@@ -391,9 +395,12 @@ var TelaTrabalho = (function () {
       + '<p id="texto-prazo">Estão no amarelo do prazo. Trabalhe antes que fiquem vermelhos.</p>'
       + '<ul class="lista-de-prazo">'
       + achados.map(function (um) {
-        return '<li><span class="caso-do-prazo"><strong>' + escapar(rotuloDoCaso(um.caso))
-          + '</strong><small>' + escapar(um.caso.id)
-          + (um.caso.situacao ? ' · ' + escapar(um.caso.situacao) : '') + '</small></span>'
+        var rotulo = rotuloDoCaso(um.caso);
+        // O Id embaixo só quando o rótulo não é o próprio Id.
+        var detalhes = (rotulo !== String(um.caso.id) ? [String(um.caso.id)] : [])
+          .concat(um.caso.situacao ? [um.caso.situacao] : []);
+        return '<li><span class="caso-do-prazo"><strong>' + escapar(rotulo)
+          + '</strong><small>' + escapar(detalhes.join(' · ') || ' ') + '</small></span>'
           + '<span class="selo-prazo tom-atencao">' + escapar(um.sinal.texto) + '</span>'
           + '<button type="button" class="botao-secundario pequeno" data-trabalhar-do-aviso="'
           + escapar(um.caso.id) + '">Trabalhar no caso</button></li>';
@@ -573,9 +580,9 @@ var TelaTrabalho = (function () {
   }
 
   // `opcoesDeMostrar` sai para o teste: é a regra do PO, "caso tenha a
-  // quantidade", e vale conferir sem desenhar a tela. `casosPertoDeVencer`
-  // também: é quem decide o que entra no aviso.
+  // quantidade", e vale conferir sem desenhar a tela. `casosPertoDeVencer` e
+  // `rotuloDoCaso` também: decidem o que entra no aviso e como o caso aparece.
   return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar,
-    casosPertoDeVencer: casosPertoDeVencer };
+    casosPertoDeVencer: casosPertoDeVencer, rotuloDoCaso: rotuloDoCaso };
 })();
 </script>

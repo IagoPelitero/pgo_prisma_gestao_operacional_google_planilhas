@@ -426,4 +426,4 @@ function rodarTestesDaParadaDaRet() {
   });
 }
 
-module.exports = { rodarTestesDaParadaDaRet };
+module.exports = { rodarTestesDaParadaDaRet, retComAParada };

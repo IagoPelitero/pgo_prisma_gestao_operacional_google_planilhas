@@ -2540,6 +2540,39 @@ Cole os arquivos marcados e rode `atualizarPGO()`. O laudo avisa:
 
 ---
 
+## Etapa 33 — A Mesa importada sem status, o aviso da Mesa e a grafia da planilha
+
+Resposta do PO às perguntas da Etapa 32: **"Sim, pode executar. E a Mesa deve
+ter pop-up para avisar também perto de vencer. Casos de importação da Mesa não
+têm status, e só devem contar quando for alterado para Em andamento."**
+
+| Parte | O que ficou |
+|---|---|
+| **Mesa importada** | A importação não põe mais o status padrão quando esse status **carimba uma data** — `statusDaImportacaoDoCanal_`. Só a Mesa tem um assim ("Em andamento" → `Data em andamento`): o caso importado entra **sem status, sem data e sem selo**, e as 48 horas começam quando alguém o põe em Em andamento (diálogo ou formulário). RET ("Não trabalhado") e VG ("Aguardando") continuam como estavam. A tela da Importação diz que a Mesa entra sem status. O cadastro pela tela segue nascendo Em andamento, carimbado |
+| **Aviso da Mesa** | O aviso já pegava o amarelo do sinalizador da Mesa (as últimas 10 das 48 horas úteis); faltava prova. A prévia passou a ter um caso da Mesa sempre no amarelo (43 horas úteis contadas com a conta do sistema, qualquer dia da semana) e o aviso abre na Mesa; teste no servidor e na tela. O caso aparece pela 1ª coluna do 2º grupo da fila, como na Produtividade, sem repetir o Id |
+| **Grafia da planilha** | O nome de coluna que as configurações guardam passa a ser trocado pela grafia da planilha onde nasce: o canal da chamada (`comAGrafiaDaAba_`, em `canalPeloId_`, sem custo — a base já é lida), a busca, a data do último registro, as migrações; os sinalizadores e os carimbos de status, uma vez por canal; e as chaves do que o formulário grava (`comAsChavesDaAba_`) e de quem some com a condição |
+| **Diagnóstico** | Campo escrito diferente da planilha vira **atenção** no bloco dos campos, com os nomes dos dois lados. Não é falha: nada quebra mais |
+
+O que **ficou de propósito**:
+
+- **Casos da Mesa já importados** (antes desta versão) entraram com "Em andamento"
+  posto pela importação, e sem a data. Eles continuam assim: o sistema não apaga
+  status gravado. Ficam sem selo; para contarem, preencha `Data em andamento` na
+  planilha. O laudo do `atualizarPGO()` já diz quantos são.
+- **O SLA de 6 horas da Mesa** continua sem amarelo — é só dentro ou fora —, e
+  por isso não entra no aviso. O aviso da Mesa é o das 48 horas.
+
+**1086 testes** (16 novos), cinco execuções seguidas sem falha, **10 quebras de
+propósito, 10 vermelhos** nesta parte e as 13 da Etapa 32 de novo vermelhas. No
+navegador: 96 combinações sem quebra, 152 cliques sem erro, ponta a ponta 15/15
+no repositório e no pacote; o aviso da Mesa visto em 1440 px.
+
+### Para quem já usa
+
+Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

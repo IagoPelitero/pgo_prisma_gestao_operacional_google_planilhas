@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const { carregar, secao, teste, igual, verdadeiro, contem, pecaRodando } = require('./ferramentas');
+const { retComAParada } = require('./testes-parada-da-ret');
 
 const lerTela = (nome) => fs.readFileSync(
   path.join(__dirname, '..', '..', 'Front-End', nome), 'utf8');
@@ -485,6 +486,212 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
       verdadeiro(chave in caso.sinais[0], 'o selo traz ' + chave);
     });
     verdadeiro(Array.isArray(caso.celulas) && caso.celulas.length > 0, 'e as células, para o rótulo');
+  });
+
+  teste('Mesa: o caso nas últimas 10 horas úteis fica amarelo — e entra no aviso', () => {
+    const t = instalado();
+    const sinalizador = t.chamar('sinalizadoresDoCanal_')(t.mesa)[0];
+    const situacoes = t.chamar('situacoesPorChave_')(t.mesa);
+    const caso = { Status: 'Em andamento', 'Data em andamento': new Date(2026, 9, 5, 8, 15) };
+    const quando = { dia: Math.round(Date.UTC(2026, 9, 9) / 86400000), minuto: 8 * 60 + 15 };
+    // Segunda 08:15 até sexta 08:15: 2.460 dos 2.880 minutos — faltam 7h.
+    const sinal = t.chamar('sinalDoCaso_')(caso, t.mesa, sinalizador, situacoes, quando);
+    igual(sinal.tom, 'atencao');
+    contem(sinal.texto, 'vence em 7h');
+    const achados = tela().casosPertoDeVencer([{ id: '9', celulas: [[]], sinais: [sinal] }]);
+    igual(achados.length, 1, 'a Mesa também tem o aviso');
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Mesa: o caso importado entra sem status e só conta ao ir para Em andamento');
+
+  function mesaComAnalista() {
+    const t = instalado();
+    const operacao = t.chamar('lerRegistros_')('CATALOGO')
+      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id;
+    t.chamar('salvarUsuario')({ nome: 'Diego Castilho', email: 'diego@exemplo.com',
+      nivelAcessoId: operacao, canalId: t.mesa.id, ativo: true });
+    t.importar = (nome) => {
+      const linhas = [['Nome do segurado', 'Documento (CPF)'], [nome, '12345678901']];
+      t.chamar('importarCasos')(t.mesa.id, {
+        fonte: { tipo: 'colado', texto: linhas.map((l) => l.join('\t')).join('\n') },
+        analistas: ['Diego Castilho'], origem: 'Lote da Mesa'
+      });
+      return t.chamar('lerRegistros_')('BASE_MESA').find((l) => l['Nome do segurado'] === nome);
+    };
+    return t;
+  }
+
+  teste('o caso importado nasce sem status, sem data e sem selo', () => {
+    const t = mesaComAnalista();
+    const caso = t.importar('Importado da Mesa');
+    igual(String(caso.Status || ''), '', 'a importação não põe "Em andamento"');
+    igual(String(caso['Data em andamento'] || ''), '');
+    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    igual(fila.find((c) => String(c.id) === String(caso.__id)).sinais.length, 0);
+  });
+
+  teste('ao ir para Em andamento, o sistema carimba e as 48 horas começam', () => {
+    const t = mesaComAnalista();
+    const caso = t.importar('Vai andar');
+    t.chamar('alterarSituacaoDoCaso')(t.mesa.id, caso.__id, 'Em andamento');
+    const depois = t.linha('BASE_MESA', caso.__id);
+    verdadeiro(depois['Data em andamento'] && typeof depois['Data em andamento'].getTime === 'function',
+      'carimbou "Data em andamento"');
+    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const sinal = fila.find((c) => String(c.id) === String(caso.__id)).sinais[0];
+    igual(sinal.encerrado, false);
+    contem(sinal.texto, 'Retorno da área');
+  });
+
+  teste('a tela da importação diz que a Mesa entra sem status; a RET, com "Não trabalhado"', () => {
+    const t = mesaComAnalista();
+    const daMesa = t.chamar('opcoesDaImportacaoDeCasos')(t.mesa.id);
+    igual(daMesa.statusPadrao, '');
+    igual(daMesa.statusQueEsperaAPessoa, 'Em andamento');
+    const daRet = t.chamar('opcoesDaImportacaoDeCasos')(t.ret.id);
+    igual(daRet.statusPadrao, 'Não trabalhado');
+    igual(daRet.statusQueEsperaAPessoa, '');
+    contem(lerTela('Importacao.html'), 'Os casos vão nascer <strong>sem status</strong>');
+  });
+
+  teste('o cadastro pela tela continua nascendo Em andamento, carimbado', () => {
+    const t = instalado();
+    const { id } = t.chamar('cadastrarCaso')(t.mesa.id, { status: 'Em andamento', nomedosegurado: 'S' });
+    igual(t.linha('BASE_MESA', id).Status, 'Em andamento');
+    verdadeiro(!!t.linha('BASE_MESA', id)['Data em andamento']);
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Cabeçalho com outra maiúscula ou acento na planilha não quebra nada');
+
+  /** Troca um cabeçalho de uma aba de `t` (montado por outro ajudante). */
+  const reescrever = (t, aba, de, para) => {
+    const folha = t.ambiente.planilha.getSheetByName(aba);
+    const cabecalhos = folha.getRange(1, 1, 1, folha.getLastColumn()).getValues()[0];
+    folha.getRange(1, cabecalhos.indexOf(de) + 1).setValue(para);
+    t.chamar('esquecerEstruturaLida_()');
+  };
+
+  teste('RET com "Status" na planilha (CANAIS e CAMPOS dizem "status"): trocar o status funciona e carimba', () => {
+    const t = instalado();
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente' });
+    t.reescreverCabecalho('BASE_RET', 'status', 'Status');
+    t.chamar('alterarSituacaoDoCaso')(t.ret.id, id, '1º contato realizado');
+    const linha = t.linha('BASE_RET', id);
+    igual(linha.Status, '1º contato realizado');
+    verdadeiro(!!linha['Data do 1º contato'], 'o carimbo do status');
+    verdadeiro(!!linha[COLUNA], 'a primeira mudança de status');
+    igual(Number(linha['Mudanças de status']), 1);
+  });
+
+  teste('RET com "Status": a fila mostra o status e o selo, e o formulário troca e carimba', () => {
+    const t = instalado();
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente' });
+    t.reescreverCabecalho('BASE_RET', 'status', 'Status');
+    let caso = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila.find((c) => String(c.id) === String(id));
+    igual(caso.situacao, 'Não trabalhado');
+    igual(caso.sinais[0].texto, 'Prazo de retorno · prazo cheio, 3 dias úteis');
+    const aberto = t.chamar('casoParaEditar')(t.ret.id, id);
+    igual(aberto.valores.status, 'Não trabalhado');
+    t.chamar('editarCaso')(t.ret.id, id,
+      Object.assign({}, aberto.valores, { status: 'Pendente' }), aberto.versao);
+    const linha = t.linha('BASE_RET', id);
+    igual(linha.Status, 'Pendente');
+    verdadeiro(!!linha['Data pendente'] && !!linha[COLUNA], 'carimbou pelo formulário também');
+    caso = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila.find((c) => String(c.id) === String(id));
+    verdadeiro(caso.sinais[0].texto.indexOf('prazo cheio') < 0, 'o prazo começou');
+  });
+
+  teste('carimbo de status escrito de outro jeito ("DATA DO 1º CONTATO") é achado', () => {
+    const t = instalado();
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente' });
+    t.reescreverCabecalho('BASE_RET', 'Data do 1º contato', 'DATA DO 1º CONTATO');
+    t.chamar('alterarSituacaoDoCaso')(t.ret.id, id, '1º contato realizado');
+    verdadeiro(!!t.linha('BASE_RET', id)['DATA DO 1º CONTATO']);
+  });
+
+  teste('data de entrada com outra grafia: o cadastro preenche, e não cria coluna nem chave dupla', () => {
+    const t = instalado();
+    t.reescreverCabecalho('BASE_RET', 'data de recepção do protocolo', 'Data de Recepção do Protocolo');
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente' });
+    verdadeiro(!!t.linha('BASE_RET', id)['Data de Recepção do Protocolo'], 'a data automática foi gravada');
+  });
+
+  teste('Mesa com "STATUS": o caso importado sem status vai para Em andamento e as 48 horas começam', () => {
+    const t = mesaComAnalista();
+    t.reescreverCabecalho('BASE_MESA', 'Status', 'STATUS');
+    const caso = t.importar('Mesa maiúscula');
+    t.chamar('alterarSituacaoDoCaso')(t.mesa.id, caso.__id, 'Em andamento');
+    const linha = t.linha('BASE_MESA', caso.__id);
+    igual(linha.STATUS, 'Em andamento');
+    verdadeiro(!!linha['Data em andamento']);
+    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    igual(fila.find((c) => String(c.id) === String(caso.__id)).sinais.length, 1);
+  });
+
+  teste('"STATUS PROPOSTA" na planilha: o Retido continua parando com Transmitido', () => {
+    const t = retComAParada();
+    reescrever(t, 'BASE_RET', 'Status proposta', 'STATUS PROPOSTA');
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id,
+      Object.assign({}, t.base, { status: 'Retido', statusproposta: 'Transmitido' }));
+    const linha = t.chamar('lerRegistros_')('BASE_RET').find((l) => l.__id === id);
+    verdadeiro(!!linha['Data do status proposta'], 'carimbou a parada');
+    const fila = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila;
+    igual(fila.find((c) => String(c.id) === String(id)).sinais[0].encerrado, true);
+  });
+
+  teste('sair do Retido transmitido limpa o Status proposta e o carimbo da parada, com outra grafia', () => {
+    const t = retComAParada();
+    reescrever(t, 'BASE_RET', 'Status proposta', 'STATUS PROPOSTA');
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id,
+      Object.assign({}, t.base, { status: 'Retido', statusproposta: 'Transmitido' }));
+    t.chamar('alterarSituacaoDoCaso')(t.ret.id, id, 'Não retido');
+    const linha = t.chamar('lerRegistros_')('BASE_RET').find((l) => l.__id === id);
+    igual(String(linha['STATUS PROPOSTA'] || ''), '');
+    igual(String(linha['Data do status proposta'] || ''), '', 'o carimbo sai junto');
+  });
+
+  teste('o carimbo de status com outra grafia guarda a PRIMEIRA visita', () => {
+    const t = instalado();
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente' });
+    t.reescreverCabecalho('BASE_RET', 'Data pendente', 'DATA PENDENTE');
+    // A primeira visita, numa data conhecida: a segunda não pode reescrevê-la.
+    const primeira = new Date(2026, 8, 1, 9, 0);
+    t.chamar('atualizarRegistro_')('BASE_RET', id, { 'DATA PENDENTE': primeira });
+    t.chamar('alterarSituacaoDoCaso')(t.ret.id, id, 'Pendente');
+    igual(t.linha('BASE_RET', id)['DATA PENDENTE'].getTime(), primeira.getTime(), 'não regravou');
+  });
+
+  teste('o aviso mostra o caso pela 1ª coluna do 2º grupo, e o Id quando ela está vazia', () => {
+    const rotulo = tela().rotuloDoCaso;
+    igual(rotulo({ id: '7', celulas: [[{ valor: '12/10' }], [{ valor: '7-0000123' }, { valor: 'Vida' }]] }),
+      '7-0000123');
+    igual(rotulo({ id: '7', celulas: [[{ valor: '12/10' }], [{ valor: '' }, { valor: 'Auto' }]] }), '7',
+      'vazia: o Id, e não a coluna seguinte');
+  });
+
+  teste('o diagnóstico avisa o campo escrito diferente da planilha — como atenção, não falha', () => {
+    const t = instalado();
+    t.reescreverCabecalho('BASE_RET', 'descrição', 'Descrição');
+    const campos = t.chamar('diagnosticoRECC()').blocos.find((b) => b.chave === 'campos');
+    const aviso = campos.itens.find((i) => i.oQue.indexOf('escrito diferente da planilha') >= 0);
+    igual(aviso.situacao, 'atencao', 'nada quebra: é atenção, não falha');
+    contem(aviso.detalhe, 'BASE_RET: "descrição" no CAMPOS, "Descrição" na planilha');
+    const limpo = instalado().chamar('diagnosticoRECC()').blocos.find((b) => b.chave === 'campos');
+    verdadeiro(!limpo.itens.some((i) => i.oQue.indexOf('escrito diferente') >= 0),
+      'planilha igual: sem aviso');
+  });
+
+  teste('sair do Retido esvazia o Status proposta mesmo com outra grafia', () => {
+    const t = retComAParada();
+    reescrever(t, 'BASE_RET', 'status', 'Status');
+    reescrever(t, 'BASE_RET', 'Status proposta', 'STATUS PROPOSTA');
+    const { id } = t.chamar('cadastrarCaso')(t.ret.id,
+      Object.assign({}, t.base, { status: 'Retido', statusproposta: 'Aguardando transmissão' }));
+    t.chamar('alterarSituacaoDoCaso')(t.ret.id, id, 'Não retido');
+    const linha = t.chamar('lerRegistros_')('BASE_RET').find((l) => l.__id === id);
+    igual(String(linha['STATUS PROPOSTA'] || ''), '');
   });
 }
 

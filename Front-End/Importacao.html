@@ -299,7 +299,12 @@ var TelaImportacao = (function () {
         ? '<p class="config-dica">Os casos vão nascer com o status '
           + '<strong>' + escapar(opcoes.statusPadrao) + '</strong>. O analista '
           + 'ajusta depois, caso a caso — e cada mudança fica registrada.</p>'
-        : '');
+        : opcoes.statusQueEsperaAPessoa
+          ? '<p class="config-dica">Os casos vão nascer <strong>sem status</strong>. O prazo '
+            + 'só começa quando alguém puser o caso em <strong>'
+            + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que o sistema '
+            + 'anota a data.</p>'
+          : '');
   }
 
   /**

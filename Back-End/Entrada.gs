@@ -304,6 +304,30 @@ function canaisQueEuVejo_(quem) {
   });
 }
 
+/**
+ * As colunas que o canal declara em CANAIS, trocadas pela grafia da planilha.
+ *
+ * Uma vez por objeto de canal. Quem lê as colunas do canal (o status, a data
+ * de entrada, a finalização…) passa a achar o valor mesmo se a planilha
+ * escrever o cabeçalho com outra maiúscula ou acento. Mora aqui, e não em
+ * `canaisVisiveis_`, por custo: resolver os três canais leria o cabeçalho das
+ * três bases em toda chamada, e a tela quase sempre usa uma só — a que esta
+ * chamada já vai ler.
+ */
+var RECC_COLUNAS_QUE_O_CANAL_DECLARA = ['colunaDaData', 'colunaDaHora', 'colunaDoStatus',
+  'colunaDaFinalizacao', 'colunaDaAreaResponsavel', 'colunaDoValor',
+  'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'];
+
+function comAGrafiaDaAba_(canal) {
+  if (!canal || canal.grafiaConferida || !canal.aba
+    || !planilhaAtiva_().getSheetByName(String(canal.aba))) return canal;
+  RECC_COLUNAS_QUE_O_CANAL_DECLARA.forEach(function (chave) {
+    if (canal[chave]) canal[chave] = grafiaDaColuna_(canal.aba, canal[chave]);
+  });
+  canal.grafiaConferida = true;
+  return canal;
+}
+
 function canaisVisiveis_() {
   return lerRegistros_('CANAIS')
     .filter(function (canal) {
@@ -372,6 +396,7 @@ function dataDoUltimoRegistro_(quem) {
   // base está atualizada?" — trazer a data de um canal que a pessoa nem
   // enxerga responderia a pergunta de outra pessoa.
   canaisQueEuVejo_(quem).forEach(function (canal) {
+    comAGrafiaDaAba_(canal);
     if (!canal.aba || !canal.colunaDaData) return;
 
     var ultimos;

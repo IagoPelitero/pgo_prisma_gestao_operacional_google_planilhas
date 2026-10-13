@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1070 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1086 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -266,7 +266,7 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-1070 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1086 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -407,7 +407,7 @@ SLA da Mesa). O selo aparece embaixo da situação, ao lado do SLA:
 | Canal | O prazo | Conta desde | Amarelo |
 |---|---|---|---|
 | **RET** | **3 dias úteis** para o caso chegar a um desfecho. Não retido, pago, cancelado e sem sucesso de contato **param o relógio sozinhos**; o **Retido** só para quando o *Status proposta* for **Transmitido** ou **Sem alteração** | a **primeira mudança de status** — *Data da primeira mudança de status*, que o sistema carimba quando o caso sai de "Não trabalhado". Até lá, **prazo cheio** | no 3º dia útil |
-| **Mesa** | **48 horas úteis** para o caso ser concluído. Para quando o status vira Concluído (ou Concluído na mesa, ou Sem retorno) | **Data em andamento**, que o sistema carimba quando o caso entra no status Em andamento — e todo caso novo da Mesa nasce assim | nas últimas 10 horas |
+| **Mesa** | **48 horas úteis** para o caso ser concluído. Para quando o status vira Concluído (ou Concluído na mesa, ou Sem retorno) | **Data em andamento**, que o sistema carimba quando o caso entra no status Em andamento — o cadastrado pela tela já nasce assim; o **importado entra sem status** e começa quando alguém o põe em Em andamento | nas últimas 10 horas |
 | **VG** | ainda não definido: a linha existe, **desligada**, para o PO preencher | — | — |
 
 Quando o caso chega a um status final, o relógio **para** e o selo mostra o
@@ -448,7 +448,8 @@ botão **Trabalhar no caso** em cada um. Sai **uma vez por canal** enquanto a
 página estiver aberta — não a cada filtro nem depois de cada gravação. Entram só
 os casos que a pessoa enxerga na fila (o alcance do nível vale aqui também).
 O vermelho já venceu e não entra; o caso parado com prazo cheio também não.
-Canal sem sinalizador ligado (o VG, hoje) não abre aviso.
+Vale para **RET e Mesa Diamante**: na Mesa, o aviso traz os casos nas últimas
+10 das 48 horas úteis. Canal sem sinalizador ligado (o VG, hoje) não abre aviso.
 
 ![O aviso dos casos perto de vencer](Evolucao/imagens/tela-aviso-de-prazo.png)
 
@@ -502,8 +503,12 @@ apagava o valor sem ver.
 caso". O campo se chama *descrição* em CAMPOS, e a coluna na planilha pode
 estar escrita *Descrição* ou *DESCRIÇÃO*: gravar sempre achou a coluna (compara
 sem maiúscula, acento e espaço), mas abrir para editar lia pelo nome exato e
-voltava vazio — e salvar em seguida **apagava** o texto. Hoje a edição lê pela
-grafia que está na planilha, em todos os campos e em todos os canais. Todos
+voltava vazio — e salvar em seguida **apagava** o texto. Hoje o sistema lê
+**pela grafia que está na planilha** em todo lugar que cita uma coluna: os campos
+do formulário, as colunas que o canal declara (status, data de entrada,
+finalização…), as dos sinalizadores e os carimbos de status. Escrever "Status"
+na planilha onde a configuração diz "status" não quebra mais nada; o
+`diagnosticoRECC` mostra a diferença como **atenção**, para ninguém se confundir. Todos
 os canais editam a descrição deles: *descrição* na RET, *Obs* no VG. A Mesa
 Diamante não tem coluna de descrição — crie o campo em Configurações ›
 Cadastrar Caso, e ele abre e salva como os outros.
@@ -935,7 +940,7 @@ numa base que já está sendo trabalhada.
 | Os cabeçalhos são os da OUTRA planilha | Casa nome com nome e sugere; a pessoa corrige o que não reconheceu |
 | A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados — e só entram na lista quem é **do canal escolhido** e está **disponível** |
 | A base repete toda semana | Escolhendo a coluna que identifica o caso — CPF, nº da proposta —, o que já está dentro é **pulado**, e o laudo diz quantos. Na RET já vem marcada a **proposta no mesmo mês** (ver abaixo) |
-| O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET |
+| O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET; "Aguardando", no VG. Na **Mesa Diamante entra sem status** — pedido do PO: *"casos de importação da Mesa não têm status e só devem contar quando for alterado para Em andamento"*. O "Em andamento" carimba a data de onde contam as 48 horas, e a importação não inventa essa data: ela nasce quando alguém põe o caso em Em andamento. A tela da Importação avisa |
 | De onde veio cada caso | Grava o **nome do lote** e a **data**, que é o que faz o gráfico existir |
 
 ### A mesma proposta não vai para a divisão duas vezes
@@ -1227,7 +1232,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1070 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1086 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

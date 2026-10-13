@@ -1710,6 +1710,41 @@ function posicaoDaColuna_(estrutura, cabecalho) {
   return i === undefined ? -1 : i;
 }
 
+/**
+ * O nome de uma coluna COMO ESTÁ ESCRITO na planilha.
+ *
+ * As configurações (CANAIS, SINALIZADORES, CAMPOS, CATALOGO) guardam nomes de
+ * coluna, e a planilha pode ter a mesma coluna com outra grafia — "status" ×
+ * "Status", "descrição" × "Descrição". Achar a coluna sempre ignorou maiúscula,
+ * acento e espaço; mas o registro lido tem as chaves EXATAMENTE como no
+ * cabeçalho, e ler `registro['status']` numa aba que diz "Status" devolve nada,
+ * calado. Foi assim que a Descrição abria vazia (achado 88).
+ *
+ * Coluna que não existe, aba que não existe ou aba que não se deixa ler
+ * devolvem o nome como veio: quem chama segue como seguia antes.
+ */
+function grafiaDaColuna_(nomeDaAba, cabecalho) {
+  var nome = String(cabecalho === null || cabecalho === undefined ? '' : cabecalho).trim();
+  if (!nome || !nomeDaAba) return nome;
+  var estrutura;
+  try {
+    estrutura = estruturaDaAba_(nomeDaAba);
+  } catch (erro) {
+    return nome;
+  }
+  var posicao = posicaoDaColuna_(estrutura, nome);
+  return posicao < 0 ? nome : estrutura.cabecalhos[posicao];
+}
+
+/** Um objeto de valores com as chaves trocadas pela grafia da planilha. */
+function comAsChavesDaAba_(nomeDaAba, valores) {
+  var saida = {};
+  Object.keys(valores).forEach(function (chave) {
+    saida[grafiaDaColuna_(nomeDaAba, chave)] = valores[chave];
+  });
+  return saida;
+}
+
 function exigirPosicaoDaColuna_(estrutura, cabecalho) {
   var i = posicaoDaColuna_(estrutura, cabecalho);
   if (i < 0) {

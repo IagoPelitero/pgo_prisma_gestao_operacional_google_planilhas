@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-13 21:54
+   Gerado em 2026-10-13 22:57
    ========================================================================== */
 
 
@@ -1726,6 +1726,41 @@ function estruturaDaAba_(nomeDaAba, recarregar) {
 function posicaoDaColuna_(estrutura, cabecalho) {
   var i = estrutura.mapa[normalizarParaComparar_(cabecalho)];
   return i === undefined ? -1 : i;
+}
+
+/**
+ * O nome de uma coluna COMO ESTÁ ESCRITO na planilha.
+ *
+ * As configurações (CANAIS, SINALIZADORES, CAMPOS, CATALOGO) guardam nomes de
+ * coluna, e a planilha pode ter a mesma coluna com outra grafia — "status" ×
+ * "Status", "descrição" × "Descrição". Achar a coluna sempre ignorou maiúscula,
+ * acento e espaço; mas o registro lido tem as chaves EXATAMENTE como no
+ * cabeçalho, e ler `registro['status']` numa aba que diz "Status" devolve nada,
+ * calado. Foi assim que a Descrição abria vazia (achado 88).
+ *
+ * Coluna que não existe, aba que não existe ou aba que não se deixa ler
+ * devolvem o nome como veio: quem chama segue como seguia antes.
+ */
+function grafiaDaColuna_(nomeDaAba, cabecalho) {
+  var nome = String(cabecalho === null || cabecalho === undefined ? '' : cabecalho).trim();
+  if (!nome || !nomeDaAba) return nome;
+  var estrutura;
+  try {
+    estrutura = estruturaDaAba_(nomeDaAba);
+  } catch (erro) {
+    return nome;
+  }
+  var posicao = posicaoDaColuna_(estrutura, nome);
+  return posicao < 0 ? nome : estrutura.cabecalhos[posicao];
+}
+
+/** Um objeto de valores com as chaves trocadas pela grafia da planilha. */
+function comAsChavesDaAba_(nomeDaAba, valores) {
+  var saida = {};
+  Object.keys(valores).forEach(function (chave) {
+    saida[grafiaDaColuna_(nomeDaAba, chave)] = valores[chave];
+  });
+  return saida;
 }
 
 function exigirPosicaoDaColuna_(estrutura, cabecalho) {
@@ -4265,7 +4300,10 @@ function condicaoBate_(condicao, valor) {
 function dependentesQueSomem_(idDoCanal, atual, alteracao) {
   var ativos = camposAtivosDoCanal_(idDoCanal);
   var cabecalhoDe = {};
-  ativos.forEach(function (campo) { cabecalhoDe[String(campo.ChaveTecnica)] = String(campo.Cabecalho); });
+  // Pela grafia da planilha: `atual` vem dela, e `alteracao` já vem assim.
+  ativos.forEach(function (campo) {
+    cabecalhoDe[String(campo.ChaveTecnica)] = grafiaDaColuna_(campo.Aba, campo.Cabecalho);
+  });
 
   var colunas = [];
   ativos.forEach(function (campo) {
@@ -4277,7 +4315,8 @@ function dependentesQueSomem_(idDoCanal, atual, alteracao) {
     var depois = Object.prototype.hasOwnProperty.call(alteracao, quemManda)
       ? alteracao[quemManda] : antes;
     if (condicaoBate_(condicao, antes) && !condicaoBate_(condicao, depois)) {
-      colunasDoCampo_(campo, { cabecalho: String(campo.Cabecalho) }).forEach(function (coluna) {
+      colunasDoCampo_(campo, { cabecalho: String(campo.Cabecalho) }).forEach(function (bruta) {
+        var coluna = grafiaDaColuna_(campo.Aba, bruta);
         if (colunas.indexOf(coluna) < 0) colunas.push(coluna);
       });
     }
@@ -4410,7 +4449,7 @@ function canalPeloId_(idDoCanal) {
   var alvo = converterParaIdentificador_(idDoCanal);
   var canais = canaisVisiveis_();
   for (var i = 0; i < canais.length; i++) {
-    if (converterParaIdentificador_(canais[i].id) === alvo) return canais[i];
+    if (converterParaIdentificador_(canais[i].id) === alvo) return comAGrafiaDaAba_(canais[i]);
   }
   throw new Error('Canal "' + idDoCanal + '" não existe ou está desativado.');
 }
@@ -4477,7 +4516,7 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     var cabecalho = String(quemManda.Cabecalho);
     var valor = valoresDaTela.hasOwnProperty(chave) ? valoresDaTela[chave]
       : (valoresDaTela.hasOwnProperty(cabecalho) ? valoresDaTela[cabecalho]
-        : (registroAtual ? registroAtual[cabecalho] : ''));
+        : (registroAtual ? valorPelaGrafiaDaAba_(registroAtual, estruturaDaAba_(canal.aba), cabecalho) : ''));
     if (valor === undefined || valor === null) valor = '';
     if (String(valor).trim() === '' && ehCasoNovo) {
       valor = valorPadraoResolvido_(quemManda.ValorPadrao, quem) || '';
@@ -4607,6 +4646,10 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
 
     paraGravar[descricao.cabecalho] = bruto;
   });
+
+  // As chaves pela GRAFIA DA PLANILHA: é assim que o canal, os sinalizadores e
+  // os carimbos procuram as colunas daqui para a frente (ver grafiaDaColuna_).
+  paraGravar = comAsChavesDaAba_(canal.aba, paraGravar);
 
   // O campo que acabou de sumir (Retido → Pago) deixa o valor para trás? Não.
   if (!ehCasoNovo && registroAtual) {
@@ -4921,7 +4964,9 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   if (!coluna) return;
 
   var estrutura = estruturaDaAba_(canal.aba);
-  if (posicaoDaColuna_(estrutura, coluna) < 0) return;
+  var posicao = posicaoDaColuna_(estrutura, coluna);
+  if (posicao < 0) return;
+  coluna = estrutura.cabecalhos[posicao];   // a grafia da planilha
 
   var jaTem = String(registroAtual[coluna] || '').trim();
   if (jaTem) return;
@@ -6003,6 +6048,7 @@ function colunasDaBusca_(canal) {
  * Procura num canal, lendo coluna por coluna e só depois as linhas que casam.
  */
 function procurarNoCanal_(canal, termo, quem) {
+  comAGrafiaDaAba_(canal);
   var colunas = colunasDaBusca_(canal);
   var aviso = '';
 
@@ -6564,7 +6610,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
     // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
-    statusPadrao: statusPadraoDoCanal_(canal)
+    statusPadrao: statusDaImportacaoDoCanal_(canal)
   };
 }
 
@@ -6890,7 +6936,28 @@ function nomesQuePodemReceberCasos_(canal) {
   return analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
 }
 
-/** O status com que o caso importado nasce, tirado do formulário do canal. */
+/**
+ * O status com que o caso IMPORTADO nasce: o padrão do canal — menos quando
+ * esse status carimba uma data.
+ *
+ * Pedido do PO para a Mesa: "casos de importação da Mesa não têm status, e só
+ * devem contar quando for alterado para Em andamento". O "Em andamento" é o
+ * status padrão da Mesa E carimba `Data em andamento`, de onde contam as 48
+ * horas. Pôr esse status na importação diria que o caso entrou nele sem dizer
+ * quando — e a importação não carimba, de propósito. Então o caso entra SEM
+ * status, e a data nasce quando alguém o põe em Em andamento de verdade.
+ *
+ * Status padrão sem carimbo ("Não trabalhado" na RET, "Aguardando" no VG)
+ * continua sendo posto: não há data nenhuma a mentir.
+ */
+function statusDaImportacaoDoCanal_(canal) {
+  var padrao = statusPadraoDoCanal_(canal);
+  var situacao = padrao ? situacaoDoCanalPeloValor_(canal, padrao) : null;
+  if (situacao && String(situacao.colunaDeCarimbo || '').trim()) return '';
+  return padrao;
+}
+
+/** O status com que o caso nasce no formulário, tirado do campo Status do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
   var achado = '';
@@ -6962,7 +7029,7 @@ function importarCasos(idDoCanal, pedido) {
   var analistas = analistasEscolhidos_(pedido.analistas, canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var agora = new Date();
-  var statusPadrao = statusPadraoDoCanal_(canal);
+  var statusPadrao = statusDaImportacaoDoCanal_(canal);
 
   var paraGravar = [];
   var pulados = { vazia: 0, repetida: 0 };
@@ -7191,7 +7258,9 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // Quem é deste canal e está de férias ou afastado. A tela diz o nome e o
     // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
-    statusPadrao: statusPadraoDoCanal_(canal),
+    statusPadrao: statusDaImportacaoDoCanal_(canal),
+    // Status padrão que a importação NÃO põe (o da Mesa): a tela explica.
+    statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
@@ -10888,6 +10957,30 @@ function canaisQueEuVejo_(quem) {
   });
 }
 
+/**
+ * As colunas que o canal declara em CANAIS, trocadas pela grafia da planilha.
+ *
+ * Uma vez por objeto de canal. Quem lê as colunas do canal (o status, a data
+ * de entrada, a finalização…) passa a achar o valor mesmo se a planilha
+ * escrever o cabeçalho com outra maiúscula ou acento. Mora aqui, e não em
+ * `canaisVisiveis_`, por custo: resolver os três canais leria o cabeçalho das
+ * três bases em toda chamada, e a tela quase sempre usa uma só — a que esta
+ * chamada já vai ler.
+ */
+var RECC_COLUNAS_QUE_O_CANAL_DECLARA = ['colunaDaData', 'colunaDaHora', 'colunaDoStatus',
+  'colunaDaFinalizacao', 'colunaDaAreaResponsavel', 'colunaDoValor',
+  'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'];
+
+function comAGrafiaDaAba_(canal) {
+  if (!canal || canal.grafiaConferida || !canal.aba
+    || !planilhaAtiva_().getSheetByName(String(canal.aba))) return canal;
+  RECC_COLUNAS_QUE_O_CANAL_DECLARA.forEach(function (chave) {
+    if (canal[chave]) canal[chave] = grafiaDaColuna_(canal.aba, canal[chave]);
+  });
+  canal.grafiaConferida = true;
+  return canal;
+}
+
 function canaisVisiveis_() {
   return lerRegistros_('CANAIS')
     .filter(function (canal) {
@@ -10956,6 +11049,7 @@ function dataDoUltimoRegistro_(quem) {
   // base está atualizada?" — trazer a data de um canal que a pessoa nem
   // enxerga responderia a pergunta de outra pessoa.
   canaisQueEuVejo_(quem).forEach(function (canal) {
+    comAGrafiaDaAba_(canal);
     if (!canal.aba || !canal.colunaDaData) return;
 
     var ultimos;
@@ -13145,6 +13239,7 @@ function sinalizadoresDoCanal_(canal) {
     .map(sinalizadorDaLinha_)
     .filter(function (sinalizador) { return sinalizador.prazo > 0; })
     .sort(function (um, outro) { return um.ordem - outro.ordem; })
+    .map(function (sinalizador) { return colunasDoSinalizadorPelaGrafia_(sinalizador, canal); })
     .map(function (sinalizador) {
       // O prazo que conta da PRIMEIRA MUDANÇA DE STATUS fica cheio enquanto o
       // caso não sai do status em que nasce. Para saber qual é esse status,
@@ -13170,7 +13265,21 @@ function condicoesDeParadaDoCanal_(canal) {
   return lerRegistros_('SINALIZADORES')
     .filter(function (linha) { return converterParaIdentificador_(linha.CanalId) === doCanal; })
     .map(sinalizadorDaLinha_)
-    .filter(temCondicaoDeParada_);
+    .filter(temCondicaoDeParada_)
+    .map(function (sinalizador) { return colunasDoSinalizadorPelaGrafia_(sinalizador, canal); });
+}
+
+/**
+ * As colunas que o sinalizador cita, pela grafia da planilha do canal — ver
+ * `grafiaDaColuna_`. Sem isto, "Status proposta" escrito de outro jeito na
+ * aba faria o Retido nunca encerrar o prazo, sem erro nenhum.
+ */
+function colunasDoSinalizadorPelaGrafia_(sinalizador, canal) {
+  ['colunaQueLiga', 'colunaDaData', 'colunaDaHora', 'colunaDaCondicao',
+    'colunaDaDataDaCondicao'].forEach(function (chave) {
+    if (sinalizador[chave]) sinalizador[chave] = grafiaDaColuna_(canal.aba, sinalizador[chave]);
+  });
+  return sinalizador;
 }
 
 /** Uma linha da aba vira o sinalizador com as contas já resolvidas. */
@@ -13407,6 +13516,10 @@ function prazoQueNaoComecou_(registro, canal, sinalizador) {
 function situacoesPorChave_(canal) {
   var porChave = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
+    // O carimbo pela grafia da planilha: é lido caso a caso pelo sinalizador.
+    if (situacao.colunaDeCarimbo) {
+      situacao.colunaDeCarimbo = grafiaDaColuna_(canal.aba, situacao.colunaDeCarimbo);
+    }
     porChave[situacao.chave] = situacao;
   });
   return porChave;
@@ -17021,7 +17134,7 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
   }
 
   // 3. quem já estava em andamento e não tem a data
-  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_MESA'; })[0];
+  var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_MESA'; })[0]);
   var situacoes = canal ? situacoesPorChave_(canal) : {};
   var semData = lerRegistros_('BASE_MESA').filter(function (registro) {
     var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
@@ -17031,7 +17144,9 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
     paraVoce.push('Mesa: ' + semData + ' caso(s) em andamento não têm "'
       + RECC_COLUNA_DATA_EM_ANDAMENTO + '" e ficam SEM selo de prazo — o sistema não '
       + 'inventa a data deles. Para contarem, preencha a coluna na planilha (por '
-      + 'exemplo, copiando a Data de entrada). Os casos novos já nascem carimbados.');
+      + 'exemplo, copiando a Data de entrada). Os cadastrados pela tela já nascem '
+      + 'carimbados; os importados entram sem status e ganham a data quando alguém os '
+      + 'põe em Em andamento.');
   }
   return feito;
 }
@@ -17107,7 +17222,7 @@ function ligarAParadaDoRetido_(pulados, paraVoce) {
     return feito;
   }
 
-  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+  var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0]);
   var retido = canal ? situacoesDoCanal_(canal).filter(function (uma) {
     return normalizarParaComparar_(uma.gravadoComo) === 'retido';
   })[0] : null;
@@ -17206,7 +17321,7 @@ function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
   }
 
   // --- 2. a data dos casos que já saíram de "Não trabalhado"
-  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+  var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0]);
   esquecerEstruturaLida_('BASE_RET');
   var estrutura = estruturaDaAba_('BASE_RET', true);
   var posicaoDaData = posicaoDaColuna_(estrutura, COLUNA);
@@ -18989,6 +19104,7 @@ function blocoDosCampos_() {
 
   var semColuna = [];
   var obrigatoriosDesligados = [];
+  var grafiaDiferente = [];
   var porAba = {};
 
   campos.forEach(function (campo) {
@@ -19006,6 +19122,11 @@ function blocoDosCampos_() {
       semColuna.push(String(campo.Rotulo || cabecalho) + ' → '
         + nomeDaAba + '.' + cabecalho);
       return;
+    }
+    var naPlanilha = estrutura.cabecalhos[posicaoDaColuna_(estrutura, cabecalho)];
+    if (naPlanilha !== cabecalho) {
+      grafiaDiferente.push(nomeDaAba + ': "' + cabecalho + '" no CAMPOS, "' + naPlanilha
+        + '" na planilha');
     }
     if (normalizarParaComparar_(campo.Obrigatorio) === 'sim'
       && normalizarParaComparar_(campo.Ativo) !== 'sim') {
@@ -19028,6 +19149,22 @@ function blocoDosCampos_() {
       'Desligado, o campo não aparece no formulário — e a obrigatoriedade '
         + 'deixa de valer. Se ele é mesmo obrigatório, ligue; se não é, tire '
         + 'a marca de obrigatório, para o cadastro não mentir.'));
+  }
+
+  /*
+   * A GRAFIA DIFERENTE não quebra mais nada — o sistema lê pela grafia da
+   * planilha (`grafiaDaColuna_`). Mas foi ela que escondeu o achado 88: este
+   * bloco dizia "os campos apontam para colunas que existem", e a Descrição
+   * abria vazia. Fica à vista, para quem lê a planilha e o CAMPOS não ver dois
+   * nomes para a mesma coisa sem saber por quê.
+   */
+  if (grafiaDiferente.length) {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      grafiaDiferente.length + ' campo(s) com o nome escrito diferente da planilha',
+      algunsExemplos_(grafiaDiferente),
+      'Nada quebra: o sistema acha a coluna nos dois jeitos. Se quiser os dois iguais, '
+        + 'acerte o cabeçalho na planilha ou a coluna Cabecalho na aba CAMPOS — lembrando '
+        + 'que o Power BI lê o nome que está na planilha.'));
   }
 
   if (!semColuna.length && !obrigatoriosDesligados.length) {

@@ -1939,7 +1939,7 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
   }
 
   // 3. quem já estava em andamento e não tem a data
-  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_MESA'; })[0];
+  var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_MESA'; })[0]);
   var situacoes = canal ? situacoesPorChave_(canal) : {};
   var semData = lerRegistros_('BASE_MESA').filter(function (registro) {
     var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
@@ -1949,7 +1949,9 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
     paraVoce.push('Mesa: ' + semData + ' caso(s) em andamento não têm "'
       + RECC_COLUNA_DATA_EM_ANDAMENTO + '" e ficam SEM selo de prazo — o sistema não '
       + 'inventa a data deles. Para contarem, preencha a coluna na planilha (por '
-      + 'exemplo, copiando a Data de entrada). Os casos novos já nascem carimbados.');
+      + 'exemplo, copiando a Data de entrada). Os cadastrados pela tela já nascem '
+      + 'carimbados; os importados entram sem status e ganham a data quando alguém os '
+      + 'põe em Em andamento.');
   }
   return feito;
 }
@@ -2025,7 +2027,7 @@ function ligarAParadaDoRetido_(pulados, paraVoce) {
     return feito;
   }
 
-  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+  var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0]);
   var retido = canal ? situacoesDoCanal_(canal).filter(function (uma) {
     return normalizarParaComparar_(uma.gravadoComo) === 'retido';
   })[0] : null;
@@ -2124,7 +2126,7 @@ function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
   }
 
   // --- 2. a data dos casos que já saíram de "Não trabalhado"
-  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+  var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0]);
   esquecerEstruturaLida_('BASE_RET');
   var estrutura = estruturaDaAba_('BASE_RET', true);
   var posicaoDaData = posicaoDaColuna_(estrutura, COLUNA);
@@ -3907,6 +3909,7 @@ function blocoDosCampos_() {
 
   var semColuna = [];
   var obrigatoriosDesligados = [];
+  var grafiaDiferente = [];
   var porAba = {};
 
   campos.forEach(function (campo) {
@@ -3924,6 +3927,11 @@ function blocoDosCampos_() {
       semColuna.push(String(campo.Rotulo || cabecalho) + ' → '
         + nomeDaAba + '.' + cabecalho);
       return;
+    }
+    var naPlanilha = estrutura.cabecalhos[posicaoDaColuna_(estrutura, cabecalho)];
+    if (naPlanilha !== cabecalho) {
+      grafiaDiferente.push(nomeDaAba + ': "' + cabecalho + '" no CAMPOS, "' + naPlanilha
+        + '" na planilha');
     }
     if (normalizarParaComparar_(campo.Obrigatorio) === 'sim'
       && normalizarParaComparar_(campo.Ativo) !== 'sim') {
@@ -3946,6 +3954,22 @@ function blocoDosCampos_() {
       'Desligado, o campo não aparece no formulário — e a obrigatoriedade '
         + 'deixa de valer. Se ele é mesmo obrigatório, ligue; se não é, tire '
         + 'a marca de obrigatório, para o cadastro não mentir.'));
+  }
+
+  /*
+   * A GRAFIA DIFERENTE não quebra mais nada — o sistema lê pela grafia da
+   * planilha (`grafiaDaColuna_`). Mas foi ela que escondeu o achado 88: este
+   * bloco dizia "os campos apontam para colunas que existem", e a Descrição
+   * abria vazia. Fica à vista, para quem lê a planilha e o CAMPOS não ver dois
+   * nomes para a mesma coisa sem saber por quê.
+   */
+  if (grafiaDiferente.length) {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      grafiaDiferente.length + ' campo(s) com o nome escrito diferente da planilha',
+      algunsExemplos_(grafiaDiferente),
+      'Nada quebra: o sistema acha a coluna nos dois jeitos. Se quiser os dois iguais, '
+        + 'acerte o cabeçalho na planilha ou a coluna Cabecalho na aba CAMPOS — lembrando '
+        + 'que o Power BI lê o nome que está na planilha.'));
   }
 
   if (!semColuna.length && !obrigatoriosDesligados.length) {

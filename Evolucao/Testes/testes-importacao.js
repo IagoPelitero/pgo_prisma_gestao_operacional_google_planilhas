@@ -814,7 +814,9 @@ function rodarTestesDeImportacao() {
       linha['Origem da importação'] === 'Corretoras para ação diferenciada');
     igual(importados.length, 2);
     igual(importados[0].Corretora, 'Corretora Alfa');
-    igual(importados[0].Status, 'Em andamento', 'o padrão da Mesa, não o da RET');
+    // Nem o padrão da RET, nem o da Mesa: "casos de importação da Mesa não têm
+    // status, e só devem contar quando for alterado para Em andamento" (PO).
+    igual(String(importados[0].Status || ''), '', 'a Mesa importa sem status');
   });
 
   secao('Os lotes já importados');

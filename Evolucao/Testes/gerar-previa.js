@@ -434,8 +434,22 @@ function gerar(pastaDeSaida) {
   ]);
 
   // Três casos EM ANDAMENTO, para o selo das 48 horas úteis mostrar as três
-  // cores: o carimbo é data E hora, como o sistema grava de verdade.
+  // cores (verde, amarelo e vermelho): o carimbo é data E hora, como o sistema
+  // grava de verdade.
   const horasAtras = (horas) => new Date(hoje.getTime() - horas * 3600000);
+  // O caso do meio fica no AMARELO (faltam 5 das 48 horas úteis) qualquer que
+  // seja o dia da semana: anda para trás de 15 em 15 minutos, contando só o
+  // expediente, com a mesma conta do sistema. É ele que faz o aviso dos casos
+  // perto de vencer aparecer também na Mesa.
+  const horasUteisAtras = (horas) => {
+    const agora = chamar('relogioDeParede_')(hoje);
+    let quando = new Date(hoje);
+    while (chamar('minutosUteisEntre_')(chamar('relogioDeParede_')(quando), agora, 495, 1110)
+      < horas * 60) {
+      quando = new Date(quando.getTime() - 15 * 60000);
+    }
+    return quando;
+  };
   chamar('inserirVariosRegistros_')('BASE_MESA', [
     { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '10:05',
@@ -448,7 +462,7 @@ function gerar(pastaDeSaida) {
       'Nome do segurado': 'Rodrigo Alves', Corretora: 'Corretora XYZ', Ramo: 'Auto',
       Assunto: 'Aguardando o retorno do Comercial',
       'Área responsável': 'Comercial', 'Data do encaminhamento': horasAtras(76),
-      'Data em andamento': horasAtras(80) },
+      'Data em andamento': horasUteisAtras(43) },
     { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'Chat',
       'Data de entrada': diasAtras(12), 'Horário': '15:20',
       'Nome do segurado': 'Fernanda Lopes', Corretora: 'Corretora ABC', SUSEP: 'RET00J',

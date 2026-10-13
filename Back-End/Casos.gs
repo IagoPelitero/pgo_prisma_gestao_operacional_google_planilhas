@@ -267,7 +267,10 @@ function condicaoBate_(condicao, valor) {
 function dependentesQueSomem_(idDoCanal, atual, alteracao) {
   var ativos = camposAtivosDoCanal_(idDoCanal);
   var cabecalhoDe = {};
-  ativos.forEach(function (campo) { cabecalhoDe[String(campo.ChaveTecnica)] = String(campo.Cabecalho); });
+  // Pela grafia da planilha: `atual` vem dela, e `alteracao` já vem assim.
+  ativos.forEach(function (campo) {
+    cabecalhoDe[String(campo.ChaveTecnica)] = grafiaDaColuna_(campo.Aba, campo.Cabecalho);
+  });
 
   var colunas = [];
   ativos.forEach(function (campo) {
@@ -279,7 +282,8 @@ function dependentesQueSomem_(idDoCanal, atual, alteracao) {
     var depois = Object.prototype.hasOwnProperty.call(alteracao, quemManda)
       ? alteracao[quemManda] : antes;
     if (condicaoBate_(condicao, antes) && !condicaoBate_(condicao, depois)) {
-      colunasDoCampo_(campo, { cabecalho: String(campo.Cabecalho) }).forEach(function (coluna) {
+      colunasDoCampo_(campo, { cabecalho: String(campo.Cabecalho) }).forEach(function (bruta) {
+        var coluna = grafiaDaColuna_(campo.Aba, bruta);
         if (colunas.indexOf(coluna) < 0) colunas.push(coluna);
       });
     }
@@ -412,7 +416,7 @@ function canalPeloId_(idDoCanal) {
   var alvo = converterParaIdentificador_(idDoCanal);
   var canais = canaisVisiveis_();
   for (var i = 0; i < canais.length; i++) {
-    if (converterParaIdentificador_(canais[i].id) === alvo) return canais[i];
+    if (converterParaIdentificador_(canais[i].id) === alvo) return comAGrafiaDaAba_(canais[i]);
   }
   throw new Error('Canal "' + idDoCanal + '" não existe ou está desativado.');
 }
@@ -479,7 +483,7 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     var cabecalho = String(quemManda.Cabecalho);
     var valor = valoresDaTela.hasOwnProperty(chave) ? valoresDaTela[chave]
       : (valoresDaTela.hasOwnProperty(cabecalho) ? valoresDaTela[cabecalho]
-        : (registroAtual ? registroAtual[cabecalho] : ''));
+        : (registroAtual ? valorPelaGrafiaDaAba_(registroAtual, estruturaDaAba_(canal.aba), cabecalho) : ''));
     if (valor === undefined || valor === null) valor = '';
     if (String(valor).trim() === '' && ehCasoNovo) {
       valor = valorPadraoResolvido_(quemManda.ValorPadrao, quem) || '';
@@ -609,6 +613,10 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
 
     paraGravar[descricao.cabecalho] = bruto;
   });
+
+  // As chaves pela GRAFIA DA PLANILHA: é assim que o canal, os sinalizadores e
+  // os carimbos procuram as colunas daqui para a frente (ver grafiaDaColuna_).
+  paraGravar = comAsChavesDaAba_(canal.aba, paraGravar);
 
   // O campo que acabou de sumir (Retido → Pago) deixa o valor para trás? Não.
   if (!ehCasoNovo && registroAtual) {
@@ -923,7 +931,9 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   if (!coluna) return;
 
   var estrutura = estruturaDaAba_(canal.aba);
-  if (posicaoDaColuna_(estrutura, coluna) < 0) return;
+  var posicao = posicaoDaColuna_(estrutura, coluna);
+  if (posicao < 0) return;
+  coluna = estrutura.cabecalhos[posicao];   // a grafia da planilha
 
   var jaTem = String(registroAtual[coluna] || '').trim();
   if (jaTem) return;
@@ -2005,6 +2015,7 @@ function colunasDaBusca_(canal) {
  * Procura num canal, lendo coluna por coluna e só depois as linhas que casam.
  */
 function procurarNoCanal_(canal, termo, quem) {
+  comAGrafiaDaAba_(canal);
   var colunas = colunasDaBusca_(canal);
   var aviso = '';
 
@@ -2566,7 +2577,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
     // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
-    statusPadrao: statusPadraoDoCanal_(canal)
+    statusPadrao: statusDaImportacaoDoCanal_(canal)
   };
 }
 
@@ -2892,7 +2903,28 @@ function nomesQuePodemReceberCasos_(canal) {
   return analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
 }
 
-/** O status com que o caso importado nasce, tirado do formulário do canal. */
+/**
+ * O status com que o caso IMPORTADO nasce: o padrão do canal — menos quando
+ * esse status carimba uma data.
+ *
+ * Pedido do PO para a Mesa: "casos de importação da Mesa não têm status, e só
+ * devem contar quando for alterado para Em andamento". O "Em andamento" é o
+ * status padrão da Mesa E carimba `Data em andamento`, de onde contam as 48
+ * horas. Pôr esse status na importação diria que o caso entrou nele sem dizer
+ * quando — e a importação não carimba, de propósito. Então o caso entra SEM
+ * status, e a data nasce quando alguém o põe em Em andamento de verdade.
+ *
+ * Status padrão sem carimbo ("Não trabalhado" na RET, "Aguardando" no VG)
+ * continua sendo posto: não há data nenhuma a mentir.
+ */
+function statusDaImportacaoDoCanal_(canal) {
+  var padrao = statusPadraoDoCanal_(canal);
+  var situacao = padrao ? situacaoDoCanalPeloValor_(canal, padrao) : null;
+  if (situacao && String(situacao.colunaDeCarimbo || '').trim()) return '';
+  return padrao;
+}
+
+/** O status com que o caso nasce no formulário, tirado do campo Status do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
   var achado = '';
@@ -2964,7 +2996,7 @@ function importarCasos(idDoCanal, pedido) {
   var analistas = analistasEscolhidos_(pedido.analistas, canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var agora = new Date();
-  var statusPadrao = statusPadraoDoCanal_(canal);
+  var statusPadrao = statusDaImportacaoDoCanal_(canal);
 
   var paraGravar = [];
   var pulados = { vazia: 0, repetida: 0 };
@@ -3193,7 +3225,9 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // Quem é deste canal e está de férias ou afastado. A tela diz o nome e o
     // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
-    statusPadrao: statusPadraoDoCanal_(canal),
+    statusPadrao: statusDaImportacaoDoCanal_(canal),
+    // Status padrão que a importação NÃO põe (o da Mesa): a tela explica.
+    statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela

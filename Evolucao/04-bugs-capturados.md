@@ -1867,12 +1867,18 @@ para o campo simples e para os que moram em várias colunas (proposta, apólice,
 produto). Teste no servidor e ponta a ponta: cabeçalho "Descrição" na planilha,
 a caixa abre preenchida, e salvar sem mexer não apaga.
 
-**Ainda em aberto, de propósito.** O mesmo jeito de ler pelo nome exato existe
-para as colunas que o canal declara (status, data de entrada, finalização…), em
-cerca de 45 lugares. Hoje elas batem letra por letra com a planilha — senão o
-status já não funcionaria —, mas renomear um desses cabeçalhos só na caixa
-quebraria em silêncio. Endurecer isso é mexer em muitos arquivos: fica para o
-PO decidir.
+**Depois, com o aval do PO, a raiz.** O mesmo jeito de ler pelo nome exato
+existia para as colunas que o canal declara (status, data de entrada,
+finalização…), as dos sinalizadores e os carimbos de status — cerca de 45
+leituras. Em vez de mexer em cada uma, o nome é trocado pela grafia da planilha
+**onde nasce**: no canal que a chamada usa (`comAGrafiaDaAba_`, em
+`canalPeloId_`, onde a base já vai ser lida — custo zero), nos sinalizadores e
+nos carimbos de status (uma vez por canal), e nas chaves do que o formulário
+grava (`comAsChavesDaAba_`). Testes trocam "status" por "Status", "Status
+proposta" por "STATUS PROPOSTA", a data de entrada e um carimbo de status, e
+conferem a troca de status, os carimbos, o selo, a parada do Retido e a limpeza
+ao sair dele. E o `diagnosticoRECC` passou a mostrar a grafia diferente, como
+atenção.
 
 ---
 

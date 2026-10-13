@@ -1109,6 +1109,7 @@ function sinalizadoresDoCanal_(canal) {
     .map(sinalizadorDaLinha_)
     .filter(function (sinalizador) { return sinalizador.prazo > 0; })
     .sort(function (um, outro) { return um.ordem - outro.ordem; })
+    .map(function (sinalizador) { return colunasDoSinalizadorPelaGrafia_(sinalizador, canal); })
     .map(function (sinalizador) {
       // O prazo que conta da PRIMEIRA MUDANÇA DE STATUS fica cheio enquanto o
       // caso não sai do status em que nasce. Para saber qual é esse status,
@@ -1134,7 +1135,21 @@ function condicoesDeParadaDoCanal_(canal) {
   return lerRegistros_('SINALIZADORES')
     .filter(function (linha) { return converterParaIdentificador_(linha.CanalId) === doCanal; })
     .map(sinalizadorDaLinha_)
-    .filter(temCondicaoDeParada_);
+    .filter(temCondicaoDeParada_)
+    .map(function (sinalizador) { return colunasDoSinalizadorPelaGrafia_(sinalizador, canal); });
+}
+
+/**
+ * As colunas que o sinalizador cita, pela grafia da planilha do canal — ver
+ * `grafiaDaColuna_`. Sem isto, "Status proposta" escrito de outro jeito na
+ * aba faria o Retido nunca encerrar o prazo, sem erro nenhum.
+ */
+function colunasDoSinalizadorPelaGrafia_(sinalizador, canal) {
+  ['colunaQueLiga', 'colunaDaData', 'colunaDaHora', 'colunaDaCondicao',
+    'colunaDaDataDaCondicao'].forEach(function (chave) {
+    if (sinalizador[chave]) sinalizador[chave] = grafiaDaColuna_(canal.aba, sinalizador[chave]);
+  });
+  return sinalizador;
 }
 
 /** Uma linha da aba vira o sinalizador com as contas já resolvidas. */
@@ -1371,6 +1386,10 @@ function prazoQueNaoComecou_(registro, canal, sinalizador) {
 function situacoesPorChave_(canal) {
   var porChave = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
+    // O carimbo pela grafia da planilha: é lido caso a caso pelo sinalizador.
+    if (situacao.colunaDeCarimbo) {
+      situacao.colunaDeCarimbo = grafiaDaColuna_(canal.aba, situacao.colunaDeCarimbo);
+    }
     porChave[situacao.chave] = situacao;
   });
   return porChave;
