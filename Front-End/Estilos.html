@@ -768,6 +768,46 @@ table.fila.agrupada td:first-child .apoio.em-bom:first-child {
   color: var(--tom, var(--suave));
 }
 
+/* O controle de prazos da Produtividade RECC: um bloco por prazo, separados
+   por um traço, cada um com os contadores, quem deixou passar e a lista. */
+.prazos { padding: 18px 20px; display: grid; gap: 18px; }
+.prazo-bloco { display: grid; gap: 10px; min-width: 0; }
+.prazo-bloco + .prazo-bloco { border-top: 1px solid var(--linha); padding-top: 18px; }
+.prazo-bloco h4 { margin: 0; font-size: 15px; }
+.prazo-titulo {
+  margin: 4px 0 0; font-size: 12px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--tenue);
+}
+.prazo-regra { margin: 0; font-size: 12.5px; color: var(--suave); line-height: 1.45; }
+.prazo-limpo { margin: 0; font-size: 13px; color: var(--bom); font-weight: 600; }
+.prazo-analistas { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.prazo-analista {
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  padding: 7px 12px; border-radius: var(--raio-pequeno);
+  background: var(--ruim-tenue);
+  border: 1px solid color-mix(in srgb, var(--ruim) 28%, transparent);
+}
+.prazo-analista strong { font-size: 13.5px; color: var(--ruim); overflow-wrap: anywhere; }
+.prazo-analista span { font-size: 12px; color: var(--suave); }
+table.fila.prazos-lista { min-width: 560px; }
+table.fila.prazos-lista td.direita, table.fila.prazos-lista th.direita { text-align: right; }
+
+/* O sinalizador de prazo: pílula com a cor do tom, embaixo da situação.
+   Quebra linha dentro da própria coluna, como a etiqueta da situação. */
+.selo-prazo {
+  display: block; width: fit-content; max-width: 100%; margin-top: 6px;
+  padding: 3px 9px; border-radius: 13px;
+  font-size: 12px; font-weight: 700; line-height: 1.35;
+  color: var(--tom, var(--suave));
+  background: var(--tom-tenue, var(--superficie-2));
+  border: 1px solid color-mix(in srgb, var(--tom, var(--linha)) 30%, transparent);
+}
+/* Texto só para leitor de tela: o que a cor quer dizer. */
+.so-leitor {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 .aviso-de-carimbo {
   background: var(--atencao-tenue); color: var(--atencao);
   border-radius: var(--raio-pequeno); padding: 10px 12px; margin-top: 10px;

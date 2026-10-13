@@ -848,7 +848,11 @@ function montarFila_(registros, canal) {
   // calculados uma vez por fila, e não uma por caso.
   var comSla = Number(canal.slaHorasUteis) > 0;
   var finais = {};
-  var agora = comSla ? relogioDeParede_(new Date()) : null;
+  // Os sinalizadores (RET: 3 dias úteis; Mesa: 48h da área). O relógio é um
+  // só por fila, e a leitura da aba também.
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  var situacoes = sinalizadores.length ? situacoesPorChave_(canal) : null;
+  var agora = (comSla || sinalizadores.length) ? relogioDeParede_(new Date()) : null;
 
   // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
   // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
@@ -898,7 +902,12 @@ function montarFila_(registros, canal) {
       situacao: situacao,
       tom: tons[normalizarParaComparar_(situacao)] || 'neutro',
       // O SLA, quando o canal declara um (hoje, a Mesa Diamante).
-      sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null
+      sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null,
+      // Os sinalizadores deste caso, na ordem da aba. Vazio quando nenhum se
+      // aplica — e é o que faz a tela não desenhar nada.
+      sinais: sinalizadores.map(function (sinalizador) {
+        return sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      }).filter(function (sinal) { return sinal !== null; })
     };
   });
 }
@@ -1055,6 +1064,338 @@ function slaDoCaso_(registro, canal, finais, agora) {
     minutosUteis: gasto,
     prazo: prazo
   };
+}
+
+
+/* ============================================================================
+   OS SINALIZADORES DE PRAZO
+   ============================================================================
+   Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
+   RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um status
+   final; na Mesa, o caso encaminhado para a área tem 48 horas úteis.
+
+   É o mesmo relógio do SLA da Mesa — minutos ÚTEIS, de segunda a sexta, dentro
+   do expediente —, e por isso reaproveita as mesmas contas. O que muda é o que
+   cada sinalizador declara na aba SINALIZADORES: quando vale, desde quando
+   conta, quanto tempo tem e quando o amarelo acende. Nada disso é escrito
+   aqui; o PO ajusta em Configurações › Sinalizadores.
+
+   AS TRÊS CORES
+     verde      dentro do prazo, com folga;
+     amarelo    dentro do prazo, mas faltando pouco — por padrão, o último dia
+                útil. Na RET: dias 1 e 2 verdes, dia 3 amarelo;
+     vermelho   passou do prazo.
+   "Faltando pouco" é uma MARGEM, e não "exatamente 3 dias": em tempo corrido
+   o instante exato dura um minuto, e o amarelo nunca apareceria. Foi o PO quem
+   escolheu esta leitura, perguntado.
+
+   ATÉ QUANDO conta: até o caso chegar a um status FINAL — a lista de status
+   finais do canal, que já existe. Parou, o selo vira "cumprido" (verde) ou
+   "estourado" (vermelho): não é mais um aviso do que está correndo, é o
+   resultado. Caso final sem nenhuma data de quando fechou — os antigos, de
+   antes do carimbo — não ganha selo: não dá para dizer se cumpriu, e inventar
+   vermelho em milhares de casos encerrados ensinaria a ignorar o vermelho.
+   ============================================================================ */
+
+/** Os sinalizadores LIGADOS de um canal, prontos para contar. */
+function sinalizadoresDoCanal_(canal) {
+  // A aba é nova: quem ainda não rodou `atualizarPGO()` segue com o Trabalho
+  // funcionando, sem selo, em vez de uma tela que estoura.
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
+
+  var doCanal = converterParaIdentificador_(canal.id);
+  return lerRegistros_('SINALIZADORES')
+    .filter(function (linha) {
+      return converterParaIdentificador_(linha.CanalId) === doCanal
+        && normalizarParaComparar_(linha.Ativo) === 'sim';
+    })
+    .map(sinalizadorDaLinha_)
+    .filter(function (sinalizador) { return sinalizador.prazo > 0; })
+    .sort(function (um, outro) { return um.ordem - outro.ordem; });
+}
+
+/** Uma linha da aba vira o sinalizador com as contas já resolvidas. */
+function sinalizadorDaLinha_(linha) {
+  var abre = minutoDaHora_(linha.InicioDoExpediente);
+  var fecha = minutoDaHora_(linha.FimDoExpediente);
+  // Expediente em branco, ilegível ou que termina antes de começar volta ao
+  // padrão: contar com ele quebrado zeraria todos os prazos.
+  if (abre === null || fecha === null || fecha <= abre) {
+    abre = minutoDaHora_(RECC_EXPEDIENTE_PADRAO.abre);
+    fecha = minutoDaHora_(RECC_EXPEDIENTE_PADRAO.fecha);
+  }
+  return {
+    id: linha.__id,
+    canalId: converterParaIdentificador_(linha.CanalId),
+    nome: String(linha.Nome || '').trim() || 'Prazo',
+    prazo: Math.max(0, Number(linha.Prazo) || 0),
+    unidade: normalizarParaComparar_(linha.Unidade).indexOf('hora') === 0 ? 'horas' : 'dias',
+    aviso: Math.max(0, Number(linha.AvisoFaltando) || 0),
+    colunaQueLiga: String(linha.ColunaQueLiga || '').trim(),
+    colunaDaData: String(linha.ColunaDaData || '').trim(),
+    colunaDaHora: String(linha.ColunaDaHora || '').trim(),
+    inicioDoExpediente: horaDoMinuto_(abre),
+    fimDoExpediente: horaDoMinuto_(fecha),
+    abre: abre,
+    fecha: fecha,
+    ordem: Number(linha.Ordem) || 0,
+    ativo: normalizarParaComparar_(linha.Ativo) === 'sim'
+  };
+}
+
+/** 495 → "08:15". */
+function horaDoMinuto_(minutos) {
+  var horas = Math.floor(minutos / 60);
+  var resto = minutos % 60;
+  return (horas < 10 ? '0' : '') + horas + ':' + (resto < 10 ? '0' : '') + resto;
+}
+
+/** Um dia útil, em minutos, no expediente deste sinalizador. */
+function minutosDeUmaUnidade_(sinalizador) {
+  return sinalizador.unidade === 'dias' ? sinalizador.fecha - sinalizador.abre : 60;
+}
+
+/**
+ * "1 dia útil", "2 dias úteis e 3h", "35h", "20min".
+ *
+ * Prazo em HORAS fala em horas: quem pediu "48 horas úteis" lê "faltam 46h30",
+ * e não "4 dias úteis e 5h" — que obrigaria a refazer a conta de cabeça com
+ * um dia de 10h15.
+ */
+function duracaoDoPrazo_(minutos, expediente, emHoras) {
+  if (emHoras) return duracaoParaLer_(minutos, Number.MAX_VALUE);
+  if (minutos < 60) return minutos + 'min';
+  if (minutos < expediente) return duracaoParaLer_(minutos, expediente);
+  var dias = Math.floor(minutos / expediente);
+  var horas = Math.floor((minutos - dias * expediente) / 60);
+  return dias + (dias === 1 ? ' dia útil' : ' dias úteis') + (horas ? ' e ' + horas + 'h' : '');
+}
+
+/** A regra por extenso, para a tela de Configurações e a Produtividade. */
+function regraDoSinalizador_(sinalizador) {
+  var unidade = sinalizador.unidade === 'dias' ? 'dia útil' : 'hora útil';
+  var plural = sinalizador.unidade === 'dias' ? 'dias úteis' : 'horas úteis';
+  function quanto(n) {
+    return String(n).replace('.', ',') + ' ' + (n === 1 ? unidade : plural);
+  }
+  return quanto(sinalizador.prazo)
+    + (sinalizador.aviso > 0 ? ' · amarelo quando faltar ' + quanto(sinalizador.aviso) : '')
+    + (sinalizador.colunaQueLiga
+      ? ' · só com "' + sinalizador.colunaQueLiga + '" preenchida' : '');
+}
+
+/**
+ * O sinalizador de UM caso — ou null, quando não se aplica ou não dá para
+ * contar. `situacoes` é o catálogo do canal por chave: de lá sai se o status é
+ * final e em que coluna ele carimba.
+ */
+function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
+  // QUANDO VALE
+  if (sinalizador.colunaQueLiga && String(
+    registro[sinalizador.colunaQueLiga] === undefined ? '' : registro[sinalizador.colunaQueLiga]
+  ).trim() === '') return null;
+
+  // DESDE QUANDO. Sem coluna própria, a data e a hora de entrada do canal.
+  var colunaDaData = sinalizador.colunaDaData || canal.colunaDaData;
+  var colunaDaHora = sinalizador.colunaDaHora
+    || (sinalizador.colunaDaData ? '' : canal.colunaDaHora);
+  var inicio = colunaDaData ? converterParaData_(registro[colunaDaData]) : '';
+  if (!inicio) return null;
+
+  var relogio = relogioDeParede_(inicio);
+  var minutoDaHora = colunaDaHora ? minutoDaHora_(registro[colunaDaHora]) : null;
+  var de = {
+    dia: relogio.dia,
+    // Sem hora declarada, vale a que a própria data carrega (o carimbo do
+    // encaminhamento é data E hora); só data pura começa na abertura do dia.
+    minuto: minutoDaHora !== null ? minutoDaHora : (relogio.minuto > 0 ? relogio.minuto : sinalizador.abre)
+  };
+
+  // ATÉ QUANDO: o status final.
+  var situacao = canal.colunaDoStatus
+    ? situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])] : null;
+  var encerrado = !!(situacao && situacao.final);
+  var ate = agora;
+  if (encerrado) {
+    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+    var carimbo = situacao.colunaDeCarimbo
+      ? converterParaDataEHora_(registro[situacao.colunaDeCarimbo]) : '';
+    var quandoFechou = mudou || carimbo;
+    if (!quandoFechou) return null;
+    ate = relogioDeParede_(quandoFechou);
+  }
+
+  var porUnidade = minutosDeUmaUnidade_(sinalizador);
+  var prazo = Math.round(sinalizador.prazo * porUnidade);
+  var aviso = Math.round(sinalizador.aviso * porUnidade);
+  var gasto = minutosUteisEntre_(de, ate, sinalizador.abre, sinalizador.fecha);
+  var expediente = sinalizador.fecha - sinalizador.abre;
+  var dentro = gasto <= prazo;
+  var emHoras = sinalizador.unidade === 'horas';
+
+  var tom, resto;
+  if (encerrado) {
+    tom = dentro ? 'bom' : 'ruim';
+    resto = dentro ? 'cumprido em ' + duracaoDoPrazo_(gasto, expediente, emHoras)
+      : 'estourado, ' + duracaoDoPrazo_(gasto - prazo, expediente, emHoras) + ' além';
+  } else if (!dentro) {
+    tom = 'ruim';
+    resto = duracaoDoPrazo_(gasto - prazo, expediente, emHoras) + ' além do prazo';
+  } else if (prazo - gasto <= aviso) {
+    tom = 'atencao';
+    // Exatamente no limite (ex.: a sexta fechou e o prazo acabou junto): o
+    // próximo minuto de expediente já estoura. "vence em 0min" leria como erro.
+    resto = prazo - gasto <= 0 ? 'no limite do prazo'
+      : 'vence em ' + duracaoDoPrazo_(prazo - gasto, expediente, emHoras);
+  } else {
+    tom = 'bom';
+    resto = 'faltam ' + duracaoDoPrazo_(prazo - gasto, expediente, emHoras);
+  }
+
+  return {
+    id: sinalizador.id,
+    nome: sinalizador.nome,
+    tom: tom,
+    texto: sinalizador.nome + ' · ' + resto,
+    regra: regraDoSinalizador_(sinalizador),
+    dentro: dentro,
+    encerrado: encerrado,
+    alem: dentro ? 0 : gasto - prazo,
+    expediente: expediente
+  };
+}
+
+/** Os status do canal por chave, para o sinalizador saber o que é final. */
+function situacoesPorChave_(canal) {
+  var porChave = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    porChave[situacao.chave] = situacao;
+  });
+  return porChave;
+}
+
+/** O texto que identifica o caso numa lista: a 1ª coluna do 2º grupo da fila. */
+function rotuloDoCasoNaFila_(registro, grupos) {
+  var grupo = grupos.length > 1 ? grupos[1] : grupos[0];
+  var coluna = grupo && grupo.colunas[0];
+  if (!coluna) return String(registro.__id || '');
+  var valor = coluna.juntar
+    ? coluna.juntar.map(function (pedaco) {
+      return paraTexto_(registro[pedaco.cabecalho], pedaco.tipo);
+    }).filter(function (texto) { return texto !== ''; }).join('-')
+    : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+  return valor || String(registro.__id || '');
+}
+
+/** Quantos casos cabem na lista da Produtividade; o resto vira "e mais N". */
+const RECC_MAXIMO_NA_LISTA_DE_PRAZOS = 50;
+
+/**
+ * O resumo de prazos que a Produtividade RECC mostra: quantos estão em cada
+ * cor, QUAIS casos passaram do prazo e de QUEM — "o nome do analista que
+ * deixou estourar", palavra do PO.
+ *
+ * `avaliados` é uma lista de { registro, tom, encerrado, alem }: vale tanto
+ * para o sinalizador quanto para o SLA da Mesa, que é o mesmo desenho.
+ */
+function resumirPrazos_(avaliados, canal, expediente, emHoras) {
+  var grupos = colunasDaFila_(canal);
+  var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
+  var r = { total: avaliados.length, noPrazo: 0, atencao: 0, fora: 0,
+    cumpridos: 0, estourados: 0, lista: [], maisCasos: 0, porAnalista: [] };
+
+  var passaram = [];
+  avaliados.forEach(function (um) {
+    if (um.tom === 'ruim') {
+      if (um.encerrado) r.estourados++; else r.fora++;
+      passaram.push(um);
+    } else if (um.encerrado) {
+      r.cumpridos++;
+    } else if (um.tom === 'atencao') {
+      r.atencao++;
+    } else {
+      r.noPrazo++;
+    }
+  });
+
+  passaram.sort(function (um, outro) { return outro.alem - um.alem; });
+  r.maisCasos = Math.max(0, passaram.length - RECC_MAXIMO_NA_LISTA_DE_PRAZOS);
+  var quem = {};
+  passaram.forEach(function (um, i) {
+    var nome = colunaDoAnalista ? String(um.registro[colunaDoAnalista] || '').trim() : '';
+    nome = nome || 'Sem analista';
+    var linha = quem[nome] = quem[nome] || { analista: nome, fora: 0, estourados: 0, total: 0 };
+    if (um.encerrado) linha.estourados++; else linha.fora++;
+    linha.total++;
+    if (i < RECC_MAXIMO_NA_LISTA_DE_PRAZOS) {
+      r.lista.push({
+        id: um.registro.__id,
+        caso: rotuloDoCasoNaFila_(um.registro, grupos),
+        analista: nome,
+        situacao: canal.colunaDoStatus ? String(um.registro[canal.colunaDoStatus] || '') : '',
+        encerrado: um.encerrado,
+        alem: duracaoDoPrazo_(um.alem, expediente, emHoras)
+      });
+    }
+  });
+  r.porAnalista = Object.keys(quem).map(function (nome) { return quem[nome]; })
+    .sort(function (um, outro) {
+      return outro.total - um.total || um.analista.localeCompare(outro.analista);
+    });
+  return r;
+}
+
+/**
+ * O controle de prazos da Produtividade RECC: o SLA do canal, quando ele tem,
+ * e cada sinalizador ligado. `null` quando o canal não tem nenhum dos dois — e
+ * aí a tela não desenha o bloco.
+ */
+function controleDePrazos_(casos, canal) {
+  var situacoes = situacoesPorChave_(canal);
+  var finais = {};
+  Object.keys(situacoes).forEach(function (chave) {
+    if (situacoes[chave].final) finais[chave] = true;
+  });
+  var agora = relogioDeParede_(new Date());
+
+  var sla = null;
+  if (Number(canal.slaHorasUteis) > 0) {
+    var abre = minutoDaHora_(canal.inicioDoExpediente);
+    var fecha = minutoDaHora_(canal.fimDoExpediente);
+    var contados = [];
+    var semConta = 0;
+    casos.forEach(function (registro) {
+      var um = slaDoCaso_(registro, canal, finais, agora);
+      if (!um) { semConta++; return; }
+      contados.push({ registro: registro, tom: um.tom, encerrado: um.parou,
+        alem: Math.max(0, um.minutosUteis - um.prazo) });
+    });
+    sla = resumirPrazos_(contados, canal,
+      (fecha !== null && abre !== null) ? fecha - abre : 615, true);
+    sla.nome = 'SLA de ' + String(Number(canal.slaHorasUteis)).replace('.', ',')
+      + ' horas úteis';
+    sla.semConta = semConta;
+  }
+
+  var sinalizadores = sinalizadoresDoCanal_(canal).map(function (sinalizador) {
+    var avaliados = [];
+    var semPrazo = 0;
+    casos.forEach(function (registro) {
+      var um = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      if (um) avaliados.push({ registro: registro, tom: um.tom, encerrado: um.encerrado, alem: um.alem });
+    });
+    semPrazo = casos.length - avaliados.length;
+    var resumo = resumirPrazos_(avaliados, canal, sinalizador.fecha - sinalizador.abre,
+      sinalizador.unidade === 'horas');
+    resumo.id = sinalizador.id;
+    resumo.nome = sinalizador.nome;
+    resumo.regra = regraDoSinalizador_(sinalizador);
+    resumo.semPrazo = semPrazo;
+    return resumo;
+  });
+
+  if (!sla && !sinalizadores.length) return null;
+  return { sla: sla, sinalizadores: sinalizadores };
 }
 
 
@@ -1238,6 +1579,14 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
       `null` quando o canal não declarou nada — e aí a tela não desenha nada.
     */
     valorPorSituacao: valorPorSituacao_(casos, canal),
+    /*
+      OS PRAZOS: o SLA do canal (dentro e fora) e cada sinalizador, com os
+      casos que passaram do prazo e o nome de quem deixou passar. Vem FORA de
+      `componentes` pelo mesmo motivo do valor por situação: o que ele mostra é
+      ajustado em Configurações › Sinalizadores, e não na lista de gráficos.
+      `null` quando o canal não tem prazo nenhum.
+    */
+    prazos: controleDePrazos_(casos, canal),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }

@@ -142,6 +142,12 @@ function resumoDasConfiguracoes() {
       { chave: 'canais', titulo: 'Canais de trabalho',
         descricao: 'As bases e o que cada painel mostra',
         quantidade: lerRegistros_('CANAIS').length },
+      { chave: 'sinalizadores', titulo: 'Sinalizadores',
+        descricao: 'Os prazos que os casos têm, com verde, amarelo e vermelho',
+        quantidade: planilhaAtiva_().getSheetByName('SINALIZADORES')
+          ? lerRegistros_('SINALIZADORES').filter(function (linha) {
+            return normalizarParaComparar_(linha.Ativo) === 'sim';
+          }).length : 0 },
       { chave: 'identidade', titulo: 'Identidade',
         descricao: 'Nome, logo, cor e a senha de administrador',
         quantidade: 0 },
@@ -2581,6 +2587,188 @@ function ocultarAnalise(idDaAnalise) {
 
   ocultarRegistro_('ANALISES', alvo, quem.usuario.Id);
   registrarAuditoria_('analise.ocultar', 'ANALISES', alvo, String(atual.Nome));
+  return true;
+}
+
+// ============================================================================
+// OS SINALIZADORES
+// ============================================================================
+
+/*
+ * Os sinalizadores de prazo — RET, Mesa e o VG, que ainda não definiu.
+ *
+ * Pedido do PO: "devo conseguir ajustar na aba de configurações", numa seção
+ * própria, "Sinalizadores". Cada linha da aba SINALIZADORES é um sinalizador
+ * de um canal; o que ele faz está em Indicadores.gs. Ajustar prazo, margem do
+ * amarelo ou a coluna de onde se conta é conteúdo — pede a permissão de
+ * configurar, e não a senha de administrador: não mexe em estrutura nenhuma.
+ */
+
+/** Todos os sinalizadores, com o nome do canal e a regra por extenso. */
+function listarSinalizadores() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
+
+  var nomes = {};
+  canaisVisiveis_().forEach(function (canal) {
+    nomes[converterParaIdentificador_(canal.id)] = canal.nome;
+  });
+  return lerRegistros_('SINALIZADORES')
+    .map(function (linha) {
+      var sinalizador = sinalizadorDaLinha_(linha);
+      sinalizador.canalNome = nomes[sinalizador.canalId] || '(canal que não existe mais)';
+      sinalizador.regra = regraDoSinalizador_(sinalizador);
+      return sinalizador;
+    })
+    .sort(function (um, outro) {
+      return um.canalNome.localeCompare(outro.canalNome) || um.ordem - outro.ordem;
+    });
+}
+
+/**
+ * O que a tela oferece para montar um sinalizador: os canais e, de cada um, as
+ * colunas que dão para escolher — todas, só as de data e só as de hora.
+ *
+ * Sai da estrutura da planilha: coluna nova na base aparece como opção sozinha.
+ */
+function opcoesDeSinalizador() {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  return {
+    // Falso numa planilha que ainda não rodou atualizarPGO(): a tela explica o
+    // que fazer, em vez de oferecer um formulário que não tem onde gravar.
+    abaExiste: !!planilhaAtiva_().getSheetByName('SINALIZADORES'),
+    expedientePadrao: RECC_EXPEDIENTE_PADRAO,
+    canais: canaisQueEuVejo_(quem).map(function (canal) {
+      var estrutura = estruturaDaAba_(canal.aba);
+      var colunas = [];
+      var deData = [];
+      var deHora = [];
+      estrutura.cabecalhos.forEach(function (cabecalho, i) {
+        if (!cabecalho || cabecalho.charAt(0) === '_') return;
+        colunas.push(cabecalho);
+        var tipo = estrutura.tipos[i];
+        if (tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.DATA_HORA) {
+          deData.push(cabecalho);
+        }
+        if (tipo === RECC_TIPO_DE_DADO.HORA) deHora.push(cabecalho);
+      });
+      return {
+        id: canal.id, nome: canal.nome, aba: canal.aba,
+        colunaDaData: canal.colunaDaData || '',
+        colunas: colunas, colunasDeData: deData, colunasDeHora: deHora
+      };
+    })
+  };
+}
+
+/** Cria ou altera um sinalizador. */
+function salvarSinalizador(dados) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
+    throw new Error('A aba SINALIZADORES ainda não existe nesta planilha. '
+      + 'Rode atualizarPGO() no editor do Apps Script.');
+  }
+
+  var nome = String(dados.nome || '').trim();
+  if (!nome) throw new Error('Dê um nome ao sinalizador: é ele que aparece no selo.');
+  if (nome.length > 40) {
+    throw new Error('O nome tem ' + nome.length + ' caracteres, e o limite é 40 — '
+      + 'o selo fica embaixo da situação, numa coluna estreita.');
+  }
+
+  var canal = canalQueEuPossoVer_(dados.canalId, quem);
+  var estrutura = estruturaDaAba_(canal.aba);
+
+  var prazo = Number(String(dados.prazo === undefined ? 0 : dados.prazo).replace(',', '.'));
+  var aviso = Number(String(dados.aviso === undefined ? 0 : dados.aviso).replace(',', '.'));
+  if (!isFinite(prazo) || prazo < 0 || !isFinite(aviso) || aviso < 0) {
+    throw new Error('Prazo e aviso são números, como 3 ou 48. Zero no prazo desliga.');
+  }
+  var ligado = dados.ativo === false ? false : true;
+  if (ligado && prazo <= 0) {
+    throw new Error('Um sinalizador ligado precisa de prazo maior que zero — com '
+      + 'zero ele não sinaliza nada. Defina o prazo, ou deixe-o desligado.');
+  }
+  // O aviso só importa com prazo: o VG nasce desligado, com prazo zero.
+  if (prazo > 0 && aviso >= prazo) {
+    throw new Error('O amarelo acende quando faltam ' + aviso + ' para o prazo '
+      + 'acabar, mas o prazo todo é ' + prazo + ': o caso já nasceria amarelo. '
+      + 'Use um aviso menor que o prazo.');
+  }
+
+  var unidade = normalizarParaComparar_(dados.unidade).indexOf('hora') === 0 ? 'horas' : 'dias';
+
+  // As colunas precisam existir — e a de data precisa ser de data, a de hora
+  // de hora. Conferir o tipo evita o sinalizador que "funciona" e nunca conta,
+  // porque aponta para uma coluna de texto.
+  var quandoVale = String(dados.colunaQueLiga || '').trim();
+  var colunaDaData = String(dados.colunaDaData || '').trim();
+  var colunaDaHora = String(dados.colunaDaHora || '').trim();
+  [quandoVale, colunaDaData, colunaDaHora].forEach(function (coluna) {
+    conferirQueAColunaExiste_(estrutura, coluna, canal.aba);
+  });
+  function tipoDe(coluna) { return estrutura.tipos[posicaoDaColuna_(estrutura, coluna)]; }
+  if (colunaDaData && tipoDe(colunaDaData) !== RECC_TIPO_DE_DADO.DATA
+    && tipoDe(colunaDaData) !== RECC_TIPO_DE_DADO.DATA_HORA) {
+    throw new Error('"' + colunaDaData + '" não é uma coluna de data, e é de uma data '
+      + 'que o prazo começa a contar.');
+  }
+  if (colunaDaHora && tipoDe(colunaDaHora) !== RECC_TIPO_DE_DADO.HORA) {
+    throw new Error('"' + colunaDaHora + '" não é uma coluna de hora.');
+  }
+
+  // O expediente: em branco vale o padrão; preenchido, tem de ser legível e
+  // terminar depois de começar.
+  var inicio = horaDoExpediente_(dados.inicioDoExpediente) || RECC_EXPEDIENTE_PADRAO.abre;
+  var fim = horaDoExpediente_(dados.fimDoExpediente) || RECC_EXPEDIENTE_PADRAO.fecha;
+  if (String(dados.inicioDoExpediente || '').trim() && !horaDoExpediente_(dados.inicioDoExpediente)
+    || String(dados.fimDoExpediente || '').trim() && !horaDoExpediente_(dados.fimDoExpediente)) {
+    throw new Error('O expediente é em horas, como 08:15 e 18:30.');
+  }
+  if (minutosDaHoraDoExpediente_(inicio) >= minutosDaHoraDoExpediente_(fim)) {
+    throw new Error('O expediente termina antes de começar: ' + inicio + ' até ' + fim + '.');
+  }
+
+  var id = converterParaIdentificador_(dados.id);
+  var repetido = lerRegistros_('SINALIZADORES').filter(function (linha) {
+    return converterParaIdentificador_(linha.CanalId) === converterParaIdentificador_(canal.id)
+      && normalizarParaComparar_(linha.Nome) === normalizarParaComparar_(nome)
+      && converterParaIdentificador_(linha.Id) !== id;
+  })[0];
+  if (repetido) {
+    throw new Error('O canal ' + canal.nome + ' já tem um sinalizador chamado "' + nome
+      + '". Dois com o mesmo nome apareceriam iguais embaixo da situação.');
+  }
+
+  var campos = {
+    CanalId: canal.id, Nome: nome, Prazo: prazo, Unidade: unidade,
+    AvisoFaltando: aviso, ColunaQueLiga: quandoVale, ColunaDaData: colunaDaData,
+    ColunaDaHora: colunaDaHora, InicioDoExpediente: inicio, FimDoExpediente: fim,
+    Ordem: Number(dados.ordem) || 0, Ativo: ligado
+  };
+
+  if (id) {
+    atualizarRegistro_('SINALIZADORES', id, campos);
+    registrarAuditoria_('sinalizador.editar', 'SINALIZADORES', id, canal.nome + ': ' + nome);
+    return id;
+  }
+  var criado = inserirRegistro_('SINALIZADORES', campos);
+  registrarAuditoria_('sinalizador.criar', 'SINALIZADORES', criado.__id,
+    canal.nome + ': ' + nome);
+  return criado.__id;
+}
+
+/** Tira o sinalizador da tela e do selo. A linha permanece na planilha. */
+function ocultarSinalizador(idDoSinalizador) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var alvo = converterParaIdentificador_(idDoSinalizador);
+  var atual = buscarRegistros_('SINALIZADORES', 'Id', alvo, 1)[0];
+  if (!atual) throw new Error('Este sinalizador não existe.');
+
+  ocultarRegistro_('SINALIZADORES', alvo, quem.usuario.Id);
+  registrarAuditoria_('sinalizador.ocultar', 'SINALIZADORES', alvo, String(atual.Nome));
   return true;
 }
 

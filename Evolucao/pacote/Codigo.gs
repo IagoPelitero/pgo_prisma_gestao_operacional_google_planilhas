@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-09 09:28
+   Gerado em 2026-10-13 00:09
    ========================================================================== */
 
 
@@ -319,6 +319,22 @@ const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
 const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
+/**
+ * QUANDO o caso foi encaminhado para a área — carimbado pelo SISTEMA no
+ * instante em que a `Área responsável` é escolhida. É daqui que o sinalizador
+ * da Mesa conta as 48 horas úteis que a área tem para dar o retorno. Decisão
+ * do PO, perguntada: o sistema não guardava esse momento, e deduzi-lo de
+ * outra data contaria o prazo errado.
+ */
+const RECC_COLUNA_DATA_DO_ENCAMINHAMENTO = 'Data do encaminhamento';
+
+/**
+ * O expediente que um sinalizador usa quando não declarou o dele: de segunda
+ * a sexta, das 08:15 às 18:30 — o da célula, palavra do PO. É o mesmo da
+ * Mesa Diamante, e mora aqui para a RET não precisar repeti-lo em canal.
+ */
+const RECC_EXPEDIENTE_PADRAO = { abre: '08:15', fecha: '18:30' };
+
 const RECC_VISIVEL_SIM = 'SIM';
 const RECC_VISIVEL_NAO = 'NAO';
 const RECC_ORIGEM_SISTEMA = 'SISTEMA';
@@ -466,7 +482,9 @@ const RECC_ESQUEMA = {
       // De qual lote o caso veio. A Mesa importa casos de corretoras para ações
       // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // QUANDO a área foi escolhida. O sistema carimba; ninguém digita.
+      { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -933,6 +951,55 @@ const RECC_ESQUEMA = {
       { cabecalho: 'GeradaEm', tipo: 'dataHora', protegido: true },
       { cabecalho: 'GeradaPor', tipo: 'identificador', protegido: true },
       { cabecalho: 'Linhas', tipo: 'numero', protegido: true }
+    ]
+  },
+
+  /*
+   * OS SINALIZADORES — quanto tempo um caso tem para chegar a um status final.
+   *
+   * Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
+   * RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um
+   * desfecho; na Mesa, o caso encaminhado para a área tem 48 horas úteis.
+   *
+   * É uma aba, e não colunas em CANAIS, porque um canal pode ter mais de um
+   * (a Mesa tem o SLA de 6h, que mora em CANAIS, e este) e porque o PO ajusta
+   * tudo pela tela: prazo, quando acende o amarelo, e a partir de que coluna
+   * se conta. Nenhum sinalizador é escrito em código.
+   *
+   * Um sinalizador não tem "tipo". Ele é definido por três respostas:
+   *   QUANDO VALE   `ColunaQueLiga`: vazio vale para todo caso sem status final;
+   *                 com uma coluna, só vale quando ela está preenchida (a Mesa
+   *                 usa `Área responsável`).
+   *   DESDE QUANDO  `ColunaDaData` (+ `ColunaDaHora`): vazio usa a data e a hora
+   *                 de entrada do canal.
+   *   ATÉ QUANDO    sempre até o status final — vem do catálogo, e não daqui.
+   * Assim o VG, que ainda não definiu o dele, só precisa que o PO ligue o
+   * sinalizador que já está lá, desligado.
+   */
+  SINALIZADORES: {
+    aba: 'SINALIZADORES',
+    titulo: 'Sinalizadores',
+    controle: true,
+    reserva: 100,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
+      // O que aparece no selo: "Prazo de retorno · faltam 2 dias úteis".
+      { cabecalho: 'Nome', tipo: 'texto', protegido: false },
+      // Quanto, e em quê. Zero não sinaliza nada.
+      { cabecalho: 'Prazo', tipo: 'numero', protegido: false },
+      // 'dias' ou 'horas' — sempre ÚTEIS, de segunda a sexta, no expediente.
+      { cabecalho: 'Unidade', tipo: 'texto', protegido: false },
+      // O amarelo: acende quando falta até isto para estourar, na mesma unidade.
+      { cabecalho: 'AvisoFaltando', tipo: 'numero', protegido: false },
+      { cabecalho: 'ColunaQueLiga', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
+      // Como "08:15" e "18:30". Em branco vale o expediente padrão.
+      { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
     ]
   },
 
@@ -4503,6 +4570,7 @@ function cadastrarCaso(idDoCanal, valores) {
   preencherEntradaAutomatica_(canal, paraGravar);
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
   carimbarOStatusDeNascimento_(canal, paraGravar);
+  carimbarOEncaminhamento_(canal, null, paraGravar);
   preencherColunasCalculadas_(canal.aba, paraGravar, {});
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
@@ -4536,6 +4604,7 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
   // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
   // diálogo, e tem de deixar o mesmo rastro.
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
+  carimbarOEncaminhamento_(canal, atual, paraGravar);
 
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
@@ -4721,6 +4790,44 @@ function carimbarOStatusDeNascimento_(canal, paraGravar) {
   // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
   // o que veio manda. O carimbo nunca reescreve o que alguém informou.
   carimbarOStatus_(canal, achada, paraGravar, paraGravar);
+}
+
+/**
+ * Carimba QUANDO o caso foi encaminhado para a área.
+ *
+ * É o relógio das 48 horas úteis que a área tem para dar o retorno, e ele só
+ * pode ser contado por quem viu o momento: o sistema. Decisão do PO,
+ * perguntada — deduzir de outra data (a de entrada, a da resposta) contaria o
+ * prazo errado, e pedir ao analista que digite mais uma data seria o jeito
+ * mais rápido de ela ficar em branco.
+ *
+ * QUANDO CARIMBA
+ *   a área passou de vazia para escolhida     carimba agora;
+ *   a área trocou de uma para outra           carimba agora: é um novo
+ *                                             encaminhamento, com prazo novo;
+ *   a área foi esvaziada                      limpa o carimbo: o caso voltou
+ *                                             para a mesa, e não há prazo.
+ * Salvar o formulário sem mexer na área não carimba nada — é o mesmo cuidado
+ * do status: só a mudança de verdade conta.
+ *
+ * Canal sem coluna de área, ou base que ainda não ganhou a coluna do carimbo
+ * (quem não rodou `atualizarPGO()`), segue gravando o caso: o diagnóstico é
+ * quem cobra o que falta.
+ *
+ * `registroAtual` é null no cadastro.
+ */
+function carimbarOEncaminhamento_(canal, registroAtual, paraGravar) {
+  var area = String(canal.colunaDaAreaResponsavel || '').trim();
+  if (!area || !paraGravar.hasOwnProperty(area)) return;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_DATA_DO_ENCAMINHAMENTO) < 0) return;
+
+  var agora = String(paraGravar[area] || '').trim();
+  var antes = registroAtual ? String(registroAtual[area] || '').trim() : '';
+  if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+  paraGravar[RECC_COLUNA_DATA_DO_ENCAMINHAMENTO] = agora ? new Date() : '';
 }
 
 /**
@@ -6920,6 +7027,12 @@ function resumoDasConfiguracoes() {
       { chave: 'canais', titulo: 'Canais de trabalho',
         descricao: 'As bases e o que cada painel mostra',
         quantidade: lerRegistros_('CANAIS').length },
+      { chave: 'sinalizadores', titulo: 'Sinalizadores',
+        descricao: 'Os prazos que os casos têm, com verde, amarelo e vermelho',
+        quantidade: planilhaAtiva_().getSheetByName('SINALIZADORES')
+          ? lerRegistros_('SINALIZADORES').filter(function (linha) {
+            return normalizarParaComparar_(linha.Ativo) === 'sim';
+          }).length : 0 },
       { chave: 'identidade', titulo: 'Identidade',
         descricao: 'Nome, logo, cor e a senha de administrador',
         quantidade: 0 },
@@ -9359,6 +9472,188 @@ function ocultarAnalise(idDaAnalise) {
 
   ocultarRegistro_('ANALISES', alvo, quem.usuario.Id);
   registrarAuditoria_('analise.ocultar', 'ANALISES', alvo, String(atual.Nome));
+  return true;
+}
+
+// ============================================================================
+// OS SINALIZADORES
+// ============================================================================
+
+/*
+ * Os sinalizadores de prazo — RET, Mesa e o VG, que ainda não definiu.
+ *
+ * Pedido do PO: "devo conseguir ajustar na aba de configurações", numa seção
+ * própria, "Sinalizadores". Cada linha da aba SINALIZADORES é um sinalizador
+ * de um canal; o que ele faz está em Indicadores.gs. Ajustar prazo, margem do
+ * amarelo ou a coluna de onde se conta é conteúdo — pede a permissão de
+ * configurar, e não a senha de administrador: não mexe em estrutura nenhuma.
+ */
+
+/** Todos os sinalizadores, com o nome do canal e a regra por extenso. */
+function listarSinalizadores() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
+
+  var nomes = {};
+  canaisVisiveis_().forEach(function (canal) {
+    nomes[converterParaIdentificador_(canal.id)] = canal.nome;
+  });
+  return lerRegistros_('SINALIZADORES')
+    .map(function (linha) {
+      var sinalizador = sinalizadorDaLinha_(linha);
+      sinalizador.canalNome = nomes[sinalizador.canalId] || '(canal que não existe mais)';
+      sinalizador.regra = regraDoSinalizador_(sinalizador);
+      return sinalizador;
+    })
+    .sort(function (um, outro) {
+      return um.canalNome.localeCompare(outro.canalNome) || um.ordem - outro.ordem;
+    });
+}
+
+/**
+ * O que a tela oferece para montar um sinalizador: os canais e, de cada um, as
+ * colunas que dão para escolher — todas, só as de data e só as de hora.
+ *
+ * Sai da estrutura da planilha: coluna nova na base aparece como opção sozinha.
+ */
+function opcoesDeSinalizador() {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  return {
+    // Falso numa planilha que ainda não rodou atualizarPGO(): a tela explica o
+    // que fazer, em vez de oferecer um formulário que não tem onde gravar.
+    abaExiste: !!planilhaAtiva_().getSheetByName('SINALIZADORES'),
+    expedientePadrao: RECC_EXPEDIENTE_PADRAO,
+    canais: canaisQueEuVejo_(quem).map(function (canal) {
+      var estrutura = estruturaDaAba_(canal.aba);
+      var colunas = [];
+      var deData = [];
+      var deHora = [];
+      estrutura.cabecalhos.forEach(function (cabecalho, i) {
+        if (!cabecalho || cabecalho.charAt(0) === '_') return;
+        colunas.push(cabecalho);
+        var tipo = estrutura.tipos[i];
+        if (tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.DATA_HORA) {
+          deData.push(cabecalho);
+        }
+        if (tipo === RECC_TIPO_DE_DADO.HORA) deHora.push(cabecalho);
+      });
+      return {
+        id: canal.id, nome: canal.nome, aba: canal.aba,
+        colunaDaData: canal.colunaDaData || '',
+        colunas: colunas, colunasDeData: deData, colunasDeHora: deHora
+      };
+    })
+  };
+}
+
+/** Cria ou altera um sinalizador. */
+function salvarSinalizador(dados) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
+    throw new Error('A aba SINALIZADORES ainda não existe nesta planilha. '
+      + 'Rode atualizarPGO() no editor do Apps Script.');
+  }
+
+  var nome = String(dados.nome || '').trim();
+  if (!nome) throw new Error('Dê um nome ao sinalizador: é ele que aparece no selo.');
+  if (nome.length > 40) {
+    throw new Error('O nome tem ' + nome.length + ' caracteres, e o limite é 40 — '
+      + 'o selo fica embaixo da situação, numa coluna estreita.');
+  }
+
+  var canal = canalQueEuPossoVer_(dados.canalId, quem);
+  var estrutura = estruturaDaAba_(canal.aba);
+
+  var prazo = Number(String(dados.prazo === undefined ? 0 : dados.prazo).replace(',', '.'));
+  var aviso = Number(String(dados.aviso === undefined ? 0 : dados.aviso).replace(',', '.'));
+  if (!isFinite(prazo) || prazo < 0 || !isFinite(aviso) || aviso < 0) {
+    throw new Error('Prazo e aviso são números, como 3 ou 48. Zero no prazo desliga.');
+  }
+  var ligado = dados.ativo === false ? false : true;
+  if (ligado && prazo <= 0) {
+    throw new Error('Um sinalizador ligado precisa de prazo maior que zero — com '
+      + 'zero ele não sinaliza nada. Defina o prazo, ou deixe-o desligado.');
+  }
+  // O aviso só importa com prazo: o VG nasce desligado, com prazo zero.
+  if (prazo > 0 && aviso >= prazo) {
+    throw new Error('O amarelo acende quando faltam ' + aviso + ' para o prazo '
+      + 'acabar, mas o prazo todo é ' + prazo + ': o caso já nasceria amarelo. '
+      + 'Use um aviso menor que o prazo.');
+  }
+
+  var unidade = normalizarParaComparar_(dados.unidade).indexOf('hora') === 0 ? 'horas' : 'dias';
+
+  // As colunas precisam existir — e a de data precisa ser de data, a de hora
+  // de hora. Conferir o tipo evita o sinalizador que "funciona" e nunca conta,
+  // porque aponta para uma coluna de texto.
+  var quandoVale = String(dados.colunaQueLiga || '').trim();
+  var colunaDaData = String(dados.colunaDaData || '').trim();
+  var colunaDaHora = String(dados.colunaDaHora || '').trim();
+  [quandoVale, colunaDaData, colunaDaHora].forEach(function (coluna) {
+    conferirQueAColunaExiste_(estrutura, coluna, canal.aba);
+  });
+  function tipoDe(coluna) { return estrutura.tipos[posicaoDaColuna_(estrutura, coluna)]; }
+  if (colunaDaData && tipoDe(colunaDaData) !== RECC_TIPO_DE_DADO.DATA
+    && tipoDe(colunaDaData) !== RECC_TIPO_DE_DADO.DATA_HORA) {
+    throw new Error('"' + colunaDaData + '" não é uma coluna de data, e é de uma data '
+      + 'que o prazo começa a contar.');
+  }
+  if (colunaDaHora && tipoDe(colunaDaHora) !== RECC_TIPO_DE_DADO.HORA) {
+    throw new Error('"' + colunaDaHora + '" não é uma coluna de hora.');
+  }
+
+  // O expediente: em branco vale o padrão; preenchido, tem de ser legível e
+  // terminar depois de começar.
+  var inicio = horaDoExpediente_(dados.inicioDoExpediente) || RECC_EXPEDIENTE_PADRAO.abre;
+  var fim = horaDoExpediente_(dados.fimDoExpediente) || RECC_EXPEDIENTE_PADRAO.fecha;
+  if (String(dados.inicioDoExpediente || '').trim() && !horaDoExpediente_(dados.inicioDoExpediente)
+    || String(dados.fimDoExpediente || '').trim() && !horaDoExpediente_(dados.fimDoExpediente)) {
+    throw new Error('O expediente é em horas, como 08:15 e 18:30.');
+  }
+  if (minutosDaHoraDoExpediente_(inicio) >= minutosDaHoraDoExpediente_(fim)) {
+    throw new Error('O expediente termina antes de começar: ' + inicio + ' até ' + fim + '.');
+  }
+
+  var id = converterParaIdentificador_(dados.id);
+  var repetido = lerRegistros_('SINALIZADORES').filter(function (linha) {
+    return converterParaIdentificador_(linha.CanalId) === converterParaIdentificador_(canal.id)
+      && normalizarParaComparar_(linha.Nome) === normalizarParaComparar_(nome)
+      && converterParaIdentificador_(linha.Id) !== id;
+  })[0];
+  if (repetido) {
+    throw new Error('O canal ' + canal.nome + ' já tem um sinalizador chamado "' + nome
+      + '". Dois com o mesmo nome apareceriam iguais embaixo da situação.');
+  }
+
+  var campos = {
+    CanalId: canal.id, Nome: nome, Prazo: prazo, Unidade: unidade,
+    AvisoFaltando: aviso, ColunaQueLiga: quandoVale, ColunaDaData: colunaDaData,
+    ColunaDaHora: colunaDaHora, InicioDoExpediente: inicio, FimDoExpediente: fim,
+    Ordem: Number(dados.ordem) || 0, Ativo: ligado
+  };
+
+  if (id) {
+    atualizarRegistro_('SINALIZADORES', id, campos);
+    registrarAuditoria_('sinalizador.editar', 'SINALIZADORES', id, canal.nome + ': ' + nome);
+    return id;
+  }
+  var criado = inserirRegistro_('SINALIZADORES', campos);
+  registrarAuditoria_('sinalizador.criar', 'SINALIZADORES', criado.__id,
+    canal.nome + ': ' + nome);
+  return criado.__id;
+}
+
+/** Tira o sinalizador da tela e do selo. A linha permanece na planilha. */
+function ocultarSinalizador(idDoSinalizador) {
+  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+
+  var alvo = converterParaIdentificador_(idDoSinalizador);
+  var atual = buscarRegistros_('SINALIZADORES', 'Id', alvo, 1)[0];
+  if (!atual) throw new Error('Este sinalizador não existe.');
+
+  ocultarRegistro_('SINALIZADORES', alvo, quem.usuario.Id);
+  registrarAuditoria_('sinalizador.ocultar', 'SINALIZADORES', alvo, String(atual.Nome));
   return true;
 }
 
@@ -12051,7 +12346,11 @@ function montarFila_(registros, canal) {
   // calculados uma vez por fila, e não uma por caso.
   var comSla = Number(canal.slaHorasUteis) > 0;
   var finais = {};
-  var agora = comSla ? relogioDeParede_(new Date()) : null;
+  // Os sinalizadores (RET: 3 dias úteis; Mesa: 48h da área). O relógio é um
+  // só por fila, e a leitura da aba também.
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  var situacoes = sinalizadores.length ? situacoesPorChave_(canal) : null;
+  var agora = (comSla || sinalizadores.length) ? relogioDeParede_(new Date()) : null;
 
   // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
   // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
@@ -12101,7 +12400,12 @@ function montarFila_(registros, canal) {
       situacao: situacao,
       tom: tons[normalizarParaComparar_(situacao)] || 'neutro',
       // O SLA, quando o canal declara um (hoje, a Mesa Diamante).
-      sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null
+      sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null,
+      // Os sinalizadores deste caso, na ordem da aba. Vazio quando nenhum se
+      // aplica — e é o que faz a tela não desenhar nada.
+      sinais: sinalizadores.map(function (sinalizador) {
+        return sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      }).filter(function (sinal) { return sinal !== null; })
     };
   });
 }
@@ -12258,6 +12562,338 @@ function slaDoCaso_(registro, canal, finais, agora) {
     minutosUteis: gasto,
     prazo: prazo
   };
+}
+
+
+/* ============================================================================
+   OS SINALIZADORES DE PRAZO
+   ============================================================================
+   Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
+   RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um status
+   final; na Mesa, o caso encaminhado para a área tem 48 horas úteis.
+
+   É o mesmo relógio do SLA da Mesa — minutos ÚTEIS, de segunda a sexta, dentro
+   do expediente —, e por isso reaproveita as mesmas contas. O que muda é o que
+   cada sinalizador declara na aba SINALIZADORES: quando vale, desde quando
+   conta, quanto tempo tem e quando o amarelo acende. Nada disso é escrito
+   aqui; o PO ajusta em Configurações › Sinalizadores.
+
+   AS TRÊS CORES
+     verde      dentro do prazo, com folga;
+     amarelo    dentro do prazo, mas faltando pouco — por padrão, o último dia
+                útil. Na RET: dias 1 e 2 verdes, dia 3 amarelo;
+     vermelho   passou do prazo.
+   "Faltando pouco" é uma MARGEM, e não "exatamente 3 dias": em tempo corrido
+   o instante exato dura um minuto, e o amarelo nunca apareceria. Foi o PO quem
+   escolheu esta leitura, perguntado.
+
+   ATÉ QUANDO conta: até o caso chegar a um status FINAL — a lista de status
+   finais do canal, que já existe. Parou, o selo vira "cumprido" (verde) ou
+   "estourado" (vermelho): não é mais um aviso do que está correndo, é o
+   resultado. Caso final sem nenhuma data de quando fechou — os antigos, de
+   antes do carimbo — não ganha selo: não dá para dizer se cumpriu, e inventar
+   vermelho em milhares de casos encerrados ensinaria a ignorar o vermelho.
+   ============================================================================ */
+
+/** Os sinalizadores LIGADOS de um canal, prontos para contar. */
+function sinalizadoresDoCanal_(canal) {
+  // A aba é nova: quem ainda não rodou `atualizarPGO()` segue com o Trabalho
+  // funcionando, sem selo, em vez de uma tela que estoura.
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
+
+  var doCanal = converterParaIdentificador_(canal.id);
+  return lerRegistros_('SINALIZADORES')
+    .filter(function (linha) {
+      return converterParaIdentificador_(linha.CanalId) === doCanal
+        && normalizarParaComparar_(linha.Ativo) === 'sim';
+    })
+    .map(sinalizadorDaLinha_)
+    .filter(function (sinalizador) { return sinalizador.prazo > 0; })
+    .sort(function (um, outro) { return um.ordem - outro.ordem; });
+}
+
+/** Uma linha da aba vira o sinalizador com as contas já resolvidas. */
+function sinalizadorDaLinha_(linha) {
+  var abre = minutoDaHora_(linha.InicioDoExpediente);
+  var fecha = minutoDaHora_(linha.FimDoExpediente);
+  // Expediente em branco, ilegível ou que termina antes de começar volta ao
+  // padrão: contar com ele quebrado zeraria todos os prazos.
+  if (abre === null || fecha === null || fecha <= abre) {
+    abre = minutoDaHora_(RECC_EXPEDIENTE_PADRAO.abre);
+    fecha = minutoDaHora_(RECC_EXPEDIENTE_PADRAO.fecha);
+  }
+  return {
+    id: linha.__id,
+    canalId: converterParaIdentificador_(linha.CanalId),
+    nome: String(linha.Nome || '').trim() || 'Prazo',
+    prazo: Math.max(0, Number(linha.Prazo) || 0),
+    unidade: normalizarParaComparar_(linha.Unidade).indexOf('hora') === 0 ? 'horas' : 'dias',
+    aviso: Math.max(0, Number(linha.AvisoFaltando) || 0),
+    colunaQueLiga: String(linha.ColunaQueLiga || '').trim(),
+    colunaDaData: String(linha.ColunaDaData || '').trim(),
+    colunaDaHora: String(linha.ColunaDaHora || '').trim(),
+    inicioDoExpediente: horaDoMinuto_(abre),
+    fimDoExpediente: horaDoMinuto_(fecha),
+    abre: abre,
+    fecha: fecha,
+    ordem: Number(linha.Ordem) || 0,
+    ativo: normalizarParaComparar_(linha.Ativo) === 'sim'
+  };
+}
+
+/** 495 → "08:15". */
+function horaDoMinuto_(minutos) {
+  var horas = Math.floor(minutos / 60);
+  var resto = minutos % 60;
+  return (horas < 10 ? '0' : '') + horas + ':' + (resto < 10 ? '0' : '') + resto;
+}
+
+/** Um dia útil, em minutos, no expediente deste sinalizador. */
+function minutosDeUmaUnidade_(sinalizador) {
+  return sinalizador.unidade === 'dias' ? sinalizador.fecha - sinalizador.abre : 60;
+}
+
+/**
+ * "1 dia útil", "2 dias úteis e 3h", "35h", "20min".
+ *
+ * Prazo em HORAS fala em horas: quem pediu "48 horas úteis" lê "faltam 46h30",
+ * e não "4 dias úteis e 5h" — que obrigaria a refazer a conta de cabeça com
+ * um dia de 10h15.
+ */
+function duracaoDoPrazo_(minutos, expediente, emHoras) {
+  if (emHoras) return duracaoParaLer_(minutos, Number.MAX_VALUE);
+  if (minutos < 60) return minutos + 'min';
+  if (minutos < expediente) return duracaoParaLer_(minutos, expediente);
+  var dias = Math.floor(minutos / expediente);
+  var horas = Math.floor((minutos - dias * expediente) / 60);
+  return dias + (dias === 1 ? ' dia útil' : ' dias úteis') + (horas ? ' e ' + horas + 'h' : '');
+}
+
+/** A regra por extenso, para a tela de Configurações e a Produtividade. */
+function regraDoSinalizador_(sinalizador) {
+  var unidade = sinalizador.unidade === 'dias' ? 'dia útil' : 'hora útil';
+  var plural = sinalizador.unidade === 'dias' ? 'dias úteis' : 'horas úteis';
+  function quanto(n) {
+    return String(n).replace('.', ',') + ' ' + (n === 1 ? unidade : plural);
+  }
+  return quanto(sinalizador.prazo)
+    + (sinalizador.aviso > 0 ? ' · amarelo quando faltar ' + quanto(sinalizador.aviso) : '')
+    + (sinalizador.colunaQueLiga
+      ? ' · só com "' + sinalizador.colunaQueLiga + '" preenchida' : '');
+}
+
+/**
+ * O sinalizador de UM caso — ou null, quando não se aplica ou não dá para
+ * contar. `situacoes` é o catálogo do canal por chave: de lá sai se o status é
+ * final e em que coluna ele carimba.
+ */
+function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
+  // QUANDO VALE
+  if (sinalizador.colunaQueLiga && String(
+    registro[sinalizador.colunaQueLiga] === undefined ? '' : registro[sinalizador.colunaQueLiga]
+  ).trim() === '') return null;
+
+  // DESDE QUANDO. Sem coluna própria, a data e a hora de entrada do canal.
+  var colunaDaData = sinalizador.colunaDaData || canal.colunaDaData;
+  var colunaDaHora = sinalizador.colunaDaHora
+    || (sinalizador.colunaDaData ? '' : canal.colunaDaHora);
+  var inicio = colunaDaData ? converterParaData_(registro[colunaDaData]) : '';
+  if (!inicio) return null;
+
+  var relogio = relogioDeParede_(inicio);
+  var minutoDaHora = colunaDaHora ? minutoDaHora_(registro[colunaDaHora]) : null;
+  var de = {
+    dia: relogio.dia,
+    // Sem hora declarada, vale a que a própria data carrega (o carimbo do
+    // encaminhamento é data E hora); só data pura começa na abertura do dia.
+    minuto: minutoDaHora !== null ? minutoDaHora : (relogio.minuto > 0 ? relogio.minuto : sinalizador.abre)
+  };
+
+  // ATÉ QUANDO: o status final.
+  var situacao = canal.colunaDoStatus
+    ? situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])] : null;
+  var encerrado = !!(situacao && situacao.final);
+  var ate = agora;
+  if (encerrado) {
+    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+    var carimbo = situacao.colunaDeCarimbo
+      ? converterParaDataEHora_(registro[situacao.colunaDeCarimbo]) : '';
+    var quandoFechou = mudou || carimbo;
+    if (!quandoFechou) return null;
+    ate = relogioDeParede_(quandoFechou);
+  }
+
+  var porUnidade = minutosDeUmaUnidade_(sinalizador);
+  var prazo = Math.round(sinalizador.prazo * porUnidade);
+  var aviso = Math.round(sinalizador.aviso * porUnidade);
+  var gasto = minutosUteisEntre_(de, ate, sinalizador.abre, sinalizador.fecha);
+  var expediente = sinalizador.fecha - sinalizador.abre;
+  var dentro = gasto <= prazo;
+  var emHoras = sinalizador.unidade === 'horas';
+
+  var tom, resto;
+  if (encerrado) {
+    tom = dentro ? 'bom' : 'ruim';
+    resto = dentro ? 'cumprido em ' + duracaoDoPrazo_(gasto, expediente, emHoras)
+      : 'estourado, ' + duracaoDoPrazo_(gasto - prazo, expediente, emHoras) + ' além';
+  } else if (!dentro) {
+    tom = 'ruim';
+    resto = duracaoDoPrazo_(gasto - prazo, expediente, emHoras) + ' além do prazo';
+  } else if (prazo - gasto <= aviso) {
+    tom = 'atencao';
+    // Exatamente no limite (ex.: a sexta fechou e o prazo acabou junto): o
+    // próximo minuto de expediente já estoura. "vence em 0min" leria como erro.
+    resto = prazo - gasto <= 0 ? 'no limite do prazo'
+      : 'vence em ' + duracaoDoPrazo_(prazo - gasto, expediente, emHoras);
+  } else {
+    tom = 'bom';
+    resto = 'faltam ' + duracaoDoPrazo_(prazo - gasto, expediente, emHoras);
+  }
+
+  return {
+    id: sinalizador.id,
+    nome: sinalizador.nome,
+    tom: tom,
+    texto: sinalizador.nome + ' · ' + resto,
+    regra: regraDoSinalizador_(sinalizador),
+    dentro: dentro,
+    encerrado: encerrado,
+    alem: dentro ? 0 : gasto - prazo,
+    expediente: expediente
+  };
+}
+
+/** Os status do canal por chave, para o sinalizador saber o que é final. */
+function situacoesPorChave_(canal) {
+  var porChave = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    porChave[situacao.chave] = situacao;
+  });
+  return porChave;
+}
+
+/** O texto que identifica o caso numa lista: a 1ª coluna do 2º grupo da fila. */
+function rotuloDoCasoNaFila_(registro, grupos) {
+  var grupo = grupos.length > 1 ? grupos[1] : grupos[0];
+  var coluna = grupo && grupo.colunas[0];
+  if (!coluna) return String(registro.__id || '');
+  var valor = coluna.juntar
+    ? coluna.juntar.map(function (pedaco) {
+      return paraTexto_(registro[pedaco.cabecalho], pedaco.tipo);
+    }).filter(function (texto) { return texto !== ''; }).join('-')
+    : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
+  return valor || String(registro.__id || '');
+}
+
+/** Quantos casos cabem na lista da Produtividade; o resto vira "e mais N". */
+const RECC_MAXIMO_NA_LISTA_DE_PRAZOS = 50;
+
+/**
+ * O resumo de prazos que a Produtividade RECC mostra: quantos estão em cada
+ * cor, QUAIS casos passaram do prazo e de QUEM — "o nome do analista que
+ * deixou estourar", palavra do PO.
+ *
+ * `avaliados` é uma lista de { registro, tom, encerrado, alem }: vale tanto
+ * para o sinalizador quanto para o SLA da Mesa, que é o mesmo desenho.
+ */
+function resumirPrazos_(avaliados, canal, expediente, emHoras) {
+  var grupos = colunasDaFila_(canal);
+  var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
+  var r = { total: avaliados.length, noPrazo: 0, atencao: 0, fora: 0,
+    cumpridos: 0, estourados: 0, lista: [], maisCasos: 0, porAnalista: [] };
+
+  var passaram = [];
+  avaliados.forEach(function (um) {
+    if (um.tom === 'ruim') {
+      if (um.encerrado) r.estourados++; else r.fora++;
+      passaram.push(um);
+    } else if (um.encerrado) {
+      r.cumpridos++;
+    } else if (um.tom === 'atencao') {
+      r.atencao++;
+    } else {
+      r.noPrazo++;
+    }
+  });
+
+  passaram.sort(function (um, outro) { return outro.alem - um.alem; });
+  r.maisCasos = Math.max(0, passaram.length - RECC_MAXIMO_NA_LISTA_DE_PRAZOS);
+  var quem = {};
+  passaram.forEach(function (um, i) {
+    var nome = colunaDoAnalista ? String(um.registro[colunaDoAnalista] || '').trim() : '';
+    nome = nome || 'Sem analista';
+    var linha = quem[nome] = quem[nome] || { analista: nome, fora: 0, estourados: 0, total: 0 };
+    if (um.encerrado) linha.estourados++; else linha.fora++;
+    linha.total++;
+    if (i < RECC_MAXIMO_NA_LISTA_DE_PRAZOS) {
+      r.lista.push({
+        id: um.registro.__id,
+        caso: rotuloDoCasoNaFila_(um.registro, grupos),
+        analista: nome,
+        situacao: canal.colunaDoStatus ? String(um.registro[canal.colunaDoStatus] || '') : '',
+        encerrado: um.encerrado,
+        alem: duracaoDoPrazo_(um.alem, expediente, emHoras)
+      });
+    }
+  });
+  r.porAnalista = Object.keys(quem).map(function (nome) { return quem[nome]; })
+    .sort(function (um, outro) {
+      return outro.total - um.total || um.analista.localeCompare(outro.analista);
+    });
+  return r;
+}
+
+/**
+ * O controle de prazos da Produtividade RECC: o SLA do canal, quando ele tem,
+ * e cada sinalizador ligado. `null` quando o canal não tem nenhum dos dois — e
+ * aí a tela não desenha o bloco.
+ */
+function controleDePrazos_(casos, canal) {
+  var situacoes = situacoesPorChave_(canal);
+  var finais = {};
+  Object.keys(situacoes).forEach(function (chave) {
+    if (situacoes[chave].final) finais[chave] = true;
+  });
+  var agora = relogioDeParede_(new Date());
+
+  var sla = null;
+  if (Number(canal.slaHorasUteis) > 0) {
+    var abre = minutoDaHora_(canal.inicioDoExpediente);
+    var fecha = minutoDaHora_(canal.fimDoExpediente);
+    var contados = [];
+    var semConta = 0;
+    casos.forEach(function (registro) {
+      var um = slaDoCaso_(registro, canal, finais, agora);
+      if (!um) { semConta++; return; }
+      contados.push({ registro: registro, tom: um.tom, encerrado: um.parou,
+        alem: Math.max(0, um.minutosUteis - um.prazo) });
+    });
+    sla = resumirPrazos_(contados, canal,
+      (fecha !== null && abre !== null) ? fecha - abre : 615, true);
+    sla.nome = 'SLA de ' + String(Number(canal.slaHorasUteis)).replace('.', ',')
+      + ' horas úteis';
+    sla.semConta = semConta;
+  }
+
+  var sinalizadores = sinalizadoresDoCanal_(canal).map(function (sinalizador) {
+    var avaliados = [];
+    var semPrazo = 0;
+    casos.forEach(function (registro) {
+      var um = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      if (um) avaliados.push({ registro: registro, tom: um.tom, encerrado: um.encerrado, alem: um.alem });
+    });
+    semPrazo = casos.length - avaliados.length;
+    var resumo = resumirPrazos_(avaliados, canal, sinalizador.fecha - sinalizador.abre,
+      sinalizador.unidade === 'horas');
+    resumo.id = sinalizador.id;
+    resumo.nome = sinalizador.nome;
+    resumo.regra = regraDoSinalizador_(sinalizador);
+    resumo.semPrazo = semPrazo;
+    return resumo;
+  });
+
+  if (!sla && !sinalizadores.length) return null;
+  return { sla: sla, sinalizadores: sinalizadores };
 }
 
 
@@ -12441,6 +13077,14 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
       `null` quando o canal não declarou nada — e aí a tela não desenha nada.
     */
     valorPorSituacao: valorPorSituacao_(casos, canal),
+    /*
+      OS PRAZOS: o SLA do canal (dentro e fora) e cada sinalizador, com os
+      casos que passaram do prazo e o nome de quem deixou passar. Vem FORA de
+      `componentes` pelo mesmo motivo do valor por situação: o que ele mostra é
+      ajustado em Configurações › Sinalizadores, e não na lista de gráficos.
+      `null` quando o canal não tem prazo nenhum.
+    */
+    prazos: controleDePrazos_(casos, canal),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }
@@ -14229,6 +14873,10 @@ function semearDadosIniciais_(emailDoInstalador) {
   var idCanal = canais[1]['Id'];
   var idVg = canais[2]['Id'];
 
+  // --- sinalizadores -----------------------------------------------------
+  contagem.sinalizadores = inserirVariosRegistros_('SINALIZADORES',
+    sinalizadoresDeFabrica_(idRet, idCanal, idVg)).length;
+
   // --- catálogo por canal ----------------------------------------------------
   var itens = [];
   // Cada situação com a sua cor. A cor não é enfeite: numa fila de trinta
@@ -15153,6 +15801,10 @@ function atualizarPGO() {
   // --- 6b. o lixo que uma versão desta migração deixou em CAMPOS -----------
   feito = feito.concat(limparCamposSemCanal_(pulados));
 
+  // --- 6b2. os sinalizadores e o carimbo do encaminhamento ------------------
+  feito = feito.concat(criarOsSinalizadores_(pulados));
+  feito = feito.concat(criarOCarimboDoEncaminhamento_(pulados));
+
   // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
   feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
 
@@ -15499,6 +16151,131 @@ function limparCamposSemCanal_(pulados) {
     feito.push('campo solto removido: ' + campo.Aba + '.' + campo.Cabecalho);
   });
   esquecerEstruturaLida_('CAMPOS');
+  return feito;
+}
+
+/**
+ * Os sinalizadores com que o sistema nasce — palavra do PO.
+ *
+ *   RET   "temos até 3 dias para alterar para o status final": 3 dias úteis,
+ *         do cadastro até um dos cinco desfechos. Verde nos dois primeiros
+ *         dias, amarelo no terceiro (o último), vermelho depois.
+ *   MESA  o caso encaminhado para a área tem 48 horas úteis para voltar e
+ *         ser concluído. Só vale com a Área responsável preenchida, e conta
+ *         do momento em que o sistema carimbou o encaminhamento. O amarelo
+ *         acende nas últimas 10 horas úteis — um expediente, o "último dia".
+ *   VG    o PO ainda não definiu. A linha existe, DESLIGADA e com prazo zero,
+ *         para ele só preencher e ligar em Configurações › Sinalizadores.
+ *
+ * O expediente é o da célula, 08:15 às 18:30, nos três.
+ */
+function sinalizadoresDeFabrica_(idRet, idMesa, idVg) {
+  function linha(canalId, nome, prazo, unidade, aviso, quandoVale, desde, ordem, ligado) {
+    return {
+      CanalId: canalId, Nome: nome, Prazo: prazo, Unidade: unidade,
+      AvisoFaltando: aviso, ColunaQueLiga: quandoVale, ColunaDaData: desde,
+      ColunaDaHora: '',
+      InicioDoExpediente: RECC_EXPEDIENTE_PADRAO.abre,
+      FimDoExpediente: RECC_EXPEDIENTE_PADRAO.fecha,
+      Ordem: ordem, Ativo: ligado
+    };
+  }
+  return [
+    linha(idRet, 'Prazo de retorno', 3, 'dias', 1, '', '', 1, true),
+    linha(idMesa, 'Retorno da área', 48, 'horas', 10,
+      'Área responsável', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, 1, true),
+    linha(idVg, 'Prazo de retorno', 0, 'dias', 1, '', '', 1, false)
+  ];
+}
+
+/**
+ * Cria a aba SINALIZADORES e as linhas de fábrica, numa instalação em uso.
+ *
+ * Só semeia o canal que NÃO tem nenhuma linha, nem oculta: quem tirou o
+ * sinalizador da RET de propósito não o vê renascer a cada atualização, e
+ * quem ajustou o prazo continua com o prazo dele. Canal que o PO criou depois
+ * não ganha sinalizador — não há o que supor sobre ele.
+ */
+function criarOsSinalizadores_(pulados) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+
+  if (!planilha.getSheetByName('SINALIZADORES')) {
+    criarAbaDoContrato_(planilha, esquemaDaAba_('SINALIZADORES'));
+    esquecerEstruturaLida_();
+    feito.push('aba SINALIZADORES criada');
+  } else {
+    pulados.push('aba SINALIZADORES já existe');
+  }
+  if (!planilha.getSheetByName('CANAIS')) return feito;
+
+  var temLinha = {};
+  lerRegistros_('SINALIZADORES', { incluirOcultos: true }).forEach(function (linha) {
+    temLinha[converterParaIdentificador_(linha.CanalId)] = true;
+  });
+  var idDaAba = {};
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    idDaAba[String(canal.Aba)] = canal.Id;
+  });
+
+  var padroes = sinalizadoresDeFabrica_(idDaAba.BASE_RET, idDaAba.BASE_MESA, idDaAba.BASE_VG);
+  var abas = ['BASE_RET', 'BASE_MESA', 'BASE_VG'];
+  padroes.forEach(function (padrao, i) {
+    var canalId = idDaAba[abas[i]];
+    if (!canalId) return;
+    if (temLinha[converterParaIdentificador_(canalId)]) {
+      pulados.push('o canal ' + abas[i] + ' já tem sinalizador');
+      return;
+    }
+    inserirRegistro_('SINALIZADORES', padrao);
+    feito.push('sinalizador "' + padrao.Nome + '" criado para ' + abas[i]
+      + (padrao.Ativo ? '' : ' (desligado, para você definir)'));
+  });
+  return feito;
+}
+
+/**
+ * Cria `Data do encaminhamento` na base da Mesa que já está em uso.
+ *
+ * É a UMA exceção à regra de que a atualização não cria coluna em base de
+ * caso — e existe porque o PO decidiu que o sistema carimba o momento do
+ * encaminhamento. Sem a coluna, os 48 horas úteis não têm de onde contar.
+ *
+ * A coluna é do SISTEMA: entra em CAMPOS desligada, na seção "Preenchido pelo
+ * sistema", como o carimbo de status. Ligada, apareceria no formulário
+ * pedindo para alguém digitar uma data que o sistema já sabe.
+ *
+ * Os casos que já estavam encaminhados antes dela ficam sem o carimbo — e
+ * sem prazo, de propósito: inventar a data deles seria contar o prazo errado.
+ */
+function criarOCarimboDoEncaminhamento_(pulados) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  if (!planilha.getSheetByName('BASE_MESA')) {
+    pulados.push('aba BASE_MESA não existe');
+    return feito;
+  }
+  esquecerEstruturaLida_('BASE_MESA');
+  if (posicaoDaColuna_(estruturaDaAba_('BASE_MESA', true),
+    RECC_COLUNA_DATA_DO_ENCAMINHAMENTO) >= 0) {
+    pulados.push('BASE_MESA.' + RECC_COLUNA_DATA_DO_ENCAMINHAMENTO + ' já existe');
+    return feito;
+  }
+
+  adicionarColuna_('BASE_MESA', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO,
+    RECC_TIPO_DE_DADO.DATA_HORA);
+  esquecerEstruturaLida_();
+
+  var chave = normalizarParaComparar_(RECC_COLUNA_DATA_DO_ENCAMINHAMENTO);
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (String(campo.Aba) === 'BASE_MESA' && normalizarParaComparar_(campo.Cabecalho) === chave) {
+      atualizarRegistro_('CAMPOS', campo.__id, {
+        Ativo: false, Secao: 'Preenchido pelo sistema'
+      });
+    }
+  });
+  feito.push('BASE_MESA.' + RECC_COLUNA_DATA_DO_ENCAMINHAMENTO + ' criada '
+    + '(o sistema carimba quando a área é escolhida)');
   return feito;
 }
 
@@ -16556,6 +17333,7 @@ function rodarDiagnostico_() {
     rodarBloco_('campos', 'Os campos do formulário', blocoDosCampos_),
     rodarBloco_('paineis', 'Os cards e os gráficos', blocoDosPaineis_),
     rodarBloco_('analises', 'As análises', blocoDasAnalises_),
+    rodarBloco_('sinalizadores', 'Os sinalizadores de prazo', blocoDosSinalizadores_),
     rodarBloco_('acesso', 'Quem entra e o que pode', blocoDoAcesso_),
     rodarBloco_('tela', 'A ligação entre a tela e o servidor', blocoDaTela_),
     rodarBloco_('estilos', 'A folha de estilos', blocoDosEstilos_)
@@ -17136,6 +17914,100 @@ function blocoDasAnalises_() {
         + (receita.GeradaEm ? '' : ' (nunca gerada)')));
   });
 
+  return itens;
+}
+
+/**
+ * Os sinalizadores de prazo apontam para coisas que existem?
+ *
+ * Um sinalizador com a coluna errada não estoura: ele simplesmente não
+ * sinaliza, e o caso vencido passa com a etiqueta verde — o pior jeito de
+ * falhar num controle de prazo. Por isso o laudo confere, um a um, o canal, as
+ * colunas e se há um status final onde o prazo possa parar.
+ */
+function blocoDosSinalizadores_() {
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
+    return [item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'A aba SINALIZADORES não existe',
+      'Sem ela os selos de prazo não aparecem no Trabalho nem na Produtividade RECC.',
+      'Rode atualizarPGO() no editor do Apps Script.')];
+  }
+
+  var linhas = lerRegistros_('SINALIZADORES');
+  if (!linhas.length) {
+    return [item_(RECC_SITUACOES_DO_LAUDO.OK, 'Nenhum sinalizador cadastrado')];
+  }
+
+  var canaisPorId = {};
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    canaisPorId[converterParaIdentificador_(canal.Id)] = canal;
+  });
+
+  var itens = [];
+  linhas.forEach(function (linha) {
+    var sinalizador = sinalizadorDaLinha_(linha);
+    var nome = '"' + sinalizador.nome + '"';
+    var canal = canaisPorId[sinalizador.canalId];
+
+    if (!canal) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+        'O sinalizador ' + nome + ' aponta para um canal que não existe',
+        'Ele não sinaliza caso nenhum.',
+        'Tire-o da lista em Configurações › Sinalizadores.'));
+      return;
+    }
+    var rotulo = 'O sinalizador ' + nome + ' (' + String(canal.Nome) + ')';
+
+    if (!sinalizador.ativo) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ' está desligado'));
+      return;
+    }
+    if (sinalizador.prazo <= 0) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO, rotulo + ' está ligado sem prazo',
+        'Com prazo zero ele não sinaliza nada.',
+        'Defina o prazo em Configurações › Sinalizadores, ou desligue-o.'));
+      return;
+    }
+
+    var estrutura = estruturaDaAba_(String(canal.Aba || ''));
+    var perdidas = [sinalizador.colunaQueLiga, sinalizador.colunaDaData,
+      sinalizador.colunaDaHora].filter(function (coluna) {
+      return coluna && posicaoDaColuna_(estrutura, coluna) < 0;
+    });
+    if (perdidas.length) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+        rotulo + ' cita coluna que a base não tem',
+        algunsExemplos_(perdidas),
+        'Sem ela o caso vencido passa sem selo. Acerte em Configurações › '
+        + 'Sinalizadores — ou, se é a "' + RECC_COLUNA_DATA_DO_ENCAMINHAMENTO
+        + '", rode atualizarPGO().'));
+      return;
+    }
+
+    var deOndeContar = sinalizador.colunaDaData || String(canal.ColunaDaData || '').trim();
+    if (!deOndeContar) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+        rotulo + ' não tem de onde começar a contar',
+        'Nem ele nem o canal declaram uma coluna de data.',
+        'Escolha a data em Configurações › Sinalizadores.'));
+      return;
+    }
+
+    var temFinal = situacoesDoCanal_({ id: canal.Id }).some(function (situacao) {
+      return situacao.final;
+    });
+    if (!temFinal) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+        rotulo + ' não tem onde parar',
+        'O canal não tem nenhum status marcado como final, e o prazo só para num '
+        + 'status final: todo caso acabaria vermelho.',
+        'Marque os status finais em Configurações › Ajustes Gerais.'));
+      return;
+    }
+
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ' está coerente',
+      regraDoSinalizador_(sinalizador)));
+  });
   return itens;
 }
 

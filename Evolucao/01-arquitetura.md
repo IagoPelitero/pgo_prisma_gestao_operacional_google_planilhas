@@ -241,6 +241,13 @@ mentir quando alguém edita a área responsável direto na planilha.
 
 **`Abertura indevida`**: `SIM` / `NAO`, também vira indicador.
 
+**`Data do encaminhamento`** (ao fim das colunas de dados): o momento, com data
+e hora, em que a `Área responsável` foi escolhida — é de onde conta o prazo de
+48 horas úteis que a área tem para devolver o caso. Quem preenche é o **sistema**
+(coluna "Preenchido pelo sistema", desativada em `CAMPOS`): escolher a área
+carimba, trocar de área carimba de novo, salvar sem mexer na área não carimba.
+Encaminhado antes da coluna existir, fica sem carimbo — e sem prazo inventado.
+
 ### 3.2 Cadastros
 
 | Aba | Colunas |
@@ -278,6 +285,7 @@ formulário (no momento em que a SUSEP é digitada) e no dashboard.
 | `PAINEIS` | `Id` · `Tela` · `CanalId` · `Titulo` · `TipoComponente` · `CampoDimensao` · `CampoMedida` · `Agregacao` · `Limite` · `Filtro` · `Ordem` · `Largura` · `VisivelPara` · `Ativo` | Os cards e gráficos de cada tela, configuráveis |
 | `CONFIG` | `Id` · `Chave` · `Valor` · `Descricao` · `AtualizadoPor` · `Data` | Parâmetros gerais (nome do sistema, janela de dias, metas…) |
 | `AUDITORIA` | `Id` · `DataHora` · `UsuarioId` · `Acao` · `Entidade` · `RegistroId` · `Detalhe` | Trilha das ações relevantes. Sem dado pessoal |
+| `SINALIZADORES` | `Id` · `CanalId` · `Nome` · `Prazo` · `Unidade` · `AvisoFaltando` · `ColunaQueLiga` · `ColunaDaData` · `ColunaDaHora` · `InicioDoExpediente` · `FimDoExpediente` · `Ordem` · `Ativo` | Os **prazos** que o caso tem em cada canal (RET: 3 dias úteis; Mesa: 48 horas úteis depois do encaminhamento; VG: preparado, desligado). Unidade `dias` ou `horas`, sempre úteis. Linha nova = prazo novo, sem código |
 | `ANALISES` | `Id` · `Nome` · `Descricao` · `CanalId` · `Colunas` · `Filtros` · `Dias` · `Ordem` · `Ativo` · `GeradaEm` · `GeradaPor` · `Linhas` | A **receita** de cada aba `ANALISE_*`. A aba gerada é outra coisa, e não está no contrato |
 
 ### 3.4 Abas de análise (geradas pelo sistema)

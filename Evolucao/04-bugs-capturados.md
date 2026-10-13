@@ -1590,9 +1590,53 @@ o menu aberto e encolhido. Um teste confere que nenhuma regra usa `:has()`.
 
 ---
 
+### 70 · O "vence em 0min" que parecia erro
+
+**Sintoma.** Na prévia, um caso da RET mostrava **"Prazo de retorno · vence em
+0min"** em amarelo, o fim de semana inteiro.
+
+**Causa.** O prazo de três dias úteis acabava exatamente no fim do expediente
+de sexta. Dentro do prazo (o limite ainda vale), faltando zero minutos — e o
+texto era escrito igual para qualquer saldo, inclusive zero.
+
+**Defesa.** Saldo zero diz **"no limite do prazo"**. O teste da borda passou a
+conferir o texto, além da cor: o primeiro minuto de expediente seguinte já é
+vermelho, e a frase é a que avisa disso.
+
+---
+
+### 71 · "48 horas úteis" lido como "4 dias úteis e 5h"
+
+**Sintoma.** Na Mesa, o selo de um caso encaminhado há 90 minutos dizia
+"faltam 4 dias úteis e 5h" para um prazo que o PO pediu em **horas**.
+
+**Causa.** O formatador de duração era o do SLA de 6 horas, que passa a falar em
+dias úteis quando o saldo passa de um expediente. Para um prazo de 48 horas, o
+dia de 10h15 obrigava quem lia a refazer a conta de cabeça.
+
+**Defesa.** Prazo em **horas** fala em horas ("faltam 46h30", "34h além"); em
+**dias**, em dias úteis. O SLA da Mesa e o resumo da Produtividade seguem a
+mesma regra.
+
+---
+
+### 72 · O teste do escape que não escapava de nada
+
+**Sintoma.** Nenhum para o PO: achado ao quebrar o código de propósito.
+
+**Causa.** O teste do selo conferia que a tela contém `escapar(sinal.texto)`.
+Só que o texto aparece duas vezes — no atributo `title` e dentro do selo — e o
+`title` bastava para o teste passar. Tirar o escape de dentro do selo, onde o
+texto vira HTML, continuava verde.
+
+**Defesa.** O teste confere as DUAS linhas separadamente, e a quebra de
+propósito (tirar o escape de dentro do selo) ficou na lista das dezoito.
+
+---
+
 ## O que esta lista ensina
 
-**São sessenta e nove achados, e a maioria era silenciosa.** Não davam erro, não
+**São setenta e dois achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1760,3 +1804,7 @@ Daí as duas práticas que o projeto não abre mão:
     pergunta era se algo saía da janela, e não se algo estava em cima de
     outra coisa. Quando o PO aponta um sintoma que a ferramenta diz não
     existir, é a ferramenta que precisa aprender.
+42. **O que aparece duas vezes no código só está testado se cada uma for
+    testada.** O item 72 passava porque a primeira ocorrência de `escapar(...)`
+    satisfazia a busca. Quebre a segunda de propósito: se continuar verde, o
+    teste está olhando a ocorrência errada.

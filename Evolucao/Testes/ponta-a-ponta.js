@@ -421,6 +421,61 @@ async function rodar() {
     igual(endereco, '#trabalho', 'gravou e levou para o Trabalho');
   });
 
+  /* --------------------------------------------------- os sinalizadores -- */
+
+  console.log('\nOs sinalizadores de prazo');
+
+  await teste('o caso cadastrado chega ao Trabalho com o selo de prazo', async () => {
+    // A data de recepção é do servidor (hoje), então o caso novo nasce dentro
+    // do prazo: o selo existe, e não é vermelho. O selo chega pela ponte real.
+    await pagina.waitForTimeout(600);
+    const selos = await pagina.$$eval('.selo-prazo', (es) => es.map((e) => e.className));
+    verdadeiro(selos.length > 0, 'nenhum selo de prazo na fila do Trabalho');
+    verdadeiro(selos.every((c) => c.indexOf('tom-ruim') < 0),
+      'o caso de hoje não pode nascer fora do prazo');
+  });
+
+  await teste('o PO ajusta o prazo da RET pela tela e a planilha guarda', async () => {
+    await pagina.click('[data-tela="configuracoes"]');
+    await pagina.waitForTimeout(600);
+    await pagina.click('[data-secao="sinalizadores"]');
+    await pagina.waitForTimeout(800);
+
+    const lista = await pagina.textContent('#config-lista');
+    verdadeiro(lista.indexOf('Lendo') < 0, 'a tela ficou presa em "Lendo"');
+    contem(lista, 'Prazo de retorno');
+    contem(lista, 'Retorno da área');
+
+    const botoes = await pagina.$$('[data-sinalizador]');
+    let daRet = null;
+    for (const botao of botoes) {
+      const texto = await botao.textContent();
+      if (texto.indexOf('RET ·') >= 0) daRet = botao;
+    }
+    verdadeiro(!!daRet, 'o sinalizador da RET aparece na lista');
+    await daRet.click();
+    await pagina.waitForTimeout(500);
+
+    await pagina.fill('#cfg-sn-prazo', '4');
+    await pagina.click('#form-sinalizador button[type="submit"]');
+    await pagina.waitForTimeout(900);
+
+    const linha = naPlanilha('SINALIZADORES').find((l) => String(l.Prazo) === '4');
+    verdadeiro(!!linha, 'a linha da RET passou a ter prazo 4');
+    igual(naPlanilha('SINALIZADORES').length, 3, 'editar não cria linha');
+    contem(await pagina.textContent('#config-lista'), '4 dias úteis',
+      'a lista recarregou com a regra nova');
+  });
+
+  await teste('amarelo igual ao prazo é recusado, com o motivo na tela', async () => {
+    await pagina.fill('#cfg-sn-aviso', '4');
+    await pagina.click('#form-sinalizador button[type="submit"]');
+    await pagina.waitForTimeout(900);
+    contem(await pagina.textContent('#config-painel'), 'Use um aviso menor que o prazo');
+    verdadeiro(!!naPlanilha('SINALIZADORES').find((l) => String(l.AvisoFaltando) === '1'
+      && String(l.Prazo) === '4'), 'a planilha não mudou');
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();

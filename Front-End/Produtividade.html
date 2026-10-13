@@ -72,6 +72,7 @@ var TelaProdutividade = (function () {
     // número que a pessoa já leu como se fosse o total.
     elemento('analitico').innerHTML = desenharFiltros()
       + desenharCartoes()
+      + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
@@ -126,6 +127,109 @@ var TelaProdutividade = (function () {
           + '</div>';
       }).join('')
       + '</div>';
+  }
+
+  /**
+   * O CONTROLE DE PRAZOS — o que a gestão pediu para acompanhar.
+   *
+   * Palavra do PO: sinalizar "os casos e o nome do analista que deixou estourar
+   * o prazo", e na Mesa "quantos casos estão dentro e quantos fora da SLA".
+   * Cada prazo é um bloco: quantos estão em cada cor, quem deixou passar e
+   * quais casos são. O SLA da Mesa mostra só dentro e fora; os sinalizadores
+   * mostram também os que vencem em breve, que é quando ainda dá para agir.
+   *
+   * Conta os casos DO PERÍODO escolhido em cima — o mesmo recorte dos
+   * cartões e dos gráficos, para os números não discordarem entre si.
+   */
+  function desenharPrazos() {
+    var prazos = painel.prazos;
+    if (!prazos) return '';
+
+    var blocos = [];
+    if (prazos.sla) blocos.push(blocoDoSla(prazos.sla));
+    prazos.sinalizadores.forEach(function (sinalizador) {
+      blocos.push(blocoDoSinalizador(sinalizador));
+    });
+
+    return '<section class="cartao prazos" aria-labelledby="titulo-dos-prazos">'
+      + '<header class="origem-cabeca"><h3 id="titulo-dos-prazos">Controle de prazos</h3>'
+      + '</header>' + blocos.join('') + '</section>';
+  }
+
+  function tileDePrazo(rotulo, numero, tom, dica) {
+    return '<div class="indicador tom-' + escapar(tom) + '"'
+      + (dica ? ' title="' + escapar(dica) + '"' : '') + '>'
+      + '<span class="rotulo">' + escapar(rotulo) + '</span>'
+      + '<strong class="numero">' + numero + '</strong></div>';
+  }
+
+  function blocoDoSla(sla) {
+    var dentro = sla.noPrazo + sla.cumpridos;
+    var fora = sla.fora + sla.estourados;
+    return '<div class="prazo-bloco" data-prazo="sla">'
+      + '<h4>' + escapar(sla.nome) + '</h4>'
+      + '<p class="prazo-regra">Conta de segunda a sexta, no expediente, até a '
+      + 'primeira resposta.</p>'
+      + '<div class="cartoes">'
+      + tileDePrazo('Dentro do SLA', dentro, 'bom',
+        'Respondidos no prazo, mais os que ainda estão dentro dele')
+      + tileDePrazo('Fora do SLA', fora, fora ? 'ruim' : 'neutro',
+        'Passaram do prazo, respondidos ou não')
+      + (sla.semConta ? tileDePrazo('Sem como contar', sla.semConta, 'neutro',
+        'Casos sem data de entrada: o prazo não tem de onde começar') : '')
+      + '</div>' + desenharQuemPassou(sla, 'Fora do SLA') + '</div>';
+  }
+
+  function blocoDoSinalizador(sinalizador) {
+    return '<div class="prazo-bloco" data-prazo="' + escapar(sinalizador.id) + '">'
+      + '<h4>' + escapar(sinalizador.nome) + '</h4>'
+      + '<p class="prazo-regra">' + escapar(sinalizador.regra)
+      + ' · de segunda a sexta, no expediente, até o status final.</p>'
+      + '<div class="cartoes">'
+      + tileDePrazo('No prazo', sinalizador.noPrazo, 'bom', 'Abertos, com folga')
+      + tileDePrazo('Vencem em breve', sinalizador.atencao,
+        sinalizador.atencao ? 'atencao' : 'neutro',
+        'Abertos, no último dia do prazo')
+      + tileDePrazo('Fora do prazo', sinalizador.fora, sinalizador.fora ? 'ruim' : 'neutro',
+        'Abertos que já passaram do prazo')
+      + tileDePrazo('Encerrados fora', sinalizador.estourados,
+        sinalizador.estourados ? 'ruim' : 'neutro',
+        'Chegaram ao status final depois do prazo')
+      + tileDePrazo('Encerrados no prazo', sinalizador.cumpridos, 'bom',
+        'Chegaram ao status final dentro do prazo')
+      + '</div>' + desenharQuemPassou(sinalizador, 'Passaram do prazo') + '</div>';
+  }
+
+  /** Quem deixou passar, e quais casos são. */
+  function desenharQuemPassou(resumo, titulo) {
+    if (!resumo.lista.length) {
+      return '<p class="prazo-limpo">Nenhum caso passou do prazo neste período.</p>';
+    }
+    var analistas = resumo.porAnalista.map(function (um) {
+      return '<li class="prazo-analista"><strong>' + escapar(um.analista) + '</strong>'
+        + '<span>' + um.total + (um.total === 1 ? ' caso' : ' casos')
+        + (um.fora && um.estourados
+          ? ' (' + um.fora + ' em aberto, ' + um.estourados + ' encerrado'
+            + (um.estourados === 1 ? '' : 's') + ')' : '') + '</span></li>';
+    }).join('');
+
+    var linhas = resumo.lista.map(function (caso) {
+      return '<tr><td>' + escapar(caso.analista) + '</td>'
+        + '<td><span class="principal">' + escapar(caso.caso) + '</span></td>'
+        + '<td>' + escapar(caso.situacao || '—') + '</td>'
+        + '<td>' + (caso.encerrado ? 'Encerrado' : 'Em aberto') + '</td>'
+        + '<td class="direita">' + escapar(caso.alem) + '</td></tr>';
+    }).join('');
+
+    return '<h5 class="prazo-titulo">' + escapar(titulo) + ' · por analista</h5>'
+      + '<ul class="prazo-analistas">' + analistas + '</ul>'
+      + '<div class="rolagem-tabela"><table class="fila prazos-lista">'
+      + '<thead><tr><th>Analista</th><th>Caso</th><th>Situação</th><th>Estado</th>'
+      + '<th class="direita">Além do prazo</th></tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div>'
+      + (resumo.maisCasos
+        ? '<p class="prazo-regra">E mais ' + resumo.maisCasos + ' caso(s), do que '
+          + 'passou menos do prazo. A lista mostra os mais atrasados.</p>' : '');
   }
 
   function desenharFiltros() {

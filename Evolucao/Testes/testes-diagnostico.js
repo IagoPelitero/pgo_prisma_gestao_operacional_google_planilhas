@@ -63,12 +63,12 @@ function rodarTestesDeDiagnostico() {
       'o laudo confere muita coisa, achei ' + laudo.resumo.total);
   });
 
-  teste('os onze blocos aparecem sempre, na mesma ordem', () => {
+  teste('os doze blocos aparecem sempre, na mesma ordem', () => {
     const { chamar } = instalacaoNova();
     const laudo = chamar('diagnosticoRECC()');
     igual(laudo.blocos.map((b) => b.chave).join(','),
       'ambiente,estrutura,sequencias,identificadores,canais,campos,paineis,'
-      + 'analises,acesso,tela,estilos');
+      + 'analises,sinalizadores,acesso,tela,estilos');
   });
 
   teste('definir a senha zera a única atenção', () => {
@@ -118,7 +118,7 @@ function rodarTestesDeDiagnostico() {
 
     const laudo = chamar('diagnosticoRECC()');
 
-    igual(laudo.blocos.length, 11, 'o bloco continua no laudo');
+    igual(laudo.blocos.length, 12, 'o bloco continua no laudo');
     const oDaEstrutura = bloco(laudo, 'estrutura');
     igual(oDaEstrutura.situacao, 'falha');
     contem(oDaEstrutura.itens[0].oQue, 'não conseguiu rodar');

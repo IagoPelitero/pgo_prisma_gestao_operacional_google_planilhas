@@ -2298,6 +2298,71 @@ tirar o `:has()`.
 
 ---
 
+## Etapa 29 — Os sinalizadores de prazo
+
+Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
+RECC". Na RET, o caso cadastrado tem **3 dias úteis** (segunda a sexta, 08:15
+às 18:30) para chegar a um status final — retido, não retido, sem sucesso de
+contato, cancelado ou pago —: verde embaixo de 3 dias, amarelo no 3º, vermelho
+depois, e a Produtividade nomeia o analista que deixou estourar. Na Mesa, o
+caso **encaminhado para a área** tem **48 horas úteis** para voltar, e a
+Produtividade mostra também quantos casos estão dentro e fora do SLA de 6
+horas úteis. O VG fica preparado. Tudo ajustável em Configurações ›
+Sinalizadores.
+
+Duas respostas do PO, perguntadas antes de escrever:
+
+- **De onde conta a Mesa:** uma coluna nova, **"Data do encaminhamento"**, que
+  o sistema carimba — com data e hora — quando a "Área responsável" é escolhida.
+  Trocar de área é encaminhar de novo (prazo novo); salvar sem mexer na área
+  não carimba. A coluna nasce desativada em CAMPOS: ninguém a digita.
+- **O amarelo da RET:** "está no 3º dia útil". Dias 1 e 2 verdes, dia 3
+  amarelo, depois do prazo vermelho. A margem (1 dia na RET, 10 horas na Mesa)
+  se ajusta em Sinalizadores.
+
+| peça | o que ficou |
+|---|---|
+| **Aba `SINALIZADORES`** | Uma linha por prazo: canal, nome, prazo, unidade (dias ou horas úteis), quanto antes acende o amarelo, a coluna que liga (Mesa: "Área responsável"), de onde conta, expediente, ordem, ativo. Nasce com RET (3 dias), Mesa (48 horas) e VG (prazo zero, **desligado**) |
+| **O motor** | Mesmos minutos úteis do SLA da Mesa (segunda a sexta, só no expediente), que **não foi tocado**. Para no status final: o selo vira "cumprido" ou "estourado". Caso final sem data de quando fechou — os antigos — não ganha selo, em vez de um vermelho falso |
+| **Trabalho** | O selo embaixo da situação, ao lado do SLA. A cor sozinha não basta: cada selo tem o texto e uma leitura para quem não distingue as cores |
+| **Produtividade RECC** | "Controle de prazos": quantos no prazo, vencendo, fora, encerrados fora e dentro; **quem deixou estourar**, de quem mais para quem menos; e a lista dos casos (os 50 piores, com "e mais N"). Na Mesa, o SLA de 6 horas entra no mesmo bloco, com dentro e fora |
+| **Configurações › Sinalizadores** | Criar, ajustar, ligar e desligar, tirar da lista. Recusa prazo zero ligado, amarelo igual ou maior que o prazo, coluna que não existe ou de tipo errado, expediente invertido, nome repetido no canal. Só quem configura; cada mudança vai para a auditoria |
+| **Diagnóstico** | Doze blocos: o novo confere cada sinalizador e avisa o que não vai funcionar (coluna que sumiu, canal sem status final) |
+| **Migração** | `atualizarPGO()` cria a aba, a coluna da Mesa e os três sinalizadores. Idempotente: não duplica, não sobrescreve o prazo que o PO ajustou, não recria o que ele tirou |
+
+**944 testes** (78 novos), cinco execuções seguidas sem falha, **18 quebras de
+propósito, 18 vermelhos** (a 17ª passou verde na primeira vez: achado 72). No
+navegador: 96 combinações de tela sem quebra, 152 cliques sem erro, ponta a
+ponta 12/12 — com o PO ajustando o prazo da RET pela tela e a planilha guardando
+— e as telas vistas em 1440, 1280 e 390 px. Medido com 60 mil casos: a fila
+leva 0,2 s e a Produtividade 0,2 s.
+
+### Para quem já usa
+
+Cole os arquivos marcados e rode `atualizarPGO()` uma vez. Até lá o Trabalho
+segue funcionando, sem selo. **Os casos já encaminhados antes de hoje não têm
+carimbo**, e por isso não ganham o selo das 48 horas: o sistema não inventa uma
+data. Valem os encaminhamentos de agora em diante (ou preencher a coluna na
+planilha, caso a caso).
+
+### Em aberto, para o PO decidir
+
+- **O formulário não apaga campo em branco** — em nenhum campo, desde antes
+  deste pedido. Tirar a "Área responsável" de um caso pelo formulário não a
+  limpa; só a edição direta na planilha. O selo não erra por isso (sem área, sem
+  prazo), mas o carimbo antigo fica na linha.
+- **A Produtividade olha o período escolhido.** Um caso aberto há 3 meses não
+  aparece em "últimos 30 dias". Para o controle da gestão, o período "mês" ou
+  "datas" resolve; se a gestão quiser um bloco que olhe **todos os abertos**
+  independente da data, é uma mudança de leitura a combinar.
+- **O VG** está preparado e desligado: quando o PO definir o prazo, é
+  Configurações › Sinalizadores, sem código.
+- **O prazo da Mesa lê "Área responsável" preenchida** como "encaminhado". Se a
+  operação usar um status "Encaminhado" em vez da coluna, a coluna que liga muda
+  na tela.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

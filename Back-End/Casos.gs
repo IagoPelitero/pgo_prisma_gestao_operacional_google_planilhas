@@ -628,6 +628,7 @@ function cadastrarCaso(idDoCanal, valores) {
   preencherEntradaAutomatica_(canal, paraGravar);
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
   carimbarOStatusDeNascimento_(canal, paraGravar);
+  carimbarOEncaminhamento_(canal, null, paraGravar);
   preencherColunasCalculadas_(canal.aba, paraGravar, {});
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
@@ -661,6 +662,7 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
   // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
   // diálogo, e tem de deixar o mesmo rastro.
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
+  carimbarOEncaminhamento_(canal, atual, paraGravar);
 
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
@@ -846,6 +848,44 @@ function carimbarOStatusDeNascimento_(canal, paraGravar) {
   // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
   // o que veio manda. O carimbo nunca reescreve o que alguém informou.
   carimbarOStatus_(canal, achada, paraGravar, paraGravar);
+}
+
+/**
+ * Carimba QUANDO o caso foi encaminhado para a área.
+ *
+ * É o relógio das 48 horas úteis que a área tem para dar o retorno, e ele só
+ * pode ser contado por quem viu o momento: o sistema. Decisão do PO,
+ * perguntada — deduzir de outra data (a de entrada, a da resposta) contaria o
+ * prazo errado, e pedir ao analista que digite mais uma data seria o jeito
+ * mais rápido de ela ficar em branco.
+ *
+ * QUANDO CARIMBA
+ *   a área passou de vazia para escolhida     carimba agora;
+ *   a área trocou de uma para outra           carimba agora: é um novo
+ *                                             encaminhamento, com prazo novo;
+ *   a área foi esvaziada                      limpa o carimbo: o caso voltou
+ *                                             para a mesa, e não há prazo.
+ * Salvar o formulário sem mexer na área não carimba nada — é o mesmo cuidado
+ * do status: só a mudança de verdade conta.
+ *
+ * Canal sem coluna de área, ou base que ainda não ganhou a coluna do carimbo
+ * (quem não rodou `atualizarPGO()`), segue gravando o caso: o diagnóstico é
+ * quem cobra o que falta.
+ *
+ * `registroAtual` é null no cadastro.
+ */
+function carimbarOEncaminhamento_(canal, registroAtual, paraGravar) {
+  var area = String(canal.colunaDaAreaResponsavel || '').trim();
+  if (!area || !paraGravar.hasOwnProperty(area)) return;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_DATA_DO_ENCAMINHAMENTO) < 0) return;
+
+  var agora = String(paraGravar[area] || '').trim();
+  var antes = registroAtual ? String(registroAtual[area] || '').trim() : '';
+  if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+  paraGravar[RECC_COLUNA_DATA_DO_ENCAMINHAMENTO] = agora ? new Date() : '';
 }
 
 /**

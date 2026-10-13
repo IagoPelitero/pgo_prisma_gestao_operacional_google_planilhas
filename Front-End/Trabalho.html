@@ -204,7 +204,7 @@ var TelaTrabalho = (function () {
         // O selo do SLA mora junto da situação, no primeiro grupo: é onde o
         // olho já procura "como este caso está".
         return '<td>' + desenharGrupo(grupo, caso, i === 0)
-          + (i === 0 ? seloDoSla(caso.sla) : '') + '</td>';
+          + (i === 0 ? seloDoSla(caso.sla) + selosDePrazo(caso.sinais) : '') + '</td>';
       }).join('');
 
       return '<tr>' + celulas + '<td class="acoes-coluna">'
@@ -312,6 +312,29 @@ var TelaTrabalho = (function () {
       + ' horas úteis, de segunda a sexta, no expediente, '
       + escapar(ATE_ONDE_O_SLA_CONTOU[sla.parouEm] || '') + '">'
       + escapar(sla.texto) + '</span>';
+  }
+
+  /*
+    OS SINALIZADORES DE PRAZO, embaixo da situação: verde dentro do prazo,
+    amarelo no último dia, vermelho depois. A cor sozinha não basta — quem
+    não distingue verde de vermelho perde o aviso —, então o selo diz também
+    o que a cor quer dizer, e a dica traz a regra por extenso.
+  */
+  var LEITURA_DO_TOM_DO_PRAZO = {
+    bom: 'dentro do prazo', atencao: 'atenção: perto de vencer', ruim: 'fora do prazo'
+  };
+
+  function selosDePrazo(sinais) {
+    return (sinais || []).map(function (sinal) {
+      return '<span class="selo-prazo tom-' + escapar(sinal.tom) + '"'
+        + ' title="' + escapar(sinal.texto) + ' — ' + escapar(sinal.regra)
+        + ', de segunda a sexta, no expediente. '
+        + (sinal.encerrado ? 'Contado até o caso chegar a um status final.'
+          : 'Ainda correndo: o caso não chegou a um status final.') + '">'
+        + escapar(sinal.texto)
+        + '<span class="so-leitor"> (' + escapar(LEITURA_DO_TOM_DO_PRAZO[sinal.tom] || '')
+        + ')</span></span>';
+    }).join('');
   }
 
   function desenharPainel() {

@@ -402,6 +402,7 @@ var TelaConfiguracoes = (function () {
     if (secaoAtual === 'canais') return carregarCanais();
     if (secaoAtual === 'paineis') return carregarPaineis();
     if (secaoAtual === 'analises') return carregarAnalises();
+    if (secaoAtual === 'sinalizadores') return carregarSinalizadores();
     if (secaoAtual === 'identidade') return desenharIdentidade();
     if (secaoAtual === 'estrutura') return carregarEstrutura();
   }
@@ -2493,6 +2494,200 @@ var TelaConfiguracoes = (function () {
       });
     }
     return escolhidos;
+  }
+
+  /* ------------------------------------------------------ sinalizadores */
+  /*
+    Os prazos que o caso tem, com verde, amarelo e vermelho — pedido do PO:
+    "devo conseguir ajustar na aba de configurações", numa seção chamada
+    Sinalizadores. A RET (3 dias úteis) e a Mesa (48 horas úteis para a área)
+    já vêm preenchidas; o VG vem desligado, para o PO definir quando quiser.
+
+    Nada aqui pede senha: ajustar prazo é conteúdo, e não estrutura.
+  */
+
+  var UNIDADES_DO_SINALIZADOR = [
+    { id: 'dias', nome: 'Dias úteis' }, { id: 'horas', nome: 'Horas úteis' }
+  ];
+
+  function carregarSinalizadores() {
+    aguarde('Lendo os sinalizadores…');
+    Servidor.chamar('opcoesDeSinalizador')
+      .entao(function (opcoes) {
+        dados.opcoes = opcoes;
+        Servidor.chamar('listarSinalizadores')
+          .entao(function (lista) {
+            dados.sinalizadores = lista;
+            desenharSinalizadores();
+          })
+          .senao(falhou);
+      })
+      .senao(falhou);
+  }
+
+  function desenharSinalizadores() {
+    if (respostaAtrasada('sinalizadores')) return;
+
+    if (!dados.opcoes.abaExiste) {
+      elemento('config-lista').innerHTML = '<p class="config-aviso forte">A aba '
+        + '<code>SINALIZADORES</code> ainda não existe nesta planilha. Rode '
+        + '<code>atualizarPGO()</code> no editor do Apps Script: ela cria a aba e '
+        + 'os sinalizadores da RET, da Mesa e do VG.</p>';
+      elemento('config-painel').innerHTML = '';
+      return;
+    }
+
+    var linhas = dados.sinalizadores.map(function (um) {
+      return '<li class="config-item'
+        + (escolhido && escolhido.id === um.id ? ' atual' : '')
+        + (um.ativo ? '' : ' desligado') + '">'
+        + '<button type="button" class="abrir" data-sinalizador="' + escapar(um.id) + '">'
+        + '<span class="nome">' + escapar(um.nome) + '</span>'
+        + '<span class="detalhe">' + escapar(um.canalNome) + ' · '
+        + (um.prazo > 0 ? escapar(um.regra) : 'sem prazo definido')
+        + (um.ativo ? '' : ' · desligado') + '</span></button></li>';
+    }).join('');
+
+    elemento('config-lista').innerHTML = '<div class="config-cabeca">'
+      + '<span class="config-titulo">' + dados.sinalizadores.length
+      + ' sinalizador(es)</span>'
+      + '<button type="button" class="botao pequeno" id="novo-sinalizador">'
+      + 'Novo sinalizador</button></div>'
+      + '<p class="config-explica">Cada sinalizador é um <strong>prazo</strong> '
+      + 'que o caso tem para chegar a um status final. Aparece embaixo da '
+      + 'situação, no Trabalho, e na Produtividade RECC com o nome de quem deixou '
+      + 'passar. <strong>Verde</strong>: dentro do prazo. <strong>Amarelo</strong>: '
+      + 'faltando pouco — por padrão, o último dia útil. <strong>Vermelho</strong>: '
+      + 'passou. Conta de segunda a sexta, só dentro do expediente.</p>'
+      + '<p class="config-explica">O <strong>SLA em horas úteis</strong> de cada '
+      + 'canal — o da Mesa Diamante é de 6 horas, até a primeira resposta — '
+      + 'continua em <em>Canais de trabalho</em>.</p>'
+      + (dados.sinalizadores.length
+        ? '<ul class="config-itens">' + linhas + '</ul>'
+        : '<p class="config-vazio">Nenhum sinalizador.</p>');
+
+    elemento('novo-sinalizador').addEventListener('click', function () {
+      escolhido = null;
+      desenharPainelDoSinalizador(null);
+    });
+    ligarCliques('[data-sinalizador]', function (botao) {
+      escolhido = { id: botao.getAttribute('data-sinalizador') };
+      desenharSinalizadores();
+    });
+
+    if (escolhido) {
+      desenharPainelDoSinalizador(acharNaLista(dados.sinalizadores, escolhido.id));
+    } else {
+      painelVazio('Escolha um sinalizador, ou crie um novo.');
+    }
+  }
+
+  function canalDoSinalizador(idDoCanal) {
+    var achado = dados.opcoes.canais.filter(function (um) {
+      return String(um.id) === String(idDoCanal);
+    })[0];
+    return achado || dados.opcoes.canais[0];
+  }
+
+  function desenharPainelDoSinalizador(sinalizador) {
+    var padrao = dados.opcoes.expedientePadrao;
+    var atual = sinalizador || {
+      id: '', nome: '', canalId: dados.opcoes.canais[0].id, prazo: 0,
+      unidade: 'dias', aviso: 0, colunaQueLiga: '', colunaDaData: '', colunaDaHora: '',
+      inicioDoExpediente: padrao.abre, fimDoExpediente: padrao.fecha,
+      ordem: 0, ativo: true
+    };
+    var canal = canalDoSinalizador(atual.canalId);
+
+    elemento('config-painel').innerHTML = '<form class="config-form" id="form-sinalizador">'
+      + tituloDoPainel(atual.id ? atual.nome : 'Novo sinalizador',
+        atual.id ? 'Prazo do canal ' + canal.nome : 'Um prazo que o caso tem')
+      + campoDeTexto('sn-nome', 'Nome', atual.nome,
+        'É o que aparece no selo: "Prazo de retorno · faltam 2 dias úteis".')
+      + (atual.id
+        ? campoSomenteLeitura('Canal', canal.nome,
+          'O canal não muda: as colunas escolhidas abaixo são dele.')
+        : caixaDeItens('sn-canal', 'Canal', dados.opcoes.canais, atual.canalId,
+          'Trocar o canal limpa as colunas escolhidas.'))
+      + campoDeTexto('sn-prazo', 'Prazo', atual.prazo,
+        'Quanto tempo o caso tem. Zero desliga.')
+      + caixaDeItens('sn-unidade', 'Em', UNIDADES_DO_SINALIZADOR, atual.unidade,
+        'Sempre ÚTEIS: segunda a sexta, no expediente abaixo.')
+      + campoDeTexto('sn-aviso', 'Amarelo quando faltar', atual.aviso,
+        'Na mesma unidade do prazo. Na RET, 1 dia: o terceiro dia do prazo fica '
+        + 'amarelo. Zero não acende amarelo.')
+      + caixaDeOpcoes('sn-liga', 'Só vale quando esta coluna estiver preenchida',
+        [''].concat(canal.colunas), atual.colunaQueLiga,
+        'Em branco vale para todo caso. A Mesa usa "Área responsável": só o '
+        + 'caso encaminhado tem prazo.')
+      + caixaDeOpcoes('sn-data', 'Conta a partir da data',
+        [''].concat(canal.colunasDeData), atual.colunaDaData,
+        'Em branco usa a data de entrada do canal'
+        + (canal.colunaDaData ? ' ("' + canal.colunaDaData + '")' : '') + '.')
+      + caixaDeOpcoes('sn-hora', 'e da hora',
+        [''].concat(canal.colunasDeHora), atual.colunaDaHora,
+        'Em branco usa a hora que a data carrega; data sem hora conta da '
+        + 'abertura do expediente.')
+      + campoDeTexto('sn-inicio', 'Início do expediente', atual.inicioDoExpediente,
+        'Como ' + padrao.abre + '.')
+      + campoDeTexto('sn-fim', 'Fim do expediente', atual.fimDoExpediente,
+        'Como ' + padrao.fecha + '.')
+      + campoDeTexto('sn-ordem', 'Ordem', atual.ordem,
+        'Quando o canal tem mais de um, o menor aparece primeiro.')
+      + caixaDeSimNao('sn-ativo', 'Sinalizador em uso', atual.ativo)
+      + '<p class="config-explica">O prazo termina quando o caso chega a um '
+      + '<strong>status final</strong> do canal.</p>'
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (atual.id ? '<button type="button" class="botao vazado perigo" '
+        + 'id="tirar-sinalizador">Tirar da lista</button>' : '')
+      + '</div></form>';
+
+    var trocaDeCanal = elemento('cfg-sn-canal');
+    if (trocaDeCanal) {
+      trocaDeCanal.addEventListener('change', function () {
+        desenharPainelDoSinalizador({
+          id: '', nome: valorDe('sn-nome'), canalId: this.value,
+          prazo: valorDe('sn-prazo'), unidade: valorDe('sn-unidade') || 'dias',
+          aviso: valorDe('sn-aviso'), colunaQueLiga: '', colunaDaData: '',
+          colunaDaHora: '', inicioDoExpediente: valorDe('sn-inicio'),
+          fimDoExpediente: valorDe('sn-fim'), ordem: valorDe('sn-ordem'),
+          ativo: marcado('sn-ativo')
+        });
+      });
+    }
+
+    elemento('form-sinalizador').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarSinalizador', {
+        id: atual.id, nome: valorDe('sn-nome'),
+        canalId: atual.id ? atual.canalId : valorDe('sn-canal'),
+        prazo: valorDe('sn-prazo'), unidade: valorDe('sn-unidade'),
+        aviso: valorDe('sn-aviso'), colunaQueLiga: valorDe('sn-liga'),
+        colunaDaData: valorDe('sn-data'), colunaDaHora: valorDe('sn-hora'),
+        inicioDoExpediente: valorDe('sn-inicio'), fimDoExpediente: valorDe('sn-fim'),
+        ordem: valorDe('sn-ordem'), ativo: marcado('sn-ativo')
+      }).entao(function (id) {
+        escolhido = { id: id };
+        avisarSalvo('Sinalizador salvo.');
+        carregarSinalizadores();
+      }).senao(mostrarErroNoPainel);
+    });
+
+    var tirar = elemento('tirar-sinalizador');
+    if (tirar) {
+      tirar.addEventListener('click', function () {
+        if (!window.confirm('Tirar "' + atual.nome + '" da lista? Os casos '
+          + 'deixam de ter este selo. A linha continua na planilha.')) return;
+        Servidor.chamar('ocultarSinalizador', atual.id)
+          .entao(function () {
+            escolhido = null;
+            avisarSalvo('Sinalizador tirado da lista.');
+            carregarSinalizadores();
+          })
+          .senao(mostrarErroNoPainel);
+      });
+    }
   }
 
   function carregarEstrutura() {

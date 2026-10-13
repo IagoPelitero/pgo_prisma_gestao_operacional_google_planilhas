@@ -311,6 +311,12 @@ function pontePreparada(respostas) {
     + '      listarAnalises: function () {\n'
     + '        responder(respostas.configuracoes.analises);\n'
     + '      },\n'
+    + '      opcoesDeSinalizador: function () {\n'
+    + '        responder(respostas.configuracoes.opcoesDeSinalizador);\n'
+    + '      },\n'
+    + '      listarSinalizadores: function () {\n'
+    + '        responder(respostas.configuracoes.sinalizadores);\n'
+    + '      },\n'
 
     + '      conferirEstruturaDaPlanilha: function () {\n'
     + '        responder(respostas.configuracoes.laudo);\n'
@@ -337,7 +343,7 @@ function pontePreparada(respostas) {
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
       'salvarConfiguracaoDoLegado', 'importarCasos',
       'salvarConfiguracaoDosCadastros', 'salvarArquivoDaAuditoria',
-      'arquivarAuditoriaAgora'])
+      'arquivarAuditoriaAgora', 'salvarSinalizador', 'ocultarSinalizador'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -425,6 +431,27 @@ function gerar(pastaDeSaida) {
       Corretora: 'Corretora XYZ', Ramo: 'Vida',
       'Data da finalização': diasAtras(1), 'Área responsável': 'Sinistro',
       Assunto: 'Encaminhado para Sinistro' }
+  ]);
+
+  // Três casos ENCAMINHADOS para a área, para o selo das 48 horas úteis mostrar
+  // as três cores: o carimbo é data E hora, como o sistema grava de verdade.
+  const horasAtras = (horas) => new Date(hoje.getTime() - horas * 3600000);
+  chamar('inserirVariosRegistros_')('BASE_MESA', [
+    { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'E-mail',
+      'Data de entrada': diasAtras(1), 'Horário': '10:05',
+      'Nome do segurado': 'Camila Teixeira', Corretora: 'Corretora ABC', SUSEP: 'RET00J',
+      Ramo: 'Vida', Assunto: 'Encaminhado hoje para a Cobrança',
+      'Área responsável': 'Cobrança', 'Data do encaminhamento': horasAtras(3) },
+    { Analista: 'Diego Castilho', Status: 'Em andamento', Canal: 'Telefone',
+      'Data de entrada': diasAtras(5), 'Horário': '09:40',
+      'Nome do segurado': 'Rodrigo Alves', Corretora: 'Corretora XYZ', Ramo: 'Auto',
+      Assunto: 'Aguardando o retorno do Comercial',
+      'Área responsável': 'Comercial', 'Data do encaminhamento': horasAtras(76) },
+    { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'Chat',
+      'Data de entrada': diasAtras(12), 'Horário': '15:20',
+      'Nome do segurado': 'Fernanda Lopes', Corretora: 'Corretora ABC', SUSEP: 'RET00J',
+      Ramo: 'Residencial', Assunto: 'A área não respondeu',
+      'Área responsável': 'Sinistro', 'Data do encaminhamento': horasAtras(24 * 12) }
   ]);
 
   // ------------------------------------------------------------------- RET
@@ -520,6 +547,20 @@ function gerar(pastaDeSaida) {
     { analista: 'Patrícia Nunes', status: 'Pendente',
       'data de recepção do protocolo': diasAtras(36),
       'nome do cliente': 'Outra do mês passado', protocolo: 'RET-2026-0892' }
+  ]);
+
+  // Casos recém-cadastrados, para o selo da RET mostrar verde e amarelo (os de
+  // sete dias ou mais, abaixo, já mostram o vermelho).
+  chamar('inserirVariosRegistros_')('BASE_RET', [
+    { analista: 'Ana Martins', status: 'Pendente',
+      'data de recepção do protocolo': diasAtras(0),
+      'nome do cliente': 'Cliente Fictício 101', protocolo: 'RET-2026-1101', canal: 'Telefone' },
+    { analista: 'Marcos Vieira', status: 'Pendente',
+      'data de recepção do protocolo': diasAtras(2),
+      'nome do cliente': 'Cliente Fictício 102', protocolo: 'RET-2026-1102', canal: 'E-mail' },
+    { analista: 'Patrícia Nunes', status: 'Pendente',
+      'data de recepção do protocolo': diasAtras(4),
+      'nome do cliente': 'Cliente Fictício 103', protocolo: 'RET-2026-1103', canal: 'Site' }
   ]);
 
   chamar('inserirVariosRegistros_')('BASE_RET', [
@@ -834,6 +875,8 @@ function gerar(pastaDeSaida) {
     componentes: componentes,
     opcoesDeAnalise: chamar('opcoesDeAnalise()'),
     analises: chamar('listarAnalises()'),
+    opcoesDeSinalizador: chamar('opcoesDeSinalizador()'),
+    sinalizadores: chamar('listarSinalizadores()'),
     diagnostico: chamar('diagnosticoDoSistema()')
   };
 

@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 531 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 944 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -278,13 +278,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-531 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+944 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 530 não valeriam nada.
+realmente corrompe — sem ele, os outros 943 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -402,6 +402,44 @@ Tudo é **configurável** em Configurações › Canais de trabalho: horas (zero
 desliga), início e fim do expediente e as colunas da data e da hora da
 primeira resposta. A RET e o VG nascem sem SLA, e o selo simplesmente não
 aparece neles.
+
+### Os sinalizadores de prazo
+
+Pedido do PO: *"um sinalizador de caso, na aba Trabalho e na Produtividade
+RECC"*. Cada canal pode ter **prazos** que o caso precisa cumprir, contados em
+**dias ou horas úteis** (segunda a sexta, 08:15 às 18:30 — o mesmo relógio do
+SLA da Mesa). O selo aparece embaixo da situação, ao lado do SLA:
+
+| Cor | Quer dizer |
+|---|---|
+| **Verde** | dentro do prazo, com folga |
+| **Amarelo** | dentro do prazo, mas faltando pouco — por padrão, o último dia |
+| **Vermelho** | passou do prazo |
+
+| Canal | O prazo | Conta desde | Amarelo |
+|---|---|---|---|
+| **RET** | **3 dias úteis** para o caso chegar a um status final: retido, não retido, sem sucesso de contato, cancelado ou pago | a data de recepção do protocolo | no 3º dia útil |
+| **Mesa** | **48 horas úteis** para a área devolver o caso encaminhado | **Data do encaminhamento**, que o sistema carimba quando a "Área responsável" é escolhida | nas últimas 10 horas |
+| **VG** | ainda não definido: a linha existe, **desligada**, para o PO preencher | — | — |
+
+Quando o caso chega a um status final, o relógio **para** e o selo mostra o
+resultado — *cumprido em 1 dia útil e 1h* (verde) ou *estourado, 1 dia útil e 1h
+além* (vermelho). Caso encerrado de antes dos carimbos, sem data de quando
+fechou, **fica sem selo**: inventar vermelho em milhares de casos encerrados
+ensinaria a ignorar o vermelho. Trocar de área é encaminhar de novo (prazo novo);
+salvar o caso sem mexer na área não carimba nada.
+
+**Na Produtividade RECC**, o bloco **Controle de prazos** mostra quantos casos
+estão no prazo, vencendo, fora e encerrados dentro e fora; o **nome de quem deixou
+estourar**, de quem mais para quem menos; e a lista dos casos mais atrasados
+(50, com "e mais N"). Na Mesa, o **SLA de 6 horas úteis** aparece no mesmo bloco,
+com quantos casos estão dentro e quantos fora.
+
+**Tudo se ajusta em Configurações › Sinalizadores** — prazo, unidade, quanto antes
+o amarelo acende, a coluna que liga o prazo, de onde ele conta e o expediente —,
+sem programador. A tela recusa prazo zero ligado, amarelo igual ou maior que o
+prazo e coluna que não existe. A planilha antiga ganha a aba, a coluna e os
+três sinalizadores rodando `atualizarPGO()` uma vez.
 
 ### As três ações de cada caso
 
@@ -1124,7 +1162,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-866 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+944 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

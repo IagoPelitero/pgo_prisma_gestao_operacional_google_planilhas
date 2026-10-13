@@ -49,7 +49,7 @@ function rodarTestesDeConfiguracoes() {
     // Conferimos as CHAVES, e não só quantas são: contar 7 continuaria
     // passando se uma seção sumisse e outra nascesse no mesmo commit.
     igual(resumo.secoes.map((s) => s.chave).join(','),
-      'campos,usuarios,niveis,catalogo,canais,identidade,paineis,analises,estrutura');
+      'campos,usuarios,niveis,catalogo,canais,sinalizadores,identidade,paineis,analises,estrutura');
     // As CHAVES são de código e não mudam; os TÍTULOS são de tela e mudaram a
     // pedido do PO: "Campos" virou "Cadastrar Caso" ("assim saberei que é onde
     // ajusto o formulário") e "Listas" virou "Ajustes Gerais" ("que vou
@@ -80,7 +80,7 @@ function rodarTestesDeConfiguracoes() {
 
   teste('a lista traz protegidos, desligados e o estado da coluna', () => {
     const campos = chamar('listarCamposDoCanal')(canal.id);
-    igual(campos.length, 25, 'os 25 cabeçalhos do canal, inclusive o Id');
+    igual(campos.length, 26, 'os 26 cabeçalhos do canal, inclusive o Id');
     verdadeiro(campos.every((c) => c.colunaExiste), 'todas as colunas existem');
     verdadeiro(campos.find((c) => c.chave === 'id').protegido);
     igual(campos.find((c) => c.chave === 'id').ativo, false);

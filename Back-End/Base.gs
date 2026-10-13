@@ -301,6 +301,22 @@ const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
 const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
+/**
+ * QUANDO o caso foi encaminhado para a área — carimbado pelo SISTEMA no
+ * instante em que a `Área responsável` é escolhida. É daqui que o sinalizador
+ * da Mesa conta as 48 horas úteis que a área tem para dar o retorno. Decisão
+ * do PO, perguntada: o sistema não guardava esse momento, e deduzi-lo de
+ * outra data contaria o prazo errado.
+ */
+const RECC_COLUNA_DATA_DO_ENCAMINHAMENTO = 'Data do encaminhamento';
+
+/**
+ * O expediente que um sinalizador usa quando não declarou o dele: de segunda
+ * a sexta, das 08:15 às 18:30 — o da célula, palavra do PO. É o mesmo da
+ * Mesa Diamante, e mora aqui para a RET não precisar repeti-lo em canal.
+ */
+const RECC_EXPEDIENTE_PADRAO = { abre: '08:15', fecha: '18:30' };
+
 const RECC_VISIVEL_SIM = 'SIM';
 const RECC_VISIVEL_NAO = 'NAO';
 const RECC_ORIGEM_SISTEMA = 'SISTEMA';
@@ -448,7 +464,9 @@ const RECC_ESQUEMA = {
       // De qual lote o caso veio. A Mesa importa casos de corretoras para ações
       // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // QUANDO a área foi escolhida. O sistema carimba; ninguém digita.
+      { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -915,6 +933,55 @@ const RECC_ESQUEMA = {
       { cabecalho: 'GeradaEm', tipo: 'dataHora', protegido: true },
       { cabecalho: 'GeradaPor', tipo: 'identificador', protegido: true },
       { cabecalho: 'Linhas', tipo: 'numero', protegido: true }
+    ]
+  },
+
+  /*
+   * OS SINALIZADORES — quanto tempo um caso tem para chegar a um status final.
+   *
+   * Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
+   * RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um
+   * desfecho; na Mesa, o caso encaminhado para a área tem 48 horas úteis.
+   *
+   * É uma aba, e não colunas em CANAIS, porque um canal pode ter mais de um
+   * (a Mesa tem o SLA de 6h, que mora em CANAIS, e este) e porque o PO ajusta
+   * tudo pela tela: prazo, quando acende o amarelo, e a partir de que coluna
+   * se conta. Nenhum sinalizador é escrito em código.
+   *
+   * Um sinalizador não tem "tipo". Ele é definido por três respostas:
+   *   QUANDO VALE   `ColunaQueLiga`: vazio vale para todo caso sem status final;
+   *                 com uma coluna, só vale quando ela está preenchida (a Mesa
+   *                 usa `Área responsável`).
+   *   DESDE QUANDO  `ColunaDaData` (+ `ColunaDaHora`): vazio usa a data e a hora
+   *                 de entrada do canal.
+   *   ATÉ QUANDO    sempre até o status final — vem do catálogo, e não daqui.
+   * Assim o VG, que ainda não definiu o dele, só precisa que o PO ligue o
+   * sinalizador que já está lá, desligado.
+   */
+  SINALIZADORES: {
+    aba: 'SINALIZADORES',
+    titulo: 'Sinalizadores',
+    controle: true,
+    reserva: 100,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
+      // O que aparece no selo: "Prazo de retorno · faltam 2 dias úteis".
+      { cabecalho: 'Nome', tipo: 'texto', protegido: false },
+      // Quanto, e em quê. Zero não sinaliza nada.
+      { cabecalho: 'Prazo', tipo: 'numero', protegido: false },
+      // 'dias' ou 'horas' — sempre ÚTEIS, de segunda a sexta, no expediente.
+      { cabecalho: 'Unidade', tipo: 'texto', protegido: false },
+      // O amarelo: acende quando falta até isto para estourar, na mesma unidade.
+      { cabecalho: 'AvisoFaltando', tipo: 'numero', protegido: false },
+      { cabecalho: 'ColunaQueLiga', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
+      // Como "08:15" e "18:30". Em branco vale o expediente padrão.
+      { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
     ]
   },
 
