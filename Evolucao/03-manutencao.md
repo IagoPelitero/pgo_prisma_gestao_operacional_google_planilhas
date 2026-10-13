@@ -115,6 +115,17 @@ de nascimento, o selo mostra o prazo cheio (`prazoQueNaoComecou_`, no
 `Indicadores.gs`). Outro canal que queira o mesmo precisa da coluna na base
 (data e hora, do sistema) e de apontar o sinalizador para ela.
 
+### A planilha do chat mudou de colunas
+
+Configurações › Estrutura › **Planilha dos atendimentos do chat**: troque o nome da
+coluna e use **Conferir a planilha** — ela mostra as últimas linhas já traduzidas.
+Quando a planilha não abre ou perde uma coluna, a Produtividade da Mesa continua
+com os números do sistema e escreve o motivo em cima. Para o chat passar a trazer
+mais uma informação (hoje: data, analista, SUSEP, corretora, assunto, consultor e
+vida individual/grupo), acrescente o item em `RECC_COLUNAS_DO_CHAT` e um campo em
+`atendimentosDaMesa_` (`Indicadores.gs`), e um gráfico em `graficoDeAtendidos_`. A
+tela não muda: ela desenha o que o servidor manda.
+
 ### Tirei um registro de cadastro e quero de volta
 
 Nos cadastros (usuários, corretoras, SUSEPs, itens de configuração), tirar

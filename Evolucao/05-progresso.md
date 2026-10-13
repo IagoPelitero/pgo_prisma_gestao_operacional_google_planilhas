@@ -2573,6 +2573,52 @@ Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`.
 
 ---
 
+## Etapa 34 — Os atendidos da Mesa: o sistema somado à planilha do chat
+
+Pedido do PO, e o último da série: **"implemente na Produtividade RECC, para a Mesa
+Diamante, a leitura de uma planilha apartada de casos atendidos pelo chat"** e
+**"na Produtividade da Mesa, adicione os gráficos de atendidos, somando os casos
+cadastrados no sistema e os casos atendidos por nome do analista; integre o nome da
+corretora para mostrar a quantidade e o top 5; SUSEPs a mesma coisa, assuntos,
+consultor, e se é vida individual ou vida em grupo."**
+
+| Parte | O que ficou |
+|---|---|
+| **A leitura** | Configurações › Estrutura › **Planilha dos atendimentos do chat**: Id, aba e **qual coluna é cada coisa** (a planilha é de outro sistema e não tem contrato). Data e analista obrigatórias; SUSEP, corretora, assunto, consultor e vida individual/grupo opcionais. **Conferir** abre, sugere pelo cabeçalho e mostra as últimas linhas traduzidas; **salvar** recusa Id, aba ou coluna inexistente. Fica em `CONFIG` (`CHAT.*`). O PGO só lê: do fim da aba, só as colunas escolhidas, só as últimas `OPERACAO.LINHAS_DO_PAINEL` linhas |
+| **Os gráficos** | Só na Produtividade da **Mesa Diamante**, logo abaixo dos prazos: o resumo (total, sistema, chat) e seis gráficos — por analista, top 5 corretoras, top 5 SUSEPs, top 5 assuntos, top 5 consultores e vida individual × em grupo —, cada um com a tabela Sistema / Chat / Total. Corretora e consultor vêm de `CORRETORAS` pela SUSEP, nos dois lados |
+| **A soma** | Sistema = todo caso da Mesa no período, no alcance do nível. Chat = toda linha da planilha no período (pela data dela) e no alcance (pelo nome do analista). **Não tira repetido** |
+
+O que **ficou de propósito**:
+
+- **Os filtros da tela não mudam o bloco** (o chat não tem as colunas deles); valem o
+  período e o alcance. A tela diz.
+- **O mesmo atendimento nas duas bases conta duas vezes.** Se a operação cadastra
+  no sistema o que o chat já registrou, a soma dobra — o PGO não tem como saber. A
+  tela diz.
+- **Sem a informação, fora do ranking:** o atendimento sem SUSEP, sem assunto etc.
+  não entra no top 5, e é contado no rodapé do gráfico. Em analista e vida
+  individual/grupo ele entra como "Sem analista"/"Sem informação".
+- **O consultor só existe quando a SUSEP está no cadastro de corretoras** e a linha do
+  cadastro tem o consultor; a planilha do chat, se tiver a coluna Consultor, serve de
+  reserva.
+
+**1111 testes** (25 novos, em `testes-chat-da-mesa.js`), cinco execuções seguidas sem
+falha, **18 quebras de propósito, 18 vermelhos**. No navegador: **108** combinações de
+tela sem quebra (o passe novo abre a Mesa em cada largura e confere que nenhuma
+tabela de atendidos rola — rolar esconderia o Total; desfeita a correção, o passe
+acusa 12), 152 cliques sem erro, ponta a ponta **16/16** no repositório e no pacote
+— o teste novo liga a planilha pela tela de Configurações (conferir, sugestões,
+salvar) e confere o bloco na Produtividade da Mesa: totais, os seis gráficos e as
+linhas por analista. Visto em 1440 px e verificado de 1440 a 320.
+
+### Para quem já usa
+
+Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`: a planilha do chat
+nasce **desligada**, e a Produtividade da Mesa mostra só o sistema, com o aviso,
+até alguém ligá-la em Configurações › Estrutura.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

@@ -30,6 +30,7 @@ const { rodarTestesDaVarredura } = require('./testes-varredura');
 const { rodarTestesDoCampoCondicional } = require('./testes-condicional');
 const { rodarTestesDaParadaDaRet } = require('./testes-parada-da-ret');
 const { rodarTestesDaDescricaoEDoInicioDoPrazo } = require('./testes-descricao-e-inicio-do-prazo');
+const { rodarTestesDoChatDaMesa } = require('./testes-chat-da-mesa');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -50,6 +51,7 @@ rodarTestesDaVarredura();
 rodarTestesDoCampoCondicional();
 rodarTestesDaParadaDaRet();
 rodarTestesDaDescricaoEDoInicioDoPrazo();
+rodarTestesDoChatDaMesa();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

@@ -65,6 +65,10 @@ const FOTOS = [
 
   { arquivo: 'sistema-no-celular', tela: 'trabalho', janela: CELULAR, inteira: true },
 
+  // A Produtividade da Mesa Diamante, com os atendidos do sistema somados aos do
+  // chat: só ela tem o bloco, e a foto precisa TROCAR de canal para chegar nele.
+  { arquivo: 'tela-produtividade-mesa', tela: 'produtividade', canal: 'Mesa', inteira: true },
+
   // O aviso dos casos perto de vencer, que o Trabalho abre ao entrar no canal.
   // Nas outras fotos ele é fechado antes de clicar e de fotografar.
   { arquivo: 'tela-aviso-de-prazo', tela: 'trabalho', comOAviso: true }

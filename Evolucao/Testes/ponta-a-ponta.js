@@ -620,6 +620,74 @@ async function rodar() {
       && String(l.Prazo) === '4'), 'a planilha não mudou');
   });
 
+  /* ------------------------------------------------- os atendidos da Mesa -- */
+
+  console.log('\nOs atendidos da Mesa');
+
+  await teste('o PO liga a planilha do chat pela tela, e a Produtividade da Mesa soma o chat ao sistema', async () => {
+    const hoje = new Date();
+    const comZero = (n) => (n < 10 ? '0' : '') + n;
+    const dia = comZero(hoje.getDate()) + '/' + comZero(hoje.getMonth() + 1) + '/' + hoje.getFullYear();
+    const idDoChat = ambiente.criarPlanilhaExterna('Atendimentos', [
+      ['Data', 'Atendente', 'SUSEP', 'Assunto', 'Ramo'],
+      [dia, 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [dia, 'Ana Martins', 'RET00J', 'Cancelamento', 'Vida Individual'],
+      [dia, 'Bianca Souza', 'RET01A', 'Cobrança', 'VG']
+    ]);
+    vm.runInContext(`(function () {
+      inserirVariosRegistros_('CORRETORAS', [
+        { SUSEP: 'RET00J', Corretora: 'Corretora ABC', Segmento: 'Diamante', Consultor: 'Marina Alencar' },
+        { SUSEP: 'RET01A', Corretora: 'Corretora Horizonte', Segmento: 'Diamante', Consultor: 'Rogério Pinto' }
+      ]);
+      inserirRegistro_('BASE_MESA', { Analista: 'Ana Martins', Status: 'Em andamento',
+        'Data de entrada': new Date(), 'Nome do segurado': 'Do sistema', SUSEP: 'RET00J',
+        Corretora: 'Corretora ABC', Assunto: 'Cobrança', Ramo: 'Vida em grupo' });
+    })()`, contexto);
+
+    // Pela tela: Configurações › Estrutura › a planilha do chat.
+    await pagina.click('[data-tela="configuracoes"]');
+    await pagina.waitForTimeout(600);
+    await pagina.click('[data-secao="estrutura"]');
+    await pagina.waitForSelector('#form-chat', { timeout: 10000 });
+    await pagina.fill('#cfg-chatId', idDoChat);
+    await pagina.fill('#cfg-chatAba', 'Atendimentos');
+    await pagina.click('#conferir-chat');
+    await pagina.waitForFunction(() => {
+      const laudo = document.getElementById('laudo-do-chat');
+      return laudo && laudo.textContent.indexOf('conferem') >= 0 || laudo.textContent.indexOf('colunas') >= 0;
+    }, { timeout: 10000 });
+    // "Conferir" sugere as colunas pelo nome do cabeçalho.
+    igual(await pagina.inputValue('#cfg-chat-analista'), 'Atendente');
+    igual(await pagina.inputValue('#cfg-chat-data'), 'Data');
+    igual(await pagina.inputValue('#cfg-chat-susep'), 'SUSEP');
+    contem(await pagina.textContent('#laudo-do-chat'), '3 linha(s) de atendimento');
+
+    await pagina.click('#form-chat button[type="submit"]');
+    await pagina.waitForTimeout(900);
+    igual(vm.runInContext("configuracaoLidaDoChat_().planilhaId", contexto), idDoChat,
+      'a planilha ficou gravada em CONFIG');
+
+    // E a Produtividade da Mesa.
+    await pagina.click('[data-tela="produtividade"]');
+    await pagina.waitForTimeout(800);
+    await pagina.locator('[data-canal]', { hasText: 'Mesa' }).first().click();
+    await pagina.waitForSelector('.atendimentos', { timeout: 10000 });
+    const bloco = await pagina.textContent('.atendimentos');
+    contem(bloco, 'Atendidos no total');
+    const tiles = await pagina.$$eval('.atendimentos .indicador .numero', (es) => es.map((e) => e.textContent));
+    igual(tiles.join(','), '4,1,3', 'total, sistema e chat');
+
+    const graficos = await pagina.$$eval('.atendimentos + .graficos .grafico h3', (es) => es.map((e) => e.textContent));
+    igual(graficos.join('|'), 'Atendidos por analista|Top 5 corretoras|Top 5 SUSEPs|Top 5 assuntos'
+      + '|Top 5 consultores|Vida individual ou Vida em grupo');
+    const analistas = await pagina.$$eval('.atendimentos + .graficos .grafico:first-child tbody tr',
+      (es) => es.map((e) => Array.from(e.querySelectorAll('td')).map((c) => c.textContent).join(' ')));
+    igual(analistas[0], 'Ana Martins 1 2 3', 'sistema 1 + chat 2');
+    igual(analistas[1], 'Bianca Souza 0 1 1');
+    verdadeiro((await pagina.textContent('.atendimentos + .graficos')).indexOf('Corretora Horizonte') >= 0,
+      'o nome da corretora vem do cadastro, pela SUSEP — a planilha do chat não o traz');
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();

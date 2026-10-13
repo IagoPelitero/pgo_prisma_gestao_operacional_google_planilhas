@@ -771,6 +771,27 @@ table.fila.agrupada td:first-child .apoio.em-bom:first-child {
 /* O controle de prazos da Produtividade RECC: um bloco por prazo, separados
    por um traço, cada um com os contadores, quem deixou passar e a lista. */
 .prazos { padding: 18px 20px; display: grid; gap: 18px; }
+/* Os atendidos da Mesa: o resumo (sistema + chat) em cima dos gráficos. */
+.atendimentos { padding: 18px 20px; display: grid; gap: 12px; margin-bottom: 16px; }
+.atendimentos .aviso-do-chat { margin: 0; font-size: 12.5px; color: var(--suave); line-height: 1.5; }
+/* A tabela de atendidos cabe no cartão estreito do ranking: sem a largura
+   mínima das outras tabelas (`table.fila.numeros`, 320px), que mandaria Chat e
+   Total para fora da vista — e com o nome na primeira coluna podendo quebrar,
+   em vez de empurrar os números. O seletor repete as duas classes de propósito:
+   com menos especificidade, a regra das tabelas de números, que vem depois no
+   arquivo, ganharia. */
+table.fila.numeros.de-atendidos { min-width: 0; font-size: 13px; }
+table.fila.numeros.de-atendidos th, table.fila.numeros.de-atendidos td {
+  padding-left: 8px; padding-right: 8px;
+}
+table.fila.numeros.de-atendidos thead th { letter-spacing: .03em; }
+table.fila.numeros.de-atendidos td:first-child { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 380px) {
+  table.fila.numeros.de-atendidos th, table.fila.numeros.de-atendidos td {
+    padding-left: 5px; padding-right: 5px;
+  }
+  table.fila.numeros.de-atendidos thead th { font-size: 10px; letter-spacing: 0; }
+}
 .prazo-bloco { display: grid; gap: 10px; min-width: 0; }
 .prazo-bloco + .prazo-bloco { border-top: 1px solid var(--linha); padding-top: 18px; }
 .prazo-bloco h4 { margin: 0; font-size: 15px; }

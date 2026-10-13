@@ -240,6 +240,47 @@ async function conferir() {
         linha.push('· ' + tela);
       }
     }
+    /*
+     * A PRODUTIVIDADE DA MESA, num passe à parte.
+     *
+     * As conferências acima ignoram o que está dentro de uma caixa que rola de
+     * propósito — e as tabelas de atendidos (sistema, chat, total) NÃO podem
+     * rolar: os números são o pedido, e rolar esconderia justamente o Total. O
+     * canal padrão é a RET, que não tem o bloco; só abrindo a Mesa ele aparece.
+     */
+    if (TELAS.indexOf('produtividade') >= 0) {
+      combinacoes++;
+      await pagina.evaluate(() => { location.hash = 'produtividade'; });
+      await pagina.waitForTimeout(900);
+      // O aviso dos casos perto de vencer, que o Trabalho abriu ao carregar, cobre a tela.
+      if (await pagina.locator('#dialogo-prazo').count()) {
+        await pagina.click('#fechar-aviso-de-prazo');
+      }
+      const daMesa = pagina.locator('[data-canal]', { hasText: 'Mesa' }).first();
+      if (await daMesa.count()) {
+        await daMesa.click();
+        await pagina.waitForTimeout(900);
+        const rolando = await pagina.evaluate(() => {
+          const achados = [];
+          document.querySelectorAll('.atendimentos + .graficos .grafico').forEach((cartao) => {
+            const caixa = cartao.querySelector('.rolagem-tabela');
+            if (caixa && caixa.scrollWidth > caixa.clientWidth + 1) {
+              achados.push(cartao.querySelector('h3').textContent);
+            }
+          });
+          return { achados: achados, quantos: document.querySelectorAll('.atendimentos').length };
+        });
+        if (!rolando.quantos) {
+          problemas.push(largura + 'px · produtividade da Mesa: o bloco de atendidos não apareceu');
+        }
+        rolando.achados.forEach((titulo) => {
+          problemas.push(largura + 'px · produtividade da Mesa: a tabela de "' + titulo
+            + '" rola na horizontal — o Total fica fora da vista');
+        });
+      } else {
+        problemas.push(largura + 'px · a Produtividade não oferece o canal Mesa');
+      }
+    }
     console.log(String(largura).padStart(5) + 'px  ' + linha.join('   '));
     await pagina.close();
   }

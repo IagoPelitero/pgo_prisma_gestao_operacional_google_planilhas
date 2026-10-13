@@ -42,6 +42,7 @@ abaixo com o motivo.
 | **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade |
 | **Senha de administrador** | Definir e trocar | Identidade |
 | **Busca** | Em quais colunas cado canal procura. Vale para o Buscar Caso **e** para a busca digitada do Trabalho, que procura também nas colunas da fila | Canais de trabalho |
+| **Planilha dos atendimentos do chat** | Apontar a planilha de casos atendidos pelo chat — Id, aba e **qual coluna dela é cada coisa** (data e analista obrigatórias; SUSEP, corretora, assunto, consultor e vida individual/grupo opcionais). "Conferir" sugere as colunas pelo cabeçalho e mostra as últimas linhas traduzidas; salvar recusa Id, aba ou coluna que não existe. Alimenta os atendidos da Produtividade da Mesa | Estrutura |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura |
 | **Arquivo da auditoria** | O Id da planilha que recebe a auditoria com **mais de 2 meses** (conferido na hora, e não pode ser esta mesma), e o botão **Arquivar agora**. Copia, confere e só então apaga daqui. Para ser automático, a cada 2 meses: um acionador **mensal** no editor do Apps Script para `arquivarAuditoriaAgendada` | Estrutura · **pede senha** |

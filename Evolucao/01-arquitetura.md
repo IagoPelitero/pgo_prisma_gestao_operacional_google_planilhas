@@ -272,6 +272,15 @@ cheio**. Carimba nas duas portas (diálogo de status e formulário) e no cadastr
 de um caso que já nasce trabalhado; a importação não carimba. As trocas
 seguintes não mexem nela.
 
+#### A planilha do chat (fora do contrato)
+
+Os atendidos da Mesa Diamante somam o sistema à planilha de casos atendidos pelo
+chat. Ela **não tem contrato** e o PGO **só lê**: o Id, a aba e o nome da coluna de
+cada informação ficam em `CONFIG` (`CHAT.PLANILHA_ID`, `CHAT.ABA`, `CHAT.COLUNAS`,
+esta em JSON). Lida do fim da aba, só as colunas escolhidas, uma ida ao serviço por
+coluna — ver `lerAtendimentosDoChat_`, em `Indicadores.gs`. A corretora e o
+consultor dos dois lados vêm de `CORRETORAS`, pela SUSEP.
+
 ### 3.2 Cadastros
 
 | Aba | Colunas |

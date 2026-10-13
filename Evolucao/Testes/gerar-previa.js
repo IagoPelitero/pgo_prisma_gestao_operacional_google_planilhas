@@ -182,6 +182,15 @@ function pontePreparada(respostas) {
     + 'cadastros: isso abre outra planilha de verdade, e aqui não há '
     + 'servidor para abrir.");\n'
     + '      },\n'
+    + '      configuracaoDoChat: function () {\n'
+    + '        responder(respostas.configuracoes.chat);\n'
+    + '      },\n'
+    // Conferir abre OUTRA planilha de verdade, e a prévia não tem servidor para
+    // isso. Recusa com o motivo, em vez de inventar um laudo.
+    + '      conferirPlanilhaDoChat: function () {\n'
+    + '        recusar("Na prévia não dá para conferir a planilha do chat: isso abre '
+    + 'outra planilha de verdade, e aqui não há servidor para abrir.");\n'
+    + '      },\n'
     + '      configuracaoDoLegado: function () {\n'
     + '        responder(respostas.busca.legado);\n'
     + '      },\n'
@@ -341,7 +350,7 @@ function pontePreparada(respostas) {
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
       'desbloquearSusep',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
-      'salvarConfiguracaoDoLegado', 'importarCasos',
+      'salvarConfiguracaoDoLegado', 'salvarConfiguracaoDoChat', 'importarCasos',
       'salvarConfiguracaoDosCadastros', 'salvarArquivoDaAuditoria',
       'arquivarAuditoriaAgora', 'salvarSinalizador', 'ocultarSinalizador'])
     + '    };\n'
@@ -390,47 +399,47 @@ function gerar(pastaDeSaida) {
     { Analista: 'Ana Martins', Status: 'Transmissão pendente', Canal: 'E-mail',
       'Data de entrada': diasAtras(6), 'Horário': '09:14',
       'Nome do segurado': 'Vanessa Duarte Lima', 'Documento (CPF)': '00012345678',
-      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida',
-      Assunto: 'Proposta parada na transmissão há três dias' },
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida individual',
+      'Título do e-mail': 'Proposta parada na transmissão há três dias', Assunto: 'Alteração cadastral' },
     { Analista: 'Ana Martins', Status: 'Pendente', Canal: 'Chat',
       'Data de entrada': diasAtras(5), 'Horário': '11:02',
       'Nome do segurado': 'Otávio Bandeira', 'Documento (CPF)': '00098765432',
-      Corretora: 'Corretora XYZ', Ramo: 'Auto',
-      Assunto: 'Corretor pede prioridade na análise' },
+      Corretora: 'Corretora XYZ', Ramo: 'Vida em grupo',
+      'Título do e-mail': 'Corretor pede prioridade na análise', Assunto: 'Cobrança' },
     { Analista: 'Diego Castilho', Status: '1º contato realizado', Canal: 'Telefone',
       'Data de entrada': diasAtras(4), 'Horário': '14:36',
       'Nome do segurado': 'Luciana Prado', 'Documento (CPF)': '00033344455',
-      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida',
-      Assunto: 'Retorno sobre documentação pendente' },
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida individual',
+      'Título do e-mail': 'Retorno sobre documentação pendente', Assunto: 'Alteração cadastral' },
     { Analista: 'Diego Castilho', Status: '2º contato realizado', Canal: 'Telefone',
       'Data de entrada': diasAtras(3), 'Horário': '10:20',
       'Nome do segurado': 'Beatriz Nogueira', 'Documento (CPF)': '00077788899',
-      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Residencial',
-      Assunto: 'Segunda tentativa — corretor não retornou' },
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida em grupo',
+      'Título do e-mail': 'Segunda tentativa — corretor não retornou', Assunto: 'Cancelamento' },
     { Analista: 'Ana Martins', Status: 'Não trabalhado', Canal: 'Site',
       'Data de entrada': diasAtras(2), 'Horário': '08:45',
       'Nome do segurado': 'Gustavo Rezende', 'Documento (CPF)': '00011122233',
-      Corretora: 'Corretora XYZ', Ramo: 'Auto',
-      Assunto: 'Entrou hoje, ainda sem tratativa' },
+      Corretora: 'Corretora XYZ', Ramo: 'Vida em grupo',
+      'Título do e-mail': 'Entrou hoje, ainda sem tratativa', Assunto: 'Cobrança' },
     // De propósito com uma SUSEP que NÃO está no cadastro de canais: é o
     // achado da Tabela de Corretoras, e a prévia precisa mostrá-lo.
     { Analista: 'Diego Castilho', Status: 'Pendente', Canal: 'Corretora',
       'Data de entrada': diasAtras(2), 'Horário': '15:10',
       'Nome do segurado': 'Helena Braga', 'Documento (CPF)': '00044455566',
-      Corretora: 'Corretora Sul Atlântico', SUSEP: 'RET02B', Ramo: 'Vida',
-      Assunto: 'Corretora que ainda não está no cadastro' },
+      Corretora: 'Corretora Sul Atlântico', SUSEP: 'RET02B', Ramo: 'Vida individual',
+      'Título do e-mail': 'Corretora que ainda não está no cadastro', Assunto: 'Cancelamento' },
     { Analista: 'Ana Martins', Status: 'Concluído', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '16:47',
       'Nome do segurado': 'Ricardo Costa', 'Documento (CPF)': '00055566677',
-      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida',
+      Corretora: 'Corretora ABC', SUSEP: 'RET00J', Ramo: 'Vida individual',
       'Data da finalização': diasAtras(1), 'horário da finalização': '17:30',
-      Assunto: 'Resolvido no primeiro contato, sem encaminhar' },
+      'Título do e-mail': 'Resolvido no primeiro contato, sem encaminhar', Assunto: 'Segunda via' },
     { Analista: 'Diego Castilho', Status: 'Concluído', Canal: 'Ouvidoria',
       'Data de entrada': diasAtras(1), 'Horário': '13:05',
       'Nome do segurado': 'Juliana Prado', 'Documento (CPF)': '00099900011',
-      Corretora: 'Corretora XYZ', Ramo: 'Vida',
+      Corretora: 'Corretora XYZ', Ramo: 'Vida individual',
       'Data da finalização': diasAtras(1), 'Área responsável': 'Sinistro',
-      Assunto: 'Encaminhado para Sinistro' }
+      'Título do e-mail': 'Encaminhado para Sinistro', Assunto: 'Sinistro' }
   ]);
 
   // Três casos EM ANDAMENTO, para o selo das 48 horas úteis mostrar as três
@@ -454,19 +463,19 @@ function gerar(pastaDeSaida) {
     { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '10:05',
       'Nome do segurado': 'Camila Teixeira', Corretora: 'Corretora ABC', SUSEP: 'RET00J',
-      Ramo: 'Vida', Assunto: 'Encaminhado hoje para a Cobrança',
+      Ramo: 'Vida individual', 'Título do e-mail': 'Encaminhado hoje para a Cobrança', Assunto: 'Cobrança',
       'Área responsável': 'Cobrança', 'Data do encaminhamento': horasAtras(3),
       'Data em andamento': horasAtras(5) },
     { Analista: 'Diego Castilho', Status: 'Em andamento', Canal: 'Telefone',
       'Data de entrada': diasAtras(5), 'Horário': '09:40',
-      'Nome do segurado': 'Rodrigo Alves', Corretora: 'Corretora XYZ', Ramo: 'Auto',
-      Assunto: 'Aguardando o retorno do Comercial',
+      'Nome do segurado': 'Rodrigo Alves', Corretora: 'Corretora XYZ', Ramo: 'Vida em grupo',
+      'Título do e-mail': 'Aguardando o retorno do Comercial', Assunto: 'Cancelamento',
       'Área responsável': 'Comercial', 'Data do encaminhamento': horasAtras(76),
       'Data em andamento': horasUteisAtras(43) },
     { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'Chat',
       'Data de entrada': diasAtras(12), 'Horário': '15:20',
       'Nome do segurado': 'Fernanda Lopes', Corretora: 'Corretora ABC', SUSEP: 'RET00J',
-      Ramo: 'Residencial', Assunto: 'A área não respondeu',
+      Ramo: 'Vida em grupo', 'Título do e-mail': 'A área não respondeu', Assunto: 'Sinistro',
       'Área responsável': 'Sinistro', 'Data do encaminhamento': horasAtras(24 * 12),
       'Data em andamento': horasAtras(24 * 13) }
   ]);
@@ -822,6 +831,35 @@ function gerar(pastaDeSaida) {
     { SUSEP: 'RET03C', Corretora: 'Corretora Novo Norte', Sucursal: '58',
       Segmento: 'Demais corretoras', Consultor: '' }
   ]);
+  // A planilha dos ATENDIMENTOS DO CHAT, que a Produtividade da Mesa soma aos
+  // casos do sistema. Os cabeçalhos são de outro sistema ("Atendente", e não
+  // "Analista"), e a planilha NÃO traz a corretora nem o consultor: eles vêm do
+  // cadastro, pela SUSEP — é isso que a prévia precisa mostrar. Há de propósito
+  // um nome em duas grafias, um analista que não é usuário, uma SUSEP fora do
+  // cadastro e uma linha sem SUSEP.
+  const linhaDoChat = (dias, hora, atendente, susep, assunto, ramo) =>
+    [diasAtras(dias) + (hora ? ' ' + hora : ''), atendente, susep, assunto, ramo];
+  const idDoChat = ambiente.criarPlanilhaExterna('Atendimentos', [
+    ['Data', 'Atendente', 'SUSEP', 'Assunto', 'Ramo'],
+    linhaDoChat(0, '09:12', 'Ana Martins', 'RET00J', 'Cancelamento', 'Vida Individual'),
+    linhaDoChat(0, '10:40', 'Diego Castilho', 'RET00J', 'Cobrança', 'VG'),
+    linhaDoChat(1, '14:05', 'diego castilho', 'RET01A', 'Segunda via', 'Vida em grupo'),
+    linhaDoChat(2, '11:30', 'Ana Martins', 'RET02B', 'Sinistro', 'Vida Individual'),
+    linhaDoChat(3, '16:20', 'Bianca Souza', 'RET00J', 'Cancelamento', 'Vida Individual'),
+    linhaDoChat(4, '08:55', 'Bianca Souza', 'RET03C', 'Alteração cadastral', 'VG'),
+    linhaDoChat(5, '13:45', 'Diego Castilho', 'RET00J', 'Cobrança', 'Vida Individual'),
+    linhaDoChat(6, '15:10', 'Ana Martins', 'RET04D', 'Cancelamento', 'Vida Individual'),
+    linhaDoChat(7, '09:30', 'Bianca Souza', 'RET01A', 'Cobrança', 'Vida em grupo'),
+    linhaDoChat(9, '10:15', 'Ana Martins', 'RET00J', 'Segunda via', 'Vida Individual'),
+    linhaDoChat(12, '17:00', 'Diego Castilho', 'RET02B', 'Cancelamento', 'VG'),
+    linhaDoChat(15, '12:20', 'Bianca Souza', '', 'Cobrança', ''),
+    linhaDoChat(40, '09:00', 'Ana Martins', 'RET00J', 'Cancelamento', 'Vida Individual')
+  ]);
+  chamar('salvarConfiguracaoDoChat')({
+    planilhaId: idDoChat, aba: 'Atendimentos',
+    colunas: { data: 'Data', analista: 'Atendente', susep: 'SUSEP', assunto: 'Assunto', ramo: 'Ramo' }
+  });
+
   // Os dois tipos de bloqueio e uma linha antiga, sem tipo — as três
   // etiquetas que a lista mostra.
   chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', {
@@ -925,6 +963,7 @@ function gerar(pastaDeSaida) {
   const configuracoes = {
     cards: cards,
     cadastros: chamar('configuracaoDosCadastros()'),
+    chat: chamar('configuracaoDoChat()'),
     arquivoDaAuditoria: chamar('configuracaoDoArquivoDaAuditoria()'),
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,

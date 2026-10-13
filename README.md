@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1086 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1111 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -266,7 +266,7 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-1086 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1111 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -746,6 +746,56 @@ resposta.
 
 E **quais** canais aparecem continua sendo a lista de canais do nível: quem abre
 só a RET e tem "o canal inteiro" vê a RET inteira, não a Mesa Diamante.
+
+### Os atendidos da Mesa: o sistema somado ao chat
+
+![Os atendidos da Mesa Diamante](Evolucao/imagens/tela-produtividade-mesa.png)
+
+Pedido do PO: *"implemente na Produtividade RECC, para a Mesa Diamante, a leitura
+de uma planilha apartada de casos atendidos pelo chat"* e *"na Produtividade da
+Mesa, os gráficos de atendidos, somando os casos cadastrados no sistema e os
+casos atendidos por nome do analista"*. Só a **Mesa Diamante** tem o bloco
+**Atendidos — sistema e chat**, logo abaixo do controle de prazos:
+
+| Em cima | O total atendido, quanto veio do **sistema** e quanto veio do **chat** |
+|---|---|
+| **Atendidos por analista** | uma barra por analista, somando os dois lados. Nomes escritos de jeitos diferentes (`diego castilho`, `DIEGO CASTILHO`) viram uma pessoa só, com o nome do cadastro de usuários |
+| **Top 5 corretoras** | quantos atendimentos cada corretora teve. O nome vem do **cadastro de corretoras, pela SUSEP** — a planilha do chat nem precisa trazê-lo, e duas bases que escrevem a mesma corretora de jeitos diferentes viram uma barra só |
+| **Top 5 SUSEPs** | o mesmo, por SUSEP |
+| **Top 5 assuntos** | o mesmo, por assunto |
+| **Top 5 consultores** | o consultor também vem do cadastro de corretoras, pela SUSEP |
+| **Vida individual ou Vida em grupo** | uma rosca. `VG`, `vida em grupo`, `VI` e `Vida Individual` valem; outro texto fica como veio |
+
+Cada gráfico traz, embaixo, a **tabela com o Sistema, o Chat e o Total** — porque
+o número é o pedido, e a tabela mostra de onde veio cada parte. O que passa do
+5º lugar é somado em **Demais valores**, para o total fechar; o atendimento que
+não traz a informação (sem SUSEP, sem assunto…) **não entra no ranking** e é
+contado à parte, no rodapé do gráfico.
+
+**Ligar a planilha do chat** é em **Configurações › Estrutura › Planilha dos
+atendimentos do chat**. Ela é de outro sistema e não tem contrato, então o PO diz
+o Id, a aba e **qual coluna dela é cada coisa**: data e analista são obrigatórios;
+SUSEP, corretora, assunto, consultor e vida individual/grupo são opcionais. O botão
+**Conferir a planilha** abre a planilha, sugere as colunas pelo nome do cabeçalho,
+mostra as últimas linhas já traduzidas e confere se as colunas existem. Salvar
+confere de novo e **recusa** o Id que não abre, a aba ou a coluna que não existe.
+**O PGO só lê** a planilha do chat — nunca escreve nela.
+
+O que vale saber, e a tela diz:
+
+- **O período e o alcance** são os da tela: o chat entra pela **data** de cada
+  linha, e o analista só vê no chat o que o nível dele deixa ver (a mesma regra,
+  pelo nome do analista). Os **filtros** de cima não mudam este bloco — o chat
+  não tem as colunas deles.
+- **O que está nas duas bases conta duas vezes.** O sistema não tem como saber
+  que um atendimento já cadastrado também está na planilha.
+- **Chat desligado, que não abriu ou que perdeu uma coluna não derruba o bloco:**
+  os números do sistema continuam, com o motivo escrito em cima. Número parcial
+  sem aviso levaria alguém a concluir que o chat não atendeu ninguém.
+- **A planilha é lida do fim:** só as últimas linhas entram — o mesmo teto que a
+  tela usa para a base do sistema (5.000, ajustável em `OPERACAO.LINHAS_DO_PAINEL`)
+  —, e a tela avisa quando cortou. Linha com data que não dá para ler fica de fora
+  e é contada no aviso.
 
 ### O período, de três maneiras
 
@@ -1232,7 +1282,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1086 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1111 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

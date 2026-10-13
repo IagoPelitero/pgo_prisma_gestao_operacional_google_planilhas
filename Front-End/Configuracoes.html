@@ -2862,13 +2862,18 @@ var TelaConfiguracoes = (function () {
             Servidor.chamar('configuracaoDosCadastros')
               .entao(function (cadastros) {
                 dados.cadastros = cadastros;
-                Servidor.chamar('configuracaoDoArquivoDaAuditoria')
-                  .entao(function (arquivo) {
-                    dados.arquivoDaAuditoria = arquivo;
-                    Servidor.chamar('listarAuditoria', 40)
-                      .entao(function (trilha) {
-                        dados.trilha = trilha;
-                        desenharEstrutura();
+                Servidor.chamar('configuracaoDoChat')
+                  .entao(function (chat) {
+                    dados.chat = chat;
+                    Servidor.chamar('configuracaoDoArquivoDaAuditoria')
+                      .entao(function (arquivo) {
+                        dados.arquivoDaAuditoria = arquivo;
+                        Servidor.chamar('listarAuditoria', 40)
+                          .entao(function (trilha) {
+                            dados.trilha = trilha;
+                            desenharEstrutura();
+                          })
+                          .senao(falhou);
                       })
                       .senao(falhou);
                   })
@@ -2911,9 +2916,11 @@ var TelaConfiguracoes = (function () {
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
     elemento('config-lista').innerHTML += desenharDiagnostico()
-      + desenharCadastros() + desenharArquivoDaAuditoria() + desenharLegado();
+      + desenharCadastros() + desenharChat() + desenharArquivoDaAuditoria()
+      + desenharLegado();
     ligarDiagnostico();
     ligarCadastros();
+    ligarChat();
     ligarArquivoDaAuditoria();
     ligarLegado();
 
@@ -3218,6 +3225,132 @@ var TelaConfiguracoes = (function () {
               .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
           });
         });
+    });
+  }
+
+  /**
+   * A planilha dos atendimentos do chat — a leitura apartada da Mesa Diamante.
+   *
+   * Ela não tem contrato: é de outro sistema. Por isso o PO diz aqui qual
+   * planilha, qual aba e qual coluna dela é cada coisa. "Conferir" abre a
+   * planilha, sugere as colunas pelo nome do cabeçalho e mostra as últimas
+   * linhas já traduzidas — conferir o mapeamento olhando o dado. O PGO só LÊ.
+   */
+  function desenharChat() {
+    var chat = dados.chat || { planilhaId: '', aba: '', colunas: {}, definicao: [], ligado: false };
+    var colunas = chat.definicao.map(function (definicao) {
+      return campoDeTexto('chat-' + definicao.chave,
+        definicao.rotulo + (definicao.obrigatoria ? ' *' : ''),
+        (chat.colunas || {})[definicao.chave],
+        definicao.obrigatoria
+          ? 'Obrigatória: sem ela o atendimento não entra no período nem no analista.'
+          : 'Opcional. Vazio: o atendimento do chat conta, mas sem esta informação.')
+        .replace('<input type="text"', '<input type="text" list="cfg-chat-cabecalhos"');
+    }).join('');
+
+    return '<div class="config-legado">'
+      + '<h4>Planilha dos atendimentos do chat</h4>'
+      + '<p class="config-explica">Os casos atendidos pelo chat, numa planilha à parte. '
+      + 'Quando apontada, a <strong>Produtividade RECC da Mesa Diamante</strong> soma '
+      + 'esses atendimentos aos casos cadastrados no sistema, por analista, corretora, '
+      + 'SUSEP, assunto, consultor e vida individual ou em grupo. '
+      + '<strong>O PGO só lê.</strong> A corretora e o consultor vêm do cadastro de '
+      + 'corretoras, pela SUSEP. Vazio desliga.</p>'
+      + (chat.ligado
+        ? '<p class="config-alerta suave">Ligada. Se a planilha sair do ar ou perder o '
+          + 'compartilhamento, a Produtividade da Mesa mostra só o sistema — com o '
+          + 'motivo ao lado, não em silêncio.</p>'
+        : '')
+      + '<form class="config-form" id="form-chat">'
+      + campoDeTexto('chatId', 'Id da planilha do chat', chat.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
+        + 'precisa ter acesso a ela.')
+      + campoDeTexto('chatAba', 'Aba', chat.aba,
+        'Vazio usa a primeira aba. A primeira linha é lida como cabeçalho.')
+      + '<datalist id="cfg-chat-cabecalhos"></datalist>'
+      + colunas
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="conferir-chat">'
+      + 'Conferir a planilha</button>'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + '</div></form>'
+      + '<div id="laudo-do-chat"></div>'
+      + '</div>';
+  }
+
+  /** As colunas escolhidas na tela, pelo que está nas caixas. */
+  function colunasDoChatNaTela() {
+    var colunas = {};
+    ((dados.chat || {}).definicao || []).forEach(function (definicao) {
+      colunas[definicao.chave] = valorDe('chat-' + definicao.chave);
+    });
+    return colunas;
+  }
+
+  function ligarChat() {
+    elemento('conferir-chat').addEventListener('click', function () {
+      var caixa = elemento('laudo-do-chat');
+      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
+
+      Servidor.chamar('conferirPlanilhaDoChat', {
+        planilhaId: valorDe('chatId'), aba: valorDe('chatAba'), colunas: colunasDoChatNaTela()
+      }).entao(function (laudo) {
+        // Os cabeçalhos viram sugestão nas caixas, e as colunas que ainda estão
+        // em branco recebem a que o nome indica — o PO confere e troca.
+        var lista = elemento('cfg-chat-cabecalhos');
+        if (lista) {
+          lista.innerHTML = (laudo.cabecalhos || []).filter(function (c) { return c; })
+            .map(function (c) { return '<option value="' + escapar(c) + '"></option>'; }).join('');
+        }
+        var preenchidas = [];
+        Object.keys(laudo.sugestoes || {}).forEach(function (chave) {
+          var campo = elemento('cfg-chat-' + chave);
+          if (campo && !campo.value.trim() && laudo.sugestoes[chave]) {
+            campo.value = laudo.sugestoes[chave];
+            preenchidas.push(laudo.sugestoes[chave]);
+          }
+        });
+
+        var amostra = (laudo.amostra || []).map(function (linha) {
+          return '<li>' + Object.keys(linha).map(function (chave) {
+            return '<strong>' + escapar(chave) + '</strong>: ' + escapar(linha[chave] || '—');
+          }).join(' · ') + '</li>';
+        }).join('');
+
+        var ok = laudo.abre && !laudo.recado && !(laudo.faltando || []).length;
+        caixa.innerHTML = (laudo.recado
+          ? '<p class="config-alerta">' + escapar(laudo.recado) + '</p>' : '')
+          + ((laudo.faltando || []).length
+            ? '<ul class="config-itens">' + laudo.faltando.map(function (linha) {
+              return '<li>' + escapar(linha) + '</li>';
+            }).join('') + '</ul>' : '')
+          + (laudo.abre && !laudo.recado
+            ? '<p class="config-alerta' + (ok ? ' suave' : '') + '">'
+              + (ok ? 'A planilha abre e as colunas conferem. ' : 'A planilha abre. ')
+              + laudo.linhas + ' linha(s) de atendimento'
+              + (laudo.limiteDeLeitura && laudo.linhas > laudo.limiteDeLeitura
+                ? ' — só as últimas ' + laudo.limiteDeLeitura + ' entram nos gráficos' : '')
+              + '.' + (preenchidas.length
+                ? ' Sugeri colunas pelo nome do cabeçalho: confira antes de salvar.' : '')
+              + '</p>' : '')
+          + (amostra ? '<p class="config-explica">As últimas linhas, como o sistema as lê:</p>'
+            + '<ul class="config-itens">' + amostra + '</ul>' : '');
+      }).senao(function (erro) {
+        caixa.innerHTML = '<p class="config-alerta">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+    });
+
+    elemento('form-chat').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      Servidor.chamar('salvarConfiguracaoDoChat', {
+        planilhaId: valorDe('chatId'), aba: valorDe('chatAba'), colunas: colunasDoChatNaTela()
+      }).entao(function (nova) {
+        dados.chat = nova;
+        avisarSalvo(nova.ligado
+          ? 'Planilha do chat ligada e conferida.'
+          : 'Planilha do chat desligada — a Produtividade da Mesa volta a mostrar só o sistema.');
+      }).senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
     });
   }
 

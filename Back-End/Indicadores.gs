@@ -1704,6 +1704,14 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
       `null` quando o canal não tem prazo nenhum.
     */
     prazos: controleDePrazos_(casos, canal),
+    /*
+      OS ATENDIDOS DA MESA: o que está no sistema mais o que veio da planilha
+      do chat. Vem FORA de `componentes` pelo mesmo motivo do valor por
+      situação e dos prazos: não mora na aba PAINEIS, e a tela de Configurações
+      não o edita. Usa o período e o alcance da tela, e NÃO os filtros — o chat
+      não tem as colunas deles. `null` fora da Mesa.
+    */
+    atendimentos: atendimentosDaMesa_(noPeriodo, canal, quem, periodo),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }
@@ -3058,4 +3066,529 @@ function oQueEuFiz_(quem, canal) {
           : ''
       };
     });
+}
+
+
+/* ############################################################################
+   #
+   #  OS ATENDIMENTOS DO CHAT — a planilha apartada da Mesa Diamante
+   #
+   ############################################################################ */
+
+/*
+ * Pedido do PO: "implemente na Produtividade RECC, para a Mesa Diamante, a
+ * leitura de uma planilha apartada de casos atendidos pelo chat" e, na
+ * Produtividade da Mesa, "os gráficos de atendidos, somando os casos
+ * cadastrados no sistema e os casos atendidos por nome do analista,
+ * integrando o nome da corretora para mostrar a quantidade e o top 5; SUSEPs,
+ * assuntos, consultor e vida individual ou em grupo, a mesma coisa".
+ *
+ * A planilha do chat NÃO tem contrato — é de outro sistema, e muda sem avisar.
+ * Por isso o PO diz, em Configurações › Estrutura, QUAL planilha, QUAL aba e
+ * QUAL coluna dela é cada coisa. O sistema só LÊ, nunca escreve ali, e uma
+ * planilha que não abre vira recado ao lado dos números do sistema, e não uma
+ * tela quebrada (mesma regra da base legada).
+ *
+ * O QUE SOMA COM O QUÊ: o atendido do sistema é todo caso da Mesa no período
+ * (o mesmo recorte e o mesmo alcance dos cartões), e o do chat é toda linha da
+ * planilha no período. A soma NÃO tira repetido: se o mesmo atendimento estiver
+ * nas duas bases, ele conta duas vezes — o sistema não tem como saber.
+ */
+
+const RECC_CHAVE_DO_CHAT_PLANILHA = 'CHAT.PLANILHA_ID';
+const RECC_CHAVE_DO_CHAT_ABA = 'CHAT.ABA';
+const RECC_CHAVE_DO_CHAT_COLUNAS = 'CHAT.COLUNAS';
+
+/**
+ * O que o sistema precisa saber de cada linha do chat. `palavras` serve só
+ * para SUGERIR a coluna (pelo nome do cabeçalho); quem decide é o PO.
+ */
+const RECC_COLUNAS_DO_CHAT = [
+  { chave: 'data', rotulo: 'Data do atendimento', obrigatoria: true,
+    palavras: ['data', 'dataatendimento', 'datadoatendimento', 'dia'] },
+  { chave: 'analista', rotulo: 'Analista', obrigatoria: true,
+    palavras: ['analista', 'atendente', 'agente', 'operador', 'nomedoanalista'] },
+  { chave: 'susep', rotulo: 'SUSEP', obrigatoria: false, palavras: ['susep'] },
+  { chave: 'corretora', rotulo: 'Corretora', obrigatoria: false,
+    palavras: ['corretora', 'nomecorretora', 'nomedacorretora'] },
+  { chave: 'assunto', rotulo: 'Assunto', obrigatoria: false,
+    palavras: ['assunto', 'motivo', 'tema', 'tipodeatendimento'] },
+  { chave: 'consultor', rotulo: 'Consultor', obrigatoria: false, palavras: ['consultor'] },
+  { chave: 'ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
+    palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] }
+];
+
+/** O que está gravado em CONFIG sobre a planilha do chat, sem checar permissão. */
+function configuracaoLidaDoChat_() {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_PLANILHA, '') || '').trim();
+  var aba = String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_ABA, '') || '').trim();
+  var guardadas = {};
+  try {
+    guardadas = JSON.parse(String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_COLUNAS, '') || '{}')) || {};
+  } catch (erro) {
+    guardadas = {};
+  }
+  var colunas = {};
+  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
+    colunas[definicao.chave] = String(guardadas[definicao.chave] || '').trim();
+  });
+  return { planilhaId: id, aba: aba, colunas: colunas, ligado: id !== '' };
+}
+
+/** O que a tela de Configurações mostra sobre a planilha do chat. */
+function configuracaoDoChat() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var lida = configuracaoLidaDoChat_();
+  lida.definicao = RECC_COLUNAS_DO_CHAT.map(function (definicao) {
+    return { chave: definicao.chave, rotulo: definicao.rotulo, obrigatoria: definicao.obrigatoria };
+  });
+  return lida;
+}
+
+/** A posição (base 1) da coluna pelo nome do cabeçalho, sem ligar para acento e caixa. */
+function posicaoNoCabecalhoDoChat_(cabecalhos, nome) {
+  var alvo = normalizarParaComparar_(nome);
+  if (!alvo) return 0;
+  for (var i = 0; i < cabecalhos.length; i++) {
+    if (normalizarParaComparar_(cabecalhos[i]) === alvo) return i + 1;
+  }
+  return 0;
+}
+
+/** Abre a aba do chat, ou diz por que não deu. */
+function abaDoChat_(planilhaId, nomeDaAba) {
+  var planilha = abrirPlanilhaDeFora_(planilhaId);
+  var procurado = String(nomeDaAba || '').trim();
+  var aba = procurado ? planilha.getSheetByName(procurado) : planilha.getSheets()[0];
+  if (!aba) {
+    throw new Error('A planilha abriu, mas não tem uma aba chamada "' + procurado
+      + '". As abas dela são: ' + planilha.getSheets().map(function (uma) {
+        return uma.getName();
+      }).join(', ') + '.');
+  }
+  return aba;
+}
+
+/** Quais colunas da planilha parecem ser cada coisa — só sugere, não decide. */
+function sugerirColunasDoChat_(cabecalhos) {
+  var sugestoes = {};
+  var usadas = {};
+  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
+    var escolhida = '';
+    definicao.palavras.some(function (palavra) {
+      return cabecalhos.some(function (cabecalho, i) {
+        if (usadas[i] || normalizarParaComparar_(cabecalho) !== palavra) return false;
+        usadas[i] = true;
+        escolhida = String(cabecalho).trim();
+        return true;
+      });
+    });
+    sugestoes[definicao.chave] = escolhida;
+  });
+  return sugestoes;
+}
+
+/**
+ * Abre a planilha do chat SEM ligar nada: é o botão "conferir".
+ *
+ * Diz se abre, quais abas e colunas tem, o que as colunas escolhidas dão nas
+ * últimas linhas e quantas SUSEPs a linha traz que o cadastro de corretoras
+ * não conhece — que é o que deixaria a corretora e o consultor em branco nos
+ * gráficos.
+ */
+function conferirPlanilhaDoChat(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var pedido = dados || {};
+  var id = String(pedido.planilhaId || '').trim();
+  if (!id) {
+    return { abre: false, recado: 'Informe o Id da planilha do chat. Ele é o pedaço do '
+      + 'endereço entre /d/ e /edit.', abas: [], cabecalhos: [], sugestoes: {}, faltando: [],
+      linhas: 0, amostra: [] };
+  }
+
+  var planilha;
+  try {
+    planilha = abrirPlanilhaDeFora_(id);
+  } catch (erro) {
+    return { abre: false, recado: erro.message || String(erro), abas: [], cabecalhos: [],
+      sugestoes: {}, faltando: [], linhas: 0, amostra: [] };
+  }
+
+  var abas = planilha.getSheets().map(function (uma) { return uma.getName(); });
+  var aba;
+  try {
+    aba = abaDoChat_(id, pedido.aba);
+  } catch (erro) {
+    return { abre: true, recado: erro.message || String(erro), abas: abas, cabecalhos: [],
+      sugestoes: {}, faltando: [], linhas: 0, amostra: [] };
+  }
+
+  var largura = aba.getLastColumn();
+  var ultima = aba.getLastRow();
+  var cabecalhos = largura >= 1
+    ? aba.getRange(1, 1, 1, largura).getDisplayValues()[0].map(function (c) {
+      return String(c === null || c === undefined ? '' : c).trim();
+    }) : [];
+
+  var escolhidas = pedido.colunas || {};
+  var faltando = [];
+  var posicoes = {};
+  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
+    var nome = String(escolhidas[definicao.chave] || '').trim();
+    if (!nome) {
+      if (definicao.obrigatoria) faltando.push(definicao.rotulo + ': escolha a coluna.');
+      return;
+    }
+    var posicao = posicaoNoCabecalhoDoChat_(cabecalhos, nome);
+    if (!posicao) faltando.push(definicao.rotulo + ': a planilha não tem a coluna "' + nome + '".');
+    else posicoes[definicao.chave] = posicao;
+  });
+
+  // As últimas linhas, já traduzidas — conferir o mapeamento olhando o dado.
+  var amostra = [];
+  var linhas = Math.max(ultima - 1, 0);
+  var quantas = Math.min(linhas, 3);
+  if (quantas && !faltando.length) {
+    var inicio = ultima - quantas + 1;
+    var lidas = {};
+    Object.keys(posicoes).forEach(function (chave) {
+      lidas[chave] = aba.getRange(inicio, posicoes[chave], quantas, 1).getDisplayValues();
+    });
+    for (var k = 0; k < quantas; k++) {
+      var linha = {};
+      Object.keys(lidas).forEach(function (chave) { linha[chave] = String(lidas[chave][k][0] || '').trim(); });
+      amostra.push(linha);
+    }
+  }
+
+  return {
+    abre: true, recado: '', abas: abas, cabecalhos: cabecalhos,
+    sugestoes: sugerirColunasDoChat_(cabecalhos), faltando: faltando,
+    linhas: linhas, amostra: amostra,
+    // O chat é lido do fim: só as últimas linhas entram nos gráficos.
+    limiteDeLeitura: linhasQueOPainelOlha_()
+  };
+}
+
+/**
+ * Aponta a planilha do chat — ou desliga, com o Id em branco.
+ *
+ * CONFERE ANTES DE GRAVAR, e a falha DERRUBA: guardar uma planilha que não
+ * abre, ou colunas que ela não tem, deixaria a Produtividade da Mesa com um
+ * recado para sempre sem ninguém saber se o erro era o Id, a aba ou o nome da
+ * coluna. A data e o analista são obrigatórios: sem a data não há como
+ * recortar o período, e sem o analista não há de quem somar.
+ */
+function salvarConfiguracaoDoChat(dados) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var pedido = dados || {};
+  var id = String(pedido.planilhaId || '').trim();
+  var aba = String(pedido.aba || '').trim();
+  var colunas = {};
+  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
+    colunas[definicao.chave] = String((pedido.colunas || {})[definicao.chave] || '').trim();
+  });
+
+  if (id) {
+    var laudo = conferirPlanilhaDoChat({ planilhaId: id, aba: aba, colunas: colunas });
+    if (!laudo.abre) throw new Error(laudo.recado);
+    if (laudo.recado) throw new Error(laudo.recado);
+    if (laudo.faltando.length) {
+      throw new Error('A planilha do chat abriu, mas as colunas não conferem:\n\n'
+        + laudo.faltando.join('\n'));
+    }
+  }
+
+  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_PLANILHA, id);
+  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_ABA, aba);
+  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_COLUNAS, JSON.stringify(colunas));
+  registrarAuditoria_('chat.configurar', 'CONFIG', '', id ? 'ligada' : 'desligada');
+  return configuracaoDoChat();
+}
+
+/**
+ * As linhas do chat, lidas do fim da aba — ou o recado do que deu errado.
+ *
+ * Nunca lança: a Produtividade da Mesa continua com os números do sistema. Lê
+ * SÓ as colunas escolhidas, uma ida ao serviço por coluna, e só as últimas
+ * `linhasQueOPainelOlha_()` linhas — o mesmo teto que a tela usa para a base
+ * do sistema. O texto vem como a pessoa o VÊ na outra planilha.
+ */
+function lerAtendimentosDoChat_() {
+  var configurada = configuracaoLidaDoChat_();
+  var vazio = { ligado: configurada.ligado, linhas: [], aviso: '', truncada: false, lidas: 0 };
+  if (!configurada.ligado) return vazio;
+
+  try {
+    var aba = abaDoChat_(configurada.planilhaId, configurada.aba);
+    var largura = aba.getLastColumn();
+    var ultima = aba.getLastRow();
+    if (ultima < 2 || largura < 1) return vazio;
+
+    var cabecalhos = aba.getRange(1, 1, 1, largura).getDisplayValues()[0];
+    var posicoes = {};
+    var faltando = [];
+    RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
+      var nome = configurada.colunas[definicao.chave];
+      if (!nome) {
+        if (definicao.obrigatoria) faltando.push(definicao.rotulo + ' (coluna não escolhida)');
+        return;
+      }
+      var posicao = posicaoNoCabecalhoDoChat_(cabecalhos, nome);
+      if (!posicao) faltando.push('"' + nome + '"');
+      else posicoes[definicao.chave] = posicao;
+    });
+    if (faltando.length) {
+      throw new Error('A planilha do chat não tem: ' + faltando.join(', ')
+        + '. Acerte em Configurações › Estrutura.');
+    }
+
+    var primeira = Math.max(2, ultima - linhasQueOPainelOlha_() + 1);
+    var quantas = ultima - primeira + 1;
+    var lidas = {};
+    Object.keys(posicoes).forEach(function (chave) {
+      lidas[chave] = aba.getRange(primeira, posicoes[chave], quantas, 1).getDisplayValues();
+    });
+
+    var linhas = [];
+    for (var k = 0; k < quantas; k++) {
+      var linha = {};
+      Object.keys(lidas).forEach(function (chave) {
+        linha[chave] = String(lidas[chave][k][0] === null || lidas[chave][k][0] === undefined
+          ? '' : lidas[chave][k][0]).trim();
+      });
+      if (!linha.data && !linha.analista) continue;   // linha em branco no meio da aba
+      linhas.push(linha);
+    }
+    return { ligado: true, linhas: linhas, aviso: '', truncada: primeira > 2, lidas: quantas };
+  } catch (erro) {
+    return { ligado: true, linhas: [], aviso: erro.message || String(erro),
+      truncada: false, lidas: 0 };
+  }
+}
+
+/** A data de uma linha do chat. Aceita "13/10/2026", "13/10/2026 14:05" e "2026-10-13…". */
+function dataDoAtendimentoDoChat_(texto) {
+  var achou = String(texto || '').trim().match(/^(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/);
+  return achou ? converterParaData_(achou[1]) : '';
+}
+
+/** "Vida individual" e "Vida em grupo", seja como for que cada base escreva. */
+function ramoDoAtendimento_(texto) {
+  var bruto = String(texto === null || texto === undefined ? '' : texto).trim();
+  if (!bruto) return { chave: '', rotulo: '' };
+  var n = normalizarParaComparar_(bruto);
+  if (n === 'vi' || n.indexOf('individual') >= 0) return { chave: 'vi', rotulo: 'Vida individual' };
+  if (n === 'vg' || n.indexOf('grupo') >= 0) return { chave: 'vg', rotulo: 'Vida em grupo' };
+  return { chave: n, rotulo: bruto };
+}
+
+/** O cadastro de corretoras por SUSEP: o nome e o consultor que valem para os dois lados. */
+function indiceDeCorretorasPorSusep_() {
+  var indice = {};
+  lerRegistros_('CORRETORAS').forEach(function (linha) {
+    var chave = chaveDaSusep_(linha.SUSEP);
+    if (!chave) return;
+    var atual = indice[chave] || { corretora: '', consultor: '' };
+    if (!atual.corretora) atual.corretora = String(linha.Corretora || '').trim();
+    if (!atual.consultor) atual.consultor = String(linha.Consultor || '').trim();
+    indice[chave] = atual;
+  });
+  return indice;
+}
+
+/**
+ * Os gráficos de ATENDIDOS da Mesa Diamante: o que está no sistema mais o que
+ * veio do chat.
+ *
+ * `casosDoSistema` já chega no recorte da tela (período e alcance da pessoa);
+ * as linhas do chat passam pelas mesmas duas regras — o período pela data
+ * delas, o alcance pelo nome do analista, pela MESMA função da tela. Devolve
+ * `null` para qualquer canal que não seja a Mesa, e a tela não desenha nada.
+ */
+function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
+  if (!canal || canal.aba !== 'BASE_MESA') return null;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achar = function (nome) {
+    var posicao = posicaoDaColuna_(estrutura, nome);
+    return posicao < 0 ? '' : estrutura.cabecalhos[posicao];
+  };
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura) || 'Analista';
+  var colunas = { susep: achar('SUSEP'), corretora: achar('Corretora'),
+    assunto: achar('Assunto'), ramo: achar('Ramo') };
+
+  // O CHAT: lê, recorta o período e o alcance.
+  var doChat = lerAtendimentosDoChat_();
+  var de = Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var ate = Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var semData = 0;
+  var doChatNoPeriodo = doChat.linhas.filter(function (linha) {
+    var data = dataDoAtendimentoDoChat_(linha.data);
+    if (!data) { semData++; return false; }
+    var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+    return dela >= de && dela <= ate;
+  });
+  var comoRegistros = doChatNoPeriodo.map(function (linha) {
+    var registro = { __chat: linha };
+    registro[colunaDoAnalista] = linha.analista;
+    return registro;
+  });
+  doChatNoPeriodo = alcanceDaProdutividade_(comoRegistros, canal, quem)
+    .map(function (registro) { return registro.__chat; });
+
+  // As duas listas viram uma só, com as mesmas seis dimensões.
+  var cadastro = indiceDeCorretorasPorSusep_();
+  var nomesDosUsuarios = {};
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    var chave = normalizarParaComparar_(usuario.Nome);
+    if (chave) nomesDosUsuarios[chave] = String(usuario.Nome).trim();
+  });
+
+  var atendimentos = [];
+  function acrescentar(origem, bruto) {
+    var susep = susepComoSeEscreve_(bruto.susep);
+    var doCadastro = susep ? cadastro[chaveDaSusep_(susep)] : null;
+    var analista = String(bruto.analista || '').trim();
+    var ramo = ramoDoAtendimento_(bruto.ramo);
+    atendimentos.push({
+      origem: origem,
+      analista: [normalizarParaComparar_(analista),
+        nomesDosUsuarios[normalizarParaComparar_(analista)] || analista],
+      susep: [chaveDaSusep_(susep), susep],
+      // O nome do CADASTRO vale quando a SUSEP é conhecida: duas bases que
+      // escrevem a mesma corretora de dois jeitos viram uma barra só.
+      corretora: (function () {
+        var nome = (doCadastro && doCadastro.corretora) || String(bruto.corretora || '').trim();
+        return [normalizarParaComparar_(nome), nome];
+      })(),
+      assunto: [normalizarParaComparar_(bruto.assunto), String(bruto.assunto || '').trim()],
+      consultor: (function () {
+        var nome = (doCadastro && doCadastro.consultor) || String(bruto.consultor || '').trim();
+        return [normalizarParaComparar_(nome), nome];
+      })(),
+      ramo: [ramo.chave, ramo.rotulo]
+    });
+  }
+
+  casosDoSistema.forEach(function (caso) {
+    acrescentar('sistema', {
+      analista: caso[colunaDoAnalista],
+      susep: colunas.susep ? caso[colunas.susep] : '',
+      corretora: colunas.corretora ? caso[colunas.corretora] : '',
+      assunto: colunas.assunto ? caso[colunas.assunto] : '',
+      ramo: colunas.ramo ? caso[colunas.ramo] : ''
+    });
+  });
+  doChatNoPeriodo.forEach(function (linha) { acrescentar('chat', linha); });
+
+  var doSistema = casosDoSistema.length;
+  var doChatTotal = doChatNoPeriodo.length;
+
+  return {
+    chat: {
+      ligado: doChat.ligado,
+      aviso: doChat.aviso,
+      truncada: doChat.truncada,
+      linhasLidas: doChat.lidas,
+      semData: semData
+    },
+    totais: { sistema: doSistema, chat: doChatTotal, total: doSistema + doChatTotal },
+    graficos: [
+      graficoDeAtendidos_(atendimentos, 'analista', 'Atendidos por analista', 'Analista',
+        'barrasDeitadas', 2, 15, 'Sem analista'),
+      graficoDeAtendidos_(atendimentos, 'corretora', 'Top 5 corretoras', 'Corretora',
+        'barrasDeitadas', 1, 5, ''),
+      graficoDeAtendidos_(atendimentos, 'susep', 'Top 5 SUSEPs', 'SUSEP',
+        'barrasDeitadas', 1, 5, ''),
+      graficoDeAtendidos_(atendimentos, 'assunto', 'Top 5 assuntos', 'Assunto',
+        'barrasDeitadas', 1, 5, ''),
+      graficoDeAtendidos_(atendimentos, 'consultor', 'Top 5 consultores', 'Consultor',
+        'barrasDeitadas', 1, 5, ''),
+      graficoDeAtendidos_(atendimentos, 'ramo', 'Vida individual ou Vida em grupo', 'Ramo',
+        'pizza', 1, 6, 'Sem informação')
+    ]
+  };
+}
+
+/**
+ * UM gráfico de atendidos: conta por `dimensao`, separando sistema e chat.
+ *
+ * `topo` é quantas barras ficam; o resto vira "Demais valores" — somado, para o
+ * total fechar. `semNome`, quando preenchido, é o balde dos que não trazem a
+ * informação e ENTRA no gráfico (analista, ramo); vazio, esses não entram no
+ * ranking e são contados à parte em `semInformacao` — um top 5 de corretoras
+ * liderado por "sem corretora" não diria nada.
+ *
+ * O formato é o que `Graficos` da tela já sabe desenhar. Não tem `id`: não mora
+ * na aba PAINEIS, e por isso não detalha por clique (mesma regra do valor por
+ * situação).
+ */
+function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, tipo, largura,
+  topo, semNome) {
+  var baldes = {};
+  var ordem = [];
+  var semInformacao = 0;
+
+  atendimentos.forEach(function (atendimento) {
+    var chave = atendimento[dimensao][0];
+    var rotulo = atendimento[dimensao][1];
+    if (!chave) {
+      if (!semNome) { semInformacao++; return; }
+      chave = '__sem';
+      rotulo = semNome;
+    }
+    if (!Object.prototype.hasOwnProperty.call(baldes, chave)) {
+      baldes[chave] = { chave: chave, rotulo: rotulo, sistema: 0, chat: 0 };
+      ordem.push(chave);
+    }
+    baldes[chave][atendimento.origem]++;
+  });
+
+  var pontos = ordem.map(function (chave) {
+    var balde = baldes[chave];
+    return { chave: balde.chave, rotulo: balde.rotulo, sistema: balde.sistema, chat: balde.chat,
+      valor: balde.sistema + balde.chat, casos: balde.sistema + balde.chat, ehOutros: false };
+  }).sort(function (um, outro) {
+    // O balde "sem informação" fica por último, e o resto por tamanho.
+    if ((um.chave === '__sem') !== (outro.chave === '__sem')) return um.chave === '__sem' ? 1 : -1;
+    return outro.valor - um.valor || (um.rotulo < outro.rotulo ? -1 : (um.rotulo > outro.rotulo ? 1 : 0));
+  });
+
+  var dobrados = 0;
+  if (topo && pontos.length > topo) {
+    var resto = pontos.slice(topo);
+    dobrados = resto.length;
+    var soma = function (campo) {
+      return resto.reduce(function (total, ponto) { return total + ponto[campo]; }, 0);
+    };
+    pontos = pontos.slice(0, topo);
+    pontos.push({ chave: '__outros', rotulo: 'Demais valores', sistema: soma('sistema'),
+      chat: soma('chat'), valor: soma('valor'), casos: soma('casos'), ehOutros: true });
+  }
+
+  pontos = pontos.map(function (ponto, i) {
+    // Barra: um tom só (a magnitude é o que importa). Rosca: uma cor por fatia.
+    return Object.assign(ponto, {
+      tom: ponto.ehOutros ? 'neutro' : '',
+      serie: tipo === 'pizza' ? (ponto.ehOutros ? 0 : (i % 6) + 1) : 0
+    });
+  });
+
+  return {
+    titulo: titulo,
+    tipo: tipo,
+    largura: largura,
+    dimensao: rotuloDaDimensao,
+    medida: 'Atendimentos',
+    agregacao: 'contagem',
+    unidade: '',
+    ehTempo: false,
+    pontos: pontos,
+    tendencia: null,
+    total: pontos.reduce(function (soma, ponto) { return soma + ponto.valor; }, 0),
+    dobradosEmOutros: dobrados,
+    semInformacao: semInformacao,
+    aviso: ''
+  };
 }

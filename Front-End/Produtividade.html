@@ -73,6 +73,7 @@ var TelaProdutividade = (function () {
     elemento('analitico').innerHTML = desenharFiltros()
       + desenharCartoes()
       + desenharPrazos()
+      + desenharAtendimentos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
@@ -154,6 +155,103 @@ var TelaProdutividade = (function () {
     return '<section class="cartao prazos" aria-labelledby="titulo-dos-prazos">'
       + '<header class="origem-cabeca"><h3 id="titulo-dos-prazos">Controle de prazos</h3>'
       + '</header>' + blocos.join('') + '</section>';
+  }
+
+  /**
+   * OS ATENDIDOS DA MESA: o que está no sistema mais o que veio do chat.
+   *
+   * Desenhado como o valor por situação — o gráfico E a tabela de números ao
+   * mesmo tempo —, porque aqui o número é o pedido, e a tabela mostra de onde
+   * veio cada parte: quanto do sistema, quanto do chat. Os gráficos não
+   * detalham por clique (não moram na aba PAINEIS).
+   *
+   * Chat desligado, que não abriu ou que perdeu coluna NÃO derruba o bloco:
+   * os números do sistema continuam, com o motivo escrito em cima. Número
+   * parcial sem aviso é o jeito de alguém concluir que o chat não atendeu
+   * ninguém.
+   */
+  function desenharAtendimentos() {
+    var atendidos = painel.atendimentos;
+    if (!atendidos) return '';
+    var chat = atendidos.chat;
+
+    var avisos = [];
+    if (!chat.ligado) {
+      avisos.push('A planilha do chat não está ligada: estes números são só dos casos '
+        + 'cadastrados no sistema. Quem administra liga em Configurações › Estrutura.');
+    } else if (chat.aviso) {
+      avisos.push('A planilha do chat não pôde ser lida, e estes números são só do '
+        + 'sistema: ' + chat.aviso);
+    }
+    if (chat.truncada) {
+      avisos.push('Do chat entram só as últimas ' + chat.linhasLidas + ' linhas da planilha.');
+    }
+    if (chat.semData) {
+      avisos.push(chat.semData + ' linha(s) do chat sem data legível ficaram de fora do período.');
+    }
+    avisos.push('Vale o período e o alcance desta tela; os filtros acima não mudam este bloco. '
+      + 'O atendimento que estiver nas duas bases conta duas vezes.');
+
+    return '<section class="cartao atendimentos" aria-labelledby="titulo-dos-atendidos">'
+      + '<header class="origem-cabeca"><h3 id="titulo-dos-atendidos">'
+      + 'Atendidos — sistema e chat</h3></header>'
+      + '<div class="cartoes">'
+      + tileDePrazo('Atendidos no total', atendidos.totais.total, 'destaque',
+        'Casos cadastrados no sistema mais os atendimentos do chat, no período')
+      + tileDePrazo('No sistema', atendidos.totais.sistema, 'neutro',
+        'Casos da Mesa Diamante cadastrados no período')
+      + tileDePrazo('No chat', atendidos.totais.chat, 'neutro',
+        'Linhas da planilha do chat no período')
+      + '</div>'
+      + avisos.map(function (aviso) {
+        return '<p class="aviso-do-chat">' + escapar(aviso) + '</p>';
+      }).join('')
+      + '</section>'
+      + '<div class="graficos">' + atendidos.graficos.map(desenharAtendidos).join('') + '</div>';
+  }
+
+  /** Um gráfico de atendidos: o desenho e, embaixo, de onde veio cada número. */
+  function desenharAtendidos(componente) {
+    var vazio = !componente.pontos.length;
+    return '<section class="cartao grafico largura-' + componente.largura + '">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo) + '</h3></header>'
+      + Graficos.desenhar(componente)
+      + (vazio ? '' : tabelaDeAtendidos(componente))
+      + rodapeDosAtendidos(componente)
+      + '</section>';
+  }
+
+  function tabelaDeAtendidos(componente) {
+    var sistema = 0;
+    var chat = 0;
+    var linhas = componente.pontos.map(function (ponto) {
+      sistema += ponto.sistema;
+      chat += ponto.chat;
+      return '<tr><td>' + escapar(ponto.rotulo) + '</td>'
+        + '<td class="direita">' + ponto.sistema + '</td>'
+        + '<td class="direita">' + ponto.chat + '</td>'
+        + '<td class="direita">' + ponto.valor + '</td></tr>';
+    }).join('');
+    return '<div class="rolagem-tabela"><table class="fila numeros de-atendidos">'
+      + '<thead><tr><th>' + escapar(componente.dimensao) + '</th>'
+      + '<th class="direita">Sistema</th><th class="direita">Chat</th>'
+      + '<th class="direita">Total</th></tr></thead><tbody>' + linhas + '</tbody>'
+      + '<tfoot><tr><td><strong>Total</strong></td><td class="direita"><strong>' + sistema + '</strong></td>'
+      + '<td class="direita"><strong>' + chat + '</strong></td>'
+      + '<td class="direita"><strong>' + (sistema + chat) + '</strong></td></tr></tfoot></table></div>';
+  }
+
+  function rodapeDosAtendidos(componente) {
+    var notas = [];
+    if (componente.dobradosEmOutros) {
+      notas.push('Mais ' + componente.dobradosEmOutros + ' valor(es) somados em '
+        + '<strong>Demais valores</strong>.');
+    }
+    if (componente.semInformacao) {
+      notas.push(componente.semInformacao + ' atendimento(s) sem esta informação não entram '
+        + 'neste ranking.');
+    }
+    return notas.length ? '<p class="grafico-pe">' + notas.join(' ') + '</p>' : '';
   }
 
   function tileDePrazo(rotulo, numero, tom, dica) {
