@@ -80,7 +80,7 @@ function rodarTestesDeConfiguracoes() {
 
   teste('a lista traz protegidos, desligados e o estado da coluna', () => {
     const campos = chamar('listarCamposDoCanal')(canal.id);
-    igual(campos.length, 26, 'os 26 cabeçalhos do canal, inclusive o Id');
+    igual(campos.length, 27, 'os 27 cabeçalhos do canal, inclusive o Id');
     verdadeiro(campos.every((c) => c.colunaExiste), 'todas as colunas existem');
     verdadeiro(campos.find((c) => c.chave === 'id').protegido);
     igual(campos.find((c) => c.chave === 'id').ativo, false);

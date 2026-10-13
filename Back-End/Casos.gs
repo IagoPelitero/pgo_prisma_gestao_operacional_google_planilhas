@@ -112,9 +112,9 @@ function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
     somenteLeitura: visibilidade === RECC_VISIBILIDADE.LEITURA || travadoPeloCargo,
     travadoPeloCargo: travadoPeloCargo,
     valorPadrao: valorPadraoResolvido_(campo.ValorPadrao, quem),
-    // Aparece só quando outro campo estiver com um valor específico. Guardado
-    // como { campo: 'chave', valor: 'TEXTO' } — ver o formulário na tela.
-    mostrarSe: configuracao.mostrarSe || null,
+    // Aparece só quando outro campo estiver com um destes valores: { campo:
+    // 'chave', valores: ['Retido', 'Pago'] } — ver condicaoDoCampo_.
+    mostrarSe: condicaoDoCampo_(configuracao),
     largura: Number(configuracao.largura) || 1,
     /*
      * Data no futuro é RECUSADA por padrão: o caso descreve algo que já
@@ -216,6 +216,75 @@ function lerConfiguracaoDoCampo_(campo) {
       erro.message);
     return {};
   }
+}
+
+/**
+ * A condição que faz um campo APARECER: { campo, valores } — ou null, quando o
+ * campo aparece sempre.
+ *
+ * `campo` é a chave técnica do campo que manda; `valores`, os que fazem este
+ * aparecer (qualquer um deles). A forma antiga, de um valor só
+ * ({ campo, valor }), continua sendo lida: foi assim que o "Nome de quem
+ * transferiu" e os "Dados do pagamento" nasceram.
+ */
+function condicaoDoCampo_(configuracao) {
+  var regra = configuracao && configuracao.mostrarSe;
+  if (!regra || !regra.campo) return null;
+  var valores = Array.isArray(regra.valores) ? regra.valores
+    : (regra.valor === undefined || regra.valor === null ? [] : [regra.valor]);
+  valores = valores.map(String).filter(function (valor) { return valor.trim() !== ''; });
+  return valores.length ? { campo: String(regra.campo), valores: valores } : null;
+}
+
+/**
+ * O valor faz a condição valer? Compara sem acento e sem caixa — a MESMA
+ * conta que a tela faz (mesmoTexto, no Comuns.html): se servidor e tela
+ * discordassem, um campo apareceria na tela e seria ignorado na gravação.
+ */
+function condicaoBate_(condicao, valor) {
+  function limpar(texto) {
+    return String(texto === null || texto === undefined ? '' : texto).trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  var alvo = limpar(valor);
+  return condicao.valores.some(function (esperado) { return limpar(esperado) === alvo; });
+}
+
+/**
+ * As colunas dos campos que ACABARAM DE SUMIR: o campo que manda estava com um
+ * valor que o mostrava, e agora está com outro.
+ *
+ * Só a TRANSIÇÃO limpa. Esconder o campo não apaga o que já estava gravado nele
+ * — um caso importado pode trazer valor numa coluna cujo campo hoje está
+ * escondido, e apagar isso só porque alguém abriu o caso seria perder dado.
+ * Mas passar de Retido para Pago é a pessoa dizendo que "situação da proposta"
+ * não se aplica mais, e o valor que ficasse ali voltaria sozinho no dia em que
+ * o caso voltasse a Retido.
+ *
+ * `alteracao` é o que vai ser gravado, por cabeçalho; o que não está nela vale
+ * o que o caso já tem.
+ */
+function dependentesQueSomem_(idDoCanal, atual, alteracao) {
+  var ativos = camposAtivosDoCanal_(idDoCanal);
+  var cabecalhoDe = {};
+  ativos.forEach(function (campo) { cabecalhoDe[String(campo.ChaveTecnica)] = String(campo.Cabecalho); });
+
+  var colunas = [];
+  ativos.forEach(function (campo) {
+    var condicao = condicaoDoCampo_(lerConfiguracaoDoCampo_(campo));
+    var quemManda = condicao ? cabecalhoDe[condicao.campo] : '';
+    if (!quemManda) return;
+
+    var antes = atual[quemManda];
+    var depois = Object.prototype.hasOwnProperty.call(alteracao, quemManda)
+      ? alteracao[quemManda] : antes;
+    if (condicaoBate_(condicao, antes) && !condicaoBate_(condicao, depois)) {
+      colunasDoCampo_(campo, { cabecalho: String(campo.Cabecalho) }).forEach(function (coluna) {
+        if (colunas.indexOf(coluna) < 0) colunas.push(coluna);
+      });
+    }
+  });
+  return colunas;
 }
 
 /**
@@ -392,12 +461,33 @@ function canalQueEuPossoVer_(idDoCanal, quem) {
  * casos não traz status nenhum. Numa EDIÇÃO não entra: repor o padrão num
  * campo que a pessoa esvaziou seria desfazer o que ela acabou de fazer.
  */
-function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
+function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtual) {
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var problemas = [];
   var paraGravar = {};
+  var ativos = camposAtivosDoCanal_(canal.id);
 
-  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
+  // O valor que um campo VAI TER depois desta gravação, para decidir se o campo
+  // que depende dele aparece: o que a tela mandou, senão o que o caso já tem,
+  // senão — no cadastro — o padrão (o "Não trabalhado" da RET manda no campo
+  // que depende do status, mesmo com a tela em branco).
+  function valorQueVaiValer(chave) {
+    var quemManda = ativos.filter(function (campo) {
+      return String(campo.ChaveTecnica) === chave;
+    })[0];
+    if (!quemManda) return '';
+    var cabecalho = String(quemManda.Cabecalho);
+    var valor = valoresDaTela.hasOwnProperty(chave) ? valoresDaTela[chave]
+      : (valoresDaTela.hasOwnProperty(cabecalho) ? valoresDaTela[cabecalho]
+        : (registroAtual ? registroAtual[cabecalho] : ''));
+    if (valor === undefined || valor === null) valor = '';
+    if (String(valor).trim() === '' && ehCasoNovo) {
+      valor = valorPadraoResolvido_(quemManda.ValorPadrao, quem) || '';
+    }
+    return valor;
+  }
+
+  ativos.forEach(function (campo) {
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
 
     // Campo que a pessoa não pode ver ou não pode editar é IGNORADO, mesmo
@@ -405,6 +495,15 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
     if (visibilidade !== RECC_VISIBILIDADE.EDICAO) return;
 
     var descricao = campoParaATela_(campo, canal.id, visibilidade, quem);
+
+    // Campo condicional que não é a vez dele não é perguntado: não se exige, e
+    // nada se grava nele. A tela já esconde — mas a tela não decide, e um
+    // campo obrigatório escondido não pode travar o salvamento.
+    if (descricao.mostrarSe
+      && !condicaoBate_(descricao.mostrarSe, valorQueVaiValer(descricao.mostrarSe.campo))) {
+      return;
+    }
+
     var veioDaTela = valoresDaTela.hasOwnProperty(descricao.chave)
       || valoresDaTela.hasOwnProperty(descricao.cabecalho);
     var bruto = valoresDaTela[descricao.chave];
@@ -510,6 +609,13 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
 
     paraGravar[descricao.cabecalho] = bruto;
   });
+
+  // O campo que acabou de sumir (Retido → Pago) deixa o valor para trás? Não.
+  if (!ehCasoNovo && registroAtual) {
+    dependentesQueSomem_(canal.id, registroAtual, paraGravar).forEach(function (coluna) {
+      paraGravar[coluna] = '';
+    });
+  }
 
   if (problemas.length) {
     var erro = new Error('Confira ' + problemas.length + ' campo(s): '
@@ -656,6 +762,7 @@ function cadastrarCaso(idDoCanal, valores) {
   preencherResponsavelAutomatico_(canal, paraGravar, quem);
   carimbarOStatusDeNascimento_(canal, paraGravar);
   carimbarOEncaminhamento_(canal, null, paraGravar);
+  carimbarAParadaDoPrazo_(canal, null, paraGravar);
   preencherColunasCalculadas_(canal.aba, paraGravar, {});
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
@@ -697,12 +804,13 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
       + 'caso de novo e refaça a sua alteração.');
   }
 
-  var paraGravar = validarValores_(canal.id, valores || {}, quem, false);
+  var paraGravar = validarValores_(canal.id, valores || {}, quem, false, atual);
 
   // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
   // diálogo, e tem de deixar o mesmo rastro.
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
   carimbarOEncaminhamento_(canal, atual, paraGravar);
+  carimbarAParadaDoPrazo_(canal, atual, paraGravar);
 
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
@@ -764,6 +872,12 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
     && normalizarParaComparar_(achada.gravadoComo).indexOf('conclu') === 0) {
     alteracao[canal.colunaDaFinalizacao] = new Date();
   }
+
+  // Sair de Retido pelo diálogo também esvazia o que só fazia sentido nele.
+  dependentesQueSomem_(canal.id, atual, alteracao).forEach(function (coluna) {
+    alteracao[coluna] = '';
+  });
+  carimbarAParadaDoPrazo_(canal, atual, alteracao);
 
   carimbarOStatus_(canal, achada, atual, alteracao);
   registrarAMudancaDeStatus_(canal, atual, alteracao, quem);
@@ -893,11 +1007,12 @@ function carimbarOStatusDeNascimento_(canal, paraGravar) {
 /**
  * Carimba QUANDO o caso foi encaminhado para a área.
  *
- * É o relógio das 48 horas úteis que a área tem para dar o retorno, e ele só
- * pode ser contado por quem viu o momento: o sistema. Decisão do PO,
- * perguntada — deduzir de outra data (a de entrada, a da resposta) contaria o
- * prazo errado, e pedir ao analista que digite mais uma data seria o jeito
- * mais rápido de ela ficar em branco.
+ * Um momento que só o sistema vê — deduzir de outra data (a de entrada, a da
+ * resposta) contaria errado, e pedir ao analista que digite mais uma data seria
+ * o jeito mais rápido de ela ficar em branco. Foi pensado para o prazo de 48
+ * horas da área; o prazo da Mesa hoje conta de `Data em andamento`, e este
+ * carimbo ficou como dado — e como base para um prazo do encaminhamento, se
+ * a operação pedir um.
  *
  * QUANDO CARIMBA
  *   a área passou de vazia para escolhida     carimba agora;
@@ -926,6 +1041,41 @@ function carimbarOEncaminhamento_(canal, registroAtual, paraGravar) {
   if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
 
   paraGravar[RECC_COLUNA_DATA_DO_ENCAMINHAMENTO] = agora ? new Date() : '';
+}
+
+/**
+ * Carimba QUANDO a condição que encerra o prazo passou a valer.
+ *
+ * Na RET, o prazo do "Retido" só termina quando o Status proposta chega em
+ * Transmitido ou Sem alteração — e o Status proposta é um campo, que guarda o
+ * valor e não a data em que mudou. Sem este carimbo o sistema saberia QUE o
+ * prazo terminou, e não QUANDO: não daria para dizer se foi dentro dos 3 dias.
+ *
+ * QUANDO CARIMBA, igual ao encaminhamento: o campo mudou de valor.
+ *   passou a um valor que encerra     carimba agora;
+ *   passou a outro valor, ou a vazio  limpa: o prazo voltou a correr.
+ * Salvar sem mexer no campo não carimba nada. Vale para os três jeitos de
+ * gravar (cadastro, formulário e troca de status), e a troca de status conta:
+ * sair de Retido esvazia o Status proposta, e o carimbo sai junto.
+ *
+ * Coluna do carimbo que a base ainda não tem (quem não rodou o
+ * `atualizarPGO()`) segue gravando o caso, sem carimbo.
+ */
+function carimbarAParadaDoPrazo_(canal, registroAtual, paraGravar) {
+  condicoesDeParadaDoCanal_(canal).forEach(function (sinalizador) {
+    var coluna = sinalizador.colunaDaCondicao;
+    if (!Object.prototype.hasOwnProperty.call(paraGravar, coluna)) return;
+
+    var estrutura = estruturaDaAba_(canal.aba);
+    if (posicaoDaColuna_(estrutura, sinalizador.colunaDaDataDaCondicao) < 0) return;
+
+    var agora = String(paraGravar[coluna] || '').trim();
+    var antes = registroAtual ? String(registroAtual[coluna] || '').trim() : '';
+    if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+    paraGravar[sinalizador.colunaDaDataDaCondicao] =
+      condicaoBate_({ valores: sinalizador.valoresDaCondicao }, agora) ? new Date() : '';
+  });
 }
 
 /**

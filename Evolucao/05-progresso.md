@@ -2402,6 +2402,69 @@ uma coisa: **apagar um campo no "Trabalhar no caso" agora apaga de verdade**.
 
 ---
 
+## Etapa 31 — O campo que aparece conforme outro, e o prazo que para na hora certa
+
+Pedido do PO, em três partes:
+
+1. **"Quando eu seleciono o status como retido, pago, cancelado, ou quantos
+   forem necessários, seja permitido gerar outro campo seletor."** O PO já
+   criou, em Ajustes Gerais, a lista **Status proposta** (Transmitido,
+   Aguardando transmissão, Sem alteração).
+2. **"Ajuste o sinalizador da Mesa para que conte a partir do status em
+   andamento. Quando o status for concluído, ele para."**
+3. **"Na RET ele irá parar quando o status for não retido, pago, cancelado, sem
+   sucesso — e para os retidos, quando o status proposta aparecer transmitido
+   ou sem alteração."**
+
+| Parte | O que ficou |
+|---|---|
+| **1 · Campo condicional** | Em Configurações › Cadastrar Caso, cada campo ganhou **"Quando este campo aparece"**: sempre, ou só quando outro campo do canal for um destes valores — uma caixinha por opção, quantas quiser marcar. Antes era uma regra de UM valor, só escrita no código. O servidor passou a respeitar a regra: campo que não é a vez dele não é cobrado nem gravado, e é esvaziado quando a pessoa sai do valor que o mostrava (pelo formulário ou pelo diálogo de status). Recusa o que faria o campo nunca aparecer: valor que a lista não tem, campo que manda em si mesmo, ciclo entre dois campos |
+| **2 · Mesa** | O prazo de 48 horas úteis conta de **`Data em andamento`**, o carimbo do status Em andamento — que é o status em que todo caso da Mesa nasce. Para quando o status vira um dos que fecham o caso (Concluído, Concluído na mesa, Sem retorno). Vale para todo caso em andamento: a Área responsável deixou de decidir. `atualizarPGO()` cria a coluna, liga o carimbo no status e leva o sinalizador de fábrica para a regra nova, sem sobrescrever o que o PO tenha ajustado |
+| **3 · RET** | Não retido, Pago, Cancelado e Sem sucesso continuam parando sozinhos. O **Retido** passou a ter uma **condição de parada** no sinalizador: só encerra o prazo quando o Status proposta for Transmitido ou Sem alteração. Antes disso o relógio corre — amarelo no 3º dia, vermelho depois. O sistema carimba, em `Data do status proposta`, QUANDO a condição passou a valer, porque campo guarda o valor e não a data em que mudou. A condição se monta em Configurações › Sinalizadores; o diagnóstico a confere; e `atualizarPGO()` a liga sozinha quando acha a coluna "Status proposta" com Transmitido e Sem alteração na lista |
+
+O que **ficou de propósito**:
+
+- **O diálogo rápido de "Alterar status" não pergunta o Status proposta.** Quem
+  marca Retido por ali preenche o Status proposta depois, em "Trabalhar no
+  caso". Até lá o Retido corre — que é exatamente o que a regra pede.
+- **O Status proposta não nasce com o sistema.** É um campo da operação (lista,
+  campo e condição pelas telas), e o nome da coluna é o que quem criou
+  escreveu. Numa instalação nova a condição do Retido nasce em branco, e o
+  Retido encerra sozinho, como antes, até alguém ligá-la.
+- **`Data do encaminhamento` e o carimbo da área continuam**, como dado. O
+  prazo da Mesa não conta mais deles; quem quiser um prazo do encaminhamento
+  cria outro sinalizador apontando para a coluna.
+- **Voltar para Em andamento não reinicia o relógio** da Mesa: o carimbo é o da
+  primeira entrada, como o de todo status.
+
+**1035 testes** (64 novos, em `testes-condicional.js` e `testes-parada-da-ret.js`,
+mais os da Mesa em `testes-sinalizadores.js`), cinco execuções seguidas sem
+falha, **27 quebras de propósito, 27 vermelhos**. No navegador: 96 combinações
+de tela sem quebra, 152 cliques sem erro e ponta a ponta 14/14 no repositório e
+no pacote — com um teste novo que monta o Status proposta pelo servidor de
+verdade, abre o formulário, escolhe Retido e Transmitido, grava, e confere a
+planilha e o carimbo. As telas foram vistas em 1440, 1280 e 390 px: o selo do
+Retido, o campo aparecendo e sumindo no "Trabalhar no caso", e os painéis de
+Campo e de Sinalizador.
+
+### Para quem já usa
+
+Cole os arquivos marcados e rode `atualizarPGO()`. O laudo avisa três coisas
+que mudam o que já existe, e que são **decisão sua**:
+
+- **Casos da Mesa já em andamento não têm `Data em andamento`** e ficam sem selo
+  — o sistema não inventa a data. Para eles contarem, preencha a coluna na
+  planilha (por exemplo, copiando a Data de entrada). Os casos novos nascem
+  carimbados.
+- **Retidos que já existem passam a contar como em aberto** enquanto não tiverem
+  o Status proposta Transmitido ou Sem alteração — e vermelhos, se já passaram de
+  3 dias. O laudo diz quantos. Os que já estão Transmitido ficam sem selo, porque
+  o sistema não sabe quando isso aconteceu.
+- Se a coluna "Status proposta" ainda não existe, o laudo diz os três passos para
+  criá-la, e o Retido segue parando sozinho até lá.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

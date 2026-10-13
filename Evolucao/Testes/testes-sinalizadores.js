@@ -7,9 +7,10 @@
  *
  *   RET   o caso cadastrado tem 3 dias úteis para chegar a um status final.
  *         Verde abaixo, amarelo no 3º dia, vermelho depois.
- *   MESA  o caso encaminhado para a área tem 48 horas úteis para voltar. E a
- *         Produtividade passa a mostrar quantos casos estão dentro e quantos
- *         fora do SLA de 6 horas úteis.
+ *   MESA  o caso tem 48 horas úteis, do status Em andamento até ser
+ *         concluído (era "do encaminhamento para a área"). E a Produtividade
+ *         passa a mostrar quantos casos estão dentro e quantos fora do SLA de
+ *         6 horas úteis.
  *   VG    ainda não definido: a linha existe, desligada, para o PO ligar.
  *
  * COMO OS TESTES CONTROLAM O RELÓGIO. O servidor lê "agora" do relógio de
@@ -75,8 +76,8 @@ function rodarTestesDeSinalizadores() {
     const daMesa = linhas.find((l) => String(l.CanalId) === String(mesa.id));
     igual(daMesa.Prazo, 48);
     igual(daMesa.Unidade, 'horas');
-    igual(daMesa.ColunaQueLiga, 'Área responsável', 'só o caso encaminhado');
-    igual(daMesa.ColunaDaData, 'Data do encaminhamento');
+    igual(daMesa.ColunaQueLiga, '', 'vale para todo caso que não fechou');
+    igual(daMesa.ColunaDaData, 'Data em andamento', 'conta do status Em andamento');
 
     const doVg = linhas.find((l) => String(l.CanalId) === String(vg.id));
     igual(doVg.Prazo, 0);
@@ -93,20 +94,29 @@ function rodarTestesDeSinalizadores() {
     igual(chamar('regraDoSinalizador_')(doCanal(ret)[0]),
       '3 dias úteis · amarelo quando faltar 1 dia útil');
     igual(chamar('regraDoSinalizador_')(doCanal(mesa)[0]),
-      '48 horas úteis · amarelo quando faltar 10 horas úteis · '
-      + 'só com "Área responsável" preenchida');
+      '48 horas úteis · amarelo quando faltar 10 horas úteis');
   });
 
-  teste('a Mesa tem a coluna do carimbo, e ela NÃO é campo do formulário', () => {
+  teste('a Mesa tem as colunas dos carimbos, e elas NÃO são campo do formulário', () => {
     const cabecalhos = chamar('estruturaDaAba_')('BASE_MESA').cabecalhos;
-    verdadeiro(cabecalhos.indexOf('Data do encaminhamento') >= 0);
-    const campo = chamar('lerRegistros_("CAMPOS")').find((c) =>
-      String(c.Aba) === 'BASE_MESA' && String(c.Cabecalho) === 'Data do encaminhamento');
-    verdadeiro(!!campo, 'o tipo da coluna mora em CAMPOS');
-    igual(String(campo.Ativo), 'NAO', 'ninguém digita uma data que o sistema sabe');
-    igual(String(campo.Secao), 'Preenchido pelo sistema');
-    verdadeiro(chamar('estruturaDaAba_')('BASE_RET').cabecalhos
-      .indexOf('Data do encaminhamento') < 0, 'a RET não encaminha para área');
+    ['Data do encaminhamento', 'Data em andamento'].forEach((coluna) => {
+      verdadeiro(cabecalhos.indexOf(coluna) >= 0, coluna + ' existe');
+      const campo = chamar('lerRegistros_("CAMPOS")').find((c) =>
+        String(c.Aba) === 'BASE_MESA' && String(c.Cabecalho) === coluna);
+      verdadeiro(!!campo, coluna + ': o tipo da coluna mora em CAMPOS');
+      igual(String(campo.Ativo), 'NAO', 'ninguém digita uma data que o sistema sabe');
+      igual(String(campo.Secao), 'Preenchido pelo sistema');
+    });
+    ['Data do encaminhamento', 'Data em andamento'].forEach((coluna) => {
+      verdadeiro(chamar('estruturaDaAba_')('BASE_RET').cabecalhos.indexOf(coluna) < 0,
+        'a RET não tem ' + coluna);
+    });
+  });
+
+  teste('o status Em andamento da Mesa carimba a coluna de onde o prazo conta', () => {
+    const emAndamento = chamar('situacoesPorChave_')(mesa)[chamar('normalizarParaComparar_')('Em andamento')];
+    igual(emAndamento.colunaDeCarimbo, 'Data em andamento');
+    igual(emAndamento.final, false);
   });
 
   /* ----------------------------------------------------------------------- */
@@ -232,19 +242,18 @@ function rodarTestesDeSinalizadores() {
   });
 
   /* ----------------------------------------------------------------------- */
-  secao('A Mesa: 48 horas úteis para a área, só para o caso encaminhado');
+  secao('A Mesa: 48 horas úteis, do status Em andamento até concluir');
 
   const sinalDaMesa = doCanal(mesa)[0];
   const situacoesDaMesa = chamar('situacoesPorChave_')(mesa);
-  // Encaminhado na SEGUNDA, 09:00. O primeiro dia só tem 570 minutos úteis, e
-  // as 48 horas (2880 minutos) acabam na SEXTA às 16:00; o amarelo acende nas
-  // últimas 10 horas, na QUINTA às 16:15.
-  const encaminhado = {
-    Status: 'Em andamento', 'Área responsável': 'Sinistro',
-    'Data do encaminhamento': new Date(2026, 9, 5, 9, 0)
+  // Entrou em Em andamento na SEGUNDA, 09:00. O primeiro dia só tem 570
+  // minutos úteis, e as 48 horas (2880 minutos) acabam na SEXTA às 16:00; o
+  // amarelo acende nas últimas 10 horas, na QUINTA às 16:15.
+  const emAndamento = {
+    Status: 'Em andamento', 'Data em andamento': new Date(2026, 9, 5, 9, 0)
   };
   const naMesa = (dia, hora, registro) => chamar('sinalDoCaso_')(
-    registro || encaminhado, mesa, sinalDaMesa, situacoesDaMesa, quando(dia, hora));
+    registro || emAndamento, mesa, sinalDaMesa, situacoesDaMesa, quando(dia, hora));
 
   teste('verde com folga, amarelo nas últimas 10 horas, vermelho depois das 48', () => {
     igual(naMesa(6, '10:00').tom, 'bom', 'terça');
@@ -257,32 +266,69 @@ function rodarTestesDeSinalizadores() {
   });
 
   teste('conta do carimbo (data E hora), e não da abertura do dia', () => {
-    // Encaminhado às 17:00 de segunda: só 90 minutos contam naquele dia.
-    const tarde = { Status: 'Em andamento', 'Área responsável': 'Sinistro',
-      'Data do encaminhamento': new Date(2026, 9, 5, 17, 0) };
+    // Entrou às 17:00 de segunda: só 90 minutos contam naquele dia.
+    const tarde = { Status: 'Em andamento',
+      'Data em andamento': new Date(2026, 9, 5, 17, 0) };
     const sinal = naMesa(6, '08:15', tarde);
     contem(sinal.texto, 'faltam 46h30', 'só 90min do primeiro dia contaram');
   });
 
-  teste('sem área responsável, o caso não tem este prazo', () => {
-    igual(naMesa(9, '16:01', { Status: 'Em andamento', 'Área responsável': '',
-      'Data do encaminhamento': new Date(2026, 9, 5, 9, 0) }), null);
+  teste('a área responsável não decide mais: com ou sem área, o prazo é o mesmo', () => {
+    const comArea = Object.assign({ 'Área responsável': 'Sinistro' }, emAndamento);
+    const semArea = Object.assign({ 'Área responsável': '' }, emAndamento);
+    igual(naMesa(9, '16:01', comArea).texto, naMesa(9, '16:01', semArea).texto);
+    igual(naMesa(9, '16:01', semArea).tom, 'ruim');
   });
 
-  teste('encaminhado ANTES do carimbo existir: sem prazo, e sem inventar data', () => {
-    igual(naMesa(9, '16:01', { Status: 'Em andamento', 'Área responsável': 'Sinistro',
-      'Data do encaminhamento': '' }), null);
+  teste('caso sem a Data em andamento: sem prazo, e sem inventar data', () => {
+    igual(naMesa(9, '16:01', { Status: 'Em andamento', 'Data em andamento': '' }), null);
   });
 
-  teste('o analista conclui o caso: o prazo para ali, cumprido ou estourado', () => {
-    const concluido = (quandoConcluiu) => Object.assign({}, encaminhado, {
-      Status: 'Concluído', 'Data da última mudança de status': quandoConcluiu });
-    const dentro = naMesa(30, '12:00', concluido(new Date(2026, 9, 7, 10, 0)));
-    igual(dentro.tom, 'bom');
-    contem(dentro.texto, 'cumprido em');
-    const fora = naMesa(30, '12:00', concluido(new Date(2026, 9, 12, 10, 0)));
-    igual(fora.tom, 'ruim');
-    contem(fora.texto, 'estourado');
+  teste('cada status que fecha o caso para o relógio — cumprido ou estourado', () => {
+    ['Concluído', 'Concluído na mesa', 'Sem retorno'].forEach((status) => {
+      const fechado = (quandoFechou) => Object.assign({}, emAndamento, {
+        Status: status, 'Data da última mudança de status': quandoFechou });
+      const dentro = naMesa(30, '12:00', fechado(new Date(2026, 9, 7, 10, 0)));
+      igual(dentro.tom, 'bom', status + ' dentro do prazo');
+      igual(dentro.encerrado, true);
+      contem(dentro.texto, 'cumprido em');
+      const fora = naMesa(30, '12:00', fechado(new Date(2026, 9, 12, 10, 0)));
+      igual(fora.tom, 'ruim', status + ' depois do prazo');
+      contem(fora.texto, 'estourado');
+    });
+  });
+
+  teste('concluído não corre mais: o dia de hoje não muda o resultado', () => {
+    const concluido = Object.assign({}, emAndamento, { Status: 'Concluído',
+      'Data da última mudança de status': new Date(2026, 9, 7, 10, 0) });
+    igual(naMesa(8, '10:00', concluido).texto, naMesa(30, '10:00', concluido).texto);
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('O carimbo de Em andamento: o caso nasce com o relógio ligado');
+
+  teste('o caso novo da Mesa nasce Em andamento, já carimbado agora', () => {
+    const antes = Date.now();
+    const criado = chamar('cadastrarCaso')(mesa.id, { nomedosegurado: 'Caso novo' });
+    const linha = chamar('lerRegistros_')('BASE_MESA').find((l) => String(l.__id) === String(criado.id));
+    igual(linha.Status, 'Em andamento', 'é o status padrão do formulário');
+    const gravado = linha['Data em andamento'];
+    verdadeiro(!!gravado && typeof gravado.getTime === 'function', 'gravou data com hora');
+    verdadeiro(Math.abs(gravado.getTime() - antes) < 60000, 'é de agora');
+  });
+
+  teste('concluir não mexe na data de entrada em andamento — e o carimbo só vale uma vez', () => {
+    const criado = chamar('cadastrarCaso')(mesa.id, { nomedosegurado: 'Vai concluir' });
+    const antiga = new Date(2026, 8, 1, 10, 0);
+    chamar('atualizarRegistro_')('BASE_MESA', criado.id, { 'Data em andamento': antiga });
+    chamar('alterarSituacaoDoCaso')(mesa.id, criado.id, 'Concluído');
+    const linha = () => chamar('lerRegistros_')('BASE_MESA')
+      .find((l) => String(l.__id) === String(criado.id));
+    igual(linha()['Data em andamento'].getTime(), antiga.getTime());
+    verdadeiro(!!linha()['Data da finalização'], 'e a conclusão carimba a finalização');
+    chamar('alterarSituacaoDoCaso')(mesa.id, criado.id, 'Em andamento');
+    igual(linha()['Data em andamento'].getTime(), antiga.getTime(),
+      'voltar para Em andamento não reinicia o relógio: ele conta do primeiro');
   });
 
   /* ----------------------------------------------------------------------- */
@@ -412,18 +458,19 @@ function rodarTestesDeSinalizadores() {
     igual(sinal.encerrado, false);
   });
 
-  teste('Mesa: só o caso encaminhado ganha o selo de 48h', () => {
-    const encaminhadoAntigo = chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia Souza',
+  teste('Mesa: o caso em andamento ganha o selo de 48h; sem a data, não', () => {
+    const antigo = chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia Souza',
       Status: 'Em andamento', 'Nome do segurado': 'Antigo', 'Data de entrada': diasAtras(60),
-      'Área responsável': 'Sinistro', 'Data do encaminhamento': diasAtras(40) });
-    const naMesaSemArea = chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia Souza',
-      Status: 'Em andamento', 'Nome do segurado': 'Na mesa', 'Data de entrada': diasAtras(0) });
+      'Data em andamento': diasAtras(40) });
+    const semData = chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia Souza',
+      Status: 'Em andamento', 'Nome do segurado': 'Anterior ao carimbo',
+      'Data de entrada': diasAtras(0) });
     const fila = chamar('resumoDoCanal')(mesa.id, {}, 90).fila;
-    const doEncaminhado = sinaisDe(fila, encaminhadoAntigo);
-    igual(doEncaminhado.length, 1);
-    igual(doEncaminhado[0].tom, 'ruim');
-    contem(doEncaminhado[0].texto, 'Retorno da área');
-    igual(sinaisDe(fila, naMesaSemArea).length, 0, 'sem área, sem selo de área');
+    const doAntigo = sinaisDe(fila, antigo);
+    igual(doAntigo.length, 1);
+    igual(doAntigo[0].tom, 'ruim');
+    contem(doAntigo[0].texto, 'Retorno da área');
+    igual(sinaisDe(fila, semData).length, 0, 'sem a data, o sistema não inventa o prazo');
   });
 
   teste('o SLA de 6h da Mesa continua aparecendo, ao lado do selo novo', () => {
@@ -549,13 +596,13 @@ function rodarTestesDeSinalizadores() {
       'diz de quem foi o SLA estourado');
   });
 
-  teste('Mesa: o retorno da área tem o seu bloco, ao lado do SLA', () => {
+  teste('Mesa: o prazo de 48 horas tem o seu bloco, ao lado do SLA', () => {
     const p = produtividade(mesa).prazos;
     igual(p.sinalizadores.length, 1);
     igual(p.sinalizadores[0].nome, 'Retorno da área');
-    verdadeiro(p.sinalizadores[0].fora >= 1, 'o encaminhado há 40 dias está fora');
+    verdadeiro(p.sinalizadores[0].fora >= 1, 'o que entrou em andamento há 40 dias está fora');
     verdadeiro(p.sinalizadores[0].total < p.sla.total,
-      'só os encaminhados entram na conta da área');
+      'só os que têm a Data em andamento entram na conta');
   });
 
   teste('VG: sem SLA e sem sinalizador ligado, a tela não desenha o bloco', () => {
@@ -593,6 +640,7 @@ function rodarTestesDeSinalizadores() {
     verdadeiro(daMesa.colunas.indexOf('Área responsável') >= 0);
     verdadeiro(daMesa.colunasDeData.indexOf('Data de entrada') >= 0);
     verdadeiro(daMesa.colunasDeData.indexOf('Data do encaminhamento') >= 0);
+    verdadeiro(daMesa.colunasDeData.indexOf('Data em andamento') >= 0);
     verdadeiro(daMesa.colunasDeData.indexOf('Analista') < 0, 'texto não é data');
     verdadeiro(daMesa.colunasDeHora.indexOf('Horário') >= 0);
     verdadeiro(daMesa.colunas.every((c) => c.charAt(0) !== '_'), 'sem as de controle');
@@ -763,13 +811,13 @@ function rodarTestesDeSinalizadores() {
     // com a etiqueta verde — o pior jeito de falhar num controle de prazo.
     const outra = carregar('primeiro.adm@exemplo.com');
     outra.chamar('instalarRECC()');
-    outra.chamar('removerColuna_')('BASE_MESA', 'Data do encaminhamento');
+    outra.chamar('removerColuna_')('BASE_MESA', 'Data em andamento');
     outra.chamar('esquecerEstruturaLida_()');
     const quebrado = outra.chamar('diagnosticoRECC()').blocos
       .find((b) => b.titulo === 'Os sinalizadores de prazo');
     igual(quebrado.situacao, 'falha');
     contem(JSON.stringify(quebrado.itens), 'cita coluna que a base não tem');
-    contem(JSON.stringify(quebrado.itens), 'Data do encaminhamento');
+    contem(JSON.stringify(quebrado.itens), 'Data em andamento');
   });
 
   teste('o diagnóstico avisa do sinalizador ligado num canal sem status final', () => {
@@ -891,6 +939,104 @@ function rodarTestesDeSinalizadores() {
     igual(antes.chamar('lerRegistros_("SINALIZADORES")')
       .filter((l) => String(l.CanalId) === String(r.id)).length, 0,
     'continua tirado');
+  });
+
+  /*
+   * A planilha como a versão ANTERIOR a esta a deixou: a Mesa contava do
+   * encaminhamento, o status Em andamento não carimbava nada, e a aba
+   * SINALIZADORES ainda não tinha as colunas da condição.
+   */
+  function planilhaDaVersaoAnterior() {
+    const antes = carregar('primeiro.adm@exemplo.com');
+    antes.chamar('instalarRECC()');
+    const m = antes.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_MESA');
+
+    antes.chamar('removerColuna_')('BASE_MESA', 'Data em andamento');
+    antes.chamar('lerRegistros_("CAMPOS")').forEach((campo) => {
+      if (String(campo.Cabecalho) === 'Data em andamento') {
+        antes.chamar('apagarRegistroDeVez_')('CAMPOS', campo.Id);
+      }
+    });
+    ['StatusComCondicao', 'ColunaDaCondicao', 'ValoresDaCondicao',
+      'ColunaDaDataDaCondicao'].forEach((coluna) => {
+      antes.chamar('removerColuna_')('SINALIZADORES', coluna);
+    });
+    const emAndamento = antes.chamar('lerRegistros_("CATALOGO")').find((i) =>
+      String(i.Tipo) === 'STATUS' && i.Nome === 'Em andamento'
+      && String(i.CanalId) === String(m.id));
+    antes.chamar('atualizarRegistro_')('CATALOGO', emAndamento.Id, { ColunaDeCarimbo: '' });
+    const linha = antes.chamar('lerRegistros_("SINALIZADORES")')
+      .find((l) => String(l.CanalId) === String(m.id));
+    antes.chamar('atualizarRegistro_')('SINALIZADORES', linha.Id, {
+      ColunaQueLiga: 'Área responsável', ColunaDaData: 'Data do encaminhamento' });
+    antes.chamar('esquecerEstruturaLida_()');
+    return Object.assign({ m: m, linhaDoSinalizador: linha.Id, idDoStatus: emAndamento.Id }, antes);
+  }
+
+  teste('a Mesa que contava do encaminhamento passa a contar do Em andamento', () => {
+    const antes = planilhaDaVersaoAnterior();
+    const recado = antes.chamar('atualizarPGO()');
+    contem(recado, 'BASE_MESA.Data em andamento criada');
+    contem(recado, 'o status "Em andamento" passou a carimbar "Data em andamento"');
+    contem(recado, 'passou a contar de "Data em andamento", e não mais do encaminhamento');
+
+    const linha = antes.chamar('lerRegistros_("SINALIZADORES")')
+      .find((l) => String(l.Id) === String(antes.linhaDoSinalizador));
+    igual(linha.ColunaDaData, 'Data em andamento');
+    igual(linha.ColunaQueLiga, '', 'a Área responsável deixou de decidir');
+    igual(linha.Prazo, 48, 'o prazo é o mesmo');
+
+    const campo = antes.chamar('lerRegistros_("CAMPOS")')
+      .find((c) => String(c.Cabecalho) === 'Data em andamento');
+    igual(String(campo.Ativo), 'NAO', 'a coluna do sistema não vira campo do formulário');
+    igual(String(campo.Secao), 'Preenchido pelo sistema');
+  });
+
+  teste('a Mesa que o PO ajustou não é sobrescrita: vira DECISÃO SUA', () => {
+    const antes = planilhaDaVersaoAnterior();
+    antes.chamar('atualizarRegistro_')('SINALIZADORES', antes.linhaDoSinalizador, {
+      ColunaDaData: 'Data resposta', Prazo: 24 });
+    const recado = antes.chamar('atualizarPGO()');
+    const linha = antes.chamar('lerRegistros_("SINALIZADORES")')
+      .find((l) => String(l.Id) === String(antes.linhaDoSinalizador));
+    igual(linha.ColunaDaData, 'Data resposta', 'continua o que o PO escolheu');
+    igual(linha.Prazo, 24);
+    contem(recado, 'foi ajustado por você');
+    contem(recado, 'escolha em Configurações › Sinalizadores a data "Data em andamento"');
+  });
+
+  teste('o status que o PO já apontou para outra coluna não é trocado', () => {
+    const antes = planilhaDaVersaoAnterior();
+    antes.chamar('atualizarRegistro_')('CATALOGO', antes.idDoStatus,
+      { ColunaDeCarimbo: 'Data resposta' });
+    const recado = antes.chamar('atualizarPGO()');
+    igual(antes.chamar('lerRegistros_("CATALOGO")')
+      .find((i) => String(i.Id) === String(antes.idDoStatus)).ColunaDeCarimbo, 'Data resposta');
+    contem(recado, 'carimba em "Data resposta"');
+  });
+
+  teste('o caso que já estava em andamento fica sem a data — e a atualização diz quantos', () => {
+    const antes = planilhaDaVersaoAnterior();
+    ['Um', 'Dois'].forEach((nome) => {
+      antes.chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia', Status: 'Em andamento',
+        'Nome do segurado': nome, 'Data de entrada': diasAtras(30) });
+    });
+    antes.chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia', Status: 'Concluído',
+      'Nome do segurado': 'Fechado', 'Data de entrada': diasAtras(30) });
+    const recado = antes.chamar('atualizarPGO()');
+    contem(recado, '2 caso(s) em andamento não têm "Data em andamento"');
+    const fila = antes.chamar('resumoDoCanal')(antes.m.id, {}, 90).fila;
+    verdadeiro(fila.every((c) => c.sinais.length === 0),
+      'sem a data não há de onde contar: nenhum selo inventado');
+  });
+
+  teste('rodar de novo a atualização da Mesa não muda nem avisa de novo o que já fez', () => {
+    const antes = planilhaDaVersaoAnterior();
+    antes.chamar('atualizarPGO()');
+    const segunda = antes.chamar('atualizarPGO()');
+    contem(segunda, 'Nada a mudar');
+    contem(segunda, 'Mesa: o sinalizador já conta de "Data em andamento"');
+    contem(segunda, 'Mesa: o status "Em andamento" já carimba "Data em andamento"');
   });
 
   teste('canal que o PO criou depois não ganha sinalizador por conta própria', () => {

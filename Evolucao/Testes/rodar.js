@@ -27,6 +27,8 @@ const { rodarTestesDeCadastrosDeFora } = require('./testes-cadastros-de-fora');
 const { rodarTestesDeDiagnostico } = require('./testes-diagnostico');
 const { rodarTestesDeSinalizadores } = require('./testes-sinalizadores');
 const { rodarTestesDaVarredura } = require('./testes-varredura');
+const { rodarTestesDoCampoCondicional } = require('./testes-condicional');
+const { rodarTestesDaParadaDaRet } = require('./testes-parada-da-ret');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -44,6 +46,8 @@ rodarTestesDeCadastrosDeFora();
 rodarTestesDeDiagnostico();
 rodarTestesDeSinalizadores();
 rodarTestesDaVarredura();
+rodarTestesDoCampoCondicional();
+rodarTestesDaParadaDaRet();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

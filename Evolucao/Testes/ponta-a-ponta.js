@@ -473,6 +473,80 @@ async function rodar() {
       'apagado na tela, apagado na planilha');
   });
 
+  await teste('o Status proposta aparece só com Retido, grava, e o prazo do Retido para', async () => {
+    // O PO monta pelas telas de Configurações: lista, campo, "só quando o Status
+    // for Retido" e a parada do prazo. Aqui o servidor de verdade faz o mesmo.
+    vm.runInContext(`(function () {
+      try { definirSenhaDeAdministrador('segredo123', ''); } catch (e) { /* já definida */ }
+      liberarComSenha('segredo123');
+      var ret = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+      var lista = criarLista('Status proposta');
+      ['Transmitido', 'Aguardando transmissão', 'Sem alteração'].forEach(function (nome, i) {
+        salvarItemDoCatalogo({ tipo: lista, canalId: '', nome: nome, ordem: i + 1, ativo: true });
+      });
+      criarCampo(ret.id, { rotulo: 'Status proposta', tipo: 'seletor', secao: 'Seguro' });
+      var campo = listarCamposDoCanal(ret.id).filter(function (c) {
+        return c.cabecalho === 'Status proposta'; })[0];
+      salvarCampo({ id: campo.id, rotulo: 'Status proposta', secao: 'Seguro', tipo: 'seletor',
+        catalogo: lista, obrigatorio: true, ativo: true,
+        mostrarSe: { campo: 'status', valores: ['Retido'] } });
+      var a = listarSinalizadores().filter(function (k) {
+        return String(k.canalId) === String(ret.id); })[0];
+      salvarSinalizador({ id: a.id, nome: a.nome, canalId: a.canalId, prazo: a.prazo,
+        unidade: a.unidade, aviso: a.aviso, colunaQueLiga: '', colunaDaData: '', colunaDaHora: '',
+        inicioDoExpediente: a.inicioDoExpediente, fimDoExpediente: a.fimDoExpediente,
+        ordem: a.ordem, ativo: true, statusComCondicao: 'Retido',
+        colunaDaCondicao: 'Status proposta', valoresDaCondicao: ['Transmitido', 'Sem alteração'],
+        colunaDaDataDaCondicao: 'Data do status proposta' });
+    })()`, contexto);
+
+    await pagina.reload();
+    await pagina.waitForSelector('.lateral-item', { timeout: 10000 });
+    await pagina.click('[data-tela="cadastrarCaso"]');
+    await pagina.waitForSelector('#campo-statusproposta', { state: 'attached', timeout: 10000 });
+    const bloco = pagina.locator('[data-campo="statusproposta"]');
+    igual(await bloco.evaluate((e) => e.hidden), true, 'nasce escondido: o status padrão não é Retido');
+
+    await pagina.selectOption('#campo-status', 'Retido');
+    igual(await bloco.evaluate((e) => e.hidden), false, 'com Retido, o campo aparece');
+    await pagina.selectOption('#campo-status', 'Pendente');
+    igual(await bloco.evaluate((e) => e.hidden), true, 'com Pendente, some');
+    await pagina.selectOption('#campo-status', 'Retido');
+
+    // Obrigatório e visível: sem o valor, o botão fica travado como qualquer obrigatório.
+    await pagina.selectOption('#campo-statusproposta', 'Transmitido');
+    const antes = naPlanilha('BASE_RET').length;
+    const obrigatorios = await pagina.$$eval(
+      '#formulario-do-caso [aria-required="true"]',
+      (es) => es.filter((e) => !e.disabled && !e.closest('[hidden]'))
+        .map((e) => ({ id: e.id, tag: e.tagName, valor: e.value })));
+    for (const campo of obrigatorios.filter((c) => !c.valor)) {
+      if (campo.tag === 'SELECT') {
+        const opcoes = await pagina.$$eval('#' + campo.id + ' option',
+          (os) => os.map((o) => o.value).filter((v) => v));
+        if (opcoes.length) await pagina.selectOption('#' + campo.id, opcoes[0]);
+      } else {
+        const tipo = await pagina.getAttribute('#' + campo.id, 'type');
+        const mascara = await pagina.getAttribute('#' + campo.id, 'data-mascara');
+        if (tipo === 'date') await pagina.fill('#' + campo.id, '2026-09-14');
+        else if (mascara === 'dinheiro') await pagina.fill('#' + campo.id, '1234,56');
+        else if (mascara) await pagina.fill('#' + campo.id, '12345678901');
+        else await pagina.fill('#' + campo.id, 'Retido de ponta a ponta');
+      }
+    }
+    await pagina.click('#salvar-caso');
+    await pagina.waitForTimeout(1500);
+
+    const depois = naPlanilha('BASE_RET');
+    igual(depois.length, antes + 1, 'o caso Retido foi gravado');
+    const gravado = depois[depois.length - 1];
+    igual(String(gravado.status), 'Retido');
+    igual(String(gravado['Status proposta']), 'Transmitido');
+    verdadeiro(!!gravado['Data do status proposta']
+      && typeof gravado['Data do status proposta'].getTime === 'function',
+    'o servidor carimbou QUANDO o Status proposta encerrou o prazo');
+  });
+
   await teste('o PO ajusta o prazo da RET pela tela e a planilha guarda', async () => {
     await pagina.click('[data-tela="configuracoes"]');
     await pagina.waitForTimeout(600);

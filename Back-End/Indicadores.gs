@@ -1068,7 +1068,8 @@ function slaDoCaso_(registro, canal, finais, agora) {
    ============================================================================
    Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
    RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um status
-   final; na Mesa, o caso encaminhado para a área tem 48 horas úteis.
+   final; na Mesa, o caso tem 48 horas úteis, do status Em andamento até ser
+   concluído.
 
    É o mesmo relógio do SLA da Mesa — minutos ÚTEIS, de segunda a sexta, dentro
    do expediente —, e por isso reaproveita as mesmas contas. O que muda é o que
@@ -1110,6 +1111,22 @@ function sinalizadoresDoCanal_(canal) {
     .sort(function (um, outro) { return um.ordem - outro.ordem; });
 }
 
+/**
+ * Os sinalizadores do canal que têm CONDIÇÃO DE PARADA — ligados ou não.
+ *
+ * Quem carimba a condição precisa enxergar também o sinalizador desligado:
+ * o PO que o desliga por uma semana e o religa não pode encontrar os casos
+ * dessa semana sem a data em que a proposta foi transmitida.
+ */
+function condicoesDeParadaDoCanal_(canal) {
+  if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
+  var doCanal = converterParaIdentificador_(canal.id);
+  return lerRegistros_('SINALIZADORES')
+    .filter(function (linha) { return converterParaIdentificador_(linha.CanalId) === doCanal; })
+    .map(sinalizadorDaLinha_)
+    .filter(temCondicaoDeParada_);
+}
+
 /** Uma linha da aba vira o sinalizador com as contas já resolvidas. */
 function sinalizadorDaLinha_(linha) {
   var abre = minutoDaHora_(linha.InicioDoExpediente);
@@ -1135,8 +1152,33 @@ function sinalizadorDaLinha_(linha) {
     abre: abre,
     fecha: fecha,
     ordem: Number(linha.Ordem) || 0,
-    ativo: normalizarParaComparar_(linha.Ativo) === 'sim'
+    ativo: normalizarParaComparar_(linha.Ativo) === 'sim',
+    // O status que só encerra o prazo com uma condição ("Retido" só com o
+    // Status proposta Transmitido ou Sem alteração). Os quatro vazios: não há.
+    statusComCondicao: String(linha.StatusComCondicao || '').trim(),
+    colunaDaCondicao: String(linha.ColunaDaCondicao || '').trim(),
+    valoresDaCondicao: valoresDaCondicaoDoSinalizador_(linha.ValoresDaCondicao),
+    colunaDaDataDaCondicao: String(linha.ColunaDaDataDaCondicao || '').trim()
   };
+}
+
+/** "Transmitido; Sem alteração" → ['Transmitido', 'Sem alteração']. */
+function valoresDaCondicaoDoSinalizador_(texto) {
+  return String(texto === undefined || texto === null ? '' : texto).split(';')
+    .map(function (valor) { return valor.trim(); })
+    .filter(function (valor) { return valor !== ''; });
+}
+
+/** O sinalizador tem condição de parada? (Os quatro campos, juntos.) */
+function temCondicaoDeParada_(sinalizador) {
+  return !!(sinalizador.statusComCondicao && sinalizador.colunaDaCondicao
+    && sinalizador.valoresDaCondicao.length && sinalizador.colunaDaDataDaCondicao);
+}
+
+/** O valor da coluna da condição é um dos que encerram o prazo? */
+function condicaoDeParadaCumprida_(sinalizador, registro) {
+  return condicaoBate_({ valores: sinalizador.valoresDaCondicao },
+    registro[sinalizador.colunaDaCondicao]);
 }
 
 /** 495 → "08:15". */
@@ -1177,7 +1219,11 @@ function regraDoSinalizador_(sinalizador) {
   return quanto(sinalizador.prazo)
     + (sinalizador.aviso > 0 ? ' · amarelo quando faltar ' + quanto(sinalizador.aviso) : '')
     + (sinalizador.colunaQueLiga
-      ? ' · só com "' + sinalizador.colunaQueLiga + '" preenchida' : '');
+      ? ' · só com "' + sinalizador.colunaQueLiga + '" preenchida' : '')
+    + (temCondicaoDeParada_(sinalizador)
+      ? ' · "' + sinalizador.statusComCondicao + '" só encerra quando "'
+        + sinalizador.colunaDaCondicao + '" for ' + sinalizador.valoresDaCondicao.join(' ou ')
+      : '');
 }
 
 /**
@@ -1207,16 +1253,31 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
     minuto: minutoDaHora !== null ? minutoDaHora : (relogio.minuto > 0 ? relogio.minuto : sinalizador.abre)
   };
 
-  // ATÉ QUANDO: o status final.
+  // ATÉ QUANDO: o status final — e, no status que declarou uma CONDIÇÃO, só
+  // quando a condição vale. Na RET, "Retido" é um desfecho, mas só encerra o
+  // prazo quando a proposta foi transmitida (ou não precisou mudar); antes
+  // disso o relógio segue correndo, e é o que o PO pediu.
   var situacao = canal.colunaDoStatus
     ? situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])] : null;
-  var encerrado = !!(situacao && situacao.final);
+  var comCondicao = temCondicaoDeParada_(sinalizador) && canal.colunaDoStatus
+    && normalizarParaComparar_(registro[canal.colunaDoStatus])
+      === normalizarParaComparar_(sinalizador.statusComCondicao);
+  var encerrado = comCondicao
+    ? condicaoDeParadaCumprida_(sinalizador, registro)
+    : !!(situacao && situacao.final);
   var ate = agora;
   if (encerrado) {
-    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
-    var carimbo = situacao.colunaDeCarimbo
-      ? converterParaDataEHora_(registro[situacao.colunaDeCarimbo]) : '';
-    var quandoFechou = mudou || carimbo;
+    // Quando parou: pela condição, é o carimbo dela; pelo status, a última
+    // mudança de status ou o carimbo do próprio status.
+    var quandoFechou;
+    if (comCondicao) {
+      quandoFechou = converterParaDataEHora_(registro[sinalizador.colunaDaDataDaCondicao]);
+    } else {
+      var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+      var carimbo = situacao.colunaDeCarimbo
+        ? converterParaDataEHora_(registro[situacao.colunaDeCarimbo]) : '';
+      quandoFechou = mudou || carimbo;
+    }
     if (!quandoFechou) return null;
     ate = relogioDeParede_(quandoFechou);
   }

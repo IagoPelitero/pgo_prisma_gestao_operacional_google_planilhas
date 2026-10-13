@@ -31,10 +31,10 @@ function rodarTestesDaFundacao() {
     const base = planilha.getSheetByName('BASE_RET');
     // Base de caso leva 2 de controle (_Visivel e _Origem): o carimbo da
     // exclusão saiu delas, a pedido do PO — caso é excluído de vez.
-    igual(base.getMaxColumns(), 50, 'colunas de BASE_RET (48 + 2 de controle)');
+    igual(base.getMaxColumns(), 51, 'colunas de BASE_RET (49 + 2 de controle)');
     igual(base.getMaxRows(), 2001, 'linhas de BASE_RET (reserva 2000 + cabeçalho)');
     const canal = planilha.getSheetByName('BASE_MESA');
-    igual(canal.getMaxColumns(), 28, 'colunas de BASE_MESA (26 + 2 de controle)');
+    igual(canal.getMaxColumns(), 29, 'colunas de BASE_MESA (27 + 2 de controle)');
     // Os cadastros continuam com as 4: lá a linha oculta ainda existe.
     const corretoras = planilha.getSheetByName('CORRETORAS');
     const deControle = corretoras.getRange(1, 1, 1, corretoras.getMaxColumns()).getValues()[0]
@@ -44,7 +44,7 @@ function rodarTestesDaFundacao() {
 
   teste('os cabeçalhos saem na ordem e na grafia do contrato', () => {
     const canal = planilha.getSheetByName('BASE_MESA');
-    const cabecalhos = canal.getRange(1, 1, 1, 28).getValues()[0];
+    const cabecalhos = canal.getRange(1, 1, 1, 29).getValues()[0];
     igual(cabecalhos[0], 'ID');
     igual(cabecalhos[7], 'Abertura indevida');
     igual(cabecalhos[15], 'Área responsável');
@@ -56,8 +56,10 @@ function rodarTestesDaFundacao() {
     igual(cabecalhos[24], 'Data da importação');
     igual(cabecalhos[25], 'Data do encaminhamento',
       'o carimbo da Mesa: a área foi escolhida quando');
-    igual(cabecalhos[26], '_Visivel');
-    igual(cabecalhos[27], '_Origem');
+    igual(cabecalhos[26], 'Data em andamento',
+      'o carimbo do status Em andamento: de onde conta o prazo da Mesa');
+    igual(cabecalhos[27], '_Visivel');
+    igual(cabecalhos[28], '_Origem');
   });
 
   teste('quem instalou vira o primeiro Administrador', () => {

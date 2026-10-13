@@ -574,11 +574,11 @@ function rodarTestesDeCadastro() {
 
     const transferiu = todos.find((c) => c.chave === 'nomedequemtransferiu');
     igual(transferiu.mostrarSe.campo, 'canal');
-    igual(transferiu.mostrarSe.valor, 'Central');
+    igual(transferiu.mostrarSe.valores.join('|'), 'Central');
 
     const dados = todos.find((c) => c.chave === 'dadosdopagamento');
     igual(dados.mostrarSe.campo, 'formadepagamento');
-    igual(dados.mostrarSe.valor, 'ADC - TODAS PARCELAS');
+    igual(dados.mostrarSe.valores.join('|'), 'ADC - TODAS PARCELAS');
 
     // E a opção que dispara existe na lista. Sem esta linha, renomear o item
     // desligaria a regra em silêncio.

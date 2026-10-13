@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 971 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1035 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -261,13 +261,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-971 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1035 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 970 não valeriam nada.
+realmente corrompe — sem ele, os outros 1034 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -401,16 +401,25 @@ SLA da Mesa). O selo aparece embaixo da situação, ao lado do SLA:
 
 | Canal | O prazo | Conta desde | Amarelo |
 |---|---|---|---|
-| **RET** | **3 dias úteis** para o caso chegar a um status final: retido, não retido, sem sucesso de contato, cancelado ou pago | a data de recepção do protocolo | no 3º dia útil |
-| **Mesa** | **48 horas úteis** para a área devolver o caso encaminhado | **Data do encaminhamento**, que o sistema carimba quando a "Área responsável" é escolhida | nas últimas 10 horas |
+| **RET** | **3 dias úteis** para o caso chegar a um desfecho. Não retido, pago, cancelado e sem sucesso de contato **param o relógio sozinhos**; o **Retido** só para quando o *Status proposta* for **Transmitido** ou **Sem alteração** | a data de recepção do protocolo | no 3º dia útil |
+| **Mesa** | **48 horas úteis** para o caso ser concluído. Para quando o status vira Concluído (ou Concluído na mesa, ou Sem retorno) | **Data em andamento**, que o sistema carimba quando o caso entra no status Em andamento — e todo caso novo da Mesa nasce assim | nas últimas 10 horas |
 | **VG** | ainda não definido: a linha existe, **desligada**, para o PO preencher | — | — |
 
 Quando o caso chega a um status final, o relógio **para** e o selo mostra o
 resultado — *cumprido em 1 dia útil e 1h* (verde) ou *estourado, 1 dia útil e 1h
 além* (vermelho). Caso encerrado de antes dos carimbos, sem data de quando
 fechou, **fica sem selo**: inventar vermelho em milhares de casos encerrados
-ensinaria a ignorar o vermelho. Trocar de área é encaminhar de novo (prazo novo);
-salvar o caso sem mexer na área não carimba nada.
+ensinaria a ignorar o vermelho. O mesmo vale para o caso da Mesa que já estava
+em andamento antes de o sistema carimbar o Em andamento: sem a data, sem selo
+(a atualização diz quantos são, e a coluna se preenche na planilha).
+
+**O Retido e o Status proposta.** Na RET, "Retido" é um desfecho, mas o caso só
+termina quando a proposta chega ao fim do caminho. Enquanto o Status proposta
+estiver em *Aguardando transmissão* (ou vazio), o relógio **segue correndo**:
+amarelo no 3º dia, vermelho depois, e o analista aparece na Produtividade. Ao
+escolher *Transmitido* ou *Sem alteração*, o sistema carimba o momento em
+*Data do status proposta* e o prazo para ali — cumprido ou estourado. Trocar o
+status de Retido para outro esvazia o Status proposta e o carimbo.
 
 **Na Produtividade RECC**, o bloco **Controle de prazos** mostra quantos casos
 estão no prazo, vencendo, fora e encerrados dentro e fora; o **nome de quem deixou
@@ -419,9 +428,11 @@ estourar**, de quem mais para quem menos; e a lista dos casos mais atrasados
 com quantos casos estão dentro e quantos fora.
 
 **Tudo se ajusta em Configurações › Sinalizadores** — prazo, unidade, quanto antes
-o amarelo acende, a coluna que liga o prazo, de onde ele conta e o expediente —,
-sem programador. A tela recusa prazo zero ligado, amarelo igual ou maior que o
-prazo e coluna que não existe. A planilha antiga ganha a aba, a coluna e os
+o amarelo acende, a coluna que liga o prazo, de onde ele conta, o expediente e a
+**condição de parada de um status** (qual status, qual coluna, quais valores e
+em que coluna o sistema anota a data) —, sem programador. A tela recusa prazo
+zero ligado, amarelo igual ou maior que o prazo, coluna que não existe, status
+que o canal não tem e valor que a lista da coluna não tem. A planilha antiga ganha a aba, a coluna e os
 três sinalizadores rodando `atualizarPGO()` uma vez.
 
 ### As três ações de cada caso
@@ -574,6 +585,36 @@ Isso **tem de ser um lugar só** — e por um tempo não foi. A edição juntava
 proposta e o detalhe não; e o produto, nenhum dos dois juntava. O detalhe
 mostrava `0000000` no lugar de `58-0000000`, e — pior — salvar um caso da RET
 com produto era **recusado**, num campo que a pessoa nem tinha tocado.
+
+### Um campo que aparece conforme outro
+
+Pedido do PO: *"quando eu seleciono o status como retido, pago, cancelado, ou
+quantos forem necessários, seja permitido gerar outro campo seletor"*. Foi assim
+que nasceu o **Status proposta**, com os valores *Transmitido*, *Aguardando
+transmissão* e *Sem alteração*.
+
+O passo a passo, sem programador:
+
+1. **Configurações › Ajustes Gerais** — crie a lista *Status proposta* e os três
+   itens.
+2. **Configurações › Cadastrar Caso › Criar campo** — *Status proposta*, tipo
+   seletor (pede a senha de administrador, porque cria uma coluna na base).
+3. No campo criado, escolha a **Lista de opções** *Status proposta* e, em
+   **Quando este campo aparece**, *Só quando "Status" for…* — e marque Retido,
+   Pago, Cancelado, ou quantos precisar. Salvar.
+
+A partir daí o campo aparece no formulário **só** com esses status. Escondido,
+ele não é cobrado (mesmo marcado como obrigatório) nem gravado. E se a pessoa
+trocar o status para um que não o mostra, o valor é **esvaziado** — pelo
+formulário ou pelo diálogo rápido de status. Abrir um caso antigo **não** apaga
+nada: só a troca esvazia.
+
+> O diálogo rápido de **Alterar status** não pergunta o Status proposta: ele só
+> troca o status. O campo se preenche depois, em Trabalhar no caso.
+
+A tela recusa o que faria o campo nunca aparecer: um valor que a lista do campo
+que manda não tem, o campo mandando em si mesmo e dois campos que esperam um
+pelo outro.
 
 ### Trabalhar no caso traz tudo o que está preenchido
 
@@ -1145,7 +1186,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-971 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1035 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

@@ -3285,7 +3285,7 @@ var Formulario = (function () {
     // para o outro.
     var condicao = campo.mostrarSe
       ? ' data-mostrar-se-campo="' + escapar(campo.mostrarSe.campo) + '"'
-        + ' data-mostrar-se-valor="' + escapar(campo.mostrarSe.valor) + '"'
+        + ' data-mostrar-se-valores="' + escapar(JSON.stringify(campo.mostrarSe.valores)) + '"'
       : '';
 
     // Travado pelo cargo não é o mesmo que somente leitura do nível, e a
@@ -3423,18 +3423,28 @@ var Formulario = (function () {
     return limpar(um) === limpar(outro);
   }
 
-  function aplicarCondicoes(raiz) {
+  /**
+   * Mostra ou esconde cada campo condicional, conforme o campo que manda.
+   *
+   * `limpar` é só para quando a PESSOA mexeu no campo que manda: trocar
+   * Retido por Pago e deixar o valor da proposta invisível dentro do campo
+   * faria esse valor ser gravado. Ao ABRIR um caso não se limpa nada — o campo
+   * escondido pode ter um valor que veio da importação, e mostrar o caso não é
+   * pedir para apagá-lo.
+   */
+  function aplicarCondicoes(raiz, limpar) {
     var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
     for (var i = 0; i < condicionais.length; i++) {
       var bloco = condicionais[i];
       var deQuem = bloco.getAttribute('data-mostrar-se-campo');
-      var esperado = bloco.getAttribute('data-mostrar-se-valor');
+      var esperados = [];
+      try { esperados = JSON.parse(bloco.getAttribute('data-mostrar-se-valores') || '[]'); }
+      catch (erro) { esperados = []; }
       var caixa = raiz.querySelector('[data-chave="' + deQuem + '"]');
       var valor = caixa ? String(caixa.value || '') : '';
-      var mostrar = mesmoTexto(valor, esperado);
+      var mostrar = esperados.some(function (esperado) { return mesmoTexto(valor, esperado); });
       bloco.hidden = !mostrar;
-      if (!mostrar) {
-        // Esconder sem limpar deixaria um valor invisível ser gravado.
+      if (!mostrar && limpar) {
         var dentro = bloco.querySelector('[data-chave]');
         if (dentro) dentro.value = '';
       }
@@ -3560,10 +3570,10 @@ var Formulario = (function () {
       jaOuvidos[deQuem] = true;
       var manda = raiz.querySelector('[data-chave="' + deQuem + '"]');
       if (!manda) continue;
-      manda.addEventListener('change', function () { aplicarCondicoes(raiz); });
-      manda.addEventListener('input', function () { aplicarCondicoes(raiz); });
+      manda.addEventListener('change', function () { aplicarCondicoes(raiz, true); });
+      manda.addEventListener('input', function () { aplicarCondicoes(raiz, true); });
     }
-    aplicarCondicoes(raiz);
+    aplicarCondicoes(raiz, false);
   }
 
   /**
@@ -3760,6 +3770,11 @@ var Formulario = (function () {
         controles[i].value = valor;
       }
     }
+
+    // O formulário foi ligado ANTES de receber o caso, com todos os campos em
+    // branco — e os condicionais ficaram escondidos. Agora que o caso chegou,
+    // os que valem para ele aparecem, sem esperar a pessoa mexer em nada.
+    aplicarCondicoes(raiz, false);
   }
 
   /**
@@ -8983,6 +8998,7 @@ var TelaConfiguracoes = (function () {
         'Preenche as opções a partir de um cadastro do sistema.')
       + caixaDeSimNao('obrigatorio', 'Obrigatório', campo.obrigatorio)
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
+      + blocoDaCondicao(campo)
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (podeExcluirEsteCampo(campo)
@@ -8996,12 +9012,102 @@ var TelaConfiguracoes = (function () {
       evento.preventDefault();
       salvarCampo(campo);
     });
+    ligarACondicao(campo);
     var excluir = elemento('excluir-campo');
     if (excluir) {
       excluir.addEventListener('click', function () {
         abrirExclusaoDoCampo(campo);
       });
     }
+  }
+
+  /* ------------------------------------------------ mostrar só quando… */
+
+  /**
+   * "Aparece sempre", ou "só quando OUTRO campo for um destes valores".
+   *
+   * É o que faz o Status proposta aparecer só com Retido: o campo que manda é
+   * um seletor, e cada valor dele é uma caixinha. Se o campo que manda não
+   * tem lista (é um texto), os valores se escrevem separados por ponto e
+   * vírgula. Quem confere de verdade é o servidor — dar a um valor um nome
+   * que a lista não tem faria o campo nunca aparecer.
+   */
+  function blocoDaCondicao(campo) {
+    var outros = dados.campos.filter(function (outro) {
+      return outro.id !== campo.id;
+    }).map(function (outro) {
+      return { id: outro.chave, nome: outro.rotulo };
+    });
+    var atual = campo.mostrarSe;
+    return '<div class="config-campo" role="group" aria-label="Quando este campo aparece">'
+      + '<span>Quando este campo aparece</span>'
+      + '<select id="cfg-mostrar-campo" aria-label="Campo que decide quando este aparece">'
+      + '<option value="">Aparece sempre</option>'
+      + outros.map(function (outro) {
+        return '<option value="' + escapar(outro.id) + '"'
+          + (atual && atual.campo === outro.id ? ' selected' : '') + '>'
+          + 'Só quando "' + escapar(outro.nome) + '" for…</option>';
+      }).join('') + '</select>'
+      + '<div id="cfg-mostrar-valores"></div>'
+      + '<em>Ex.: o Status proposta só aparece quando o Status for Retido. '
+      + 'O valor escondido não é cobrado nem gravado, e é esvaziado quando a '
+      + 'pessoa troca o valor que o mostrava.</em></div>';
+  }
+
+  function desenharOsValoresDaCondicao(campo, chaveQueManda) {
+    var caixa = elemento('cfg-mostrar-valores');
+    if (!caixa) return;
+    if (!chaveQueManda) { caixa.innerHTML = ''; return; }
+
+    var quemManda = dados.campos.filter(function (outro) {
+      return outro.chave === chaveQueManda;
+    })[0];
+    var marcados = (campo.mostrarSe && campo.mostrarSe.campo === chaveQueManda)
+      ? campo.mostrarSe.valores : [];
+    var opcoes = quemManda ? quemManda.opcoes : [];
+
+    if (!opcoes.length) {
+      caixa.innerHTML = '<input type="text" id="cfg-mostrar-texto" value="'
+        + escapar(marcados.join('; ')) + '">'
+        + '<em>Os valores, separados por ponto e vírgula.</em>';
+      return;
+    }
+    caixa.innerHTML = opcoes.map(function (opcao) {
+      var ligado = marcados.some(function (valor) {
+        return texto(valor).toLowerCase() === texto(opcao).toLowerCase();
+      });
+      return '<label class="config-chave">'
+        + '<input type="checkbox" data-valor-da-condicao="' + escapar(opcao) + '"'
+        + (ligado ? ' checked' : '') + '>'
+        + '<span>' + escapar(opcao) + '</span></label>';
+    }).join('');
+  }
+
+  function ligarACondicao(campo) {
+    var escolha = elemento('cfg-mostrar-campo');
+    if (!escolha) return;
+    desenharOsValoresDaCondicao(campo, escolha.value);
+    escolha.addEventListener('change', function () {
+      desenharOsValoresDaCondicao(campo, escolha.value);
+    });
+  }
+
+  /** O que a tela pede: { campo, valores }, ou null para "aparece sempre". */
+  function lerACondicao() {
+    var quemManda = valorDe('mostrar-campo');
+    if (!quemManda) return null;
+
+    var valores = [];
+    var caixas = document.querySelectorAll('[data-valor-da-condicao]');
+    for (var i = 0; i < caixas.length; i++) {
+      if (caixas[i].checked) valores.push(caixas[i].getAttribute('data-valor-da-condicao'));
+    }
+    var escrito = elemento('cfg-mostrar-texto');
+    if (escrito) {
+      valores = escrito.value.split(';').map(function (valor) { return valor.trim(); })
+        .filter(function (valor) { return valor !== ''; });
+    }
+    return { campo: quemManda, valores: valores };
   }
 
   /**
@@ -9107,7 +9213,8 @@ var TelaConfiguracoes = (function () {
       catalogo: valorDe('catalogo'),
       listaDe: valorDe('listaDe'),
       obrigatorio: marcado('obrigatorio'),
-      ativo: marcado('ativo')
+      ativo: marcado('ativo'),
+      mostrarSe: lerACondicao()
     };
     Servidor.chamar('salvarCampo', envio)
       .entao(function () { avisarSalvo(); carregarCampos(); })
@@ -11015,7 +11122,8 @@ var TelaConfiguracoes = (function () {
       id: '', nome: '', canalId: dados.opcoes.canais[0].id, prazo: 0,
       unidade: 'dias', aviso: 0, colunaQueLiga: '', colunaDaData: '', colunaDaHora: '',
       inicioDoExpediente: padrao.abre, fimDoExpediente: padrao.fecha,
-      ordem: 0, ativo: true
+      ordem: 0, ativo: true, statusComCondicao: '', colunaDaCondicao: '',
+      valoresDaCondicao: [], colunaDaDataDaCondicao: ''
     };
     var canal = canalDoSinalizador(atual.canalId);
 
@@ -11038,8 +11146,9 @@ var TelaConfiguracoes = (function () {
         + 'amarelo. Zero não acende amarelo.')
       + caixaDeOpcoes('sn-liga', 'Só vale quando esta coluna estiver preenchida',
         [''].concat(canal.colunas), atual.colunaQueLiga,
-        'Em branco vale para todo caso. A Mesa usa "Área responsável": só o '
-        + 'caso encaminhado tem prazo.')
+        'Em branco vale para todo caso. Serve para um prazo que só existe quando '
+        + 'outra coluna está preenchida — por exemplo, só os casos que têm '
+        + '"Área responsável".')
       + caixaDeOpcoes('sn-data', 'Conta a partir da data',
         [''].concat(canal.colunasDeData), atual.colunaDaData,
         'Em branco usa a data de entrada do canal'
@@ -11048,6 +11157,20 @@ var TelaConfiguracoes = (function () {
         [''].concat(canal.colunasDeHora), atual.colunaDaHora,
         'Em branco usa a hora que a data carrega; data sem hora conta da '
         + 'abertura do expediente.')
+      + caixaDeOpcoes('sn-cond-status', 'Este status só encerra o prazo quando…',
+        [''].concat(canal.situacoes || []), atual.statusComCondicao,
+        'Na RET: Retido. Em branco, todo status final encerra o prazo sozinho.')
+      + caixaDeOpcoes('sn-cond-coluna', '…esta coluna',
+        [''].concat(canal.colunas), atual.colunaDaCondicao,
+        'Na RET: Status proposta.')
+      + '<div class="config-campo"><span>…tiver um destes valores</span>'
+      + '<div id="cfg-sn-cond-valores"></div>'
+      + '<em>Na RET: Transmitido e Sem alteração. Enquanto o valor for outro, o '
+      + 'relógio segue correndo.</em></div>'
+      + caixaDeOpcoes('sn-cond-data', '…e a data em que isso aconteceu',
+        [''].concat(canal.colunasDeData), atual.colunaDaDataDaCondicao,
+        'O sistema carimba aqui o momento em que a condição passou a valer. '
+        + 'Na RET: Data do status proposta.')
       + campoDeTexto('sn-inicio', 'Início do expediente', atual.inicioDoExpediente,
         'Como ' + padrao.abre + '.')
       + campoDeTexto('sn-fim', 'Fim do expediente', atual.fimDoExpediente,
@@ -11056,12 +11179,18 @@ var TelaConfiguracoes = (function () {
         'Quando o canal tem mais de um, o menor aparece primeiro.')
       + caixaDeSimNao('sn-ativo', 'Sinalizador em uso', atual.ativo)
       + '<p class="config-explica">O prazo termina quando o caso chega a um '
-      + '<strong>status final</strong> do canal.</p>'
+      + '<strong>status final</strong> do canal — e um status pode encerrar só '
+      + 'com uma condição, como o Retido na RET (acima).</p>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (atual.id ? '<button type="button" class="botao vazado perigo" '
         + 'id="tirar-sinalizador">Tirar da lista</button>' : '')
       + '</div></form>';
+
+    desenharOsValoresDaParada(canal, atual.colunaDaCondicao, atual.valoresDaCondicao);
+    elemento('cfg-sn-cond-coluna').addEventListener('change', function () {
+      desenharOsValoresDaParada(canal, this.value, []);
+    });
 
     var trocaDeCanal = elemento('cfg-sn-canal');
     if (trocaDeCanal) {
@@ -11072,7 +11201,8 @@ var TelaConfiguracoes = (function () {
           aviso: valorDe('sn-aviso'), colunaQueLiga: '', colunaDaData: '',
           colunaDaHora: '', inicioDoExpediente: valorDe('sn-inicio'),
           fimDoExpediente: valorDe('sn-fim'), ordem: valorDe('sn-ordem'),
-          ativo: marcado('sn-ativo')
+          ativo: marcado('sn-ativo'), statusComCondicao: '', colunaDaCondicao: '',
+          valoresDaCondicao: [], colunaDaDataDaCondicao: ''
         });
       });
     }
@@ -11086,7 +11216,11 @@ var TelaConfiguracoes = (function () {
         aviso: valorDe('sn-aviso'), colunaQueLiga: valorDe('sn-liga'),
         colunaDaData: valorDe('sn-data'), colunaDaHora: valorDe('sn-hora'),
         inicioDoExpediente: valorDe('sn-inicio'), fimDoExpediente: valorDe('sn-fim'),
-        ordem: valorDe('sn-ordem'), ativo: marcado('sn-ativo')
+        ordem: valorDe('sn-ordem'), ativo: marcado('sn-ativo'),
+        statusComCondicao: valorDe('sn-cond-status'),
+        colunaDaCondicao: valorDe('sn-cond-coluna'),
+        valoresDaCondicao: lerOsValoresDaParada(),
+        colunaDaDataDaCondicao: valorDe('sn-cond-data')
       }).entao(function (id) {
         escolhido = { id: id };
         avisarSalvo('Sinalizador salvo.');
@@ -11108,6 +11242,48 @@ var TelaConfiguracoes = (function () {
           .senao(mostrarErroNoPainel);
       });
     }
+  }
+
+  /**
+   * Os valores da condição de parada: uma caixinha por opção, quando a coluna é
+   * um campo com lista (o Status proposta); um texto, separado por ponto e
+   * vírgula, quando não é. O servidor confere os dois jeitos.
+   */
+  function desenharOsValoresDaParada(canal, coluna, marcados) {
+    var caixa = elemento('cfg-sn-cond-valores');
+    if (!caixa) return;
+    if (!coluna) { caixa.innerHTML = ''; return; }
+
+    var opcoes = (canal.colunasComLista || {})[coluna] || [];
+    if (!opcoes.length) {
+      caixa.innerHTML = '<input type="text" id="cfg-sn-cond-texto" value="'
+        + escapar((marcados || []).join('; ')) + '">'
+        + '<em>Os valores, separados por ponto e vírgula.</em>';
+      return;
+    }
+    caixa.innerHTML = opcoes.map(function (opcao) {
+      var ligado = (marcados || []).some(function (valor) {
+        return texto(valor).toLowerCase() === texto(opcao).toLowerCase();
+      });
+      return '<label class="config-chave">'
+        + '<input type="checkbox" data-valor-da-parada="' + escapar(opcao) + '"'
+        + (ligado ? ' checked' : '') + '>'
+        + '<span>' + escapar(opcao) + '</span></label>';
+    }).join('');
+  }
+
+  function lerOsValoresDaParada() {
+    var escrito = elemento('cfg-sn-cond-texto');
+    if (escrito) {
+      return escrito.value.split(';').map(function (valor) { return valor.trim(); })
+        .filter(function (valor) { return valor !== ''; });
+    }
+    var valores = [];
+    var caixas = document.querySelectorAll('[data-valor-da-parada]');
+    for (var i = 0; i < caixas.length; i++) {
+      if (caixas[i].checked) valores.push(caixas[i].getAttribute('data-valor-da-parada'));
+    }
+    return valores;
   }
 
   function carregarEstrutura() {

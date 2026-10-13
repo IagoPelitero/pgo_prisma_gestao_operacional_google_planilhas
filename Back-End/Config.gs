@@ -218,6 +218,12 @@ function listarCamposDoCanal(idDoCanal) {
         catalogo: String(configuracao.catalogo || ''),
         listaDe: String(configuracao.listaDe || ''),
         largura: Number(configuracao.largura) || 1,
+        // Quando o campo aparece, e — para quem pode mandar nos outros — as
+        // opções que ele tem: é com elas que a tela monta "mostrar quando…".
+        mostrarSe: condicaoDoCampo_(configuracao),
+        opcoes: String(campo.TipoCampo || '') === 'seletor'
+          ? opcoesDoCampo_(configuracao, canal.id).map(function (opcao) { return opcao.valor; })
+          : [],
         // Coluna que sumiu da planilha aparece marcada, em vez de o campo
         // simplesmente parar de funcionar sem ninguém entender por quê.
         colunaExiste: posicaoDaColuna_(estrutura, campo.Cabecalho) >= 0,
@@ -291,6 +297,11 @@ function salvarCampo(dados) {
     if (largura > 1) configuracao.largura = largura;
     else delete configuracao.largura;
   }
+  if (dados.mostrarSe !== undefined) {
+    var condicao = conferirACondicaoDoCampo_(atual, dados.mostrarSe);
+    if (condicao) configuracao.mostrarSe = condicao;
+    else delete configuracao.mostrarSe;
+  }
 
   var tipo = String(dados.tipo || atual.TipoCampo);
   if (!RECC_DO_CAMPO_PARA_O_DADO[tipo]) {
@@ -312,6 +323,74 @@ function salvarCampo(dados) {
   esquecerEstruturaLida_();
   registrarAuditoria_('campo.editar', 'CAMPOS', id, String(atual.Cabecalho));
   return true;
+}
+
+/**
+ * Confere a condição que a tela mandou — "mostrar este campo só quando OUTRO
+ * campo for um destes valores" — e devolve a que vai ser guardada, ou null
+ * para "aparece sempre".
+ *
+ * O que ela recusa, porque cada um vira um campo que nunca aparece (e ninguém
+ * entende por quê):
+ *   · o campo que manda não existir neste canal, ou ser o próprio campo;
+ *   · um valor que não é opção do campo que manda — a digitação errada de
+ *     "Transmitido" nunca faria a regra valer;
+ *   · um ciclo: A aparece quando B tem valor, e B aparece quando A tem valor.
+ * Os valores guardados são os NOMES das opções, como a lista os escreve.
+ */
+function conferirACondicaoDoCampo_(campo, pedido) {
+  if (!pedido || !pedido.campo) return null;
+
+  var doCanal = lerRegistros_('CAMPOS').filter(function (outro) {
+    return converterParaIdentificador_(outro.CanalId) === converterParaIdentificador_(campo.CanalId);
+  });
+  var chaveDele = String(campo.ChaveTecnica);
+  var quemManda = doCanal.filter(function (outro) {
+    return String(outro.ChaveTecnica) === String(pedido.campo);
+  })[0];
+  if (!quemManda || String(quemManda.ChaveTecnica) === chaveDele) {
+    throw new Error('O campo que decide quando este aparece precisa ser OUTRO '
+      + 'campo do mesmo canal.');
+  }
+
+  var pedidos = (Array.isArray(pedido.valores) ? pedido.valores : [])
+    .map(function (valor) { return String(valor).trim(); })
+    .filter(function (valor) { return valor !== ''; });
+  if (!pedidos.length) {
+    throw new Error('Escolha em quais valores de "' + String(quemManda.Rotulo || quemManda.Cabecalho)
+      + '" este campo aparece — ou deixe "Aparece sempre".');
+  }
+
+  var opcoes = opcoesDoCampo_(lerConfiguracaoDoCampo_(quemManda), campo.CanalId)
+    .map(function (opcao) { return opcao.valor; });
+  var valores = pedidos.map(function (valor) {
+    if (!opcoes.length) return valor;
+    var achada = opcoes.filter(function (opcao) {
+      return condicaoBate_({ valores: [opcao] }, valor);
+    })[0];
+    if (achada === undefined) {
+      throw new Error('"' + valor + '" não é uma opção de "'
+        + String(quemManda.Rotulo || quemManda.Cabecalho) + '". As opções são: '
+        + opcoes.join(', ') + '.');
+    }
+    return achada;
+  });
+
+  // Ciclo: sobe de quem manda em quem manda; se chegar neste campo, volta.
+  var subindo = quemManda;
+  for (var passo = 0; subindo && passo < 20; passo++) {
+    var acima = condicaoDoCampo_(lerConfiguracaoDoCampo_(subindo));
+    if (!acima) break;
+    if (acima.campo === chaveDele) {
+      throw new Error('"' + String(quemManda.Rotulo || quemManda.Cabecalho) + '" já só aparece '
+        + 'quando este campo tem valor: um esperaria o outro, e nenhum dos dois apareceria.');
+    }
+    subindo = doCanal.filter(function (outro) {
+      return String(outro.ChaveTecnica) === acima.campo;
+    })[0];
+  }
+
+  return { campo: String(quemManda.ChaveTecnica), valores: valores };
 }
 
 /**
@@ -2671,10 +2750,21 @@ function opcoesDeSinalizador() {
         }
         if (tipo === RECC_TIPO_DE_DADO.HORA) deHora.push(cabecalho);
       });
+      // As colunas que são campo com lista de opções, com as opções: é com elas
+      // que a tela monta os valores da condição de parada.
+      var comLista = {};
+      lerRegistros_('CAMPOS').forEach(function (campo) {
+        if (String(campo.Aba) !== canal.aba) return;
+        var opcoes = opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), canal.id)
+          .map(function (opcao) { return opcao.valor; });
+        if (opcoes.length) comLista[String(campo.Cabecalho)] = opcoes;
+      });
       return {
         id: canal.id, nome: canal.nome, aba: canal.aba,
         colunaDaData: canal.colunaDaData || '',
-        colunas: colunas, colunasDeData: deData, colunasDeHora: deHora
+        colunas: colunas, colunasDeData: deData, colunasDeHora: deHora,
+        situacoes: situacoesDoCanal_(canal).map(function (uma) { return uma.gravadoComo; }),
+        colunasComLista: comLista
       };
     })
   };
@@ -2686,6 +2776,11 @@ function salvarSinalizador(dados) {
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
     throw new Error('A aba SINALIZADORES ainda não existe nesta planilha. '
       + 'Rode atualizarPGO() no editor do Apps Script.');
+  }
+
+  if (posicaoDaColuna_(estruturaDaAba_('SINALIZADORES'), 'StatusComCondicao') < 0) {
+    throw new Error('A aba SINALIZADORES desta planilha ainda não tem as colunas da '
+      + 'condição de parada. Rode atualizarPGO() no editor do Apps Script.');
   }
 
   var nome = String(dados.nome || '').trim();
@@ -2736,6 +2831,28 @@ function salvarSinalizador(dados) {
     throw new Error('"' + colunaDaHora + '" não é uma coluna de hora.');
   }
 
+  /*
+   * A CONDIÇÃO DE PARADA — "este status só encerra o prazo quando esta coluna
+   * tiver um destes valores". Os quatro juntos, ou nenhum: metade da regra não
+   * para nada e não avisa. Cada parte é conferida, porque um valor com a
+   * digitação errada nunca encerraria o prazo, e o caso ficaria vermelho para
+   * sempre sem ninguém entender por quê.
+   */
+  // Pedido sem NENHUM dos quatro campos da condição vem de uma tela antiga, de
+  // antes de eles existirem: ela não está pedindo para tirar a condição, só não
+  // sabe dela. Salvar assim mantém a que o sinalizador já tem.
+  var idDoSinalizador = converterParaIdentificador_(dados.id);
+  var existente = idDoSinalizador
+    ? buscarRegistros_('SINALIZADORES', 'Id', idDoSinalizador, 1)[0] : null;
+  var semCondicaoNoPedido = ['statusComCondicao', 'colunaDaCondicao', 'valoresDaCondicao',
+    'colunaDaDataDaCondicao'].every(function (chave) { return dados[chave] === undefined; });
+  var condicao = semCondicaoNoPedido && existente
+    ? { status: String(existente.StatusComCondicao || ''),
+      coluna: String(existente.ColunaDaCondicao || ''),
+      valores: valoresDaCondicaoDoSinalizador_(existente.ValoresDaCondicao),
+      data: String(existente.ColunaDaDataDaCondicao || '') }
+    : conferirACondicaoDeParada_(canal, estrutura, dados);
+
   // O expediente: em branco vale o padrão; preenchido, tem de ser legível e
   // terminar depois de começar.
   var inicio = horaDoExpediente_(dados.inicioDoExpediente) || RECC_EXPEDIENTE_PADRAO.abre;
@@ -2763,7 +2880,10 @@ function salvarSinalizador(dados) {
     CanalId: canal.id, Nome: nome, Prazo: prazo, Unidade: unidade,
     AvisoFaltando: aviso, ColunaQueLiga: quandoVale, ColunaDaData: colunaDaData,
     ColunaDaHora: colunaDaHora, InicioDoExpediente: inicio, FimDoExpediente: fim,
-    Ordem: Number(dados.ordem) || 0, Ativo: ligado
+    Ordem: Number(dados.ordem) || 0, Ativo: ligado,
+    StatusComCondicao: condicao.status, ColunaDaCondicao: condicao.coluna,
+    ValoresDaCondicao: condicao.valores.join('; '),
+    ColunaDaDataDaCondicao: condicao.data
   };
 
   if (id) {
@@ -2775,6 +2895,69 @@ function salvarSinalizador(dados) {
   registrarAuditoria_('sinalizador.criar', 'SINALIZADORES', criado.__id,
     canal.nome + ': ' + nome);
   return criado.__id;
+}
+
+/**
+ * Confere a condição de parada que a tela mandou e devolve a que vai ser
+ * guardada: { status, coluna, valores, data } — tudo vazio quando não há.
+ *
+ * O status é conferido contra os do canal, e escrito como o canal o grava; a
+ * coluna precisa existir; a data precisa ser de data e hora (a hora em que o
+ * prazo parou conta, e uma data sem hora pararia sempre na abertura do dia);
+ * e os valores, quando a coluna é um campo com lista, precisam ser opções
+ * dela — escritos como a lista os escreve.
+ */
+function conferirACondicaoDeParada_(canal, estrutura, dados) {
+  var vazio = { status: '', coluna: '', valores: [], data: '' };
+  var status = String(dados.statusComCondicao || '').trim();
+  var coluna = String(dados.colunaDaCondicao || '').trim();
+  var data = String(dados.colunaDaDataDaCondicao || '').trim();
+  var valores = (Array.isArray(dados.valoresDaCondicao) ? dados.valoresDaCondicao
+    : String(dados.valoresDaCondicao || '').split(';'))
+    .map(function (valor) { return String(valor).trim(); })
+    .filter(function (valor) { return valor !== ''; });
+
+  if (!status && !coluna && !data && !valores.length) return vazio;
+  if (!status || !coluna || !data || !valores.length) {
+    throw new Error('A condição de parada pede os quatro: o status, a coluna, os '
+      + 'valores e a coluna da data. Preencha todos, ou deixe todos em branco.');
+  }
+
+  var situacoes = situacoesDoCanal_(canal);
+  var doStatus = situacoes.filter(function (uma) {
+    return condicaoBate_({ valores: [uma.gravadoComo] }, status);
+  })[0];
+  if (!doStatus) {
+    throw new Error('O status "' + status + '" não existe no canal ' + canal.nome
+      + '. Os status são: ' + situacoes.map(function (uma) { return uma.gravadoComo; }).join(', ') + '.');
+  }
+
+  conferirQueAColunaExiste_(estrutura, coluna, canal.aba);
+  conferirQueAColunaExiste_(estrutura, data, canal.aba);
+  if (estrutura.tipos[posicaoDaColuna_(estrutura, data)] !== RECC_TIPO_DE_DADO.DATA_HORA) {
+    throw new Error('"' + data + '" não é uma coluna de data e hora. É nela que o '
+      + 'sistema anota QUANDO a condição passou a valer.');
+  }
+
+  var campo = lerRegistros_('CAMPOS').filter(function (outro) {
+    return String(outro.Aba) === canal.aba
+      && normalizarParaComparar_(outro.Cabecalho) === normalizarParaComparar_(coluna);
+  })[0];
+  var opcoes = campo ? opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), canal.id)
+    .map(function (opcao) { return opcao.valor; }) : [];
+  var certos = valores.map(function (valor) {
+    if (!opcoes.length) return valor;
+    var achada = opcoes.filter(function (opcao) {
+      return condicaoBate_({ valores: [opcao] }, valor);
+    })[0];
+    if (achada === undefined) {
+      throw new Error('"' + valor + '" não é uma opção de "' + coluna + '". As opções são: '
+        + opcoes.join(', ') + '.');
+    }
+    return achada;
+  });
+
+  return { status: doStatus.gravadoComo, coluna: coluna, valores: certos, data: data };
 }
 
 /** Tira o sinalizador da tela e do selo. A linha permanece na planilha. */

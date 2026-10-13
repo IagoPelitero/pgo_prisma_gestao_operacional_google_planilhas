@@ -242,11 +242,23 @@ mentir quando alguém edita a área responsável direto na planilha.
 **`Abertura indevida`**: `SIM` / `NAO`, também vira indicador.
 
 **`Data do encaminhamento`** (ao fim das colunas de dados): o momento, com data
-e hora, em que a `Área responsável` foi escolhida — é de onde conta o prazo de
-48 horas úteis que a área tem para devolver o caso. Quem preenche é o **sistema**
+e hora, em que a `Área responsável` foi escolhida. Quem preenche é o **sistema**
 (coluna "Preenchido pelo sistema", desativada em `CAMPOS`): escolher a área
 carimba, trocar de área carimba de novo, salvar sem mexer na área não carimba.
-Encaminhado antes da coluna existir, fica sem carimbo — e sem prazo inventado.
+Hoje é dado (e Power BI): o prazo da Mesa não conta mais dele.
+
+**`Data em andamento`** (logo depois): o momento em que o caso entrou no status
+**Em andamento** — o carimbo do próprio status (`CATALOGO.ColunaDeCarimbo`),
+como as datas de status da RET. Todo caso novo da Mesa nasce Em andamento, e
+nasce carimbado. É de onde conta o prazo de 48 horas úteis, até um status que
+fecha o caso. Só a **primeira** entrada carimba: voltar para Em andamento não
+reinicia o relógio. Caso que já estava em andamento antes da coluna existir fica
+sem a data — e sem prazo inventado; a atualização diz quantos são.
+
+**`Data do status proposta`** (`BASE_RET`, ao fim): o momento em que o Status
+proposta chegou num valor que encerra o prazo do Retido. O Status proposta é um
+campo que a operação cria, e campo guarda o valor, não a data em que mudou — por
+isso o sistema carimba aqui, na gravação.
 
 ### 3.2 Cadastros
 
@@ -285,7 +297,7 @@ formulário (no momento em que a SUSEP é digitada) e no dashboard.
 | `PAINEIS` | `Id` · `Tela` · `CanalId` · `Titulo` · `TipoComponente` · `CampoDimensao` · `CampoMedida` · `Agregacao` · `Limite` · `Filtro` · `Ordem` · `Largura` · `VisivelPara` · `Ativo` | Os cards e gráficos de cada tela, configuráveis |
 | `CONFIG` | `Id` · `Chave` · `Valor` · `Descricao` · `AtualizadoPor` · `Data` | Parâmetros gerais (nome do sistema, janela de dias, metas…) |
 | `AUDITORIA` | `Id` · `DataHora` · `UsuarioId` · `Acao` · `Entidade` · `RegistroId` · `Detalhe` | Trilha das ações relevantes. Sem dado pessoal |
-| `SINALIZADORES` | `Id` · `CanalId` · `Nome` · `Prazo` · `Unidade` · `AvisoFaltando` · `ColunaQueLiga` · `ColunaDaData` · `ColunaDaHora` · `InicioDoExpediente` · `FimDoExpediente` · `Ordem` · `Ativo` | Os **prazos** que o caso tem em cada canal (RET: 3 dias úteis; Mesa: 48 horas úteis depois do encaminhamento; VG: preparado, desligado). Unidade `dias` ou `horas`, sempre úteis. Linha nova = prazo novo, sem código |
+| `SINALIZADORES` | `Id` · `CanalId` · `Nome` · `Prazo` · `Unidade` · `AvisoFaltando` · `ColunaQueLiga` · `ColunaDaData` · `ColunaDaHora` · `InicioDoExpediente` · `FimDoExpediente` · `Ordem` · `Ativo` · `StatusComCondicao` · `ColunaDaCondicao` · `ValoresDaCondicao` · `ColunaDaDataDaCondicao` | Os **prazos** que o caso tem em cada canal (RET: 3 dias úteis, e o Retido só para com o Status proposta pronto; Mesa: 48 horas úteis do status Em andamento até concluir; VG: preparado, desligado). Unidade `dias` ou `horas`, sempre úteis. Os quatro últimos campos são a **condição de parada** de um status: `StatusComCondicao` só encerra o prazo quando `ColunaDaCondicao` tem um dos `ValoresDaCondicao` (separados por `;`), e `ColunaDaDataDaCondicao` guarda quando isso passou a valer. Linha nova = prazo novo, sem código |
 | `ANALISES` | `Id` · `Nome` · `Descricao` · `CanalId` · `Colunas` · `Filtros` · `Dias` · `Ordem` · `Ativo` · `GeradaEm` · `GeradaPor` · `Linhas` | A **receita** de cada aba `ANALISE_*`. A aba gerada é outra coisa, e não está no contrato |
 
 ### 3.4 Abas de análise (geradas pelo sistema)

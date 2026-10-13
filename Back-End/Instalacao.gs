@@ -480,7 +480,9 @@ function semearDadosIniciais_(emailDoInstalador) {
   // "Sem retorno" NÃO carimba a data da finalização, embora seja final: a
   // conta de "Finalizados na célula" é finalização preenchida sem área
   // responsável, e um caso sem retorno entraria ali como resolvido.
-  [['Em andamento', 'atencao', ''],
+  // "Em andamento" carimba QUANDO o caso entrou nele: é de lá que o sinalizador
+  // da Mesa conta as 48 horas, até o caso ser concluído.
+  [['Em andamento', 'atencao', RECC_COLUNA_DATA_EM_ANDAMENTO],
    ['Concluído', 'bom', 'Data da finalização', true],
    ['Concluído na mesa', 'destaque', 'Data da finalização', true],
    ['Sem retorno', 'atencao', '', true]].forEach(function (linha, i) {
@@ -1351,7 +1353,18 @@ function atualizarPGO() {
 
   // --- 6b2. os sinalizadores e o carimbo do encaminhamento ------------------
   feito = feito.concat(criarOsSinalizadores_(pulados));
+  feito = feito.concat(criarColunasDoContrato_('SINALIZADORES', pulados));
   feito = feito.concat(criarOCarimboDoEncaminhamento_(pulados));
+
+  // --- 6b3. o prazo da Mesa conta do status Em andamento ----------------------
+  feito = feito.concat(criarUmaColunaDoSistema_('BASE_MESA', RECC_COLUNA_DATA_EM_ANDAMENTO,
+    'o sistema carimba quando o caso entra em Em andamento', pulados));
+  feito = feito.concat(ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce));
+
+  // --- 6b4. o prazo da RET só para no Retido com o Status proposta pronto -----
+  feito = feito.concat(criarUmaColunaDoSistema_('BASE_RET', RECC_COLUNA_DATA_DO_STATUS_PROPOSTA,
+    'o sistema carimba quando o Status proposta encerra o prazo', pulados));
+  feito = feito.concat(ligarAParadaDoRetido_(pulados, paraVoce));
 
   // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
   feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
@@ -1704,10 +1717,10 @@ function limparCamposSemCanal_(pulados) {
  *   RET   "temos até 3 dias para alterar para o status final": 3 dias úteis,
  *         do cadastro até um dos cinco desfechos. Verde nos dois primeiros
  *         dias, amarelo no terceiro (o último), vermelho depois.
- *   MESA  o caso encaminhado para a área tem 48 horas úteis para voltar e
- *         ser concluído. Só vale com a Área responsável preenchida, e conta
- *         do momento em que o sistema carimbou o encaminhamento. O amarelo
- *         acende nas últimas 10 horas úteis — um expediente, o "último dia".
+ *   MESA  o caso tem 48 horas úteis para ser concluído, contadas do momento
+ *         em que ele entrou em "Em andamento" (o carimbo do status). Para
+ *         quando o status vira um dos que fecham o caso. O amarelo acende nas
+ *         últimas 10 horas úteis — um expediente, o "último dia".
  *   VG    o PO ainda não definiu. A linha existe, DESLIGADA e com prazo zero,
  *         para ele só preencher e ligar em Configurações › Sinalizadores.
  *
@@ -1727,7 +1740,7 @@ function sinalizadoresDeFabrica_(idRet, idMesa, idVg) {
   return [
     linha(idRet, 'Prazo de retorno', 3, 'dias', 1, '', '', 1, true),
     linha(idMesa, 'Retorno da área', 48, 'horas', 10,
-      'Área responsável', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, 1, true),
+      '', RECC_COLUNA_DATA_EM_ANDAMENTO, 1, true),
     linha(idVg, 'Prazo de retorno', 0, 'dias', 1, '', '', 1, false)
   ];
 }
@@ -1781,9 +1794,10 @@ function criarOsSinalizadores_(pulados) {
 /**
  * Cria `Data do encaminhamento` na base da Mesa que já está em uso.
  *
- * É a UMA exceção à regra de que a atualização não cria coluna em base de
- * caso — e existe porque o PO decidiu que o sistema carimba o momento do
- * encaminhamento. Sem a coluna, os 48 horas úteis não têm de onde contar.
+ * É uma das exceções à regra de que a atualização não cria coluna em base de
+ * caso (ver `criarUmaColunaDoSistema_`) — e existe porque o PO decidiu que o
+ * sistema carimba o momento do encaminhamento. O prazo da Mesa não conta mais dela (ver
+ * `ligarOPrazoDaMesaAoEmAndamento_`), mas ela segue sendo carimbada: é dado.
  *
  * A coluna é do SISTEMA: entra em CAMPOS desligada, na seção "Preenchido pelo
  * sistema", como o carimbo de status. Ligada, apareceria no formulário
@@ -1793,33 +1807,245 @@ function criarOsSinalizadores_(pulados) {
  * sem prazo, de propósito: inventar a data deles seria contar o prazo errado.
  */
 function criarOCarimboDoEncaminhamento_(pulados) {
+  return criarUmaColunaDoSistema_('BASE_MESA', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO,
+    'o sistema carimba quando a área é escolhida', pulados);
+}
+
+/**
+ * Cria numa base de caso em uso uma coluna que SÓ O SISTEMA preenche: uma data
+ * e hora carimbada (`Data em andamento`, `Data do status proposta`…).
+ *
+ * É a exceção à regra de que a atualização não cria coluna em base de caso, e
+ * existe porque o prazo precisa de um momento que o sistema viu e nenhum outro
+ * campo guarda. A coluna entra em CAMPOS desligada, na seção "Preenchido pelo
+ * sistema": ligada, apareceria no formulário pedindo para alguém digitar uma
+ * data que o sistema já sabe.
+ *
+ * Os casos que já existiam ficam com ela vazia — e sem prazo, de propósito:
+ * inventar a data deles seria contar o prazo errado.
+ */
+function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
   var feito = [];
-  var planilha = planilhaAtiva_();
-  if (!planilha.getSheetByName('BASE_MESA')) {
-    pulados.push('aba BASE_MESA não existe');
+  if (!planilhaAtiva_().getSheetByName(nomeDaAba)) {
+    pulados.push('aba ' + nomeDaAba + ' não existe');
     return feito;
   }
-  esquecerEstruturaLida_('BASE_MESA');
-  if (posicaoDaColuna_(estruturaDaAba_('BASE_MESA', true),
-    RECC_COLUNA_DATA_DO_ENCAMINHAMENTO) >= 0) {
-    pulados.push('BASE_MESA.' + RECC_COLUNA_DATA_DO_ENCAMINHAMENTO + ' já existe');
+  esquecerEstruturaLida_(nomeDaAba);
+  if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba, true), cabecalho) >= 0) {
+    pulados.push(nomeDaAba + '.' + cabecalho + ' já existe');
     return feito;
   }
 
-  adicionarColuna_('BASE_MESA', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO,
-    RECC_TIPO_DE_DADO.DATA_HORA);
+  adicionarColuna_(nomeDaAba, cabecalho, RECC_TIPO_DE_DADO.DATA_HORA);
   esquecerEstruturaLida_();
 
-  var chave = normalizarParaComparar_(RECC_COLUNA_DATA_DO_ENCAMINHAMENTO);
+  var chave = normalizarParaComparar_(cabecalho);
   lerRegistros_('CAMPOS').forEach(function (campo) {
-    if (String(campo.Aba) === 'BASE_MESA' && normalizarParaComparar_(campo.Cabecalho) === chave) {
+    if (String(campo.Aba) === nomeDaAba && normalizarParaComparar_(campo.Cabecalho) === chave) {
       atualizarRegistro_('CAMPOS', campo.__id, {
         Ativo: false, Secao: 'Preenchido pelo sistema'
       });
     }
   });
-  feito.push('BASE_MESA.' + RECC_COLUNA_DATA_DO_ENCAMINHAMENTO + ' criada '
-    + '(o sistema carimba quando a área é escolhida)');
+  feito.push(nomeDaAba + '.' + cabecalho + ' criada (' + oQueFaz + ')');
+  return feito;
+}
+
+/**
+ * O prazo da Mesa passa a contar do status "Em andamento", e não do
+ * encaminhamento para a área. Pedido do PO: "conte a partir do status em
+ * andamento, assim ele irá contar corretamente; quando o status for concluído,
+ * ele para".
+ *
+ * Três passos, e nenhum atropela o que o PO ajustou:
+ *   1. o status "Em andamento" passa a carimbar `Data em andamento` — se ainda
+ *      não carimbava nada;
+ *   2. o sinalizador da Mesa, se ainda é o de fábrica de antes (contar de
+ *      `Data do encaminhamento`, só com Área responsável), passa a contar do
+ *      carimbo novo. Se o PO já o mudou, fica como está e vira DECISÃO SUA;
+ *   3. avisa quantos casos já em andamento NÃO têm a data nova: sem ela eles
+ *      ficam sem selo, e o sistema não inventa a data.
+ */
+function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  if (!planilha.getSheetByName('CANAIS') || !planilha.getSheetByName('BASE_MESA')
+    || !planilha.getSheetByName('SINALIZADORES')) {
+    pulados.push('a Mesa ainda não tem as abas do prazo');
+    return feito;
+  }
+  var mesa = lerRegistros_('CANAIS').filter(function (canal) {
+    return String(canal.Aba) === 'BASE_MESA';
+  })[0];
+  if (!mesa) { pulados.push('o canal BASE_MESA não está cadastrado'); return feito; }
+  var idDaMesa = converterParaIdentificador_(mesa.Id);
+
+  // 1. o status carimba
+  var status = lerRegistros_('CATALOGO').filter(function (item) {
+    return normalizarParaComparar_(item.Tipo) === 'status'
+      && converterParaIdentificador_(item.CanalId) === idDaMesa
+      && normalizarParaComparar_(item.Nome) === 'emandamento';
+  })[0];
+  if (!status) {
+    pulados.push('Mesa: o status "Em andamento" não existe');
+  } else if (!String(status.ColunaDeCarimbo || '').trim()) {
+    atualizarRegistro_('CATALOGO', status.__id, { ColunaDeCarimbo: RECC_COLUNA_DATA_EM_ANDAMENTO });
+    feito.push('Mesa: o status "Em andamento" passou a carimbar "'
+      + RECC_COLUNA_DATA_EM_ANDAMENTO + '"');
+  } else if (String(status.ColunaDeCarimbo).trim() === RECC_COLUNA_DATA_EM_ANDAMENTO) {
+    pulados.push('Mesa: o status "Em andamento" já carimba "' + RECC_COLUNA_DATA_EM_ANDAMENTO + '"');
+  } else {
+    paraVoce.push('Mesa: o status "Em andamento" carimba em "' + status.ColunaDeCarimbo
+      + '", e o prazo da Mesa conta de "' + RECC_COLUNA_DATA_EM_ANDAMENTO + '". Para o prazo '
+      + 'contar certo, escolha essa coluna em Configurações › Ajustes Gerais › Situações.');
+  }
+
+  // 2. o sinalizador
+  var linhas = lerRegistros_('SINALIZADORES').filter(function (linha) {
+    return converterParaIdentificador_(linha.CanalId) === idDaMesa;
+  });
+  var deFabricaDeAntes = linhas.filter(function (linha) {
+    return String(linha.ColunaDaData || '').trim() === RECC_COLUNA_DATA_DO_ENCAMINHAMENTO
+      && String(linha.ColunaQueLiga || '').trim() === 'Área responsável'
+      && !String(linha.ColunaDaHora || '').trim();
+  })[0];
+  if (deFabricaDeAntes) {
+    atualizarRegistro_('SINALIZADORES', deFabricaDeAntes.__id, {
+      ColunaQueLiga: '', ColunaDaData: RECC_COLUNA_DATA_EM_ANDAMENTO
+    });
+    feito.push('Mesa: o sinalizador "' + deFabricaDeAntes.Nome + '" passou a contar de "'
+      + RECC_COLUNA_DATA_EM_ANDAMENTO + '", e não mais do encaminhamento para a área');
+  } else if (linhas.some(function (linha) {
+    return String(linha.ColunaDaData || '').trim() === RECC_COLUNA_DATA_EM_ANDAMENTO;
+  })) {
+    pulados.push('Mesa: o sinalizador já conta de "' + RECC_COLUNA_DATA_EM_ANDAMENTO + '"');
+  } else if (linhas.length) {
+    paraVoce.push('Mesa: o sinalizador "' + linhas[0].Nome + '" foi ajustado por você e '
+      + 'continua contando de "' + (linhas[0].ColunaDaData || 'a data de entrada')
+      + '". Para contar do status Em andamento, escolha em Configurações › '
+      + 'Sinalizadores a data "' + RECC_COLUNA_DATA_EM_ANDAMENTO
+      + '" e deixe "Só vale quando…" em branco.');
+  }
+
+  // 3. quem já estava em andamento e não tem a data
+  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_MESA'; })[0];
+  var situacoes = canal ? situacoesPorChave_(canal) : {};
+  var semData = lerRegistros_('BASE_MESA').filter(function (registro) {
+    var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
+    return situacao && !situacao.final && !String(registro[RECC_COLUNA_DATA_EM_ANDAMENTO] || '').trim();
+  }).length;
+  if (semData) {
+    paraVoce.push('Mesa: ' + semData + ' caso(s) em andamento não têm "'
+      + RECC_COLUNA_DATA_EM_ANDAMENTO + '" e ficam SEM selo de prazo — o sistema não '
+      + 'inventa a data deles. Para contarem, preencha a coluna na planilha (por '
+      + 'exemplo, copiando a Data de entrada). Os casos novos já nascem carimbados.');
+  }
+  return feito;
+}
+
+/**
+ * O prazo da RET para quando o caso chega a um desfecho — e o Retido só
+ * quando o Status proposta chega em Transmitido ou Sem alteração. Pedido do
+ * PO: "para os retidos, quando o status proposta aparecer transmitido ou sem
+ * alteração".
+ *
+ * O Status proposta é um campo que a operação cria (lista, campo e condição
+ * pelas telas de Configurações): não nasce com o sistema, e o nome da coluna
+ * é o que quem criou escreveu. Por isso esta etapa PROCURA a coluna — com
+ * "Status proposta" no nome, sem ligar para acento e caixa — e a lista dela:
+ *   achou as duas, com Transmitido e Sem alteração   liga a condição, sozinha;
+ *   não achou, ou a lista não tem os dois valores    não inventa: diz o que
+ *                                                    fazer, e o Retido segue
+ *                                                    parando como antes;
+ *   o sinalizador já tem condição                    não mexe: foi o PO.
+ *
+ * E avisa o que a regra muda no que já existe: Retido que ainda não tem o
+ * Status proposta passa a contar como em aberto.
+ */
+function ligarAParadaDoRetido_(pulados, paraVoce) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  if (!planilha.getSheetByName('CANAIS') || !planilha.getSheetByName('BASE_RET')
+    || !planilha.getSheetByName('SINALIZADORES')) {
+    pulados.push('a RET ainda não tem as abas do prazo');
+    return feito;
+  }
+  var ret = lerRegistros_('CANAIS').filter(function (canal) {
+    return String(canal.Aba) === 'BASE_RET';
+  })[0];
+  if (!ret) { pulados.push('o canal BASE_RET não está cadastrado'); return feito; }
+
+  var linha = lerRegistros_('SINALIZADORES').filter(function (outra) {
+    return converterParaIdentificador_(outra.CanalId) === converterParaIdentificador_(ret.Id);
+  })[0];
+  if (!linha) { pulados.push('a RET não tem sinalizador'); return feito; }
+  if (String(linha.StatusComCondicao || '').trim()) {
+    pulados.push('RET: o sinalizador já tem condição de parada ("' + linha.StatusComCondicao + '")');
+    return feito;
+  }
+
+  var coluna = estruturaDaAba_('BASE_RET', true).cabecalhos.filter(function (cabecalho) {
+    return normalizarParaComparar_(cabecalho) === 'statusproposta';
+  })[0];
+  var comoLigar = 'Para o Retido só encerrar o prazo com o Status proposta Transmitido ou Sem '
+    + 'alteração: crie a lista "Status proposta" em Configurações › Ajustes Gerais; crie o campo '
+    + '"Status proposta" em Configurações › Cadastrar Caso, com essa lista e "Só quando Status for '
+    + 'Retido"; e rode atualizarPGO() de novo — ou preencha a condição em Configurações › '
+    + 'Sinalizadores. Até lá o Retido encerra o prazo sozinho, como antes.';
+  if (!coluna) {
+    paraVoce.push('RET: a base não tem a coluna "Status proposta". ' + comoLigar);
+    return feito;
+  }
+
+  var campo = lerRegistros_('CAMPOS').filter(function (outro) {
+    return String(outro.Aba) === 'BASE_RET'
+      && normalizarParaComparar_(outro.Cabecalho) === 'statusproposta';
+  })[0];
+  var opcoes = campo ? opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), ret.Id) : [];
+  var valores = ['transmitido', 'semalteracao'].map(function (procurado) {
+    return opcoes.filter(function (opcao) {
+      return normalizarParaComparar_(opcao.valor) === procurado;
+    })[0];
+  }).filter(Boolean).map(function (opcao) { return opcao.valor; });
+  if (!valores.length) {
+    paraVoce.push('RET: a coluna "' + coluna + '" existe, mas a lista dela não tem "Transmitido" '
+      + 'nem "Sem alteração". Escolha a lista certa no campo e rode atualizarPGO() de novo, ou '
+      + 'preencha a condição em Configurações › Sinalizadores.');
+    return feito;
+  }
+
+  var canal = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+  var retido = canal ? situacoesDoCanal_(canal).filter(function (uma) {
+    return normalizarParaComparar_(uma.gravadoComo) === 'retido';
+  })[0] : null;
+  if (!retido) {
+    paraVoce.push('RET: não achei o status "Retido" para ligar a condição. Preencha-a em '
+      + 'Configurações › Sinalizadores.');
+    return feito;
+  }
+
+  atualizarRegistro_('SINALIZADORES', linha.__id, {
+    StatusComCondicao: retido.gravadoComo, ColunaDaCondicao: coluna,
+    ValoresDaCondicao: valores.join('; '),
+    ColunaDaDataDaCondicao: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA
+  });
+  feito.push('RET: o "' + retido.gravadoComo + '" só encerra o prazo quando "' + coluna
+    + '" for ' + valores.join(' ou '));
+
+  var retidos = lerRegistros_('BASE_RET').filter(function (registro) {
+    return normalizarParaComparar_(registro[canal.colunaDoStatus]) === 'retido';
+  });
+  var abertos = retidos.filter(function (registro) {
+    return !condicaoBate_({ valores: valores }, registro[coluna]);
+  }).length;
+  if (retidos.length) {
+    paraVoce.push('RET: dos ' + retidos.length + ' caso(s) Retido que já existem, ' + abertos
+      + ' ainda não têm o Status proposta Transmitido ou Sem alteração: passam a contar como em '
+      + 'ABERTO (e vermelhos, se já passaram de ' + linha.Prazo + ' ' + linha.Unidade
+      + ' úteis). Os outros ' + (retidos.length - abertos) + ' ficam sem selo, porque o sistema '
+      + 'não sabe QUANDO o Status proposta foi preenchido. O que for preenchido de agora em '
+      + 'diante já é carimbado.');
+  }
   return feito;
 }
 
@@ -3629,7 +3855,8 @@ function blocoDosSinalizadores_() {
 
     var estrutura = estruturaDaAba_(String(canal.Aba || ''));
     var perdidas = [sinalizador.colunaQueLiga, sinalizador.colunaDaData,
-      sinalizador.colunaDaHora].filter(function (coluna) {
+      sinalizador.colunaDaHora, sinalizador.colunaDaCondicao,
+      sinalizador.colunaDaDataDaCondicao].filter(function (coluna) {
       return coluna && posicaoDaColuna_(estrutura, coluna) < 0;
     });
     if (perdidas.length) {
@@ -3640,6 +3867,52 @@ function blocoDosSinalizadores_() {
         + 'Sinalizadores — ou, se é a "' + RECC_COLUNA_DATA_DO_ENCAMINHAMENTO
         + '", rode atualizarPGO().'));
       return;
+    }
+
+    // A condição de parada: os quatro juntos, e cada um apontando para algo
+    // que existe. Pela metade ela não para nada — e o Retido encerraria como
+    // se a condição não existisse, ou nunca encerraria.
+    var preenchidos = [sinalizador.statusComCondicao, sinalizador.colunaDaCondicao,
+      sinalizador.valoresDaCondicao.length, sinalizador.colunaDaDataDaCondicao]
+      .filter(Boolean).length;
+    if (preenchidos && preenchidos < 4) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+        rotulo + ' tem a condição de parada pela metade',
+        'Ela pede o status, a coluna, os valores e a coluna da data — os quatro.',
+        'Complete ou limpe a condição em Configurações › Sinalizadores.'));
+      return;
+    }
+    if (temCondicaoDeParada_(sinalizador)) {
+      var statusDoCanal = situacoesDoCanal_({ id: canal.Id });
+      if (!statusDoCanal.some(function (situacao) {
+        return condicaoBate_({ valores: [situacao.gravadoComo] }, sinalizador.statusComCondicao);
+      })) {
+        itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+          rotulo + ' cita o status "' + sinalizador.statusComCondicao + '", que o canal não tem',
+          'A condição nunca valeria, e o status encerraria como qualquer outro.',
+          'Escolha um status do canal em Configurações › Sinalizadores.'));
+        return;
+      }
+      var campoDaCondicao = lerRegistros_('CAMPOS').filter(function (campo) {
+        return String(campo.Aba) === String(canal.Aba)
+          && normalizarParaComparar_(campo.Cabecalho)
+            === normalizarParaComparar_(sinalizador.colunaDaCondicao);
+      })[0];
+      var opcoesDaCondicao = campoDaCondicao
+        ? opcoesDoCampo_(lerConfiguracaoDoCampo_(campoDaCondicao), canal.Id) : [];
+      var foraDaLista = opcoesDaCondicao.length ? sinalizador.valoresDaCondicao.filter(function (valor) {
+        return !opcoesDaCondicao.some(function (opcao) {
+          return condicaoBate_({ valores: [opcao.valor] }, valor);
+        });
+      }) : [];
+      if (foraDaLista.length) {
+        itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+          rotulo + ' espera valor que a lista de "' + sinalizador.colunaDaCondicao + '" não tem',
+          algunsExemplos_(foraDaLista),
+          'Renomeou um item da lista? Acerte os valores em Configurações › Sinalizadores: '
+          + 'sem isso o prazo do ' + sinalizador.statusComCondicao + ' nunca para.'));
+        return;
+      }
     }
 
     var deOndeContar = sinalizador.colunaDaData || String(canal.ColunaDaData || '').trim();

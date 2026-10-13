@@ -299,12 +299,30 @@ const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
 /**
  * QUANDO o caso foi encaminhado para a área — carimbado pelo SISTEMA no
- * instante em que a `Área responsável` é escolhida. É daqui que o sinalizador
- * da Mesa conta as 48 horas úteis que a área tem para dar o retorno. Decisão
- * do PO, perguntada: o sistema não guardava esse momento, e deduzi-lo de
- * outra data contaria o prazo errado.
+ * instante em que a `Área responsável` é escolhida. É um dado da operação (e
+ * do Power BI); o prazo da Mesa NÃO conta mais dele: desde que o PO pediu
+ * "conte a partir do status em andamento", conta de `Data em andamento`.
+ * Quem quiser um prazo do encaminhamento cria outro sinalizador apontando para
+ * esta coluna.
  */
 const RECC_COLUNA_DATA_DO_ENCAMINHAMENTO = 'Data do encaminhamento';
+
+/**
+ * QUANDO o caso da Mesa entrou em "Em andamento" — carimbado pelo SISTEMA, como
+ * o carimbo de qualquer status (`CATALOGO.ColunaDeCarimbo`). É daqui que o
+ * sinalizador da Mesa conta as 48 horas úteis, até o caso ser concluído.
+ * Pedido do PO: "conte a partir do status em andamento".
+ */
+const RECC_COLUNA_DATA_EM_ANDAMENTO = 'Data em andamento';
+
+/**
+ * QUANDO o Status proposta chegou num valor que encerra o prazo da RET
+ * (Transmitido, Sem alteração) — carimbado pelo sistema na gravação. O
+ * sinalizador da RET para "nos retidos, quando o status proposta aparecer
+ * transmitido ou sem alteração", e precisa saber QUANDO isso aconteceu: o
+ * Status proposta é um campo, e campo não guarda a data em que mudou.
+ */
+const RECC_COLUNA_DATA_DO_STATUS_PROPOSTA = 'Data do status proposta';
 
 /**
  * O expediente que um sinalizador usa quando não declarou o dele: de segunda
@@ -419,7 +437,9 @@ const RECC_ESQUEMA = {
       // De qual lote o caso veio, quando ele entrou. Vazio quer dizer que o
       // caso foi cadastrado um a um, na tela.
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // QUANDO o Status proposta encerrou o prazo do Retido. O sistema carimba.
+      { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -462,7 +482,9 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       // QUANDO a área foi escolhida. O sistema carimba; ninguém digita.
-      { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // QUANDO o caso entrou em "Em andamento": é daqui que o prazo conta.
+      { cabecalho: RECC_COLUNA_DATA_EM_ANDAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -937,7 +959,8 @@ const RECC_ESQUEMA = {
    *
    * Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
    * RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um
-   * desfecho; na Mesa, o caso encaminhado para a área tem 48 horas úteis.
+   * desfecho; na Mesa, o caso tem 48 horas úteis, do status Em andamento até
+   * ser concluído.
    *
    * É uma aba, e não colunas em CANAIS, porque um canal pode ter mais de um
    * (a Mesa tem o SLA de 6h, que mora em CANAIS, e este) e porque o PO ajusta
@@ -977,7 +1000,16 @@ const RECC_ESQUEMA = {
       { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
-      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
+      { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
+      // QUANDO UM STATUS SÓ ENCERRA O PRAZO COM CONDIÇÃO. Na RET, "Retido" só
+      // para o relógio quando o Status proposta chega em Transmitido ou Sem
+      // alteração: status, coluna da condição e valores, separados por ";".
+      // A data é a coluna que o sistema carimba quando a condição passa a valer.
+      // Os quatro vazios: o status final encerra sozinho, como em todo canal.
+      { cabecalho: 'StatusComCondicao', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaCondicao', tipo: 'texto', protegido: false },
+      { cabecalho: 'ValoresDaCondicao', tipo: 'texto', protegido: false },
+      { cabecalho: 'ColunaDaDataDaCondicao', tipo: 'texto', protegido: false }
     ]
   },
 

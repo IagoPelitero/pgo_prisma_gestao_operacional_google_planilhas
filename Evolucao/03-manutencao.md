@@ -89,6 +89,22 @@ Execute **`verificarEstruturaRECC`**. Só lê: mostra o que sumiu e o que
 apareceu, sem consertar nada. O conserto é decisão de gente: ou renomeia de
 volta na planilha, ou ajusta o contrato no `Back-End/Base.gs`.
 
+### Quero um campo que só aparece com certos valores de outro
+
+Pela tela: Configurações › Cadastrar Caso › o campo › **Quando este campo
+aparece**. Guarda `{ "mostrarSe": { "campo": "status", "valores": ["Retido"] } }`
+na coluna `Configuracao` da aba `CAMPOS` — e a forma antiga, de um valor só
+(`"valor"`), continua sendo lida. A regra vale no servidor também (ver
+`condicaoDoCampo_` e `condicaoBate_`, no `Casos.gs`).
+
+### O prazo de um status só deve parar com uma condição
+
+É o caso do Retido na RET. Em Configurações › Sinalizadores, a **condição de
+parada**: o status, a coluna, os valores e a coluna da data. Essa coluna é do
+sistema — ele a carimba quando a condição passa a valer
+(`carimbarAParadaDoPrazo_`, no `Casos.gs`) — e precisa existir na base como data e
+hora (`Data do status proposta`, na RET; `atualizarPGO()` a cria).
+
 ### Tirei um registro de cadastro e quero de volta
 
 Nos cadastros (usuários, corretoras, SUSEPs, itens de configuração), tirar

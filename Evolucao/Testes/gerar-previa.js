@@ -433,25 +433,28 @@ function gerar(pastaDeSaida) {
       Assunto: 'Encaminhado para Sinistro' }
   ]);
 
-  // Três casos ENCAMINHADOS para a área, para o selo das 48 horas úteis mostrar
-  // as três cores: o carimbo é data E hora, como o sistema grava de verdade.
+  // Três casos EM ANDAMENTO, para o selo das 48 horas úteis mostrar as três
+  // cores: o carimbo é data E hora, como o sistema grava de verdade.
   const horasAtras = (horas) => new Date(hoje.getTime() - horas * 3600000);
   chamar('inserirVariosRegistros_')('BASE_MESA', [
     { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'E-mail',
       'Data de entrada': diasAtras(1), 'Horário': '10:05',
       'Nome do segurado': 'Camila Teixeira', Corretora: 'Corretora ABC', SUSEP: 'RET00J',
       Ramo: 'Vida', Assunto: 'Encaminhado hoje para a Cobrança',
-      'Área responsável': 'Cobrança', 'Data do encaminhamento': horasAtras(3) },
+      'Área responsável': 'Cobrança', 'Data do encaminhamento': horasAtras(3),
+      'Data em andamento': horasAtras(5) },
     { Analista: 'Diego Castilho', Status: 'Em andamento', Canal: 'Telefone',
       'Data de entrada': diasAtras(5), 'Horário': '09:40',
       'Nome do segurado': 'Rodrigo Alves', Corretora: 'Corretora XYZ', Ramo: 'Auto',
       Assunto: 'Aguardando o retorno do Comercial',
-      'Área responsável': 'Comercial', 'Data do encaminhamento': horasAtras(76) },
+      'Área responsável': 'Comercial', 'Data do encaminhamento': horasAtras(76),
+      'Data em andamento': horasAtras(80) },
     { Analista: 'Ana Martins', Status: 'Em andamento', Canal: 'Chat',
       'Data de entrada': diasAtras(12), 'Horário': '15:20',
       'Nome do segurado': 'Fernanda Lopes', Corretora: 'Corretora ABC', SUSEP: 'RET00J',
       Ramo: 'Residencial', Assunto: 'A área não respondeu',
-      'Área responsável': 'Sinistro', 'Data do encaminhamento': horasAtras(24 * 12) }
+      'Área responsável': 'Sinistro', 'Data do encaminhamento': horasAtras(24 * 12),
+      'Data em andamento': horasAtras(24 * 13) }
   ]);
 
   // ------------------------------------------------------------------- RET
@@ -547,6 +550,54 @@ function gerar(pastaDeSaida) {
     { analista: 'Patrícia Nunes', status: 'Pendente',
       'data de recepção do protocolo': diasAtras(36),
       'nome do cliente': 'Outra do mês passado', protocolo: 'RET-2026-0892' }
+  ]);
+
+  // O Status proposta, montado como o PO monta pelas telas de Configurações: a
+  // lista, o campo, "só quando o Status for Retido" e a parada do prazo do
+  // Retido. A senha de administrador é só da prévia: o instalador de verdade
+  // não define senha nenhuma — quem define é o primeiro administrador.
+  chamar('definirSenhaDeAdministrador')('previa-do-recc', '');
+  chamar('liberarComSenha')('previa-do-recc');
+  const retDaPrevia = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+  const listaDaProposta = chamar('criarLista')('Status proposta');
+  ['Transmitido', 'Aguardando transmissão', 'Sem alteração'].forEach((nome, i) => {
+    chamar('salvarItemDoCatalogo')({ tipo: listaDaProposta, canalId: '', nome: nome,
+      ordem: i + 1, ativo: true, cor: ['bom', 'atencao', 'destaque'][i] });
+  });
+  chamar('criarCampo')(retDaPrevia.id, { rotulo: 'Status proposta', tipo: 'seletor',
+    secao: 'Seguro', descricao: 'Aparece só quando o status é Retido.' });
+  const campoDaProposta = chamar('listarCamposDoCanal')(retDaPrevia.id)
+    .find((c) => c.cabecalho === 'Status proposta');
+  chamar('salvarCampo')({ id: campoDaProposta.id, rotulo: 'Status proposta', secao: 'Seguro',
+    descricao: 'Aparece só quando o status é Retido.', tipo: 'seletor',
+    catalogo: listaDaProposta, obrigatorio: false, ativo: true,
+    mostrarSe: { campo: 'status', valores: ['Retido'] } });
+  const sinalizadorDaRet = chamar('listarSinalizadores')()
+    .find((k) => String(k.canalId) === String(retDaPrevia.id));
+  chamar('salvarSinalizador')({ id: sinalizadorDaRet.id, nome: sinalizadorDaRet.nome,
+    canalId: sinalizadorDaRet.canalId, prazo: sinalizadorDaRet.prazo,
+    unidade: sinalizadorDaRet.unidade, aviso: sinalizadorDaRet.aviso, colunaQueLiga: '',
+    colunaDaData: '', colunaDaHora: '',
+    inicioDoExpediente: sinalizadorDaRet.inicioDoExpediente,
+    fimDoExpediente: sinalizadorDaRet.fimDoExpediente, ordem: sinalizadorDaRet.ordem,
+    ativo: true, statusComCondicao: 'Retido', colunaDaCondicao: 'Status proposta',
+    valoresDaCondicao: ['Transmitido', 'Sem alteração'],
+    colunaDaDataDaCondicao: 'Data do status proposta' });
+
+  // Três Retidos, um em cada situação do prazo: esperando a transmissão (no
+  // prazo e fora dele) e já transmitido.
+  const horasAtrasDaRet = (horas) => new Date(hoje.getTime() - horas * 3600000);
+  chamar('inserirVariosRegistros_')('BASE_RET', [
+    { analista: 'Ana Martins', status: 'Retido', 'Status proposta': 'Aguardando transmissão',
+      'data de recepção do protocolo': diasAtras(1),
+      'nome do cliente': 'Retido aguardando 1', protocolo: 'RET-2026-1201', canal: 'Telefone' },
+    { analista: 'Marcos Vieira', status: 'Retido', 'Status proposta': 'Transmitido',
+      'Data do status proposta': horasAtrasDaRet(30),
+      'data de recepção do protocolo': diasAtras(3),
+      'nome do cliente': 'Retido transmitido', protocolo: 'RET-2026-1202', canal: 'E-mail' },
+    { analista: 'Patrícia Nunes', status: 'Retido', 'Status proposta': 'Aguardando transmissão',
+      'data de recepção do protocolo': diasAtras(9),
+      'nome do cliente': 'Retido aguardando 9', protocolo: 'RET-2026-1203', canal: 'Site' }
   ]);
 
   // Casos recém-cadastrados, para o selo da RET mostrar verde e amarelo (os de
@@ -833,7 +884,7 @@ function gerar(pastaDeSaida) {
   // Uma senha de administrador, só na prévia, para o diálogo das ações sem
   // desfazer aparecer. O instalador de verdade não define senha nenhuma —
   // quem define é o primeiro administrador, na própria tela.
-  chamar('definirSenhaDeAdministrador_')('previa-do-recc', '');
+  // (definida acima, junto do Status proposta.)
 
   // A tela de Configurações, respondida pelo servidor de verdade.
   const opcoesDeCampo = chamar('opcoesDeConfiguracaoDeCampo()');

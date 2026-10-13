@@ -1790,9 +1790,67 @@ Nome…"). As mesmas 90 conferências, em 31 linhas.
 
 ---
 
+### 84 · O campo condicional que abria escondido
+
+**Sintoma.** Abrir um caso em "Trabalhar no caso" com o status que mostra o campo
+(Canal de origem = Central, e o "Nome de quem transferiu" gravado) e não ver o
+campo. Ele só aparecia depois de a pessoa mexer no campo que manda.
+
+**Causa.** O formulário é ligado ANTES de receber o caso, com todos os campos em
+branco — e as condições escondem tudo. Ao preencher, ninguém reaplicava a
+regra. Desde o primeiro dia da regra.
+
+**Defesa.** `preencher` reaplica as condições ao terminar. E ao abrir um caso a
+regra só mostra e esconde, sem esvaziar: o campo escondido pode ter um valor que
+veio da importação, e mostrar o caso não é pedir para apagá-lo. Só a pessoa
+trocando o campo que manda esvazia o que deixou de valer.
+
+---
+
+### 85 · O campo escondido que o servidor continuava cobrando
+
+**Causa.** A condição de "aparece só quando…" era só da tela. O servidor não a
+conhecia: um campo obrigatório que estava escondido recusava o salvamento com
+"é obrigatório", e um valor mandado para um campo escondido era gravado mesmo
+assim.
+
+**Defesa.** O servidor avalia a mesma condição, com a mesma conta da tela (sem
+acento e sem caixa): campo que não é a vez dele não é cobrado nem gravado. Vale
+com o valor que o campo que manda VAI TER — o que a tela mandou, senão o que o
+caso já tem, senão, no cadastro, o padrão (o "Não trabalhado" da RET).
+
+---
+
+### 86 · O valor que ficava para trás ao sair do Retido
+
+**Causa.** Passar um caso de Retido para Não retido pelo diálogo de status não
+esvaziava o Status proposta: o valor ficava na planilha, invisível, e voltava
+sozinho no dia em que o caso voltasse a Retido — já com o carimbo da vez
+anterior.
+
+**Defesa.** Quando o campo que manda deixa o valor que mostrava o dependente, o
+dependente é esvaziado — nos três caminhos (formulário, diálogo e cadastro), e o
+carimbo da condição sai junto. Só a TRANSIÇÃO limpa; o campo que já estava
+escondido, com valor de importação, não é tocado.
+
+---
+
+### 87 · A tela antiga que apagaria a condição de parada
+
+**Sintoma.** Nenhum — achado pelo teste da própria rodada.
+
+**Causa.** A tela de Sinalizadores sempre manda os quatro campos da condição de
+parada. Uma tela em cache, de antes de eles existirem, não manda nenhum — e o
+servidor lia "nada" como "tirar a condição".
+
+**Defesa.** Pedido sem nenhum dos quatro campos mantém a condição que o
+sinalizador já tem. Pedido com algum (mesmo vazio) é a tela nova falando, e vale.
+
+---
+
 ## O que esta lista ensina
 
-**São oitenta e três achados, e a maioria era silenciosa.** Não davam erro, não
+**São oitenta e sete achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1971,3 +2029,11 @@ Daí as duas práticas que o projeto não abre mão:
     ferramenta que não existia, e o item 80 um arquivo com o nome errado. Quem
     lê uma instrução do sistema segue ao pé da letra — e é no dia de emergência
     que ela é lida.
+45. **Regra que só a tela conhece é regra que o servidor desconhece.** O item 85
+    era a condição do campo escondido: certa para quem usa o formulário, errada
+    para a importação e para qualquer chamada direta. Toda regra de tela precisa
+    de uma cópia no servidor — e de um teste que garanta que as duas concordam.
+46. **Limpar por estado apaga dado; limpar por ação, não.** No item 84 a primeira
+    ideia era esvaziar todo campo escondido. Dado importado mora justamente em
+    campo que a tela esconde. O que se esvazia é o que a PESSOA acabou de
+    tornar sem sentido, e só nesse momento.

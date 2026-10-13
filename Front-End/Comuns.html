@@ -919,7 +919,7 @@ var Formulario = (function () {
     // para o outro.
     var condicao = campo.mostrarSe
       ? ' data-mostrar-se-campo="' + escapar(campo.mostrarSe.campo) + '"'
-        + ' data-mostrar-se-valor="' + escapar(campo.mostrarSe.valor) + '"'
+        + ' data-mostrar-se-valores="' + escapar(JSON.stringify(campo.mostrarSe.valores)) + '"'
       : '';
 
     // Travado pelo cargo não é o mesmo que somente leitura do nível, e a
@@ -1057,18 +1057,28 @@ var Formulario = (function () {
     return limpar(um) === limpar(outro);
   }
 
-  function aplicarCondicoes(raiz) {
+  /**
+   * Mostra ou esconde cada campo condicional, conforme o campo que manda.
+   *
+   * `limpar` é só para quando a PESSOA mexeu no campo que manda: trocar
+   * Retido por Pago e deixar o valor da proposta invisível dentro do campo
+   * faria esse valor ser gravado. Ao ABRIR um caso não se limpa nada — o campo
+   * escondido pode ter um valor que veio da importação, e mostrar o caso não é
+   * pedir para apagá-lo.
+   */
+  function aplicarCondicoes(raiz, limpar) {
     var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
     for (var i = 0; i < condicionais.length; i++) {
       var bloco = condicionais[i];
       var deQuem = bloco.getAttribute('data-mostrar-se-campo');
-      var esperado = bloco.getAttribute('data-mostrar-se-valor');
+      var esperados = [];
+      try { esperados = JSON.parse(bloco.getAttribute('data-mostrar-se-valores') || '[]'); }
+      catch (erro) { esperados = []; }
       var caixa = raiz.querySelector('[data-chave="' + deQuem + '"]');
       var valor = caixa ? String(caixa.value || '') : '';
-      var mostrar = mesmoTexto(valor, esperado);
+      var mostrar = esperados.some(function (esperado) { return mesmoTexto(valor, esperado); });
       bloco.hidden = !mostrar;
-      if (!mostrar) {
-        // Esconder sem limpar deixaria um valor invisível ser gravado.
+      if (!mostrar && limpar) {
         var dentro = bloco.querySelector('[data-chave]');
         if (dentro) dentro.value = '';
       }
@@ -1194,10 +1204,10 @@ var Formulario = (function () {
       jaOuvidos[deQuem] = true;
       var manda = raiz.querySelector('[data-chave="' + deQuem + '"]');
       if (!manda) continue;
-      manda.addEventListener('change', function () { aplicarCondicoes(raiz); });
-      manda.addEventListener('input', function () { aplicarCondicoes(raiz); });
+      manda.addEventListener('change', function () { aplicarCondicoes(raiz, true); });
+      manda.addEventListener('input', function () { aplicarCondicoes(raiz, true); });
     }
-    aplicarCondicoes(raiz);
+    aplicarCondicoes(raiz, false);
   }
 
   /**
@@ -1394,6 +1404,11 @@ var Formulario = (function () {
         controles[i].value = valor;
       }
     }
+
+    // O formulário foi ligado ANTES de receber o caso, com todos os campos em
+    // branco — e os condicionais ficaram escondidos. Agora que o caso chegou,
+    // os que valem para ele aparecem, sem esperar a pessoa mexer em nada.
+    aplicarCondicoes(raiz, false);
   }
 
   /**
