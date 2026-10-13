@@ -42,9 +42,24 @@ o contrário.** Cada teste ali nasceu de um problema real.
 
 ## 3. As tarefas que aparecem toda semana
 
+> **Como rodar uma função no editor.** As funções sem `_` no fim —
+> `atualizarPGO`, `diagnosticoRECC`, `verificarEstruturaRECC`,
+> `normalizarBase` — aparecem na lista do editor: escolha e clique em
+> *Executar*; o resultado sai no registro de execução. As que terminam com `_`
+> são internas, não aparecem na lista e algumas pedem parâmetro. Para rodar uma
+> delas, crie uma função de uma linha, execute e apague em seguida:
+>
+> ```javascript
+> function rodarUmaVez() { adicionarColuna_('BASE_MESA', 'Nome da coluna', 'texto'); }
+> ```
+
 ### Preciso de uma coluna nova numa base
 
-Não edite o cabeçalho na planilha à mão. Use:
+**Pela tela, sempre que der:** Configurações › Cadastrar Caso › novo campo. Pede
+a senha de administrador, cria a coluna no fim da aba e o campo no formulário.
+
+Não edite o cabeçalho na planilha à mão. Se a coluna não for um campo do
+formulário, pelo editor:
 
 ```javascript
 adicionarColuna_('BASE_MESA', 'Nome da coluna', 'texto');
@@ -58,39 +73,31 @@ voltaria a ser lida como texto — e uma coluna de moeda guardaria
 
 ### Alguém digitou linhas direto na planilha
 
-Linha digitada à mão nasce sem Id. Sem Id não há relacionamento, e a
-atualização por Id não acha o registro.
+Linha digitada à mão nasce sem Id. Sem Id o sistema não consegue editá-la.
+No editor, execute **`normalizarBase`**: ela dá Id a quem está sem, em todas as
+abas, realinha as sequências e não toca em mais nada da linha.
 
-```javascript
-normalizarIdentificadoresDaAba_('BASE_MESA');
-```
+### Duas linhas com o mesmo Id
 
-Ela carimba os Ids que faltam, realinha a sequência e devolve um laudo com
-quantas linhas foram carimbadas e se há Id repetido.
+O diagnóstico e a edição do caso avisam. Qual das duas é a cópia é decisão de
+gente: apague o Id da linha que é a cópia, na planilha, e execute
+`normalizarBase` — ela dá um Id novo a quem ficou sem.
 
 ### Um cabeçalho mudou de nome na planilha
 
-```javascript
-verificarEstruturaRECC();
-```
+Execute **`verificarEstruturaRECC`**. Só lê: mostra o que sumiu e o que
+apareceu, sem consertar nada. O conserto é decisão de gente: ou renomeia de
+volta na planilha, ou ajusta o contrato no `Back-End/Base.gs`.
 
-Só lê. Mostra o que sumiu e o que apareceu, sem consertar nada. O conserto é
-decisão de gente: ou renomeia de volta na planilha, ou ajusta o contrato no
-`Back-End/Base.gs`.
+### Tirei um registro de cadastro e quero de volta
 
-### Preciso esconder um registro sem perdê-lo
+Nos cadastros (usuários, corretoras, SUSEPs, itens de configuração), tirar
+pela tela **oculta**: some do sistema e continua na planilha, com `_Visivel`
+= `NAO`, e `_ExcluidoEm` e `_ExcluidoPor` dizem quando e quem. Para trazer de
+volta, troque `_Visivel` para `SIM` na célula.
 
-Nunca apague a linha. A exclusão do RECC é lógica:
-
-```javascript
-ocultarRegistro_('BASE_MESA', '0000000042', idDoUsuario);
-reexibirRegistro_('BASE_MESA', '0000000042');
-```
-
-Some do sistema, permanece na planilha. Dá para reverter editando `_Visivel`
-na mão, direto na célula. Nos cadastros, `_ExcluidoEm` e `_ExcluidoPor` guardam
-quando e quem ocultou; nas bases de caso esse carimbo não existe (caso é
-apagado de vez), e ocultar mexe só no `_Visivel`.
+O **caso** é diferente: a pedido da operação, excluir apaga a linha de vez, e o
+que estava gravado fica na aba `AUDITORIA`.
 
 ### Quero ver as telas sem publicar no Apps Script
 
@@ -119,7 +126,7 @@ você. Abra uma questão.
 | Quem pode entrar | `Back-End/Entrada.gs` |
 | O que a tela recebe ao abrir (o `doGet`) | `Back-End/Entrada.gs` |
 | As perguntas do formulário, a validação | `Back-End/Casos.gs` |
-| Gravar, editar ou ocultar um caso | `Back-End/Casos.gs` |
+| Gravar, editar ou excluir um caso | `Back-End/Casos.gs` |
 | Como a busca procura | `Back-End/Casos.gs` |
 | Os cartões do Trabalho e a fila | `Back-End/Indicadores.gs` |
 | As contas dos gráficos | `Back-End/Indicadores.gs` |
@@ -134,11 +141,12 @@ você. Abra uma questão.
 | O menu, a barra superior, o formulário, os gráficos | `Front-End/Comuns.html` |
 | A ponte com o servidor e a navegação | `Front-End/Aplicacao.html` |
 | Uma tela do menu | `Front-End/<NomeDaTela>.html` |
-| Nome, logo, cor, nomes das telas | **a aba `CONFIG` da planilha** — não o código |
+| Nome, logo, cor, nomes das telas | **Configurações › Identidade** (guardado na aba `CONFIG`) — não o código |
 
 A última linha é a mais importante. Boa parte do que parece código é
 configuração: nome do sistema, logo, cor, títulos do menu, status, motivos,
-cargos, níveis, canais e campos do formulário vivem na planilha.
+cargos, níveis, canais, campos do formulário e sinalizadores de prazo vivem na
+planilha, e se ajustam pela tela de Configurações.
 
 ---
 

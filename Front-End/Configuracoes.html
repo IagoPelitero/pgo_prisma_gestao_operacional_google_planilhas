@@ -268,7 +268,7 @@ var TelaConfiguracoes = (function () {
   var resumo = null;
   var pacoteDoSistema = null;   // o pacote de partida, para os canais
   var secaoAtual = 'campos';
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
@@ -301,7 +301,7 @@ var TelaConfiguracoes = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return '<div class="config" id="config">'
       + '<p class="carregando-campos">Abrindo as configurações…</p>'
       + '</div>';
@@ -414,7 +414,7 @@ var TelaConfiguracoes = (function () {
     Servidor.chamar('opcoesDeConfiguracaoDeCampo')
       .entao(function (opcoes) {
         dados.opcoes = opcoes;
-        Servidor.chamar('listarCamposDoCanal', canalEscolhida)
+        Servidor.chamar('listarCamposDoCanal', canalEscolhido)
           .entao(function (campos) {
             dados.campos = campos;
             desenharCampos();
@@ -474,7 +474,7 @@ var TelaConfiguracoes = (function () {
     return '<select id="canal-da-config" aria-label="Canal">'
       + pacoteDoSistema.canais.map(function (canal) {
         return '<option value="' + escapar(canal.id) + '"'
-          + (canal.id === canalEscolhida ? ' selected' : '') + '>'
+          + (canal.id === canalEscolhido ? ' selected' : '') + '>'
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>';
   }
@@ -483,7 +483,7 @@ var TelaConfiguracoes = (function () {
     var seletor = elemento('canal-da-config');
     if (seletor) {
       seletor.addEventListener('change', function () {
-        canalEscolhida = this.value;
+        canalEscolhido = this.value;
         escolhido = null;
         carregarCampos();
       });
@@ -519,7 +519,7 @@ var TelaConfiguracoes = (function () {
     // A ordem já mudou na tela — se o servidor recusar, a lista volta ao que
     // era e o motivo aparece no painel. Nunca deixamos a tela mostrando uma
     // ordem que a planilha não tem.
-    Servidor.chamar('reordenarCampos', canalEscolhida, lista.map(function (campo) {
+    Servidor.chamar('reordenarCampos', canalEscolhido, lista.map(function (campo) {
       return campo.id;
     })).senao(function (erro) {
       // O recado flutua, e não mora no painel: recarregar a lista redesenha o
@@ -653,7 +653,7 @@ var TelaConfiguracoes = (function () {
       evento.preventDefault();
       var apagarAColuna = marcado('apagar-coluna');
       comSenhaDeAdministrador(function () {
-        Servidor.chamar('excluirCampo', canalEscolhida, campo.id, apagarAColuna)
+        Servidor.chamar('excluirCampo', canalEscolhido, campo.id, apagarAColuna)
           .entao(function (saiu) {
             escolhido = null;
             avisarSalvo('Campo "' + saiu.rotulo + '" excluído.'
@@ -733,7 +733,7 @@ var TelaConfiguracoes = (function () {
         obrigatorio: marcado('obrigatorio')
       };
       comSenhaDeAdministrador(function () {
-        Servidor.chamar('criarCampo', canalEscolhida, envio)
+        Servidor.chamar('criarCampo', canalEscolhido, envio)
           .entao(function (criada) {
             avisarSalvo('Coluna "' + criada.cabecalho + '" criada em '
               + criada.canal + '.');
@@ -1711,7 +1711,7 @@ var TelaConfiguracoes = (function () {
   };
 
   function carregarPaineis() {
-    if (!canalDosCards) canalDosCards = canalEscolhida;
+    if (!canalDosCards) canalDosCards = canalEscolhido;
     if (abaDosPaineis === 'graficosDaProdutividade') return carregarGraficos();
 
     aguarde('Lendo os cards…');
@@ -2439,7 +2439,7 @@ var TelaConfiguracoes = (function () {
 
   function gerarAgora(id) {
     avisar('Gerando a aba…', 'neutro');
-    Servidor.chamar('gerarAnalise', id)
+    Servidor.chamarSemPressa('gerarAnalise', id)
       .entao(function (feito) {
         avisarSalvo(feito.aba + ': ' + feito.linhas + ' linha(s) e '
           + feito.colunas + ' coluna(s).'
@@ -2799,7 +2799,7 @@ var TelaConfiguracoes = (function () {
     elemento('rodar-diagnostico').addEventListener('click', function () {
       var onde = elemento('resultado-do-diagnostico');
       onde.innerHTML = '<p class="carregando-campos">Conferindo o sistema…</p>';
-      Servidor.chamar('diagnosticoDoSistema')
+      Servidor.chamarSemPressa('diagnosticoDoSistema')
         .entao(function (laudo) { onde.innerHTML = laudoDesenhado(laudo); })
         .senao(function (erro) {
           onde.innerHTML = '<p class="carregando-campos erro-carga">'
@@ -3045,7 +3045,7 @@ var TelaConfiguracoes = (function () {
         + 'daqui</strong> depois de conferidas lá.',
         'Arquivar', function () {
           comSenhaDeAdministrador(function () {
-            Servidor.chamar('arquivarAuditoriaAgora')
+            Servidor.chamarSemPressa('arquivarAuditoriaAgora')
               .entao(function (resultado) {
                 dados.arquivoDaAuditoria = resultado.configuracao;
                 avisarSalvo(resultado.arquivadas

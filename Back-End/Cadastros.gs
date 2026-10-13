@@ -7,8 +7,8 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. OS DOIS CADASTROS   (era Corretoras.gs)
- *   2. COLAR, CONFERIR E APLICAR EM LOTE   (era Importacao.gs)
+ *   1. OS DOIS CADASTROS
+ *   2. COLAR, CONFERIR E APLICAR EM LOTE
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -18,15 +18,11 @@
    #
    #  SEÇÃO 1 de 2 · OS TRÊS CADASTROS
    #
-   #  Era o arquivo Back-End/Corretoras.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Corretoras.gs · quem traz o caso para dentro
+ * Quem traz o caso para dentro
  * ============================================================================
  * Três cadastros que sustentam o resto do sistema e que, até aqui, só se
  * ajustavam abrindo a planilha:
@@ -487,14 +483,10 @@ function exportarCorretoras(procurar, segmento) {
    #
    #  SEÇÃO 2 de 2 · COLAR, CONFERIR E APLICAR EM LOTE
    #
-   #  Era o arquivo Back-End/Importacao.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
- * RECC — Importacao.gs · trazer listas prontas para dentro do sistema
+ * Trazer listas prontas para dentro do sistema
  * ============================================================================
  * O cadastro de corretoras e a lista de SUSEPs bloqueadas já EXISTEM na
  * operação, em planilha, antes de o PGO nascer. Digitar centenas de linhas

@@ -9,9 +9,9 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. OS CARTÕES DO DIA E A FILA   (era Painel.gs)
- *   2. OS GRÁFICOS DA OPERAÇÃO   (era Analitico.gs)
- *   3. A TELA EM QUE O ANALISTA SE VÊ   (era Performance.gs)
+ *   1. OS CARTÕES DO DIA E A FILA
+ *   2. OS GRÁFICOS DA OPERAÇÃO
+ *   3. A TELA EM QUE O ANALISTA SE VÊ
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -21,15 +21,11 @@
    #
    #  SEÇÃO 1 de 3 · OS CARTÕES DO DIA E A FILA
    #
-   #  Era o arquivo Back-End/Painel.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Painel.gs · os números do dia e a fila de trabalho
+ * Os números do dia e a fila de trabalho
  * ============================================================================
  * O Trabalho responde três perguntas, nesta ordem de importância:
  *
@@ -1454,15 +1450,11 @@ function paraTexto_(valor, tipo) {
    #
    #  SEÇÃO 2 de 3 · OS GRÁFICOS DA OPERAÇÃO
    #
-   #  Era o arquivo Back-End/Analitico.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Analitico.gs · os números por trás da operação
+ * Os números por trás da operação
  * ============================================================================
  * O Trabalho responde "o que eu tenho que trabalhar hoje". Esta tela responde
  * outra pergunta: "o que está acontecendo na operação". São coisas diferentes,
@@ -1730,7 +1722,7 @@ function calcularComponente_(componente, casos, canal) {
 
   if (posicaoDaDimensao < 0) {
     return semDados_(componente, 'A coluna "' + componente.dimensao +
-      '" não existe na aba ' + canal.aba + '. Ajuste em Configurações → Painéis.');
+      '" não existe na aba ' + canal.aba + '. Ajuste em Configurações › Painéis.');
   }
 
   var tipoDaDimensao = estrutura.tipos[posicaoDaDimensao];
@@ -1739,7 +1731,7 @@ function calcularComponente_(componente, casos, canal) {
 
   if (componente.agregacao !== 'contagem' && !componente.medida) {
     return semDados_(componente, 'Este gráfico soma um valor, mas não diz qual. ' +
-      'Escolha a coluna da medida em Configurações → Painéis.');
+      'Escolha a coluna da medida em Configurações › Painéis.');
   }
 
   var somas = {};
@@ -2259,15 +2251,11 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
    #
    #  SEÇÃO 3 de 3 · A TELA EM QUE O ANALISTA SE VÊ
    #
-   #  Era o arquivo Back-End/Performance.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Performance.gs · a tela em que o analista se vê
+ * A tela em que o analista se vê
  * ============================================================================
  * As outras telas mostram a operação. Esta mostra UMA PESSOA — e por isso o
  * cuidado aqui é de outra natureza. Um número mal escolhido no Trabalho

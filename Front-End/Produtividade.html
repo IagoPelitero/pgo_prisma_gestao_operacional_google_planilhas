@@ -25,7 +25,7 @@
 
 var TelaProdutividade = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var filtros = {};
   /*
    * COMO o período foi escolhido, e não o período em si.
@@ -47,8 +47,8 @@ var TelaProdutividade = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
   }
 
@@ -56,7 +56,7 @@ var TelaProdutividade = (function () {
     var caixa = elemento('analitico');
     if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
 
-    Servidor.chamar('produtividadeDaEquipe', canalEscolhida, filtros, periodo)
+    Servidor.chamar('produtividadeDaEquipe', canalEscolhido, filtros, periodo)
       .entao(function (resposta) {
         painel = resposta;
         desenhar();
@@ -79,7 +79,7 @@ var TelaProdutividade = (function () {
           + painel.componentes.map(desenharComponente).join('') + '</div>'
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
           + 'canal.</strong><p>Um administrador monta os gráficos em '
-          + 'Configurações → Painéis.</p></div>')
+          + 'Configurações › Painéis.</p></div>')
       + (painel.valorPorSituacao
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
@@ -374,7 +374,7 @@ var TelaProdutividade = (function () {
     caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    Servidor.chamar('detalharComponente', canalEscolhida, idDoComponente,
+    Servidor.chamar('detalharComponente', canalEscolhido, idDoComponente,
       chaveDoPonto, filtros, periodo)
       .entao(function (resposta) { desenharDetalhe(resposta); })
       .senao(function (erro) {
@@ -432,7 +432,7 @@ var TelaProdutividade = (function () {
     var abrir = document.querySelectorAll('[data-caso-do-painel]');
     for (var i = 0; i < abrir.length; i++) {
       abrir[i].addEventListener('click', function () {
-        CasoEmModal.abrir(canalEscolhida, this.getAttribute('data-caso-do-painel'),
+        CasoEmModal.abrir(canalEscolhido, this.getAttribute('data-caso-do-painel'),
           carregar);
       });
     }
@@ -447,7 +447,7 @@ var TelaProdutividade = (function () {
    * cima, para quem estiver num contexto que o aceite.
    */
   function exportar(idDoComponente) {
-    Servidor.chamar('exportarComponente', canalEscolhida, idDoComponente,
+    Servidor.chamar('exportarComponente', canalEscolhido, idDoComponente,
       filtros, periodo)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
@@ -493,7 +493,7 @@ var TelaProdutividade = (function () {
   function ligar(pacote) {
     if (pacote) pacoteDoSistema = pacote;
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       filtros = {};
       tabelasAbertas = {};
       Aplicacao.remontar();

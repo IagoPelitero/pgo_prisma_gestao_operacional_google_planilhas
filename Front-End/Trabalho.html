@@ -11,7 +11,7 @@
 
 var TelaTrabalho = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var filtrosEscolhidos = {};
   // COMO o período foi escolhido. Quem calcula as datas é o servidor — se a
   // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
@@ -31,8 +31,8 @@ var TelaTrabalho = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
   }
 
@@ -364,7 +364,7 @@ var TelaTrabalho = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)
+    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -428,16 +428,16 @@ var TelaTrabalho = (function () {
     });
 
     ligarCliques('[data-trabalhar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-trabalhar'), carregar);
+      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), carregar);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
-      CasoEmModal.trocarSituacao(canalEscolhida,
+      CasoEmModal.trocarSituacao(canalEscolhido,
         botao.getAttribute('data-status-do-caso'), carregar);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');
       Formulario.confirmarExclusao(idDoCaso, function () {
-        Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
+        Servidor.chamar('excluirCaso', canalEscolhido, idDoCaso)
           .entao(carregar)
           .senao(function (erro) { window.alert(erro.message || String(erro)); });
       });
@@ -468,7 +468,7 @@ var TelaTrabalho = (function () {
 
   function ligar(pacote) {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });

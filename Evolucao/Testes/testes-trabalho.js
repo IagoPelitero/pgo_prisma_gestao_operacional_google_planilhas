@@ -289,9 +289,9 @@ function rodarTestesDoTrabalho() {
     verdadeiro(acoes.indexOf('Ver detalhes') < 0, 'o "Ver detalhes" saiu');
     verdadeiro(acoes.indexOf('data-editar') < 0, 'e o lápis também');
 
-    contem(dashboard, "CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-trabalhar')",
+    contem(dashboard, "CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar')",
       'Trabalhar no caso abre o modal');
-    contem(dashboard, 'CasoEmModal.trocarSituacao(canalEscolhida',
+    contem(dashboard, 'CasoEmModal.trocarSituacao(canalEscolhido',
       'Alterar status abre o diálogo de status, sem o formulário inteiro');
     contem(dashboard, 'Formulario.confirmarExclusao(idDoCaso, function',
       'e excluir pergunta antes, no aviso de atenção');
@@ -1776,7 +1776,7 @@ function rodarTestesDoTrabalho() {
     const corpo = clique.substring(0, clique.indexOf('});'));
     contem(corpo, 'desenharPainel();');
     verdadeiro(corpo.indexOf('carregar()') < 0, 'não chama o servidor');
-    contem(tela, "Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)\n",
+    contem(tela, "Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo)\n",
       'o servidor não recebe mais quantos mostrar');
   });
 

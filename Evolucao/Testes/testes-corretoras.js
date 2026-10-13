@@ -835,8 +835,8 @@ function rodarTestesDeCorretoras() {
     contem(tela, 'data-fonte-da-importacao="planilha"');
     contem(tela, 'planilha-da-importacao');
     contem(tela, 'aba-da-importacao');
-    contem(tela, "Servidor.chamar('conferirImportacao', tipoDaImportacao, fonte)");
-    contem(tela, "Servidor.chamar('aplicarImportacao', tipoDaImportacao, fonte)");
+    contem(tela, "Servidor.chamarSemPressa('conferirImportacao', tipoDaImportacao, fonte)");
+    contem(tela, "Servidor.chamarSemPressa('aplicarImportacao', tipoDaImportacao, fonte)");
   });
 
   secao('O selo da SUSEP em escala');

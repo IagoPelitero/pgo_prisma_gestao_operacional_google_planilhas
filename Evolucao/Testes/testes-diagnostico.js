@@ -220,7 +220,7 @@ function rodarTestesDeDiagnostico() {
     const item = bloco(laudo, 'identificadores').itens
       .find((u) => u.situacao === 'atencao');
     contem(item.oQue, 'linha(s) sem Id');
-    contem(item.comoArrumar, 'Normalizar base');
+    contem(item.comoArrumar, 'normalizarBase()');
   });
 
   secao('As sequências');
@@ -1420,7 +1420,7 @@ function rodarTestesDeDiagnostico() {
     chamar('migrarParaCanais()');
     const recado = chamar('migrarParaCanais()');
 
-    contem(recado, 'JÁ ESTAVA ASSIM', 'a segunda vez não faz nada');
+    contem(recado, 'JÁ ESTAVA EM DIA', 'a segunda vez não faz nada');
     igual(chamar('canaisVisiveis_()').length, quantasBasesOContratoTem(chamar),
       'e os canais continuam de pé');
     igual(chamar('diagnosticoRECC()').aprovado, true);
@@ -2041,7 +2041,7 @@ function rodarTestesDeDiagnostico() {
     chamar('atualizarPGO()');
     const segunda = chamar('atualizarPGO()');
 
-    contem(segunda, 'a disponibilidade "Férias" já existe');
+    contem(segunda, 'Disponibilidades que já existiam: Disponível, Férias, Afastado');
     igual(chamar('lerRegistros_("CATALOGO")')
       .filter((i) => String(i.Tipo) === 'DISPONIBILIDADE').length, 3);
   });
@@ -2289,7 +2289,7 @@ function rodarTestesDeDiagnostico() {
     chamar('atualizarPGO()');
     const filaDepois = chamar('lerRegistros_("CANAIS")').map((um) => String(um.ColunasDaFila));
     const segunda = chamar('atualizarPGO()');
-    contem(segunda, 'já está como pedido');
+    contem(segunda, 'Grupos da fila já como pedido');
     contem(segunda, 'já aceita CNPJ');
     igual(chamar('lerRegistros_("CANAIS")').map((um) => String(um.ColunasDaFila)).join('#'),
       filaDepois.join('#'));
@@ -2355,7 +2355,7 @@ function rodarTestesDeDiagnostico() {
     const { chamar } = comoEraAntesDestaRodada();
     chamar('atualizarPGO()');
     const segunda = chamar('atualizarPGO()');
-    contem(segunda, 'BASE_RET._ExcluidoEm já não existe');
+    contem(segunda, 'BASE_RET já não tinha: _ExcluidoEm, _ExcluidoPor');
     verdadeiro(segunda.indexOf('removida (estava vazia)') < 0);
   });
 
@@ -2369,11 +2369,11 @@ function rodarTestesDeDiagnostico() {
       nivelAcessoId: nivel('Administrador'), ativo: true });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('atualizarPGO()'), 'rode pelo editor');
-      lanca(() => chamar('migrarParaCanais()'), 'rode pelo editor');
+      lanca(() => chamar('atualizarPGO()'), 'é para o editor do Apps Script');
+      lanca(() => chamar('migrarParaCanais()'), 'é para o editor do Apps Script');
     });
     comoUsuario(ambiente, 'ninguem@exemplo.com', () => {
-      lanca(() => chamar('atualizarPGO()'), 'rode pelo editor');
+      lanca(() => chamar('atualizarPGO()'), 'é para o editor do Apps Script');
     });
     comoUsuario(ambiente, 'outro.adm@exemplo.com', () => {
       contem(chamar('atualizarPGO()'), 'ATUALIZAÇÃO DO PGO', 'administrador passa');
@@ -2454,7 +2454,7 @@ function rodarTestesDeDiagnostico() {
     chamar('atualizarPGO()');
     const segunda = chamar('atualizarPGO()');
 
-    contem(segunda, 'JÁ ESTAVA ASSIM');
+    contem(segunda, 'JÁ ESTAVA EM DIA');
     const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
     verdadeiro(chamar('produtividadeDaEquipe')(ret.id, {}, 30).valorPorSituacao
       !== null, 'o gráfico continua de pé');
@@ -2485,13 +2485,23 @@ function rodarTestesDeDiagnostico() {
 
   secao('As duas portas');
 
-  teste('a porta do editor não exige permissão nem login', () => {
-    // Quando doGet está quebrado, a tela não serve para diagnosticar nada —
-    // e quem abre o editor do Apps Script já tem acesso a tudo mesmo.
+  teste('a porta do editor: no editor roda sem cadastro; pelo navegador, só administrador', () => {
+    // Quando doGet está quebrado, a tela não serve para diagnosticar nada: no
+    // editor (quem chama é o dono) o laudo sai sem ler cadastro nenhum.
     const { ambiente, chamar } = instalacaoNova();
+    chamar('apagarRegistroDeVez_')('USUARIOS',
+      chamar('lerRegistros_("USUARIOS")')[0].__id);
+    chamar('esquecerRegistrosLidos_()');
+    verdadeiro(chamar('diagnosticoRECC()').resumo.total > 40,
+      'rodou no editor mesmo sem ninguém cadastrado');
+    contem(chamar('verificarEstruturaRECC()'), 'ESTRUTURA');
+
+    // Pelo navegador, um estranho não lê o laudo: ele descreve a planilha e
+    // cita e-mails do cadastro.
     comoUsuario(ambiente, 'ninguem@exemplo.com', () => {
-      const laudo = chamar('diagnosticoRECC()');
-      verdadeiro(laudo.resumo.total > 40, 'rodou mesmo sem usuário cadastrado');
+      lanca(() => chamar('diagnosticoRECC()'), 'é para o editor do Apps Script');
+      lanca(() => chamar('verificarEstruturaRECC()'), 'é para o editor do Apps Script');
+      lanca(() => chamar('normalizarBase()'), 'é para o editor do Apps Script');
     });
   });
 

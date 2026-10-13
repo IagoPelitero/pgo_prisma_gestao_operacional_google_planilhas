@@ -24,13 +24,11 @@
 
 <!-- ========================================================================
      PEÇA 1 de 7 · Moldura
-     Era o arquivo Front-End/Moldura.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   RECC — Moldura.html · o menu lateral e a barra superior
+   Moldura · o menu lateral e a barra superior
    ============================================================================
    A moldura aparece em TODAS as telas e é a mesma em todas. Ela não é escrita
    à mão no HTML: é montada a partir do pacote de partida, porque o menu
@@ -484,13 +482,11 @@ var Moldura = (function () {
 
 <!-- ========================================================================
      PEÇA 2 de 7 · SenhaDeAdministrador
-     Era o arquivo Front-End/SenhaDeAdministrador.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — SenhaDeAdministrador.html · a guarda das ações sem desfazer
+   SenhaDeAdministrador · a guarda das ações sem desfazer
    ============================================================================
    Um diálogo só, usado por todas as telas que fazem alguma coisa de alcance
    grande: criar coluna na planilha, mexer em nível de acesso, importar um
@@ -598,13 +594,11 @@ var SenhaDeAdministrador = (function () {
 
 <!-- ========================================================================
      PEÇA 3 de 7 · SeletorDeCanal
-     Era o arquivo Front-End/SeletorDeCanal.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — SeletorDeCanal.html · a escolha do canal de trabalho
+   SeletorDeCanal · a escolha do canal de trabalho
    ============================================================================
    Aparece no Trabalho e no Cadastrar Caso, e é a mesma peça nos dois. Duas
    cópias divergiriam na primeira mudança — bastaria um canal novo ganhar
@@ -692,13 +686,11 @@ var SeletorDeCanal = (function () {
 
 <!-- ========================================================================
      PEÇA 4 de 7 · Formulario
-     Era o arquivo Front-End/Formulario.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — Formulario.html · o formulário, desenhado num lugar só
+   Formulario · o formulário, desenhado num lugar só
    ============================================================================
    Duas telas montam o mesmo formulário: Cadastrar Caso e a edição dentro do
    modal do Trabalho. Elas não têm duas cópias disto.
@@ -1351,6 +1343,11 @@ var Formulario = (function () {
     var controles = raiz.querySelectorAll('[data-chave]');
     for (var i = 0; i < controles.length; i++) {
       if (controles[i].disabled) continue;
+      // O valor gravado que o controle não conseguiu mostrar (ver preencher)
+      // não vai como vazio: vazio agora APAGA na planilha, e a pessoa não
+      // pediu isso — só não viu o valor.
+      if (controles[i].getAttribute('data-valor-que-nao-coube') !== null
+        && controles[i].value === '') continue;
       lidos[controles[i].getAttribute('data-chave')] = controles[i].value;
     }
     return lidos;
@@ -1378,6 +1375,14 @@ var Formulario = (function () {
       }
       if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
       controles[i].value = valor;
+      controles[i].removeAttribute('data-valor-que-nao-coube');
+
+      // Valor que o controle recusou: uma data num formato que o calendário
+      // não lê ("2026/10/05", digitada direto na planilha) faz a caixa ficar
+      // vazia. Fica marcado, para salvar não apagar o que a pessoa nem viu.
+      if (valor !== '' && controles[i].value === '' && controles[i].tagName !== 'SELECT') {
+        controles[i].setAttribute('data-valor-que-nao-coube', valor);
+      }
 
       // Valor que não está entre as opções: o seletor ficaria em branco e a
       // pessoa gravaria vazio sem perceber. Acrescentamos a opção, marcada.
@@ -1667,13 +1672,11 @@ var Formulario = (function () {
 
 <!-- ========================================================================
      PEÇA 5 de 7 · CasoEmModal
-     Era o arquivo Front-End/CasoEmModal.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — CasoEmModal.html · o caso aberto para trabalhar, por cima da fila
+   CasoEmModal · o caso aberto para trabalhar, por cima da fila
    ============================================================================
    "Trabalhar no caso", na fila, não leva a pessoa para outra tela: abre o
    caso por cima, JÁ NO FORMULÁRIO, e fechar devolve a fila exatamente como
@@ -1701,6 +1704,9 @@ var CasoEmModal = (function () {
 
   var canalAtual = '';
   var idAtual = '';
+  // A versão do caso quando ele abriu: salvar devolve ao servidor, que recusa
+  // se outra pessoa gravou no meio do caminho (ver editarCaso).
+  var versaoAoAbrir = '';
   var formulario = null;
   /*
     O FORMULÁRIO DE CADA CANAL, GUARDADO.
@@ -1732,6 +1738,7 @@ var CasoEmModal = (function () {
   function abrir(idDoCanal, idDoCaso, quandoMudar) {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
+    versaoAoAbrir = '';
     aoFechar = quandoMudar || null;
     mudouAlgo = false;
     salvando = false;
@@ -1883,6 +1890,7 @@ var CasoEmModal = (function () {
     Servidor.chamar('casoParaEditar', canalAtual, idAtual)
       .entao(function (caso) {
         osValores = caso;
+        versaoAoAbrir = caso.versao || '';
         quandoAsDuasChegarem();
       })
       .senao(falhou);
@@ -1949,7 +1957,8 @@ var CasoEmModal = (function () {
     // gravação está a caminho — nem o X, nem o "Fechar".
     Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
-    Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo))
+    Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
+      versaoAoAbrir)
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
@@ -2079,13 +2088,11 @@ var CasoEmModal = (function () {
 
 <!-- ========================================================================
      PEÇA 6 de 7 · Graficos
-     Era o arquivo Front-End/Graficos.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — Graficos.html · os desenhos, num lugar só
+   Graficos · os desenhos, num lugar só
    ============================================================================
    Duas telas desenham gráficos: a Produtividade RECC e Minha Performance. Elas
    não têm duas cópias disto — pela mesma razão que já custou caro aqui:

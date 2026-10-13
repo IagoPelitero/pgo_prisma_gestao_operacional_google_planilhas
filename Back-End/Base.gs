@@ -7,9 +7,9 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. O CONTRATO DAS ABAS   (era Esquema.gs)
- *   2. O GERADOR DE Id   (era Sequencia.gs)
- *   3. A PORTA ÚNICA PARA O GOOGLE PLANILHAS   (era Planilha.gs)
+ *   1. O CONTRATO DAS ABAS
+ *   2. O GERADOR DE Id
+ *   3. A PORTA ÚNICA PARA O GOOGLE PLANILHAS
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -19,15 +19,11 @@
    #
    #  SEÇÃO 1 de 3 · O CONTRATO DAS ABAS
    #
-   #  Era o arquivo Back-End/Esquema.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Esquema.gs · o contrato das abas
+ * O contrato das abas
  * ============================================================================
  * Plataforma PGO (Pelitero Labs) · operação RECC (Porto Seguro)
  *
@@ -1089,15 +1085,11 @@ function nomesDasAbasDoContrato_() {
    #
    #  SEÇÃO 2 de 3 · O GERADOR DE Id
    #
-   #  Era o arquivo Back-End/Sequencia.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Sequencia.gs · o gerador de Id
+ * O gerador de Id
  * ============================================================================
  * O Id do RECC é DECIMAL, PROGRESSIVO, de 10 CASAS, começando em 0000000000.
  * Dez casas dão dez bilhões de combinações.
@@ -1247,11 +1239,15 @@ function realinharSequencia_(nomeDaAba) {
 }
 
 /**
- * NORMALIZAR BASE — carimba Id em linha que entrou direto na planilha.
+ * Carimba Id em linha que entrou direto na planilha — UMA aba. Quem roda é
+ * `normalizarBase()`, no editor do Apps Script, para todas as abas.
  *
  * Quem digita uma linha à mão não gera Id. Sem Id não há relacionamento, e
  * a atualização por Id não acha o registro. Esta rotina percorre a aba, dá
  * Id a quem está sem, e realinha a sequência.
+ *
+ * Id REPETIDO ela só aponta, não corrige: qual das duas linhas é a cópia é
+ * decisão de gente. Apagando o Id da cópia, a próxima rodada dá um novo.
  *
  * Só lê e escreve a coluna de Id: não toca em mais nada da linha.
  */
@@ -1287,11 +1283,19 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
     var repetidos = [];
     var carimbados = 0;
 
+    // Os Ids novos saem num bloco só: um por linha seria uma ida ao
+    // PropertiesService para cada linha sem Id (ver proximosIdentificadores_).
+    var precisam = 0;
+    for (var j = 0; j < coluna.length; j++) {
+      if (!converterParaIdentificador_(coluna[j][0]) && !linhaEstaVazia_(bloco[j])) precisam++;
+    }
+    var novos = proximosIdentificadores_(nomeDaAba, precisam);
+
     for (var i = 0; i < coluna.length; i++) {
       var atual = converterParaIdentificador_(coluna[i][0]);
       if (!atual) {
         if (linhaEstaVazia_(bloco[i])) continue;   // linha em branco não ganha Id
-        coluna[i][0] = proximoIdentificador_(nomeDaAba);
+        coluna[i][0] = novos[carimbados];
         carimbados++;
         continue;
       }
@@ -1323,15 +1327,11 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
    #
    #  SEÇÃO 3 de 3 · A PORTA ÚNICA PARA O GOOGLE PLANILHAS
    #
-   #  Era o arquivo Back-End/Planilha.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Planilha.gs · a porta única para o Google Planilhas
+ * A porta única para o Google Planilhas
  * ============================================================================
  * NENHUM outro arquivo chama SpreadsheetApp. Toda leitura e toda gravação
  * passam por aqui — é o que garante, num lugar só, as duas regras que
@@ -1501,6 +1501,20 @@ function normalizarParaComparar_(texto) {
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * O e-mail em forma de CHAVE: sem espaço nas pontas e em minúsculas — e nada
+ * além disso.
+ *
+ * NÃO passa por `normalizarParaComparar_`, que tira ponto, traço e
+ * sublinhado: com ela, "joaosilva@" entrava como "joao.silva@", e um domínio
+ * escolhido a dedo ("iago@peliteroportoseguro.com.br") entrava como
+ * "iago.pelitero@portoseguro.com.br" — com o acesso dele. Em e-mail, cada
+ * caractere identifica uma pessoa; só a caixa não importa.
+ */
+function emailParaComparar_(texto) {
+  return String(texto === null || texto === undefined ? '' : texto).trim().toLowerCase();
 }
 
 /**
@@ -2045,7 +2059,7 @@ function abrirPlanilhaDeFora_(idDaPlanilha) {
  *
  * E é conteúdo de QUALQUER coluna, deliberadamente: usar a coluna de Id aqui
  * seria mais preciso e daria dois bugs. Uma linha digitada à mão nasce sem Id,
- * então ficaria invisível para o "Normalizar base" — que existe justamente
+ * então ficaria invisível para o `normalizarBase()` — que existe justamente
  * para carimbá-la —, e a próxima inserção do sistema gravaria POR CIMA dela.
  */
 function ultimaLinhaComConteudo_(estrutura) {
@@ -2291,7 +2305,8 @@ function linhaDoRegistro_(estrutura, id) {
     throw new Error('O Id ' + alvo + ' aparece em ' + achadas.length +
       ' linhas da aba "' + estrutura.nomeDaAba + '" (linhas ' + achadas.join(', ') +
       '). Gravar assim sobrescreveria o registro errado. ' +
-      'Rode "Normalizar base" antes de continuar.');
+      'Na planilha, apague o Id da linha que é a cópia e rode normalizarBase() '
+      + 'no editor do Apps Script: ela dá um Id novo a quem ficou sem.');
   }
   return achadas.length ? achadas[0] : -1;
 }

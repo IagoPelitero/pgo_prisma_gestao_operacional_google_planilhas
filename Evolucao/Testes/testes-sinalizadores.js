@@ -864,7 +864,7 @@ function rodarTestesDeSinalizadores() {
     const segunda = antes.chamar('atualizarPGO()');
     igual(antes.chamar('lerRegistros_("SINALIZADORES")').length, 3, 'continuam três');
     contem(segunda, 'aba SINALIZADORES já existe');
-    contem(segunda, 'BASE_MESA.Data do encaminhamento já existe');
+    contem(segunda, 'BASE_MESA já tinha: Data do encaminhamento');
     verdadeiro(segunda.indexOf('criado para BASE_') < 0, 'nada novo na segunda rodada');
   });
 
@@ -911,7 +911,7 @@ function rodarTestesDeSinalizadores() {
     nova.chamar('instalarRECC()');
     const recado = nova.chamar('atualizarPGO()');
     contem(recado, 'aba SINALIZADORES já existe');
-    contem(recado, 'BASE_MESA.Data do encaminhamento já existe');
+    contem(recado, 'BASE_MESA já tinha: Data do encaminhamento');
     igual(nova.chamar('lerRegistros_("SINALIZADORES")').length, 3);
   });
 

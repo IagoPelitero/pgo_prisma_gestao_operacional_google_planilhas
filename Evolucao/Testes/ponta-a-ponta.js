@@ -435,6 +435,44 @@ async function rodar() {
       'o caso de hoje não pode nascer fora do prazo');
   });
 
+  await teste('apagar um campo no "Trabalhar no caso" apaga na planilha', async () => {
+    // Pela tela de verdade: abre o caso, escreve, salva; abre de novo, apaga,
+    // salva. A versão do caso vai e volta pela ponte nas duas gravações.
+    const ultimoDaRet = () => {
+      const linhas = naPlanilha('BASE_RET');
+      return linhas[linhas.length - 1];
+    };
+    const abrirOCaso = async () => {
+      await pagina.click('[data-trabalhar]');
+      await pagina.waitForFunction(() => {
+        const salvar = document.getElementById('modal-salvar');
+        return salvar && !salvar.disabled;
+      }, { timeout: 10000 });
+    };
+    const campoLivre = await (async () => {
+      await abrirOCaso();
+      return pagina.$$eval('#modal-do-caso [data-chave]', (es) => {
+        const livre = es.find((e) => e.tagName === 'TEXTAREA' && !e.disabled
+          && e.getAttribute('aria-required') !== 'true');
+        return livre ? livre.id : '';
+      });
+    })();
+    verdadeiro(!!campoLivre, 'o caso tem um campo de texto livre que não é obrigatório');
+
+    await pagina.fill('#' + campoLivre, 'Texto para apagar');
+    await pagina.click('#modal-salvar');
+    await pagina.waitForTimeout(1200);
+    verdadeiro(Object.values(ultimoDaRet()).indexOf('Texto para apagar') >= 0,
+      'gravou o texto');
+
+    await abrirOCaso();
+    await pagina.fill('#' + campoLivre, '');
+    await pagina.click('#modal-salvar');
+    await pagina.waitForTimeout(1200);
+    igual(Object.values(ultimoDaRet()).indexOf('Texto para apagar'), -1,
+      'apagado na tela, apagado na planilha');
+  });
+
   await teste('o PO ajusta o prazo da RET pela tela e a planilha guarda', async () => {
     await pagina.click('[data-tela="configuracoes"]');
     await pagina.waitForTimeout(600);

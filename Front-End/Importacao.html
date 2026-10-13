@@ -28,7 +28,7 @@
 
 var TelaImportacao = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var pacoteDoSistema = null;
   var opcoes = null;          // colunas, analistas, lotes já importados
   var laudo = null;           // o resultado do passo 2, enquanto não se grava
@@ -50,8 +50,8 @@ var TelaImportacao = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="importacao"><p class="carregando-campos">'
       + 'Lendo as colunas do canal…</p></div>';
   }
@@ -61,7 +61,7 @@ var TelaImportacao = (function () {
     if (caixa) {
       caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
     }
-    Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhida)
+    Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhido)
       .entao(function (resposta) {
         opcoes = resposta;
         if (colunaQueIdentifica === null) {
@@ -425,7 +425,7 @@ var TelaImportacao = (function () {
 
   function ligar() {
     SeletorDeCanal.ligar(function (id) {
-      canalEscolhida = id;
+      canalEscolhido = id;
       fonte = { tipo: fonte.tipo, texto: '', planilhaId: '', aba: '' };
       analistasMarcados = {};
       colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
@@ -480,7 +480,7 @@ var TelaImportacao = (function () {
     var antigo = document.querySelector('.canais');
     if (!antigo || !antigo.parentNode) return;
     var novo = document.createElement('div');
-    novo.innerHTML = SeletorDeCanal.montar(pacoteDoSistema.canais, canalEscolhida);
+    novo.innerHTML = SeletorDeCanal.montar(pacoteDoSistema.canais, canalEscolhido);
     antigo.parentNode.replaceChild(novo.firstChild, antigo);
   }
 
@@ -527,7 +527,7 @@ var TelaImportacao = (function () {
     var botao = elemento('conferir-importacao');
     if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
 
-    Servidor.chamar('conferirImportacaoDeCasos', canalEscolhida, {
+    Servidor.chamarSemPressa('conferirImportacaoDeCasos', canalEscolhido, {
       fonte: fonte,
       dePara: deParaEscolhido,
       colunaQueIdentifica: colunaQueIdentifica || ''
@@ -561,7 +561,7 @@ var TelaImportacao = (function () {
     var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
-    Servidor.chamar('importarCasos', canalEscolhida, {
+    Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
       fonte: fonte,
       dePara: deParaEscolhido || laudo.dePara,
       colunaQueIdentifica: colunaQueIdentifica || '',

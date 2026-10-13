@@ -13,7 +13,7 @@
 
 var TelaCadastrarCaso = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var salvando = false;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -23,9 +23,9 @@ var TelaCadastrarCaso = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
 
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
@@ -46,10 +46,10 @@ var TelaCadastrarCaso = (function () {
     corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
     mostrarAsAcoes(false);
 
-    Servidor.chamar('formularioDoCanal', canalEscolhida)
+    Servidor.chamar('formularioDoCanal', canalEscolhido)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
-        Formulario.ligar(corpo(), '', canalEscolhida);
+        Formulario.ligar(corpo(), '', canalEscolhido);
         // Só no cadastro NOVO. No caso já gravado quem manda é o valor da
         // planilha — um padrão por cima dele seria perda silenciosa de dado.
         Formulario.aplicarPadroes(corpo(), resposta);
@@ -120,7 +120,7 @@ var TelaCadastrarCaso = (function () {
     Formulario.comecouAGravar(elemento('salvar-caso'),
       elemento('formulario-do-caso'));
 
-    Servidor.chamar('cadastrarCaso', canalEscolhida, Formulario.valores(corpo()))
+    Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()))
       .entao(function () {
         salvando = false;
         /*
@@ -148,7 +148,7 @@ var TelaCadastrarCaso = (function () {
 
   function ligar(pacote) {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       Aplicacao.remontar();
     });
 

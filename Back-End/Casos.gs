@@ -7,9 +7,9 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. O MOTOR DO FORMULÁRIO   (era Campos.gs)
- *   2. REGISTRAR, EDITAR E OCULTAR   (era Casos.gs)
- *   3. ACHAR UM CASO QUE A FILA NÃO MOSTRA MAIS   (era Busca.gs)
+ *   1. O MOTOR DO FORMULÁRIO
+ *   2. REGISTRAR, EDITAR E EXCLUIR
+ *   3. ACHAR UM CASO QUE A FILA NÃO MOSTRA MAIS
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -19,15 +19,11 @@
    #
    #  SEÇÃO 1 de 3 · O MOTOR DO FORMULÁRIO
    #
-   #  Era o arquivo Back-End/Campos.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Campos.gs · o motor do formulário
+ * O motor do formulário
  * ============================================================================
  * O formulário NÃO está escrito em lugar nenhum do código. Ele é montado a
  * partir da aba CAMPOS, campo a campo, toda vez que a tela abre.
@@ -245,7 +241,7 @@ function opcoesDoCampo_(configuracao, idDoCanal) {
     .filter(function (item) {
       if (normalizarParaComparar_(item.Tipo) !== tipo) return false;
       if (normalizarParaComparar_(item.Ativo) !== 'sim') return false;
-      // Item sem canal é global e serve a todas; com canal, só à dela.
+      // Item sem canal é global e serve a todos; com canal, só ao dele.
       var canalDoItem = converterParaIdentificador_(item.CanalId);
       return !canalDoItem || canalDoItem === doCanal;
     })
@@ -409,6 +405,8 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
     if (visibilidade !== RECC_VISIBILIDADE.EDICAO) return;
 
     var descricao = campoParaATela_(campo, canal.id, visibilidade, quem);
+    var veioDaTela = valoresDaTela.hasOwnProperty(descricao.chave)
+      || valoresDaTela.hasOwnProperty(descricao.cabecalho);
     var bruto = valoresDaTela[descricao.chave];
     if (bruto === undefined) bruto = valoresDaTela[descricao.cabecalho];
     if (bruto === undefined || bruto === null) bruto = '';
@@ -428,7 +426,26 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
       problemas.push({ campo: descricao.chave, rotulo: descricao.rotulo, erro: problema });
       return;
     }
-    if (String(bruto).trim() === '') return;
+
+    /*
+     * CAMPO ESVAZIADO NA EDIÇÃO É APAGADO NA PLANILHA.
+     *
+     * Antes, vazio era sempre "não mexer": a pessoa apagava a Área
+     * responsável, a tela dizia que salvou, e a área continuava lá — o caso
+     * nunca mais contava como finalizado na célula. Agora apaga, desde que o
+     * campo tenha VINDO no formulário (quem não manda a chave não está
+     * pedindo para apagar nada) e não seja travado (o responsável que o
+     * sistema preencheu, por exemplo, nem é enviado pela tela).
+     * No cadastro, vazio continua sendo só vazio: não há o que apagar.
+     */
+    if (String(bruto).trim() === '') {
+      if (!ehCasoNovo && veioDaTela && !descricao.somenteLeitura) {
+        colunasDoCampo_(campo, descricao).forEach(function (cabecalho) {
+          paraGravar[cabecalho] = '';
+        });
+      }
+      return;
+    }
 
     /*
      * ESPAÇO DE PONTA NÃO VAI PARA A PLANILHA.
@@ -501,6 +518,20 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo) {
     throw erro;
   }
   return paraGravar;
+}
+
+/**
+ * As colunas da planilha que um campo do formulário preenche: uma, na maioria;
+ * duas no seletor que separa código e nome (o produto); várias no campo que
+ * se parte pelo hífen (a proposta e a apólice).
+ */
+function colunasDoCampo_(campo, descricao) {
+  var configuracao = lerConfiguracaoDoCampo_(campo);
+  var separa = configuracao.separaEm;
+  if (separa && separa.codigo && separa.nome) return [separa.codigo, separa.nome];
+  var partir = configuracao.partirEm;
+  if (partir && partir.colunas && partir.colunas.length > 1) return partir.colunas.slice();
+  return [descricao.cabecalho];
 }
 
 /** Devolve a mensagem do problema, ou string vazia quando está tudo certo. */
@@ -586,17 +617,13 @@ function dataEstaNoFuturo_(data) {
 
 /* ############################################################################
    #
-   #  SEÇÃO 2 de 3 · REGISTRAR, EDITAR E OCULTAR
-   #
-   #  Era o arquivo Back-End/Casos.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
+   #  SEÇÃO 2 de 3 · REGISTRAR, EDITAR E EXCLUIR
    #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Casos.gs · registrar, editar e ocultar um caso
+ * Registrar, editar e ocultar um caso
  * ============================================================================
  * É aqui que o dado entra na planilha. Três coisas acontecem, nesta ordem, e
  * nenhuma pode ser pulada:
@@ -644,7 +671,7 @@ function cadastrarCaso(idDoCanal, valores) {
  * vier na alteração, ele é respeitado — mas o preenchimento automático só age
  * na criação.
  */
-function editarCaso(idDoCanal, idDoCaso, valores) {
+function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -656,6 +683,19 @@ function editarCaso(idDoCanal, idDoCaso, valores) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
   exigirAlcanceSobre_(atual, canal, quem);
+
+  /*
+   * DUAS PESSOAS NO MESMO CASO. O formulário volta INTEIRO: quem abriu antes
+   * regravaria, por cima, os valores velhos dos campos que a outra pessoa
+   * acabou de mudar — sem erro e sem aviso. A versão é o retrato da linha no
+   * momento em que o caso abriu; se a linha mudou desde então, recusa e diz
+   * por quê. Sem versão (chamada direta, sem a tela), segue como antes.
+   */
+  if (versaoQueAbriu && versaoQueAbriu !== versaoDoCaso_(atual, canal.aba)) {
+    throw new Error('Este caso foi alterado por outra pessoa depois que você o '
+      + 'abriu. Para não apagar a mudança dela, nada foi gravado: feche, abra o '
+      + 'caso de novo e refaça a sua alteração.');
+  }
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false);
 
@@ -705,7 +745,7 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
   var achada = situacaoDoCanalPeloValor_(canal, escolhida);
   if (!achada) {
     throw new Error('A situação "' + escolhida + '" não existe no canal ' +
-      canal.nome + '. As situações dela são: ' + conhecidas.map(function (uma) {
+      canal.nome + '. As situações dele são: ' + conhecidas.map(function (uma) {
         return uma.gravadoComo;
       }).join(', ') + '.');
   }
@@ -1036,7 +1076,30 @@ function casoParaEditar(idDoCanal, idDoCaso) {
     doSistema.push({ rotulo: nome, valor: valor });
   });
 
-  return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema };
+  return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema,
+    versao: versaoDoCaso_(registro, canal.aba) };
+}
+
+/**
+ * O retrato de uma linha: muda sempre que qualquer célula do caso muda.
+ *
+ * É um resumo (FNV-1a de 32 bits) do conteúdo, e não a data da última
+ * gravação, porque a planilha não guarda essa data — e quem edita direto na
+ * célula também tem de ser percebido.
+ */
+function versaoDoCaso_(registro, nomeDaAba) {
+  var texto = estruturaDaAba_(nomeDaAba).cabecalhos.map(function (cabecalho) {
+    var valor = registro[cabecalho];
+    if (Object.prototype.toString.call(valor) === '[object Date]') return String(valor.getTime());
+    return valor === null || valor === undefined ? '' : String(valor);
+  }).join('\u0001');
+
+  var resumo = 0x811c9dc5;
+  for (var i = 0; i < texto.length; i++) {
+    resumo ^= texto.charCodeAt(i);
+    resumo = Math.imul(resumo, 0x01000193) >>> 0;
+  }
+  return texto.length + '-' + resumo.toString(16);
 }
 
 /**
@@ -1596,15 +1659,11 @@ function partirDaPropostaDoCanal_(canal) {
    #
    #  SEÇÃO 3 de 3 · ACHAR UM CASO QUE A FILA NÃO MOSTRA MAIS
    #
-   #  Era o arquivo Back-End/Busca.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Busca.gs · achar um caso que a fila não mostra mais
+ * Achar um caso que a fila não mostra mais
  * ============================================================================
  * O Trabalho mostra os últimos 30 dias. Isso é de propósito: ele responde
  * "o que eu tenho que trabalhar hoje". Quando o cliente liga citando um
@@ -1662,7 +1721,7 @@ function opcoesDaBusca() {
 }
 
 /**
- * Procura o termo nos canais escolhidas e, se estiver ligada, na base legada.
+ * Procura o termo nos canais escolhidos e, se estiver ligada, na base legada.
  *
  * `ondeProcurar` é a lista de ids de canal; vazio procura em todas as que a
  * pessoa enxerga. `incluirLegado` diz se a planilha antiga entra.
@@ -1698,7 +1757,9 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
     return soma + origem.casos.length;
   }, 0);
 
-  registrarAuditoria_('busca', 'BUSCA', '', procurado);
+  // Só QUANTOS achou, nunca o termo: quem procura digita CPF e nome de
+  // segurado, e a auditoria é, por contrato, sem dado pessoal.
+  registrarAuditoria_('busca', 'BUSCA', '', total + ' resultado(s)');
   return {
     termo: procurado,
     total: total,
@@ -1754,7 +1815,7 @@ function procurarNoCanal_(canal, termo, quem) {
       colunas: [],
       casos: [],
       aviso: 'Este canal não declarou em quais colunas procurar. ' +
-        'Isso se ajusta em Configurações → Canais de trabalho.'
+        'Isso se ajusta em Configurações › Canais de trabalho.'
     };
   }
 
@@ -1774,6 +1835,9 @@ function procurarNoCanal_(canal, termo, quem) {
       ordemDasLinhas.push(numeroDaLinha);
     }
   });
+
+  // O alcance vem ANTES do corte: os 100 lugares são dos casos que eu posso ver.
+  ordemDasLinhas = linhasNoMeuAlcance_(canal.aba, ordemDasLinhas, quem);
 
   if (ordemDasLinhas.length > RECC_MAXIMO_DA_BUSCA) {
     aviso = 'A busca achou ' + ordemDasLinhas.length + ' casos e mostra os ' +
@@ -2297,9 +2361,8 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
-    // Se alguém marcou um analista que está fora, o laudo DIZ, com quantos
-    // casos e até quando. Não recusa: o lote pode ser para a volta dela, e o
-    // laudo existe justamente para a pessoa ver antes de gravar.
+    // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
+    // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
     statusPadrao: statusPadraoDoCanal_(canal)
   };
@@ -2854,14 +2917,14 @@ function analistasEscolhidos_(escolhidos, canal) {
      * está ativa, e mesmo assim não pode receber. Quem lesse iria cadastrar
      * de novo alguém que já existe.
      */
-    var deFerias = {};
+    var indisponiveis = {};
     quemEstaForaDaDivisao_(canal).forEach(function (um) {
-      deFerias[normalizarParaComparar_(um.nome)] = um.porque || 'indisponível';
+      indisponiveis[normalizarParaComparar_(um.nome)] = um.porque || 'indisponível';
     });
 
     var explicados = foraDoCadastro.map(function (nome) {
       var chave = normalizarParaComparar_(nome);
-      if (deFerias[chave]) return nome + ' (' + deFerias[chave] + ')';
+      if (indisponiveis[chave]) return nome + ' (' + indisponiveis[chave] + ')';
       return nome + ' (não é do canal ' + canal.nome + ', ou não está ativo)';
     });
 

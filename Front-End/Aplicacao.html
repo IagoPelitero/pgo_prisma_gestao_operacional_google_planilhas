@@ -1,6 +1,6 @@
 <script>
 /* ============================================================================
-   RECC — Aplicacao.html · a ponte com o servidor, o roteador e as telas
+   PGO — Aplicacao.html · a ponte com o servidor, o roteador e as telas
    ============================================================================
    Três coisas moram aqui:
 
@@ -39,10 +39,10 @@ var Servidor = (function () {
   /*
     QUANTO TEMPO ESPERAR ANTES DE DESISTIR.
 
-    O Apps Script tem seis minutos de teto por execução, mas nenhuma chamada
-    deste sistema chega perto: a mais cara, medida com 200 mil casos, leva
-    nove segundos. Quarenta segundos é folga de sobra — e é o que separa
-    "está demorando" de "não vem mais".
+    O Apps Script tem seis minutos de teto por execução, e as chamadas do dia
+    a dia não chegam perto: abrir uma tela, gravar um caso, buscar. Para elas,
+    quarenta segundos é folga de sobra — e é o que separa "está demorando" de
+    "não vem mais".
 
     ISTO EXISTE PORQUE HÁ FALHA QUE NÃO CHEGA AO withFailureHandler. Quando a
     função não existe, quando a resposta não consegue atravessar a fronteira,
@@ -54,6 +54,16 @@ var Servidor = (function () {
     Desistir e explicar é melhor do que esperar para sempre.
   */
   var SEGUNDOS_ATE_DESISTIR = 40;
+
+  /*
+    E AS CHAMADAS QUE TRABALHAM DE VERDADE — importar, arquivar a auditoria,
+    gerar uma análise, rodar o diagnóstico — esperam o teto do Apps Script
+    (6 minutos) e mais uma folga. Com 40 segundos, uma importação de 2.000
+    linhas num horário cheio era dada como perdida enquanto o servidor
+    terminava de gravar — e quem tentasse de novo importava duas vezes.
+    Quem chama assim é `Servidor.chamarSemPressa`.
+  */
+  var SEGUNDOS_DAS_CHAMADAS_LONGAS = 380;
 
   /** Chamada pelo roteador, toda vez que o miolo é remontado. */
   function trocouDeTela() { geracaoDaTela++; }
@@ -69,7 +79,17 @@ var Servidor = (function () {
    * gerador de prévia coloca um substituto no lugar. Por isso a checagem.
    */
   function chamar(nomeDaFuncao) {
-    var argumentos = Array.prototype.slice.call(arguments, 1);
+    return chamarComPrazo(SEGUNDOS_ATE_DESISTIR, nomeDaFuncao,
+      Array.prototype.slice.call(arguments, 1));
+  }
+
+  /** A mesma `chamar`, para o que demora: ver SEGUNDOS_DAS_CHAMADAS_LONGAS. */
+  function chamarSemPressa(nomeDaFuncao) {
+    return chamarComPrazo(SEGUNDOS_DAS_CHAMADAS_LONGAS, nomeDaFuncao,
+      Array.prototype.slice.call(arguments, 1));
+  }
+
+  function chamarComPrazo(segundosAteDesistir, nomeDaFuncao, argumentos) {
     var aoDarCerto = null;
     var aoDarErrado = null;
     var minhaGeracao = geracaoDaTela;
@@ -104,13 +124,14 @@ var Servidor = (function () {
       jaRespondeu = true;
       if (!aTelaAindaEAMesma()) return;
       var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
-        + SEGUNDOS_ATE_DESISTIR + ' segundos.\n\n'
-        + 'Em geral é um arquivo .gs que não foi copiado para o projeto do '
-        + 'Apps Script: a função não existe lá, e a chamada morre sem dizer '
-        + 'nada. Execute diagnosticoRECC() no editor — ele lista o que falta.');
+        + segundosAteDesistir + ' segundos.\n\n'
+        + 'Pode ter sido só demora: antes de repetir, confira se o que você '
+        + 'pediu já não foi feito. Se acontece sempre, costuma ser um arquivo '
+        + '.gs que não foi copiado para o projeto do Apps Script — execute '
+        + 'diagnosticoRECC() no editor, que lista o que falta.');
       if (aoDarErrado) aoDarErrado(erro);
       else console.error(erro);
-    }, SEGUNDOS_ATE_DESISTIR * 1000);
+    }, segundosAteDesistir * 1000);
 
     function responder(oQueFazer, valor) {
       if (jaRespondeu) return;
@@ -162,7 +183,7 @@ var Servidor = (function () {
     return acompanhamento;
   }
 
-  return { chamar: chamar, trocouDeTela: trocouDeTela };
+  return { chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela };
 })();
 
 /* ----------------------------------------------------------------- rotas */

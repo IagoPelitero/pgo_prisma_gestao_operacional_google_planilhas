@@ -561,7 +561,7 @@ quase preto. É por isso que o par certo é sempre `--destaque-escuro` com
 A operação perguntou se a Produtividade RECC tinha os dois recortes. **Por área**
 sempre teve, e não como gráfico: é o seletor de canal. Um gráfico "casos por
 área" com duas barras compararia RET com Mesa Diamante, que têm colunas,
-situações e volumes incomparáveis — a Canal sempre pareceria pequena, e nunca
+situações e volumes incomparáveis — a Mesa Diamante sempre pareceria pequena, e nunca
 foi para ser grande.
 
 **Por analista** faltava, e agora nasce junto com o sistema nos dois canais, em
@@ -924,7 +924,7 @@ análise — usa 2,5% dele.
 | `ANALISE_RetVida` (cortada em 50 mil) | 1.750.035 | 18% |
 | tudo somado | **9.672.905** | **96,7%** |
 
-Com 200 mil casos a planilha está **cheia**. Não sobra espaço para a Canal
+Com 200 mil casos a planilha está **cheia**. Não sobra espaço para a Mesa
 Diamante crescer nem para uma segunda aba de análise. O diagnóstico já acusa
 isso como FALHA acima de 95%, com o caminho escrito no laudo.
 
@@ -2363,6 +2363,45 @@ planilha, caso a caso).
 
 ---
 
+## Etapa 30 — A varredura de outubro: segurança, dados e textos
+
+Pedido do PO, em duas vezes. Primeiro o diagnóstico, só lendo: "procure bugs,
+textos que se repetem em vão, funções que não usamos mais, algo que mencione
+legado diferente do atual, algo que possa quebrar, e o quanto otimizado está".
+Depois: "faça as correções… e valide o instalar e atualizar, pois há textos
+repetidos". O detalhe de cada achado está em `04-bugs-capturados.md`, itens 73
+a 83.
+
+| Parte | O que mudou |
+|---|---|
+| **Segurança** | O login compara o e-mail inteiro — um e-mail parecido entrava como o administrador (73). `diagnosticoRECC`, `verificarEstruturaRECC` e a nova `normalizarBase` passam pela porta do editor (77). A busca não guarda mais o termo na auditoria (76) |
+| **Dados** | O formulário apaga o que a pessoa apagou, sem apagar o que ela nem viu (74). Duas pessoas no mesmo caso: a segunda é avisada em vez de gravar por cima (79). A busca de quem vê só os próprios casos acha os dele (75) |
+| **Manutenção** | `normalizarBase()`, que as mensagens prometiam e não existia (78). A contagem de um item de lista lê só as colunas dele: de 3 s para 0,07 s com 60 mil casos (81). Importar, arquivar, gerar análise e diagnosticar esperam o teto do Apps Script (82) |
+| **Instalar e atualizar** | O `atualizarPGO` devolve um laudo só — FEITO, DECISÃO SUA, JÁ ESTAVA EM DIA —, com a migração de canais dentro e a frase final uma vez; as mesmas 90 conferências em 31 linhas, em vez de ~100 (83). O `instalarRECC` aponta Configurações › Identidade, que é onde a senha se define |
+| **Textos** | Seis mensagens apontavam para seções com nome antigo; concordâncias da troca de mesa por canal; o bloco "Era o arquivo X…" repetido em 24 lugares; "(era X.gs)" nos índices; os títulos "Ocultar" e "As nove seções", que já não eram verdade; `canalEscolhida` virou `canalEscolhido` (80) |
+| **Documentação** | A instalação do README reescrita para quem chega de fora — primeira vez, atualizar e as ferramentas do editor —, com a regra do Google sobre de quem o e-mail é reconhecido e o nome certo do arquivo `Comuns`. O `03` explica como rodar uma função no editor. O `06` perdeu o calendário que saiu e ganhou a seção "Só no código" |
+
+O que **ficou de propósito**: `arquivarAuditoriaAgendada` e
+`atualizarAnalisesAgendadas` continuam sem a porta do editor, porque um
+acionador de tempo não tem quem esteja logado e a porta poderia barrar o
+próprio acionador; as duas obedecem às suas regras mesmo chamadas fora de hora.
+As funções auxiliares repetidas entre telas (`tituloDoPainel`, `valorDe`…)
+ficaram: juntá-las é refatoração sem defeito a corrigir.
+
+**971 testes** (27 novos, em `testes-varredura.js`), cinco execuções seguidas
+sem falha, **18 quebras de propósito, 18 vermelhos**. No navegador: 96
+combinações de tela sem quebra, 152 cliques sem erro e ponta a ponta 13/13 no
+repositório e no pacote — com um teste novo que abre o caso pela tela, apaga um
+campo, salva e confere a planilha.
+
+### Para quem já usa
+
+Cole os arquivos marcados e rode `atualizarPGO()` uma vez — nada de estrutura
+mudou nesta rodada, então o laudo deve dizer "Nada a mudar". Avise a equipe de
+uma coisa: **apagar um campo no "Trabalhar no caso" agora apaga de verdade**.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
@@ -2370,5 +2409,5 @@ planilha, caso a caso).
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
-| **Criar e apagar canal** | A tela ajusta os canais que existem. Criar um canal novo é estrutura (cria aba), e ainda não passa por Configurações |
+| **Apagar canal** | Criar um canal novo já passa por Configurações › Canais de trabalho (cria a aba; pede senha). Apagar não existe de propósito: o canal se desliga, e a aba com os casos fica |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

@@ -7,9 +7,9 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. A PORTA DE ENTRADA (doGet)   (era Principal.gs)
- *   2. NÍVEIS, ESCOPO E A SENHA DE ADMINISTRADOR   (era Acesso.gs)
- *   3. O CADASTRO DE QUEM PODE ENTRAR   (era Usuarios.gs)
+ *   1. A PORTA DE ENTRADA (doGet)
+ *   2. NÍVEIS, ESCOPO E A SENHA DE ADMINISTRADOR
+ *   3. O CADASTRO DE QUEM PODE ENTRAR
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -19,15 +19,11 @@
    #
    #  SEÇÃO 1 de 3 · A PORTA DE ENTRADA (doGet)
    #
-   #  Era o arquivo Back-End/Principal.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Principal.gs · a porta de entrada
+ * A porta de entrada
  * ============================================================================
  * doGet é a função que o Google chama quando alguém abre o endereço do
  * sistema. Ela decide entre duas coisas, e só duas:
@@ -507,15 +503,11 @@ function lerIdentidadeVisual_() {
    #
    #  SEÇÃO 2 de 3 · NÍVEIS, ESCOPO E A SENHA DE ADMINISTRADOR
    #
-   #  Era o arquivo Back-End/Acesso.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Acesso.gs · quem entra, e o que cada um pode
+ * Quem entra, e o que cada um pode
  * ============================================================================
  * Duas coisas diferentes, e confundi-las é o erro mais caro que este sistema
  * pode cometer:
@@ -654,7 +646,7 @@ function usuarioAtual_() {
   var encontrado = null;
   var usuarios = lerRegistros_('USUARIOS');
   for (var i = 0; i < usuarios.length; i++) {
-    if (normalizarParaComparar_(usuarios[i].Email) === normalizarParaComparar_(email)) {
+    if (emailParaComparar_(usuarios[i].Email) === emailParaComparar_(email)) {
       encontrado = usuarios[i];
       break;
     }
@@ -925,6 +917,34 @@ function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
 }
 
 /**
+ * Os números de linha que estão no meu alcance — a mesma regra de
+ * `filtrarPeloAlcance_`, lendo só a coluna do responsável.
+ *
+ * Existe para a busca, que acha as linhas antes de ler os casos. Recortar o
+ * alcance só depois de cortar nos 100 mais recentes fazia um analista com
+ * "só os meus casos" não achar os dele — os 100 lugares iam para casos de
+ * outras pessoas, que ele nem pode ver —, e o aviso ainda contava esses casos.
+ */
+function linhasNoMeuAlcance_(nomeDaAba, numerosDeLinha, quem) {
+  var escopo = quem.permissoes.escopo;
+  if (escopo === RECC_ESCOPOS.TODOS || escopo === RECC_ESCOPOS.CANAL) return numerosDeLinha;
+  if (!numerosDeLinha.length) return numerosDeLinha;
+
+  var coluna = colunaDoResponsavel_(estruturaDaAba_(nomeDaAba));
+  if (!coluna) return numerosDeLinha;
+
+  var responsaveis = lerColunaInteira_(nomeDaAba, coluna);
+  var leves = numerosDeLinha.map(function (numero) {
+    var registro = { __linha: numero };
+    registro[coluna] = responsaveis[numero - 2];
+    return registro;
+  });
+  return filtrarPeloAlcance_(leves, nomeDaAba, quem).map(function (registro) {
+    return registro.__linha;
+  });
+}
+
+/**
  * Quem é da MINHA equipe: as pessoas cadastradas no MESMO CANAL que eu.
  *
  * Mora aqui, fora do `filtrarPeloAlcance_`, porque duas telas fazem a mesma
@@ -1075,7 +1095,7 @@ function conferirSenhaDeAdministrador_(senha) {
   var guardado = propriedades.getProperty(RECC_CHAVE_DA_SENHA);
   if (!guardado) {
     throw new Error('Nenhuma senha de administrador foi definida ainda. ' +
-      'Defina em Configurações › Segurança.');
+      'Defina em Configurações › Identidade.');
   }
 
   var tentativas = lerTentativasDeSenha_();
@@ -1200,15 +1220,11 @@ function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
    #
    #  SEÇÃO 3 de 3 · O CADASTRO DE QUEM PODE ENTRAR
    #
-   #  Era o arquivo Back-End/Usuarios.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Usuarios.gs · o cadastro de quem pode entrar
+ * O cadastro de quem pode entrar
  * ============================================================================
  * Não existe senha própria: a pessoa entra com a conta Google dela, e o
  * sistema confere o e-mail autenticado contra esta aba. Cadastrar alguém é,
@@ -1302,10 +1318,10 @@ function salvarUsuario(dados) {
   // O canal é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
   // preenchida, tem de existir: um canal que sumiu deixaria a pessoa apontando
   // para o nada, e ninguém descobriria até alguém estranhar o Trabalho vazio.
-  var canalEscolhida = converterParaIdentificador_(dados.canalId);
-  if (canalEscolhida) {
+  var canalEscolhido = converterParaIdentificador_(dados.canalId);
+  if (canalEscolhido) {
     var existe = lerRegistros_('CANAIS').filter(function (canal) {
-      return converterParaIdentificador_(canal.Id) === canalEscolhida;
+      return converterParaIdentificador_(canal.Id) === canalEscolhido;
     })[0];
     if (!existe) {
       throw new Error('O canal escolhido não existe mais. Escolha outro, ou ' +
@@ -1317,7 +1333,7 @@ function salvarUsuario(dados) {
   var jaCadastrados = lerRegistros_('USUARIOS');
   for (var i = 0; i < jaCadastrados.length; i++) {
     var mesmoEmail =
-      normalizarParaComparar_(jaCadastrados[i].Email) === normalizarParaComparar_(email);
+      emailParaComparar_(jaCadastrados[i].Email) === emailParaComparar_(email);
     var outraPessoa =
       converterParaIdentificador_(jaCadastrados[i].Id) !== idInformado;
     if (mesmoEmail && outraPessoa) {

@@ -279,7 +279,7 @@ formulário (no momento em que a SUSEP é digitada) e no dashboard.
 
 | Aba | Colunas | Para quê |
 |---|---|---|
-| `CANAIS` | `Id` · `Nome` · `Descricao` · `Aba` · `Icone` · `Ordem` · `Ativo` | Registro dos canais. Canal nova = linha nova, sem código |
+| `CANAIS` | `Id` · `Nome` · `Descricao` · `Aba` · `Icone` · `Ordem` · `Ativo` | Registro dos canais. Canal novo = linha nova (Configurações › Canais de trabalho cria a aba e a linha), sem código |
 | `CAMPOS` | `Id` · `CanalId` · `Aba` · `ChaveTecnica` · `Cabecalho` · `Rotulo` · `Descricao` · `TipoCampo` · `Secao` · `Mascara` · `Obrigatorio` · `Protegido` · `Ativo` · `Ordem` · `VisivelPara` · `ValorPadrao` · `Configuracao` | O catálogo do formulário e o mapa coluna↔campo |
 | `CATALOGO` | `Id` · `CanalId` · `Tipo` · `Codigo` · `Nome` · `Rotulo` · `PaiId` · `Cor` · `Ordem` · `Ativo` · `Configuracao` | Status, motivos, origens, tipos, ramos, áreas responsáveis, cargos, níveis de acesso, segmentos |
 | `PAINEIS` | `Id` · `Tela` · `CanalId` · `Titulo` · `TipoComponente` · `CampoDimensao` · `CampoMedida` · `Agregacao` · `Limite` · `Filtro` · `Ordem` · `Largura` · `VisivelPara` · `Ativo` | Os cards e gráficos de cada tela, configuráveis |

@@ -79,96 +79,48 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 944 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 971 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
 
 ## Instalação
 
-1. Crie uma planilha **nova e vazia** no Google Planilhas, e um projeto do
-   Apps Script vinculado a ela.
+São duas situações, e cada uma tem o seu caminho:
 
-2. Copie os arquivos. **O projeto do Apps Script não tem pastas** — as daqui
-   são organização do repositório. Há dois caminhos:
+| Situação | O que fazer |
+|---|---|
+| **Primeira vez** — planilha nova, ninguém usando | os passos 1 a 7 abaixo |
+| **Já está em uso** e saiu uma versão nova | [Atualizar uma instalação](#atualizar-uma-instalação-que-já-está-em-uso) |
 
-   ### Já tem o PGO instalado? Migre, não reinstale
+### Primeira vez
 
-   Numa rodada, "mesa" virou **canal** em todo o sistema, e a aba `CANAIS` —
-   que guardava corretoras — cedeu o nome. Uma planilha instalada antes disso
-   continua com as abas antigas: o sistema abre, mas **sem canal nenhum**, e o
-   Trabalho nasce vazio.
+1. **Crie uma planilha nova e vazia** no Google Planilhas e abra
+   *Extensões › Apps Script*. O projeto que abre já nasce vinculado a ela.
 
-   Depois de copiar os arquivos novos, rode **uma vez** no editor do Apps
-   Script:
+2. **Confira o motor.** Em *Configurações do projeto*, deixe marcado **"Ativar
+   o ambiente de execução do Chrome V8"**. Projeto novo já nasce assim; num
+   projeto antigo, no motor legado, o PGO não abre.
 
-   ```
-   migrarParaCanais()
-   ```
+3. **Copie o código.** O projeto do Apps Script não tem pastas: as daqui são só
+   organização do repositório. Escolha um dos três caminhos:
 
-   Ela renomeia as duas abas, renomeia a coluna `MesaId`, acrescenta as
-   colunas novas do contrato e — o passo menos óbvio — **leva a sequência de
-   Id junto com a aba**. Sem isso a contagem recomeçaria do zero e o sistema
-   reemitiria um Id já gravado, que é o defeito que custou 4.328 colisões no
-   PGO 5.x.
-
-   **Não apaga nada, e pode rodar duas vezes sem estragar.** Depois dela,
-   `diagnosticoRECC()` para conferir.
-
-   > O que ela NÃO faz, de propósito: não mexe no formulário, nos cartões nem
-   > nas listas. Eles ganharam padrões novos, mas a sua instalação pode ter
-   > sido ajustada à mão — e sobrescrever configuração é perder trabalho em
-   > silêncio. Para pegar os padrões novos, ajuste em Configurações, ou
-   > instale numa planilha vazia.
-
-   **A cada versão nova, rode `atualizarPGO()`.** Ela traz para a planilha em
-   uso o que cada rodada mudou, e diz no fim o que fez, o que já estava assim
-   e o que é decisão sua. A última rodada que mexeu na planilha criou as
-   cinco colunas do **SLA** em `CANAIS`, ligou o **SLA da Mesa Diamante** (6
-   horas úteis, das 08:15 às 18:30, até a primeira resposta — só se a Mesa
-   ainda não tiver um SLA declarado) e fez o grupo **Vigência do VG abrir pelos meses**. A anterior
-   trocou os **destaques da fila** — a proposta inteira e o telefone na RET, o
-   título do e-mail na Mesa — e fez o **CPF da Mesa aceitar CNPJ**. Só onde
-   ainda estava como a instalação deixou: grupo da fila ou máscara que alguém
-   personalizou **não é mexido**, e aparece na "DECISÃO SUA" com o texto
-   pronto para colar em Configurações. Rodar duas vezes não muda nada. A busca
-   do Trabalho, a fila de 5, as datas com máscara e as cores da vigência são só
-   de tela e de servidor: basta colar o código.
-
-   ### O caminho curto: três arquivos
-
-   A pasta **[`Evolucao/pacote/`](Evolucao/pacote/)** tem o sistema inteiro
-   junto, pronto para colar:
+   **a) O caminho curto: três arquivos.** A pasta
+   [`Evolucao/pacote/`](Evolucao/pacote/) tem o sistema inteiro junto:
 
    | Cole este | Num arquivo chamado | Que é |
    |---|---|---|
    | `Codigo.gs` | `Codigo` (arquivo **.gs**) | os 7 arquivos do servidor |
-   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto com as 10 telas dentro |
+   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto, com as 8 telas dentro |
    | `SemAcesso.html` | `SemAcesso` (arquivo **HTML**) | a tela de acesso negado |
 
-   **Atenção ao nome:** no Apps Script o arquivo se chama `Index`, e não
-   `Index.html` — sem extensão, sem acento, com as maiúsculas iguais.
+   Quem prefere copiar de uma planilha usa
+   [`PGO-codigo-completo.xlsx`](Evolucao/pacote/PGO-codigo-completo.xlsx):
+   uma aba por arquivo, e o losango ◆ no nome marca o que mudou na última
+   versão.
 
-   > O pacote é **gerado**, não escrito à mão: `node
-   > Evolucao/Testes/gerar-pacote.js`. O teste ponta a ponta roda contra ele e
-   > contra os 19 arquivos soltos, e cobra que os dois se comportem igual — senão
-   > haveria duas verdades, e a que a operação usa seria a que ninguém testa.
-
-   ### O caminho longo: arquivo por arquivo
-
-   Vale quando você vai mexer no código: cada arquivo fica separado por
-   assunto, como no repositório.
-
-   | Aqui | No editor do Apps Script |
-   |---|---|
-   | `Back-End/Entrada.gs` | `Entrada.gs` |
-   | `Front-End/Index.html` | `Index.html` |
-   | `Evolucao/` | **não vai** |
-
-   São **19 arquivos** — 7 do servidor e 12 de tela —, e basta **um** ficar
-   para trás para uma tela congelar numa mensagem de carregamento. A ordem não
-   importa: o Apps Script avalia os `.gs` em ordem alfabética, e nenhum tem
-   código de topo que dependa de outro.
+   **b) Arquivo por arquivo**, quando você vai mexer no código. São **19
+   arquivos**: os 7 de `Back-End/` e os 12 de `Front-End/`. A ordem não importa.
 
    | Servidor (7) | Responde |
    |---|---|
@@ -178,7 +130,7 @@ Dentro de `Evolucao/`:
    | `Config.gs` | o que se ajusta sem programador |
    | `Entrada.gs` | quem entra e o que pode |
    | `Indicadores.gs` | os números |
-   | `Instalacao.gs` | criar e conferir a instalação |
+   | `Instalacao.gs` | criar, atualizar e conferir a instalação |
 
    | Tela (12) | O que é |
    |---|---|
@@ -189,10 +141,8 @@ Dentro de `Evolucao/`:
    | `Trabalho.html` … `Configuracoes.html` | uma por item do menu (8) |
    | `SemAcesso.html` | a tela de quem não está cadastrado |
 
-   ### O caminho de quem tem terminal: `clasp`
-
-   O `clasp` é a ferramenta oficial do Google e evita a cópia manual por
-   completo — os 19 arquivos sobem de uma vez, e sobem de novo a cada mudança:
+   **c) Pelo terminal, com o `clasp`**, a ferramenta oficial do Google: os 19
+   arquivos sobem de uma vez, e de novo a cada mudança.
 
    ```bash
    npm install -g @google/clasp
@@ -202,55 +152,88 @@ Dentro de `Evolucao/`:
    clasp push
    ```
 
-3. Publique como **aplicativo da web** (executar como você). Em
-   *Configurações do projeto*, deixe marcado **"Ativar o ambiente de execução
-   do Chrome V8"** — projeto novo já nasce assim; um projeto antigo pode estar
-   no motor legado, e nele o PGO não abre.
+   > **O nome do arquivo no Apps Script é o nome daqui sem a extensão**, com as
+   > mesmas maiúsculas e sem acento: `Comuns.html` vira `Comuns`, `Index.html`
+   > vira `Index`. O sistema inclui cada tela pelo nome — um arquivo com outro
+   > nome é um arquivo que falta.
 
-4. No editor, execute **`instalarRECC()`** uma vez. Ela cria as 13 abas, semeia
-   o catálogo e **cadastra você como o primeiro administrador**.
+4. **Instale.** No editor, escolha **`instalarRECC`** na lista e clique em
+   *Executar*. Ela cria as 16 abas, semeia o que o sistema precisa para abrir —
+   os três canais (RET, Mesa Diamante, VG), o formulário de cada um, as listas,
+   os cartões, os gráficos e os sinalizadores de prazo — e **cadastra você como
+   o primeiro administrador**. As bases de caso, as corretoras e as SUSEPs
+   bloqueadas nascem vazias.
 
-   > Esse último passo não é conveniência: o acesso é pelo e-mail autenticado
-   > conferido contra a aba `USUARIOS`, e uma base nova tem essa aba vazia. Sem
-   > ninguém dentro, ninguém entra — e sem entrar, ninguém cadastra.
-
-5. Confira com **`verificarEstruturaRECC()`**. Ela só lê, e diz em segundos
-   duas coisas: se alguma **aba** do contrato ficou faltando, e se algum
-   **arquivo de tela** ficou para trás na cópia — com o nome de cada um.
-
-   > Nenhum teste rodado fora do Apps Script pega isso: a suíte lê a pasta do
-   > repositório, onde os arquivos estão. Quem pode não tê-los é o projeto.
+   > Sem esse cadastro, ninguém entraria: o acesso é pelo e-mail conferido na
+   > aba `USUARIOS`, e uma planilha nova tem essa aba vazia.
    >
-   > No Apps Script o arquivo se chama `Formulario`, e não `Comuns.html`:
-   > sem extensão no nome, sem acento, e com as maiúsculas iguais.
+   > A instalação **recusa** rodar sobre uma planilha que já tenha dado. É a
+   > única rotina que cria estrutura; depois dela, nenhum caminho do sistema
+   > cria, renomeia ou apaga aba por conta própria.
 
-6. Se alguma tela ficar **parada numa mensagem de carregamento** — "Lendo o
-   cadastro…", "Somando os casos…" —, é arquivo `.gs` que ficou para trás.
-   Cole `Evolucao/conferir-projeto.gs` num arquivo novo e execute
-   **`oQueFaltaNoProjeto`**: ela não depende de nenhum outro arquivo do PGO e
-   diz quais copiar. Depois é só apagá-la.
+5. **Publique.** *Implantar › Nova implantação › App da Web*:
+   - **Executar como:** você.
+   - **Quem pode acessar:** as pessoas da sua organização.
 
-   > Quando a função não existe no servidor, a chamada estoura antes de sair
-   > do navegador, num ponto em que o tratamento de erro da tela ainda nem foi
-   > registrado. Nada aparece — a tela só congela.
+   > **O e-mail de quem acessa só chega ao sistema quando a pessoa está na
+   > mesma organização do Google Workspace que publicou.** É uma regra do
+   > Google, não do PGO. Publicado por uma conta pessoal (@gmail.com), só o
+   > dono é reconhecido: os outros veem a tela de acesso negado. Publique com
+   > a conta da empresa.
 
-7. Para a conferência completa, execute **`diagnosticoRECC()`**. São dez
-   blocos — fuso, estrutura, sequências de Id, Ids repetidos, canais, campos,
-   painéis, análises, quem consegue configurar, e se toda função que a tela
-   chama existe no servidor. Também só lê, e escreve o laudo no log.
+6. **Confira.** Execute **`diagnosticoRECC`** no editor. São doze blocos — fuso,
+   estrutura, sequências de Id, Ids repetidos, canais, campos, painéis,
+   análises, sinalizadores, quem consegue configurar, a tela e os estilos — e
+   cada problema vem com o que fazer. Ela só lê. A mesma conferência está em
+   Configurações › Estrutura.
 
-   > Ela roda no editor de propósito: é a porta que importa quando o sistema
-   > **não abre**. A mesma conferência está em Configurações › Estrutura,
-   > atrás de um botão.
+   > **Uma tela parada em "Lendo o cadastro…"** quase sempre é arquivo que
+   > ficou para trás na cópia. `verificarEstruturaRECC` diz quais. Se nem o
+   > editor ajudar, cole `Evolucao/conferir-projeto.gs` num arquivo novo e
+   > execute **`oQueFaltaNoProjeto`**: ela não depende de nenhum outro arquivo
+   > do PGO. Depois, apague-a.
 
-8. Abra o sistema e defina a senha de administrador.
+7. **Abra o sistema** pelo endereço da implantação, defina a senha de
+   administrador em **Configurações › Identidade** e cadastre a equipe em
+   **Configurações › Usuários** — cada pessoa com o seu canal e o seu nível de
+   acesso.
 
-**A instalação recusa rodar sobre uma planilha que já tenha dado.** É a única
-rotina do sistema que cria estrutura; depois dela, nenhum caminho do produto
-cria, renomeia, apaga ou reordena aba e coluna por conta própria.
+### Atualizar uma instalação que já está em uso
 
-Nenhum dado operacional é semeado: bases, canais e SUSEPs bloqueadas
-nascem vazios.
+1. **Cole os arquivos que mudaram** — na planilha de código, são as abas com
+   ◆ — ou todos, se preferir. Nada se perde: o código não guarda dado.
+2. **Execute `atualizarPGO` uma vez**, no editor. Ela traz para a planilha em
+   uso o que a versão nova pede, **sem apagar nada** e sem mexer no que você
+   já ajustou em Configurações. Pode rodar quantas vezes quiser: a segunda
+   não muda nada. O laudo vem em três partes:
+   - **FEITO** — o que ela mudou agora;
+   - **DECISÃO SUA** — o que ela viu e deixou para você decidir, com o texto
+     pronto para colar em Configurações;
+   - **JÁ ESTAVA EM DIA** — o que ela conferiu e não precisou mexer.
+3. **Execute `diagnosticoRECC`** para conferir o resto.
+
+Até rodar o `atualizarPGO`, o sistema continua abrindo: o que é novo só
+aparece depois. O que cada versão mudou está em
+[`05-progresso.md`](Evolucao/05-progresso.md).
+
+### As ferramentas do editor
+
+Funções feitas para rodar no editor do Apps Script (*escolher na lista ›
+Executar*). Pelo navegador, só um administrador consegue chamá-las.
+
+| Função | Para quê | Mexe na planilha? |
+|---|---|---|
+| `instalarRECC` | instalar numa planilha vazia | cria tudo |
+| `atualizarPGO` | trazer a versão nova para a planilha em uso | só acrescenta |
+| `diagnosticoRECC` | conferir o sistema inteiro, com o que fazer em cada problema | não |
+| `verificarEstruturaRECC` | conferir só as abas e os arquivos copiados | não |
+| `normalizarBase` | dar Id às linhas digitadas direto na planilha | só a coluna Id |
+
+E duas que são para **acionadores de tempo** (*Acionadores › Adicionar
+acionador*), e não para clicar: `arquivarAuditoriaAgendada` (mensal) e
+`atualizarAnalisesAgendadas` (no horário que a operação quiser). As duas
+obedecem às próprias regras mesmo se chamadas fora de hora: o arquivamento só
+acontece de 2 em 2 meses, e as análises só regeram o que já está ligado.
 
 ---
 
@@ -260,7 +243,7 @@ nascem vazios.
 node Evolucao/Testes/conferir-responsividade.js
 ```
 
-Abre a prévia num navegador de verdade e percorre **as 7 telas em 12
+Abre a prévia num navegador de verdade e percorre **as 8 telas em 12
 larguras** — do monitor de 1600px ao celular de 320px —, procurando a página
 rolar na horizontal e o elemento que escapou da janela. Tabela dentro de uma
 caixa que rola de propósito não conta: rolar a tabela é a solução, não o
@@ -278,13 +261,13 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-944 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+971 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
 de verdade**: numa célula de formato Geral, `'00000010'` vira `10` e
 `'000000E1'` vira `0`. Há um teste dedicado só a provar que o simulador
-realmente corrompe — sem ele, os outros 943 não valeriam nada.
+realmente corrompe — sem ele, os outros 970 não valeriam nada.
 
 ## Ver as telas sem publicar
 
@@ -1162,7 +1145,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-944 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+971 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

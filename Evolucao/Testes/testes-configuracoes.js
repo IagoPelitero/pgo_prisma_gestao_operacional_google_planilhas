@@ -1696,7 +1696,7 @@ function rodarTestesDeConfiguracoes() {
     const tela = lerTela('Configuracoes.html');
     contem(tela, "Servidor.chamar('configuracaoDoArquivoDaAuditoria')");
     contem(tela, "Servidor.chamar('salvarArquivoDaAuditoria'");
-    contem(tela, "Servidor.chamar('arquivarAuditoriaAgora')");
+    contem(tela, "Servidor.chamarSemPressa('arquivarAuditoriaAgora')");
     contem(tela, 'arquivarAuditoriaAgendada', 'o nome da função para o acionador');
     contem(tela, 'id="arquivar-agora"');
   });

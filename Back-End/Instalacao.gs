@@ -8,8 +8,8 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. A ÚNICA ROTINA QUE CRIA ESTRUTURA   (era Instalador.gs)
- *   2. O LAUDO QUE RODA DENTRO DO APPS SCRIPT   (era Diagnostico.gs)
+ *   1. A ÚNICA ROTINA QUE CRIA ESTRUTURA
+ *   2. O LAUDO QUE RODA DENTRO DO APPS SCRIPT
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -19,15 +19,11 @@
    #
    #  SEÇÃO 1 de 2 · A ÚNICA ROTINA QUE CRIA ESTRUTURA
    #
-   #  Era o arquivo Back-End/Instalador.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Instalador.gs · a única rotina que cria estrutura
+ * A única rotina que cria estrutura
  * ============================================================================
  * Rode `instalarRECC()` UMA vez, no editor do Apps Script, sobre uma planilha
  * VAZIA. Ela recusa rodar se qualquer aba do contrato já tiver dado.
@@ -97,7 +93,7 @@ function instalarRECC() {
       ' de ' + RECC_TETO_DE_CELULAS.toLocaleString('pt-BR') +
       ' (' + orcamento.percentual + '%)',
     '',
-    'Próximo passo: abrir Configurações › Segurança e definir a senha de ADM.'
+    'Próximo passo: abrir Configurações › Identidade e definir a senha de administrador.'
   ].join('\n');
 
   Logger.log(laudo);
@@ -446,7 +442,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   // nem foi perdido — a tentativa de contato não chegou a ninguém. Fica depois
   // dos desfechos que já existiam, na mesma ordem que a migração usa numa
   // instalação em uso: duas ordens diferentes para o mesmo status confundiriam
-  // quem olha as duas planilhas. A ordem é editável em Cadastrar Caso › Listas.
+  // quem olha as duas planilhas. A ordem é editável em Configurações › Ajustes Gerais.
   //
   // OS DESFECHOS, com os nomes do PO: "um caso concluído é cancelado, pago,
   // não retido, retido ou sem sucesso de contato". São os cinco marcados como
@@ -543,7 +539,7 @@ function semearDadosIniciais_(emailDoInstalador) {
     // O produto vem no formato "código - nome", num seletor só. O sistema
     // separa os dois ao gravar, para o painel agrupar por código.
     // A RET trata Vida Individual e, agora, Vida em Grupo. A lista é ponto de
-    // partida: a operação acrescenta produto em Configurações › Listas, sem
+    // partida: a operação acrescenta produto em Configurações › Ajustes Gerais, sem
     // programador — é o que mantém o sistema aberto enquanto ela se forma.
     PRODUTO: ['1101 - VIDA INDIVIDUAL', '1102 - VIDA EM GRUPO',
       '1103 - PRESTAMISTA', '1104 - ACIDENTES PESSOAIS'],
@@ -687,7 +683,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas, naProdutividade) 
  * Os cartões que o Trabalho mostra quando o sistema nasce.
  *
  * A RET mostra todas as situações; a Mesa Diamante mostra duas. Não é
- * capricho: a Canal tem muito menos volume, e sete cartões de números pequenos
+ * capricho: a Mesa Diamante tem muito menos volume, e sete cartões de números pequenos
  * viram uma parede que ninguém lê. Tudo isso é editável em Configurações —
  * este é o ponto de partida, não a regra.
  */
@@ -802,7 +798,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'canal', 'contagem', '', 6, 1, 5));
   // Por analista: a mesma pergunta do "por área", uma camada abaixo. O
   // recorte por área já existe sem gráfico nenhum — é o seletor de canal no
-  // alto da tela, e cada canal tem os gráficos dela. O que faltava era ver a
+  // alto da tela, e cada canal tem os gráficos dele. O que faltava era ver a
   // distribuição DENTRO da área, e é isto.
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
@@ -896,7 +892,7 @@ const RECC_PADRAO_DO_FORMULARIO = {
    * Campo da base que a operação não listou não é apagado: vai para a seção
    * "Outros" no fim, ligado. Apagar perderia dado já gravado, e desligar
    * calado esconderia o que alguém ainda usa. Tudo isso é editável em
-   * Configurações › Campos — aqui é só o ponto de partida.
+   * Configurações › Cadastrar Caso — aqui é só o ponto de partida.
    */
 
   // ==========================================================================
@@ -1286,7 +1282,9 @@ function atualizarPGO() {
   var paraVoce = [];
 
   // --- 1. as migrações antigas, que são seguras de repetir -----------------
-  var deCanais = migrarParaCanais();
+  var deCanais = migrarParaCanais_();
+  feito = feito.concat(deCanais.feito);
+  pulados = pulados.concat(deCanais.pulados);
 
   // --- 2. as colunas novas da aba CANAIS -----------------------------------
   //
@@ -1397,21 +1395,17 @@ function atualizarPGO() {
       + par[1] + ' Apague a aba quando quiser.');
   });
 
-  var recado = 'ATUALIZAÇÃO DO PGO\n\n'
-    + (feito.length ? 'FEITO:\n  ' + feito.join('\n  ') : 'Nada a fazer.')
-    + (pulados.length ? '\n\nJÁ ESTAVA ASSIM:\n  ' + pulados.join('\n  ') : '')
-    + (paraVoce.length ? '\n\nDECISÃO SUA:\n  ' + paraVoce.join('\n  ') : '')
-    + '\n\n--- migração de canais ---\n' + deCanais
-    + '\n\nAgora rode diagnosticoRECC() para conferir o que sobrou.';
+  var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
   Logger.log(recado);
   return recado;
 }
 
 /**
- * A PORTA DO EDITOR — quem pode rodar as funções que mexem na estrutura.
+ * A PORTA DO EDITOR — quem pode rodar as funções feitas para o editor.
  *
- * `atualizarPGO()` e `migrarParaCanais()` são feitas para o editor do Apps
- * Script. Só que toda função sem "_" no fim também pode ser chamada pelo
+ * `atualizarPGO()`, `migrarParaCanais()`, `normalizarBase()`,
+ * `diagnosticoRECC()` e `verificarEstruturaRECC()` são feitas para o editor do
+ * Apps Script. Só que toda função sem "_" no fim também pode ser chamada pelo
  * navegador, por qualquer pessoa com o sistema aberto: o `google.script.run`
  * não sabe quais funções a tela usa. Achado 68.
  *
@@ -1426,14 +1420,14 @@ function atualizarPGO() {
  * ler o e-mail de quem executa usa a mesma que o sistema já tem.
  */
 function exigirPortaDoEditor_(nomeDaFuncao) {
-  var quemChama = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
-  var quemExecuta = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
+  var quemChama = emailParaComparar_(Session.getActiveUser().getEmail());
+  var quemExecuta = emailParaComparar_(Session.getEffectiveUser().getEmail());
   if (quemChama && quemChama === quemExecuta) return true;
 
   var quem = usuarioAtual_();
   if (quem.cadastrado && podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA)) return true;
-  throw new Error(nomeDaFuncao + '() mexe na estrutura da planilha: rode pelo '
-    + 'editor do Apps Script, ou peça a um administrador.');
+  throw new Error(nomeDaFuncao + '() é para o editor do Apps Script: rode por '
+    + 'lá, ou peça a um administrador.');
 }
 
 /**
@@ -2250,7 +2244,7 @@ const RECC_FILA_DO_PO = [
  * Aplica RECC_FILA_DO_PO na planilha em uso, grupo por grupo.
  *
  * TROCA SÓ O GRUPO QUE ESTÁ COMO A INSTALAÇÃO DEIXOU. As colunas da fila são
- * editáveis em Configurações › Canais, e um grupo que alguém já reescreveu foi
+ * editáveis em Configurações › Canais de trabalho, e um grupo que alguém já reescreveu foi
  * reescrito de propósito: passar por cima seria desfazer o trabalho de alguém
  * sem avisar. Esse vai para a "DECISÃO SUA", com o texto pronto para colar.
  *
@@ -2397,7 +2391,7 @@ function aceitarCnpjNaMesa_(pulados, paraVoce) {
   if (mascara && mascara !== '000.000.000-00') {
     paraVoce.push('Mesa Diamante: o campo CPF tem uma máscara personalizada ("'
       + mascara + '") e ficou como está. Para aceitar CNPJ, use em Configurações › '
-      + 'Campos do formulário a máscara ' + novaMascara + '.');
+      + 'Cadastrar Caso a máscara ' + novaMascara + '.');
     return feito;
   }
 
@@ -2565,6 +2559,15 @@ function camposDaAbaPorCabecalho_(nomeDaAba) {
  */
 function migrarParaCanais() {
   exigirPortaDoEditor_('migrarParaCanais');
+  var migracao = migrarParaCanais_();
+  var recado = laudoDaAtualizacao_('MIGRAÇÃO PARA CANAIS', migracao.feito,
+    migracao.pulados, []);
+  Logger.log(recado);
+  return recado;
+}
+
+/** O trabalho de `migrarParaCanais`, sem o laudo: o atualizarPGO junta ao dele. */
+function migrarParaCanais_() {
   var planilha = planilhaAtiva_();
   var feito = [];
   var pulados = [];
@@ -2688,12 +2691,74 @@ function migrarParaCanais() {
 
   esquecerEstruturaLida_();
 
-  var recado = 'MIGRAÇÃO PARA CANAIS\n\n'
-    + (feito.length ? 'FEITO:\n  ' + feito.join('\n  ') : 'Nada a fazer.')
-    + (pulados.length ? '\n\nJÁ ESTAVA ASSIM:\n  ' + pulados.join('\n  ') : '')
-    + '\n\nAgora rode diagnosticoRECC() para conferir o que sobrou.';
-  Logger.log(recado);
-  return recado;
+  return { feito: feito, pulados: pulados };
+}
+
+/**
+ * Como o laudo junta as conferências parecidas numa linha só: o padrão do
+ * texto, o nome do grupo e o item que entra na lista. O que não casa com
+ * nenhum padrão aparece como veio.
+ */
+var RECC_GRUPOS_DO_LAUDO = [
+  [/^([A-Z][A-Z0-9_]*)\.(.+) já existe$/,
+    function (m) { return m[1] + ' já tinha'; }, function (m) { return m[2]; }],
+  [/^([A-Z][A-Z0-9_]*)\.(.+) já não existe$/,
+    function (m) { return m[1] + ' já não tinha'; }, function (m) { return m[2]; }],
+  [/^([A-Z][A-Z0-9_]*)\.(.+) já parte em colunas$/,
+    function (m) { return m[1] + ' já partia em colunas'; }, function (m) { return m[2]; }],
+  [/^(.+): o status "(.+)" já existe$/,
+    function (m) { return m[1] + ' já tinha os status'; }, function (m) { return m[2]; }],
+  [/^o status "(.+)" já existe na (.+)$/,
+    function (m) { return m[2] + ' já tinha os status'; }, function (m) { return m[1]; }],
+  [/^(.+): o status "(.+)" já não existe$/,
+    function (m) { return m[1] + ' já não tinha os status'; }, function (m) { return m[2]; }],
+  [/^(.+): o grupo "(.+)" da fila já está como pedido$/,
+    function () { return 'Grupos da fila já como pedido'; },
+    function (m) { return m[1] + ' › ' + m[2]; }],
+  [/^a disponibilidade "(.+)" já existe$/,
+    function () { return 'Disponibilidades que já existiam'; }, function (m) { return m[1]; }],
+  [/^o canal (.+) já tem sinalizador$/,
+    function () { return 'Canais que já tinham sinalizador'; }, function (m) { return m[1]; }]
+];
+
+/**
+ * O laudo de uma atualização, na ordem em que ele é lido: o que MUDOU, o que
+ * pede uma DECISÃO SUA e, por último, o que já estava em dia.
+ *
+ * "Já estava em dia" é a maior parte do texto e a que menos importa, então
+ * vem no fim e AGRUPADA por aba — "CATALOGO já tinha: Id, Tipo, Nome…" numa
+ * linha, e não treze linhas de "CATALOGO.Id já existe". Era assim antes: o
+ * laudo do atualizarPGO trazia oitenta linhas iguais e, colado embaixo, o
+ * laudo inteiro da migração de canais, com o seu próprio "Nada a fazer" e a
+ * mesma frase final repetida.
+ */
+function laudoDaAtualizacao_(titulo, feito, pulados, paraVoce) {
+  var grupos = {};
+  var ordem = [];
+  pulados.forEach(function (texto) {
+    var regra = null;
+    var achado = null;
+    for (var i = 0; i < RECC_GRUPOS_DO_LAUDO.length && !achado; i++) {
+      achado = RECC_GRUPOS_DO_LAUDO[i][0].exec(texto);
+      if (achado) regra = RECC_GRUPOS_DO_LAUDO[i];
+    }
+    var chave = achado ? regra[1](achado) : texto;
+    if (!grupos[chave]) { grupos[chave] = []; ordem.push(chave); }
+    if (achado && grupos[chave].indexOf(regra[2](achado)) < 0) {
+      grupos[chave].push(regra[2](achado));
+    }
+  });
+  var emDia = ordem.map(function (chave) {
+    return grupos[chave].length ? chave + ': ' + grupos[chave].join(', ') : chave;
+  });
+
+  return titulo + '\n\n'
+    + (feito.length ? 'FEITO:\n  ' + feito.join('\n  ')
+      : 'Nada a mudar: a planilha já estava em dia.')
+    + (paraVoce.length ? '\n\nDECISÃO SUA:\n  ' + paraVoce.join('\n  ') : '')
+    + (emDia.length ? '\n\nJÁ ESTAVA EM DIA (' + pulados.length + ' conferências):\n  '
+      + emDia.join('\n  ') : '')
+    + '\n\nPara conferir o sistema inteiro, rode diagnosticoRECC().';
 }
 
 /**
@@ -2716,7 +2781,49 @@ function ehAAbaDeCorretoras_(aba) {
   return temSusep && !temAba;
 }
 
+/**
+ * NORMALIZAR BASE — para rodar no editor do Apps Script, sem parâmetro.
+ *
+ * Dá Id a toda linha que entrou direto na planilha sem ele, em todas as abas
+ * do contrato que têm Id, e realinha cada sequência sem nunca baixá-la. Id
+ * repetido ela aponta no laudo, e não corrige: apague o Id da linha que é a
+ * cópia e rode de novo.
+ *
+ * Aba de outra planilha (a de cadastros) que não aceita escrita fica de fora,
+ * com o motivo no laudo.
+ */
+function normalizarBase() {
+  exigirPortaDoEditor_('normalizarBase');
+  var linhas = [];
+  nomesDasAbasDoContrato_().forEach(function (nomeDaAba) {
+    var laudo;
+    try {
+      if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba), 'Id') < 0) return;
+      if (!abaDeForaAceitaEscrita_(nomeDaAba).aceita) {
+        linhas.push(nomeDaAba + ': fica de fora — mora na planilha de cadastros, '
+          + 'que não aceita escrita.');
+        return;
+      }
+      laudo = normalizarIdentificadoresDaAba_(nomeDaAba);
+    } catch (erro) {
+      linhas.push(nomeDaAba + ': não deu — ' + erro.message);
+      return;
+    }
+    linhas.push(nomeDaAba + ': ' + laudo.carimbados + ' Id(s) novo(s)'
+      + (laudo.repetidos.length
+        ? '; ' + laudo.repetidos.length + ' repetido(s) — '
+          + algunsExemplos_(laudo.repetidos.map(function (um) {
+            return 'linha ' + um.linha + ' (Id ' + um.id + ')';
+          }))
+        : ''));
+  });
+  var recado = 'normalizarBase()\n\n' + linhas.join('\n');
+  Logger.log(recado);
+  return recado;
+}
+
 function verificarEstruturaRECC() {
+  exigirPortaDoEditor_('verificarEstruturaRECC');
   var laudo = conferirEstrutura_();
   var faltamArquivos = arquivosDeTelaQueFaltam_();
   var tudoCerto = laudo.ok && !faltamArquivos.length;
@@ -2781,15 +2888,11 @@ function orcamentoDeCelulas_(planilha) {
    #
    #  SEÇÃO 2 de 2 · O LAUDO QUE RODA DENTRO DO APPS SCRIPT
    #
-   #  Era o arquivo Back-End/Diagnostico.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
  * ============================================================================
- * RECC — Diagnostico.gs · o laudo que roda DENTRO do Apps Script
+ * O laudo que roda DENTRO do Apps Script
  * ============================================================================
  * A suíte de testes prova que o código está certo. Ela não prova que ESTA
  * instalação está certa: a planilha é editável à mão, e o que a suíte conferiu
@@ -2850,11 +2953,12 @@ var RECC_EXEMPLOS_NO_LAUDO = 5;
  * Para rodar no editor do Apps Script, direto, sem abrir o sistema.
  *
  * É a porta que importa quando o sistema NÃO abre: se `doGet` está quebrado,
- * a tela não serve para diagnosticar nada. Esta função não exige permissão
- * nem senha, e não precisa: quem consegue abrir o editor do Apps Script já
- * tem acesso a tudo, e negar aqui só atrapalharia quem foi consertar.
+ * a tela não serve para diagnosticar nada. No editor ela não pede senha nem
+ * cadastro — a porta do editor passa sem ler aba nenhuma. Pelo navegador,
+ * só administrador: o laudo descreve a planilha e cita e-mails do cadastro.
  */
 function diagnosticoRECC() {
+  exigirPortaDoEditor_('diagnosticoRECC');
   var laudo = rodarDiagnostico_();
   Logger.log(laudoEmTexto_(laudo));
   return laudo;
@@ -3046,7 +3150,7 @@ function blocoDaEstrutura_() {
         algunsExemplos_(aba.aMais),
         'Nada quebra: o sistema ignora o que não conhece. Mas coluna que o '
           + 'sistema não preenche fica vazia para sempre — se ela deveria '
-          + 'existir, cadastre em Configurações › Campos.'));
+          + 'existir, cadastre em Configurações › Cadastrar Caso.'));
       return;
     }
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
@@ -3085,7 +3189,7 @@ function blocoDasSequencias_() {
           nomeDaAba + ': a aba tem Ids e a sequência não foi criada',
           'Maior Id na aba: ' + formatarIdentificador_(naAba) + '.',
           'A primeira gravação se alinha sozinha com a planilha. Se quiser '
-            + 'alinhar agora, use "Normalizar base".'));
+            + 'alinhar agora, rode normalizarBase() no editor do Apps Script.'));
       return;
     }
 
@@ -3094,7 +3198,8 @@ function blocoDasSequencias_() {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
         nomeDaAba + ': a sequência está com lixo',
         'Valor guardado: "' + guardado + '".',
-        'Use "Normalizar base" nesta aba: ela realinha sem nunca baixar o piso.'));
+        'Rode normalizarBase() no editor do Apps Script: ela realinha sem nunca '
+          + 'baixar o piso.'));
       return;
     }
     if (numero < naAba) {
@@ -3103,7 +3208,8 @@ function blocoDasSequencias_() {
         'Sequência em ' + numero + ', maior Id na aba '
           + formatarIdentificador_(naAba) + '. A próxima gravação vai reemitir '
           + 'um Id que já existe.',
-        'Use "Normalizar base" nesta aba, antes de gravar qualquer coisa.'));
+        'Rode normalizarBase() no editor do Apps Script antes de gravar qualquer '
+          + 'coisa.'));
       return;
     }
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
@@ -3169,8 +3275,9 @@ function blocoDosIds_() {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
         nomeDaAba + ': ' + repetidos.length + ' Id(s) repetido(s)',
         algunsExemplos_(repetidos),
-        'Duas linhas com o mesmo Id fazem a edição achar a errada. Corrija na '
-          + 'planilha dando um Id novo, acima do maior já usado, à segunda.'));
+        'Duas linhas com o mesmo Id fazem a edição achar a errada. Na planilha, '
+          + 'apague o Id da linha que é a cópia e rode normalizarBase() no editor: '
+          + 'ela dá um Id novo a quem ficou sem.'));
     }
 
     if (semId) {
@@ -3178,7 +3285,8 @@ function blocoDosIds_() {
         nomeDaAba + ': ' + semId + ' linha(s) sem Id',
         'Linha digitada direto na planilha nasce sem Id, e sem Id o sistema '
           + 'não consegue editá-la nem ocultá-la.',
-        'Use "Normalizar base" nesta aba: ela carimba Id em quem está sem, e '
+        'Rode normalizarBase() no editor do Apps Script: ela carimba Id em quem '
+          + 'está sem, e '
           + 'não toca em mais nada da linha.'));
     }
 
@@ -3191,16 +3299,16 @@ function blocoDosIds_() {
   return itens;
 }
 
-/** Toda coluna que um canal declara precisa existir na aba dela. */
+/** Toda coluna que um canal declara precisa existir na aba dele. */
 function blocoDasCanais_() {
   var itens = [];
   var canais = lerRegistros_('CANAIS');
 
   if (!canais.length) {
     return [item_(RECC_SITUACOES_DO_LAUDO.FALHA,
-      'Não há nenhum canal cadastrada',
+      'Não há nenhum canal cadastrado',
       'Sem canal, o Trabalho, o cadastro e a busca não têm onde procurar.',
-      'Rode instalarRECC() ou cadastre em Configurações › Canais.')];
+      'Rode instalarRECC() ou cadastre em Configurações › Canais de trabalho.')];
   }
 
   var ativas = 0;
@@ -3250,7 +3358,7 @@ function blocoDasCanais_() {
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
         'O canal "' + nome + '" cita coluna que a aba não tem',
         algunsExemplos_(problemas),
-        'Acerte em Configurações › Canais, ou acrescente a coluna em '
+        'Acerte em Configurações › Canais de trabalho, ou acrescente a coluna em '
           + nomeDaAba + '. A aba tem: ' + estrutura.cabecalhos.join(', ') + '.'));
       return;
     }
@@ -3264,7 +3372,7 @@ function blocoDasCanais_() {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
       'Nenhum canal está ligado',
       'Existem ' + canais.length + ' canal(is) cadastrado(s), e todos desligados.',
-      'Ligue pelo menos uma em Configurações › Canais. Sem canal ligada o '
+      'Ligue pelo menos um em Configurações › Canais de trabalho. Sem canal ligado o '
         + 'Trabalho abre vazio.'));
   }
 
@@ -3338,7 +3446,7 @@ function blocoDosCampos_() {
       semColuna.length + ' campo(s) apontam para coluna que não existe',
       algunsExemplos_(semColuna),
       'Cadastrar um caso com um desses campos preenchidos vai estourar. '
-        + 'Desligue o campo em Configurações › Campos, ou acrescente a coluna.'));
+        + 'Desligue o campo em Configurações › Cadastrar Caso, ou acrescente a coluna.'));
   }
 
   if (obrigatoriosDesligados.length) {

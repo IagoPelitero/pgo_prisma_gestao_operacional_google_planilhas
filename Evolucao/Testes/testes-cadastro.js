@@ -1768,7 +1768,7 @@ function rodarTestesDeCadastro() {
       'nenhuma regra de CSS usa :has()');
     const tela = lerPeca('CadastrarCaso');
     const montar = tela.substring(tela.indexOf('function montar('), tela.indexOf('function carregarFormulario'));
-    contem(montar, "return SeletorDeCanal.montar(pacote.canais, canalEscolhida)\n      + '<form class=\"cartao formulario\" id=\"formulario-do-caso\"",
+    contem(montar, "return SeletorDeCanal.montar(pacote.canais, canalEscolhido)\n      + '<form class=\"cartao formulario\" id=\"formulario-do-caso\"",
       'o formulário sai logo depois dos canais, direto no miolo');
   });
 }

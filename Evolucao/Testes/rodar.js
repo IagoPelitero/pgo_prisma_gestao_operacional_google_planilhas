@@ -26,6 +26,7 @@ const { rodarTestesDeImportacao } = require('./testes-importacao');
 const { rodarTestesDeCadastrosDeFora } = require('./testes-cadastros-de-fora');
 const { rodarTestesDeDiagnostico } = require('./testes-diagnostico');
 const { rodarTestesDeSinalizadores } = require('./testes-sinalizadores');
+const { rodarTestesDaVarredura } = require('./testes-varredura');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -42,6 +43,7 @@ rodarTestesDeImportacao();
 rodarTestesDeCadastrosDeFora();
 rodarTestesDeDiagnostico();
 rodarTestesDeSinalizadores();
+rodarTestesDaVarredura();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

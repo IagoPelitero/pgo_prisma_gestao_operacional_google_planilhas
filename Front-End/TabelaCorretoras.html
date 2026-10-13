@@ -672,7 +672,7 @@ var TelaTabelaCorretoras = (function () {
     var onde = elemento('resultado-da-importacao');
     onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
 
-    Servidor.chamar('conferirImportacao', tipoDaImportacao, fonte)
+    Servidor.chamarSemPressa('conferirImportacao', tipoDaImportacao, fonte)
       .entao(function (resposta) {
         conferido = resposta;
         desenharConferencia();
@@ -767,7 +767,7 @@ var TelaTabelaCorretoras = (function () {
     SenhaDeAdministrador.pedir(function () {
       elemento('resultado-da-importacao').innerHTML =
         '<p class="carregando-campos">Gravando…</p>';
-      Servidor.chamar('aplicarImportacao', tipoDaImportacao, fonte)
+      Servidor.chamarSemPressa('aplicarImportacao', tipoDaImportacao, fonte)
         .entao(function (feito) {
           avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
             + ' atualizada(s) em ' + feito.titulo + '.', 'bom');

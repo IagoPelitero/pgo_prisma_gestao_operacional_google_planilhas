@@ -26,12 +26,11 @@
  */
 function oQueFaltaNoProjeto() {
   var esperado = {
-    'Cadastros.gs': ['aplicarImportacao', 'bloquearSusep', 'conferirImportacao', 'desbloquearSusep', 'exportarCorretoras', 'listarSusepsBloqueadas', 'ocultarCorretora', 'opcoesDaImportacao', 'origemDosCadastros', 'salvarCorretora', 'tabelaDeCorretoras'],
-    'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'conferirImportacaoDeCasos', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'importarCasos', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
-    'Config.gs': ['arquivarAuditoriaAgora', 'conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'gerarAnalise', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarSinalizador', 'usoDoItemDoCatalogo'],
+    'Cadastros.gs': ['bloquearSusep', 'desbloquearSusep', 'exportarCorretoras', 'listarSusepsBloqueadas', 'ocultarCorretora', 'opcoesDaImportacao', 'origemDosCadastros', 'salvarCorretora', 'tabelaDeCorretoras'],
+    'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
+    'Config.gs': ['conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarSinalizador', 'usoDoItemDoCatalogo'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
-    'Indicadores.gs': ['detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'salvarComponentesDoPainel'],
-    'Instalacao.gs': ['diagnosticoDoSistema']
+    'Indicadores.gs': ['detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'salvarComponentesDoPainel']
   };
 
   var faltando = [];
@@ -48,7 +47,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 84 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 77 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

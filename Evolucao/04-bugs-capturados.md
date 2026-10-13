@@ -1634,9 +1634,165 @@ propósito (tirar o escape de dentro do selo) ficou na lista das dezoito.
 
 ---
 
+### 73 · O e-mail parecido que entrava como o administrador
+
+**Sintoma.** Nenhum visível — achado na varredura. `primeiroadm@`,
+`primeiro_adm@`, `primeiro-adm@` e até `primeiro.adm@exemplocom` entravam no
+sistema como `primeiro.adm@exemplo.com`, com o nível dele.
+
+**Causa.** O login comparava e-mails com `normalizarParaComparar_`, feita para
+comparar NOMES: ela tira acento, ponto, traço e sublinhado. Com o app aberto a
+qualquer conta Google, bastava um domínio escolhido a dedo
+(`iago@peliteroportoseguro.com.br`) para entrar como
+`iago.pelitero@portoseguro.com.br`.
+
+**Defesa.** `emailParaComparar_`: só tira o espaço das pontas e a caixa. Vale
+no login e no cadastro de usuário — que agora aceita `joao.silva@` e
+`joaosilva@` como as duas pessoas que são. Testes com as cinco variações.
+
+---
+
+### 74 · O campo que a pessoa apagava e continuava lá
+
+**Sintoma.** Apagar a Área responsável, a SUSEP ou o título do e-mail no
+"Trabalhar no caso" e salvar: a tela dizia que salvou, e o valor continuava na
+planilha. Na Mesa, um caso encaminhado por engano nunca mais contava como
+"finalizado na célula".
+
+**Causa.** Na validação, vazio era sempre "não mexer" — certo no cadastro,
+errado na edição.
+
+**Defesa.** Na edição, campo que VEIO no formulário vazio é apagado, inclusive
+os que se gravam em várias colunas (a proposta, o produto). Campo que não veio,
+ou travado, fica como estava. E a tela não manda como vazio o valor que o
+controle não conseguiu mostrar (uma data num formato que o calendário não lê):
+salvar não apaga o que a pessoa nem viu.
+
+---
+
+### 75 · A busca que escondia os casos do próprio analista
+
+**Sintoma.** Quem vê só os próprios casos buscava "Silva", tinha 3 casos com
+esse nome e via **zero** — com o aviso "a busca achou 123 casos".
+
+**Causa.** A busca cortava nos 100 mais recentes e só depois recortava o
+alcance. Os 100 lugares iam para casos de outras pessoas, e o aviso ainda
+contava casos que ela não podia ver.
+
+**Defesa.** O alcance vem antes do corte, lendo só a coluna do responsável
+(`linhasNoMeuAlcance_`).
+
+---
+
+### 76 · A auditoria que guardava o CPF buscado
+
+**Causa.** Cada busca gravava o termo digitado na `AUDITORIA` — em geral um CPF
+ou um nome de segurado —, e o contrato da auditoria é "sem dado pessoal".
+
+**Defesa.** Grava só quantos resultados vieram.
+
+---
+
+### 77 · O diagnóstico aberto a qualquer pessoa logada
+
+**Causa.** `diagnosticoRECC()` e `verificarEstruturaRECC()` não conferiam quem
+chamava ("é para o editor"). Mas toda função sem `_` também é chamada pelo
+navegador — é o achado 68 de novo. O laudo descreve a planilha e cita e-mails
+do cadastro.
+
+**Defesa.** A mesma porta do editor do `atualizarPGO`: no editor rodam sem
+cadastro nenhum (servem quando o sistema não abre); pelo navegador, só
+administrador. As duas funções de acionador (`arquivarAuditoriaAgendada` e
+`atualizarAnalisesAgendadas`) ficam abertas de propósito: um acionador de tempo
+não tem quem esteja logado, e as duas obedecem às próprias regras.
+
+---
+
+### 78 · "Rode Normalizar base", que não existia
+
+**Sintoma.** Cinco mensagens — o erro de Id repetido e quatro do diagnóstico —
+mandavam rodar "Normalizar base". Não havia menu, botão nem função com esse
+nome.
+
+**Causa.** A rotina era `normalizarIdentificadoresDaAba_`: termina com `_`, não
+aparece na lista do editor e pede parâmetro. E ela só aponta Id repetido, não
+conserta — a mensagem prometia o que ela não fazia.
+
+**Defesa.** `normalizarBase()`, sem parâmetro, na lista do editor, atrás da
+porta do editor: dá Id a quem está sem em todas as abas, num bloco só. As
+mensagens dizem o que ela faz e o que fazer com o repetido: apagar o Id da
+cópia e rodar de novo.
+
+---
+
+### 79 · Duas pessoas no mesmo caso, e a segunda apagava a primeira
+
+**Causa.** O formulário volta inteiro. Quem abriu o caso antes regravava os
+valores velhos dos campos que a outra pessoa tinha acabado de mudar.
+
+**Defesa.** O caso abre com uma versão — um resumo do conteúdo da linha — e
+salvar devolve essa versão. Se a linha mudou no meio do caminho, nada é
+gravado, e a mensagem diz para abrir de novo.
+
+---
+
+### 80 · O README que mandava nomear o arquivo errado
+
+**Sintoma.** Quem seguisse o passo a passo nomearia `Comuns.html` como
+`Formulario`, e o sistema não abriria: o `Index` inclui `Comuns`.
+
+**Causa.** O nome era de antes de as peças serem juntadas. Junto com ele:
+"13 abas" (são 16), "nenhum canal é semeado" (são três), "dez blocos" no
+diagnóstico (são doze), seis mensagens apontando para seções que mudaram de
+nome ("Configurações › Segurança", "› Campos", "› Canais") e concordâncias
+que sobraram da troca de mesa por canal ("nenhum canal cadastrada").
+
+**Defesa.** O passo a passo de instalação foi reescrito para quem chega de
+fora, com a regra do Google sobre de quem o e-mail é reconhecido. Um teste
+confere que nenhuma mensagem aponta para seção que não existe.
+
+---
+
+### 81 · Contar um item de lista lendo a base inteira
+
+**Causa.** Antes de renomear ou excluir um item de lista, o sistema contava em
+quantos casos ele está — lendo todas as colunas de todas as linhas de todas as
+bases, duas vezes. Com 60 mil casos, 3 segundos no computador; no Apps Script,
+várias vezes isso.
+
+**Defesa.** Lê só as colunas dos campos que usam aquela lista: 0,07 segundo, a
+mesma conta. Lista que nenhum campo usa continua procurada na linha inteira.
+
+---
+
+### 82 · A tela que desistia de uma importação ainda em andamento
+
+**Causa.** Toda chamada desistia em 40 segundos e dizia "provavelmente falta um
+arquivo .gs". Uma importação de 2.000 linhas num horário cheio podia passar
+disso: a tela dava como perdida, o servidor terminava, e quem tentasse de novo
+importava duas vezes.
+
+**Defesa.** `Servidor.chamarSemPressa` para o que trabalha de verdade
+(importar, arquivar, gerar análise, diagnosticar), com o teto do Apps Script. E
+a mensagem de desistência avisa que a ação pode ter sido feita.
+
+---
+
+### 83 · O laudo do atualizarPGO que repetia tudo
+
+**Sintoma.** Rodando numa planilha em dia: oitenta linhas de "X.Y já existe",
+depois o laudo inteiro da migração de canais colado embaixo — com o seu próprio
+"Nada a fazer" — e a frase "Agora rode diagnosticoRECC()" duas vezes.
+
+**Defesa.** Um laudo só, na ordem em que se lê: FEITO, DECISÃO SUA e, por
+último, JÁ ESTAVA EM DIA, agrupado por aba ("CATALOGO já tinha: Id, Tipo,
+Nome…"). As mesmas 90 conferências, em 31 linhas.
+
+---
+
 ## O que esta lista ensina
 
-**São setenta e dois achados, e a maioria era silenciosa.** Não davam erro, não
+**São oitenta e três achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -1808,3 +1964,10 @@ Daí as duas práticas que o projeto não abre mão:
     testada.** O item 72 passava porque a primeira ocorrência de `escapar(...)`
     satisfazia a busca. Quebre a segunda de propósito: se continuar verde, o
     teste está olhando a ocorrência errada.
+43. **Função feita para comparar uma coisa não serve para comparar outra.** O
+    item 73 usava, para e-mail, a função de comparar nomes — que existe
+    justamente para ignorar o que, num e-mail, identifica a pessoa.
+44. **Mensagem que manda rodar algo é promessa.** O item 78 citava uma
+    ferramenta que não existia, e o item 80 um arquivo com o nome errado. Quem
+    lê uma instrução do sistema segue ao pé da letra — e é no dia de emergência
+    que ela é lida.

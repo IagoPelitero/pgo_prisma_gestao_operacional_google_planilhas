@@ -17,15 +17,15 @@ abaixo com o motivo.
 
 | Assunto | O que dá para fazer | Onde |
 |---|---|---|
-| **Campos do formulário** | Rótulo, dica, seção, tipo, máscara, obrigatoriedade, ordem, lista de origem, ligar e desligar. A máscara aceita **formas alternativas separadas por `\|`** — `000.000.000-00\|00.000.000/0000-00` é CPF ou CNPJ: a tela troca pelo tamanho, e o servidor aceita qualquer um dos tamanhos | Campos do formulário |
-| **Coluna nova na base** | Criar campo, que cria a coluna na planilha | Campos do formulário · **pede senha** |
+| **Campos do formulário** | Rótulo, dica, seção, tipo, máscara, obrigatoriedade, ordem, lista de origem, ligar e desligar. A máscara aceita **formas alternativas separadas por `\|`** — `000.000.000-00\|00.000.000/0000-00` é CPF ou CNPJ: a tela troca pelo tamanho, e o servidor aceita qualquer um dos tamanhos | Cadastrar Caso |
+| **Coluna nova na base** | Criar campo, que cria a coluna na planilha | Cadastrar Caso · **pede senha** |
 | **Usuários** | Cadastrar, editar, trocar cargo e nível, canal que atende, tirar o acesso | Usuários |
 | **Níveis de acesso** | Quais telas abrem, o que a pessoa pode fazer, até onde enxerga, quais canais | Níveis de acesso |
 | **Quem vê a produtividade de quem** | Por nível: bloqueado, só os próprios, a equipe dele, ou o canal inteiro. É INDEPENDENTE do "até onde enxerga" — um analista pode ver só os casos dele na fila e a equipe inteira na Produtividade. E "bloqueado" tira a tela do menu | Níveis de acesso |
 | **Listas** | Criar lista nova, renomear e excluir a que nenhum campo usa. Itens de qualquer lista — situações, canais, motivos, ramos, áreas, cargos, formas de pagamento, origens, produtos, assuntos: criar, renomear o rótulo, recolorir, reordenar, desligar e excluir (os casos mantêm o texto). Cada lista diz em quais campos é usada | Ajustes Gerais |
-| **Em qual coluna cada status carimba** | Um status pode gravar data e hora numa coluna da base quando o caso chega nele. É o controle de produtividade — e o administrador aponta status novos para colunas novas, sem programador | Listas → Situações |
-| **Quais status fecham o caso** | A marca "Fecha o caso (status final)" de cada status. O que é final entra em "Concluídos" e na meta, e sai de "Ainda em aberto". Não trava o caso. Na RET são Não retido, Retido, Sem sucesso de contato, Cancelado e Pago; na Mesa, Concluído, Concluído na mesa e Sem retorno; no VG, o PO ainda vai decidir — é aqui que ele decide | Listas → Situações |
-| **Canais de trabalho** | Nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar. As **colunas da fila se montam num editor visual**, por canal: grupos (renomear, subir, descer, criar, tirar), as linhas de cada grupo (acrescentar, subir, descer, tirar) e **"+ juntar…"**, que põe duas colunas numa linha só, com hífen — é assim que a RET mostra a proposta inteira. O **primeiro item de cada grupo é o destaque** | Canais de trabalho |
+| **Em qual coluna cada status carimba** | Um status pode gravar data e hora numa coluna da base quando o caso chega nele. É o controle de produtividade — e o administrador aponta status novos para colunas novas, sem programador | Ajustes Gerais → Situações |
+| **Quais status fecham o caso** | A marca "Fecha o caso (status final)" de cada status. O que é final entra em "Concluídos" e na meta, e sai de "Ainda em aberto". Não trava o caso. Na RET são Não retido, Retido, Sem sucesso de contato, Cancelado e Pago; na Mesa, Concluído, Concluído na mesa e Sem retorno; no VG, o PO ainda vai decidir — é aqui que ele decide | Ajustes Gerais → Situações |
+| **Canais de trabalho** | **Criar um canal novo** (cria a aba na planilha; pede senha), nome, descrição, coluna da data, da hora, da situação, da finalização, da área responsável, colunas da fila e os grupos delas, ordem, ligar e desligar. As **colunas da fila se montam num editor visual**, por canal: grupos (renomear, subir, descer, criar, tirar), as linhas de cada grupo (acrescentar, subir, descer, tirar) e **"+ juntar…"**, que põe duas colunas numa linha só, com hífen — é assim que a RET mostra a proposta inteira. O **primeiro item de cada grupo é o destaque** | Canais de trabalho |
 | **Repetição na importação** | Na hora de importar, quem importa escolhe como reconhecer o repetido: uma coluna, a **proposta no mesmo mês** (canais com proposta em pedaços — hoje a RET, onde ela já vem marcada) ou trazer tudo | Importação, no passo de conferir |
 | **Cartões do Trabalho** | Criar, renomear, escolher o que cada um conta, a cor, a ordem, mostrar ou ocultar, remover — até 12 por tela | Painéis → Cards do Trabalho |
 | **Cartões da Produtividade RECC** | A mesma coisa, numa **lista separada**: o Trabalho mostra o que ainda dá trabalho, a Produtividade mostra o que já foi entregue | Painéis → Cartões da Produtividade |
@@ -33,30 +33,37 @@ abaixo com o motivo.
 | **Gráficos da Produtividade RECC** | Criar, escolher a forma, o campo que vira eixo, o que medir, o TOP N e o tamanho na tela | Painéis → Gráficos |
 | **Meta por pessoa** | Quantos casos por mês se espera de alguém no canal. Zero desliga a barra de progresso | Canais de trabalho |
 | **SLA em horas úteis** | Por canal: quantas horas úteis (zero desliga), início e fim do expediente (como 08:15 e 18:30) e as colunas da data e da hora da **primeira resposta**, que é onde o prazo para (caso encerrado sem resposta para no encerramento). Conta de segunda a sexta, só dentro do expediente. A Mesa Diamante nasce com 6 horas, das 08:15 às 18:30, até "Data resposta" e "Hora resposta"; RET e VG, sem SLA. A tela recusa expediente que termina antes de começar | Canais de trabalho |
-| **Sinalizadores de prazo** | Por canal, quantos prazos quiser: nome, prazo, **dias ou horas úteis**, quanto antes o amarelo acende, a coluna que liga o prazo (a Mesa usa "Área responsável": só o caso encaminhado tem prazo), a coluna da data e da hora de onde conta, o expediente, a ordem, ligar e desligar. A RET nasce com 3 dias (amarelo no último), a Mesa com 48 horas (amarelo nas últimas 10) e o VG com um sinalizador **desligado**, à espera da regra | Configurações › Sinalizadores |
+| **Sinalizadores de prazo** | Por canal, quantos prazos quiser: nome, prazo, **dias ou horas úteis**, quanto antes o amarelo acende, a coluna que liga o prazo (a Mesa usa "Área responsável": só o caso encaminhado tem prazo), a coluna da data e da hora de onde conta, o expediente, a ordem, ligar e desligar. A RET nasce com 3 dias (amarelo no último), a Mesa com 48 horas (amarelo nas últimas 10) e o VG com um sinalizador **desligado**, à espera da regra | Sinalizadores |
 | **Corretoras e canais** | Cadastrar, editar o segmento, tirar do cadastro — e cadastrar direto as SUSEPs que os casos citam | Tabela de Corretoras |
 | **SUSEPs bloqueadas** | Bloquear dizendo **quem bloqueou** — a companhia (selo vermelho) ou a corretora (selo violeta) —, **editar** (é assim que as antigas, sem tipo, ganham o tipo) e liberar. O histórico do bloqueio permanece | Tabela de Corretoras |
 | **Importar em lote** | Colar a planilha de corretoras (SUSEP, corretora, canal, segmento) ou a de SUSEPs bloqueadas, conferir o que vai acontecer linha a linha, e só então gravar | Tabela de Corretoras → Importar · **pede senha** |
 | **Importar uma base de casos** | Trazer cem ou trezentos casos de outra planilha — colando ou pelo link —, escolher para onde cada coluna vai, dividir entre os analistas em rodízio, pular o que já entrou e dar um nome ao lote | Importação · **ação `importar`** |
-| **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade e segurança |
-| **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade e segurança |
-| **Senha de administrador** | Definir e trocar | Identidade e segurança |
+| **Identidade** | Nome curto, nome por extenso, operação, frase da tela de bloqueio, cor da operação, plataforma, fabricante, **logo** (escolhendo a imagem do computador) | Identidade |
+| **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade |
+| **Senha de administrador** | Definir e trocar | Identidade |
 | **Busca** | Em quais colunas cado canal procura. Vale para o Buscar Caso **e** para a busca digitada do Trabalho, que procura também nas colunas da fila | Canais de trabalho |
-| **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura e auditoria |
-| **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura e auditoria |
-| **Arquivo da auditoria** | O Id da planilha que recebe a auditoria com **mais de 2 meses** (conferido na hora, e não pode ser esta mesma), e o botão **Arquivar agora**. Copia, confere e só então apaga daqui. Para ser automático, a cada 2 meses: um acionador **mensal** no editor do Apps Script para `arquivarAuditoriaAgendada` | Estrutura e auditoria · **pede senha** |
+| **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura |
+| **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura |
+| **Arquivo da auditoria** | O Id da planilha que recebe a auditoria com **mais de 2 meses** (conferido na hora, e não pode ser esta mesma), e o botão **Arquivar agora**. Copia, confere e só então apaga daqui. Para ser automático, a cada 2 meses: um acionador **mensal** no editor do Apps Script para `arquivarAuditoriaAgendada` | Estrutura · **pede senha** |
+| **Quais colunas a importação pode preencher** | Ajustes Gerais → Situações, na coluna do carimbo de cada status | O carimbo nunca é sugerido sozinho, mas pode ser escolhido no de-para. Criar um status novo apontando para uma coluna já a torna escolhível |
+| **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: canal, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
+| **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, canais, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
+
+---
+
+## Só no código — para quem mantém
+
+Funcionam, mas mudar exige mexer numa linha do código. Cada uma é uma constante
+com nome, num lugar só.
+
+| Assunto | Onde mora | Como está hoje |
+|---|---|---|
 | **Os limites e as cores do alerta** | `RECC_ALERTAS_DA_LINHA`, no `Base.gs` | Hoje só o VG tem: vigência abaixo de 18 em vermelho, exatamente 18 em amarelo (`noLimite`), acima de 18 em verde (`acima`); margem abaixo de 25,5 em vermelho. Acrescentar coluna, trocar o limite ou a faixa é uma linha. Ainda **não** tem tela |
 | **Quantos casos a fila do Trabalho pode mostrar** | `RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`, no `Indicadores.gs` | A fila abre com 5, e a barra "Mostrar", em cima da tabela, oferece 10, 20, 50, 100 e todos — só as que o canal tem. As opções e o padrão são estas duas linhas: trocar ou acrescentar uma opção é mexer só nelas. Os cartões, a busca e os filtros olham todos os casos do período |
 | **Quanto tempo a auditoria fica na planilha** | `RECC_MESES_QUE_A_AUDITORIA_GUARDA`, no `Config.gs` | 2 meses, pedido do PO. Vale para o "Arquivar agora" e para o acionador, que também usa o número para saber se já é hora de arquivar de novo |
 | **Os tipos de bloqueio de SUSEP** | `RECC_QUEM_BLOQUEOU`, no `Cadastros.gs` | `Companhia` e `Corretora`. A cor de cada um no selo mora no `Comuns.html` e no `Estilos.html` |
 | **Campo que aceita data no futuro** | `RECC_PADRAO_POR_ABA`, no `Instalacao.gs` | Só o `Início da vigência` do VG. Todas as outras datas continuam recusando futuro |
 | **Coluna calculada** | `RECC_COLUNAS_CALCULADAS`, no `Base.gs` | Hoje só os meses de vigência do VG. Outra conta é uma linha aqui e um `if` na função |
-| **Ausências** (férias, licença, afastamento) | Configurações › Calendário | Quem, motivo e o período. Sai da meta da pessoa e da média da equipe — não bloqueia o acesso |
-| **Feriados da operação** (municipal, facultativo, emenda) | Configurações › Calendário | Os nacionais o sistema calcula sozinho, móveis inclusive. `Trabalha = SIM` cancela um nacional |
-| **Quais colunas a importação pode preencher** | Configurações › Listas, na coluna `ColunaDeCarimbo` de cada status | O carimbo nunca é sugerido sozinho, mas pode ser escolhido no de-para. Criar um status novo apontando para uma coluna já a torna escolhível |
-| **Motivos de ausência** | Configurações › Listas (`AUSENCIA_MOTIVO`) | Nascem quatro; "licença paternidade" e "afastamento INSS" se acrescentam sem programador |
-| **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: canal, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
-| **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, canais, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
 
 ---
 
@@ -79,8 +86,7 @@ Isto não é omissão: cada um tem uma razão para ainda não existir.
 
 | Assunto | Por quê |
 |---|---|
-| **Criar canal nova** | Criar canal é criar aba na planilha. É a ação mais cara do sistema, e a única do contrato que ainda não passou por uma tela com senha |
-| **Apagar canal, campo ou lista** | Por decisão, o sistema **desliga** em vez de apagar. Apagar de verdade sairia do princípio de que nenhuma linha se perde |
+| **Apagar um canal** | Por decisão, o canal se **desliga** em vez de apagar: a aba dele guarda casos, e apagá-la perderia todos. Campo, lista e item de lista já se excluem pela tela |
 | **Trocar o TIPO de uma coluna existente** | Mudar `texto` para `data` numa coluna com 30 mil linhas reinterpreta tudo o que já está gravado. Precisa de conversão e conferência, não de um seletor |
 | **Renomear o cabeçalho de uma coluna** | É o nome que amarra o dado ao Power BI. Renomear na planilha e reconciliar aqui é o caminho seguro; um botão que fizesse isso quebraria relatório em silêncio |
 | **A ordem das cores da paleta** | Os seis tons foram conferidos por régua — separação mínima sob daltonismo e em visão normal. Trocar um por gosto quebraria a garantia, então eles são do sistema, não da operação |
@@ -89,11 +95,12 @@ Isto não é omissão: cada um tem uma razão para ainda não existir.
 
 ## As três perguntas que a operação fez, respondidas
 
-**"As configurações ajustam tudo que o sistema possui?"** — as três tabelas
-acima são a resposta inteira. Resumindo: tudo o que a operação muda no dia a
-dia está na primeira. O que sobrou na segunda são quatro ajustes que se fazem
-uma vez e quase nunca se repetem. O que está na terceira está fora de
-propósito, cada um com o motivo escrito.
+**"As configurações ajustam tudo que o sistema possui?"** — as tabelas acima
+são a resposta inteira. Resumindo: tudo o que a operação muda no dia a dia
+está na primeira. "Só no código" são regras que mudam uma vez por ano, se
+mudarem. "Só na planilha" são três ajustes que se fazem uma vez e quase nunca
+se repetem. E o que não se ajusta em lugar nenhum está fora de propósito, cada
+um com o motivo escrito.
 
 **"Na Produtividade RECC tem tanto por área quanto por analista?"** — tem os
 dois, e por caminhos diferentes, o que é de propósito:
@@ -101,7 +108,7 @@ dois, e por caminhos diferentes, o que é de propósito:
 - **Por área** é o seletor de canal no alto da tela. Não é um gráfico: RET
   e Mesa Diamante têm colunas diferentes, situações diferentes e volumes que
   não se comparam. Um gráfico "casos por área" com duas barras dessas ao lado
-  responderia à pergunta errada — a Canal sempre pareceria pequena, e nunca foi
+  responderia à pergunta errada — a Mesa Diamante sempre pareceria pequena, e nunca foi
   para ser grande.
 - **Por analista** é um gráfico, e agora nasce junto com o sistema: *Casos por
   analista*, em barras deitadas, nos dois canais. Barra deitada porque nome de

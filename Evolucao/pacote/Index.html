@@ -9,7 +9,7 @@
 <!-- ==== Estilos.html ==== -->
 <style>
 /* ============================================================================
-   RECC — Estilos.html · a aparência inteira do sistema
+   PGO — Estilos.html · a aparência inteira do sistema
    ============================================================================
    Os QUATRO TEMAS vivem aqui, e vivem do mesmo jeito: cada um redefine as
    mesmas variáveis de cor. Nenhum componente conhece um tema — todos leem as
@@ -2390,13 +2390,11 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 
 <!-- ========================================================================
      PEÇA 1 de 7 · Moldura
-     Era o arquivo Front-End/Moldura.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   RECC — Moldura.html · o menu lateral e a barra superior
+   Moldura · o menu lateral e a barra superior
    ============================================================================
    A moldura aparece em TODAS as telas e é a mesma em todas. Ela não é escrita
    à mão no HTML: é montada a partir do pacote de partida, porque o menu
@@ -2850,13 +2848,11 @@ var Moldura = (function () {
 
 <!-- ========================================================================
      PEÇA 2 de 7 · SenhaDeAdministrador
-     Era o arquivo Front-End/SenhaDeAdministrador.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — SenhaDeAdministrador.html · a guarda das ações sem desfazer
+   SenhaDeAdministrador · a guarda das ações sem desfazer
    ============================================================================
    Um diálogo só, usado por todas as telas que fazem alguma coisa de alcance
    grande: criar coluna na planilha, mexer em nível de acesso, importar um
@@ -2964,13 +2960,11 @@ var SenhaDeAdministrador = (function () {
 
 <!-- ========================================================================
      PEÇA 3 de 7 · SeletorDeCanal
-     Era o arquivo Front-End/SeletorDeCanal.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — SeletorDeCanal.html · a escolha do canal de trabalho
+   SeletorDeCanal · a escolha do canal de trabalho
    ============================================================================
    Aparece no Trabalho e no Cadastrar Caso, e é a mesma peça nos dois. Duas
    cópias divergiriam na primeira mudança — bastaria um canal novo ganhar
@@ -3058,13 +3052,11 @@ var SeletorDeCanal = (function () {
 
 <!-- ========================================================================
      PEÇA 4 de 7 · Formulario
-     Era o arquivo Front-End/Formulario.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — Formulario.html · o formulário, desenhado num lugar só
+   Formulario · o formulário, desenhado num lugar só
    ============================================================================
    Duas telas montam o mesmo formulário: Cadastrar Caso e a edição dentro do
    modal do Trabalho. Elas não têm duas cópias disto.
@@ -3717,6 +3709,11 @@ var Formulario = (function () {
     var controles = raiz.querySelectorAll('[data-chave]');
     for (var i = 0; i < controles.length; i++) {
       if (controles[i].disabled) continue;
+      // O valor gravado que o controle não conseguiu mostrar (ver preencher)
+      // não vai como vazio: vazio agora APAGA na planilha, e a pessoa não
+      // pediu isso — só não viu o valor.
+      if (controles[i].getAttribute('data-valor-que-nao-coube') !== null
+        && controles[i].value === '') continue;
       lidos[controles[i].getAttribute('data-chave')] = controles[i].value;
     }
     return lidos;
@@ -3744,6 +3741,14 @@ var Formulario = (function () {
       }
       if (controles[i].type === 'date') valor = paraCaixaDeData(valor);
       controles[i].value = valor;
+      controles[i].removeAttribute('data-valor-que-nao-coube');
+
+      // Valor que o controle recusou: uma data num formato que o calendário
+      // não lê ("2026/10/05", digitada direto na planilha) faz a caixa ficar
+      // vazia. Fica marcado, para salvar não apagar o que a pessoa nem viu.
+      if (valor !== '' && controles[i].value === '' && controles[i].tagName !== 'SELECT') {
+        controles[i].setAttribute('data-valor-que-nao-coube', valor);
+      }
 
       // Valor que não está entre as opções: o seletor ficaria em branco e a
       // pessoa gravaria vazio sem perceber. Acrescentamos a opção, marcada.
@@ -4033,13 +4038,11 @@ var Formulario = (function () {
 
 <!-- ========================================================================
      PEÇA 5 de 7 · CasoEmModal
-     Era o arquivo Front-End/CasoEmModal.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — CasoEmModal.html · o caso aberto para trabalhar, por cima da fila
+   CasoEmModal · o caso aberto para trabalhar, por cima da fila
    ============================================================================
    "Trabalhar no caso", na fila, não leva a pessoa para outra tela: abre o
    caso por cima, JÁ NO FORMULÁRIO, e fechar devolve a fila exatamente como
@@ -4067,6 +4070,9 @@ var CasoEmModal = (function () {
 
   var canalAtual = '';
   var idAtual = '';
+  // A versão do caso quando ele abriu: salvar devolve ao servidor, que recusa
+  // se outra pessoa gravou no meio do caminho (ver editarCaso).
+  var versaoAoAbrir = '';
   var formulario = null;
   /*
     O FORMULÁRIO DE CADA CANAL, GUARDADO.
@@ -4098,6 +4104,7 @@ var CasoEmModal = (function () {
   function abrir(idDoCanal, idDoCaso, quandoMudar) {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
+    versaoAoAbrir = '';
     aoFechar = quandoMudar || null;
     mudouAlgo = false;
     salvando = false;
@@ -4249,6 +4256,7 @@ var CasoEmModal = (function () {
     Servidor.chamar('casoParaEditar', canalAtual, idAtual)
       .entao(function (caso) {
         osValores = caso;
+        versaoAoAbrir = caso.versao || '';
         quandoAsDuasChegarem();
       })
       .senao(falhou);
@@ -4315,7 +4323,8 @@ var CasoEmModal = (function () {
     // gravação está a caminho — nem o X, nem o "Fechar".
     Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
-    Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo))
+    Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
+      versaoAoAbrir)
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
@@ -4445,13 +4454,11 @@ var CasoEmModal = (function () {
 
 <!-- ========================================================================
      PEÇA 6 de 7 · Graficos
-     Era o arquivo Front-End/Graficos.html antes de as peças
-     compartilhadas serem agrupadas num arquivo só.
      ======================================================================== -->
 
 <script>
 /* ============================================================================
-   PGO — Graficos.html · os desenhos, num lugar só
+   Graficos · os desenhos, num lugar só
    ============================================================================
    Duas telas desenham gráficos: a Produtividade RECC e Minha Performance. Elas
    não têm duas cópias disto — pela mesma razão que já custou caro aqui:
@@ -5111,7 +5118,7 @@ var SeletorDePeriodo = (function () {
 
 var TelaTrabalho = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var filtrosEscolhidos = {};
   // COMO o período foi escolhido. Quem calcula as datas é o servidor — se a
   // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
@@ -5131,8 +5138,8 @@ var TelaTrabalho = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
   }
 
@@ -5464,7 +5471,7 @@ var TelaTrabalho = (function () {
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhida, filtrosEscolhidos, periodo)
+    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo)
       .entao(function (resposta) {
         resumo = resposta;
         desenharPainel();
@@ -5528,16 +5535,16 @@ var TelaTrabalho = (function () {
     });
 
     ligarCliques('[data-trabalhar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhida, botao.getAttribute('data-trabalhar'), carregar);
+      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), carregar);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
-      CasoEmModal.trocarSituacao(canalEscolhida,
+      CasoEmModal.trocarSituacao(canalEscolhido,
         botao.getAttribute('data-status-do-caso'), carregar);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');
       Formulario.confirmarExclusao(idDoCaso, function () {
-        Servidor.chamar('excluirCaso', canalEscolhida, idDoCaso)
+        Servidor.chamar('excluirCaso', canalEscolhido, idDoCaso)
           .entao(carregar)
           .senao(function (erro) { window.alert(erro.message || String(erro)); });
       });
@@ -5568,7 +5575,7 @@ var TelaTrabalho = (function () {
 
   function ligar(pacote) {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });
@@ -5598,7 +5605,7 @@ var TelaTrabalho = (function () {
 
 var TelaCadastrarCaso = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var salvando = false;
 
   function escapar(texto) { return Moldura.escapar(texto); }
@@ -5608,9 +5615,9 @@ var TelaCadastrarCaso = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
 
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
@@ -5631,10 +5638,10 @@ var TelaCadastrarCaso = (function () {
     corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
     mostrarAsAcoes(false);
 
-    Servidor.chamar('formularioDoCanal', canalEscolhida)
+    Servidor.chamar('formularioDoCanal', canalEscolhido)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
-        Formulario.ligar(corpo(), '', canalEscolhida);
+        Formulario.ligar(corpo(), '', canalEscolhido);
         // Só no cadastro NOVO. No caso já gravado quem manda é o valor da
         // planilha — um padrão por cima dele seria perda silenciosa de dado.
         Formulario.aplicarPadroes(corpo(), resposta);
@@ -5705,7 +5712,7 @@ var TelaCadastrarCaso = (function () {
     Formulario.comecouAGravar(elemento('salvar-caso'),
       elemento('formulario-do-caso'));
 
-    Servidor.chamar('cadastrarCaso', canalEscolhida, Formulario.valores(corpo()))
+    Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()))
       .entao(function () {
         salvando = false;
         /*
@@ -5733,7 +5740,7 @@ var TelaCadastrarCaso = (function () {
 
   function ligar(pacote) {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       Aplicacao.remontar();
     });
 
@@ -5802,7 +5809,7 @@ var TelaCadastrarCaso = (function () {
 
 var TelaMinhaPerformance = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var dados = null;
   // COMO o período foi escolhido. O mesmo seletor das outras duas telas.
   var periodo = SeletorDePeriodo.padrao();
@@ -5813,8 +5820,8 @@ var TelaMinhaPerformance = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="performance"><p class="carregando-campos">'
       + 'Somando os seus números…</p></div>';
   }
@@ -5825,7 +5832,7 @@ var TelaMinhaPerformance = (function () {
       caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
     }
 
-    Servidor.chamar('minhaPerformance', canalEscolhida, periodo)
+    Servidor.chamar('minhaPerformance', canalEscolhido, periodo)
       .entao(function (resposta) { dados = resposta; desenhar(); })
       .senao(function (erro) {
         elemento('performance').innerHTML =
@@ -5839,7 +5846,7 @@ var TelaMinhaPerformance = (function () {
       elemento('performance').innerHTML = '<div class="cartao vazio">'
         + '<strong>Este canal não diz quem é o responsável por cada caso.</strong>'
         + '<p>Sem uma coluna de responsável não há "os meus casos" para somar. '
-        + 'Um administrador aponta essa coluna em Configurações → Canais de '
+        + 'Um administrador aponta essa coluna em Configurações › Canais de '
         + 'trabalho.</p></div>';
       return;
     }
@@ -6040,7 +6047,7 @@ var TelaMinhaPerformance = (function () {
     var abrir = document.querySelectorAll('[data-caso-recente]');
     for (var i = 0; i < abrir.length; i++) {
       abrir[i].addEventListener('click', function () {
-        CasoEmModal.abrir(canalEscolhida,
+        CasoEmModal.abrir(canalEscolhido,
           this.getAttribute('data-caso-recente'), carregar);
       });
     }
@@ -6050,7 +6057,7 @@ var TelaMinhaPerformance = (function () {
 
   function ligarTela() {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       Aplicacao.remontar();
     });
     carregar();
@@ -6134,7 +6141,7 @@ var TelaBuscarCaso = (function () {
       + 'Onde procurar</span>' + caixas.join('')
       + (opcoes.legado.ligado ? ''
         : '<span class="busca-dica">Não há base legada apontada. '
-          + 'Um administrador aponta em Configurações → Estrutura.</span>');
+          + 'Um administrador aponta em Configurações › Estrutura.</span>');
 
     ligarOnde();
   }
@@ -7051,7 +7058,7 @@ var TelaTabelaCorretoras = (function () {
     var onde = elemento('resultado-da-importacao');
     onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
 
-    Servidor.chamar('conferirImportacao', tipoDaImportacao, fonte)
+    Servidor.chamarSemPressa('conferirImportacao', tipoDaImportacao, fonte)
       .entao(function (resposta) {
         conferido = resposta;
         desenharConferencia();
@@ -7146,7 +7153,7 @@ var TelaTabelaCorretoras = (function () {
     SenhaDeAdministrador.pedir(function () {
       elemento('resultado-da-importacao').innerHTML =
         '<p class="carregando-campos">Gravando…</p>';
-      Servidor.chamar('aplicarImportacao', tipoDaImportacao, fonte)
+      Servidor.chamarSemPressa('aplicarImportacao', tipoDaImportacao, fonte)
         .entao(function (feito) {
           avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
             + ' atualizada(s) em ' + feito.titulo + '.', 'bom');
@@ -7337,7 +7344,7 @@ var TelaTabelaCorretoras = (function () {
 
 var TelaImportacao = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var pacoteDoSistema = null;
   var opcoes = null;          // colunas, analistas, lotes já importados
   var laudo = null;           // o resultado do passo 2, enquanto não se grava
@@ -7359,8 +7366,8 @@ var TelaImportacao = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="importacao"><p class="carregando-campos">'
       + 'Lendo as colunas do canal…</p></div>';
   }
@@ -7370,7 +7377,7 @@ var TelaImportacao = (function () {
     if (caixa) {
       caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
     }
-    Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhida)
+    Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhido)
       .entao(function (resposta) {
         opcoes = resposta;
         if (colunaQueIdentifica === null) {
@@ -7734,7 +7741,7 @@ var TelaImportacao = (function () {
 
   function ligar() {
     SeletorDeCanal.ligar(function (id) {
-      canalEscolhida = id;
+      canalEscolhido = id;
       fonte = { tipo: fonte.tipo, texto: '', planilhaId: '', aba: '' };
       analistasMarcados = {};
       colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
@@ -7789,7 +7796,7 @@ var TelaImportacao = (function () {
     var antigo = document.querySelector('.canais');
     if (!antigo || !antigo.parentNode) return;
     var novo = document.createElement('div');
-    novo.innerHTML = SeletorDeCanal.montar(pacoteDoSistema.canais, canalEscolhida);
+    novo.innerHTML = SeletorDeCanal.montar(pacoteDoSistema.canais, canalEscolhido);
     antigo.parentNode.replaceChild(novo.firstChild, antigo);
   }
 
@@ -7836,7 +7843,7 @@ var TelaImportacao = (function () {
     var botao = elemento('conferir-importacao');
     if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
 
-    Servidor.chamar('conferirImportacaoDeCasos', canalEscolhida, {
+    Servidor.chamarSemPressa('conferirImportacaoDeCasos', canalEscolhido, {
       fonte: fonte,
       dePara: deParaEscolhido,
       colunaQueIdentifica: colunaQueIdentifica || ''
@@ -7870,7 +7877,7 @@ var TelaImportacao = (function () {
     var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
-    Servidor.chamar('importarCasos', canalEscolhida, {
+    Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
       fonte: fonte,
       dePara: deParaEscolhido || laudo.dePara,
       colunaQueIdentifica: colunaQueIdentifica || '',
@@ -7927,7 +7934,7 @@ var TelaImportacao = (function () {
 
 var TelaProdutividade = (function () {
 
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var filtros = {};
   /*
    * COMO o período foi escolhido, e não o período em si.
@@ -7949,8 +7956,8 @@ var TelaProdutividade = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhida)
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
   }
 
@@ -7958,7 +7965,7 @@ var TelaProdutividade = (function () {
     var caixa = elemento('analitico');
     if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
 
-    Servidor.chamar('produtividadeDaEquipe', canalEscolhida, filtros, periodo)
+    Servidor.chamar('produtividadeDaEquipe', canalEscolhido, filtros, periodo)
       .entao(function (resposta) {
         painel = resposta;
         desenhar();
@@ -7981,7 +7988,7 @@ var TelaProdutividade = (function () {
           + painel.componentes.map(desenharComponente).join('') + '</div>'
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
           + 'canal.</strong><p>Um administrador monta os gráficos em '
-          + 'Configurações → Painéis.</p></div>')
+          + 'Configurações › Painéis.</p></div>')
       + (painel.valorPorSituacao
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
@@ -8276,7 +8283,7 @@ var TelaProdutividade = (function () {
     caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    Servidor.chamar('detalharComponente', canalEscolhida, idDoComponente,
+    Servidor.chamar('detalharComponente', canalEscolhido, idDoComponente,
       chaveDoPonto, filtros, periodo)
       .entao(function (resposta) { desenharDetalhe(resposta); })
       .senao(function (erro) {
@@ -8334,7 +8341,7 @@ var TelaProdutividade = (function () {
     var abrir = document.querySelectorAll('[data-caso-do-painel]');
     for (var i = 0; i < abrir.length; i++) {
       abrir[i].addEventListener('click', function () {
-        CasoEmModal.abrir(canalEscolhida, this.getAttribute('data-caso-do-painel'),
+        CasoEmModal.abrir(canalEscolhido, this.getAttribute('data-caso-do-painel'),
           carregar);
       });
     }
@@ -8349,7 +8356,7 @@ var TelaProdutividade = (function () {
    * cima, para quem estiver num contexto que o aceite.
    */
   function exportar(idDoComponente) {
-    Servidor.chamar('exportarComponente', canalEscolhida, idDoComponente,
+    Servidor.chamar('exportarComponente', canalEscolhido, idDoComponente,
       filtros, periodo)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
       .senao(function (erro) { window.alert(erro.message || String(erro)); });
@@ -8395,7 +8402,7 @@ var TelaProdutividade = (function () {
   function ligar(pacote) {
     if (pacote) pacoteDoSistema = pacote;
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhida = idDoCanal;
+      canalEscolhido = idDoCanal;
       filtros = {};
       tabelasAbertas = {};
       Aplicacao.remontar();
@@ -8681,7 +8688,7 @@ var TelaConfiguracoes = (function () {
   var resumo = null;
   var pacoteDoSistema = null;   // o pacote de partida, para os canais
   var secaoAtual = 'campos';
-  var canalEscolhida = '';
+  var canalEscolhido = '';
   var tipoDeListaEscolhido = '';
   var escolhido = null;        // o item aberto no painel da direita
   var dados = {};              // o que a seção atual carregou do servidor
@@ -8714,7 +8721,7 @@ var TelaConfiguracoes = (function () {
 
   function montar(pacote) {
     pacoteDoSistema = pacote;
-    if (!canalEscolhida && pacote.canais.length) canalEscolhida = pacote.canais[0].id;
+    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return '<div class="config" id="config">'
       + '<p class="carregando-campos">Abrindo as configurações…</p>'
       + '</div>';
@@ -8827,7 +8834,7 @@ var TelaConfiguracoes = (function () {
     Servidor.chamar('opcoesDeConfiguracaoDeCampo')
       .entao(function (opcoes) {
         dados.opcoes = opcoes;
-        Servidor.chamar('listarCamposDoCanal', canalEscolhida)
+        Servidor.chamar('listarCamposDoCanal', canalEscolhido)
           .entao(function (campos) {
             dados.campos = campos;
             desenharCampos();
@@ -8887,7 +8894,7 @@ var TelaConfiguracoes = (function () {
     return '<select id="canal-da-config" aria-label="Canal">'
       + pacoteDoSistema.canais.map(function (canal) {
         return '<option value="' + escapar(canal.id) + '"'
-          + (canal.id === canalEscolhida ? ' selected' : '') + '>'
+          + (canal.id === canalEscolhido ? ' selected' : '') + '>'
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>';
   }
@@ -8896,7 +8903,7 @@ var TelaConfiguracoes = (function () {
     var seletor = elemento('canal-da-config');
     if (seletor) {
       seletor.addEventListener('change', function () {
-        canalEscolhida = this.value;
+        canalEscolhido = this.value;
         escolhido = null;
         carregarCampos();
       });
@@ -8932,7 +8939,7 @@ var TelaConfiguracoes = (function () {
     // A ordem já mudou na tela — se o servidor recusar, a lista volta ao que
     // era e o motivo aparece no painel. Nunca deixamos a tela mostrando uma
     // ordem que a planilha não tem.
-    Servidor.chamar('reordenarCampos', canalEscolhida, lista.map(function (campo) {
+    Servidor.chamar('reordenarCampos', canalEscolhido, lista.map(function (campo) {
       return campo.id;
     })).senao(function (erro) {
       // O recado flutua, e não mora no painel: recarregar a lista redesenha o
@@ -9066,7 +9073,7 @@ var TelaConfiguracoes = (function () {
       evento.preventDefault();
       var apagarAColuna = marcado('apagar-coluna');
       comSenhaDeAdministrador(function () {
-        Servidor.chamar('excluirCampo', canalEscolhida, campo.id, apagarAColuna)
+        Servidor.chamar('excluirCampo', canalEscolhido, campo.id, apagarAColuna)
           .entao(function (saiu) {
             escolhido = null;
             avisarSalvo('Campo "' + saiu.rotulo + '" excluído.'
@@ -9146,7 +9153,7 @@ var TelaConfiguracoes = (function () {
         obrigatorio: marcado('obrigatorio')
       };
       comSenhaDeAdministrador(function () {
-        Servidor.chamar('criarCampo', canalEscolhida, envio)
+        Servidor.chamar('criarCampo', canalEscolhido, envio)
           .entao(function (criada) {
             avisarSalvo('Coluna "' + criada.cabecalho + '" criada em '
               + criada.canal + '.');
@@ -10124,7 +10131,7 @@ var TelaConfiguracoes = (function () {
   };
 
   function carregarPaineis() {
-    if (!canalDosCards) canalDosCards = canalEscolhida;
+    if (!canalDosCards) canalDosCards = canalEscolhido;
     if (abaDosPaineis === 'graficosDaProdutividade') return carregarGraficos();
 
     aguarde('Lendo os cards…');
@@ -10852,7 +10859,7 @@ var TelaConfiguracoes = (function () {
 
   function gerarAgora(id) {
     avisar('Gerando a aba…', 'neutro');
-    Servidor.chamar('gerarAnalise', id)
+    Servidor.chamarSemPressa('gerarAnalise', id)
       .entao(function (feito) {
         avisarSalvo(feito.aba + ': ' + feito.linhas + ' linha(s) e '
           + feito.colunas + ' coluna(s).'
@@ -11212,7 +11219,7 @@ var TelaConfiguracoes = (function () {
     elemento('rodar-diagnostico').addEventListener('click', function () {
       var onde = elemento('resultado-do-diagnostico');
       onde.innerHTML = '<p class="carregando-campos">Conferindo o sistema…</p>';
-      Servidor.chamar('diagnosticoDoSistema')
+      Servidor.chamarSemPressa('diagnosticoDoSistema')
         .entao(function (laudo) { onde.innerHTML = laudoDesenhado(laudo); })
         .senao(function (erro) {
           onde.innerHTML = '<p class="carregando-campos erro-carga">'
@@ -11458,7 +11465,7 @@ var TelaConfiguracoes = (function () {
         + 'daqui</strong> depois de conferidas lá.',
         'Arquivar', function () {
           comSenhaDeAdministrador(function () {
-            Servidor.chamar('arquivarAuditoriaAgora')
+            Servidor.chamarSemPressa('arquivarAuditoriaAgora')
               .entao(function (resultado) {
                 dados.arquivoDaAuditoria = resultado.configuracao;
                 avisarSalvo(resultado.arquivadas
@@ -11678,7 +11685,7 @@ var TelaConfiguracoes = (function () {
 <!-- ==== Aplicacao.html ==== -->
 <script>
 /* ============================================================================
-   RECC — Aplicacao.html · a ponte com o servidor, o roteador e as telas
+   PGO — Aplicacao.html · a ponte com o servidor, o roteador e as telas
    ============================================================================
    Três coisas moram aqui:
 
@@ -11717,10 +11724,10 @@ var Servidor = (function () {
   /*
     QUANTO TEMPO ESPERAR ANTES DE DESISTIR.
 
-    O Apps Script tem seis minutos de teto por execução, mas nenhuma chamada
-    deste sistema chega perto: a mais cara, medida com 200 mil casos, leva
-    nove segundos. Quarenta segundos é folga de sobra — e é o que separa
-    "está demorando" de "não vem mais".
+    O Apps Script tem seis minutos de teto por execução, e as chamadas do dia
+    a dia não chegam perto: abrir uma tela, gravar um caso, buscar. Para elas,
+    quarenta segundos é folga de sobra — e é o que separa "está demorando" de
+    "não vem mais".
 
     ISTO EXISTE PORQUE HÁ FALHA QUE NÃO CHEGA AO withFailureHandler. Quando a
     função não existe, quando a resposta não consegue atravessar a fronteira,
@@ -11732,6 +11739,16 @@ var Servidor = (function () {
     Desistir e explicar é melhor do que esperar para sempre.
   */
   var SEGUNDOS_ATE_DESISTIR = 40;
+
+  /*
+    E AS CHAMADAS QUE TRABALHAM DE VERDADE — importar, arquivar a auditoria,
+    gerar uma análise, rodar o diagnóstico — esperam o teto do Apps Script
+    (6 minutos) e mais uma folga. Com 40 segundos, uma importação de 2.000
+    linhas num horário cheio era dada como perdida enquanto o servidor
+    terminava de gravar — e quem tentasse de novo importava duas vezes.
+    Quem chama assim é `Servidor.chamarSemPressa`.
+  */
+  var SEGUNDOS_DAS_CHAMADAS_LONGAS = 380;
 
   /** Chamada pelo roteador, toda vez que o miolo é remontado. */
   function trocouDeTela() { geracaoDaTela++; }
@@ -11747,7 +11764,17 @@ var Servidor = (function () {
    * gerador de prévia coloca um substituto no lugar. Por isso a checagem.
    */
   function chamar(nomeDaFuncao) {
-    var argumentos = Array.prototype.slice.call(arguments, 1);
+    return chamarComPrazo(SEGUNDOS_ATE_DESISTIR, nomeDaFuncao,
+      Array.prototype.slice.call(arguments, 1));
+  }
+
+  /** A mesma `chamar`, para o que demora: ver SEGUNDOS_DAS_CHAMADAS_LONGAS. */
+  function chamarSemPressa(nomeDaFuncao) {
+    return chamarComPrazo(SEGUNDOS_DAS_CHAMADAS_LONGAS, nomeDaFuncao,
+      Array.prototype.slice.call(arguments, 1));
+  }
+
+  function chamarComPrazo(segundosAteDesistir, nomeDaFuncao, argumentos) {
     var aoDarCerto = null;
     var aoDarErrado = null;
     var minhaGeracao = geracaoDaTela;
@@ -11782,13 +11809,14 @@ var Servidor = (function () {
       jaRespondeu = true;
       if (!aTelaAindaEAMesma()) return;
       var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
-        + SEGUNDOS_ATE_DESISTIR + ' segundos.\n\n'
-        + 'Em geral é um arquivo .gs que não foi copiado para o projeto do '
-        + 'Apps Script: a função não existe lá, e a chamada morre sem dizer '
-        + 'nada. Execute diagnosticoRECC() no editor — ele lista o que falta.');
+        + segundosAteDesistir + ' segundos.\n\n'
+        + 'Pode ter sido só demora: antes de repetir, confira se o que você '
+        + 'pediu já não foi feito. Se acontece sempre, costuma ser um arquivo '
+        + '.gs que não foi copiado para o projeto do Apps Script — execute '
+        + 'diagnosticoRECC() no editor, que lista o que falta.');
       if (aoDarErrado) aoDarErrado(erro);
       else console.error(erro);
-    }, SEGUNDOS_ATE_DESISTIR * 1000);
+    }, segundosAteDesistir * 1000);
 
     function responder(oQueFazer, valor) {
       if (jaRespondeu) return;
@@ -11840,7 +11868,7 @@ var Servidor = (function () {
     return acompanhamento;
   }
 
-  return { chamar: chamar, trocouDeTela: trocouDeTela };
+  return { chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela };
 })();
 
 /* ----------------------------------------------------------------- rotas */

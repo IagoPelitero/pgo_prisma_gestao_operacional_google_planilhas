@@ -12,8 +12,8 @@
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
- *   1. AS NOVE SEÇÕES   (era Config.gs)
- *   2. AS ABAS ANALISE_* QUE O SISTEMA GERA   (era Analise.gs)
+ *   1. AS SEÇÕES DE CONFIGURAÇÕES
+ *   2. AS ABAS ANALISE_* QUE O SISTEMA GERA
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -21,17 +21,13 @@
 
 /* ############################################################################
    #
-   #  SEÇÃO 1 de 2 · AS NOVE SEÇÕES
-   #
-   #  Era o arquivo Back-End/Config.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
+   #  SEÇÃO 1 de 2 · AS SEÇÕES DE CONFIGURAÇÕES
    #
    ############################################################################ */
 
 /**
  * ============================================================================
- * PGO — Config.gs · onde o sistema é ajustado sem programador
+ * Onde o sistema é ajustado sem programador
  *
  * O nome é "Config", e não "Configuracoes", por um motivo da plataforma: no
  * Apps Script os arquivos moram todos num projeto só, sem pasta, e o nome é
@@ -641,10 +637,20 @@ function salvarItemDoCatalogo(dados) {
   return criado.__id;
 }
 
-/** Em quantos casos este item de lista está gravado. */
+/**
+ * Em quantos casos este item de lista está gravado.
+ *
+ * Lê só as COLUNAS dos campos que usam a lista do item (o Assunto, para um
+ * assunto; o Status, para um status) — e não a linha inteira de todas as
+ * bases, que com 200 mil casos estouraria o tempo do Apps Script. Lista que
+ * nenhum campo usa (Origem, Cargo, Disponibilidade) continua sendo procurada
+ * em todas as colunas, como antes: não há como saber onde ela foi gravada.
+ */
 function quantosCasosUsam_(item) {
   var procurado = normalizarParaComparar_(item.Nome);
+  var lista = String(item.Tipo || '').trim().toUpperCase();
   var doCanal = converterParaIdentificador_(item.CanalId);
+  var campos = lerRegistros_('CAMPOS');
   var quantos = 0;
 
   canaisVisiveis_().forEach(function (canal) {
@@ -655,15 +661,31 @@ function quantosCasosUsam_(item) {
     } catch (erro) {
       return;
     }
-    lerRegistros_(canal.aba, { incluirOcultos: true }).forEach(function (registro) {
-      for (var i = 0; i < estrutura.cabecalhos.length; i++) {
-        var cabecalho = estrutura.cabecalhos[i];
-        if (!cabecalho || cabecalho.charAt(0) === '_') continue;
-        if (normalizarParaComparar_(registro[cabecalho]) === procurado) {
-          quantos++;
-          return;
+
+    var colunas = [];
+    campos.forEach(function (campo) {
+      if (converterParaIdentificador_(campo.CanalId) !== converterParaIdentificador_(canal.id)) return;
+      if (String(lerConfiguracaoDoCampo_(campo).catalogo || '').trim().toUpperCase() !== lista) return;
+      colunasDoCampo_(campo, { cabecalho: String(campo.Cabecalho || '') }).forEach(function (cabecalho) {
+        if (posicaoDaColuna_(estrutura, cabecalho) >= 0 && colunas.indexOf(cabecalho) < 0) {
+          colunas.push(cabecalho);
         }
-      }
+      });
+    });
+    if (!colunas.length) {
+      colunas = estrutura.cabecalhos.filter(function (cabecalho) {
+        return cabecalho && String(cabecalho).charAt(0) !== '_';
+      });
+    }
+
+    var linhasQueTem = {};
+    colunas.forEach(function (cabecalho) {
+      lerColunaInteira_(canal.aba, cabecalho).forEach(function (valor, i) {
+        if (!linhasQueTem[i] && normalizarParaComparar_(valor) === procurado) {
+          linhasQueTem[i] = true;
+          quantos++;
+        }
+      });
     });
   });
   return quantos;
@@ -1529,7 +1551,7 @@ function criarCanal(dados) {
     proximosPassos: [
       'Em Cadastrar Caso, crie os campos do formulário deste canal.',
       'Volte aqui e aponte a coluna da data e a coluna da situação.',
-      'Em Cadastrar Caso › Listas, cadastre as situações deste canal.',
+      'Em Configurações › Ajustes Gerais, cadastre as situações deste canal.',
       'Em Níveis de acesso, marque quem enxerga este canal.'
     ]
   };
@@ -1766,7 +1788,7 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
       });
       if (!existe) {
         throw new Error('A situação "' + cartao.filtro + '" não existe no canal ' +
-          canal.nome + '. As situações dela são: ' + situacoes.join(', ') + '.');
+          canal.nome + '. As situações dele são: ' + situacoes.join(', ') + '.');
       }
     }
   });
@@ -2279,14 +2301,10 @@ function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
    #
    #  SEÇÃO 2 de 2 · AS ABAS ANALISE_* QUE O SISTEMA GERA
    #
-   #  Era o arquivo Back-End/Analise.gs antes de os arquivos serem
-   #  agrupados por assunto. O cabeçalho original vem logo abaixo,
-   #  inteiro — nada foi reescrito, só mudou de endereço.
-   #
    ############################################################################ */
 
 /**
- * RECC — Analise.gs · as abas ANALISE_* que o sistema gera
+ * As abas ANALISE_* que o sistema gera
  * ============================================================================
  * O pedido: *"permitir criar uma aba exclusiva que irá criar uma aba no
  * planilhas para análise de dados."*
