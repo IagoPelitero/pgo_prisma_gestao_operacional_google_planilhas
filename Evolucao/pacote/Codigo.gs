@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-13 23:46
+   Gerado em 2026-10-14 12:28
    ========================================================================== */
 
 
@@ -2894,13 +2894,73 @@ function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
 // ============================================================================
 
 /**
+ * As colunas que os CAMPOS do formulário ocupam, por aba: { BASE_RET: { chave: true } }.
+ *
+ * Inclui o campo desligado — ele continua sendo coluna conhecida — e os campos
+ * que moram em mais de uma coluna (produto, proposta, apólice). Aba CAMPOS que
+ * ainda não existe (instalação em andamento) ou ilegível vale como "nenhum":
+ * a conferência da estrutura não pode depender dela para rodar.
+ */
+function colunasDosCamposPorAba_() {
+  var porAba = {};
+  try {
+    if (!planilhaAtiva_().getSheetByName('CAMPOS')) return porAba;
+    lerRegistros_('CAMPOS').forEach(function (campo) {
+      var nome = String(campo.Aba || '');
+      if (!nome) return;
+      porAba[nome] = porAba[nome] || {};
+      colunasQueOCampoOcupa_(campo).forEach(function (cabecalho) {
+        porAba[nome][normalizarParaComparar_(cabecalho)] = true;
+      });
+    });
+  } catch (erro) {
+    return {};
+  }
+  return porAba;
+}
+
+/**
+ * As colunas que são SÓ do PO numa aba: nem do contrato, nem de campo do
+ * formulário — as que ele escreveu direto na planilha. Devolve { chave: true },
+ * pela chave normalizada do cabeçalho.
+ *
+ * É a mesma separação do laudo (`aMais` em `conferirEstrutura_`), e é por ela que
+ * "Trabalhar no caso" decide o que se corrige ali: a coluna sua sim; o carimbo do
+ * sistema, não.
+ */
+function colunasSuasDaAba_(nomeDaAba) {
+  var conhecidas = {};
+  if (RECC_ESQUEMA[nomeDaAba]) {
+    esquemaDaAba_(nomeDaAba).colunas.forEach(function (coluna) {
+      conhecidas[normalizarParaComparar_(coluna.cabecalho)] = true;
+    });
+  }
+  var doFormulario = colunasDosCamposPorAba_()[nomeDaAba] || {};
+  var suas = {};
+  estruturaDaAba_(nomeDaAba).cabecalhos.forEach(function (cabecalho) {
+    var chave = normalizarParaComparar_(cabecalho);
+    if (!chave || String(cabecalho).charAt(0) === '_') return;
+    if (conhecidas[chave] || doFormulario[chave]) return;
+    suas[chave] = true;
+  });
+  return suas;
+}
+
+/**
  * Compara o que o contrato espera com o que a planilha tem.
  * Não cria, não renomeia, não apaga e não reordena nada: devolve o laudo
  * para a tela de reconciliação decidir com o administrador.
+ *
+ * Coluna fora do contrato vem em DUAS listas, e a diferença é o pedido do PO
+ * ("por que fica aparecendo as colunas que criei, sinalizando que são
+ * ignoradas?"): `doFormulario` é a que ele criou em Configurações › Cadastrar
+ * Caso — o sistema a conhece, grava nela e a mostra —, e `aMais` é a que
+ * ninguém declarou. Só a segunda merece ser mencionada.
  */
 function conferirEstrutura_() {
   var planilha = planilhaAtiva_();
   var laudo = { ok: true, abas: [] };
+  var doFormulario = colunasDosCamposPorAba_();
 
   nomesDasAbasDoContrato_().forEach(function (nomeDaAba) {
     var esquema = esquemaDaAba_(nomeDaAba);
@@ -2909,6 +2969,7 @@ function conferirEstrutura_() {
       existe: false,
       faltando: [],
       aMais: [],
+      doFormulario: [],
       linhas: 0
     };
 
@@ -2932,8 +2993,11 @@ function conferirEstrutura_() {
       if (presentes[normalizarParaComparar_(coluna.cabecalho)] === undefined) item.faltando.push(coluna.cabecalho);
     });
 
+    var camposDaAba = doFormulario[nomeDaAba] || {};
     Object.keys(presentes).forEach(function (chave) {
-      if (esperados[chave] === undefined) item.aMais.push(presentes[chave]);
+      if (esperados[chave] !== undefined) return;
+      if (camposDaAba[chave]) item.doFormulario.push(presentes[chave]);
+      else item.aMais.push(presentes[chave]);
     });
 
     if (item.faltando.length) laudo.ok = false;
@@ -4819,7 +4883,7 @@ function cadastrarCaso(idDoCanal, valores) {
  * vier na alteração, ele é respeitado — mas o preenchimento automático só age
  * na criação.
  */
-function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
+function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -4846,6 +4910,7 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
   }
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false, atual);
+  acrescentarColunasSuas_(canal, colunasSuas, paraGravar);
 
   // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
   // diálogo, e tem de deixar o mesmo rastro.
@@ -4861,6 +4926,31 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
+}
+
+/**
+ * As colunas SUAS que a pessoa corrigiu no "Trabalhar no caso" — e só elas.
+ *
+ * Confere de novo, no servidor, que cada uma é mesmo coluna do PO (nem do
+ * contrato, nem de campo): a tela só desenha a caixa, e quem decide o que se
+ * grava é daqui. Carimbo do sistema mandado por fora é recusado com o nome dele.
+ * Vazio apaga — é a mesma regra do campo esvaziado na edição.
+ */
+function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
+  if (!colunasSuas || typeof colunasSuas !== 'object') return;
+  var nomes = Object.keys(colunasSuas);
+  if (!nomes.length) return;
+
+  var suas = colunasSuasDaAba_(canal.aba);
+  nomes.forEach(function (nome) {
+    if (!suas[normalizarParaComparar_(nome)]) {
+      throw new Error('A coluna "' + nome + '" não se edita no "Trabalhar no caso": ela é '
+        + 'do sistema ou de um campo do formulário.');
+    }
+    var valor = colunasSuas[nome];
+    paraGravar[grafiaDaColuna_(canal.aba, nome)] =
+      String(valor === null || valor === undefined ? '' : valor).trim();
+  });
 }
 
 /**
@@ -5289,6 +5379,15 @@ function casoParaEditar(idDoCanal, idDoCaso) {
    * — o número da pessoa passaria a depender do que alguém digitou, e não do
    * que aconteceu.
    */
+  /*
+   * A COLUNA SUA SE CORRIGE AQUI. Pedido do PO: "preciso ter a opção de editar
+   * esse modal, assim fica mais fácil caso algo fique fora de formato" — e,
+   * perguntado, escolheu: só as colunas DELE (as escritas direto na planilha,
+   * que nem o contrato nem o formulário conhecem). O carimbo do sistema segue só
+   * leitura, pelo motivo de sempre. `editavel` diz qual é qual; quem grava é
+   * `editarCaso`, que confere de novo.
+   */
+  var suas = colunasSuasDaAba_(canal.aba);
   var doSistema = [];
   estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
     var nome = String(cabecalho || '');
@@ -5298,7 +5397,8 @@ function casoParaEditar(idDoCanal, idDoCaso) {
 
     var valor = paraTexto_(registro[nome], estrutura.tipos[posicao]);
     if (!String(valor).trim()) return;
-    doSistema.push({ rotulo: nome, valor: valor });
+    doSistema.push({ rotulo: nome, valor: valor,
+      editavel: suas[normalizarParaComparar_(nome)] === true });
   });
 
   return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema,
@@ -9344,7 +9444,8 @@ function conferirEstruturaDaPlanilha() {
         existe: aba.existe,
         linhas: aba.linhas,
         faltando: aba.faltando,
-        aMais: aba.aMais
+        aMais: aba.aMais,
+        doFormulario: aba.doFormulario || []
       };
     })
   };
@@ -19365,12 +19466,21 @@ function blocoDaEstrutura_() {
       return;
     }
     if (aba.aMais.length) {
-      itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
-        aba.aba + ': ' + aba.aMais.length + ' coluna(s) fora do contrato',
+      /*
+       * COLUNA SUA, e não problema. Era ATENÇÃO, dizendo que o sistema "ignora o
+       * que não conhece" e que a coluna "fica vazia para sempre" — e as duas
+       * frases erravam: a coluna que o PO cria em Cadastrar Caso é conhecida (e
+       * nem chega aqui, ver `doFormulario`), e a que ele escreve na planilha, com
+       * valor, aparece em "Trabalhar no caso" como leitura. Fica a informação,
+       * sem o alarme.
+       */
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
+        aba.aba + ': ' + aba.aMais.length + ' coluna(s) suas, fora do contrato',
         algunsExemplos_(aba.aMais),
-        'Nada quebra: o sistema ignora o que não conhece. Mas coluna que o '
-          + 'sistema não preenche fica vazia para sempre — se ela deveria '
-          + 'existir, cadastre em Configurações › Cadastrar Caso.'));
+        'Nada quebra, e o sistema não mexe nelas. O formulário não pergunta essas '
+          + 'colunas: o que estiver preenchido nelas aparece em "Trabalhar no caso", '
+          + 'só para leitura. Para digitar nelas pelo sistema, cadastre em '
+          + 'Configurações › Cadastrar Caso.'));
       return;
     }
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,

@@ -2069,7 +2069,8 @@ function conferirEstruturaDaPlanilha() {
         existe: aba.existe,
         linhas: aba.linhas,
         faltando: aba.faltando,
-        aMais: aba.aMais
+        aMais: aba.aMais,
+        doFormulario: aba.doFormulario || []
       };
     })
   };

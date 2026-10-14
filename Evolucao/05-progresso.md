@@ -2619,6 +2619,35 @@ até alguém ligá-la em Configurações › Estrutura.
 
 ---
 
+## Etapa 35 — Coluna sua não é problema, e se corrige no "Trabalhar no caso"
+
+Pergunta e pedido do PO: **"por que fica aparecendo as colunas que criei fora do
+contrato e sinalizando que são ignoradas? Se for preenchido não vai aparecer?"** e
+**"preciso ter a opção de editar esse modal, assim fica mais fácil caso algo fique
+fora de formato"**. Perguntado o que editar, ele escolheu: **só as colunas dele** (as
+escritas direto na planilha); os carimbos do sistema continuam só leitura.
+
+| Parte | O que ficou |
+|---|---|
+| **Por quê** | O laudo só comparava com o contrato fixo. A coluna criada em Cadastrar Caso — que o sistema conhece e usa — caía em "a mais", dava atenção e era chamada de ignorada (achado 89) |
+| **Agora** | O laudo consulta os CAMPOS: a coluna do formulário (ligada ou desligada) não é mencionada; a escrita direto na planilha é citada como **sua**, sem alarme (nível OK), dizendo o que acontece com ela |
+| **Se for preenchida** | **Aparece** em "Trabalhar no caso" — vazia, não enche a tela. O aviso deixou de dizer "escrito pelo sistema" |
+| **Editar no modal** | A coluna sua com valor vira caixa de texto e é gravada com "Salvar alterações" (`editarCaso` recebe `colunasSuas`; `acrescentarColunasSuas_` confere no servidor que cada uma é mesmo do PO — `colunasSuasDaAba_`, a mesma separação do laudo). Vazio apaga; pontas sem espaço; a regra de "duas pessoas no mesmo caso" vale. Carimbo do sistema e coluna de campo mandados por fora são recusados com o nome |
+
+**1126 testes** (15 novos, em `testes-colunas-suas.js`; dois antigos que exigiam o
+comportamento errado agora exigem o certo), cinco execuções seguidas sem falha, **15
+quebras de propósito, 15 vermelhos** (a do desenho da caixa, só o ponta a ponta
+enxerga — e enxergou). Navegador: ponta a ponta **17/17** no repositório e no pacote
+— o teste novo põe uma coluna sua na planilha, abre o caso, corrige na caixa, salva e
+confere a planilha —, 108 combinações sem quebra, 152 cliques sem erro; o modal visto
+em 1440 e 390 px.
+
+### Para quem já usa
+
+Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

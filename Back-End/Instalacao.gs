@@ -3637,12 +3637,21 @@ function blocoDaEstrutura_() {
       return;
     }
     if (aba.aMais.length) {
-      itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
-        aba.aba + ': ' + aba.aMais.length + ' coluna(s) fora do contrato',
+      /*
+       * COLUNA SUA, e não problema. Era ATENÇÃO, dizendo que o sistema "ignora o
+       * que não conhece" e que a coluna "fica vazia para sempre" — e as duas
+       * frases erravam: a coluna que o PO cria em Cadastrar Caso é conhecida (e
+       * nem chega aqui, ver `doFormulario`), e a que ele escreve na planilha, com
+       * valor, aparece em "Trabalhar no caso" como leitura. Fica a informação,
+       * sem o alarme.
+       */
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
+        aba.aba + ': ' + aba.aMais.length + ' coluna(s) suas, fora do contrato',
         algunsExemplos_(aba.aMais),
-        'Nada quebra: o sistema ignora o que não conhece. Mas coluna que o '
-          + 'sistema não preenche fica vazia para sempre — se ela deveria '
-          + 'existir, cadastre em Configurações › Cadastrar Caso.'));
+        'Nada quebra, e o sistema não mexe nelas. O formulário não pergunta essas '
+          + 'colunas: o que estiver preenchido nelas aparece em "Trabalhar no caso", '
+          + 'só para leitura. Para digitar nelas pelo sistema, cadastre em '
+          + 'Configurações › Cadastrar Caso.'));
       return;
     }
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,

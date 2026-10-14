@@ -413,11 +413,15 @@ function rodarTestesDeConfiguracoes() {
     chamar('esquecerEstruturaLida_()');
   });
 
-  teste('a coluna criada pelo administrador consta como fora do contrato', () => {
+  teste('a coluna criada pelo administrador em Cadastrar Caso consta como DO FORMULÁRIO, e não como "a mais"', () => {
+    // Ela é fora do contrato, mas o sistema a conhece: o formulário grava nela e o
+    // caso a mostra. Dizer que é "a mais" — e que o sistema a "ignora" — era falso.
     const canal4 = chamar('conferirEstruturaDaPlanilha()').abas
       .find((a) => a.aba === 'BASE_MESA');
-    verdadeiro(canal4.aMais.indexOf('Valor negociado') >= 0,
-      'coluna nova é respeitada, e o laudo diz que ela não é do contrato');
+    verdadeiro(canal4.doFormulario.indexOf('Valor negociado') >= 0,
+      'a coluna que o PO criou é do formulário');
+    verdadeiro(canal4.aMais.indexOf('Valor negociado') < 0,
+      'e não aparece entre as que ninguém declarou');
     igual(canal4.faltando.length, 0);
   });
 

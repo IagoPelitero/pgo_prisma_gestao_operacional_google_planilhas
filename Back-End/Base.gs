@@ -2876,13 +2876,73 @@ function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
 // ============================================================================
 
 /**
+ * As colunas que os CAMPOS do formulário ocupam, por aba: { BASE_RET: { chave: true } }.
+ *
+ * Inclui o campo desligado — ele continua sendo coluna conhecida — e os campos
+ * que moram em mais de uma coluna (produto, proposta, apólice). Aba CAMPOS que
+ * ainda não existe (instalação em andamento) ou ilegível vale como "nenhum":
+ * a conferência da estrutura não pode depender dela para rodar.
+ */
+function colunasDosCamposPorAba_() {
+  var porAba = {};
+  try {
+    if (!planilhaAtiva_().getSheetByName('CAMPOS')) return porAba;
+    lerRegistros_('CAMPOS').forEach(function (campo) {
+      var nome = String(campo.Aba || '');
+      if (!nome) return;
+      porAba[nome] = porAba[nome] || {};
+      colunasQueOCampoOcupa_(campo).forEach(function (cabecalho) {
+        porAba[nome][normalizarParaComparar_(cabecalho)] = true;
+      });
+    });
+  } catch (erro) {
+    return {};
+  }
+  return porAba;
+}
+
+/**
+ * As colunas que são SÓ do PO numa aba: nem do contrato, nem de campo do
+ * formulário — as que ele escreveu direto na planilha. Devolve { chave: true },
+ * pela chave normalizada do cabeçalho.
+ *
+ * É a mesma separação do laudo (`aMais` em `conferirEstrutura_`), e é por ela que
+ * "Trabalhar no caso" decide o que se corrige ali: a coluna sua sim; o carimbo do
+ * sistema, não.
+ */
+function colunasSuasDaAba_(nomeDaAba) {
+  var conhecidas = {};
+  if (RECC_ESQUEMA[nomeDaAba]) {
+    esquemaDaAba_(nomeDaAba).colunas.forEach(function (coluna) {
+      conhecidas[normalizarParaComparar_(coluna.cabecalho)] = true;
+    });
+  }
+  var doFormulario = colunasDosCamposPorAba_()[nomeDaAba] || {};
+  var suas = {};
+  estruturaDaAba_(nomeDaAba).cabecalhos.forEach(function (cabecalho) {
+    var chave = normalizarParaComparar_(cabecalho);
+    if (!chave || String(cabecalho).charAt(0) === '_') return;
+    if (conhecidas[chave] || doFormulario[chave]) return;
+    suas[chave] = true;
+  });
+  return suas;
+}
+
+/**
  * Compara o que o contrato espera com o que a planilha tem.
  * Não cria, não renomeia, não apaga e não reordena nada: devolve o laudo
  * para a tela de reconciliação decidir com o administrador.
+ *
+ * Coluna fora do contrato vem em DUAS listas, e a diferença é o pedido do PO
+ * ("por que fica aparecendo as colunas que criei, sinalizando que são
+ * ignoradas?"): `doFormulario` é a que ele criou em Configurações › Cadastrar
+ * Caso — o sistema a conhece, grava nela e a mostra —, e `aMais` é a que
+ * ninguém declarou. Só a segunda merece ser mencionada.
  */
 function conferirEstrutura_() {
   var planilha = planilhaAtiva_();
   var laudo = { ok: true, abas: [] };
+  var doFormulario = colunasDosCamposPorAba_();
 
   nomesDasAbasDoContrato_().forEach(function (nomeDaAba) {
     var esquema = esquemaDaAba_(nomeDaAba);
@@ -2891,6 +2951,7 @@ function conferirEstrutura_() {
       existe: false,
       faltando: [],
       aMais: [],
+      doFormulario: [],
       linhas: 0
     };
 
@@ -2914,8 +2975,11 @@ function conferirEstrutura_() {
       if (presentes[normalizarParaComparar_(coluna.cabecalho)] === undefined) item.faltando.push(coluna.cabecalho);
     });
 
+    var camposDaAba = doFormulario[nomeDaAba] || {};
     Object.keys(presentes).forEach(function (chave) {
-      if (esperados[chave] === undefined) item.aMais.push(presentes[chave]);
+      if (esperados[chave] !== undefined) return;
+      if (camposDaAba[chave]) item.doFormulario.push(presentes[chave]);
+      else item.aMais.push(presentes[chave]);
     });
 
     if (item.faltando.length) laudo.ok = false;

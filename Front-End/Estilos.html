@@ -1731,6 +1731,13 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   font-size: 12px; color: var(--tenue);
 }
 .par-do-caso.do-sistema > strong { font-weight: 400; color: var(--tenue); }
+/* A coluna SUA, que se corrige ali mesmo: a caixa tem o desenho das do formulário. */
+.par-do-caso.coluna-sua > label { font-size: 12px; color: var(--tenue); }
+.par-do-caso.coluna-sua > input {
+  width: 100%; border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto); padding: 8px 10px; font: inherit;
+}
+.par-do-caso.coluna-sua > input:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
 
 
 .modal-pe {

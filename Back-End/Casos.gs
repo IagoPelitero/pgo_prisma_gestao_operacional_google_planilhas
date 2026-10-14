@@ -786,7 +786,7 @@ function cadastrarCaso(idDoCanal, valores) {
  * vier na alteração, ele é respeitado — mas o preenchimento automático só age
  * na criação.
  */
-function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
+function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -813,6 +813,7 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
   }
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false, atual);
+  acrescentarColunasSuas_(canal, colunasSuas, paraGravar);
 
   // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
   // diálogo, e tem de deixar o mesmo rastro.
@@ -828,6 +829,31 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu) {
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
+}
+
+/**
+ * As colunas SUAS que a pessoa corrigiu no "Trabalhar no caso" — e só elas.
+ *
+ * Confere de novo, no servidor, que cada uma é mesmo coluna do PO (nem do
+ * contrato, nem de campo): a tela só desenha a caixa, e quem decide o que se
+ * grava é daqui. Carimbo do sistema mandado por fora é recusado com o nome dele.
+ * Vazio apaga — é a mesma regra do campo esvaziado na edição.
+ */
+function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
+  if (!colunasSuas || typeof colunasSuas !== 'object') return;
+  var nomes = Object.keys(colunasSuas);
+  if (!nomes.length) return;
+
+  var suas = colunasSuasDaAba_(canal.aba);
+  nomes.forEach(function (nome) {
+    if (!suas[normalizarParaComparar_(nome)]) {
+      throw new Error('A coluna "' + nome + '" não se edita no "Trabalhar no caso": ela é '
+        + 'do sistema ou de um campo do formulário.');
+    }
+    var valor = colunasSuas[nome];
+    paraGravar[grafiaDaColuna_(canal.aba, nome)] =
+      String(valor === null || valor === undefined ? '' : valor).trim();
+  });
 }
 
 /**
@@ -1256,6 +1282,15 @@ function casoParaEditar(idDoCanal, idDoCaso) {
    * — o número da pessoa passaria a depender do que alguém digitou, e não do
    * que aconteceu.
    */
+  /*
+   * A COLUNA SUA SE CORRIGE AQUI. Pedido do PO: "preciso ter a opção de editar
+   * esse modal, assim fica mais fácil caso algo fique fora de formato" — e,
+   * perguntado, escolheu: só as colunas DELE (as escritas direto na planilha,
+   * que nem o contrato nem o formulário conhecem). O carimbo do sistema segue só
+   * leitura, pelo motivo de sempre. `editavel` diz qual é qual; quem grava é
+   * `editarCaso`, que confere de novo.
+   */
+  var suas = colunasSuasDaAba_(canal.aba);
   var doSistema = [];
   estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
     var nome = String(cabecalho || '');
@@ -1265,7 +1300,8 @@ function casoParaEditar(idDoCanal, idDoCaso) {
 
     var valor = paraTexto_(registro[nome], estrutura.tipos[posicao]);
     if (!String(valor).trim()) return;
-    doSistema.push({ rotulo: nome, valor: valor });
+    doSistema.push({ rotulo: nome, valor: valor,
+      editavel: suas[normalizarParaComparar_(nome)] === true });
   });
 
   return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema,

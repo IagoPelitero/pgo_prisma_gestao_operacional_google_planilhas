@@ -177,7 +177,7 @@ function rodarTestesDaVarredura() {
     const peca = lerPeca('CasoEmModal');
     contem(peca, "versaoAoAbrir = caso.versao || '';");
     contem(peca, "Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),\n"
-      + '      versaoAoAbrir)');
+      + '      versaoAoAbrir, colunasSuasNaTela())', 'a versão vai junto (e, depois dela, as colunas suas)');
   });
 
   /* ----------------------------------------------------------------------- */

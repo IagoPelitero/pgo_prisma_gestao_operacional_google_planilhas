@@ -163,10 +163,11 @@ function rodarTestesDeDiagnostico() {
     contem(falhasEmTexto(laudo), 'Status');
   });
 
-  teste('coluna a mais é atenção, e não falha', () => {
-    // Coluna que alguém acrescentou à mão não quebra nada: o sistema ignora
-    // o que não conhece. Reprovar por isso ensinaria a operação a ignorar o
-    // laudo inteiro.
+  teste('coluna sua, escrita à mão, não reprova e nem dá alarme: fica citada, como informação', () => {
+    // Coluna que alguém acrescentou à mão não quebra nada: o sistema não mexe
+    // nela, e com valor ela aparece em "Trabalhar no caso". Reprovar — ou dar
+    // atenção — por isso ensinaria a operação a ignorar o laudo inteiro, e foi
+    // o que o PO apontou: "por que fica aparecendo as colunas que criei?".
     const { chamar } = instalacaoNova();
     const aba = chamar('planilhaAtiva_()').getSheetByName('CORRETORAS');
     aba.insertColumnsAfter(aba.getMaxColumns(), 1);
@@ -174,11 +175,12 @@ function rodarTestesDeDiagnostico() {
     chamar('esquecerEstruturaLida_')('CORRETORAS');
 
     const laudo = chamar('diagnosticoRECC()');
-    igual(laudo.aprovado, true, 'coluna a mais não reprova a instalação');
+    igual(laudo.aprovado, true, 'coluna sua não reprova a instalação');
     const oDaEstrutura = bloco(laudo, 'estrutura');
-    igual(oDaEstrutura.situacao, 'atencao');
-    const item = oDaEstrutura.itens.find((u) => u.situacao === 'atencao');
-    contem(item.detalhe, 'Anotação minha');
+    igual(oDaEstrutura.situacao, 'ok', 'e não é atenção');
+    const item = oDaEstrutura.itens.find((u) => u.detalhe.indexOf('Anotação minha') >= 0);
+    igual(item.situacao, 'ok');
+    contem(item.oQue, 'coluna(s) suas, fora do contrato');
   });
 
   secao('Os identificadores — a armadilha mais cara do PGO 5.x');

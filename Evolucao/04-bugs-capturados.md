@@ -1882,6 +1882,31 @@ atenção.
 
 ---
 
+### 89 · O alarme que dizia "ignorada" para a coluna que o sistema usa
+
+**Sintoma.** Relatado pelo PO: "por que fica aparecendo as colunas que criei fora do
+contrato e sinalizando que são ignoradas? Se for preenchido não vai aparecer?"
+
+**Causa.** O laudo da planilha comparava as colunas SÓ com o contrato fixo
+(`RECC_ESQUEMA`). Toda coluna fora dele — inclusive as que o próprio sistema cria
+quando o PO cadastra um campo em Configurações › Cadastrar Caso — entrava em "a
+mais", dava ATENÇÃO no diagnóstico e ouvia: "o sistema ignora o que não conhece"
+e "coluna que o sistema não preenche fica vazia para sempre". As duas frases
+erravam: o campo criado pelo PO é conhecido (o formulário grava nele, o caso o
+mostra), e a coluna escrita à mão, com valor, aparece em "Trabalhar no caso". Além
+disso, a lista de leitura de "Trabalhar no caso" chamava essas colunas de "escrito
+pelo sistema". Um teste antigo (`a coluna criada pelo administrador consta como fora
+do contrato`) exigia exatamente o comportamento errado.
+
+**Defesa.** `conferirEstrutura_` consulta os CAMPOS (`colunasDosCamposPorAba_`,
+campo desligado e campo de várias colunas inclusive) e separa `doFormulario` de
+`aMais`. A coluna do formulário não é citada; a que é só do PO é citada como
+**sua**, no nível OK — informação, sem alarme —, com o texto certo; e a lista de
+leitura do caso diz "colunas que o formulário não pergunta (as do sistema e as que
+você criou)". O teste antigo passou a exigir o contrário.
+
+---
+
 ## O que esta lista ensina
 
 **São oitenta e sete achados, e a maioria era silenciosa.** Não davam erro, não
@@ -2075,3 +2100,8 @@ Daí as duas práticas que o projeto não abre mão:
     o diagnóstico comparavam sem maiúscula e acento; a leitura, não. Cada lado
     estava certo sozinho, e juntos apagavam a descrição. Quando uma regra de
     comparação existe, ela vale para quem grava, quem lê e quem confere.
+48. **Alarme que erra ensina a ignorar o alarme.** No item 89 o laudo dava "atenção"
+    por uma coluna que o próprio sistema tinha criado, com uma explicação falsa. A
+    operação passou a ler "atenção" como ruído — e o próximo atenção de verdade
+    chegaria no meio dele. Todo aviso precisa distinguir o que o sistema NÃO sabe do
+    que ele só não esperava.

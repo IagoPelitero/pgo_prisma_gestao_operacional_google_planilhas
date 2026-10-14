@@ -620,6 +620,45 @@ async function rodar() {
       && String(l.Prazo) === '4'), 'a planilha não mudou');
   });
 
+  /* --------------------------------------------- a coluna sua, no modal -- */
+
+  console.log('\nA coluna sua, corrigida no "Trabalhar no caso"');
+
+  await teste('a coluna escrita direto na planilha vem editável no modal, e o carimbo não', async () => {
+    vm.runInContext(`(function () {
+      var aba = planilhaAtiva_().getSheetByName('BASE_RET');
+      aba.insertColumnsBefore(3, 1);
+      aba.getRange(1, 3).setNumberFormat('@');
+      aba.getRange(1, 3).setValue('Observação minha');
+      esquecerEstruturaLida_();
+      var ultimo = lerRegistros_('BASE_RET').pop();
+      atualizarRegistro_('BASE_RET', ultimo.__id, { 'Observação minha': 'fora  do formato' });
+    })()`, contexto);
+
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(900);
+    if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
+    await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
+    await pagina.waitForTimeout(900);
+    if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
+    await pagina.click('[data-trabalhar]');
+    await pagina.waitForFunction(() => {
+      const salvar = document.getElementById('modal-salvar');
+      return salvar && !salvar.disabled;
+    }, { timeout: 10000 });
+
+    const caixa = pagina.locator('#modal-do-sistema [data-coluna-sua="Observação minha"]');
+    igual(await caixa.count(), 1, 'a coluna sua virou caixa de texto');
+    igual(await caixa.inputValue(), 'fora  do formato');
+    igual(await pagina.locator('#modal-do-sistema [data-coluna-sua="Quem mudou o status"]').count(), 0,
+      'o carimbo do sistema continua texto');
+
+    await caixa.fill('Formato certo');
+    await pagina.click('#modal-salvar');
+    await pagina.waitForTimeout(1200);
+    igual(naPlanilha('BASE_RET').pop()['Observação minha'], 'Formato certo', 'gravou na planilha');
+  });
+
   /* ------------------------------------------------- os atendidos da Mesa -- */
 
   console.log('\nOs atendidos da Mesa');

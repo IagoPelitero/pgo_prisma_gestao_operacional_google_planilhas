@@ -1921,15 +1921,38 @@ var CasoEmModal = (function () {
   */
   function desenharDoSistema(linhas) {
     if (!linhas || !linhas.length) return '';
+    var temSua = linhas.some(function (linha) { return linha.editavel; });
     return '<section class="modal-pares">'
-      + '<p class="pares-do-sistema">Também está na planilha — escrito pelo '
-      + 'sistema, não se edita no formulário.</p>'
-      + linhas.map(function (linha) {
+      + '<p class="pares-do-sistema">Também está na planilha — colunas que o '
+      + 'formulário não pergunta. '
+      + (temSua ? 'As suas dá para corrigir aqui; as do sistema são só leitura.'
+        : 'Aqui só para leitura.') + '</p>'
+      + linhas.map(function (linha, i) {
+        // A coluna SUA (escrita direto na planilha) vira caixa de texto, para
+        // corrigir o que ficou fora de formato. O carimbo do sistema continua
+        // texto: reescrevê-lo à mão mudaria a produtividade e os prazos.
+        if (linha.editavel) {
+          var id = 'coluna-sua-' + i;
+          return '<div class="par-do-caso coluna-sua">'
+            + '<label for="' + id + '">' + escapar(linha.rotulo) + '</label>'
+            + '<input type="text" id="' + id + '" data-coluna-sua="'
+            + escapar(linha.rotulo) + '" value="' + escapar(linha.valor) + '"></div>';
+        }
         return '<div class="par-do-caso do-sistema">'
           + '<span>' + escapar(linha.rotulo) + '</span>'
           + '<strong>' + escapar(linha.valor) + '</strong></div>';
       }).join('')
       + '</section>';
+  }
+
+  /** O que está nas caixas das colunas suas, pelo nome da coluna. */
+  function colunasSuasNaTela() {
+    var colunas = {};
+    var caixas = document.querySelectorAll('#modal-do-sistema [data-coluna-sua]');
+    for (var i = 0; i < caixas.length; i++) {
+      colunas[caixas[i].getAttribute('data-coluna-sua')] = caixas[i].value;
+    }
+    return colunas;
   }
 
   /**
@@ -1973,7 +1996,7 @@ var CasoEmModal = (function () {
     Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
-      versaoAoAbrir)
+      versaoAoAbrir, colunasSuasNaTela())
       .entao(function () {
         salvando = false;
         mudouAlgo = true;

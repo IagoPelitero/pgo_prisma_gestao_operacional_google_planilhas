@@ -814,6 +814,19 @@ function gerar(pastaDeSaida) {
   chamar('atualizarRegistro_')('USUARIOS', eu.Id, { CanalId: canalDaRet.id });
   chamar('esquecerEstruturaLida_()');
 
+  // Uma coluna SUA na RET — escrita direto na planilha, sem campo —, com valor em
+  // dois casos: é o que "Trabalhar no caso" deixa corrigir ali mesmo, e o que o
+  // laudo da Estrutura cita como "coluna sua", sem alarme.
+  const abaDaRet = ambiente.planilha.getSheetByName('BASE_RET');
+  abaDaRet.insertColumnsBefore(3, 1);
+  abaDaRet.getRange(1, 3).setNumberFormat('@');
+  abaDaRet.getRange(1, 3).setValue('Observação da operação');
+  chamar('esquecerEstruturaLida_()');
+  chamar('lerRegistros_')('BASE_RET').slice(-2).forEach((caso, i) => {
+    chamar('atualizarRegistro_')('BASE_RET', caso.__id,
+      { 'Observação da operação': i ? 'Cliente pediu retorno após 14h' : 'ligar  depois  das 14h' });
+  });
+
   const pacote = chamar('pacoteDePartida()');
 
   // O formulário de cado canal e alguns exemplos de SUSEP, para a tela de

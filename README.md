@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1111 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1126 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -266,7 +266,7 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-1111 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1126 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -666,9 +666,20 @@ pelo outro.
 
 Um caso importado chega com valor em colunas que o formulário não pergunta: a
 origem da importação, a data dela, os carimbos de contato. Elas aparecem
-**embaixo do formulário**, atrás de um aviso, **como leitura**: são escritas pelo
-sistema, e deixar reescrever "Quem mudou o status" à mão faria o número da
-produtividade depender do que alguém digitou, e não do que aconteceu.
+**embaixo do formulário**, atrás de um aviso: são as colunas que o formulário não
+pergunta — as do sistema e as **suas**, escritas direto na planilha.
+
+- **As suas se corrigem ali mesmo.** Pedido do PO: *"preciso ter a opção de editar
+  esse modal, assim fica mais fácil caso algo fique fora de formato"*. A coluna sua
+  com valor vira uma **caixa de texto**; o que você corrigir é gravado junto com o
+  resto, em "Salvar alterações". Esvaziar apaga, como no campo do formulário.
+- **As do sistema continuam só leitura.** Deixar reescrever "Quem mudou o status"
+  ou uma data de status à mão faria a produtividade e os prazos dependerem do que
+  alguém digitou, e não do que aconteceu. O servidor confere: coluna do sistema ou
+  de campo mandada por fora é recusada, com o nome dela.
+
+Para a coluna sua aparecer também no **cadastro** de casos novos, cadastre-a em
+Configurações › Cadastrar Caso — aí ela vira campo do formulário.
 
 Coluna **vazia** que ninguém declarou no formulário não entra — a BASE_RET tem
 quase cinquenta colunas, e listar as vazias encheria a tela de travessões
@@ -746,6 +757,20 @@ resposta.
 
 E **quais** canais aparecem continua sendo a lista de canais do nível: quem abre
 só a RET e tem "o canal inteiro" vê a RET inteira, não a Mesa Diamante.
+
+### Coluna que você criou, fora do contrato
+
+O laudo da planilha (Configurações › Estrutura e `diagnosticoRECC`) separa duas
+coisas, e nenhuma delas é problema:
+
+| A coluna… | O laudo diz | O sistema |
+|---|---|---|
+| **foi criada em Configurações › Cadastrar Caso** | nada (na Estrutura: *campos criados em Cadastrar Caso*) | a conhece: o formulário grava nela e o caso a mostra — inclusive se o campo for desligado |
+| **foi escrita direto na planilha, sem campo** | *colunas suas, fora do contrato* — informação, **sem alarme** | não mexe nela. **Com valor, ela aparece em "Trabalhar no caso", numa caixa para corrigir**; vazia, não enche a tela |
+
+Por um tempo o laudo tratava as duas como "a mais", dava **atenção** e dizia que o
+sistema "ignora o que não conhece" e que a coluna "fica vazia para sempre" — e as
+duas frases erravam (achado 89).
 
 ### Os atendidos da Mesa: o sistema somado ao chat
 
@@ -1282,7 +1307,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1111 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1126 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

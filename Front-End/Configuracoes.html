@@ -2900,8 +2900,12 @@ var TelaConfiguracoes = (function () {
             + (aba.faltando.length
               ? ' · <strong class="alerta">faltam: '
                 + escapar(aba.faltando.join(', ')) + '</strong>' : '')
+            + (aba.doFormulario && aba.doFormulario.length
+              ? ' · campos criados em Cadastrar Caso: '
+                + escapar(aba.doFormulario.join(', ')) : '')
             + (aba.aMais.length
-              ? ' · fora do contrato: ' + escapar(aba.aMais.join(', ')) : ''))
+              ? ' · colunas suas, fora do contrato (o sistema não mexe nelas): '
+                + escapar(aba.aMais.join(', ')) : ''))
         + '</span></li>';
     }).join('');
 
