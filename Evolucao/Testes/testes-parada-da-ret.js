@@ -12,7 +12,7 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comAFilaDaTela } = require('./ferramentas');
 const { retComStatusProposta } = require('./testes-condicional');
 
 const CONDICAO = {
@@ -254,7 +254,7 @@ function rodarTestesDaParadaDaRet() {
       'nome do cliente': 'Transmitido', status: 'Retido', 'Status proposta': 'Transmitido',
       'Data do status proposta': dias(29), 'data de recepção do protocolo': dias(30),
       'Data da primeira mudança de status': dias(30) });
-    const fila = x.chamar('resumoDoCanal')(x.ret.id, {}, 90).fila;
+    const fila = comAFilaDaTela(x.chamar('resumoDoCanal')(x.ret.id, {}, 90)).fila;
     const sinais = (r) => fila.find((c) => String(c.id) === String(r.__id)).sinais[0];
     igual(sinais(aguardando).encerrado, false);
     igual(sinais(aguardando).tom, 'ruim', 'há 30 dias esperando a transmissão');

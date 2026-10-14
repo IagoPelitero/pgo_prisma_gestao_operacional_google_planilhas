@@ -74,6 +74,20 @@ const RECC_LINHAS_DO_PAINEL_PADRAO = 5000;
 const RECC_CASOS_NA_FILA = 5;
 const RECC_OPCOES_DE_CASOS_NA_FILA = [5, 10, 20, 50, 100];
 
+/**
+ * Quantos casos da fila o Trabalho recebe ao ABRIR: os da maior opção do
+ * "Mostrar" (100). "Todos" é que vai buscar o resto.
+ *
+ * O PO relatou: "a aba Trabalho vem demorando para carregar e, quando carrega,
+ * traz o erro de 40 s para responder". A fila ia INTEIRA para a tela, e com
+ * 5.000 casos no período a resposta tinha 6 MB — o Apps Script leva dezenas
+ * de segundos para atravessar isso até o navegador, e a tela desistia nos 40.
+ * Perguntado, ele escolheu: abrir com os 100 mais recentes (5, 10, 20, 50 e
+ * 100 continuam na hora) e "Todos" ir ao servidor quando clicado. Os cartões,
+ * os filtros e o aviso de prazo continuam olhando TODOS os casos.
+ */
+const RECC_FILA_NA_ABERTURA = RECC_OPCOES_DE_CASOS_NA_FILA[RECC_OPCOES_DE_CASOS_NA_FILA.length - 1];
+
 function linhasQueOPainelOlha_() {
   var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
   if (isFinite(declarado) && declarado > 0) return Math.floor(declarado);
@@ -101,7 +115,7 @@ function tomValido_(cor) {
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -139,6 +153,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
+  var pertoDeVencer = casosPertoDeVencer_(filtrados, canal);
 
   return {
     canal: canal,
@@ -154,10 +169,22 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido) {
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
-    // A fila inteira, o mais recente em cima; a tela mostra 5 e o resto sob
-    // pedido, no "Mostrar". Ver RECC_CASOS_NA_FILA.
-    fila: montarFila_(filtrados, canal),
-    mostrarNaFila: { padrao: RECC_CASOS_NA_FILA, opcoes: RECC_OPCOES_DE_CASOS_NA_FILA },
+    // A fila, o mais recente em cima: os 100 mais recentes, ou todos quando a
+    // tela pede "Todos". Ver RECC_FILA_NA_ABERTURA. Vai COMPACTA — só os
+    // valores; o nome de cada coluna já está em `colunas`, e a tela remonta.
+    // `total` continua sendo a fila inteira.
+    fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
+      ? filtrados : filtrados.slice(-RECC_FILA_NA_ABERTURA), canal)),
+    filaCompacta: true,
+    // O aviso de prazo olha a fila INTEIRA — um caso perto de vencer que não
+    // está entre os 100 mais recentes é justamente o que mais precisa do aviso.
+    // A LISTA do aviso vai com até 100 (os mais recentes); o número, inteiro.
+    // Um aviso de 2.000 linhas pesaria tanto quanto a fila — e ninguém o lê.
+    pertoDeVencer: compactarFila_(montarFila_(
+      pertoDeVencer.slice(-RECC_FILA_NA_ABERTURA), canal)),
+    quantosPertoDeVencer: pertoDeVencer.length,
+    mostrarNaFila: { padrao: RECC_CASOS_NA_FILA, opcoes: RECC_OPCOES_DE_CASOS_NA_FILA,
+      naAbertura: RECC_FILA_NA_ABERTURA },
     total: filtrados.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,
@@ -951,6 +978,54 @@ function montarFila_(registros, canal) {
         return sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
       }).filter(function (sinal) { return sinal !== null; })
     };
+  });
+}
+
+/**
+ * A fila em forma COMPACTA, para atravessar até o navegador.
+ *
+ * Cada célula ia como um objeto com o nome da coluna, se é status e o alerta —
+ * 1,1 KB por caso, quase tudo repetido. Aqui vai só o valor (ou, quando há
+ * alerta, [valor, recado, tom]); o nome e o "é status" a tela tira de
+ * `colunas`, que já vem na mesma resposta e na mesma ordem. Cinco vezes menor.
+ * A tela remonta o formato de antes (`expandirFila`, em Trabalho.html), e o
+ * resto do desenho não mudou.
+ */
+function compactarFila_(fila) {
+  return fila.map(function (caso) {
+    return {
+      id: caso.id,
+      v: caso.celulas.map(function (grupo) {
+        return grupo.map(function (celula) {
+          return celula.alerta || celula.tomDoAlerta
+            ? [celula.valor, celula.alerta, celula.tomDoAlerta] : celula.valor;
+        });
+      }),
+      situacao: caso.situacao,
+      tom: caso.tom,
+      sla: caso.sla,
+      sinais: caso.sinais
+    };
+  });
+}
+
+/**
+ * Os casos no AMARELO de algum sinalizador — o que o aviso do Trabalho mostra
+ * ao entrar no canal. Mesma regra da tela: amarelo e ainda não encerrado.
+ *
+ * Olha todos os casos que a pessoa enxerga, e não só os da fila que foi para
+ * a tela. O relógio e a leitura dos sinalizadores são uma vez só, como na fila.
+ */
+function casosPertoDeVencer_(registros, canal) {
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  if (!sinalizadores.length) return [];
+  var situacoes = situacoesPorChave_(canal);
+  var agora = relogioDeParede_(new Date());
+  return registros.filter(function (registro) {
+    return sinalizadores.some(function (sinalizador) {
+      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      return sinal !== null && sinal.tom === 'atencao' && !sinal.encerrado;
+    });
   });
 }
 

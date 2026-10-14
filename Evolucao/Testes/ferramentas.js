@@ -310,7 +310,28 @@ function pecaRodando(nome, vizinhos) {
   return contexto;
 }
 
+/**
+ * A resposta do Trabalho com a fila como a TELA a vê.
+ *
+ * A fila atravessa compacta — só os valores (ver compactarFila_) — e a tela a
+ * remonta com `TelaTrabalho.expandirFila`. Os testes leem pela MESMA função
+ * da tela: o que eles conferem é o caminho inteiro, servidor e tela juntos.
+ */
+let telaDoTrabalho = null;
+function comAFilaDaTela(resumo) {
+  if (!resumo || !resumo.filaCompacta) return resumo;
+  if (!telaDoTrabalho) {
+    telaDoTrabalho = pecaRodando('Trabalho', { SeletorDePeriodo: { padrao: () => ({}) } })
+      .TelaTrabalho;
+  }
+  return Object.assign({}, resumo, {
+    fila: telaDoTrabalho.expandirFila(resumo.fila, resumo.colunas),
+    pertoDeVencer: telaDoTrabalho.expandirFila(resumo.pertoDeVencer, resumo.colunas)
+  });
+}
+
 module.exports = {
+  comAFilaDaTela,
   telasDoSistema,
   carregar, secao, teste, igual, verdadeiro, contem, lanca, ehData,
   celula, formatoDaCelula, comoUsuario, resumo, lerPeca, scriptDaPeca,

@@ -2697,6 +2697,36 @@ Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`. Depois:
 
 ---
 
+## Etapa 37 — O Trabalho que não estoura os 40 segundos
+
+Relato do PO: **"a aba Trabalho vem demorando para carregar e, quando carrega, traz um
+erro informando o problema de 40 s para responder"**. A investigação mostrou que não
+eram as leituras (4 a 7 idas ao serviço) nem o processamento (uns 200 ms no Node), e
+sim o tamanho da resposta: a fila ia inteira, 1,1 KB por caso — 6 MB com 5.000 casos
+no período (achado 95). Perguntado, o PO escolheu as duas correções juntas.
+
+| Parte | O que ficou |
+|---|---|
+| **Fila compacta** | `compactarFila_` manda só os valores (com alerta: valor, recado e cor); `TelaTrabalho.expandirFila` remonta o formato de antes a partir de `colunas`. O desenho da fila não mudou |
+| **100 mais recentes** | A tela recebe os casos da maior opção do "Mostrar" (`RECC_FILA_NA_ABERTURA` = 100). 5, 10, 20, 50 e 100 continuam na hora; "Todos", com mais casos do que vieram, vai ao servidor ("Trazendo os N casos…") e a escolha vale nas recargas seguintes. A barra diz o total da fila inteira |
+| **O que continua olhando tudo** | Os cartões, os filtros e a busca (antes do corte) e o **aviso de prazo**: `casosPertoDeVencer_` olha todos os casos que a pessoa enxerga e manda a lista com até 100, mais o número inteiro ("E mais N casos no amarelo") |
+| **O tamanho** | Com 5.000 casos: abertura de 6 MB para **85 KB**; "Todos", 1,8 MB |
+
+A Busca e a Produtividade usam a mesma `montarFila_` e não mudaram. **1173 testes**
+(14 novos, em `testes-trabalho-rapido.js`; os 82 lugares que liam a fila do Trabalho
+passaram a ler pela função da tela, `comAFilaDaTela`, e o teste que segurava "trocar
+a quantidade não volta ao servidor" passou a segurar "até 100"), **12 quebras de
+propósito, 11 vermelhos** — a que escapou (tirar o "ainda não encerrado" do aviso) não
+muda nada: caso encerrado nunca fica amarelo. Navegador: ponta a ponta **20/20** — o
+novo abre o Trabalho com 150 casos, confere que 100 não vai ao servidor e que "Todos"
+vai, uma vez só.
+
+### Para quem já usa
+
+Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

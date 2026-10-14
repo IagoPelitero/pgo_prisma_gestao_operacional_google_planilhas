@@ -31,7 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
-  lerPeca } = require('./ferramentas');
+  lerPeca, comAFilaDaTela } = require('./ferramentas');
 
 const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
 const lerTela = (nome) => fs.readFileSync(path.join(PASTA_DAS_TELAS, nome), 'utf8');
@@ -435,7 +435,7 @@ function rodarTestesDeSinalizadores() {
     status: 'Pendente',
     'Data da primeira mudança de status': (extra || {})['data de recepção do protocolo'] || ''
   }, extra));
-  const filaDaRet = () => chamar('resumoDoCanal')(ret.id, {}, 90).fila;
+  const filaDaRet = () => comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {}, 90)).fila;
   const sinaisDe = (fila, registro) => fila.find((c) => String(c.id) === String(registro.__id)).sinais;
 
   const velhoAberto = casoDaRet({ 'data de recepção do protocolo': diasAtras(60) });
@@ -476,7 +476,7 @@ function rodarTestesDeSinalizadores() {
     const semData = chamar('inserirRegistro_')('BASE_MESA', { Analista: 'Bia Souza',
       Status: 'Em andamento', 'Nome do segurado': 'Anterior ao carimbo',
       'Data de entrada': diasAtras(0) });
-    const fila = chamar('resumoDoCanal')(mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(chamar('resumoDoCanal')(mesa.id, {}, 90)).fila;
     const doAntigo = sinaisDe(fila, antigo);
     igual(doAntigo.length, 1);
     igual(doAntigo[0].tom, 'ruim');
@@ -485,7 +485,7 @@ function rodarTestesDeSinalizadores() {
   });
 
   teste('o SLA de 6h da Mesa continua aparecendo, ao lado do selo novo', () => {
-    const fila = chamar('resumoDoCanal')(mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(chamar('resumoDoCanal')(mesa.id, {}, 90)).fila;
     verdadeiro(fila.every((c) => c.sla !== null), 'o SLA não foi tocado');
   });
 
@@ -498,7 +498,7 @@ function rodarTestesDeSinalizadores() {
     outra.chamar('atualizarRegistro_')('SINALIZADORES', linha.Id, { Ativo: false });
     outra.chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana',
       'data de recepção do protocolo': diasAtras(60), status: 'Pendente' });
-    const fila = outra.chamar('resumoDoCanal')(r.id, {}, 90).fila;
+    const fila = comAFilaDaTela(outra.chamar('resumoDoCanal')(r.id, {}, 90)).fila;
     verdadeiro(fila.length > 0 && fila.every((c) => c.sinais.length === 0));
   });
 
@@ -511,7 +511,7 @@ function rodarTestesDeSinalizadores() {
     const r = antiga.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
     antiga.chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana',
       'data de recepção do protocolo': diasAtras(60), status: 'Pendente' });
-    const fila = antiga.chamar('resumoDoCanal')(r.id, {}, 90).fila;
+    const fila = comAFilaDaTela(antiga.chamar('resumoDoCanal')(r.id, {}, 90)).fila;
     verdadeiro(fila.length > 0 && fila.every((c) => c.sinais.length === 0));
     igual(antiga.chamar('listarSinalizadores()').length, 0);
     igual(antiga.chamar('opcoesDeSinalizador()').abaExiste, false);
@@ -913,7 +913,7 @@ function rodarTestesDeSinalizadores() {
       'Nome do segurado': 'Antigo', 'Data de entrada': diasAtras(30),
       'Área responsável': 'Sinistro' });
     antes.chamar('atualizarPGO()');
-    const fila = antes.chamar('resumoDoCanal')(m.id, {}, 90).fila;
+    const fila = comAFilaDaTela(antes.chamar('resumoDoCanal')(m.id, {}, 90)).fila;
     verdadeiro(fila.length > 0);
     verdadeiro(fila.every((c) => c.sinais.length === 0),
       'sem carimbo não há de onde contar as 48 horas');
@@ -1038,7 +1038,7 @@ function rodarTestesDeSinalizadores() {
       'Nome do segurado': 'Fechado', 'Data de entrada': diasAtras(30) });
     const recado = antes.chamar('atualizarPGO()');
     contem(recado, '2 caso(s) em andamento não têm "Data em andamento"');
-    const fila = antes.chamar('resumoDoCanal')(antes.m.id, {}, 90).fila;
+    const fila = comAFilaDaTela(antes.chamar('resumoDoCanal')(antes.m.id, {}, 90)).fila;
     verdadeiro(fila.every((c) => c.sinais.length === 0),
       'sem a data não há de onde contar: nenhum selo inventado');
   });
@@ -1061,7 +1061,7 @@ function rodarTestesDeSinalizadores() {
     igual(antes.chamar('lerRegistros_("SINALIZADORES")').length, 3,
       'nenhum sinalizador nasceu junto com o canal: prazo é decisão do PO');
     // E o Trabalho do canal novo abre, sem selo e sem erro.
-    const fila = antes.chamar('resumoDoCanal')(novo.id, {}, 90).fila;
+    const fila = comAFilaDaTela(antes.chamar('resumoDoCanal')(novo.id, {}, 90)).fila;
     igual(fila.length, 0);
   });
 

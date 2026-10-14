@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, celula, lerPeca,
-  scriptDaPeca, comoUsuario, elementoFalso, pecaRodando } = require('./ferramentas');
+  scriptDaPeca, comoUsuario, elementoFalso, pecaRodando, comAFilaDaTela } = require('./ferramentas');
 
 function rodarTestesDeCadastro() {
   console.log('\nEtapa 4 — Cadastrar Caso');
@@ -488,7 +488,7 @@ function rodarTestesDeCadastro() {
     igual(chamar('buscarRegistros_')('BASE_RET', 'id', novo.id, 1).length, 0);
 
     // E some da fila do Trabalho, que é onde a pessoa vai conferir.
-    const fila = chamar('resumoDoCanal')(canalRetAqui.id, {}).fila;
+    const fila = comAFilaDaTela(chamar('resumoDoCanal')(canalRetAqui.id, {})).fila;
     verdadeiro(!fila.some((linha) => linha.id === novo.id),
       'o caso apagado não pode continuar na fila');
   });

@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
-  ehData, lerPeca, scriptDaPeca, pecaRodando } = require('./ferramentas');
+  ehData, lerPeca, scriptDaPeca, pecaRodando, comAFilaDaTela } = require('./ferramentas');
 
 function rodarTestesDoTrabalho() {
   console.log('\nEtapa 5 — Trabalho');
@@ -50,7 +50,7 @@ function rodarTestesDoTrabalho() {
   secao('Os cartões');
 
   teste('base vazia entrega zeros, não uma tela quebrada', () => {
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     igual(resumo.total, 0);
     igual(resumo.fila.length, 0);
     igual(resumo.cartoes[0].rotulo, 'Total de casos');
@@ -61,12 +61,12 @@ function rodarTestesDoTrabalho() {
     // A Mesa Diamante tem menos demanda que a RET: sete cartões para poucos
     // casos é ruído. Cada cartão é uma LINHA de PAINEIS, com nome, cor e
     // ordem próprios — não um texto separado por vírgula dentro do canal.
-    const rotulos = chamar('resumoDoCanal')(canal.id, {}).cartoes.map((c) => c.rotulo);
+    const rotulos = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes.map((c) => c.rotulo);
     igual(rotulos.join(' | '),
       'Total de casos | Em andamento | Concluído | Finalizados na célula');
 
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    const daRet = chamar('resumoDoCanal')(ret.id, {}).cartoes.map((c) => c.rotulo);
+    const daRet = comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).cartoes.map((c) => c.rotulo);
     igual(daRet.join(' | '),
       'Total de casos | Aguardando transmissão | Pendente | 1º contato realizado'
       + ' | 2º contato realizado | Não trabalhado',
@@ -77,17 +77,17 @@ function rodarTestesDoTrabalho() {
     const painel = chamar('listarCardsDoPainel')('trabalho', canal.id);
     igual(painel.cartoes.length, 4);
 
-    const antes = chamar('resumoDoCanal')(canal.id, {}).total;
+    const antes = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).total;
     const sobrando = painel.cartoes.filter((c) => c.dimensao !== 'naCelula');
     chamar('salvarCardsDoPainel')('trabalho', canal.id, sobrando);
 
-    const depois = chamar('resumoDoCanal')(canal.id, {});
+    const depois = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     igual(depois.cartoes.length, 3, 'o cartão sumiu da tela');
     igual(depois.total, antes, 'e os casos continuam todos lá');
 
     // E volta, porque a linha não foi apagada — foi desligada.
     chamar('salvarCardsDoPainel')('trabalho', canal.id, painel.cartoes);
-    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length, 4);
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes.length, 4);
   });
 
   teste('cartão além do teto, sem nome ou de situação inventada é recusado', () => {
@@ -125,7 +125,7 @@ function rodarTestesDoTrabalho() {
         'Data da finalização': escrever(hoje) }
     ]);
 
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     const porRotulo = {};
     resumo.cartoes.forEach((c) => { porRotulo[c.rotulo] = c.valor; });
 
@@ -136,7 +136,7 @@ function rodarTestesDoTrabalho() {
     // Na RET, que mostra todas, dá para conferir a situação sem nenhum caso.
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
     const daRet = {};
-    chamar('resumoDoCanal')(ret.id, {}).cartoes
+    comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).cartoes
       .forEach((c) => { daRet[c.rotulo] = c.valor; });
     igual(daRet['Aguardando transmissão'], 0,
       'situação sem caso vale zero, não some');
@@ -148,7 +148,7 @@ function rodarTestesDoTrabalho() {
     // A cor mora no CATALOGO como NOME de tom, e não como código: cada tema
     // pinta o seu verde. Gravar #15794A deixaria o verde do tema claro
     // aparecendo no escuro.
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     const porRotulo = {};
     resumo.cartoes.forEach((c) => { porRotulo[c.rotulo] = c.tom; });
     igual(porRotulo['Em andamento'], 'atencao');
@@ -165,7 +165,7 @@ function rodarTestesDoTrabalho() {
   teste('"finalizado na célula" conta o que não foi encaminhado', () => {
     // Finalização preenchida E área responsável vazia. É conta, não coluna:
     // assim não mente quando alguém edita a área direto na planilha.
-    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes
       .find((c) => c.chave === 'naCelula').valor, 1);
 
     chamar('inserirRegistro_')('BASE_MESA', {
@@ -174,14 +174,14 @@ function rodarTestesDoTrabalho() {
       'Data da finalização': escrever(hoje), 'Área responsável': 'Sinistro'
     });
 
-    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes
       .find((c) => c.chave === 'naCelula').valor, 1,
       'o encaminhado não conta como resolvido na célula');
   });
 
   teste('o canal que não declara as colunas não ganha o cartão', () => {
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    const resumo = chamar('resumoDoCanal')(ret.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {}));
     verdadeiro(!resumo.cartoes.some((c) => c.chave === 'naCelula'),
       'cartão sempre zerado pareceria um problema — melhor não existir');
   });
@@ -194,7 +194,7 @@ function rodarTestesDoTrabalho() {
       'Data de entrada': diasAtras(90), 'Nome do segurado': 'Caso antigo'
     });
 
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     igual(resumo.periodo.dias, 30);
     verdadeiro(!JSON.stringify(resumo.fila).includes('Caso antigo'),
       'fora da janela não aparece na fila');
@@ -206,7 +206,7 @@ function rodarTestesDoTrabalho() {
     // Um caso da RET tem trinta e cinco colunas. Seis lado a lado perdem o
     // resto; trinta e cinco não cabem. Juntar as que se leem de uma vez —
     // proposta com apólice, nome com CPF — resolve as duas coisas.
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     igual(resumo.colunas.map((g) => g.titulo).join(' | '),
       'Situação | Dados do caso | Dados cadastrais | Corretora | Responsável');
     igual(resumo.colunas[0].colunas.map((c) => c.cabecalho).join(', '),
@@ -221,7 +221,7 @@ function rodarTestesDoTrabalho() {
       colunaDaData: ret.colunaDaData, colunaDoStatus: ret.colunaDoStatus,
       colunasDaFila: 'nome do cliente, status, protocolo' });
 
-    const grupos = chamar('resumoDoCanal')(ret.id, {}).colunas;
+    const grupos = comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).colunas;
     igual(grupos.map((g) => g.titulo).join(' | '),
       'nome do cliente | status | protocolo',
       'sem dois-pontos, cada coluna é um grupo com o próprio nome');
@@ -235,7 +235,7 @@ function rodarTestesDoTrabalho() {
     // uma coluna foi renomeada seria pior do que mostrar o resto.
     chamar('atualizarRegistro_')('CANAIS', ret.id,
       { ColunasDaFila: 'Cliente: nome do cliente, coluna que nao existe' });
-    const grupos = chamar('resumoDoCanal')(ret.id, {}).colunas;
+    const grupos = comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).colunas;
     igual(grupos.length, 1);
     igual(grupos[0].colunas.map((c) => c.cabecalho).join(', '), 'nome do cliente');
   });
@@ -243,7 +243,7 @@ function rodarTestesDoTrabalho() {
   teste('a data chega à tela como texto, e no formato brasileiro', () => {
     // Um objeto de data atravessando a ponte chega com o fuso de quem abriu,
     // e o mesmo caso apareceria com dias diferentes para pessoas diferentes.
-    const primeira = valorNaFila(chamar('resumoDoCanal')(canal.id, {}), 0,
+    const primeira = valorNaFila(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})), 0,
       'Data de entrada');
     igual(typeof primeira, 'string');
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(primeira), 'veio ' + primeira);
@@ -252,7 +252,7 @@ function rodarTestesDoTrabalho() {
   teste('a variação compara com o período anterior, e cala quando não dá', () => {
     // Mostrar "+100%" porque saiu de zero é ruído que a operação aprende a
     // ignorar — e junto com ele ignora a variação que importa.
-    const total = chamar('resumoDoCanal')(canal.id, {}).cartoes[0];
+    const total = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes[0];
     igual(total.anterior, 0, 'não havia nada no período anterior');
     igual(total.variacao, null, 'sem base de comparação, não há variação');
 
@@ -261,7 +261,7 @@ function rodarTestesDoTrabalho() {
       Analista: 'Ana Martins', Status: 'Em andamento',
       'Data de entrada': diasAtras(40), 'Nome do segurado': 'Do mês passado'
     });
-    const comBase = chamar('resumoDoCanal')(canal.id, {}).cartoes[0];
+    const comBase = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes[0];
     igual(comBase.anterior, 1);
     igual(comBase.variacao, 300, 'de 1 para 4 são +300%');
   });
@@ -338,14 +338,14 @@ function rodarTestesDoTrabalho() {
   secao('Os filtros');
 
   teste('os filtros são os campos que já são lista — nada escrito em código', () => {
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     verdadeiro(resumo.filtrosDisponiveis.length > 0);
     verdadeiro(resumo.filtrosDisponiveis.length <= 4, 'no máximo quatro na tela');
     verdadeiro(resumo.filtrosDisponiveis.some((f) => f.chave === 'status'));
   });
 
   teste('filtrar muda o cartão e a fila juntos', () => {
-    const resumo = chamar('resumoDoCanal')(canal.id, { status: 'Em andamento' });
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, { status: 'Em andamento' }));
     igual(resumo.total, 2);
     igual(resumo.fila.length, 2);
     igual(resumo.cartoes[0].valor, 2, 'o total acompanha o filtro');
@@ -353,7 +353,7 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('filtro sem valor não filtra nada', () => {
-    igual(chamar('resumoDoCanal')(canal.id, { status: '' }).total, 4);
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, { status: '' })).total, 4);
   });
 
   secao('O alcance vale no painel');
@@ -369,7 +369,7 @@ function rodarTestesDoTrabalho() {
     });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      const resumo = chamar('resumoDoCanal')(canal.id, {});
+      const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
       igual(resumo.escopo, 'PROPRIOS');
       igual(resumo.cartoes[0].valor, 3, 'os três casos da Ana no período');
       igual(resumo.fila.length, 3, 'e a fila mostra exatamente os mesmos');
@@ -393,7 +393,7 @@ function rodarTestesDoTrabalho() {
     });
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
-      lanca(() => chamar('resumoDoCanal')(canal.id, {}), 'não abre a tela trabalho');
+      lanca(() => comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})), 'não abre a tela trabalho');
     });
 
     configuracao.telas = guardadas;
@@ -407,7 +407,7 @@ function rodarTestesDoTrabalho() {
   teste('Trabalhar no caso traz todos os campos, inclusive os em branco', () => {
     // Campo vazio vem como caixa vazia, e não sumindo: sumir faria a pessoa
     // achar que aquele campo não existe neste canal.
-    const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
+    const primeiro = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).fila[0];
     const aberto = chamar('casoParaEditar')(canal.id, primeiro.id);
     const chaves = Object.keys(aberto.valores);
 
@@ -900,7 +900,7 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('o caso volta pronto para o formulário, pela chave do campo', () => {
-    const primeiro = chamar('resumoDoCanal')(canal.id, {}).fila[0];
+    const primeiro = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).fila[0];
     const paraEditar = chamar('casoParaEditar')(canal.id, primeiro.id);
 
     igual(paraEditar.id, primeiro.id);
@@ -912,7 +912,7 @@ function rodarTestesDoTrabalho() {
   teste('Trabalhar no caso respeita o alcance do nível', () => {
     // Pela busca: a fila mostra só os cinco mais recentes, e o caso do Diego
     // pode não estar entre eles.
-    const doDiego = chamar('resumoDoCanal')(canal.id, { busca: 'Diego Castilho' }).fila
+    const doDiego = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, { busca: 'Diego Castilho' })).fila
       .find((caso) => JSON.stringify(caso.celulas).includes('Diego Castilho'));
 
     comoUsuario(ambiente, 'ana@exemplo.com', () => {
@@ -950,10 +950,10 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('excluir tira da fila e do cartão ao mesmo tempo', () => {
-    const antes = chamar('resumoDoCanal')(canal.id, {});
+    const antes = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     chamar('excluirCaso')(canal.id, antes.fila[0].id);
 
-    const depois = chamar('resumoDoCanal')(canal.id, {});
+    const depois = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     igual(depois.total, antes.total - 1);
     igual(depois.fila.length, antes.fila.length - 1);
     verdadeiro(!depois.fila.some((caso) => caso.id === antes.fila[0].id),
@@ -980,7 +980,7 @@ function rodarTestesDoTrabalho() {
   };
 
   teste('sem pedido nenhum, o Trabalho abre no atalho da CONFIG', () => {
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     igual(resumo.periodo.tipo, 'dias');
     igual(resumo.periodo.dias, 30);
     contem(resumo.periodo.rotulo, 'últimos 30 dias');
@@ -995,20 +995,20 @@ function rodarTestesDoTrabalho() {
       'Data de entrada': diaNoMes(2), 'Nome do segurado': 'Caso de dois meses atras'
     });
 
-    const noMesDele = chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(2) });
+    const noMesDele = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(2) }));
     igual(noMesDele.periodo.tipo, 'mes');
     igual(noMesDele.periodo.mes, mesDe(2));
     verdadeiro(JSON.stringify(noMesDele.fila).includes('Caso de dois meses atras'),
       'escolhido o mês dele, o caso aparece');
 
-    const noMesPassado = chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(1) });
+    const noMesPassado = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(1) }));
     verdadeiro(!JSON.stringify(noMesPassado.fila).includes('Caso de dois meses atras'),
       'escolhido outro mês, ele sai');
   });
 
   teste('o Trabalho aceita de/até, com as duas pontas dentro', () => {
-    const resumo = chamar('resumoDoCanal')(canal.id, {},
-      { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(1) });
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {},
+      { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(1) }));
     igual(resumo.periodo.tipo, 'intervalo');
     igual(resumo.periodo.de, diasAtras(2));
     igual(resumo.periodo.ate, diasAtras(1));
@@ -1024,17 +1024,17 @@ function rodarTestesDoTrabalho() {
       'Nome do segurado': 'Caso sem data nenhuma'
     });
 
-    const atalho = chamar('resumoDoCanal')(canal.id, {});
+    const atalho = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     verdadeiro(JSON.stringify(atalho.fila).includes('Caso sem data nenhuma'),
       'no atalho ele aparece, para ser arrumado');
 
-    const mes = chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(0) });
+    const mes = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(0) }));
     verdadeiro(!JSON.stringify(mes.fila).includes('Caso sem data nenhuma'),
       'num mês fechado ele sai');
   });
 
   teste('o Trabalho entrega os meses para a tela montar a lista', () => {
-    const resumo = chamar('resumoDoCanal')(canal.id, {});
+    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     verdadeiro(resumo.mesesDisponiveis.length > 0, 'sem lista, não há o que escolher');
     igual(resumo.mesesDisponiveis[0].valor, mesDe(0), 'o corrente vem primeiro');
   });
@@ -1139,7 +1139,7 @@ function rodarTestesDoTrabalho() {
     igual(vg.icone, 'grupo');
     // Sem cartões e sem meta: o PO pediu para começar assim e configurar os
     // indicadores depois. Um cartão inventado estaria na tela dele amanhã.
-    igual(chamar('resumoDoCanal')(vg.id, {}).cartoes.length, 0);
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(vg.id, {})).cartoes.length, 0);
   });
 
   teste('o desenho do VG é dele, e não o padrão de outro canal', () => {
@@ -1387,7 +1387,7 @@ function rodarTestesDoTrabalho() {
       margemdecontribuicao: '20'
     });
 
-    const fila = chamar('resumoDoCanal')(vg.id, {}).fila;
+    const fila = comAFilaDaTela(chamar('resumoDoCanal')(vg.id, {})).fila;
     const emAlerta = fila.find((linha) =>
       JSON.stringify(linha.celulas).indexOf('Empresa em alerta') >= 0);
 
@@ -1416,7 +1416,7 @@ function rodarTestesDoTrabalho() {
     igual(chamar('paraTexto_')('', 'numero'), '');
 
     // E na fila de verdade, que é onde a operação vê.
-    const fila = chamar('resumoDoCanal')(vg.id, {}).fila;
+    const fila = comAFilaDaTela(chamar('resumoDoCanal')(vg.id, {})).fila;
     const celulas = [];
     fila.forEach((linha) => linha.celulas.forEach(
       (grupo) => grupo.forEach((c) => celulas.push(c))));
@@ -1485,7 +1485,7 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('RET · "Dados da proposta" abre com a proposta inteira, sem protocolo', () => {
-    const resumo = novo.chamar('resumoDoCanal')(daRet.id, {});
+    const resumo = comAFilaDaTela(novo.chamar('resumoDoCanal')(daRet.id, {}));
     const grupo = grupoNaFila(resumo, 'Dados da proposta', linhaDe(resumo, 'Cliente da fila'));
     igual(grupo.valores[0], '7-0000123', 'código e número juntos, com o hífen');
     igual(grupo.cabecalhos[0], 'Código origem da proposta + número da proposta');
@@ -1500,13 +1500,13 @@ function rodarTestesDoTrabalho() {
       'data de recepção do protocolo': diasAtras(0),
       'número da proposta': '0000456', 'nome do cliente': 'Sem código'
     });
-    const resumo = novo.chamar('resumoDoCanal')(daRet.id, {});
+    const resumo = comAFilaDaTela(novo.chamar('resumoDoCanal')(daRet.id, {}));
     igual(grupoNaFila(resumo, 'Dados da proposta', linhaDe(resumo, 'Sem código')).valores[0],
       '0000456');
   });
 
   teste('RET · "Dados cadastrais" abre com o telefone', () => {
-    const resumo = novo.chamar('resumoDoCanal')(daRet.id, {});
+    const resumo = comAFilaDaTela(novo.chamar('resumoDoCanal')(daRet.id, {}));
     const grupo = grupoNaFila(resumo, 'Dados cadastrais', linhaDe(resumo, 'Cliente da fila'));
     igual(grupo.cabecalhos[0], 'telefones de contato', 'o telefone é o destaque');
     igual(grupo.valores[0], '11988887777', 'só dígitos, como o sistema guarda telefone');
@@ -1519,7 +1519,7 @@ function rodarTestesDoTrabalho() {
       'Data de entrada': diasAtras(0), 'Título do e-mail': 'Endosso urgente — apólice 123',
       Ramo: 'Auto', Assunto: 'Endosso'
     });
-    const resumo = novo.chamar('resumoDoCanal')(daMesa.id, {});
+    const resumo = comAFilaDaTela(novo.chamar('resumoDoCanal')(daMesa.id, {}));
     const grupo = grupoNaFila(resumo, 'Dados do caso', linhaDe(resumo, 'Endosso urgente'));
     igual(grupo.cabecalhos.join(', '), 'Título do e-mail, Ramo, Assunto');
     igual(grupo.valores[0], 'Endosso urgente — apólice 123');
@@ -1626,7 +1626,7 @@ function rodarTestesDoTrabalho() {
   });
 
   const buscar = (canalDaBusca, termo) =>
-    comBusca.chamar('resumoDoCanal')(canalDaBusca.id, { busca: termo });
+    comAFilaDaTela(comBusca.chamar('resumoDoCanal')(canalDaBusca.id, { busca: termo }));
 
   teste('o termo filtra a fila e os cartões juntos', () => {
     const resumo = buscar(mesaDaBusca, 'zoro');
@@ -1719,7 +1719,7 @@ function rodarTestesDoTrabalho() {
   }
 
   teste('o servidor manda a fila inteira, e diz que a tela abre com 5', () => {
-    const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id, {});
+    const resumo = comAFilaDaTela(curta.chamar('resumoDoCanal')(mesaCurta.id, {}));
     igual(resumo.fila.length, 7, 'a fila inteira: quem mostra 5 é a tela');
     igual(resumo.total, 7);
     igual(resumo.cartoes[0].valor, 7, 'os cartões contam todos');
@@ -1729,7 +1729,7 @@ function rodarTestesDoTrabalho() {
 
   teste('a fila vem do mais recente para o mais antigo', () => {
     // A tela mostra os primeiros: são eles que precisam ser os mais novos.
-    const fila = curta.chamar('resumoDoCanal')(mesaCurta.id, {}).fila;
+    const fila = comAFilaDaTela(curta.chamar('resumoDoCanal')(mesaCurta.id, {})).fila;
     contem(JSON.stringify(fila[0].celulas), 'Caso número 7');
     const primeirosCinco = JSON.stringify(fila.slice(0, 5));
     verdadeiro(primeirosCinco.indexOf('Caso número 1"') < 0, 'o mais antigo fica depois dos cinco');
@@ -1737,8 +1737,8 @@ function rodarTestesDoTrabalho() {
   });
 
   teste('a busca continua procurando em todos', () => {
-    const resumo = curta.chamar('resumoDoCanal')(mesaCurta.id,
-      { busca: 'Caso número 1' });
+    const resumo = comAFilaDaTela(curta.chamar('resumoDoCanal')(mesaCurta.id,
+      { busca: 'Caso número 1' }));
     igual(resumo.total, 1);
     contem(JSON.stringify(resumo.fila), 'Caso número 1');
   });
@@ -1768,16 +1768,19 @@ function rodarTestesDoTrabalho() {
     contem(lerPeca('Estilos'), '.mostrar-quantos[aria-pressed="true"]');
   });
 
-  teste('trocar a quantidade não volta ao servidor', () => {
-    // É visual: a fila inteira já veio. Uma ida ao servidor por clique seria
-    // um a três segundos de espera para ver o que já está na tela.
+  teste('trocar a quantidade até 100 não volta ao servidor', () => {
+    // É visual: os 100 mais recentes já vieram. Uma ida ao servidor por clique
+    // seria um a três segundos de espera para ver o que já está na tela. Só o
+    // "Todos", com mais casos do que vieram, vai buscar o resto — decisão do PO
+    // quando a fila inteira passou a estourar os 40 segundos (ver
+    // testes-trabalho-rapido.js).
     const tela = lerPeca('Trabalho');
     const clique = tela.substring(tela.indexOf("ligarCliques('[data-mostrar]'"));
-    const corpo = clique.substring(0, clique.indexOf('});'));
+    const corpo = clique.substring(0, clique.indexOf('\n    });'));
     contem(corpo, 'desenharPainel();');
-    verdadeiro(corpo.indexOf('carregar()') < 0, 'não chama o servidor');
-    contem(tela, "Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo)\n",
-      'o servidor não recebe mais quantos mostrar');
+    verdadeiro(corpo.indexOf('carregar()') < 0, 'a quantidade, sozinha, não chama o servidor');
+    contem(corpo, "if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {",
+      'só o "Todos" com casos faltando vai ao servidor');
   });
 
   teste('limpar filtros e trocar de canal não mexem no "Mostrar"', () => {
@@ -1949,10 +1952,10 @@ function rodarTestesDoTrabalho() {
     doTeste.chamar('cadastrarCaso')(daRet.id, {
       nomedocliente: 'Caso sem prazo', status: 'Não trabalhado' });
 
-    const linhaDaMesa = doTeste.chamar('resumoDoCanal')(daMesa.id, {}).fila[0];
+    const linhaDaMesa = comAFilaDaTela(doTeste.chamar('resumoDoCanal')(daMesa.id, {})).fila[0];
     verdadeiro(linhaDaMesa.sla !== null, 'a Mesa tem SLA');
     verdadeiro(/^(No prazo|Fora do prazo)/.test(linhaDaMesa.sla.texto), linhaDaMesa.sla.texto);
-    igual(doTeste.chamar('resumoDoCanal')(daRet.id, {}).fila[0].sla, null,
+    igual(comAFilaDaTela(doTeste.chamar('resumoDoCanal')(daRet.id, {})).fila[0].sla, null,
       'canal sem SLA não manda nada');
   });
 
@@ -2015,7 +2018,7 @@ function rodarTestesDoTrabalho() {
         });
       });
 
-    const resumo = doTeste.chamar('resumoDoCanal')(doVg.id, {});
+    const resumo = comAFilaDaTela(doTeste.chamar('resumoDoCanal')(doVg.id, {}));
     const posicao = resumo.colunas.findIndex((g) => g.titulo === 'Vigência');
     verdadeiro(posicao >= 0, 'o grupo Vigência existe');
     igual(resumo.colunas[posicao].colunas[0].cabecalho, 'Meses de vigência',

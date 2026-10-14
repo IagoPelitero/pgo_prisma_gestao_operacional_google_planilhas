@@ -20,7 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, pecaRodando } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, pecaRodando, comAFilaDaTela } = require('./ferramentas');
 const { retComAParada } = require('./testes-parada-da-ret');
 
 const lerTela = (nome) => fs.readFileSync(
@@ -209,7 +209,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
 
   const COLUNA = 'Data da primeira mudança de status';
   const prazoDe = (t, id) => {
-    const fila = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.ret.id, {}, 90)).fila;
     const caso = fila.find((c) => String(c.id) === String(id));
     return caso ? caso.sinais[0] : undefined;
   };
@@ -326,7 +326,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const t = instalado();
     const caso = t.chamar('inserirRegistro_')('BASE_MESA',
       { 'Nome do segurado': 'Sem data', Status: 'Em andamento' });
-    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.mesa.id, {}, 90)).fila;
     igual(fila.find((c) => String(c.id) === String(caso.__id)).sinais.length, 0);
   });
 
@@ -410,7 +410,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const sinalizador = t.chamar('sinalizadoresDoCanal_')(t.mesa)[0];
     igual(sinalizador.prazo, 48);
     igual(sinalizador.unidade, 'horas');
-    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.mesa.id, {}, 90)).fila;
     const sinal = fila.find((c) => String(c.id) === String(id)).sinais[0];
     igual(sinal.encerrado, false, 'Em andamento: o relógio corre');
     verdadeiro(sinal.tom === 'bom' || sinal.tom === 'atencao', 'acabou de nascer: não está vermelho');
@@ -438,7 +438,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const t = instalado();
     const { id } = t.chamar('cadastrarCaso')(t.mesa.id, { status: 'Em andamento', nomedosegurado: 'Segurado' });
     t.chamar('alterarSituacaoDoCaso')(t.mesa.id, id, 'Concluído');
-    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.mesa.id, {}, 90)).fila;
     const sinal = fila.find((c) => String(c.id) === String(id)).sinais[0];
     igual(sinal.encerrado, true);
     contem(sinal.texto, 'cumprido em');
@@ -480,7 +480,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     // basta conferir que o selo que a fila manda traz o que o aviso lê.
     const t = instalado();
     const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente', status: 'Pendente' });
-    const fila = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.ret.id, {}, 90)).fila;
     const caso = fila.find((c) => String(c.id) === String(id));
     ['tom', 'texto', 'encerrado'].forEach((chave) => {
       verdadeiro(chave in caso.sinais[0], 'o selo traz ' + chave);
@@ -527,7 +527,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const caso = t.importar('Importado da Mesa');
     igual(String(caso.Status || ''), '', 'a importação não põe "Em andamento"');
     igual(String(caso['Data em andamento'] || ''), '');
-    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.mesa.id, {}, 90)).fila;
     igual(fila.find((c) => String(c.id) === String(caso.__id)).sinais.length, 0);
   });
 
@@ -538,7 +538,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const depois = t.linha('BASE_MESA', caso.__id);
     verdadeiro(depois['Data em andamento'] && typeof depois['Data em andamento'].getTime === 'function',
       'carimbou "Data em andamento"');
-    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.mesa.id, {}, 90)).fila;
     const sinal = fila.find((c) => String(c.id) === String(caso.__id)).sinais[0];
     igual(sinal.encerrado, false);
     contem(sinal.texto, 'Retorno da área');
@@ -589,7 +589,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const t = instalado();
     const { id } = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Cliente' });
     t.reescreverCabecalho('BASE_RET', 'status', 'Status');
-    let caso = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila.find((c) => String(c.id) === String(id));
+    let caso = comAFilaDaTela(t.chamar('resumoDoCanal')(t.ret.id, {}, 90)).fila.find((c) => String(c.id) === String(id));
     igual(caso.situacao, 'Não trabalhado');
     igual(caso.sinais[0].texto, 'Prazo de retorno · prazo cheio, 3 dias úteis');
     const aberto = t.chamar('casoParaEditar')(t.ret.id, id);
@@ -599,7 +599,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const linha = t.linha('BASE_RET', id);
     igual(linha.Status, 'Pendente');
     verdadeiro(!!linha['Data pendente'] && !!linha[COLUNA], 'carimbou pelo formulário também');
-    caso = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila.find((c) => String(c.id) === String(id));
+    caso = comAFilaDaTela(t.chamar('resumoDoCanal')(t.ret.id, {}, 90)).fila.find((c) => String(c.id) === String(id));
     verdadeiro(caso.sinais[0].texto.indexOf('prazo cheio') < 0, 'o prazo começou');
   });
 
@@ -626,7 +626,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const linha = t.linha('BASE_MESA', caso.__id);
     igual(linha.STATUS, 'Em andamento');
     verdadeiro(!!linha['Data em andamento']);
-    const fila = t.chamar('resumoDoCanal')(t.mesa.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.mesa.id, {}, 90)).fila;
     igual(fila.find((c) => String(c.id) === String(caso.__id)).sinais.length, 1);
   });
 
@@ -637,7 +637,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
       Object.assign({}, t.base, { status: 'Retido', statusproposta: 'Transmitido' }));
     const linha = t.chamar('lerRegistros_')('BASE_RET').find((l) => l.__id === id);
     verdadeiro(!!linha['Data do status proposta'], 'carimbou a parada');
-    const fila = t.chamar('resumoDoCanal')(t.ret.id, {}, 90).fila;
+    const fila = comAFilaDaTela(t.chamar('resumoDoCanal')(t.ret.id, {}, 90)).fila;
     igual(fila.find((c) => String(c.id) === String(id)).sinais[0].encerrado, true);
   });
 

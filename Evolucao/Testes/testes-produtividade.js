@@ -18,7 +18,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca,
+  comAFilaDaTela } =
   require('./ferramentas');
 
 function rodarTestesDaProdutividade() {
@@ -702,7 +703,7 @@ function rodarTestesDaProdutividade() {
 
     comoUsuario(ambiente, 'ana.eq@exemplo.com', () => {
       const naProdutividade = chamar('produtividadeDaEquipe')(ret.id, {}, 30).total;
-      const noTrabalho = chamar('resumoDoCanal')(ret.id, {}).total;
+      const noTrabalho = comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).total;
 
       verdadeiro(naProdutividade > noTrabalho,
         'a Produtividade mostra o canal; o Trabalho, só os dela');

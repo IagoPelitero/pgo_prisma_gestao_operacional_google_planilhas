@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1159 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1173 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -266,7 +266,7 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-1159 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1173 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -321,8 +321,14 @@ em cima da tabela, uma barra diz quantos aparecem e oferece o resto:
 "Mostrando os 5 casos mais recentes de 37 · Mostrar **5 · 10 · 20 · Todos
 (37)**". As opções são as do PO — 5, 10, 20, 50 e 100 —, **só até a
 quantidade que existe**: com 12 casos aparecem 5, 10 e Todos (12); com 5 ou
-menos, a barra nem aparece. Trocar é **na hora**: o servidor já mandou a fila
-inteira, e a tela só mostra mais ou menos. **Não é filtro** — fica fora da
+menos, a barra nem aparece. Trocar é **na hora** até 100: a tela abre com os
+**100 mais recentes** já na mão, e só mostra mais ou menos. **"Todos"**, quando
+há mais de 100, vai buscar o resto no servidor ("Trazendo os N casos…"). Foi
+assim que o Trabalho deixou de estourar os 40 segundos: a fila ia inteira, e com
+5.000 casos no período a resposta tinha 6 MB — hoje a abertura tem uns 85 KB,
+porque a fila também vai **compacta** (só os valores; a tela remonta). Os
+cartões, os filtros, a busca e o **aviso de prazo** continuam olhando todos os
+casos — o aviso lista até 100 e diz quantos são ao todo. **Não é filtro** — fica fora da
 caixa de filtros, não muda os cartões, e a escolha continua valendo ao trocar
 de canal ou limpar os filtros. As opções e o padrão moram em `Indicadores.gs`
 (`RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`).
@@ -1318,7 +1324,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1159 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1173 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

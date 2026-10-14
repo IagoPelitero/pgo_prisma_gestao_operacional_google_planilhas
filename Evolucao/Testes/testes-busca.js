@@ -14,7 +14,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
+  comAFilaDaTela } =
   require('./ferramentas');
 
 function rodarTestesDeBusca() {
@@ -86,7 +87,7 @@ function rodarTestesDeBusca() {
   });
 
   teste('a busca alcança o que a fila dos 30 dias já não mostra', () => {
-    const noPainel = chamar('resumoDoCanal')(canal.id, {}).total;
+    const noPainel = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).total;
     igual(noPainel, 0, 'os casos de exemplo são de janeiro e fevereiro');
     verdadeiro(chamar('buscarCasos')('Vanessa', [], false).total > 0,
       'e a busca acha os mesmos casos — é para isso que ela existe');

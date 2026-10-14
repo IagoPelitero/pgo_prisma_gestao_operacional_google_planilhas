@@ -314,6 +314,10 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
     carimbo passa por `carimboParaAColuna_`, que decide pela coluna (achado 93).
 12. **Aplicar a regra do tipo do campo à SUSEP.** O tipo é editável; a SUSEP tem
     letra. Quem confere ou grava a SUSEP pergunta `ehASusep_` antes (achado 90).
+13. **Mandar para a tela o que ela não vai mostrar.** Toda resposta do
+    `google.script.run` atravessa como JSON, e o tamanho custa tempo: a fila do
+    Trabalho com 5.000 casos (6 MB) estourava os 40 segundos (achado 95). Mande o
+    que a tela mostra agora, compacto, e deixe o resto sob pedido.
 
 ---
 

@@ -848,6 +848,47 @@ async function rodar() {
     verdadeiro(cards.indexOf('1ª tentativa=1') >= 0, 'o card conta o caso: ' + cards.join(', '));
   });
 
+  /* ------------------------------------------- o Trabalho que não estoura -- */
+
+  console.log('\nO Trabalho com fila grande');
+
+  await teste('abre com os 100 mais recentes; até 100 não volta ao servidor; "Todos" vai buscar', async () => {
+    vm.runInContext(`(function () {
+      var lote = [];
+      for (var i = 0; i < 150; i++) {
+        lote.push({ 'data de recepção do protocolo': new Date(), analista: 'Ana Martins',
+          'nome do cliente': 'Fila grande ' + i, status: 'Pendente', protocolo: 'FG-' + i });
+      }
+      inserirVariosRegistros_('BASE_RET', lote);
+    })()`, contexto);
+    const totalNaBase = naPlanilha('BASE_RET').length;
+
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(900);
+    const naRet = pagina.locator('[data-canal]', { hasText: 'RET' }).first();
+    if (await naRet.count()) await naRet.click();
+    await pagina.waitForSelector('.fila-mostrando', { timeout: 10000 });
+    contem(await pagina.textContent('.fila-mostrando'), 'de ' + totalNaBase,
+      'a barra fala da fila inteira');
+    contem(await pagina.textContent('table.fila.agrupada tbody'), 'Fila grande 149',
+      'o mais recente em cima');
+
+    const antes = chamadasDoNavegador.resumoDoCanal;
+    await pagina.click('[data-mostrar="100"]');
+    await pagina.waitForTimeout(400);
+    igual(await pagina.$$eval('table.fila.agrupada tbody tr', (es) => es.length), 100);
+    igual(chamadasDoNavegador.resumoDoCanal, antes, '100 é na hora, sem ir ao servidor');
+
+    await pagina.click('[data-mostrar="todos"]');
+    await pagina.waitForFunction((n) =>
+      document.querySelectorAll('table.fila.agrupada tbody tr').length === n,
+      totalNaBase, { timeout: 10000 });
+    igual(chamadasDoNavegador.resumoDoCanal, antes + 1, '"Todos" foi buscar o resto');
+    contem(await pagina.textContent('table.fila.agrupada tbody'), 'Fila grande 0',
+      'até o mais antigo');
+    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando todos os ' + totalNaBase);
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();

@@ -21,7 +21,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const vm = require('vm');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca } =
+const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, lerPeca,
+  comAFilaDaTela } =
   require('./ferramentas');
 
 function rodarTestesDeDiagnostico() {
@@ -436,7 +437,7 @@ function rodarTestesDeDiagnostico() {
     }
     chamar('inserirVariosRegistros_')('BASE_RET', casos);
 
-    igual(chamar('resumoDoCanal')(ret.id, {}).truncada, true, 'Trabalho');
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).truncada, true, 'Trabalho');
     igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).truncada, true,
       'Produtividade RECC');
     igual(chamar('minhaPerformance')(ret.id, 30).truncada, true,
@@ -451,7 +452,7 @@ function rodarTestesDeDiagnostico() {
     // Aviso que aparece sempre é aviso que ninguém lê.
     const { chamar } = instalacaoNova();
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
-    igual(chamar('resumoDoCanal')(ret.id, {}).truncada, false);
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).truncada, false);
     igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).truncada, false);
     igual(chamar('minhaPerformance')(ret.id, 30).truncada, false);
   });
@@ -2325,7 +2326,7 @@ function rodarTestesDeDiagnostico() {
 
     chamar('cadastrarCaso')(mesa.id, { status: 'Em andamento',
       nomedosegurado: 'Caso depois de atualizar' });
-    verdadeiro(chamar('resumoDoCanal')(mesa.id, {}).fila[0].sla !== null,
+    verdadeiro(comAFilaDaTela(chamar('resumoDoCanal')(mesa.id, {})).fila[0].sla !== null,
       'e a fila da Mesa já sai com o selo');
   });
 

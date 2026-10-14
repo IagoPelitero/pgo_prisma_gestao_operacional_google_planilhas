@@ -1995,9 +1995,34 @@ linha da cópia. Desfazer a correção deixa os dois vermelhos.
 
 ---
 
+### 95 · O Trabalho que estourava os 40 segundos
+
+**Sintoma.** Relatado pelo PO: "a aba Trabalho vem demorando para carregar e, quando
+carrega, traz um erro informando o problema de 40 s para responder".
+
+**Causa.** Não eram as leituras da planilha — o estresse mede 4 a 7 idas ao
+serviço, e o processamento no Node leva uns 200 ms. Era o TAMANHO da resposta:
+desde o pedido "mostrar 5, mas poder mostrar todos na hora", o servidor mandava a
+fila INTEIRA, e cada célula levava junto o nome da coluna, "é status" e o alerta
+— 1,1 KB por caso. Com 5.000 casos no período, 6 MB. O Apps Script leva dezenas
+de segundos para atravessar isso até o navegador, e a tela desiste nos 40
+(`SEGUNDOS_ATE_DESISTIR`). O simulador conta idas e células, e não o tamanho do
+que volta: por isso o estresse aprovava.
+
+**Defesa.** Decisão do PO, entre as opções: (A) a fila vai **compacta** —
+`compactarFila_` manda só os valores, e `TelaTrabalho.expandirFila` remonta o
+formato de antes a partir de `colunas`; (B) a tela recebe os **100 mais recentes**
+(`RECC_FILA_NA_ABERTURA`), e "Todos" vai ao servidor. O aviso de prazo deixou de
+depender da fila que veio: `casosPertoDeVencer_` olha todos os casos e manda a
+lista com até 100, mais o número inteiro. Com 5.000 casos: abertura de 6 MB para
+**85 KB**; "Todos", 1,8 MB. Os testes leem a fila pela mesma função da tela
+(`comAFilaDaTela`), e um deles mede o tamanho da resposta.
+
+---
+
 ## O que esta lista ensina
 
-**São noventa e quatro achados, e a maioria era silenciosa.** Não davam erro, não
+**São noventa e cinco achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -2201,3 +2226,6 @@ Daí as duas práticas que o projeto não abre mão:
     91 e 94 a tela mandava menos campos do que o servidor grava — o canal do item,
     a coluna do card — e o servidor gravava vazio no lugar. Campo que a tela não
     manda tem de ser mantido pelo servidor, ou ir junto.
+51. **O que volta também pesa.** No item 95 o estresse contava idas e células
+    lidas e aprovava; o que estourava era o tamanho da resposta. "Mandar tudo para
+    a tela decidir" é barato com 30 casos e caro com 5.000 — e a base só cresce.

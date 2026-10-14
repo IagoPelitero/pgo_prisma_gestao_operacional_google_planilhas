@@ -5219,8 +5219,9 @@ var TelaTrabalho = (function () {
   // conta sairia do relógio da planilha.
   var periodo = SeletorDePeriodo.padrao();
   // Quantos casos a fila mostra — o "Mostrar", em cima da tabela. Zero é
-  // "ainda não escolheu": vale o padrão do servidor (5). É só visual: a fila
-  // inteira já veio, e trocar não volta ao servidor. Não é filtro — não muda
+  // "ainda não escolheu": vale o padrão do servidor (5). Os 100 mais recentes
+  // já vieram, e até 100 trocar não volta ao servidor; "Todos" vai buscar o
+  // resto (ver RECC_FILA_NA_ABERTURA, no servidor). Não é filtro — não muda
   // os cartões, o "Limpar filtros" não mexe nele, e trocar de canal mantém.
   var quantosNaFila = 0;
   var focarNoMostrar = '';
@@ -5346,11 +5347,47 @@ var TelaTrabalho = (function () {
         + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
 
+  /**
+   * A fila como a tela sempre a desenhou, a partir da forma compacta em que
+   * ela atravessa do servidor: só os valores, e o nome e o "é status" de cada
+   * coluna tirados de `colunas`, na mesma ordem. Ver compactarFila_.
+   */
+  function expandirFila(compacta, colunas) {
+    return (compacta || []).map(function (caso) {
+      return {
+        id: caso.id,
+        celulas: (caso.v || []).map(function (grupo, g) {
+          var doGrupo = (colunas[g] && colunas[g].colunas) || [];
+          return grupo.map(function (bruto, c) {
+            var coluna = doGrupo[c] || {};
+            var comAlerta = Object.prototype.toString.call(bruto) === '[object Array]';
+            return {
+              cabecalho: coluna.cabecalho || '',
+              valor: comAlerta ? bruto[0] : bruto,
+              ehStatus: coluna.ehStatus === true,
+              alerta: comAlerta ? bruto[1] : '',
+              tomDoAlerta: comAlerta ? bruto[2] : ''
+            };
+          });
+        }),
+        situacao: caso.situacao,
+        tom: caso.tom,
+        sla: caso.sla,
+        sinais: caso.sinais
+      };
+    });
+  }
+
   /** Quantos casos aparecem agora: a escolha da pessoa, ou o padrão (5). */
   function limiteDaFila() {
-    var total = resumo.fila.length;
-    if (quantosNaFila === 'todos') return total;
-    return Math.min(quantosNaFila || resumo.mostrarNaFila.padrao, total);
+    var veio = resumo.fila.length;
+    if (quantosNaFila === 'todos') return veio;
+    return Math.min(quantosNaFila || resumo.mostrarNaFila.padrao, veio);
+  }
+
+  /** A fila inteira — `total` —, e não só os casos que vieram para a tela. */
+  function totalDaFila() {
+    return typeof resumo.total === 'number' ? resumo.total : resumo.fila.length;
   }
 
   /**
@@ -5366,10 +5403,10 @@ var TelaTrabalho = (function () {
 
   /**
    * A barra em cima da tabela: quantos aparecem, de quantos, e os botões para
-   * mostrar mais. Trocar é na hora — a fila inteira já está na tela.
+   * mostrar mais. Até 100 é na hora; "Todos" busca o resto no servidor.
    */
   function barraDeMostrar(visiveis) {
-    var total = resumo.fila.length;
+    var total = totalDaFila();
     var opcoes = opcoesDeMostrar(total, resumo.mostrarNaFila.opcoes);
     if (!opcoes.length) return '';
 
@@ -5586,17 +5623,22 @@ var TelaTrabalho = (function () {
   }
 
   function avisarDosQueVencem() {
-    var achados = casosPertoDeVencer(resumo && resumo.fila);
+    // Os perto de vencer vêm à parte, da fila INTEIRA: a fila que veio para a
+    // tela são só os 100 mais recentes.
+    var achados = casosPertoDeVencer(resumo && (resumo.pertoDeVencer || resumo.fila));
     if (!achados.length || document.getElementById('dialogo-prazo')) return;
 
     var nomeDoCanal = resumo.canal && resumo.canal.nome ? resumo.canal.nome : '';
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
     caixa.id = 'dialogo-prazo';
+    // O número é o da fila inteira; a lista vem com até 100 (ver o servidor).
+    var quantos = Math.max(Number(resumo.quantosPertoDeVencer) || 0, achados.length);
+    var sobram = quantos - achados.length;
     caixa.innerHTML = '<div class="dialogo-caixa aviso-de-prazo" role="alertdialog"'
       + ' aria-modal="true" aria-labelledby="titulo-prazo" aria-describedby="texto-prazo">'
-      + '<h3 id="titulo-prazo">' + achados.length
-      + (achados.length === 1 ? ' caso perto de vencer' : ' casos perto de vencer')
+      + '<h3 id="titulo-prazo">' + quantos
+      + (quantos === 1 ? ' caso perto de vencer' : ' casos perto de vencer')
       + (nomeDoCanal ? ' · ' + escapar(nomeDoCanal) : '') + '</h3>'
       + '<p id="texto-prazo">Estão no amarelo do prazo. Trabalhe antes que fiquem vermelhos.</p>'
       + '<ul class="lista-de-prazo">'
@@ -5612,6 +5654,9 @@ var TelaTrabalho = (function () {
           + escapar(um.caso.id) + '">Trabalhar no caso</button></li>';
       }).join('')
       + '</ul>'
+      + (sobram > 0 ? '<p class="config-explica">E mais ' + sobram + (sobram === 1
+        ? ' caso' : ' casos') + ' no amarelo. Estes são os mais recentes; a fila mostra '
+        + 'o selo de prazo em cada um.</p>' : '')
       + '<div class="config-acoes"><button type="button" class="botao" id="fechar-aviso-de-prazo">'
       + 'Entendi</button></div></div>';
     document.body.appendChild(caixa);
@@ -5662,13 +5707,22 @@ var TelaTrabalho = (function () {
 
   /* ---------------------------------------------------------- comportamento */
 
-  function carregar() {
+  // `recado` é o texto da espera ("Trazendo os 5000 casos…"). Só vale texto:
+  // `carregar` também é passado como "depois de salvar" ao modal do caso, que
+  // o chama com outra coisa.
+  function carregar(recado) {
     var painel = elemento('painel');
-    if (painel) painel.innerHTML = '<p class="carregando-campos">Somando os casos…</p>';
+    if (painel) painel.innerHTML = '<p class="carregando-campos">'
+      + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo)
+    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo,
+      quantosNaFila === 'todos' ? 'todos' : '')
       .entao(function (resposta) {
         resumo = resposta;
+        if (resposta.filaCompacta) {
+          resumo.fila = expandirFila(resposta.fila, resposta.colunas);
+          resumo.pertoDeVencer = expandirFila(resposta.pertoDeVencer, resposta.colunas);
+        }
         desenharPainel();
         if (avisarQuandoChegar) {
           avisarQuandoChegar = false;
@@ -5726,11 +5780,16 @@ var TelaTrabalho = (function () {
       });
     }
 
-    // O "Mostrar": só redesenha, sem ir ao servidor — a fila inteira já veio.
+    // O "Mostrar": até 100 só redesenha, sem ir ao servidor — os 100 mais
+    // recentes já vieram. "Todos" com mais casos do que vieram busca o resto.
     ligarCliques('[data-mostrar]', function (botao) {
       var escolha = botao.getAttribute('data-mostrar');
       quantosNaFila = escolha === 'todos' ? 'todos' : Number(escolha);
       focarNoMostrar = escolha;
+      if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {
+        carregar('Trazendo os ' + totalDaFila() + ' casos…');
+        return;
+      }
       desenharPainel();
     });
 
@@ -5789,7 +5848,8 @@ var TelaTrabalho = (function () {
   // quantidade", e vale conferir sem desenhar a tela. `casosPertoDeVencer` e
   // `rotuloDoCaso` também: decidem o que entra no aviso e como o caso aparece.
   return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar,
-    casosPertoDeVencer: casosPertoDeVencer, rotuloDoCaso: rotuloDoCaso };
+    casosPertoDeVencer: casosPertoDeVencer, rotuloDoCaso: rotuloDoCaso,
+    expandirFila: expandirFila };
 })();
 </script>
 

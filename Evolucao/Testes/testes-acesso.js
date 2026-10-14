@@ -9,8 +9,7 @@
  */
 
 const {
-  carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario
-} = require('./ferramentas');
+  carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, comAFilaDaTela } = require('./ferramentas');
 
 function rodarTestesDeAcesso() {
   console.log('\nEtapa 2 — Acesso');
@@ -305,7 +304,7 @@ function rodarTestesDeAcesso() {
     nivelDaOperacaoVendo([ret.id]);
 
     ambiente.definirEmail('ana@exemplo.com');
-    lanca(() => chamar('resumoDoCanal')(diamante.id, {}),
+    lanca(() => comAFilaDaTela(chamar('resumoDoCanal')(diamante.id, {})),
       'não enxerga o canal', 'o Trabalho do canal alheio é recusado');
     lanca(() => chamar('formularioDoCanal')(diamante.id),
       'não enxerga o canal', 'e o formulário dele também');
@@ -320,7 +319,7 @@ function rodarTestesDeAcesso() {
     nivelDaOperacaoVendo([ret.id]);
 
     ambiente.definirEmail('ana@exemplo.com');
-    lanca(() => chamar('resumoDoCanal')(diamante.id, {}), 'RET',
+    lanca(() => comAFilaDaTela(chamar('resumoDoCanal')(diamante.id, {})), 'RET',
       'a mensagem nomeia o canal que ela enxerga');
     ambiente.definirEmail('primeiro.adm@exemplo.com');
   });

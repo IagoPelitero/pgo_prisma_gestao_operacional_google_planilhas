@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, scriptDaPeca,
-  pecaRodando } = require('./ferramentas');
+  pecaRodando, comAFilaDaTela } = require('./ferramentas');
 
 const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
 
@@ -533,7 +533,7 @@ function rodarTestesDeConfiguracoes() {
         filtro: 'Em andamento', cor: 'ruim', mostrar: true }
     ]);
 
-    const cartoes = chamar('resumoDoCanal')(canal.id, {}).cartoes;
+    const cartoes = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes;
     igual(cartoes.length, 1);
     igual(cartoes[0].rotulo, 'Só o que falta fazer',
       'o nome do cartão é livre — não precisa ser o nome da situação');
@@ -541,7 +541,7 @@ function rodarTestesDeConfiguracoes() {
 
     // E o que foi tirado da tela não sumiu da planilha: volta inteiro.
     chamar('salvarCardsDoPainel')('trabalho', canal.id, painel.cartoes);
-    igual(chamar('resumoDoCanal')(canal.id, {}).cartoes.length,
+    igual(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes.length,
       painel.cartoes.length);
   });
 
@@ -563,7 +563,7 @@ function rodarTestesDeConfiguracoes() {
     // cartões desligados, para dar como religá-los, então a lista dele não
     // encurta quando um cartão sai de cena.
     const naTela = () => chamar('produtividadeDaEquipe')(canal.id, {}, 30).cartoes.length;
-    const noTrabalho = () => chamar('resumoDoCanal')(canal.id, {}).cartoes.length;
+    const noTrabalho = () => comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes.length;
     const cardsDoTrabalhoAntes = noTrabalho();
 
     chamar('salvarCardsDoPainel')('produtividade', canal.id, [
@@ -1174,7 +1174,7 @@ function rodarTestesDeConfiguracoes() {
     });
     verdadeiro(String(salvo.id || salvo) !== '', 'o caso precisa ser gravado');
 
-    const fila = chamar('resumoDoCanal')(novo.id, {});
+    const fila = comAFilaDaTela(chamar('resumoDoCanal')(novo.id, {}));
     igual(fila.total, 1, 'e aparecer na fila do canal novo');
   });
 

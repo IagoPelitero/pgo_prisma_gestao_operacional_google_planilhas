@@ -33,6 +33,7 @@ const { rodarTestesDaDescricaoEDoInicioDoPrazo } = require('./testes-descricao-e
 const { rodarTestesDoChatDaMesa } = require('./testes-chat-da-mesa');
 const { rodarTestesDasColunasSuas } = require('./testes-colunas-suas');
 const { rodarTestesDosCardsEDosCarimbos } = require('./testes-cards-e-carimbos');
+const { rodarTestesDoTrabalhoRapido } = require('./testes-trabalho-rapido');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -56,6 +57,7 @@ rodarTestesDaDescricaoEDoInicioDoPrazo();
 rodarTestesDoChatDaMesa();
 rodarTestesDasColunasSuas();
 rodarTestesDosCardsEDosCarimbos();
+rodarTestesDoTrabalhoRapido();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));
