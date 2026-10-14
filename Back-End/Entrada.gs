@@ -1327,6 +1327,7 @@ function comoDataEHora_(valor) {
  */
 function salvarUsuario(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var email = String(dados.email || '').trim().toLowerCase();
   if (!email || email.indexOf('@') < 0) {

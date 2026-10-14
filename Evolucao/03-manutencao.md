@@ -218,7 +218,8 @@ que a anterior não pega.
 |---|---|---|
 | **1. A suíte** | `node Evolucao/Testes/rodar.js` | Regra de negócio, conversão de tipo, permissão. E erro de sintaxe em qualquer `.gs`: o simulador avalia os sete para poder rodar, então um arquivo quebrado derruba tudo na primeira linha |
 | **2. Os dois mundos** | (dentro da suíte, bloco *O projeto do Apps Script*) | `.gs` usando `document`; `.html` chamando `SpreadsheetApp`; `require` em qualquer um dos dois; `<script>` sem fechar; nome de arquivo que colide ignorando a extensão |
-| **3. O navegador** | `conferir-responsividade.js`, `clicar-em-tudo.js`, `ponta-a-ponta.js` | O que só aparece com a tela montada: botão cortado, **um elemento por cima do outro**, classe de CSS que não existe, clique que estoura, `undefined` escrito na tela |
+| **3. O navegador** | `conferir-responsividade.js`, `clicar-em-tudo.js`, `ponta-a-ponta.js`, `clicar-com-base-suja.js` | O que só aparece com a tela montada: botão cortado, **um elemento por cima do outro**, classe de CSS que não existe, clique que estoura, `undefined` escrito na tela, código guardado na base que rodaria na tela |
+| **3½. A varredura geral** | `varredura-geral.js` (e a parte do dia a dia, dentro da suíte) | O que nenhum pedido testou: cada função pública com o inesperado, por cada nível e por quem não tem cadastro; as chamadas reais da tela com um campo estragado; o tamanho das respostas com 5.000 casos. Rode depois de mudar o que a tela manda — e regrave `chamadas-gravadas.json` (ver o cabeçalho da ferramenta) |
 | **4. Lá dentro** | `diagnosticoRECC()` no editor | O que depende da INSTALAÇÃO: arquivo que ficou para trás na cópia, aba apagada, coluna fora do contrato, fuso horário do projeto, sequência de Id corrompida |
 
 **As três primeiras rodam aqui e não provam a quarta.** É por isso que a
@@ -318,6 +319,10 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
     `google.script.run` atravessa como JSON, e o tamanho custa tempo: a fila do
     Trabalho com 5.000 casos (6 MB) estourava os 40 segundos (achado 95). Mande o
     que a tela mostra agora, compacto, e deixe o resto sob pedido.
+14. **Ler `dados.x` sem conferir que `dados` chegou.** Página antiga guardada no
+    navegador manda o que a versão dela mandava. Toda função que grava um
+    formulário começa por `dados = dadosDaTela_(dados)`, depois da permissão; lista
+    que vem da tela passa por `listaDaTela_` (achado 96). A varredura geral cobra.
 
 ---
 

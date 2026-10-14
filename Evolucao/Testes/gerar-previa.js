@@ -62,6 +62,32 @@ function gravacoesRecusadas(nomes) {
  * do resto do arquivo: o que aparece na prévia saiu do sistema, e não de um
  * JSON escrito à mão que envelhece sozinho.
  */
+/**
+ * PGO_GRAVAR_CHAMADAS=arquivo.json guarda as chamadas às funções PÚBLICAS que a
+ * prévia faz ao servidor de verdade, com os argumentos de verdade — a outra
+ * metade da matéria-prima da varredura geral (a primeira vem do ponta a ponta).
+ */
+const chamadasGravadas = [];
+function comGravacao(chamar) {
+  if (!process.env.PGO_GRAVAR_CHAMADAS) return chamar;
+  return function (expressao) {
+    const alvo = chamar(expressao);
+    const semArgumento = /^([A-Za-z0-9]*[A-Za-z0-9])\(\)$/.exec(expressao);
+    if (semArgumento) {
+      chamadasGravadas.push({ nome: semArgumento[1], args: [] });
+      return alvo;
+    }
+    if (typeof alvo !== 'function' || !/^[A-Za-z0-9]*[A-Za-z0-9]$/.test(expressao)) return alvo;
+    return function () {
+      const args = Array.prototype.slice.call(arguments);
+      try {
+        chamadasGravadas.push({ nome: expressao, args: JSON.parse(JSON.stringify(args)) });
+      } catch (erro) { /* argumento que não vira JSON não atravessa a fronteira */ }
+      return alvo.apply(null, args);
+    };
+  };
+}
+
 function conferenciasDeExemplo(chamar) {
   const exemplos = {
     corretoras: [
@@ -366,7 +392,8 @@ function pontePreparada(respostas) {
 }
 
 function gerar(pastaDeSaida) {
-  const { ambiente, chamar } = carregar('ana.martins@exemplo.com');
+  const { ambiente, chamar: chamarDoSistema } = carregar('ana.martins@exemplo.com');
+  const chamar = comGravacao(chamarDoSistema);
 
   // Uma instalação inteira, do zero, igual à que o PO vai rodar no editor.
   chamar('instalarRECC()');
@@ -1102,6 +1129,10 @@ function gerar(pastaDeSaida) {
   fs.writeFileSync(path.join(pastaDeSaida, 'sem-acesso.html'), telaSemAcesso);
 
   console.log('Prévia gerada em ' + pastaDeSaida);
+  if (process.env.PGO_GRAVAR_CHAMADAS) {
+    fs.writeFileSync(process.env.PGO_GRAVAR_CHAMADAS, JSON.stringify(chamadasGravadas));
+    console.log('  ' + chamadasGravadas.length + ' chamadas gravadas em ' + process.env.PGO_GRAVAR_CHAMADAS);
+  }
   console.log('  sistema.html    ' + paginaDoSistema.length + ' bytes  ('
     + pacote.menu.length + ' itens de menu, nível ' + pacote.usuario.nivelAcesso
     + ', ' + Object.keys(formularios).length + ' formulários, '

@@ -2070,7 +2070,7 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
       'que você procura.');
   }
 
-  var escolhidas = (ondeProcurar || []).map(converterParaIdentificador_);
+  var escolhidas = listaDaTela_(ondeProcurar).map(converterParaIdentificador_);
   var resultados = [];
 
   // E procura SÓ nos canais desta pessoa. A tela não oferecer os outros não
@@ -2368,6 +2368,7 @@ function configuracaoDoLegado() {
  */
 function salvarConfiguracaoDoLegado(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var id = String(dados.planilhaId || '').trim();
   var aba = String(dados.aba || '').trim();

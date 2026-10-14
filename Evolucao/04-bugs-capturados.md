@@ -2020,9 +2020,49 @@ lista com até 100, mais o número inteiro. Com 5.000 casos: abertura de 6 MB pa
 
 ---
 
+### 96 · O formulário que não chegava virava "Cannot read properties of null"
+
+**Sintoma.** Achado pela varredura geral, pedida pelo PO ("um teste em todo o
+sistema para capturar bugs, erros e quebras"): treze funções de gravar — salvar
+corretora, bloquear SUSEP, legado, campo (criar e salvar), item de lista, nível,
+canal (criar e salvar), identidade, análise, sinalizador e usuário — estouravam com
+o erro cru do JavaScript quando o formulário vinha vazio. A busca e o reordenar
+campos estouravam com "x.map is not a function" quando a lista vinha em outro
+formato, e salvar cards, com um card vazio na lista.
+
+**Causa.** As funções liam `dados.nome`, `dados.id`… direto. A tela de hoje sempre
+manda o objeto — mas uma **página antiga guardada no navegador** depois de uma
+atualização (o caso do PO com a Descrição) manda o que a versão dela mandava, e a
+pessoa leria o erro cru.
+
+**Defesa.** `dadosDaTela_` (Base.gs), logo depois da permissão: sem o objeto, o
+recado manda recarregar a página (Ctrl+F5), e nada é gravado. `listaDaTela_` para
+as listas; o card vazio diz o número dele. A permissão continua vindo primeiro —
+quem não pode gravar ouve "não tem permissão", e não "recarregue". Varredura:
+**28 defeitos na 1ª passada e 15 na 2ª → zero**.
+
+---
+
+### 97 · A fatia do gráfico da Produtividade também estourava os 40 segundos
+
+**Sintoma.** Achado pela 3ª passada da varredura (o volume): com 5.000 casos,
+clicar numa fatia de gráfico da Produtividade devolvia **6,6 MB** — o mesmo defeito
+do Trabalho (item 95), em outra tela.
+
+**Causa.** `detalharComponente` montava a lista inteira com `montarFila_`, no
+formato de 1,1 KB por caso.
+
+**Defesa.** O mesmo remédio, escolhido pelo PO: a lista vai compacta e com os
+**100 mais recentes** (`RECC_FILA_NA_ABERTURA`), a tela remonta com
+`TelaTrabalho.expandirFila`, e **"Mostrar todos (N)"** busca o resto. Com 5.000
+casos, a maior resposta do sistema passou a ser **98 KB**. O ponta a ponta clica
+na fatia, confere as 100 linhas e o botão, e pede "todos".
+
+---
+
 ## O que esta lista ensina
 
-**São noventa e cinco achados, e a maioria era silenciosa.** Não davam erro, não
+**São noventa e sete achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -2229,3 +2269,8 @@ Daí as duas práticas que o projeto não abre mão:
 51. **O que volta também pesa.** No item 95 o estresse contava idas e células
     lidas e aprovava; o que estourava era o tamanho da resposta. "Mandar tudo para
     a tela decidir" é barato com 30 casos e caro com 5.000 — e a base só cresce.
+52. **Teste de pedido confere o prometido; varredura confere o resto.** Os itens
+    96 e 97 não eram de pedido nenhum, e nenhum teste perguntava "e se vier
+    vazio?" ou "e com 5.000 casos?". Uma ferramenta que descobre as funções
+    sozinha e chama cada uma com o inesperado pega o que ninguém pensou em
+    testar — e pega a função nova no dia em que ela nasce.

@@ -2237,7 +2237,7 @@ function mediaMovel_(pontos, janela) {
  * isso, o painel só informa, e informar não resolve caso nenhum.
  */
 function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
-  periodoPedido) {
+  periodoPedido, quantos) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -2295,7 +2295,14 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
     ponto: ehTempo ? rotuloDoDia_(procurado)
       : (procurado === '__outros' ? 'Demais valores' : procurado),
     colunas: colunasDaFila_(canal),
-    casos: montarFila_(escolhidos, canal),
+    // Os 100 mais recentes, compactos — "todos" quando a tela pede. Achado da
+    // varredura geral (item 97): a lista ia INTEIRA, e com 5.000 casos o
+    // clique numa fatia devolvia 6,6 MB e estourava os 40 segundos, o mesmo
+    // defeito do Trabalho (item 95). O PO escolheu o mesmo remédio. `total`
+    // continua sendo a fatia inteira.
+    casos: compactarFila_(montarFila_(quantos === 'todos'
+      ? escolhidos : escolhidos.slice(-RECC_FILA_NA_ABERTURA), canal)),
+    filaCompacta: true,
     total: escolhidos.length,
     // "Trabalhar no caso" abre a EDIÇÃO; quem não pode editar não ganha o
     // botão, em vez de ganhar um botão que a chamada recusa.

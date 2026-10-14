@@ -324,10 +324,13 @@ function comAFilaDaTela(resumo) {
     telaDoTrabalho = pecaRodando('Trabalho', { SeletorDePeriodo: { padrao: () => ({}) } })
       .TelaTrabalho;
   }
-  return Object.assign({}, resumo, {
-    fila: telaDoTrabalho.expandirFila(resumo.fila, resumo.colunas),
-    pertoDeVencer: telaDoTrabalho.expandirFila(resumo.pertoDeVencer, resumo.colunas)
+  // `fila` e `pertoDeVencer` são do Trabalho; `casos`, da lista que abre ao
+  // clicar num gráfico da Produtividade — as três atravessam compactas.
+  const expandida = Object.assign({}, resumo);
+  ['fila', 'pertoDeVencer', 'casos'].forEach((chave) => {
+    if (resumo[chave]) expandida[chave] = telaDoTrabalho.expandirFila(resumo[chave], resumo.colunas);
   });
+  return expandida;
 }
 
 module.exports = {

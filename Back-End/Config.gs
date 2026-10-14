@@ -268,6 +268,7 @@ function tiposDeCatalogoExistentes_() {
  */
 function salvarCampo(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var id = converterParaIdentificador_(dados.id);
   var atual = buscarRegistros_('CAMPOS', 'Id', id, 1)[0];
@@ -402,6 +403,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
 function criarCampo(idDoCanal, dados) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
+  dados = dadosDaTela_(dados);
 
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var rotulo = String(dados.rotulo || '').trim();
@@ -448,7 +450,7 @@ function reordenarCampos(idDoCanal, idsNaOrdem) {
   listarCamposDoCanal(canal.id).forEach(function (campo) { doCanal[campo.id] = true; });
 
   var ordem = 0;
-  (idsNaOrdem || []).forEach(function (idDoCampo) {
+  listaDaTela_(idsNaOrdem).forEach(function (idDoCampo) {
     var id = converterParaIdentificador_(idDoCampo);
     if (!doCanal[id]) {
       throw new Error('O campo ' + id + ' não é do canal ' + canal.nome + '.');
@@ -665,6 +667,7 @@ function listarCatalogo(tipo, idDoCanal) {
  */
 function salvarItemDoCatalogo(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var nome = String(dados.nome || '').trim();
   if (!nome) throw new Error('Dê um nome ao item.');
@@ -1160,6 +1163,7 @@ function listarNiveisDeAcesso() {
  */
 function salvarNivelDeAcesso(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
   var id = converterParaIdentificador_(dados.id);
   var atual = id ? buscarRegistros_('CATALOGO', 'Id', id, 1)[0] : null;
   if (id && !atual) throw new Error('Nível ' + id + ' não encontrado.');
@@ -1466,6 +1470,7 @@ function listarCanaisConfiguraveis() {
  */
 function salvarCanal(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var id = converterParaIdentificador_(dados.id);
   var atual = buscarRegistros_('CANAIS', 'Id', id, 1)[0];
@@ -1643,6 +1648,7 @@ function minutosDaHoraDoExpediente_(texto) {
 function criarCanal(dados) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
+  dados = dadosDaTela_(dados);
 
   var nome = String(dados.nome || '').trim();
   if (!nome) {
@@ -2062,7 +2068,13 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     return s.gravadoComo;
   });
 
-  lista.forEach(function (cartao) {
+  lista.forEach(function (cartao, posicao) {
+    // Card que chega vazio é página antiga ou tela quebrada: recado, e não erro
+    // cru do JavaScript (item 96).
+    if (!cartao || typeof cartao !== 'object') {
+      throw new Error('O card ' + (posicao + 1) + ' chegou vazio da tela. Recarregue a '
+        + 'página (Ctrl+F5) e tente de novo.');
+    }
     if (!String(cartao.titulo || '').trim()) {
       throw new Error('Todo cartão precisa de um nome — é o que a pessoa lê ' +
         'em cima do número.');
@@ -2163,6 +2175,7 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
 /** Nome, subtítulo, operação, logo, cor e o rodapé do menu. */
 function salvarIdentidade(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var mudancas = {
     'IDENTIDADE.NOME': String(dados.nome || '').trim(),
@@ -2829,6 +2842,7 @@ function filtrosPossiveisDaAnalise_(canal) {
  */
 function salvarAnalise(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var nome = String(dados.nome || '').trim();
   conferirNomeDaAnalise_(nome);
@@ -3002,6 +3016,7 @@ function opcoesDeSinalizador() {
 /** Cria ou altera um sinalizador. */
 function salvarSinalizador(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
     throw new Error('A aba SINALIZADORES ainda não existe nesta planilha. '
       + 'Rode atualizarPGO() no editor do Apps Script.');

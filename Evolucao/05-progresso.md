@@ -2727,6 +2727,41 @@ Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
 
 ---
 
+## Etapa 38 — A varredura geral: o sistema inteiro, atrás do que quebra
+
+Pedido do PO: **"consegue gerar um teste em todo o sistema para capturar bugs, erros e
+quebras? Faça todos os testes possíveis para capturar e corrigir."**
+
+| Camada | Ferramenta | O que fez | Achou |
+|---|---|---|---|
+| **O inesperado** | `varredura-geral.js`, 1ª passada | As 100 funções públicas, cada parâmetro com vazio, nulo, número, texto de 5.000, `<script>`, fórmula, Id inexistente; pelos 4 níveis e por quem não tem cadastro — **8.343 chamadas** | 28 defeitos (item 96); **nenhum dado entregue a quem não tem cadastro** |
+| **A fundo** | 2ª passada | As chamadas reais da tela (223 do ponta a ponta + as da prévia, 58 funções), com um campo estragado por vez — **7.152 chamadas** | 15 defeitos, da mesma família (item 96) |
+| **Volume** | 3ª passada | Cada resposta de leitura com 5.000 casos — **311 chamadas** | A fatia do gráfico da Produtividade: 6,6 MB (item 97) |
+| **A tela com base suja** | `clicar-com-base-suja.js` | O sistema de verdade sobre a base suja: 102 cliques em cada seção e canal | Nada: nenhum erro de página, nenhum `undefined`/`NaN` |
+| **Código na base** | (dentro das duas acima) | Um nome `<img onerror=…>` em caso, corretora, SUSEP bloqueada e usuário | Nada: o código **aparece escrito e nunca roda** (3 telas o mostraram) |
+| **Fórmula digitada** | (conferência à parte) | "=IMPORTRANGE(…)" pelo cadastro, edição, coluna sua, corretora, usuário e importação | Nada: toda célula é formatada como texto antes de gravar |
+| **Estresse** | `estresse.js`, 50 mil casos | Idas ao serviço e células de cada operação | Nada: todas cabem com folga |
+
+**O que foi corrigido.** Item 96: `dadosDaTela_` e `listaDaTela_` na porta de 16
+funções — recado que manda recarregar, em vez do erro cru. Item 97: a lista da fatia
+do gráfico com os 100 mais recentes, compacta, e "Mostrar todos (N)". Depois das
+correções, as três passadas: **15.806 chamadas, zero defeito**; a maior resposta do
+sistema com 5.000 casos caiu de 6,6 MB para **98 KB**.
+
+**O que ficou para sempre.** A parte do dia a dia está **dentro da suíte**
+(`testes-varredura-geral.js`): toda função pública como administrador e sem cadastro,
+e as chamadas gravadas com um campo estragado. Uma função nova é varrida no dia em
+que nasce. **1199 testes** (26 novos), cinco execuções seguidas sem falha, **10
+quebras de propósito, 10 vermelhos** (a do botão "Mostrar todos" só o navegador via
+na primeira rodada — ganhou guarda na suíte). Navegador: ponta a ponta **21/21** no
+repositório e no pacote, 108 combinações, 152 cliques na prévia e 102 com base suja.
+
+### Para quem já usa
+
+Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

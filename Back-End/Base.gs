@@ -1598,6 +1598,28 @@ function susepComoSeEscreve_(valor) {
 }
 
 /**
+ * Os dados de um formulário, conferidos na PORTA da função que os grava.
+ *
+ * Achado da varredura geral (item 96): treze funções de gravar liam
+ * `dados.nome`, `dados.id`… direto, e quando o objeto não vinha a pessoa lia
+ * na tela "Cannot read properties of null (reading 'nome')". A tela de hoje
+ * sempre manda o objeto — mas uma página ANTIGA, guardada no navegador depois
+ * de uma atualização, manda o que a versão dela mandava. O recado diz o que
+ * fazer, e a função para antes de mexer em qualquer coisa.
+ */
+function dadosDaTela_(dados) {
+  if (dados && typeof dados === 'object' && !Array.isArray(dados)) return dados;
+  throw new Error('A tela não mandou os dados deste formulário. Recarregue a página '
+    + '(Ctrl+F5) e tente de novo — se continuar, a página guardada no navegador pode '
+    + 'ser de uma versão antiga do sistema.');
+}
+
+/** Uma lista que veio da tela; o que não for lista vale como lista vazia. */
+function listaDaTela_(valor) {
+  return Array.isArray(valor) ? valor : [];
+}
+
+/**
  * Este campo, ou esta coluna, é a SUSEP?
  *
  * Pedido do PO: a SUSEP aceita SÓ NÚMEROS, SÓ LETRAS ou OS DOIS — "7dmd8gs",

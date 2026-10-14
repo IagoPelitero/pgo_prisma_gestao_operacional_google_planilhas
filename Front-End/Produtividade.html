@@ -467,21 +467,30 @@ var TelaProdutividade = (function () {
     }
   }
 
-  function detalhar(idDoComponente, chaveDoPonto) {
+  // `todos`: a lista vem com os 100 mais recentes; "Mostrar todos" pede o resto.
+  function detalhar(idDoComponente, chaveDoPonto, todos) {
     var caixa = elemento('detalhe-do-painel');
     caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     Servidor.chamar('detalharComponente', canalEscolhido, idDoComponente,
-      chaveDoPonto, filtros, periodo)
-      .entao(function (resposta) { desenharDetalhe(resposta); })
+      chaveDoPonto, filtros, periodo, todos ? 'todos' : '')
+      .entao(function (resposta) {
+        // A lista atravessa compacta; a remontagem é a mesma da fila do
+        // Trabalho (TelaTrabalho.expandirFila — as duas peças vivem na mesma
+        // página).
+        if (resposta.filaCompacta) {
+          resposta.casos = TelaTrabalho.expandirFila(resposta.casos, resposta.colunas);
+        }
+        desenharDetalhe(resposta, idDoComponente, chaveDoPonto);
+      })
       .senao(function (erro) {
         caixa.innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
 
-  function desenharDetalhe(detalhe) {
+  function desenharDetalhe(detalhe, idDoComponente, chaveDoPonto) {
     var cabecalho = detalhe.colunas.map(function (grupo) {
       return '<th>' + escapar(grupo.titulo) + '</th>';
     }).join('') + '<th class="acoes-coluna">Ações</th>';
@@ -516,6 +525,12 @@ var TelaProdutividade = (function () {
       + '<span class="quantos">' + detalhe.total + '</span>'
       + '<button type="button" class="botao-texto" id="fechar-detalhe">'
       + 'Fechar</button></header>'
+      + (detalhe.casos.length < detalhe.total
+        ? '<div class="fila-mostrar"><span class="fila-mostrando">Mostrando os '
+          + detalhe.casos.length + ' casos mais recentes de ' + detalhe.total + '</span>'
+          + '<button type="button" class="mostrar-quantos" id="detalhe-todos">'
+          + 'Mostrar todos (' + detalhe.total + ')</button></div>'
+        : '')
       + (detalhe.casos.length
         ? '<div class="rolagem-tabela"><table class="fila agrupada">'
           + '<thead><tr>' + cabecalho + '</tr></thead>'
@@ -525,6 +540,10 @@ var TelaProdutividade = (function () {
 
     elemento('fechar-detalhe').addEventListener('click', function () {
       elemento('detalhe-do-painel').innerHTML = '';
+    });
+    var todos = elemento('detalhe-todos');
+    if (todos) todos.addEventListener('click', function () {
+      detalhar(idDoComponente, chaveDoPonto, true);
     });
 
     var abrir = document.querySelectorAll('[data-caso-do-painel]');

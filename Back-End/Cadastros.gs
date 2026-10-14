@@ -230,6 +230,7 @@ function segmentosConhecidos_(todas) {
 function salvarCorretora(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
+  dados = dadosDaTela_(dados);
 
   var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP — é ela que liga a corretora ao caso.');
@@ -361,6 +362,7 @@ function listarSusepsBloqueadas() {
 function bloquearSusep(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
+  dados = dadosDaTela_(dados);
 
   var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP a bloquear.');

@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-14 17:25
+   Gerado em 2026-10-14 22:30
    ========================================================================== */
 
 
@@ -1613,6 +1613,28 @@ function chaveDaSusep_(valor) {
 /** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
 function susepComoSeEscreve_(valor) {
   return String(valor === null || valor === undefined ? '' : valor).trim();
+}
+
+/**
+ * Os dados de um formulário, conferidos na PORTA da função que os grava.
+ *
+ * Achado da varredura geral (item 96): treze funções de gravar liam
+ * `dados.nome`, `dados.id`… direto, e quando o objeto não vinha a pessoa lia
+ * na tela "Cannot read properties of null (reading 'nome')". A tela de hoje
+ * sempre manda o objeto — mas uma página ANTIGA, guardada no navegador depois
+ * de uma atualização, manda o que a versão dela mandava. O recado diz o que
+ * fazer, e a função para antes de mexer em qualquer coisa.
+ */
+function dadosDaTela_(dados) {
+  if (dados && typeof dados === 'object' && !Array.isArray(dados)) return dados;
+  throw new Error('A tela não mandou os dados deste formulário. Recarregue a página '
+    + '(Ctrl+F5) e tente de novo — se continuar, a página guardada no navegador pode '
+    + 'ser de uma versão antiga do sistema.');
+}
+
+/** Uma lista que veio da tela; o que não for lista vale como lista vazia. */
+function listaDaTela_(valor) {
+  return Array.isArray(valor) ? valor : [];
 }
 
 /**
@@ -3264,6 +3286,7 @@ function segmentosConhecidos_(todas) {
 function salvarCorretora(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
+  dados = dadosDaTela_(dados);
 
   var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP — é ela que liga a corretora ao caso.');
@@ -3395,6 +3418,7 @@ function listarSusepsBloqueadas() {
 function bloquearSusep(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
+  dados = dadosDaTela_(dados);
 
   var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP a bloquear.');
@@ -6189,7 +6213,7 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
       'que você procura.');
   }
 
-  var escolhidas = (ondeProcurar || []).map(converterParaIdentificador_);
+  var escolhidas = listaDaTela_(ondeProcurar).map(converterParaIdentificador_);
   var resultados = [];
 
   // E procura SÓ nos canais desta pessoa. A tela não oferecer os outros não
@@ -6487,6 +6511,7 @@ function configuracaoDoLegado() {
  */
 function salvarConfiguracaoDoLegado(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var id = String(dados.planilhaId || '').trim();
   var aba = String(dados.aba || '').trim();
@@ -7751,6 +7776,7 @@ function tiposDeCatalogoExistentes_() {
  */
 function salvarCampo(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var id = converterParaIdentificador_(dados.id);
   var atual = buscarRegistros_('CAMPOS', 'Id', id, 1)[0];
@@ -7885,6 +7911,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
 function criarCampo(idDoCanal, dados) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
+  dados = dadosDaTela_(dados);
 
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var rotulo = String(dados.rotulo || '').trim();
@@ -7931,7 +7958,7 @@ function reordenarCampos(idDoCanal, idsNaOrdem) {
   listarCamposDoCanal(canal.id).forEach(function (campo) { doCanal[campo.id] = true; });
 
   var ordem = 0;
-  (idsNaOrdem || []).forEach(function (idDoCampo) {
+  listaDaTela_(idsNaOrdem).forEach(function (idDoCampo) {
     var id = converterParaIdentificador_(idDoCampo);
     if (!doCanal[id]) {
       throw new Error('O campo ' + id + ' não é do canal ' + canal.nome + '.');
@@ -8148,6 +8175,7 @@ function listarCatalogo(tipo, idDoCanal) {
  */
 function salvarItemDoCatalogo(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var nome = String(dados.nome || '').trim();
   if (!nome) throw new Error('Dê um nome ao item.');
@@ -8643,6 +8671,7 @@ function listarNiveisDeAcesso() {
  */
 function salvarNivelDeAcesso(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
   var id = converterParaIdentificador_(dados.id);
   var atual = id ? buscarRegistros_('CATALOGO', 'Id', id, 1)[0] : null;
   if (id && !atual) throw new Error('Nível ' + id + ' não encontrado.');
@@ -8949,6 +8978,7 @@ function listarCanaisConfiguraveis() {
  */
 function salvarCanal(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var id = converterParaIdentificador_(dados.id);
   var atual = buscarRegistros_('CANAIS', 'Id', id, 1)[0];
@@ -9126,6 +9156,7 @@ function minutosDaHoraDoExpediente_(texto) {
 function criarCanal(dados) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
+  dados = dadosDaTela_(dados);
 
   var nome = String(dados.nome || '').trim();
   if (!nome) {
@@ -9545,7 +9576,13 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     return s.gravadoComo;
   });
 
-  lista.forEach(function (cartao) {
+  lista.forEach(function (cartao, posicao) {
+    // Card que chega vazio é página antiga ou tela quebrada: recado, e não erro
+    // cru do JavaScript (item 96).
+    if (!cartao || typeof cartao !== 'object') {
+      throw new Error('O card ' + (posicao + 1) + ' chegou vazio da tela. Recarregue a '
+        + 'página (Ctrl+F5) e tente de novo.');
+    }
     if (!String(cartao.titulo || '').trim()) {
       throw new Error('Todo cartão precisa de um nome — é o que a pessoa lê ' +
         'em cima do número.');
@@ -9646,6 +9683,7 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
 /** Nome, subtítulo, operação, logo, cor e o rodapé do menu. */
 function salvarIdentidade(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var mudancas = {
     'IDENTIDADE.NOME': String(dados.nome || '').trim(),
@@ -10312,6 +10350,7 @@ function filtrosPossiveisDaAnalise_(canal) {
  */
 function salvarAnalise(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var nome = String(dados.nome || '').trim();
   conferirNomeDaAnalise_(nome);
@@ -10485,6 +10524,7 @@ function opcoesDeSinalizador() {
 /** Cria ou altera um sinalizador. */
 function salvarSinalizador(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
     throw new Error('A aba SINALIZADORES ainda não existe nesta planilha. '
       + 'Rode atualizarPGO() no editor do Apps Script.');
@@ -12417,6 +12457,7 @@ function comoDataEHora_(valor) {
  */
 function salvarUsuario(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  dados = dadosDaTela_(dados);
 
   var email = String(dados.email || '').trim().toLowerCase();
   if (!email || email.indexOf('@') < 0) {
@@ -14804,7 +14845,7 @@ function mediaMovel_(pontos, janela) {
  * isso, o painel só informa, e informar não resolve caso nenhum.
  */
 function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
-  periodoPedido) {
+  periodoPedido, quantos) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -14862,7 +14903,14 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
     ponto: ehTempo ? rotuloDoDia_(procurado)
       : (procurado === '__outros' ? 'Demais valores' : procurado),
     colunas: colunasDaFila_(canal),
-    casos: montarFila_(escolhidos, canal),
+    // Os 100 mais recentes, compactos — "todos" quando a tela pede. Achado da
+    // varredura geral (item 97): a lista ia INTEIRA, e com 5.000 casos o
+    // clique numa fatia devolvia 6,6 MB e estourava os 40 segundos, o mesmo
+    // defeito do Trabalho (item 95). O PO escolheu o mesmo remédio. `total`
+    // continua sendo a fatia inteira.
+    casos: compactarFila_(montarFila_(quantos === 'todos'
+      ? escolhidos : escolhidos.slice(-RECC_FILA_NA_ABERTURA), canal)),
+    filaCompacta: true,
     total: escolhidos.length,
     // "Trabalhar no caso" abre a EDIÇÃO; quem não pode editar não ganha o
     // botão, em vez de ganhar um botão que a chamada recusa.

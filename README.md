@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1173 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1199 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -260,13 +260,46 @@ comando só.
 
 ---
 
+## A varredura geral
+
+```bash
+node Evolucao/Testes/varredura-geral.js          # o servidor, função por função
+node Evolucao/Testes/clicar-com-base-suja.js     # a tela, com o servidor de verdade
+```
+
+Pedido do PO: "um teste em todo o sistema para capturar bugs, erros e quebras". A
+suíte confere o que cada pedido prometeu; a varredura pergunta **e quando chega o
+que ninguém esperava?** Ela descobre sozinha, no código, as **100 funções
+públicas** do servidor e chama cada uma em três passadas:
+
+| Passada | O que faz |
+|---|---|
+| **1. O inesperado** | Cada parâmetro, um de cada vez, recebe vazio, nulo, número, texto de 5.000 caracteres, `<script>`, fórmula, Id que não existe — chamado pelos **quatro níveis** de fábrica e por alguém **sem cadastro** |
+| **2. A fundo** | As chamadas que a tela fez **de verdade** (gravadas do ponta a ponta e da prévia, em `chamadas-gravadas.json`) repetidas com **um campo estragado de cada vez** — é o que alcança o miolo das funções |
+| **3. Volume** | Cada resposta de leitura com **5.000 casos** na RET e na Mesa: nenhuma pode passar de 500 KB, a lição dos 40 segundos |
+
+Tudo roda numa base **suja**: data que não existe, texto em coluna de número,
+fórmula, linha em branco, emoji, e um nome com código (`<img onerror=…>`). Conta
+como defeito: **erro cru do JavaScript** ("Cannot read properties of null"),
+resposta que não atravessa até a tela, resposta grande e **dado entregue a quem
+não tem cadastro**. Recusar com recado em português é o certo, e não conta.
+
+O `clicar-com-base-suja.js` abre o sistema de verdade sobre essa base e clica em
+tudo, entrando em cada seção e canal: erro de página, erro cru do servidor,
+`undefined`/`NaN` na tela — e confere que o código guardado num nome **aparece
+escrito e nunca roda**. A parte que cabe no dia a dia (as funções como
+administrador e sem cadastro, e as chamadas gravadas) está **dentro da suíte**:
+uma função nova é varrida no dia em que nasce.
+
+---
+
 ## Rodar os testes
 
 ```bash
 node Evolucao/Testes/rodar.js
 ```
 
-1173 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1199 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -859,7 +892,9 @@ do dia 1". Em fevereiro, a segunda conta erraria por três dias todo ano.
 
 Cada gráfico é uma linha da aba `PAINEIS` — nada aqui está escrito no código.
 Cinco formas: pizza, barras em pé, barras deitadas, linha e barras com linha.
-Clicar numa fatia abre a lista dos casos que a formam.
+Clicar numa fatia abre a lista dos casos que a formam — os **100 mais recentes**,
+com o total ao lado; **"Mostrar todos (N)"** traz o resto. Com a lista inteira, uma
+fatia de 5.000 casos devolvia 6,6 MB e estourava os 40 segundos (achado 97).
 
 Três regras sustentam a leitura, e cada uma existe por um motivo:
 
@@ -1324,7 +1359,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1173 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1199 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

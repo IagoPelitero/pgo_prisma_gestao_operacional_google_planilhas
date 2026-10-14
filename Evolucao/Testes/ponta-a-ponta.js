@@ -181,8 +181,15 @@ async function rodar() {
   const chamadasDoNavegador = {};
 
   // A PONTE. O navegador chama aqui, e aqui roda o servidor de verdade.
+  // PGO_GRAVAR_CHAMADAS=arquivo.json guarda o que a tela mandou de verdade —
+  // é a matéria-prima da varredura geral (varredura-geral.js), que repete cada
+  // chamada estragando um campo de cada vez.
+  const gravadas = [];
   await pagina.exposeFunction('__servidorDoPGO', (nome, argumentos) => {
     chamadasDoNavegador[nome] = (chamadasDoNavegador[nome] || 0) + 1;
+    if (process.env.PGO_GRAVAR_CHAMADAS) {
+      gravadas.push({ nome: nome, args: JSON.parse(JSON.stringify(argumentos)) });
+    }
     try {
       const chamada = vm.runInContext('(' + nome + ')', contexto);
       const valor = chamada.apply(null, argumentos);
@@ -889,10 +896,35 @@ async function rodar() {
     contem(await pagina.textContent('.fila-mostrando'), 'Mostrando todos os ' + totalNaBase);
   });
 
+  await teste('na Produtividade, a fatia do gráfico abre com 100 e "Mostrar todos" traz o resto', async () => {
+    // Os 150 casos "Pendente" do teste anterior estão na RET.
+    await pagina.click('[data-tela="produtividade"]');
+    await pagina.waitForTimeout(900);
+    const naRet = pagina.locator('[data-canal]', { hasText: 'RET' }).first();
+    if (await naRet.count()) await naRet.click();
+    await pagina.waitForTimeout(900);
+    const fatia = pagina.locator('.grafico[data-grafico] .legenda-item[data-ponto="Pendente"]').first();
+    verdadeiro(await fatia.count() > 0, 'a fatia "Pendente" existe');
+    const antes = chamadasDoNavegador.detalharComponente || 0;
+    await fatia.click();
+    await pagina.waitForSelector('#detalhe-do-painel table', { timeout: 10000 });
+    igual(await pagina.$$eval('#detalhe-do-painel tbody tr', (es) => es.length), 100);
+    contem(await pagina.textContent('#detalhe-do-painel'), 'Mostrando os 100 casos mais recentes de');
+    await pagina.click('#detalhe-todos');
+    await pagina.waitForFunction(() =>
+      document.querySelectorAll('#detalhe-do-painel tbody tr').length > 100, null, { timeout: 10000 });
+    igual(chamadasDoNavegador.detalharComponente, antes + 2, 'uma ida para abrir, outra para "todos"');
+    verdadeiro(!(await pagina.locator('#detalhe-todos').count()), 'com tudo na tela, o botão some');
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
+  if (process.env.PGO_GRAVAR_CHAMADAS) {
+    fs.writeFileSync(process.env.PGO_GRAVAR_CHAMADAS, JSON.stringify(gravadas));
+    console.log(gravadas.length + ' chamadas da tela gravadas em ' + process.env.PGO_GRAVAR_CHAMADAS);
+  }
 
   const unicos = erros.filter((e, i) => erros.indexOf(e) === i);
   console.log('\n' + '-'.repeat(62));
