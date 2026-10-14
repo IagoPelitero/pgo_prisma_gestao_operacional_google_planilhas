@@ -3869,6 +3869,23 @@ function blocoDasCanais_() {
         + (ligada ? '' : ' (desligada)')));
   });
 
+  // STATUS SEM CANAL. A tela de Ajustes Gerais apagava o canal de todo status
+  // editado nela — ele virava status de todos os canais, e aparecia na RET, na
+  // Mesa e no VG. A tela foi corrigida; os que já perderam o canal ficam como
+  // estão, porque o sistema não tem como saber de qual canal eles eram. Quem
+  // sabe é o PO, e o laudo diz quais são.
+  var statusSemCanal = lerRegistros_('CATALOGO').filter(function (item) {
+    return normalizarParaComparar_(item.Tipo) === 'status'
+      && !converterParaIdentificador_(item.CanalId);
+  }).map(function (item) { return String(item.Nome); });
+  if (statusSemCanal.length) {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      statusSemCanal.length + ' status sem canal: aparecem em todos os canais',
+      algunsExemplos_(statusSemCanal),
+      'Se cada um é de um canal só, escolha o canal dele em Configurações › Ajustes '
+        + 'Gerais › Status, no menu "Canal". Se é mesmo de todos, pode deixar.'));
+  }
+
   if (!ativas) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,
       'Nenhum canal está ligado',

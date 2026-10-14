@@ -109,7 +109,7 @@ Esta é a regra que impede corrupção silenciosa de dado.
 
 | Natureza | Exemplo | Na planilha | Por quê |
 |---|---|---|---|
-| **Identificador** | ID, CPF, SUSEP, protocolo, apólice, proposta | **Texto**, só dígitos | `0000000000` num campo numérico vira `0`. `000000E1` vira `0` (notação científica) |
+| **Identificador** | ID, CPF, apólice, proposta | **Texto**, só dígitos | `0000000000` num campo numérico vira `0`. `000000E1` vira `0` (notação científica) |
 | **Medida** | tentativas de contato, contagens | **Número** nativo | Power BI soma direto, sem conversão |
 | **Dinheiro** | valor do prêmio, prêmio retido, prêmio mensal | **Número** nativo + formato `R$ #,##0.00` | O valor gravado é número puro; o `R$` é formato da célula, não texto |
 | **Data** | data de entrada, data de finalização | **Data** nativa | Power BI reconhece; filtro por período funciona |
@@ -140,7 +140,8 @@ O que o usuário digita e o que vai para a planilha são coisas diferentes.
 |---|---|---|
 | CPF | `000.000.000-00` | `00012345678` |
 | Protocolo | `0-0000000000` | `01234567890` |
-| Apólice / SUSEP | máscara configurável | só dígitos |
+| Apólice | máscara configurável | só dígitos |
+| SUSEP | sem máscara — tem letra | o que foi digitado (`RET00J`, `jamjamm`, `77777777`) |
 
 A máscara fica em `CAMPOS`, é editável em Configurações e é aplicada nos dois
 sentidos: **exibe** com máscara, **grava** sem. Sem traço, ponto ou vírgula —
@@ -218,7 +219,8 @@ tentativas de contato
 ```
 
 - `analista` grava **o nome**, não o ID — conforme pedido.
-- Identificadores em texto: `id`, `SUSEP`, `Código origem da proposta`,
+- A SUSEP é **texto**, e não identificador: tem letra (achado 90).
+- Identificadores em texto: `id`, `Código origem da proposta`,
   `número da proposta`, `cod produto`, `protocolo`, `cod_sucursal`, `cod_ramo`,
   `Num_apolice`, `CPF`, `Novo cod origem proposta`, `novo numero da proposta`.
 - Dinheiro em número com formato `R$ #,##0.00`: `valor do prêmio`,

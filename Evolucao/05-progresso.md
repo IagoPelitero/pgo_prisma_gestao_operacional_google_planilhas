@@ -2648,6 +2648,55 @@ Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`.
 
 ---
 
+## Etapa 36 — Cards por coluna, o carimbo das tentativas e a SUSEP de letra
+
+Três pedidos do PO na mesma rodada:
+
+- **"Os cards estão limitados apenas a status? Vamos aumentar o leque para demais
+  colunas, menos as de data, e corrigir o bug mencionado."**
+- Os status "1º contato realizado" e "2º contato realizado" viraram **"Contatando"**,
+  com uma lista ao lado ("1ª/2ª tentativa de contato sem sucesso"), e "Data do 1º
+  contato"/"Data do 2º contato" pararam de receber data. **"Não consigo ter uma forma
+  de escolher em qual coluna carimba? Assim evitamos troca de nomes no meio do
+  caminho, e igual para status."** Perguntado, ele escolheu um **menu** com as colunas
+  de data e as colunas suas, e manter as colunas de antes como destino (o histórico e
+  "Já contatados" continuam).
+- **"A SUSEP não aceita apenas letras. Aceitar ou só números, ou só letras, ou o
+  código — 7dmd8gs, jamjamm, 77777777."**
+
+| Parte | O que ficou |
+|---|---|
+| **Cards: valor de um campo** | Tipo novo (`valor`): para campo de lista (do catálogo ou escrita no campo) e Sim/Não, um card por valor — "Tentativa: 1ª tentativa de contato sem sucesso". Conta a foto de hoje, sem acento e sem caixa. Em PAINEIS: `CampoDimensao = valor`, `CampoMedida` = a coluna, `Filtro` = o valor |
+| **Cards: coluna preenchida** | Toda outra coluna que não é data nem hora (texto, número, as suas) vira "Preenchida: X". Ficam de fora a coluna do status (tem os cards dela), o id (seria o Total), as técnicas e as listas de cadastro (usuários, corretoras — milhares de valores) |
+| **O bug do menu** | A opção marcada é a que bate em regra, filtro e coluna; o menu vem em grupos; card cuja opção sumiu aparece como "Não está mais disponível" e fica como está. No Trabalho, só o card de status filtra a fila (achado 92) |
+| **Carimbo pelo item da lista** | O item de uma lista que algum campo usa ganha "Coluna que recebe data e hora", como o status: escolher a tentativa no caso grava data e hora ali — no cadastro e na edição, só quando o campo muda, só se a célula estiver vazia. A escolha mora na linha do item (pelo Id): trocar o rótulo não muda onde carimba |
+| **O menu da coluna** | Status e itens de lista escolhem a coluna num menu, por canal: as colunas de data da base e as colunas suas. Coluna de texto é recusada pelo servidor — só quando a coluna MUDA, para status antigo continuar salvando. Coluna sua recebe `dd/MM/yyyy HH:mm` (achado 93). Coluna que um item carimba não se exclui calada |
+| **O canal do item** | Editar um item apagava o canal dele (achado 91). O painel ganhou o menu Canal, e o diagnóstico lista os status sem canal |
+| **SUSEP** | Aceita só números, só letras ou os dois, qualquer que seja o tipo ou a máscara do campo (achado 90) |
+
+Para a RET do PO, o caminho é: em Ajustes Gerais, na lista das tentativas, apontar
+"1ª tentativa…" para **Data do 1º contato** e "2ª tentativa…" para **Data do 2º
+contato**. Os cards "Já contatados" e "Com 2º contato" voltam a crescer sem mexer em
+Painéis.
+
+**1159 testes** (33 novos, em `testes-cards-e-carimbos.js`; dois antigos ajustados à
+redação nova), cinco execuções seguidas sem falha, **16 quebras de propósito, 16
+vermelhos** (duas escaparam na primeira rodada — a comparação sem acento do card e a
+SUSEP em base sem contrato — e ganharam teste). Navegador: ponta a ponta **19/19** no
+repositório e no pacote — dois testes novos: o menu do carimbo e o canal pela tela, e
+o card de valor criado, salvo de novo e contado no Trabalho (este pegou o achado 94)
+—, 108 combinações sem quebra, 152 cliques sem erro.
+
+### Para quem já usa
+
+Cole os arquivos marcados. Não há passo novo no `atualizarPGO()`. Depois:
+
+1. Rode o diagnóstico: se aparecer "status sem canal", escolha o canal de cada um em
+   Ajustes Gerais › Status, no menu Canal.
+2. Em Ajustes Gerais, na lista das tentativas, escolha a coluna de cada item.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

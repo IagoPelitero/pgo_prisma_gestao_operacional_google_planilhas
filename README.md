@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1126 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1159 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -266,7 +266,7 @@ comando só.
 node Evolucao/Testes/rodar.js
 ```
 
-1126 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1159 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -589,7 +589,9 @@ num Chrome em inglês ele pede mm/dd/aaaa, e foi assim que uma analista gravou
 é recusado pelo servidor, em vez de virar 3 de março calado.
 
 **A SUSEP tem letra**: `RET00J`. Todo campo que pede SUSEP aceita e guarda
-exatamente o que foi colado — letra, dígito, caixa e pontuação. Só o espaço
+exatamente o que foi colado — letra, dígito, caixa e pontuação. Só números
+(`77777777`), só letras (`jamjamm`) ou os dois (`7dmd8gs`), qualquer que seja o
+tipo ou a máscara escolhidos para o campo em Cadastrar Caso. Só o espaço
 das pontas sai, e por um motivo concreto: quem copia de outra planilha traz
 `" RET00J "` sem ver, o selo acha a corretora assim mesmo (ele compara
 normalizado), e o estrago só aparece depois no Power BI, onde o join é pelo
@@ -728,6 +730,12 @@ a explicação.
 do "1º contato realizado" e hoje está em "Retido" continua tendo sido contatado
 — contar pelo status diria zero, e a operação concluiria que ninguém ligou para
 ninguém. A coluna de carimbo não esquece.
+
+O carimbo não precisa vir de um status. O **item de uma lista** também carimba:
+na RET, com o status "Contatando" e a lista de tentativas ao lado, "1ª tentativa
+de contato sem sucesso" aponta para **Data do 1º contato** e "2ª tentativa…" para
+**Data do 2º contato** — escolhidas num menu, em Ajustes Gerais. "Já contatados"
+segue contando pela mesma coluna.
 
 E o carimbo vale para **toda** porta: o diálogo de alterar status, o
 formulário inteiro de "Trabalhar no caso" e o cadastro de um caso novo. Por um tempo só o
@@ -1245,9 +1253,12 @@ entregue. Mesma máquina, duas perguntas. Até 12 por tela. Remover um cartão n
 toca em caso nenhum — o cartão é uma forma de contar, e apagar a conta não apaga
 o que foi contado.
 
-Um cartão conta de quatro maneiras: o **total**, uma **situação**, os
-**finalizados na célula** (que é conta, não coluna) e **"já passaram por"** — que
-lê a coluna de carimbo, e por isso não zera quando o caso avança.
+Um cartão conta de seis maneiras: o **total**, uma **situação**, os
+**finalizados na célula** (que é conta, não coluna), **"já passaram por"** — que
+lê a coluna de carimbo, e por isso não zera quando o caso avança —, **o valor de
+um campo** de lista ou Sim/Não ("Tentativa: 1ª tentativa de contato sem sucesso")
+e **"Preenchida: X"**, para qualquer outra coluna que não seja data. O menu vem
+em grupos, e só o cartão de situação filtra a fila do Trabalho ao ser clicado.
 
 ![Os cartões e os gráficos](Evolucao/imagens/tela-configuracoes-paineis.png)
 
@@ -1307,7 +1318,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1126 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1159 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

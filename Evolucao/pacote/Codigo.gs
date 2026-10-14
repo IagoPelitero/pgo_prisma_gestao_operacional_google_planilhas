@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-14 12:28
+   Gerado em 2026-10-14 15:12
    ========================================================================== */
 
 
@@ -934,8 +934,10 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
       // 'cartao' no Trabalho; pizza, linha e barras na Produtividade RECC.
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
-      // Para um cartão, é a regra de contagem: 'total', 'situacao' ou
-      // 'naCelula'. Para um gráfico, é o campo que vira eixo.
+      // Para um cartão, é a regra de contagem: 'total', 'situacao',
+      // 'naCelula', 'preenchido' (a coluna do Filtro tem algo escrito) ou
+      // 'valor' (a coluna do CampoMedida tem o valor do Filtro). Para um
+      // gráfico, é o campo que vira eixo.
       { cabecalho: 'CampoDimensao', tipo: 'texto', protegido: false },
       { cabecalho: 'CampoMedida', tipo: 'texto', protegido: false },
       { cabecalho: 'Agregacao', tipo: 'texto', protegido: false },
@@ -1540,8 +1542,11 @@ function tiposDeclaradosPeloAdministrador_() {
         var cabecalho = String(campo.Cabecalho || '').trim();
         if (!aba || !cabecalho) return;
         if (!mapa[aba]) mapa[aba] = {};
-        mapa[aba][normalizarParaComparar_(cabecalho)] =
-          RECC_DO_CAMPO_PARA_O_DADO[campo.TipoCampo] || RECC_TIPO_DE_DADO.TEXTO;
+        // A SUSEP é texto mesmo com o campo noutro tipo: identificador
+        // guardaria só os dígitos, e "jamjamm" iria para a célula vazia.
+        mapa[aba][normalizarParaComparar_(cabecalho)] = ehASusep_(cabecalho)
+          ? RECC_TIPO_DE_DADO.TEXTO
+          : RECC_DO_CAMPO_PARA_O_DADO[campo.TipoCampo] || RECC_TIPO_DE_DADO.TEXTO;
       });
     }
     tiposDeclaradosJaLidos = mapa;
@@ -1608,6 +1613,23 @@ function chaveDaSusep_(valor) {
 /** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
 function susepComoSeEscreve_(valor) {
   return String(valor === null || valor === undefined ? '' : valor).trim();
+}
+
+/**
+ * Este campo, ou esta coluna, é a SUSEP?
+ *
+ * Pedido do PO: a SUSEP aceita SÓ NÚMEROS, SÓ LETRAS ou OS DOIS — "7dmd8gs",
+ * "jamjamm" e "77777777" são todas SUSEPs. E aceita qualquer que seja o tipo
+ * escolhido para o campo em Configurações › Cadastrar Caso.
+ *
+ * Era aí que ela quebrava: com o campo SUSEP como "identificador" (ou
+ * "documento", ou "número"), a conferência pedia ao menos um dígito, e a SUSEP
+ * só de letras era recusada — "jamjamm" voltava com "precisa ter ao menos um
+ * dígito", enquanto "7dmd8gs" passava. O tipo do campo vale para os outros
+ * campos; a SUSEP é sempre texto, como no contrato das bases.
+ */
+function ehASusep_(chaveOuCabecalho) {
+  return normalizarParaComparar_(chaveOuCabecalho) === 'susep';
 }
 
 /**
@@ -4706,7 +4728,8 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     // isto, a barra do CNPJ ("12.345.678/0001-90") seria lida como separador
     // de lista — a regra dos telefones — e a célula receberia
     // "12345678;000190". Apareceu quando a Mesa passou a aceitar CNPJ.
-    if (descricao.tipo === 'documento') bruto = apenasDigitos_(bruto);
+    if (descricao.tipo === 'documento' && !ehASusep_(descricao.chave)
+      && !ehASusep_(descricao.cabecalho)) bruto = apenasDigitos_(bruto);
 
     paraGravar[descricao.cabecalho] = bruto;
   });
@@ -4752,6 +4775,10 @@ function conferirCampo_(campo, valor) {
   if (texto === '') {
     return campo.obrigatorio ? 'é obrigatório' : '';
   }
+
+  // A SUSEP aceita só números, só letras ou os dois, seja qual for o tipo do
+  // campo. Ver ehASusep_.
+  if (ehASusep_(campo.chave) || ehASusep_(campo.cabecalho)) return '';
 
   if (campo.tipo === 'identificador' || campo.tipo === 'documento') {
     var digitos = converterParaIdentificador_(texto);
@@ -4868,6 +4895,7 @@ function cadastrarCaso(idDoCanal, valores) {
   carimbarOStatusDeNascimento_(canal, paraGravar);
   carimbarOEncaminhamento_(canal, null, paraGravar);
   carimbarAParadaDoPrazo_(canal, null, paraGravar);
+  carimbarOsItensDeLista_(canal, null, paraGravar);
   preencherColunasCalculadas_(canal.aba, paraGravar, {});
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
@@ -4917,6 +4945,7 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
   carimbarOEncaminhamento_(canal, atual, paraGravar);
   carimbarAParadaDoPrazo_(canal, atual, paraGravar);
+  carimbarOsItensDeLista_(canal, atual, paraGravar);
 
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
@@ -5061,7 +5090,23 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   var jaTem = String(registroAtual[coluna] || '').trim();
   if (jaTem) return;
 
-  alteracao[coluna] = new Date();
+  alteracao[coluna] = carimboParaAColuna_(estrutura, posicao);
+}
+
+/**
+ * O "agora" do carimbo, do jeito que a coluna guarda.
+ *
+ * Coluna de data recebe a data. A coluna sua — criada direto na planilha —
+ * o sistema não sabe que é de data, e grava como texto: um Date ali virava
+ * "Wed Oct 14 2026 14:50:59 GMT+0000". Ela recebe "dd/MM/aaaa HH:mm", o mesmo
+ * texto do @AGORA. O menu da coluna do carimbo oferece as colunas suas, e é
+ * por isso que este cuidado passou a ser necessário.
+ */
+function carimboParaAColuna_(estrutura, posicao) {
+  var tipo = estrutura.tipos[posicao];
+  var agora = new Date();
+  if (tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.DATA_HORA) return agora;
+  return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
 }
 
 /**
@@ -5213,6 +5258,69 @@ function carimbarAParadaDoPrazo_(canal, registroAtual, paraGravar) {
 
     paraGravar[sinalizador.colunaDaDataDaCondicao] =
       condicaoBate_({ valores: sinalizador.valoresDaCondicao }, agora) ? new Date() : '';
+  });
+}
+
+/**
+ * Carimba data e hora quando um campo de LISTA chega num item que carimba.
+ *
+ * Pedido do PO: os status "1º contato realizado" e "2º contato realizado"
+ * viraram um status só, "Contatando", com uma lista ao lado — "1ª tentativa
+ * de contato sem sucesso", "2ª tentativa…". As colunas "Data do 1º contato" e
+ * "Data do 2º contato" pararam de receber data, porque nenhum status apontava
+ * mais para elas. Agora o ITEM da lista aponta, do mesmo jeito que o status:
+ * "Coluna que recebe data e hora", em Configurações › Ajustes Gerais.
+ *
+ * A escolha mora na linha do item no CATÁLOGO (pelo Id), e não no nome dele:
+ * trocar o rótulo do item não muda onde ele carimba.
+ *
+ * AS MESMAS REGRAS DO CARIMBO DE STATUS:
+ *   - carimba só quando o campo MUDOU para aquele item (salvar sem mexer não
+ *     carimba nada);
+ *   - carimba só se a célula estiver vazia: voltar a um item por onde o caso
+ *     já passou guarda a data da primeira vez;
+ *   - coluna que a base não tem é ignorada, sem estourar — o caso é salvo.
+ *
+ * O status tem o carimbo dele (carimbarOStatus_), e por isso a lista de
+ * STATUS fica de fora daqui: seriam dois carimbos para a mesma mudança.
+ */
+function carimbarOsItensDeLista_(canal, registroAtual, paraGravar) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var doCanal = converterParaIdentificador_(canal.id);
+  var catalogo = null;
+
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (converterParaIdentificador_(campo.CanalId) !== doCanal) return;
+    if (String(campo.TipoCampo || '') !== 'seletor') return;
+    var configuracao = lerConfiguracaoDoCampo_(campo);
+    var lista = normalizarParaComparar_(configuracao.catalogo);
+    if (!lista || lista === 'status') return;
+    if (configuracao.separaEm || configuracao.partirEm) return;
+
+    var coluna = grafiaDaColuna_(canal.aba, campo.Cabecalho);
+    if (!Object.prototype.hasOwnProperty.call(paraGravar, coluna)) return;
+    var agora = String(paraGravar[coluna] || '').trim();
+    var antes = registroAtual ? String(registroAtual[coluna] || '').trim() : '';
+    if (!agora || normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+    catalogo = catalogo || lerRegistros_('CATALOGO');
+    var item = null;
+    catalogo.forEach(function (um) {
+      if (item) return;
+      if (normalizarParaComparar_(um.Tipo) !== lista) return;
+      var canalDoItem = converterParaIdentificador_(um.CanalId);
+      if (canalDoItem && canalDoItem !== doCanal) return;
+      if (normalizarParaComparar_(um.Nome) === normalizarParaComparar_(agora)) item = um;
+    });
+    if (!item || !String(item.ColunaDeCarimbo || '').trim()) return;
+
+    var posicao = posicaoDaColuna_(estrutura, item.ColunaDeCarimbo);
+    if (posicao < 0) return;
+    var destino = estrutura.cabecalhos[posicao];   // a grafia da planilha
+
+    var jaTem = registroAtual ? String(registroAtual[destino] || '').trim() : '';
+    if (jaTem || String(paraGravar[destino] || '').trim()) return;
+    paraGravar[destino] = carimboParaAColuna_(estrutura, posicao);
   });
 }
 
@@ -7980,12 +8088,16 @@ function quemApontaParaAColuna_(canal, cabecalho, jaLido) {
    * estranhar que "Já contatados" está zerado — foi exatamente assim que o
    * achado 43 apareceu, pela tela de Produtividade.
    */
+  //
+  // E os itens de LISTA que carimbam (a tentativa de contato, por exemplo), e
+  // os itens sem canal, que valem para todos — inclusive para este.
   (pronto.catalogo || lerRegistros_('CATALOGO')).forEach(function (item) {
-    if (normalizarParaComparar_(item.Tipo) !== 'status') return;
-    if (converterParaIdentificador_(item.CanalId)
-      !== converterParaIdentificador_(canal.id)) return;
+    var canalDoItem = converterParaIdentificador_(item.CanalId);
+    if (canalDoItem && canalDoItem !== converterParaIdentificador_(canal.id)) return;
     if (normalizarParaComparar_(item.ColunaDeCarimbo) !== procurado) return;
-    achados.push('o carimbo do status "' + item.Nome + '"');
+    achados.push(normalizarParaComparar_(item.Tipo) === 'status'
+      ? 'o carimbo do status "' + item.Nome + '"'
+      : 'o carimbo do item "' + item.Nome + '" (lista ' + item.Tipo + ')');
   });
 
   return achados;
@@ -8043,9 +8155,19 @@ function salvarItemDoCatalogo(dados) {
   var tipo = String(dados.tipo || '').trim().toUpperCase();
   if (!tipo) throw new Error('Diga de que lista o item faz parte.');
 
+  var id = converterParaIdentificador_(dados.id);
+  var atual = id ? buscarRegistros_('CATALOGO', 'Id', id, 1)[0] : null;
+  if (id && !atual) throw new Error('Item ' + id + ' não encontrado.');
+
   var campos = {
     Tipo: tipo,
-    CanalId: converterParaIdentificador_(dados.canalId),
+    // O CANAL DO ITEM. Antes a tela não mandava o canal, e editar um status
+    // gravava o canal VAZIO: o status de um canal virava status de todos, e
+    // passava a aparecer na RET, na Mesa e no VG. Agora a tela manda; e quem
+    // chama sem mandar (de fora da tela) mantém o canal que o item já tinha.
+    CanalId: dados.canalId === undefined && atual
+      ? converterParaIdentificador_(atual.CanalId)
+      : converterParaIdentificador_(dados.canalId),
     Codigo: converterParaIdentificador_(dados.codigo),
     Nome: nome,
     Rotulo: String(dados.rotulo || nome),
@@ -8054,11 +8176,20 @@ function salvarItemDoCatalogo(dados) {
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
   };
 
-  // Só status carimba. Guardar a coluna num motivo ou num cargo criaria uma
-  // configuração que não faz nada — e configuração que não faz nada é pior
-  // que configuração faltando, porque alguém a preenche e espera efeito.
-  if (tipo === 'STATUS') {
+  // Carimba o status e o item de uma lista que algum campo do formulário usa
+  // (a tentativa de contato, pedido do PO). Guardar a coluna num item de lista
+  // que nenhum campo usa criaria uma configuração que não faz nada — e
+  // configuração que não faz nada é pior que configuração faltando, porque
+  // alguém a preenche e espera efeito.
+  if (tipo === 'STATUS' || listaUsadaPorCampo_(tipo)) {
     campos.ColunaDeCarimbo = String(dados.colunaDeCarimbo || '').trim();
+    var mudouOCarimbo = !atual || normalizarParaComparar_(atual.ColunaDeCarimbo)
+      !== normalizarParaComparar_(campos.ColunaDeCarimbo);
+    if (campos.ColunaDeCarimbo && mudouOCarimbo) {
+      conferirColunaDoCarimbo_(tipo, campos.CanalId, campos.ColunaDeCarimbo);
+    }
+  }
+  if (tipo === 'STATUS') {
     // Status FINAL: fecha o caso e entra em "Concluídos". Só grava se a
     // planilha já tem a coluna — antes de rodar atualizarPGO ela não existe,
     // e campo sem coluna é recusado, o que impediria salvar o status inteiro.
@@ -8067,11 +8198,7 @@ function salvarItemDoCatalogo(dados) {
     }
   }
 
-  var id = converterParaIdentificador_(dados.id);
   if (id) {
-    var atual = buscarRegistros_('CATALOGO', 'Id', id, 1)[0];
-    if (!atual) throw new Error('Item ' + id + ' não encontrado.');
-
     if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
       var emUso = quantosCasosUsam_(atual);
       if (emUso > 0) {
@@ -8089,6 +8216,114 @@ function salvarItemDoCatalogo(dados) {
   var criado = inserirRegistro_('CATALOGO', campos);
   registrarAuditoria_('catalogo.criar', 'CATALOGO', criado.__id, tipo);
   return criado.__id;
+}
+
+/** Algum campo do formulário usa esta lista? É o que faz um item dela carimbar. */
+function listaUsadaPorCampo_(tipo) {
+  var procurada = normalizarParaComparar_(tipo);
+  return lerRegistros_('CAMPOS').some(function (campo) {
+    if (String(campo.TipoCampo || '') !== 'seletor') return false;
+    return normalizarParaComparar_(lerConfiguracaoDoCampo_(campo).catalogo) === procurada;
+  });
+}
+
+/**
+ * Os canais em que um item de lista pode carimbar: o canal dele, ou — item de
+ * todos os canais — os canais cujo formulário usa a lista (no status, todos).
+ */
+function canaisDoCarimbo_(tipo, canalId) {
+  var doItem = converterParaIdentificador_(canalId);
+  var ehStatus = normalizarParaComparar_(tipo) === 'status';
+  var usam = {};
+  if (!ehStatus) {
+    lerRegistros_('CAMPOS').forEach(function (campo) {
+      if (String(campo.TipoCampo || '') !== 'seletor') return;
+      if (normalizarParaComparar_(lerConfiguracaoDoCampo_(campo).catalogo)
+        !== normalizarParaComparar_(tipo)) return;
+      usam[converterParaIdentificador_(campo.CanalId)] = true;
+    });
+  }
+  return canaisVisiveis_().filter(function (canal) {
+    var id = converterParaIdentificador_(canal.id);
+    if (doItem) return id === doItem;
+    return ehStatus || usam[id];
+  });
+}
+
+/**
+ * As colunas de uma base que podem receber o carimbo: as de DATA (do
+ * contrato ou de um campo de data) e as colunas suas, criadas direto na
+ * planilha — o sistema não sabe o tipo delas, e uma "Data da 1ª tentativa"
+ * criada à mão tem de aparecer. Ficam de fora as de texto, número e lista:
+ * carimbar data em "Nome do cliente" não tem volta.
+ */
+function colunasQueRecebemCarimbo_(nomeDaAba) {
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var suas = colunasSuasDaAba_(nomeDaAba);
+  return estrutura.cabecalhos.filter(function (cabecalho, posicao) {
+    if (!cabecalho || String(cabecalho).charAt(0) === '_') return false;
+    var tipo = estrutura.tipos[posicao];
+    return tipo === 'data' || tipo === 'dataHora'
+      || suas[normalizarParaComparar_(cabecalho)] === true;
+  });
+}
+
+/**
+ * O que o menu "Coluna que recebe data e hora" oferece, canal por canal.
+ *
+ * Pedido do PO: escolher a coluna num MENU, e não escrevendo o nome — "assim
+ * evitamos troca de nomes no meio do caminho". Vai junto quais canais usam a
+ * lista, para o item "de todos os canais" mostrar só o que faz sentido.
+ */
+function opcoesDoCarimboDoItem(tipo) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var ehStatus = normalizarParaComparar_(tipo) === 'status';
+  var carimba = ehStatus || listaUsadaPorCampo_(tipo);
+  var usam = carimba ? canaisDoCarimbo_(tipo, '').map(function (canal) {
+    return converterParaIdentificador_(canal.id);
+  }) : [];
+
+  return {
+    carimba: carimba,
+    canais: canaisVisiveis_().map(function (canal) {
+      var colunas = [];
+      try {
+        colunas = carimba ? colunasQueRecebemCarimbo_(canal.aba) : [];
+      } catch (erro) {
+        colunas = [];   // aba ausente: o diagnóstico é quem explica
+      }
+      return {
+        id: converterParaIdentificador_(canal.id),
+        nome: String(canal.nome),
+        usaALista: usam.indexOf(converterParaIdentificador_(canal.id)) >= 0,
+        colunas: colunas
+      };
+    })
+  };
+}
+
+/**
+ * Recusa uma coluna de carimbo que nenhum canal do item aceita.
+ *
+ * Só é chamada quando a coluna MUDA: um status antigo, que carimba numa coluna
+ * de antes desta regra, continua salvando como sempre.
+ */
+function conferirColunaDoCarimbo_(tipo, canalId, coluna) {
+  var canais = canaisDoCarimbo_(tipo, canalId);
+  var aceitas = [];
+  var serve = canais.some(function (canal) {
+    var daBase = [];
+    try { daBase = colunasQueRecebemCarimbo_(canal.aba); } catch (erro) { daBase = []; }
+    daBase.forEach(function (uma) { if (aceitas.indexOf(uma) < 0) aceitas.push(uma); });
+    return daBase.some(function (uma) {
+      return normalizarParaComparar_(uma) === normalizarParaComparar_(coluna);
+    });
+  });
+  if (serve) return;
+  throw new Error('A coluna "' + coluna + '" não recebe carimbo '
+    + (canais.length === 1 ? 'em ' + canais[0].nome : 'nos canais deste item')
+    + '. Escolha uma coluna de data, ou uma coluna sua'
+    + (aceitas.length ? ': ' + aceitas.join(', ') : '') + '.');
 }
 
 /**
@@ -9128,18 +9363,22 @@ function listarCardsDoPainel(tela, idDoCanal) {
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = normalizarParaComparar_(tela) || 'trabalho';
 
+  // `grupo` é só para a tela separar o menu em partes (optgroup): com os
+  // valores de cada campo, ele deixou de caber numa lista corrida.
   var oQueContar = [
-    { chave: 'total', rotulo: 'Total de casos', filtro: '' }
+    { chave: 'total', rotulo: 'Total de casos', filtro: '', grupo: 'Status' }
   ];
   situacoesDoCanal_(canal).forEach(function (situacao) {
     // O cartão aponta para o que está GRAVADO no caso, e mostra o rótulo.
     oQueContar.push({
-      chave: 'situacao', rotulo: situacao.nome, filtro: situacao.gravadoComo
+      chave: 'situacao', rotulo: situacao.nome, filtro: situacao.gravadoComo,
+      grupo: 'Status'
     });
   });
   if (canal.colunaDaFinalizacao && canal.colunaDaAreaResponsavel) {
     oQueContar.push({
-      chave: 'naCelula', rotulo: 'Finalizados na célula', filtro: ''
+      chave: 'naCelula', rotulo: 'Finalizados na célula', filtro: '',
+      grupo: 'Status'
     });
   }
 
@@ -9157,9 +9396,12 @@ function listarCardsDoPainel(tela, idDoCanal) {
     oQueContar.push({
       chave: 'preenchido',
       rotulo: 'Já passaram por: ' + situacao.nome,
-      filtro: situacao.colunaDeCarimbo
+      filtro: situacao.colunaDeCarimbo,
+      grupo: 'Já passaram por (carimbo)'
     });
   });
+
+  oQueContar = oQueContar.concat(opcoesDeCartaoPelasColunas_(canal, oQueContar));
 
   var cartoes = lerRegistros_('PAINEIS')
     .filter(function (linha) {
@@ -9177,6 +9419,7 @@ function listarCardsDoPainel(tela, idDoCanal) {
         titulo: String(linha.Titulo || ''),
         dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
         filtro: String(linha.Filtro || ''),
+        coluna: String(linha.CampoMedida || ''),
         cor: tomValido_(linha.Cor),
         ordem: Number(linha.Ordem) || 0,
         mostrar: normalizarParaComparar_(linha.Ativo) === 'sim'
@@ -9192,6 +9435,88 @@ function listarCardsDoPainel(tela, idDoCanal) {
     oQueContar: oQueContar,
     cartoes: cartoes
   };
+}
+
+/** Tipos de coluna que são data ou hora: ficam de fora dos cartões por coluna. */
+const RECC_TIPOS_DE_DATA_PARA_OS_CARTOES = ['data', 'dataHora', 'hora'];
+
+/**
+ * Os cartões que contam pelas OUTRAS colunas da base — pedido do PO: "os cards
+ * estão limitados apenas a status? Vamos aumentar o leque para demais colunas,
+ * menos as de data".
+ *
+ * Duas formas, conforme a coluna:
+ *   - campo de LISTA (do catálogo ou escrita no campo) e SIM/NÃO: um cartão
+ *     por valor — "Tentativa: 1ª tentativa de contato sem sucesso";
+ *   - qualquer outra coluna (texto, número, as suas): "Preenchida: X",
+ *     quantos casos têm alguma coisa escrita nela.
+ *
+ * Fica de fora: data e hora (a contagem por data é o carimbo, "Já passaram
+ * por"), a coluna do status (já tem os cartões dela), as colunas técnicas
+ * ("_…") e as que outra opção já cobre. Lista vinda de um cadastro (usuários,
+ * corretoras) vira "Preenchida": são milhares de valores, e um cartão por
+ * corretora não é cartão, é tabela.
+ */
+function opcoesDeCartaoPelasColunas_(canal, jaOferecidas) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var doStatus = normalizarParaComparar_(canal.colunaDoStatus);
+
+  var cobertas = {};
+  jaOferecidas.forEach(function (opcao) {
+    if (opcao.chave === 'preenchido') cobertas[normalizarParaComparar_(opcao.filtro)] = true;
+  });
+
+  // O campo do formulário de cada coluna, para saber o nome na tela e a lista.
+  var campoDaColuna = {};
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (converterParaIdentificador_(campo.CanalId)
+      !== converterParaIdentificador_(canal.id)) return;
+    campoDaColuna[normalizarParaComparar_(campo.Cabecalho)] = campo;
+  });
+
+  var valores = [];
+  var preenchidas = [];
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    var chave = normalizarParaComparar_(cabecalho);
+    if (!chave || String(cabecalho).charAt(0) === '_') return;
+    // O id está em todo caso: "Preenchida: id" seria o Total com outro nome.
+    if (chave === doStatus || chave === 'id' || cobertas[chave]) return;
+    var tipo = estrutura.tipos[posicao];
+    if (RECC_TIPOS_DE_DATA_PARA_OS_CARTOES.indexOf(tipo) >= 0) return;
+
+    var campo = campoDaColuna[chave];
+    var nome = campo ? String(campo.Rotulo || cabecalho) : cabecalho;
+    var opcoes = opcoesDeValorDoCartao_(campo, tipo, canal);
+
+    if (opcoes.length) {
+      opcoes.forEach(function (opcao) {
+        valores.push({ chave: 'valor', rotulo: nome + ': ' + opcao.rotulo,
+          filtro: opcao.valor, coluna: cabecalho, grupo: 'Valor de um campo' });
+      });
+      return;
+    }
+    preenchidas.push({ chave: 'preenchido', rotulo: 'Preenchida: ' + nome,
+      filtro: cabecalho, grupo: 'Coluna preenchida' });
+  });
+  return valores.concat(preenchidas);
+}
+
+/**
+ * Os valores que um cartão pode contar numa coluna: os itens da lista do
+ * campo, ou Sim e Não. Vazio quando a coluna não é de valores fechados.
+ */
+function opcoesDeValorDoCartao_(campo, tipo, canal) {
+  var tipoDoCampo = campo ? String(campo.TipoCampo || '') : '';
+  if (tipo === 'simOuNao' || tipoDoCampo === 'simOuNao') {
+    return [{ valor: 'SIM', rotulo: 'Sim' }, { valor: 'NAO', rotulo: 'Não' }];
+  }
+  if (!campo || tipoDoCampo !== 'seletor') return [];
+
+  var configuracao = lerConfiguracaoDoCampo_(campo);
+  // Campo que grava em mais de uma coluna (o produto, a proposta) não tem o
+  // valor da lista inteiro em coluna nenhuma.
+  if (configuracao.separaEm || configuracao.partirEm || configuracao.listaDe) return [];
+  return opcoesDoCampo_(configuracao, canal.id);
 }
 
 /**
@@ -9228,13 +9553,21 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     cartao.dimensao = dimensaoDoCartao_(cartao.dimensao);
     if (!cartao.dimensao) {
       throw new Error('Não sei contar isso. As contagens são: total, ' +
-        'situacao, naCelula e preenchido.');
+        'situacao, naCelula, preenchido e valor.');
     }
     if (cartao.dimensao === 'preenchido') {
       // A coluna tem de existir AGORA, e não na hora de desenhar. Guardar um
       // cartão que aponta para coluna inexistente cria um cartão que some da
       // tela sem explicação — e quem o criou vai jurar que salvou.
       conferirQueAColunaExiste_(estruturaDaAba_(canal.aba), cartao.filtro, canal.aba);
+    }
+    if (cartao.dimensao === 'valor') {
+      // O cartão "valor" aponta para DUAS coisas: a coluna e o valor nela.
+      if (!String(cartao.coluna || '').trim() || !String(cartao.filtro || '').trim()) {
+        throw new Error('O card "' + String(cartao.titulo).trim() + '" conta um '
+          + 'valor de campo, e precisa da coluna e do valor.');
+      }
+      conferirQueAColunaExiste_(estruturaDaAba_(canal.aba), cartao.coluna, canal.aba);
     }
     if (cartao.dimensao === 'situacao') {
       var existe = situacoes.some(function (nome) {
@@ -9263,13 +9596,16 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
       Titulo: String(cartao.titulo).trim(),
       TipoWidget: 'cartao',
       CampoDimensao: cartao.dimensao,
-      CampoMedida: '',
+      // No cartão "valor", a coluna onde o valor é procurado. Nos outros
+      // cartões não há medida — um gráfico usa este campo para outra coisa.
+      CampoMedida: cartao.dimensao === 'valor' ? String(cartao.coluna).trim() : '',
       Agregacao: 'contagem',
       Limite: 0,
       // O Filtro é o que o cartão aponta: o nome do status, ou — quando conta
       // pelo carimbo — o nome da coluna. Nas outras contagens não há para onde
       // apontar, e um valor sobrando ali só confundiria quem for ler a aba.
-      Filtro: (cartao.dimensao === 'situacao' || cartao.dimensao === 'preenchido')
+      Filtro: (cartao.dimensao === 'situacao' || cartao.dimensao === 'preenchido'
+        || cartao.dimensao === 'valor')
         ? String(cartao.filtro || '') : '',
       Ordem: posicao + 1,
       Largura: 1,
@@ -12776,7 +13112,7 @@ function aplicarBusca_(registros, canal, termo) {
  * mesma coisa.
  */
 function dimensaoDoCartao_(valor) {
-  var canonicas = ['total', 'situacao', 'naCelula', 'preenchido'];
+  var canonicas = ['total', 'situacao', 'naCelula', 'preenchido', 'valor'];
   var procurado = normalizarParaComparar_(valor);
   for (var i = 0; i < canonicas.length; i++) {
     if (normalizarParaComparar_(canonicas[i]) === procurado) return canonicas[i];
@@ -12793,7 +13129,18 @@ function contarCartoes_(registros, anteriores, canal, tela) {
     tons[situacao.chave] = situacao.tom;
   });
 
+  // Cada cartão sai dizendo a regra pela qual contou (`dimensao`). É com ela que
+  // o Trabalho decide se clicar filtra a fila pelo status: só o cartão de
+  // status filtra. Antes a tela deduzia pela chave, e um cartão "Já passaram
+  // por" clicado filtrava a fila por um status com o nome do cartão — fila
+  // vazia, sem erro.
   return cartoesDoCanal_(canal, tela).map(function (cartao) {
+    var feito = umCartao(cartao);
+    if (feito) feito.dimensao = cartao.dimensao;
+    return feito;
+  }).filter(function (cartao) { return cartao !== null; });
+
+  function umCartao(cartao) {
     if (cartao.dimensao === 'total') {
       return montarCartao_('total', cartao.titulo, registros.length,
         anteriores.length, cartao.cor, '');
@@ -12812,11 +13159,44 @@ function contarCartoes_(registros, anteriores, canal, tela) {
         quantos, contarComColunaPreenchida_(anteriores, canal, cartao.filtro),
         cartao.cor, 'Casos com "' + cartao.filtro + '" preenchida');
     }
+    if (cartao.dimensao === 'valor') {
+      var comOValor = contarComOValor_(registros, canal, cartao.coluna, cartao.filtro);
+      if (comOValor === null) return null;
+      return montarCartao_('valor:' + normalizarParaComparar_(cartao.coluna) + ':'
+        + normalizarParaComparar_(cartao.filtro), cartao.titulo, comOValor,
+        contarComOValor_(anteriores, canal, cartao.coluna, cartao.filtro),
+        cartao.cor, 'Casos com "' + cartao.coluna + '" igual a "' + cartao.filtro + '"');
+    }
 
     var chave = normalizarParaComparar_(cartao.filtro);
     return montarCartao_(chave, cartao.titulo, agora[chave] || 0,
       antes[chave] || 0, cartao.cor || tons[chave] || 'neutro', '');
-  }).filter(function (cartao) { return cartao !== null; });
+  }
+}
+
+/**
+ * Quantos casos têm ESTE valor nesta coluna — "1ª tentativa de contato sem
+ * sucesso" em Tentativa, "Sim" em Abertura indevida.
+ *
+ * Pedido do PO: os cartões não podiam ficar só no status. É a foto de HOJE,
+ * como o cartão de status: o caso que sai do valor sai da conta. O que fica
+ * para sempre é o carimbo ("Já passaram por").
+ *
+ * Compara sem acento e sem caixa, como o resto do sistema. Coluna que não
+ * existe na base devolve null e o cartão some, igual ao "preenchido".
+ */
+function contarComOValor_(registros, canal, cabecalho, valor) {
+  var coluna = String(cabecalho || '').trim();
+  var procurado = normalizarParaComparar_(valor);
+  if (!coluna || !procurado) return null;
+  if (posicaoDaColuna_(estruturaDaAba_(canal.aba), coluna) < 0) return null;
+  coluna = grafiaDaColuna_(canal.aba, coluna);
+
+  var quantos = 0;
+  registros.forEach(function (registro) {
+    if (normalizarParaComparar_(registro[coluna]) === procurado) quantos++;
+  });
+  return quantos;
 }
 
 /**
@@ -12878,6 +13258,8 @@ function cartoesDoCanal_(canal, tela) {
         titulo: String(linha.Titulo || ''),
         dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
         filtro: String(linha.Filtro || ''),
+        // Só o cartão "valor" usa: a coluna onde o valor do Filtro é procurado.
+        coluna: String(linha.CampoMedida || ''),
         cor: tomValido_(linha.Cor)
       };
     });
@@ -19697,6 +20079,23 @@ function blocoDasCanais_() {
       'O canal "' + nome + '" está coerente com ' + nomeDaAba
         + (ligada ? '' : ' (desligada)')));
   });
+
+  // STATUS SEM CANAL. A tela de Ajustes Gerais apagava o canal de todo status
+  // editado nela — ele virava status de todos os canais, e aparecia na RET, na
+  // Mesa e no VG. A tela foi corrigida; os que já perderam o canal ficam como
+  // estão, porque o sistema não tem como saber de qual canal eles eram. Quem
+  // sabe é o PO, e o laudo diz quais são.
+  var statusSemCanal = lerRegistros_('CATALOGO').filter(function (item) {
+    return normalizarParaComparar_(item.Tipo) === 'status'
+      && !converterParaIdentificador_(item.CanalId);
+  }).map(function (item) { return String(item.Nome); });
+  if (statusSemCanal.length) {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      statusSemCanal.length + ' status sem canal: aparecem em todos os canais',
+      algunsExemplos_(statusSemCanal),
+      'Se cada um é de um canal só, escolha o canal dele em Configurações › Ajustes '
+        + 'Gerais › Status, no menu "Canal". Se é mesmo de todos, pode deixar.'));
+  }
 
   if (!ativas) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA,

@@ -3304,6 +3304,10 @@ var Formulario = (function () {
         || campo.tipo === 'percentual') htmlTipo = 'text';
 
       var dinheiro = ehCampoDeDinheiro(campo);
+      // A SUSEP não leva máscara: a máscara guarda só dígito, e "jamjamm"
+      // sumiria enquanto a pessoa digita. Ela aceita só números, só letras
+      // ou os dois — pedido do PO.
+      var mascara = campo.chave === 'susep' ? '' : campo.mascara;
       // inputmode="decimal" faz o celular abrir o teclado NUMÉRICO. Sem isso a
       // pessoa abre o alfabético, procura o número e digita errado com mais
       // frequência — e metade da operação trabalha no telefone.
@@ -3311,10 +3315,10 @@ var Formulario = (function () {
         + ' data-chave="' + escapar(campo.chave) + '"'
         + (dinheiro ? ' data-dinheiro="sim" inputmode="decimal"' : '')
         + (dinheiro ? ' placeholder="R$ 0,00"' : '')
-        + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
+        + (mascara ? ' data-mascara="' + escapar(mascara) + '"' : '')
         // Duas máscaras ("CPF|CNPJ") aparecem como as duas formas aceitas.
-        + (campo.mascara ? ' placeholder="'
-          + escapar(campo.mascara.split('|').join(' ou ')) + '"' : '')
+        + (mascara ? ' placeholder="'
+          + escapar(mascara.split('|').join(' ou ')) + '"' : '')
         // A coluna de data do canal: é dela que o selo da proposta tira o mês.
         + (colunaDaData && campo.cabecalho === colunaDaData
           ? ' data-data-do-caso="sim"' : '')
@@ -5258,11 +5262,16 @@ var TelaTrabalho = (function () {
   /**
    * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
    * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
+   *
+   * Só o cartão de STATUS filtra. Os que contam por coluna ("Já passaram
+   * por", "Preenchida", o valor de um campo) não têm status para filtrar:
+   * clicados, filtravam a fila por um status com o nome do cartão, e a fila
+   * ficava vazia.
    */
   function desenharCartoes() {
     return '<div class="cartoes">'
       + resumo.cartoes.map(function (cartao) {
-        var filtravel = cartao.chave !== 'total' && cartao.chave !== 'naCelula'
+        var filtravel = cartao.dimensao === 'situacao'
           && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
         var ligado = filtravel
           && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);
@@ -9977,7 +9986,14 @@ var TelaConfiguracoes = (function () {
         Servidor.chamar('listarCatalogo', tipoDeListaEscolhido, '')
           .entao(function (itens) {
             dados.itens = itens;
-            desenharListas();
+            // O menu do canal e o da coluna do carimbo vêm do servidor: são
+            // as colunas de data (e as suas) de cada base.
+            Servidor.chamar('opcoesDoCarimboDoItem', tipoDeListaEscolhido)
+              .entao(function (carimbo) {
+                dados.carimbo = carimbo;
+                desenharListas();
+              })
+              .senao(falhou);
           })
           .senao(falhou);
       })
@@ -10176,27 +10192,89 @@ var TelaConfiguracoes = (function () {
       ativo: true, codigo: '', colunaDeCarimbo: '', final: false
     };
 
-    /** Só a lista de STATUS carimba data e hora. */
     function ehStatus() {
       return String(tipoDeListaEscolhido || '').toUpperCase() === 'STATUS';
     }
 
+    /** O status carimba; o item de uma lista que algum campo usa, também. */
+    function carimba() {
+      return !!(dados.carimbo && dados.carimbo.carimba);
+    }
+
+    /*
+      O CANAL DO ITEM. Antes não havia este menu, e editar um status apagava
+      o canal dele: o status virava de todos os canais. Vem preenchido com o
+      canal que o item já tem.
+    */
+    function canalDoItem(item) {
+      var canais = (dados.carimbo && dados.carimbo.canais) || [];
+      return '<label class="config-campo"><span>Canal</span>'
+        + '<select id="cfg-canal-do-item">'
+        + '<option value="">Todos os canais</option>'
+        + canais.map(function (canal) {
+          return '<option value="' + escapar(canal.id) + '"'
+            + (texto(canal.id) === texto(item.canalId) ? ' selected' : '') + '>'
+            + escapar(canal.nome) + '</option>';
+        }).join('') + '</select>'
+        + '<em>Em que canal o item aparece. "Todos os canais" vale para todos.</em>'
+        + '</label>';
+    }
+
     /**
-     * O campo que diz onde este status grava a data e a hora.
+     * As opções da coluna do carimbo para o canal escolhido. "Todos os
+     * canais" mostra, em grupos, as colunas de cada canal que usa a lista.
      *
-     * Só aparece para status, porque só status carimba. Oferecer o campo num
-     * motivo ou num cargo convidaria a preenchê-lo e esperar efeito.
+     * A coluna que o item já tem e que não está entre as oferecidas (uma
+     * coluna de texto, de antes desta regra) aparece marcada como tal: o menu
+     * não troca a configuração calado.
      */
-    function carimboDoStatus(item) {
-      if (!ehStatus()) return '';
-      return campoDeTexto('coluna-de-carimbo',
-        'Coluna que recebe data e hora', item.colunaDeCarimbo || '',
-        'Quando o caso chegar neste status, o sistema grava data e hora nessa '
-        + 'coluna da base do canal — é o que mede produtividade. Escreva o '
-        + 'cabeçalho exatamente como está na planilha (por exemplo "Data do '
-        + '1º contato"). Deixe em branco se este status não carimba nada. '
-        + 'O carimbo só é escrito se a célula estiver vazia: um caso que '
-        + 'volta a este status guarda a data da primeira vez.');
+    function opcoesDaColunaDoCarimbo(canalId, escolhida) {
+      var canais = (dados.carimbo && dados.carimbo.canais) || [];
+      var mostrados = canais.filter(function (canal) {
+        return canalId ? texto(canal.id) === texto(canalId) : canal.usaALista;
+      });
+      var achou = !escolhida;
+      var html = '<option value=""' + (escolhida ? '' : ' selected') + '>'
+        + 'Não carimba</option>';
+      mostrados.forEach(function (canal) {
+        html += '<optgroup label="' + escapar(canal.nome) + '">';
+        canal.colunas.forEach(function (coluna) {
+          var esta = !achou && normalizarTexto(coluna) === normalizarTexto(escolhida);
+          if (esta) achou = true;
+          html += '<option value="' + escapar(coluna) + '"' + (esta ? ' selected' : '')
+            + '>' + escapar(coluna) + '</option>';
+        });
+        html += '</optgroup>';
+      });
+      if (!achou) {
+        html += '<option value="' + escapar(escolhida) + '" selected>' + escapar(escolhida)
+          + ' (atual, fora das colunas de data)</option>';
+      }
+      return html;
+    }
+
+    /**
+     * Onde este item grava a data e a hora: um MENU com as colunas de data da
+     * base e as colunas suas. Pedido do PO: escolher, e não escrever o nome —
+     * "assim evitamos troca de nomes no meio do caminho".
+     *
+     * Só aparece onde carimbar faz efeito: no status e no item de uma lista
+     * que algum campo usa. Num cargo, convidaria a preencher e esperar efeito.
+     */
+    function carimboDoItem(item) {
+      if (!carimba()) return '';
+      return '<label class="config-campo"><span>Coluna que recebe data e hora</span>'
+        + '<select id="cfg-coluna-de-carimbo">'
+        + opcoesDaColunaDoCarimbo(item.canalId, item.colunaDeCarimbo || '')
+        + '</select>'
+        + '<em>' + escapar((ehStatus()
+          ? 'Quando o caso chegar neste status'
+          : 'Quando este item for escolhido no caso')
+          + ', o sistema grava data e hora nessa coluna da base do canal — é o que '
+          + 'mede produtividade. A escolha fica no próprio item: trocar o rótulo '
+          + 'não muda onde ele carimba. O carimbo só é escrito se a célula estiver '
+          + 'vazia: um caso que volta a este item guarda a data da primeira vez.')
+        + '</em></label>';
     }
 
     /*
@@ -10225,7 +10303,8 @@ var TelaConfiguracoes = (function () {
       + caixaDeOpcoes('cor', 'Tom', dados.tons, atual.cor,
         'O tom acompanha o tema: escolher "ruim" fica vermelho no claro e no '
         + 'escuro, sem ninguém precisar mexer.')
-      + carimboDoStatus(atual)
+      + canalDoItem(atual)
+      + carimboDoItem(atual)
       + finalDoStatus(atual)
       + campoDeTexto('ordem', 'Ordem', atual.ordem, '')
       + caixaDeSimNao('ativo', 'Aparece nas listas', atual.ativo)
@@ -10238,6 +10317,16 @@ var TelaConfiguracoes = (function () {
     var excluir = elemento('excluir-item');
     if (excluir) excluir.addEventListener('click', function () { excluirOItem(atual); });
 
+    // Trocar o canal troca as colunas oferecidas: cada base tem as dela.
+    var menuDoCanal = elemento('cfg-canal-do-item');
+    var menuDoCarimbo = elemento('cfg-coluna-de-carimbo');
+    if (menuDoCanal && menuDoCarimbo) {
+      menuDoCanal.addEventListener('change', function () {
+        menuDoCarimbo.innerHTML = opcoesDaColunaDoCarimbo(menuDoCanal.value,
+          menuDoCarimbo.value);
+      });
+    }
+
     elemento('form-item').addEventListener('submit', function (evento) {
       evento.preventDefault();
       Servidor.chamar('salvarItemDoCatalogo', {
@@ -10247,7 +10336,8 @@ var TelaConfiguracoes = (function () {
         rotulo: valorDe('rotulo'),
         codigo: valorDe('codigo'),
         cor: valorDe('cor'),
-        colunaDeCarimbo: ehStatus() ? valorDe('coluna-de-carimbo') : '',
+        canalId: valorDe('canal-do-item'),
+        colunaDeCarimbo: carimba() ? valorDe('coluna-de-carimbo') : '',
         final: ehStatus() ? marcado('final') : false,
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
@@ -10754,7 +10844,10 @@ var TelaConfiguracoes = (function () {
   function copiarCard(card) {
     return {
       id: card.id || '', titulo: card.titulo, dimensao: card.dimensao,
-      filtro: card.filtro, cor: card.cor, mostrar: card.mostrar !== false
+      // A coluna é do card "valor": sem ela na cópia, salvar de novo a lista
+      // recusava o card ("precisa da coluna e do valor").
+      filtro: card.filtro, coluna: card.coluna || '', cor: card.cor,
+      mostrar: card.mostrar !== false
     };
   }
 
@@ -10810,13 +10903,7 @@ var TelaConfiguracoes = (function () {
         + ' value="' + escapar(card.titulo) + '"></label>'
         + '<label class="config-campo"><span>O que contar</span>'
         + '<select data-card="' + posicao + '" data-parte="contar">'
-        + dados.painel.oQueContar.map(function (opcao, i) {
-          var escolhido = opcao.chave === card.dimensao
-            && (opcao.chave !== 'situacao'
-              || normalizarTexto(opcao.filtro) === normalizarTexto(card.filtro));
-          return '<option value="' + i + '"' + (escolhido ? ' selected' : '') + '>'
-            + escapar(opcao.rotulo) + '</option>';
-        }).join('') + '</select></label>'
+        + opcoesDoQueContar(card) + '</select></label>'
         + '</div>'
         + '<div class="card-linha">'
         + '<label class="config-campo"><span>Cor</span>'
@@ -10838,6 +10925,45 @@ var TelaConfiguracoes = (function () {
         + posicao + '">✕ Remover</button>'
         + '</div></div>';
     }).join('');
+  }
+
+  /**
+   * As opções do "O que contar", em grupos, com a do card marcada.
+   *
+   * A opção do card é a que bate em TUDO: regra, filtro e coluna. Antes só a
+   * regra era comparada (fora do status), e com dois cards "Já passaram por"
+   * os dois mostravam a mesma opção — a tela dizia uma coisa e o card contava
+   * outra.
+   *
+   * Card cuja opção não existe mais (o status foi desligado, a coluna saiu)
+   * aparece como tal, em vez de o menu cair calado na primeira opção. O card
+   * continua como está até alguém escolher outra.
+   */
+  function opcoesDoQueContar(card) {
+    var achou = false;
+    var grupoAberto = null;
+    var html = '';
+    dados.painel.oQueContar.forEach(function (opcao, i) {
+      var escolhido = !achou && opcao.chave === card.dimensao
+        && normalizarTexto(opcao.filtro) === normalizarTexto(card.filtro)
+        && normalizarTexto(opcao.coluna) === normalizarTexto(
+          card.dimensao === 'valor' ? card.coluna : '');
+      if (escolhido) achou = true;
+      var grupo = opcao.grupo || '';
+      if (grupo !== grupoAberto) {
+        if (grupoAberto) html += '</optgroup>';
+        if (grupo) html += '<optgroup label="' + escapar(grupo) + '">';
+        grupoAberto = grupo;
+      }
+      html += '<option value="' + i + '"' + (escolhido ? ' selected' : '') + '>'
+        + escapar(opcao.rotulo) + '</option>';
+    });
+    if (grupoAberto) html += '</optgroup>';
+    if (!achou) {
+      html = '<option value="" selected>Não está mais disponível: '
+        + escapar(card.filtro || card.titulo) + '</option>' + html;
+    }
+    return html;
   }
 
   function normalizarTexto(valor) {
@@ -10867,10 +10993,11 @@ var TelaConfiguracoes = (function () {
         var parte = this.getAttribute('data-parte');
         if (parte === 'titulo') card.titulo = this.value;
         if (parte === 'mostrar') card.mostrar = this.checked;
-        if (parte === 'contar') {
+        if (parte === 'contar' && this.value !== '') {
           var opcao = dados.painel.oQueContar[Number(this.value)];
           card.dimensao = opcao.chave;
           card.filtro = opcao.filtro;
+          card.coluna = opcao.coluna || '';
         }
       });
     }
@@ -10882,7 +11009,7 @@ var TelaConfiguracoes = (function () {
       }
       var primeira = dados.painel.oQueContar[0];
       cardsEmEdicao.push({ id: '', titulo: 'Novo card',
-        dimensao: primeira.chave, filtro: primeira.filtro,
+        dimensao: primeira.chave, filtro: primeira.filtro, coluna: primeira.coluna || '',
         cor: 'neutro', mostrar: true });
       redesenharCards();
     });

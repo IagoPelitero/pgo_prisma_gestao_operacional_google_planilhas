@@ -727,6 +727,127 @@ async function rodar() {
       'o nome da corretora vem do cadastro, pela SUSEP — a planilha do chat não o traz');
   });
 
+  /* ------------------------------------- as tentativas e os cards novos -- */
+
+  console.log('\nO carimbo da tentativa e o card por valor');
+
+  await teste('a tentativa escolhe no menu onde carimba, e editar o status mantém o canal', async () => {
+    // Como o PO montou: o status "Contatando" e, ao lado, a lista de tentativas.
+    vm.runInContext(`(function () {
+      try { definirSenhaDeAdministrador('segredo123', ''); } catch (e) { /* já definida */ }
+      liberarComSenha('segredo123');
+      var ret = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+      var lista = criarLista('Tentativa de contato');
+      ['1ª tentativa de contato sem sucesso', '2ª tentativa de contato sem sucesso']
+        .forEach(function (nome, i) {
+          salvarItemDoCatalogo({ tipo: lista, canalId: '', nome: nome, ordem: i + 1, ativo: true });
+        });
+      criarCampo(ret.id, { rotulo: 'Tentativa', tipo: 'seletor', secao: 'Situação' });
+      var campo = listarCamposDoCanal(ret.id).filter(function (c) {
+        return c.cabecalho === 'Tentativa'; })[0];
+      salvarCampo({ id: campo.id, rotulo: 'Tentativa', secao: 'Situação', tipo: 'seletor',
+        catalogo: lista, obrigatorio: false, ativo: true });
+    })()`, contexto);
+
+    await pagina.click('[data-tela="configuracoes"]');
+    await pagina.waitForTimeout(600);
+    await pagina.click('[data-secao="catalogo"]');
+    await pagina.waitForSelector('#tipo-da-lista', { timeout: 10000 });
+    await pagina.selectOption('#tipo-da-lista', 'TENTATIVA_DE_CONTATO');
+    await pagina.waitForTimeout(900);
+    await pagina.locator('[data-item]', { hasText: '1ª tentativa' }).first().click();
+    await pagina.waitForSelector('#cfg-coluna-de-carimbo', { timeout: 10000 });
+
+    // O menu traz as colunas de data da RET; texto não entra.
+    const oferecidas = await pagina.$$eval('#cfg-coluna-de-carimbo option', (es) => es.map((e) => e.value));
+    verdadeiro(oferecidas.indexOf('Data do 1º contato') >= 0, 'a coluna de data é oferecida');
+    verdadeiro(oferecidas.every((v) => v.toLowerCase() !== 'nome do cliente'), 'texto fica de fora');
+    igual(await pagina.inputValue('#cfg-canal-do-item'), '', 'o item é de todos os canais');
+
+    await pagina.selectOption('#cfg-coluna-de-carimbo', 'Data do 1º contato');
+    await pagina.click('#form-item button[type="submit"]');
+    await pagina.waitForTimeout(900);
+    const item = naPlanilha('CATALOGO').find((l) => l.Nome === '1ª tentativa de contato sem sucesso');
+    igual(item.ColunaDeCarimbo, 'Data do 1º contato', 'a escolha ficou na linha do item');
+
+    // Editar um status pela tela não apaga mais o canal dele.
+    await pagina.selectOption('#tipo-da-lista', 'STATUS');
+    await pagina.waitForTimeout(900);
+    await pagina.locator('[data-item]').first().click();
+    await pagina.waitForSelector('#form-item', { timeout: 10000 });
+    const idDoStatus = await pagina.getAttribute('[data-item]', 'data-item');
+    const antes = naPlanilha('CATALOGO').find((l) => String(l.__id) === String(idDoStatus));
+    verdadeiro(!!String(antes.CanalId || ''), 'o status de fábrica tem canal');
+    igual(await pagina.inputValue('#cfg-canal-do-item'), String(antes.CanalId),
+      'o menu vem com o canal do status');
+    await pagina.click('#form-item button[type="submit"]');
+    await pagina.waitForTimeout(900);
+    igual(String(naPlanilha('CATALOGO').find((l) => String(l.__id) === String(idDoStatus)).CanalId),
+      String(antes.CanalId), 'salvar pela tela manteve o canal');
+
+    // E o caso: escolher a 1ª tentativa carimba a data.
+    const caso = vm.runInContext(`(function () {
+      var ret = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+      return cadastrarCaso(ret.id, { nomedocliente: 'Tentou uma vez',
+        tentativa: '1ª tentativa de contato sem sucesso' }).id;
+    })()`, contexto);
+    const linha = naPlanilha('BASE_RET').find((l) => l.__id === caso);
+    verdadeiro(Object.prototype.toString.call(linha['Data do 1º contato']) === '[object Date]',
+      'a tentativa carimbou "Data do 1º contato"');
+  });
+
+  await teste('o card por valor de campo se cria pela tela, se salva de novo e conta no Trabalho', async () => {
+    await pagina.click('[data-tela="configuracoes"]');
+    await pagina.waitForTimeout(600);
+    await pagina.click('[data-secao="paineis"]');
+    await pagina.waitForSelector('#add-card', { timeout: 10000 });
+    await pagina.locator('[data-canal-dos-cards]', { hasText: 'RET' }).first().click();
+    await pagina.waitForTimeout(900);
+
+    await pagina.click('#add-card');
+    await pagina.waitForTimeout(300);
+    const ultimo = (await pagina.$$('[data-parte="contar"]')).length - 1;
+    const grupos = await pagina.$$eval('[data-parte="contar"]:last-of-type optgroup',
+      (es) => es.map((e) => e.label));
+    verdadeiro(grupos.indexOf('Valor de um campo') >= 0 && grupos.indexOf('Coluna preenchida') >= 0,
+      'o menu tem os grupos novos: ' + grupos.join(', '));
+    await pagina.selectOption('[data-card="' + ultimo + '"][data-parte="contar"]',
+      { label: 'Tentativa: 1ª tentativa de contato sem sucesso' });
+    await pagina.fill('[data-card="' + ultimo + '"][data-parte="titulo"]', '1ª tentativa');
+    await pagina.dispatchEvent('[data-card="' + ultimo + '"][data-parte="titulo"]', 'change');
+    await pagina.click('#salvar-cards');
+    await pagina.waitForTimeout(1000);
+
+    const gravado = naPlanilha('PAINEIS').find((l) => l.Titulo === '1ª tentativa');
+    verdadeiro(!!gravado, 'o card foi gravado');
+    igual(gravado.CampoDimensao, 'valor');
+    igual(gravado.CampoMedida, 'Tentativa', 'a coluna');
+    igual(gravado.Filtro, '1ª tentativa de contato sem sucesso', 'o valor');
+
+    // A lista recarregou: o menu do card mostra a opção dele, e salvar de novo
+    // (a lista inteira volta ao servidor) não perde a coluna.
+    const indice = (await pagina.$$eval('[data-parte="titulo"]', (es) => es.map((e) => e.value)))
+      .indexOf('1ª tentativa');
+    const marcado = await pagina.$eval('[data-card="' + indice + '"][data-parte="contar"]',
+      (e) => e.options[e.selectedIndex].textContent);
+    igual(marcado, 'Tentativa: 1ª tentativa de contato sem sucesso', 'o menu marca a opção certa');
+    await pagina.click('#salvar-cards');
+    await pagina.waitForTimeout(1000);
+    const ruins = await pagina.$$eval('.aviso-flutuante.tom-ruim', (es) => es.map((e) => e.textContent));
+    igual(ruins.length, 0, 'salvar de novo não dá erro: ' + ruins.join(' | '));
+    igual(naPlanilha('PAINEIS').find((l) => l.Titulo === '1ª tentativa').CampoMedida, 'Tentativa');
+
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(900);
+    const naRet = pagina.locator('[data-canal]', { hasText: 'RET' }).first();
+    if (await naRet.count()) await naRet.click();
+    await pagina.waitForTimeout(900);
+    const cards = await pagina.$$eval('.cartoes .indicador', (es) => es.map((e) =>
+      e.querySelector('.rotulo').textContent + '=' + e.querySelector('.numero').textContent
+      + (e.tagName === 'BUTTON' ? ' (filtra)' : '')));
+    verdadeiro(cards.indexOf('1ª tentativa=1') >= 0, 'o card conta o caso: ' + cards.join(', '));
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();

@@ -886,6 +886,10 @@ var Formulario = (function () {
         || campo.tipo === 'percentual') htmlTipo = 'text';
 
       var dinheiro = ehCampoDeDinheiro(campo);
+      // A SUSEP não leva máscara: a máscara guarda só dígito, e "jamjamm"
+      // sumiria enquanto a pessoa digita. Ela aceita só números, só letras
+      // ou os dois — pedido do PO.
+      var mascara = campo.chave === 'susep' ? '' : campo.mascara;
       // inputmode="decimal" faz o celular abrir o teclado NUMÉRICO. Sem isso a
       // pessoa abre o alfabético, procura o número e digita errado com mais
       // frequência — e metade da operação trabalha no telefone.
@@ -893,10 +897,10 @@ var Formulario = (function () {
         + ' data-chave="' + escapar(campo.chave) + '"'
         + (dinheiro ? ' data-dinheiro="sim" inputmode="decimal"' : '')
         + (dinheiro ? ' placeholder="R$ 0,00"' : '')
-        + (campo.mascara ? ' data-mascara="' + escapar(campo.mascara) + '"' : '')
+        + (mascara ? ' data-mascara="' + escapar(mascara) + '"' : '')
         // Duas máscaras ("CPF|CNPJ") aparecem como as duas formas aceitas.
-        + (campo.mascara ? ' placeholder="'
-          + escapar(campo.mascara.split('|').join(' ou ')) + '"' : '')
+        + (mascara ? ' placeholder="'
+          + escapar(mascara.split('|').join(' ou ')) + '"' : '')
         // A coluna de data do canal: é dela que o selo da proposta tira o mês.
         + (colunaDaData && campo.cabecalho === colunaDaData
           ? ' data-data-do-caso="sim"' : '')

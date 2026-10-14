@@ -916,8 +916,10 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
       // 'cartao' no Trabalho; pizza, linha e barras na Produtividade RECC.
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
-      // Para um cartão, é a regra de contagem: 'total', 'situacao' ou
-      // 'naCelula'. Para um gráfico, é o campo que vira eixo.
+      // Para um cartão, é a regra de contagem: 'total', 'situacao',
+      // 'naCelula', 'preenchido' (a coluna do Filtro tem algo escrito) ou
+      // 'valor' (a coluna do CampoMedida tem o valor do Filtro). Para um
+      // gráfico, é o campo que vira eixo.
       { cabecalho: 'CampoDimensao', tipo: 'texto', protegido: false },
       { cabecalho: 'CampoMedida', tipo: 'texto', protegido: false },
       { cabecalho: 'Agregacao', tipo: 'texto', protegido: false },
@@ -1522,8 +1524,11 @@ function tiposDeclaradosPeloAdministrador_() {
         var cabecalho = String(campo.Cabecalho || '').trim();
         if (!aba || !cabecalho) return;
         if (!mapa[aba]) mapa[aba] = {};
-        mapa[aba][normalizarParaComparar_(cabecalho)] =
-          RECC_DO_CAMPO_PARA_O_DADO[campo.TipoCampo] || RECC_TIPO_DE_DADO.TEXTO;
+        // A SUSEP é texto mesmo com o campo noutro tipo: identificador
+        // guardaria só os dígitos, e "jamjamm" iria para a célula vazia.
+        mapa[aba][normalizarParaComparar_(cabecalho)] = ehASusep_(cabecalho)
+          ? RECC_TIPO_DE_DADO.TEXTO
+          : RECC_DO_CAMPO_PARA_O_DADO[campo.TipoCampo] || RECC_TIPO_DE_DADO.TEXTO;
       });
     }
     tiposDeclaradosJaLidos = mapa;
@@ -1590,6 +1595,23 @@ function chaveDaSusep_(valor) {
 /** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
 function susepComoSeEscreve_(valor) {
   return String(valor === null || valor === undefined ? '' : valor).trim();
+}
+
+/**
+ * Este campo, ou esta coluna, é a SUSEP?
+ *
+ * Pedido do PO: a SUSEP aceita SÓ NÚMEROS, SÓ LETRAS ou OS DOIS — "7dmd8gs",
+ * "jamjamm" e "77777777" são todas SUSEPs. E aceita qualquer que seja o tipo
+ * escolhido para o campo em Configurações › Cadastrar Caso.
+ *
+ * Era aí que ela quebrava: com o campo SUSEP como "identificador" (ou
+ * "documento", ou "número"), a conferência pedia ao menos um dígito, e a SUSEP
+ * só de letras era recusada — "jamjamm" voltava com "precisa ter ao menos um
+ * dígito", enquanto "7dmd8gs" passava. O tipo do campo vale para os outros
+ * campos; a SUSEP é sempre texto, como no contrato das bases.
+ */
+function ehASusep_(chaveOuCabecalho) {
+  return normalizarParaComparar_(chaveOuCabecalho) === 'susep';
 }
 
 /**

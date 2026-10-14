@@ -582,7 +582,10 @@ function rodarTestesDeConfiguracoes() {
     // que não está na base criaria um cartão que nunca aparece, e quem o
     // criasse ia jurar que salvou.
     const opcoes = chamar('listarCardsDoPainel')('produtividade', canal.id).oQueContar;
-    const porCarimbo = opcoes.filter((o) => o.chave === 'preenchido');
+    // As de carimbo são as do grupo delas: "Preenchida: X" também é
+    // 'preenchido', mas conta coluna que não é carimbo de status.
+    const porCarimbo = opcoes.filter((o) => o.chave === 'preenchido'
+      && o.grupo === 'Já passaram por (carimbo)');
     verdadeiro(porCarimbo.length > 0, 'a Mesa Diamante carimba a finalização');
     verdadeiro(porCarimbo.every((o) => o.rotulo.indexOf('Já passaram por: ') === 0),
       'o rótulo diz que é jornada, e não estado de hoje');

@@ -309,6 +309,11 @@ Não repita nenhuma delas. A lista completa, com sintoma e causa, está em
     `canalPeloId_` já chega com as colunas na grafia da planilha; quem percorre
     vários canais por `canaisVisiveis_` chama `comAGrafiaDaAba_(canal)` antes
     de ler. O achado 88 apagava a descrição assim.
+11. **Gravar `new Date()` numa coluna que o sistema não sabe que é de data.**
+    Coluna sua é texto para o sistema, e o `Date` vira "Wed Oct 14 2026 …". Todo
+    carimbo passa por `carimboParaAColuna_`, que decide pela coluna (achado 93).
+12. **Aplicar a regra do tipo do campo à SUSEP.** O tipo é editável; a SUSEP tem
+    letra. Quem confere ou grava a SUSEP pergunta `ehASusep_` antes (achado 90).
 
 ---
 

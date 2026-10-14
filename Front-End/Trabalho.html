@@ -61,11 +61,16 @@ var TelaTrabalho = (function () {
   /**
    * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
    * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
+   *
+   * Só o cartão de STATUS filtra. Os que contam por coluna ("Já passaram
+   * por", "Preenchida", o valor de um campo) não têm status para filtrar:
+   * clicados, filtravam a fila por um status com o nome do cartão, e a fila
+   * ficava vazia.
    */
   function desenharCartoes() {
     return '<div class="cartoes">'
       + resumo.cartoes.map(function (cartao) {
-        var filtravel = cartao.chave !== 'total' && cartao.chave !== 'naCelula'
+        var filtravel = cartao.dimensao === 'situacao'
           && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
         var ligado = filtravel
           && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);

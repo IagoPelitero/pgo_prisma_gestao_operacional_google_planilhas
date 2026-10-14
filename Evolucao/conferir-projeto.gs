@@ -28,7 +28,7 @@ function oQueFaltaNoProjeto() {
   var esperado = {
     'Cadastros.gs': ['bloquearSusep', 'desbloquearSusep', 'exportarCorretoras', 'listarSusepsBloqueadas', 'ocultarCorretora', 'opcoesDaImportacao', 'origemDosCadastros', 'salvarCorretora', 'tabelaDeCorretoras'],
     'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'casoParaEditar', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
-    'Config.gs': ['conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarSinalizador', 'usoDoItemDoCatalogo'],
+    'Config.gs': ['conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'opcoesDoCarimboDoItem', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarSinalizador', 'usoDoItemDoCatalogo'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
     'Indicadores.gs': ['conferirPlanilhaDoChat', 'configuracaoDoChat', 'detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'minhaPerformance', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'salvarComponentesDoPainel', 'salvarConfiguracaoDoChat']
   };
@@ -47,7 +47,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 80 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 81 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

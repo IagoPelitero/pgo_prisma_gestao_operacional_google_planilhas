@@ -305,6 +305,10 @@ function pontePreparada(respostas) {
     + '      listarCatalogo: function (tipo) {\n'
     + '        responder(respostas.configuracoes.listas[tipo] || []);\n'
     + '      },\n'
+    + '      opcoesDoCarimboDoItem: function (tipo) {\n'
+    + '        responder(respostas.configuracoes.carimboDasListas[tipo]\n'
+    + '          || { carimba: false, canais: [] });\n'
+    + '      },\n'
     + '      listarCanaisConfiguraveis: function () {\n'
     + '        responder(respostas.configuracoes.canais);\n'
     + '      },\n'
@@ -958,8 +962,10 @@ function gerar(pastaDeSaida) {
     camposPorCanal[canal.id] = chamar('listarCamposDoCanal')(canal.id);
   });
   const listas = {};
+  const carimboDasListas = {};
   opcoesDeCampo.tiposDeCatalogo.forEach((tipo) => {
     listas[tipo] = chamar('listarCatalogo')(tipo, '');
+    carimboDasListas[tipo] = chamar('opcoesDoCarimboDoItem')(tipo);
   });
 
   const cards = {};
@@ -985,6 +991,7 @@ function gerar(pastaDeSaida) {
     usuarios: chamar('listarUsuarios()'),
     niveis: chamar('listarNiveisDeAcesso()'),
     listas: listas,
+    carimboDasListas: carimboDasListas,
     canais: chamar('listarCanaisConfiguraveis()'),
     laudo: chamar('conferirEstruturaDaPlanilha()'),
     trilha: chamar('listarAuditoria')(40),

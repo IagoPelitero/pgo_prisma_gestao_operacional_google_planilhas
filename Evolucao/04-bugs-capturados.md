@@ -1907,9 +1907,97 @@ você criou)". O teste antigo passou a exigir o contrário.
 
 ---
 
+### 90 · A SUSEP só de letras recusada pelo tipo do campo
+
+**Sintoma.** Relatado pelo PO: "encontrei um problema na SUSEP ao não aceitar apenas
+letras". `7dmd8gs` e `77777777` passavam; `jamjamm` voltava com "SUSEP — precisa ter
+ao menos um dígito".
+
+**Causa.** O campo SUSEP de fábrica é texto, mas o tipo de qualquer campo se troca em
+Configurações › Cadastrar Caso. Com ele como **identificador** (ou documento, ou
+número), a conferência do servidor aplicava a regra do tipo: pedia ao menos um dígito.
+Documento ainda passava a SUSEP por "só dígitos" (`7dmd8gs` virava `78`), e uma
+máscara no campo apagava as letras enquanto a pessoa digitava. Reproduzido no
+simulador com os três tipos e com máscara, 12 combinações.
+
+**Defesa.** `ehASusep_` (Base.gs): o campo SUSEP é conferido e gravado como texto
+qualquer que seja o tipo escolhido — `conferirCampo_` não aplica a regra do tipo, o
+"só dígitos" do documento não vale para ela, `tiposDeclaradosPeloAdministrador_`
+declara a coluna como texto (canal sem contrato), e a tela não põe máscara nela. Os
+outros campos continuam conferidos pelo tipo deles.
+
+---
+
+### 91 · Editar um item em Ajustes Gerais apagava o canal dele
+
+**Sintoma.** Achado durante o pedido do carimbo das tentativas, antes de o PO
+reclamar: um status editado em Ajustes Gerais (só o rótulo, ou a cor) passava a
+aparecer em **todos** os canais.
+
+**Causa.** A tela não mandava o canal do item ao salvar, e o servidor gravava
+`CanalId` vazio — que o sistema lê como "item de todos os canais". Item novo criado
+pela tela também nascia sem canal, porque a tela não tinha onde escolher.
+
+**Defesa.** O painel do item ganhou o menu **Canal** (Todos os canais, RET, Mesa,
+VG), que vem com o canal atual; a tela manda o que está nele. Quem chama o servidor
+sem mandar o canal (de fora da tela) mantém o que o item já tinha. Os status que já
+perderam o canal não são "consertados" sozinhos — o sistema não tem como saber de
+qual canal eram —, e o diagnóstico passou a listá-los (atenção, em Os canais).
+
+---
+
+### 92 · O menu dos cards marcava a opção errada, e o card de coluna filtrava o status
+
+**Sintoma.** Com dois cards "Já passaram por" no mesmo canal, os dois mostravam a
+mesma opção em "O que contar". E no Trabalho, clicar num card "Já passaram por"
+deixava a fila vazia.
+
+**Causa.** O menu comparava só a regra (`preenchido`) quando ela não era de status —
+a coluna, que é o que distingue um "Já passaram por" do outro, ficava de fora. Card
+cuja opção sumira (status desligado) caía calado na primeira opção. No Trabalho, a
+tela tratava como "filtrável pelo status" todo card que não fosse total nem
+finalizados na célula, e filtrava a fila por um status com o nome do card.
+
+**Defesa.** `opcoesDoQueContar` compara regra, filtro **e** coluna, agrupa o menu e
+mostra "Não está mais disponível: …" para o card órfão, sem trocar a configuração
+dele. Cada card sai do servidor dizendo a regra (`dimensao`), e só o de status filtra.
+
+---
+
+### 93 · O carimbo na coluna sua virava "Wed Oct 14 2026 14:50:59 GMT"
+
+**Sintoma.** Pego pelo teste do carimbo das tentativas, antes de sair: apontar o
+carimbo para uma coluna criada direto na planilha gravava a data como o texto cru
+do JavaScript.
+
+**Causa.** Coluna sua não tem tipo declarado, e o sistema a trata como texto — o
+`Date` do carimbo era convertido com `String()`. O menu novo oferece as colunas
+suas, então o caminho passou a ser fácil de pegar.
+
+**Defesa.** `carimboParaAColuna_`: coluna de data recebe a data; as outras recebem
+`dd/MM/yyyy HH:mm`, o mesmo texto do `@AGORA`. Vale para o carimbo de status e para
+o de item de lista.
+
+---
+
+### 94 · O card de valor perdia a coluna ao salvar de novo
+
+**Sintoma.** Pego pelo ponta a ponta, antes de sair: criar o card "Tentativa: 1ª
+tentativa…" funcionava; salvar a lista outra vez recusava o card ("precisa da coluna
+e do valor") e o menu dele aparecia como "não está mais disponível".
+
+**Causa.** A tela copia cada card ao abrir Painéis (`copiarCard`), e a cópia levava
+regra, filtro e cor — não a coluna, que só o card novo usa.
+
+**Defesa.** A cópia leva a coluna. O ponta a ponta cria o card, confere a opção
+marcada depois de recarregar, salva de novo e confere a planilha; a suíte confere a
+linha da cópia. Desfazer a correção deixa os dois vermelhos.
+
+---
+
 ## O que esta lista ensina
 
-**São oitenta e sete achados, e a maioria era silenciosa.** Não davam erro, não
+**São noventa e quatro achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 
@@ -2105,3 +2193,11 @@ Daí as duas práticas que o projeto não abre mão:
     operação passou a ler "atenção" como ruído — e o próximo atenção de verdade
     chegaria no meio dele. Todo aviso precisa distinguir o que o sistema NÃO sabe do
     que ele só não esperava.
+49. **Configuração que o PO pode mudar não decide o que o dado é.** No item 90 o
+    tipo do campo SUSEP era editável, e a regra do tipo vencia o que a SUSEP é. O
+    que vem da natureza do dado (a SUSEP tem letra) mora no código; o que é gosto
+    da operação mora na configuração.
+50. **Tela que salva o objeto inteiro precisa mandar o objeto inteiro.** Nos itens
+    91 e 94 a tela mandava menos campos do que o servidor grava — o canal do item,
+    a coluna do card — e o servidor gravava vazio no lugar. Campo que a tela não
+    manda tem de ser mantido pelo servidor, ou ir junto.

@@ -545,7 +545,7 @@ function aplicarBusca_(registros, canal, termo) {
  * mesma coisa.
  */
 function dimensaoDoCartao_(valor) {
-  var canonicas = ['total', 'situacao', 'naCelula', 'preenchido'];
+  var canonicas = ['total', 'situacao', 'naCelula', 'preenchido', 'valor'];
   var procurado = normalizarParaComparar_(valor);
   for (var i = 0; i < canonicas.length; i++) {
     if (normalizarParaComparar_(canonicas[i]) === procurado) return canonicas[i];
@@ -562,7 +562,18 @@ function contarCartoes_(registros, anteriores, canal, tela) {
     tons[situacao.chave] = situacao.tom;
   });
 
+  // Cada cartão sai dizendo a regra pela qual contou (`dimensao`). É com ela que
+  // o Trabalho decide se clicar filtra a fila pelo status: só o cartão de
+  // status filtra. Antes a tela deduzia pela chave, e um cartão "Já passaram
+  // por" clicado filtrava a fila por um status com o nome do cartão — fila
+  // vazia, sem erro.
   return cartoesDoCanal_(canal, tela).map(function (cartao) {
+    var feito = umCartao(cartao);
+    if (feito) feito.dimensao = cartao.dimensao;
+    return feito;
+  }).filter(function (cartao) { return cartao !== null; });
+
+  function umCartao(cartao) {
     if (cartao.dimensao === 'total') {
       return montarCartao_('total', cartao.titulo, registros.length,
         anteriores.length, cartao.cor, '');
@@ -581,11 +592,44 @@ function contarCartoes_(registros, anteriores, canal, tela) {
         quantos, contarComColunaPreenchida_(anteriores, canal, cartao.filtro),
         cartao.cor, 'Casos com "' + cartao.filtro + '" preenchida');
     }
+    if (cartao.dimensao === 'valor') {
+      var comOValor = contarComOValor_(registros, canal, cartao.coluna, cartao.filtro);
+      if (comOValor === null) return null;
+      return montarCartao_('valor:' + normalizarParaComparar_(cartao.coluna) + ':'
+        + normalizarParaComparar_(cartao.filtro), cartao.titulo, comOValor,
+        contarComOValor_(anteriores, canal, cartao.coluna, cartao.filtro),
+        cartao.cor, 'Casos com "' + cartao.coluna + '" igual a "' + cartao.filtro + '"');
+    }
 
     var chave = normalizarParaComparar_(cartao.filtro);
     return montarCartao_(chave, cartao.titulo, agora[chave] || 0,
       antes[chave] || 0, cartao.cor || tons[chave] || 'neutro', '');
-  }).filter(function (cartao) { return cartao !== null; });
+  }
+}
+
+/**
+ * Quantos casos têm ESTE valor nesta coluna — "1ª tentativa de contato sem
+ * sucesso" em Tentativa, "Sim" em Abertura indevida.
+ *
+ * Pedido do PO: os cartões não podiam ficar só no status. É a foto de HOJE,
+ * como o cartão de status: o caso que sai do valor sai da conta. O que fica
+ * para sempre é o carimbo ("Já passaram por").
+ *
+ * Compara sem acento e sem caixa, como o resto do sistema. Coluna que não
+ * existe na base devolve null e o cartão some, igual ao "preenchido".
+ */
+function contarComOValor_(registros, canal, cabecalho, valor) {
+  var coluna = String(cabecalho || '').trim();
+  var procurado = normalizarParaComparar_(valor);
+  if (!coluna || !procurado) return null;
+  if (posicaoDaColuna_(estruturaDaAba_(canal.aba), coluna) < 0) return null;
+  coluna = grafiaDaColuna_(canal.aba, coluna);
+
+  var quantos = 0;
+  registros.forEach(function (registro) {
+    if (normalizarParaComparar_(registro[coluna]) === procurado) quantos++;
+  });
+  return quantos;
 }
 
 /**
@@ -647,6 +691,8 @@ function cartoesDoCanal_(canal, tela) {
         titulo: String(linha.Titulo || ''),
         dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
         filtro: String(linha.Filtro || ''),
+        // Só o cartão "valor" usa: a coluna onde o valor do Filtro é procurado.
+        coluna: String(linha.CampoMedida || ''),
         cor: tomValido_(linha.Cor)
       };
     });

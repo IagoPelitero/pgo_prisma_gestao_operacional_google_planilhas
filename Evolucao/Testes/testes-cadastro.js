@@ -1660,7 +1660,7 @@ function rodarTestesDeCadastro() {
 
   teste('o campo diz na dica que aceita os dois formatos', () => {
     const fonte = lerPeca('Formulario');
-    contem(fonte, "campo.mascara.split('|').join(' ou ')",
+    contem(fonte, "mascara.split('|').join(' ou ')",
       'a dica mostra CPF ou CNPJ, e não a máscara com a barra vertical');
   });
   secao('Datas: o calendário, a primeira já com hoje, e sem futuro');

@@ -609,7 +609,8 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     // isto, a barra do CNPJ ("12.345.678/0001-90") seria lida como separador
     // de lista — a regra dos telefones — e a célula receberia
     // "12345678;000190". Apareceu quando a Mesa passou a aceitar CNPJ.
-    if (descricao.tipo === 'documento') bruto = apenasDigitos_(bruto);
+    if (descricao.tipo === 'documento' && !ehASusep_(descricao.chave)
+      && !ehASusep_(descricao.cabecalho)) bruto = apenasDigitos_(bruto);
 
     paraGravar[descricao.cabecalho] = bruto;
   });
@@ -655,6 +656,10 @@ function conferirCampo_(campo, valor) {
   if (texto === '') {
     return campo.obrigatorio ? 'é obrigatório' : '';
   }
+
+  // A SUSEP aceita só números, só letras ou os dois, seja qual for o tipo do
+  // campo. Ver ehASusep_.
+  if (ehASusep_(campo.chave) || ehASusep_(campo.cabecalho)) return '';
 
   if (campo.tipo === 'identificador' || campo.tipo === 'documento') {
     var digitos = converterParaIdentificador_(texto);
@@ -771,6 +776,7 @@ function cadastrarCaso(idDoCanal, valores) {
   carimbarOStatusDeNascimento_(canal, paraGravar);
   carimbarOEncaminhamento_(canal, null, paraGravar);
   carimbarAParadaDoPrazo_(canal, null, paraGravar);
+  carimbarOsItensDeLista_(canal, null, paraGravar);
   preencherColunasCalculadas_(canal.aba, paraGravar, {});
 
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
@@ -820,6 +826,7 @@ function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
   carimbarOEncaminhamento_(canal, atual, paraGravar);
   carimbarAParadaDoPrazo_(canal, atual, paraGravar);
+  carimbarOsItensDeLista_(canal, atual, paraGravar);
 
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
@@ -964,7 +971,23 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   var jaTem = String(registroAtual[coluna] || '').trim();
   if (jaTem) return;
 
-  alteracao[coluna] = new Date();
+  alteracao[coluna] = carimboParaAColuna_(estrutura, posicao);
+}
+
+/**
+ * O "agora" do carimbo, do jeito que a coluna guarda.
+ *
+ * Coluna de data recebe a data. A coluna sua — criada direto na planilha —
+ * o sistema não sabe que é de data, e grava como texto: um Date ali virava
+ * "Wed Oct 14 2026 14:50:59 GMT+0000". Ela recebe "dd/MM/aaaa HH:mm", o mesmo
+ * texto do @AGORA. O menu da coluna do carimbo oferece as colunas suas, e é
+ * por isso que este cuidado passou a ser necessário.
+ */
+function carimboParaAColuna_(estrutura, posicao) {
+  var tipo = estrutura.tipos[posicao];
+  var agora = new Date();
+  if (tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.DATA_HORA) return agora;
+  return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
 }
 
 /**
@@ -1116,6 +1139,69 @@ function carimbarAParadaDoPrazo_(canal, registroAtual, paraGravar) {
 
     paraGravar[sinalizador.colunaDaDataDaCondicao] =
       condicaoBate_({ valores: sinalizador.valoresDaCondicao }, agora) ? new Date() : '';
+  });
+}
+
+/**
+ * Carimba data e hora quando um campo de LISTA chega num item que carimba.
+ *
+ * Pedido do PO: os status "1º contato realizado" e "2º contato realizado"
+ * viraram um status só, "Contatando", com uma lista ao lado — "1ª tentativa
+ * de contato sem sucesso", "2ª tentativa…". As colunas "Data do 1º contato" e
+ * "Data do 2º contato" pararam de receber data, porque nenhum status apontava
+ * mais para elas. Agora o ITEM da lista aponta, do mesmo jeito que o status:
+ * "Coluna que recebe data e hora", em Configurações › Ajustes Gerais.
+ *
+ * A escolha mora na linha do item no CATÁLOGO (pelo Id), e não no nome dele:
+ * trocar o rótulo do item não muda onde ele carimba.
+ *
+ * AS MESMAS REGRAS DO CARIMBO DE STATUS:
+ *   - carimba só quando o campo MUDOU para aquele item (salvar sem mexer não
+ *     carimba nada);
+ *   - carimba só se a célula estiver vazia: voltar a um item por onde o caso
+ *     já passou guarda a data da primeira vez;
+ *   - coluna que a base não tem é ignorada, sem estourar — o caso é salvo.
+ *
+ * O status tem o carimbo dele (carimbarOStatus_), e por isso a lista de
+ * STATUS fica de fora daqui: seriam dois carimbos para a mesma mudança.
+ */
+function carimbarOsItensDeLista_(canal, registroAtual, paraGravar) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var doCanal = converterParaIdentificador_(canal.id);
+  var catalogo = null;
+
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (converterParaIdentificador_(campo.CanalId) !== doCanal) return;
+    if (String(campo.TipoCampo || '') !== 'seletor') return;
+    var configuracao = lerConfiguracaoDoCampo_(campo);
+    var lista = normalizarParaComparar_(configuracao.catalogo);
+    if (!lista || lista === 'status') return;
+    if (configuracao.separaEm || configuracao.partirEm) return;
+
+    var coluna = grafiaDaColuna_(canal.aba, campo.Cabecalho);
+    if (!Object.prototype.hasOwnProperty.call(paraGravar, coluna)) return;
+    var agora = String(paraGravar[coluna] || '').trim();
+    var antes = registroAtual ? String(registroAtual[coluna] || '').trim() : '';
+    if (!agora || normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
+
+    catalogo = catalogo || lerRegistros_('CATALOGO');
+    var item = null;
+    catalogo.forEach(function (um) {
+      if (item) return;
+      if (normalizarParaComparar_(um.Tipo) !== lista) return;
+      var canalDoItem = converterParaIdentificador_(um.CanalId);
+      if (canalDoItem && canalDoItem !== doCanal) return;
+      if (normalizarParaComparar_(um.Nome) === normalizarParaComparar_(agora)) item = um;
+    });
+    if (!item || !String(item.ColunaDeCarimbo || '').trim()) return;
+
+    var posicao = posicaoDaColuna_(estrutura, item.ColunaDeCarimbo);
+    if (posicao < 0) return;
+    var destino = estrutura.cabecalhos[posicao];   // a grafia da planilha
+
+    var jaTem = registroAtual ? String(registroAtual[destino] || '').trim() : '';
+    if (jaTem || String(paraGravar[destino] || '').trim()) return;
+    paraGravar[destino] = carimboParaAColuna_(estrutura, posicao);
   });
 }
 
