@@ -749,8 +749,8 @@ async function rodar() {
     ]);
     vm.runInContext(`(function () {
       inserirVariosRegistros_('CORRETORAS', [
-        { SUSEP: 'RET00J', Corretora: 'Corretora ABC', Segmento: 'Diamante', Consultor: 'Marina Alencar' },
-        { SUSEP: 'RET01A', Corretora: 'Corretora Horizonte', Segmento: 'Diamante', Consultor: 'Rogério Pinto' }
+        { SUSEP: 'RET00J', Corretora: 'Corretora ABC', Sucursal: '12', Segmento: 'Diamante', Consultor: 'Marina Alencar' },
+        { SUSEP: 'RET01A', Corretora: 'Corretora Horizonte', Sucursal: '12', Segmento: 'Diamante', Consultor: 'Rogério Pinto' }
       ]);
       inserirRegistro_('BASE_MESA', { Analista: 'Ana Martins', Status: 'Em andamento',
         'Data de entrada': new Date(), 'Nome do segurado': 'Do sistema', SUSEP: 'RET00J',
@@ -795,15 +795,37 @@ async function rodar() {
     const tiles = await pagina.$$eval('.atendimentos .indicador .numero', (es) => es.map((e) => e.textContent));
     igual(tiles.join(','), '4,1,3', 'total, sistema e chat');
 
-    const graficos = await pagina.$$eval('.atendimentos + .graficos .grafico h3', (es) => es.map((e) => e.textContent));
-    igual(graficos.join('|'), 'Atendidos por analista|Top 5 corretoras|Top 5 SUSEPs|Top 5 assuntos'
-      + '|Top 5 consultores|Vida individual ou Vida em grupo');
-    const analistas = await pagina.$$eval('.atendimentos + .graficos .grafico:first-child tbody tr',
+    const titulos = () => pagina.$$eval('.atendimentos + .graficos .grafico h3', (es) => es.map((e) => e.textContent));
+    igual((await titulos()).join('|'), 'Atendidos por analista|Top 5 corretoras|Top 5 SUSEPs|Top 5 sucursais'
+      + '|Top 5 assuntos|Top 5 consultores|Vida individual ou Vida em grupo');
+    const analistas = () => pagina.$$eval('.atendimentos + .graficos .grafico:first-child tbody tr',
       (es) => es.map((e) => Array.from(e.querySelectorAll('td')).map((c) => c.textContent).join(' ')));
-    igual(analistas[0], 'Ana Martins 1 2 3', 'sistema 1 + chat 2');
-    igual(analistas[1], 'Bianca Souza 0 1 1');
+    const numeros = () => pagina.$$eval('.atendimentos .indicador .numero', (es) => es.map((e) => e.textContent));
+    // Uma coluna só: o número do atendimento (1 do e-mail + 2 do chat).
+    igual((await analistas()).join('|'), 'Ana Martins 3|Bianca Souza 1');
     verdadeiro((await pagina.textContent('.atendimentos + .graficos')).indexOf('Corretora Horizonte') >= 0,
       'o nome da corretora vem do cadastro, pela SUSEP — a planilha do chat não o traz');
+    const sucursais = await pagina.$$eval('.atendimentos + .graficos .grafico:nth-child(4) tbody tr',
+      (es) => es.map((e) => Array.from(e.querySelectorAll('td')).map((c) => c.textContent).join(' ')));
+    igual(sucursais.join('|'), '12 4', 'a sucursal vem do cadastro, e nem o chat nem a Mesa a trazem');
+
+    // Vida em grupo: tudo recalcula na tela, sem voltar ao servidor, e a rosca some.
+    await pagina.click('[data-ramo-dos-atendidos="vg"]');
+    igual((await numeros()).join(','), '3,1,2', 'total, e-mail e chat só de Vida em grupo');
+    igual((await analistas()).join('|'), 'Ana Martins 2|Bianca Souza 1');
+    verdadeiro((await titulos()).indexOf('Vida individual ou Vida em grupo') < 0, 'a rosca só existe no Total');
+
+    // E só o chat, ainda de Vida em grupo: um número só.
+    await pagina.click('[data-origem-dos-atendidos="chat"]');
+    igual((await numeros()).join(','), '2', 'só o chat de Vida em grupo');
+    igual((await analistas()).join('|'), 'Ana Martins 1|Bianca Souza 1');
+    await pagina.click('[data-origem-dos-atendidos="sistema"]');
+    igual((await numeros()).join(','), '1', 'só o e-mail (o caso do sistema) de Vida em grupo');
+
+    // De volta ao começo.
+    await pagina.click('[data-origem-dos-atendidos="todos"]');
+    await pagina.click('[data-ramo-dos-atendidos="total"]');
+    igual((await numeros()).join(','), '4,1,3');
   });
 
   /* ------------------------------------- as tentativas e os cards novos -- */

@@ -2805,6 +2805,45 @@ prévia e 100 com base suja.
 
 ---
 
+## Etapa 40 — Os atendidos da Mesa: sucursal, Vida em grupo × individual e e-mail × chat
+
+Pedido do PO: **"o chat da Mesa Diamante está faltando colunas. Eu preciso dividir
+se é vida em grupo ou vida individual ou total — top 5 de assuntos, de analista, de
+corretoras, o mesmo para sucursal e para susep — e deixar atendimentos + chat uma
+aba única, com filtro para escolher ver um ou outro."** Quatro respostas dele, quando
+perguntado:
+
+| Pergunta | Escolha |
+|---|---|
+| De onde vem a **sucursal** | Do cadastro de corretoras, pela SUSEP — como o consultor. Sem coluna nova na Mesa nem no chat |
+| Como mostrar **VG / VI / Total** | Um seletor no topo (e não três gráficos por tema) |
+| O que o **filtro** escolhe | **E-mail ou chat**: "E-mail: casos do sistema e chat: casos importados" |
+| As **tabelas** | Uma coluna só, de atendimentos (o Sistema | Chat | Total saiu) |
+| O **analista** | Continua com até 15 (os outros temas são Top 5) |
+
+| Parte | O que ficou |
+|---|---|
+| **Servidor** | `atendimentosDaMesa_` monta nove visões — origem (Todos, E-mail, Chat) × ramo (Total, Vida em grupo, Vida individual) —, cada uma pela mesma `graficoDeAtendidos_`, para o Top 5 ser refeito dentro do recorte. A visão Todos × Total segue em `totais` e `graficos`; as outras oito vêm em `visoes`. Gráfico novo: **Top 5 sucursais**. A rosca VI × VG só existe no Total |
+| **Tela** | Dois seletores em "Atendidos (e-mail + chat)"; trocar redesenha sem ir ao servidor. Resumos: em "Todos", total + e-mail + chat; numa origem, só o total dela. Tabelas com uma coluna |
+| **O que não mudou** | A aba **Equipe** e o resto da Produtividade; a importação do chat (as colunas dela são as mesmas — a sucursal não é importada); o chat que falha não derruba o bloco |
+
+**Números.** **1256 testes** (11 a mais, em `testes-chat-da-mesa.js`: sucursal pelo
+cadastro e pela SUSEP, as oito visões, o Top 5 refeito dentro de cada ramo, a rosca só
+no Total, e-mail e chat que não se misturam, o analista com até 15, e os cliques dos
+seletores), cinco execuções seguidas sem falha, **10 quebras de propósito, 10
+vermelhos**. Navegador: ponta a ponta **22/22** no repositório e no pacote (o do chat
+clica nos seletores e confere os números de cada visão), 108 combinações de largura,
+152 cliques na prévia, 100 com base suja, varredura geral sem defeito — e a maior
+resposta do sistema com 5.000 casos segue em 82 KB, mesmo com as oito visões a mais.
+
+### Para quem já usa
+
+Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`. A sucursal
+só aparece para SUSEP cadastrada em **Tabela de Corretoras** com a sucursal
+preenchida.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

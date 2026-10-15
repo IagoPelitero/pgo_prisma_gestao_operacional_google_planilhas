@@ -41,6 +41,11 @@ var TelaProdutividade = (function () {
   // (sistema + chat). Pedido do PO: a Produtividade "ficou bagunçada com muitas
   // informações sobre a Mesa Diamante". Abre em Equipe; trocar de canal mantém.
   var abaDaMesa = 'equipe';
+  // Dentro de "Atendidos": a origem (Todos / E-mail / Chat) e o ramo (Total /
+  // Vida em grupo / Vida individual). Cada combinação já vem pronta do
+  // servidor, e trocar não volta a ele.
+  var origemDosAtendidos = 'todos';
+  var ramoDosAtendidos = 'total';
   // Onde abre a lista dos casos de uma fatia — nas duas abas, o mesmo lugar.
   var LUGAR_DO_DETALHE = '<div id="detalhe-do-painel"></div>';
   var tabelasAbertas = {};
@@ -77,7 +82,7 @@ var TelaProdutividade = (function () {
   function abasDaMesa() {
     if (!painel.atendimentos) return '';
     return '<div class="config-abas" role="tablist" aria-label="O que ver">'
-      + [['equipe', 'Equipe'], ['atendidos', 'Atendidos (sistema + chat)']].map(function (aba) {
+      + [['equipe', 'Equipe'], ['atendidos', 'Atendidos (e-mail + chat)']].map(function (aba) {
         var atual = abaDaMesa === aba[0];
         return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
           + ' aria-selected="' + atual + '" data-aba-da-mesa="' + aba[0] + '">'
@@ -196,15 +201,47 @@ var TelaProdutividade = (function () {
    * parcial sem aviso é o jeito de alguém concluir que o chat não atendeu
    * ninguém.
    */
+  /** A visão escolhida: a de sempre (Todos, Total) ou uma das oito prontas. */
+  function visaoDosAtendidos() {
+    var atendidos = painel.atendimentos;
+    var chave = origemDosAtendidos + '|' + ramoDosAtendidos;
+    return (atendidos.visoes && atendidos.visoes[chave]) || atendidos;
+  }
+
+  /** Dois grupos de botões: de onde vem o atendimento, e de que ramo. */
+  function seletoresDosAtendidos() {
+    function grupo(rotulo, atributo, atual, opcoes) {
+      return '<div class="seletor-de-atendidos"><span class="rotulo">' + escapar(rotulo) + '</span>'
+        + '<div class="config-abas" role="group" aria-label="' + escapar(rotulo) + '">'
+        + opcoes.map(function (opcao) {
+          return '<button type="button" class="config-aba' + (atual === opcao[0] ? ' atual' : '') + '"'
+            + ' aria-pressed="' + (atual === opcao[0]) + '" ' + atributo + '="' + opcao[0] + '">'
+            + escapar(opcao[1]) + '</button>';
+        }).join('') + '</div></div>';
+    }
+    return grupo('Origem', 'data-origem-dos-atendidos', origemDosAtendidos,
+        [['todos', 'Todos'], ['sistema', 'E-mail'], ['chat', 'Chat']])
+      + grupo('Ramo', 'data-ramo-dos-atendidos', ramoDosAtendidos,
+        [['total', 'Total'], ['vg', 'Vida em grupo'], ['vi', 'Vida individual']]);
+  }
+
+  /** O que a visão escolhida diz de si, em palavras. */
+  function nomeDaVisaoDosAtendidos() {
+    var origem = { todos: 'e-mail e chat', sistema: 'e-mail', chat: 'chat' }[origemDosAtendidos];
+    var ramo = { total: 'todos os ramos', vg: 'Vida em grupo', vi: 'Vida individual' }[ramoDosAtendidos];
+    return origem + ' · ' + ramo;
+  }
+
   function desenharAtendimentos() {
     var atendidos = painel.atendimentos;
     if (!atendidos) return '';
     var chat = atendidos.chat;
+    var visao = visaoDosAtendidos();
 
     var avisos = [];
     if (!chat.ligado) {
       avisos.push('Nenhum atendimento do chat foi importado ainda: estes números são só dos '
-        + 'casos cadastrados no sistema. Traga o chat pela tela de Importação — Mesa '
+        + 'casos cadastrados no sistema (e-mail). Traga o chat pela tela de Importação — Mesa '
         + 'Diamante, "Atendimentos do chat".');
     } else if (chat.aviso) {
       avisos.push('Os atendimentos do chat não puderam ser lidos, e estes números são só do '
@@ -216,25 +253,31 @@ var TelaProdutividade = (function () {
     if (chat.semData) {
       avisos.push(chat.semData + ' linha(s) do chat sem data legível ficaram de fora do período.');
     }
-    avisos.push('Vale o período e o alcance desta tela; os filtros acima não mudam este bloco. '
+    avisos.push('E-mail são os casos cadastrados no sistema; chat, os atendimentos importados. '
+      + 'Vale o período e o alcance desta tela; os filtros acima não mudam este bloco. '
       + 'O atendimento que estiver nas duas bases conta duas vezes.');
+
+    // Com "Todos", o total e a sua divisão; com uma origem só, só o total dela.
+    var tiles = origemDosAtendidos === 'todos'
+      ? tileDePrazo('Atendidos no total', visao.totais.total, 'destaque',
+        'E-mail mais chat, no período')
+        + tileDePrazo('E-mail', visao.totais.sistema, 'neutro',
+          'Casos da Mesa Diamante cadastrados no sistema, no período')
+        + tileDePrazo('Chat', visao.totais.chat, 'neutro',
+          'Atendimentos do chat importados, no período')
+      : tileDePrazo(origemDosAtendidos === 'sistema' ? 'Atendidos por e-mail' : 'Atendidos por chat',
+        visao.totais.total, 'destaque', 'No período');
 
     return '<section class="cartao atendimentos" aria-labelledby="titulo-dos-atendidos">'
       + '<header class="origem-cabeca"><h3 id="titulo-dos-atendidos">'
-      + 'Atendidos — sistema e chat</h3></header>'
-      + '<div class="cartoes">'
-      + tileDePrazo('Atendidos no total', atendidos.totais.total, 'destaque',
-        'Casos cadastrados no sistema mais os atendimentos do chat, no período')
-      + tileDePrazo('No sistema', atendidos.totais.sistema, 'neutro',
-        'Casos da Mesa Diamante cadastrados no período')
-      + tileDePrazo('No chat', atendidos.totais.chat, 'neutro',
-        'Atendimentos do chat importados, no período')
-      + '</div>'
+      + 'Atendidos — ' + escapar(nomeDaVisaoDosAtendidos()) + '</h3></header>'
+      + seletoresDosAtendidos()
+      + '<div class="cartoes">' + tiles + '</div>'
       + avisos.map(function (aviso) {
         return '<p class="aviso-do-chat">' + escapar(aviso) + '</p>';
       }).join('')
       + '</section>'
-      + '<div class="graficos">' + atendidos.graficos.map(desenharAtendidos).join('') + '</div>';
+      + '<div class="graficos">' + visao.graficos.map(desenharAtendidos).join('') + '</div>';
   }
 
   /** Um gráfico de atendidos: o desenho e, embaixo, de onde veio cada número. */
@@ -249,23 +292,17 @@ var TelaProdutividade = (function () {
   }
 
   function tabelaDeAtendidos(componente) {
-    var sistema = 0;
-    var chat = 0;
+    var total = 0;
     var linhas = componente.pontos.map(function (ponto) {
-      sistema += ponto.sistema;
-      chat += ponto.chat;
+      total += ponto.valor;
       return '<tr><td>' + escapar(ponto.rotulo) + '</td>'
-        + '<td class="direita">' + ponto.sistema + '</td>'
-        + '<td class="direita">' + ponto.chat + '</td>'
         + '<td class="direita">' + ponto.valor + '</td></tr>';
     }).join('');
     return '<div class="rolagem-tabela"><table class="fila numeros de-atendidos">'
       + '<thead><tr><th>' + escapar(componente.dimensao) + '</th>'
-      + '<th class="direita">Sistema</th><th class="direita">Chat</th>'
-      + '<th class="direita">Total</th></tr></thead><tbody>' + linhas + '</tbody>'
-      + '<tfoot><tr><td><strong>Total</strong></td><td class="direita"><strong>' + sistema + '</strong></td>'
-      + '<td class="direita"><strong>' + chat + '</strong></td>'
-      + '<td class="direita"><strong>' + (sistema + chat) + '</strong></td></tr></tfoot></table></div>';
+      + '<th class="direita">Atendimentos</th></tr></thead><tbody>' + linhas + '</tbody>'
+      + '<tfoot><tr><td><strong>Total</strong></td><td class="direita"><strong>' + total
+      + '</strong></td></tr></tfoot></table></div>';
   }
 
   function rodapeDosAtendidos(componente) {
@@ -445,6 +482,19 @@ var TelaProdutividade = (function () {
       var escolhida = botao.getAttribute('data-aba-da-mesa');
       if (escolhida === abaDaMesa) return;
       abaDaMesa = escolhida;
+      desenhar();
+    });
+
+    ligarCliques('[data-origem-dos-atendidos]', function (botao) {
+      var escolhida = botao.getAttribute('data-origem-dos-atendidos');
+      if (escolhida === origemDosAtendidos) return;
+      origemDosAtendidos = escolhida;
+      desenhar();
+    });
+    ligarCliques('[data-ramo-dos-atendidos]', function (botao) {
+      var escolhido = botao.getAttribute('data-ramo-dos-atendidos');
+      if (escolhido === ramoDosAtendidos) return;
+      ramoDosAtendidos = escolhido;
       desenhar();
     });
 

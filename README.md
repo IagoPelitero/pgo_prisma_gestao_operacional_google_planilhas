@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1245 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1256 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -299,7 +299,7 @@ uma função nova é varrida no dia em que nasce.
 node Evolucao/Testes/rodar.js
 ```
 
-1245 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1256 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -858,25 +858,39 @@ Pedido do PO: *"implemente na Produtividade RECC, para a Mesa Diamante, a leitur
 de uma planilha apartada de casos atendidos pelo chat"* e *"na Produtividade da
 Mesa, os gráficos de atendidos, somando os casos cadastrados no sistema e os
 casos atendidos por nome do analista"*. Só a **Mesa Diamante** tem o bloco
-**Atendidos — sistema e chat**. Ele mora numa **aba à parte** dentro da
-Produtividade da Mesa — **Equipe** (cartões, gráficos e prazos, como nos outros
-canais) e **Atendidos (sistema + chat)** —, porque, palavra do PO, a Produtividade
-"ficou bagunçada com muitas informações sobre a Mesa Diamante":
+**Atendidos**. Ele mora numa **aba à parte** dentro da Produtividade da Mesa —
+**Equipe** (cartões, gráficos e prazos, como nos outros canais) e **Atendidos
+(e-mail + chat)** —, porque, palavra do PO, a Produtividade "ficou bagunçada com
+muitas informações sobre a Mesa Diamante".
 
-| Em cima | O total atendido, quanto veio do **sistema** e quanto veio do **chat** |
+**Dois seletores no topo da aba**, e trocar um deles não volta ao servidor — todos
+os números e gráficos mudam na hora:
+
+| Seletor | Opções | O que escolhe |
+|---|---|---|
+| **Origem** | Todos · E-mail · Chat | **E-mail** são os casos cadastrados no sistema; **Chat**, os atendimentos importados. É a definição do PO (*"E-mail: casos do sistema e chat: casos importados"*): o campo Canal do caso não entra |
+| **Ramo** | Total · Vida em grupo · Vida individual | Os gráficos passam a contar só aquele ramo — e o **Top 5 é refeito** dentro dele (os cinco primeiros de Vida em grupo não são os cinco do total) |
+
+Pedido do PO: *"Top 5 VG, VI e total"* de assuntos, analista, corretoras, sucursal
+e SUSEP. Os resumos em cima mostram o total e, em "Todos", a divisão e-mail ×
+chat; escolhida uma origem, só o total dela.
+
+| Gráfico | O que conta |
 |---|---|
-| **Atendidos por analista** | uma barra por analista, somando os dois lados. Nomes escritos de jeitos diferentes (`diego castilho`, `DIEGO CASTILHO`) viram uma pessoa só, com o nome do cadastro de usuários |
+| **Atendidos por analista** | uma barra por analista (até 15). Nomes escritos de jeitos diferentes (`diego castilho`, `DIEGO CASTILHO`) viram uma pessoa só, com o nome do cadastro de usuários |
 | **Top 5 corretoras** | quantos atendimentos cada corretora teve. O nome vem do **cadastro de corretoras, pela SUSEP** — a planilha do chat nem precisa trazê-lo, e duas bases que escrevem a mesma corretora de jeitos diferentes viram uma barra só |
 | **Top 5 SUSEPs** | o mesmo, por SUSEP |
+| **Top 5 sucursais** | a **sucursal vem do cadastro de corretoras, pela SUSEP** — nem a Mesa nem o chat têm essa coluna. SUSEP fora do cadastro, ou cadastrada sem sucursal, é contada à parte |
 | **Top 5 assuntos** | o mesmo, por assunto |
 | **Top 5 consultores** | o consultor também vem do cadastro de corretoras, pela SUSEP |
-| **Vida individual ou Vida em grupo** | uma rosca. `VG`, `vida em grupo`, `VI` e `Vida Individual` valem; outro texto fica como veio |
+| **Vida individual ou Vida em grupo** | uma rosca, **só na visão Total** (num ramo só seria uma fatia de 100%). `VG`, `vida em grupo`, `VI` e `Vida Individual` valem; outro texto fica como veio |
 
-Cada gráfico traz, embaixo, a **tabela com o Sistema, o Chat e o Total** — porque
-o número é o pedido, e a tabela mostra de onde veio cada parte. O que passa do
-5º lugar é somado em **Demais valores**, para o total fechar; o atendimento que
-não traz a informação (sem SUSEP, sem assunto…) **não entra no ranking** e é
-contado à parte, no rodapé do gráfico.
+Cada gráfico traz, embaixo, a **tabela com os atendimentos** — uma coluna só,
+porque o número é o pedido; quem quer ver só e-mail ou só chat usa o seletor de
+origem. O que passa do 5º lugar é somado em **Demais valores**, para o total
+fechar; o atendimento que não traz a informação (sem SUSEP, sem assunto…) **não
+entra no ranking** e é contado à parte, no rodapé do gráfico. O atendimento sem
+ramo só conta no Total.
 
 **Trazer o chat** é pela tela de **Importação**: escolha a **Mesa Diamante** e
 **Atendimentos do chat**, cole as linhas ou dê o link da planilha, confira e
@@ -1405,7 +1419,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1245 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1256 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

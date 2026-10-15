@@ -774,6 +774,11 @@ table.fila.agrupada td:first-child .apoio.em-bom:first-child {
 /* Os atendidos da Mesa: o resumo (sistema + chat) em cima dos gráficos. */
 .atendimentos { padding: 18px 20px; display: grid; gap: 12px; margin-bottom: 16px; }
 .atendimentos .aviso-do-chat { margin: 0; font-size: 12.5px; color: var(--suave); line-height: 1.5; }
+/* Os dois seletores dos atendidos (origem e ramo): um rótulo e as opções, lado a
+   lado, e uma embaixo da outra quando falta largura. */
+.atendimentos .seletor-de-atendidos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.atendimentos .seletor-de-atendidos .rotulo { font-size: 12.5px; color: var(--suave); min-width: 52px; }
+.atendimentos .seletor-de-atendidos .config-abas { margin: 0; flex-wrap: wrap; }
 /* A tabela de atendidos cabe no cartão estreito do ranking: sem a largura
    mínima das outras tabelas (`table.fila.numeros`, 320px), que mandaria Chat e
    Total para fora da vista — e com o nome na primeira coluna podendo quebrar,

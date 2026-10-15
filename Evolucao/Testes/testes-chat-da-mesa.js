@@ -358,6 +358,131 @@ function rodarTestesDoChatDaMesa() {
   });
 
   /* ----------------------------------------------------------------------- */
+  secao('Sucursal, e Vida em grupo / Vida individual / Total');
+
+  /** A visão pedida: a de sempre vem em `atendimentos`; as outras oito, em `visoes`. */
+  const visao = (painel, chave) => (chave === 'todos|total'
+    ? painel.atendimentos : painel.atendimentos.visoes[chave]);
+
+  /** Três do chat e três do sistema, com ramo, SUSEP e assunto escolhidos a dedo. */
+  function mesaComVidas() {
+    const t = mesaComChat([
+      [diasAtras(0), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(0), 'Ana Martins', 'RET01A', 'Cobrança', 'VI'],
+      [diasAtras(0), 'Diego Castilho', 'RET03C', 'Sinistro', 'VG']]);
+    t.ligar();
+    t.caso({ Ramo: 'Vida em grupo', SUSEP: 'RET00J', Assunto: 'Cobrança' });
+    t.caso({ Ramo: 'Vida individual', SUSEP: 'RET01A', Assunto: 'Sinistro', Analista: 'Diego Castilho' });
+    t.caso({ SUSEP: 'RET00J', Assunto: 'Cobrança' });   // sem ramo: só no Total
+    return t;
+  }
+
+  teste('a sucursal vem do cadastro, pela SUSEP — nos dois lados', () => {
+    const t = mesaComVidas();
+    const grafico = t.grafico(t.painel(), 'Top 5 sucursais');
+    igual(grafico.dimensao, 'Sucursal');
+    igual(t.pontos(grafico).join('|'), '12:3+2|58:0+1',
+      'RET00J e RET01A são da 12; RET03C, da 58 — o chat nem traz a coluna');
+  });
+
+  teste('SUSEP fora do cadastro, ou sem sucursal, vai para "sem informação"', () => {
+    const t = mesaComChat([[diasAtras(0), 'Ana Martins', 'RET99Z', 'Cobrança', 'VG']]);
+    t.ligar();
+    t.chamar('inserirRegistro_')('CORRETORAS', { SUSEP: 'RET77X', Corretora: 'Sem sucursal', Sucursal: '' });
+    t.caso({ SUSEP: 'RET77X' });
+    const grafico = t.grafico(t.painel(), 'Top 5 sucursais');
+    igual(grafico.pontos.length, 0);
+    igual(grafico.semInformacao, 2);
+  });
+
+  teste('o Total é a visão de sempre; as outras oito vêm prontas, sem repetir o Total', () => {
+    const t = mesaComVidas();
+    const a = t.painel().atendimentos;
+    igual(Object.keys(a.visoes).sort().join(','),
+      'chat|total,chat|vg,chat|vi,sistema|total,sistema|vg,sistema|vi,todos|vg,todos|vi');
+    igual(a.totais.total, 6);
+    igual(a.graficos.map((g) => g.titulo).join('|'), 'Atendidos por analista|Top 5 corretoras|'
+      + 'Top 5 SUSEPs|Top 5 sucursais|Top 5 assuntos|Top 5 consultores|Vida individual ou Vida em grupo');
+  });
+
+  teste('Vida em grupo: o top 5 é só dos atendimentos de Vida em grupo', () => {
+    const t = mesaComVidas();
+    const vg = visao(t.painel(), 'todos|vg');
+    igual(vg.totais.total, 3, 'VG: 1 do sistema e 2 do chat');
+    igual(vg.totais.sistema, 1);
+    igual(vg.totais.chat, 2);
+    igual(t.pontos(vg.graficos.find((g) => g.titulo === 'Top 5 sucursais')).join('|'), '12:1+1|58:0+1');
+    igual(t.pontos(vg.graficos.find((g) => g.titulo === 'Top 5 SUSEPs')).join('|'),
+      'RET00J:1+1|RET03C:0+1');
+    igual(t.pontos(vg.graficos.find((g) => g.titulo === 'Top 5 assuntos')).join('|'),
+      'Cobrança:1+1|Sinistro:0+1');
+    igual(t.pontos(vg.graficos.find((g) => g.titulo === 'Atendidos por analista')).join('|'),
+      'Ana Martins:1+1|Diego Castilho:0+1');
+  });
+
+  teste('Vida individual: o outro ramo, também isolado', () => {
+    const t = mesaComVidas();
+    const vi = visao(t.painel(), 'todos|vi');
+    igual(vi.totais.total, 2);
+    igual(t.pontos(vi.graficos.find((g) => g.titulo === 'Top 5 SUSEPs')).join('|'),
+      'RET01A:1+1');
+    igual(t.pontos(vi.graficos.find((g) => g.titulo === 'Top 5 assuntos')).join('|'),
+      'Cobrança:0+1|Sinistro:1+0');
+  });
+
+  teste('a rosca de Vida individual × Vida em grupo só existe no Total', () => {
+    const t = mesaComVidas();
+    const painel = t.painel();
+    const titulos = (chave) => visao(painel, chave).graficos.map((g) => g.titulo);
+    verdadeiro(titulos('todos|total').indexOf('Vida individual ou Vida em grupo') >= 0);
+    verdadeiro(titulos('chat|total').indexOf('Vida individual ou Vida em grupo') >= 0,
+      'com a origem escolhida, o Total continua tendo a rosca');
+    verdadeiro(titulos('todos|vg').indexOf('Vida individual ou Vida em grupo') < 0,
+      'num ramo só seria uma fatia de 100%');
+    verdadeiro(titulos('chat|vi').indexOf('Vida individual ou Vida em grupo') < 0);
+  });
+
+  teste('E-mail é o caso do sistema; Chat, o importado — e cada origem some com a outra', () => {
+    const t = mesaComVidas();
+    const painel = t.painel();
+    const email = visao(painel, 'sistema|total');
+    igual(email.totais.total, 3);
+    igual(email.totais.chat, 0, 'o chat não entra no e-mail');
+    igual(t.pontos(email.graficos.find((g) => g.titulo === 'Top 5 sucursais')).join('|'), '12:3+0');
+    const chat = visao(painel, 'chat|total');
+    igual(chat.totais.total, 3);
+    igual(chat.totais.sistema, 0, 'o sistema não entra no chat');
+    igual(t.pontos(chat.graficos.find((g) => g.titulo === 'Top 5 sucursais')).join('|'), '12:0+2|58:0+1');
+  });
+
+  teste('origem e ramo juntos: só o chat de Vida individual', () => {
+    const t = mesaComVidas();
+    const v = visao(t.painel(), 'chat|vi');
+    igual(v.totais.total, 1);
+    igual(t.pontos(v.graficos.find((g) => g.titulo === 'Top 5 assuntos')).join('|'), 'Cobrança:0+1');
+  });
+
+  teste('o analista segue com até 15 em cada visão', () => {
+    const t = mesaComChat();
+    for (let i = 0; i < 17; i++) t.caso({ Analista: 'Analista ' + comZero(i), Ramo: 'Vida em grupo' });
+    const grafico = visao(t.painel(), 'todos|vg').graficos[0];
+    igual(grafico.titulo, 'Atendidos por analista');
+    igual(grafico.pontos.length, 16, '15 e o "Demais valores"');
+    igual(grafico.total, 17);
+  });
+
+  teste('a soma de VG e VI nunca passa do Total', () => {
+    const t = mesaComVidas();
+    const painel = t.painel();
+    ['sistema', 'chat', 'todos'].forEach((origem) => {
+      const total = visao(painel, origem + '|total').totais.total;
+      const soma = visao(painel, origem + '|vg').totais.total + visao(painel, origem + '|vi').totais.total;
+      verdadeiro(soma <= total, origem + ': ' + soma + ' ≤ ' + total);
+    });
+    igual(visao(painel, 'todos|total').totais.total - 5, 1, 'o caso sem ramo só conta no Total');
+  });
+
+  /* ----------------------------------------------------------------------- */
   secao('O período e o alcance valem para o chat também');
 
   teste('o chat entra pelo período da tela; a data com hora também vale', () => {
@@ -411,7 +536,7 @@ function rodarTestesDoChatDaMesa() {
     igual(a.chat.ligado, false);
     igual(a.totais.sistema, 2);
     igual(a.totais.chat, 0);
-    verdadeiro(a.graficos.length === 6, 'os seis gráficos existem mesmo assim');
+    verdadeiro(a.graficos.length === 7, 'os sete gráficos existem mesmo assim');
     contem(lerTela('Produtividade.html'), 'Traga o chat pela tela de Importação');
   });
 
@@ -470,18 +595,32 @@ function rodarTestesDoChatDaMesa() {
   /* ----------------------------------------------------------------------- */
   secao('A tela');
 
-  teste('a Produtividade desenha o resumo, os seis gráficos e a tabela de onde veio cada número', () => {
+  teste('a Produtividade desenha o resumo, os gráficos e a tabela de atendimentos', () => {
     const tela = lerTela('Produtividade.html');
     contem(tela, 'function desenharAtendimentos');
-    contem(tela, 'Atendidos — sistema e chat');
+    contem(tela, "'Atendidos — ' + escapar(nomeDaVisaoDosAtendidos())");
     contem(tela, 'function tabelaDeAtendidos');
     contem(tela, '+ desenharAtendimentos()', 'entra na tela, depois dos prazos');
-    ['Sistema', 'Chat', 'Total'].forEach((coluna) => contem(tela, coluna));
+    contem(tela, "<th class=\"direita\">Atendimentos</th>", 'uma coluna só, como o PO pediu');
+    verdadeiro(tela.indexOf('<th class="direita">Sistema</th>') < 0, 'sem Sistema | Chat separados');
+  });
+
+  teste('a tela tem os dois seletores — origem e ramo — e trocar não volta ao servidor', () => {
+    const tela = lerTela('Produtividade.html');
+    contem(tela, 'data-origem-dos-atendidos');
+    contem(tela, 'data-ramo-dos-atendidos');
+    contem(tela, "[['todos', 'Todos'], ['sistema', 'E-mail'], ['chat', 'Chat']]");
+    contem(tela, "[['total', 'Total'], ['vg', 'Vida em grupo'], ['vi', 'Vida individual']]");
+    contem(tela, "atendidos.visoes[chave]", 'a visão vem pronta da resposta');
+    contem(tela, 'origemDosAtendidos = escolhida;\n      desenhar();', 'trocar a origem redesenha');
+    contem(tela, 'ramoDosAtendidos = escolhido;\n      desenhar();', 'trocar o ramo redesenha');
+    contem(tela, "var chave = origemDosAtendidos + '|' + ramoDosAtendidos;", 'a visão é a das duas escolhas');
+    contem(lerTela('Estilos.html'), '.seletor-de-atendidos', 'a classe existe no estilo');
   });
 
   teste('a Produtividade da Mesa separa a Equipe dos Atendidos, em abas', () => {
     const tela = lerTela('Produtividade.html');
-    contem(tela, "[['equipe', 'Equipe'], ['atendidos', 'Atendidos (sistema + chat)']]");
+    contem(tela, "[['equipe', 'Equipe'], ['atendidos', 'Atendidos (e-mail + chat)']]");
     contem(tela, 'data-aba-da-mesa');
   });
 

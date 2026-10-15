@@ -3527,9 +3527,11 @@ function indiceDeCorretorasPorSusep_() {
   lerRegistros_('CORRETORAS').forEach(function (linha) {
     var chave = chaveDaSusep_(linha.SUSEP);
     if (!chave) return;
-    var atual = indice[chave] || { corretora: '', consultor: '' };
+    var atual = indice[chave] || { corretora: '', consultor: '', sucursal: '' };
     if (!atual.corretora) atual.corretora = String(linha.Corretora || '').trim();
     if (!atual.consultor) atual.consultor = String(linha.Consultor || '').trim();
+    if (!atual.sucursal) atual.sucursal = String(linha.Sucursal === undefined || linha.Sucursal === null
+      ? '' : linha.Sucursal).trim();
     indice[chave] = atual;
   });
   return indice;
@@ -3605,6 +3607,13 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
         var nome = (doCadastro && doCadastro.consultor) || String(bruto.consultor || '').trim();
         return [normalizarParaComparar_(nome), nome];
       })(),
+      // A sucursal vem SÓ do cadastro, pela SUSEP: nem a Mesa nem o chat têm
+      // essa coluna (pedido do PO: "o mesmo para sucursal"). SUSEP fora do
+      // cadastro, ou cadastrada sem sucursal, cai em "sem informação".
+      sucursal: (function () {
+        var nome = (doCadastro && doCadastro.sucursal) || '';
+        return [normalizarParaComparar_(nome), nome];
+      })(),
       ramo: [ramo.chave, ramo.rotulo]
     });
   }
@@ -3620,8 +3629,58 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
   });
   doChatNoPeriodo.forEach(function (linha) { acrescentar('chat', linha); });
 
-  var doSistema = casosDoSistema.length;
-  var doChatTotal = doChatNoPeriodo.length;
+  // AS VISÕES. A tela tem dois seletores — a origem (Todos / E-mail / Chat) e o
+  // ramo (Total / Vida em grupo / Vida individual) — e trocar um deles não volta
+  // ao servidor: cada combinação já vem pronta. O "Top 5" de Vida em grupo não
+  // é o do total filtrado na tela (os cinco primeiros são outros), e por isso
+  // cada visão é montada do zero, pela MESMA função dos gráficos. A visão
+  // "todos|total" é a de sempre (`totais` e `graficos`); as outras oito vão em
+  // `visoes`, para a resposta não carregar a mesma coisa duas vezes.
+  //
+  // E-MAIL é o caso cadastrado no sistema; CHAT, o atendimento importado. A
+  // definição é do PO ("E-mail: casos do sistema e chat: casos importados"):
+  // o campo Canal do caso (Chat, Retorno | chat, E-mail) não entra nela.
+  var ORIGENS = [['todos', null], ['sistema', 'sistema'], ['chat', 'chat']];
+  var RAMOS = [['total', null], ['vg', 'vg'], ['vi', 'vi']];
+  var visoes = {};
+  var padrao = null;
+  ORIGENS.forEach(function (origem) {
+    RAMOS.forEach(function (ramo) {
+      var recorte = atendimentos.filter(function (atendimento) {
+        return (!origem[1] || atendimento.origem === origem[1])
+          && (!ramo[1] || atendimento.ramo[0] === ramo[1]);
+      });
+      var daOrigem = function (nome) {
+        return recorte.filter(function (atendimento) { return atendimento.origem === nome; }).length;
+      };
+      var visao = {
+        totais: { sistema: daOrigem('sistema'), chat: daOrigem('chat'), total: recorte.length },
+        graficos: [
+          graficoDeAtendidos_(recorte, 'analista', 'Atendidos por analista', 'Analista',
+            'barrasDeitadas', 2, 15, 'Sem analista'),
+          graficoDeAtendidos_(recorte, 'corretora', 'Top 5 corretoras', 'Corretora',
+            'barrasDeitadas', 1, 5, ''),
+          graficoDeAtendidos_(recorte, 'susep', 'Top 5 SUSEPs', 'SUSEP',
+            'barrasDeitadas', 1, 5, ''),
+          graficoDeAtendidos_(recorte, 'sucursal', 'Top 5 sucursais', 'Sucursal',
+            'barrasDeitadas', 1, 5, ''),
+          graficoDeAtendidos_(recorte, 'assunto', 'Top 5 assuntos', 'Assunto',
+            'barrasDeitadas', 1, 5, ''),
+          graficoDeAtendidos_(recorte, 'consultor', 'Top 5 consultores', 'Consultor',
+            'barrasDeitadas', 1, 5, '')
+        ]
+      };
+      // A rosca de Vida individual × Vida em grupo É a divisão por ramo: ela
+      // só existe na visão "Total". Numa visão de um ramo só seria uma fatia de
+      // 100%.
+      if (!ramo[1]) {
+        visao.graficos.push(graficoDeAtendidos_(recorte, 'ramo', 'Vida individual ou Vida em grupo',
+          'Ramo', 'pizza', 1, 6, 'Sem informação'));
+      }
+      if (origem[0] === 'todos' && ramo[0] === 'total') padrao = visao;
+      else visoes[origem[0] + '|' + ramo[0]] = visao;
+    });
+  });
 
   return {
     chat: {
@@ -3631,21 +3690,9 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
       linhasLidas: doChat.lidas,
       semData: semData
     },
-    totais: { sistema: doSistema, chat: doChatTotal, total: doSistema + doChatTotal },
-    graficos: [
-      graficoDeAtendidos_(atendimentos, 'analista', 'Atendidos por analista', 'Analista',
-        'barrasDeitadas', 2, 15, 'Sem analista'),
-      graficoDeAtendidos_(atendimentos, 'corretora', 'Top 5 corretoras', 'Corretora',
-        'barrasDeitadas', 1, 5, ''),
-      graficoDeAtendidos_(atendimentos, 'susep', 'Top 5 SUSEPs', 'SUSEP',
-        'barrasDeitadas', 1, 5, ''),
-      graficoDeAtendidos_(atendimentos, 'assunto', 'Top 5 assuntos', 'Assunto',
-        'barrasDeitadas', 1, 5, ''),
-      graficoDeAtendidos_(atendimentos, 'consultor', 'Top 5 consultores', 'Consultor',
-        'barrasDeitadas', 1, 5, ''),
-      graficoDeAtendidos_(atendimentos, 'ramo', 'Vida individual ou Vida em grupo', 'Ramo',
-        'pizza', 1, 6, 'Sem informação')
-    ]
+    totais: padrao.totais,
+    graficos: padrao.graficos,
+    visoes: visoes
   };
 }
 
