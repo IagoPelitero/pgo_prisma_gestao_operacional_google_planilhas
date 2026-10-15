@@ -110,7 +110,7 @@ Esta é a regra que impede corrupção silenciosa de dado.
 | Natureza | Exemplo | Na planilha | Por quê |
 |---|---|---|---|
 | **Identificador** | ID, CPF, apólice, proposta | **Texto**, só dígitos | `0000000000` num campo numérico vira `0`. `000000E1` vira `0` (notação científica) |
-| **Medida** | tentativas de contato, contagens | **Número** nativo | Power BI soma direto, sem conversão |
+| **Medida** | contagens | **Número** nativo | Power BI soma direto, sem conversão |
 | **Dinheiro** | valor do prêmio, prêmio retido, prêmio mensal | **Número** nativo + formato `R$ #,##0.00` | O valor gravado é número puro; o `R$` é formato da célula, não texto |
 | **Data** | data de entrada, data de finalização | **Data** nativa | Power BI reconhece; filtro por período funciona |
 | **Hora** | horário, hora resposta | **Hora** nativa | |
@@ -227,7 +227,10 @@ tentativas de contato
   `valor do prêmio retido`, `prêmio mensal`. A última se chamava *prêmio mensal
   retido* — nome errado, palavra do PO; `atualizarPGO` renomeia o cabeçalho, o
   campo (chave `premiomensal`), a permissão de cada nível e o que citava o nome.
-- Medida em número puro: `tentativas de contato`.
+- `tentativas de contato` é **texto**: guarda a opção da lista ("1ª tentativa",
+  "Caixa postal"). Já foi declarada como número, e a opção ia em branco (achado 98).
+- `valor do prêmio retido` é obrigatório quando o status é Retido — regra do campo
+  (`obrigatorioSe`, em `CAMPOS.Configuracao`), e não da coluna.
 
 #### `BASE_MESA` — Mesa Diamante (20 colunas + controle)
 
@@ -274,14 +277,18 @@ cheio**. Carimba nas duas portas (diálogo de status e formulário) e no cadastr
 de um caso que já nasce trabalhado; a importação não carimba. As trocas
 seguintes não mexem nela.
 
-#### A planilha do chat (fora do contrato)
+#### A aba do chat: `ATENDIMENTOS_CHAT`
 
-Os atendidos da Mesa Diamante somam o sistema à planilha de casos atendidos pelo
-chat. Ela **não tem contrato** e o PGO **só lê**: o Id, a aba e o nome da coluna de
-cada informação ficam em `CONFIG` (`CHAT.PLANILHA_ID`, `CHAT.ABA`, `CHAT.COLUNAS`,
-esta em JSON). Lida do fim da aba, só as colunas escolhidas, uma ida ao serviço por
-coluna — ver `lerAtendimentosDoChat_`, em `Indicadores.gs`. A corretora e o
-consultor dos dois lados vêm de `CORRETORAS`, pela SUSEP.
+Os atendidos da Mesa Diamante somam o sistema aos atendimentos do chat. Desde a
+Etapa 39 eles **entram pela Importação** e moram nesta aba, que tem contrato:
+`Id` · `Data` (data) · `Analista` · `SUSEP` · `Corretora` · `Assunto` · `Consultor` ·
+`Ramo` · `Lote` · `ImportadoEm` (do sistema). A Produtividade lê o fim da aba, com o
+teto de `OPERACAO.LINHAS_DO_PAINEL` — ver `lerAtendimentosDoChat_`, em
+`Indicadores.gs`. A importação (`conferirImportacaoDoChat`,
+`importarAtendimentosDoChat`) usa a mesma leitura de fonte e o mesmo de-para da
+importação de casos, e pula a linha que já está na aba, na mesma quantidade. A
+corretora e o consultor dos dois lados vêm de `CORRETORAS`, pela SUSEP. As chaves
+antigas `CHAT.*` da `CONFIG` deixaram de ser lidas.
 
 ### 3.2 Cadastros
 

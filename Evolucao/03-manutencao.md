@@ -117,14 +117,25 @@ de nascimento, o selo mostra o prazo cheio (`prazoQueNaoComecou_`, no
 
 ### A planilha do chat mudou de colunas
 
-Configurações › Estrutura › **Planilha dos atendimentos do chat**: troque o nome da
-coluna e use **Conferir a planilha** — ela mostra as últimas linhas já traduzidas.
-Quando a planilha não abre ou perde uma coluna, a Produtividade da Mesa continua
-com os números do sistema e escreve o motivo em cima. Para o chat passar a trazer
-mais uma informação (hoje: data, analista, SUSEP, corretora, assunto, consultor e
-vida individual/grupo), acrescente o item em `RECC_COLUNAS_DO_CHAT` e um campo em
-`atendimentosDaMesa_` (`Indicadores.gs`), e um gráfico em `graficoDeAtendidos_`. A
-tela não muda: ela desenha o que o servidor manda.
+Nada a configurar: o chat entra pela **Importação** (Mesa Diamante → Atendimentos
+do chat), e o de-para é escolhido a cada importação — a coluna que mudou de nome
+se liga de novo ali, e a conferência mostra as primeiras linhas já traduzidas.
+Importou um lote errado? Ele tem nome (coluna `Lote` da aba `ATENDIMENTOS_CHAT`):
+filtre por ele na planilha e apague essas linhas. Para o chat passar a trazer mais
+uma informação (hoje: data, analista, SUSEP, corretora, assunto, consultor e vida
+individual/grupo), acrescente a coluna em `RECC_ESQUEMA.ATENDIMENTOS_CHAT`
+(`Base.gs`), o item em `RECC_COLUNAS_DO_CHAT` e o campo em `atendimentosDaMesa_`
+(`Indicadores.gs`), e um gráfico em `graficoDeAtendidos_`. A tela não muda: ela
+desenha o que o servidor manda.
+
+### Um campo de lista grava em branco
+
+Se a gravação for recusada com "a coluna X da planilha guarda número, e '…' ficaria
+em branco nela", o contrato da aba (`RECC_ESQUEMA`, `Base.gs`) diz que a coluna é
+de número (ou data, ou outro tipo), e o campo manda texto. Foi o que aconteceu com
+a tentativa de contato (achado 98). Troque o `tipo` da coluna no contrato para
+`texto` — ou o tipo do campo, se a coluna é que está certa. Antes dessa guarda, o
+valor ia em branco sem aviso.
 
 ### Tirei um registro de cadastro e quero de volta
 

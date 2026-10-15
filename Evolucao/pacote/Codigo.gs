@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-14 22:30
+   Gerado em 2026-10-15 15:45
    ========================================================================== */
 
 
@@ -429,7 +429,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'novo numero da proposta', tipo: 'identificador', protegido: true },
       { cabecalho: 'motivo do cancelamento', tipo: 'texto', protegido: true },
       { cabecalho: 'data da transmissão', tipo: 'data', protegido: true },
-      { cabecalho: 'tentativas de contato', tipo: 'numero', protegido: true },
+      // TEXTO, e não número (achado 98). O campo sempre foi uma LISTA — "1ª
+      // tentativa", "2ª tentativa"… —, e com a coluna declarada número o texto
+      // era convertido para número, não dava, e a célula ficava em branco: a
+      // tentativa escolhida nunca chegou à planilha. Ninguém soma esta coluna.
+      { cabecalho: 'tentativas de contato', tipo: 'texto', protegido: true },
 
       // ---- OS CARIMBOS DE STATUS ----------------------------------------
       // Uma coluna por status da RET, com a data e a hora em que o caso
@@ -1014,6 +1018,32 @@ const RECC_ESQUEMA = {
    * Assim o VG, que ainda não definiu o dele, só precisa que o PO ligue o
    * sinalizador que já está lá, desligado.
    */
+  // Os atendimentos do CHAT da Mesa Diamante, trazidos pela tela de Importação.
+  // Pedido do PO: ler uma planilha à parte "ficou confuso e não consegui fazer
+  // a junção" — agora o chat entra como os casos entram (colar ou link, de-para,
+  // conferência) e mora aqui, dentro do PGO. A Produtividade da Mesa soma estas
+  // linhas aos casos do sistema.
+  ATENDIMENTOS_CHAT: {
+    aba: 'ATENDIMENTOS_CHAT',
+    titulo: 'Atendimentos do chat',
+    controle: true,
+    reserva: 1000,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Data', tipo: 'data', protegido: true },
+      { cabecalho: 'Analista', tipo: 'texto', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: false },
+      { cabecalho: 'Corretora', tipo: 'texto', protegido: false },
+      { cabecalho: 'Assunto', tipo: 'texto', protegido: false },
+      { cabecalho: 'Consultor', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ramo', tipo: 'texto', protegido: false },
+      // O lote, como na importação de casos: é por ele que se acha (e, se
+      // preciso, se apaga) uma leva importada errada.
+      { cabecalho: 'Lote', tipo: 'texto', protegido: false },
+      { cabecalho: 'ImportadoEm', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+    ]
+  },
+
   SINALIZADORES: {
     aba: 'SINALIZADORES',
     titulo: 'Sinalizadores',
@@ -4258,6 +4288,11 @@ function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
     // Aparece só quando outro campo estiver com um destes valores: { campo:
     // 'chave', valores: ['Retido', 'Pago'] } — ver condicaoDoCampo_.
     mostrarSe: condicaoDoCampo_(configuracao),
+    // OBRIGATÓRIO só quando outro campo estiver com um destes valores — pedido
+    // do PO: "quando o status for Retido, o valor retido deve ser obrigatório".
+    // Mesmo formato do mostrarSe; o campo continua aparecendo nos outros casos,
+    // só deixa de ser cobrado.
+    obrigatorioSe: condicaoDoCampo_({ mostrarSe: configuracao.obrigatorioSe }),
     largura: Number(configuracao.largura) || 1,
     /*
      * Data no futuro é RECUSADA por padrão: o caso descreve algo que já
@@ -4651,6 +4686,13 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
       return;
     }
 
+    // "Obrigatório quando…": vale o valor que o campo que manda VAI TER — o
+    // Retido escolhido agora cobra o valor retido nesta mesma gravação.
+    if (descricao.obrigatorioSe
+      && condicaoBate_(descricao.obrigatorioSe, valorQueVaiValer(descricao.obrigatorioSe.campo))) {
+      descricao.obrigatorio = true;
+    }
+
     var veioDaTela = valoresDaTela.hasOwnProperty(descricao.chave)
       || valoresDaTela.hasOwnProperty(descricao.cabecalho);
     var bruto = valoresDaTela[descricao.chave];
@@ -4755,6 +4797,16 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     if (descricao.tipo === 'documento' && !ehASusep_(descricao.chave)
       && !ehASusep_(descricao.cabecalho)) bruto = apenasDigitos_(bruto);
 
+    // O VALOR TEM DE CABER NA COLUNA. A coluna de número, de data ou de Id
+    // converte o que recebe; o que não converte vira VAZIO — e era assim, calado,
+    // que a tentativa de contato sumia (achado 98). Recusar com o motivo é melhor
+    // do que dizer "salvo" e gravar em branco.
+    var naoCabe = valorQueNaoCabeNaColuna_(canal.aba, descricao.cabecalho, bruto);
+    if (naoCabe) {
+      problemas.push({ campo: descricao.chave, rotulo: descricao.rotulo, erro: naoCabe });
+      return;
+    }
+
     paraGravar[descricao.cabecalho] = bruto;
   });
 
@@ -4857,6 +4909,35 @@ function conferirCampo_(campo, valor) {
   }
 
   return '';
+}
+
+/**
+ * O motivo de um valor NÃO caber no tipo da coluna da planilha — ou vazio, quando
+ * cabe.
+ *
+ * Quem decide o tipo é o contrato da base (ou o campo, numa coluna criada por
+ * Cadastrar Caso). Um texto numa coluna de número, ou de data, era convertido e
+ * virava célula em branco, sem erro nenhum. Só reclama quando a conversão APAGA
+ * o valor: número com vírgula, data em dd/mm/aaaa e o resto que a coluna entende
+ * continuam passando como sempre.
+ */
+var RECC_O_QUE_A_COLUNA_GUARDA = {
+  identificador: 'um código só de dígitos', numero: 'número', dinheiro: 'valor em dinheiro',
+  data: 'data', dataHora: 'data e hora', hora: 'hora', simOuNao: 'Sim ou Não'
+};
+
+function valorQueNaoCabeNaColuna_(nomeDaAba, cabecalho, valor) {
+  if (String(valor === null || valor === undefined ? '' : valor).trim() === '') return '';
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var posicao = posicaoDaColuna_(estrutura, cabecalho);
+  if (posicao < 0) return '';
+  var tipo = estrutura.tipos[posicao];
+  if (!RECC_O_QUE_A_COLUNA_GUARDA[tipo]) return '';
+  var convertido = converterParaOTipoDaColuna_(valor, tipo);
+  if (convertido !== '' && convertido !== null && convertido !== undefined) return '';
+  return 'a coluna "' + estrutura.cabecalhos[posicao] + '" da planilha guarda '
+    + RECC_O_QUE_A_COLUNA_GUARDA[tipo] + ', e "' + String(valor).trim().slice(0, 60)
+    + '" ficaria em branco nela. Escolha outro valor, ou peça para ajustar o tipo da coluna';
 }
 
 /** Numa máscara, cada zero é um dígito: 000.000.000-00 pede 11. */
@@ -5016,7 +5097,7 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
  *
  * Segue a permissão de EDITAR: trocar a situação é editar o caso.
  */
-function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
+function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = converterParaIdentificador_(idDoCaso);
@@ -5044,6 +5125,14 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
 
   var alteracao = {};
   alteracao[canal.colunaDoStatus] = achada.gravadoComo;
+
+  // OS CAMPOS QUE O STATUS PEDE. Pedido do PO: o valor retido é obrigatório no
+  // Retido — e o diálogo de status, que só trocava o status, deixava passar um
+  // Retido sem valor. Agora ele recebe os campos que aparecem ou são cobrados
+  // no status escolhido (o valor retido, o Status proposta, a tentativa de
+  // contato) e confere como o formulário confere. Ver camposDaSituacao.
+  gravarOsCamposDaSituacao_(canal, quem, atual, achada.gravadoComo,
+    valoresDosCampos || {}, alteracao);
 
   // Concluir preenche a data de finalização quando o canal tem essa coluna e
   // ela ainda está vazia — é o que a operação faria à mão logo em seguida.
@@ -5083,6 +5172,99 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
   // ocultar, mexer em configuração.
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
+}
+
+/**
+ * Os campos que um status PEDE: os que aparecem só nele (mostrarSe do campo de
+ * status) e os que ficam obrigatórios nele (obrigatorioSe). É o que o diálogo
+ * de "Alterar status" mostra ao escolher o status.
+ */
+function camposPedidosPelaSituacao_(canal, quem, situacao) {
+  var doStatus = '';
+  var ativos = camposAtivosDoCanal_(canal.id);
+  ativos.forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Cabecalho) === normalizarParaComparar_(canal.colunaDoStatus)) {
+      doStatus = String(campo.ChaveTecnica);
+    }
+  });
+  if (!doStatus) return [];
+  var pedidos = [];
+  ativos.forEach(function (campo) {
+    if (String(campo.ChaveTecnica) === doStatus) return;
+    if (visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica) !== RECC_VISIBILIDADE.EDICAO) return;
+    var descricao = campoParaATela_(campo, canal.id, RECC_VISIBILIDADE.EDICAO, quem);
+    var aparece = descricao.mostrarSe && descricao.mostrarSe.campo === doStatus
+      && condicaoBate_(descricao.mostrarSe, situacao);
+    var cobrado = descricao.obrigatorioSe && descricao.obrigatorioSe.campo === doStatus
+      && condicaoBate_(descricao.obrigatorioSe, situacao);
+    // Campo que depende de OUTRO campo (não do status) e não aparece agora não
+    // é pergunta deste diálogo.
+    if (descricao.mostrarSe && descricao.mostrarSe.campo !== doStatus) return;
+    if (!aparece && !cobrado) return;
+    if (cobrado) descricao.obrigatorio = true;
+    if (descricao.mostrarSe && !aparece) return;
+    pedidos.push(descricao);
+  });
+  return pedidos;
+}
+
+/**
+ * O que o diálogo de status mostra ao escolher um status: os campos que ele
+ * pede, já com o valor que o caso tem.
+ */
+function camposDaSituacao(idDoCanal, idDoCaso, situacao) {
+  var quem = exigirPermissao_(RECC_ACOES.EDITAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var atual = buscarRegistros_(canal.aba, 'Id', converterParaIdentificador_(idDoCaso), 1)[0];
+  if (!atual) throw new Error('O caso ' + idDoCaso + ' não existe no canal ' + canal.nome + '.');
+  exigirAlcanceSobre_(atual, canal, quem);
+  var estrutura = estruturaDaAba_(canal.aba);
+  return camposPedidosPelaSituacao_(canal, quem, String(situacao || '')).map(function (descricao) {
+    // O valor como o formulário o espera: o dinheiro como NÚMERO (a tela o
+    // escreve como R$, ver Formulario.preencher) e a data em dd/mm/aaaa.
+    var valor = valorPelaGrafiaDaAba_(atual, estrutura, descricao.cabecalho);
+    var tipoDaColuna = estrutura.tipos[posicaoDaColuna_(estrutura, descricao.cabecalho)];
+    descricao.valor = Object.prototype.toString.call(valor) === '[object Date]'
+      ? paraTexto_(valor, tipoDaColuna) : (valor === null || valor === undefined ? '' : valor);
+    // Quem decidiu se o campo aparece e se é cobrado foi o servidor, agora,
+    // para o status escolhido. A condição não vai para a tela: no diálogo o
+    // status é o seletor dele, e não um campo "status" — o formulário, sem
+    // achar quem manda, esconderia o campo que o status acabou de pedir.
+    descricao.mostrarSe = null;
+    descricao.obrigatorioSe = null;
+    return descricao;
+  });
+}
+
+/**
+ * Confere e grava, na troca de status, os campos que o status pede.
+ *
+ * Vale o que a tela mandou; o que ela não mandou fica como está no caso. O
+ * obrigatório vazio recusa a troca inteira — com o nome de cada campo —, e o
+ * valor passa pelas MESMAS conferências do formulário (conferirCampo_ e o
+ * "cabe na coluna"). Quem chama sem mandar nada (de fora da tela) também é
+ * cobrado: o Retido sem valor não entra por nenhuma porta.
+ */
+function gravarOsCamposDaSituacao_(canal, quem, atual, situacao, valores, alteracao) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var problemas = [];
+  camposPedidosPelaSituacao_(canal, quem, situacao).forEach(function (descricao) {
+    var veio = Object.prototype.hasOwnProperty.call(valores, descricao.chave);
+    var bruto = veio ? valores[descricao.chave]
+      : valorPelaGrafiaDaAba_(atual, estrutura, descricao.cabecalho);
+    if (bruto === null || bruto === undefined) bruto = '';
+    if (typeof bruto === 'string') bruto = bruto.trim();
+    var problema = conferirCampo_(descricao, bruto)
+      || valorQueNaoCabeNaColuna_(canal.aba, descricao.cabecalho, bruto);
+    if (problema) {
+      problemas.push(descricao.rotulo + ' — ' + problema);
+      return;
+    }
+    if (veio) alteracao[grafiaDaColuna_(canal.aba, descricao.cabecalho)] = bruto;
+  });
+  if (problemas.length) {
+    throw new Error('Para "' + situacao + '", confira: ' + problemas.join('; ') + '.');
+  }
 }
 
 /**
@@ -6843,7 +7025,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
     // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
-    statusPadrao: statusDaImportacaoDoCanal_(canal)
+    statusPadrao: statusDoLote_(canal, pedido.statusDoLote)
   };
 }
 
@@ -7190,6 +7372,32 @@ function statusDaImportacaoDoCanal_(canal) {
   return padrao;
 }
 
+/**
+ * O status dos casos do LOTE — pedido do PO: "escolher importação deve permitir
+ * que eu delegue o status de origem para todos os casos, e não mais por padrão
+ * apenas Não trabalhado".
+ *
+ * `escolhido` undefined (quem chama sem escolher) é o padrão do canal, como
+ * antes; vazio é "sem status", escolha de verdade; qualquer outro tem de ser um
+ * status do canal. Vale para o caso que a fonte trouxe SEM status: o que veio
+ * com status na coluna ligada no de-para continua com o dele.
+ *
+ * NÃO CARIMBA, por decisão do PO: o caso é antigo, e carimbar hoje diria que o
+ * contato (ou o Retido) aconteceu hoje.
+ */
+function statusDoLote_(canal, escolhido) {
+  if (escolhido === undefined || escolhido === null) return statusDaImportacaoDoCanal_(canal);
+  var texto = String(escolhido).trim();
+  if (!texto) return '';
+  var achada = situacaoDoCanalPeloValor_(canal, texto);
+  if (!achada) {
+    throw new Error('O status "' + texto + '" não existe no canal ' + canal.nome + '. Os status '
+      + 'dele são: ' + situacoesDoCanal_(canal).map(function (s) { return s.gravadoComo; }).join(', ')
+      + '.');
+  }
+  return achada.gravadoComo;
+}
+
 /** O status com que o caso nasce no formulário, tirado do campo Status do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
@@ -7262,7 +7470,7 @@ function importarCasos(idDoCanal, pedido) {
   var analistas = analistasEscolhidos_(pedido.analistas, canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var agora = new Date();
-  var statusPadrao = statusDaImportacaoDoCanal_(canal);
+  var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
 
   var paraGravar = [];
   var pulados = { vazia: 0, repetida: 0 };
@@ -7492,9 +7700,15 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusDaImportacaoDoCanal_(canal),
+    // Os status que a pessoa pode escolher para o lote inteiro.
+    statusDoCanal: canal.colunaDoStatus ? situacoesDoCanal_(canal).map(function (situacao) {
+      return { valor: situacao.gravadoComo, rotulo: situacao.nome };
+    }) : [],
     // Status padrão que a importação NÃO põe (o da Mesa): a tela explica.
     statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
+    // Na Mesa, a mesma tela traz também os atendimentos do CHAT (Etapa 39).
+    aceitaChat: canal.aba === 'BASE_MESA',
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
     // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.
@@ -7729,6 +7943,7 @@ function listarCamposDoCanal(idDoCanal) {
         // Quando o campo aparece, e — para quem pode mandar nos outros — as
         // opções que ele tem: é com elas que a tela monta "mostrar quando…".
         mostrarSe: condicaoDoCampo_(configuracao),
+        obrigatorioSe: condicaoDoCampo_({ mostrarSe: configuracao.obrigatorioSe }),
         opcoes: String(campo.TipoCampo || '') === 'seletor'
           ? opcoesDoCampo_(configuracao, canal.id).map(function (opcao) { return opcao.valor; })
           : [],
@@ -7811,6 +8026,12 @@ function salvarCampo(dados) {
     if (condicao) configuracao.mostrarSe = condicao;
     else delete configuracao.mostrarSe;
   }
+  // "Obrigatório quando…" — o valor retido no Retido, pedido do PO.
+  if (dados.obrigatorioSe !== undefined) {
+    var obrigacao = conferirACondicaoDoCampo_(atual, dados.obrigatorioSe, true);
+    if (obrigacao) configuracao.obrigatorioSe = obrigacao;
+    else delete configuracao.obrigatorioSe;
+  }
 
   var tipo = String(dados.tipo || atual.TipoCampo);
   if (!RECC_DO_CAMPO_PARA_O_DADO[tipo]) {
@@ -7847,8 +8068,11 @@ function salvarCampo(dados) {
  *   · um ciclo: A aparece quando B tem valor, e B aparece quando A tem valor.
  * Os valores guardados são os NOMES das opções, como a lista os escreve.
  */
-function conferirACondicaoDoCampo_(campo, pedido) {
+function conferirACondicaoDoCampo_(campo, pedido, ehObrigacao) {
   if (!pedido || !pedido.campo) return null;
+  // A mesma conferência serve ao "obrigatório quando…": muda só o texto, e o
+  // ciclo não se aplica — ser cobrado não esconde campo nenhum.
+  var oQue = ehObrigacao ? 'é obrigatório' : 'aparece';
 
   var doCanal = lerRegistros_('CAMPOS').filter(function (outro) {
     return converterParaIdentificador_(outro.CanalId) === converterParaIdentificador_(campo.CanalId);
@@ -7858,7 +8082,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
     return String(outro.ChaveTecnica) === String(pedido.campo);
   })[0];
   if (!quemManda || String(quemManda.ChaveTecnica) === chaveDele) {
-    throw new Error('O campo que decide quando este aparece precisa ser OUTRO '
+    throw new Error('O campo que decide quando este ' + oQue + ' precisa ser OUTRO '
       + 'campo do mesmo canal.');
   }
 
@@ -7867,7 +8091,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
     .filter(function (valor) { return valor !== ''; });
   if (!pedidos.length) {
     throw new Error('Escolha em quais valores de "' + String(quemManda.Rotulo || quemManda.Cabecalho)
-      + '" este campo aparece — ou deixe "Aparece sempre".');
+      + '" este campo ' + oQue + ' — ou deixe "' + (ehObrigacao ? 'Nunca' : 'Aparece sempre') + '".');
   }
 
   var opcoes = opcoesDoCampo_(lerConfiguracaoDoCampo_(quemManda), campo.CanalId)
@@ -7886,7 +8110,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
   });
 
   // Ciclo: sobe de quem manda em quem manda; se chegar neste campo, volta.
-  var subindo = quemManda;
+  var subindo = ehObrigacao ? null : quemManda;
   for (var passo = 0; subindo && passo < 20; passo++) {
     var acima = condicaoDoCampo_(lerConfiguracaoDoCampo_(subindo));
     if (!acima) break;
@@ -15807,7 +16031,7 @@ function oQueEuFiz_(quem, canal) {
 
 /* ############################################################################
    #
-   #  OS ATENDIMENTOS DO CHAT — a planilha apartada da Mesa Diamante
+   #  OS ATENDIMENTOS DO CHAT da Mesa Diamante — trazidos pela Importação
    #
    ############################################################################ */
 
@@ -15819,292 +16043,302 @@ function oQueEuFiz_(quem, canal) {
  * integrando o nome da corretora para mostrar a quantidade e o top 5; SUSEPs,
  * assuntos, consultor e vida individual ou em grupo, a mesma coisa".
  *
- * A planilha do chat NÃO tem contrato — é de outro sistema, e muda sem avisar.
- * Por isso o PO diz, em Configurações › Estrutura, QUAL planilha, QUAL aba e
- * QUAL coluna dela é cada coisa. O sistema só LÊ, nunca escreve ali, e uma
- * planilha que não abre vira recado ao lado dos números do sistema, e não uma
- * tela quebrada (mesma regra da base legada).
- *
  * O QUE SOMA COM O QUÊ: o atendido do sistema é todo caso da Mesa no período
  * (o mesmo recorte e o mesmo alcance dos cartões), e o do chat é toda linha da
- * planilha no período. A soma NÃO tira repetido: se o mesmo atendimento estiver
+ * aba ATENDIMENTOS_CHAT no período. A soma NÃO tira repetido: se o mesmo atendimento estiver
  * nas duas bases, ele conta duas vezes — o sistema não tem como saber.
  */
 
-const RECC_CHAVE_DO_CHAT_PLANILHA = 'CHAT.PLANILHA_ID';
-const RECC_CHAVE_DO_CHAT_ABA = 'CHAT.ABA';
-const RECC_CHAVE_DO_CHAT_COLUNAS = 'CHAT.COLUNAS';
+/*
+ * DESDE A ETAPA 39 O CHAT ENTRA PELA IMPORTAÇÃO. Antes o PO apontava, em
+ * Configurações › Estrutura, a planilha do chat, a aba e qual coluna dela era
+ * cada coisa — e o sistema lia de lá a cada abertura. Palavra dele: "ficou
+ * confuso e não consegui fazer a junção". Agora os atendimentos são trazidos
+ * pela tela de Importação, como os casos (colar ou link, de-para, conferência),
+ * e moram na aba ATENDIMENTOS_CHAT do próprio PGO. A configuração antiga (as
+ * chaves CHAT.* da CONFIG) deixou de ser lida.
+ */
 
 /**
- * O que o sistema precisa saber de cada linha do chat. `palavras` serve só
- * para SUGERIR a coluna (pelo nome do cabeçalho); quem decide é o PO.
+ * As colunas da aba ATENDIMENTOS_CHAT. `palavras` serve só para SUGERIR, no
+ * de-para da importação, qual coluna da origem é cada coisa; quem decide é a
+ * pessoa.
  */
 const RECC_COLUNAS_DO_CHAT = [
-  { chave: 'data', rotulo: 'Data do atendimento', obrigatoria: true,
+  { chave: 'data', cabecalho: 'Data', rotulo: 'Data do atendimento', obrigatoria: true,
     palavras: ['data', 'dataatendimento', 'datadoatendimento', 'dia'] },
-  { chave: 'analista', rotulo: 'Analista', obrigatoria: true,
+  { chave: 'analista', cabecalho: 'Analista', rotulo: 'Analista', obrigatoria: true,
     palavras: ['analista', 'atendente', 'agente', 'operador', 'nomedoanalista'] },
-  { chave: 'susep', rotulo: 'SUSEP', obrigatoria: false, palavras: ['susep'] },
-  { chave: 'corretora', rotulo: 'Corretora', obrigatoria: false,
+  { chave: 'susep', cabecalho: 'SUSEP', rotulo: 'SUSEP', obrigatoria: false, palavras: ['susep'] },
+  { chave: 'corretora', cabecalho: 'Corretora', rotulo: 'Corretora', obrigatoria: false,
     palavras: ['corretora', 'nomecorretora', 'nomedacorretora'] },
-  { chave: 'assunto', rotulo: 'Assunto', obrigatoria: false,
+  { chave: 'assunto', cabecalho: 'Assunto', rotulo: 'Assunto', obrigatoria: false,
     palavras: ['assunto', 'motivo', 'tema', 'tipodeatendimento'] },
-  { chave: 'consultor', rotulo: 'Consultor', obrigatoria: false, palavras: ['consultor'] },
-  { chave: 'ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
+  { chave: 'consultor', cabecalho: 'Consultor', rotulo: 'Consultor', obrigatoria: false,
+    palavras: ['consultor'] },
+  { chave: 'ramo', cabecalho: 'Ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
     palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] }
 ];
 
-/** O que está gravado em CONFIG sobre a planilha do chat, sem checar permissão. */
-function configuracaoLidaDoChat_() {
-  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_PLANILHA, '') || '').trim();
-  var aba = String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_ABA, '') || '').trim();
-  var guardadas = {};
-  try {
-    guardadas = JSON.parse(String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_COLUNAS, '') || '{}')) || {};
-  } catch (erro) {
-    guardadas = {};
-  }
-  var colunas = {};
-  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    colunas[definicao.chave] = String(guardadas[definicao.chave] || '').trim();
-  });
-  return { planilhaId: id, aba: aba, colunas: colunas, ligado: id !== '' };
-}
+const RECC_ABA_DO_CHAT = 'ATENDIMENTOS_CHAT';
 
-/** O que a tela de Configurações mostra sobre a planilha do chat. */
-function configuracaoDoChat() {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var lida = configuracaoLidaDoChat_();
-  lida.definicao = RECC_COLUNAS_DO_CHAT.map(function (definicao) {
-    return { chave: definicao.chave, rotulo: definicao.rotulo, obrigatoria: definicao.obrigatoria };
-  });
-  return lida;
-}
-
-/** A posição (base 1) da coluna pelo nome do cabeçalho, sem ligar para acento e caixa. */
-function posicaoNoCabecalhoDoChat_(cabecalhos, nome) {
-  var alvo = normalizarParaComparar_(nome);
-  if (!alvo) return 0;
-  for (var i = 0; i < cabecalhos.length; i++) {
-    if (normalizarParaComparar_(cabecalhos[i]) === alvo) return i + 1;
-  }
-  return 0;
-}
-
-/** Abre a aba do chat, ou diz por que não deu. */
-function abaDoChat_(planilhaId, nomeDaAba) {
-  var planilha = abrirPlanilhaDeFora_(planilhaId);
-  var procurado = String(nomeDaAba || '').trim();
-  var aba = procurado ? planilha.getSheetByName(procurado) : planilha.getSheets()[0];
-  if (!aba) {
-    throw new Error('A planilha abriu, mas não tem uma aba chamada "' + procurado
-      + '". As abas dela são: ' + planilha.getSheets().map(function (uma) {
-        return uma.getName();
-      }).join(', ') + '.');
-  }
-  return aba;
-}
-
-/** Quais colunas da planilha parecem ser cada coisa — só sugere, não decide. */
-function sugerirColunasDoChat_(cabecalhos) {
-  var sugestoes = {};
+/** O de-para sugerido: cada coluna da origem para a do chat de mesmo sentido. */
+function sugerirDeParaDoChat_(cabecalhosDaFonte) {
   var usadas = {};
+  var porPosicao = {};
   RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    var escolhida = '';
-    definicao.palavras.some(function (palavra) {
-      return cabecalhos.some(function (cabecalho, i) {
+    var palavras = definicao.palavras.concat([normalizarParaComparar_(definicao.cabecalho)]);
+    palavras.some(function (palavra) {
+      return cabecalhosDaFonte.some(function (cabecalho, i) {
         if (usadas[i] || normalizarParaComparar_(cabecalho) !== palavra) return false;
         usadas[i] = true;
-        escolhida = String(cabecalho).trim();
+        porPosicao[i] = definicao.cabecalho;
         return true;
       });
     });
-    sugestoes[definicao.chave] = escolhida;
   });
-  return sugestoes;
+  return cabecalhosDaFonte.map(function (cabecalho, i) {
+    return { daFonte: String(cabecalho), paraAColuna: porPosicao[i] || '' };
+  });
+}
+
+/** O que a tela de Importação precisa para trazer atendimentos do chat. */
+function opcoesDaImportacaoDoChat() {
+  exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
+  var existe = !!planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT);
+  return {
+    canal: { id: '', nome: 'Atendimentos do chat (Mesa)', aba: RECC_ABA_DO_CHAT },
+    abaExiste: existe,
+    colunasDoCanal: RECC_COLUNAS_DO_CHAT.map(function (d) { return d.cabecalho; }),
+    obrigatorias: RECC_COLUNAS_DO_CHAT.filter(function (d) { return d.obrigatoria; })
+      .map(function (d) { return d.cabecalho; }),
+    colunasDeCarimbo: [],
+    analistas: [],
+    foraDaDivisao: [],
+    statusDoCanal: [],
+    statusPadrao: '',
+    lotes: existe ? lotesDoChat_() : [],
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    repeticaoPelaProposta: false,
+    repeticaoPadrao: ''
+  };
+}
+
+/** Os lotes do chat já importados, do mais recente para o mais antigo. */
+function lotesDoChat_() {
+  var porLote = {};
+  lerRegistros_(RECC_ABA_DO_CHAT).forEach(function (linha) {
+    var lote = String(linha.Lote || '').trim();
+    if (!lote) return;
+    porLote[lote] = (porLote[lote] || 0) + 1;
+  });
+  return Object.keys(porLote).map(function (lote) {
+    return { origem: lote, casos: porLote[lote] };
+  });
 }
 
 /**
- * Abre a planilha do chat SEM ligar nada: é o botão "conferir".
+ * Monta as linhas do chat a partir da fonte, e diz o que entra e o que fica de
+ * fora — é o miolo da conferência e da gravação, que precisam concordar.
  *
- * Diz se abre, quais abas e colunas tem, o que as colunas escolhidas dão nas
- * últimas linhas e quantas SUSEPs a linha traz que o cadastro de corretoras
- * não conhece — que é o que deixaria a corretora e o consultor em branco nos
- * gráficos.
+ * Fica de fora: linha sem data ou sem analista (não há como recortar o período,
+ * nem de quem somar), data que não é data, e a linha que JÁ ESTÁ na aba. Sem
+ * esta última regra, importar a mesma planilha duas vezes contaria cada
+ * atendimento em dobro.
+ *
+ * O "já está" conta QUANTAS vezes: duas linhas idênticas no mesmo arquivo são
+ * dois atendimentos (o corretor que chamou duas vezes no dia, pelo mesmo
+ * assunto) e entram as duas; se a aba já tem uma igual, entra só a outra. Assim
+ * reimportar o mesmo arquivo não dobra nada, e nenhum atendimento de verdade
+ * some por parecer com outro.
  */
-function conferirPlanilhaDoChat(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var pedido = dados || {};
-  var id = String(pedido.planilhaId || '').trim();
-  if (!id) {
-    return { abre: false, recado: 'Informe o Id da planilha do chat. Ele é o pedaço do '
-      + 'endereço entre /d/ e /edit.', abas: [], cabecalhos: [], sugestoes: {}, faltando: [],
-      linhas: 0, amostra: [] };
+function linhasDoChatDaFonte_(pedido) {
+  var grade = gradeDaFonte_(pedido.fonte);
+  if (grade.length < 2) {
+    throw new Error('Preciso de pelo menos duas linhas: a primeira com os nomes das '
+      + 'colunas e ao menos uma de atendimento. Recebi ' + grade.length + '.');
+  }
+  var cabecalhosDaFonte = grade[0];
+  var corpo = grade.slice(1);
+  var dePara = Array.isArray(pedido.dePara) && pedido.dePara.length
+    ? pedido.dePara : sugerirDeParaDoChat_(cabecalhosDaFonte);
+
+  var destinos = {};
+  dePara.forEach(function (par) { if (par && par.paraAColuna) destinos[par.paraAColuna] = true; });
+  var faltando = RECC_COLUNAS_DO_CHAT.filter(function (d) {
+    return d.obrigatoria && !destinos[d.cabecalho];
+  }).map(function (d) { return d.rotulo; });
+
+  var chave = function (linha) {
+    return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
+      linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
+      .map(normalizarParaComparar_).join('|');
+  };
+  var jaNaAba = {};
+  if (planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT)) {
+    lerRegistros_(RECC_ABA_DO_CHAT).forEach(function (linha) {
+      var data = linha.Data;
+      var a = chave({ Data: Object.prototype.toString.call(data) === '[object Date]' ? data : '',
+        Analista: linha.Analista, SUSEP: linha.SUSEP, Corretora: linha.Corretora,
+        Assunto: linha.Assunto, Consultor: linha.Consultor, Ramo: linha.Ramo });
+      jaNaAba[a] = (jaNaAba[a] || 0) + 1;
+    });
   }
 
-  var planilha;
-  try {
-    planilha = abrirPlanilhaDeFora_(id);
-  } catch (erro) {
-    return { abre: false, recado: erro.message || String(erro), abas: [], cabecalhos: [],
-      sugestoes: {}, faltando: [], linhas: 0, amostra: [] };
-  }
-
-  var abas = planilha.getSheets().map(function (uma) { return uma.getName(); });
-  var aba;
-  try {
-    aba = abaDoChat_(id, pedido.aba);
-  } catch (erro) {
-    return { abre: true, recado: erro.message || String(erro), abas: abas, cabecalhos: [],
-      sugestoes: {}, faltando: [], linhas: 0, amostra: [] };
-  }
-
-  var largura = aba.getLastColumn();
-  var ultima = aba.getLastRow();
-  var cabecalhos = largura >= 1
-    ? aba.getRange(1, 1, 1, largura).getDisplayValues()[0].map(function (c) {
-      return String(c === null || c === undefined ? '' : c).trim();
-    }) : [];
-
-  var escolhidas = pedido.colunas || {};
-  var faltando = [];
-  var posicoes = {};
-  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    var nome = String(escolhidas[definicao.chave] || '').trim();
-    if (!nome) {
-      if (definicao.obrigatoria) faltando.push(definicao.rotulo + ': escolha a coluna.');
-      return;
-    }
-    var posicao = posicaoNoCabecalhoDoChat_(cabecalhos, nome);
-    if (!posicao) faltando.push(definicao.rotulo + ': a planilha não tem a coluna "' + nome + '".');
-    else posicoes[definicao.chave] = posicao;
+  var entram = [];
+  var motivos = { vazia: 0, repetida: 0, semDataOuAnalista: 0 };
+  corpo.forEach(function (bruta) {
+    var linha = linhaDaFonteParaOCaso_(bruta, cabecalhosDaFonte, dePara);
+    if (!temAlgumValor_(linha)) { motivos.vazia++; return; }
+    var data = dataDoAtendimentoDoChat_(linha.Data);
+    var analista = String(linha.Analista || '').trim();
+    if (!data || !analista) { motivos.semDataOuAnalista++; return; }
+    var pronta = { Data: data, Analista: analista };
+    ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo'].forEach(function (coluna) {
+      pronta[coluna] = String(linha[coluna] === undefined || linha[coluna] === null
+        ? '' : linha[coluna]).trim();
+    });
+    var a = chave(pronta);
+    if (jaNaAba[a] > 0) { jaNaAba[a]--; motivos.repetida++; return; }
+    entram.push(pronta);
   });
 
-  // As últimas linhas, já traduzidas — conferir o mapeamento olhando o dado.
-  var amostra = [];
-  var linhas = Math.max(ultima - 1, 0);
-  var quantas = Math.min(linhas, 3);
-  if (quantas && !faltando.length) {
-    var inicio = ultima - quantas + 1;
-    var lidas = {};
-    Object.keys(posicoes).forEach(function (chave) {
-      lidas[chave] = aba.getRange(inicio, posicoes[chave], quantas, 1).getDisplayValues();
-    });
-    for (var k = 0; k < quantas; k++) {
-      var linha = {};
-      Object.keys(lidas).forEach(function (chave) { linha[chave] = String(lidas[chave][k][0] || '').trim(); });
-      amostra.push(linha);
+  // O analista que o cadastro de usuários não conhece: a soma por analista
+  // juntaria o chat a um nome que não existe no sistema — é a "junção" que o PO
+  // não conseguia fazer. O laudo diz quem é, antes de gravar.
+  var conhecidos = {};
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    conhecidos[normalizarParaComparar_(usuario.Nome)] = true;
+  });
+  var desconhecidos = [];
+  entram.forEach(function (linha) {
+    var nome = linha.Analista;
+    if (!conhecidos[normalizarParaComparar_(nome)] && desconhecidos.indexOf(nome) < 0) {
+      desconhecidos.push(nome);
     }
-  }
+  });
 
+  return { cabecalhosDaFonte: cabecalhosDaFonte, corpo: corpo, dePara: dePara,
+    faltando: faltando, entram: entram, motivos: motivos, desconhecidos: desconhecidos };
+}
+
+/** O passo "conferir antes de importar", para os atendimentos do chat. */
+function conferirImportacaoDoChat(pedido) {
+  exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
+  var montado = linhasDoChatDaFonte_(dadosDaTela_(pedido || {}));
+  var pulam = montado.motivos.vazia + montado.motivos.repetida + montado.motivos.semDataOuAnalista;
   return {
-    abre: true, recado: '', abas: abas, cabecalhos: cabecalhos,
-    sugestoes: sugerirColunasDoChat_(cabecalhos), faltando: faltando,
-    linhas: linhas, amostra: amostra,
-    // O chat é lido do fim: só as últimas linhas entram nos gráficos.
-    limiteDeLeitura: linhasQueOPainelOlha_()
+    canal: { id: '', nome: 'Atendimentos do chat (Mesa)', aba: RECC_ABA_DO_CHAT },
+    cabecalhosDaFonte: montado.cabecalhosDaFonte,
+    colunasDoCanal: RECC_COLUNAS_DO_CHAT.map(function (d) { return d.cabecalho; }),
+    colunasDeCarimbo: [],
+    dePara: montado.dePara,
+    linhasNaFonte: montado.corpo.length,
+    vaoEntrar: montado.faltando.length ? 0 : montado.entram.length,
+    vaoSerPuladas: pulam,
+    motivosParaPular: { vazia: montado.motivos.vazia + montado.motivos.semDataOuAnalista,
+      repetida: montado.motivos.repetida },
+    semDataOuAnalista: montado.motivos.semDataOuAnalista,
+    faltando: montado.faltando,
+    analistasDesconhecidos: montado.desconhecidos,
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    passaDoLimite: montado.corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    amostra: montado.entram.slice(0, 3).map(function (linha) {
+      var vista = {};
+      Object.keys(linha).forEach(function (coluna) {
+        vista[coluna] = coluna === 'Data'
+          ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'dd/MM/yyyy') : linha[coluna];
+      });
+      return vista;
+    }),
+    analistas: [],
+    foraDaDivisao: [],
+    avisos: [],
+    statusPadrao: ''
+  };
+}
+
+/** Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. */
+function importarAtendimentosDoChat(pedido) {
+  exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
+  pedido = dadosDaTela_(pedido || {});
+  if (!planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT)) {
+    throw new Error('A aba ' + RECC_ABA_DO_CHAT + ' ainda não existe nesta planilha. Rode '
+      + 'atualizarPGO() no editor do Apps Script.');
+  }
+  var lote = String(pedido.origem || '').trim();
+  if (!lote) {
+    throw new Error('Dê um nome ao lote — "Chat de outubro", por exemplo. É por ele que se '
+      + 'acha uma leva importada errada.');
+  }
+  var montado = linhasDoChatDaFonte_(pedido);
+  if (montado.corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO) {
+    throw new Error('São no máximo ' + RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO + ' linhas por '
+      + 'importação, e vieram ' + montado.corpo.length + '. Divida em levas.');
+  }
+  if (montado.faltando.length) {
+    throw new Error('Diga qual coluna da origem é: ' + montado.faltando.join(' e ')
+      + '. Sem a data não há como recortar o período, e sem o analista não há de quem somar.');
+  }
+  if (!montado.entram.length) {
+    throw new Error('Nenhuma linha entraria: ' + montado.motivos.repetida + ' já estão na aba, '
+      + montado.motivos.semDataOuAnalista + ' sem data ou sem analista e '
+      + montado.motivos.vazia + ' em branco. Nada foi gravado.');
+  }
+  var agora = new Date();
+  var gravados = inserirVariosRegistros_(RECC_ABA_DO_CHAT, montado.entram.map(function (linha) {
+    return Object.assign({ Lote: lote, ImportadoEm: agora }, linha);
+  }), { origem: RECC_ORIGEM_PLANILHA });
+  registrarAuditoria_('chat.importar', RECC_ABA_DO_CHAT, '', lote + ' · ' + gravados.length
+    + ' atendimentos');
+  return {
+    canal: 'Atendimentos do chat (Mesa)',
+    origem: lote,
+    entraram: gravados.length,
+    pulados: { vazia: montado.motivos.vazia + montado.motivos.semDataOuAnalista,
+      repetida: montado.motivos.repetida },
+    analistas: [],
+    analistasDesconhecidos: montado.desconhecidos,
+    primeiroId: gravados.length ? gravados[0].__id : '',
+    ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
   };
 }
 
 /**
- * Aponta a planilha do chat — ou desliga, com o Id em branco.
+ * Os atendimentos do chat, lidos da aba ATENDIMENTOS_CHAT — o fim dela, com o
+ * mesmo teto de linhas que a tela usa para a base do sistema.
  *
- * CONFERE ANTES DE GRAVAR, e a falha DERRUBA: guardar uma planilha que não
- * abre, ou colunas que ela não tem, deixaria a Produtividade da Mesa com um
- * recado para sempre sem ninguém saber se o erro era o Id, a aba ou o nome da
- * coluna. A data e o analista são obrigatórios: sem a data não há como
- * recortar o período, e sem o analista não há de quem somar.
+ * Nunca lança: a Produtividade da Mesa continua com os números do sistema.
+ * `ligado` é haver alguma linha — sem nada importado, a tela diz como trazer.
  */
-function salvarConfiguracaoDoChat(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var pedido = dados || {};
-  var id = String(pedido.planilhaId || '').trim();
-  var aba = String(pedido.aba || '').trim();
-  var colunas = {};
-  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    colunas[definicao.chave] = String((pedido.colunas || {})[definicao.chave] || '').trim();
-  });
-
-  if (id) {
-    var laudo = conferirPlanilhaDoChat({ planilhaId: id, aba: aba, colunas: colunas });
-    if (!laudo.abre) throw new Error(laudo.recado);
-    if (laudo.recado) throw new Error(laudo.recado);
-    if (laudo.faltando.length) {
-      throw new Error('A planilha do chat abriu, mas as colunas não conferem:\n\n'
-        + laudo.faltando.join('\n'));
-    }
+function lerAtendimentosDoChat_() {
+  var vazio = { ligado: false, linhas: [], aviso: '', truncada: false, lidas: 0 };
+  try {
+    if (!planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT)) return vazio;
+    var teto = linhasQueOPainelOlha_();
+    var registros = lerRegistros_(RECC_ABA_DO_CHAT, { ultimas: teto });
+    var linhas = registros.map(function (r) {
+      return { data: r.Data, analista: String(r.Analista || '').trim(), susep: r.SUSEP,
+        corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo };
+    }).filter(function (linha) { return linha.data || linha.analista; });
+    return { ligado: linhas.length > 0, linhas: linhas, aviso: '',
+      truncada: registros.length >= teto, lidas: registros.length };
+  } catch (erro) {
+    return { ligado: true, linhas: [], aviso: erro.message || String(erro), truncada: false, lidas: 0 };
   }
-
-  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_PLANILHA, id);
-  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_ABA, aba);
-  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_COLUNAS, JSON.stringify(colunas));
-  registrarAuditoria_('chat.configurar', 'CONFIG', '', id ? 'ligada' : 'desligada');
-  return configuracaoDoChat();
 }
 
 /**
- * As linhas do chat, lidas do fim da aba — ou o recado do que deu errado.
- *
- * Nunca lança: a Produtividade da Mesa continua com os números do sistema. Lê
- * SÓ as colunas escolhidas, uma ida ao serviço por coluna, e só as últimas
- * `linhasQueOPainelOlha_()` linhas — o mesmo teto que a tela usa para a base
- * do sistema. O texto vem como a pessoa o VÊ na outra planilha.
+ * A data de uma linha do chat. Aceita a data de verdade (a da aba) e o texto:
+ * "13/10/2026", "13/10/2026 14:05" e "2026-10-13…".
  */
-function lerAtendimentosDoChat_() {
-  var configurada = configuracaoLidaDoChat_();
-  var vazio = { ligado: configurada.ligado, linhas: [], aviso: '', truncada: false, lidas: 0 };
-  if (!configurada.ligado) return vazio;
-
-  try {
-    var aba = abaDoChat_(configurada.planilhaId, configurada.aba);
-    var largura = aba.getLastColumn();
-    var ultima = aba.getLastRow();
-    if (ultima < 2 || largura < 1) return vazio;
-
-    var cabecalhos = aba.getRange(1, 1, 1, largura).getDisplayValues()[0];
-    var posicoes = {};
-    var faltando = [];
-    RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-      var nome = configurada.colunas[definicao.chave];
-      if (!nome) {
-        if (definicao.obrigatoria) faltando.push(definicao.rotulo + ' (coluna não escolhida)');
-        return;
-      }
-      var posicao = posicaoNoCabecalhoDoChat_(cabecalhos, nome);
-      if (!posicao) faltando.push('"' + nome + '"');
-      else posicoes[definicao.chave] = posicao;
-    });
-    if (faltando.length) {
-      throw new Error('A planilha do chat não tem: ' + faltando.join(', ')
-        + '. Acerte em Configurações › Estrutura.');
-    }
-
-    var primeira = Math.max(2, ultima - linhasQueOPainelOlha_() + 1);
-    var quantas = ultima - primeira + 1;
-    var lidas = {};
-    Object.keys(posicoes).forEach(function (chave) {
-      lidas[chave] = aba.getRange(primeira, posicoes[chave], quantas, 1).getDisplayValues();
-    });
-
-    var linhas = [];
-    for (var k = 0; k < quantas; k++) {
-      var linha = {};
-      Object.keys(lidas).forEach(function (chave) {
-        linha[chave] = String(lidas[chave][k][0] === null || lidas[chave][k][0] === undefined
-          ? '' : lidas[chave][k][0]).trim();
-      });
-      if (!linha.data && !linha.analista) continue;   // linha em branco no meio da aba
-      linhas.push(linha);
-    }
-    return { ligado: true, linhas: linhas, aviso: '', truncada: primeira > 2, lidas: quantas };
-  } catch (erro) {
-    return { ligado: true, linhas: [], aviso: erro.message || String(erro),
-      truncada: false, lidas: 0 };
-  }
-}
-
-/** A data de uma linha do chat. Aceita "13/10/2026", "13/10/2026 14:05" e "2026-10-13…". */
 function dataDoAtendimentoDoChat_(texto) {
+  if (Object.prototype.toString.call(texto) === '[object Date]') {
+    return isNaN(texto.getTime()) ? '' : texto;
+  }
   var achou = String(texto || '').trim().match(/^(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/);
   return achou ? converterParaData_(achou[1]) : '';
 }
@@ -17318,8 +17552,12 @@ const RECC_PADRAO_DO_FORMULARIO = {
   valordopremio: { secao: 'Seguro', ordem: 27, rotulo: 'Valor do prêmio anual' },
   premiomensal: { secao: 'Seguro', ordem: 28,
     rotulo: 'Valor do prêmio mensal' },
+  // Obrigatório no Retido, pedido do PO: "quando o status for preenchido como
+  // retido, o valor retido deve ser obrigatório". Nos outros status, continua
+  // aparecendo e não é cobrado.
   valordopremioretido: { secao: 'Seguro', ordem: 29,
-    rotulo: 'Valor do prêmio retido' },
+    rotulo: 'Valor do prêmio retido',
+    obrigatorioSe: { campo: 'status', valores: ['Retido'] } },
   formadepagamento: { secao: 'Seguro', ordem: 30, rotulo: 'Forma de pagamento',
     tipoCampo: 'seletor', catalogo: 'FORMA_PAGAMENTO' },
   dadosdopagamento: { secao: 'Seguro', ordem: 31, rotulo: 'Dados de pagamento',
@@ -17527,6 +17765,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
     if (padrao.listaDe) configuracao.listaDe = padrao.listaDe;
     if (padrao.largura) configuracao.largura = padrao.largura;
     if (padrao.mostrarSe) configuracao.mostrarSe = padrao.mostrarSe;
+    if (padrao.obrigatorioSe) configuracao.obrigatorioSe = padrao.obrigatorioSe;
     if (padrao.travaPara) configuracao.travaPara = padrao.travaPara;
     if (padrao.separaEm) configuracao.separaEm = padrao.separaEm;
     if (padrao.partirEm) configuracao.partirEm = padrao.partirEm;
@@ -17708,6 +17947,12 @@ function atualizarPGO() {
 
   // --- 6b6. a coluna "prêmio mensal retido" da RET vira "prêmio mensal" -------
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
+
+  // --- 6b7. o valor retido é obrigatório no Retido ---------------------------
+  feito = feito.concat(ligarOValorRetidoNoRetido_(pulados, paraVoce));
+
+  // --- 6b8. os atendimentos do chat entram pela Importação --------------------
+  feito = feito.concat(criarAAbaDoChat_(pulados, paraVoce));
 
   // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
   feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
@@ -18419,6 +18664,75 @@ function ligarAParadaDoRetido_(pulados, paraVoce) {
  * Os casos em "Não trabalhado" não ganham data: ficam com o prazo cheio, que é
  * exatamente o pedido.
  */
+/**
+ * A aba ATENDIMENTOS_CHAT, onde o chat da Mesa passa a morar (Etapa 39). Quem
+ * tinha a planilha à parte configurada é avisado: ela não é mais lida, e os
+ * atendimentos se trazem pela tela de Importação.
+ */
+function criarAAbaDoChat_(pulados, paraVoce) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  if (!planilha.getSheetByName('ATENDIMENTOS_CHAT')) {
+    criarAbaDoContrato_(planilha, esquemaDaAba_('ATENDIMENTOS_CHAT'));
+    esquecerEstruturaLida_();
+    feito.push('aba ATENDIMENTOS_CHAT criada — os atendimentos do chat entram pela Importação');
+  } else {
+    pulados.push('aba ATENDIMENTOS_CHAT já existe');
+  }
+  var antiga = '';
+  try { antiga = String(valorDaConfiguracao_('CHAT.PLANILHA_ID', '') || '').trim(); }
+  catch (erro) { antiga = ''; }
+  if (antiga) {
+    paraVoce.push('A planilha do chat que estava ligada em Configurações › Estrutura NÃO é mais '
+      + 'lida. Traga os atendimentos pela tela de Importação: escolha a Mesa Diamante, '
+      + '"Atendimentos do chat", e use "Ler outra planilha pelo link" com o mesmo Id ('
+      + antiga + '). A linha repetida é pulada, então dá para importar de novo sem contar dobrado.');
+  }
+  return feito;
+}
+
+/**
+ * Liga, numa instalação que já existe, a regra do PO: "quando o status for
+ * Retido, o valor retido deve ser obrigatório".
+ *
+ * Só liga se o campo não tem condição de obrigatório nenhuma — o que o PO já
+ * configurou, ele configurou de propósito. Campo marcado "Obrigatório" sempre
+ * já é mais exigente, e também fica como está.
+ */
+function ligarOValorRetidoNoRetido_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CAMPOS') || !planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('o valor retido: as abas de configuração ainda não existem');
+    return feito;
+  }
+  var ret = lerRegistros_('CANAIS').filter(function (canal) {
+    return String(canal.Aba) === 'BASE_RET';
+  })[0];
+  if (!ret) { pulados.push('o canal BASE_RET não está cadastrado'); return feito; }
+  var campo = lerRegistros_('CAMPOS').filter(function (um) {
+    return converterParaIdentificador_(um.CanalId) === converterParaIdentificador_(ret.Id)
+      && String(um.ChaveTecnica) === 'valordopremioretido';
+  })[0];
+  if (!campo) { pulados.push('RET: o campo do valor retido não existe'); return feito; }
+
+  var configuracao = lerConfiguracaoDoCampo_(campo);
+  if (configuracao.obrigatorioSe) {
+    pulados.push('RET: o valor retido já tem a condição de obrigatório');
+    return feito;
+  }
+  if (normalizarParaComparar_(campo.Obrigatorio) === 'sim') {
+    paraVoce.push('RET: o valor retido está marcado como obrigatório SEMPRE, e ficou assim. '
+      + 'Para cobrar só no Retido, desmarque "Obrigatório" e escolha "Só quando Status for '
+      + 'Retido" em "Quando este campo é obrigatório", em Configurações › Cadastrar Caso.');
+    return feito;
+  }
+  configuracao.obrigatorioSe = { campo: 'status', valores: ['Retido'] };
+  atualizarRegistro_('CAMPOS', campo.__id, { Configuracao: JSON.stringify(configuracao) });
+  feito.push('RET: o valor retido passou a ser obrigatório quando o Status é Retido '
+    + '(no formulário e no "Alterar status")');
+  return feito;
+}
+
 function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
   var feito = [];
   var planilha = planilhaAtiva_();

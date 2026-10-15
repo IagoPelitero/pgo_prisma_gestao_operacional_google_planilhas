@@ -8,6 +8,11 @@
  * cadastrados no sistema e os casos atendidos por nome do analista, integrando
  * o nome da corretora para mostrar a quantidade e o top 5; SUSEPs, assuntos,
  * consultor e vida individual ou em grupo, a mesma coisa".
+ *
+ * Etapa 39: "ler uma planilha de chat ficou confuso e não consegui fazer a
+ * junção". O chat deixou de ser LIDO de outra planilha configurada em
+ * Estrutura: os atendimentos são IMPORTADOS pela tela de Importação, como os
+ * casos, para a aba ATENDIMENTOS_CHAT — e a Produtividade lê de lá.
  * ============================================================================
  */
 
@@ -19,8 +24,10 @@ const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } 
 const lerTela = (nome) => fs.readFileSync(
   path.join(__dirname, '..', '..', 'Front-End', nome), 'utf8');
 
-const COLUNAS = { data: 'Data', analista: 'Atendente', susep: 'SUSEP',
-  assunto: 'Assunto', ramo: 'Ramo' };
+/** O de-para que a pessoa confirma na tela: "Atendente" da origem é o Analista. */
+const DE_PARA = [{ daFonte: 'Data', paraAColuna: 'Data' },
+  { daFonte: 'Atendente', paraAColuna: 'Analista' }, { daFonte: 'SUSEP', paraAColuna: 'SUSEP' },
+  { daFonte: 'Assunto', paraAColuna: 'Assunto' }, { daFonte: 'Ramo', paraAColuna: 'Ramo' }];
 
 const comZero = (n) => (n < 10 ? '0' : '') + n;
 const diasAtras = (n) => {
@@ -62,8 +69,13 @@ function mesaComChat(linhas) {
 
   t.idDoChat = t.ambiente.criarPlanilhaExterna('Chat', [
     ['Data', 'Atendente', 'SUSEP', 'Assunto', 'Ramo']].concat(linhas || []));
-  t.ligar = (extra) => t.chamar('salvarConfiguracaoDoChat')(Object.assign(
-    { planilhaId: t.idDoChat, aba: 'Chat', colunas: COLUNAS }, extra || {}));
+  t.pedido = (extra) => Object.assign({
+    fonte: { tipo: 'planilha', planilhaId: t.idDoChat, aba: 'Chat' },
+    dePara: DE_PARA, origem: 'Chat de outubro' }, extra || {});
+  // "Ligar" o chat agora é importar a planilha dele pela Importação.
+  t.ligar = (extra) => t.chamar('importarAtendimentosDoChat')(t.pedido(extra));
+  t.conferir = (extra) => t.chamar('conferirImportacaoDoChat')(t.pedido(extra));
+  t.aba = () => t.chamar('lerRegistros_')('ATENDIMENTOS_CHAT');
   t.painel = (periodo) => t.chamar('produtividadeDaEquipe')(t.mesa.id, {}, periodo || 30);
   t.grafico = (painel, titulo) => painel.atendimentos.graficos.find((g) => g.titulo === titulo);
   t.pontos = (grafico) => grafico.pontos.map((p) => p.rotulo + ':' + p.sistema + '+' + p.chat);
@@ -77,87 +89,154 @@ function rodarTestesDoChatDaMesa() {
   console.log('\nOs atendidos da Mesa: o sistema e a planilha do chat');
 
   /* ----------------------------------------------------------------------- */
-  secao('Ligar a planilha do chat, em Configurações');
+  secao('Trazer o chat pela Importação');
 
-  teste('de fábrica ela está desligada, e a tela sabe quais colunas pedir', () => {
+  teste('a Importação da Mesa oferece o chat; RET e VG, não', () => {
     const t = mesaComChat();
-    const configuracao = t.chamar('configuracaoDoChat')();
-    igual(configuracao.ligado, false);
-    igual(configuracao.definicao.map((d) => d.chave).join(','),
-      'data,analista,susep,corretora,assunto,consultor,ramo');
-    igual(configuracao.definicao.filter((d) => d.obrigatoria).map((d) => d.chave).join(','),
-      'data,analista', 'só a data e o analista são obrigatórios');
+    igual(t.chamar('opcoesDaImportacaoDeCasos')(t.mesa.id).aceitaChat, true);
+    igual(t.chamar('opcoesDaImportacaoDeCasos')(t.ret.id).aceitaChat, false);
+    const opcoes = t.chamar('opcoesDaImportacaoDoChat')();
+    igual(opcoes.abaExiste, true, 'a instalação cria a aba ATENDIMENTOS_CHAT');
+    igual(opcoes.colunasDoCanal.join(','),
+      'Data,Analista,SUSEP,Corretora,Assunto,Consultor,Ramo');
+    igual(opcoes.obrigatorias.join(','), 'Data,Analista', 'só a data e o analista são obrigatórios');
+    igual(opcoes.lotes.length, 0);
   });
 
-  teste('salvar confere a planilha, a aba e as colunas, e guarda', () => {
-    const t = mesaComChat();
-    const nova = t.ligar();
-    igual(nova.ligado, true);
-    igual(nova.aba, 'Chat');
-    igual(nova.colunas.analista, 'Atendente');
-    igual(t.chamar('configuracaoDoChat')().planilhaId, t.idDoChat, 'e relê o que gravou');
-  });
-
-  teste('recusa Id que não abre, aba que não existe e coluna que não existe', () => {
-    const t = mesaComChat();
-    lanca(() => t.ligar({ planilhaId: 'nao-existe' }), 'Não consegui abrir');
-    lanca(() => t.ligar({ aba: 'Outra aba' }), 'não tem uma aba chamada "Outra aba"');
-    lanca(() => t.ligar({ colunas: Object.assign({}, COLUNAS, { assunto: 'Motivo do contato' }) }),
-      'não tem a coluna "Motivo do contato"');
-    igual(t.chamar('configuracaoDoChat')().ligado, false, 'nada foi gravado');
-  });
-
-  teste('a data e o analista são obrigatórios', () => {
-    const t = mesaComChat();
-    lanca(() => t.ligar({ colunas: Object.assign({}, COLUNAS, { data: '' }) }),
-      'Data do atendimento: escolha a coluna');
-    lanca(() => t.ligar({ colunas: Object.assign({}, COLUNAS, { analista: '' }) }),
-      'Analista: escolha a coluna');
-  });
-
-  teste('com o Id em branco desliga, e as colunas escolhidas ficam guardadas', () => {
-    const t = mesaComChat();
-    t.ligar();
-    const desligada = t.ligar({ planilhaId: '' });
-    igual(desligada.ligado, false);
-    igual(desligada.colunas.analista, 'Atendente', 'religar não obriga a escolher tudo de novo');
-  });
-
-  teste('conferir sugere as colunas pelo cabeçalho e mostra as últimas linhas traduzidas', () => {
+  teste('conferir sugere o de-para pelo cabeçalho e mostra as primeiras linhas', () => {
     const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
-    const laudo = t.chamar('conferirPlanilhaDoChat')({ planilhaId: t.idDoChat, aba: 'Chat', colunas: {} });
-    igual(laudo.abre, true);
-    igual(laudo.sugestoes.analista, 'Atendente', '"Atendente" é o analista');
-    igual(laudo.sugestoes.susep, 'SUSEP');
-    igual(laudo.sugestoes.data, 'Data');
-    igual(laudo.faltando.length, 2, 'sem escolher, faltam a data e o analista');
-
-    const completo = t.chamar('conferirPlanilhaDoChat')({ planilhaId: t.idDoChat, aba: 'Chat', colunas: COLUNAS });
-    igual(completo.faltando.length, 0);
-    igual(completo.linhas, 1);
-    igual(completo.amostra[0].analista, 'Ana Martins');
-    igual(completo.amostra[0].ramo, 'VG');
+    const laudo = t.conferir({ dePara: [] });
+    const para = (daFonte) => laudo.dePara.find((p) => p.daFonte === daFonte).paraAColuna;
+    igual(para('Atendente'), 'Analista', '"Atendente" é o analista');
+    igual(para('SUSEP'), 'SUSEP');
+    igual(para('Data'), 'Data');
+    igual(laudo.faltando.length, 0);
+    igual(laudo.vaoEntrar, 1);
+    igual(laudo.amostra[0].Analista, 'Ana Martins');
+    igual(laudo.amostra[0].Ramo, 'VG');
+    igual(laudo.amostra[0].Data, diasAtras(1));
   });
 
   teste('conferir NÃO grava nada', () => {
-    const t = mesaComChat();
-    t.chamar('conferirPlanilhaDoChat')({ planilhaId: t.idDoChat, aba: 'Chat', colunas: COLUNAS });
-    igual(t.chamar('configuracaoDoChat')().ligado, false);
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.conferir();
+    igual(t.aba().length, 0);
   });
 
-  teste('só quem configura mexe: a Operação é recusada — e nada muda por baixo', () => {
-    const t = mesaComChat();
+  teste('importar grava na aba, com o lote e a data de verdade', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    const resultado = t.ligar();
+    igual(resultado.entraram, 1);
+    const linha = t.aba()[0];
+    igual(linha.Analista, 'Ana Martins');
+    igual(linha.Lote, 'Chat de outubro');
+    verdadeiro(linha.Data instanceof Date || Object.prototype.toString.call(linha.Data) === '[object Date]',
+      'a data vira data, e não texto');
+    verdadeiro(!!linha.ImportadoEm, 'e o sistema carimba quando entrou');
+    igual(t.chamar('opcoesDaImportacaoDoChat')().lotes[0].origem, 'Chat de outubro');
+    verdadeiro(t.chamar('lerRegistros_')('AUDITORIA').some((a) => a.Acao === 'chat.importar'),
+      'e fica na auditoria');
+  });
+
+  teste('a data e o analista são obrigatórios no de-para', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    const semAnalista = DE_PARA.filter((p) => p.paraAColuna !== 'Analista');
+    igual(t.conferir({ dePara: semAnalista }).faltando.join(','), 'Analista');
+    igual(t.conferir({ dePara: semAnalista }).vaoEntrar, 0);
+    lanca(() => t.ligar({ dePara: semAnalista }), 'Diga qual coluna da origem é: Analista');
+    lanca(() => t.ligar({ dePara: DE_PARA.filter((p) => p.paraAColuna !== 'Data') }),
+      'Data do atendimento');
+    igual(t.aba().length, 0, 'nada foi gravado');
+  });
+
+  teste('sem nome de lote não grava', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    lanca(() => t.ligar({ origem: '  ' }), 'Dê um nome ao lote');
+    igual(t.aba().length, 0);
+  });
+
+  teste('reimportar o mesmo arquivo não dobra nada', () => {
+    const t = mesaComChat([
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(2), 'Diego Castilho', 'RET01A', 'Sinistro', 'VI']]);
     t.ligar();
+    igual(t.conferir().vaoEntrar, 0, 'a conferência já avisa');
+    igual(t.conferir().motivosParaPular.repetida, 2);
+    lanca(() => t.ligar({ origem: 'De novo' }), 'Nenhuma linha entraria: 2 já estão na aba');
+    igual(t.aba().length, 2);
+  });
+
+  teste('duas linhas iguais no mesmo arquivo são dois atendimentos — e entram as duas', () => {
+    // O corretor que chamou duas vezes no dia, pelo mesmo assunto.
+    const t = mesaComChat([
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    igual(t.ligar().entraram, 2);
+  });
+
+  teste('o arquivo que repete parte do anterior traz só o que é novo', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ligar();
+    const outro = t.ambiente.criarPlanilhaExterna('Chat2', [
+      ['Data', 'Atendente', 'SUSEP', 'Assunto', 'Ramo'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(0), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    const r = t.ligar({ fonte: { tipo: 'planilha', planilhaId: outro, aba: 'Chat2' },
+      origem: 'Chat de novembro' });
+    igual(r.entraram, 2, 'a que já estava fica; a segunda igual e a nova entram');
+    igual(r.pulados.repetida, 1);
+    igual(t.aba().length, 3);
+  });
+
+  teste('a linha sem data legível ou sem analista não entra — e o laudo diz', () => {
+    const t = mesaComChat([
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      ['semana passada', 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(1), '', 'RET00J', 'Cobrança', 'VG']]);
+    const laudo = t.conferir();
+    igual(laudo.vaoEntrar, 1);
+    igual(laudo.semDataOuAnalista, 2);
+    igual(t.ligar().entraram, 1);
+  });
+
+  teste('o analista que o cadastro de usuários não conhece é avisado, sem impedir', () => {
+    const t = mesaComChat([
+      [diasAtras(1), 'ana martins', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(1), 'Bianca Souza', 'RET00J', 'Cobrança', 'VG'],
+      [diasAtras(2), 'Bianca Souza', 'RET00J', 'Cobrança', 'VG']]);
+    igual(t.conferir().analistasDesconhecidos.join(','), 'Bianca Souza',
+      'a Ana, em outra grafia, é conhecida; a Bianca aparece uma vez só');
+    igual(t.ligar().entraram, 3, 'avisa, mas grava');
+    contem(lerTela('Importacao.html'), 'laudo.analistasDesconhecidos');
+  });
+
+  teste('o texto colado também vale', () => {
+    const t = mesaComChat();
+    const r = t.chamar('importarAtendimentosDoChat')({
+      fonte: { tipo: 'colar', texto: 'Data\tAtendente\n' + diasAtras(1) + '\tAna Martins' },
+      dePara: [], origem: 'Colado' });
+    igual(r.entraram, 1);
+  });
+
+  teste('só quem importa mexe: a Operação é recusada — e nada muda por baixo', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    const operacao = t.chamar('listarNiveisDeAcesso()').find((n) => n.nome === 'Operação');
+    t.chamar('salvarNivelDeAcesso')(Object.assign({}, operacao, { telas: (operacao.telas || [])
+      .filter((tela) => tela !== 'importacao') }));
     comoUsuario(t.ambiente, 'diego@exemplo.com', () => {
-      lanca(() => t.chamar('configuracaoDoChat')());
-      lanca(() => t.chamar('salvarConfiguracaoDoChat')({ planilhaId: t.idDoChat, colunas: COLUNAS }));
-      lanca(() => t.chamar('salvarConfiguracaoDoChat')({ planilhaId: '' }),
-        '', 'nem para DESLIGAR: o Id em branco também não passa sem permissão');
-      lanca(() => t.chamar('conferirPlanilhaDoChat')({ planilhaId: t.idDoChat, colunas: COLUNAS }));
+      lanca(() => t.chamar('opcoesDaImportacaoDoChat')());
+      lanca(() => t.conferir());
+      lanca(() => t.ligar());
     });
-    // A recusa tem de vir ANTES de gravar: erro depois de gravar desligaria o
-    // chat de todo mundo e ainda diria "não pode".
-    igual(t.chamar('configuracaoDoChat')().ligado, true, 'a configuração continua como estava');
+    igual(t.aba().length, 0);
+  });
+
+  teste('sem a aba ATENDIMENTOS_CHAT, importar ensina a criar', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ambiente.planilha.deleteSheet(t.ambiente.planilha.getSheetByName('ATENDIMENTOS_CHAT'));
+    igual(t.chamar('opcoesDaImportacaoDoChat')().abaExiste, false);
+    lanca(() => t.ligar(), 'atualizarPGO()');
   });
 
   /* ----------------------------------------------------------------------- */
@@ -210,8 +289,7 @@ function rodarTestesDoChatDaMesa() {
   teste('é top 5: o que passa vira "Demais valores", somado — e o total fecha', () => {
     const corretoras = ['Alfa', 'Beta', 'Gama', 'Delta', 'Épsilon', 'Zeta', 'Eta'];
     const t = mesaComChat();
-    t.ligar();
-    corretoras.forEach((nome, i) => {
+        corretoras.forEach((nome, i) => {
       for (let k = 0; k <= 6 - i; k++) t.caso({ Corretora: 'Corretora ' + nome });
     });
     const grafico = t.grafico(t.painel(), 'Top 5 corretoras');
@@ -282,17 +360,24 @@ function rodarTestesDoChatDaMesa() {
   /* ----------------------------------------------------------------------- */
   secao('O período e o alcance valem para o chat também');
 
-  teste('o chat entra pelo período da tela, e a linha sem data legível fica de fora — dita', () => {
+  teste('o chat entra pelo período da tela; a data com hora também vale', () => {
     const t = mesaComChat([
       [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
       [diasAtras(40), 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
-      [diasAtras(2) + ' 14:30:05', 'Ana Martins', 'RET00J', 'Cobrança', 'VG'],
-      ['semana passada', 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+      [diasAtras(2) + ' 14:30:05', 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
     t.ligar();
     const a = t.painel(30).atendimentos;
-    igual(a.totais.chat, 2, 'a de 40 dias e a sem data não entram; a com hora entra');
-    igual(a.chat.semData, 1, 'e a sem data é contada, para ninguém achar que sumiu');
+    igual(a.totais.chat, 2, 'a de 40 dias não entra; a com hora entra');
     igual(t.painel(90).atendimentos.totais.chat, 3, 'um período maior pega a de 40 dias');
+  });
+
+  teste('a linha da aba sem data (escrita à mão) fica fora do período — dita', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ligar();
+    t.chamar('inserirRegistro_')('ATENDIMENTOS_CHAT', { Analista: 'Ana Martins', Lote: 'À mão' });
+    const a = t.painel(30).atendimentos;
+    igual(a.totais.chat, 1);
+    igual(a.chat.semData, 1, 'contada, para ninguém achar que sumiu');
   });
 
   teste('o alcance do nível vale: quem só vê os próprios números vê só os seus no chat', () => {
@@ -319,7 +404,7 @@ function rodarTestesDoChatDaMesa() {
   /* ----------------------------------------------------------------------- */
   secao('Quando o chat falha, o sistema segue');
 
-  teste('chat desligado: só o sistema, e a tela diz', () => {
+  teste('nada importado ainda: só o sistema, e a tela diz como trazer', () => {
     const t = mesaComChat();
     t.caso(); t.caso();
     const a = t.painel().atendimentos;
@@ -327,35 +412,36 @@ function rodarTestesDoChatDaMesa() {
     igual(a.totais.sistema, 2);
     igual(a.totais.chat, 0);
     verdadeiro(a.graficos.length === 6, 'os seis gráficos existem mesmo assim');
-    contem(lerTela('Produtividade.html'), 'A planilha do chat não está ligada');
+    contem(lerTela('Produtividade.html'), 'Traga o chat pela tela de Importação');
   });
 
-  teste('planilha que sumiu, aba apagada ou coluna renomeada: recado, e o sistema segue', () => {
+  teste('aba ATENDIMENTOS_CHAT apagada: o sistema segue', () => {
     const t = mesaComChat([[diasAtras(0), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
     t.ligar();
     t.caso();
-
-    // A aba some.
-    const externa = t.ambiente.planilhaExternaPeloId(t.idDoChat);
-    externa.getSheetByName('Chat').setName('Renomeada');
-    let a = t.painel().atendimentos;
+    t.ambiente.planilha.deleteSheet(t.ambiente.planilha.getSheetByName('ATENDIMENTOS_CHAT'));
+    const a = t.painel().atendimentos;
     igual(a.totais.sistema, 1, 'o sistema continua');
     igual(a.totais.chat, 0);
-    contem(a.chat.aviso, 'Chat', 'diz qual aba procurou');
-    externa.getSheetByName('Renomeada').setName('Chat');
+  });
 
-    // A coluna ganha outro nome.
-    const aba = externa.getSheetByName('Chat');
-    aba.getRange(1, 2).setValue('Quem atendeu');
-    a = t.painel().atendimentos;
-    contem(a.chat.aviso, 'Atendente', 'diz qual coluna sumiu');
+  teste('a aba do chat que não se deixa ler vira recado, e o sistema segue', () => {
+    const t = mesaComChat([[diasAtras(0), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ligar();
+    t.caso();
+    const original = t.contexto.lerRegistros_;
+    t.contexto.lerRegistros_ = function (aba, opcoes) {
+      if (aba === 'ATENDIMENTOS_CHAT') throw new Error('a aba está protegida');
+      return original(aba, opcoes);
+    };
+    const a = t.painel().atendimentos;
     igual(a.totais.sistema, 1);
-    contem(lerTela('Produtividade.html'), 'A planilha do chat não pôde ser lida');
+    contem(a.chat.aviso, 'protegida');
+    contem(lerTela('Produtividade.html'), 'Os atendimentos do chat não puderam ser lidos');
   });
 
   teste('chat com a aba vazia (só o cabeçalho) não é erro', () => {
     const t = mesaComChat();
-    t.ligar();
     const a = t.painel().atendimentos;
     igual(a.chat.aviso, '');
     igual(a.totais.chat, 0);
@@ -363,8 +449,7 @@ function rodarTestesDoChatDaMesa() {
 
   teste('só a Mesa tem o bloco: RET e VG recebem null', () => {
     const t = mesaComChat();
-    t.ligar();
-    igual(t.chamar('produtividadeDaEquipe')(t.ret.id, {}, 30).atendimentos, null);
+        igual(t.chamar('produtividadeDaEquipe')(t.ret.id, {}, 30).atendimentos, null);
     const vg = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_VG');
     igual(t.chamar('produtividadeDaEquipe')(vg.id, {}, 30).atendimentos, null);
   });
@@ -379,7 +464,7 @@ function rodarTestesDoChatDaMesa() {
     const a = t.painel().atendimentos;
     igual(a.totais.chat, 2, 'só as duas últimas');
     igual(a.chat.truncada, true);
-    contem(lerTela('Produtividade.html'), 'entram só as últimas');
+    contem(lerTela('Produtividade.html'), 'Do chat entram só os últimos');
   });
 
   /* ----------------------------------------------------------------------- */
@@ -394,12 +479,24 @@ function rodarTestesDoChatDaMesa() {
     ['Sistema', 'Chat', 'Total'].forEach((coluna) => contem(tela, coluna));
   });
 
-  teste('Configurações oferece a planilha do chat, com conferir e salvar', () => {
+  teste('a Produtividade da Mesa separa a Equipe dos Atendidos, em abas', () => {
+    const tela = lerTela('Produtividade.html');
+    contem(tela, "[['equipe', 'Equipe'], ['atendidos', 'Atendidos (sistema + chat)']]");
+    contem(tela, 'data-aba-da-mesa');
+  });
+
+  teste('a Importação oferece "Atendimentos do chat" e chama as funções do chat', () => {
+    const tela = lerTela('Importacao.html');
+    contem(tela, 'data-o-que-importar');
+    contem(tela, "'conferirImportacaoDoChat'");
+    contem(tela, "'importarAtendimentosDoChat'");
+    contem(tela, "'opcoesDaImportacaoDoChat'");
+  });
+
+  teste('Configurações já não pede a planilha do chat — diz onde ela foi parar', () => {
     const tela = lerTela('Configuracoes.html');
-    contem(tela, 'Planilha dos atendimentos do chat');
-    contem(tela, "Servidor.chamar('conferirPlanilhaDoChat'");
-    contem(tela, "Servidor.chamar('salvarConfiguracaoDoChat'");
-    contem(tela, "Servidor.chamar('configuracaoDoChat')");
+    verdadeiro(tela.indexOf("Servidor.chamar('salvarConfiguracaoDoChat'") < 0);
+    contem(tela, 'Os atendimentos do chat da Mesa Diamante agora entram');
   });
 }
 

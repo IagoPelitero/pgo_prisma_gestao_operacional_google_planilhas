@@ -320,7 +320,7 @@ function rodarTestesDaProdutividade() {
       datadereceptodoprotocolo: diasAtras(1)
     });
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, '1º contato realizado');
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido', { valordopremioretido: '100,00' });
 
     const cartoes = painelDaRet().cartoes;
     const acharCartao = (rotulo) => cartoes.find((c) => c.rotulo === rotulo);

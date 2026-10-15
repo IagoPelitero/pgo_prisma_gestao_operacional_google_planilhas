@@ -552,7 +552,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     const daRet = t.chamar('opcoesDaImportacaoDeCasos')(t.ret.id);
     igual(daRet.statusPadrao, 'Não trabalhado');
     igual(daRet.statusQueEsperaAPessoa, '');
-    contem(lerTela('Importacao.html'), 'Os casos vão nascer <strong>sem status</strong>');
+    contem(lerTela('Importacao.html'), 'Os casos sem status na planilha vão nascer <strong>sem status</strong>');
   });
 
   teste('o cadastro pela tela continua nascendo Em andamento, carimbado', () => {

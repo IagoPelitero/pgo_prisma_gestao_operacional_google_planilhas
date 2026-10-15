@@ -184,6 +184,9 @@ function pontePreparada(respostas) {
     + '      situacoesParaTrocar: function (idDoCanal, idDoCaso) {\n'
     + '        responder(respostas.paineis[idDoCanal].situacoes[idDoCaso]);\n'
     + '      },\n'
+    + '      camposDaSituacao: function () {\n'
+    + '        responder([]);\n'
+    + '      },\n'
     + '      listarCardsDoPainel: function (tela, idDoCanal) {\n'
     + '        responder(respostas.configuracoes.cards[idDoCanal]);\n'
     + '      },\n'
@@ -208,14 +211,14 @@ function pontePreparada(respostas) {
     + 'cadastros: isso abre outra planilha de verdade, e aqui não há '
     + 'servidor para abrir.");\n'
     + '      },\n'
-    + '      configuracaoDoChat: function () {\n'
-    + '        responder(respostas.configuracoes.chat);\n'
+    // O chat entra pela Importação (Etapa 39). As opções são as do servidor de
+    // verdade; conferir e gravar ficam com o servidor, que a prévia não tem.
+    + '      opcoesDaImportacaoDoChat: function () {\n'
+    + '        responder(respostas.configuracoes.chatDaImportacao);\n'
     + '      },\n'
-    // Conferir abre OUTRA planilha de verdade, e a prévia não tem servidor para
-    // isso. Recusa com o motivo, em vez de inventar um laudo.
-    + '      conferirPlanilhaDoChat: function () {\n'
-    + '        recusar("Na prévia não dá para conferir a planilha do chat: isso abre '
-    + 'outra planilha de verdade, e aqui não há servidor para abrir.");\n'
+    + '      conferirImportacaoDoChat: function () {\n'
+    + '        recusar("Na prévia não dá para conferir uma importação: quem lê e traduz '
+    + 'as linhas é o servidor, e aqui não há servidor.");\n'
     + '      },\n'
     + '      configuracaoDoLegado: function () {\n'
     + '        responder(respostas.busca.legado);\n'
@@ -380,7 +383,7 @@ function pontePreparada(respostas) {
       'salvarCorretora', 'ocultarCorretora', 'bloquearSusep',
       'desbloquearSusep',
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
-      'salvarConfiguracaoDoLegado', 'salvarConfiguracaoDoChat', 'importarCasos',
+      'salvarConfiguracaoDoLegado', 'importarAtendimentosDoChat', 'importarCasos',
       'salvarConfiguracaoDosCadastros', 'salvarArquivoDaAuditoria',
       'arquivarAuditoriaAgora', 'salvarSinalizador', 'ocultarSinalizador'])
     + '    };\n'
@@ -899,9 +902,13 @@ function gerar(pastaDeSaida) {
     linhaDoChat(15, '12:20', 'Bianca Souza', '', 'Cobrança', ''),
     linhaDoChat(40, '09:00', 'Ana Martins', 'RET00J', 'Cancelamento', 'Vida Individual')
   ]);
-  chamar('salvarConfiguracaoDoChat')({
-    planilhaId: idDoChat, aba: 'Atendimentos',
-    colunas: { data: 'Data', analista: 'Atendente', susep: 'SUSEP', assunto: 'Assunto', ramo: 'Ramo' }
+  // Pela porta de verdade: a importação do chat, com o de-para da tela.
+  chamar('importarAtendimentosDoChat')({
+    fonte: { tipo: 'planilha', planilhaId: idDoChat, aba: 'Atendimentos' },
+    dePara: [{ daFonte: 'Data', paraAColuna: 'Data' }, { daFonte: 'Atendente', paraAColuna: 'Analista' },
+      { daFonte: 'SUSEP', paraAColuna: 'SUSEP' }, { daFonte: 'Assunto', paraAColuna: 'Assunto' },
+      { daFonte: 'Ramo', paraAColuna: 'Ramo' }],
+    origem: 'Chat de outubro'
   });
 
   // Os dois tipos de bloqueio e uma linha antiga, sem tipo — as três
@@ -1009,7 +1016,7 @@ function gerar(pastaDeSaida) {
   const configuracoes = {
     cards: cards,
     cadastros: chamar('configuracaoDosCadastros()'),
-    chat: chamar('configuracaoDoChat()'),
+    chatDaImportacao: chamar('opcoesDaImportacaoDoChat()'),
     arquivoDaAuditoria: chamar('configuracaoDoArquivoDaAuditoria()'),
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,

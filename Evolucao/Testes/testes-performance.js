@@ -492,7 +492,7 @@ function rodarTestesDePerformance() {
 
   teste('status final NÃO trava o caso: ele continua mudando de status', () => {
     const novo = chamar('cadastrarCaso')(ret.id, { nomedocliente: 'Caso que reabre' });
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido', { valordopremioretido: '100,00' });
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
     igual(chamar('buscarRegistros_')('BASE_RET', 'Id', novo.id, 1)[0].status, 'Pendente');
   });

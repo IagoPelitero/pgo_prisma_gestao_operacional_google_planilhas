@@ -40,12 +40,13 @@ const CLICAVEIS = [
   '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-aba-corretoras]',
   '[data-tipo-de-lista]', '[data-canal-config]', '[data-ver]', '[data-ponto]',
   '[data-componente]', '[data-trocar-situacao]', '[data-mostrar]', '[data-trabalhar]',
-  '[data-status-do-caso]'
+  '[data-status-do-caso]', '[data-o-que-importar]', '[data-aba-da-mesa]'
 ];
 const POR_TIPO = 6;
 /** O que troca a VISTA (e não só abre um item): a varredura entra em cada uma. */
 const NAVEGAM = ['[data-secao]', '[data-canal]', '[data-aba-corretoras]',
-  '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-canal-config]', '[data-tipo-de-lista]'];
+  '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-canal-config]', '[data-tipo-de-lista]',
+  '[data-o-que-importar]', '[data-aba-da-mesa]'];
 const NUNCA_NA_TELA = ['undefined', '[object Object]', 'NaN', 'não existe no servidor'];
 
 function acharPlaywright() {

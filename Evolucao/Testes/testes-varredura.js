@@ -363,7 +363,11 @@ function rodarTestesDaVarredura() {
     const leia = ler('README.md');
     verdadeiro(leia.indexOf('se chama `Formulario`') < 0,
       'o arquivo das peças se chama Comuns, e é assim que o Index o inclui');
-    contem(leia, 'Ela cria as 16 abas');
+    // O número sai do contrato: uma aba nova (a ATENDIMENTOS_CHAT, na Etapa 39)
+    // não deixa o README mentindo em silêncio.
+    const instalado = carregar('primeiro.adm@exemplo.com');
+    instalado.chamar('instalarRECC()');
+    contem(leia, 'Ela cria as ' + instalado.ambiente.planilha.getSheets().length + ' abas');
     contem(leia, 'mesma organização do Google Workspace',
       'a regra do Google que decide quem é reconhecido');
     contem(ler('Front-End/Index.html'), "incluir('Comuns')");

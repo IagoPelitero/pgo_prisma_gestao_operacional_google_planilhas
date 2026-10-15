@@ -41,7 +41,8 @@ function retComStatusProposta(obrigatorio) {
     catalogo: lista, obrigatorio: obrigatorio === true, ativo: true }, extra));
   salvar({ mostrarSe: { campo: 'status', valores: ['Retido', 'Pago', 'Cancelado'] } });
 
-  const base = { nomedocliente: 'Cliente de teste' };
+  // O valor retido é obrigatório no Retido (rodada da Etapa 39): a base já o traz.
+  const base = { nomedocliente: 'Cliente de teste', valordopremioretido: '100,00' };
   const linha = (id) => chamar('lerRegistros_')('BASE_RET').find((l) => l.__id === id);
   return { ambiente, chamar, ret, lista, campo, salvar, base, linha };
 }
@@ -285,8 +286,10 @@ function rodarTestesDoCampoCondicional() {
     contem(html, '["Retido","Pago"]');
 
     const tela = lerTela('Configuracoes.html');
-    contem(tela, 'id="cfg-mostrar-campo"');
-    contem(tela, 'data-valor-da-condicao');
+    // As caixas das duas condições ("aparece quando" e "é obrigatório quando")
+    // saem da mesma função; o id leva o prefixo de cada uma.
+    contem(tela, "mostrarSe: { prefixo: 'mostrar', marca: 'data-valor-da-condicao'");
+    contem(tela, '<select id="cfg-\' + regra.prefixo + \'-campo"');
     contem(tela, 'mostrarSe: lerACondicao()', 'a condição vai no salvar do campo');
   });
 }

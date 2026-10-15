@@ -221,6 +221,7 @@ function listarCamposDoCanal(idDoCanal) {
         // Quando o campo aparece, e — para quem pode mandar nos outros — as
         // opções que ele tem: é com elas que a tela monta "mostrar quando…".
         mostrarSe: condicaoDoCampo_(configuracao),
+        obrigatorioSe: condicaoDoCampo_({ mostrarSe: configuracao.obrigatorioSe }),
         opcoes: String(campo.TipoCampo || '') === 'seletor'
           ? opcoesDoCampo_(configuracao, canal.id).map(function (opcao) { return opcao.valor; })
           : [],
@@ -303,6 +304,12 @@ function salvarCampo(dados) {
     if (condicao) configuracao.mostrarSe = condicao;
     else delete configuracao.mostrarSe;
   }
+  // "Obrigatório quando…" — o valor retido no Retido, pedido do PO.
+  if (dados.obrigatorioSe !== undefined) {
+    var obrigacao = conferirACondicaoDoCampo_(atual, dados.obrigatorioSe, true);
+    if (obrigacao) configuracao.obrigatorioSe = obrigacao;
+    else delete configuracao.obrigatorioSe;
+  }
 
   var tipo = String(dados.tipo || atual.TipoCampo);
   if (!RECC_DO_CAMPO_PARA_O_DADO[tipo]) {
@@ -339,8 +346,11 @@ function salvarCampo(dados) {
  *   · um ciclo: A aparece quando B tem valor, e B aparece quando A tem valor.
  * Os valores guardados são os NOMES das opções, como a lista os escreve.
  */
-function conferirACondicaoDoCampo_(campo, pedido) {
+function conferirACondicaoDoCampo_(campo, pedido, ehObrigacao) {
   if (!pedido || !pedido.campo) return null;
+  // A mesma conferência serve ao "obrigatório quando…": muda só o texto, e o
+  // ciclo não se aplica — ser cobrado não esconde campo nenhum.
+  var oQue = ehObrigacao ? 'é obrigatório' : 'aparece';
 
   var doCanal = lerRegistros_('CAMPOS').filter(function (outro) {
     return converterParaIdentificador_(outro.CanalId) === converterParaIdentificador_(campo.CanalId);
@@ -350,7 +360,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
     return String(outro.ChaveTecnica) === String(pedido.campo);
   })[0];
   if (!quemManda || String(quemManda.ChaveTecnica) === chaveDele) {
-    throw new Error('O campo que decide quando este aparece precisa ser OUTRO '
+    throw new Error('O campo que decide quando este ' + oQue + ' precisa ser OUTRO '
       + 'campo do mesmo canal.');
   }
 
@@ -359,7 +369,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
     .filter(function (valor) { return valor !== ''; });
   if (!pedidos.length) {
     throw new Error('Escolha em quais valores de "' + String(quemManda.Rotulo || quemManda.Cabecalho)
-      + '" este campo aparece — ou deixe "Aparece sempre".');
+      + '" este campo ' + oQue + ' — ou deixe "' + (ehObrigacao ? 'Nunca' : 'Aparece sempre') + '".');
   }
 
   var opcoes = opcoesDoCampo_(lerConfiguracaoDoCampo_(quemManda), campo.CanalId)
@@ -378,7 +388,7 @@ function conferirACondicaoDoCampo_(campo, pedido) {
   });
 
   // Ciclo: sobe de quem manda em quem manda; se chegar neste campo, volta.
-  var subindo = quemManda;
+  var subindo = ehObrigacao ? null : quemManda;
   for (var passo = 0; subindo && passo < 20; passo++) {
     var acima = condicaoDoCampo_(lerConfiguracaoDoCampo_(subindo));
     if (!acima) break;

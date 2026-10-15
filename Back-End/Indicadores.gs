@@ -3199,7 +3199,7 @@ function oQueEuFiz_(quem, canal) {
 
 /* ############################################################################
    #
-   #  OS ATENDIMENTOS DO CHAT — a planilha apartada da Mesa Diamante
+   #  OS ATENDIMENTOS DO CHAT da Mesa Diamante — trazidos pela Importação
    #
    ############################################################################ */
 
@@ -3211,292 +3211,302 @@ function oQueEuFiz_(quem, canal) {
  * integrando o nome da corretora para mostrar a quantidade e o top 5; SUSEPs,
  * assuntos, consultor e vida individual ou em grupo, a mesma coisa".
  *
- * A planilha do chat NÃO tem contrato — é de outro sistema, e muda sem avisar.
- * Por isso o PO diz, em Configurações › Estrutura, QUAL planilha, QUAL aba e
- * QUAL coluna dela é cada coisa. O sistema só LÊ, nunca escreve ali, e uma
- * planilha que não abre vira recado ao lado dos números do sistema, e não uma
- * tela quebrada (mesma regra da base legada).
- *
  * O QUE SOMA COM O QUÊ: o atendido do sistema é todo caso da Mesa no período
  * (o mesmo recorte e o mesmo alcance dos cartões), e o do chat é toda linha da
- * planilha no período. A soma NÃO tira repetido: se o mesmo atendimento estiver
+ * aba ATENDIMENTOS_CHAT no período. A soma NÃO tira repetido: se o mesmo atendimento estiver
  * nas duas bases, ele conta duas vezes — o sistema não tem como saber.
  */
 
-const RECC_CHAVE_DO_CHAT_PLANILHA = 'CHAT.PLANILHA_ID';
-const RECC_CHAVE_DO_CHAT_ABA = 'CHAT.ABA';
-const RECC_CHAVE_DO_CHAT_COLUNAS = 'CHAT.COLUNAS';
+/*
+ * DESDE A ETAPA 39 O CHAT ENTRA PELA IMPORTAÇÃO. Antes o PO apontava, em
+ * Configurações › Estrutura, a planilha do chat, a aba e qual coluna dela era
+ * cada coisa — e o sistema lia de lá a cada abertura. Palavra dele: "ficou
+ * confuso e não consegui fazer a junção". Agora os atendimentos são trazidos
+ * pela tela de Importação, como os casos (colar ou link, de-para, conferência),
+ * e moram na aba ATENDIMENTOS_CHAT do próprio PGO. A configuração antiga (as
+ * chaves CHAT.* da CONFIG) deixou de ser lida.
+ */
 
 /**
- * O que o sistema precisa saber de cada linha do chat. `palavras` serve só
- * para SUGERIR a coluna (pelo nome do cabeçalho); quem decide é o PO.
+ * As colunas da aba ATENDIMENTOS_CHAT. `palavras` serve só para SUGERIR, no
+ * de-para da importação, qual coluna da origem é cada coisa; quem decide é a
+ * pessoa.
  */
 const RECC_COLUNAS_DO_CHAT = [
-  { chave: 'data', rotulo: 'Data do atendimento', obrigatoria: true,
+  { chave: 'data', cabecalho: 'Data', rotulo: 'Data do atendimento', obrigatoria: true,
     palavras: ['data', 'dataatendimento', 'datadoatendimento', 'dia'] },
-  { chave: 'analista', rotulo: 'Analista', obrigatoria: true,
+  { chave: 'analista', cabecalho: 'Analista', rotulo: 'Analista', obrigatoria: true,
     palavras: ['analista', 'atendente', 'agente', 'operador', 'nomedoanalista'] },
-  { chave: 'susep', rotulo: 'SUSEP', obrigatoria: false, palavras: ['susep'] },
-  { chave: 'corretora', rotulo: 'Corretora', obrigatoria: false,
+  { chave: 'susep', cabecalho: 'SUSEP', rotulo: 'SUSEP', obrigatoria: false, palavras: ['susep'] },
+  { chave: 'corretora', cabecalho: 'Corretora', rotulo: 'Corretora', obrigatoria: false,
     palavras: ['corretora', 'nomecorretora', 'nomedacorretora'] },
-  { chave: 'assunto', rotulo: 'Assunto', obrigatoria: false,
+  { chave: 'assunto', cabecalho: 'Assunto', rotulo: 'Assunto', obrigatoria: false,
     palavras: ['assunto', 'motivo', 'tema', 'tipodeatendimento'] },
-  { chave: 'consultor', rotulo: 'Consultor', obrigatoria: false, palavras: ['consultor'] },
-  { chave: 'ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
+  { chave: 'consultor', cabecalho: 'Consultor', rotulo: 'Consultor', obrigatoria: false,
+    palavras: ['consultor'] },
+  { chave: 'ramo', cabecalho: 'Ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
     palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] }
 ];
 
-/** O que está gravado em CONFIG sobre a planilha do chat, sem checar permissão. */
-function configuracaoLidaDoChat_() {
-  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_PLANILHA, '') || '').trim();
-  var aba = String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_ABA, '') || '').trim();
-  var guardadas = {};
-  try {
-    guardadas = JSON.parse(String(valorDaConfiguracao_(RECC_CHAVE_DO_CHAT_COLUNAS, '') || '{}')) || {};
-  } catch (erro) {
-    guardadas = {};
-  }
-  var colunas = {};
-  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    colunas[definicao.chave] = String(guardadas[definicao.chave] || '').trim();
-  });
-  return { planilhaId: id, aba: aba, colunas: colunas, ligado: id !== '' };
-}
+const RECC_ABA_DO_CHAT = 'ATENDIMENTOS_CHAT';
 
-/** O que a tela de Configurações mostra sobre a planilha do chat. */
-function configuracaoDoChat() {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var lida = configuracaoLidaDoChat_();
-  lida.definicao = RECC_COLUNAS_DO_CHAT.map(function (definicao) {
-    return { chave: definicao.chave, rotulo: definicao.rotulo, obrigatoria: definicao.obrigatoria };
-  });
-  return lida;
-}
-
-/** A posição (base 1) da coluna pelo nome do cabeçalho, sem ligar para acento e caixa. */
-function posicaoNoCabecalhoDoChat_(cabecalhos, nome) {
-  var alvo = normalizarParaComparar_(nome);
-  if (!alvo) return 0;
-  for (var i = 0; i < cabecalhos.length; i++) {
-    if (normalizarParaComparar_(cabecalhos[i]) === alvo) return i + 1;
-  }
-  return 0;
-}
-
-/** Abre a aba do chat, ou diz por que não deu. */
-function abaDoChat_(planilhaId, nomeDaAba) {
-  var planilha = abrirPlanilhaDeFora_(planilhaId);
-  var procurado = String(nomeDaAba || '').trim();
-  var aba = procurado ? planilha.getSheetByName(procurado) : planilha.getSheets()[0];
-  if (!aba) {
-    throw new Error('A planilha abriu, mas não tem uma aba chamada "' + procurado
-      + '". As abas dela são: ' + planilha.getSheets().map(function (uma) {
-        return uma.getName();
-      }).join(', ') + '.');
-  }
-  return aba;
-}
-
-/** Quais colunas da planilha parecem ser cada coisa — só sugere, não decide. */
-function sugerirColunasDoChat_(cabecalhos) {
-  var sugestoes = {};
+/** O de-para sugerido: cada coluna da origem para a do chat de mesmo sentido. */
+function sugerirDeParaDoChat_(cabecalhosDaFonte) {
   var usadas = {};
+  var porPosicao = {};
   RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    var escolhida = '';
-    definicao.palavras.some(function (palavra) {
-      return cabecalhos.some(function (cabecalho, i) {
+    var palavras = definicao.palavras.concat([normalizarParaComparar_(definicao.cabecalho)]);
+    palavras.some(function (palavra) {
+      return cabecalhosDaFonte.some(function (cabecalho, i) {
         if (usadas[i] || normalizarParaComparar_(cabecalho) !== palavra) return false;
         usadas[i] = true;
-        escolhida = String(cabecalho).trim();
+        porPosicao[i] = definicao.cabecalho;
         return true;
       });
     });
-    sugestoes[definicao.chave] = escolhida;
   });
-  return sugestoes;
+  return cabecalhosDaFonte.map(function (cabecalho, i) {
+    return { daFonte: String(cabecalho), paraAColuna: porPosicao[i] || '' };
+  });
+}
+
+/** O que a tela de Importação precisa para trazer atendimentos do chat. */
+function opcoesDaImportacaoDoChat() {
+  exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
+  var existe = !!planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT);
+  return {
+    canal: { id: '', nome: 'Atendimentos do chat (Mesa)', aba: RECC_ABA_DO_CHAT },
+    abaExiste: existe,
+    colunasDoCanal: RECC_COLUNAS_DO_CHAT.map(function (d) { return d.cabecalho; }),
+    obrigatorias: RECC_COLUNAS_DO_CHAT.filter(function (d) { return d.obrigatoria; })
+      .map(function (d) { return d.cabecalho; }),
+    colunasDeCarimbo: [],
+    analistas: [],
+    foraDaDivisao: [],
+    statusDoCanal: [],
+    statusPadrao: '',
+    lotes: existe ? lotesDoChat_() : [],
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    repeticaoPelaProposta: false,
+    repeticaoPadrao: ''
+  };
+}
+
+/** Os lotes do chat já importados, do mais recente para o mais antigo. */
+function lotesDoChat_() {
+  var porLote = {};
+  lerRegistros_(RECC_ABA_DO_CHAT).forEach(function (linha) {
+    var lote = String(linha.Lote || '').trim();
+    if (!lote) return;
+    porLote[lote] = (porLote[lote] || 0) + 1;
+  });
+  return Object.keys(porLote).map(function (lote) {
+    return { origem: lote, casos: porLote[lote] };
+  });
 }
 
 /**
- * Abre a planilha do chat SEM ligar nada: é o botão "conferir".
+ * Monta as linhas do chat a partir da fonte, e diz o que entra e o que fica de
+ * fora — é o miolo da conferência e da gravação, que precisam concordar.
  *
- * Diz se abre, quais abas e colunas tem, o que as colunas escolhidas dão nas
- * últimas linhas e quantas SUSEPs a linha traz que o cadastro de corretoras
- * não conhece — que é o que deixaria a corretora e o consultor em branco nos
- * gráficos.
+ * Fica de fora: linha sem data ou sem analista (não há como recortar o período,
+ * nem de quem somar), data que não é data, e a linha que JÁ ESTÁ na aba. Sem
+ * esta última regra, importar a mesma planilha duas vezes contaria cada
+ * atendimento em dobro.
+ *
+ * O "já está" conta QUANTAS vezes: duas linhas idênticas no mesmo arquivo são
+ * dois atendimentos (o corretor que chamou duas vezes no dia, pelo mesmo
+ * assunto) e entram as duas; se a aba já tem uma igual, entra só a outra. Assim
+ * reimportar o mesmo arquivo não dobra nada, e nenhum atendimento de verdade
+ * some por parecer com outro.
  */
-function conferirPlanilhaDoChat(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var pedido = dados || {};
-  var id = String(pedido.planilhaId || '').trim();
-  if (!id) {
-    return { abre: false, recado: 'Informe o Id da planilha do chat. Ele é o pedaço do '
-      + 'endereço entre /d/ e /edit.', abas: [], cabecalhos: [], sugestoes: {}, faltando: [],
-      linhas: 0, amostra: [] };
+function linhasDoChatDaFonte_(pedido) {
+  var grade = gradeDaFonte_(pedido.fonte);
+  if (grade.length < 2) {
+    throw new Error('Preciso de pelo menos duas linhas: a primeira com os nomes das '
+      + 'colunas e ao menos uma de atendimento. Recebi ' + grade.length + '.');
+  }
+  var cabecalhosDaFonte = grade[0];
+  var corpo = grade.slice(1);
+  var dePara = Array.isArray(pedido.dePara) && pedido.dePara.length
+    ? pedido.dePara : sugerirDeParaDoChat_(cabecalhosDaFonte);
+
+  var destinos = {};
+  dePara.forEach(function (par) { if (par && par.paraAColuna) destinos[par.paraAColuna] = true; });
+  var faltando = RECC_COLUNAS_DO_CHAT.filter(function (d) {
+    return d.obrigatoria && !destinos[d.cabecalho];
+  }).map(function (d) { return d.rotulo; });
+
+  var chave = function (linha) {
+    return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
+      linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
+      .map(normalizarParaComparar_).join('|');
+  };
+  var jaNaAba = {};
+  if (planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT)) {
+    lerRegistros_(RECC_ABA_DO_CHAT).forEach(function (linha) {
+      var data = linha.Data;
+      var a = chave({ Data: Object.prototype.toString.call(data) === '[object Date]' ? data : '',
+        Analista: linha.Analista, SUSEP: linha.SUSEP, Corretora: linha.Corretora,
+        Assunto: linha.Assunto, Consultor: linha.Consultor, Ramo: linha.Ramo });
+      jaNaAba[a] = (jaNaAba[a] || 0) + 1;
+    });
   }
 
-  var planilha;
-  try {
-    planilha = abrirPlanilhaDeFora_(id);
-  } catch (erro) {
-    return { abre: false, recado: erro.message || String(erro), abas: [], cabecalhos: [],
-      sugestoes: {}, faltando: [], linhas: 0, amostra: [] };
-  }
-
-  var abas = planilha.getSheets().map(function (uma) { return uma.getName(); });
-  var aba;
-  try {
-    aba = abaDoChat_(id, pedido.aba);
-  } catch (erro) {
-    return { abre: true, recado: erro.message || String(erro), abas: abas, cabecalhos: [],
-      sugestoes: {}, faltando: [], linhas: 0, amostra: [] };
-  }
-
-  var largura = aba.getLastColumn();
-  var ultima = aba.getLastRow();
-  var cabecalhos = largura >= 1
-    ? aba.getRange(1, 1, 1, largura).getDisplayValues()[0].map(function (c) {
-      return String(c === null || c === undefined ? '' : c).trim();
-    }) : [];
-
-  var escolhidas = pedido.colunas || {};
-  var faltando = [];
-  var posicoes = {};
-  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    var nome = String(escolhidas[definicao.chave] || '').trim();
-    if (!nome) {
-      if (definicao.obrigatoria) faltando.push(definicao.rotulo + ': escolha a coluna.');
-      return;
-    }
-    var posicao = posicaoNoCabecalhoDoChat_(cabecalhos, nome);
-    if (!posicao) faltando.push(definicao.rotulo + ': a planilha não tem a coluna "' + nome + '".');
-    else posicoes[definicao.chave] = posicao;
+  var entram = [];
+  var motivos = { vazia: 0, repetida: 0, semDataOuAnalista: 0 };
+  corpo.forEach(function (bruta) {
+    var linha = linhaDaFonteParaOCaso_(bruta, cabecalhosDaFonte, dePara);
+    if (!temAlgumValor_(linha)) { motivos.vazia++; return; }
+    var data = dataDoAtendimentoDoChat_(linha.Data);
+    var analista = String(linha.Analista || '').trim();
+    if (!data || !analista) { motivos.semDataOuAnalista++; return; }
+    var pronta = { Data: data, Analista: analista };
+    ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo'].forEach(function (coluna) {
+      pronta[coluna] = String(linha[coluna] === undefined || linha[coluna] === null
+        ? '' : linha[coluna]).trim();
+    });
+    var a = chave(pronta);
+    if (jaNaAba[a] > 0) { jaNaAba[a]--; motivos.repetida++; return; }
+    entram.push(pronta);
   });
 
-  // As últimas linhas, já traduzidas — conferir o mapeamento olhando o dado.
-  var amostra = [];
-  var linhas = Math.max(ultima - 1, 0);
-  var quantas = Math.min(linhas, 3);
-  if (quantas && !faltando.length) {
-    var inicio = ultima - quantas + 1;
-    var lidas = {};
-    Object.keys(posicoes).forEach(function (chave) {
-      lidas[chave] = aba.getRange(inicio, posicoes[chave], quantas, 1).getDisplayValues();
-    });
-    for (var k = 0; k < quantas; k++) {
-      var linha = {};
-      Object.keys(lidas).forEach(function (chave) { linha[chave] = String(lidas[chave][k][0] || '').trim(); });
-      amostra.push(linha);
+  // O analista que o cadastro de usuários não conhece: a soma por analista
+  // juntaria o chat a um nome que não existe no sistema — é a "junção" que o PO
+  // não conseguia fazer. O laudo diz quem é, antes de gravar.
+  var conhecidos = {};
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    conhecidos[normalizarParaComparar_(usuario.Nome)] = true;
+  });
+  var desconhecidos = [];
+  entram.forEach(function (linha) {
+    var nome = linha.Analista;
+    if (!conhecidos[normalizarParaComparar_(nome)] && desconhecidos.indexOf(nome) < 0) {
+      desconhecidos.push(nome);
     }
-  }
+  });
 
+  return { cabecalhosDaFonte: cabecalhosDaFonte, corpo: corpo, dePara: dePara,
+    faltando: faltando, entram: entram, motivos: motivos, desconhecidos: desconhecidos };
+}
+
+/** O passo "conferir antes de importar", para os atendimentos do chat. */
+function conferirImportacaoDoChat(pedido) {
+  exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
+  var montado = linhasDoChatDaFonte_(dadosDaTela_(pedido || {}));
+  var pulam = montado.motivos.vazia + montado.motivos.repetida + montado.motivos.semDataOuAnalista;
   return {
-    abre: true, recado: '', abas: abas, cabecalhos: cabecalhos,
-    sugestoes: sugerirColunasDoChat_(cabecalhos), faltando: faltando,
-    linhas: linhas, amostra: amostra,
-    // O chat é lido do fim: só as últimas linhas entram nos gráficos.
-    limiteDeLeitura: linhasQueOPainelOlha_()
+    canal: { id: '', nome: 'Atendimentos do chat (Mesa)', aba: RECC_ABA_DO_CHAT },
+    cabecalhosDaFonte: montado.cabecalhosDaFonte,
+    colunasDoCanal: RECC_COLUNAS_DO_CHAT.map(function (d) { return d.cabecalho; }),
+    colunasDeCarimbo: [],
+    dePara: montado.dePara,
+    linhasNaFonte: montado.corpo.length,
+    vaoEntrar: montado.faltando.length ? 0 : montado.entram.length,
+    vaoSerPuladas: pulam,
+    motivosParaPular: { vazia: montado.motivos.vazia + montado.motivos.semDataOuAnalista,
+      repetida: montado.motivos.repetida },
+    semDataOuAnalista: montado.motivos.semDataOuAnalista,
+    faltando: montado.faltando,
+    analistasDesconhecidos: montado.desconhecidos,
+    limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    passaDoLimite: montado.corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
+    amostra: montado.entram.slice(0, 3).map(function (linha) {
+      var vista = {};
+      Object.keys(linha).forEach(function (coluna) {
+        vista[coluna] = coluna === 'Data'
+          ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'dd/MM/yyyy') : linha[coluna];
+      });
+      return vista;
+    }),
+    analistas: [],
+    foraDaDivisao: [],
+    avisos: [],
+    statusPadrao: ''
+  };
+}
+
+/** Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. */
+function importarAtendimentosDoChat(pedido) {
+  exigirPermissao_(RECC_ACOES.IMPORTAR);
+  exigirTela_('importacao');
+  pedido = dadosDaTela_(pedido || {});
+  if (!planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT)) {
+    throw new Error('A aba ' + RECC_ABA_DO_CHAT + ' ainda não existe nesta planilha. Rode '
+      + 'atualizarPGO() no editor do Apps Script.');
+  }
+  var lote = String(pedido.origem || '').trim();
+  if (!lote) {
+    throw new Error('Dê um nome ao lote — "Chat de outubro", por exemplo. É por ele que se '
+      + 'acha uma leva importada errada.');
+  }
+  var montado = linhasDoChatDaFonte_(pedido);
+  if (montado.corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO) {
+    throw new Error('São no máximo ' + RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO + ' linhas por '
+      + 'importação, e vieram ' + montado.corpo.length + '. Divida em levas.');
+  }
+  if (montado.faltando.length) {
+    throw new Error('Diga qual coluna da origem é: ' + montado.faltando.join(' e ')
+      + '. Sem a data não há como recortar o período, e sem o analista não há de quem somar.');
+  }
+  if (!montado.entram.length) {
+    throw new Error('Nenhuma linha entraria: ' + montado.motivos.repetida + ' já estão na aba, '
+      + montado.motivos.semDataOuAnalista + ' sem data ou sem analista e '
+      + montado.motivos.vazia + ' em branco. Nada foi gravado.');
+  }
+  var agora = new Date();
+  var gravados = inserirVariosRegistros_(RECC_ABA_DO_CHAT, montado.entram.map(function (linha) {
+    return Object.assign({ Lote: lote, ImportadoEm: agora }, linha);
+  }), { origem: RECC_ORIGEM_PLANILHA });
+  registrarAuditoria_('chat.importar', RECC_ABA_DO_CHAT, '', lote + ' · ' + gravados.length
+    + ' atendimentos');
+  return {
+    canal: 'Atendimentos do chat (Mesa)',
+    origem: lote,
+    entraram: gravados.length,
+    pulados: { vazia: montado.motivos.vazia + montado.motivos.semDataOuAnalista,
+      repetida: montado.motivos.repetida },
+    analistas: [],
+    analistasDesconhecidos: montado.desconhecidos,
+    primeiroId: gravados.length ? gravados[0].__id : '',
+    ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
   };
 }
 
 /**
- * Aponta a planilha do chat — ou desliga, com o Id em branco.
+ * Os atendimentos do chat, lidos da aba ATENDIMENTOS_CHAT — o fim dela, com o
+ * mesmo teto de linhas que a tela usa para a base do sistema.
  *
- * CONFERE ANTES DE GRAVAR, e a falha DERRUBA: guardar uma planilha que não
- * abre, ou colunas que ela não tem, deixaria a Produtividade da Mesa com um
- * recado para sempre sem ninguém saber se o erro era o Id, a aba ou o nome da
- * coluna. A data e o analista são obrigatórios: sem a data não há como
- * recortar o período, e sem o analista não há de quem somar.
+ * Nunca lança: a Produtividade da Mesa continua com os números do sistema.
+ * `ligado` é haver alguma linha — sem nada importado, a tela diz como trazer.
  */
-function salvarConfiguracaoDoChat(dados) {
-  exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  var pedido = dados || {};
-  var id = String(pedido.planilhaId || '').trim();
-  var aba = String(pedido.aba || '').trim();
-  var colunas = {};
-  RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-    colunas[definicao.chave] = String((pedido.colunas || {})[definicao.chave] || '').trim();
-  });
-
-  if (id) {
-    var laudo = conferirPlanilhaDoChat({ planilhaId: id, aba: aba, colunas: colunas });
-    if (!laudo.abre) throw new Error(laudo.recado);
-    if (laudo.recado) throw new Error(laudo.recado);
-    if (laudo.faltando.length) {
-      throw new Error('A planilha do chat abriu, mas as colunas não conferem:\n\n'
-        + laudo.faltando.join('\n'));
-    }
+function lerAtendimentosDoChat_() {
+  var vazio = { ligado: false, linhas: [], aviso: '', truncada: false, lidas: 0 };
+  try {
+    if (!planilhaAtiva_().getSheetByName(RECC_ABA_DO_CHAT)) return vazio;
+    var teto = linhasQueOPainelOlha_();
+    var registros = lerRegistros_(RECC_ABA_DO_CHAT, { ultimas: teto });
+    var linhas = registros.map(function (r) {
+      return { data: r.Data, analista: String(r.Analista || '').trim(), susep: r.SUSEP,
+        corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo };
+    }).filter(function (linha) { return linha.data || linha.analista; });
+    return { ligado: linhas.length > 0, linhas: linhas, aviso: '',
+      truncada: registros.length >= teto, lidas: registros.length };
+  } catch (erro) {
+    return { ligado: true, linhas: [], aviso: erro.message || String(erro), truncada: false, lidas: 0 };
   }
-
-  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_PLANILHA, id);
-  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_ABA, aba);
-  gravarConfiguracao_(RECC_CHAVE_DO_CHAT_COLUNAS, JSON.stringify(colunas));
-  registrarAuditoria_('chat.configurar', 'CONFIG', '', id ? 'ligada' : 'desligada');
-  return configuracaoDoChat();
 }
 
 /**
- * As linhas do chat, lidas do fim da aba — ou o recado do que deu errado.
- *
- * Nunca lança: a Produtividade da Mesa continua com os números do sistema. Lê
- * SÓ as colunas escolhidas, uma ida ao serviço por coluna, e só as últimas
- * `linhasQueOPainelOlha_()` linhas — o mesmo teto que a tela usa para a base
- * do sistema. O texto vem como a pessoa o VÊ na outra planilha.
+ * A data de uma linha do chat. Aceita a data de verdade (a da aba) e o texto:
+ * "13/10/2026", "13/10/2026 14:05" e "2026-10-13…".
  */
-function lerAtendimentosDoChat_() {
-  var configurada = configuracaoLidaDoChat_();
-  var vazio = { ligado: configurada.ligado, linhas: [], aviso: '', truncada: false, lidas: 0 };
-  if (!configurada.ligado) return vazio;
-
-  try {
-    var aba = abaDoChat_(configurada.planilhaId, configurada.aba);
-    var largura = aba.getLastColumn();
-    var ultima = aba.getLastRow();
-    if (ultima < 2 || largura < 1) return vazio;
-
-    var cabecalhos = aba.getRange(1, 1, 1, largura).getDisplayValues()[0];
-    var posicoes = {};
-    var faltando = [];
-    RECC_COLUNAS_DO_CHAT.forEach(function (definicao) {
-      var nome = configurada.colunas[definicao.chave];
-      if (!nome) {
-        if (definicao.obrigatoria) faltando.push(definicao.rotulo + ' (coluna não escolhida)');
-        return;
-      }
-      var posicao = posicaoNoCabecalhoDoChat_(cabecalhos, nome);
-      if (!posicao) faltando.push('"' + nome + '"');
-      else posicoes[definicao.chave] = posicao;
-    });
-    if (faltando.length) {
-      throw new Error('A planilha do chat não tem: ' + faltando.join(', ')
-        + '. Acerte em Configurações › Estrutura.');
-    }
-
-    var primeira = Math.max(2, ultima - linhasQueOPainelOlha_() + 1);
-    var quantas = ultima - primeira + 1;
-    var lidas = {};
-    Object.keys(posicoes).forEach(function (chave) {
-      lidas[chave] = aba.getRange(primeira, posicoes[chave], quantas, 1).getDisplayValues();
-    });
-
-    var linhas = [];
-    for (var k = 0; k < quantas; k++) {
-      var linha = {};
-      Object.keys(lidas).forEach(function (chave) {
-        linha[chave] = String(lidas[chave][k][0] === null || lidas[chave][k][0] === undefined
-          ? '' : lidas[chave][k][0]).trim();
-      });
-      if (!linha.data && !linha.analista) continue;   // linha em branco no meio da aba
-      linhas.push(linha);
-    }
-    return { ligado: true, linhas: linhas, aviso: '', truncada: primeira > 2, lidas: quantas };
-  } catch (erro) {
-    return { ligado: true, linhas: [], aviso: erro.message || String(erro),
-      truncada: false, lidas: 0 };
-  }
-}
-
-/** A data de uma linha do chat. Aceita "13/10/2026", "13/10/2026 14:05" e "2026-10-13…". */
 function dataDoAtendimentoDoChat_(texto) {
+  if (Object.prototype.toString.call(texto) === '[object Date]') {
+    return isNaN(texto.getTime()) ? '' : texto;
+  }
   var achou = String(texto || '').trim().match(/^(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/);
   return achou ? converterParaData_(achou[1]) : '';
 }

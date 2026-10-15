@@ -37,6 +37,12 @@ var TelaProdutividade = (function () {
    */
   var periodo = SeletorDePeriodo.padrao();
   var painel = null;
+  // Na Mesa, duas abas: "Equipe" (os cards e gráficos de sempre) e "Atendidos"
+  // (sistema + chat). Pedido do PO: a Produtividade "ficou bagunçada com muitas
+  // informações sobre a Mesa Diamante". Abre em Equipe; trocar de canal mantém.
+  var abaDaMesa = 'equipe';
+  // Onde abre a lista dos casos de uma fatia — nas duas abas, o mesmo lugar.
+  var LUGAR_DO_DETALHE = '<div id="detalhe-do-painel"></div>';
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
 
@@ -67,13 +73,33 @@ var TelaProdutividade = (function () {
       });
   }
 
+  /** As abas da Mesa. Canal sem atendimentos (RET, VG) não tem aba nenhuma. */
+  function abasDaMesa() {
+    if (!painel.atendimentos) return '';
+    return '<div class="config-abas" role="tablist" aria-label="O que ver">'
+      + [['equipe', 'Equipe'], ['atendidos', 'Atendidos (sistema + chat)']].map(function (aba) {
+        var atual = abaDaMesa === aba[0];
+        return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
+          + ' aria-selected="' + atual + '" data-aba-da-mesa="' + aba[0] + '">'
+          + escapar(aba[1]) + '</button>';
+      }).join('') + '</div>';
+  }
+
   function desenhar() {
+    // Na aba "Atendidos" da Mesa, só o bloco dos atendidos — o resto fica na
+    // aba "Equipe", que é onde a tela abre.
+    if (painel.atendimentos && abaDaMesa === 'atendidos') {
+      elemento('analitico').innerHTML = desenharFiltros() + abasDaMesa()
+        + desenharAtendimentos() + LUGAR_DO_DETALHE;
+      ligarPainel();
+      return;
+    }
     // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
     // número que a pessoa já leu como se fosse o total.
     elemento('analitico').innerHTML = desenharFiltros()
+      + abasDaMesa()
       + desenharCartoes()
       + desenharPrazos()
-      + desenharAtendimentos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
@@ -85,7 +111,7 @@ var TelaProdutividade = (function () {
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
         : '')
-      + '<div id="detalhe-do-painel"></div>';
+      + LUGAR_DO_DETALHE;
     ligarPainel();
   }
 
@@ -177,14 +203,15 @@ var TelaProdutividade = (function () {
 
     var avisos = [];
     if (!chat.ligado) {
-      avisos.push('A planilha do chat não está ligada: estes números são só dos casos '
-        + 'cadastrados no sistema. Quem administra liga em Configurações › Estrutura.');
+      avisos.push('Nenhum atendimento do chat foi importado ainda: estes números são só dos '
+        + 'casos cadastrados no sistema. Traga o chat pela tela de Importação — Mesa '
+        + 'Diamante, "Atendimentos do chat".');
     } else if (chat.aviso) {
-      avisos.push('A planilha do chat não pôde ser lida, e estes números são só do '
+      avisos.push('Os atendimentos do chat não puderam ser lidos, e estes números são só do '
         + 'sistema: ' + chat.aviso);
     }
     if (chat.truncada) {
-      avisos.push('Do chat entram só as últimas ' + chat.linhasLidas + ' linhas da planilha.');
+      avisos.push('Do chat entram só os últimos ' + chat.linhasLidas + ' atendimentos importados.');
     }
     if (chat.semData) {
       avisos.push(chat.semData + ' linha(s) do chat sem data legível ficaram de fora do período.');
@@ -201,7 +228,7 @@ var TelaProdutividade = (function () {
       + tileDePrazo('No sistema', atendidos.totais.sistema, 'neutro',
         'Casos da Mesa Diamante cadastrados no período')
       + tileDePrazo('No chat', atendidos.totais.chat, 'neutro',
-        'Linhas da planilha do chat no período')
+        'Atendimentos do chat importados, no período')
       + '</div>'
       + avisos.map(function (aviso) {
         return '<p class="aviso-do-chat">' + escapar(aviso) + '</p>';
@@ -414,6 +441,13 @@ var TelaProdutividade = (function () {
   /* --------------------------------------------------------- comportamento */
 
   function ligarPainel() {
+    ligarCliques('[data-aba-da-mesa]', function (botao) {
+      var escolhida = botao.getAttribute('data-aba-da-mesa');
+      if (escolhida === abaDaMesa) return;
+      abaDaMesa = escolhida;
+      desenhar();
+    });
+
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {

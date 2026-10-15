@@ -43,7 +43,7 @@ const CLICAVEIS = [
   '[data-item]', '[data-campo-config]', '[data-analise]',
   '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-aba-corretoras]',
   '[data-tipo-de-lista]', '[data-canal-config]', '[data-ver]', '[data-ponto]',
-  '[data-componente]', '[data-trocar-situacao]'
+  '[data-componente]', '[data-trocar-situacao]', '[data-o-que-importar]', '[data-aba-da-mesa]'
 ];
 
 /** Quantos elementos de cada tipo apertar. Passar disso só repete o caminho. */

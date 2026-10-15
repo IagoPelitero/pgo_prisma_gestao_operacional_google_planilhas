@@ -42,6 +42,20 @@ var TelaImportacao = (function () {
   // "trazer tudo" —, e por isso não pode servir de "não escolhido".
   var colunaQueIdentifica = null;
   var nomeDoLote = '';
+  // O status de todos os casos do lote. null = ainda não escolheu: vale o
+  // padrão do canal (Não trabalhado na RET, sem status na Mesa). Vazio é
+  // "sem status", escolha de verdade.
+  var statusDoLote = null;
+  // O que importar. Na Mesa há dois destinos: os casos do canal e os
+  // atendimentos do chat (pedido do PO: "ler uma planilha de chat ficou confuso"
+  // — agora o chat entra por esta mesma tela). O fluxo é o mesmo; muda o
+  // servidor que confere e grava, e o texto.
+  var oQueImportar = 'casos';
+  var canalAceitaChat = false;
+  function ehChat() { return oQueImportar === 'chat'; }
+  function oQue(plural) {
+    return ehChat() ? (plural ? 'atendimentos' : 'atendimento') : (plural ? 'casos' : 'caso');
+  }
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -63,14 +77,25 @@ var TelaImportacao = (function () {
     }
     Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhido)
       .entao(function (resposta) {
-        opcoes = resposta;
-        if (colunaQueIdentifica === null) {
-          colunaQueIdentifica = resposta.repeticaoPadrao || '';
-        }
+        canalAceitaChat = resposta.aceitaChat === true;
+        if (!canalAceitaChat) oQueImportar = 'casos';
         laudo = null;
         resultado = null;
         deParaEscolhido = null;
-        desenhar();
+        if (!ehChat()) {
+          opcoes = resposta;
+          if (colunaQueIdentifica === null) {
+            colunaQueIdentifica = resposta.repeticaoPadrao || '';
+          }
+          desenhar();
+          return;
+        }
+        Servidor.chamar('opcoesDaImportacaoDoChat')
+          .entao(function (doChat) { opcoes = doChat; desenhar(); })
+          .senao(function (erro) {
+            elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
+              + escapar(erro.message || String(erro)) + '</p>';
+          });
       })
       .senao(function (erro) {
         elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
@@ -91,8 +116,17 @@ var TelaImportacao = (function () {
   function desenharFonte() {
     var colado = fonte.tipo === 'colado';
 
-    return '<section class="cartaa importação-passo">'
-      + '<header class="grafico-cabeca"><h3>1. De onde vêm os casos</h3></header>'
+    return escolhaDoQueImportar()
+      + '<section class="cartaa importação-passo">'
+      + '<header class="grafico-cabeca"><h3>1. De onde vêm os ' + oQue(true) + '</h3></header>'
+      + (ehChat() && opcoes.abaExiste === false
+        ? '<p class="aviso-janela">A aba ATENDIMENTOS_CHAT ainda não existe nesta planilha. '
+          + 'Rode atualizarPGO() no editor do Apps Script antes de importar.</p>' : '')
+      + (ehChat()
+        ? '<p class="config-dica">Uma linha por atendimento. São obrigatórias a <strong>data'
+          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor e '
+          + 'vida individual ou em grupo são opcionais. A linha igual a uma que já entrou é '
+          + 'pulada — importar a mesma planilha de novo não conta em dobro.</p>' : '')
       + '<div class="config-abas">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
       + ' data-fonte="colado">Colar da planilha</button>'
@@ -107,6 +141,16 @@ var TelaImportacao = (function () {
       + '<button type="button" class="botao" id="conferir-importacao">'
       + 'Conferir antes de importar</button></div>'
       + '</section>';
+  }
+
+  /** Na Mesa: casos do canal ou atendimentos do chat. Nos outros canais, nada. */
+  function escolhaDoQueImportar() {
+    if (!canalAceitaChat) return '';
+    return '<div class="config-abas" role="group" aria-label="O que importar">'
+      + '<button type="button" class="config-aba' + (ehChat() ? '' : ' atual') + '"'
+      + ' data-o-que-importar="casos">Casos do canal</button>'
+      + '<button type="button" class="config-aba' + (ehChat() ? ' atual' : '') + '"'
+      + ' data-o-que-importar="chat">Atendimentos do chat</button></div>';
   }
 
   function desenharColar() {
@@ -140,7 +184,7 @@ var TelaImportacao = (function () {
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="importar-agora"'
       + (laudo.vaoEntrar ? '' : ' disabled') + '>'
-      + 'Importar ' + laudo.vaoEntrar + ' caso(s)</button>'
+      + 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)</button>'
       + '<button type="button" class="botao vazado" id="recomecar-do-laudo">'
       + 'Recomeçar</button></div>'
       + '</section>';
@@ -253,20 +297,51 @@ var TelaImportacao = (function () {
       + '</tbody></table></div>';
   }
 
-  /** Nome do lote, para quem vai, e o que não repetir. */
-  function desenharDestino() {
-    return '<h4 class="importacao-titulo">De quem são, e como se chama o lote</h4>'
-      + '<div class="grade">'
-      + '<label class="campo largura-2"><span>Nome do lote</span>'
+  /**
+   * No chat, o destino é só o nome do lote — não há analista a dividir, nem
+   * status. E o laudo diz o que impediria a soma de juntar certo: a coluna
+   * obrigatória que faltou ligar e o analista que o cadastro não conhece.
+   */
+  function desenharDestinoDoChat() {
+    return (laudo.faltando && laudo.faltando.length
+      ? '<p class="aviso-janela">Ligue no de-para acima a coluna de: <strong>'
+        + escapar(laudo.faltando.join(' e ')) + '</strong>. Sem a data não há como recortar '
+        + 'o período, e sem o analista não há de quem somar.</p>' : '')
+      + (laudo.analistasDesconhecidos && laudo.analistasDesconhecidos.length
+        ? '<p class="config-dica aviso-de-carimbo">Estes nomes não estão no cadastro de usuários: '
+          + '<strong>' + escapar(laudo.analistasDesconhecidos.slice(0, 10).join(', ')) + '</strong>'
+          + (laudo.analistasDesconhecidos.length > 10
+            ? ' e mais ' + (laudo.analistasDesconhecidos.length - 10) : '')
+          + '. Eles entram, mas no gráfico "Atendidos por analista" aparecem separados de quem '
+          + 'tem o nome cadastrado. Se for a mesma pessoa escrita de outro jeito, acerte o nome '
+          + 'na planilha de origem antes de importar.</p>' : '')
+      + (laudo.semDataOuAnalista
+        ? '<p class="config-dica">' + laudo.semDataOuAnalista + ' linha(s) sem data ou sem '
+          + 'analista ficam de fora.</p>' : '')
+      + '<h4 class="importacao-titulo">Como se chama o lote</h4>'
+      + '<div class="grade">' + caixaDoNomeDoLote('Chat de outubro') + '</div>';
+  }
+
+  /** A caixa do nome do lote, com os lotes já usados — a mesma nos dois destinos. */
+  function caixaDoNomeDoLote(exemplo) {
+    return '<label class="campo largura-2"><span>Nome do lote</span>'
       + '<input type="text" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
-      + ' placeholder="Base de inadimplentes Vida Presente"'
+      + ' placeholder="' + escapar(exemplo) + '"'
       + (opcoes.lotes.length ? ' list="lotes-ja-usados"' : '') + '>'
       + (opcoes.lotes.length
         ? '<datalist id="lotes-ja-usados">' + opcoes.lotes.map(function (lote) {
           return '<option value="' + escapar(lote.origem) + '"></option>';
         }).join('') + '</datalist>'
         : '')
-      + '</label>'
+      + '</label>';
+  }
+
+  /** Nome do lote, para quem vai, e o que não repetir. */
+  function desenharDestino() {
+    if (ehChat()) return desenharDestinoDoChat();
+    return '<h4 class="importacao-titulo">De quem são, e como se chama o lote</h4>'
+      + '<div class="grade">'
+      + caixaDoNomeDoLote('Base de inadimplentes Vida Presente')
       + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
       + '<select class="filtro" id="coluna-que-identifica">'
       + ['<option value="">— trazer tudo, mesmo repetido —</option>']
@@ -295,16 +370,37 @@ var TelaImportacao = (function () {
         : '')
       + '</p>'
       + desenharAnalistas()
-      + (opcoes.statusPadrao
-        ? '<p class="config-dica">Os casos vão nascer com o status '
-          + '<strong>' + escapar(opcoes.statusPadrao) + '</strong>. O analista '
-          + 'ajusta depois, caso a caso — e cada mudança fica registrada.</p>'
-        : opcoes.statusQueEsperaAPessoa
-          ? '<p class="config-dica">Os casos vão nascer <strong>sem status</strong>. O prazo '
-            + 'só começa quando alguém puser o caso em <strong>'
-            + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que o sistema '
-            + 'anota a data.</p>'
-          : '');
+      + escolhaDoStatusDoLote();
+  }
+
+  /*
+    O STATUS DE TODOS OS CASOS DO LOTE. Pedido do PO: escolher, e não mais só o
+    "Não trabalhado". Vale para o caso que a fonte trouxe sem status; o que veio
+    com status na coluna ligada no de-para fica com o dele. Não carimba data —
+    o caso é antigo.
+  */
+  function escolhaDoStatusDoLote() {
+    var lista = opcoes.statusDoCanal || [];
+    if (!lista.length) return '';
+    var vale = statusQueVale();
+    return '<div class="grade"><label class="campo">'
+      + '<span>Status dos casos importados</span>'
+      + '<select class="filtro" id="status-do-lote">'
+      + '<option value=""' + (vale === '' ? ' selected' : '') + '>— sem status —</option>'
+      + lista.map(function (status) {
+        return '<option value="' + escapar(status.valor) + '"'
+          + (status.valor === vale ? ' selected' : '') + '>' + escapar(status.rotulo) + '</option>';
+      }).join('') + '</select></label></div>'
+      + '<p class="config-dica">' + (vale
+        ? 'Os casos sem status na planilha vão nascer em <strong>' + escapar(vale)
+          + '</strong>; os que trazem o status numa coluna ligada acima ficam com o deles. '
+          + 'A importação não carimba data: o caso é antigo, e a data de hoje diria que o '
+          + 'contato foi hoje. O analista ajusta depois, caso a caso.'
+        : 'Os casos sem status na planilha vão nascer <strong>sem status</strong>.'
+          + (opcoes.statusQueEsperaAPessoa ? ' O prazo só começa quando alguém puser o caso '
+            + 'em <strong>' + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que '
+            + 'o sistema anota a data.' : ''))
+      + '</p>';
   }
 
   /**
@@ -394,7 +490,8 @@ var TelaImportacao = (function () {
     return '<section class="cartaa importação-passo">'
       + '<header class="grafico-cabeca"><h3>Importado</h3></header>'
       + '<div class="cartoes">'
-      + '<div class="indicador tom-bom"><span class="rotulo">Casos que entraram'
+      + '<div class="indicador tom-bom"><span class="rotulo">'
+      + (ehChat() ? 'Atendimentos que entraram' : 'Casos que entraram')
       + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
       + (resultado.pulados.repetida
         ? '<div class="indicador tom-atencao"><span class="rotulo">Já estavam na base'
@@ -407,7 +504,7 @@ var TelaImportacao = (function () {
           + '</strong></div>'
         : '')
       + '</div>'
-      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, no canal '
+      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, em '
       + escapar(resultado.canal) + '.'
       + (resultado.primeiroId
         ? ' Do caso ' + escapar(resultado.primeiroId) + ' ao '
@@ -418,8 +515,11 @@ var TelaImportacao = (function () {
         ? '<p class="config-dica">Divididos entre: '
           + escapar(resultado.analistas.join(', ')) + '.</p>'
         : '')
-      + '<p class="config-dica">A Produtividade RECC já mostra este lote no '
-      + 'gráfico de casos importados por dia.</p>'
+      + (ehChat()
+        ? '<p class="config-dica">A Produtividade da Mesa já soma estes atendimentos aos casos '
+          + 'do sistema, na aba "Atendidos".</p>'
+        : '<p class="config-dica">A Produtividade RECC já mostra este lote no '
+          + 'gráfico de casos importados por dia.</p>')
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="importar-outro-lote">'
       + 'Importar outro lote</button></div>'
@@ -435,7 +535,17 @@ var TelaImportacao = (function () {
       analistasMarcados = {};
       colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
       nomeDoLote = '';
+      statusDoLote = null;          // e o status padrão dele
       desenharSeletor();
+      carregar();
+    });
+
+    cliques('[data-o-que-importar]', function (botao) {
+      var escolha = botao.getAttribute('data-o-que-importar');
+      if (escolha === oQueImportar) return;
+      guardarOQueEstaNaTela();
+      oQueImportar = escolha;
+      nomeDoLote = '';
       carregar();
     });
 
@@ -478,6 +588,13 @@ var TelaImportacao = (function () {
 
     mudancas('#coluna-que-identifica', function (caixa) {
       colunaQueIdentifica = caixa.value;
+    });
+
+    // O status do lote muda o texto de baixo, e o laudo já conferido vale
+    // para o status de antes: guardar o que está na tela e redesenhar.
+    mudancas('#status-do-lote', function () {
+      guardarOQueEstaNaTela();
+      desenhar();
     });
   }
 
@@ -524,6 +641,14 @@ var TelaImportacao = (function () {
 
     var chave = elemento('coluna-que-identifica');
     if (chave) colunaQueIdentifica = chave.value;
+
+    var status = elemento('status-do-lote');
+    if (status) statusDoLote = status.value;
+  }
+
+  /** O status que vale agora: o escolhido, ou o padrão do canal. */
+  function statusQueVale() {
+    return statusDoLote === null ? (opcoes.statusPadrao || '') : statusDoLote;
   }
 
   function conferir() {
@@ -532,11 +657,15 @@ var TelaImportacao = (function () {
     var botao = elemento('conferir-importacao');
     if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
 
-    Servidor.chamarSemPressa('conferirImportacaoDeCasos', canalEscolhido, {
-      fonte: fonte,
-      dePara: deParaEscolhido,
-      colunaQueIdentifica: colunaQueIdentifica || ''
-    })
+    var conferencia = ehChat()
+      ? Servidor.chamarSemPressa('conferirImportacaoDoChat', { fonte: fonte, dePara: deParaEscolhido })
+      : Servidor.chamarSemPressa('conferirImportacaoDeCasos', canalEscolhido, {
+        fonte: fonte,
+        dePara: deParaEscolhido,
+        colunaQueIdentifica: colunaQueIdentifica || '',
+        statusDoLote: statusQueVale()
+      });
+    conferencia
       .entao(function (resposta) {
         laudo = resposta;
         deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
@@ -560,19 +689,27 @@ var TelaImportacao = (function () {
 
     // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
     // fácil: importar errado se desfaz apagando linha por linha.
-    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' caso(s) no canal '
-      + laudo.canal.nome + '? Desfazer isso é apagar os casos um a um.')) return;
+    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em '
+      + laudo.canal.nome + '? Desfazer isso é apagar as linhas uma a uma.')) return;
 
     var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
-    Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
-      fonte: fonte,
-      dePara: deParaEscolhido || laudo.dePara,
-      colunaQueIdentifica: colunaQueIdentifica || '',
-      analistas: escolhidos,
-      origem: nomeDoLote
-    })
+    var gravacao = ehChat()
+      ? Servidor.chamarSemPressa('importarAtendimentosDoChat', {
+        fonte: fonte,
+        dePara: deParaEscolhido || laudo.dePara,
+        origem: nomeDoLote
+      })
+      : Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
+        fonte: fonte,
+        dePara: deParaEscolhido || laudo.dePara,
+        colunaQueIdentifica: colunaQueIdentifica || '',
+        analistas: escolhidos,
+        origem: nomeDoLote,
+        statusDoLote: statusQueVale()
+      });
+    gravacao
       .entao(function (resposta) {
         resultado = resposta;
         laudo = null;
@@ -581,7 +718,7 @@ var TelaImportacao = (function () {
       .senao(function (erro) {
         if (botao) {
           botao.disabled = false;
-          botao.textContent = 'Importar ' + laudo.vaoEntrar + ' caso(s)';
+          botao.textContent = 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)';
         }
         window.alert(erro.message || String(erro));
       });

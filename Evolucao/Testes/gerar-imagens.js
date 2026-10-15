@@ -67,7 +67,10 @@ const FOTOS = [
 
   // A Produtividade da Mesa Diamante, com os atendidos do sistema somados aos do
   // chat: só ela tem o bloco, e a foto precisa TROCAR de canal para chegar nele.
-  { arquivo: 'tela-produtividade-mesa', tela: 'produtividade', canal: 'Mesa', inteira: true },
+  // Desde a Etapa 39 os atendidos moram numa aba da Produtividade da Mesa, e a
+  // foto clica nela.
+  { arquivo: 'tela-produtividade-mesa', tela: 'produtividade', canal: 'Mesa', inteira: true,
+    clique: '[data-aba-da-mesa="atendidos"]' },
 
   // O aviso dos casos perto de vencer, que o Trabalho abre ao entrar no canal.
   // Nas outras fotos ele é fechado antes de clicar e de fotografar.
@@ -130,6 +133,16 @@ async function gerar() {
       await botao.click();
       await esperarATelaMontar(pagina);
       await fecharOAvisoDePrazo(pagina);
+    }
+
+    // Um clique a mais dentro da tela (uma aba), quando a foto pede.
+    if (foto.clique) {
+      if (!await pagina.locator(foto.clique).count()) {
+        throw new Error('a foto "' + foto.arquivo + '" pede o clique em ' + foto.clique
+          + ', e ele não está na tela');
+      }
+      await pagina.click(foto.clique);
+      await esperarATelaMontar(pagina);
     }
 
     const caminho = path.join(DESTINO, foto.arquivo + '.png');

@@ -564,6 +564,7 @@ var TelaConfiguracoes = (function () {
       + caixaDeSimNao('obrigatorio', 'Obrigatório', campo.obrigatorio)
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
       + blocoDaCondicao(campo)
+      + blocoDaCondicao(campo, 'obrigatorioSe')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (podeExcluirEsteCampo(campo)
@@ -578,6 +579,7 @@ var TelaConfiguracoes = (function () {
       salvarCampo(campo);
     });
     ligarACondicao(campo);
+    ligarACondicao(campo, 'obrigatorioSe');
     var excluir = elemento('excluir-campo');
     if (excluir) {
       excluir.addEventListener('click', function () {
@@ -588,6 +590,27 @@ var TelaConfiguracoes = (function () {
 
   /* ------------------------------------------------ mostrar só quando… */
 
+  /*
+   * DUAS CONDIÇÕES, O MESMO EDITOR.
+   *
+   * "Quando este campo aparece" (mostrarSe) e "quando este campo é obrigatório"
+   * (obrigatorioSe — pedido do PO: o valor retido obrigatório no Retido). As
+   * duas são "só quando OUTRO campo for um destes valores", e por isso
+   * dividem as mesmas funções; muda o texto e o id das caixas.
+   */
+  var CONDICOES = {
+    mostrarSe: { prefixo: 'mostrar', marca: 'data-valor-da-condicao',
+      titulo: 'Quando este campo aparece', sempre: 'Aparece sempre',
+      exemplo: 'Ex.: o Status proposta só aparece quando o Status for Retido. '
+        + 'O valor escondido não é cobrado nem gravado, e é esvaziado quando a '
+        + 'pessoa troca o valor que o mostrava.' },
+    obrigatorioSe: { prefixo: 'obrigar', marca: 'data-valor-da-obrigacao',
+      titulo: 'Quando este campo é obrigatório', sempre: 'Só quando "Obrigatório" estiver marcado',
+      exemplo: 'Ex.: o valor retido é obrigatório quando o Status for Retido. Nos '
+        + 'outros status o campo continua aparecendo, sem ser cobrado. Vale no '
+        + 'cadastro, no "Trabalhar no caso" e no "Alterar status".' }
+  };
+
   /**
    * "Aparece sempre", ou "só quando OUTRO campo for um destes valores".
    *
@@ -597,42 +620,42 @@ var TelaConfiguracoes = (function () {
    * vírgula. Quem confere de verdade é o servidor — dar a um valor um nome
    * que a lista não tem faria o campo nunca aparecer.
    */
-  function blocoDaCondicao(campo) {
+  function blocoDaCondicao(campo, qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
     var outros = dados.campos.filter(function (outro) {
       return outro.id !== campo.id;
     }).map(function (outro) {
       return { id: outro.chave, nome: outro.rotulo };
     });
-    var atual = campo.mostrarSe;
-    return '<div class="config-campo" role="group" aria-label="Quando este campo aparece">'
-      + '<span>Quando este campo aparece</span>'
-      + '<select id="cfg-mostrar-campo" aria-label="Campo que decide quando este aparece">'
-      + '<option value="">Aparece sempre</option>'
+    var atual = campo[qual || 'mostrarSe'];
+    return '<div class="config-campo" role="group" aria-label="' + escapar(regra.titulo) + '">'
+      + '<span>' + escapar(regra.titulo) + '</span>'
+      + '<select id="cfg-' + regra.prefixo + '-campo" aria-label="Campo que decide">'
+      + '<option value="">' + escapar(regra.sempre) + '</option>'
       + outros.map(function (outro) {
         return '<option value="' + escapar(outro.id) + '"'
           + (atual && atual.campo === outro.id ? ' selected' : '') + '>'
           + 'Só quando "' + escapar(outro.nome) + '" for…</option>';
       }).join('') + '</select>'
-      + '<div id="cfg-mostrar-valores"></div>'
-      + '<em>Ex.: o Status proposta só aparece quando o Status for Retido. '
-      + 'O valor escondido não é cobrado nem gravado, e é esvaziado quando a '
-      + 'pessoa troca o valor que o mostrava.</em></div>';
+      + '<div id="cfg-' + regra.prefixo + '-valores"></div>'
+      + '<em>' + escapar(regra.exemplo) + '</em></div>';
   }
 
-  function desenharOsValoresDaCondicao(campo, chaveQueManda) {
-    var caixa = elemento('cfg-mostrar-valores');
+  function desenharOsValoresDaCondicao(campo, chaveQueManda, qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
+    var caixa = elemento('cfg-' + regra.prefixo + '-valores');
     if (!caixa) return;
     if (!chaveQueManda) { caixa.innerHTML = ''; return; }
 
     var quemManda = dados.campos.filter(function (outro) {
       return outro.chave === chaveQueManda;
     })[0];
-    var marcados = (campo.mostrarSe && campo.mostrarSe.campo === chaveQueManda)
-      ? campo.mostrarSe.valores : [];
+    var atual = campo[qual || 'mostrarSe'];
+    var marcados = (atual && atual.campo === chaveQueManda) ? atual.valores : [];
     var opcoes = quemManda ? quemManda.opcoes : [];
 
     if (!opcoes.length) {
-      caixa.innerHTML = '<input type="text" id="cfg-mostrar-texto" value="'
+      caixa.innerHTML = '<input type="text" id="cfg-' + regra.prefixo + '-texto" value="'
         + escapar(marcados.join('; ')) + '">'
         + '<em>Os valores, separados por ponto e vírgula.</em>';
       return;
@@ -642,32 +665,34 @@ var TelaConfiguracoes = (function () {
         return texto(valor).toLowerCase() === texto(opcao).toLowerCase();
       });
       return '<label class="config-chave">'
-        + '<input type="checkbox" data-valor-da-condicao="' + escapar(opcao) + '"'
+        + '<input type="checkbox" ' + regra.marca + '="' + escapar(opcao) + '"'
         + (ligado ? ' checked' : '') + '>'
         + '<span>' + escapar(opcao) + '</span></label>';
     }).join('');
   }
 
-  function ligarACondicao(campo) {
-    var escolha = elemento('cfg-mostrar-campo');
+  function ligarACondicao(campo, qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
+    var escolha = elemento('cfg-' + regra.prefixo + '-campo');
     if (!escolha) return;
-    desenharOsValoresDaCondicao(campo, escolha.value);
+    desenharOsValoresDaCondicao(campo, escolha.value, qual);
     escolha.addEventListener('change', function () {
-      desenharOsValoresDaCondicao(campo, escolha.value);
+      desenharOsValoresDaCondicao(campo, escolha.value, qual);
     });
   }
 
   /** O que a tela pede: { campo, valores }, ou null para "aparece sempre". */
-  function lerACondicao() {
-    var quemManda = valorDe('mostrar-campo');
+  function lerACondicao(qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
+    var quemManda = valorDe(regra.prefixo + '-campo');
     if (!quemManda) return null;
 
     var valores = [];
-    var caixas = document.querySelectorAll('[data-valor-da-condicao]');
+    var caixas = document.querySelectorAll('[' + regra.marca + ']');
     for (var i = 0; i < caixas.length; i++) {
-      if (caixas[i].checked) valores.push(caixas[i].getAttribute('data-valor-da-condicao'));
+      if (caixas[i].checked) valores.push(caixas[i].getAttribute(regra.marca));
     }
-    var escrito = elemento('cfg-mostrar-texto');
+    var escrito = elemento('cfg-' + regra.prefixo + '-texto');
     if (escrito) {
       valores = escrito.value.split(';').map(function (valor) { return valor.trim(); })
         .filter(function (valor) { return valor !== ''; });
@@ -779,7 +804,8 @@ var TelaConfiguracoes = (function () {
       listaDe: valorDe('listaDe'),
       obrigatorio: marcado('obrigatorio'),
       ativo: marcado('ativo'),
-      mostrarSe: lerACondicao()
+      mostrarSe: lerACondicao(),
+      obrigatorioSe: lerACondicao('obrigatorioSe')
     };
     Servidor.chamar('salvarCampo', envio)
       .entao(function () { avisarSalvo(); carregarCampos(); })
@@ -2980,18 +3006,13 @@ var TelaConfiguracoes = (function () {
             Servidor.chamar('configuracaoDosCadastros')
               .entao(function (cadastros) {
                 dados.cadastros = cadastros;
-                Servidor.chamar('configuracaoDoChat')
-                  .entao(function (chat) {
-                    dados.chat = chat;
-                    Servidor.chamar('configuracaoDoArquivoDaAuditoria')
-                      .entao(function (arquivo) {
-                        dados.arquivoDaAuditoria = arquivo;
-                        Servidor.chamar('listarAuditoria', 40)
-                          .entao(function (trilha) {
-                            dados.trilha = trilha;
-                            desenharEstrutura();
-                          })
-                          .senao(falhou);
+                Servidor.chamar('configuracaoDoArquivoDaAuditoria')
+                  .entao(function (arquivo) {
+                    dados.arquivoDaAuditoria = arquivo;
+                    Servidor.chamar('listarAuditoria', 40)
+                      .entao(function (trilha) {
+                        dados.trilha = trilha;
+                        desenharEstrutura();
                       })
                       .senao(falhou);
                   })
@@ -3042,7 +3063,6 @@ var TelaConfiguracoes = (function () {
       + desenharLegado();
     ligarDiagnostico();
     ligarCadastros();
-    ligarChat();
     ligarArquivoDaAuditoria();
     ligarLegado();
 
@@ -3351,129 +3371,18 @@ var TelaConfiguracoes = (function () {
   }
 
   /**
-   * A planilha dos atendimentos do chat — a leitura apartada da Mesa Diamante.
-   *
-   * Ela não tem contrato: é de outro sistema. Por isso o PO diz aqui qual
-   * planilha, qual aba e qual coluna dela é cada coisa. "Conferir" abre a
-   * planilha, sugere as colunas pelo nome do cabeçalho e mostra as últimas
-   * linhas já traduzidas — conferir o mapeamento olhando o dado. O PGO só LÊ.
+   * O chat da Mesa NÃO se configura mais aqui (Etapa 39). Antes, esta seção
+   * pedia o Id, a aba e qual coluna da planilha do chat era cada coisa — e o
+   * PO não conseguiu fazer a junção. Agora os atendimentos entram pela tela de
+   * Importação, como os casos. A frase fica para quem vier procurar aqui.
    */
   function desenharChat() {
-    var chat = dados.chat || { planilhaId: '', aba: '', colunas: {}, definicao: [], ligado: false };
-    var colunas = chat.definicao.map(function (definicao) {
-      return campoDeTexto('chat-' + definicao.chave,
-        definicao.rotulo + (definicao.obrigatoria ? ' *' : ''),
-        (chat.colunas || {})[definicao.chave],
-        definicao.obrigatoria
-          ? 'Obrigatória: sem ela o atendimento não entra no período nem no analista.'
-          : 'Opcional. Vazio: o atendimento do chat conta, mas sem esta informação.')
-        .replace('<input type="text"', '<input type="text" list="cfg-chat-cabecalhos"');
-    }).join('');
-
     return '<div class="config-legado">'
-      + '<h4>Planilha dos atendimentos do chat</h4>'
-      + '<p class="config-explica">Os casos atendidos pelo chat, numa planilha à parte. '
-      + 'Quando apontada, a <strong>Produtividade RECC da Mesa Diamante</strong> soma '
-      + 'esses atendimentos aos casos cadastrados no sistema, por analista, corretora, '
-      + 'SUSEP, assunto, consultor e vida individual ou em grupo. '
-      + '<strong>O PGO só lê.</strong> A corretora e o consultor vêm do cadastro de '
-      + 'corretoras, pela SUSEP. Vazio desliga.</p>'
-      + (chat.ligado
-        ? '<p class="config-alerta suave">Ligada. Se a planilha sair do ar ou perder o '
-          + 'compartilhamento, a Produtividade da Mesa mostra só o sistema — com o '
-          + 'motivo ao lado, não em silêncio.</p>'
-        : '')
-      + '<form class="config-form" id="form-chat">'
-      + campoDeTexto('chatId', 'Id da planilha do chat', chat.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
-        + 'precisa ter acesso a ela.')
-      + campoDeTexto('chatAba', 'Aba', chat.aba,
-        'Vazio usa a primeira aba. A primeira linha é lida como cabeçalho.')
-      + '<datalist id="cfg-chat-cabecalhos"></datalist>'
-      + colunas
-      + '<div class="config-acoes">'
-      + '<button type="button" class="botao vazado" id="conferir-chat">'
-      + 'Conferir a planilha</button>'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + '</div></form>'
-      + '<div id="laudo-do-chat"></div>'
-      + '</div>';
-  }
-
-  /** As colunas escolhidas na tela, pelo que está nas caixas. */
-  function colunasDoChatNaTela() {
-    var colunas = {};
-    ((dados.chat || {}).definicao || []).forEach(function (definicao) {
-      colunas[definicao.chave] = valorDe('chat-' + definicao.chave);
-    });
-    return colunas;
-  }
-
-  function ligarChat() {
-    elemento('conferir-chat').addEventListener('click', function () {
-      var caixa = elemento('laudo-do-chat');
-      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
-
-      Servidor.chamar('conferirPlanilhaDoChat', {
-        planilhaId: valorDe('chatId'), aba: valorDe('chatAba'), colunas: colunasDoChatNaTela()
-      }).entao(function (laudo) {
-        // Os cabeçalhos viram sugestão nas caixas, e as colunas que ainda estão
-        // em branco recebem a que o nome indica — o PO confere e troca.
-        var lista = elemento('cfg-chat-cabecalhos');
-        if (lista) {
-          lista.innerHTML = (laudo.cabecalhos || []).filter(function (c) { return c; })
-            .map(function (c) { return '<option value="' + escapar(c) + '"></option>'; }).join('');
-        }
-        var preenchidas = [];
-        Object.keys(laudo.sugestoes || {}).forEach(function (chave) {
-          var campo = elemento('cfg-chat-' + chave);
-          if (campo && !campo.value.trim() && laudo.sugestoes[chave]) {
-            campo.value = laudo.sugestoes[chave];
-            preenchidas.push(laudo.sugestoes[chave]);
-          }
-        });
-
-        var amostra = (laudo.amostra || []).map(function (linha) {
-          return '<li>' + Object.keys(linha).map(function (chave) {
-            return '<strong>' + escapar(chave) + '</strong>: ' + escapar(linha[chave] || '—');
-          }).join(' · ') + '</li>';
-        }).join('');
-
-        var ok = laudo.abre && !laudo.recado && !(laudo.faltando || []).length;
-        caixa.innerHTML = (laudo.recado
-          ? '<p class="config-alerta">' + escapar(laudo.recado) + '</p>' : '')
-          + ((laudo.faltando || []).length
-            ? '<ul class="config-itens">' + laudo.faltando.map(function (linha) {
-              return '<li>' + escapar(linha) + '</li>';
-            }).join('') + '</ul>' : '')
-          + (laudo.abre && !laudo.recado
-            ? '<p class="config-alerta' + (ok ? ' suave' : '') + '">'
-              + (ok ? 'A planilha abre e as colunas conferem. ' : 'A planilha abre. ')
-              + laudo.linhas + ' linha(s) de atendimento'
-              + (laudo.limiteDeLeitura && laudo.linhas > laudo.limiteDeLeitura
-                ? ' — só as últimas ' + laudo.limiteDeLeitura + ' entram nos gráficos' : '')
-              + '.' + (preenchidas.length
-                ? ' Sugeri colunas pelo nome do cabeçalho: confira antes de salvar.' : '')
-              + '</p>' : '')
-          + (amostra ? '<p class="config-explica">As últimas linhas, como o sistema as lê:</p>'
-            + '<ul class="config-itens">' + amostra + '</ul>' : '');
-      }).senao(function (erro) {
-        caixa.innerHTML = '<p class="config-alerta">'
-          + escapar(erro.message || String(erro)) + '</p>';
-      });
-    });
-
-    elemento('form-chat').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('salvarConfiguracaoDoChat', {
-        planilhaId: valorDe('chatId'), aba: valorDe('chatAba'), colunas: colunasDoChatNaTela()
-      }).entao(function (nova) {
-        dados.chat = nova;
-        avisarSalvo(nova.ligado
-          ? 'Planilha do chat ligada e conferida.'
-          : 'Planilha do chat desligada — a Produtividade da Mesa volta a mostrar só o sistema.');
-      }).senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
-    });
+      + '<h4>Atendimentos do chat</h4>'
+      + '<p class="config-explica">Os atendimentos do chat da Mesa Diamante agora entram '
+      + 'pela tela de <strong>Importação</strong>: escolha a Mesa Diamante e '
+      + '"Atendimentos do chat", cole ou dê o link, ligue as colunas e confira. A '
+      + 'Produtividade da Mesa soma esses atendimentos aos casos do sistema.</p></div>';
   }
 
   function desenharLegado() {

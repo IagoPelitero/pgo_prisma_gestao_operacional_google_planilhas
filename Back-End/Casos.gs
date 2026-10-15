@@ -115,6 +115,11 @@ function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
     // Aparece só quando outro campo estiver com um destes valores: { campo:
     // 'chave', valores: ['Retido', 'Pago'] } — ver condicaoDoCampo_.
     mostrarSe: condicaoDoCampo_(configuracao),
+    // OBRIGATÓRIO só quando outro campo estiver com um destes valores — pedido
+    // do PO: "quando o status for Retido, o valor retido deve ser obrigatório".
+    // Mesmo formato do mostrarSe; o campo continua aparecendo nos outros casos,
+    // só deixa de ser cobrado.
+    obrigatorioSe: condicaoDoCampo_({ mostrarSe: configuracao.obrigatorioSe }),
     largura: Number(configuracao.largura) || 1,
     /*
      * Data no futuro é RECUSADA por padrão: o caso descreve algo que já
@@ -508,6 +513,13 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
       return;
     }
 
+    // "Obrigatório quando…": vale o valor que o campo que manda VAI TER — o
+    // Retido escolhido agora cobra o valor retido nesta mesma gravação.
+    if (descricao.obrigatorioSe
+      && condicaoBate_(descricao.obrigatorioSe, valorQueVaiValer(descricao.obrigatorioSe.campo))) {
+      descricao.obrigatorio = true;
+    }
+
     var veioDaTela = valoresDaTela.hasOwnProperty(descricao.chave)
       || valoresDaTela.hasOwnProperty(descricao.cabecalho);
     var bruto = valoresDaTela[descricao.chave];
@@ -612,6 +624,16 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     if (descricao.tipo === 'documento' && !ehASusep_(descricao.chave)
       && !ehASusep_(descricao.cabecalho)) bruto = apenasDigitos_(bruto);
 
+    // O VALOR TEM DE CABER NA COLUNA. A coluna de número, de data ou de Id
+    // converte o que recebe; o que não converte vira VAZIO — e era assim, calado,
+    // que a tentativa de contato sumia (achado 98). Recusar com o motivo é melhor
+    // do que dizer "salvo" e gravar em branco.
+    var naoCabe = valorQueNaoCabeNaColuna_(canal.aba, descricao.cabecalho, bruto);
+    if (naoCabe) {
+      problemas.push({ campo: descricao.chave, rotulo: descricao.rotulo, erro: naoCabe });
+      return;
+    }
+
     paraGravar[descricao.cabecalho] = bruto;
   });
 
@@ -714,6 +736,35 @@ function conferirCampo_(campo, valor) {
   }
 
   return '';
+}
+
+/**
+ * O motivo de um valor NÃO caber no tipo da coluna da planilha — ou vazio, quando
+ * cabe.
+ *
+ * Quem decide o tipo é o contrato da base (ou o campo, numa coluna criada por
+ * Cadastrar Caso). Um texto numa coluna de número, ou de data, era convertido e
+ * virava célula em branco, sem erro nenhum. Só reclama quando a conversão APAGA
+ * o valor: número com vírgula, data em dd/mm/aaaa e o resto que a coluna entende
+ * continuam passando como sempre.
+ */
+var RECC_O_QUE_A_COLUNA_GUARDA = {
+  identificador: 'um código só de dígitos', numero: 'número', dinheiro: 'valor em dinheiro',
+  data: 'data', dataHora: 'data e hora', hora: 'hora', simOuNao: 'Sim ou Não'
+};
+
+function valorQueNaoCabeNaColuna_(nomeDaAba, cabecalho, valor) {
+  if (String(valor === null || valor === undefined ? '' : valor).trim() === '') return '';
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var posicao = posicaoDaColuna_(estrutura, cabecalho);
+  if (posicao < 0) return '';
+  var tipo = estrutura.tipos[posicao];
+  if (!RECC_O_QUE_A_COLUNA_GUARDA[tipo]) return '';
+  var convertido = converterParaOTipoDaColuna_(valor, tipo);
+  if (convertido !== '' && convertido !== null && convertido !== undefined) return '';
+  return 'a coluna "' + estrutura.cabecalhos[posicao] + '" da planilha guarda '
+    + RECC_O_QUE_A_COLUNA_GUARDA[tipo] + ', e "' + String(valor).trim().slice(0, 60)
+    + '" ficaria em branco nela. Escolha outro valor, ou peça para ajustar o tipo da coluna';
 }
 
 /** Numa máscara, cada zero é um dígito: 000.000.000-00 pede 11. */
@@ -873,7 +924,7 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
  *
  * Segue a permissão de EDITAR: trocar a situação é editar o caso.
  */
-function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
+function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = converterParaIdentificador_(idDoCaso);
@@ -901,6 +952,14 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
 
   var alteracao = {};
   alteracao[canal.colunaDoStatus] = achada.gravadoComo;
+
+  // OS CAMPOS QUE O STATUS PEDE. Pedido do PO: o valor retido é obrigatório no
+  // Retido — e o diálogo de status, que só trocava o status, deixava passar um
+  // Retido sem valor. Agora ele recebe os campos que aparecem ou são cobrados
+  // no status escolhido (o valor retido, o Status proposta, a tentativa de
+  // contato) e confere como o formulário confere. Ver camposDaSituacao.
+  gravarOsCamposDaSituacao_(canal, quem, atual, achada.gravadoComo,
+    valoresDosCampos || {}, alteracao);
 
   // Concluir preenche a data de finalização quando o canal tem essa coluna e
   // ela ainda está vazia — é o que a operação faria à mão logo em seguida.
@@ -940,6 +999,99 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova) {
   // ocultar, mexer em configuração.
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
+}
+
+/**
+ * Os campos que um status PEDE: os que aparecem só nele (mostrarSe do campo de
+ * status) e os que ficam obrigatórios nele (obrigatorioSe). É o que o diálogo
+ * de "Alterar status" mostra ao escolher o status.
+ */
+function camposPedidosPelaSituacao_(canal, quem, situacao) {
+  var doStatus = '';
+  var ativos = camposAtivosDoCanal_(canal.id);
+  ativos.forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Cabecalho) === normalizarParaComparar_(canal.colunaDoStatus)) {
+      doStatus = String(campo.ChaveTecnica);
+    }
+  });
+  if (!doStatus) return [];
+  var pedidos = [];
+  ativos.forEach(function (campo) {
+    if (String(campo.ChaveTecnica) === doStatus) return;
+    if (visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica) !== RECC_VISIBILIDADE.EDICAO) return;
+    var descricao = campoParaATela_(campo, canal.id, RECC_VISIBILIDADE.EDICAO, quem);
+    var aparece = descricao.mostrarSe && descricao.mostrarSe.campo === doStatus
+      && condicaoBate_(descricao.mostrarSe, situacao);
+    var cobrado = descricao.obrigatorioSe && descricao.obrigatorioSe.campo === doStatus
+      && condicaoBate_(descricao.obrigatorioSe, situacao);
+    // Campo que depende de OUTRO campo (não do status) e não aparece agora não
+    // é pergunta deste diálogo.
+    if (descricao.mostrarSe && descricao.mostrarSe.campo !== doStatus) return;
+    if (!aparece && !cobrado) return;
+    if (cobrado) descricao.obrigatorio = true;
+    if (descricao.mostrarSe && !aparece) return;
+    pedidos.push(descricao);
+  });
+  return pedidos;
+}
+
+/**
+ * O que o diálogo de status mostra ao escolher um status: os campos que ele
+ * pede, já com o valor que o caso tem.
+ */
+function camposDaSituacao(idDoCanal, idDoCaso, situacao) {
+  var quem = exigirPermissao_(RECC_ACOES.EDITAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var atual = buscarRegistros_(canal.aba, 'Id', converterParaIdentificador_(idDoCaso), 1)[0];
+  if (!atual) throw new Error('O caso ' + idDoCaso + ' não existe no canal ' + canal.nome + '.');
+  exigirAlcanceSobre_(atual, canal, quem);
+  var estrutura = estruturaDaAba_(canal.aba);
+  return camposPedidosPelaSituacao_(canal, quem, String(situacao || '')).map(function (descricao) {
+    // O valor como o formulário o espera: o dinheiro como NÚMERO (a tela o
+    // escreve como R$, ver Formulario.preencher) e a data em dd/mm/aaaa.
+    var valor = valorPelaGrafiaDaAba_(atual, estrutura, descricao.cabecalho);
+    var tipoDaColuna = estrutura.tipos[posicaoDaColuna_(estrutura, descricao.cabecalho)];
+    descricao.valor = Object.prototype.toString.call(valor) === '[object Date]'
+      ? paraTexto_(valor, tipoDaColuna) : (valor === null || valor === undefined ? '' : valor);
+    // Quem decidiu se o campo aparece e se é cobrado foi o servidor, agora,
+    // para o status escolhido. A condição não vai para a tela: no diálogo o
+    // status é o seletor dele, e não um campo "status" — o formulário, sem
+    // achar quem manda, esconderia o campo que o status acabou de pedir.
+    descricao.mostrarSe = null;
+    descricao.obrigatorioSe = null;
+    return descricao;
+  });
+}
+
+/**
+ * Confere e grava, na troca de status, os campos que o status pede.
+ *
+ * Vale o que a tela mandou; o que ela não mandou fica como está no caso. O
+ * obrigatório vazio recusa a troca inteira — com o nome de cada campo —, e o
+ * valor passa pelas MESMAS conferências do formulário (conferirCampo_ e o
+ * "cabe na coluna"). Quem chama sem mandar nada (de fora da tela) também é
+ * cobrado: o Retido sem valor não entra por nenhuma porta.
+ */
+function gravarOsCamposDaSituacao_(canal, quem, atual, situacao, valores, alteracao) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var problemas = [];
+  camposPedidosPelaSituacao_(canal, quem, situacao).forEach(function (descricao) {
+    var veio = Object.prototype.hasOwnProperty.call(valores, descricao.chave);
+    var bruto = veio ? valores[descricao.chave]
+      : valorPelaGrafiaDaAba_(atual, estrutura, descricao.cabecalho);
+    if (bruto === null || bruto === undefined) bruto = '';
+    if (typeof bruto === 'string') bruto = bruto.trim();
+    var problema = conferirCampo_(descricao, bruto)
+      || valorQueNaoCabeNaColuna_(canal.aba, descricao.cabecalho, bruto);
+    if (problema) {
+      problemas.push(descricao.rotulo + ' — ' + problema);
+      return;
+    }
+    if (veio) alteracao[grafiaDaColuna_(canal.aba, descricao.cabecalho)] = bruto;
+  });
+  if (problemas.length) {
+    throw new Error('Para "' + situacao + '", confira: ' + problemas.join('; ') + '.');
+  }
 }
 
 /**
@@ -2700,7 +2852,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
     // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
-    statusPadrao: statusDaImportacaoDoCanal_(canal)
+    statusPadrao: statusDoLote_(canal, pedido.statusDoLote)
   };
 }
 
@@ -3047,6 +3199,32 @@ function statusDaImportacaoDoCanal_(canal) {
   return padrao;
 }
 
+/**
+ * O status dos casos do LOTE — pedido do PO: "escolher importação deve permitir
+ * que eu delegue o status de origem para todos os casos, e não mais por padrão
+ * apenas Não trabalhado".
+ *
+ * `escolhido` undefined (quem chama sem escolher) é o padrão do canal, como
+ * antes; vazio é "sem status", escolha de verdade; qualquer outro tem de ser um
+ * status do canal. Vale para o caso que a fonte trouxe SEM status: o que veio
+ * com status na coluna ligada no de-para continua com o dele.
+ *
+ * NÃO CARIMBA, por decisão do PO: o caso é antigo, e carimbar hoje diria que o
+ * contato (ou o Retido) aconteceu hoje.
+ */
+function statusDoLote_(canal, escolhido) {
+  if (escolhido === undefined || escolhido === null) return statusDaImportacaoDoCanal_(canal);
+  var texto = String(escolhido).trim();
+  if (!texto) return '';
+  var achada = situacaoDoCanalPeloValor_(canal, texto);
+  if (!achada) {
+    throw new Error('O status "' + texto + '" não existe no canal ' + canal.nome + '. Os status '
+      + 'dele são: ' + situacoesDoCanal_(canal).map(function (s) { return s.gravadoComo; }).join(', ')
+      + '.');
+  }
+  return achada.gravadoComo;
+}
+
 /** O status com que o caso nasce no formulário, tirado do campo Status do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
@@ -3119,7 +3297,7 @@ function importarCasos(idDoCanal, pedido) {
   var analistas = analistasEscolhidos_(pedido.analistas, canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var agora = new Date();
-  var statusPadrao = statusDaImportacaoDoCanal_(canal);
+  var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
 
   var paraGravar = [];
   var pulados = { vazia: 0, repetida: 0 };
@@ -3349,9 +3527,15 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusDaImportacaoDoCanal_(canal),
+    // Os status que a pessoa pode escolher para o lote inteiro.
+    statusDoCanal: canal.colunaDoStatus ? situacoesDoCanal_(canal).map(function (situacao) {
+      return { valor: situacao.gravadoComo, rotulo: situacao.nome };
+    }) : [],
     // Status padrão que a importação NÃO põe (o da Mesa): a tela explica.
     statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
+    // Na Mesa, a mesma tela traz também os atendimentos do CHAT (Etapa 39).
+    aceitaChat: canal.aba === 'BASE_MESA',
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
     // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.

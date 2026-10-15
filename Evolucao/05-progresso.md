@@ -2762,6 +2762,49 @@ Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
 
 ---
 
+## Etapa 39 — O valor retido no Retido, a tentativa que ia em branco, o chat pela Importação
+
+Quatro pedidos do PO numa rodada, e as escolhas dele quando perguntado:
+
+| Pedido | Escolha | O que ficou |
+|---|---|---|
+| **"quando o status for preenchido como retido o valor retido deve ser obrigatório incluir"** | Pedir no próprio diálogo | Regra nova de campo, **"Quando este campo é obrigatório"** (`obrigatorioSe`, mesmo formato do "Quando aparece"), editável em Configurações › Cadastrar Caso. O valor retido vem com ela de fábrica: aparece em todos os status, cobrado só no Retido. No formulário o asterisco liga e desliga com o status; o diálogo **Alterar status** pergunta ao servidor (`camposDaSituacao`) o que o status escolhido pede e desenha ali — o valor retido no Retido, o Status proposta e a tentativa onde eles aparecem. O servidor confere nas três portas |
+| **"a tentativa de contato não está carimbando a opção da lista na planilha, tanto no botão da aba Trabalho quanto em cadastrar caso"** | — (erro) | Achado 98: a coluna estava declarada como **número** no contrato e todo texto virava vazio — inclusive os itens de fábrica. Virou texto, e `valorQueNaoCabeNaColuna_` recusa, com o nome da coluna, qualquer valor que iria em branco |
+| **"ler uma planilha de chat ficou confuso e não consegui fazer a junção"** | Importar pela tela de Importação | A configuração em Estrutura saiu. Na Importação da Mesa: **Casos do canal / Atendimentos do chat**. Colar ou link, de-para sugerido ("Atendente" → Analista), conferência que diz **quais analistas o cadastro de usuários não conhece**, nome de lote, auditoria. Os atendimentos moram na aba nova `ATENDIMENTOS_CHAT`; importar de novo não dobra (a linha já importada é pulada, na mesma quantidade) |
+| **"o produtividade recc ficou bagunçado com muitas informações sobre a mesa diamante"** | Abas dentro da Produtividade | A Mesa abre na aba **Equipe** (o que os outros canais têm) e os atendidos vão para **Atendidos (sistema + chat)** |
+| **"Escolher importação deve permitir que eu delegue o status de origem para todos os casos"** | Status para todos, sem carimbar | No passo da conferência, **Status de todos os casos do lote**: o padrão do canal, qualquer status dele ou "sem status". Vale para quem veio sem status na planilha; não nasce data de status |
+
+**Testado depois de construído**, como o PO pediu ("crie tudo primeiro, depois faça
+os devidos testes"). O ponta a ponta achou o item 99 antes da entrega: o diálogo
+desenhava escondida a tentativa que o servidor tinha pedido, porque ia com a
+condição "aparece quando o Status…" e no diálogo não há campo Status — o servidor
+passou a mandar os campos sem a condição.
+
+**Números.** **1245 testes** (46 a mais: 36 em `testes-retido-tentativa-e-lote.js`;
+`testes-chat-da-mesa.js` reescrito para a Importação, com a reimportação que não
+dobra, o analista desconhecido e a permissão; os testes que cadastravam Retido sem
+valor passaram a mandá-lo), cinco execuções seguidas sem falha, **12 quebras de
+propósito, 12 vermelhos**. Varredura geral com as chamadas da tela regravadas (o
+diálogo e a importação do chat entraram): **17.761 chamadas, zero defeito**.
+Navegador: ponta a ponta **22/22** no repositório e no pacote (o do chat agora
+importa pela tela e abre a aba Atendidos; o novo abre o Alterar status, escolhe Sem
+sucesso de contato e Retido e grava), 108 combinações de largura, 152 cliques na
+prévia e 100 com base suja.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆).
+2. Rode **`atualizarPGO()`**. Dois passos novos: liga o "obrigatório no Retido" no
+   valor retido (só se o campo não tem condição — se estiver marcado "Obrigatório"
+   sempre, fica como está e o laudo explica como trocar), e cria a aba
+   `ATENDIMENTOS_CHAT`. Se a planilha do chat estava ligada em Estrutura, o laudo
+   diz o Id dela: traga os atendimentos pela Importação, com "Ler outra planilha
+   pelo link".
+3. A tentativa de contato dos casos antigos estava em branco — o que foi escolhido
+   antes desta versão não foi gravado e não há como recuperar pelo sistema.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

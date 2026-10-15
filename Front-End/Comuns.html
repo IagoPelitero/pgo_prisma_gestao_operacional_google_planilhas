@@ -811,7 +811,10 @@ var Formulario = (function () {
 
   function desenharCampo(campo, prefixo, colunaDaData) {
     var id = prefixo + 'campo-' + campo.chave;
-    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
+    // O asterisco existe também no campo "obrigatório quando…": ele nasce
+    // escondido e `aplicarCondicoes` o acende quando a condição vale.
+    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>'
+      : (campo.obrigatorioSe ? ' <span class="exigido" data-exigido-condicional hidden>*</span>' : '');
     /*
       O asterisco é VISUAL. Quem usa leitor de tela não o ouve como "campo
       obrigatório" — ouve "asterisco", ou nada. `aria-required` é o que diz
@@ -921,10 +924,15 @@ var Formulario = (function () {
     // módulo: o formulário é desenhado em dois lugares — a tela de cadastro e
     // o caso aberto por cima — e o que estiver só na memória de um não vale
     // para o outro.
-    var condicao = campo.mostrarSe
+    var condicao = (campo.mostrarSe
       ? ' data-mostrar-se-campo="' + escapar(campo.mostrarSe.campo) + '"'
         + ' data-mostrar-se-valores="' + escapar(JSON.stringify(campo.mostrarSe.valores)) + '"'
-      : '';
+      : '')
+      // "Obrigatório quando…" viaja do mesmo jeito (o valor retido no Retido).
+      + (campo.obrigatorioSe && !campo.obrigatorio
+        ? ' data-obrigatorio-se-campo="' + escapar(campo.obrigatorioSe.campo) + '"'
+          + ' data-obrigatorio-se-valores="' + escapar(JSON.stringify(campo.obrigatorioSe.valores)) + '"'
+        : '');
 
     // Travado pelo cargo não é o mesmo que somente leitura do nível, e a
     // pessoa merece saber qual dos dois é. Sem essa frase, um analista lê o
@@ -1071,6 +1079,27 @@ var Formulario = (function () {
    * pedir para apagá-lo.
    */
   function aplicarCondicoes(raiz, limpar) {
+    // "Obrigatório quando…": liga e desliga o aria-required (que é o que o
+    // botão de salvar e o servidor cobram) e o asterisco.
+    var cobrados = raiz.querySelectorAll('[data-obrigatorio-se-campo]');
+    for (var c = 0; c < cobrados.length; c++) {
+      var cobrado = cobrados[c];
+      var deQuemCobra = cobrado.getAttribute('data-obrigatorio-se-campo');
+      var quando = [];
+      try { quando = JSON.parse(cobrado.getAttribute('data-obrigatorio-se-valores') || '[]'); }
+      catch (erro) { quando = []; }
+      var manda = raiz.querySelector('[data-chave="' + deQuemCobra + '"]');
+      var valorQueManda = manda ? String(manda.value || '') : '';
+      var vale = quando.some(function (esperado) { return mesmoTexto(valorQueManda, esperado); });
+      var controle = cobrado.querySelector('[data-chave]');
+      if (controle) {
+        if (vale) controle.setAttribute('aria-required', 'true');
+        else controle.removeAttribute('aria-required');
+      }
+      var asterisco = cobrado.querySelector('[data-exigido-condicional]');
+      if (asterisco) asterisco.hidden = !vale;
+    }
+
     var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
     for (var i = 0; i < condicionais.length; i++) {
       var bloco = condicionais[i];
@@ -1200,10 +1229,14 @@ var Formulario = (function () {
     // Os campos condicionais reagem ao campo de que dependem. O ouvinte fica
     // no campo que MANDA, e não no que obedece: quem obedece pode estar
     // escondido, e elemento escondido não recebe evento.
-    var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
+    // Duas buscas, e não uma com vírgula: o campo que só aparece e o que só é
+    // cobrado dependem, os dois, de quem manda.
+    var condicionais = Array.prototype.slice.call(raiz.querySelectorAll('[data-mostrar-se-campo]'))
+      .concat(Array.prototype.slice.call(raiz.querySelectorAll('[data-obrigatorio-se-campo]')));
     var jaOuvidos = {};
     for (var k = 0; k < condicionais.length; k++) {
-      var deQuem = condicionais[k].getAttribute('data-mostrar-se-campo');
+      var deQuem = condicionais[k].getAttribute('data-mostrar-se-campo')
+        || condicionais[k].getAttribute('data-obrigatorio-se-campo');
       if (jaOuvidos[deQuem]) continue;
       jaOuvidos[deQuem] = true;
       var manda = raiz.querySelector('[data-chave="' + deQuem + '"]');
@@ -2072,6 +2105,10 @@ var CasoEmModal = (function () {
               + escapar(opcao.rotulo) + '</option>';
           }).join('')
           + '</select></label>'
+          // Os campos que o status escolhido PEDE — o valor retido e o Status
+          // proposta no Retido, a tentativa de contato onde ela aparece. Vêm
+          // do servidor a cada troca do status (ver camposDaSituacao).
+          + '<div id="campos-da-situacao"></div>'
           + '<p class="dialogo-erro" id="erro-situacao" hidden></p>'
           + '<div class="config-acoes">'
           + '<button type="submit" class="botao" id="salvar-situacao">Salvar</button>'
@@ -2095,6 +2132,33 @@ var CasoEmModal = (function () {
         });
         elemento('situacao-nova').focus();
 
+        // A cada status escolhido, o servidor diz o que ele pede; o formulário
+        // desenha com as mesmas máscaras e listas do cadastro. A resposta de um
+        // status que já não está escolhido é descartada.
+        var pedidoAtual = 0;
+        function mostrarOsCamposDaSituacao() {
+          var situacao = elemento('situacao-nova').value;
+          var lugar = elemento('campos-da-situacao');
+          var esta = ++pedidoAtual;
+          lugar.innerHTML = '';
+          Servidor.chamar('camposDaSituacao', idDoCanal, idDoCaso, situacao)
+            .entao(function (campos) {
+              if (esta !== pedidoAtual || !elemento('campos-da-situacao')) return;
+              if (!campos || !campos.length) { lugar.innerHTML = ''; return; }
+              lugar.innerHTML = '<p class="config-explica">O status "' + escapar(situacao)
+                + '" pede:</p>'
+                + Formulario.desenhar({ secoes: [{ nome: situacao, campos: campos }], canal: {} },
+                  'situacao-');
+              Formulario.ligar(lugar, 'situacao-', idDoCanal, false);
+              var valoresDoCaso = {};
+              campos.forEach(function (campo) { valoresDoCaso[campo.chave] = campo.valor; });
+              Formulario.preencher(lugar, valoresDoCaso);
+            })
+            .senao(function () { lugar.innerHTML = ''; });
+        }
+        elemento('situacao-nova').addEventListener('change', mostrarOsCamposDaSituacao);
+        mostrarOsCamposDaSituacao();
+
         elemento('form-situacao').addEventListener('submit', function (evento) {
           evento.preventDefault();
           if (gravando) return;
@@ -2103,7 +2167,8 @@ var CasoEmModal = (function () {
           // gravariam duas mudanças, e o contador de mudanças contaria duas.
           Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
-            elemento('situacao-nova').value)
+            elemento('situacao-nova').value,
+            Formulario.valores(elemento('campos-da-situacao')))
             .entao(function () {
               gravando = false;
               sair();

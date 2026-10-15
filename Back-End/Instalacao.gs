@@ -984,8 +984,12 @@ const RECC_PADRAO_DO_FORMULARIO = {
   valordopremio: { secao: 'Seguro', ordem: 27, rotulo: 'Valor do prêmio anual' },
   premiomensal: { secao: 'Seguro', ordem: 28,
     rotulo: 'Valor do prêmio mensal' },
+  // Obrigatório no Retido, pedido do PO: "quando o status for preenchido como
+  // retido, o valor retido deve ser obrigatório". Nos outros status, continua
+  // aparecendo e não é cobrado.
   valordopremioretido: { secao: 'Seguro', ordem: 29,
-    rotulo: 'Valor do prêmio retido' },
+    rotulo: 'Valor do prêmio retido',
+    obrigatorioSe: { campo: 'status', valores: ['Retido'] } },
   formadepagamento: { secao: 'Seguro', ordem: 30, rotulo: 'Forma de pagamento',
     tipoCampo: 'seletor', catalogo: 'FORMA_PAGAMENTO' },
   dadosdopagamento: { secao: 'Seguro', ordem: 31, rotulo: 'Dados de pagamento',
@@ -1193,6 +1197,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
     if (padrao.listaDe) configuracao.listaDe = padrao.listaDe;
     if (padrao.largura) configuracao.largura = padrao.largura;
     if (padrao.mostrarSe) configuracao.mostrarSe = padrao.mostrarSe;
+    if (padrao.obrigatorioSe) configuracao.obrigatorioSe = padrao.obrigatorioSe;
     if (padrao.travaPara) configuracao.travaPara = padrao.travaPara;
     if (padrao.separaEm) configuracao.separaEm = padrao.separaEm;
     if (padrao.partirEm) configuracao.partirEm = padrao.partirEm;
@@ -1374,6 +1379,12 @@ function atualizarPGO() {
 
   // --- 6b6. a coluna "prêmio mensal retido" da RET vira "prêmio mensal" -------
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
+
+  // --- 6b7. o valor retido é obrigatório no Retido ---------------------------
+  feito = feito.concat(ligarOValorRetidoNoRetido_(pulados, paraVoce));
+
+  // --- 6b8. os atendimentos do chat entram pela Importação --------------------
+  feito = feito.concat(criarAAbaDoChat_(pulados, paraVoce));
 
   // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
   feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
@@ -2085,6 +2096,75 @@ function ligarAParadaDoRetido_(pulados, paraVoce) {
  * Os casos em "Não trabalhado" não ganham data: ficam com o prazo cheio, que é
  * exatamente o pedido.
  */
+/**
+ * A aba ATENDIMENTOS_CHAT, onde o chat da Mesa passa a morar (Etapa 39). Quem
+ * tinha a planilha à parte configurada é avisado: ela não é mais lida, e os
+ * atendimentos se trazem pela tela de Importação.
+ */
+function criarAAbaDoChat_(pulados, paraVoce) {
+  var feito = [];
+  var planilha = planilhaAtiva_();
+  if (!planilha.getSheetByName('ATENDIMENTOS_CHAT')) {
+    criarAbaDoContrato_(planilha, esquemaDaAba_('ATENDIMENTOS_CHAT'));
+    esquecerEstruturaLida_();
+    feito.push('aba ATENDIMENTOS_CHAT criada — os atendimentos do chat entram pela Importação');
+  } else {
+    pulados.push('aba ATENDIMENTOS_CHAT já existe');
+  }
+  var antiga = '';
+  try { antiga = String(valorDaConfiguracao_('CHAT.PLANILHA_ID', '') || '').trim(); }
+  catch (erro) { antiga = ''; }
+  if (antiga) {
+    paraVoce.push('A planilha do chat que estava ligada em Configurações › Estrutura NÃO é mais '
+      + 'lida. Traga os atendimentos pela tela de Importação: escolha a Mesa Diamante, '
+      + '"Atendimentos do chat", e use "Ler outra planilha pelo link" com o mesmo Id ('
+      + antiga + '). A linha repetida é pulada, então dá para importar de novo sem contar dobrado.');
+  }
+  return feito;
+}
+
+/**
+ * Liga, numa instalação que já existe, a regra do PO: "quando o status for
+ * Retido, o valor retido deve ser obrigatório".
+ *
+ * Só liga se o campo não tem condição de obrigatório nenhuma — o que o PO já
+ * configurou, ele configurou de propósito. Campo marcado "Obrigatório" sempre
+ * já é mais exigente, e também fica como está.
+ */
+function ligarOValorRetidoNoRetido_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CAMPOS') || !planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('o valor retido: as abas de configuração ainda não existem');
+    return feito;
+  }
+  var ret = lerRegistros_('CANAIS').filter(function (canal) {
+    return String(canal.Aba) === 'BASE_RET';
+  })[0];
+  if (!ret) { pulados.push('o canal BASE_RET não está cadastrado'); return feito; }
+  var campo = lerRegistros_('CAMPOS').filter(function (um) {
+    return converterParaIdentificador_(um.CanalId) === converterParaIdentificador_(ret.Id)
+      && String(um.ChaveTecnica) === 'valordopremioretido';
+  })[0];
+  if (!campo) { pulados.push('RET: o campo do valor retido não existe'); return feito; }
+
+  var configuracao = lerConfiguracaoDoCampo_(campo);
+  if (configuracao.obrigatorioSe) {
+    pulados.push('RET: o valor retido já tem a condição de obrigatório');
+    return feito;
+  }
+  if (normalizarParaComparar_(campo.Obrigatorio) === 'sim') {
+    paraVoce.push('RET: o valor retido está marcado como obrigatório SEMPRE, e ficou assim. '
+      + 'Para cobrar só no Retido, desmarque "Obrigatório" e escolha "Só quando Status for '
+      + 'Retido" em "Quando este campo é obrigatório", em Configurações › Cadastrar Caso.');
+    return feito;
+  }
+  configuracao.obrigatorioSe = { campo: 'status', valores: ['Retido'] };
+  atualizarRegistro_('CAMPOS', campo.__id, { Configuracao: JSON.stringify(configuracao) });
+  feito.push('RET: o valor retido passou a ser obrigatório quando o Status é Retido '
+    + '(no formulário e no "Alterar status")');
+  return feito;
+}
+
 function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
   var feito = [];
   var planilha = planilhaAtiva_();

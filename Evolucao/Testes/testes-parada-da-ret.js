@@ -321,7 +321,7 @@ function rodarTestesDaParadaDaRet() {
       const c = carregar('primeiro.adm@exemplo.com');
       c.chamar('instalarRECC()');
       return Object.assign({ ret: c.chamar('canaisVisiveis_()').find((k) => k.aba === 'BASE_RET'),
-        base: { nomedocliente: 'Cliente' } }, c);
+        base: { nomedocliente: 'Cliente', valordopremioretido: '100,00' } }, c);
     })();
     x.chamar('removerColuna_')('BASE_RET', 'Data do status proposta');
     x.chamar('lerRegistros_("CAMPOS")').forEach((campo) => {

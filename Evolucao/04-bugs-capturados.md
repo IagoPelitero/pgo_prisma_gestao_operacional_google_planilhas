@@ -2060,9 +2060,54 @@ na fatia, confere as 100 linhas e o botão, e pede "todos".
 
 ---
 
+### 98 · A tentativa de contato escolhida na lista ia em branco para a planilha
+
+**Sintoma.** Relato do PO: "ajustei o PGO para que quando o status for retido ou
+for sem sucesso de contato ele mostre a caixinha da tentativa de contato. Nela
+apaguei e coloquei outras opções, mas notei que ele não está carimbando a opção
+da lista na planilha. Tanto no botão da aba Trabalho quanto em cadastrar caso".
+A pessoa escolhia "Caixa postal", salvava sem erro nenhum, e a coluna
+"tentativas de contato" continuava vazia.
+
+**Causa.** O contrato da BASE_RET (`RECC_ESQUEMA`, Base.gs) dizia que essa coluna
+guarda **número** — herança de quando ela seria "quantas tentativas". O campo
+virou seletor de lista, mas "o contrato manda": todo valor passava por
+`converterParaOTipoDaColuna_`, que transforma texto que não é número em vazio.
+Não era só a lista nova do PO: nem os itens de fábrica ("1ª tentativa") chegavam
+a ser gravados, desde sempre. Ninguém tinha visto porque não havia erro.
+
+**Defesa.** A coluna passou a ser **texto** no contrato. E a família inteira
+ganhou guarda: `valorQueNaoCabeNaColuna_` (Casos.gs) confere, antes de gravar,
+se o valor sobrevive à conversão da coluna — se um valor preenchido viraria
+vazio, a gravação é **recusada com o nome da coluna** ("a coluna X da planilha
+guarda número, e 'Caixa postal' ficaria em branco nela"), no cadastro, no
+"Trabalhar no caso" e no "Alterar status". O mesmo engano numa coluna futura
+aparece no primeiro clique, e não meses depois.
+
+---
+
+### 99 · O campo que o status pedia sumia no diálogo "Alterar status"
+
+**Sintoma.** Achado pelo ponta a ponta desta mesma rodada, antes da entrega: ao
+escolher "Sem sucesso de contato" no diálogo, o servidor mandava a tentativa de
+contato para a tela — e a tela a desenhava **escondida**.
+
+**Causa.** O campo ia com a condição dele ("aparece quando o Status for…"). No
+formulário de cadastro, o Status é um campo; no diálogo, é o seletor do próprio
+diálogo. O formulário procurava o campo "status" para decidir, não achava, e
+escondia — o mesmo campo que o servidor tinha acabado de pedir.
+
+**Defesa.** Quem decide o que o diálogo mostra é o servidor, para o status
+escolhido: `camposDaSituacao` manda os campos **sem** `mostrarSe` e
+`obrigatorioSe`. A suíte ganhou o teste que desenha o que o servidor mandou e
+confere que nada sai escondido; o ponta a ponta abre o diálogo, escolhe os dois
+status e grava.
+
+---
+
 ## O que esta lista ensina
 
-**São noventa e sete achados, e a maioria era silenciosa.** Não davam erro, não
+**São noventa e nove achados, e a maioria era silenciosa.** Não davam erro, não
 travavam, não apareciam no log. Gravavam dado errado — ou desenhavam a tela
 errada — e seguiam em frente.
 

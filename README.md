@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1199 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1245 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -158,7 +158,7 @@ São duas situações, e cada uma tem o seu caminho:
    > nome é um arquivo que falta.
 
 4. **Instale.** No editor, escolha **`instalarRECC`** na lista e clique em
-   *Executar*. Ela cria as 16 abas, semeia o que o sistema precisa para abrir —
+   *Executar*. Ela cria as 17 abas, semeia o que o sistema precisa para abrir —
    os três canais (RET, Mesa Diamante, VG), o formulário de cada um, as listas,
    os cartões, os gráficos e os sinalizadores de prazo — e **cadastra você como
    o primeiro administrador**. As bases de caso, as corretoras e as SUSEPs
@@ -299,7 +299,7 @@ uma função nova é varrida no dia em que nasce.
 node Evolucao/Testes/rodar.js
 ```
 
-1199 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1245 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -696,12 +696,43 @@ trocar o status para um que não o mostra, o valor é **esvaziado** — pelo
 formulário ou pelo diálogo rápido de status. Abrir um caso antigo **não** apaga
 nada: só a troca esvazia.
 
-> O diálogo rápido de **Alterar status** não pergunta o Status proposta: ele só
-> troca o status. O campo se preenche depois, em Trabalhar no caso.
+> Desde a Etapa 39, o diálogo rápido de **Alterar status** também pergunta: ao
+> escolher o status, ele mostra os campos que aquele status faz aparecer (o
+> Status proposta no Retido, a tentativa de contato no Sem sucesso…) e os que
+> ficam obrigatórios nele, já com o valor que o caso tem. O que faltar é dito
+> pelo nome, e o status não muda até estar completo.
 
 A tela recusa o que faria o campo nunca aparecer: um valor que a lista do campo
 que manda não tem, o campo mandando em si mesmo e dois campos que esperam um
 pelo outro.
+
+### Um campo que é obrigatório conforme outro
+
+Pedido do PO: *"quando o status for preenchido como retido, o valor retido deve
+ser obrigatório incluir"*. Em **Configurações › Cadastrar Caso**, cada campo tem,
+abaixo de "Quando este campo aparece", o **Quando este campo é obrigatório**:
+*Só quando "Obrigatório" estiver marcado* (o de sempre) ou *Só quando "Status"
+for…* — e os valores, quantos forem.
+
+O **Valor do prêmio retido** já vem assim de fábrica: aparece em **todos** os
+status, e só é cobrado no **Retido**. Vale nas três portas:
+
+| Porta | O que acontece no Retido sem o valor |
+|---|---|
+| **Cadastrar caso** | o asterisco aparece ao escolher Retido, e o botão fica travado até preencher |
+| **Trabalhar no caso** | o asterisco aparece ao escolher Retido; salvar sem o valor é recusado com o nome do campo, e nada é gravado |
+| **Alterar status** (o botão da fila do Trabalho) | o diálogo pede o valor ali mesmo; sem ele, diz "Para 'Retido', confira: Valor do prêmio retido — é obrigatório" e o status não muda |
+
+O servidor confere de novo nas três — quem chamasse por fora da tela também
+ouviria o recado. "Obrigatório" marcado continua valendo para todos os status.
+
+### A opção da lista vai para a planilha como está escrita
+
+Relato do PO: a **tentativa de contato** escolhida ("Caixa postal", e até o
+"1ª tentativa" de fábrica) ia **em branco** para a planilha, pelo cadastro e pelo
+Alterar status (achado 98). A coluna estava declarada como número; agora é texto.
+E se um dia outra coluna tiver o mesmo engano, a gravação é **recusada com o nome
+da coluna** — em vez de gravar vazio sem avisar.
 
 ### Trabalhar no caso traz tudo o que está preenchido
 
@@ -827,7 +858,10 @@ Pedido do PO: *"implemente na Produtividade RECC, para a Mesa Diamante, a leitur
 de uma planilha apartada de casos atendidos pelo chat"* e *"na Produtividade da
 Mesa, os gráficos de atendidos, somando os casos cadastrados no sistema e os
 casos atendidos por nome do analista"*. Só a **Mesa Diamante** tem o bloco
-**Atendidos — sistema e chat**, logo abaixo do controle de prazos:
+**Atendidos — sistema e chat**. Ele mora numa **aba à parte** dentro da
+Produtividade da Mesa — **Equipe** (cartões, gráficos e prazos, como nos outros
+canais) e **Atendidos (sistema + chat)** —, porque, palavra do PO, a Produtividade
+"ficou bagunçada com muitas informações sobre a Mesa Diamante":
 
 | Em cima | O total atendido, quanto veio do **sistema** e quanto veio do **chat** |
 |---|---|
@@ -844,14 +878,25 @@ o número é o pedido, e a tabela mostra de onde veio cada parte. O que passa do
 não traz a informação (sem SUSEP, sem assunto…) **não entra no ranking** e é
 contado à parte, no rodapé do gráfico.
 
-**Ligar a planilha do chat** é em **Configurações › Estrutura › Planilha dos
-atendimentos do chat**. Ela é de outro sistema e não tem contrato, então o PO diz
-o Id, a aba e **qual coluna dela é cada coisa**: data e analista são obrigatórios;
-SUSEP, corretora, assunto, consultor e vida individual/grupo são opcionais. O botão
-**Conferir a planilha** abre a planilha, sugere as colunas pelo nome do cabeçalho,
-mostra as últimas linhas já traduzidas e confere se as colunas existem. Salvar
-confere de novo e **recusa** o Id que não abre, a aba ou a coluna que não existe.
-**O PGO só lê** a planilha do chat — nunca escreve nela.
+**Trazer o chat** é pela tela de **Importação**: escolha a **Mesa Diamante** e
+**Atendimentos do chat**, cole as linhas ou dê o link da planilha, confira e
+importe — o mesmo caminho dos casos. Até a Etapa 38 o PO apontava a planilha do
+chat em Configurações › Estrutura e o sistema a lia a cada abertura; palavra dele:
+"ficou confuso e não consegui fazer a junção". Agora os atendimentos **entram** no
+PGO, na aba `ATENDIMENTOS_CHAT`, e a Produtividade lê de lá.
+
+- **O de-para** é o da importação: o sistema sugere qual coluna da origem é cada
+  coisa pelo nome do cabeçalho ("Atendente" vira **Analista**), e a pessoa
+  confirma. **Data** e **analista** são obrigatórios; SUSEP, corretora, assunto,
+  consultor e vida individual/grupo, opcionais.
+- **A conferência diz antes de gravar** quantas linhas entram, quantas ficam de
+  fora (sem data legível ou sem analista, ou já importadas) e **quais analistas o
+  cadastro de usuários não conhece** — é a junção por analista que não fechava. O
+  aviso não impede a importação: o nome entra como veio.
+- **Importar de novo não conta em dobro.** A linha igual a uma que já está na aba
+  é pulada — e na mesma quantidade: duas linhas iguais num arquivo novo (o
+  corretor que chamou duas vezes no dia) são dois atendimentos, e entram as duas.
+- Cada importação tem um **nome de lote** ("Chat de outubro") e fica na auditoria.
 
 O que vale saber, e a tela diz:
 
@@ -861,13 +906,14 @@ O que vale saber, e a tela diz:
   não tem as colunas deles.
 - **O que está nas duas bases conta duas vezes.** O sistema não tem como saber
   que um atendimento já cadastrado também está na planilha.
-- **Chat desligado, que não abriu ou que perdeu uma coluna não derruba o bloco:**
-  os números do sistema continuam, com o motivo escrito em cima. Número parcial
-  sem aviso levaria alguém a concluir que o chat não atendeu ninguém.
-- **A planilha é lida do fim:** só as últimas linhas entram — o mesmo teto que a
+- **Sem chat importado, ou com a aba que não se deixa ler, o bloco não cai:**
+  os números do sistema continuam, com o motivo escrito em cima — e, sem nada
+  importado, como trazer. Número parcial sem aviso levaria alguém a concluir que
+  o chat não atendeu ninguém.
+- **A aba é lida do fim:** só as últimas linhas entram — o mesmo teto que a
   tela usa para a base do sistema (5.000, ajustável em `OPERACAO.LINHAS_DO_PAINEL`)
-  —, e a tela avisa quando cortou. Linha com data que não dá para ler fica de fora
-  e é contada no aviso.
+  —, e a tela avisa quando cortou. Linha sem data (escrita à mão na aba) fica de
+  fora do período e é contada no aviso.
 
 ### O período, de três maneiras
 
@@ -1064,7 +1110,7 @@ numa base que já está sendo trabalhada.
 | Os cabeçalhos são os da OUTRA planilha | Casa nome com nome e sugere; a pessoa corrige o que não reconheceu |
 | A base chega sem responsável | Rodízio em partes iguais entre os analistas marcados — e só entram na lista quem é **do canal escolhido** e está **disponível** |
 | A base repete toda semana | Escolhendo a coluna que identifica o caso — CPF, nº da proposta —, o que já está dentro é **pulado**, e o laudo diz quantos. Na RET já vem marcada a **proposta no mesmo mês** (ver abaixo) |
-| O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET; "Aguardando", no VG. Na **Mesa Diamante entra sem status** — pedido do PO: *"casos de importação da Mesa não têm status e só devem contar quando for alterado para Em andamento"*. O "Em andamento" carimba a data de onde contam as 48 horas, e a importação não inventa essa data: ela nasce quando alguém põe o caso em Em andamento. A tela da Importação avisa |
+| O caso precisa nascer trabalhável | Entra com o status padrão do canal: "Não trabalhado", na RET; "Aguardando", no VG. Na **Mesa Diamante entra sem status** — pedido do PO: *"casos de importação da Mesa não têm status e só devem contar quando for alterado para Em andamento"*. O "Em andamento" carimba a data de onde contam as 48 horas, e a importação não inventa essa data: ela nasce quando alguém põe o caso em Em andamento. A tela da Importação avisa. **Desde a Etapa 39 a pessoa escolhe**, no passo da conferência, o **status de todos os casos do lote** — qualquer status do canal, ou "sem status" (pedido do PO: *"Escolher importação deve permitir que eu delegue o status de origem para todos os casos"*). Vale para os casos que vieram **sem** status na planilha (o que a planilha trouxe fica), e **não carimba**: nenhuma data de status nasce na importação |
 | De onde veio cada caso | Grava o **nome do lote** e a **data**, que é o que faz o gráfico existir |
 
 ### A mesma proposta não vai para a divisão duas vezes
@@ -1359,7 +1405,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1199 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1245 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

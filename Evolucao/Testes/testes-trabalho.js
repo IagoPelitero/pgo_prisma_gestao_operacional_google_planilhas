@@ -803,7 +803,7 @@ function rodarTestesDoTrabalho() {
     ];
 
     caminho.forEach((passo) => {
-      chamar('alterarSituacaoDoCaso')(ret.id, novo.id, passo[0]);
+      chamar('alterarSituacaoDoCaso')(ret.id, novo.id, passo[0], { valordopremioretido: '100,00' });
       const gravado = linhaDaRet(novo.id);
       igual(gravado.status, passo[0], 'o status ficou gravado');
       verdadeiro(ehData(gravado[passo[1]]),
@@ -878,7 +878,7 @@ function rodarTestesDoTrabalho() {
     const novo = casoNovoDaRet('Caso fora da auditoria');
     const antes = chamar('lerRegistros_("AUDITORIA")').length;
     chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Pendente');
-    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido');
+    chamar('alterarSituacaoDoCaso')(ret.id, novo.id, 'Retido', { valordopremioretido: '100,00' });
     igual(chamar('lerRegistros_("AUDITORIA")').length, antes,
       'duas trocas de status não podem ter escrito nada na auditoria');
   });

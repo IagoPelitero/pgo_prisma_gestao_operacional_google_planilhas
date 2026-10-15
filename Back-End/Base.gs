@@ -411,7 +411,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'novo numero da proposta', tipo: 'identificador', protegido: true },
       { cabecalho: 'motivo do cancelamento', tipo: 'texto', protegido: true },
       { cabecalho: 'data da transmissão', tipo: 'data', protegido: true },
-      { cabecalho: 'tentativas de contato', tipo: 'numero', protegido: true },
+      // TEXTO, e não número (achado 98). O campo sempre foi uma LISTA — "1ª
+      // tentativa", "2ª tentativa"… —, e com a coluna declarada número o texto
+      // era convertido para número, não dava, e a célula ficava em branco: a
+      // tentativa escolhida nunca chegou à planilha. Ninguém soma esta coluna.
+      { cabecalho: 'tentativas de contato', tipo: 'texto', protegido: true },
 
       // ---- OS CARIMBOS DE STATUS ----------------------------------------
       // Uma coluna por status da RET, com a data e a hora em que o caso
@@ -996,6 +1000,32 @@ const RECC_ESQUEMA = {
    * Assim o VG, que ainda não definiu o dele, só precisa que o PO ligue o
    * sinalizador que já está lá, desligado.
    */
+  // Os atendimentos do CHAT da Mesa Diamante, trazidos pela tela de Importação.
+  // Pedido do PO: ler uma planilha à parte "ficou confuso e não consegui fazer
+  // a junção" — agora o chat entra como os casos entram (colar ou link, de-para,
+  // conferência) e mora aqui, dentro do PGO. A Produtividade da Mesa soma estas
+  // linhas aos casos do sistema.
+  ATENDIMENTOS_CHAT: {
+    aba: 'ATENDIMENTOS_CHAT',
+    titulo: 'Atendimentos do chat',
+    controle: true,
+    reserva: 1000,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Data', tipo: 'data', protegido: true },
+      { cabecalho: 'Analista', tipo: 'texto', protegido: true },
+      { cabecalho: 'SUSEP', tipo: 'texto', protegido: false },
+      { cabecalho: 'Corretora', tipo: 'texto', protegido: false },
+      { cabecalho: 'Assunto', tipo: 'texto', protegido: false },
+      { cabecalho: 'Consultor', tipo: 'texto', protegido: false },
+      { cabecalho: 'Ramo', tipo: 'texto', protegido: false },
+      // O lote, como na importação de casos: é por ele que se acha (e, se
+      // preciso, se apaga) uma leva importada errada.
+      { cabecalho: 'Lote', tipo: 'texto', protegido: false },
+      { cabecalho: 'ImportadoEm', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+    ]
+  },
+
   SINALIZADORES: {
     aba: 'SINALIZADORES',
     titulo: 'Sinalizadores',

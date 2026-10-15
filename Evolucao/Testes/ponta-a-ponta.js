@@ -409,8 +409,9 @@ async function rodar() {
       } else {
         const tipo = await pagina.getAttribute('#' + campo.id, 'type');
         const mascara = await pagina.getAttribute('#' + campo.id, 'data-mascara');
+        const dinheiro = await pagina.getAttribute('#' + campo.id, 'data-dinheiro');
         if (tipo === 'date') await pagina.fill('#' + campo.id, '2026-09-14');
-        else if (mascara === 'dinheiro') await pagina.fill('#' + campo.id, '1234,56');
+        else if (mascara === 'dinheiro' || dinheiro === 'sim') await pagina.fill('#' + campo.id, '1234,56');
         else if (mascara) await pagina.fill('#' + campo.id, '12345678901');
         else await pagina.fill('#' + campo.id, 'Teste ponta a ponta');
       }
@@ -567,12 +568,18 @@ async function rodar() {
       } else {
         const tipo = await pagina.getAttribute('#' + campo.id, 'type');
         const mascara = await pagina.getAttribute('#' + campo.id, 'data-mascara');
+        const dinheiro = await pagina.getAttribute('#' + campo.id, 'data-dinheiro');
         if (tipo === 'date') await pagina.fill('#' + campo.id, '2026-09-14');
-        else if (mascara === 'dinheiro') await pagina.fill('#' + campo.id, '1234,56');
+        else if (mascara === 'dinheiro' || dinheiro === 'sim') await pagina.fill('#' + campo.id, '1234,56');
         else if (mascara) await pagina.fill('#' + campo.id, '12345678901');
         else await pagina.fill('#' + campo.id, 'Retido de ponta a ponta');
       }
     }
+    // Se o botão ficou travado, o teste diz QUAL campo faltou.
+    const faltou = await pagina.$$eval('#formulario-do-caso [aria-required="true"]',
+      (es) => es.filter((e) => !e.disabled && !(e.closest('[data-campo]') || {}).hidden
+        && !String(e.value || '').trim()).map((e) => e.id + '=' + JSON.stringify(e.value)));
+    igual(faltou.join(','), '', 'nenhum obrigatório vazio');
     await pagina.click('#salvar-caso');
     await pagina.waitForTimeout(1500);
 
@@ -584,6 +591,66 @@ async function rodar() {
     verdadeiro(!!gravado['Data do status proposta']
       && typeof gravado['Data do status proposta'].getTime === 'function',
     'o servidor carimbou QUANDO o Status proposta encerrou o prazo');
+  });
+
+  await teste('"Alterar status" para Retido pede o valor retido no diálogo; a tentativa grava a opção', async () => {
+    // Como o PO montou: a tentativa aparece no Retido e no Sem sucesso de
+    // contato, com as opções dele no lugar das de fábrica.
+    const idDoCaso = vm.runInContext(`(function () {
+      var ret = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+      lerRegistros_('CATALOGO').filter(function (i) { return i.Tipo === 'TENTATIVA'; })
+        .forEach(function (i) { excluirItemDoCatalogo(i.Id); });
+      ['Caixa postal', 'Não atende'].forEach(function (nome, i) {
+        salvarItemDoCatalogo({ tipo: 'TENTATIVA', canalId: '', nome: nome, ordem: i + 1, ativo: true });
+      });
+      var campo = listarCamposDoCanal(ret.id).filter(function (c) {
+        return c.chave === 'tentativasdecontato'; })[0];
+      salvarCampo({ id: campo.id, rotulo: campo.rotulo, secao: campo.secao, tipo: campo.tipo,
+        catalogo: campo.catalogo, obrigatorio: false, ativo: true,
+        mostrarSe: { campo: 'status', valores: ['Retido', 'Sem sucesso de contato'] } });
+      return cadastrarCaso(ret.id, { nomedocliente: 'Vai reter', status: 'Pendente' }).id;
+    })()`, contexto);
+    const doCaso = () => naPlanilha('BASE_RET').find((l) => String(l.__id) === String(idDoCaso));
+
+    await pagina.reload();
+    await pagina.waitForSelector('.lateral-item', { timeout: 10000 });
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-status-do-caso="' + idDoCaso + '"]', { timeout: 10000 });
+    await pagina.click('[data-status-do-caso="' + idDoCaso + '"]');
+    await pagina.waitForSelector('#situacao-nova', { timeout: 10000 });
+
+    // Sem sucesso de contato: só a tentativa, com as opções do PO.
+    await pagina.selectOption('#situacao-nova', 'Sem sucesso de contato');
+    await pagina.waitForSelector('#situacao-campo-tentativasdecontato', { timeout: 10000 });
+    const opcoes = await pagina.$$eval('#situacao-campo-tentativasdecontato option',
+      (os) => os.map((o) => o.value).filter((v) => v));
+    igual(opcoes.join('|'), 'Caixa postal|Não atende');
+    igual(await pagina.locator('#situacao-campo-valordopremioretido').count(), 0,
+      'o valor retido não é pedido fora do Retido');
+
+    // Retido: o valor retido aparece, obrigatório.
+    await pagina.selectOption('#situacao-nova', 'Retido');
+    await pagina.waitForSelector('#situacao-campo-valordopremioretido', { timeout: 10000 });
+    igual(await pagina.getAttribute('#situacao-campo-valordopremioretido', 'aria-required'), 'true');
+    await pagina.click('#salvar-situacao');
+    await pagina.waitForSelector('#erro-situacao:not([hidden])', { timeout: 10000 });
+    contem(await pagina.textContent('#erro-situacao'), 'Valor do prêmio retido');
+    igual(doCaso().status, 'Pendente', 'sem o valor, o status não muda');
+
+    // O Status proposta (do teste anterior, obrigatório no Retido) também é pedido aqui.
+    contem(await pagina.textContent('#erro-situacao'), 'Status proposta');
+    await pagina.selectOption('#situacao-campo-statusproposta', 'Transmitido');
+    await pagina.fill('#situacao-campo-valordopremioretido', '900,00');
+    await pagina.selectOption('#situacao-campo-tentativasdecontato', 'Caixa postal');
+    await pagina.click('#salvar-situacao');
+    await pagina.waitForFunction(() => !document.getElementById('dialogo-situacao')
+      || document.getElementById('erro-situacao').textContent.indexOf('prêmio') < 0
+        && !document.getElementById('erro-situacao').hidden, { timeout: 10000 });
+    igual(await pagina.locator('#dialogo-situacao').count() ? await pagina.textContent('#erro-situacao') : '',
+      '', 'o diálogo fechou sem erro');
+    igual(doCaso().status, 'Retido');
+    igual(Number(doCaso()['valor do prêmio retido']), 900, 'o valor foi junto');
+    igual(doCaso()['tentativas de contato'], 'Caixa postal', 'a opção da lista foi para a planilha');
   });
 
   await teste('o PO ajusta o prazo da RET pela tela e a planilha guarda', async () => {
@@ -670,7 +737,7 @@ async function rodar() {
 
   console.log('\nOs atendidos da Mesa');
 
-  await teste('o PO liga a planilha do chat pela tela, e a Produtividade da Mesa soma o chat ao sistema', async () => {
+  await teste('o PO importa o chat pela Importação, e a Produtividade da Mesa soma o chat ao sistema', async () => {
     const hoje = new Date();
     const comZero = (n) => (n < 10 ? '0' : '') + n;
     const dia = comZero(hoje.getDate()) + '/' + comZero(hoje.getMonth() + 1) + '/' + hoje.getFullYear();
@@ -690,33 +757,38 @@ async function rodar() {
         Corretora: 'Corretora ABC', Assunto: 'Cobrança', Ramo: 'Vida em grupo' });
     })()`, contexto);
 
-    // Pela tela: Configurações › Estrutura › a planilha do chat.
-    await pagina.click('[data-tela="configuracoes"]');
+    // Pela tela: Importação › Mesa › "Atendimentos do chat" › link da planilha.
+    await pagina.click('[data-tela="importacao"]');
     await pagina.waitForTimeout(600);
-    await pagina.click('[data-secao="estrutura"]');
-    await pagina.waitForSelector('#form-chat', { timeout: 10000 });
-    await pagina.fill('#cfg-chatId', idDoChat);
-    await pagina.fill('#cfg-chatAba', 'Atendimentos');
-    await pagina.click('#conferir-chat');
-    await pagina.waitForFunction(() => {
-      const laudo = document.getElementById('laudo-do-chat');
-      return laudo && laudo.textContent.indexOf('conferem') >= 0 || laudo.textContent.indexOf('colunas') >= 0;
-    }, { timeout: 10000 });
-    // "Conferir" sugere as colunas pelo nome do cabeçalho.
-    igual(await pagina.inputValue('#cfg-chat-analista'), 'Atendente');
-    igual(await pagina.inputValue('#cfg-chat-data'), 'Data');
-    igual(await pagina.inputValue('#cfg-chat-susep'), 'SUSEP');
-    contem(await pagina.textContent('#laudo-do-chat'), '3 linha(s) de atendimento');
-
-    await pagina.click('#form-chat button[type="submit"]');
-    await pagina.waitForTimeout(900);
-    igual(vm.runInContext("configuracaoLidaDoChat_().planilhaId", contexto), idDoChat,
-      'a planilha ficou gravada em CONFIG');
+    await pagina.locator('[data-canal]', { hasText: 'Mesa' }).first().click();
+    await pagina.waitForSelector('[data-o-que-importar="chat"]', { timeout: 10000 });
+    await pagina.click('[data-o-que-importar="chat"]');
+    await pagina.waitForSelector('[data-fonte="planilha"]', { timeout: 10000 });
+    await pagina.click('[data-fonte="planilha"]');
+    await pagina.fill('#planilha-id', idDoChat);
+    await pagina.fill('#planilha-aba', 'Atendimentos');
+    await pagina.click('#conferir-importacao');
+    await pagina.waitForSelector('#importar-agora', { timeout: 10000 });
+    // "Conferir" sugere o de-para pelo nome do cabeçalho: "Atendente" é o Analista.
+    const laudo = await pagina.textContent('#importacao');
+    contem(laudo, 'Bianca Souza', 'o analista que não é usuário é avisado antes de gravar');
+    contem(await pagina.textContent('#importar-agora'), 'Importar 3');
+    await pagina.fill('#nome-do-lote', 'Chat de hoje');
+    await pagina.click('#importar-agora');
+    await pagina.waitForSelector('#importar-outro-lote', { timeout: 10000 });
+    const gravados = naPlanilha('ATENDIMENTOS_CHAT');
+    igual(gravados.length, 3, 'os três atendimentos foram para a aba do chat');
+    igual(gravados.map((l) => l.Analista).join(','), 'Ana Martins,Ana Martins,Bianca Souza');
+    igual(gravados[0].Lote, 'Chat de hoje');
 
     // E a Produtividade da Mesa.
     await pagina.click('[data-tela="produtividade"]');
     await pagina.waitForTimeout(800);
     await pagina.locator('[data-canal]', { hasText: 'Mesa' }).first().click();
+    // A Mesa abre na Equipe; os atendidos estão na aba deles.
+    await pagina.waitForSelector('[data-aba-da-mesa="atendidos"]', { timeout: 10000 });
+    igual(await pagina.locator('.atendimentos').count(), 0, 'a Equipe não mistura os atendidos');
+    await pagina.click('[data-aba-da-mesa="atendidos"]');
     await pagina.waitForSelector('.atendimentos', { timeout: 10000 });
     const bloco = await pagina.textContent('.atendimentos');
     contem(bloco, 'Atendidos no total');

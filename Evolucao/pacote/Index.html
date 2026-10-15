@@ -3229,7 +3229,10 @@ var Formulario = (function () {
 
   function desenharCampo(campo, prefixo, colunaDaData) {
     var id = prefixo + 'campo-' + campo.chave;
-    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>' : '';
+    // O asterisco existe também no campo "obrigatório quando…": ele nasce
+    // escondido e `aplicarCondicoes` o acende quando a condição vale.
+    var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>'
+      : (campo.obrigatorioSe ? ' <span class="exigido" data-exigido-condicional hidden>*</span>' : '');
     /*
       O asterisco é VISUAL. Quem usa leitor de tela não o ouve como "campo
       obrigatório" — ouve "asterisco", ou nada. `aria-required` é o que diz
@@ -3339,10 +3342,15 @@ var Formulario = (function () {
     // módulo: o formulário é desenhado em dois lugares — a tela de cadastro e
     // o caso aberto por cima — e o que estiver só na memória de um não vale
     // para o outro.
-    var condicao = campo.mostrarSe
+    var condicao = (campo.mostrarSe
       ? ' data-mostrar-se-campo="' + escapar(campo.mostrarSe.campo) + '"'
         + ' data-mostrar-se-valores="' + escapar(JSON.stringify(campo.mostrarSe.valores)) + '"'
-      : '';
+      : '')
+      // "Obrigatório quando…" viaja do mesmo jeito (o valor retido no Retido).
+      + (campo.obrigatorioSe && !campo.obrigatorio
+        ? ' data-obrigatorio-se-campo="' + escapar(campo.obrigatorioSe.campo) + '"'
+          + ' data-obrigatorio-se-valores="' + escapar(JSON.stringify(campo.obrigatorioSe.valores)) + '"'
+        : '');
 
     // Travado pelo cargo não é o mesmo que somente leitura do nível, e a
     // pessoa merece saber qual dos dois é. Sem essa frase, um analista lê o
@@ -3489,6 +3497,27 @@ var Formulario = (function () {
    * pedir para apagá-lo.
    */
   function aplicarCondicoes(raiz, limpar) {
+    // "Obrigatório quando…": liga e desliga o aria-required (que é o que o
+    // botão de salvar e o servidor cobram) e o asterisco.
+    var cobrados = raiz.querySelectorAll('[data-obrigatorio-se-campo]');
+    for (var c = 0; c < cobrados.length; c++) {
+      var cobrado = cobrados[c];
+      var deQuemCobra = cobrado.getAttribute('data-obrigatorio-se-campo');
+      var quando = [];
+      try { quando = JSON.parse(cobrado.getAttribute('data-obrigatorio-se-valores') || '[]'); }
+      catch (erro) { quando = []; }
+      var manda = raiz.querySelector('[data-chave="' + deQuemCobra + '"]');
+      var valorQueManda = manda ? String(manda.value || '') : '';
+      var vale = quando.some(function (esperado) { return mesmoTexto(valorQueManda, esperado); });
+      var controle = cobrado.querySelector('[data-chave]');
+      if (controle) {
+        if (vale) controle.setAttribute('aria-required', 'true');
+        else controle.removeAttribute('aria-required');
+      }
+      var asterisco = cobrado.querySelector('[data-exigido-condicional]');
+      if (asterisco) asterisco.hidden = !vale;
+    }
+
     var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
     for (var i = 0; i < condicionais.length; i++) {
       var bloco = condicionais[i];
@@ -3618,10 +3647,14 @@ var Formulario = (function () {
     // Os campos condicionais reagem ao campo de que dependem. O ouvinte fica
     // no campo que MANDA, e não no que obedece: quem obedece pode estar
     // escondido, e elemento escondido não recebe evento.
-    var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
+    // Duas buscas, e não uma com vírgula: o campo que só aparece e o que só é
+    // cobrado dependem, os dois, de quem manda.
+    var condicionais = Array.prototype.slice.call(raiz.querySelectorAll('[data-mostrar-se-campo]'))
+      .concat(Array.prototype.slice.call(raiz.querySelectorAll('[data-obrigatorio-se-campo]')));
     var jaOuvidos = {};
     for (var k = 0; k < condicionais.length; k++) {
-      var deQuem = condicionais[k].getAttribute('data-mostrar-se-campo');
+      var deQuem = condicionais[k].getAttribute('data-mostrar-se-campo')
+        || condicionais[k].getAttribute('data-obrigatorio-se-campo');
       if (jaOuvidos[deQuem]) continue;
       jaOuvidos[deQuem] = true;
       var manda = raiz.querySelector('[data-chave="' + deQuem + '"]');
@@ -4490,6 +4523,10 @@ var CasoEmModal = (function () {
               + escapar(opcao.rotulo) + '</option>';
           }).join('')
           + '</select></label>'
+          // Os campos que o status escolhido PEDE — o valor retido e o Status
+          // proposta no Retido, a tentativa de contato onde ela aparece. Vêm
+          // do servidor a cada troca do status (ver camposDaSituacao).
+          + '<div id="campos-da-situacao"></div>'
           + '<p class="dialogo-erro" id="erro-situacao" hidden></p>'
           + '<div class="config-acoes">'
           + '<button type="submit" class="botao" id="salvar-situacao">Salvar</button>'
@@ -4513,6 +4550,33 @@ var CasoEmModal = (function () {
         });
         elemento('situacao-nova').focus();
 
+        // A cada status escolhido, o servidor diz o que ele pede; o formulário
+        // desenha com as mesmas máscaras e listas do cadastro. A resposta de um
+        // status que já não está escolhido é descartada.
+        var pedidoAtual = 0;
+        function mostrarOsCamposDaSituacao() {
+          var situacao = elemento('situacao-nova').value;
+          var lugar = elemento('campos-da-situacao');
+          var esta = ++pedidoAtual;
+          lugar.innerHTML = '';
+          Servidor.chamar('camposDaSituacao', idDoCanal, idDoCaso, situacao)
+            .entao(function (campos) {
+              if (esta !== pedidoAtual || !elemento('campos-da-situacao')) return;
+              if (!campos || !campos.length) { lugar.innerHTML = ''; return; }
+              lugar.innerHTML = '<p class="config-explica">O status "' + escapar(situacao)
+                + '" pede:</p>'
+                + Formulario.desenhar({ secoes: [{ nome: situacao, campos: campos }], canal: {} },
+                  'situacao-');
+              Formulario.ligar(lugar, 'situacao-', idDoCanal, false);
+              var valoresDoCaso = {};
+              campos.forEach(function (campo) { valoresDoCaso[campo.chave] = campo.valor; });
+              Formulario.preencher(lugar, valoresDoCaso);
+            })
+            .senao(function () { lugar.innerHTML = ''; });
+        }
+        elemento('situacao-nova').addEventListener('change', mostrarOsCamposDaSituacao);
+        mostrarOsCamposDaSituacao();
+
         elemento('form-situacao').addEventListener('submit', function (evento) {
           evento.preventDefault();
           if (gravando) return;
@@ -4521,7 +4585,8 @@ var CasoEmModal = (function () {
           // gravariam duas mudanças, e o contador de mudanças contaria duas.
           Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
-            elemento('situacao-nova').value)
+            elemento('situacao-nova').value,
+            Formulario.valores(elemento('campos-da-situacao')))
             .entao(function () {
               gravando = false;
               sair();
@@ -7623,6 +7688,20 @@ var TelaImportacao = (function () {
   // "trazer tudo" —, e por isso não pode servir de "não escolhido".
   var colunaQueIdentifica = null;
   var nomeDoLote = '';
+  // O status de todos os casos do lote. null = ainda não escolheu: vale o
+  // padrão do canal (Não trabalhado na RET, sem status na Mesa). Vazio é
+  // "sem status", escolha de verdade.
+  var statusDoLote = null;
+  // O que importar. Na Mesa há dois destinos: os casos do canal e os
+  // atendimentos do chat (pedido do PO: "ler uma planilha de chat ficou confuso"
+  // — agora o chat entra por esta mesma tela). O fluxo é o mesmo; muda o
+  // servidor que confere e grava, e o texto.
+  var oQueImportar = 'casos';
+  var canalAceitaChat = false;
+  function ehChat() { return oQueImportar === 'chat'; }
+  function oQue(plural) {
+    return ehChat() ? (plural ? 'atendimentos' : 'atendimento') : (plural ? 'casos' : 'caso');
+  }
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -7644,14 +7723,25 @@ var TelaImportacao = (function () {
     }
     Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhido)
       .entao(function (resposta) {
-        opcoes = resposta;
-        if (colunaQueIdentifica === null) {
-          colunaQueIdentifica = resposta.repeticaoPadrao || '';
-        }
+        canalAceitaChat = resposta.aceitaChat === true;
+        if (!canalAceitaChat) oQueImportar = 'casos';
         laudo = null;
         resultado = null;
         deParaEscolhido = null;
-        desenhar();
+        if (!ehChat()) {
+          opcoes = resposta;
+          if (colunaQueIdentifica === null) {
+            colunaQueIdentifica = resposta.repeticaoPadrao || '';
+          }
+          desenhar();
+          return;
+        }
+        Servidor.chamar('opcoesDaImportacaoDoChat')
+          .entao(function (doChat) { opcoes = doChat; desenhar(); })
+          .senao(function (erro) {
+            elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
+              + escapar(erro.message || String(erro)) + '</p>';
+          });
       })
       .senao(function (erro) {
         elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
@@ -7672,8 +7762,17 @@ var TelaImportacao = (function () {
   function desenharFonte() {
     var colado = fonte.tipo === 'colado';
 
-    return '<section class="cartaa importação-passo">'
-      + '<header class="grafico-cabeca"><h3>1. De onde vêm os casos</h3></header>'
+    return escolhaDoQueImportar()
+      + '<section class="cartaa importação-passo">'
+      + '<header class="grafico-cabeca"><h3>1. De onde vêm os ' + oQue(true) + '</h3></header>'
+      + (ehChat() && opcoes.abaExiste === false
+        ? '<p class="aviso-janela">A aba ATENDIMENTOS_CHAT ainda não existe nesta planilha. '
+          + 'Rode atualizarPGO() no editor do Apps Script antes de importar.</p>' : '')
+      + (ehChat()
+        ? '<p class="config-dica">Uma linha por atendimento. São obrigatórias a <strong>data'
+          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor e '
+          + 'vida individual ou em grupo são opcionais. A linha igual a uma que já entrou é '
+          + 'pulada — importar a mesma planilha de novo não conta em dobro.</p>' : '')
       + '<div class="config-abas">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
       + ' data-fonte="colado">Colar da planilha</button>'
@@ -7688,6 +7787,16 @@ var TelaImportacao = (function () {
       + '<button type="button" class="botao" id="conferir-importacao">'
       + 'Conferir antes de importar</button></div>'
       + '</section>';
+  }
+
+  /** Na Mesa: casos do canal ou atendimentos do chat. Nos outros canais, nada. */
+  function escolhaDoQueImportar() {
+    if (!canalAceitaChat) return '';
+    return '<div class="config-abas" role="group" aria-label="O que importar">'
+      + '<button type="button" class="config-aba' + (ehChat() ? '' : ' atual') + '"'
+      + ' data-o-que-importar="casos">Casos do canal</button>'
+      + '<button type="button" class="config-aba' + (ehChat() ? ' atual' : '') + '"'
+      + ' data-o-que-importar="chat">Atendimentos do chat</button></div>';
   }
 
   function desenharColar() {
@@ -7721,7 +7830,7 @@ var TelaImportacao = (function () {
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="importar-agora"'
       + (laudo.vaoEntrar ? '' : ' disabled') + '>'
-      + 'Importar ' + laudo.vaoEntrar + ' caso(s)</button>'
+      + 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)</button>'
       + '<button type="button" class="botao vazado" id="recomecar-do-laudo">'
       + 'Recomeçar</button></div>'
       + '</section>';
@@ -7834,20 +7943,51 @@ var TelaImportacao = (function () {
       + '</tbody></table></div>';
   }
 
-  /** Nome do lote, para quem vai, e o que não repetir. */
-  function desenharDestino() {
-    return '<h4 class="importacao-titulo">De quem são, e como se chama o lote</h4>'
-      + '<div class="grade">'
-      + '<label class="campo largura-2"><span>Nome do lote</span>'
+  /**
+   * No chat, o destino é só o nome do lote — não há analista a dividir, nem
+   * status. E o laudo diz o que impediria a soma de juntar certo: a coluna
+   * obrigatória que faltou ligar e o analista que o cadastro não conhece.
+   */
+  function desenharDestinoDoChat() {
+    return (laudo.faltando && laudo.faltando.length
+      ? '<p class="aviso-janela">Ligue no de-para acima a coluna de: <strong>'
+        + escapar(laudo.faltando.join(' e ')) + '</strong>. Sem a data não há como recortar '
+        + 'o período, e sem o analista não há de quem somar.</p>' : '')
+      + (laudo.analistasDesconhecidos && laudo.analistasDesconhecidos.length
+        ? '<p class="config-dica aviso-de-carimbo">Estes nomes não estão no cadastro de usuários: '
+          + '<strong>' + escapar(laudo.analistasDesconhecidos.slice(0, 10).join(', ')) + '</strong>'
+          + (laudo.analistasDesconhecidos.length > 10
+            ? ' e mais ' + (laudo.analistasDesconhecidos.length - 10) : '')
+          + '. Eles entram, mas no gráfico "Atendidos por analista" aparecem separados de quem '
+          + 'tem o nome cadastrado. Se for a mesma pessoa escrita de outro jeito, acerte o nome '
+          + 'na planilha de origem antes de importar.</p>' : '')
+      + (laudo.semDataOuAnalista
+        ? '<p class="config-dica">' + laudo.semDataOuAnalista + ' linha(s) sem data ou sem '
+          + 'analista ficam de fora.</p>' : '')
+      + '<h4 class="importacao-titulo">Como se chama o lote</h4>'
+      + '<div class="grade">' + caixaDoNomeDoLote('Chat de outubro') + '</div>';
+  }
+
+  /** A caixa do nome do lote, com os lotes já usados — a mesma nos dois destinos. */
+  function caixaDoNomeDoLote(exemplo) {
+    return '<label class="campo largura-2"><span>Nome do lote</span>'
       + '<input type="text" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
-      + ' placeholder="Base de inadimplentes Vida Presente"'
+      + ' placeholder="' + escapar(exemplo) + '"'
       + (opcoes.lotes.length ? ' list="lotes-ja-usados"' : '') + '>'
       + (opcoes.lotes.length
         ? '<datalist id="lotes-ja-usados">' + opcoes.lotes.map(function (lote) {
           return '<option value="' + escapar(lote.origem) + '"></option>';
         }).join('') + '</datalist>'
         : '')
-      + '</label>'
+      + '</label>';
+  }
+
+  /** Nome do lote, para quem vai, e o que não repetir. */
+  function desenharDestino() {
+    if (ehChat()) return desenharDestinoDoChat();
+    return '<h4 class="importacao-titulo">De quem são, e como se chama o lote</h4>'
+      + '<div class="grade">'
+      + caixaDoNomeDoLote('Base de inadimplentes Vida Presente')
       + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
       + '<select class="filtro" id="coluna-que-identifica">'
       + ['<option value="">— trazer tudo, mesmo repetido —</option>']
@@ -7876,16 +8016,37 @@ var TelaImportacao = (function () {
         : '')
       + '</p>'
       + desenharAnalistas()
-      + (opcoes.statusPadrao
-        ? '<p class="config-dica">Os casos vão nascer com o status '
-          + '<strong>' + escapar(opcoes.statusPadrao) + '</strong>. O analista '
-          + 'ajusta depois, caso a caso — e cada mudança fica registrada.</p>'
-        : opcoes.statusQueEsperaAPessoa
-          ? '<p class="config-dica">Os casos vão nascer <strong>sem status</strong>. O prazo '
-            + 'só começa quando alguém puser o caso em <strong>'
-            + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que o sistema '
-            + 'anota a data.</p>'
-          : '');
+      + escolhaDoStatusDoLote();
+  }
+
+  /*
+    O STATUS DE TODOS OS CASOS DO LOTE. Pedido do PO: escolher, e não mais só o
+    "Não trabalhado". Vale para o caso que a fonte trouxe sem status; o que veio
+    com status na coluna ligada no de-para fica com o dele. Não carimba data —
+    o caso é antigo.
+  */
+  function escolhaDoStatusDoLote() {
+    var lista = opcoes.statusDoCanal || [];
+    if (!lista.length) return '';
+    var vale = statusQueVale();
+    return '<div class="grade"><label class="campo">'
+      + '<span>Status dos casos importados</span>'
+      + '<select class="filtro" id="status-do-lote">'
+      + '<option value=""' + (vale === '' ? ' selected' : '') + '>— sem status —</option>'
+      + lista.map(function (status) {
+        return '<option value="' + escapar(status.valor) + '"'
+          + (status.valor === vale ? ' selected' : '') + '>' + escapar(status.rotulo) + '</option>';
+      }).join('') + '</select></label></div>'
+      + '<p class="config-dica">' + (vale
+        ? 'Os casos sem status na planilha vão nascer em <strong>' + escapar(vale)
+          + '</strong>; os que trazem o status numa coluna ligada acima ficam com o deles. '
+          + 'A importação não carimba data: o caso é antigo, e a data de hoje diria que o '
+          + 'contato foi hoje. O analista ajusta depois, caso a caso.'
+        : 'Os casos sem status na planilha vão nascer <strong>sem status</strong>.'
+          + (opcoes.statusQueEsperaAPessoa ? ' O prazo só começa quando alguém puser o caso '
+            + 'em <strong>' + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que '
+            + 'o sistema anota a data.' : ''))
+      + '</p>';
   }
 
   /**
@@ -7975,7 +8136,8 @@ var TelaImportacao = (function () {
     return '<section class="cartaa importação-passo">'
       + '<header class="grafico-cabeca"><h3>Importado</h3></header>'
       + '<div class="cartoes">'
-      + '<div class="indicador tom-bom"><span class="rotulo">Casos que entraram'
+      + '<div class="indicador tom-bom"><span class="rotulo">'
+      + (ehChat() ? 'Atendimentos que entraram' : 'Casos que entraram')
       + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
       + (resultado.pulados.repetida
         ? '<div class="indicador tom-atencao"><span class="rotulo">Já estavam na base'
@@ -7988,7 +8150,7 @@ var TelaImportacao = (function () {
           + '</strong></div>'
         : '')
       + '</div>'
-      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, no canal '
+      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, em '
       + escapar(resultado.canal) + '.'
       + (resultado.primeiroId
         ? ' Do caso ' + escapar(resultado.primeiroId) + ' ao '
@@ -7999,8 +8161,11 @@ var TelaImportacao = (function () {
         ? '<p class="config-dica">Divididos entre: '
           + escapar(resultado.analistas.join(', ')) + '.</p>'
         : '')
-      + '<p class="config-dica">A Produtividade RECC já mostra este lote no '
-      + 'gráfico de casos importados por dia.</p>'
+      + (ehChat()
+        ? '<p class="config-dica">A Produtividade da Mesa já soma estes atendimentos aos casos '
+          + 'do sistema, na aba "Atendidos".</p>'
+        : '<p class="config-dica">A Produtividade RECC já mostra este lote no '
+          + 'gráfico de casos importados por dia.</p>')
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="importar-outro-lote">'
       + 'Importar outro lote</button></div>'
@@ -8016,7 +8181,17 @@ var TelaImportacao = (function () {
       analistasMarcados = {};
       colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
       nomeDoLote = '';
+      statusDoLote = null;          // e o status padrão dele
       desenharSeletor();
+      carregar();
+    });
+
+    cliques('[data-o-que-importar]', function (botao) {
+      var escolha = botao.getAttribute('data-o-que-importar');
+      if (escolha === oQueImportar) return;
+      guardarOQueEstaNaTela();
+      oQueImportar = escolha;
+      nomeDoLote = '';
       carregar();
     });
 
@@ -8059,6 +8234,13 @@ var TelaImportacao = (function () {
 
     mudancas('#coluna-que-identifica', function (caixa) {
       colunaQueIdentifica = caixa.value;
+    });
+
+    // O status do lote muda o texto de baixo, e o laudo já conferido vale
+    // para o status de antes: guardar o que está na tela e redesenhar.
+    mudancas('#status-do-lote', function () {
+      guardarOQueEstaNaTela();
+      desenhar();
     });
   }
 
@@ -8105,6 +8287,14 @@ var TelaImportacao = (function () {
 
     var chave = elemento('coluna-que-identifica');
     if (chave) colunaQueIdentifica = chave.value;
+
+    var status = elemento('status-do-lote');
+    if (status) statusDoLote = status.value;
+  }
+
+  /** O status que vale agora: o escolhido, ou o padrão do canal. */
+  function statusQueVale() {
+    return statusDoLote === null ? (opcoes.statusPadrao || '') : statusDoLote;
   }
 
   function conferir() {
@@ -8113,11 +8303,15 @@ var TelaImportacao = (function () {
     var botao = elemento('conferir-importacao');
     if (botao) { botao.disabled = true; botao.textContent = 'Conferindo…'; }
 
-    Servidor.chamarSemPressa('conferirImportacaoDeCasos', canalEscolhido, {
-      fonte: fonte,
-      dePara: deParaEscolhido,
-      colunaQueIdentifica: colunaQueIdentifica || ''
-    })
+    var conferencia = ehChat()
+      ? Servidor.chamarSemPressa('conferirImportacaoDoChat', { fonte: fonte, dePara: deParaEscolhido })
+      : Servidor.chamarSemPressa('conferirImportacaoDeCasos', canalEscolhido, {
+        fonte: fonte,
+        dePara: deParaEscolhido,
+        colunaQueIdentifica: colunaQueIdentifica || '',
+        statusDoLote: statusQueVale()
+      });
+    conferencia
       .entao(function (resposta) {
         laudo = resposta;
         deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
@@ -8141,19 +8335,27 @@ var TelaImportacao = (function () {
 
     // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
     // fácil: importar errado se desfaz apagando linha por linha.
-    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' caso(s) no canal '
-      + laudo.canal.nome + '? Desfazer isso é apagar os casos um a um.')) return;
+    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em '
+      + laudo.canal.nome + '? Desfazer isso é apagar as linhas uma a uma.')) return;
 
     var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
-    Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
-      fonte: fonte,
-      dePara: deParaEscolhido || laudo.dePara,
-      colunaQueIdentifica: colunaQueIdentifica || '',
-      analistas: escolhidos,
-      origem: nomeDoLote
-    })
+    var gravacao = ehChat()
+      ? Servidor.chamarSemPressa('importarAtendimentosDoChat', {
+        fonte: fonte,
+        dePara: deParaEscolhido || laudo.dePara,
+        origem: nomeDoLote
+      })
+      : Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
+        fonte: fonte,
+        dePara: deParaEscolhido || laudo.dePara,
+        colunaQueIdentifica: colunaQueIdentifica || '',
+        analistas: escolhidos,
+        origem: nomeDoLote,
+        statusDoLote: statusQueVale()
+      });
+    gravacao
       .entao(function (resposta) {
         resultado = resposta;
         laudo = null;
@@ -8162,7 +8364,7 @@ var TelaImportacao = (function () {
       .senao(function (erro) {
         if (botao) {
           botao.disabled = false;
-          botao.textContent = 'Importar ' + laudo.vaoEntrar + ' caso(s)';
+          botao.textContent = 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)';
         }
         window.alert(erro.message || String(erro));
       });
@@ -8216,6 +8418,12 @@ var TelaProdutividade = (function () {
    */
   var periodo = SeletorDePeriodo.padrao();
   var painel = null;
+  // Na Mesa, duas abas: "Equipe" (os cards e gráficos de sempre) e "Atendidos"
+  // (sistema + chat). Pedido do PO: a Produtividade "ficou bagunçada com muitas
+  // informações sobre a Mesa Diamante". Abre em Equipe; trocar de canal mantém.
+  var abaDaMesa = 'equipe';
+  // Onde abre a lista dos casos de uma fatia — nas duas abas, o mesmo lugar.
+  var LUGAR_DO_DETALHE = '<div id="detalhe-do-painel"></div>';
   var tabelasAbertas = {};
   var pacoteDoSistema = null;
 
@@ -8246,13 +8454,33 @@ var TelaProdutividade = (function () {
       });
   }
 
+  /** As abas da Mesa. Canal sem atendimentos (RET, VG) não tem aba nenhuma. */
+  function abasDaMesa() {
+    if (!painel.atendimentos) return '';
+    return '<div class="config-abas" role="tablist" aria-label="O que ver">'
+      + [['equipe', 'Equipe'], ['atendidos', 'Atendidos (sistema + chat)']].map(function (aba) {
+        var atual = abaDaMesa === aba[0];
+        return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
+          + ' aria-selected="' + atual + '" data-aba-da-mesa="' + aba[0] + '">'
+          + escapar(aba[1]) + '</button>';
+      }).join('') + '</div>';
+  }
+
   function desenhar() {
+    // Na aba "Atendidos" da Mesa, só o bloco dos atendidos — o resto fica na
+    // aba "Equipe", que é onde a tela abre.
+    if (painel.atendimentos && abaDaMesa === 'atendidos') {
+      elemento('analitico').innerHTML = desenharFiltros() + abasDaMesa()
+        + desenharAtendimentos() + LUGAR_DO_DETALHE;
+      ligarPainel();
+      return;
+    }
     // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
     // número que a pessoa já leu como se fosse o total.
     elemento('analitico').innerHTML = desenharFiltros()
+      + abasDaMesa()
       + desenharCartoes()
       + desenharPrazos()
-      + desenharAtendimentos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
         ? '<div class="graficos">'
@@ -8264,7 +8492,7 @@ var TelaProdutividade = (function () {
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
         : '')
-      + '<div id="detalhe-do-painel"></div>';
+      + LUGAR_DO_DETALHE;
     ligarPainel();
   }
 
@@ -8356,14 +8584,15 @@ var TelaProdutividade = (function () {
 
     var avisos = [];
     if (!chat.ligado) {
-      avisos.push('A planilha do chat não está ligada: estes números são só dos casos '
-        + 'cadastrados no sistema. Quem administra liga em Configurações › Estrutura.');
+      avisos.push('Nenhum atendimento do chat foi importado ainda: estes números são só dos '
+        + 'casos cadastrados no sistema. Traga o chat pela tela de Importação — Mesa '
+        + 'Diamante, "Atendimentos do chat".');
     } else if (chat.aviso) {
-      avisos.push('A planilha do chat não pôde ser lida, e estes números são só do '
+      avisos.push('Os atendimentos do chat não puderam ser lidos, e estes números são só do '
         + 'sistema: ' + chat.aviso);
     }
     if (chat.truncada) {
-      avisos.push('Do chat entram só as últimas ' + chat.linhasLidas + ' linhas da planilha.');
+      avisos.push('Do chat entram só os últimos ' + chat.linhasLidas + ' atendimentos importados.');
     }
     if (chat.semData) {
       avisos.push(chat.semData + ' linha(s) do chat sem data legível ficaram de fora do período.');
@@ -8380,7 +8609,7 @@ var TelaProdutividade = (function () {
       + tileDePrazo('No sistema', atendidos.totais.sistema, 'neutro',
         'Casos da Mesa Diamante cadastrados no período')
       + tileDePrazo('No chat', atendidos.totais.chat, 'neutro',
-        'Linhas da planilha do chat no período')
+        'Atendimentos do chat importados, no período')
       + '</div>'
       + avisos.map(function (aviso) {
         return '<p class="aviso-do-chat">' + escapar(aviso) + '</p>';
@@ -8593,6 +8822,13 @@ var TelaProdutividade = (function () {
   /* --------------------------------------------------------- comportamento */
 
   function ligarPainel() {
+    ligarCliques('[data-aba-da-mesa]', function (botao) {
+      var escolhida = botao.getAttribute('data-aba-da-mesa');
+      if (escolhida === abaDaMesa) return;
+      abaDaMesa = escolhida;
+      desenhar();
+    });
+
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
@@ -9371,6 +9607,7 @@ var TelaConfiguracoes = (function () {
       + caixaDeSimNao('obrigatorio', 'Obrigatório', campo.obrigatorio)
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
       + blocoDaCondicao(campo)
+      + blocoDaCondicao(campo, 'obrigatorioSe')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (podeExcluirEsteCampo(campo)
@@ -9385,6 +9622,7 @@ var TelaConfiguracoes = (function () {
       salvarCampo(campo);
     });
     ligarACondicao(campo);
+    ligarACondicao(campo, 'obrigatorioSe');
     var excluir = elemento('excluir-campo');
     if (excluir) {
       excluir.addEventListener('click', function () {
@@ -9395,6 +9633,27 @@ var TelaConfiguracoes = (function () {
 
   /* ------------------------------------------------ mostrar só quando… */
 
+  /*
+   * DUAS CONDIÇÕES, O MESMO EDITOR.
+   *
+   * "Quando este campo aparece" (mostrarSe) e "quando este campo é obrigatório"
+   * (obrigatorioSe — pedido do PO: o valor retido obrigatório no Retido). As
+   * duas são "só quando OUTRO campo for um destes valores", e por isso
+   * dividem as mesmas funções; muda o texto e o id das caixas.
+   */
+  var CONDICOES = {
+    mostrarSe: { prefixo: 'mostrar', marca: 'data-valor-da-condicao',
+      titulo: 'Quando este campo aparece', sempre: 'Aparece sempre',
+      exemplo: 'Ex.: o Status proposta só aparece quando o Status for Retido. '
+        + 'O valor escondido não é cobrado nem gravado, e é esvaziado quando a '
+        + 'pessoa troca o valor que o mostrava.' },
+    obrigatorioSe: { prefixo: 'obrigar', marca: 'data-valor-da-obrigacao',
+      titulo: 'Quando este campo é obrigatório', sempre: 'Só quando "Obrigatório" estiver marcado',
+      exemplo: 'Ex.: o valor retido é obrigatório quando o Status for Retido. Nos '
+        + 'outros status o campo continua aparecendo, sem ser cobrado. Vale no '
+        + 'cadastro, no "Trabalhar no caso" e no "Alterar status".' }
+  };
+
   /**
    * "Aparece sempre", ou "só quando OUTRO campo for um destes valores".
    *
@@ -9404,42 +9663,42 @@ var TelaConfiguracoes = (function () {
    * vírgula. Quem confere de verdade é o servidor — dar a um valor um nome
    * que a lista não tem faria o campo nunca aparecer.
    */
-  function blocoDaCondicao(campo) {
+  function blocoDaCondicao(campo, qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
     var outros = dados.campos.filter(function (outro) {
       return outro.id !== campo.id;
     }).map(function (outro) {
       return { id: outro.chave, nome: outro.rotulo };
     });
-    var atual = campo.mostrarSe;
-    return '<div class="config-campo" role="group" aria-label="Quando este campo aparece">'
-      + '<span>Quando este campo aparece</span>'
-      + '<select id="cfg-mostrar-campo" aria-label="Campo que decide quando este aparece">'
-      + '<option value="">Aparece sempre</option>'
+    var atual = campo[qual || 'mostrarSe'];
+    return '<div class="config-campo" role="group" aria-label="' + escapar(regra.titulo) + '">'
+      + '<span>' + escapar(regra.titulo) + '</span>'
+      + '<select id="cfg-' + regra.prefixo + '-campo" aria-label="Campo que decide">'
+      + '<option value="">' + escapar(regra.sempre) + '</option>'
       + outros.map(function (outro) {
         return '<option value="' + escapar(outro.id) + '"'
           + (atual && atual.campo === outro.id ? ' selected' : '') + '>'
           + 'Só quando "' + escapar(outro.nome) + '" for…</option>';
       }).join('') + '</select>'
-      + '<div id="cfg-mostrar-valores"></div>'
-      + '<em>Ex.: o Status proposta só aparece quando o Status for Retido. '
-      + 'O valor escondido não é cobrado nem gravado, e é esvaziado quando a '
-      + 'pessoa troca o valor que o mostrava.</em></div>';
+      + '<div id="cfg-' + regra.prefixo + '-valores"></div>'
+      + '<em>' + escapar(regra.exemplo) + '</em></div>';
   }
 
-  function desenharOsValoresDaCondicao(campo, chaveQueManda) {
-    var caixa = elemento('cfg-mostrar-valores');
+  function desenharOsValoresDaCondicao(campo, chaveQueManda, qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
+    var caixa = elemento('cfg-' + regra.prefixo + '-valores');
     if (!caixa) return;
     if (!chaveQueManda) { caixa.innerHTML = ''; return; }
 
     var quemManda = dados.campos.filter(function (outro) {
       return outro.chave === chaveQueManda;
     })[0];
-    var marcados = (campo.mostrarSe && campo.mostrarSe.campo === chaveQueManda)
-      ? campo.mostrarSe.valores : [];
+    var atual = campo[qual || 'mostrarSe'];
+    var marcados = (atual && atual.campo === chaveQueManda) ? atual.valores : [];
     var opcoes = quemManda ? quemManda.opcoes : [];
 
     if (!opcoes.length) {
-      caixa.innerHTML = '<input type="text" id="cfg-mostrar-texto" value="'
+      caixa.innerHTML = '<input type="text" id="cfg-' + regra.prefixo + '-texto" value="'
         + escapar(marcados.join('; ')) + '">'
         + '<em>Os valores, separados por ponto e vírgula.</em>';
       return;
@@ -9449,32 +9708,34 @@ var TelaConfiguracoes = (function () {
         return texto(valor).toLowerCase() === texto(opcao).toLowerCase();
       });
       return '<label class="config-chave">'
-        + '<input type="checkbox" data-valor-da-condicao="' + escapar(opcao) + '"'
+        + '<input type="checkbox" ' + regra.marca + '="' + escapar(opcao) + '"'
         + (ligado ? ' checked' : '') + '>'
         + '<span>' + escapar(opcao) + '</span></label>';
     }).join('');
   }
 
-  function ligarACondicao(campo) {
-    var escolha = elemento('cfg-mostrar-campo');
+  function ligarACondicao(campo, qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
+    var escolha = elemento('cfg-' + regra.prefixo + '-campo');
     if (!escolha) return;
-    desenharOsValoresDaCondicao(campo, escolha.value);
+    desenharOsValoresDaCondicao(campo, escolha.value, qual);
     escolha.addEventListener('change', function () {
-      desenharOsValoresDaCondicao(campo, escolha.value);
+      desenharOsValoresDaCondicao(campo, escolha.value, qual);
     });
   }
 
   /** O que a tela pede: { campo, valores }, ou null para "aparece sempre". */
-  function lerACondicao() {
-    var quemManda = valorDe('mostrar-campo');
+  function lerACondicao(qual) {
+    var regra = CONDICOES[qual || 'mostrarSe'];
+    var quemManda = valorDe(regra.prefixo + '-campo');
     if (!quemManda) return null;
 
     var valores = [];
-    var caixas = document.querySelectorAll('[data-valor-da-condicao]');
+    var caixas = document.querySelectorAll('[' + regra.marca + ']');
     for (var i = 0; i < caixas.length; i++) {
-      if (caixas[i].checked) valores.push(caixas[i].getAttribute('data-valor-da-condicao'));
+      if (caixas[i].checked) valores.push(caixas[i].getAttribute(regra.marca));
     }
-    var escrito = elemento('cfg-mostrar-texto');
+    var escrito = elemento('cfg-' + regra.prefixo + '-texto');
     if (escrito) {
       valores = escrito.value.split(';').map(function (valor) { return valor.trim(); })
         .filter(function (valor) { return valor !== ''; });
@@ -9586,7 +9847,8 @@ var TelaConfiguracoes = (function () {
       listaDe: valorDe('listaDe'),
       obrigatorio: marcado('obrigatorio'),
       ativo: marcado('ativo'),
-      mostrarSe: lerACondicao()
+      mostrarSe: lerACondicao(),
+      obrigatorioSe: lerACondicao('obrigatorioSe')
     };
     Servidor.chamar('salvarCampo', envio)
       .entao(function () { avisarSalvo(); carregarCampos(); })
@@ -11787,18 +12049,13 @@ var TelaConfiguracoes = (function () {
             Servidor.chamar('configuracaoDosCadastros')
               .entao(function (cadastros) {
                 dados.cadastros = cadastros;
-                Servidor.chamar('configuracaoDoChat')
-                  .entao(function (chat) {
-                    dados.chat = chat;
-                    Servidor.chamar('configuracaoDoArquivoDaAuditoria')
-                      .entao(function (arquivo) {
-                        dados.arquivoDaAuditoria = arquivo;
-                        Servidor.chamar('listarAuditoria', 40)
-                          .entao(function (trilha) {
-                            dados.trilha = trilha;
-                            desenharEstrutura();
-                          })
-                          .senao(falhou);
+                Servidor.chamar('configuracaoDoArquivoDaAuditoria')
+                  .entao(function (arquivo) {
+                    dados.arquivoDaAuditoria = arquivo;
+                    Servidor.chamar('listarAuditoria', 40)
+                      .entao(function (trilha) {
+                        dados.trilha = trilha;
+                        desenharEstrutura();
                       })
                       .senao(falhou);
                   })
@@ -11849,7 +12106,6 @@ var TelaConfiguracoes = (function () {
       + desenharLegado();
     ligarDiagnostico();
     ligarCadastros();
-    ligarChat();
     ligarArquivoDaAuditoria();
     ligarLegado();
 
@@ -12158,129 +12414,18 @@ var TelaConfiguracoes = (function () {
   }
 
   /**
-   * A planilha dos atendimentos do chat — a leitura apartada da Mesa Diamante.
-   *
-   * Ela não tem contrato: é de outro sistema. Por isso o PO diz aqui qual
-   * planilha, qual aba e qual coluna dela é cada coisa. "Conferir" abre a
-   * planilha, sugere as colunas pelo nome do cabeçalho e mostra as últimas
-   * linhas já traduzidas — conferir o mapeamento olhando o dado. O PGO só LÊ.
+   * O chat da Mesa NÃO se configura mais aqui (Etapa 39). Antes, esta seção
+   * pedia o Id, a aba e qual coluna da planilha do chat era cada coisa — e o
+   * PO não conseguiu fazer a junção. Agora os atendimentos entram pela tela de
+   * Importação, como os casos. A frase fica para quem vier procurar aqui.
    */
   function desenharChat() {
-    var chat = dados.chat || { planilhaId: '', aba: '', colunas: {}, definicao: [], ligado: false };
-    var colunas = chat.definicao.map(function (definicao) {
-      return campoDeTexto('chat-' + definicao.chave,
-        definicao.rotulo + (definicao.obrigatoria ? ' *' : ''),
-        (chat.colunas || {})[definicao.chave],
-        definicao.obrigatoria
-          ? 'Obrigatória: sem ela o atendimento não entra no período nem no analista.'
-          : 'Opcional. Vazio: o atendimento do chat conta, mas sem esta informação.')
-        .replace('<input type="text"', '<input type="text" list="cfg-chat-cabecalhos"');
-    }).join('');
-
     return '<div class="config-legado">'
-      + '<h4>Planilha dos atendimentos do chat</h4>'
-      + '<p class="config-explica">Os casos atendidos pelo chat, numa planilha à parte. '
-      + 'Quando apontada, a <strong>Produtividade RECC da Mesa Diamante</strong> soma '
-      + 'esses atendimentos aos casos cadastrados no sistema, por analista, corretora, '
-      + 'SUSEP, assunto, consultor e vida individual ou em grupo. '
-      + '<strong>O PGO só lê.</strong> A corretora e o consultor vêm do cadastro de '
-      + 'corretoras, pela SUSEP. Vazio desliga.</p>'
-      + (chat.ligado
-        ? '<p class="config-alerta suave">Ligada. Se a planilha sair do ar ou perder o '
-          + 'compartilhamento, a Produtividade da Mesa mostra só o sistema — com o '
-          + 'motivo ao lado, não em silêncio.</p>'
-        : '')
-      + '<form class="config-form" id="form-chat">'
-      + campoDeTexto('chatId', 'Id da planilha do chat', chat.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
-        + 'precisa ter acesso a ela.')
-      + campoDeTexto('chatAba', 'Aba', chat.aba,
-        'Vazio usa a primeira aba. A primeira linha é lida como cabeçalho.')
-      + '<datalist id="cfg-chat-cabecalhos"></datalist>'
-      + colunas
-      + '<div class="config-acoes">'
-      + '<button type="button" class="botao vazado" id="conferir-chat">'
-      + 'Conferir a planilha</button>'
-      + '<button type="submit" class="botao">Salvar</button>'
-      + '</div></form>'
-      + '<div id="laudo-do-chat"></div>'
-      + '</div>';
-  }
-
-  /** As colunas escolhidas na tela, pelo que está nas caixas. */
-  function colunasDoChatNaTela() {
-    var colunas = {};
-    ((dados.chat || {}).definicao || []).forEach(function (definicao) {
-      colunas[definicao.chave] = valorDe('chat-' + definicao.chave);
-    });
-    return colunas;
-  }
-
-  function ligarChat() {
-    elemento('conferir-chat').addEventListener('click', function () {
-      var caixa = elemento('laudo-do-chat');
-      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
-
-      Servidor.chamar('conferirPlanilhaDoChat', {
-        planilhaId: valorDe('chatId'), aba: valorDe('chatAba'), colunas: colunasDoChatNaTela()
-      }).entao(function (laudo) {
-        // Os cabeçalhos viram sugestão nas caixas, e as colunas que ainda estão
-        // em branco recebem a que o nome indica — o PO confere e troca.
-        var lista = elemento('cfg-chat-cabecalhos');
-        if (lista) {
-          lista.innerHTML = (laudo.cabecalhos || []).filter(function (c) { return c; })
-            .map(function (c) { return '<option value="' + escapar(c) + '"></option>'; }).join('');
-        }
-        var preenchidas = [];
-        Object.keys(laudo.sugestoes || {}).forEach(function (chave) {
-          var campo = elemento('cfg-chat-' + chave);
-          if (campo && !campo.value.trim() && laudo.sugestoes[chave]) {
-            campo.value = laudo.sugestoes[chave];
-            preenchidas.push(laudo.sugestoes[chave]);
-          }
-        });
-
-        var amostra = (laudo.amostra || []).map(function (linha) {
-          return '<li>' + Object.keys(linha).map(function (chave) {
-            return '<strong>' + escapar(chave) + '</strong>: ' + escapar(linha[chave] || '—');
-          }).join(' · ') + '</li>';
-        }).join('');
-
-        var ok = laudo.abre && !laudo.recado && !(laudo.faltando || []).length;
-        caixa.innerHTML = (laudo.recado
-          ? '<p class="config-alerta">' + escapar(laudo.recado) + '</p>' : '')
-          + ((laudo.faltando || []).length
-            ? '<ul class="config-itens">' + laudo.faltando.map(function (linha) {
-              return '<li>' + escapar(linha) + '</li>';
-            }).join('') + '</ul>' : '')
-          + (laudo.abre && !laudo.recado
-            ? '<p class="config-alerta' + (ok ? ' suave' : '') + '">'
-              + (ok ? 'A planilha abre e as colunas conferem. ' : 'A planilha abre. ')
-              + laudo.linhas + ' linha(s) de atendimento'
-              + (laudo.limiteDeLeitura && laudo.linhas > laudo.limiteDeLeitura
-                ? ' — só as últimas ' + laudo.limiteDeLeitura + ' entram nos gráficos' : '')
-              + '.' + (preenchidas.length
-                ? ' Sugeri colunas pelo nome do cabeçalho: confira antes de salvar.' : '')
-              + '</p>' : '')
-          + (amostra ? '<p class="config-explica">As últimas linhas, como o sistema as lê:</p>'
-            + '<ul class="config-itens">' + amostra + '</ul>' : '');
-      }).senao(function (erro) {
-        caixa.innerHTML = '<p class="config-alerta">'
-          + escapar(erro.message || String(erro)) + '</p>';
-      });
-    });
-
-    elemento('form-chat').addEventListener('submit', function (evento) {
-      evento.preventDefault();
-      Servidor.chamar('salvarConfiguracaoDoChat', {
-        planilhaId: valorDe('chatId'), aba: valorDe('chatAba'), colunas: colunasDoChatNaTela()
-      }).entao(function (nova) {
-        dados.chat = nova;
-        avisarSalvo(nova.ligado
-          ? 'Planilha do chat ligada e conferida.'
-          : 'Planilha do chat desligada — a Produtividade da Mesa volta a mostrar só o sistema.');
-      }).senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
-    });
+      + '<h4>Atendimentos do chat</h4>'
+      + '<p class="config-explica">Os atendimentos do chat da Mesa Diamante agora entram '
+      + 'pela tela de <strong>Importação</strong>: escolha a Mesa Diamante e '
+      + '"Atendimentos do chat", cole ou dê o link, ligue as colunas e confira. A '
+      + 'Produtividade da Mesa soma esses atendimentos aos casos do sistema.</p></div>';
   }
 
   function desenharLegado() {

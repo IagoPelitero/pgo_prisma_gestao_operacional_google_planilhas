@@ -260,6 +260,12 @@ async function conferir() {
       if (await daMesa.count()) {
         await daMesa.click();
         await pagina.waitForTimeout(900);
+        // Os atendidos moram na aba "Atendidos" da Mesa (Etapa 39).
+        const abaDosAtendidos = pagina.locator('[data-aba-da-mesa="atendidos"]');
+        if (await abaDosAtendidos.count()) {
+          await abaDosAtendidos.click();
+          await pagina.waitForTimeout(500);
+        }
         const rolando = await pagina.evaluate(() => {
           const achados = [];
           document.querySelectorAll('.atendimentos + .graficos .grafico').forEach((cartao) => {
