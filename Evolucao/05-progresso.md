@@ -2844,6 +2844,100 @@ preenchida.
 
 ---
 
+## Etapa 41 — O chat da Mesa com sucursal, tabulação, sub assunto e TMO
+
+Pedido do PO: **"na importação para os chats da mesa você não colocou a sucursal,
+vai ser necessário; aproveite e acrescente a tabulação, sub assunto e TMO (esse é só
+número em segundos, tipo 1.152). Isso tudo vem da planilha externa. O que não tinha
+pode deixar em branco que irei preencher manualmente."**
+
+| Parte | O que ficou |
+|---|---|
+| **A aba** | `ATENDIMENTOS_CHAT` ganhou `Sucursal`, `Tabulação`, `Sub assunto` (texto) e `TMO` (número). O `atualizarPGO` acrescenta as quatro numa aba que já existe, sem mexer nas linhas — que ficam com elas em branco |
+| **A importação** | O de-para sugere as quatro pelo cabeçalho ("Cod Sucursal", "Sub Assunto", "TMO"…). Todas opcionais: o que a origem não trouxer fica em branco |
+| **O TMO** | Em segundos: aceita 1152, "1.152", "12,5" e o número da planilha. O que não for número entra com o TMO em branco, e a conferência e o resultado dizem quantas linhas são |
+| **O repetido** | As quatro ficam FORA da chave: reimportar um arquivo antigo, agora com as colunas novas, não conta em dobro |
+| **A Produtividade** | No Top 5 sucursais, vale a sucursal que o chat trouxe; em branco, a do cadastro de corretoras pela SUSEP. Tabulação, sub assunto e TMO ficam guardados — não há gráfico deles, porque não foi pedido |
+
+### Para quem já usa
+
+Cole os arquivos marcados (◆) e rode `atualizarPGO()`: ele cria as quatro colunas.
+
+---
+
+## Etapa 42 — Velocidade: a configuração guardada por 5 minutos
+
+Relato do PO: **"teve relatos dos analistas da Mesa e da RET em questão de lentidão
+na aba Trabalho e até o problema dos 40 s"**, com até 9 pessoas na mesma aba,
+"principalmente em Trabalhar caso e na aba Cadastrar caso". As bases são pequenas
+(RET 200 a 800 casos, Mesa 200, VG 20).
+
+**A medição** (cada ação como uma execução nova, como no Apps Script): cada clique
+fazia de **30 a 60 idas ao serviço**, e a maior parte era reler a configuração. A
+trava das gravações já era curta (5 a 10 idas), e a base, pequena, pesava pouco. Por
+isso o remédio foi um só, com o PO escolhendo as regras:
+
+| Pergunta | Escolha |
+|---|---|
+| Mudança feita direto na planilha | Vale em **até 5 minutos** |
+| Um botão para não esperar | **Sim**, em Configurações › Estrutura |
+| Passar a configuração para o código | **Não** (recomendação aceita): perderia as telas de Configurações, e o ganho seria o mesmo do cache |
+
+| Parte | O que ficou |
+|---|---|
+| **O cache** | `CONFIG`, `CANAIS`, `CAMPOS`, `CATALOGO`, `USUARIOS`, `SINALIZADORES` e `PAINEIS` no CacheService do script, por 5 minutos, para todos. Um `getAll` traz tudo na primeira leitura da execução; aba grande vai em pedaços; data volta Date |
+| **Vale na hora** | Toda gravação limpa o cache da aba (antes e depois de escrever); o `atualizarPGO` limpa tudo; o botão "Aplicar mudanças da planilha agora" também |
+| **Nunca derruba** | Serviço fora do ar, valor que não cabe ou pedaço que sumiu: lê a planilha, como antes |
+| **O que ficou de fora** | As bases de casos, as corretoras e as SUSEPs bloqueadas — mudam a cada clique |
+
+| Por clique, todas as idas ao serviço | Antes | Agora |
+|---|---|---|
+| Abrir o Trabalho | 47 | 11 |
+| Abrir o Trabalhar no caso (formulário + caso) | 27 + 31 | 6 + 10 |
+| Salvar o Alterar status | 44 | 18 |
+| Salvar o Cadastrar caso | 51 | 25 |
+
+**O que ainda dá para fazer, em etapas, se a medição real pedir:** trocar o status
+sem recarregar a fila inteira (hoje são 2 chamadas por troca) e ler da base só as
+linhas do período. Ficaram fora desta etapa de propósito: primeiro, medir o efeito do
+cache em **Apps Script › Execuções**.
+
+**Números das Etapas 41, 42 e 43.** **1283 testes** (27 a mais: 8 das colunas novas
+do chat em `testes-chat-da-mesa.js`; 17 do cache em `testes-velocidade.js`, novo; 2
+do período), cinco execuções seguidas sem falha. **15 quebras de propósito, 14
+vermelhos** — a que escapou troca "pedaço do cache faltando → ler a planilha" por
+"pular o pedaço": o texto fica incompleto, não abre, e a proteção em volta lê a
+planilha do mesmo jeito; o comportamento não muda. Navegador: ponta a ponta
+**22/22** no repositório e no pacote, 108 combinações de largura, 152 cliques na
+prévia, 100 com base suja; varredura geral sem defeito.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆) e rode `atualizarPGO()` (por causa da Etapa 41).
+2. **Implantar › Gerenciar implantações › editar › Versão: Nova versão** — sem isso,
+   o link continua o mesmo, mas roda o código antigo.
+3. Antes e depois, anote em **Apps Script › Execuções** a duração de `resumoDoCanal`,
+   `casoParaEditar`, `alterarSituacaoDoCaso` e `cadastrarCaso`.
+
+---
+
+## Etapa 43 — O período só por data e por mês, abrindo em "Por data"
+
+Pedido do PO: **"nos filtros tire os de dias e deixe apenas por data e por mês. Por
+padrão vem o por data."**
+
+| Parte | O que ficou |
+|---|---|
+| **A tela** | O seletor de período (o mesmo no Trabalho, na Produtividade e na Minha Performance) oferece só **Por data** e **Por mês**, e abre em **Por data** |
+| **A abertura** | As caixas de/até já vêm preenchidas com a janela de sempre — os últimos 30 dias de `OPERACAO.JANELA_DIAS` —, para o Trabalho não passar a mostrar menos casos do que mostrava. Trocar de "Por mês" para "Por data" traz as datas do mês |
+| **O servidor** | "Por data" sem as datas devolve essa janela já como datas. O formato antigo "dias" continua aceito — página aberta antes da atualização não quebra, e aparece como "Por data" |
+
+### Para quem já usa
+
+Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

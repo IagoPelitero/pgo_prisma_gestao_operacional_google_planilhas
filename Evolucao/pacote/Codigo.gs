@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-15 19:15
+   Gerado em 2026-10-16 16:34
    ========================================================================== */
 
 
@@ -1037,6 +1037,14 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Assunto', tipo: 'texto', protegido: false },
       { cabecalho: 'Consultor', tipo: 'texto', protegido: false },
       { cabecalho: 'Ramo', tipo: 'texto', protegido: false },
+      // Etapa 41, pedido do PO: "na importação para os chats da mesa você não
+      // colocou a sucursal (...) acrescente a tabulação, sub assunto e TMO".
+      // Todas opcionais: o que a planilha de origem não trouxer fica em branco,
+      // para o PO preencher à mão. O TMO é em SEGUNDOS ("1.152" = 1152 s).
+      { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
+      { cabecalho: 'Tabulação', tipo: 'texto', protegido: false },
+      { cabecalho: 'Sub assunto', tipo: 'texto', protegido: false },
+      { cabecalho: 'TMO', tipo: 'numero', protegido: false },
       // O lote, como na importação de casos: é por ele que se acha (e, se
       // preciso, se apaga) uma leva importada errada.
       { cabecalho: 'Lote', tipo: 'texto', protegido: false },
@@ -1410,6 +1418,7 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
     // Texto ANTES do valor: é o que impede 0000000010 de virar 10.
     faixa.setNumberFormat('@');
     faixa.setValues(coluna);
+    esquecerCacheDaConfiguracao_(nomeDaAba);
 
     return {
       aba: nomeDaAba,
@@ -1514,6 +1523,7 @@ var tiposDeclaradosJaLidos = null;
 var lendoTiposDeclarados = false;
 
 function esquecerEstruturaLida_(nomeDaAba) {
+  esquecerCacheDaConfiguracao_(nomeDaAba);
   if (nomeDaAba) {
     delete estruturasJaLidas[nomeDaAba];
     esquecerRegistrosLidos_(nomeDaAba);
@@ -1547,6 +1557,162 @@ function esquecerRegistrosLidos_(nomeDaAba) {
   Object.keys(registrosJaLidos).forEach(function (chave) {
     if (chave.indexOf(nomeDaAba + '|') === 0) delete registrosJaLidos[chave];
   });
+}
+
+/**
+ * ----------------------------------------------------------------------------
+ * O CACHE DA CONFIGURAÇÃO — entre uma chamada e outra (Etapa 42)
+ * ----------------------------------------------------------------------------
+ * Relato do PO: lentidão no Trabalho, no "Trabalhar no caso" e no Cadastrar
+ * Caso, com 9 pessoas ao mesmo tempo, e o erro dos 40 segundos. A medição
+ * mostrou que cada ação da tela fazia de 30 a 60 idas ao Planilhas, e a maior
+ * parte era RELER a configuração (CANAIS, CAMPOS, listas, prazos, usuários) —
+ * que quase nunca muda. O memo de cima não resolve isso: cada clique é uma
+ * execução nova, e ele morre com ela.
+ *
+ * O CacheService do Apps Script guarda a configuração por 5 minutos para todas
+ * as execuções. A planilha continua sendo a dona do dado; o cache só evita a
+ * ida até ela. As regras, escolhidas pelo PO:
+ *   - salvar pelo sistema (as telas de Configurações, o cadastro de usuários,
+ *     o atualizarPGO) LIMPA o cache da aba na hora — vale na mesma hora;
+ *   - quem mexe DIRETO na planilha vê a mudança em até 5 minutos, ou na hora
+ *     com o botão "Aplicar mudanças da planilha agora" (Configurações ›
+ *     Estrutura).
+ *
+ * SÓ CONFIGURAÇÃO ENTRA. As bases de casos mudam a cada clique de 9 pessoas e
+ * ficam de fora, como os cadastros de corretoras e SUSEPs bloqueadas.
+ *
+ * O cache NUNCA é necessário: se o serviço falhar, ou o valor não couber, o
+ * sistema lê a planilha como sempre leu. Cache que derruba a tela seria pior
+ * que a lentidão.
+ */
+var RECC_ABAS_DO_CACHE = ['CONFIG', 'CANAIS', 'CAMPOS', 'CATALOGO', 'USUARIOS',
+  'SINALIZADORES', 'PAINEIS'];
+var RECC_SEGUNDOS_DO_CACHE = 300;
+var RECC_PREFIXO_DO_CACHE = 'pgo-config-1|';
+// O CacheService aceita até 100 KB por valor. Pedaços de 40 mil caracteres
+// cabem com folga mesmo com acentos (que ocupam 2 bytes); até 6 pedaços por aba.
+var RECC_TAMANHO_DO_PEDACO = 40000;
+var RECC_PEDACOS_POR_ABA = 6;
+
+/** O que já veio do cache NESTA execução: um getAll só, na primeira vez. */
+var cacheDaConfiguracaoLido = null;
+
+function cacheDoScript_() {
+  try {
+    return typeof CacheService === 'undefined' ? null : CacheService.getScriptCache();
+  } catch (erro) {
+    return null;
+  }
+}
+
+/** Só a leitura "inteira" (sem `ultimas`) de uma aba de configuração entra. */
+function vaiParaOCache_(nomeDaAba, opcoes) {
+  return RECC_ABAS_DO_CACHE.indexOf(nomeDaAba) >= 0 && !(Number(opcoes.ultimas) > 0);
+}
+
+/** As chaves dos pedaços de uma leitura: com e sem as linhas ocultas. */
+function chavesDoCache_(nomeDaAba, incluirOcultos) {
+  var chaves = [];
+  for (var i = 0; i < RECC_PEDACOS_POR_ABA; i++) {
+    chaves.push(RECC_PREFIXO_DO_CACHE + nomeDaAba + '|' + (incluirOcultos ? 1 : 0) + '#' + i);
+  }
+  return chaves;
+}
+
+function todasAsChavesDoCache_(abas) {
+  var chaves = [];
+  (abas || RECC_ABAS_DO_CACHE).forEach(function (aba) {
+    chaves = chaves.concat(chavesDoCache_(aba, false), chavesDoCache_(aba, true));
+  });
+  return chaves;
+}
+
+/**
+ * Data não sobrevive ao JSON: vira texto. Ela vai marcada, e volta Date — o
+ * resto do sistema compara datas, e um texto no lugar daria conta errada calada.
+ */
+function paraOCache_(chave, valor) {
+  var bruto = this[chave];
+  if (Object.prototype.toString.call(bruto) === '[object Date]') {
+    return { $data: isNaN(bruto.getTime()) ? null : bruto.getTime() };
+  }
+  return valor;
+}
+
+function doCache_(chave, valor) {
+  if (valor && typeof valor === 'object' && Object.prototype.hasOwnProperty.call(valor, '$data')) {
+    return valor.$data === null ? new Date(NaN) : new Date(valor.$data);
+  }
+  return valor;
+}
+
+/** Os registros de uma aba que estão no cache, ou null. */
+function lerDoCacheDaConfiguracao_(nomeDaAba, opcoes) {
+  var cache = cacheDoScript_();
+  if (!cache) return null;
+  try {
+    if (cacheDaConfiguracaoLido === null) {
+      cacheDaConfiguracaoLido = cache.getAll(todasAsChavesDoCache_()) || {};
+    }
+    var chaves = chavesDoCache_(nomeDaAba, !!opcoes.incluirOcultos);
+    var primeiro = cacheDaConfiguracaoLido[chaves[0]];
+    if (!primeiro) return null;
+    var separador = primeiro.indexOf('|');
+    var quantos = Number(primeiro.substring(0, separador));
+    var texto = primeiro.substring(separador + 1);
+    for (var i = 1; i < quantos; i++) {
+      var pedaco = cacheDaConfiguracaoLido[chaves[i]];
+      if (typeof pedaco !== 'string') return null;   // pedaço que expirou antes: lê a planilha
+      texto += pedaco;
+    }
+    return JSON.parse(texto, doCache_);
+  } catch (erro) {
+    return null;
+  }
+}
+
+/** Guarda os registros recém-lidos da planilha. Não couber ou falhar: não guarda. */
+function guardarNoCacheDaConfiguracao_(nomeDaAba, opcoes, registros) {
+  var cache = cacheDoScript_();
+  if (!cache) return;
+  try {
+    var texto = JSON.stringify(registros, paraOCache_);
+    var pedacos = [];
+    for (var i = 0; i < texto.length; i += RECC_TAMANHO_DO_PEDACO) {
+      pedacos.push(texto.substring(i, i + RECC_TAMANHO_DO_PEDACO));
+    }
+    if (!pedacos.length) pedacos.push('');
+    if (pedacos.length > RECC_PEDACOS_POR_ABA) return;
+    var chaves = chavesDoCache_(nomeDaAba, !!opcoes.incluirOcultos);
+    var valores = {};
+    pedacos.forEach(function (pedaco, j) {
+      valores[chaves[j]] = j === 0 ? pedacos.length + '|' + pedaco : pedaco;
+    });
+    cache.putAll(valores, RECC_SEGUNDOS_DO_CACHE);
+    if (cacheDaConfiguracaoLido) {
+      Object.keys(valores).forEach(function (k) { cacheDaConfiguracaoLido[k] = valores[k]; });
+    }
+  } catch (erro) {
+    // Sem cache, o sistema segue lendo a planilha.
+  }
+}
+
+/**
+ * Esquece o que o cache tem de uma aba — ou de todas, sem nome. Chamado em
+ * toda gravação (por esquecerEstruturaLida_ e de novo depois de escrever, para
+ * que uma leitura que corria ao lado não deixe o dado velho guardado).
+ */
+function esquecerCacheDaConfiguracao_(nomeDaAba) {
+  var abas = nomeDaAba ? [nomeDaAba] : RECC_ABAS_DO_CACHE;
+  if (nomeDaAba && RECC_ABAS_DO_CACHE.indexOf(nomeDaAba) < 0) return;
+  var chaves = todasAsChavesDoCache_(abas);
+  if (cacheDaConfiguracaoLido) {
+    chaves.forEach(function (k) { delete cacheDaConfiguracaoLido[k]; });
+  }
+  var cache = cacheDoScript_();
+  if (!cache) return;
+  try { cache.removeAll(chaves); } catch (erro) { /* expira sozinho em 5 minutos */ }
 }
 
 /**
@@ -2292,14 +2458,25 @@ function lerRegistros_(nomeDaAba, opcoes) {
   opcoes = opcoes || {};
 
   var chave = chaveDoMemo_(nomeDaAba, opcoes);
-  var guardar = valeGuardarNaMemoria_(nomeDaAba);
+  var cacheavel = vaiParaOCache_(nomeDaAba, opcoes);
+  var guardar = valeGuardarNaMemoria_(nomeDaAba) || cacheavel;
   if (guardar && registrosJaLidos[chave]) {
     return copiarRegistros_(registrosJaLidos[chave]);
+  }
+  if (cacheavel) {
+    var doCache = lerDoCacheDaConfiguracao_(nomeDaAba, opcoes);
+    if (doCache) {
+      registrosJaLidos[chave] = doCache;
+      return copiarRegistros_(doCache);
+    }
   }
 
   var estrutura = estruturaDaAba_(nomeDaAba);
   var totalDados = quantidadeDeRegistros_(estrutura);
-  if (totalDados <= 0) return [];
+  if (totalDados <= 0) {
+    if (cacheavel) guardarNoCacheDaConfiguracao_(nomeDaAba, opcoes, []);
+    return [];
+  }
 
   var primeira = 2;
   var quantas = totalDados;
@@ -2323,6 +2500,7 @@ function lerRegistros_(nomeDaAba, opcoes) {
   }
 
   if (guardar) registrosJaLidos[chave] = saida;
+  if (cacheavel) guardarNoCacheDaConfiguracao_(nomeDaAba, opcoes, saida);
   return guardar ? copiarRegistros_(saida) : saida;
 }
 
@@ -2544,6 +2722,10 @@ function formatarEGravar_(estrutura, primeiraLinha, linhas) {
   var formatos = linhas.map(function () { return formatoDaLinha; });
   faixa.setNumberFormats(formatos);
   faixa.setValues(linhas);
+  // De novo DEPOIS de escrever: uma leitura que corria em outra execução, entre
+  // o "esquecer" do começo da gravação e esta linha, pode ter guardado o dado
+  // de antes. Sem isto, o PO salvaria e veria o valor velho por 5 minutos.
+  esquecerCacheDaConfiguracao_(estrutura.nomeDaAba);
 }
 
 /**
@@ -11349,6 +11531,21 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   };
 }
 
+/**
+ * O botão "Aplicar mudanças da planilha agora", em Configurações › Estrutura.
+ *
+ * A configuração fica guardada por 5 minutos no cache (Etapa 42). Salvar pelas
+ * telas já limpa o cache na hora; quem mexeu DIRETO na planilha — numa aba como
+ * CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES ou PAINEIS — aperta
+ * este botão em vez de esperar.
+ */
+function aplicarMudancasDaPlanilha() {
+  exigirPermissao_(RECC_ACOES.ESTRUTURA);
+  esquecerEstruturaLida_();
+  registrarAuditoria_('cache.limpar', 'CONFIG', '', 'Aplicou as mudanças feitas direto na planilha');
+  return { abas: RECC_ABAS_DO_CACHE.slice(), minutos: RECC_SEGUNDOS_DO_CACHE / 60 };
+}
+
 
 /* ==== Entrada.gs ========================================================== */
 
@@ -13124,6 +13321,20 @@ function resolverPeriodo_(pedido, diasPadrao) {
   if (tipo === 'intervalo') {
     var de = converterParaData_(pedido.de);
     var ate = converterParaData_(pedido.ate);
+    // "Por data" sem as duas datas é a ABERTURA da tela (Etapa 43: o PO tirou
+    // o "Por dias" e pediu "Por data" como padrão). Vale a mesma janela de
+    // sempre — os últimos N dias da configuração —, já escrita como datas,
+    // para as caixas de/até abrirem preenchidas.
+    if (!pedido.de && !pedido.ate) {
+      var janela = periodoPorDias_(padrao);
+      return {
+        tipo: 'intervalo',
+        de: janela.de,
+        ate: janela.ate,
+        dias: janela.dias,
+        rotulo: 'de ' + comoSeEscreve_(janela.de) + ' a ' + comoSeEscreve_(janela.ate)
+      };
+    }
     if (de && ate) {
       // Datas invertidas se endireitam em vez de devolver lista vazia. Quem
       // digitou "de 30/09 a 01/09" quis setembro, e uma tela zerada faria a
@@ -16077,8 +16288,38 @@ const RECC_COLUNAS_DO_CHAT = [
   { chave: 'consultor', cabecalho: 'Consultor', rotulo: 'Consultor', obrigatoria: false,
     palavras: ['consultor'] },
   { chave: 'ramo', cabecalho: 'Ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
-    palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] }
+    palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] },
+  { chave: 'sucursal', cabecalho: 'Sucursal', rotulo: 'Sucursal', obrigatoria: false,
+    palavras: ['sucursal', 'codsucursal', 'codigodasucursal'] },
+  { chave: 'tabulacao', cabecalho: 'Tabulação', rotulo: 'Tabulação', obrigatoria: false,
+    palavras: ['tabulacao', 'tabulacoes'] },
+  { chave: 'subassunto', cabecalho: 'Sub assunto', rotulo: 'Sub assunto', obrigatoria: false,
+    palavras: ['subassunto', 'submotivo'] },
+  { chave: 'tmo', cabecalho: 'TMO', rotulo: 'TMO (em segundos)', obrigatoria: false,
+    palavras: ['tmo', 'tempomedio', 'tempomediodeatendimento', 'tempodeatendimento'] }
 ];
+
+/** As colunas de texto livre do chat, copiadas como vieram (sem espaço nas pontas). */
+const RECC_TEXTOS_DO_CHAT = ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo', 'Sucursal',
+  'Tabulação', 'Sub assunto'];
+
+/**
+ * O TMO em segundos, como a planilha de origem o escreve: o número (1152), o
+ * texto com o ponto de milhar ("1.152") ou sem ele ("1152"), e a vírgula
+ * decimal ("12,5"). Vazio é vazio; o que não for número devolve `null` — a
+ * conferência conta essas linhas e o TMO delas fica em branco, em vez de virar
+ * um número inventado.
+ */
+function segundosDoTmo_(valor) {
+  if (valor === null || valor === undefined) return '';
+  if (typeof valor === 'number') return isFinite(valor) && valor >= 0 ? valor : null;
+  var texto = String(valor).trim().replace(/\s/g, '');
+  if (!texto) return '';
+  if (/^\d{1,3}(\.\d{3})+$/.test(texto)) return Number(texto.replace(/\./g, ''));
+  if (/^\d+$/.test(texto)) return Number(texto);
+  if (/^\d+,\d+$/.test(texto)) return Number(texto.replace(',', '.'));
+  return null;
+}
 
 const RECC_ABA_DO_CHAT = 'ATENDIMENTOS_CHAT';
 
@@ -16170,6 +16411,10 @@ function linhasDoChatDaFonte_(pedido) {
     return d.obrigatoria && !destinos[d.cabecalho];
   }).map(function (d) { return d.rotulo; });
 
+  // As quatro colunas da Etapa 41 (sucursal, tabulação, sub assunto e TMO) NÃO
+  // entram na chave: as linhas importadas antes delas existirem estão com elas
+  // em branco, e reimportar o mesmo arquivo — agora com os valores — contaria
+  // tudo em dobro.
   var chave = function (linha) {
     return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
       linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
@@ -16188,6 +16433,7 @@ function linhasDoChatDaFonte_(pedido) {
 
   var entram = [];
   var motivos = { vazia: 0, repetida: 0, semDataOuAnalista: 0 };
+  var tmoQueNaoENumero = 0;
   corpo.forEach(function (bruta) {
     var linha = linhaDaFonteParaOCaso_(bruta, cabecalhosDaFonte, dePara);
     if (!temAlgumValor_(linha)) { motivos.vazia++; return; }
@@ -16195,12 +16441,16 @@ function linhasDoChatDaFonte_(pedido) {
     var analista = String(linha.Analista || '').trim();
     if (!data || !analista) { motivos.semDataOuAnalista++; return; }
     var pronta = { Data: data, Analista: analista };
-    ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo'].forEach(function (coluna) {
+    RECC_TEXTOS_DO_CHAT.forEach(function (coluna) {
       pronta[coluna] = String(linha[coluna] === undefined || linha[coluna] === null
         ? '' : linha[coluna]).trim();
     });
+
     var a = chave(pronta);
     if (jaNaAba[a] > 0) { jaNaAba[a]--; motivos.repetida++; return; }
+    var tmo = segundosDoTmo_(linha.TMO);
+    if (tmo === null) { tmoQueNaoENumero++; tmo = ''; }
+    pronta.TMO = tmo;
     entram.push(pronta);
   });
 
@@ -16220,7 +16470,8 @@ function linhasDoChatDaFonte_(pedido) {
   });
 
   return { cabecalhosDaFonte: cabecalhosDaFonte, corpo: corpo, dePara: dePara,
-    faltando: faltando, entram: entram, motivos: motivos, desconhecidos: desconhecidos };
+    faltando: faltando, entram: entram, motivos: motivos, desconhecidos: desconhecidos,
+    tmoQueNaoENumero: tmoQueNaoENumero };
 }
 
 /** O passo "conferir antes de importar", para os atendimentos do chat. */
@@ -16243,6 +16494,7 @@ function conferirImportacaoDoChat(pedido) {
     semDataOuAnalista: montado.motivos.semDataOuAnalista,
     faltando: montado.faltando,
     analistasDesconhecidos: montado.desconhecidos,
+    tmoQueNaoENumero: montado.tmoQueNaoENumero,
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     passaDoLimite: montado.corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     amostra: montado.entram.slice(0, 3).map(function (linha) {
@@ -16302,6 +16554,7 @@ function importarAtendimentosDoChat(pedido) {
       repetida: montado.motivos.repetida },
     analistas: [],
     analistasDesconhecidos: montado.desconhecidos,
+    tmoQueNaoENumero: montado.tmoQueNaoENumero,
     primeiroId: gravados.length ? gravados[0].__id : '',
     ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
   };
@@ -16322,7 +16575,8 @@ function lerAtendimentosDoChat_() {
     var registros = lerRegistros_(RECC_ABA_DO_CHAT, { ultimas: teto });
     var linhas = registros.map(function (r) {
       return { data: r.Data, analista: String(r.Analista || '').trim(), susep: r.SUSEP,
-        corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo };
+        corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo,
+        sucursal: r.Sucursal, tabulacao: r['Tabulação'], subassunto: r['Sub assunto'], tmo: r.TMO };
     }).filter(function (linha) { return linha.data || linha.analista; });
     return { ligado: linhas.length > 0, linhas: linhas, aviso: '',
       truncada: registros.length >= teto, lidas: registros.length };
@@ -16439,11 +16693,13 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
         var nome = (doCadastro && doCadastro.consultor) || String(bruto.consultor || '').trim();
         return [normalizarParaComparar_(nome), nome];
       })(),
-      // A sucursal vem SÓ do cadastro, pela SUSEP: nem a Mesa nem o chat têm
-      // essa coluna (pedido do PO: "o mesmo para sucursal"). SUSEP fora do
-      // cadastro, ou cadastrada sem sucursal, cai em "sem informação".
+      // A sucursal que o chat TROUXE vale (Etapa 41, a planilha de origem tem a
+      // coluna); sem ela — o caso do sistema, ou o chat em branco —, a do
+      // cadastro de corretoras, pela SUSEP.
       sucursal: (function () {
-        var nome = (doCadastro && doCadastro.sucursal) || '';
+        var doChat = String(bruto.sucursal === undefined || bruto.sucursal === null
+          ? '' : bruto.sucursal).trim();
+        var nome = doChat || (doCadastro && doCadastro.sucursal) || '';
         return [normalizarParaComparar_(nome), nome];
       })(),
       ramo: [ramo.chave, ramo.rotulo]
@@ -17902,6 +18158,10 @@ function atualizarPGO() {
   var feito = [];
   var pulados = [];
   var paraVoce = [];
+  // Algumas migrações escrevem direto na aba (uma coluna inteira, um
+  // cabeçalho). O cache da configuração (Etapa 42) é esquecido no começo e no
+  // fim, para nada do que mudou aqui ficar 5 minutos escondido.
+  esquecerCacheDaConfiguracao_();
 
   // --- 1. as migrações antigas, que são seguras de repetir -----------------
   var deCanais = migrarParaCanais_();
@@ -18043,6 +18303,7 @@ function atualizarPGO() {
       + par[1] + ' Apague a aba quando quiser.');
   });
 
+  esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
   Logger.log(recado);
   return recado;
@@ -18725,6 +18986,9 @@ function criarAAbaDoChat_(pulados, paraVoce) {
     feito.push('aba ATENDIMENTOS_CHAT criada — os atendimentos do chat entram pela Importação');
   } else {
     pulados.push('aba ATENDIMENTOS_CHAT já existe');
+    // Etapa 41: Sucursal, Tabulação, Sub assunto e TMO. Só acrescenta o
+    // cabeçalho que falta; as linhas já importadas ficam com eles em branco.
+    feito = feito.concat(criarColunasDoContrato_('ATENDIMENTOS_CHAT', pulados));
   }
   var antiga = '';
   try { antiga = String(valorDaConfiguracao_('CHAT.PLANILHA_ID', '') || '').trim(); }

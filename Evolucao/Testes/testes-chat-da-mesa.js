@@ -98,7 +98,7 @@ function rodarTestesDoChatDaMesa() {
     const opcoes = t.chamar('opcoesDaImportacaoDoChat')();
     igual(opcoes.abaExiste, true, 'a instalação cria a aba ATENDIMENTOS_CHAT');
     igual(opcoes.colunasDoCanal.join(','),
-      'Data,Analista,SUSEP,Corretora,Assunto,Consultor,Ramo');
+      'Data,Analista,SUSEP,Corretora,Assunto,Consultor,Ramo,Sucursal,Tabulação,Sub assunto,TMO');
     igual(opcoes.obrigatorias.join(','), 'Data,Analista', 'só a data e o analista são obrigatórios');
     igual(opcoes.lotes.length, 0);
   });
@@ -237,6 +237,106 @@ function rodarTestesDoChatDaMesa() {
     t.ambiente.planilha.deleteSheet(t.ambiente.planilha.getSheetByName('ATENDIMENTOS_CHAT'));
     igual(t.chamar('opcoesDaImportacaoDoChat')().abaExiste, false);
     lanca(() => t.ligar(), 'atualizarPGO()');
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Etapa 41: sucursal, tabulação, sub assunto e TMO');
+
+  /** Uma planilha de chat com as colunas novas, como a origem do PO as escreve. */
+  function chatCompleto(linhas) {
+    const t = mesaComChat();
+    t.idDoChat = t.ambiente.criarPlanilhaExterna('Completo', [
+      ['Data', 'Atendente', 'SUSEP', 'Assunto', 'Ramo', 'Cod Sucursal', 'Tabulação', 'Sub Assunto', 'TMO']]
+      .concat(linhas));
+    t.pedido = (extra) => Object.assign({ fonte: { tipo: 'planilha', planilhaId: t.idDoChat, aba: 'Completo' },
+      dePara: [], origem: 'Chat completo' }, extra || {});
+    t.ligar = (extra) => t.chamar('importarAtendimentosDoChat')(t.pedido(extra));
+    t.conferir = (extra) => t.chamar('conferirImportacaoDoChat')(t.pedido(extra));
+    return t;
+  }
+
+  teste('o de-para sugere as quatro colunas novas pelo cabeçalho', () => {
+    const t = chatCompleto([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG', '12', 'Retenção', '2ª via', '1.152']]);
+    const laudo = t.conferir();
+    const para = (daFonte) => laudo.dePara.find((p) => p.daFonte === daFonte).paraAColuna;
+    igual(para('Cod Sucursal'), 'Sucursal');
+    igual(para('Tabulação'), 'Tabulação');
+    igual(para('Sub Assunto'), 'Sub assunto');
+    igual(para('TMO'), 'TMO');
+  });
+
+  teste('importar grava as quatro — e o TMO "1.152" vira 1152 segundos', () => {
+    const t = chatCompleto([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG', '12', 'Retenção', '2ª via', '1.152']]);
+    t.ligar();
+    const linha = t.aba()[0];
+    igual(String(linha.Sucursal), '12');
+    igual(linha['Tabulação'], 'Retenção');
+    igual(linha['Sub assunto'], '2ª via');
+    igual(linha.TMO, 1152);
+  });
+
+  teste('o TMO aceita 1152, 1.152, 12,5 e o número da planilha; vazio fica vazio', () => {
+    const t = chatCompleto([
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'A', 'VG', '', '', '', '1152'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'B', 'VG', '', '', '', '12,5'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'C', 'VG', '', '', '', 300],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'D', 'VG', '', '', '', '']]);
+    t.ligar();
+    igual(t.aba().map((l) => l.TMO).join('|'), '1152|12.5|300|');
+  });
+
+  teste('TMO que não é número: a linha entra, o TMO fica em branco — e o laudo conta', () => {
+    const t = chatCompleto([
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'A', 'VG', '', '', '', '19 min'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'B', 'VG', '', '', '', '1.152']]);
+    igual(t.conferir().tmoQueNaoENumero, 1);
+    const r = t.ligar();
+    igual(r.entraram, 2);
+    igual(r.tmoQueNaoENumero, 1);
+    igual(String(t.aba()[0].TMO), '');
+    contem(lerTela('Importacao.html'), 'laudo.tmoQueNaoENumero');
+  });
+
+  teste('a planilha de origem sem as colunas novas: elas ficam em branco, para preencher à mão', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ligar();
+    const linha = t.aba()[0];
+    ['Sucursal', 'Tabulação', 'Sub assunto', 'TMO'].forEach((coluna) => igual(String(linha[coluna]), '', coluna));
+  });
+
+  teste('reimportar o mesmo arquivo, agora com as colunas novas, não dobra', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ligar();
+    const outro = t.ambiente.criarPlanilhaExterna('ComNovas', [
+      ['Data', 'Atendente', 'SUSEP', 'Assunto', 'Ramo', 'Sucursal', 'TMO'],
+      [diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG', '12', '1.152']]);
+    lanca(() => t.ligar({ fonte: { tipo: 'planilha', planilhaId: outro, aba: 'ComNovas' }, dePara: [],
+      origem: 'De novo' }), 'já estão na aba');
+    igual(t.aba().length, 1);
+  });
+
+  teste('na Produtividade, a sucursal que o chat trouxe vale; em branco, a do cadastro', () => {
+    const t = chatCompleto([
+      [diasAtras(0), 'Ana Martins', 'RET00J', 'Cobrança', 'VG', '99', '', '', ''],
+      [diasAtras(0), 'Ana Martins', 'RET00J', 'Cobrança', 'VI', '', '', '', '']]);
+    t.ligar();
+    igual(t.pontos(t.grafico(t.painel(), 'Top 5 sucursais')).join('|'), '12:0+1|99:0+1',
+      'a do chat (99) ganha do cadastro (12); a linha em branco usa o cadastro');
+  });
+
+  teste('a atualização acrescenta as quatro colunas numa aba do chat que já existe', () => {
+    const t = mesaComChat([[diasAtras(1), 'Ana Martins', 'RET00J', 'Cobrança', 'VG']]);
+    t.ligar();
+    ['TMO', 'Sub assunto', 'Tabulação', 'Sucursal'].forEach((coluna) =>
+      t.chamar('removerColuna_')('ATENDIMENTOS_CHAT', coluna));
+    const recado = t.chamar('atualizarPGO()');
+    contem(recado, 'ATENDIMENTOS_CHAT.Sucursal criada');
+    contem(recado, 'ATENDIMENTOS_CHAT.TMO criada');
+    const linha = t.aba()[0];
+    igual(linha.Analista, 'Ana Martins', 'a linha que já estava continua inteira');
+    igual(String(linha.TMO), '');
+    verdadeiro(t.chamar('atualizarPGO()').indexOf('ATENDIMENTOS_CHAT.TMO criada') < 0,
+      'a segunda vez não mexe');
   });
 
   /* ----------------------------------------------------------------------- */

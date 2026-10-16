@@ -312,11 +312,16 @@ const medidor = {
   propriedadesLidas: 0,
   propriedadesGravadas: 0,
   travasPedidas: 0,
+  // O CacheService também é ida ao serviço — barata (uns 10 ms), mas é. Fica
+  // contado à parte, para a conta das idas à PLANILHA continuar comparável.
+  cacheLidos: 0,
+  cacheGravados: 0,
   zerar() {
     this.celulasLidas = 0; this.celulasGravadas = 0;
     this.idasParaLer = 0; this.idasParaGravar = 0; this.faixasPedidas = 0;
     this.propriedadesLidas = 0; this.propriedadesGravadas = 0;
     this.travasPedidas = 0;
+    this.cacheLidos = 0; this.cacheGravados = 0;
     return this;
   },
   retrato() {
@@ -327,6 +332,8 @@ const medidor = {
       propriedadesLidas: this.propriedadesLidas,
       propriedadesGravadas: this.propriedadesGravadas,
       travasPedidas: this.travasPedidas,
+      cacheLidos: this.cacheLidos,
+      cacheGravados: this.cacheGravados,
       // O que o Apps Script realmente cobra: cada ida ao serviço.
       idasNoTotal: this.idasParaLer + this.idasParaGravar
         + this.propriedadesLidas + this.propriedadesGravadas
@@ -404,9 +411,39 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     }
   }
 
+  /*
+   * O CacheService do script: um só para todas as execuções, como no Apps
+   * Script. Respeita o prazo de cada valor pelo relógio de `cache.agora()`, que
+   * o teste pode adiantar (`cache.adiantar(segundos)`) para provar que a
+   * mudança feita direto na planilha aparece quando o prazo vence.
+   */
+  const valoresDoCache = new Map();
+  let adiantadoEmMs = 0;
+  const cache = {
+    agora: () => Date.now() + adiantadoEmMs,
+    adiantar: (segundos) => { adiantadoEmMs += segundos * 1000; },
+    limpar: () => valoresDoCache.clear(),
+    chaves: () => Array.from(valoresDoCache.keys()),
+    ler(chave) {
+      const guardado = valoresDoCache.get(chave);
+      if (!guardado) return null;
+      if (guardado.vence <= cache.agora()) { valoresDoCache.delete(chave); return null; }
+      return guardado.valor;
+    },
+    gravar(chave, valor, segundos) {
+      const texto = String(valor);
+      // O limite do Apps Script: 100 KB por valor. Passar disso ESTOURA lá.
+      if (Buffer.byteLength(texto, 'utf8') > 100 * 1024) {
+        throw new Error('Argument too large: value');
+      }
+      valoresDoCache.set(chave, { valor: texto, vence: cache.agora() + (segundos || 600) * 1000 });
+    }
+  };
+
   const ambiente = {
     medidor,
     planilha,
+    cache,
     propriedades,
     propriedadesDoUsuario,
     registros,
@@ -528,6 +565,24 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
           return saidaHtml(
             fs.readFileSync(path.join(PASTA_DAS_TELAS, nome + '.html'), 'utf8'));
         }
+      },
+      CacheService: {
+        getScriptCache: () => ({
+          get: (chave) => { medidor.cacheLidos++; return cache.ler(chave); },
+          getAll: (chaves) => {
+            medidor.cacheLidos++;
+            const saida = {};
+            chaves.forEach((k) => { const v = cache.ler(k); if (v !== null) saida[k] = v; });
+            return saida;
+          },
+          put: (chave, valor, segundos) => { medidor.cacheGravados++; cache.gravar(chave, valor, segundos); },
+          putAll: (valores, segundos) => {
+            medidor.cacheGravados++;
+            Object.keys(valores).forEach((k) => cache.gravar(k, valores[k], segundos));
+          },
+          remove: (chave) => { medidor.cacheGravados++; valoresDoCache.delete(chave); },
+          removeAll: (chaves) => { medidor.cacheGravados++; chaves.forEach((k) => valoresDoCache.delete(k)); }
+        })
       },
       LockService: {
         getScriptLock: () => ({

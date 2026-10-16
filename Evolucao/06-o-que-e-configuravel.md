@@ -45,7 +45,8 @@ abaixo com o motivo.
 | **Nome de cada tela** | Renomear qualquer item do menu. O menu, o cabeçalho da página e o título da janela obedecem; deixar em branco volta ao nome de fábrica. Foi assim que o Trabalho virou "Trabalho" | Identidade |
 | **Senha de administrador** | Definir e trocar | Identidade |
 | **Busca** | Em quais colunas cado canal procura. Vale para o Buscar Caso **e** para a busca digitada do Trabalho, que procura também nas colunas da fila | Canais de trabalho |
-| **Atendimentos do chat (Mesa)** | Trazer os atendimentos do chat pela Importação, como os casos: colar ou dar o link, confirmar o de-para (data e analista obrigatórios; SUSEP, corretora, assunto, consultor e vida individual/grupo opcionais), conferir — o laudo diz quem o cadastro de usuários não conhece — e importar com um nome de lote. A linha já importada é pulada. Alimentam a aba "Atendidos (e-mail + chat)" da Produtividade da Mesa, onde a pessoa escolhe a origem (Todos / E-mail / Chat) e o ramo (Total / Vida em grupo / Vida individual); a sucursal vem do cadastro de corretoras, pela SUSEP | Importação → Mesa Diamante → Atendimentos do chat · **ação `importar`** |
+| **Atendimentos do chat (Mesa)** | Trazer os atendimentos do chat pela Importação, como os casos: colar ou dar o link, confirmar o de-para (data e analista obrigatórios; SUSEP, corretora, assunto, consultor, vida individual/grupo, sucursal, tabulação, sub assunto e TMO em segundos opcionais — o que a origem não trouxer fica em branco), conferir — o laudo diz quem o cadastro de usuários não conhece — e importar com um nome de lote. A linha já importada é pulada. Alimentam a aba "Atendidos (e-mail + chat)" da Produtividade da Mesa, onde a pessoa escolhe a origem (Todos / E-mail / Chat) e o ramo (Total / Vida em grupo / Vida individual); a sucursal é a que o chat trouxe, ou a do cadastro de corretoras pela SUSEP | Importação → Mesa Diamante → Atendimentos do chat · **ação `importar`** |
+| **Aplicar mudanças da planilha agora** | A configuração fica guardada por até 5 minutos para a tela responder rápido; o que se salva pelas telas vale na hora. Quem mexeu direto numa aba de configuração aperta este botão em vez de esperar | Estrutura |
 | **Planilha legada** | Apontar a base do sistema anterior — Id, aba e como ela aparece na busca. O Id é conferido na hora | Estrutura |
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura |
 | **Arquivo da auditoria** | O Id da planilha que recebe a auditoria com **mais de 2 meses** (conferido na hora, e não pode ser esta mesma), e o botão **Arquivar agora**. Copia, confere e só então apaga daqui. Para ser automático, a cada 2 meses: um acionador **mensal** no editor do Apps Script para `arquivarAuditoriaAgendada` | Estrutura · **pede senha** |
@@ -78,7 +79,7 @@ Funciona, e é editável — mas exige abrir a aba e digitar na célula, o que n
 
 | Assunto | Onde mora | Por que ainda não tem tela |
 |---|---|---|
-| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; é o próximo a ganhar campo. Agora é só a **abertura** das telas: quem está olhando troca o período na própria tela, por dias, por data ou por mês |
+| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; é o próximo a ganhar campo. Agora é só a **abertura** das telas: quem está olhando troca o período na própria tela, por data (a abertura, já com essa janela em de/até) ou por mês |
 | **Tema padrão da operação** | `CONFIG` → `OPERACAO.TEMA_PADRAO` | Idem |
 | **Visibilidade de campo por nível** | `CATALOGO` → `Configuracao.campos` | O servidor já respeita (oculto, leitura, edição). Falta a tela — hoje é um JSON |
 

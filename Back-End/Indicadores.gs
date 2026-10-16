@@ -292,6 +292,20 @@ function resolverPeriodo_(pedido, diasPadrao) {
   if (tipo === 'intervalo') {
     var de = converterParaData_(pedido.de);
     var ate = converterParaData_(pedido.ate);
+    // "Por data" sem as duas datas é a ABERTURA da tela (Etapa 43: o PO tirou
+    // o "Por dias" e pediu "Por data" como padrão). Vale a mesma janela de
+    // sempre — os últimos N dias da configuração —, já escrita como datas,
+    // para as caixas de/até abrirem preenchidas.
+    if (!pedido.de && !pedido.ate) {
+      var janela = periodoPorDias_(padrao);
+      return {
+        tipo: 'intervalo',
+        de: janela.de,
+        ate: janela.ate,
+        dias: janela.dias,
+        rotulo: 'de ' + comoSeEscreve_(janela.de) + ' a ' + comoSeEscreve_(janela.ate)
+      };
+    }
     if (de && ate) {
       // Datas invertidas se endireitam em vez de devolver lista vazia. Quem
       // digitou "de 30/09 a 01/09" quis setembro, e uma tela zerada faria a
@@ -3245,8 +3259,38 @@ const RECC_COLUNAS_DO_CHAT = [
   { chave: 'consultor', cabecalho: 'Consultor', rotulo: 'Consultor', obrigatoria: false,
     palavras: ['consultor'] },
   { chave: 'ramo', cabecalho: 'Ramo', rotulo: 'Vida individual ou em grupo', obrigatoria: false,
-    palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] }
+    palavras: ['ramo', 'produto', 'segmento', 'vidaindividualougrupo'] },
+  { chave: 'sucursal', cabecalho: 'Sucursal', rotulo: 'Sucursal', obrigatoria: false,
+    palavras: ['sucursal', 'codsucursal', 'codigodasucursal'] },
+  { chave: 'tabulacao', cabecalho: 'Tabulação', rotulo: 'Tabulação', obrigatoria: false,
+    palavras: ['tabulacao', 'tabulacoes'] },
+  { chave: 'subassunto', cabecalho: 'Sub assunto', rotulo: 'Sub assunto', obrigatoria: false,
+    palavras: ['subassunto', 'submotivo'] },
+  { chave: 'tmo', cabecalho: 'TMO', rotulo: 'TMO (em segundos)', obrigatoria: false,
+    palavras: ['tmo', 'tempomedio', 'tempomediodeatendimento', 'tempodeatendimento'] }
 ];
+
+/** As colunas de texto livre do chat, copiadas como vieram (sem espaço nas pontas). */
+const RECC_TEXTOS_DO_CHAT = ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo', 'Sucursal',
+  'Tabulação', 'Sub assunto'];
+
+/**
+ * O TMO em segundos, como a planilha de origem o escreve: o número (1152), o
+ * texto com o ponto de milhar ("1.152") ou sem ele ("1152"), e a vírgula
+ * decimal ("12,5"). Vazio é vazio; o que não for número devolve `null` — a
+ * conferência conta essas linhas e o TMO delas fica em branco, em vez de virar
+ * um número inventado.
+ */
+function segundosDoTmo_(valor) {
+  if (valor === null || valor === undefined) return '';
+  if (typeof valor === 'number') return isFinite(valor) && valor >= 0 ? valor : null;
+  var texto = String(valor).trim().replace(/\s/g, '');
+  if (!texto) return '';
+  if (/^\d{1,3}(\.\d{3})+$/.test(texto)) return Number(texto.replace(/\./g, ''));
+  if (/^\d+$/.test(texto)) return Number(texto);
+  if (/^\d+,\d+$/.test(texto)) return Number(texto.replace(',', '.'));
+  return null;
+}
 
 const RECC_ABA_DO_CHAT = 'ATENDIMENTOS_CHAT';
 
@@ -3338,6 +3382,10 @@ function linhasDoChatDaFonte_(pedido) {
     return d.obrigatoria && !destinos[d.cabecalho];
   }).map(function (d) { return d.rotulo; });
 
+  // As quatro colunas da Etapa 41 (sucursal, tabulação, sub assunto e TMO) NÃO
+  // entram na chave: as linhas importadas antes delas existirem estão com elas
+  // em branco, e reimportar o mesmo arquivo — agora com os valores — contaria
+  // tudo em dobro.
   var chave = function (linha) {
     return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
       linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
@@ -3356,6 +3404,7 @@ function linhasDoChatDaFonte_(pedido) {
 
   var entram = [];
   var motivos = { vazia: 0, repetida: 0, semDataOuAnalista: 0 };
+  var tmoQueNaoENumero = 0;
   corpo.forEach(function (bruta) {
     var linha = linhaDaFonteParaOCaso_(bruta, cabecalhosDaFonte, dePara);
     if (!temAlgumValor_(linha)) { motivos.vazia++; return; }
@@ -3363,12 +3412,16 @@ function linhasDoChatDaFonte_(pedido) {
     var analista = String(linha.Analista || '').trim();
     if (!data || !analista) { motivos.semDataOuAnalista++; return; }
     var pronta = { Data: data, Analista: analista };
-    ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo'].forEach(function (coluna) {
+    RECC_TEXTOS_DO_CHAT.forEach(function (coluna) {
       pronta[coluna] = String(linha[coluna] === undefined || linha[coluna] === null
         ? '' : linha[coluna]).trim();
     });
+
     var a = chave(pronta);
     if (jaNaAba[a] > 0) { jaNaAba[a]--; motivos.repetida++; return; }
+    var tmo = segundosDoTmo_(linha.TMO);
+    if (tmo === null) { tmoQueNaoENumero++; tmo = ''; }
+    pronta.TMO = tmo;
     entram.push(pronta);
   });
 
@@ -3388,7 +3441,8 @@ function linhasDoChatDaFonte_(pedido) {
   });
 
   return { cabecalhosDaFonte: cabecalhosDaFonte, corpo: corpo, dePara: dePara,
-    faltando: faltando, entram: entram, motivos: motivos, desconhecidos: desconhecidos };
+    faltando: faltando, entram: entram, motivos: motivos, desconhecidos: desconhecidos,
+    tmoQueNaoENumero: tmoQueNaoENumero };
 }
 
 /** O passo "conferir antes de importar", para os atendimentos do chat. */
@@ -3411,6 +3465,7 @@ function conferirImportacaoDoChat(pedido) {
     semDataOuAnalista: montado.motivos.semDataOuAnalista,
     faltando: montado.faltando,
     analistasDesconhecidos: montado.desconhecidos,
+    tmoQueNaoENumero: montado.tmoQueNaoENumero,
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     passaDoLimite: montado.corpo.length > RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
     amostra: montado.entram.slice(0, 3).map(function (linha) {
@@ -3470,6 +3525,7 @@ function importarAtendimentosDoChat(pedido) {
       repetida: montado.motivos.repetida },
     analistas: [],
     analistasDesconhecidos: montado.desconhecidos,
+    tmoQueNaoENumero: montado.tmoQueNaoENumero,
     primeiroId: gravados.length ? gravados[0].__id : '',
     ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
   };
@@ -3490,7 +3546,8 @@ function lerAtendimentosDoChat_() {
     var registros = lerRegistros_(RECC_ABA_DO_CHAT, { ultimas: teto });
     var linhas = registros.map(function (r) {
       return { data: r.Data, analista: String(r.Analista || '').trim(), susep: r.SUSEP,
-        corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo };
+        corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo,
+        sucursal: r.Sucursal, tabulacao: r['Tabulação'], subassunto: r['Sub assunto'], tmo: r.TMO };
     }).filter(function (linha) { return linha.data || linha.analista; });
     return { ligado: linhas.length > 0, linhas: linhas, aviso: '',
       truncada: registros.length >= teto, lidas: registros.length };
@@ -3607,11 +3664,13 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
         var nome = (doCadastro && doCadastro.consultor) || String(bruto.consultor || '').trim();
         return [normalizarParaComparar_(nome), nome];
       })(),
-      // A sucursal vem SÓ do cadastro, pela SUSEP: nem a Mesa nem o chat têm
-      // essa coluna (pedido do PO: "o mesmo para sucursal"). SUSEP fora do
-      // cadastro, ou cadastrada sem sucursal, cai em "sem informação".
+      // A sucursal que o chat TROUXE vale (Etapa 41, a planilha de origem tem a
+      // coluna); sem ela — o caso do sistema, ou o chat em branco —, a do
+      // cadastro de corretoras, pela SUSEP.
       sucursal: (function () {
-        var nome = (doCadastro && doCadastro.sucursal) || '';
+        var doChat = String(bruto.sucursal === undefined || bruto.sucursal === null
+          ? '' : bruto.sucursal).trim();
+        var nome = doChat || (doCadastro && doCadastro.sucursal) || '';
         return [normalizarParaComparar_(nome), nome];
       })(),
       ramo: [ramo.chave, ramo.rotulo]

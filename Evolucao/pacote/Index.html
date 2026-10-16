@@ -5104,9 +5104,14 @@ var SeletorDePeriodo = (function () {
 
   function escapar(texto) { return Moldura.escapar(texto); }
 
-  /** O período de abertura: o atalho, com a janela que o servidor mandar. */
+  /**
+   * O período de abertura: "Por data", sem as datas — o servidor devolve a
+   * janela da configuração já como de/até. Etapa 43, pedido do PO: "nos filtros
+   * tire os de dias e deixe apenas por data e por mês. Por padrão vem o por
+   * data".
+   */
   function padrao() {
-    return { tipo: 'dias', dias: 0, de: '', ate: '', mes: '' };
+    return { tipo: 'intervalo', dias: 0, de: '', ate: '', mes: '' };
   }
 
   /**
@@ -5119,32 +5124,19 @@ var SeletorDePeriodo = (function () {
    */
   function desenhar(resposta) {
     var periodo = resposta.periodo || {};
-    var tipo = periodo.tipo || 'dias';
+    // Só duas maneiras. Um período que chegue como "dias" (uma página antiga,
+    // aberta antes da atualização) aparece como "Por data", com as datas que o
+    // servidor resolveu.
+    var tipo = periodo.tipo === 'mes' ? 'mes' : 'intervalo';
 
-    var comoEscolher = [['dias', 'Por dias'], ['intervalo', 'Por data'],
-      ['mes', 'Por mês']].map(function (par) {
+    var comoEscolher = [['intervalo', 'Por data'], ['mes', 'Por mês']].map(function (par) {
       return '<option value="' + par[0] + '"'
         + (tipo === par[0] ? ' selected' : '') + '>' + par[1] + '</option>';
     }).join('');
 
     return '<select class="filtro" data-periodo="como"'
       + ' aria-label="Como escolher o período">' + comoEscolher + '</select>'
-      + (tipo === 'intervalo' ? deAte(periodo)
-        : (tipo === 'mes' ? porMes(resposta) : porDias(periodo)));
-  }
-
-  /** Os atalhos de "Por dias". */
-  var DIAS_OFERECIDOS = [7, 15, 30, 60, 90, 180, 365];
-
-  function porDias(periodo) {
-    var opcoes = DIAS_OFERECIDOS.map(function (quantos) {
-      return '<option value="' + quantos + '"'
-        + (periodo.dias === quantos ? ' selected' : '') + '>'
-        + 'Últimos ' + quantos + ' dias</option>';
-    }).join('');
-
-    return '<select class="filtro" data-periodo="dias" aria-label="Período">'
-      + opcoes + '</select>';
+      + (tipo === 'mes' ? porMes(resposta) : deAte(periodo));
   }
 
   /*
@@ -5197,13 +5189,7 @@ var SeletorDePeriodo = (function () {
     var periodo = resposta.periodo || {};
 
     if (qual === 'como') {
-      // Os dias do período que estava valendo só servem se forem um dos
-      // atalhos. Voltando de "Por data" (279 dias) ou de "Por mês" (31), a
-      // caixa mostrava "Últimos 7 dias" e a conta somava os 279. Zero é "o
-      // padrão da configuração", que o servidor resolve.
-      var dias = DIAS_OFERECIDOS.indexOf(Number(periodo.dias)) >= 0
-        ? Number(periodo.dias) : 0;
-      var novo = { tipo: caixa.value, dias: dias, de: '', ate: '', mes: '' };
+      var novo = { tipo: caixa.value, dias: 0, de: '', ate: '', mes: '' };
       if (novo.tipo === 'mes') {
         var meses = resposta.mesesDisponiveis || [];
         if (meses.length) novo.mes = meses[0].valor;   // o mês corrente
@@ -5215,10 +5201,6 @@ var SeletorDePeriodo = (function () {
         novo.ate = periodo.ate;
       }
       return novo;
-    }
-
-    if (qual === 'dias') {
-      return { tipo: 'dias', dias: Number(caixa.value), de: '', ate: '', mes: '' };
     }
 
     if (qual === 'mes') {
@@ -7775,8 +7757,9 @@ var TelaImportacao = (function () {
           + 'Rode atualizarPGO() no editor do Apps Script antes de importar.</p>' : '')
       + (ehChat()
         ? '<p class="config-dica">Uma linha por atendimento. São obrigatórias a <strong>data'
-          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor e '
-          + 'vida individual ou em grupo são opcionais. A linha igual a uma que já entrou é '
+          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor, '
+          + 'vida individual ou em grupo, sucursal, tabulação, sub assunto e TMO (em segundos, '
+          + 'como 1.152) são opcionais — o que a origem não trouxer fica em branco. A linha igual a uma que já entrou é '
           + 'pulada — importar a mesma planilha de novo não conta em dobro.</p>' : '')
       + '<div class="config-abas">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
@@ -7969,6 +7952,10 @@ var TelaImportacao = (function () {
       + (laudo.semDataOuAnalista
         ? '<p class="config-dica">' + laudo.semDataOuAnalista + ' linha(s) sem data ou sem '
           + 'analista ficam de fora.</p>' : '')
+      + (laudo.tmoQueNaoENumero
+        ? '<p class="config-dica aviso-de-carimbo">' + laudo.tmoQueNaoENumero + ' linha(s) '
+          + 'com um TMO que não é número (em segundos, como 1.152). Elas entram, com o TMO em '
+          + 'branco para você preencher.</p>' : '')
       + '<h4 class="importacao-titulo">Como se chama o lote</h4>'
       + '<div class="grade">' + caixaDoNomeDoLote('Chat de outubro') + '</div>';
   }
@@ -12157,9 +12144,11 @@ var TelaConfiguracoes = (function () {
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
     elemento('config-lista').innerHTML += desenharDiagnostico()
+      + desenharMudancasDaPlanilha()
       + desenharCadastros() + desenharChat() + desenharArquivoDaAuditoria()
       + desenharLegado();
     ligarDiagnostico();
+    ligarMudancasDaPlanilha();
     ligarCadastros();
     ligarArquivoDaAuditoria();
     ligarLegado();
@@ -12464,6 +12453,42 @@ var TelaConfiguracoes = (function () {
               })
               .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
           });
+        });
+    });
+  }
+
+  /**
+   * "Aplicar mudanças da planilha agora" (Etapa 42). A configuração fica
+   * guardada por 5 minutos para o sistema não reler a planilha a cada clique;
+   * o que se salva por estas telas vale na hora. Quem mexeu DIRETO na planilha
+   * aperta aqui em vez de esperar.
+   */
+  function desenharMudancasDaPlanilha() {
+    return '<div class="config-legado">'
+      + '<h4>Mudou algo direto na planilha?</h4>'
+      + '<p class="config-explica">Para a tela responder rápido, o sistema guarda a '
+      + 'configuração (CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES e '
+      + 'PAINEIS) por até <strong>5 minutos</strong>. O que se salva por estas telas vale '
+      + 'na hora. Se você editou uma dessas abas direto na planilha, aperte o botão para '
+      + 'valer agora — ou espere até 5 minutos.</p>'
+      + '<div class="config-acoes"><button type="button" class="botao vazado" '
+      + 'id="aplicar-mudancas-da-planilha">Aplicar mudanças da planilha agora</button></div>'
+      + '</div>';
+  }
+
+  function ligarMudancasDaPlanilha() {
+    var botao = elemento('aplicar-mudancas-da-planilha');
+    if (!botao) return;
+    botao.addEventListener('click', function () {
+      botao.disabled = true;
+      Servidor.chamar('aplicarMudancasDaPlanilha')
+        .entao(function () {
+          avisarSalvo('Pronto: as mudanças feitas na planilha já valem.');
+          carregarEstrutura();
+        })
+        .senao(function (erro) {
+          botao.disabled = false;
+          avisar(erro.message || String(erro), 'ruim');
         });
     });
   }

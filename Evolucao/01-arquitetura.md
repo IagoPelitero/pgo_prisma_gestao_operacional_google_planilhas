@@ -277,12 +277,31 @@ cheio**. Carimba nas duas portas (diálogo de status e formulário) e no cadastr
 de um caso que já nasce trabalhado; a importação não carimba. As trocas
 seguintes não mexem nela.
 
+#### O cache da configuração (Etapa 42)
+
+Cada chamada da tela é uma execução nova do Apps Script, e o memo de dentro da
+execução (`registrosJaLidos`, em `Base.gs`) morre com ela. As abas de configuração —
+`CONFIG`, `CANAIS`, `CAMPOS`, `CATALOGO`, `USUARIOS`, `SINALIZADORES` e `PAINEIS` —
+ficam também no **CacheService do script por 5 minutos** (`lerRegistros_` →
+`lerDoCacheDaConfiguracao_` / `guardarNoCacheDaConfiguracao_`). Um `getAll` só traz
+tudo, na primeira leitura da execução. A aba grande vai em pedaços (até 6 de 40 mil
+caracteres); pedaço que falta manda ler a planilha. Data vai marcada e volta Date.
+
+A limpeza (`esquecerCacheDaConfiguracao_`) acontece em `esquecerEstruturaLida_` — que
+toda gravação chama — e de novo no fim de `formatarEGravar_`, depois de escrever,
+para que uma leitura de outra execução no meio da gravação não deixe o dado velho.
+O `atualizarPGO` limpa no começo e no fim; o botão de Estrutura chama
+`aplicarMudancasDaPlanilha`. Falha do serviço nunca derruba nada: sem cache, lê a
+planilha.
+
 #### A aba do chat: `ATENDIMENTOS_CHAT`
 
 Os atendidos da Mesa Diamante somam o sistema aos atendimentos do chat. Desde a
 Etapa 39 eles **entram pela Importação** e moram nesta aba, que tem contrato:
 `Id` · `Data` (data) · `Analista` · `SUSEP` · `Corretora` · `Assunto` · `Consultor` ·
-`Ramo` · `Lote` · `ImportadoEm` (do sistema). A Produtividade lê o fim da aba, com o
+`Ramo` · `Sucursal` · `Tabulação` · `Sub assunto` · `TMO` (número, em segundos) ·
+`Lote` · `ImportadoEm` (do sistema). As quatro antes do lote entraram na Etapa 41 e
+ficam fora da chave do repetido (as linhas antigas estão com elas em branco). A Produtividade lê o fim da aba, com o
 teto de `OPERACAO.LINHAS_DO_PAINEL` — ver `lerAtendimentosDoChat_`, em
 `Indicadores.gs`. A importação (`conferirImportacaoDoChat`,
 `importarAtendimentosDoChat`) usa a mesma leitura de fonte e o mesmo de-para da

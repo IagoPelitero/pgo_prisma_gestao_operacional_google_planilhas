@@ -77,6 +77,21 @@ Linha digitada à mão nasce sem Id. Sem Id o sistema não consegue editá-la.
 No editor, execute **`normalizarBase`**: ela dá Id a quem está sem, em todas as
 abas, realinha as sequências e não toca em mais nada da linha.
 
+### Mudei uma aba de configuração direto na planilha e nada mudou
+
+A configuração (CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES e PAINEIS)
+fica guardada por até 5 minutos para a tela responder rápido (Etapa 42). Espere, ou
+use **Configurações › Estrutura › Aplicar mudanças da planilha agora**. O que se salva
+pelas telas vale na hora. Uma aba nova de configuração entra no cache acrescentando o
+nome em `RECC_ABAS_DO_CACHE` (`Base.gs`) — nunca uma base de casos.
+
+### A tela continua lenta
+
+Antes de mexer no código, meça: **Apps Script › Execuções** mostra a duração de cada
+chamada. Execução curta e tela esperando 40 s é fila do Google ou versão antiga da
+implantação (ver seção 5). Para contar idas no simulador, use o `medidor` de
+`Evolucao/Testes/simulador.js`, como `testes-velocidade.js` faz.
+
 ### Duas linhas com o mesmo Id
 
 O diagnóstico e a edição do caso avisam. Qual das duas é a cópia é decisão de
@@ -122,9 +137,10 @@ do chat), e o de-para é escolhido a cada importação — a coluna que mudou de
 se liga de novo ali, e a conferência mostra as primeiras linhas já traduzidas.
 Importou um lote errado? Ele tem nome (coluna `Lote` da aba `ATENDIMENTOS_CHAT`):
 filtre por ele na planilha e apague essas linhas. Para o chat passar a trazer mais
-uma informação (hoje: data, analista, SUSEP, corretora, assunto, consultor e vida
-individual/grupo), acrescente a coluna em `RECC_ESQUEMA.ATENDIMENTOS_CHAT`
-(`Base.gs`), o item em `RECC_COLUNAS_DO_CHAT` e o campo em `atendimentosDaMesa_`
+uma informação (hoje: data, analista, SUSEP, corretora, assunto, consultor, vida
+individual/grupo, sucursal, tabulação, sub assunto e TMO), acrescente a coluna em `RECC_ESQUEMA.ATENDIMENTOS_CHAT`
+(`Base.gs`), o item em `RECC_COLUNAS_DO_CHAT` (e, se for texto, em
+`RECC_TEXTOS_DO_CHAT`) e o campo em `atendimentosDaMesa_`
 (`Indicadores.gs`), e um gráfico em `graficoDeAtendidos_`. A tela não muda: ela
 desenha o que o servidor manda.
 
@@ -214,6 +230,10 @@ alfabética, e **nenhum arquivo tem código de topo que dependa de outro**. Essa
 regra não é estilo — no sistema anterior, uma constante de topo lida antes da
 hora derrubava a carga do projeto inteiro com um erro que aparecia longe da
 causa.
+
+**Manter o mesmo link:** em *Implantar › Gerenciar implantações*, edite a implantação
+(lápis) e escolha **Versão: Nova versão** antes de *Implantar*. Sem isso, o link
+continua igual, mas serve o código antigo.
 
 Depois de publicar, rode `verificarEstruturaRECC()` no editor. Nenhum teste
 rodado fora do Apps Script pega um arquivo que ficou para trás na cópia.

@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1256 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1283 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -293,13 +293,50 @@ uma função nova é varrida no dia em que nasce.
 
 ---
 
+## Velocidade: a configuração guardada por 5 minutos
+
+Relato dos analistas da Mesa e da RET: lentidão no Trabalho, no **Trabalhar no
+caso** e no **Cadastrar caso**, com até 9 pessoas ao mesmo tempo, e o erro dos 40
+segundos. Medido (Etapa 42): cada clique fazia de 30 a 60 idas à planilha, e a maior
+parte era **reler a configuração** — CANAIS, CAMPOS, listas, prazos, usuários —, que
+quase nunca muda. Com bases de 200 a 800 casos, a base em si pesa pouco.
+
+O sistema passou a guardar a configuração no **cache do Apps Script por 5 minutos**,
+para todas as pessoas. A planilha continua sendo a dona do dado:
+
+| Você muda… | Quando vale |
+|---|---|
+| Pelas telas (Configurações, Usuários, `atualizarPGO`) | **Na hora**: salvar limpa o cache daquela aba |
+| **Direto na planilha** (CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES ou PAINEIS) | Em **até 5 minutos** — ou na hora, em **Configurações › Estrutura › Aplicar mudanças da planilha agora** |
+
+As bases de casos, as corretoras e as SUSEPs bloqueadas **não** entram no cache:
+mudam a cada clique. Se o cache do Google falhar, o sistema lê a planilha como
+sempre leu — ele deixa a tela mais rápida, nunca a derruba.
+
+Por clique (fora o primeiro depois de 5 minutos), contando todas as idas ao serviço:
+
+| Ação | Antes | Agora |
+|---|---|---|
+| Abrir o Trabalho | 47 | 11 |
+| Abrir o Trabalhar no caso (formulário + caso) | 27 + 31 | 6 + 10 |
+| Salvar o Alterar status | 44 | 18 |
+| Salvar o Cadastrar caso | 51 | 25 |
+
+São números do simulador; o tempo real de cada ida no Google varia. Para conferir na
+sua planilha, compare em **Apps Script › Execuções** a duração de `resumoDoCanal`,
+`casoParaEditar`, `alterarSituacaoDoCaso` e `cadastrarCaso` antes e depois.
+
+> **Atualizou o código e manteve o link?** Em *Implantar › Gerenciar implantações*,
+> edite a implantação e escolha **Versão: Nova versão**. Sem isso, o link continua o
+> mesmo, mas roda o código antigo.
+
 ## Rodar os testes
 
 ```bash
 node Evolucao/Testes/rodar.js
 ```
 
-1256 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1283 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -344,8 +381,8 @@ Buscar Caso: sem acento, sem maiúscula, e o documento com ou sem pontuação �
 acha. O "x" do campo limpa a busca na hora, e trocar de canal limpa junto com
 os outros filtros. É uma ida ao servidor por Enter, e não uma por letra.
 
-Depois vem o **período**, nas mesmas três maneiras da Produtividade RECC (ver
-adiante): por dias, por data e por mês. Antes o Trabalho olhava só a janela
+Depois vem o **período**, nas mesmas maneiras da Produtividade RECC (ver
+adiante): **por data** (a abertura) e **por mês**. Antes o Trabalho olhava só a janela
 fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem precisasse
 fechar uma semana ou um mês tinha de exportar e contar fora.
 
@@ -880,7 +917,7 @@ chat; escolhida uma origem, só o total dela.
 | **Atendidos por analista** | uma barra por analista (até 15). Nomes escritos de jeitos diferentes (`diego castilho`, `DIEGO CASTILHO`) viram uma pessoa só, com o nome do cadastro de usuários |
 | **Top 5 corretoras** | quantos atendimentos cada corretora teve. O nome vem do **cadastro de corretoras, pela SUSEP** — a planilha do chat nem precisa trazê-lo, e duas bases que escrevem a mesma corretora de jeitos diferentes viram uma barra só |
 | **Top 5 SUSEPs** | o mesmo, por SUSEP |
-| **Top 5 sucursais** | a **sucursal vem do cadastro de corretoras, pela SUSEP** — nem a Mesa nem o chat têm essa coluna. SUSEP fora do cadastro, ou cadastrada sem sucursal, é contada à parte |
+| **Top 5 sucursais** | no chat, vale a **sucursal que a planilha de origem trouxe** (Etapa 41); sem ela — e sempre nos casos do sistema, que não têm a coluna —, a **do cadastro de corretoras, pela SUSEP**. Sem nenhuma das duas, o atendimento é contado à parte |
 | **Top 5 assuntos** | o mesmo, por assunto |
 | **Top 5 consultores** | o consultor também vem do cadastro de corretoras, pela SUSEP |
 | **Vida individual ou Vida em grupo** | uma rosca, **só na visão Total** (num ramo só seria uma fatia de 100%). `VG`, `vida em grupo`, `VI` e `Vida Individual` valem; outro texto fica como veio |
@@ -902,7 +939,12 @@ PGO, na aba `ATENDIMENTOS_CHAT`, e a Produtividade lê de lá.
 - **O de-para** é o da importação: o sistema sugere qual coluna da origem é cada
   coisa pelo nome do cabeçalho ("Atendente" vira **Analista**), e a pessoa
   confirma. **Data** e **analista** são obrigatórios; SUSEP, corretora, assunto,
-  consultor e vida individual/grupo, opcionais.
+  consultor, vida individual/grupo, **sucursal, tabulação, sub assunto e TMO**
+  (Etapa 41) são opcionais. O que a planilha de origem não trouxer fica **em
+  branco** na aba, para preencher à mão.
+- **O TMO é em segundos.** Vale o número da planilha (1152), o texto com ponto de
+  milhar ("1.152") ou sem ele, e a vírgula decimal ("12,5"). O que não for número
+  ("19 min") entra com o TMO em branco, e a conferência diz quantas linhas são.
 - **A conferência diz antes de gravar** quantas linhas entram, quantas ficam de
   fora (sem data legível ou sem analista, ou já importadas) e **quais analistas o
   cadastro de usuários não conhece** — é a junção por analista que não fechava. O
@@ -938,11 +980,15 @@ fazendo a mesma pergunta.
 
 | Maneira | Para quê |
 |---|---|
-| **Por dias** | "Últimos 30 dias". É o do dia a dia, e continua sendo a abertura |
-| **Por data** | Duas datas, de/até, no calendário do navegador (até hoje). Responde uma pergunta específica: a semana da campanha, os dias da virada |
+| **Por data** | Duas datas, de/até, no calendário do navegador (até hoje). **É a abertura**: as caixas já vêm com os últimos 30 dias (`OPERACAO.JANELA_DIAS`), e a pessoa ajusta uma ponta. Responde também uma pergunta específica: a semana da campanha, os dias da virada |
 | **Por mês** | "Setembro de 2026". É como a operação REPORTA — e é diferente de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias pegam metade de setembro e metade de outubro, e nenhum fechamento se faz assim |
 
-Quem resolve as três é o **servidor**. Se a tela calculasse as datas, o dia do
+O **"Por dias"** ("Últimos 7, 15, 30… dias") saiu na Etapa 43, pedido do PO: "nos
+filtros tire os de dias e deixe apenas por data e por mês. Por padrão vem o por
+data". O servidor ainda entende o formato antigo, para uma página aberta antes da
+atualização não quebrar — e ela aparece como "Por data".
+
+Quem resolve as maneiras é o **servidor**. Se a tela calculasse as datas, o dia do
 gráfico sairia do relógio de quem está olhando e o dia da conta sairia do
 relógio da planilha — num fechamento de mês, essa diferença é um dia inteiro de
 casos.
@@ -1419,7 +1465,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1256 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1283 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

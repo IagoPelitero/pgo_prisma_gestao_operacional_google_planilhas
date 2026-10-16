@@ -484,8 +484,7 @@ function rodarTestesDaProdutividade() {
     // Endereço guardado, clique repetido, data digitada pela metade. Uma tela
     // de número que mostra erro em vez de número é uma tela que ninguém abre
     // de novo.
-    [{ tipo: 'intervalo', de: '', ate: '' },
-     { tipo: 'intervalo', de: 'qualquer coisa', ate: diasAtras(1) },
+    [{ tipo: 'intervalo', de: 'qualquer coisa', ate: diasAtras(1) },
      { tipo: 'mes', mes: '2026-13' },
      { tipo: 'mes', mes: 'setembro' },
      { tipo: 'sei-la' },
@@ -495,6 +494,18 @@ function rodarTestesDaProdutividade() {
         'caiu em ' + painel.periodo.tipo + ' com ' + JSON.stringify(pedido));
       igual(painel.periodo.dias, 30);
     });
+  });
+
+  teste('"Por data" sem as datas é a abertura: a janela da configuração, já como datas', () => {
+    // Etapa 43: a tela abre em "Por data" e manda o intervalo vazio.
+    const painel = chamar('produtividadeDaEquipe')(ret.id, {}, { tipo: 'intervalo', de: '', ate: '' });
+    igual(painel.periodo.tipo, 'intervalo');
+    igual(painel.periodo.dias, 30, 'os mesmos 30 dias de antes');
+    verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(painel.periodo.de), 'de: ' + painel.periodo.de);
+    verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(painel.periodo.ate), 'até: ' + painel.periodo.ate);
+    const antes = chamar('produtividadeDaEquipe')(ret.id, {}, { tipo: 'dias', dias: 30 });
+    igual(painel.periodo.de + '|' + painel.periodo.ate, antes.periodo.de + '|' + antes.periodo.ate,
+      'as mesmas datas que "últimos 30 dias" dava');
   });
 
   teste('caso sem data fica no atalho e sai do período fechado', () => {

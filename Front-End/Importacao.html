@@ -124,8 +124,9 @@ var TelaImportacao = (function () {
           + 'Rode atualizarPGO() no editor do Apps Script antes de importar.</p>' : '')
       + (ehChat()
         ? '<p class="config-dica">Uma linha por atendimento. São obrigatórias a <strong>data'
-          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor e '
-          + 'vida individual ou em grupo são opcionais. A linha igual a uma que já entrou é '
+          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor, '
+          + 'vida individual ou em grupo, sucursal, tabulação, sub assunto e TMO (em segundos, '
+          + 'como 1.152) são opcionais — o que a origem não trouxer fica em branco. A linha igual a uma que já entrou é '
           + 'pulada — importar a mesma planilha de novo não conta em dobro.</p>' : '')
       + '<div class="config-abas">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
@@ -318,6 +319,10 @@ var TelaImportacao = (function () {
       + (laudo.semDataOuAnalista
         ? '<p class="config-dica">' + laudo.semDataOuAnalista + ' linha(s) sem data ou sem '
           + 'analista ficam de fora.</p>' : '')
+      + (laudo.tmoQueNaoENumero
+        ? '<p class="config-dica aviso-de-carimbo">' + laudo.tmoQueNaoENumero + ' linha(s) '
+          + 'com um TMO que não é número (em segundos, como 1.152). Elas entram, com o TMO em '
+          + 'branco para você preencher.</p>' : '')
       + '<h4 class="importacao-titulo">Como se chama o lote</h4>'
       + '<div class="grade">' + caixaDoNomeDoLote('Chat de outubro') + '</div>';
   }

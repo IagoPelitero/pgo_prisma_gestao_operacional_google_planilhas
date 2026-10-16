@@ -1737,20 +1737,28 @@ function rodarTestesDeCadastro() {
     contem(peca, "' class=\"filtro\" max=\"' + hojeNoCalendario() + '\"'");
   });
 
-  teste('voltar para "Por dias" não carrega os dias do intervalo escondidos', () => {
-    /*
-     * Achado da varredura: de "Por data" (01/01 a hoje, 279 dias) de volta
-     * para "Por dias", a caixa mostrava "Últimos 7 dias" — 279 não é uma das
-     * opções — e a conta continuava somando os 279.
-     */
+  teste('o período tem só "Por data" e "Por mês", e abre em "Por data" (Etapa 43)', () => {
+    // Pedido do PO: "nos filtros tire os de dias e deixe apenas por data e por
+    // mês. Por padrão vem o por data".
+    const periodo = pecaRodando('SeletorDePeriodo').SeletorDePeriodo;
+    igual(periodo.padrao().tipo, 'intervalo');
+    const html = periodo.desenhar({ periodo: { tipo: 'intervalo', de: '01/10/2026', ate: '15/10/2026' } });
+    contem(html, '>Por data</option>');
+    contem(html, '>Por mês</option>');
+    verdadeiro(html.indexOf('Por dias') < 0 && html.indexOf('data-periodo="dias"') < 0, 'o "Por dias" saiu');
+    contem(html, 'value="2026-10-01"', 'abre com as datas preenchidas');
+    // Uma página antiga, que ainda mande "dias", aparece como "Por data".
+    const antigo = periodo.desenhar({ periodo: { tipo: 'dias', de: '01/10/2026', ate: '15/10/2026', dias: 15 } });
+    contem(antigo, '<option value="intervalo" selected>Por data</option>');
+  });
+
+  teste('de "Por mês" para "Por data", as datas do mês vêm preenchidas', () => {
     const periodo = pecaRodando('SeletorDePeriodo').SeletorDePeriodo;
     const como = elementoFalso('select', { 'data-periodo': 'como' });
-    como.value = 'dias';
-    igual(periodo.mudou(como, { periodo: { tipo: 'intervalo', dias: 279 } }).dias, 0,
-      'zero: o servidor usa o padrão da configuração');
-    igual(periodo.mudou(como, { periodo: { tipo: 'mes', dias: 31 } }).dias, 0);
-    igual(periodo.mudou(como, { periodo: { tipo: 'mes', dias: 30 } }).dias, 30,
-      'quando os dias são um dos atalhos, eles ficam');
+    como.value = 'intervalo';
+    const novo = periodo.mudou(como, { periodo: { tipo: 'mes', de: '01/09/2026', ate: '30/09/2026', dias: 30 } });
+    igual(novo.tipo, 'intervalo');
+    igual(novo.de + '|' + novo.ate, '01/09/2026|30/09/2026');
   });
 
 

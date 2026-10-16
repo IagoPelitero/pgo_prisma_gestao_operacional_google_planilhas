@@ -1287,6 +1287,10 @@ function atualizarPGO() {
   var feito = [];
   var pulados = [];
   var paraVoce = [];
+  // Algumas migrações escrevem direto na aba (uma coluna inteira, um
+  // cabeçalho). O cache da configuração (Etapa 42) é esquecido no começo e no
+  // fim, para nada do que mudou aqui ficar 5 minutos escondido.
+  esquecerCacheDaConfiguracao_();
 
   // --- 1. as migrações antigas, que são seguras de repetir -----------------
   var deCanais = migrarParaCanais_();
@@ -1428,6 +1432,7 @@ function atualizarPGO() {
       + par[1] + ' Apague a aba quando quiser.');
   });
 
+  esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
   Logger.log(recado);
   return recado;
@@ -2110,6 +2115,9 @@ function criarAAbaDoChat_(pulados, paraVoce) {
     feito.push('aba ATENDIMENTOS_CHAT criada — os atendimentos do chat entram pela Importação');
   } else {
     pulados.push('aba ATENDIMENTOS_CHAT já existe');
+    // Etapa 41: Sucursal, Tabulação, Sub assunto e TMO. Só acrescenta o
+    // cabeçalho que falta; as linhas já importadas ficam com eles em branco.
+    feito = feito.concat(criarColunasDoContrato_('ATENDIMENTOS_CHAT', pulados));
   }
   var antiga = '';
   try { antiga = String(valorDaConfiguracao_('CHAT.PLANILHA_ID', '') || '').trim(); }

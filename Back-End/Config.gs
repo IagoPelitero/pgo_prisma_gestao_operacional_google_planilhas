@@ -3627,4 +3627,17 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   };
 }
 
-
+/**
+ * O botão "Aplicar mudanças da planilha agora", em Configurações › Estrutura.
+ *
+ * A configuração fica guardada por 5 minutos no cache (Etapa 42). Salvar pelas
+ * telas já limpa o cache na hora; quem mexeu DIRETO na planilha — numa aba como
+ * CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES ou PAINEIS — aperta
+ * este botão em vez de esperar.
+ */
+function aplicarMudancasDaPlanilha() {
+  exigirPermissao_(RECC_ACOES.ESTRUTURA);
+  esquecerEstruturaLida_();
+  registrarAuditoria_('cache.limpar', 'CONFIG', '', 'Aplicou as mudanças feitas direto na planilha');
+  return { abas: RECC_ABAS_DO_CACHE.slice(), minutos: RECC_SEGUNDOS_DO_CACHE / 60 };
+}

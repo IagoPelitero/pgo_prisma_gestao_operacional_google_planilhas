@@ -3059,9 +3059,11 @@ var TelaConfiguracoes = (function () {
       + '<ul class="config-itens laudo">' + abas + '</ul>';
 
     elemento('config-lista').innerHTML += desenharDiagnostico()
+      + desenharMudancasDaPlanilha()
       + desenharCadastros() + desenharChat() + desenharArquivoDaAuditoria()
       + desenharLegado();
     ligarDiagnostico();
+    ligarMudancasDaPlanilha();
     ligarCadastros();
     ligarArquivoDaAuditoria();
     ligarLegado();
@@ -3366,6 +3368,42 @@ var TelaConfiguracoes = (function () {
               })
               .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
           });
+        });
+    });
+  }
+
+  /**
+   * "Aplicar mudanças da planilha agora" (Etapa 42). A configuração fica
+   * guardada por 5 minutos para o sistema não reler a planilha a cada clique;
+   * o que se salva por estas telas vale na hora. Quem mexeu DIRETO na planilha
+   * aperta aqui em vez de esperar.
+   */
+  function desenharMudancasDaPlanilha() {
+    return '<div class="config-legado">'
+      + '<h4>Mudou algo direto na planilha?</h4>'
+      + '<p class="config-explica">Para a tela responder rápido, o sistema guarda a '
+      + 'configuração (CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES e '
+      + 'PAINEIS) por até <strong>5 minutos</strong>. O que se salva por estas telas vale '
+      + 'na hora. Se você editou uma dessas abas direto na planilha, aperte o botão para '
+      + 'valer agora — ou espere até 5 minutos.</p>'
+      + '<div class="config-acoes"><button type="button" class="botao vazado" '
+      + 'id="aplicar-mudancas-da-planilha">Aplicar mudanças da planilha agora</button></div>'
+      + '</div>';
+  }
+
+  function ligarMudancasDaPlanilha() {
+    var botao = elemento('aplicar-mudancas-da-planilha');
+    if (!botao) return;
+    botao.addEventListener('click', function () {
+      botao.disabled = true;
+      Servidor.chamar('aplicarMudancasDaPlanilha')
+        .entao(function () {
+          avisarSalvo('Pronto: as mudanças feitas na planilha já valem.');
+          carregarEstrutura();
+        })
+        .senao(function (erro) {
+          botao.disabled = false;
+          avisar(erro.message || String(erro), 'ruim');
         });
     });
   }
