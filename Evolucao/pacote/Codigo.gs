@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-16 16:34
+   Gerado em 2026-10-20 20:21
    ========================================================================== */
 
 
@@ -7179,8 +7179,9 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
 
   var regra = regraDeRepeticao_(canal, pedido.colunaQueIdentifica);
+  var premios = premiosDoDePara_(deParaEscolhido, canal);
   var contagem = contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte,
-    deParaEscolhido, regra);
+    deParaEscolhido, regra, premios);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
@@ -7207,7 +7208,9 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
     // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
-    statusPadrao: statusDoLote_(canal, pedido.statusDoLote)
+    statusPadrao: statusDoLote_(canal, pedido.statusDoLote),
+    premios: premios,
+    dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal)
   };
 }
 
@@ -7296,10 +7299,17 @@ function regraDeRepeticao_(canal, escolha) {
     if (chave) jaDentro[chave] = true;
   }
 
+  var hoje = new Date();
   return {
     partir: partir,
-    colunaDaData: canal.colunaDaData,
-    hoje: new Date(),
+    // Etapa 45, pedido do PO: "ao invés de 30 dias, vamos limitar apenas no
+    // mês vigente da importação". O caso da PLANILHA conta no mês de hoje,
+    // qualquer que seja a data que ele traga; o do PGO, no mês da data de
+    // recepção (ou, sem ela, da importação/cadastro). A mesma proposta que
+    // entrou em setembro e volta em outubro entra de novo.
+    colunaDaData: '',
+    hoje: hoje,
+    mes: RECC_NOMES_DOS_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(),
     jaDentro: jaDentro
   };
 }
@@ -7328,15 +7338,20 @@ function chaveDaPropostaNoMes_(registro, partir, colunaDaData, hoje) {
  * MESMO arquivo — duas linhas iguais no lote também são repetição.
  */
 function ehRepetido_(regra, caso, vistosNestaLeva) {
-  if (!regra) return false;
+  if (!regra) return '';
 
+  // Devolve POR QUE repete (Etapa 45, pedido do PO: "deve ficar claro o porquê
+  // não foram importadas, se é pela planilha importada ou porque já tem no PGO
+  // naquele mês"): 'base' (já está no PGO) ou 'arquivo' (repete na planilha).
+  // Vazio quando não repete — e vazio é falso, para quem só pergunta se repete.
   if (regra.partir) {
     var chaveDoMes = chaveDaPropostaNoMes_(caso, regra.partir, regra.colunaDaData,
       regra.hoje);
-    if (!chaveDoMes) return false;
-    if (regra.jaDentro[chaveDoMes] || vistosNestaLeva[chaveDoMes]) return true;
+    if (!chaveDoMes) return '';
+    if (regra.jaDentro[chaveDoMes]) return 'base';
+    if (vistosNestaLeva[chaveDoMes]) return 'arquivo';
     vistosNestaLeva[chaveDoMes] = true;
-    return false;
+    return '';
   }
 
   var chave = normalizarParaComparar_(caso[regra.coluna]);
@@ -7344,10 +7359,108 @@ function ehRepetido_(regra, caso, vistosNestaLeva) {
   // As duas formas são conferidas porque não sabemos aqui se a coluna é
   // identificador: a base pode ter sido lida com um tipo e a fonte trazer o
   // valor com máscara. Pular por qualquer das duas é o lado seguro.
-  if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])
-    || vistosNestaLeva[chave || soDigitos]) return true;
+  if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])) return 'base';
+  if (vistosNestaLeva[chave || soDigitos]) return 'arquivo';
   vistosNestaLeva[chave || soDigitos] = true;
-  return false;
+  return '';
+}
+
+/** Como a proposta (ou o valor da coluna) repetida aparece na lista do laudo. */
+function comoMostrarORepetido_(regra, caso) {
+  if (regra.partir) {
+    return regra.partir.colunas.map(function (cabecalho) {
+      return converterParaIdentificador_(caso[cabecalho]);
+    }).join('-');
+  }
+  return String(caso[regra.coluna] === undefined ? '' : caso[regra.coluna]).trim();
+}
+
+/** Quantas propostas repetidas o laudo lista, em cada motivo. */
+const RECC_REPETIDOS_LISTADOS = 50;
+
+/** Os motivos para pular, com a lista do que repetiu. */
+function novosMotivosParaPular_(regra) {
+  return { vazia: 0, repetida: 0, repetidaNoArquivo: 0, jaNoPgo: 0,
+    listaNoArquivo: [], listaNoPgo: [], mes: regra && regra.mes ? regra.mes : '',
+    pelaProposta: !!(regra && regra.partir) };
+}
+
+function anotarORepetido_(motivos, regra, caso, porque) {
+  motivos.repetida++;
+  var mostrar = comoMostrarORepetido_(regra, caso);
+  if (porque === 'base') {
+    motivos.jaNoPgo++;
+    if (motivos.listaNoPgo.length < RECC_REPETIDOS_LISTADOS) motivos.listaNoPgo.push(mostrar);
+  } else {
+    motivos.repetidaNoArquivo++;
+    if (motivos.listaNoArquivo.length < RECC_REPETIDOS_LISTADOS) motivos.listaNoArquivo.push(mostrar);
+  }
+}
+
+/**
+ * A data de recepção dos casos importados (Etapa 45, pedido do PO): "muitas
+ * bases não têm uma data de recepção, e podemos escolher que venha com a data
+ * de hoje ou deixar a da planilha".
+ *   'hoje'     — a data de hoje em TODOS os casos (a da planilha é ignorada);
+ *   'planilha' — a da planilha; o caso que veio sem data fica com a de hoje.
+ * Sem escolha (página antiga), nada muda. Só vale para o canal que oferece a
+ * escolha — a RET (ver `dataDeRecepcaoNaImportacao_`).
+ */
+function aplicarDataDeRecepcao_(caso, canal, escolha, agora) {
+  var coluna = dataDeRecepcaoNaImportacao_(canal);
+  if (!coluna) return;
+  var qual = normalizarParaComparar_(escolha);
+  if (qual === 'hoje') { caso[coluna] = agora; return; }
+  if (qual === 'planilha' && String(caso[coluna] === undefined || caso[coluna] === null
+    ? '' : caso[coluna]).trim() === '') {
+    caso[coluna] = agora;
+  }
+}
+
+/** A coluna da data de recepção que a importação deixa escolher — só no canal com proposta (a RET). */
+function dataDeRecepcaoNaImportacao_(canal) {
+  if (!canal.colunaDaData || !partirDaPropostaDoCanal_(canal)) return '';
+  var estrutura = estruturaDaAba_(canal.aba);
+  return posicaoDaColuna_(estrutura, canal.colunaDaData) >= 0
+    ? grafiaDaColuna_(canal.aba, canal.colunaDaData) : '';
+}
+
+/**
+ * O prêmio que está sendo importado (Etapa 45, pedido do PO): "quando vamos
+ * tombar casos sempre colocamos prêmio mensal ou anual — mostre o valor que
+ * está sendo importado, se tiver uma coluna ou ambas". O anual é a coluna
+ * "valor do prêmio"; o mensal, "prêmio mensal". Só entra o que o de-para
+ * ligou, e só dos casos que vão entrar.
+ */
+const RECC_PREMIOS_DA_IMPORTACAO = [
+  { rotulo: 'Prêmio anual', coluna: 'valor do prêmio' },
+  { rotulo: 'Prêmio mensal', coluna: 'prêmio mensal' }
+];
+
+function somarPremios_(premios, caso) {
+  premios.forEach(function (premio) {
+    var bruto = caso[premio.coluna];
+    if (bruto === undefined || bruto === null || String(bruto).trim() === '') return;
+    var numero = converterParaNumero_(bruto);
+    if (numero === '' || numero === null || isNaN(numero)) return;
+    premio.total += Number(numero);
+    premio.casos++;
+  });
+}
+
+/** Os prêmios que o de-para leva para alguma coluna, zerados para somar. */
+function premiosDoDePara_(dePara, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var destinos = {};
+  (dePara || []).forEach(function (par) {
+    if (par && par.paraAColuna) destinos[normalizarParaComparar_(par.paraAColuna)] = true;
+  });
+  return RECC_PREMIOS_DA_IMPORTACAO.filter(function (premio) {
+    return posicaoDaColuna_(estrutura, premio.coluna) >= 0
+      && destinos[normalizarParaComparar_(premio.coluna)];
+  }).map(function (premio) {
+    return { rotulo: premio.rotulo, coluna: premio.coluna, total: 0, casos: 0 };
+  });
 }
 
 /**
@@ -7389,8 +7502,8 @@ function jaEstaNaBase_(canal, cabecalho) {
  * outra, o laudo prometeria um número e a base receberia outro — e ninguém
  * descobre isso olhando a tela.
  */
-function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra) {
-  var motivos = { vazia: 0, repetida: 0 };
+function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra, premios) {
+  var motivos = novosMotivosParaPular_(regra);
   var amostra = [];
   var entram = 0;
   var vistosNestaLeva = {};
@@ -7400,12 +7513,14 @@ function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra) {
 
     if (!temAlgumValor_(caso)) { motivos.vazia++; continue; }
 
-    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
-      motivos.repetida++;
+    var porque = ehRepetido_(regra, caso, vistosNestaLeva);
+    if (porque) {
+      anotarORepetido_(motivos, regra, caso, porque);
       continue;
     }
 
     entram++;
+    if (premios) somarPremios_(premios, caso);
     if (amostra.length < RECC_LINHAS_DE_AMOSTRA) amostra.push(caso);
   }
 
@@ -7655,7 +7770,8 @@ function importarCasos(idDoCanal, pedido) {
   var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
 
   var paraGravar = [];
-  var pulados = { vazia: 0, repetida: 0 };
+  var pulados = novosMotivosParaPular_(regra);
+  var premios = premiosDoDePara_(dePara, canal);
   var vistosNestaLeva = {};
 
   for (var i = 0; i < corpo.length; i++) {
@@ -7664,10 +7780,13 @@ function importarCasos(idDoCanal, pedido) {
 
     // ANTES da divisão: o repetido não chega a analista nenhum. Era o que o
     // PO viu acontecer — a mesma proposta indo para duas pessoas.
-    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
-      pulados.repetida++;
+    var porque = ehRepetido_(regra, caso, vistosNestaLeva);
+    if (porque) {
+      anotarORepetido_(pulados, regra, caso, porque);
       continue;
     }
+    somarPremios_(premios, caso);
+    aplicarDataDeRecepcao_(caso, canal, pedido.dataDeRecepcao, agora);
 
     if (colunaDoAnalista && analistas.length && !caso[colunaDoAnalista]) {
       // Rodízio pelo número de casos JÁ MONTADOS, e não pelo índice da linha
@@ -7685,8 +7804,9 @@ function importarCasos(idDoCanal, pedido) {
   }
 
   if (!paraGravar.length) {
-    throw new Error('Nenhuma linha entraria: ' + pulados.vazia + ' em branco e '
-      + pulados.repetida + ' já estão na base. Nada foi gravado.');
+    throw new Error('Nenhuma linha entraria: ' + pulados.vazia + ' em branco, '
+      + pulados.jaNoPgo + ' já estão no PGO' + (pulados.mes ? ' em ' + pulados.mes : '')
+      + ' e ' + pulados.repetidaNoArquivo + ' repetidas na própria planilha. Nada foi gravado.');
   }
 
   // _Origem = PLANILHA porque o dado veio de FORA, e não da tela do PGO. É o
@@ -7704,6 +7824,7 @@ function importarCasos(idDoCanal, pedido) {
     origem: nomeDoLote,
     entraram: gravados.length,
     pulados: pulados,
+    premios: premios,
     analistas: analistas,
     primeiroId: gravados.length ? gravados[0].__id : '',
     ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
@@ -7895,6 +8016,9 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
     // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.
     repeticaoPelaProposta: repeticaoPelaProposta,
+    // Etapa 45: a escolha da data de recepção (hoje / da planilha) — só no
+    // canal com proposta, a RET. Vazio: a tela não mostra a escolha.
+    dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
 }
@@ -8643,6 +8767,9 @@ function salvarItemDoCatalogo(dados) {
       }
     }
     atualizarRegistro_('CATALOGO', id, campos);
+    if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
+      renomearNosCartoes_(atual.Nome, nome, tipo, campos.CanalId);
+    }
     registrarAuditoria_('catalogo.editar', 'CATALOGO', id, tipo);
     return id;
   }
@@ -8650,6 +8777,38 @@ function salvarItemDoCatalogo(dados) {
   var criado = inserirRegistro_('CATALOGO', campos);
   registrarAuditoria_('catalogo.criar', 'CATALOGO', criado.__id, tipo);
   return criado.__id;
+}
+
+/**
+ * O item renomeado leva junto os cartões que o contavam (Etapa 44).
+ *
+ * Relato do PO: os cards "não funcionam" e "ficam presos". A causa: o status
+ * renomeado em Ajustes Gerais deixava o cartão apontando para o nome antigo —
+ * contava zero, filtrava a fila para vazio e travava o salvar dos cartões.
+ * Vale para o cartão de status e para o de valor de um campo cuja lista é a do
+ * item renomeado.
+ */
+function renomearNosCartoes_(antigo, novo, tipo, canalDoItem) {
+  var velho = normalizarParaComparar_(antigo);
+  var doItem = converterParaIdentificador_(canalDoItem);
+  var listaDaColuna = {};
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    var catalogo = String(lerConfiguracaoDoCampo_(campo).catalogo || '').toUpperCase();
+    if (!catalogo) return;
+    listaDaColuna[converterParaIdentificador_(campo.CanalId) + '|'
+      + normalizarParaComparar_(campo.Cabecalho)] = catalogo;
+  });
+  lerRegistros_('PAINEIS').forEach(function (linha) {
+    if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return;
+    if (normalizarParaComparar_(linha.Filtro) !== velho) return;
+    var canal = converterParaIdentificador_(linha.CanalId);
+    if (doItem && canal !== doItem) return;
+    var dimensao = dimensaoDoCartao_(linha.CampoDimensao);
+    var dele = (dimensao === 'situacao' && tipo === 'STATUS')
+      || (dimensao === 'valor'
+        && listaDaColuna[canal + '|' + normalizarParaComparar_(linha.CampoMedida)] === tipo);
+    if (dele) atualizarRegistro_('PAINEIS', linha.__id, { Filtro: novo });
+  });
 }
 
 /** Algum campo do formulário usa esta lista? É o que faz um item dela carimbar. */
@@ -9851,7 +10010,7 @@ function listarCardsDoPainel(tela, idDoCanal) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
     })
     .map(function (linha) {
-      return {
+      var cartao = {
         id: linha.__id,
         titulo: String(linha.Titulo || ''),
         dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
@@ -9861,6 +10020,11 @@ function listarCardsDoPainel(tela, idDoCanal) {
         ordem: Number(linha.Ordem) || 0,
         mostrar: normalizarParaComparar_(linha.Ativo) === 'sim'
       };
+      // Etapa 44: o cartão que aponta para um status ou coluna que NÃO EXISTE
+      // MAIS vem marcado — a tela mostra o motivo, para trocar ou remover. Antes
+      // ele travava o salvar da lista inteira, e nenhum cartão saía mais.
+      cartao.naoExiste = motivoDoCartaoQueNaoExiste_(cartao, canal, estruturaDaBase);
+      return cartao;
     });
 
   return {
@@ -9872,6 +10036,28 @@ function listarCardsDoPainel(tela, idDoCanal) {
     oQueContar: oQueContar,
     cartoes: cartoes
   };
+}
+
+/**
+ * Por que este cartão não conta mais nada — ou vazio, quando está tudo certo.
+ * Acontece quando o status é renomeado ou apagado em Ajustes Gerais, ou a
+ * coluna some da planilha.
+ */
+function motivoDoCartaoQueNaoExiste_(cartao, canal, estrutura) {
+  if (cartao.dimensao === 'situacao') {
+    var existe = situacoesDoCanal_(canal).some(function (situacao) {
+      return normalizarParaComparar_(situacao.gravadoComo) === normalizarParaComparar_(cartao.filtro);
+    });
+    return existe ? '' : 'O status "' + cartao.filtro + '" não existe mais no canal. Troque o '
+      + 'que o cartão conta, ou remova o cartão.';
+  }
+  var coluna = cartao.dimensao === 'valor' ? cartao.coluna
+    : (cartao.dimensao === 'preenchido' ? cartao.filtro : '');
+  if (coluna && posicaoDaColuna_(estrutura, coluna) < 0) {
+    return 'A coluna "' + coluna + '" não existe mais na aba ' + canal.aba + '. Troque o que o '
+      + 'cartão conta, ou remova o cartão.';
+  }
+  return '';
 }
 
 /** Tipos de coluna que são data ou hora: ficam de fora dos cartões por coluna. */
@@ -9982,6 +10168,24 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     return s.gravadoComo;
   });
 
+  // O que já está gravado, por Id. A conferência abaixo vale para o cartão
+  // NOVO ou MUDADO: um cartão antigo que aponta para um status renomeado não
+  // pode impedir de salvar a lista — nem de removê-lo (Etapa 44, o "card
+  // preso" do PO). Ele segue gravado e aparece marcado na tela.
+  var comoEstava = {};
+  lerRegistros_('PAINEIS').forEach(function (linha) {
+    comoEstava[converterParaIdentificador_(linha.__id)] = [
+      normalizarParaComparar_(dimensaoDoCartao_(linha.CampoDimensao)),
+      normalizarParaComparar_(linha.Filtro), normalizarParaComparar_(linha.CampoMedida)].join('|');
+  });
+  function mudou(cartao) {
+    var id = converterParaIdentificador_(cartao.id);
+    if (!id || !comoEstava[id]) return true;
+    return comoEstava[id] !== [normalizarParaComparar_(cartao.dimensao),
+      normalizarParaComparar_(cartao.filtro),
+      normalizarParaComparar_(cartao.dimensao === 'valor' ? cartao.coluna : '')].join('|');
+  }
+
   lista.forEach(function (cartao, posicao) {
     // Card que chega vazio é página antiga ou tela quebrada: recado, e não erro
     // cru do JavaScript (item 96).
@@ -9998,6 +10202,7 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
       throw new Error('Não sei contar isso. As contagens são: total, ' +
         'situacao, naCelula, preenchido e valor.');
     }
+    if (!mudou(cartao)) return;
     if (cartao.dimensao === 'preenchido') {
       // A coluna tem de existir AGORA, e não na hora de desenhar. Guardar um
       // cartão que aponta para coluna inexistente cria um cartão que some da
@@ -13164,7 +13369,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   // da Produtividade RECC, pelo mesmo motivo: num "últimos 30 dias" ela é um
   // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
   // o qual não dá para afirmar que é de setembro.
-  var guardarSemData = (periodo.tipo === 'dias');
+  var guardarSemData = guardaOsSemData_(periodo);
 
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
     guardarSemData);
@@ -13183,6 +13388,10 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var anterioresFiltrados = aplicarBusca_(
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
   var pertoDeVencer = casosPertoDeVencer_(filtrados, canal);
+  // O CARTÃO CLICADO filtra a FILA pelo que ele conta (Etapa 44) — o status, o
+  // valor de uma coluna (o Status proposta), a coluna preenchida. Os cartões
+  // continuam contando sem ele: clicar em "Pendente" não pode zerar os outros.
+  var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
 
   return {
     canal: canal,
@@ -13203,7 +13412,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     // valores; o nome de cada coluna já está em `colunas`, e a tela remonta.
     // `total` continua sendo a fila inteira.
     fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
-      ? filtrados : filtrados.slice(-RECC_FILA_NA_ABERTURA), canal)),
+      ? naFila : naFila.slice(-RECC_FILA_NA_ABERTURA), canal)),
     filaCompacta: true,
     // O aviso de prazo olha a fila INTEIRA — um caso perto de vencer que não
     // está entre os 100 mais recentes é justamente o que mais precisa do aviso.
@@ -13214,7 +13423,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     quantosPertoDeVencer: pertoDeVencer.length,
     mostrarNaFila: { padrao: RECC_CASOS_NA_FILA, opcoes: RECC_OPCOES_DE_CASOS_NA_FILA,
       naAbertura: RECC_FILA_NA_ABERTURA },
-    total: filtrados.length,
+    total: naFila.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
@@ -13329,6 +13538,11 @@ function resolverPeriodo_(pedido, diasPadrao) {
       var janela = periodoPorDias_(padrao);
       return {
         tipo: 'intervalo',
+        // É a ABERTURA: o caso sem data continua aparecendo, como no antigo
+        // "últimos 30 dias" (ver guardaOsSemData_). Etapa 44: sem esta marca, a
+        // troca da abertura para "Por data" escondeu os casos importados sem
+        // data de recepção — e os cartões passaram a contar menos.
+        abertura: true,
         de: janela.de,
         ate: janela.ate,
         dias: janela.dias,
@@ -13356,6 +13570,16 @@ function resolverPeriodo_(pedido, diasPadrao) {
   }
 
   return periodoPorDias_(Number(pedido.dias) || padrao);
+}
+
+/**
+ * O caso SEM data entra neste período? Na abertura da tela (e no antigo "por
+ * dias"), sim: é um caso mal preenchido, e some-lo esconderia justamente quem
+ * precisa de atenção. Num período escolhido de/até ou num mês, não: não dá
+ * para afirmar que ele é desse período.
+ */
+function guardaOsSemData_(periodo) {
+  return periodo.tipo === 'dias' || periodo.abertura === true;
 }
 
 function periodoPorDias_(dias) {
@@ -13474,6 +13698,9 @@ function mesesParaEscolher_() {
  * um campo em seletor, ele vira filtro sozinho; se desligar o campo, o filtro
  * some junto.
  */
+/** Quantas caixas de filtro o Trabalho mostra. Era 4; o PO pediu o Status proposta (Etapa 44). */
+const RECC_FILTROS_NO_TRABALHO = 6;
+
 function filtrosDoCanal_(canal, quem) {
   var disponiveis = [];
 
@@ -13487,16 +13714,32 @@ function filtrosDoCanal_(canal, quem) {
   //
   // A ordem do FORMULÁRIO segue o caminho de quem atende; a ordem dos FILTROS
   // segue o que a operação recorta. Amarrar uma na outra foi o defeito.
+  //
+  // Etapa 44, pedido do PO: o filtro do Status proposta. Logo depois do Status
+  // vêm os campos que APARECEM conforme o status (o Status proposta aparece no
+  // Retido); depois os outros campos de lista. Até 6 caixas.
   var colunaDoStatus = normalizarParaComparar_(canal.colunaDoStatus || '');
-  var campos = camposAtivosDoCanal_(canal.id).slice().sort(function (um, outro) {
-    var umEhStatus = normalizarParaComparar_(um.Cabecalho) === colunaDoStatus;
-    var outroEhStatus = normalizarParaComparar_(outro.Cabecalho) === colunaDoStatus;
-    if (umEhStatus === outroEhStatus) return 0;
-    return umEhStatus ? -1 : 1;
+  var ativos = camposAtivosDoCanal_(canal.id);
+  var chaveDoStatus = '';
+  ativos.forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Cabecalho) === colunaDoStatus) {
+      chaveDoStatus = String(campo.ChaveTecnica);
+    }
   });
+  function prioridade(campo) {
+    if (normalizarParaComparar_(campo.Cabecalho) === colunaDoStatus) return 0;
+    var condicao = lerConfiguracaoDoCampo_(campo).mostrarSe;
+    if (chaveDoStatus && condicao && String(condicao.campo) === chaveDoStatus) return 1;
+    return 2;
+  }
+  var campos = ativos.map(function (campo, ordem) {
+    return { campo: campo, prioridade: prioridade(campo), ordem: ordem };
+  }).sort(function (um, outro) {
+    return um.prioridade - outro.prioridade || um.ordem - outro.ordem;
+  }).map(function (item) { return item.campo; });
 
   campos.forEach(function (campo) {
-    if (disponiveis.length >= 4) return;   // mais que isso vira parede de caixas
+    if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;   // mais vira parede de caixas
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 
@@ -13573,6 +13816,21 @@ function aplicarBusca_(registros, canal, termo) {
     });
   });
   colunasDaBusca_(canal).forEach(guardar);
+  // E TODAS as outras colunas do caso (Etapa 44, pedido do PO): "digitando
+  // 'aguardando transmissão' não acha os casos" — o Status proposta, criado
+  // fora do contrato, não estava na fila nem nas colunas da busca. As técnicas
+  // ("_Visivel"…) ficam de fora.
+  // Nas colunas de IDENTIFICADOR que entram só por esta regra, a busca vale
+  // quando o termo parece um número (CPF, Id, protocolo): elas comparam só os
+  // dígitos, e "Caso número 1" acharia o caso de Id 0000000001.
+  var termoEhNumero = /^[\d\s.\-\/]+$/.test(String(termo).trim());
+  var estrutura = estruturaDaAba_(canal.aba);
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    if (!cabecalho || String(cabecalho).charAt(0) === '_') return;
+    var tipo = estrutura.tipos[posicao];
+    if (tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR && !termoEhNumero) return;
+    guardar({ cabecalho: cabecalho, tipo: tipo });
+  });
 
   return registros.filter(function (registro) {
     return onde.some(function (coluna) {
@@ -13637,9 +13895,26 @@ function contarCartoes_(registros, anteriores, canal, tela) {
   // status filtra. Antes a tela deduzia pela chave, e um cartão "Já passaram
   // por" clicado filtrava a fila por um status com o nome do cartão — fila
   // vazia, sem erro.
+  var existentes = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    existentes[normalizarParaComparar_(situacao.gravadoComo)] = true;
+  });
+
   return cartoesDoCanal_(canal, tela).map(function (cartao) {
+    // O cartão de um status que NÃO EXISTE MAIS (renomeado ou apagado em Ajustes
+    // Gerais) some, em vez de aparecer com zero e parecer um problema da
+    // operação. Em Configurações ele aparece marcado, para trocar ou remover.
+    if (cartao.dimensao === 'situacao' && !existentes[normalizarParaComparar_(cartao.filtro)]) {
+      return null;
+    }
     var feito = umCartao(cartao);
-    if (feito) feito.dimensao = cartao.dimensao;
+    if (feito) {
+      feito.dimensao = cartao.dimensao;
+      // Clicar filtra a fila pelo que o cartão CONTA (Etapa 44). O "Total" é
+      // o desligar; "Finalizados na célula" não é uma regra de linha.
+      feito.id = cartao.id;
+      feito.filtravel = cartao.dimensao !== 'naCelula';
+    }
     return feito;
   }).filter(function (cartao) { return cartao !== null; });
 
@@ -13675,6 +13950,38 @@ function contarCartoes_(registros, anteriores, canal, tela) {
     return montarCartao_(chave, cartao.titulo, agora[chave] || 0,
       antes[chave] || 0, cartao.cor || tons[chave] || 'neutro', '');
   }
+}
+
+/**
+ * Os casos que um cartão conta — para a fila, quando a pessoa clica nele
+ * (Etapa 44). A regra é a MESMA da contagem: o número do cartão e o tamanho da
+ * fila filtrada têm de bater. Cartão que não existe (ou o "Total"): a fila
+ * inteira.
+ */
+function filtrarPeloCartao_(registros, canal, idDoCartao) {
+  var id = converterParaIdentificador_(idDoCartao);
+  if (!id) return registros;
+  var cartao = cartoesDoCanal_(canal, 'trabalho').filter(function (um) {
+    return converterParaIdentificador_(um.id) === id;
+  })[0];
+  if (!cartao || cartao.dimensao === 'total' || cartao.dimensao === 'naCelula') return registros;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var coluna = cartao.dimensao === 'situacao' ? canal.colunaDoStatus
+    : (cartao.dimensao === 'valor' ? cartao.coluna : cartao.filtro);
+  if (!coluna || posicaoDaColuna_(estrutura, coluna) < 0) return [];
+  coluna = grafiaDaColuna_(canal.aba, coluna);
+
+  if (cartao.dimensao === 'preenchido') {
+    return registros.filter(function (registro) {
+      return String(registro[coluna] === null || registro[coluna] === undefined
+        ? '' : registro[coluna]).trim() !== '';
+    });
+  }
+  var procurado = normalizarParaComparar_(cartao.filtro);
+  return registros.filter(function (registro) {
+    return normalizarParaComparar_(registro[coluna]) === procurado;
+  });
 }
 
 /**
@@ -14793,6 +15100,141 @@ const RECC_AGREGACOES = {
 const RECC_MAXIMO_DE_FATIAS = 6;
 
 /**
+ * As três colunas de prêmio da RET (Etapa 46): anual = "valor do prêmio",
+ * mensal = "prêmio mensal", retido = "valor do prêmio retido". `null` quando o
+ * canal não tem as três — e aí nada disto aparece (hoje, só a RET tem).
+ */
+function colunasDosPremios_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achar = function (nome) {
+    var posicao = posicaoDaColuna_(estrutura, nome);
+    return posicao < 0 ? '' : estrutura.cabecalhos[posicao];
+  };
+  var colunas = { anual: achar('valor do prêmio'), mensal: achar('prêmio mensal'),
+    retido: achar('valor do prêmio retido') };
+  return colunas.anual && colunas.mensal && colunas.retido ? colunas : null;
+}
+
+function somaDaColuna_(casos, coluna) {
+  return casos.reduce(function (soma, caso) {
+    var numero = converterParaNumero_(caso[coluna]);
+    return soma + (numero === '' || numero === null || isNaN(numero) ? 0 : Number(numero));
+  }, 0);
+}
+
+/** "Prêmios: anual, mensal e retido" — três barras, a soma de cada coluna nos casos da tela. */
+function graficoDosPremios_(casos, colunas) {
+  var pontos = [['anual', 'Prêmio anual', colunas.anual], ['mensal', 'Prêmio mensal', colunas.mensal],
+    ['retido', 'Prêmio retido', colunas.retido]].map(function (par) {
+    var comValor = casos.filter(function (caso) {
+      var numero = converterParaNumero_(caso[par[2]]);
+      return numero !== '' && numero !== null && !isNaN(numero) && Number(numero) !== 0;
+    }).length;
+    return { chave: par[0], rotulo: par[1], valor: somaDaColuna_(casos, par[2]), casos: comValor,
+      ehOutros: false, tom: par[0] === 'retido' ? 'bom' : '', serie: 0 };
+  });
+  return {
+    titulo: 'Prêmios: anual, mensal e retido',
+    tipo: 'barras',
+    largura: 2,
+    dimensao: 'Prêmio',
+    medida: 'Valor',
+    agregacao: 'soma',
+    unidade: 'dinheiro',
+    ehTempo: false,
+    pontos: pontos,
+    tendencia: null,
+    // Somar anual, mensal e retido não dá um número que signifique alguma coisa.
+    total: null,
+    aviso: ''
+  };
+}
+
+/**
+ * O valor embaixo de cada cartão de status (Etapa 46, pedido do PO): "embaixo
+ * de cada status deve ter o valor anual das propostas, sendo apenas o retido
+ * que irá trazer o valor total dos retidos da coluna prêmio retido".
+ */
+function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
+  var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
+  if (!colunaDoStatus) return;
+  var porChave = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    porChave[normalizarParaComparar_(situacao.gravadoComo)] = situacao.gravadoComo;
+  });
+  cartoes.forEach(function (cartao) {
+    if (cartao.dimensao !== 'situacao') return;
+    var doStatus = casos.filter(function (caso) {
+      return normalizarParaComparar_(caso[colunaDoStatus]) === cartao.chave;
+    });
+    var ehRetido = cartao.chave === 'retido';
+    cartao.soma = somaDaColuna_(doStatus, ehRetido ? colunas.retido : colunas.anual);
+    cartao.rotuloDaSoma = ehRetido ? 'prêmio retido' : 'prêmio anual';
+  });
+}
+
+/**
+ * A produtividade de cada analista, uma linha por pessoa (Etapa 46, pedido do
+ * PO: "por último a produtividade por analista mostrando tudo
+ * individualmente"): o total, quantos em cada status e os três prêmios.
+ */
+function quadroPorAnalista_(casos, canal, colunas) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+  var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
+  var status = situacoesDoCanal_(canal).map(function (situacao) {
+    return { chave: normalizarParaComparar_(situacao.gravadoComo), nome: situacao.nome };
+  });
+  var porAnalista = {};
+  var ordem = [];
+  casos.forEach(function (caso) {
+    var nome = String((colunaDoAnalista ? caso[colunaDoAnalista] : '') || '').trim() || 'Sem analista';
+    var chave = normalizarParaComparar_(nome);
+    if (!porAnalista[chave]) {
+      porAnalista[chave] = { analista: nome, total: 0, porStatus: {}, casos: [] };
+      ordem.push(chave);
+    }
+    var linha = porAnalista[chave];
+    linha.total++;
+    linha.casos.push(caso);
+    var doStatus = colunaDoStatus ? normalizarParaComparar_(caso[colunaDoStatus]) : '';
+    linha.porStatus[doStatus] = (linha.porStatus[doStatus] || 0) + 1;
+  });
+  // Só os status que aparecem em alguém: uma coluna de zeros não diz nada.
+  var usados = status.filter(function (s) {
+    return ordem.some(function (chave) { return porAnalista[chave].porStatus[s.chave]; });
+  });
+  var linhas = ordem.map(function (chave) {
+    var linha = porAnalista[chave];
+    return {
+      analista: linha.analista,
+      total: linha.total,
+      porStatus: usados.map(function (s) { return linha.porStatus[s.chave] || 0; }),
+      anual: somaDaColuna_(linha.casos, colunas.anual),
+      mensal: somaDaColuna_(linha.casos, colunas.mensal),
+      retido: somaDaColuna_(linha.casos, colunas.retido)
+    };
+  }).sort(function (um, outro) {
+    return outro.total - um.total || (um.analista < outro.analista ? -1 : 1);
+  });
+  return {
+    status: usados.map(function (s) { return s.nome; }),
+    linhas: linhas,
+    totais: {
+      total: casos.length,
+      porStatus: usados.map(function (s) {
+        return ordem.reduce(function (soma, chave) {
+          return soma + (porAnalista[chave].porStatus[s.chave] || 0);
+        }, 0);
+      }),
+      anual: somaDaColuna_(casos, colunas.anual),
+      mensal: somaDaColuna_(casos, colunas.mensal),
+      retido: somaDaColuna_(casos, colunas.retido)
+    }
+  };
+}
+
+/**
  * O painel inteiro: todos os gráficos do canal, já calculados.
  *
  * Vem numa chamada só porque a tela abre mostrando todos ao mesmo tempo —
@@ -14811,7 +15253,7 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   // Linha sem data FICA no atalho e SAI dos períodos fechados. Num "últimos 30
   // dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela
   // é um caso sobre o qual não dá para afirmar que é de setembro.
-  var guardarSemData = (periodo.tipo === 'dias');
+  var guardarSemData = guardaOsSemData_(periodo);
 
   var noPeriodo = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
@@ -14829,6 +15271,9 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   var componentes = componentesDoCanal_(canal).map(function (componente) {
     return calcularComponente_(componente, casos, canal);
   });
+  var colunasDosPremios = colunasDosPremios_(canal);
+  var cartoes = contarCartoes_(casos, casosDeAntes, canal, 'produtividade');
+  if (colunasDosPremios) somarPremiosNosCartoes_(cartoes, casos, canal, colunasDosPremios);
 
   return {
     canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
@@ -14846,8 +15291,18 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
     truncada: truncada,
     linhasLidas: recentes.length,
     filtrosDisponiveis: disponiveis,
-    cartoes: contarCartoes_(casos, casosDeAntes, canal, 'produtividade'),
+    cartoes: cartoes,
     componentes: componentes,
+    /*
+      ETAPA 46, pedido do PO (só a RET por enquanto): "o gráfico que mostra o
+      valor do prêmio anual total, mensal e retido deve ser o primeiro", e "por
+      último a produtividade por analista mostrando tudo individualmente". Vêm
+      FORA de `componentes`, como o valor por situação: são do canal (as
+      colunas de prêmio), e não da lista que Configurações edita. `null` no
+      canal que não tem as colunas de prêmio.
+    */
+    premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
+    porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
     /*
       O VALOR POR SITUAÇÃO vem FORA de `componentes`, e de propósito.
       `componentes` é a lista que a tela de Configurações edita — tirar,
@@ -15300,7 +15755,7 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   // a pessoa concluiria, com razão, que um dos dois está errado.
   var meus = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-      periodo.tipo === 'dias'),
+      guardaOsSemData_(periodo)),
     canal, quem);
   var casos = aplicarFiltros_(meus, filtrosDoCanal_(canal, quem), filtros || {});
 
@@ -15609,7 +16064,7 @@ function minhaPerformance(idDoCanal, periodoPedido) {
   // e número incompleto vira julgamento errado sobre alguém.
   var truncada = recentes.length >= linhasQueOPainelOlha_();
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-    periodo.tipo === 'dias');
+    guardaOsSemData_(periodo));
   var anterior = entreDuasDatas_(recentes, canal, antesDele.de, antesDele.ate, false);
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
@@ -18302,6 +18757,9 @@ function atualizarPGO() {
     paraVoce.push('A aba ' + par[0] + ' saiu do sistema e continua aí, intacta. '
       + par[1] + ' Apague a aba quando quiser.');
   });
+
+  // --- Etapa 44: os 4 cards do Trabalho da RET, na ordem do PO -------------
+  feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -21578,4 +22036,81 @@ function laudoEmTexto_(laudo) {
   });
 
   return linhas.join('\n');
+}
+
+/** A marca de que os cards da RET já foram montados — para não desfazer o que o PO mudar depois. */
+const RECC_CHAVE_DOS_CARDS_DA_RET = 'MIGRACAO.CARDS_DA_RET';
+
+/**
+ * Monta os cards do Trabalho da RET na ordem que o PO pediu (Etapa 44): "total
+ * de casos, aguardando transmissão (que vem da coluna Status proposta que
+ * criei depois), pendente, contatando".
+ *
+ * Roda UMA VEZ: depois disso, quem manda nos cards é a tela de Configurações, e
+ * rodar o atualizarPGO de novo não pode desfazer o que o PO arrumou lá. Só mexe
+ * se achar as quatro coisas — o campo Status proposta com "Aguardando
+ * transmissão" e os status Pendente e Contatando. Faltando alguma, não mexe em
+ * nada e diz o que falta: montar pela metade trocaria os cards dele por menos.
+ */
+function montarOsCardsDaRet_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('PAINEIS') || !planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('os cards da RET: as abas ainda não existem');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DOS_CARDS_DA_RET, '') || '').trim()) {
+    pulados.push('os cards da RET já foram montados (agora quem manda é Configurações)');
+    return feito;
+  }
+  var ret = canaisVisiveis_().filter(function (canal) { return canal.aba === 'BASE_RET'; })[0];
+  if (!ret) { pulados.push('o canal BASE_RET não está ligado'); return feito; }
+
+  var faltando = [];
+  var situacoes = situacoesDoCanal_(ret);
+  function status(nome) {
+    var achado = situacoes.filter(function (s) {
+      return normalizarParaComparar_(s.gravadoComo) === normalizarParaComparar_(nome)
+        || normalizarParaComparar_(s.nome) === normalizarParaComparar_(nome);
+    })[0];
+    if (!achado) faltando.push('o status "' + nome + '"');
+    return achado;
+  }
+  var pendente = status('Pendente');
+  var contatando = status('Contatando');
+
+  var aguardando = null;
+  var campo = camposAtivosDoCanal_(ret.id).filter(function (um) {
+    return normalizarParaComparar_(um.Cabecalho) === 'statusproposta';
+  })[0];
+  if (!campo) {
+    faltando.push('o campo "Status proposta"');
+  } else {
+    var opcao = opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), ret.id).filter(function (o) {
+      return normalizarParaComparar_(o.valor) === 'aguardandotransmissao';
+    })[0];
+    if (!opcao) faltando.push('o item "Aguardando transmissão" na lista do Status proposta');
+    else aguardando = { coluna: grafiaDaColuna_(ret.aba, campo.Cabecalho), valor: opcao.valor };
+  }
+
+  if (faltando.length) {
+    paraVoce.push('Os cards do Trabalho da RET NÃO foram montados, porque falta ' + faltando.join(', ')
+      + '. Crie o que falta (ou ajuste o nome) e rode atualizarPGO() de novo — ou monte os '
+      + 'cards em Configurações › Painéis › Cards do Trabalho.');
+    return feito;
+  }
+
+  salvarCardsDoPainel('trabalho', ret.id, [
+    { titulo: 'Total de casos', dimensao: 'total', filtro: '', cor: 'neutro', mostrar: true },
+    { titulo: 'Aguardando transmissão', dimensao: 'valor', coluna: aguardando.coluna,
+      filtro: aguardando.valor, cor: 'atencao', mostrar: true },
+    { titulo: pendente.nome, dimensao: 'situacao', filtro: pendente.gravadoComo,
+      cor: pendente.tom || 'neutro', mostrar: true },
+    { titulo: contatando.nome, dimensao: 'situacao', filtro: contatando.gravadoComo,
+      cor: contatando.tom || 'neutro', mostrar: true }
+  ]);
+  gravarConfiguracao_(RECC_CHAVE_DOS_CARDS_DA_RET, 'Etapa 44 — '
+    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  feito.push('RET: os cards do Trabalho ficaram Total de casos, Aguardando transmissão (do '
+    + 'Status proposta), Pendente e Contatando — os outros foram desligados');
+  return feito;
 }

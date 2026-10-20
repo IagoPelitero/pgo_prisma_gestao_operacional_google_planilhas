@@ -527,6 +527,17 @@ Ler a coluna antes das linhas não é preciosismo: numa base de 200 mil linhas �
 35 colunas, ler tudo são 7 milhões de células e estoura o tempo; ler uma coluna
 são 200 mil, e depois só as linhas que interessam.
 
+A **busca digitada do Trabalho** (`aplicarBusca_`, `Indicadores.gs`) é outra
+coisa: filtra os casos do período que a tela já leu, e por isso não faz ida nova
+à planilha. Desde a Etapa 44 ela olha a fila, as colunas da busca **e todas as
+colunas da aba** (menos as técnicas, com `_`); as de identificador que entram só
+por essa regra valem quando o termo parece número.
+
+O **clique no cartão** (Etapa 44) também é resolvido aqui: `resumoDoCanal` recebe o
+Id do cartão em `filtros.cartao`, e `filtrarPeloCartao_` aplica à fila a mesma
+regra com que `contarCartoes_` contou. Os cartões continuam contando o período
+inteiro; só a fila é recortada.
+
 ---
 
 ## 5. Configurabilidade

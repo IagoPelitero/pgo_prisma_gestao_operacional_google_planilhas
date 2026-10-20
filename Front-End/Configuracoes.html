@@ -2145,7 +2145,7 @@ var TelaConfiguracoes = (function () {
       // A coluna é do card "valor": sem ela na cópia, salvar de novo a lista
       // recusava o card ("precisa da coluna e do valor").
       filtro: card.filtro, coluna: card.coluna || '', cor: card.cor,
-      mostrar: card.mostrar !== false
+      mostrar: card.mostrar !== false, naoExiste: card.naoExiste || ''
     };
   }
 
@@ -2203,6 +2203,8 @@ var TelaConfiguracoes = (function () {
         + '<select data-card="' + posicao + '" data-parte="contar">'
         + opcoesDoQueContar(card) + '</select></label>'
         + '</div>'
+        + (card.naoExiste
+          ? '<p class="config-dica aviso-de-carimbo">' + escapar(card.naoExiste) + '</p>' : '')
         + '<div class="card-linha">'
         + '<label class="config-campo"><span>Cor</span>'
         + '<div class="tira-de-tons">'
@@ -2269,9 +2271,21 @@ var TelaConfiguracoes = (function () {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
+  /*
+   * Etapa 44: o que é da LISTA de cards (remover, cor, as caixas de cada card)
+   * é religado a cada redesenho, porque os elementos são novos. O que é da TELA
+   * (trocar de aba e de canal, + card, descartar, salvar) é ligado UMA vez. Antes
+   * `redesenharCards` religava tudo: cada card removido somava um ouvinte ao
+   * Salvar, e um clique gravava duas, três vezes ao mesmo tempo — card novo
+   * duplicado, e "planilha ocupada" no meio. Era o "card preso" do PO.
+   */
   function ligarPaineis() {
     ligarTrocaDeTelaEDeCanal();
+    ligarListaDeCards();
+    ligarBotoesDosCards();
+  }
 
+  function ligarListaDeCards() {
     ligarCliques('[data-remover-card]', function (botao) {
       cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
       redesenharCards();
@@ -2296,10 +2310,13 @@ var TelaConfiguracoes = (function () {
           card.dimensao = opcao.chave;
           card.filtro = opcao.filtro;
           card.coluna = opcao.coluna || '';
+          card.naoExiste = '';
         }
       });
     }
+  }
 
+  function ligarBotoesDosCards() {
     elemento('add-card').addEventListener('click', function () {
       if (cardsEmEdicao.length >= dados.painel.maximo) {
         return avisar('São no máximo ' + dados.painel.maximo + ' cards por '
@@ -2325,7 +2342,7 @@ var TelaConfiguracoes = (function () {
   /** Redesenha só a lista: a explicação e os botões não mudaram. */
   function redesenharCards() {
     elemento('lista-de-cards').innerHTML = desenharCards();
-    ligarPaineis();
+    ligarListaDeCards();
   }
 
   /* --------------------------------------------------- identidade e senha */

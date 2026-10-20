@@ -38,7 +38,7 @@ const TELAS = telasDoSistema();
  * um elemento clicável — a lista sai do próprio código, não de um chute.
  */
 const CLICAVEIS = [
-  '[data-tela]', '[data-secao]', '[data-canal]', '[data-cartao]',
+  '[data-tela]', '[data-secao]', '[data-canal]', '[data-cartao]', '[data-cartao-da-fila]',
   '[data-corretora]', '[data-produto]', '[data-usuario]', '[data-nivel]',
   '[data-item]', '[data-campo-config]', '[data-analise]',
   '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-aba-corretoras]',

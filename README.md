@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1283 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1328 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -336,7 +336,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1283 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1328 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -361,7 +361,9 @@ a cada mudança.
 
 Cartões e fila saem da **mesma lista**, já filtrada pelo alcance do nível — por
 isso o número do cartão sempre bate com o que a fila mostra. Os filtros são os
-campos que já são lista: nada escrito em código.
+campos que já são lista: nada escrito em código. São **até 6**, e o **Status vem
+primeiro**; logo depois, os campos que dependem do status — na RET, o **Status
+proposta**, que a operação criou fora do contrato (Etapa 44, pedido do PO).
 
 ![O Trabalho](Evolucao/imagens/tela-trabalho.png)
 
@@ -374,9 +376,13 @@ ligado, a tela com três casos, e ninguém entendendo por quê.
 
 O primeiro filtro é a **busca digitada**, do canal escolhido — pedido do PO.
 Digite e aperte **Enter**: a fila e os cartões passam a contar só os casos em
-que o termo aparece. Procura nas colunas que a fila mostra e nas **colunas da
-busca** do canal (Configurações › Canais de trabalho), do mesmo jeito do
-Buscar Caso: sem acento, sem maiúscula, e o documento com ou sem pontuação —
+que o termo aparece. Procura nas colunas que a fila mostra, nas **colunas da
+busca** do canal (Configurações › Canais de trabalho) e, desde a Etapa 44, em
+**todas as outras colunas do caso** — inclusive as criadas direto na planilha,
+como o Status proposta: "aguardando transmissão" acha os casos. Nas colunas de
+identificador (CPF, Id, protocolo) que entram só por essa regra, a busca vale
+quando o termo parece número — senão "caso número 1" acharia o caso de Id
+`0000000001`. Do mesmo jeito do Buscar Caso: sem acento, sem maiúscula, e o documento com ou sem pontuação —
 `123.456.789-01` acha `12345678901`. A proposta inteira (`7-0000123`) também
 acha. O "x" do campo limpa a busca na hora, e trocar de canal limpa junto com
 os outros filtros. É uma ida ao servidor por Enter, e não uma por letra.
@@ -436,6 +442,35 @@ estava montado abre igual. O destaque não quebra linha, para dar para
 varrer com o olho: título de e-mail longo aparece com "…". **Passar o cursor
 por cima mostra o texto inteiro**, com o nome da coluna — a pedido do PO, e
 igual nas três filas: Trabalho, Busca e o detalhamento da Produtividade RECC.
+
+### Os cartões do Trabalho: clicar filtra
+
+**Clicar num cartão mostra na fila exatamente os casos que ele conta**, de
+qualquer tipo — status, valor de um campo ("Aguardando transmissão", do Status
+proposta), "preenchida: X". Clicar de novo, ou no **Total**, volta a mostrar
+tudo. O cartão ligado fica marcado, e os outros cartões continuam contando o
+período inteiro: eles dizem o tamanho de cada pedaço, e a fila mostra o pedaço
+escolhido. O único que não filtra é "finalizados na célula", que é conta e não
+coluna — passar o cursor num cartão que filtra mostra "Filtrar a fila por…". Quem resolve é o servidor, pelo
+**Id** do cartão: antes a tela mandava o título, e só o cartão de status filtrava.
+
+**O cartão que perdeu o status não trava mais nada** (Etapa 44, achado 100). Se
+um status muda de nome em Ajustes Gerais, os cartões que contavam esse status
+**mudam junto** — e os de valor também, quando o item renomeado é da lista do
+campo. Um cartão que ainda aponta para um status que não existe:
+
+- **some do Trabalho**, em vez de mostrar zero e esvaziar a fila ao ser clicado;
+- aparece **marcado em Configurações › Painéis**, dizendo o que sumiu, para ser
+  trocado ou removido;
+- **não impede de salvar** os outros: só o cartão novo ou alterado é conferido.
+
+**Os 4 cartões da RET.** O `atualizarPGO()` monta, **uma vez só**, os cartões do
+Trabalho da RET na ordem pedida pelo PO: **Total de casos, Aguardando
+transmissão** (do Status proposta), **Pendente** e **Contatando**; os outros
+saem. Ele só monta se o status Contatando, o campo Status proposta e o item
+"Aguardando transmissão" existirem — faltando algum, não muda nada e o resultado
+diz o que falta. Depois disso, quem manda é Configurações (a marca
+`MIGRACAO.CARDS_DA_RET`, na `CONFIG`, impede que ele monte de novo).
 
 ### O SLA da Mesa Diamante
 
@@ -873,6 +908,28 @@ resposta.
 E **quais** canais aparecem continua sendo a lista de canais do nível: quem abre
 só a RET e tem "o canal inteiro" vê a RET inteira, não a Mesa Diamante.
 
+### A RET: os prêmios primeiro, a equipe por último
+
+Pedido do PO para a Produtividade da RET (Etapa 46; os outros canais seguem como
+estavam):
+
+1. **Os cartões**, e **embaixo de cada status, a soma do prêmio anual** dos casos
+   dele — "R$ 2.400,00 de prêmio anual". No **Retido**, a soma é a do **prêmio
+   retido** (`valor do prêmio retido`), o que de fato ficou.
+2. **O gráfico dos prêmios**, logo depois dos cartões: três barras — **prêmio
+   anual** (`valor do prêmio`), **prêmio mensal** (`prêmio mensal`) e **prêmio
+   retido** —, com a soma de cada um e de quantos casos ela vem. Não há "total":
+   anual mais mensal mais retido não é uma conta que exista.
+3. O resto da tela, como era — menos o gráfico **"Valor por situação"** (Retido,
+   Não retido, Sem sucesso de contato…), que saiu a pedido do PO: "já virá abaixo
+   dos cards". Canal sem os prêmios continua com ele.
+4. **Por último, um quadro por analista**: uma linha por pessoa, com o total de
+   casos, quantos em cada status (só os status que aparecem) e os três prêmios, e a
+   linha de total embaixo. Caso sem analista entra como "Sem analista".
+
+Tudo obedece aos filtros e ao período da tela. Canal sem as três colunas de prêmio
+não ganha nem o gráfico nem o quadro.
+
 ### Coluna que você criou, fora do contrato
 
 O laudo da planilha (Configurações › Estrutura e `diagnosticoRECC`) separa duas
@@ -987,6 +1044,11 @@ O **"Por dias"** ("Últimos 7, 15, 30… dias") saiu na Etapa 43, pedido do PO: 
 filtros tire os de dias e deixe apenas por data e por mês. Por padrão vem o por
 data". O servidor ainda entende o formato antigo, para uma página aberta antes da
 atualização não quebrar — e ela aparece como "Por data".
+
+Na **abertura** (o "Por data" com as datas que a tela já trouxe), os casos **sem
+data de recepção** continuam aparecendo, como no "Por dias" de antes — a Etapa 43
+os tinha escondido sem querer, e a Etapa 44 devolveu (achado 103). Escolhidas outras
+datas, ou um mês, vale só quem tem data dentro.
 
 Quem resolve as maneiras é o **servidor**. Se a tela calculasse as datas, o dia do
 gráfico sairia do relógio de quem está olhando e o dia da conta sairia do
@@ -1185,12 +1247,38 @@ marcada em "Não repetir o que já entrou":
   ocupa a vez de ninguém na divisão.
 - **Outro mês é pedido novo**, e entra — a mesma regra do selo do cadastro.
   `7-0000123` e `8-0000123` são propostas diferentes.
-- O mês é o da **data de recepção do protocolo**. Caso sem essa data conta
-  pelo mês em que foi importado — senão a segunda leva do mês passaria.
-- O laudo diz quantas foram puladas, e o número que ele promete é o que a
-  gravação faz.
+- **O mês é o da importação** (Etapa 45, pedido do PO: "ao invés de 30 dias
+  vamos limitar apenas no mês vigente da importação"). Importando em outubro,
+  toda proposta do arquivo é conferida contra os casos de **outubro** no PGO —
+  pela data de recepção do protocolo; o caso sem ela, pela data em que entrou —
+  e contra as outras linhas do próprio arquivo.
+- **O laudo diz o porquê, separado**: quantas "**já estão no PGO em outubro de
+  2026**" e quantas "**se repetem na própria planilha** (entra só a primeira)",
+  com as propostas de cada motivo (até 50 de cada). O número que ele promete é o
+  que a gravação faz; quando nada entraria, o recado separa os dois motivos.
 - **Dá para desmarcar** ("trazer tudo") ou trocar por uma coluna. Canal sem
   proposta em pedaços (a Mesa, o VG) não tem a opção.
+
+### A data de recepção do protocolo
+
+Muitas bases chegam **sem data de recepção**. Na Importação da RET, o passo de
+conferir pergunta **"Data de recepção do protocolo"** (Etapa 45):
+
+| Escolha | O que acontece |
+|---|---|
+| **A da planilha** *(o padrão)* | Quem trouxe data fica com a dela; quem veio **sem**, fica com a de **hoje** |
+| **A data de hoje, para todos os casos** | A data da planilha é ignorada |
+
+Só a RET tem a pergunta — é o canal com a proposta no mês. A Mesa e o VG seguem
+como estavam.
+
+### O prêmio que está sendo importado
+
+Quando o de-para liga a coluna do **prêmio anual** (`valor do prêmio`) ou do
+**prêmio mensal** — uma, outra ou as duas —, a conferência mostra, em reais, **a
+soma de cada uma nos casos que vão entrar** e de quantos casos ela vem ("Prêmio
+anual importado"). A linha que vai ser pulada por repetida não soma, e quem veio
+sem valor não conta. O resultado da importação repete os números do que entrou.
 
 ### Quem entra na divisão de um lote
 
@@ -1405,7 +1493,10 @@ Um cartão conta de seis maneiras: o **total**, uma **situação**, os
 lê a coluna de carimbo, e por isso não zera quando o caso avança —, **o valor de
 um campo** de lista ou Sim/Não ("Tentativa: 1ª tentativa de contato sem sucesso")
 e **"Preenchida: X"**, para qualquer outra coluna que não seja data. O menu vem
-em grupos, e só o cartão de situação filtra a fila do Trabalho ao ser clicado.
+em grupos. No Trabalho, **clicar em qualquer cartão filtra a fila** pelo que ele
+conta — menos "finalizados na célula", que é conta e não coluna. Renomear um status
+em Ajustes Gerais leva junto os cartões que o contam; um cartão que ficou apontando
+para algo que não existe aparece marcado aqui, e não impede de salvar os outros.
 
 ![Os cartões e os gráficos](Evolucao/imagens/tela-configuracoes-paineis.png)
 
@@ -1465,7 +1556,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1283 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1328 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

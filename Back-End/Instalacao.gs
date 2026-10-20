@@ -1432,6 +1432,9 @@ function atualizarPGO() {
       + par[1] + ' Apague a aba quando quiser.');
   });
 
+  // --- Etapa 44: os 4 cards do Trabalho da RET, na ordem do PO -------------
+  feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
+
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
   Logger.log(recado);
@@ -4707,4 +4710,81 @@ function laudoEmTexto_(laudo) {
   });
 
   return linhas.join('\n');
+}
+
+/** A marca de que os cards da RET já foram montados — para não desfazer o que o PO mudar depois. */
+const RECC_CHAVE_DOS_CARDS_DA_RET = 'MIGRACAO.CARDS_DA_RET';
+
+/**
+ * Monta os cards do Trabalho da RET na ordem que o PO pediu (Etapa 44): "total
+ * de casos, aguardando transmissão (que vem da coluna Status proposta que
+ * criei depois), pendente, contatando".
+ *
+ * Roda UMA VEZ: depois disso, quem manda nos cards é a tela de Configurações, e
+ * rodar o atualizarPGO de novo não pode desfazer o que o PO arrumou lá. Só mexe
+ * se achar as quatro coisas — o campo Status proposta com "Aguardando
+ * transmissão" e os status Pendente e Contatando. Faltando alguma, não mexe em
+ * nada e diz o que falta: montar pela metade trocaria os cards dele por menos.
+ */
+function montarOsCardsDaRet_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('PAINEIS') || !planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('os cards da RET: as abas ainda não existem');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DOS_CARDS_DA_RET, '') || '').trim()) {
+    pulados.push('os cards da RET já foram montados (agora quem manda é Configurações)');
+    return feito;
+  }
+  var ret = canaisVisiveis_().filter(function (canal) { return canal.aba === 'BASE_RET'; })[0];
+  if (!ret) { pulados.push('o canal BASE_RET não está ligado'); return feito; }
+
+  var faltando = [];
+  var situacoes = situacoesDoCanal_(ret);
+  function status(nome) {
+    var achado = situacoes.filter(function (s) {
+      return normalizarParaComparar_(s.gravadoComo) === normalizarParaComparar_(nome)
+        || normalizarParaComparar_(s.nome) === normalizarParaComparar_(nome);
+    })[0];
+    if (!achado) faltando.push('o status "' + nome + '"');
+    return achado;
+  }
+  var pendente = status('Pendente');
+  var contatando = status('Contatando');
+
+  var aguardando = null;
+  var campo = camposAtivosDoCanal_(ret.id).filter(function (um) {
+    return normalizarParaComparar_(um.Cabecalho) === 'statusproposta';
+  })[0];
+  if (!campo) {
+    faltando.push('o campo "Status proposta"');
+  } else {
+    var opcao = opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), ret.id).filter(function (o) {
+      return normalizarParaComparar_(o.valor) === 'aguardandotransmissao';
+    })[0];
+    if (!opcao) faltando.push('o item "Aguardando transmissão" na lista do Status proposta');
+    else aguardando = { coluna: grafiaDaColuna_(ret.aba, campo.Cabecalho), valor: opcao.valor };
+  }
+
+  if (faltando.length) {
+    paraVoce.push('Os cards do Trabalho da RET NÃO foram montados, porque falta ' + faltando.join(', ')
+      + '. Crie o que falta (ou ajuste o nome) e rode atualizarPGO() de novo — ou monte os '
+      + 'cards em Configurações › Painéis › Cards do Trabalho.');
+    return feito;
+  }
+
+  salvarCardsDoPainel('trabalho', ret.id, [
+    { titulo: 'Total de casos', dimensao: 'total', filtro: '', cor: 'neutro', mostrar: true },
+    { titulo: 'Aguardando transmissão', dimensao: 'valor', coluna: aguardando.coluna,
+      filtro: aguardando.valor, cor: 'atencao', mostrar: true },
+    { titulo: pendente.nome, dimensao: 'situacao', filtro: pendente.gravadoComo,
+      cor: pendente.tom || 'neutro', mostrar: true },
+    { titulo: contatando.nome, dimensao: 'situacao', filtro: contatando.gravadoComo,
+      cor: contatando.tom || 'neutro', mostrar: true }
+  ]);
+  gravarConfiguracao_(RECC_CHAVE_DOS_CARDS_DA_RET, 'Etapa 44 — '
+    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  feito.push('RET: os cards do Trabalho ficaram Total de casos, Aguardando transmissão (do '
+    + 'Status proposta), Pendente e Contatando — os outros foram desligados');
+  return feito;
 }

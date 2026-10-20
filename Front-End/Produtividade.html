@@ -101,9 +101,12 @@ var TelaProdutividade = (function () {
     }
     // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
     // número que a pessoa já leu como se fosse o total.
+    // Etapa 46 (RET): os prêmios logo depois dos cartões — "deve ser o
+    // primeiro a mostrar" — e o quadro por analista por último.
     elemento('analitico').innerHTML = desenharFiltros()
       + abasDaMesa()
       + desenharCartoes()
+      + desenharPremios()
       + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
@@ -112,12 +115,77 @@ var TelaProdutividade = (function () {
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
           + 'canal.</strong><p>Um administrador monta os gráficos em '
           + 'Configurações › Painéis.</p></div>')
-      + (painel.valorPorSituacao
+      // Com os prêmios (a RET), o "Valor por situação" sai: pedido do PO, "já
+      // virá abaixo dos cards" — cada cartão de status traz a soma dele.
+      + (painel.valorPorSituacao && !painel.premios
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
         : '')
+      + desenharPorAnalista()
       + LUGAR_DO_DETALHE;
     ligarPainel();
+  }
+
+  /** R$ 1.234,56. */
+  function emReais(valor) {
+    var numero = Number(valor) || 0;
+    return 'R$ ' + numero.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  /**
+   * "Prêmios: anual, mensal e retido" (Etapa 46, só a RET). A tabela é desta
+   * tela, e não a dos gráficos: lá a última linha soma tudo, e anual + mensal +
+   * retido não é um número que queira dizer alguma coisa.
+   */
+  function desenharPremios() {
+    var premios = painel.premios;
+    if (!premios) return '';
+    return '<div class="graficos"><section class="cartao grafico largura-2" data-premios="sim">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(premios.titulo) + '</h3></header>'
+      + Graficos.desenhar(premios)
+      + '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>Prêmio</th><th class="direita">Valor</th>'
+      + '<th class="direita">Casos com valor</th></tr></thead><tbody>'
+      + premios.pontos.map(function (ponto) {
+        return '<tr><td>' + escapar(ponto.rotulo) + '</td><td class="direita">'
+          + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      + '</section></div>';
+  }
+
+  /**
+   * A produtividade de cada analista (Etapa 46, só a RET): "por último, a
+   * produtividade por analista mostrando tudo individualmente" — uma linha por
+   * pessoa, com o total, cada status e os três prêmios.
+   */
+  function desenharPorAnalista() {
+    var quadro = painel.porAnalista;
+    if (!quadro || !quadro.linhas.length) return '';
+    return '<section class="cartao por-analista" aria-labelledby="titulo-por-analista">'
+      + '<header class="grafico-cabeca"><h3 id="titulo-por-analista">Produtividade por analista</h3></header>'
+      + '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>Analista</th><th class="direita">Casos</th>'
+      + quadro.status.map(function (nome) {
+        return '<th class="direita">' + escapar(nome) + '</th>';
+      }).join('')
+      + '<th class="direita">Prêmio anual</th><th class="direita">Prêmio mensal</th>'
+      + '<th class="direita">Prêmio retido</th></tr></thead><tbody>'
+      + quadro.linhas.map(function (linha) {
+        return '<tr><td>' + escapar(linha.analista) + '</td><td class="direita">' + linha.total + '</td>'
+          + linha.porStatus.map(function (n) { return '<td class="direita">' + n + '</td>'; }).join('')
+          + '<td class="direita">' + emReais(linha.anual) + '</td>'
+          + '<td class="direita">' + emReais(linha.mensal) + '</td>'
+          + '<td class="direita">' + emReais(linha.retido) + '</td></tr>';
+      }).join('')
+      + '</tbody><tfoot><tr><td><strong>Total</strong></td><td class="direita"><strong>'
+      + quadro.totais.total + '</strong></td>'
+      + quadro.totais.porStatus.map(function (n) {
+        return '<td class="direita"><strong>' + n + '</strong></td>';
+      }).join('')
+      + '<td class="direita"><strong>' + emReais(quadro.totais.anual) + '</strong></td>'
+      + '<td class="direita"><strong>' + emReais(quadro.totais.mensal) + '</strong></td>'
+      + '<td class="direita"><strong>' + emReais(quadro.totais.retido) + '</strong></td>'
+      + '</tr></tfoot></table></div></section>';
   }
 
   /**
@@ -155,6 +223,11 @@ var TelaProdutividade = (function () {
           + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"' : '')
           + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
           + '<strong class="numero">' + cartao.valor + '</strong>'
+          // Etapa 46 (RET): embaixo do status, o prêmio anual dos casos dele; no
+          // Retido, o prêmio retido.
+          + (cartao.soma !== undefined
+            ? '<span class="soma-do-cartao">' + escapar(emReais(cartao.soma)) + ' de '
+              + escapar(cartao.rotuloDaSoma) + '</span>' : '')
           + variacao(cartao)
           + '</div>';
       }).join('')

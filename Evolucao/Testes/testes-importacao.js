@@ -440,9 +440,25 @@ function rodarTestesDeImportacao() {
     igual(laudo.motivosParaPular.repetida, 1);
   });
 
-  teste('a mesma proposta em OUTRO mês é pedido novo, e entra', () => {
+  teste('a data que a planilha traz NÃO muda o mês: conta o mês da importação (Etapa 45)', () => {
+    // Pedido do PO: "ao invés de 30 dias, vamos limitar apenas no mês vigente
+    // da importação". A linha com data do mês passado, de uma proposta que o
+    // PGO já tem neste mês, fica de fora — e o laudo diz que é porque já está
+    // no PGO.
     const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([cabecalhoDaProposta, ['7', '4200001', mesPassado, 'Mês passado']]),
+      colunaQueIdentifica: '@PROPOSTA_NO_MES'
+    });
+    igual(laudo.vaoEntrar, 0);
+    igual(laudo.motivosParaPular.jaNoPgo, 1);
+  });
+
+  teste('a proposta que o PGO só tem no MÊS PASSADO é pedido novo, e entra', () => {
+    chamar('inserirRegistro_')('BASE_RET', { 'Código origem da proposta': '7',
+      'número da proposta': '4900001', 'data de recepção do protocolo': mesPassado,
+      'nome do cliente': 'Entrou no mês passado', analista: 'Marcos Vieira' });
+    const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
+      fonte: colado([cabecalhoDaProposta, ['7', '4900001', dia(1), 'Voltou este mês']]),
       colunaQueIdentifica: '@PROPOSTA_NO_MES'
     });
     igual(laudo.vaoEntrar, 1);
@@ -497,8 +513,11 @@ function rodarTestesDeImportacao() {
       fonte: fonte, colunaQueIdentifica: '@PROPOSTA_NO_MES',
       origem: 'Leva conferida pela proposta'
     });
-    igual(laudo.vaoEntrar, 2);
+    igual(laudo.vaoEntrar, 1, 'só a Nova: a "Outro mês" conta no mês da importação, e já está no PGO');
     igual(resultado.entraram, laudo.vaoEntrar, 'o laudo prometeu e a base cumpriu');
+    igual(laudo.motivosParaPular.jaNoPgo, 2);
+    igual(laudo.motivosParaPular.repetidaNoArquivo, 1);
+    igual(resultado.pulados.jaNoPgo + '|' + resultado.pulados.repetidaNoArquivo, '2|1');
   });
 
   teste('DESMARCADA a opção, tudo entra — a escolha é de quem importa', () => {

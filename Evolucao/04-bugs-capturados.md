@@ -2103,6 +2103,62 @@ escolhido: `camposDaSituacao` manda os campos **sem** `mostrarSe` e
 confere que nada sai escondido; o ponta a ponta abre o diálogo, escolhe os dois
 status e grava.
 
+### 100 · O card do status renomeado ficava preso, com zero, e esvaziava a fila
+
+**Sintoma.** Relato do PO: "clico e a fila fica vazia", "o número do card está
+errado", "ao escolher ou editar nas Configurações ele não remove o card e fica
+preso".
+
+**Causa.** O card de situação guarda o **nome** do status em `PAINEIS.Filtro`.
+Renomear o status em Ajustes Gerais não mexia no card: ele passava a contar um
+status que não existia (zero), e clicar filtrava a fila por esse nome (vazia). E
+salvar a lista de cards conferia **todos** os cards — o órfão era recusado, e com
+ele qualquer outra mudança: não dava nem para removê-lo.
+
+**Defesa.** `renomearNosCartoes_` leva o nome novo aos cards; o card órfão some do
+Trabalho, aparece marcado em Configurações e só o card novo ou alterado é conferido
+ao salvar. A suíte renomeia um status e confere os cards, e salva uma lista com um
+órfão dentro.
+
+### 101 · O clique no card filtrava pelo título, e só o card de status filtrava
+
+**Sintoma.** Achado ao reproduzir o 100: um card chamado "Aguardando" de valor de
+campo não filtrava nada; um card de status renomeado só na tela filtrava pelo nome
+da tela.
+
+**Causa.** A tela mandava o **título** do card como filtro de status. O título é
+do PO; o que o card conta mora em outro lugar.
+
+**Defesa.** A tela manda o **Id**; o servidor aplica à fila a mesma regra com que
+contou (`filtrarPeloCartao_`). A suíte clica num card de valor, num de status com
+outro nome e num de coluna preenchida, e confere a fila; o ponta a ponta clica no
+card e conta as linhas.
+
+### 102 · O editor de cards gravava duas, três vezes por clique
+
+**Sintoma.** Achado ao reproduzir o 100: depois de acrescentar ou remover um card,
+um Salvar disparava várias gravações ao mesmo tempo — e a última a chegar vencia.
+
+**Causa.** Cada redesenho da lista chamava a função que liga **todos** os botões da
+tela, e o Salvar e o "+ card" ganhavam um ouvinte a mais por redesenho.
+
+**Defesa.** A ligação foi dividida: a troca de tela e de canal, a lista de cards e
+os botões. O redesenho liga só a lista. A suíte confere que a tela liga o Salvar uma
+vez só, e que remover um card não duplica a gravação.
+
+### 103 · O "Por data" da abertura escondia os casos sem data de recepção
+
+**Sintoma.** Achado ao testar a Etapa 44: na RET, os casos importados sem data de
+recepção não apareciam no Trabalho nem nos cartões.
+
+**Causa.** Na Etapa 43 a abertura passou de "últimos 30 dias" para "Por data" com
+as datas já preenchidas. O "Por dias" deixava passar o caso sem data; o "Por data",
+não — e a abertura mudou de regra sem ninguém pedir.
+
+**Defesa.** O período da abertura leva a marca `abertura`, e `guardaOsSemData_`
+mantém os sem data nela (Trabalho, Produtividade, detalhamento e Minha
+Performance). Escolhidas outras datas, ou um mês, vale só quem tem data dentro.
+
 ---
 
 ## O que esta lista ensina
@@ -2319,3 +2375,11 @@ Daí as duas práticas que o projeto não abre mão:
     vazio?" ou "e com 5.000 casos?". Uma ferramenta que descobre as funções
     sozinha e chama cada uma com o inesperado pega o que ninguém pensou em
     testar — e pega a função nova no dia em que ela nasce.
+53. **O que aponta por nome precisa saber quando o nome muda.** No item 100 o card
+    guardava o nome do status, e renomear o status não avisava o card. Toda
+    referência por nome precisa de duas coisas: quem renomeia leva o nome junto, e
+    quem lê sabe mostrar — sem travar — a referência que ficou órfã.
+54. **Trocar a forma de uma tela não pode trocar a regra dela.** No item 103 a
+    abertura mudou de "últimos 30 dias" para "Por data" com as mesmas datas, e a
+    regra do caso sem data mudou junto. Mudança de aparência precisa de um teste
+    que confira que o que a tela mostra continua o mesmo.

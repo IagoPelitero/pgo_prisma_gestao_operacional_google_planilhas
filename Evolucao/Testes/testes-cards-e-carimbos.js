@@ -231,11 +231,13 @@ function rodarTestesDosCardsEDosCarimbos() {
     igual(t.chamar('contarComOValor_')([], canal, 'Coluna que saiu', 'x'), null);
   });
 
-  teste('no Trabalho, só o card de status filtra a fila', () => {
-    // Um "Já passaram por" clicado filtrava a fila por um status com o nome do
-    // card: fila vazia, sem erro.
+  teste('no Trabalho, o card filtra a fila pelo Id, e não pelo nome (Etapa 44)', () => {
+    // Antes: um "Já passaram por" clicado filtrava a fila por um status com o
+    // nome do card — fila vazia. Agora todo card filtra, pelo que ele CONTA.
     const tela = lerTela('Trabalho.html');
-    contem(tela, "var filtravel = cartao.dimensao === 'situacao'");
+    contem(tela, "var filtravel = cartao.filtravel === true && cartao.id !== undefined;");
+    contem(tela, "data-cartao-da-fila");
+    verdadeiro(tela.indexOf('data-situacao') < 0, 'o filtro pelo nome do card saiu');
   });
 
   /* ----------------------------------------------------------------------- */

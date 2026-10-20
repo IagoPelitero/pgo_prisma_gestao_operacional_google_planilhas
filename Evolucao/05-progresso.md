@@ -2938,6 +2938,92 @@ Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
 
 ---
 
+## Etapa 44 — Os cards e os filtros do Trabalho, e a busca em todas as colunas
+
+Pedido do PO: **"na aba Trabalho altere os filtros seguindo a sequência: total de
+casos, aguardando transmissão (que vem da coluna Status proposta que criei depois),
+pendente, contatando. Os cards não estão funcionando corretamente tanto nas
+configurações quanto na aba Trabalho (...). Adicione mais filtros como da coluna AZ,
+que fica o Status proposta, foi criado fora do contrato do PGO, e mesmo digitando na
+busca não acha os casos escrevendo aguardando transmissão."**
+
+Os sintomas, nas palavras do PO: "clico e a fila fica vazia/errada", "o número do
+card está errado", "ao escolher ou editar nas configurações ele não remove o card e
+fica preso". Reproduzidos no simulador — achados 100, 101 e 102.
+
+| Parte | O que ficou |
+|---|---|
+| **Clicar filtra** | Qualquer cartão filtra a fila pelo que conta (status, valor de campo, "preenchida"), resolvido no servidor pelo **Id** do cartão. Clicar de novo, ou no Total, solta. Os cartões continuam contando o período inteiro. Só "finalizados na célula" não filtra |
+| **Renomear leva junto** | Renomear um status em Ajustes Gerais muda o filtro dos cards de situação; renomear um item de lista muda os cards de valor do campo que usa a lista |
+| **Card órfão** | Card de status que não existe mais **some do Trabalho**, aparece **marcado em Configurações › Painéis** e **não impede de salvar** os outros — só o card novo ou alterado é conferido |
+| **O editor de cards** | Cada redesenho ligava de novo o Salvar e o "+ card": um clique virava duas, três gravações ao mesmo tempo. Agora a lista se religa sozinha, e os botões, uma vez |
+| **Os 4 cards da RET** | `atualizarPGO()` monta uma vez: Total de casos, Aguardando transmissão (Status proposta), Pendente, Contatando; os outros saem. Faltando o status Contatando, o campo Status proposta ou o item Aguardando transmissão, não muda nada e diz o que falta. Marca: `MIGRACAO.CARDS_DA_RET` |
+| **Filtros até 6** | O Status primeiro, depois os campos que dependem do status (o Status proposta), depois os outros na ordem do formulário (`RECC_FILTROS_NO_TRABALHO`) |
+| **A busca** | Procura também em todas as colunas da aba, inclusive as criadas direto na planilha. Coluna de identificador que entra só por essa regra vale com termo que parece número |
+| **A abertura** | Corrigido o que a Etapa 43 tinha quebrado: o "Por data" da abertura voltou a mostrar os casos sem data de recepção (achado 103) |
+
+---
+
+## Etapa 45 — A importação da RET: a data, os prêmios e o porquê do repetido
+
+Pedidos do PO: **"na importação da RET traga um flag para que a data de recepção dos
+protocolos seja do dia (...) podemos escolher que venha com a data de hoje ou deixar
+escolhido da planilha"**; **"crie que mostre o valor que está sendo importado"**; e
+**"ao invés de 30 dias vamos limitar apenas no mês vigente da importação (...) e deve
+ficar claro o porquê não foram importadas, se é pela planilha importada ou porque já
+tem no PGO naquele mês"**.
+
+| Pergunta | Escolha do PO |
+|---|---|
+| A data de recepção | Duas opções: **hoje para todos**, ou **a da planilha** — o caso sem data fica com a de hoje |
+| O mês que vale | O **da importação**. No PGO, pela data de recepção do caso; sem ela, pela data em que entrou. E as repetidas dentro do próprio arquivo |
+| O porquê | Os dois motivos separados, cada um com as propostas |
+
+| Parte | O que ficou |
+|---|---|
+| **A data** | Seletor "Data de recepção do protocolo" no passo de conferir, só na RET. "A da planilha" é o padrão. Página antiga, que não manda a escolha, não muda nada |
+| **Os prêmios** | A conferência e o resultado somam, em reais, o prêmio anual (`valor do prêmio`) e o mensal (`prêmio mensal`) dos casos que vão entrar — só os que o de-para ligou. Repetida não soma |
+| **O repetido** | A proposta é conferida contra o **mês da importação**. O laudo diz "já estão no PGO em outubro de 2026" e "se repetem na própria planilha (entra só a primeira)", com até 50 propostas de cada (`RECC_REPETIDOS_LISTADOS`). Quando nada entraria, o recado separa os dois |
+
+Os testes antigos da proposta no mês diziam "o mês do caso", que era a regra até
+aqui; foram trocados para "o mês da importação", com o PO.
+
+---
+
+## Etapa 46 — A Produtividade da RET: os prêmios primeiro, a equipe por último
+
+Pedido do PO: **"o gráfico que mostra o valor do prêmio anual total, mensal e retido
+deve ser o primeiro a mostrar, e o restante posterior, ficando por último a
+produtividade por analista mostrando tudo individualmente. Apenas do canal RET por
+enquanto. Embaixo de cada status deve ter o valor anual das propostas, sendo apenas o
+retido que irá trazer o valor total dos retidos da coluna prêmio retido."**
+
+| Parte | O que ficou |
+|---|---|
+| **A ordem** | Cartões → **prêmios** → o resto como era → **quadro por analista** |
+| **"Valor por situação" saiu** | Pedido do PO, depois de ver a tela: "exclua o último gráfico informando reteve, não reteve, sem sucesso, pois já virá abaixo dos cards". Sai da tela da Produtividade quando há os prêmios (a RET); a Minha Performance e o servidor seguem como estavam |
+| **O gráfico dos prêmios** | Três barras: anual (`valor do prêmio`), mensal (`prêmio mensal`) e retido (`valor do prêmio retido`), com a soma e de quantos casos ela vem, e uma tabela embaixo. Sem "total" |
+| **Embaixo de cada status** | A soma do prêmio anual dos casos do status; no Retido, a do prêmio retido |
+| **Por analista** | Uma linha por pessoa: total, quantos em cada status que aparece, os três prêmios; linha de total. "Sem analista" para quem não tem |
+| **Só a RET** | Canal sem as três colunas de prêmio (a Mesa, o VG) recebe `null` e a tela não desenha nada novo |
+
+**Números das Etapas 44, 45 e 46.** **1328 testes** (45 a mais: 20 em
+`testes-cards-filtros-e-busca.js`, 14 em `testes-importacao-da-ret.js` e 10 em
+`testes-produtividade-da-ret.js`, novos; 1 em `testes-importacao.js`), cinco
+execuções seguidas sem falha. **16 quebras de propósito, 16 vermelhos** — uma para cada regra nova (a marca da abertura, o card órfão, o filtro da fila pelo card, o renomear, o salvar que confere só o alterado, a ordem dos filtros, a busca em todas as colunas, a marca da migração, o editor de cards, os dois motivos do repetido, o mês da importação, a data de hoje, os prêmios da conferência, a soma do Retido, a contagem por status e o quadro por analista na tela). Navegador: ponta a ponta
+**22/22** no repositório e no pacote — o roteiro dos cards agora clica no card e
+confere a fila —, 108 combinações de largura, 152 cliques na prévia, 105 com base
+suja; varredura geral sem defeito.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆) e rode **`atualizarPGO()`**: ele monta os 4 cards
+   do Trabalho da RET — ou diz o que falta para montar.
+2. **Implantar › Gerenciar implantações › editar › Versão: Nova versão** — sem isso,
+   o link continua o mesmo, mas roda o código antigo.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

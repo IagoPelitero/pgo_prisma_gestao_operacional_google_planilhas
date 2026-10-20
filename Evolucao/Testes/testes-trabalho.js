@@ -340,7 +340,7 @@ function rodarTestesDoTrabalho() {
   teste('os filtros são os campos que já são lista — nada escrito em código', () => {
     const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
     verdadeiro(resumo.filtrosDisponiveis.length > 0);
-    verdadeiro(resumo.filtrosDisponiveis.length <= 4, 'no máximo quatro na tela');
+    verdadeiro(resumo.filtrosDisponiveis.length <= 6, 'no máximo seis na tela (Etapa 44)');
     verdadeiro(resumo.filtrosDisponiveis.some((f) => f.chave === 'status'));
   });
 

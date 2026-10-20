@@ -783,6 +783,9 @@ table.fila.agrupada td:first-child .apoio.em-bom:first-child {
 /* Os atendidos da Mesa: o resumo (sistema + chat) em cima dos gráficos. */
 .atendimentos { padding: 18px 20px; display: grid; gap: 12px; margin-bottom: 16px; }
 .atendimentos .aviso-do-chat { margin: 0; font-size: 12.5px; color: var(--suave); line-height: 1.5; }
+/* Etapa 46 (RET): o prêmio embaixo do número do cartão, e o quadro por analista. */
+.indicador .soma-do-cartao { display: block; font-size: 12px; color: var(--suave); margin-top: 2px; }
+.por-analista { padding: 18px 20px; margin-top: 16px; }
 /* Os dois seletores dos atendidos (origem e ramo): um rótulo e as opções, lado a
    lado, e uma embaixo da outra quando falta largura. */
 .atendimentos .seletor-de-atendidos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -5316,23 +5319,26 @@ var TelaTrabalho = (function () {
    * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
    * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
    *
-   * Só o cartão de STATUS filtra. Os que contam por coluna ("Já passaram
-   * por", "Preenchida", o valor de um campo) não têm status para filtrar:
-   * clicados, filtravam a fila por um status com o nome do cartão, e a fila
-   * ficava vazia.
+   * CLICAR NUM CARTÃO FILTRA A FILA pelo que ele conta (Etapa 44): o status,
+   * o valor de uma coluna (o Status proposta: "Aguardando transmissão"), a
+   * coluna preenchida. Quem decide é o servidor, pelo Id do cartão — a mesma
+   * regra da contagem, para o número do cartão e a fila baterem. Antes só o
+   * cartão de status filtrava, e pelo NOME do cartão: um cartão chamado
+   * diferente do status deixava a fila vazia. Clicar de novo, ou no "Total",
+   * desliga. Os cartões continuam contando sem o filtro deles.
    */
   function desenharCartoes() {
     return '<div class="cartoes">'
       + resumo.cartoes.map(function (cartao) {
-        var filtravel = cartao.dimensao === 'situacao'
-          && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
-        var ligado = filtravel
-          && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);
+        var filtravel = cartao.filtravel === true && cartao.id !== undefined;
+        var ligado = filtravel && cartao.dimensao !== 'total'
+          && String(filtrosEscolhidos.cartao || '') === String(cartao.id);
 
         return '<' + (filtravel ? 'button type="button"' : 'div')
           + ' class="indicador tom-' + escapar(cartao.tom || 'neutro')
           + (filtravel ? ' clicavel' : '') + (ligado ? ' ligado' : '') + '"'
-          + (filtravel ? ' data-situacao="' + escapar(cartao.rotulo) + '"' : '')
+          + (filtravel ? ' data-cartao-da-fila="' + escapar(cartao.id) + '"'
+            + ' data-cartao-total="' + (cartao.dimensao === 'total' ? 'sim' : 'nao') + '"' : '')
           + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"'
             : (filtravel ? ' title="Filtrar a fila por ' + escapar(cartao.rotulo) + '"' : ''))
           + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
@@ -5824,10 +5830,10 @@ var TelaTrabalho = (function () {
     var cartoes = document.querySelectorAll('.indicador.clicavel');
     for (var c = 0; c < cartoes.length; c++) {
       cartoes[c].addEventListener('click', function () {
-        var situacao = this.getAttribute('data-situacao');
-        // Clicar de novo no mesmo cartão desliga o filtro.
-        filtrosEscolhidos.status =
-          (filtrosEscolhidos.status === situacao) ? '' : situacao;
+        var id = this.getAttribute('data-cartao-da-fila');
+        // Clicar de novo no mesmo cartão — ou no "Total" — desliga o filtro.
+        filtrosEscolhidos.cartao = (this.getAttribute('data-cartao-total') === 'sim'
+          || String(filtrosEscolhidos.cartao || '') === id) ? '' : id;
         carregar();
       });
     }
@@ -7679,6 +7685,9 @@ var TelaImportacao = (function () {
   // padrão do canal (Não trabalhado na RET, sem status na Mesa). Vazio é
   // "sem status", escolha de verdade.
   var statusDoLote = null;
+  // Etapa 45: a data de recepção dos casos (RET) — 'planilha' (sem data fica
+  // hoje) ou 'hoje' (todos com a data de hoje).
+  var dataDeRecepcao = 'planilha';
   // O que importar. Na Mesa há dois destinos: os casos do canal e os
   // atendimentos do chat (pedido do PO: "ler uma planilha de chat ficou confuso"
   // — agora o chat entra por esta mesma tela). O fluxo é o mesmo; muda o
@@ -7828,7 +7837,7 @@ var TelaImportacao = (function () {
     var pulados = laudo.vaoSerPuladas
       ? '<div class="indicador tom-atencao" title="'
         + laudo.motivosParaPular.vazia + ' em branco, '
-        + laudo.motivosParaPular.repetida + ' já na base">'
+        + laudo.motivosParaPular.repetida + ' repetidas">'
         + '<span class="rotulo">Vão ser puladas'
         + '</span><strong class="numero">' + laudo.vaoSerPuladas + '</strong>'
         + '</div>'
@@ -7840,7 +7849,14 @@ var TelaImportacao = (function () {
       + '<div class="indicador tom-bom"><span class="rotulo">Vão entrar</span>'
       + '<strong class="numero">' + laudo.vaoEntrar + '</strong></div>'
       + pulados
+      + (laudo.premios || []).map(function (premio) {
+        return '<div class="indicador tom-neutro" title="Soma da coluna &quot;'
+          + escapar(premio.coluna) + '&quot; dos ' + premio.casos + ' caso(s) que vão entrar e '
+          + 'trazem o valor"><span class="rotulo">' + escapar(premio.rotulo) + ' importado'
+          + '</span><strong class="numero">' + emReais(premio.total) + '</strong></div>';
+      }).join('')
       + '</div>'
+      + porQueRepetem(laudo.motivosParaPular, 'vão ficar de fora')
       + (laudo.passaDoLimite
         ? '<p class="aviso-janela">São ' + laudo.linhasNaFonte + ' linhas, e o '
           + 'limite é ' + laudo.limite + '. Divida em levas: se o mapeamento '
@@ -8008,7 +8024,8 @@ var TelaImportacao = (function () {
         : '')
       + '</p>'
       + desenharAnalistas()
-      + escolhaDoStatusDoLote();
+      + escolhaDoStatusDoLote()
+      + escolhaDaDataDeRecepcao();
   }
 
   /*
@@ -8038,6 +8055,28 @@ var TelaImportacao = (function () {
           + (opcoes.statusQueEsperaAPessoa ? ' O prazo só começa quando alguém puser o caso '
             + 'em <strong>' + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que '
             + 'o sistema anota a data.' : ''))
+      + '</p>';
+  }
+
+  /**
+   * A data de recepção dos casos (Etapa 45, só na RET). Pedido do PO: "muitas
+   * bases não têm uma data de recepção — podemos escolher que venha com a data
+   * de hoje ou deixar a da planilha".
+   */
+  function escolhaDaDataDeRecepcao() {
+    var coluna = opcoes.dataDeRecepcao;
+    if (!coluna) return '';
+    return '<div class="grade"><label class="campo">'
+      + '<span>' + escapar(coluna.charAt(0).toUpperCase() + coluna.slice(1)) + '</span>'
+      + '<select class="filtro" id="data-de-recepcao">'
+      + '<option value="planilha"' + (dataDeRecepcao === 'planilha' ? ' selected' : '')
+      + '>A da planilha (sem data, fica a de hoje)</option>'
+      + '<option value="hoje"' + (dataDeRecepcao === 'hoje' ? ' selected' : '')
+      + '>A data de hoje, para todos os casos</option>'
+      + '</select></label></div>'
+      + '<p class="config-dica">' + (dataDeRecepcao === 'hoje'
+        ? 'Todos os casos vão entrar com a data de hoje, mesmo os que trazem data na planilha.'
+        : 'Vale a data que a planilha trouxer; o caso que vier sem data entra com a de hoje.')
       + '</p>';
   }
 
@@ -8124,6 +8163,34 @@ var TelaImportacao = (function () {
   }
 
   /** Passo 3: o que entrou. */
+  /** R$ 1.234,56 — o prêmio, como a operação lê. */
+  function emReais(valor) {
+    var numero = Number(valor) || 0;
+    return 'R$ ' + numero.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  /**
+   * Por que cada repetida fica de fora — pedido do PO (Etapa 45): "deve ficar
+   * claro o porquê não foram importadas, se é pela planilha importada ou porque
+   * já tem no PGO naquele mês". Com as propostas (até 50 de cada).
+   */
+  function porQueRepetem(motivos, verbo) {
+    if (!motivos || !motivos.repetida) return '';
+    var oQue = motivos.pelaProposta ? 'proposta(s)' : 'caso(s)';
+    var lista = function (itens, total) {
+      return itens.length ? ': <strong>' + escapar(itens.join(', ')) + '</strong>'
+        + (total > itens.length ? ' e mais ' + (total - itens.length) : '') : '';
+    };
+    return (motivos.jaNoPgo
+      ? '<p class="config-dica aviso-de-carimbo">' + motivos.jaNoPgo + ' ' + oQue + ' ' + verbo
+        + ' porque <strong>já estão no PGO</strong>' + (motivos.mes ? ' em ' + escapar(motivos.mes) : '')
+        + lista(motivos.listaNoPgo || [], motivos.jaNoPgo) + '.</p>' : '')
+      + (motivos.repetidaNoArquivo
+        ? '<p class="config-dica aviso-de-carimbo">' + motivos.repetidaNoArquivo + ' ' + oQue + ' '
+          + verbo + ' porque <strong>se repetem na própria planilha</strong> (entra só a primeira)'
+          + lista(motivos.listaNoArquivo || [], motivos.repetidaNoArquivo) + '.</p>' : '');
+  }
+
   function desenharResultado() {
     return '<section class="cartaa importação-passo">'
       + '<header class="grafico-cabeca"><h3>Importado</h3></header>'
@@ -8132,16 +8199,21 @@ var TelaImportacao = (function () {
       + (ehChat() ? 'Atendimentos que entraram' : 'Casos que entraram')
       + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
       + (resultado.pulados.repetida
-        ? '<div class="indicador tom-atencao"><span class="rotulo">Já estavam na base'
+        ? '<div class="indicador tom-atencao"><span class="rotulo">Repetidas, ficaram de fora'
           + '</span><strong class="numero">' + resultado.pulados.repetida
           + '</strong></div>'
         : '')
+      + (resultado.premios || []).map(function (premio) {
+        return '<div class="indicador tom-neutro"><span class="rotulo">' + escapar(premio.rotulo)
+          + ' importado</span><strong class="numero">' + emReais(premio.total) + '</strong></div>';
+      }).join('')
       + (resultado.pulados.vazia
         ? '<div class="indicador tom-neutro"><span class="rotulo">Linhas em branco'
           + '</span><strong class="numero">' + resultado.pulados.vazia
           + '</strong></div>'
         : '')
       + '</div>'
+      + porQueRepetem(resultado.pulados, 'ficaram de fora')
       + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, em '
       + escapar(resultado.canal) + '.'
       + (resultado.primeiroId
@@ -8174,6 +8246,7 @@ var TelaImportacao = (function () {
       colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
       nomeDoLote = '';
       statusDoLote = null;          // e o status padrão dele
+      dataDeRecepcao = 'planilha';
       desenharSeletor();
       carregar();
     });
@@ -8234,6 +8307,10 @@ var TelaImportacao = (function () {
       guardarOQueEstaNaTela();
       desenhar();
     });
+    mudancas('#data-de-recepcao', function () {
+      guardarOQueEstaNaTela();
+      desenhar();
+    });
   }
 
   function desenharSeletor() {
@@ -8282,6 +8359,9 @@ var TelaImportacao = (function () {
 
     var status = elemento('status-do-lote');
     if (status) statusDoLote = status.value;
+
+    var recepcao = elemento('data-de-recepcao');
+    if (recepcao) dataDeRecepcao = recepcao.value;
   }
 
   /** O status que vale agora: o escolhido, ou o padrão do canal. */
@@ -8301,7 +8381,8 @@ var TelaImportacao = (function () {
         fonte: fonte,
         dePara: deParaEscolhido,
         colunaQueIdentifica: colunaQueIdentifica || '',
-        statusDoLote: statusQueVale()
+        statusDoLote: statusQueVale(),
+        dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     conferencia
       .entao(function (resposta) {
@@ -8345,7 +8426,8 @@ var TelaImportacao = (function () {
         colunaQueIdentifica: colunaQueIdentifica || '',
         analistas: escolhidos,
         origem: nomeDoLote,
-        statusDoLote: statusQueVale()
+        statusDoLote: statusQueVale(),
+        dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     gravacao
       .entao(function (resposta) {
@@ -8474,9 +8556,12 @@ var TelaProdutividade = (function () {
     }
     // O aviso vem ANTES dos gráficos, e não depois: depois, ele explica um
     // número que a pessoa já leu como se fosse o total.
+    // Etapa 46 (RET): os prêmios logo depois dos cartões — "deve ser o
+    // primeiro a mostrar" — e o quadro por analista por último.
     elemento('analitico').innerHTML = desenharFiltros()
       + abasDaMesa()
       + desenharCartoes()
+      + desenharPremios()
       + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
@@ -8485,12 +8570,77 @@ var TelaProdutividade = (function () {
         : '<div class="cartao vazio"><strong>Nenhum gráfico configurado nesta '
           + 'canal.</strong><p>Um administrador monta os gráficos em '
           + 'Configurações › Painéis.</p></div>')
-      + (painel.valorPorSituacao
+      // Com os prêmios (a RET), o "Valor por situação" sai: pedido do PO, "já
+      // virá abaixo dos cards" — cada cartão de status traz a soma dele.
+      + (painel.valorPorSituacao && !painel.premios
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
         : '')
+      + desenharPorAnalista()
       + LUGAR_DO_DETALHE;
     ligarPainel();
+  }
+
+  /** R$ 1.234,56. */
+  function emReais(valor) {
+    var numero = Number(valor) || 0;
+    return 'R$ ' + numero.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  /**
+   * "Prêmios: anual, mensal e retido" (Etapa 46, só a RET). A tabela é desta
+   * tela, e não a dos gráficos: lá a última linha soma tudo, e anual + mensal +
+   * retido não é um número que queira dizer alguma coisa.
+   */
+  function desenharPremios() {
+    var premios = painel.premios;
+    if (!premios) return '';
+    return '<div class="graficos"><section class="cartao grafico largura-2" data-premios="sim">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(premios.titulo) + '</h3></header>'
+      + Graficos.desenhar(premios)
+      + '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>Prêmio</th><th class="direita">Valor</th>'
+      + '<th class="direita">Casos com valor</th></tr></thead><tbody>'
+      + premios.pontos.map(function (ponto) {
+        return '<tr><td>' + escapar(ponto.rotulo) + '</td><td class="direita">'
+          + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      + '</section></div>';
+  }
+
+  /**
+   * A produtividade de cada analista (Etapa 46, só a RET): "por último, a
+   * produtividade por analista mostrando tudo individualmente" — uma linha por
+   * pessoa, com o total, cada status e os três prêmios.
+   */
+  function desenharPorAnalista() {
+    var quadro = painel.porAnalista;
+    if (!quadro || !quadro.linhas.length) return '';
+    return '<section class="cartao por-analista" aria-labelledby="titulo-por-analista">'
+      + '<header class="grafico-cabeca"><h3 id="titulo-por-analista">Produtividade por analista</h3></header>'
+      + '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>Analista</th><th class="direita">Casos</th>'
+      + quadro.status.map(function (nome) {
+        return '<th class="direita">' + escapar(nome) + '</th>';
+      }).join('')
+      + '<th class="direita">Prêmio anual</th><th class="direita">Prêmio mensal</th>'
+      + '<th class="direita">Prêmio retido</th></tr></thead><tbody>'
+      + quadro.linhas.map(function (linha) {
+        return '<tr><td>' + escapar(linha.analista) + '</td><td class="direita">' + linha.total + '</td>'
+          + linha.porStatus.map(function (n) { return '<td class="direita">' + n + '</td>'; }).join('')
+          + '<td class="direita">' + emReais(linha.anual) + '</td>'
+          + '<td class="direita">' + emReais(linha.mensal) + '</td>'
+          + '<td class="direita">' + emReais(linha.retido) + '</td></tr>';
+      }).join('')
+      + '</tbody><tfoot><tr><td><strong>Total</strong></td><td class="direita"><strong>'
+      + quadro.totais.total + '</strong></td>'
+      + quadro.totais.porStatus.map(function (n) {
+        return '<td class="direita"><strong>' + n + '</strong></td>';
+      }).join('')
+      + '<td class="direita"><strong>' + emReais(quadro.totais.anual) + '</strong></td>'
+      + '<td class="direita"><strong>' + emReais(quadro.totais.mensal) + '</strong></td>'
+      + '<td class="direita"><strong>' + emReais(quadro.totais.retido) + '</strong></td>'
+      + '</tr></tfoot></table></div></section>';
   }
 
   /**
@@ -8528,6 +8678,11 @@ var TelaProdutividade = (function () {
           + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"' : '')
           + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
           + '<strong class="numero">' + cartao.valor + '</strong>'
+          // Etapa 46 (RET): embaixo do status, o prêmio anual dos casos dele; no
+          // Retido, o prêmio retido.
+          + (cartao.soma !== undefined
+            ? '<span class="soma-do-cartao">' + escapar(emReais(cartao.soma)) + ' de '
+              + escapar(cartao.rotuloDaSoma) + '</span>' : '')
           + variacao(cartao)
           + '</div>';
       }).join('')
@@ -11230,7 +11385,7 @@ var TelaConfiguracoes = (function () {
       // A coluna é do card "valor": sem ela na cópia, salvar de novo a lista
       // recusava o card ("precisa da coluna e do valor").
       filtro: card.filtro, coluna: card.coluna || '', cor: card.cor,
-      mostrar: card.mostrar !== false
+      mostrar: card.mostrar !== false, naoExiste: card.naoExiste || ''
     };
   }
 
@@ -11288,6 +11443,8 @@ var TelaConfiguracoes = (function () {
         + '<select data-card="' + posicao + '" data-parte="contar">'
         + opcoesDoQueContar(card) + '</select></label>'
         + '</div>'
+        + (card.naoExiste
+          ? '<p class="config-dica aviso-de-carimbo">' + escapar(card.naoExiste) + '</p>' : '')
         + '<div class="card-linha">'
         + '<label class="config-campo"><span>Cor</span>'
         + '<div class="tira-de-tons">'
@@ -11354,9 +11511,21 @@ var TelaConfiguracoes = (function () {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
+  /*
+   * Etapa 44: o que é da LISTA de cards (remover, cor, as caixas de cada card)
+   * é religado a cada redesenho, porque os elementos são novos. O que é da TELA
+   * (trocar de aba e de canal, + card, descartar, salvar) é ligado UMA vez. Antes
+   * `redesenharCards` religava tudo: cada card removido somava um ouvinte ao
+   * Salvar, e um clique gravava duas, três vezes ao mesmo tempo — card novo
+   * duplicado, e "planilha ocupada" no meio. Era o "card preso" do PO.
+   */
   function ligarPaineis() {
     ligarTrocaDeTelaEDeCanal();
+    ligarListaDeCards();
+    ligarBotoesDosCards();
+  }
 
+  function ligarListaDeCards() {
     ligarCliques('[data-remover-card]', function (botao) {
       cardsEmEdicao.splice(Number(botao.getAttribute('data-remover-card')), 1);
       redesenharCards();
@@ -11381,10 +11550,13 @@ var TelaConfiguracoes = (function () {
           card.dimensao = opcao.chave;
           card.filtro = opcao.filtro;
           card.coluna = opcao.coluna || '';
+          card.naoExiste = '';
         }
       });
     }
+  }
 
+  function ligarBotoesDosCards() {
     elemento('add-card').addEventListener('click', function () {
       if (cardsEmEdicao.length >= dados.painel.maximo) {
         return avisar('São no máximo ' + dados.painel.maximo + ' cards por '
@@ -11410,7 +11582,7 @@ var TelaConfiguracoes = (function () {
   /** Redesenha só a lista: a explicação e os botões não mudaram. */
   function redesenharCards() {
     elemento('lista-de-cards').innerHTML = desenharCards();
-    ligarPaineis();
+    ligarListaDeCards();
   }
 
   /* --------------------------------------------------- identidade e senha */

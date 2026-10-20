@@ -2824,8 +2824,9 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     : sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal);
 
   var regra = regraDeRepeticao_(canal, pedido.colunaQueIdentifica);
+  var premios = premiosDoDePara_(deParaEscolhido, canal);
   var contagem = contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte,
-    deParaEscolhido, regra);
+    deParaEscolhido, regra, premios);
 
   return {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
@@ -2852,7 +2853,9 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
     // avisosDaImportacao_, que é onde o próximo aviso entra.
     avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
-    statusPadrao: statusDoLote_(canal, pedido.statusDoLote)
+    statusPadrao: statusDoLote_(canal, pedido.statusDoLote),
+    premios: premios,
+    dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal)
   };
 }
 
@@ -2941,10 +2944,17 @@ function regraDeRepeticao_(canal, escolha) {
     if (chave) jaDentro[chave] = true;
   }
 
+  var hoje = new Date();
   return {
     partir: partir,
-    colunaDaData: canal.colunaDaData,
-    hoje: new Date(),
+    // Etapa 45, pedido do PO: "ao invés de 30 dias, vamos limitar apenas no
+    // mês vigente da importação". O caso da PLANILHA conta no mês de hoje,
+    // qualquer que seja a data que ele traga; o do PGO, no mês da data de
+    // recepção (ou, sem ela, da importação/cadastro). A mesma proposta que
+    // entrou em setembro e volta em outubro entra de novo.
+    colunaDaData: '',
+    hoje: hoje,
+    mes: RECC_NOMES_DOS_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(),
     jaDentro: jaDentro
   };
 }
@@ -2973,15 +2983,20 @@ function chaveDaPropostaNoMes_(registro, partir, colunaDaData, hoje) {
  * MESMO arquivo — duas linhas iguais no lote também são repetição.
  */
 function ehRepetido_(regra, caso, vistosNestaLeva) {
-  if (!regra) return false;
+  if (!regra) return '';
 
+  // Devolve POR QUE repete (Etapa 45, pedido do PO: "deve ficar claro o porquê
+  // não foram importadas, se é pela planilha importada ou porque já tem no PGO
+  // naquele mês"): 'base' (já está no PGO) ou 'arquivo' (repete na planilha).
+  // Vazio quando não repete — e vazio é falso, para quem só pergunta se repete.
   if (regra.partir) {
     var chaveDoMes = chaveDaPropostaNoMes_(caso, regra.partir, regra.colunaDaData,
       regra.hoje);
-    if (!chaveDoMes) return false;
-    if (regra.jaDentro[chaveDoMes] || vistosNestaLeva[chaveDoMes]) return true;
+    if (!chaveDoMes) return '';
+    if (regra.jaDentro[chaveDoMes]) return 'base';
+    if (vistosNestaLeva[chaveDoMes]) return 'arquivo';
     vistosNestaLeva[chaveDoMes] = true;
-    return false;
+    return '';
   }
 
   var chave = normalizarParaComparar_(caso[regra.coluna]);
@@ -2989,10 +3004,108 @@ function ehRepetido_(regra, caso, vistosNestaLeva) {
   // As duas formas são conferidas porque não sabemos aqui se a coluna é
   // identificador: a base pode ter sido lida com um tipo e a fonte trazer o
   // valor com máscara. Pular por qualquer das duas é o lado seguro.
-  if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])
-    || vistosNestaLeva[chave || soDigitos]) return true;
+  if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])) return 'base';
+  if (vistosNestaLeva[chave || soDigitos]) return 'arquivo';
   vistosNestaLeva[chave || soDigitos] = true;
-  return false;
+  return '';
+}
+
+/** Como a proposta (ou o valor da coluna) repetida aparece na lista do laudo. */
+function comoMostrarORepetido_(regra, caso) {
+  if (regra.partir) {
+    return regra.partir.colunas.map(function (cabecalho) {
+      return converterParaIdentificador_(caso[cabecalho]);
+    }).join('-');
+  }
+  return String(caso[regra.coluna] === undefined ? '' : caso[regra.coluna]).trim();
+}
+
+/** Quantas propostas repetidas o laudo lista, em cada motivo. */
+const RECC_REPETIDOS_LISTADOS = 50;
+
+/** Os motivos para pular, com a lista do que repetiu. */
+function novosMotivosParaPular_(regra) {
+  return { vazia: 0, repetida: 0, repetidaNoArquivo: 0, jaNoPgo: 0,
+    listaNoArquivo: [], listaNoPgo: [], mes: regra && regra.mes ? regra.mes : '',
+    pelaProposta: !!(regra && regra.partir) };
+}
+
+function anotarORepetido_(motivos, regra, caso, porque) {
+  motivos.repetida++;
+  var mostrar = comoMostrarORepetido_(regra, caso);
+  if (porque === 'base') {
+    motivos.jaNoPgo++;
+    if (motivos.listaNoPgo.length < RECC_REPETIDOS_LISTADOS) motivos.listaNoPgo.push(mostrar);
+  } else {
+    motivos.repetidaNoArquivo++;
+    if (motivos.listaNoArquivo.length < RECC_REPETIDOS_LISTADOS) motivos.listaNoArquivo.push(mostrar);
+  }
+}
+
+/**
+ * A data de recepção dos casos importados (Etapa 45, pedido do PO): "muitas
+ * bases não têm uma data de recepção, e podemos escolher que venha com a data
+ * de hoje ou deixar a da planilha".
+ *   'hoje'     — a data de hoje em TODOS os casos (a da planilha é ignorada);
+ *   'planilha' — a da planilha; o caso que veio sem data fica com a de hoje.
+ * Sem escolha (página antiga), nada muda. Só vale para o canal que oferece a
+ * escolha — a RET (ver `dataDeRecepcaoNaImportacao_`).
+ */
+function aplicarDataDeRecepcao_(caso, canal, escolha, agora) {
+  var coluna = dataDeRecepcaoNaImportacao_(canal);
+  if (!coluna) return;
+  var qual = normalizarParaComparar_(escolha);
+  if (qual === 'hoje') { caso[coluna] = agora; return; }
+  if (qual === 'planilha' && String(caso[coluna] === undefined || caso[coluna] === null
+    ? '' : caso[coluna]).trim() === '') {
+    caso[coluna] = agora;
+  }
+}
+
+/** A coluna da data de recepção que a importação deixa escolher — só no canal com proposta (a RET). */
+function dataDeRecepcaoNaImportacao_(canal) {
+  if (!canal.colunaDaData || !partirDaPropostaDoCanal_(canal)) return '';
+  var estrutura = estruturaDaAba_(canal.aba);
+  return posicaoDaColuna_(estrutura, canal.colunaDaData) >= 0
+    ? grafiaDaColuna_(canal.aba, canal.colunaDaData) : '';
+}
+
+/**
+ * O prêmio que está sendo importado (Etapa 45, pedido do PO): "quando vamos
+ * tombar casos sempre colocamos prêmio mensal ou anual — mostre o valor que
+ * está sendo importado, se tiver uma coluna ou ambas". O anual é a coluna
+ * "valor do prêmio"; o mensal, "prêmio mensal". Só entra o que o de-para
+ * ligou, e só dos casos que vão entrar.
+ */
+const RECC_PREMIOS_DA_IMPORTACAO = [
+  { rotulo: 'Prêmio anual', coluna: 'valor do prêmio' },
+  { rotulo: 'Prêmio mensal', coluna: 'prêmio mensal' }
+];
+
+function somarPremios_(premios, caso) {
+  premios.forEach(function (premio) {
+    var bruto = caso[premio.coluna];
+    if (bruto === undefined || bruto === null || String(bruto).trim() === '') return;
+    var numero = converterParaNumero_(bruto);
+    if (numero === '' || numero === null || isNaN(numero)) return;
+    premio.total += Number(numero);
+    premio.casos++;
+  });
+}
+
+/** Os prêmios que o de-para leva para alguma coluna, zerados para somar. */
+function premiosDoDePara_(dePara, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var destinos = {};
+  (dePara || []).forEach(function (par) {
+    if (par && par.paraAColuna) destinos[normalizarParaComparar_(par.paraAColuna)] = true;
+  });
+  return RECC_PREMIOS_DA_IMPORTACAO.filter(function (premio) {
+    return posicaoDaColuna_(estrutura, premio.coluna) >= 0
+      && destinos[normalizarParaComparar_(premio.coluna)];
+  }).map(function (premio) {
+    return { rotulo: premio.rotulo, coluna: premio.coluna, total: 0, casos: 0 };
+  });
 }
 
 /**
@@ -3034,8 +3147,8 @@ function jaEstaNaBase_(canal, cabecalho) {
  * outra, o laudo prometeria um número e a base receberia outro — e ninguém
  * descobre isso olhando a tela.
  */
-function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra) {
-  var motivos = { vazia: 0, repetida: 0 };
+function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra, premios) {
+  var motivos = novosMotivosParaPular_(regra);
   var amostra = [];
   var entram = 0;
   var vistosNestaLeva = {};
@@ -3045,12 +3158,14 @@ function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra) {
 
     if (!temAlgumValor_(caso)) { motivos.vazia++; continue; }
 
-    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
-      motivos.repetida++;
+    var porque = ehRepetido_(regra, caso, vistosNestaLeva);
+    if (porque) {
+      anotarORepetido_(motivos, regra, caso, porque);
       continue;
     }
 
     entram++;
+    if (premios) somarPremios_(premios, caso);
     if (amostra.length < RECC_LINHAS_DE_AMOSTRA) amostra.push(caso);
   }
 
@@ -3300,7 +3415,8 @@ function importarCasos(idDoCanal, pedido) {
   var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
 
   var paraGravar = [];
-  var pulados = { vazia: 0, repetida: 0 };
+  var pulados = novosMotivosParaPular_(regra);
+  var premios = premiosDoDePara_(dePara, canal);
   var vistosNestaLeva = {};
 
   for (var i = 0; i < corpo.length; i++) {
@@ -3309,10 +3425,13 @@ function importarCasos(idDoCanal, pedido) {
 
     // ANTES da divisão: o repetido não chega a analista nenhum. Era o que o
     // PO viu acontecer — a mesma proposta indo para duas pessoas.
-    if (ehRepetido_(regra, caso, vistosNestaLeva)) {
-      pulados.repetida++;
+    var porque = ehRepetido_(regra, caso, vistosNestaLeva);
+    if (porque) {
+      anotarORepetido_(pulados, regra, caso, porque);
       continue;
     }
+    somarPremios_(premios, caso);
+    aplicarDataDeRecepcao_(caso, canal, pedido.dataDeRecepcao, agora);
 
     if (colunaDoAnalista && analistas.length && !caso[colunaDoAnalista]) {
       // Rodízio pelo número de casos JÁ MONTADOS, e não pelo índice da linha
@@ -3330,8 +3449,9 @@ function importarCasos(idDoCanal, pedido) {
   }
 
   if (!paraGravar.length) {
-    throw new Error('Nenhuma linha entraria: ' + pulados.vazia + ' em branco e '
-      + pulados.repetida + ' já estão na base. Nada foi gravado.');
+    throw new Error('Nenhuma linha entraria: ' + pulados.vazia + ' em branco, '
+      + pulados.jaNoPgo + ' já estão no PGO' + (pulados.mes ? ' em ' + pulados.mes : '')
+      + ' e ' + pulados.repetidaNoArquivo + ' repetidas na própria planilha. Nada foi gravado.');
   }
 
   // _Origem = PLANILHA porque o dado veio de FORA, e não da tela do PGO. É o
@@ -3349,6 +3469,7 @@ function importarCasos(idDoCanal, pedido) {
     origem: nomeDoLote,
     entraram: gravados.length,
     pulados: pulados,
+    premios: premios,
     analistas: analistas,
     primeiroId: gravados.length ? gravados[0].__id : '',
     ultimoId: gravados.length ? gravados[gravados.length - 1].__id : ''
@@ -3540,6 +3661,9 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
     // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.
     repeticaoPelaProposta: repeticaoPelaProposta,
+    // Etapa 45: a escolha da data de recepção (hoje / da planilha) — só no
+    // canal com proposta, a RET. Vazio: a tela não mostra a escolha.
+    dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
 }

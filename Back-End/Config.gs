@@ -739,6 +739,9 @@ function salvarItemDoCatalogo(dados) {
       }
     }
     atualizarRegistro_('CATALOGO', id, campos);
+    if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
+      renomearNosCartoes_(atual.Nome, nome, tipo, campos.CanalId);
+    }
     registrarAuditoria_('catalogo.editar', 'CATALOGO', id, tipo);
     return id;
   }
@@ -746,6 +749,38 @@ function salvarItemDoCatalogo(dados) {
   var criado = inserirRegistro_('CATALOGO', campos);
   registrarAuditoria_('catalogo.criar', 'CATALOGO', criado.__id, tipo);
   return criado.__id;
+}
+
+/**
+ * O item renomeado leva junto os cartões que o contavam (Etapa 44).
+ *
+ * Relato do PO: os cards "não funcionam" e "ficam presos". A causa: o status
+ * renomeado em Ajustes Gerais deixava o cartão apontando para o nome antigo —
+ * contava zero, filtrava a fila para vazio e travava o salvar dos cartões.
+ * Vale para o cartão de status e para o de valor de um campo cuja lista é a do
+ * item renomeado.
+ */
+function renomearNosCartoes_(antigo, novo, tipo, canalDoItem) {
+  var velho = normalizarParaComparar_(antigo);
+  var doItem = converterParaIdentificador_(canalDoItem);
+  var listaDaColuna = {};
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    var catalogo = String(lerConfiguracaoDoCampo_(campo).catalogo || '').toUpperCase();
+    if (!catalogo) return;
+    listaDaColuna[converterParaIdentificador_(campo.CanalId) + '|'
+      + normalizarParaComparar_(campo.Cabecalho)] = catalogo;
+  });
+  lerRegistros_('PAINEIS').forEach(function (linha) {
+    if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return;
+    if (normalizarParaComparar_(linha.Filtro) !== velho) return;
+    var canal = converterParaIdentificador_(linha.CanalId);
+    if (doItem && canal !== doItem) return;
+    var dimensao = dimensaoDoCartao_(linha.CampoDimensao);
+    var dele = (dimensao === 'situacao' && tipo === 'STATUS')
+      || (dimensao === 'valor'
+        && listaDaColuna[canal + '|' + normalizarParaComparar_(linha.CampoMedida)] === tipo);
+    if (dele) atualizarRegistro_('PAINEIS', linha.__id, { Filtro: novo });
+  });
 }
 
 /** Algum campo do formulário usa esta lista? É o que faz um item dela carimbar. */
@@ -1947,7 +1982,7 @@ function listarCardsDoPainel(tela, idDoCanal) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
     })
     .map(function (linha) {
-      return {
+      var cartao = {
         id: linha.__id,
         titulo: String(linha.Titulo || ''),
         dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
@@ -1957,6 +1992,11 @@ function listarCardsDoPainel(tela, idDoCanal) {
         ordem: Number(linha.Ordem) || 0,
         mostrar: normalizarParaComparar_(linha.Ativo) === 'sim'
       };
+      // Etapa 44: o cartão que aponta para um status ou coluna que NÃO EXISTE
+      // MAIS vem marcado — a tela mostra o motivo, para trocar ou remover. Antes
+      // ele travava o salvar da lista inteira, e nenhum cartão saía mais.
+      cartao.naoExiste = motivoDoCartaoQueNaoExiste_(cartao, canal, estruturaDaBase);
+      return cartao;
     });
 
   return {
@@ -1968,6 +2008,28 @@ function listarCardsDoPainel(tela, idDoCanal) {
     oQueContar: oQueContar,
     cartoes: cartoes
   };
+}
+
+/**
+ * Por que este cartão não conta mais nada — ou vazio, quando está tudo certo.
+ * Acontece quando o status é renomeado ou apagado em Ajustes Gerais, ou a
+ * coluna some da planilha.
+ */
+function motivoDoCartaoQueNaoExiste_(cartao, canal, estrutura) {
+  if (cartao.dimensao === 'situacao') {
+    var existe = situacoesDoCanal_(canal).some(function (situacao) {
+      return normalizarParaComparar_(situacao.gravadoComo) === normalizarParaComparar_(cartao.filtro);
+    });
+    return existe ? '' : 'O status "' + cartao.filtro + '" não existe mais no canal. Troque o '
+      + 'que o cartão conta, ou remova o cartão.';
+  }
+  var coluna = cartao.dimensao === 'valor' ? cartao.coluna
+    : (cartao.dimensao === 'preenchido' ? cartao.filtro : '');
+  if (coluna && posicaoDaColuna_(estrutura, coluna) < 0) {
+    return 'A coluna "' + coluna + '" não existe mais na aba ' + canal.aba + '. Troque o que o '
+      + 'cartão conta, ou remova o cartão.';
+  }
+  return '';
 }
 
 /** Tipos de coluna que são data ou hora: ficam de fora dos cartões por coluna. */
@@ -2078,6 +2140,24 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     return s.gravadoComo;
   });
 
+  // O que já está gravado, por Id. A conferência abaixo vale para o cartão
+  // NOVO ou MUDADO: um cartão antigo que aponta para um status renomeado não
+  // pode impedir de salvar a lista — nem de removê-lo (Etapa 44, o "card
+  // preso" do PO). Ele segue gravado e aparece marcado na tela.
+  var comoEstava = {};
+  lerRegistros_('PAINEIS').forEach(function (linha) {
+    comoEstava[converterParaIdentificador_(linha.__id)] = [
+      normalizarParaComparar_(dimensaoDoCartao_(linha.CampoDimensao)),
+      normalizarParaComparar_(linha.Filtro), normalizarParaComparar_(linha.CampoMedida)].join('|');
+  });
+  function mudou(cartao) {
+    var id = converterParaIdentificador_(cartao.id);
+    if (!id || !comoEstava[id]) return true;
+    return comoEstava[id] !== [normalizarParaComparar_(cartao.dimensao),
+      normalizarParaComparar_(cartao.filtro),
+      normalizarParaComparar_(cartao.dimensao === 'valor' ? cartao.coluna : '')].join('|');
+  }
+
   lista.forEach(function (cartao, posicao) {
     // Card que chega vazio é página antiga ou tela quebrada: recado, e não erro
     // cru do JavaScript (item 96).
@@ -2094,6 +2174,7 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
       throw new Error('Não sei contar isso. As contagens são: total, ' +
         'situacao, naCelula, preenchido e valor.');
     }
+    if (!mudou(cartao)) return;
     if (cartao.dimensao === 'preenchido') {
       // A coluna tem de existir AGORA, e não na hora de desenhar. Guardar um
       // cartão que aponta para coluna inexistente cria um cartão que some da

@@ -46,6 +46,9 @@ var TelaImportacao = (function () {
   // padrão do canal (Não trabalhado na RET, sem status na Mesa). Vazio é
   // "sem status", escolha de verdade.
   var statusDoLote = null;
+  // Etapa 45: a data de recepção dos casos (RET) — 'planilha' (sem data fica
+  // hoje) ou 'hoje' (todos com a data de hoje).
+  var dataDeRecepcao = 'planilha';
   // O que importar. Na Mesa há dois destinos: os casos do canal e os
   // atendimentos do chat (pedido do PO: "ler uma planilha de chat ficou confuso"
   // — agora o chat entra por esta mesma tela). O fluxo é o mesmo; muda o
@@ -195,7 +198,7 @@ var TelaImportacao = (function () {
     var pulados = laudo.vaoSerPuladas
       ? '<div class="indicador tom-atencao" title="'
         + laudo.motivosParaPular.vazia + ' em branco, '
-        + laudo.motivosParaPular.repetida + ' já na base">'
+        + laudo.motivosParaPular.repetida + ' repetidas">'
         + '<span class="rotulo">Vão ser puladas'
         + '</span><strong class="numero">' + laudo.vaoSerPuladas + '</strong>'
         + '</div>'
@@ -207,7 +210,14 @@ var TelaImportacao = (function () {
       + '<div class="indicador tom-bom"><span class="rotulo">Vão entrar</span>'
       + '<strong class="numero">' + laudo.vaoEntrar + '</strong></div>'
       + pulados
+      + (laudo.premios || []).map(function (premio) {
+        return '<div class="indicador tom-neutro" title="Soma da coluna &quot;'
+          + escapar(premio.coluna) + '&quot; dos ' + premio.casos + ' caso(s) que vão entrar e '
+          + 'trazem o valor"><span class="rotulo">' + escapar(premio.rotulo) + ' importado'
+          + '</span><strong class="numero">' + emReais(premio.total) + '</strong></div>';
+      }).join('')
       + '</div>'
+      + porQueRepetem(laudo.motivosParaPular, 'vão ficar de fora')
       + (laudo.passaDoLimite
         ? '<p class="aviso-janela">São ' + laudo.linhasNaFonte + ' linhas, e o '
           + 'limite é ' + laudo.limite + '. Divida em levas: se o mapeamento '
@@ -375,7 +385,8 @@ var TelaImportacao = (function () {
         : '')
       + '</p>'
       + desenharAnalistas()
-      + escolhaDoStatusDoLote();
+      + escolhaDoStatusDoLote()
+      + escolhaDaDataDeRecepcao();
   }
 
   /*
@@ -405,6 +416,28 @@ var TelaImportacao = (function () {
           + (opcoes.statusQueEsperaAPessoa ? ' O prazo só começa quando alguém puser o caso '
             + 'em <strong>' + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que '
             + 'o sistema anota a data.' : ''))
+      + '</p>';
+  }
+
+  /**
+   * A data de recepção dos casos (Etapa 45, só na RET). Pedido do PO: "muitas
+   * bases não têm uma data de recepção — podemos escolher que venha com a data
+   * de hoje ou deixar a da planilha".
+   */
+  function escolhaDaDataDeRecepcao() {
+    var coluna = opcoes.dataDeRecepcao;
+    if (!coluna) return '';
+    return '<div class="grade"><label class="campo">'
+      + '<span>' + escapar(coluna.charAt(0).toUpperCase() + coluna.slice(1)) + '</span>'
+      + '<select class="filtro" id="data-de-recepcao">'
+      + '<option value="planilha"' + (dataDeRecepcao === 'planilha' ? ' selected' : '')
+      + '>A da planilha (sem data, fica a de hoje)</option>'
+      + '<option value="hoje"' + (dataDeRecepcao === 'hoje' ? ' selected' : '')
+      + '>A data de hoje, para todos os casos</option>'
+      + '</select></label></div>'
+      + '<p class="config-dica">' + (dataDeRecepcao === 'hoje'
+        ? 'Todos os casos vão entrar com a data de hoje, mesmo os que trazem data na planilha.'
+        : 'Vale a data que a planilha trouxer; o caso que vier sem data entra com a de hoje.')
       + '</p>';
   }
 
@@ -491,6 +524,34 @@ var TelaImportacao = (function () {
   }
 
   /** Passo 3: o que entrou. */
+  /** R$ 1.234,56 — o prêmio, como a operação lê. */
+  function emReais(valor) {
+    var numero = Number(valor) || 0;
+    return 'R$ ' + numero.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  /**
+   * Por que cada repetida fica de fora — pedido do PO (Etapa 45): "deve ficar
+   * claro o porquê não foram importadas, se é pela planilha importada ou porque
+   * já tem no PGO naquele mês". Com as propostas (até 50 de cada).
+   */
+  function porQueRepetem(motivos, verbo) {
+    if (!motivos || !motivos.repetida) return '';
+    var oQue = motivos.pelaProposta ? 'proposta(s)' : 'caso(s)';
+    var lista = function (itens, total) {
+      return itens.length ? ': <strong>' + escapar(itens.join(', ')) + '</strong>'
+        + (total > itens.length ? ' e mais ' + (total - itens.length) : '') : '';
+    };
+    return (motivos.jaNoPgo
+      ? '<p class="config-dica aviso-de-carimbo">' + motivos.jaNoPgo + ' ' + oQue + ' ' + verbo
+        + ' porque <strong>já estão no PGO</strong>' + (motivos.mes ? ' em ' + escapar(motivos.mes) : '')
+        + lista(motivos.listaNoPgo || [], motivos.jaNoPgo) + '.</p>' : '')
+      + (motivos.repetidaNoArquivo
+        ? '<p class="config-dica aviso-de-carimbo">' + motivos.repetidaNoArquivo + ' ' + oQue + ' '
+          + verbo + ' porque <strong>se repetem na própria planilha</strong> (entra só a primeira)'
+          + lista(motivos.listaNoArquivo || [], motivos.repetidaNoArquivo) + '.</p>' : '');
+  }
+
   function desenharResultado() {
     return '<section class="cartaa importação-passo">'
       + '<header class="grafico-cabeca"><h3>Importado</h3></header>'
@@ -499,16 +560,21 @@ var TelaImportacao = (function () {
       + (ehChat() ? 'Atendimentos que entraram' : 'Casos que entraram')
       + '</span><strong class="numero">' + resultado.entraram + '</strong></div>'
       + (resultado.pulados.repetida
-        ? '<div class="indicador tom-atencao"><span class="rotulo">Já estavam na base'
+        ? '<div class="indicador tom-atencao"><span class="rotulo">Repetidas, ficaram de fora'
           + '</span><strong class="numero">' + resultado.pulados.repetida
           + '</strong></div>'
         : '')
+      + (resultado.premios || []).map(function (premio) {
+        return '<div class="indicador tom-neutro"><span class="rotulo">' + escapar(premio.rotulo)
+          + ' importado</span><strong class="numero">' + emReais(premio.total) + '</strong></div>';
+      }).join('')
       + (resultado.pulados.vazia
         ? '<div class="indicador tom-neutro"><span class="rotulo">Linhas em branco'
           + '</span><strong class="numero">' + resultado.pulados.vazia
           + '</strong></div>'
         : '')
       + '</div>'
+      + porQueRepetem(resultado.pulados, 'ficaram de fora')
       + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, em '
       + escapar(resultado.canal) + '.'
       + (resultado.primeiroId
@@ -541,6 +607,7 @@ var TelaImportacao = (function () {
       colunaQueIdentifica = null;   // o canal novo traz a sugestão dele
       nomeDoLote = '';
       statusDoLote = null;          // e o status padrão dele
+      dataDeRecepcao = 'planilha';
       desenharSeletor();
       carregar();
     });
@@ -601,6 +668,10 @@ var TelaImportacao = (function () {
       guardarOQueEstaNaTela();
       desenhar();
     });
+    mudancas('#data-de-recepcao', function () {
+      guardarOQueEstaNaTela();
+      desenhar();
+    });
   }
 
   function desenharSeletor() {
@@ -649,6 +720,9 @@ var TelaImportacao = (function () {
 
     var status = elemento('status-do-lote');
     if (status) statusDoLote = status.value;
+
+    var recepcao = elemento('data-de-recepcao');
+    if (recepcao) dataDeRecepcao = recepcao.value;
   }
 
   /** O status que vale agora: o escolhido, ou o padrão do canal. */
@@ -668,7 +742,8 @@ var TelaImportacao = (function () {
         fonte: fonte,
         dePara: deParaEscolhido,
         colunaQueIdentifica: colunaQueIdentifica || '',
-        statusDoLote: statusQueVale()
+        statusDoLote: statusQueVale(),
+        dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     conferencia
       .entao(function (resposta) {
@@ -712,7 +787,8 @@ var TelaImportacao = (function () {
         colunaQueIdentifica: colunaQueIdentifica || '',
         analistas: escolhidos,
         origem: nomeDoLote,
-        statusDoLote: statusQueVale()
+        statusDoLote: statusQueVale(),
+        dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     gravacao
       .entao(function (resposta) {

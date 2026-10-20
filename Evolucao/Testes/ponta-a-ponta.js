@@ -946,7 +946,20 @@ async function rodar() {
     const cards = await pagina.$$eval('.cartoes .indicador', (es) => es.map((e) =>
       e.querySelector('.rotulo').textContent + '=' + e.querySelector('.numero').textContent
       + (e.tagName === 'BUTTON' ? ' (filtra)' : '')));
-    verdadeiro(cards.indexOf('1ª tentativa=1') >= 0, 'o card conta o caso: ' + cards.join(', '));
+    verdadeiro(cards.indexOf('1ª tentativa=1 (filtra)') >= 0, 'o card conta o caso: ' + cards.join(', '));
+
+    // Etapa 44: clicar no card de valor filtra a fila pelo que ele conta.
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: '1ª tentativa' }).first().click();
+    await pagina.waitForTimeout(900);
+    const linhas = await pagina.locator('.fila tbody tr').count();
+    igual(linhas, 1, 'a fila fica com o caso do card');
+    igual(await pagina.locator('.cartoes .indicador.ligado', { hasText: '1ª tentativa' }).count(), 1,
+      'e o card fica marcado');
+    const outros = await pagina.$$eval('.cartoes .indicador', (es) => es.map((e) =>
+      e.querySelector('.rotulo').textContent + '=' + e.querySelector('.numero').textContent));
+    verdadeiro(outros.indexOf('Total de casos=4') >= 0, 'os outros cards não zeram: ' + outros.join(', '));
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: '1ª tentativa' }).first().click();
+    await pagina.waitForTimeout(900);
   });
 
   /* ------------------------------------------- o Trabalho que não estoura -- */

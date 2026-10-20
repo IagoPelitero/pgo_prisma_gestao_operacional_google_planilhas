@@ -135,7 +135,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   // da Produtividade RECC, pelo mesmo motivo: num "últimos 30 dias" ela é um
   // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
   // o qual não dá para afirmar que é de setembro.
-  var guardarSemData = (periodo.tipo === 'dias');
+  var guardarSemData = guardaOsSemData_(periodo);
 
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
     guardarSemData);
@@ -154,6 +154,10 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var anterioresFiltrados = aplicarBusca_(
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
   var pertoDeVencer = casosPertoDeVencer_(filtrados, canal);
+  // O CARTÃO CLICADO filtra a FILA pelo que ele conta (Etapa 44) — o status, o
+  // valor de uma coluna (o Status proposta), a coluna preenchida. Os cartões
+  // continuam contando sem ele: clicar em "Pendente" não pode zerar os outros.
+  var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
 
   return {
     canal: canal,
@@ -174,7 +178,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     // valores; o nome de cada coluna já está em `colunas`, e a tela remonta.
     // `total` continua sendo a fila inteira.
     fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
-      ? filtrados : filtrados.slice(-RECC_FILA_NA_ABERTURA), canal)),
+      ? naFila : naFila.slice(-RECC_FILA_NA_ABERTURA), canal)),
     filaCompacta: true,
     // O aviso de prazo olha a fila INTEIRA — um caso perto de vencer que não
     // está entre os 100 mais recentes é justamente o que mais precisa do aviso.
@@ -185,7 +189,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     quantosPertoDeVencer: pertoDeVencer.length,
     mostrarNaFila: { padrao: RECC_CASOS_NA_FILA, opcoes: RECC_OPCOES_DE_CASOS_NA_FILA,
       naAbertura: RECC_FILA_NA_ABERTURA },
-    total: filtrados.length,
+    total: naFila.length,
     totalNoPeriodo: meus.length,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
@@ -300,6 +304,11 @@ function resolverPeriodo_(pedido, diasPadrao) {
       var janela = periodoPorDias_(padrao);
       return {
         tipo: 'intervalo',
+        // É a ABERTURA: o caso sem data continua aparecendo, como no antigo
+        // "últimos 30 dias" (ver guardaOsSemData_). Etapa 44: sem esta marca, a
+        // troca da abertura para "Por data" escondeu os casos importados sem
+        // data de recepção — e os cartões passaram a contar menos.
+        abertura: true,
         de: janela.de,
         ate: janela.ate,
         dias: janela.dias,
@@ -327,6 +336,16 @@ function resolverPeriodo_(pedido, diasPadrao) {
   }
 
   return periodoPorDias_(Number(pedido.dias) || padrao);
+}
+
+/**
+ * O caso SEM data entra neste período? Na abertura da tela (e no antigo "por
+ * dias"), sim: é um caso mal preenchido, e some-lo esconderia justamente quem
+ * precisa de atenção. Num período escolhido de/até ou num mês, não: não dá
+ * para afirmar que ele é desse período.
+ */
+function guardaOsSemData_(periodo) {
+  return periodo.tipo === 'dias' || periodo.abertura === true;
 }
 
 function periodoPorDias_(dias) {
@@ -445,6 +464,9 @@ function mesesParaEscolher_() {
  * um campo em seletor, ele vira filtro sozinho; se desligar o campo, o filtro
  * some junto.
  */
+/** Quantas caixas de filtro o Trabalho mostra. Era 4; o PO pediu o Status proposta (Etapa 44). */
+const RECC_FILTROS_NO_TRABALHO = 6;
+
 function filtrosDoCanal_(canal, quem) {
   var disponiveis = [];
 
@@ -458,16 +480,32 @@ function filtrosDoCanal_(canal, quem) {
   //
   // A ordem do FORMULÁRIO segue o caminho de quem atende; a ordem dos FILTROS
   // segue o que a operação recorta. Amarrar uma na outra foi o defeito.
+  //
+  // Etapa 44, pedido do PO: o filtro do Status proposta. Logo depois do Status
+  // vêm os campos que APARECEM conforme o status (o Status proposta aparece no
+  // Retido); depois os outros campos de lista. Até 6 caixas.
   var colunaDoStatus = normalizarParaComparar_(canal.colunaDoStatus || '');
-  var campos = camposAtivosDoCanal_(canal.id).slice().sort(function (um, outro) {
-    var umEhStatus = normalizarParaComparar_(um.Cabecalho) === colunaDoStatus;
-    var outroEhStatus = normalizarParaComparar_(outro.Cabecalho) === colunaDoStatus;
-    if (umEhStatus === outroEhStatus) return 0;
-    return umEhStatus ? -1 : 1;
+  var ativos = camposAtivosDoCanal_(canal.id);
+  var chaveDoStatus = '';
+  ativos.forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Cabecalho) === colunaDoStatus) {
+      chaveDoStatus = String(campo.ChaveTecnica);
+    }
   });
+  function prioridade(campo) {
+    if (normalizarParaComparar_(campo.Cabecalho) === colunaDoStatus) return 0;
+    var condicao = lerConfiguracaoDoCampo_(campo).mostrarSe;
+    if (chaveDoStatus && condicao && String(condicao.campo) === chaveDoStatus) return 1;
+    return 2;
+  }
+  var campos = ativos.map(function (campo, ordem) {
+    return { campo: campo, prioridade: prioridade(campo), ordem: ordem };
+  }).sort(function (um, outro) {
+    return um.prioridade - outro.prioridade || um.ordem - outro.ordem;
+  }).map(function (item) { return item.campo; });
 
   campos.forEach(function (campo) {
-    if (disponiveis.length >= 4) return;   // mais que isso vira parede de caixas
+    if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;   // mais vira parede de caixas
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 
@@ -544,6 +582,21 @@ function aplicarBusca_(registros, canal, termo) {
     });
   });
   colunasDaBusca_(canal).forEach(guardar);
+  // E TODAS as outras colunas do caso (Etapa 44, pedido do PO): "digitando
+  // 'aguardando transmissão' não acha os casos" — o Status proposta, criado
+  // fora do contrato, não estava na fila nem nas colunas da busca. As técnicas
+  // ("_Visivel"…) ficam de fora.
+  // Nas colunas de IDENTIFICADOR que entram só por esta regra, a busca vale
+  // quando o termo parece um número (CPF, Id, protocolo): elas comparam só os
+  // dígitos, e "Caso número 1" acharia o caso de Id 0000000001.
+  var termoEhNumero = /^[\d\s.\-\/]+$/.test(String(termo).trim());
+  var estrutura = estruturaDaAba_(canal.aba);
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    if (!cabecalho || String(cabecalho).charAt(0) === '_') return;
+    var tipo = estrutura.tipos[posicao];
+    if (tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR && !termoEhNumero) return;
+    guardar({ cabecalho: cabecalho, tipo: tipo });
+  });
 
   return registros.filter(function (registro) {
     return onde.some(function (coluna) {
@@ -608,9 +661,26 @@ function contarCartoes_(registros, anteriores, canal, tela) {
   // status filtra. Antes a tela deduzia pela chave, e um cartão "Já passaram
   // por" clicado filtrava a fila por um status com o nome do cartão — fila
   // vazia, sem erro.
+  var existentes = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    existentes[normalizarParaComparar_(situacao.gravadoComo)] = true;
+  });
+
   return cartoesDoCanal_(canal, tela).map(function (cartao) {
+    // O cartão de um status que NÃO EXISTE MAIS (renomeado ou apagado em Ajustes
+    // Gerais) some, em vez de aparecer com zero e parecer um problema da
+    // operação. Em Configurações ele aparece marcado, para trocar ou remover.
+    if (cartao.dimensao === 'situacao' && !existentes[normalizarParaComparar_(cartao.filtro)]) {
+      return null;
+    }
     var feito = umCartao(cartao);
-    if (feito) feito.dimensao = cartao.dimensao;
+    if (feito) {
+      feito.dimensao = cartao.dimensao;
+      // Clicar filtra a fila pelo que o cartão CONTA (Etapa 44). O "Total" é
+      // o desligar; "Finalizados na célula" não é uma regra de linha.
+      feito.id = cartao.id;
+      feito.filtravel = cartao.dimensao !== 'naCelula';
+    }
     return feito;
   }).filter(function (cartao) { return cartao !== null; });
 
@@ -646,6 +716,38 @@ function contarCartoes_(registros, anteriores, canal, tela) {
     return montarCartao_(chave, cartao.titulo, agora[chave] || 0,
       antes[chave] || 0, cartao.cor || tons[chave] || 'neutro', '');
   }
+}
+
+/**
+ * Os casos que um cartão conta — para a fila, quando a pessoa clica nele
+ * (Etapa 44). A regra é a MESMA da contagem: o número do cartão e o tamanho da
+ * fila filtrada têm de bater. Cartão que não existe (ou o "Total"): a fila
+ * inteira.
+ */
+function filtrarPeloCartao_(registros, canal, idDoCartao) {
+  var id = converterParaIdentificador_(idDoCartao);
+  if (!id) return registros;
+  var cartao = cartoesDoCanal_(canal, 'trabalho').filter(function (um) {
+    return converterParaIdentificador_(um.id) === id;
+  })[0];
+  if (!cartao || cartao.dimensao === 'total' || cartao.dimensao === 'naCelula') return registros;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var coluna = cartao.dimensao === 'situacao' ? canal.colunaDoStatus
+    : (cartao.dimensao === 'valor' ? cartao.coluna : cartao.filtro);
+  if (!coluna || posicaoDaColuna_(estrutura, coluna) < 0) return [];
+  coluna = grafiaDaColuna_(canal.aba, coluna);
+
+  if (cartao.dimensao === 'preenchido') {
+    return registros.filter(function (registro) {
+      return String(registro[coluna] === null || registro[coluna] === undefined
+        ? '' : registro[coluna]).trim() !== '';
+    });
+  }
+  var procurado = normalizarParaComparar_(cartao.filtro);
+  return registros.filter(function (registro) {
+    return normalizarParaComparar_(registro[coluna]) === procurado;
+  });
 }
 
 /**
@@ -1764,6 +1866,141 @@ const RECC_AGREGACOES = {
 const RECC_MAXIMO_DE_FATIAS = 6;
 
 /**
+ * As três colunas de prêmio da RET (Etapa 46): anual = "valor do prêmio",
+ * mensal = "prêmio mensal", retido = "valor do prêmio retido". `null` quando o
+ * canal não tem as três — e aí nada disto aparece (hoje, só a RET tem).
+ */
+function colunasDosPremios_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achar = function (nome) {
+    var posicao = posicaoDaColuna_(estrutura, nome);
+    return posicao < 0 ? '' : estrutura.cabecalhos[posicao];
+  };
+  var colunas = { anual: achar('valor do prêmio'), mensal: achar('prêmio mensal'),
+    retido: achar('valor do prêmio retido') };
+  return colunas.anual && colunas.mensal && colunas.retido ? colunas : null;
+}
+
+function somaDaColuna_(casos, coluna) {
+  return casos.reduce(function (soma, caso) {
+    var numero = converterParaNumero_(caso[coluna]);
+    return soma + (numero === '' || numero === null || isNaN(numero) ? 0 : Number(numero));
+  }, 0);
+}
+
+/** "Prêmios: anual, mensal e retido" — três barras, a soma de cada coluna nos casos da tela. */
+function graficoDosPremios_(casos, colunas) {
+  var pontos = [['anual', 'Prêmio anual', colunas.anual], ['mensal', 'Prêmio mensal', colunas.mensal],
+    ['retido', 'Prêmio retido', colunas.retido]].map(function (par) {
+    var comValor = casos.filter(function (caso) {
+      var numero = converterParaNumero_(caso[par[2]]);
+      return numero !== '' && numero !== null && !isNaN(numero) && Number(numero) !== 0;
+    }).length;
+    return { chave: par[0], rotulo: par[1], valor: somaDaColuna_(casos, par[2]), casos: comValor,
+      ehOutros: false, tom: par[0] === 'retido' ? 'bom' : '', serie: 0 };
+  });
+  return {
+    titulo: 'Prêmios: anual, mensal e retido',
+    tipo: 'barras',
+    largura: 2,
+    dimensao: 'Prêmio',
+    medida: 'Valor',
+    agregacao: 'soma',
+    unidade: 'dinheiro',
+    ehTempo: false,
+    pontos: pontos,
+    tendencia: null,
+    // Somar anual, mensal e retido não dá um número que signifique alguma coisa.
+    total: null,
+    aviso: ''
+  };
+}
+
+/**
+ * O valor embaixo de cada cartão de status (Etapa 46, pedido do PO): "embaixo
+ * de cada status deve ter o valor anual das propostas, sendo apenas o retido
+ * que irá trazer o valor total dos retidos da coluna prêmio retido".
+ */
+function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
+  var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
+  if (!colunaDoStatus) return;
+  var porChave = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    porChave[normalizarParaComparar_(situacao.gravadoComo)] = situacao.gravadoComo;
+  });
+  cartoes.forEach(function (cartao) {
+    if (cartao.dimensao !== 'situacao') return;
+    var doStatus = casos.filter(function (caso) {
+      return normalizarParaComparar_(caso[colunaDoStatus]) === cartao.chave;
+    });
+    var ehRetido = cartao.chave === 'retido';
+    cartao.soma = somaDaColuna_(doStatus, ehRetido ? colunas.retido : colunas.anual);
+    cartao.rotuloDaSoma = ehRetido ? 'prêmio retido' : 'prêmio anual';
+  });
+}
+
+/**
+ * A produtividade de cada analista, uma linha por pessoa (Etapa 46, pedido do
+ * PO: "por último a produtividade por analista mostrando tudo
+ * individualmente"): o total, quantos em cada status e os três prêmios.
+ */
+function quadroPorAnalista_(casos, canal, colunas) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+  var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
+  var status = situacoesDoCanal_(canal).map(function (situacao) {
+    return { chave: normalizarParaComparar_(situacao.gravadoComo), nome: situacao.nome };
+  });
+  var porAnalista = {};
+  var ordem = [];
+  casos.forEach(function (caso) {
+    var nome = String((colunaDoAnalista ? caso[colunaDoAnalista] : '') || '').trim() || 'Sem analista';
+    var chave = normalizarParaComparar_(nome);
+    if (!porAnalista[chave]) {
+      porAnalista[chave] = { analista: nome, total: 0, porStatus: {}, casos: [] };
+      ordem.push(chave);
+    }
+    var linha = porAnalista[chave];
+    linha.total++;
+    linha.casos.push(caso);
+    var doStatus = colunaDoStatus ? normalizarParaComparar_(caso[colunaDoStatus]) : '';
+    linha.porStatus[doStatus] = (linha.porStatus[doStatus] || 0) + 1;
+  });
+  // Só os status que aparecem em alguém: uma coluna de zeros não diz nada.
+  var usados = status.filter(function (s) {
+    return ordem.some(function (chave) { return porAnalista[chave].porStatus[s.chave]; });
+  });
+  var linhas = ordem.map(function (chave) {
+    var linha = porAnalista[chave];
+    return {
+      analista: linha.analista,
+      total: linha.total,
+      porStatus: usados.map(function (s) { return linha.porStatus[s.chave] || 0; }),
+      anual: somaDaColuna_(linha.casos, colunas.anual),
+      mensal: somaDaColuna_(linha.casos, colunas.mensal),
+      retido: somaDaColuna_(linha.casos, colunas.retido)
+    };
+  }).sort(function (um, outro) {
+    return outro.total - um.total || (um.analista < outro.analista ? -1 : 1);
+  });
+  return {
+    status: usados.map(function (s) { return s.nome; }),
+    linhas: linhas,
+    totais: {
+      total: casos.length,
+      porStatus: usados.map(function (s) {
+        return ordem.reduce(function (soma, chave) {
+          return soma + (porAnalista[chave].porStatus[s.chave] || 0);
+        }, 0);
+      }),
+      anual: somaDaColuna_(casos, colunas.anual),
+      mensal: somaDaColuna_(casos, colunas.mensal),
+      retido: somaDaColuna_(casos, colunas.retido)
+    }
+  };
+}
+
+/**
  * O painel inteiro: todos os gráficos do canal, já calculados.
  *
  * Vem numa chamada só porque a tela abre mostrando todos ao mesmo tempo —
@@ -1782,7 +2019,7 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   // Linha sem data FICA no atalho e SAI dos períodos fechados. Num "últimos 30
   // dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela
   // é um caso sobre o qual não dá para afirmar que é de setembro.
-  var guardarSemData = (periodo.tipo === 'dias');
+  var guardarSemData = guardaOsSemData_(periodo);
 
   var noPeriodo = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
@@ -1800,6 +2037,9 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   var componentes = componentesDoCanal_(canal).map(function (componente) {
     return calcularComponente_(componente, casos, canal);
   });
+  var colunasDosPremios = colunasDosPremios_(canal);
+  var cartoes = contarCartoes_(casos, casosDeAntes, canal, 'produtividade');
+  if (colunasDosPremios) somarPremiosNosCartoes_(cartoes, casos, canal, colunasDosPremios);
 
   return {
     canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
@@ -1817,8 +2057,18 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
     truncada: truncada,
     linhasLidas: recentes.length,
     filtrosDisponiveis: disponiveis,
-    cartoes: contarCartoes_(casos, casosDeAntes, canal, 'produtividade'),
+    cartoes: cartoes,
     componentes: componentes,
+    /*
+      ETAPA 46, pedido do PO (só a RET por enquanto): "o gráfico que mostra o
+      valor do prêmio anual total, mensal e retido deve ser o primeiro", e "por
+      último a produtividade por analista mostrando tudo individualmente". Vêm
+      FORA de `componentes`, como o valor por situação: são do canal (as
+      colunas de prêmio), e não da lista que Configurações edita. `null` no
+      canal que não tem as colunas de prêmio.
+    */
+    premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
+    porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
     /*
       O VALOR POR SITUAÇÃO vem FORA de `componentes`, e de propósito.
       `componentes` é a lista que a tela de Configurações edita — tirar,
@@ -2271,7 +2521,7 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   // a pessoa concluiria, com razão, que um dos dois está errado.
   var meus = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-      periodo.tipo === 'dias'),
+      guardaOsSemData_(periodo)),
     canal, quem);
   var casos = aplicarFiltros_(meus, filtrosDoCanal_(canal, quem), filtros || {});
 
@@ -2580,7 +2830,7 @@ function minhaPerformance(idDoCanal, periodoPedido) {
   // e número incompleto vira julgamento errado sobre alguém.
   var truncada = recentes.length >= linhasQueOPainelOlha_();
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-    periodo.tipo === 'dias');
+    guardaOsSemData_(periodo));
   var anterior = entreDuasDatas_(recentes, canal, antesDele.de, antesDele.ate, false);
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));

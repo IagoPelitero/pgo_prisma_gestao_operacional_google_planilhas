@@ -34,7 +34,7 @@ const { mundo, ehErroInterno, funcoesPublicas } = require('./varredura-geral');
 
 const TELAS = telasDoSistema();
 const CLICAVEIS = [
-  '[data-tela]', '[data-secao]', '[data-canal]', '[data-cartao]', '[data-situacao]',
+  '[data-tela]', '[data-secao]', '[data-canal]', '[data-cartao]', '[data-cartao-da-fila]',
   '[data-corretora]', '[data-produto]', '[data-usuario]', '[data-nivel]',
   '[data-item]', '[data-campo-config]', '[data-analise]', '[data-sinalizador]',
   '[data-tela-do-painel]', '[data-canal-dos-cards]', '[data-aba-corretoras]',

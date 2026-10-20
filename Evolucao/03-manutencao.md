@@ -153,6 +153,23 @@ a tentativa de contato (achado 98). Troque o `tipo` da coluna no contrato para
 `texto` — ou o tipo do campo, se a coluna é que está certa. Antes dessa guarda, o
 valor ia em branco sem aviso.
 
+### Um card do Trabalho mostra zero ou sumiu
+
+Desde a Etapa 44, um card de status que aponta para um status que **não existe
+mais** some do Trabalho e aparece marcado em **Configurações › Painéis**, dizendo o
+que sumiu. Troque o que ele conta, ou remova. Renomear o status pela tela já leva
+o card junto; o que deixa o card órfão é mudar o nome **direto na planilha**
+(CATALOGO) ou apagar o status.
+
+### Os 4 cards da RET não foram montados
+
+O `atualizarPGO()` monta Total de casos, Aguardando transmissão, Pendente e
+Contatando **uma vez só**, e só se existirem o status **Contatando**, o campo
+**Status proposta** e o item **Aguardando transmissão** na lista dele. O resultado
+diz o que faltou. Crie o que falta e rode de novo — ou monte os cards à mão em
+Configurações › Painéis. Para ele montar de novo depois de já ter montado, apague a
+chave `MIGRACAO.CARDS_DA_RET` da `CONFIG`.
+
 ### Tirei um registro de cadastro e quero de volta
 
 Nos cadastros (usuários, corretoras, SUSEPs, itens de configuração), tirar

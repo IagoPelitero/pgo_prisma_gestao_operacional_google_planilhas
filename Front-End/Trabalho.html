@@ -63,23 +63,26 @@ var TelaTrabalho = (function () {
    * Os cartões. Clicar num deles filtra a fila por aquela situação — é o
    * gesto que a tela existe para atender: "é isso que eu tenho de trabalhar".
    *
-   * Só o cartão de STATUS filtra. Os que contam por coluna ("Já passaram
-   * por", "Preenchida", o valor de um campo) não têm status para filtrar:
-   * clicados, filtravam a fila por um status com o nome do cartão, e a fila
-   * ficava vazia.
+   * CLICAR NUM CARTÃO FILTRA A FILA pelo que ele conta (Etapa 44): o status,
+   * o valor de uma coluna (o Status proposta: "Aguardando transmissão"), a
+   * coluna preenchida. Quem decide é o servidor, pelo Id do cartão — a mesma
+   * regra da contagem, para o número do cartão e a fila baterem. Antes só o
+   * cartão de status filtrava, e pelo NOME do cartão: um cartão chamado
+   * diferente do status deixava a fila vazia. Clicar de novo, ou no "Total",
+   * desliga. Os cartões continuam contando sem o filtro deles.
    */
   function desenharCartoes() {
     return '<div class="cartoes">'
       + resumo.cartoes.map(function (cartao) {
-        var filtravel = cartao.dimensao === 'situacao'
-          && resumo.filtrosDisponiveis.some(function (f) { return f.chave === 'status'; });
-        var ligado = filtravel
-          && normalizarTexto(filtrosEscolhidos.status) === normalizarTexto(cartao.rotulo);
+        var filtravel = cartao.filtravel === true && cartao.id !== undefined;
+        var ligado = filtravel && cartao.dimensao !== 'total'
+          && String(filtrosEscolhidos.cartao || '') === String(cartao.id);
 
         return '<' + (filtravel ? 'button type="button"' : 'div')
           + ' class="indicador tom-' + escapar(cartao.tom || 'neutro')
           + (filtravel ? ' clicavel' : '') + (ligado ? ' ligado' : '') + '"'
-          + (filtravel ? ' data-situacao="' + escapar(cartao.rotulo) + '"' : '')
+          + (filtravel ? ' data-cartao-da-fila="' + escapar(cartao.id) + '"'
+            + ' data-cartao-total="' + (cartao.dimensao === 'total' ? 'sim' : 'nao') + '"' : '')
           + (cartao.explicacao ? ' title="' + escapar(cartao.explicacao) + '"'
             : (filtravel ? ' title="Filtrar a fila por ' + escapar(cartao.rotulo) + '"' : ''))
           + '><span class="rotulo">' + escapar(cartao.rotulo) + '</span>'
@@ -571,10 +574,10 @@ var TelaTrabalho = (function () {
     var cartoes = document.querySelectorAll('.indicador.clicavel');
     for (var c = 0; c < cartoes.length; c++) {
       cartoes[c].addEventListener('click', function () {
-        var situacao = this.getAttribute('data-situacao');
-        // Clicar de novo no mesmo cartão desliga o filtro.
-        filtrosEscolhidos.status =
-          (filtrosEscolhidos.status === situacao) ? '' : situacao;
+        var id = this.getAttribute('data-cartao-da-fila');
+        // Clicar de novo no mesmo cartão — ou no "Total" — desliga o filtro.
+        filtrosEscolhidos.cartao = (this.getAttribute('data-cartao-total') === 'sim'
+          || String(filtrosEscolhidos.cartao || '') === id) ? '' : id;
         carregar();
       });
     }
