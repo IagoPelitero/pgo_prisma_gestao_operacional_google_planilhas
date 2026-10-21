@@ -40,6 +40,9 @@ const { rodarTestesDeVelocidade } = require('./testes-velocidade');
 const { rodarTestesDosCardsFiltrosEBusca } = require('./testes-cards-filtros-e-busca');
 const { rodarTestesDaImportacaoDaRet } = require('./testes-importacao-da-ret');
 const { rodarTestesDaProdutividadeDaRet } = require('./testes-produtividade-da-ret');
+const { rodarTestesDasTentativas } = require('./testes-tentativas');
+const { rodarTestesDoDeParaLembrado } = require('./testes-depara-lembrado');
+const { rodarTestesDasColunasForaDaRet } = require('./testes-colunas-fora-da-ret');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -70,6 +73,9 @@ rodarTestesDeVelocidade();
 rodarTestesDosCardsFiltrosEBusca();
 rodarTestesDaImportacaoDaRet();
 rodarTestesDaProdutividadeDaRet();
+rodarTestesDasTentativas();
+rodarTestesDoDeParaLembrado();
+rodarTestesDasColunasForaDaRet();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

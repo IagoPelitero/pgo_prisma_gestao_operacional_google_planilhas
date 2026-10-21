@@ -3024,6 +3024,64 @@ suja; varredura geral sem defeito.
 
 ---
 
+## Etapa 47 — Tentativas até o sucesso, e os contatos por CPF
+
+Pedido do PO: **"na produtividade RECC seja contabilizada a quantidade de contatos
+por CPF. Precisamos medir quantas vezes precisamos contatar o cliente para ter
+sucesso."** A regra, palavra dele: "a 1 e a 2 ficam carimbadas nas colunas Data do 1º
+contato e do 2º contato; Data concluído fica o sem sucesso, que é status. Enquanto
+está contatando, os analistas usam o status Contatando". Sucesso é Retido ou Não
+retido.
+
+| Parte | O que ficou |
+|---|---|
+| **A conta** | Sai dos carimbos, sem coluna nova: sucesso no 1º contato (sem tentativa carimbada), no 2º (com a Data do 1º contato), no 3º (com as duas). Sem sucesso de contato = as carimbadas + 1. Outro status = ainda tentando |
+| **O resumo** | Sucessos, contatos por sucesso (média), sem sucesso e ainda tentando, e o gráfico "Em qual contato o cliente atendeu" |
+| **Por analista** | A mesma conta, pessoa a pessoa |
+| **Por CPF** | O mesmo CPF em vários casos soma os contatos; o desfecho diz em qual contato deu certo. Os 100 CPFs com mais contatos (`RECC_CPFS_LISTADOS`); sem CPF fica fora, e é contado |
+| **Onde** | Produtividade da RET, depois dos gráficos e antes do quadro por analista. Obedece aos filtros e ao período |
+| **Achado 104** | A data com hora importada ("03/10/2026") virava 10 de março. Corrigido — é o que deixa a base antiga trazer as datas de contato certas |
+
+---
+
+## Etapa 48 — A importação lembra o de-para, e o seletor ganha busca
+
+Relato do PO: **"estou tendo dificuldade de localizar determinados nomes para fazer a
+importação, e quando altero o nome da coluna o PGO deixa de ler a coluna"**. A
+resposta foi não renomear coluna da base, e as duas melhorias que ele escolheu:
+
+| Parte | O que ficou |
+|---|---|
+| **(a) O de-para lembrado** | Ao gravar, a importação guarda o de-para do canal na `CONFIG` (`IMPORTACAO.DEPARA.<Id do canal>`), inclusive o "não trazer". A próxima conferência abre com ele, marcado "como na última importação". Soma de uma importação para a outra; cada canal tem o seu; carimbo e coluna que sumiu não voltam sozinhos; importação recusada não lembra nada |
+| **(b) O seletor** | Em ordem alfabética, com uma busca em cada linha: o seletor mostra só as colunas que contêm o texto, e sobrando uma ela fica escolhida. Vale também para o de-para do chat da Mesa |
+
+---
+
+## Etapa 49 — Grupo, agente da central e relacionamento saem do contrato da RET
+
+Pedido do PO: **"remova do contrato a coluna agente da central. Não estamos usando,
+remova também a coluna relacionamento. A coluna grupo"**.
+
+| Parte | O que ficou |
+|---|---|
+| **Planilha nova** | A RET nasce com 32 colunas, sem as três, e o formulário sem os três campos |
+| **Planilha em uso** | A coluna **fica**, com o dado — apagar coluna com dado nunca é decisão de migração. O `atualizarPGO()` desliga os três campos uma vez (`MIGRACAO.COLUNAS_FORA_DA_RET`) e avisa, em "decisão sua", que a coluna pode ser apagada na planilha quando você quiser. Quem religar o campo depois não o vê desligado de novo |
+| **O laudo** | As três passam a ser "colunas suas, fora do contrato": informação, sem alarme |
+
+**Números das Etapas 47, 48 e 49.** **1359 testes** (31 a mais: 14 em
+`testes-tentativas.js`, 12 em `testes-depara-lembrado.js` e 5 em
+`testes-colunas-fora-da-ret.js`, novos), cinco execuções seguidas sem falha.
+**14 quebras de propósito, 14 vermelhos** — o contato do sucesso, o "sem sucesso", a soma por CPF, o CPF com pontuação, a conta no servidor e o bloco na tela; o de-para lembrado (usar, gravar, o "não trazer", não sugerir carimbo), a ordem alfabética; a marca e o desligar da migração; e as duas partes da data com hora brasileira. Navegador: ponta a ponta **22/22** no repositório e no pacote — o
+roteiro da importação agora confere a ordem alfabética e a busca do de-para.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆) e rode **`atualizarPGO()`**: ele tira grupo, agente
+   da central e relacionamento do formulário da RET (as colunas ficam).
+2. **Implantar › Gerenciar implantações › editar › Versão: Nova versão**.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

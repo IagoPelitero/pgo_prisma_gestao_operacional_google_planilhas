@@ -31,7 +31,8 @@ function rodarTestesDaFundacao() {
     const base = planilha.getSheetByName('BASE_RET');
     // Base de caso leva 2 de controle (_Visivel e _Origem): o carimbo da
     // exclusão saiu delas, a pedido do PO — caso é excluído de vez.
-    igual(base.getMaxColumns(), 52, 'colunas de BASE_RET (50 + 2 de controle)');
+    // 47 desde a Etapa 49: grupo, agente da central e relacionamento saíram.
+    igual(base.getMaxColumns(), 49, 'colunas de BASE_RET (47 + 2 de controle)');
     igual(base.getMaxRows(), 2001, 'linhas de BASE_RET (reserva 2000 + cabeçalho)');
     const canal = planilha.getSheetByName('BASE_MESA');
     igual(canal.getMaxColumns(), 29, 'colunas de BASE_MESA (27 + 2 de controle)');

@@ -379,19 +379,19 @@ const RECC_ESQUEMA = {
       { cabecalho: 'nome do cliente', tipo: 'texto', protegido: true },
       { cabecalho: 'cod produto', tipo: 'identificador', protegido: true },
       { cabecalho: 'produto', tipo: 'texto', protegido: true },
-      { cabecalho: 'grupo', tipo: 'texto', protegido: true },
+      // "grupo", "agente da central" e "relacionamento" saíram do contrato na
+      // Etapa 49, pedido do PO: "não estamos usando". Numa planilha em uso elas
+      // continuam lá, com o dado — o atualizarPGO só tira os campos do formulário.
       { cabecalho: 'sistema', tipo: 'texto', protegido: true },
       { cabecalho: 'valor do prêmio', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
       // Era "prêmio mensal retido" — nome errado, palavra do PO: "deve ser
       // prêmio mensal". O retido é a coluna de cima. `atualizarPGO` renomeia.
       { cabecalho: 'prêmio mensal', tipo: 'dinheiro', protegido: true },
-      { cabecalho: 'agente da central', tipo: 'texto', protegido: true },
       // Quem passou o caso adiante. Só aparece no formulário quando o canal
       // de origem é a Central — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO.
       { cabecalho: 'nome de quem transferiu', tipo: 'texto', protegido: false },
       { cabecalho: 'canal', tipo: 'texto', protegido: true },
-      { cabecalho: 'relacionamento', tipo: 'texto', protegido: true },
       { cabecalho: 'contato', tipo: 'texto', protegido: true },
       // Texto, e não identificador: o protocolo da operação é alfanumérico
       // ("RET-2026-1024"), e como identificador ele perderia as letras — o
@@ -2098,7 +2098,23 @@ function converterParaDataEHora_(valor) {
   if (Object.prototype.toString.call(valor) === '[object Date]') {
     return isNaN(valor.getTime()) ? '' : valor;
   }
-  var d = new Date(String(valor));
+  var texto = String(valor).trim();
+  // "dd/MM/yyyy", com ou sem a hora — como se escreve aqui, e como a outra
+  // planilha chega na importação (getDisplayValues). `new Date("03/10/2026")`
+  // lê no padrão americano: 10 de março, e "25/10/2026" nem lê (achado 104).
+  var br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (br) {
+    var dia = diaQueExiste_(Number(br[3]), Number(br[2]), Number(br[1]));
+    if (!dia) return '';
+    if (br[4] !== undefined) {
+      var h = Number(br[4]);
+      var min = Number(br[5]);
+      if (h > 23 || min > 59) return '';
+      dia.setHours(h, min, Number(br[6] || 0));
+    }
+    return dia;
+  }
+  var d = new Date(texto);
   return isNaN(d.getTime()) ? '' : d;
 }
 

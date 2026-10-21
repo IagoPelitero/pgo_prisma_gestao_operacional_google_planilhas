@@ -716,6 +716,9 @@ button { font: inherit; color: inherit; }
   font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
 }
 .importacao-depara select { max-width: 100%; }
+/* A busca de cada linha do de-para (Etapa 48) fica em cima do seletor. */
+.importacao-depara .procurar-coluna { display: block; width: 100%; max-width: 100%; margin-bottom: 4px; }
+.importacao-depara .config-dica { display: block; margin-top: 2px; }
 
 /*
   O recado de que a origem vai escrever numa coluna de produtividade.
@@ -777,6 +780,8 @@ table.fila.agrupada td:first-child .apoio.em-bom:first-child {
 /* Etapa 46 (RET): o prêmio embaixo do número do cartão, e o quadro por analista. */
 .indicador .soma-do-cartao { display: block; font-size: 12px; color: var(--suave); margin-top: 2px; }
 .por-analista { padding: 18px 20px; margin-top: 16px; }
+/* Tentativas até o sucesso (Etapa 47): resumo, gráfico e as duas tabelas, em coluna. */
+.tentativas { padding: 18px 20px; margin-top: 16px; display: grid; gap: 12px; min-width: 0; }
 /* Os dois seletores dos atendidos (origem e ramo): um rótulo e as opções, lado a
    lado, e uma embaixo da outra quando falta largura. */
 .atendimentos .seletor-de-atendidos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

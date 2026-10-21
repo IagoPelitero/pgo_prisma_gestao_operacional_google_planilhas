@@ -241,20 +241,14 @@ var TelaImportacao = (function () {
       + '<th>Na planilha de origem</th><th>Vai para esta coluna do canal</th>'
       + '</tr></thead><tbody>'
       + atual.map(function (par, i) {
-        var opcoesDeColuna = ['<option value="">— não trazer —</option>']
-          .concat(opcoes.colunasDoCanal.map(function (coluna) {
-            return '<option value="' + escapar(coluna) + '"'
-              + (par.paraAColuna === coluna ? ' selected' : '') + '>'
-              + escapar(coluna)
-              // A coluna de carimbo é destino permitido, mas não é uma coluna
-              // qualquer: ela alimenta a Produtividade RECC. O aviso vai no
-              // próprio nome, onde a pessoa está olhando na hora de escolher.
-              + (ehCarimbo(coluna) ? '  (controle de produtividade)' : '')
-              + '</option>';
-          }));
         return '<tr><td><code>' + escapar(par.daFonte || '(sem nome)') + '</code></td>'
-          + '<td><select class="filtro" data-depara="' + i + '">'
-          + opcoesDeColuna.join('') + '</select></td></tr>';
+          + '<td><input type="search" class="filtro procurar-coluna" data-procurar-coluna="' + i + '"'
+          + ' placeholder="Digite para procurar a coluna" aria-label="Procurar a coluna para '
+          + escapar(par.daFonte || '(sem nome)') + '">'
+          + '<select class="filtro" data-depara="' + i + '">'
+          + opcoesDeColuna(par.paraAColuna, '') + '</select>'
+          + (par.lembrado ? '<span class="config-dica">como na última importação</span>' : '')
+          + '</td></tr>';
       }).join('')
       + '</tbody></table>'
       + (algumCarimboEscolhido(atual)
@@ -264,6 +258,36 @@ var TelaImportacao = (function () {
           + 'assim que esses casos passam a contar em "Já contatados". Confira '
           + 'nas três linhas traduzidas abaixo se a data chegou certa.</p>'
         : '');
+  }
+
+  /**
+   * As opções de um seletor do de-para, em ORDEM ALFABÉTICA (Etapa 48, pedido
+   * do PO: "dificuldade de localizar determinados nomes"). Com `termo`, só as
+   * colunas que o contêm — sem acento e sem maiúscula —, mais a escolhida, que
+   * nunca some do seletor só porque a busca não a acha.
+   */
+  function opcoesDeColuna(escolhida, termo) {
+    var procurado = normalizarTexto(termo);
+    var colunas = opcoes.colunasDoCanal.slice().sort(function (uma, outra) {
+      return normalizarTexto(uma).localeCompare(normalizarTexto(outra));
+    }).filter(function (coluna) {
+      return !procurado || coluna === escolhida || normalizarTexto(coluna).indexOf(procurado) >= 0;
+    });
+    return ['<option value="">— não trazer —</option>'].concat(colunas.map(function (coluna) {
+      return '<option value="' + escapar(coluna) + '"'
+        + (escolhida === coluna ? ' selected' : '') + '>'
+        + escapar(coluna)
+        // A coluna de carimbo é destino permitido, mas não é uma coluna
+        // qualquer: ela alimenta a Produtividade RECC. O aviso vai no
+        // próprio nome, onde a pessoa está olhando na hora de escolher.
+        + (ehCarimbo(coluna) ? '  (controle de produtividade)' : '')
+        + '</option>';
+    })).join('');
+  }
+
+  function normalizarTexto(texto) {
+    return String(texto === null || texto === undefined ? '' : texto)
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
   /** A coluna é um carimbo de status? O servidor diz quais são. */
@@ -641,15 +665,27 @@ var TelaImportacao = (function () {
       desenhar();
     });
 
-    mudancas('[data-depara]', function (caixa) {
-      if (!deParaEscolhido) {
-        deParaEscolhido = laudo.dePara.map(function (par) {
-          return { daFonte: par.daFonte, paraAColuna: par.paraAColuna };
+    mudancas('[data-depara]', escolherColuna);
+
+    // A busca de cada linha do de-para (Etapa 48): a cada letra, o seletor ao
+    // lado mostra só as colunas que contêm o texto. Sobrou uma só, ela fica
+    // escolhida — digitar "segur" e achar "nome do segurado" já basta.
+    var buscas = document.querySelectorAll('#importacao [data-procurar-coluna]');
+    for (var b = 0; b < buscas.length; b++) {
+      buscas[b].addEventListener('input', function () {
+        var seletor = document.querySelector('#importacao [data-depara="'
+          + this.getAttribute('data-procurar-coluna') + '"]');
+        if (!seletor) return;
+        seletor.innerHTML = opcoesDeColuna(seletor.value, this.value);
+        var achadas = Array.prototype.filter.call(seletor.options, function (opcao) {
+          return opcao.value !== '';
         });
-      }
-      deParaEscolhido[Number(caixa.getAttribute('data-depara'))].paraAColuna =
-        caixa.value;
-    });
+        if (this.value.trim() && achadas.length === 1 && seletor.value !== achadas[0].value) {
+          seletor.value = achadas[0].value;
+          escolherColuna(seletor);
+        }
+      });
+    }
 
     mudancas('[data-analista]', function (caixa) {
       analistasMarcados[caixa.getAttribute('data-analista')] = caixa.checked;
@@ -672,6 +708,17 @@ var TelaImportacao = (function () {
       guardarOQueEstaNaTela();
       desenhar();
     });
+  }
+
+  function escolherColuna(caixa) {
+    if (!deParaEscolhido) {
+      deParaEscolhido = laudo.dePara.map(function (par) {
+        return { daFonte: par.daFonte, paraAColuna: par.paraAColuna, lembrado: par.lembrado === true };
+      });
+    }
+    var par = deParaEscolhido[Number(caixa.getAttribute('data-depara'))];
+    par.paraAColuna = caixa.value;
+    par.lembrado = false;   // agora é escolha desta importação
   }
 
   function desenharSeletor() {

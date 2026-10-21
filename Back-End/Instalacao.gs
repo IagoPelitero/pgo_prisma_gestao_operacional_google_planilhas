@@ -1033,10 +1033,7 @@ const RECC_PADRAO_DO_FORMULARIO = {
     } },
 
   // --- Outros: da base, fora da lista da operação. Ficam ligados.
-  grupo: { secao: 'Outros', ordem: 90 },
   sistema: { secao: 'Outros', ordem: 91 },
-  agentedacentral: { secao: 'Outros', ordem: 92 },
-  relacionamento: { secao: 'Outros', ordem: 93 },
   contato: { secao: 'Outros', ordem: 94 },
   descricao: { secao: 'Outros', ordem: 95, largura: 3 },
 
@@ -1403,7 +1400,9 @@ function atualizarPGO() {
   // declarada e não adivinhada: "tudo que está na planilha e não está no
   // contrato" apontaria também para coluna que a pessoa criou por conta dela,
   // e mandar apagar o trabalho de alguém não é recado de migração.
-  [['USUARIOS', ['Matricula', 'Canal que atende'],
+  [['BASE_RET', RECC_COLUNAS_QUE_SAIRAM_DA_RET,
+    'Não estavam em uso, a seu pedido (Etapa 49); o campo saiu do formulário.'],
+   ['USUARIOS', ['Matricula', 'Canal que atende'],
     'A equipe agora é o CANAL: quem atende o mesmo canal aparece junto, e o '
     + 'canal já está na coluna CanalId.'],
    ['CORRETORAS', ['Nome', 'Canal'],
@@ -1434,6 +1433,9 @@ function atualizarPGO() {
 
   // --- Etapa 44: os 4 cards do Trabalho da RET, na ordem do PO -------------
   feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
+
+  // --- Etapa 49: grupo, agente da central e relacionamento saem do formulário
+  feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -3088,6 +3090,44 @@ function ligarAPropostaEAApoliceEmPedacos_(pulados) {
     });
   });
 
+  return feito;
+}
+
+/*
+ * ETAPA 49, pedido do PO: "remova do contrato a coluna agente da central. Não
+ * estamos usando; remova também a coluna relacionamento. A coluna grupo".
+ * Na planilha em uso a coluna FICA, com o que estiver nela — apagar coluna com
+ * dado nunca é decisão de migração (o recado de "o que sobrou" avisa). O que
+ * sai é o CAMPO, do formulário: desligado, e não apagado, para voltar com um
+ * clique em Configurações › Cadastrar Caso. Roda uma vez só: quem religar o
+ * campo depois não o vê desligado de novo.
+ */
+const RECC_COLUNAS_QUE_SAIRAM_DA_RET = ['grupo', 'agente da central', 'relacionamento'];
+const RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET = 'MIGRACAO.COLUNAS_FORA_DA_RET';
+
+function tirarDoFormularioOQueSaiuDaRet_(pulados) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CAMPOS') || !planilhaAtiva_().getSheetByName('CONFIG')) {
+    pulados.push('os campos que saíram da RET: as abas ainda não existem');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET, '') || '').trim()) {
+    pulados.push('grupo, agente da central e relacionamento já saíram do formulário da RET');
+    return feito;
+  }
+  var sairam = RECC_COLUNAS_QUE_SAIRAM_DA_RET.map(normalizarParaComparar_);
+  // Todos os campos da coluna, e não só o primeiro: uma planilha antiga pode
+  // ter dois para o mesmo cabeçalho.
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Aba) !== 'baseret') return;
+    if (sairam.indexOf(normalizarParaComparar_(campo.Cabecalho)) < 0) return;
+    if (normalizarParaComparar_(campo.Ativo) !== 'sim') return;
+    atualizarRegistro_('CAMPOS', campo.__id, { Ativo: 'NAO' });
+    feito.push('RET: o campo "' + (campo.Rotulo || campo.Cabecalho) + '" saiu do formulário — a '
+      + 'coluna continua na planilha, com o que estava nela');
+  });
+  gravarConfiguracao_(RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET, 'Etapa 49 — '
+    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
   return feito;
 }
 

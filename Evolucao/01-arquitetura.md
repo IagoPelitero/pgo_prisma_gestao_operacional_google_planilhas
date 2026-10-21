@@ -204,14 +204,14 @@ começar.
 
 ### 3.1 Bases operacionais
 
-#### `BASE_RET` — Retenção Vida (35 colunas + controle)
+#### `BASE_RET` — Retenção Vida (32 colunas + controle)
 
 ```
 id | data de recepção do protocolo | analista | SUSEP | segmento |
 Código origem da proposta | número da proposta | nome do cliente |
-cod produto | produto | grupo | sistema | valor do prêmio |
-valor do prêmio retido | prêmio mensal | agente da central | canal |
-relacionamento | contato | protocolo | cod_sucursal | cod_ramo |
+cod produto | produto | sistema | valor do prêmio |
+valor do prêmio retido | prêmio mensal | canal |
+contato | protocolo | cod_sucursal | cod_ramo |
 Num_apolice | CPF | status | Forma de pagamento | dados do pagamento |
 descrição | telefones de contato | e-mail | Novo cod origem proposta |
 novo numero da proposta | motivo do cancelamento | data da transmissão |
@@ -231,6 +231,10 @@ tentativas de contato
   "Caixa postal"). Já foi declarada como número, e a opção ia em branco (achado 98).
 - `valor do prêmio retido` é obrigatório quando o status é Retido — regra do campo
   (`obrigatorioSe`, em `CAMPOS.Configuracao`), e não da coluna.
+- `grupo`, `agente da central` e `relacionamento` **saíram do contrato** na Etapa 49
+  ("não estamos usando"). Planilha nova nasce sem elas; na planilha em uso elas
+  ficam, com o dado, como colunas fora do contrato, e o `atualizarPGO` desliga os
+  campos delas uma vez (`MIGRACAO.COLUNAS_FORA_DA_RET`).
 
 #### `BASE_MESA` — Mesa Diamante (20 colunas + controle)
 

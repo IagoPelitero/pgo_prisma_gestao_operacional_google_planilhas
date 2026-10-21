@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1328 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1359 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -336,7 +336,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1328 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1359 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -923,12 +923,45 @@ estavam):
 3. O resto da tela, como era — menos o gráfico **"Valor por situação"** (Retido,
    Não retido, Sem sucesso de contato…), que saiu a pedido do PO: "já virá abaixo
    dos cards". Canal sem os prêmios continua com ele.
-4. **Por último, um quadro por analista**: uma linha por pessoa, com o total de
+4. **Tentativas até o sucesso** (Etapa 47) — ver logo abaixo.
+5. **Por último, um quadro por analista**: uma linha por pessoa, com o total de
    casos, quantos em cada status (só os status que aparecem) e os três prêmios, e a
    linha de total embaixo. Caso sem analista entra como "Sem analista".
 
 Tudo obedece aos filtros e ao período da tela. Canal sem as três colunas de prêmio
 não ganha nem o gráfico nem o quadro.
+
+### Tentativas até o sucesso: quantos contatos até falar com o cliente
+
+Pedido do PO (Etapa 47): "precisamos medir quantas vezes precisamos contatar o
+cliente para ter sucesso", e "a quantidade de contatos por CPF". A regra é a da
+operação: enquanto tenta, o analista usa o status **Contatando**; a **1ª e a 2ª
+tentativa** sem sucesso ficam carimbadas em **Data do 1º contato** e **Data do 2º
+contato**; na 3ª, o status vira **Sem sucesso de contato**. **Sucesso é Retido ou
+Não retido** — falou com o cliente.
+
+Nada novo é gravado: a conta sai dos carimbos, que não se apagam quando o caso
+muda de status. (A coluna "tentativas de contato" não entra: ela se esvazia quando o
+caso sai do Contatando.)
+
+| O caso | Contatos |
+|---|---|
+| Retido ou Não retido, **sem** tentativa carimbada | sucesso no **1º** contato |
+| … com a Data do 1º contato | sucesso no **2º** contato |
+| … com a do 1º e a do 2º | sucesso no **3º** contato |
+| Sem sucesso de contato | as tentativas carimbadas + 1 (a 3ª, que virou o status) |
+| Qualquer outro status | ainda tentando: só as carimbadas |
+
+O bloco mostra **quantos sucessos**, a **média de contatos por sucesso**, quantos
+sem sucesso e quantos ainda tentando; o gráfico "Em qual contato o cliente atendeu";
+a mesma conta **por analista**; e **Contatos por CPF** — o mesmo cliente em dois
+casos soma os contatos, e o desfecho diz em qual contato deu certo ("Retido no 2º
+contato"). A tabela lista os 100 CPFs com mais contatos e diz quantos são ao todo;
+caso sem CPF fica fora dela, e é contado.
+
+> **Vale para o que foi trabalhado com os carimbos ligados.** Um caso de antes de
+> a 1ª e a 2ª tentativa carimbarem aparece como sucesso no 1º contato. O filtro de
+> período da tela é o jeito de olhar só o que veio depois.
 
 ### Coluna que você criou, fora do contrato
 
@@ -1280,6 +1313,31 @@ soma de cada uma nos casos que vão entrar** e de quantos casos ela vem ("Prêmi
 anual importado"). A linha que vai ser pulada por repetida não soma, e quem veio
 sem valor não conta. O resultado da importação repete os números do que entrou.
 
+### O de-para lembrado, e a busca no seletor
+
+Relato do PO: "estou tendo dificuldade de localizar determinados nomes para fazer
+a importação, e quando altero o nome da coluna o PGO deixa de ler a coluna". A
+causa era renomear a coluna **da base** para o nome casar — e o PGO acha cada
+coluna **pelo nome do cabeçalho**: renomeada, ela some para o sistema.
+
+> **Não renomeie coluna da base.** Escolha o destino no seletor do de-para, ou mude
+> o nome na **planilha de origem**. Coluna da base renomeada: volte o nome (o
+> `diagnosticoRECC()` diz qual está diferente).
+
+Desde a Etapa 48:
+
+- **A importação lembra o de-para do canal.** Ao gravar, ela guarda para qual
+  coluna foi cada cabeçalho da planilha de origem — inclusive o "não trazer" — e a
+  próxima conferência do mesmo canal já abre assim, com a marca **"como na última
+  importação"**. A base que chega toda semana com os mesmos cabeçalhos não precisa
+  ser casada de novo. Vale para todo mundo que importa (fica na `CONFIG`, chave
+  `IMPORTACAO.DEPARA.<Id do canal>`), soma de uma importação para a outra e cada
+  canal tem o seu. Carimbo nunca é lembrado: escolher uma coluna de controle de
+  produtividade continua sendo decisão de cada vez.
+- **O seletor vem em ordem alfabética**, e cada linha tem uma **busca**: digite um
+  pedaço do nome ("segur") e o seletor mostra só as colunas que o contêm; sobrando
+  uma, ela fica escolhida.
+
 ### Quem entra na divisão de um lote
 
 Duas regras, as duas do PO, e as duas sobre não mandar caso para quem não vai
@@ -1556,7 +1614,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1328 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1359 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

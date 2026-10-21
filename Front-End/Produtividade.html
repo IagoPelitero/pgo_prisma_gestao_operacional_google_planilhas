@@ -121,6 +121,7 @@ var TelaProdutividade = (function () {
         ? '<div class="graficos">'
           + desenharValorPorSituacao(painel.valorPorSituacao) + '</div>'
         : '')
+      + desenharTentativas()
       + desenharPorAnalista()
       + LUGAR_DO_DETALHE;
     ligarPainel();
@@ -151,6 +152,77 @@ var TelaProdutividade = (function () {
           + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
       }).join('') + '</tbody></table></div>'
       + '</section></div>';
+  }
+
+  /** 1,6 — a média com vírgula, ou um traço quando não há sucesso. */
+  function comVirgula(numero) {
+    return numero === null || numero === undefined ? '—' : String(numero).replace('.', ',');
+  }
+
+  /**
+   * Tentativas até o sucesso (Etapa 47, só a RET): "quantas vezes precisamos
+   * contatar o cliente para ter sucesso". Sucesso é Retido ou Não retido; as
+   * tentativas são os carimbos do 1º e do 2º contato; a 3ª é o "Sem sucesso de
+   * contato". Um resumo, o gráfico, a conta por analista e a por CPF.
+   */
+  function desenharTentativas() {
+    var tentativas = painel.tentativas;
+    if (!tentativas) return '';
+    var porAnalista = tentativas.porAnalista.map(function (linha) {
+      return '<tr><td>' + escapar(linha.analista) + '</td>'
+        + '<td class="direita">' + linha.sucessos + '</td>'
+        + linha.porContato.map(function (n) { return '<td class="direita">' + n + '</td>'; }).join('')
+        + '<td class="direita">' + linha.semSucesso + '</td>'
+        + '<td class="direita">' + comVirgula(linha.media) + '</td></tr>';
+    }).join('');
+    var porCpf = tentativas.porCpf.linhas.map(function (linha) {
+      return '<tr><td>' + escapar(linha.cpf) + '</td><td>' + escapar(linha.cliente || '—') + '</td>'
+        + '<td class="direita">' + linha.casos + '</td>'
+        + '<td class="direita">' + linha.contatos + '</td>'
+        + '<td>' + escapar(linha.desfecho) + '</td></tr>';
+    }).join('');
+    var notasDoCpf = [];
+    if (tentativas.porCpf.total > tentativas.porCpf.linhas.length) {
+      notasDoCpf.push('Mostrando os ' + tentativas.porCpf.linhas.length + ' CPFs com mais contatos, de '
+        + tentativas.porCpf.total + '.');
+    }
+    if (tentativas.porCpf.semCpf) {
+      notasDoCpf.push(tentativas.porCpf.semCpf + ' caso(s) sem CPF ficaram fora desta tabela.');
+    }
+    return '<section class="cartao tentativas" aria-labelledby="titulo-tentativas">'
+      + '<header class="grafico-cabeca"><h3 id="titulo-tentativas">' + escapar(tentativas.titulo)
+      + '</h3></header>'
+      + '<p class="prazo-regra">Sucesso é Retido ou Não retido. As tentativas são a "Data do 1º '
+      + 'contato" e a "Data do 2º contato"; a 3ª é o status "Sem sucesso de contato".</p>'
+      + '<div class="cartoes">'
+      + tileDePrazo('Sucessos', tentativas.sucessos, 'bom', 'Casos em Retido ou Não retido')
+      + tileDePrazo('Contatos por sucesso', comVirgula(tentativas.media), 'neutro',
+        'Em média, quantos contatos até falar com o cliente')
+      + tileDePrazo('Sem sucesso', tentativas.semSucesso, tentativas.semSucesso ? 'atencao' : 'neutro',
+        'Casos em "Sem sucesso de contato"')
+      + tileDePrazo('Ainda tentando', tentativas.emAndamento, 'neutro',
+        'Casos que ainda não chegaram a um desses desfechos')
+      + '</div>'
+      + Graficos.desenhar(tentativas.grafico)
+      + (porAnalista
+        ? '<h5 class="prazo-titulo">Por analista</h5>'
+          + '<div class="rolagem-tabela"><table class="fila numeros"><thead><tr>'
+          + '<th>Analista</th><th class="direita">Sucessos</th>'
+          + tentativas.faixas.map(function (faixa) {
+            return '<th class="direita">' + escapar(faixa) + '</th>';
+          }).join('')
+          + '<th class="direita">Sem sucesso</th><th class="direita">Contatos por sucesso</th>'
+          + '</tr></thead><tbody>' + porAnalista + '</tbody></table></div>'
+        : '')
+      + (porCpf
+        ? '<h5 class="prazo-titulo">Contatos por CPF</h5>'
+          + '<div class="rolagem-tabela"><table class="fila numeros"><thead><tr>'
+          + '<th>CPF</th><th>Cliente</th><th class="direita">Casos</th>'
+          + '<th class="direita">Contatos</th><th>Desfecho</th>'
+          + '</tr></thead><tbody>' + porCpf + '</tbody></table></div>'
+        : '')
+      + (notasDoCpf.length ? '<p class="prazo-regra">' + notasDoCpf.join(' ') + '</p>' : '')
+      + '</section>';
   }
 
   /**

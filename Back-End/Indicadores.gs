@@ -2000,6 +2000,172 @@ function quadroPorAnalista_(casos, canal, colunas) {
   };
 }
 
+/*
+ * TENTATIVAS ATÉ O SUCESSO (Etapa 47, pedido do PO): "precisamos medir quantas
+ * vezes precisamos contatar o cliente para ter sucesso". A regra da operação,
+ * palavra do PO: enquanto tenta, o analista usa o status Contatando, e a 1ª e
+ * a 2ª tentativa sem sucesso ficam carimbadas em "Data do 1º contato" e "Data
+ * do 2º contato"; na 3ª, o status vira "Sem sucesso de contato". Sucesso é
+ * Retido ou Não retido — falou com o cliente.
+ *
+ * Nada novo é gravado: a conta sai dos carimbos, que não se apagam quando o
+ * caso muda de status. A coluna "tentativas de contato" NÃO entra — ela se
+ * esvazia quando o caso sai do Contatando.
+ */
+const RECC_COLUNAS_DAS_TENTATIVAS = ['Data do 1º contato', 'Data do 2º contato'];
+const RECC_STATUS_DE_SUCESSO = ['Retido', 'Não retido'];
+const RECC_STATUS_SEM_SUCESSO = 'Sem sucesso de contato';
+/** Quantos CPFs a tabela lista (os de mais contatos); o total vem sempre. */
+const RECC_CPFS_LISTADOS = 100;
+
+/**
+ * Cada caso vira: quantos contatos houve e como terminou.
+ *   sucesso      1 + as tentativas carimbadas (o contato que deu certo conta);
+ *   semSucesso   1 + as tentativas carimbadas (a 3ª, que virou o status);
+ *   emAndamento  só as tentativas carimbadas.
+ * `null` no canal sem as colunas (hoje, só a RET as tem).
+ */
+function tentativasAteOSucesso_(casos, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achar = function (nome) {
+    var posicao = posicaoDaColuna_(estrutura, nome);
+    return posicao < 0 ? '' : estrutura.cabecalhos[posicao];
+  };
+  var colunasDasTentativas = RECC_COLUNAS_DAS_TENTATIVAS.map(achar);
+  var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
+  if (colunasDasTentativas.some(function (coluna) { return !coluna; }) || !colunaDoStatus) return null;
+  var colunaDoCpf = achar('CPF');
+  var colunaDoCliente = achar('nome do cliente');
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+
+  var nomeDoStatus = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    nomeDoStatus[normalizarParaComparar_(situacao.gravadoComo)] = situacao.nome;
+  });
+  var deSucesso = RECC_STATUS_DE_SUCESSO.map(normalizarParaComparar_);
+  var semSucesso = normalizarParaComparar_(RECC_STATUS_SEM_SUCESSO);
+
+  var lidos = casos.map(function (caso) {
+    var status = normalizarParaComparar_(caso[colunaDoStatus]);
+    var tentativas = colunasDasTentativas.filter(function (coluna) {
+      return String(caso[coluna] === null || caso[coluna] === undefined ? '' : caso[coluna]).trim() !== '';
+    }).length;
+    var desfecho = deSucesso.indexOf(status) >= 0 ? 'sucesso'
+      : (status === semSucesso ? 'semSucesso' : 'emAndamento');
+    return {
+      caso: caso,
+      status: nomeDoStatus[status] || String(caso[colunaDoStatus] || '').trim() || 'Sem status',
+      desfecho: desfecho,
+      contatos: tentativas + (desfecho === 'emAndamento' ? 0 : 1)
+    };
+  });
+
+  // Sucesso no 1º, 2º, 3º contato… — quantas faixas os dados pedirem.
+  function faixas(grupo) {
+    var porContato = [];
+    grupo.forEach(function (lido) {
+      if (lido.desfecho !== 'sucesso') return;
+      porContato[lido.contatos - 1] = (porContato[lido.contatos - 1] || 0) + 1;
+    });
+    for (var i = 0; i < Math.max(porContato.length, 3); i++) porContato[i] = porContato[i] || 0;
+    return porContato;
+  }
+  function resumo(grupo) {
+    var sucessos = grupo.filter(function (lido) { return lido.desfecho === 'sucesso'; });
+    var contatos = sucessos.reduce(function (soma, lido) { return soma + lido.contatos; }, 0);
+    return {
+      sucessos: sucessos.length,
+      porContato: faixas(grupo),
+      semSucesso: grupo.filter(function (lido) { return lido.desfecho === 'semSucesso'; }).length,
+      emAndamento: grupo.filter(function (lido) { return lido.desfecho === 'emAndamento'; }).length,
+      // Contatos por sucesso, com uma casa: "1,6 contato até falar com o cliente".
+      media: sucessos.length ? Math.round(contatos / sucessos.length * 10) / 10 : null
+    };
+  }
+
+  var geral = resumo(lidos);
+  var ordinal = function (n) { return 'No ' + n + 'º contato'; };
+  var pontos = geral.porContato.map(function (quantos, i) {
+    return { chave: 'contato' + (i + 1), rotulo: ordinal(i + 1), valor: quantos, casos: quantos,
+      ehOutros: false, tom: 'bom', serie: 0 };
+  }).concat([{ chave: 'semsucesso', rotulo: 'Sem sucesso', valor: geral.semSucesso,
+    casos: geral.semSucesso, ehOutros: false, tom: 'atencao', serie: 0 }]);
+
+  // Por analista: a mesma conta, pessoa a pessoa.
+  var porAnalista = {};
+  var ordem = [];
+  lidos.forEach(function (lido) {
+    var nome = String((colunaDoAnalista ? lido.caso[colunaDoAnalista] : '') || '').trim() || 'Sem analista';
+    var chave = normalizarParaComparar_(nome);
+    if (!porAnalista[chave]) { porAnalista[chave] = { analista: nome, lidos: [] }; ordem.push(chave); }
+    porAnalista[chave].lidos.push(lido);
+  });
+  var analistas = ordem.map(function (chave) {
+    var linha = resumo(porAnalista[chave].lidos);
+    linha.analista = porAnalista[chave].analista;
+    return linha;
+  });
+  // Todas as linhas com as mesmas colunas (a conta geral tem as faixas de todos).
+  analistas.forEach(function (linha) {
+    for (var i = 0; i < geral.porContato.length; i++) linha.porContato[i] = linha.porContato[i] || 0;
+  });
+  analistas.sort(function (um, outro) {
+    return outro.sucessos - um.sucessos || (um.analista < outro.analista ? -1 : 1);
+  });
+
+  // Por CPF: o mesmo cliente pode ter mais de um caso — os contatos somam.
+  var porCpf = {};
+  var cpfs = [];
+  var semCpf = 0;
+  lidos.forEach(function (lido) {
+    var cpf = colunaDoCpf ? converterParaIdentificador_(lido.caso[colunaDoCpf]) : '';
+    if (!cpf) { semCpf++; return; }
+    if (!porCpf[cpf]) {
+      porCpf[cpf] = { cpf: cpf, cliente: '', casos: 0, contatos: 0, desfechos: [] };
+      cpfs.push(cpf);
+    }
+    var linha = porCpf[cpf];
+    linha.casos++;
+    linha.contatos += lido.contatos;
+    var cliente = colunaDoCliente ? String(lido.caso[colunaDoCliente] || '').trim() : '';
+    if (cliente) linha.cliente = cliente;
+    var desfecho = lido.desfecho === 'sucesso'
+      ? lido.status + ' no ' + lido.contatos + 'º contato' : lido.status;
+    if (linha.desfechos.indexOf(desfecho) < 0) linha.desfechos.push(desfecho);
+  });
+  var linhasDosCpfs = cpfs.map(function (cpf) {
+    var linha = porCpf[cpf];
+    return { cpf: linha.cpf, cliente: linha.cliente, casos: linha.casos, contatos: linha.contatos,
+      desfecho: linha.desfechos.join(', ') };
+  }).sort(function (um, outro) {
+    return outro.contatos - um.contatos || outro.casos - um.casos || (um.cpf < outro.cpf ? -1 : 1);
+  });
+
+  return {
+    titulo: 'Tentativas até o sucesso',
+    sucessos: geral.sucessos,
+    semSucesso: geral.semSucesso,
+    emAndamento: geral.emAndamento,
+    media: geral.media,
+    grafico: {
+      titulo: 'Em qual contato o cliente atendeu',
+      tipo: 'barras', largura: 2, dimensao: 'Contato', medida: 'Casos',
+      agregacao: 'contagem', unidade: 'casos', ehTempo: false,
+      pontos: pontos, tendencia: null, total: null, aviso: ''
+    },
+    faixas: geral.porContato.map(function (quantos, i) { return ordinal(i + 1); }),
+    porAnalista: analistas.map(function (linha) {
+      return { analista: linha.analista, sucessos: linha.sucessos, porContato: linha.porContato,
+        semSucesso: linha.semSucesso, media: linha.media };
+    }),
+    porCpf: {
+      linhas: linhasDosCpfs.slice(0, RECC_CPFS_LISTADOS),
+      total: linhasDosCpfs.length,
+      semCpf: semCpf
+    }
+  };
+}
+
 /**
  * O painel inteiro: todos os gráficos do canal, já calculados.
  *
@@ -2069,6 +2235,8 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
     */
     premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
     porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
+    // Etapa 47: em qual contato o cliente atendeu, por analista e por CPF.
+    tentativas: tentativasAteOSucesso_(casos, canal),
     /*
       O VALOR POR SITUAÇÃO vem FORA de `componentes`, e de propósito.
       `componentes` é a lista que a tela de Configurações edita — tirar,

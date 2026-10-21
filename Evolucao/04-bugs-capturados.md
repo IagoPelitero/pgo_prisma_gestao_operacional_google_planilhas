@@ -2159,6 +2159,23 @@ não — e a abertura mudou de regra sem ninguém pedir.
 mantém os sem data nela (Trabalho, Produtividade, detalhamento e Minha
 Performance). Escolhidas outras datas, ou um mês, vale só quem tem data dentro.
 
+### 104 · A data com hora importada trocava o dia pelo mês
+
+**Sintoma.** Achado ao montar a Etapa 47: a "Data do 1º contato" trazida de uma base
+antiga como "03/10/2026" era gravada como **10 de março**, e "25/10/2026" ficava em
+branco. A coluna de data sem hora (a data de recepção) convertia certo.
+
+**Causa.** `converterParaDataEHora_` entregava o texto a `new Date()`, que lê no
+padrão americano, mês antes do dia. A outra planilha chega na importação como texto
+(`getDisplayValues`), no formato brasileiro — então toda coluna de data e hora
+importada passava por ali: os carimbos de contato, os de status, a data da
+transmissão do Status proposta.
+
+**Defesa.** "dd/MM/yyyy", com ou sem "HH:mm[:ss]", é lido primeiro, com o mesmo
+`diaQueExiste_` da data sem hora (31/02 fica vazio, e não 3 de março). A suíte
+importa uma "Data do 1º contato" com dia acima de 12 e confere o dia gravado e a
+conta das tentativas.
+
 ---
 
 ## O que esta lista ensina
@@ -2383,3 +2400,7 @@ Daí as duas práticas que o projeto não abre mão:
     abertura mudou de "últimos 30 dias" para "Por data" com as mesmas datas, e a
     regra do caso sem data mudou junto. Mudança de aparência precisa de um teste
     que confira que o que a tela mostra continua o mesmo.
+55. **Dois tipos parecidos, duas portas de conversão.** No item 104 a data sem hora
+    tinha a leitura brasileira, e a data com hora não — cada uma tinha a sua função,
+    e só uma foi ensinada. Quando dois tipos guardam a mesma coisa (um dia), o teste
+    de um precisa existir para o outro.

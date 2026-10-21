@@ -2697,13 +2697,62 @@ function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
   colunasQueAImportacaoSugere_(canal).forEach(function (cabecalho) {
     porNome[normalizarParaComparar_(cabecalho)] = cabecalho;
   });
+  var lembrado = deParaLembrado_(canal);
 
   return cabecalhosDaFonte.map(function (cabecalho) {
+    var daFonte = normalizarParaComparar_(cabecalho);
+    // Primeiro o que a pessoa escolheu na última importação do canal (Etapa
+    // 48) — inclusive o "não trazer". Só vale se a coluna ainda pode ser
+    // sugerida: coluna que sumiu, ou carimbo, cai na regra do nome.
+    if (Object.prototype.hasOwnProperty.call(lembrado, daFonte)) {
+      var escolhida = normalizarParaComparar_(lembrado[daFonte]);
+      if (!escolhida || porNome[escolhida]) {
+        return { daFonte: String(cabecalho || ''), paraAColuna: escolhida ? porNome[escolhida] : '',
+          lembrado: true };
+      }
+    }
     return {
       daFonte: String(cabecalho || ''),
-      paraAColuna: porNome[normalizarParaComparar_(cabecalho)] || ''
+      paraAColuna: porNome[daFonte] || ''
     };
   });
+}
+
+/*
+ * O DE-PARA LEMBRADO (Etapa 48, pedido do PO): a importação de cada canal
+ * guarda, ao gravar, para qual coluna foi cada cabeçalho da planilha de origem
+ * — e a próxima já abre assim. A base que chega toda semana com os mesmos
+ * cabeçalhos ("Nome do segurado", "Cod Proposta"…) não precisa ser casada de
+ * novo, e ninguém precisa renomear coluna nenhuma da base para o nome casar.
+ *
+ * Fica na CONFIG, uma chave por canal, e vale para todo mundo que importa. A
+ * importação seguinte soma ao que já estava: um cabeçalho que não veio desta
+ * vez continua lembrado.
+ */
+const RECC_CHAVE_DO_DE_PARA_LEMBRADO = 'IMPORTACAO.DEPARA.';
+
+/** { cabeçalho da origem (normalizado): coluna do canal, ou '' para "não trazer" }. */
+function deParaLembrado_(canal) {
+  var texto = valorDaConfiguracao_(RECC_CHAVE_DO_DE_PARA_LEMBRADO + canal.id, '');
+  if (!texto) return {};
+  try {
+    var lido = JSON.parse(texto);
+    return lido && typeof lido === 'object' && !Array.isArray(lido) ? lido : {};
+  } catch (erro) {
+    // Alguém mexeu na célula e deixou um texto que não é JSON: esquece e casa
+    // pelo nome, como antes. Quebrar a importação por isso seria pior.
+    return {};
+  }
+}
+
+function lembrarODeParaDoCanal_(canal, dePara) {
+  var lembrado = deParaLembrado_(canal);
+  (dePara || []).forEach(function (par) {
+    var daFonte = normalizarParaComparar_((par || {}).daFonte);
+    if (!daFonte) return;
+    lembrado[daFonte] = String(par.paraAColuna || '').trim();
+  });
+  gravarConfiguracao_(RECC_CHAVE_DO_DE_PARA_LEMBRADO + canal.id, JSON.stringify(lembrado));
 }
 
 /*
@@ -3459,6 +3508,13 @@ function importarCasos(idDoCanal, pedido) {
   // importado — e conferir um contra o outro quando um número não fecha.
   var gravados = inserirVariosRegistros_(canal.aba, paraGravar,
     { origem: RECC_ORIGEM_PLANILHA });
+  // Os casos já entraram: lembrar o de-para não pode derrubar a importação —
+  // quem visse o erro importaria de novo. Se falhar, a próxima casa pelo nome.
+  try {
+    lembrarODeParaDoCanal_(canal, dePara);
+  } catch (erro) {
+    Logger.log('O de-para desta importação não foi lembrado: ' + erro.message);
+  }
 
   registrarAuditoria_('caso.importar', canal.aba, '',
     canal.nome + ' · ' + nomeDoLote + ' · ' + gravados.length + ' casos'

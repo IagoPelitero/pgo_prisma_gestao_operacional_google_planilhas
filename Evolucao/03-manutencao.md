@@ -170,6 +170,15 @@ diz o que faltou. Crie o que falta e rode de novo — ou monte os cards à mão 
 Configurações › Painéis. Para ele montar de novo depois de já ter montado, apague a
 chave `MIGRACAO.CARDS_DA_RET` da `CONFIG`.
 
+### A importação não acha a coluna, ou parou de ler uma coluna
+
+O PGO acha a coluna **pelo nome do cabeçalho**. Se alguém renomeou a coluna da
+base para o nome da planilha de origem casar, ela sumiu para o sistema: volte o
+nome (o `diagnosticoRECC()` aponta a grafia diferente). Para casar nomes diferentes,
+escolha o destino no seletor do de-para — tem busca e vem em ordem alfabética —, e a
+próxima importação do canal já abre com a escolha (Etapa 48). Para o PGO esquecer o
+de-para de um canal, apague a chave `IMPORTACAO.DEPARA.<Id do canal>` da `CONFIG`.
+
 ### Tirei um registro de cadastro e quero de volta
 
 Nos cadastros (usuários, corretoras, SUSEPs, itens de configuração), tirar

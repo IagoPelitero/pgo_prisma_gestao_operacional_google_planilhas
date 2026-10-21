@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-20 20:21
+   Gerado em 2026-10-21 13:15
    ========================================================================== */
 
 
@@ -397,19 +397,19 @@ const RECC_ESQUEMA = {
       { cabecalho: 'nome do cliente', tipo: 'texto', protegido: true },
       { cabecalho: 'cod produto', tipo: 'identificador', protegido: true },
       { cabecalho: 'produto', tipo: 'texto', protegido: true },
-      { cabecalho: 'grupo', tipo: 'texto', protegido: true },
+      // "grupo", "agente da central" e "relacionamento" saíram do contrato na
+      // Etapa 49, pedido do PO: "não estamos usando". Numa planilha em uso elas
+      // continuam lá, com o dado — o atualizarPGO só tira os campos do formulário.
       { cabecalho: 'sistema', tipo: 'texto', protegido: true },
       { cabecalho: 'valor do prêmio', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
       // Era "prêmio mensal retido" — nome errado, palavra do PO: "deve ser
       // prêmio mensal". O retido é a coluna de cima. `atualizarPGO` renomeia.
       { cabecalho: 'prêmio mensal', tipo: 'dinheiro', protegido: true },
-      { cabecalho: 'agente da central', tipo: 'texto', protegido: true },
       // Quem passou o caso adiante. Só aparece no formulário quando o canal
       // de origem é a Central — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO.
       { cabecalho: 'nome de quem transferiu', tipo: 'texto', protegido: false },
       { cabecalho: 'canal', tipo: 'texto', protegido: true },
-      { cabecalho: 'relacionamento', tipo: 'texto', protegido: true },
       { cabecalho: 'contato', tipo: 'texto', protegido: true },
       // Texto, e não identificador: o protocolo da operação é alfanumérico
       // ("RET-2026-1024"), e como identificador ele perderia as letras — o
@@ -2116,7 +2116,23 @@ function converterParaDataEHora_(valor) {
   if (Object.prototype.toString.call(valor) === '[object Date]') {
     return isNaN(valor.getTime()) ? '' : valor;
   }
-  var d = new Date(String(valor));
+  var texto = String(valor).trim();
+  // "dd/MM/yyyy", com ou sem a hora — como se escreve aqui, e como a outra
+  // planilha chega na importação (getDisplayValues). `new Date("03/10/2026")`
+  // lê no padrão americano: 10 de março, e "25/10/2026" nem lê (achado 104).
+  var br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (br) {
+    var dia = diaQueExiste_(Number(br[3]), Number(br[2]), Number(br[1]));
+    if (!dia) return '';
+    if (br[4] !== undefined) {
+      var h = Number(br[4]);
+      var min = Number(br[5]);
+      if (h > 23 || min > 59) return '';
+      dia.setHours(h, min, Number(br[6] || 0));
+    }
+    return dia;
+  }
+  var d = new Date(texto);
   return isNaN(d.getTime()) ? '' : d;
 }
 
@@ -7052,13 +7068,62 @@ function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
   colunasQueAImportacaoSugere_(canal).forEach(function (cabecalho) {
     porNome[normalizarParaComparar_(cabecalho)] = cabecalho;
   });
+  var lembrado = deParaLembrado_(canal);
 
   return cabecalhosDaFonte.map(function (cabecalho) {
+    var daFonte = normalizarParaComparar_(cabecalho);
+    // Primeiro o que a pessoa escolheu na última importação do canal (Etapa
+    // 48) — inclusive o "não trazer". Só vale se a coluna ainda pode ser
+    // sugerida: coluna que sumiu, ou carimbo, cai na regra do nome.
+    if (Object.prototype.hasOwnProperty.call(lembrado, daFonte)) {
+      var escolhida = normalizarParaComparar_(lembrado[daFonte]);
+      if (!escolhida || porNome[escolhida]) {
+        return { daFonte: String(cabecalho || ''), paraAColuna: escolhida ? porNome[escolhida] : '',
+          lembrado: true };
+      }
+    }
     return {
       daFonte: String(cabecalho || ''),
-      paraAColuna: porNome[normalizarParaComparar_(cabecalho)] || ''
+      paraAColuna: porNome[daFonte] || ''
     };
   });
+}
+
+/*
+ * O DE-PARA LEMBRADO (Etapa 48, pedido do PO): a importação de cada canal
+ * guarda, ao gravar, para qual coluna foi cada cabeçalho da planilha de origem
+ * — e a próxima já abre assim. A base que chega toda semana com os mesmos
+ * cabeçalhos ("Nome do segurado", "Cod Proposta"…) não precisa ser casada de
+ * novo, e ninguém precisa renomear coluna nenhuma da base para o nome casar.
+ *
+ * Fica na CONFIG, uma chave por canal, e vale para todo mundo que importa. A
+ * importação seguinte soma ao que já estava: um cabeçalho que não veio desta
+ * vez continua lembrado.
+ */
+const RECC_CHAVE_DO_DE_PARA_LEMBRADO = 'IMPORTACAO.DEPARA.';
+
+/** { cabeçalho da origem (normalizado): coluna do canal, ou '' para "não trazer" }. */
+function deParaLembrado_(canal) {
+  var texto = valorDaConfiguracao_(RECC_CHAVE_DO_DE_PARA_LEMBRADO + canal.id, '');
+  if (!texto) return {};
+  try {
+    var lido = JSON.parse(texto);
+    return lido && typeof lido === 'object' && !Array.isArray(lido) ? lido : {};
+  } catch (erro) {
+    // Alguém mexeu na célula e deixou um texto que não é JSON: esquece e casa
+    // pelo nome, como antes. Quebrar a importação por isso seria pior.
+    return {};
+  }
+}
+
+function lembrarODeParaDoCanal_(canal, dePara) {
+  var lembrado = deParaLembrado_(canal);
+  (dePara || []).forEach(function (par) {
+    var daFonte = normalizarParaComparar_((par || {}).daFonte);
+    if (!daFonte) return;
+    lembrado[daFonte] = String(par.paraAColuna || '').trim();
+  });
+  gravarConfiguracao_(RECC_CHAVE_DO_DE_PARA_LEMBRADO + canal.id, JSON.stringify(lembrado));
 }
 
 /*
@@ -7814,6 +7879,13 @@ function importarCasos(idDoCanal, pedido) {
   // importado — e conferir um contra o outro quando um número não fecha.
   var gravados = inserirVariosRegistros_(canal.aba, paraGravar,
     { origem: RECC_ORIGEM_PLANILHA });
+  // Os casos já entraram: lembrar o de-para não pode derrubar a importação —
+  // quem visse o erro importaria de novo. Se falhar, a próxima casa pelo nome.
+  try {
+    lembrarODeParaDoCanal_(canal, dePara);
+  } catch (erro) {
+    Logger.log('O de-para desta importação não foi lembrado: ' + erro.message);
+  }
 
   registrarAuditoria_('caso.importar', canal.aba, '',
     canal.nome + ' · ' + nomeDoLote + ' · ' + gravados.length + ' casos'
@@ -15234,6 +15306,172 @@ function quadroPorAnalista_(casos, canal, colunas) {
   };
 }
 
+/*
+ * TENTATIVAS ATÉ O SUCESSO (Etapa 47, pedido do PO): "precisamos medir quantas
+ * vezes precisamos contatar o cliente para ter sucesso". A regra da operação,
+ * palavra do PO: enquanto tenta, o analista usa o status Contatando, e a 1ª e
+ * a 2ª tentativa sem sucesso ficam carimbadas em "Data do 1º contato" e "Data
+ * do 2º contato"; na 3ª, o status vira "Sem sucesso de contato". Sucesso é
+ * Retido ou Não retido — falou com o cliente.
+ *
+ * Nada novo é gravado: a conta sai dos carimbos, que não se apagam quando o
+ * caso muda de status. A coluna "tentativas de contato" NÃO entra — ela se
+ * esvazia quando o caso sai do Contatando.
+ */
+const RECC_COLUNAS_DAS_TENTATIVAS = ['Data do 1º contato', 'Data do 2º contato'];
+const RECC_STATUS_DE_SUCESSO = ['Retido', 'Não retido'];
+const RECC_STATUS_SEM_SUCESSO = 'Sem sucesso de contato';
+/** Quantos CPFs a tabela lista (os de mais contatos); o total vem sempre. */
+const RECC_CPFS_LISTADOS = 100;
+
+/**
+ * Cada caso vira: quantos contatos houve e como terminou.
+ *   sucesso      1 + as tentativas carimbadas (o contato que deu certo conta);
+ *   semSucesso   1 + as tentativas carimbadas (a 3ª, que virou o status);
+ *   emAndamento  só as tentativas carimbadas.
+ * `null` no canal sem as colunas (hoje, só a RET as tem).
+ */
+function tentativasAteOSucesso_(casos, canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achar = function (nome) {
+    var posicao = posicaoDaColuna_(estrutura, nome);
+    return posicao < 0 ? '' : estrutura.cabecalhos[posicao];
+  };
+  var colunasDasTentativas = RECC_COLUNAS_DAS_TENTATIVAS.map(achar);
+  var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
+  if (colunasDasTentativas.some(function (coluna) { return !coluna; }) || !colunaDoStatus) return null;
+  var colunaDoCpf = achar('CPF');
+  var colunaDoCliente = achar('nome do cliente');
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+
+  var nomeDoStatus = {};
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    nomeDoStatus[normalizarParaComparar_(situacao.gravadoComo)] = situacao.nome;
+  });
+  var deSucesso = RECC_STATUS_DE_SUCESSO.map(normalizarParaComparar_);
+  var semSucesso = normalizarParaComparar_(RECC_STATUS_SEM_SUCESSO);
+
+  var lidos = casos.map(function (caso) {
+    var status = normalizarParaComparar_(caso[colunaDoStatus]);
+    var tentativas = colunasDasTentativas.filter(function (coluna) {
+      return String(caso[coluna] === null || caso[coluna] === undefined ? '' : caso[coluna]).trim() !== '';
+    }).length;
+    var desfecho = deSucesso.indexOf(status) >= 0 ? 'sucesso'
+      : (status === semSucesso ? 'semSucesso' : 'emAndamento');
+    return {
+      caso: caso,
+      status: nomeDoStatus[status] || String(caso[colunaDoStatus] || '').trim() || 'Sem status',
+      desfecho: desfecho,
+      contatos: tentativas + (desfecho === 'emAndamento' ? 0 : 1)
+    };
+  });
+
+  // Sucesso no 1º, 2º, 3º contato… — quantas faixas os dados pedirem.
+  function faixas(grupo) {
+    var porContato = [];
+    grupo.forEach(function (lido) {
+      if (lido.desfecho !== 'sucesso') return;
+      porContato[lido.contatos - 1] = (porContato[lido.contatos - 1] || 0) + 1;
+    });
+    for (var i = 0; i < Math.max(porContato.length, 3); i++) porContato[i] = porContato[i] || 0;
+    return porContato;
+  }
+  function resumo(grupo) {
+    var sucessos = grupo.filter(function (lido) { return lido.desfecho === 'sucesso'; });
+    var contatos = sucessos.reduce(function (soma, lido) { return soma + lido.contatos; }, 0);
+    return {
+      sucessos: sucessos.length,
+      porContato: faixas(grupo),
+      semSucesso: grupo.filter(function (lido) { return lido.desfecho === 'semSucesso'; }).length,
+      emAndamento: grupo.filter(function (lido) { return lido.desfecho === 'emAndamento'; }).length,
+      // Contatos por sucesso, com uma casa: "1,6 contato até falar com o cliente".
+      media: sucessos.length ? Math.round(contatos / sucessos.length * 10) / 10 : null
+    };
+  }
+
+  var geral = resumo(lidos);
+  var ordinal = function (n) { return 'No ' + n + 'º contato'; };
+  var pontos = geral.porContato.map(function (quantos, i) {
+    return { chave: 'contato' + (i + 1), rotulo: ordinal(i + 1), valor: quantos, casos: quantos,
+      ehOutros: false, tom: 'bom', serie: 0 };
+  }).concat([{ chave: 'semsucesso', rotulo: 'Sem sucesso', valor: geral.semSucesso,
+    casos: geral.semSucesso, ehOutros: false, tom: 'atencao', serie: 0 }]);
+
+  // Por analista: a mesma conta, pessoa a pessoa.
+  var porAnalista = {};
+  var ordem = [];
+  lidos.forEach(function (lido) {
+    var nome = String((colunaDoAnalista ? lido.caso[colunaDoAnalista] : '') || '').trim() || 'Sem analista';
+    var chave = normalizarParaComparar_(nome);
+    if (!porAnalista[chave]) { porAnalista[chave] = { analista: nome, lidos: [] }; ordem.push(chave); }
+    porAnalista[chave].lidos.push(lido);
+  });
+  var analistas = ordem.map(function (chave) {
+    var linha = resumo(porAnalista[chave].lidos);
+    linha.analista = porAnalista[chave].analista;
+    return linha;
+  });
+  // Todas as linhas com as mesmas colunas (a conta geral tem as faixas de todos).
+  analistas.forEach(function (linha) {
+    for (var i = 0; i < geral.porContato.length; i++) linha.porContato[i] = linha.porContato[i] || 0;
+  });
+  analistas.sort(function (um, outro) {
+    return outro.sucessos - um.sucessos || (um.analista < outro.analista ? -1 : 1);
+  });
+
+  // Por CPF: o mesmo cliente pode ter mais de um caso — os contatos somam.
+  var porCpf = {};
+  var cpfs = [];
+  var semCpf = 0;
+  lidos.forEach(function (lido) {
+    var cpf = colunaDoCpf ? converterParaIdentificador_(lido.caso[colunaDoCpf]) : '';
+    if (!cpf) { semCpf++; return; }
+    if (!porCpf[cpf]) {
+      porCpf[cpf] = { cpf: cpf, cliente: '', casos: 0, contatos: 0, desfechos: [] };
+      cpfs.push(cpf);
+    }
+    var linha = porCpf[cpf];
+    linha.casos++;
+    linha.contatos += lido.contatos;
+    var cliente = colunaDoCliente ? String(lido.caso[colunaDoCliente] || '').trim() : '';
+    if (cliente) linha.cliente = cliente;
+    var desfecho = lido.desfecho === 'sucesso'
+      ? lido.status + ' no ' + lido.contatos + 'º contato' : lido.status;
+    if (linha.desfechos.indexOf(desfecho) < 0) linha.desfechos.push(desfecho);
+  });
+  var linhasDosCpfs = cpfs.map(function (cpf) {
+    var linha = porCpf[cpf];
+    return { cpf: linha.cpf, cliente: linha.cliente, casos: linha.casos, contatos: linha.contatos,
+      desfecho: linha.desfechos.join(', ') };
+  }).sort(function (um, outro) {
+    return outro.contatos - um.contatos || outro.casos - um.casos || (um.cpf < outro.cpf ? -1 : 1);
+  });
+
+  return {
+    titulo: 'Tentativas até o sucesso',
+    sucessos: geral.sucessos,
+    semSucesso: geral.semSucesso,
+    emAndamento: geral.emAndamento,
+    media: geral.media,
+    grafico: {
+      titulo: 'Em qual contato o cliente atendeu',
+      tipo: 'barras', largura: 2, dimensao: 'Contato', medida: 'Casos',
+      agregacao: 'contagem', unidade: 'casos', ehTempo: false,
+      pontos: pontos, tendencia: null, total: null, aviso: ''
+    },
+    faixas: geral.porContato.map(function (quantos, i) { return ordinal(i + 1); }),
+    porAnalista: analistas.map(function (linha) {
+      return { analista: linha.analista, sucessos: linha.sucessos, porContato: linha.porContato,
+        semSucesso: linha.semSucesso, media: linha.media };
+    }),
+    porCpf: {
+      linhas: linhasDosCpfs.slice(0, RECC_CPFS_LISTADOS),
+      total: linhasDosCpfs.length,
+      semCpf: semCpf
+    }
+  };
+}
+
 /**
  * O painel inteiro: todos os gráficos do canal, já calculados.
  *
@@ -15303,6 +15541,8 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
     */
     premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
     porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
+    // Etapa 47: em qual contato o cliente atendeu, por analista e por CPF.
+    tentativas: tentativasAteOSucesso_(casos, canal),
     /*
       O VALOR POR SITUAÇÃO vem FORA de `componentes`, e de propósito.
       `componentes` é a lista que a tela de Configurações edita — tirar,
@@ -18359,10 +18599,7 @@ const RECC_PADRAO_DO_FORMULARIO = {
     } },
 
   // --- Outros: da base, fora da lista da operação. Ficam ligados.
-  grupo: { secao: 'Outros', ordem: 90 },
   sistema: { secao: 'Outros', ordem: 91 },
-  agentedacentral: { secao: 'Outros', ordem: 92 },
-  relacionamento: { secao: 'Outros', ordem: 93 },
   contato: { secao: 'Outros', ordem: 94 },
   descricao: { secao: 'Outros', ordem: 95, largura: 3 },
 
@@ -18729,7 +18966,9 @@ function atualizarPGO() {
   // declarada e não adivinhada: "tudo que está na planilha e não está no
   // contrato" apontaria também para coluna que a pessoa criou por conta dela,
   // e mandar apagar o trabalho de alguém não é recado de migração.
-  [['USUARIOS', ['Matricula', 'Canal que atende'],
+  [['BASE_RET', RECC_COLUNAS_QUE_SAIRAM_DA_RET,
+    'Não estavam em uso, a seu pedido (Etapa 49); o campo saiu do formulário.'],
+   ['USUARIOS', ['Matricula', 'Canal que atende'],
     'A equipe agora é o CANAL: quem atende o mesmo canal aparece junto, e o '
     + 'canal já está na coluna CanalId.'],
    ['CORRETORAS', ['Nome', 'Canal'],
@@ -18760,6 +18999,9 @@ function atualizarPGO() {
 
   // --- Etapa 44: os 4 cards do Trabalho da RET, na ordem do PO -------------
   feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
+
+  // --- Etapa 49: grupo, agente da central e relacionamento saem do formulário
+  feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -20414,6 +20656,44 @@ function ligarAPropostaEAApoliceEmPedacos_(pulados) {
     });
   });
 
+  return feito;
+}
+
+/*
+ * ETAPA 49, pedido do PO: "remova do contrato a coluna agente da central. Não
+ * estamos usando; remova também a coluna relacionamento. A coluna grupo".
+ * Na planilha em uso a coluna FICA, com o que estiver nela — apagar coluna com
+ * dado nunca é decisão de migração (o recado de "o que sobrou" avisa). O que
+ * sai é o CAMPO, do formulário: desligado, e não apagado, para voltar com um
+ * clique em Configurações › Cadastrar Caso. Roda uma vez só: quem religar o
+ * campo depois não o vê desligado de novo.
+ */
+const RECC_COLUNAS_QUE_SAIRAM_DA_RET = ['grupo', 'agente da central', 'relacionamento'];
+const RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET = 'MIGRACAO.COLUNAS_FORA_DA_RET';
+
+function tirarDoFormularioOQueSaiuDaRet_(pulados) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CAMPOS') || !planilhaAtiva_().getSheetByName('CONFIG')) {
+    pulados.push('os campos que saíram da RET: as abas ainda não existem');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET, '') || '').trim()) {
+    pulados.push('grupo, agente da central e relacionamento já saíram do formulário da RET');
+    return feito;
+  }
+  var sairam = RECC_COLUNAS_QUE_SAIRAM_DA_RET.map(normalizarParaComparar_);
+  // Todos os campos da coluna, e não só o primeiro: uma planilha antiga pode
+  // ter dois para o mesmo cabeçalho.
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (normalizarParaComparar_(campo.Aba) !== 'baseret') return;
+    if (sairam.indexOf(normalizarParaComparar_(campo.Cabecalho)) < 0) return;
+    if (normalizarParaComparar_(campo.Ativo) !== 'sim') return;
+    atualizarRegistro_('CAMPOS', campo.__id, { Ativo: 'NAO' });
+    feito.push('RET: o campo "' + (campo.Rotulo || campo.Cabecalho) + '" saiu do formulário — a '
+      + 'coluna continua na planilha, com o que estava nela');
+  });
+  gravarConfiguracao_(RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET, 'Etapa 49 — '
+    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
   return feito;
 }
 

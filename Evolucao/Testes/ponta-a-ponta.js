@@ -772,6 +772,17 @@ async function rodar() {
     // "Conferir" sugere o de-para pelo nome do cabeçalho: "Atendente" é o Analista.
     const laudo = await pagina.textContent('#importacao');
     contem(laudo, 'Bianca Souza', 'o analista que não é usuário é avisado antes de gravar');
+    // Etapa 48: o seletor do de-para vem em ordem alfabética, e a busca da linha
+    // filtra o seletor; sobrando uma coluna, ela fica escolhida.
+    const linhaDoAtendente = pagina.locator('.importacao-depara tr', { hasText: 'Atendente' });
+    const opcoesAntes = await linhaDoAtendente.locator('select option').allTextContents();
+    const semNaoTrazer = opcoesAntes.slice(1);
+    igual(semNaoTrazer.join('|'), semNaoTrazer.slice().sort((a, b) => a.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toLowerCase().localeCompare(b.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').toLowerCase())).join('|'), 'as colunas em ordem alfabética');
+    await linhaDoAtendente.locator('.procurar-coluna').fill('analis');
+    igual(await linhaDoAtendente.locator('select option').count(), 2, '"— não trazer —" e Analista');
+    igual(await linhaDoAtendente.locator('select').inputValue(), 'Analista');
     contem(await pagina.textContent('#importar-agora'), 'Importar 3');
     await pagina.fill('#nome-do-lote', 'Chat de hoje');
     await pagina.click('#importar-agora');
