@@ -68,10 +68,6 @@ var Moldura = (function () {
     cadastrarCaso:
       '<path d="M12 4.6v14.8M4.6 12h14.8"></path>',
 
-    // desempenho: a linha de pulso, que sobe e desce como o dia da operação
-    minhaPerformance:
-      '<path d="M3.2 12.4h3.6l2.4-7 4 14.2 2.6-7.2h5"></path>',
-
     // buscar: a lupa
     buscarCaso:
       '<circle cx="10.8" cy="10.8" r="6.4"></circle>'
@@ -418,9 +414,9 @@ var Moldura = (function () {
   /**
    * O aviso de que a tela leu só uma parte da base.
    *
-   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Trabalho,
-   * Produtividade RECC e Minha Performance —, e três textos diferentes para o
-   * mesmo fato é como a operação aprende que um deles não é sério.
+   * Num lugar só porque são DUAS telas dizendo a mesma coisa — Trabalho e
+   * Produtividade RECC —, e dois textos diferentes para o mesmo fato é como a
+   * operação aprende que um deles não é sério.
    *
    * A frase diz o que foi lido e o que fazer, nessa ordem. "Os números podem
    * estar incompletos" sozinho não ajuda ninguém: a pessoa precisa saber que
@@ -442,7 +438,7 @@ var Moldura = (function () {
   /**
    * A caixa que envolve os filtros de uma tela.
    *
-   * Três telas filtram — Trabalho, Minha Performance e Produtividade RECC — e
+   * Duas telas filtram — Trabalho e Produtividade RECC — e
    * até aqui os controles ficavam soltos sobre o fundo da página, encostados
    * no conteúdo. Numa tela com cartão, gráfico e tabela, a pessoa não sabia
    * onde o recorte acabava e o resultado começava.
@@ -2201,9 +2197,9 @@ var CasoEmModal = (function () {
 /* ============================================================================
    Graficos · os desenhos, num lugar só
    ============================================================================
-   Duas telas desenham gráficos: a Produtividade RECC e Minha Performance. Elas
-   não têm duas cópias disto — pela mesma razão que já custou caro aqui:
-   regra copiada em dois lugares é regra que um dia diverge, e num gráfico a
+   Os gráficos da Produtividade RECC saem daqui. Não há duas cópias disto —
+   pela mesma razão que já custou caro aqui: regra copiada em dois lugares é
+   regra que um dia diverge, e num gráfico a
    divergência não dá erro. Vira uma barra um pouco mais alta do que devia, e
    alguém decide alguma coisa com base nela.
 
@@ -2657,8 +2653,8 @@ var Graficos = (function () {
 /* ============================================================================
    PGO — SeletorDePeriodo · as três maneiras de escolher o tempo
    ============================================================================
-   TRÊS TELAS filtram por período — Trabalho, Minha Performance e Produtividade
-   RECC — e as três oferecem as mesmas três maneiras:
+   DUAS TELAS filtram por período — Trabalho e Produtividade RECC — e as duas
+   oferecem as mesmas maneiras:
 
      POR DIAS   "últimos 30 dias". É o do dia a dia, e é a abertura.
      POR DATA   duas datas, de/até. Responde uma pergunta específica.

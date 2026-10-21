@@ -86,10 +86,73 @@ function rodarTestesDosCardsFiltrosEBusca() {
     t.chamar('excluirItemDoCatalogo')(t.itemDoContato.Id);
     const todos = t.cards().cartoes.filter((c) => c.mostrar);
     t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, todos.filter((c) => c.titulo !== 'Pendente'));
-    verdadeiro(!t.cards().cartoes.find((c) => c.titulo === 'Pendente').mostrar, 'tirou outro, com o órfão na lista');
+    verdadeiro(!t.cards().cartoes.find((c) => c.titulo === 'Pendente'), 'tirou outro, com o órfão na lista');
     t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, t.cards().cartoes.filter((c) => c.mostrar
       && c.titulo !== '1º contato realizado'));
-    verdadeiro(!t.cards().cartoes.find((c) => c.titulo === '1º contato realizado').mostrar, 'e tirou o órfão');
+    verdadeiro(!t.cards().cartoes.find((c) => c.titulo === '1º contato realizado'), 'e tirou o órfão');
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('O card removido não volta ao recarregar (Etapa 50)');
+
+  const titulos = (t) => t.cards().cartoes.map((c) => c.titulo);
+
+  teste('remover os seis primeiros e salvar: recarregar não os traz de volta', () => {
+    const t = retDoPO();
+    const todos = t.cards().cartoes;
+    t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, todos.slice(6).concat([
+      { titulo: 'Fica', dimensao: 'total', filtro: '', cor: 'neutro', mostrar: true }]));
+    igual(titulos(t).join('|'), todos.slice(6).map((c) => c.titulo).concat(['Fica']).join('|'));
+    igual(t.cards().cartoes.filter((c) => !c.mostrar).length, 0, 'nenhum desmarcado no topo');
+  });
+
+  teste('o removido continua na planilha, desligado — nenhum dado se perde', () => {
+    const t = retDoPO();
+    const total = t.cards().cartoes[0];
+    t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, t.cards().cartoes.slice(1));
+    const linha = t.chamar('lerRegistros_')('PAINEIS').find((l) => l.__id === total.id);
+    igual(String(linha.Ativo).toUpperCase(), 'NAO');
+    igual(linha.Titulo, total.titulo);
+  });
+
+  teste('o card só escondido (sem "Mostrar") continua na lista, no lugar dele, para religar', () => {
+    const t = retDoPO();
+    const lista = t.cards().cartoes;
+    lista[1].mostrar = false;
+    t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, lista);
+    const de = t.cards().cartoes;
+    igual(de.length, lista.length);
+    igual(de[1].titulo, lista[1].titulo, 'no mesmo lugar');
+    igual(de[1].mostrar, false);
+    de[1].mostrar = true;
+    t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, de);
+    igual(t.cards().cartoes[1].mostrar, true, 'e religa');
+  });
+
+  teste('o card que o atualizarPGO desligou ao montar os 4 da RET também some do editor', () => {
+    const t = retDoPO();
+    t.renomearStatus('1º contato realizado', 'Contatando');
+    t.chamar('atualizarPGO()');
+    igual(titulos(t).join('|'), 'Total de casos|Aguardando transmissão|Pendente|Contatando');
+  });
+
+  teste('remover na Produtividade também: a lista dela é a mesma máquina', () => {
+    const t = retDoPO();
+    const antes = t.chamar('listarCardsDoPainel')('produtividade', t.ret.id).cartoes;
+    t.chamar('salvarCardsDoPainel')('produtividade', t.ret.id, antes.slice(2));
+    igual(t.chamar('listarCardsDoPainel')('produtividade', t.ret.id).cartoes.length, antes.length - 2);
+    igual(t.cards().cartoes.length > 0, true, 'e a do Trabalho segue intacta');
+  });
+
+  teste('recriar o card removido cria um novo — sem ressuscitar a linha antiga', () => {
+    const t = retDoPO();
+    const total = t.cards().cartoes[0];
+    t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, t.cards().cartoes.slice(1));
+    t.chamar('salvarCardsDoPainel')('trabalho', t.ret.id, [{ id: '', titulo: 'Total de casos',
+      dimensao: 'total', filtro: '', cor: 'neutro', mostrar: true }].concat(t.cards().cartoes));
+    const novo = t.cards().cartoes[0];
+    verdadeiro(novo.id !== total.id, 'é outra linha');
+    igual(novo.mostrar, true);
   });
 
   teste('um card NOVO apontando para status inexistente continua sendo recusado', () => {

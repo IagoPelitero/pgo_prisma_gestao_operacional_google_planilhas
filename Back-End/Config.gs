@@ -1483,7 +1483,6 @@ function listarCanaisConfiguraveis() {
         colunaDoStatus: String(canal.ColunaDoStatus || ''),
         colunasDaFila: String(canal.ColunasDaFila || ''),
         colunasDaBusca: String(canal.ColunasDaBusca || ''),
-        metaMensalPorPessoa: Number(canal.MetaMensalPorPessoa) || 0,
         colunaDaFinalizacao: String(canal.ColunaDaFinalizacao || ''),
         colunaDaAreaResponsavel: String(canal.ColunaDaAreaResponsavel || ''),
         colunaDoValor: String(canal.ColunaDoValor || ''),
@@ -1575,7 +1574,6 @@ function salvarCanal(dados) {
     ColunaDoStatus: String(dados.colunaDoStatus || ''),
     ColunasDaFila: String(dados.colunasDaFila || ''),
     ColunasDaBusca: String(dados.colunasDaBusca || ''),
-    MetaMensalPorPessoa: Number(dados.metaMensalPorPessoa) || 0,
     ColunaDaFinalizacao: String(dados.colunaDaFinalizacao || ''),
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
     ColunaDoValor: String(dados.colunaDoValor || ''),
@@ -1769,7 +1767,6 @@ function criarCanal(dados) {
     ColunaDoStatus: '',
     ColunasDaFila: '',
     ColunasDaBusca: '',
-    MetaMensalPorPessoa: 0,
     ColunaDaFinalizacao: '',
     ColunaDaAreaResponsavel: '',
     ColunaDoValor: '',
@@ -1975,8 +1972,9 @@ function listarCardsDoPainel(tela, idDoCanal) {
     .filter(function (linha) {
       if (normalizarParaComparar_(linha.Tela) !== alvo) return false;
       if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return false;
-      return converterParaIdentificador_(linha.CanalId)
-        === converterParaIdentificador_(canal.id);
+      if (converterParaIdentificador_(linha.CanalId)
+        !== converterParaIdentificador_(canal.id)) return false;
+      return !cartaoFoiRemovido_(linha);
     })
     .sort(function (um, outro) {
       return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0);
@@ -2008,6 +2006,20 @@ function listarCardsDoPainel(tela, idDoCanal) {
     oQueContar: oQueContar,
     cartoes: cartoes
   };
+}
+
+/**
+ * O cartão que a pessoa REMOVEU, e não o que ela só escondeu (Etapa 50).
+ *
+ * Os dois ficam desligados na aba, e a diferença é a ordem: quem esconde um
+ * cartão (tira o "Mostrar") continua no lugar dele, com Ordem 1, 2, 3…; quem o
+ * remove recebe Ordem 0 (ver salvarCardsDoPainel). O editor lista o escondido —
+ * para dar como religá-lo — e não o removido. Antes listava os dois, e o cartão
+ * removido voltava, desmarcado e no topo, na hora de recarregar. A linha do
+ * removido continua na planilha: religar à mão é pôr Ativo SIM e uma Ordem.
+ */
+function cartaoFoiRemovido_(linha) {
+  return normalizarParaComparar_(linha.Ativo) !== 'sim' && !(Number(linha.Ordem) > 0);
 }
 
 /**

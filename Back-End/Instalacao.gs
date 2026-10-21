@@ -207,7 +207,7 @@ function semearDadosIniciais_(emailDoInstalador) {
      */
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar', 'configurar', 'estrutura'],
-      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade', 'configuracoes'],
       'CANAL'),
     // A Coordenação importa: é ela quem recebe a base de inadimplentes e
@@ -215,14 +215,14 @@ function semearDadosIniciais_(emailDoInstalador) {
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar'],
-      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade'],
       'CANAL'),
     // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
     // "próprios" no resto do sistema.
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
-      ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'produtividade'],
       'EQUIPE'),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
@@ -287,7 +287,6 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Responsável: analista',
       ColunasDaBusca: 'protocolo, CPF, Num_apolice, número da proposta, '
         + 'nome do cliente',
-      MetaMensalPorPessoa: 0,
       ColunaDaFinalizacao: 'data da transmissão',
       ColunaDaAreaResponsavel: '',
       /*
@@ -332,7 +331,6 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Corretora: Corretora, SUSEP'
         + '; Responsável: Analista',
       ColunasDaBusca: 'Nome do segurado, Documento (CPF), SUSEP, Corretora',
-      MetaMensalPorPessoa: 0,
       ColunaDaFinalizacao: 'Data da finalização',
       ColunaDaAreaResponsavel: 'Área responsável',
       // Sem coluna de valor: a Mesa Diamante não mede dinheiro por situação, e
@@ -390,7 +388,6 @@ function semearDadosIniciais_(emailDoInstalador) {
         + '; Financeiro: Prêmio mensal, Margem de contribuição'
         + '; Responsável: Analista',
       ColunasDaBusca: 'CNPJ, Subestipulante, SUSEP, TK/Assunto',
-      MetaMensalPorPessoa: 0,
       // Sem coluna de finalização: nenhum dos seis status do VG é "concluído"
       // no sentido de encerrar o caso — "Pago" e "Retido" são desfechos, e o
       // PO não pediu uma data para eles. Fica vazio até ele pedir.
@@ -1402,6 +1399,8 @@ function atualizarPGO() {
   // e mandar apagar o trabalho de alguém não é recado de migração.
   [['BASE_RET', RECC_COLUNAS_QUE_SAIRAM_DA_RET,
     'Não estavam em uso, a seu pedido (Etapa 49); o campo saiu do formulário.'],
+   ['CANAIS', ['MetaMensalPorPessoa'],
+    'Só a Minha Performance a lia, e a tela saiu do sistema (Etapa 52).'],
    ['USUARIOS', ['Matricula', 'Canal que atende'],
     'A equipe agora é o CANAL: quem atende o mesmo canal aparece junto, e o '
     + 'canal já está na coluna CanalId.'],
@@ -1436,6 +1435,9 @@ function atualizarPGO() {
 
   // --- Etapa 49: grupo, agente da central e relacionamento saem do formulário
   feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
+
+  // --- Etapa 52: a Minha Performance saiu do sistema — e dos níveis de acesso
+  feito = feito.concat(tirarAMinhaPerformanceDosNiveis_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -3131,6 +3133,46 @@ function tirarDoFormularioOQueSaiuDaRet_(pulados) {
   return feito;
 }
 
+/*
+ * ETAPA 52, pedido do PO: "a aba Minha Performance não será mais necessária.
+ * Readeque o sistema". A tela saiu; o que sobra numa planilha em uso é a marca
+ * dela dentro de cada NÍVEL DE ACESSO (a lista de telas que o nível abre). Sem
+ * efeito nenhum — o menu só mostra o que existe —, mas a configuração ficaria
+ * com uma tela que não há mais. Tirada uma vez só, com o nível dizendo qual era.
+ * A coluna CANAIS.MetaMensalPorPessoa (a barra de progresso dela) fica na
+ * planilha, com o dado: ver "o que sobrou", acima.
+ */
+const RECC_TELA_QUE_SAIU = 'minhaPerformance';
+const RECC_CHAVE_DA_TELA_QUE_SAIU = 'MIGRACAO.SEM_MINHA_PERFORMANCE';
+
+function tirarAMinhaPerformanceDosNiveis_(pulados) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CATALOGO') || !planilhaAtiva_().getSheetByName('CONFIG')) {
+    pulados.push('a Minha Performance dos níveis: as abas ainda não existem');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DA_TELA_QUE_SAIU, '') || '').trim()) {
+    pulados.push('a Minha Performance já saiu dos níveis de acesso');
+    return feito;
+  }
+  lerRegistros_('CATALOGO').forEach(function (item) {
+    if (normalizarParaComparar_(item.Tipo) !== 'nivelacesso') return;
+    var configuracao;
+    try { configuracao = JSON.parse(String(item.Configuracao || '{}')); } catch (erro) { return; }
+    if (!configuracao || !Array.isArray(configuracao.telas)) return;
+    if (configuracao.telas.indexOf(RECC_TELA_QUE_SAIU) < 0) return;
+    configuracao.telas = configuracao.telas.filter(function (tela) {
+      return tela !== RECC_TELA_QUE_SAIU;
+    });
+    atualizarRegistro_('CATALOGO', item.__id, { Configuracao: JSON.stringify(configuracao) });
+    feito.push('Nível "' + (item.Rotulo || item.Nome) + '": a Minha Performance saiu das telas '
+      + 'que ele abre (a tela deixou de existir)');
+  });
+  gravarConfiguracao_(RECC_CHAVE_DA_TELA_QUE_SAIU, 'Etapa 52 — '
+    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  return feito;
+}
+
 /** Os campos de uma aba, indexados pela chave técnica. */
 function camposDaAbaPorChave_(nomeDaAba) {
   var porChave = {};
@@ -4065,6 +4107,7 @@ function blocoDosCampos_() {
   }
 
   var semColuna = [];
+  var desligadosSemColuna = [];
   var obrigatoriosDesligados = [];
   var grafiaDiferente = [];
   var porAba = {};
@@ -4081,8 +4124,13 @@ function blocoDosCampos_() {
     var estrutura = porAba[nomeDaAba];
 
     if (!estrutura || posicaoDaColuna_(estrutura, cabecalho) < 0) {
-      semColuna.push(String(campo.Rotulo || cabecalho) + ' → '
-        + nomeDaAba + '.' + cabecalho);
+      var qual = String(campo.Rotulo || cabecalho) + ' → ' + nomeDaAba + '.' + cabecalho;
+      // Só o campo LIGADO estoura ao cadastrar. O desligado não aparece no
+      // formulário, e é justamente o que se faz com o campo cuja coluna saiu
+      // (Etapa 51: o PO apagou a coluna "agente da central", e o laudo pedia
+      // para desligar o campo que já estava desligado).
+      if (normalizarParaComparar_(campo.Ativo) === 'sim') semColuna.push(qual);
+      else desligadosSemColuna.push(qual);
       return;
     }
     var naPlanilha = estrutura.cabecalhos[posicaoDaColuna_(estrutura, cabecalho)];
@@ -4131,7 +4179,17 @@ function blocoDosCampos_() {
 
   if (!semColuna.length && !obrigatoriosDesligados.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
-      'Os ' + campos.length + ' campos apontam para colunas que existem'));
+      'Os ' + (campos.length - desligadosSemColuna.length)
+        + ' campos apontam para colunas que existem'));
+  }
+
+  if (desligadosSemColuna.length) {
+    itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
+      desligadosSemColuna.length + ' campo(s) desligado(s) sem a coluna na planilha',
+      algunsExemplos_(desligadosSemColuna),
+      'Nada quebra: o campo está desligado e não aparece no formulário. Se quiser '
+        + 'a aba CAMPOS limpa, exclua a linha dele — e depois aperte "Aplicar '
+        + 'mudanças da planilha agora", em Configurações › Estrutura.'));
   }
 
   return itens;

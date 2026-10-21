@@ -138,7 +138,7 @@ function rodarTestesDeAcesso() {
     chamar('atualizarRegistro_')('CATALOGO', operacao.Id, {
       Configuracao: JSON.stringify({
         escopo: 'PROPRIOS',
-        telas: ['trabalho', 'cadastrarCaso', 'minhaPerformance', 'buscarCaso',
+        telas: ['trabalho', 'cadastrarCaso', 'buscarCaso',
           'tabelaCorretoras'],
         acoes: ['criar', 'editar', 'exportar'],
         campos: {},
@@ -154,14 +154,14 @@ function rodarTestesDeAcesso() {
     ambiente.definirEmail('ana@exemplo.com');
     const daOperacao = chamar('pacoteDePartida()');
     igual(daOperacao.disponivel, true);
-    igual(daOperacao.menu.length, 5,
+    igual(daOperacao.menu.length, 4,
       'a Operação não vê Produtividade RECC nem Configurações');
     igual(daOperacao.menu[0].titulo, 'Trabalho', 'o título vem de CONFIG');
     igual(daOperacao.menu[0].tela, 'trabalho',
       'e a CHAVE não muda com o nome — é ela que identifica a tela');
 
     ambiente.definirEmail('primeiro.adm@exemplo.com');
-    igual(chamar('pacoteDePartida()').menu.length, 8, 'o Administrador vê tudo');
+    igual(chamar('pacoteDePartida()').menu.length, 7, 'o Administrador vê tudo');
   });
 
   teste('a guarda do servidor barra a ação que o nível não tem', () => {

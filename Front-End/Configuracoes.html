@@ -945,7 +945,7 @@ var TelaConfiguracoes = (function () {
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
       + '<em>O canal é também a EQUIPE da pessoa: quem está no mesmo canal '
-      + 'aparece junto na Minha Performance. Quem administra fica em "todos os '
+      + 'é a equipe dela na Produtividade RECC. Quem administra fica em "todos os '
       + 'canais" — pode cadastrar em qualquer uma e delegar, e não entra em '
       + 'equipe nenhuma.</em></label>';
   }
@@ -1578,8 +1578,8 @@ var TelaConfiguracoes = (function () {
     /*
       O status que FECHA o caso. Pedido do PO: o que é "concluído" muda de
       canal para canal — e no VG ele ainda vai decidir. É daqui que ele decide,
-      sem código: marcado, o status entra em "Concluídos" e sai de "Ainda em
-      aberto" em Minha Performance, e conta para a meta.
+      sem código: marcado, o status é um desfecho: encerra o prazo dos
+      sinalizadores e conta como encerrado.
 
       Não trava nada: um caso num status final continua aceitando mudança.
     */
@@ -1806,10 +1806,6 @@ var TelaConfiguracoes = (function () {
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
         + 'a busca não estourar numa base grande.')
-      + campoDeTexto('metaMensalPorPessoa', 'Meta de casos por pessoa, no mês',
-        canal.metaMensalPorPessoa,
-        'Aparece em Minha Performance como barra de progresso. Zero desliga: '
-        + 'canal sem meta não inventa uma.')
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -1832,7 +1828,7 @@ var TelaConfiguracoes = (function () {
       + caixaDeOpcoes('colunaDoValor', 'Coluna do valor', colunas,
         canal.colunaDoValor,
         'A coluna de dinheiro deste canal. É dela que sai o gráfico "Valor por '
-        + 'situação", na Produtividade RECC e na Minha Performance. Em branco, '
+        + 'situação", na Produtividade RECC. Em branco, '
         + 'o gráfico não aparece.')
       + campoDeTexto('situacoesDestacadas', 'Situações com barra própria',
         canal.situacoesDestacadas,
@@ -1868,7 +1864,6 @@ var TelaConfiguracoes = (function () {
         colunaDoStatus: valorDe('colunaDoStatus'),
         colunasDaFila: valorDe('colunasDaFila'),
         colunasDaBusca: valorDe('colunasDaBusca'),
-        metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
         slaHorasUteis: valorDe('slaHorasUteis'),
@@ -2052,11 +2047,9 @@ var TelaConfiguracoes = (function () {
         + '<div class="card-linha">'
         + '<label class="config-campo"><span>Mostrar no máximo</span>'
         + '<input type="text" data-card="' + posicao + '" data-parte="limite"'
-        + ' value="' + (grafico.limite || '') + '" placeholder="todos">'
-        + '<em>O resto vira uma fatia só, "Demais valores"'
-        + (grafico.tipo === 'pizza'
-          ? '. A pizza aceita no máximo ' + opcoes.maximoDeFatias + '.' : '.')
-        + '</em></label>'
+        + ' value="' + (grafico.limite || '') + '" placeholder="' + opcoes.topoDosGraficos + '">'
+        + '<em>No máximo os ' + opcoes.topoDosGraficos + ' maiores. O resto não aparece '
+        + '(não há "Demais valores"). A linha do tempo mostra todos os dias.</em></label>'
         + caixaSimples(posicao, 'largura', 'Tamanho na tela',
           [{ valor: '1', rotulo: 'Metade da linha' },
            { valor: '2', rotulo: 'Linha inteira' }], String(grafico.largura))

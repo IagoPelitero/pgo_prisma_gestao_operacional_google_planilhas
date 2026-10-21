@@ -127,36 +127,84 @@ function rodarTestesDaProdutividade() {
     igual(porCanal.pontos.reduce((soma, p) => soma + p.casos, 0), 4);
   });
 
-  secao('O TOP N e os "Demais valores"');
+  secao('Só o top 5, sem "Demais valores" (Etapa 53)');
 
-  teste('o que passa do limite vira UMA fatia, e não uma cor nova', () => {
+  // Pedido do PO: "tirar da aba Produtividade RECC dos gráficos os demais
+  // valores. Deve aparecer somente o top 5 de cada tópico".
+
+  /** Uma RET só destes testes: os casos que eles gravam não vazam para os outros. */
+  const retSo = () => {
+    const outra = carregar('primeiro.adm@exemplo.com');
+    outra.chamar('instalarRECC()');
+    const daRet = outra.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
+    return { chamar: outra.chamar, painel: () => outra.chamar('produtividadeDaEquipe')(daRet.id, {}, 30) };
+  };
+
+  teste('o que passa do limite SAI do gráfico — não vira uma fatia "Demais valores"', () => {
     const lista = chamar('listarComponentesDoPainel')(ret.id);
     chamar('salvarComponentesDoPainel')(ret.id, lista.map((grafico) =>
       grafico.titulo.indexOf('Casos por canal') === 0
         ? Object.assign({}, grafico, { limite: 1 }) : grafico));
 
     const porCanal = acharGrafico('Casos por canal');
-    igual(porCanal.pontos.length, 2, 'o primeiro, mais a fatia do resto');
-    igual(porCanal.pontos[1].rotulo, 'Demais valores',
-      'não "Outros": várias listas da operação já têm um item com esse nome');
-    verdadeiro(porCanal.dobradosEmOutros >= 1, 'a tela diz quantos foram somados');
-
-    // A soma tem de continuar fechando com o total.
-    igual(porCanal.pontos.reduce((soma, p) => soma + p.casos, 0), 4);
+    igual(porCanal.pontos.length, 1, 'só o maior');
+    verdadeiro(porCanal.pontos.every((p) => !p.ehOutros && p.rotulo !== 'Demais valores'));
+    verdadeiro(porCanal.foraDoTopo >= 1, 'e a tela sabe que ficou gente de fora');
     chamar('salvarComponentesDoPainel')(ret.id, lista);
   });
 
-  teste('a pizza não passa de seis fatias, mesmo pedindo mais', () => {
+  teste('sem limite configurado, cada gráfico mostra no máximo os 5 maiores', () => {
+    const so = retSo();
+    ['Fax', 'Carta', 'Totem', 'Balcão', 'Rádio', 'Pombo', 'Sinal'].forEach((nome, i) => {
+      for (let k = 0; k <= 7 - i; k++) {
+        so.chamar('inserirRegistro_')('BASE_RET', { analista: 'Marcos Vieira', status: 'Pendente',
+          canal: 'Canal ' + nome, 'data de recepção do protocolo': diasAtras(1),
+          'nome do cliente': nome + k });
+      }
+    });
+    const painel = so.painel();
+    painel.componentes.filter((g) => !g.ehTempo && !g.aviso).forEach((grafico) => {
+      verdadeiro(grafico.pontos.length <= 5, grafico.titulo + ': ' + grafico.pontos.length + ' pontos');
+      verdadeiro(!grafico.pontos.some((p) => p.ehOutros), grafico.titulo + ' sem "Demais valores"');
+    });
+    const porCanal = painel.componentes.find((g) => g.titulo.indexOf('Casos por canal') === 0);
+    igual(porCanal.pontos[0].rotulo, 'Canal Fax', 'o maior primeiro');
+    verdadeiro(porCanal.foraDoTopo >= 2, 'os menores ficaram de fora: ' + porCanal.foraDoTopo);
+  });
+
+  teste('limite acima de 5 também para no 5 — inclusive a pizza', () => {
     const lista = chamar('listarComponentesDoPainel')(ret.id);
     chamar('salvarComponentesDoPainel')(ret.id, lista.map((grafico) =>
-      grafico.tipo === 'pizza'
-        ? Object.assign({}, grafico, { limite: 20 }) : grafico));
-
-    // Seis situações na RET, todas com caso ou não — a pizza corta em 6.
-    const pizza = acharGrafico('Situação dos casos');
-    verdadeiro(pizza.pontos.length <= 6,
-      'acima de seis fatias a pizza vira confete, e ninguém lê');
+      Object.assign({}, grafico, { limite: 20 })));
+    painelDaRet().componentes.filter((g) => !g.ehTempo).forEach((grafico) => {
+      verdadeiro(grafico.pontos.length <= 5, grafico.titulo);
+    });
     chamar('salvarComponentesDoPainel')(ret.id, lista);
+  });
+
+  teste('a linha do tempo não se corta: cada dia é um ponto', () => {
+    const so = retSo();
+    for (let dia = 2; dia <= 9; dia++) {
+      so.chamar('inserirRegistro_')('BASE_RET', { analista: 'Marcos Vieira', status: 'Pendente',
+        'data de recepção do protocolo': diasAtras(dia), 'nome do cliente': 'Dia ' + dia });
+    }
+    const linha = so.painel().componentes.find((g) => g.ehTempo);
+    verdadeiro(linha.pontos.length > 5, 'a linha tem ' + linha.pontos.length + ' dias');
+  });
+
+  teste('a tela avisa que a soma e as porcentagens são entre os mostrados', () => {
+    const tela = fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End',
+      'Produtividade.html'), 'utf8');
+    contem(tela, 'function soOsMaiores(componente)');
+    contem(tela, "(componente.foraDoTopo ? soOsMaiores(componente) + ' ' : '')",
+      'o rodapé dos gráficos usa o aviso');
+    contem(tela, 'if (componente.foraDoTopo) notas.push(soOsMaiores(componente));',
+      'e o dos atendidos da Mesa também');
+    verdadeiro(tela.indexOf('<strong>Demais valores</strong>') < 0,
+      'a tela não escreve mais "somados em Demais valores"');
+    const config = fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End',
+      'Configuracoes.html'), 'utf8');
+    contem(config, 'não há "Demais valores"');
   });
 
   secao('A cor');
@@ -238,20 +286,6 @@ function rodarTestesDaProdutividade() {
     contem(tela, 'Trabalhar no caso');
     contem(tela, 'detalhe.podeEditar');
     verdadeiro(tela.indexOf('Ver detalhes') < 0, 'o "Ver detalhes" saiu');
-  });
-
-  teste('"Demais valores" devolve exatamente o que não está nas outras fatias', () => {
-    const lista = chamar('listarComponentesDoPainel')(ret.id);
-    chamar('salvarComponentesDoPainel')(ret.id, lista.map((grafico) =>
-      grafico.titulo.indexOf('Casos por canal') === 0
-        ? Object.assign({}, grafico, { limite: 1 }) : grafico));
-
-    const porCanal = acharGrafico('Casos por canal');
-    const resto = porCanal.pontos.find((p) => p.ehOutros);
-    const detalhe = chamar('detalharComponente')(ret.id, porCanal.id,
-      '__outros', {}, 30);
-    igual(detalhe.total, resto.casos);
-    chamar('salvarComponentesDoPainel')(ret.id, lista);
   });
 
   teste('coluna vazia em todos os casos vira recado, e não uma barra só', () => {
@@ -384,8 +418,8 @@ function rodarTestesDaProdutividade() {
   });
 
   teste('mandar só um número continua funcionando', () => {
-    // O Trabalho e a Minha Performance chamam assim, e a pergunta deles é
-    // sempre "os últimos N dias". Não havia motivo para mexer neles.
+    // O Trabalho chamava assim (e a Minha Performance, que saiu), e a pergunta
+    // era sempre "os últimos N dias". Não havia motivo para mexer.
     const painel = chamar('produtividadeDaEquipe')(ret.id, {}, 60);
     igual(painel.periodo.tipo, 'dias');
     igual(painel.periodo.dias, 60);
@@ -552,8 +586,8 @@ function rodarTestesDaProdutividade() {
   secao('De quem são os números: o nível de acesso decide');
 
   /*
-   * A tela é DA EQUIPE por natureza — não há botão de "só os meus", porque
-   * Minha Performance é a tela de uma pessoa e esta é a do grupo.
+   * A tela é DA EQUIPE por natureza — não há botão de "só os meus": quem quer
+   * o número de uma pessoa usa o filtro de Analista.
    *
    * Mas QUEM vê a produtividade de quem é decisão da operação, e por isso é
    * nível de acesso. Quatro respostas: bloqueado, próprios, equipe, canal.
@@ -937,12 +971,12 @@ function rodarTestesDaProdutividade() {
     contem(tela, 'CasoEmModal.abrir(', 'e o caso abre no mesmo modal das outras telas');
   });
 
-  teste('quem desenha é um módulo só, usado pelas duas telas', () => {
+  teste('quem desenha é um módulo só, e a tela não tem a sua própria cópia', () => {
     // Regra copiada em dois lugares é regra que um dia diverge — e num
     // gráfico a divergência não dá erro: vira uma barra um pouco mais alta
     // do que devia, e alguém decide alguma coisa com base nela.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    ['Produtividade.html', 'MinhaPerformance.html'].forEach((nome) => {
+    ['Produtividade.html'].forEach((nome) => {
       const fonte = fs.readFileSync(path.join(pasta, nome), 'utf8');
       contem(fonte, 'Graficos.desenhar(', nome + ' pede o desenho ao módulo');
       verdadeiro(fonte.indexOf('function desenharPizza') < 0
@@ -982,8 +1016,7 @@ function rodarTestesDaProdutividade() {
    * VALOR POR SITUAÇÃO — o gráfico de dinheiro que o PO pediu
    * ==========================================================================
    * "Traga na produtividade RECC gráfico com valor dos retidos, não retidos,
-   * sem sucesso, valor dos demais status e total. O mesmo em minha
-   * performance."
+   * sem sucesso, valor dos demais status e total."
    *
    * Gráfico de dinheiro erra do pior jeito: parece certo. Por isso os testes
    * aqui conferem as CONTAS, baldes vazios inclusive.
@@ -1101,40 +1134,6 @@ function rodarTestesDaProdutividade() {
     chamar('atualizarRegistro_')('CANAIS', ret.id, { ColunaDoValor: comoEstava });
     chamar('esquecerEstruturaLida_')();
     verdadeiro(painelDaRet().valorPorSituacao.aviso === '', 'e volta ao normal');
-  });
-
-  teste('o mesmo gráfico aparece na Minha Performance, com os meus casos', () => {
-    /*
-     * "O mesmo em minha performance" — e "o mesmo" tem de ser a MESMA conta,
-     * não uma parecida. A diferença é o recorte: lá a equipe, aqui a pessoa.
-     *
-     * A prova é por DIFERENÇA, e não por número absoluto: acrescenta um caso
-     * no nome de quem está olhando e cobra que a barra dela suba exatamente
-     * esse valor. Assim o teste não depende do que os outros testes deixaram
-     * na base.
-     */
-    const euSou = chamar('usuarioAtual_()').usuario.Nome;
-    const retidoAntes = (chamar('minhaPerformance')(ret.id, 30)
-      .valorPorSituacao.pontos.find((p) => p.rotulo === 'Retido') || {}).valor;
-
-    chamar('inserirRegistro_')('BASE_RET', {
-      analista: euSou, status: 'Retido',
-      'data de recepção do protocolo': diasAtras(1),
-      'valor do prêmio': 777, 'nome do cliente': 'Meu caso'
-    });
-
-    const minha = chamar('minhaPerformance')(ret.id, 30).valorPorSituacao;
-    verdadeiro(minha !== null, 'a tela da pessoa também tem o gráfico');
-    igual(minha.pontos.find((p) => p.rotulo === 'Retido').valor,
-      retidoAntes + 777, 'a barra dela subiu exatamente o valor do caso dela');
-
-    const daEquipe = painelDaRet().valorPorSituacao;
-    igual(minha.pontos.map((p) => p.rotulo).join(' | '),
-      daEquipe.pontos.map((p) => p.rotulo).join(' | '),
-      'as mesmas barras, na mesma ordem das duas telas');
-    verdadeiro(minha.total <= daEquipe.total,
-      'e o meu valor nunca passa o do canal: ' + minha.total + ' contra '
-      + daEquipe.total);
   });
 
 }

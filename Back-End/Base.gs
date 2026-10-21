@@ -770,10 +770,9 @@ const RECC_ESQUEMA = {
       // sistema lê a base inteira — ler as 35 colunas de 200 mil linhas são
       // 7 milhões de células, e ler cinco são um milhão.
       { cabecalho: 'ColunasDaBusca', tipo: 'texto', protegido: false },
-      // Quantos casos por mês se espera de uma pessoa neste canal. Zero
-      // desliga a meta: canal sem meta declarada não inventa uma, e a tela
-      // simplesmente não mostra a barra de progresso.
-      { cabecalho: 'MetaMensalPorPessoa', tipo: 'numero', protegido: false },
+      // "MetaMensalPorPessoa" saiu do contrato na Etapa 52: só a Minha
+      // Performance a lia, e a tela saiu do sistema. Na planilha em uso a
+      // coluna fica, com o que estiver nela.
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
       /*
@@ -781,8 +780,7 @@ const RECC_ESQUEMA = {
        * gráfico de valor por situação.
        *
        * Pedido do PO: "traga na produtividade RECC gráfico com valor dos
-       * retidos, não retidos, sem sucesso, valor dos demais status e total. O
-       * mesmo em minha performance".
+       * retidos, não retidos, sem sucesso, valor dos demais status e total".
        *
        * Mora aqui, e não escrito no código, porque é decisão de operação: a
        * RET mede prêmio, outro canal pode medir outra coisa, e quais situações

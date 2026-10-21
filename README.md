@@ -31,8 +31,8 @@ código:
 
 ### As telas
 
-`Trabalho` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
-`Tabela de Corretoras` · `Importação` · `Produtividade RECC` · `Configurações`
+`Trabalho` · `Cadastrar Caso` · `Buscar Caso` · `Tabela de Corretoras` ·
+`Importação` · `Produtividade RECC` · `Configurações`
 
 Cada uma aparece — ou não — conforme o **nível de acesso** de quem entrou.
 
@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1359 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1358 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -111,7 +111,7 @@ São duas situações, e cada uma tem o seu caminho:
    | Cole este | Num arquivo chamado | Que é |
    |---|---|---|
    | `Codigo.gs` | `Codigo` (arquivo **.gs**) | os 7 arquivos do servidor |
-   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto, com as 8 telas dentro |
+   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto, com as 7 telas dentro |
    | `SemAcesso.html` | `SemAcesso` (arquivo **HTML**) | a tela de acesso negado |
 
    Quem prefere copiar de uma planilha usa
@@ -248,7 +248,7 @@ acontece de 2 em 2 meses, e as análises só regeram o que já está ligado.
 node Evolucao/Testes/conferir-responsividade.js
 ```
 
-Abre a prévia num navegador de verdade e percorre **as 8 telas em 12
+Abre a prévia num navegador de verdade e percorre **as 7 telas em 12
 larguras** — do monitor de 1600px ao celular de 320px —, procurando a página
 rolar na horizontal e o elemento que escapou da janela. Tabela dentro de uma
 caixa que rola de propósito não conta: rolar a tabela é a solução, não o
@@ -336,7 +336,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1359 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1358 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -369,8 +369,8 @@ proposta**, que a operação criou fora do contrato (Etapa 44, pedido do PO).
 
 Tudo o que filtra mora numa **caixa branca, com o título "Filtros"** e, do lado
 direito, **quantos casos estão sendo mostrados e de qual período**. É a mesma
-caixa nas três telas que filtram — Trabalho, Minha Performance e Produtividade
-RECC —, desenhada por uma peça só (`Moldura.caixaDeFiltros`). A contagem ao
+caixa nas duas telas que filtram — Trabalho e Produtividade RECC —, desenhada
+por uma peça só (`Moldura.caixaDeFiltros`). A contagem ao
 lado do título é o que evita a leitura errada mais comum: um filtro esquecido
 ligado, a tela com três casos, e ninguém entendendo por quê.
 
@@ -600,7 +600,7 @@ contato, Data do 2º contato…), que é de onde sai a produtividade da RET.
 
 "Trabalhar no caso" e "Alterar status" aparecem só para quem tem a ação de
 **editar** no nível de acesso — o servidor recusaria. A Busca, a Produtividade
-RECC e a Minha Performance abrem o caso do mesmo jeito.
+RECC abrem o caso do mesmo jeito.
 
 ### Trabalhar no caso: abre com o que está gravado, e fecha quando salva
 
@@ -885,10 +885,9 @@ diálogo carimbava, e o mesmo caso na mesma situação ficava com data ou sem da
 conforme onde a pessoa tivesse clicado — a conta ficava pela metade sem errar
 em nada visível. É o achado 43.
 
-**Esta tela é da EQUIPE, e não tem botão para trocar:** Minha Performance é
-sobre uma pessoa, a Produtividade RECC é sobre o grupo, e cada pergunta tem a
-sua tela. Quem quiser o número de uma pessoa dentro da equipe usa o filtro de
-Analista — isso é recortar a equipe, e não trocar de assunto.
+**Esta tela é da EQUIPE, e não tem botão para trocar.** Quem quiser o número de
+uma pessoa dentro da equipe usa o filtro de Analista — isso é recortar a equipe,
+e não trocar de assunto.
 
 **Quem vê a produtividade de quem é NÍVEL DE ACESSO**, com quatro respostas:
 
@@ -1014,8 +1013,8 @@ chat; escolhida uma origem, só o total dela.
 
 Cada gráfico traz, embaixo, a **tabela com os atendimentos** — uma coluna só,
 porque o número é o pedido; quem quer ver só e-mail ou só chat usa o seletor de
-origem. O que passa do 5º lugar é somado em **Demais valores**, para o total
-fechar; o atendimento que não traz a informação (sem SUSEP, sem assunto…) **não
+origem. Só os 5 maiores aparecem (o analista, até 15), **sem "Demais valores"**
+— a soma da tabela é entre eles (Etapa 53); o atendimento que não traz a informação (sem SUSEP, sem assunto…) **não
 entra no ranking** e é contado à parte, no rodapé do gráfico. O atendimento sem
 ramo só conta no Total.
 
@@ -1063,10 +1062,9 @@ O que vale saber, e a tela diz:
 
 ### O período, de três maneiras
 
-Vale para as **três telas que filtram** — Trabalho, Minha Performance e
-Produtividade RECC. É a mesma peça (`SeletorDePeriodo`) nas três: duas cópias
-divergiriam no primeiro ajuste, e a operação veria três telas diferentes
-fazendo a mesma pergunta.
+Vale para as **duas telas que filtram** — Trabalho e Produtividade RECC. É a
+mesma peça (`SeletorDePeriodo`) nas duas: duas cópias divergiriam no primeiro
+ajuste, e a operação veria duas telas diferentes fazendo a mesma pergunta.
 
 | Maneira | Para quê |
 |---|---|
@@ -1108,41 +1106,42 @@ Três regras sustentam a leitura, e cada uma existe por um motivo:
   catálogo diz que é, e continua verde depois de qualquer filtro
 
 A paleta é de seis tons em ordem fixa, **conferidos por régua**: ΔE 9,1 de
-separação mínima sob daltonismo, 19,6 na visão normal. Um sétimo valor vira
-"Demais valores", nunca uma cor nova. E como três dos seis ficam abaixo de
+separação mínima sob daltonismo, 19,6 na visão normal.
+
+**Só o top 5, sem "Demais valores"** (Etapa 53, pedido do PO). Cada gráfico mostra no
+máximo os 5 maiores — um gráfico configurado com limite menor fica com o dele — e o resto
+**sai**, em vez de virar uma fatia somada. A linha do tempo não se corta. Como a rosca e a
+tabela somam o que aparece, o rodapé avisa: "Só os 5 maiores aparecem; a soma e as
+porcentagens são entre eles". O total do canal está nos cartões, em cima. E como três dos seis ficam abaixo de
 3:1 de contraste, todo gráfico traz o **número visível**, a **tabela** a um
 clique e a dica no passar do mouse — cor é a segunda leitura, nunca a única.
 
 ---
 
-## A tela em que o analista se vê
+## O que saiu: a Minha Performance
 
-![Minha Performance](Evolucao/imagens/tela-minha-performance.png)
+A tela que mostrava **uma pessoa** — os números dela, a evolução, a posição no
+ranking da equipe e a barra de meta — **saiu do sistema na Etapa 52**, a pedido
+do PO: "a aba Minha Performance não será mais necessária. Readeque o sistema,
+iremos trabalhar somente com as demais".
 
-As outras telas mostram a operação; esta mostra **uma pessoa**, e o cuidado é
-de outra natureza. Um número mal escolhido no Trabalho atrapalha uma decisão;
-aqui, atrapalha alguém.
+| O que saiu | E agora |
+|---|---|
+| A tela, o item do menu e a função do servidor | Quem quer o número de uma pessoa usa o filtro de **Analista** na Produtividade RECC |
+| O ranking e a comparação com a média da equipe | Não há mais — a Produtividade mostra o quadro **por analista** (RET) |
+| A **meta mensal por pessoa** e a barra de progresso | O campo saiu de Configurações › Canais de trabalho e a coluna `MetaMensalPorPessoa` saiu do contrato |
+| A marca "Minha Performance" nos **níveis de acesso** | O `atualizarPGO()` tira a marca de cada nível, uma vez, e diz qual era |
 
-- **O ranking segue o alcance do nível.** Quem só enxerga os próprios casos não
-  vê nome de colega — vê a própria posição contra a média. E quem pode ver
-  recebe os **vizinhos**, não o pódio: um pódio diz pouco a quem está no meio e
-  demais sobre quem está embaixo
-- **Todo número vem com a sua base**, e a média da equipe aparece sempre
-- **No tempo médio, menos é melhor** — cair é verde. A mesma seta para baixo em
-  "concluídos" é o contrário
-- **O que não dá para calcular some**, em vez de aparecer zerado
-- **A meta é declarada, nunca inventada.** Canal sem meta não ganha barra
-- **A meta conta DIA ÚTIL, e desconta férias** — ver a seção seguinte
+Numa planilha em uso a coluna `MetaMensalPorPessoa` **fica, com o dado** — apagar
+coluna com dado nunca é decisão de migração —, e o laudo a lista como "saiu do
+contrato e continua na planilha": apague quando quiser. Quem tinha a tela
+guardada como endereço (`#minhaPerformance`) abre na primeira tela do menu.
 
-**Esta tela é sobre MIM, sempre** — as minhas inclusões. A equipe continua
-aparecendo, mas como REFERÊNCIA: a média e a minha posição, no bloco de baixo.
-Saber que se fez 8 não diz nada sem saber que a média é 6. O que ela não faz é
-virar o assunto da tela — para isso existe a Produtividade RECC.
+### Quais status fecham o caso
 
-### O que é "concluído", canal a canal
-
-"Concluídos", "Ainda em aberto" e a meta contam os casos que chegaram a um
-**status final** — e o que é final muda de canal para canal, palavra do PO:
+O que **fecha** um caso — o "status final" — muda de canal para canal, palavra do
+PO, e é por ele que os **prazos** dos sinalizadores terminam ("Encerrados no
+prazo", "Encerrados fora"):
 
 | Canal | Status que fecham o caso |
 |---|---|
@@ -1155,13 +1154,6 @@ Quem diz é a coluna **`Final`** do catálogo, marcada em Configurações › Li
 código. **Final não trava nada**: um caso fechado continua aceitando mudança de
 status.
 
-Antes o sistema adivinhava pelo nome — status que começa com "conclu". Um caso
-**Retido** aparecia como *em aberto*, um **Sem retorno** da Mesa também, e a
-meta da RET contava só "Concluído", um status que a RET não usa: o progresso
-dela ficava praticamente zerado. Com os finais marcados, **o número da meta e
-de "Concluídos" da RET muda** — passa a contar o que a operação considera
-fechado.
-
 **Na RET não existe mais "Concluído"**, e os nomes são os do PO: Não reteve →
 **Não retido**, Reteve → **Retido**, Sem sucesso → **Sem sucesso de contato**,
 mais **Cancelado** e **Pago**. Na Mesa, Concluído na célula → **Concluído na
@@ -1170,17 +1162,12 @@ rodando `atualizarPGO()` — ver a seção de instalação. As colunas de carimb
 "Data reteve" e "Data não reteve" **mantêm o nome**: coluna da base é contrato
 com o Power BI.
 
-### A meta: dias corridos do mês
+### O calendário saiu
 
-A meta de um canal é **mensal por pessoa**, e o alvo do período se reparte
-pelos **dias corridos** do mês — num período fechado o alvo bate exatamente
-com a meta mensal.
-
-O sistema já teve aqui um motor de dias úteis, feriados nacionais calculados
-pela Páscoa e desconto de férias. **Saiu a pedido do PO**, por regra de
-negócio: "vamos eliminar o calendário, pelas regras de negócio ela não será
-mais necessária". Com ele saíram a seção Calendário das Configurações e a
-conta de ausência na média da equipe.
+O sistema já teve um motor de dias úteis, feriados nacionais calculados pela
+Páscoa e desconto de férias. **Saiu a pedido do PO**, por regra de negócio: "vamos
+eliminar o calendário, pelas regras de negócio ela não será mais necessária".
+Com ele saíram a seção Calendário das Configurações e as contas de ausência.
 
 Quem tem a aba `AUSENCIAS` ou `FERIADOS` de instalações anteriores **não
 perde nada**: `atualizarPGO()` deixa as duas intactas na planilha e diz, no
@@ -1464,7 +1451,7 @@ campo só**: a data do protocolo do próprio VG continua recusando futuro.
 
 ### O que ele ainda não tem
 
-**Cartões e meta**, de propósito. O PO pediu para começar assim e montar os
+**Cartões**, de propósito. O PO pediu para começar assim e montar os
 indicadores depois, em **Configurações › Painéis**, sem programador. Um cartão
 inventado estaria na tela da operação amanhã, medindo o que ninguém pediu.
 
@@ -1546,6 +1533,12 @@ entregue. Mesma máquina, duas perguntas. Até 12 por tela. Remover um cartão n
 toca em caso nenhum — o cartão é uma forma de contar, e apagar a conta não apaga
 o que foi contado.
 
+**Remover e esconder são coisas diferentes** (Etapa 50). Tirar o **"Mostrar"** esconde
+o cartão: ele continua na lista, no lugar dele, para ser religado. **Remover**
+tira o cartão da lista de vez — salvou, recarregou, ele não volta. A linha continua
+na aba `PAINEIS`, desligada, com a `Ordem` 0; religar à mão é pôr `Ativo` SIM e uma
+`Ordem`. Antes o removido voltava ao recarregar, desmarcado e no topo (achado 105).
+
 Um cartão conta de seis maneiras: o **total**, uma **situação**, os
 **finalizados na célula** (que é conta, não coluna), **"já passaram por"** — que
 lê a coluna de carimbo, e por isso não zera quando o caso avança —, **o valor de
@@ -1608,14 +1601,15 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**14 de 14 etapas construídas.** O detalhe de cada uma está em
+**14 etapas construídas, e uma retirada.** A 9ª (Minha Performance) saiu na
+Etapa 52, a pedido do PO. O detalhe de cada uma está em
 [`05-progresso.md`](Evolucao/05-progresso.md).
 
-| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Minha Performance · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
+| ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1359 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
-responsividade em 8 telas × 12 larguras, o roteiro que clica em tudo, os testes
+1358 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.
 

@@ -2176,6 +2176,40 @@ transmissão do Status proposta.
 importa uma "Data do 1º contato" com dia acima de 12 e confere o dia gravado e a
 conta das tentativas.
 
+### 105 · O card removido voltava, desmarcado e no topo, ao recarregar
+
+**Sintoma.** Relato do PO, em Configurações › Painéis › Cards do Trabalho: ao remover
+os seis primeiros cards e salvar, eles somem — e, quando a tela recarrega, voltam.
+
+**Causa.** Salvar não apaga o card removido: desliga (`Ativo NAO`) e põe `Ordem` 0,
+para nenhum dado se perder. Só que o editor lista **também** os desligados — de
+propósito, para dar como religar um card que a pessoa escondeu em "Mostrar" — e não
+distinguia o escondido do removido. O removido voltava, com "Mostrar" desmarcado, e
+a Ordem 0 o punha no topo: os "seis primeiros". Os cards que o `atualizarPGO`
+desligou ao montar os 4 da RET faziam o mesmo.
+
+**Defesa.** `cartaoFoiRemovido_` separa os dois pela ordem: o escondido guarda a
+posição (1, 2, 3…), o removido tem Ordem 0 e não entra na lista do editor. A linha
+segue na planilha. A suíte remove os seis primeiros, salva, recarrega e confere que
+não voltam; confere que o escondido continua no lugar e se religa; e que os
+desligados pelo `atualizarPGO` também saem. Não precisa migrar nada: os que já
+estavam desligados com Ordem 0 somem do editor na hora.
+
+### 106 · O diagnóstico pedia para desligar o campo que já estava desligado
+
+**Sintoma.** Relato do PO: depois de apagar a coluna "agente da central" da planilha, o
+diagnóstico "sinaliza que precisa incluir a coluna do agente da central".
+
+**Causa.** O bloco dos campos conferia **todos** os campos da aba CAMPOS contra a
+planilha, ligados ou não. O `atualizarPGO` da Etapa 49 desliga o campo e diz que a
+coluna pode ser apagada; apagada, o laudo dava FALHA — "Desligue o campo… ou acrescente a
+coluna" —, a primeira opção já feita, a segunda desfazendo o pedido do PO.
+
+**Defesa.** Só o campo **ligado** sem coluna é FALHA: é ele que estouraria no cadastro. O
+desligado vira uma linha informativa. A suíte apaga as três colunas depois do
+`atualizarPGO`, confere o laudo sem FALHA, confere que um campo ligado sem coluna
+continua reprovado, e que excluir a linha do campo não faz nada recriá-lo.
+
 ---
 
 ## O que esta lista ensina
@@ -2404,3 +2438,12 @@ Daí as duas práticas que o projeto não abre mão:
     tinha a leitura brasileira, e a data com hora não — cada uma tinha a sua função,
     e só uma foi ensinada. Quando dois tipos guardam a mesma coisa (um dia), o teste
     de um precisa existir para o outro.
+56. **"Desligado" com dois sentidos é um botão que mente.** No item 105 a mesma
+    marca (`Ativo NAO`) valia para "escondi" e para "removi", e a tela só sabia um.
+    Quando um estado de dado nasce de duas ações diferentes, a diferença tem de
+    estar gravada — aqui, na ordem — para a tela poder tratar cada uma como a
+    pessoa a entendeu.
+57. **Um laudo não pode mandar desfazer o que outro laudo mandou fazer.** No item 106 o
+    `atualizarPGO` dizia "pode apagar a coluna" e o diagnóstico, depois, "acrescente a
+    coluna". Quando uma ferramenta autoriza um passo, as outras precisam ter sido
+    ensaiadas DEPOIS dele — foi o ensaio que faltou.

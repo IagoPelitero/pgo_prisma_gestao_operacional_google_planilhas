@@ -386,20 +386,18 @@ function rodarTestesDoChatDaMesa() {
       'RET00J:1+1|RET01A:0+1', 'a SUSEP compara sem ligar para a caixa');
   });
 
-  teste('é top 5: o que passa vira "Demais valores", somado — e o total fecha', () => {
+  teste('é top 5: o que passa SAI do gráfico, sem "Demais valores" (Etapa 53)', () => {
     const corretoras = ['Alfa', 'Beta', 'Gama', 'Delta', 'Épsilon', 'Zeta', 'Eta'];
     const t = mesaComChat();
         corretoras.forEach((nome, i) => {
       for (let k = 0; k <= 6 - i; k++) t.caso({ Corretora: 'Corretora ' + nome });
     });
     const grafico = t.grafico(t.painel(), 'Top 5 corretoras');
-    igual(grafico.pontos.length, 6, 'cinco e o resto');
-    igual(grafico.pontos[5].rotulo, 'Demais valores');
-    igual(grafico.pontos[5].ehOutros, true);
-    igual(grafico.dobradosEmOutros, 2);
+    igual(grafico.pontos.length, 5, 'só os cinco maiores');
+    verdadeiro(grafico.pontos.every((p) => !p.ehOutros), 'sem "Demais valores"');
+    igual(grafico.foraDoTopo, 2, 'e a tela sabe quantos ficaram de fora');
     igual(grafico.pontos[0].rotulo, 'Corretora Alfa', 'o maior primeiro');
-    igual(grafico.total, 7 + 6 + 5 + 4 + 3 + 2 + 1, 'nada sumiu na dobra');
-    igual(grafico.pontos[5].valor, 2 + 1);
+    igual(grafico.total, 7 + 6 + 5 + 4 + 3, 'a soma é entre os mostrados');
   });
 
   teste('quem não traz a informação não entra no ranking — é contado à parte', () => {
@@ -567,8 +565,9 @@ function rodarTestesDoChatDaMesa() {
     for (let i = 0; i < 17; i++) t.caso({ Analista: 'Analista ' + comZero(i), Ramo: 'Vida em grupo' });
     const grafico = visao(t.painel(), 'todos|vg').graficos[0];
     igual(grafico.titulo, 'Atendidos por analista');
-    igual(grafico.pontos.length, 16, '15 e o "Demais valores"');
-    igual(grafico.total, 17);
+    igual(grafico.pontos.length, 15, 'os 15, sem "Demais valores"');
+    igual(grafico.foraDoTopo, 2);
+    igual(visao(t.painel(), 'todos|vg').totais.total, 17, 'o total de atendidos continua inteiro');
   });
 
   teste('a soma de VG e VI nunca passa do Total', () => {

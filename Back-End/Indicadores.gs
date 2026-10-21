@@ -2,16 +2,17 @@
  * ============================================================================
  * PGO — Indicadores.gs · os números
  * ============================================================================
- * Três telas que contam os mesmos casos e respondem perguntas diferentes:
- * "o que eu trabalho hoje", "o que está acontecendo na operação" e
- * "como eu estou indo". Por isso moram juntas — mudar a regra de contagem
- * num lugar e esquecer dos outros dois é o erro que este arquivo evita.
+ * Duas telas que contam os mesmos casos e respondem perguntas diferentes:
+ * "o que eu trabalho hoje" e "o que está acontecendo na operação". Por isso
+ * moram juntas — mudar a regra de contagem num lugar e esquecer do outro é o
+ * erro que este arquivo evita. (Uma terceira, a Minha Performance, saiu na
+ * Etapa 52, a pedido do PO.)
  *
  * O QUE TEM AQUI DENTRO, nesta ordem:
  *
  *   1. OS CARTÕES DO DIA E A FILA
  *   2. OS GRÁFICOS DA OPERAÇÃO
- *   3. A TELA EM QUE O ANALISTA SE VÊ
+ *   3. O VALOR POR SITUAÇÃO E OS ATENDIDOS DO CHAT
  *
  * Procure pelo banner com ##### para pular de uma seção à outra.
  * ============================================================================
@@ -285,8 +286,7 @@ function resolverPeriodo_(pedido, diasPadrao) {
   pedido = pedido || {};
 
   // Compatibilidade: quem chamar só com um número continua funcionando. É o
-  // que a Minha Performance e o Trabalho fazem, e não há motivo para mexer
-  // neles — a pergunta deles é sempre "os últimos N dias".
+  // que o Trabalho fazia, e não há motivo para mexer nele.
   if (typeof pedido === 'number' || typeof pedido === 'string') {
     return periodoPorDias_(Number(pedido) || padrao);
   }
@@ -1857,13 +1857,13 @@ const RECC_AGREGACOES = {
 };
 
 /**
- * Quantas fatias a pizza aguenta antes de virar confete.
- *
- * Acima disto, o resto vira "Outros" — e não uma cor nova. Cor gerada na hora
- * fica indistinguível das outras para quem não enxerga cor, e quebra a
- * separação que a paleta garante.
+ * Quantos valores um gráfico da Produtividade RECC mostra: os 5 maiores (Etapa
+ * 53, pedido do PO: "tirar dos gráficos os demais valores. Deve aparecer somente
+ * o top 5 de cada tópico"). O resto NÃO vira uma fatia "Demais valores" — sai
+ * do gráfico, e o rodapé avisa que a soma e as porcentagens são entre os
+ * mostrados. Um gráfico com limite menor (TOP 3) fica com o dele.
  */
-const RECC_MAXIMO_DE_FATIAS = 6;
+const RECC_TOPO_DOS_GRAFICOS = 5;
 
 /**
  * As três colunas de prêmio da RET (Etapa 46): anual = "valor do prêmio",
@@ -2277,8 +2277,8 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
  * De quem são os números desta tela. Quem responde é o NÍVEL DE ACESSO.
  *
  * A Produtividade RECC é a tela da equipe — é para isso que ela existe, e por
- * isso ela não tem botão de "só os meus": Minha Performance é a tela de uma
- * pessoa, esta é a do grupo, e cada pergunta tem a sua tela.
+ * isso ela não tem botão de "só os meus". Quem quiser o número de uma pessoa
+ * usa o filtro de Analista — isso é recortar a equipe.
  *
  * Mas QUEM vê a produtividade de quem não é decisão do código. Em algumas
  * equipes o analista acompanhar o grupo puxa todo mundo para cima; em outras,
@@ -2471,30 +2471,15 @@ function calcularComponente_(componente, casos, canal) {
     pontos.sort(function (um, outro) { return outro.valor - um.valor; });
   }
 
-  var dobrados = 0;
+  // O top 5, e só ele: o que passa SAI do gráfico (Etapa 53). O tempo não se
+  // corta — cada dia do período é um ponto da linha.
+  var foraDoTopo = 0;
   if (!ehTempo) {
     var teto = componente.limite > 0
-      ? componente.limite
-      : (componente.tipo === 'pizza' ? RECC_MAXIMO_DE_FATIAS : pontos.length);
-    if (componente.tipo === 'pizza' && teto > RECC_MAXIMO_DE_FATIAS) {
-      teto = RECC_MAXIMO_DE_FATIAS;
-    }
+      ? Math.min(componente.limite, RECC_TOPO_DOS_GRAFICOS) : RECC_TOPO_DOS_GRAFICOS;
     if (pontos.length > teto) {
-      var resto = pontos.slice(teto);
-      dobrados = resto.length;
-      var soma = resto.reduce(function (total, ponto) { return total + ponto.valor; }, 0);
-      var casosDoResto = resto.reduce(function (total, ponto) {
-        return total + ponto.casos;
-      }, 0);
+      foraDoTopo = pontos.length - teto;
       pontos = pontos.slice(0, teto);
-      // "Demais valores", e não "Outros": várias listas da operação já têm
-      // um item chamado "Outros", e duas linhas com o mesmo nome no mesmo
-      // gráfico — uma real e uma somada — não têm como ser distinguidas.
-      //
-      // E é uma fatia só, nunca uma cor nova: cor gerada na hora fica igual
-      // às outras para quem não enxerga cor.
-      pontos.push({ chave: '__outros', rotulo: 'Demais valores', valor: soma,
-        casos: casosDoResto, ehOutros: true });
     }
   }
 
@@ -2514,7 +2499,9 @@ function calcularComponente_(componente, casos, canal) {
     tendencia: componente.tipo === 'barrasComLinha'
       ? mediaMovel_(pintado, 7) : null,
     total: pintado.reduce(function (soma, ponto) { return soma + ponto.valor; }, 0),
-    dobradosEmOutros: dobrados,
+    // Quantos valores ficaram fora do top 5 — a tela avisa que a soma e as
+    // porcentagens são só entre os mostrados.
+    foraDoTopo: foraDoTopo,
     aviso: ''
   };
 }
@@ -2533,7 +2520,7 @@ function semDados_(componente, aviso) {
     pontos: [],
     tendencia: null,
     total: 0,
-    dobradosEmOutros: 0,
+    foraDoTopo: 0,
     aviso: aviso
   };
 }
@@ -2699,33 +2686,18 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
     || estrutura.tipos[posicao] === RECC_TIPO_DE_DADO.DATA_HORA);
 
   var procurado = String(chaveDoPonto || '');
-  var escolhidos;
-
-  if (procurado === '__outros') {
-    // "Outros" é o resto: os casos que NÃO estão em nenhuma das fatias
-    // mostradas. Calculamos de novo quais são elas, para a conta bater com o
-    // gráfico — e não com uma segunda regra que um dia diverge.
-    var mostradas = calcularComponente_(componente, casos, canal).pontos
-      .filter(function (ponto) { return !ponto.ehOutros; })
-      .map(function (ponto) { return normalizarParaComparar_(ponto.chave); });
-
-    escolhidos = casos.filter(function (caso) {
-      var valor = String(caso[componente.dimensao] || '').trim() || 'Sem informação';
-      return mostradas.indexOf(normalizarParaComparar_(valor)) < 0;
-    });
-  } else {
-    escolhidos = casos.filter(function (caso) {
-      var valor = ehTempo
-        ? diaDoCaso_(caso[componente.dimensao])
-        : (String(caso[componente.dimensao] || '').trim() || 'Sem informação');
-      return normalizarParaComparar_(valor) === normalizarParaComparar_(procurado);
-    });
-  }
+  // Sem "Demais valores" desde a Etapa 53: todo ponto clicável é um valor de
+  // verdade da coluna.
+  var escolhidos = casos.filter(function (caso) {
+    var valor = ehTempo
+      ? diaDoCaso_(caso[componente.dimensao])
+      : (String(caso[componente.dimensao] || '').trim() || 'Sem informação');
+    return normalizarParaComparar_(valor) === normalizarParaComparar_(procurado);
+  });
 
   return {
     titulo: componente.titulo,
-    ponto: ehTempo ? rotuloDoDia_(procurado)
-      : (procurado === '__outros' ? 'Demais valores' : procurado),
+    ponto: ehTempo ? rotuloDoDia_(procurado) : procurado,
     colunas: colunasDaFila_(canal),
     // Os 100 mais recentes, compactos — "todos" quando a tela pede. Achado da
     // varredura geral (item 97): a lista ia INTEIRA, e com 5.000 casos o
@@ -2823,7 +2795,7 @@ function opcoesDosGraficos(idDoCanal) {
     }),
     dimensoes: dimensoes,
     medidas: medidas,
-    maximoDeFatias: RECC_MAXIMO_DE_FATIAS
+    topoDosGraficos: RECC_TOPO_DOS_GRAFICOS
   };
 }
 
@@ -2942,439 +2914,16 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
 
 /* ############################################################################
    #
-   #  SEÇÃO 3 de 3 · A TELA EM QUE O ANALISTA SE VÊ
+   #  SEÇÃO 3 de 3 · O VALOR POR SITUAÇÃO E OS ATENDIDOS DO CHAT
    #
    ############################################################################ */
-
-/**
- * ============================================================================
- * A tela em que o analista se vê
- * ============================================================================
- * As outras telas mostram a operação. Esta mostra UMA PESSOA — e por isso o
- * cuidado aqui é de outra natureza. Um número mal escolhido no Trabalho
- * atrapalha uma decisão; um número mal escolhido aqui atrapalha alguém.
- *
- * QUATRO DECISÕES, e cada uma tem motivo:
- *
- *   1. O RANKING SEGUE O ALCANCE DO NÍVEL. Quem só enxerga os próprios casos
- *      NÃO vê uma lista com o nome dos colegas — vê a própria posição contra
- *      a MÉDIA da equipe. Mostrar a lista a quem não pode ver os casos dos
- *      outros seria uma porta dos fundos, e ainda por cima a mais constrangedora.
- *
- *   2. TODO NÚMERO VEM COM A SUA BASE. "8 casos" sozinho não diz nada; "8 de
- *      uma média de 6" diz. Comparação sem referência é o jeito mais rápido
- *      de transformar um painel em ansiedade.
- *
- *   3. O QUE NÃO DÁ PARA CALCULAR NÃO APARECE. Tempo médio exige que o canal
- *      declare a coluna de finalização. Sem ela, o indicador some — e não
- *      aparece zerado, que pareceria um desempenho ruim.
- *
- *   4. A META É DECLARADA, NUNCA INVENTADA. Canal sem meta em `CANAIS` não
- *      ganha barra de progresso. Um alvo tirado do nada é pior que alvo
- *      nenhum: ele parece oficial.
- * ============================================================================
- */
-
-/** Quantas pessoas o ranking mostra em volta de quem está olhando. */
-const RECC_VIZINHOS_NO_RANKING = 2;
-
-/**
- * Os números de quem está olhando, no canal e no período escolhidos.
- */
-function minhaPerformance(idDoCanal, periodoPedido) {
-  var quem = exigirTela_('minhaPerformance');
-  var canal = canalQueEuPossoVer_(idDoCanal, quem);
-
-  // As mesmas três maneiras das outras duas telas — por dias, por data e por
-  // mês. `resolverPeriodo_` aceita só um número também, que é como esta tela
-  // era chamada antes; nada quebra por isso.
-  var periodo = resolverPeriodo_(periodoPedido);
-  var antesDele = periodoAnterior_(periodo);
-  var janela = periodo.dias;
-
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  // Bateu no teto de leitura: pode haver caso do período que ficou de fora.
-  // Aqui isto pesa mais que nas outras telas — esta é a tela sobre UMA PESSOA,
-  // e número incompleto vira julgamento errado sobre alguém.
-  var truncada = recentes.length >= linhasQueOPainelOlha_();
-  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-    guardaOsSemData_(periodo));
-  var anterior = entreDuasDatas_(recentes, canal, antesDele.de, antesDele.ate, false);
-
-  var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
-  var meuNome = String(quem.usuario.Nome || '');
-
-  // SEMPRE as minhas inclusões. Esta tela é sobre UMA PESSOA, e por decisão da
-  // operação ela não troca de assunto: quem quiser o número da equipe abre a
-  // Produtividade RECC, que é a tela da equipe. Duas telas, duas perguntas.
-  //
-  // O que a equipe ainda faz aqui é dar REFERÊNCIA: o bloco "Você e a equipe",
-  // mais abaixo, mostra a média e a posição de quem está olhando. Saber que se
-  // fez 8 não diz nada sem saber que a média é 6.
-  var minhaEquipe = equipeParaComparar_(quem);
-  var olhados = casosDaPessoa_(noPeriodo, coluna, meuNome);
-  var olhadosAntes = casosDaPessoa_(anterior, coluna, meuNome);
-
-  return {
-    canal: { id: canal.id, nome: canal.nome, icone: canal.icone },
-    pessoa: {
-      nome: meuNome,
-      cargo: quem.cargo,
-      nivel: quem.nivel,
-      // O canal da pessoa, que é a EQUIPE dela — por decisão do PO nesta
-      // rodada. Vazio para quem administra, que não pertence a canal nenhum.
-      canal: nomeDoCanalDaPessoa_(quem)
-    },
-    periodo: {
-      tipo: periodo.tipo,
-      dias: periodo.dias,
-      mes: periodo.mes || '',
-      de: comoSeEscreve_(periodo.de),
-      ate: comoSeEscreve_(periodo.ate),
-      rotulo: periodo.rotulo
-    },
-    mesesDisponiveis: mesesParaEscolher_(),
-    truncada: truncada,
-    linhasLidas: recentes.length,
-    // Sem coluna de responsável não há "meus casos", e a tela diz isso em vez
-    // de mostrar zero — zero pareceria que a pessoa não trabalhou.
-    temResponsavel: !!coluna,
-    indicadores: indicadoresDaPessoa_(olhados, olhadosAntes, canal),
-    meta: metaDaPessoa_(olhados, canal, periodo, 1),
-    porDia: serieDoPeriodo_(olhados, canal, janela),
-    porSituacao: distribuicao_(olhados, canal, canal.colunaDoStatus, 'Situação'),
-    porCanal: distribuicao_(olhados, canal, colunaDoCanal_(canal), 'Canal'),
-    // O MESMO gráfico da Produtividade RECC, pela mesma função — a diferença
-    // é que aqui entram só os casos da pessoa. "O mesmo em minha performance"
-    // foi o pedido, e "o mesmo" tem de ser a mesma conta, não uma parecida.
-    valorPorSituacao: valorPorSituacao_(olhados, canal),
-    // O ranking compara DENTRO da equipe: é a pergunta "como eu vou em relação
-    // a quem faz o mesmo que eu". Rankear contra o canal inteiro colocaria o
-    // analista da RET ao lado de quem nem atende RET.
-    equipe: comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe),
-    recentes: oQueEuFiz_(quem, canal)
-  };
-}
-
-/** Os casos em que a pessoa é a responsável. */
-function casosDaPessoa_(registros, coluna, nome) {
-  if (!coluna) return [];
-  var procurado = normalizarParaComparar_(nome);
-  return registros.filter(function (registro) {
-    return normalizarParaComparar_(registro[coluna]) === procurado;
-  });
-}
-
-/** A coluna de canal do canal, quando ela tem uma. */
-function colunaDoCanal_(canal) {
-  var estrutura = estruturaDaAba_(canal.aba);
-  var achada = '';
-  estrutura.cabecalhos.forEach(function (cabecalho) {
-    if (achada) return;
-    if (normalizarParaComparar_(cabecalho) === 'canal') achada = cabecalho;
-  });
-  return achada;
-}
-
-// ============================================================================
-// OS INDICADORES
-// ============================================================================
-
-/**
- * Os números da pessoa, cada um com o do período anterior ao lado.
- *
- * Todo indicador carrega a comparação: "8 casos" sozinho não diz nada, "8
- * contra 6 no período anterior" diz. E o que não dá para calcular neste canal
- * simplesmente não entra na lista.
- */
-function indicadoresDaPessoa_(meus, meusAntes, canal) {
-  var lista = [];
-
-  lista.push(indicador_('trabalhados', 'Casos trabalhados',
-    meus.length, meusAntes.length, 'casos',
-    'Todos os casos em que você é a pessoa responsável no período.'));
-
-  if (canal.colunaDoStatus) {
-    var concluidos = contarConcluidos_(meus, canal);
-    lista.push(indicador_('concluidos', 'Concluídos',
-      concluidos, contarConcluidos_(meusAntes, canal), 'casos',
-      'Casos que chegaram a uma situação de conclusão.'));
-
-    lista.push(indicador_('emAberto', 'Ainda em aberto',
-      meus.length - concluidos, meusAntes.length - contarConcluidos_(meusAntes, canal),
-      'casos', 'O que continua esperando alguma tratativa sua.'));
-  }
-
-  var tempo = tempoMedioDeTratativa_(meus, canal);
-  if (tempo !== null) {
-    lista.push(indicador_('tempoMedio', 'Tempo médio até concluir',
-      tempo, tempoMedioDeTratativa_(meusAntes, canal), 'dias',
-      'Da entrada do caso até a finalização, nos que você concluiu.',
-      // Aqui, MENOS é melhor: a tela precisa saber disso para não pintar de
-      // vermelho uma queda que é boa notícia.
-      true));
-  }
-
-  var naCelula = resolvidosSemEncaminhar_(meus, canal);
-  if (naCelula !== null) {
-    lista.push(indicador_('naCelula', 'Resolvidos sem encaminhar',
-      naCelula, resolvidosSemEncaminhar_(meusAntes, canal), 'casos',
-      'Concluídos por você, sem passar para outra área.'));
-  }
-
-  return lista;
-}
-
-function indicador_(chave, rotulo, valor, anterior, unidade, explicacao, menorEhMelhor) {
-  var variacao = null;
-  if (anterior > 0) {
-    variacao = Math.round(((valor - anterior) / anterior) * 100);
-  }
-  return {
-    chave: chave,
-    rotulo: rotulo,
-    valor: valor,
-    anterior: anterior,
-    // Sem base de comparação a variação fica VAZIA, e não "+100%": subir de
-    // zero para um não é dobrar, e "+100%" ali é ruído que a operação aprende
-    // a ignorar — junto com a variação que importa.
-    variacao: variacao,
-    unidade: unidade,
-    explicacao: explicacao,
-    menorEhMelhor: !!menorEhMelhor
-  };
-}
-
-/** Uma situação conta como conclusão quando o nome dela começa com "conclu". */
-function contarConcluidos_(casos, canal) {
-  if (!canal.colunaDoStatus) return 0;
-  var finais = statusFinaisDoCanal_(canal);
-  return casos.filter(function (caso) {
-    var status = normalizarParaComparar_(caso[canal.colunaDoStatus]);
-    return finais ? finais.indexOf(status) >= 0 : status.indexOf('conclu') === 0;
-  }).length;
-}
-
-/**
- * Os status que FECHAM o caso neste canal — os marcados como Final no
- * catálogo —, já normalizados para comparar com o que está gravado.
- *
- * Devolve null numa planilha que ainda não tem a coluna Final (quem colou o
- * código novo e ainda não rodou atualizarPGO). Aí vale a regra antiga, do
- * nome que começa com "conclu": sem ela, a Mesa passaria a mostrar zero
- * concluídos até a atualização rodar, e o número errado pareceria defeito.
- *
- * Canal sem nenhum status final marcado — o VG, por enquanto — conta zero
- * concluídos. É verdade: ninguém disse ainda o que fecha um caso ali.
- */
-function statusFinaisDoCanal_(canal) {
-  if (posicaoDaColuna_(estruturaDaAba_('CATALOGO'), 'Final') < 0) return null;
-  return situacoesDoCanal_(canal)
-    .filter(function (situacao) { return situacao.final; })
-    .map(function (situacao) { return situacao.chave; });
-}
-
-/**
- * Quantos dias, em média, entre a entrada do caso e a finalização.
- *
- * Devolve null quando o canal não declara a coluna de finalização, ou quando
- * ninguém concluiu nada no período: um "0 dias" ali pareceria um desempenho
- * excelente, e é só ausência de dado.
- */
-function tempoMedioDeTratativa_(casos, canal) {
-  if (!canal.colunaDaData || !canal.colunaDaFinalizacao) return null;
-
-  var soma = 0;
-  var quantos = 0;
-  casos.forEach(function (caso) {
-    var entrada = converterParaData_(caso[canal.colunaDaData]);
-    var fim = converterParaData_(caso[canal.colunaDaFinalizacao]);
-    if (!entrada || !fim) return;
-    var dias = (fim.getTime() - entrada.getTime()) / (1000 * 60 * 60 * 24);
-    if (dias < 0) return;   // data invertida na planilha não vira média negativa
-    soma += dias;
-    quantos++;
-  });
-
-  if (!quantos) return null;
-  return Math.round((soma / quantos) * 10) / 10;
-}
-
-/** Concluídos sem encaminhar para outra área. Null quando não dá para saber. */
-function resolvidosSemEncaminhar_(casos, canal) {
-  return contarFinalizadosNaCelula_(casos, canal);
-}
-
-// ============================================================================
-// A META
-// ============================================================================
-
-/**
- * O progresso contra a meta do canal, proporcional ao período escolhido.
- *
- * Devolve null quando o canal não declarou meta. Alvo tirado do nada é pior
- * que alvo nenhum: ele parece oficial, e ninguém sabe de onde saiu.
- */
-function metaDaPessoa_(meus, canal, periodo, quantasPessoas) {
-  var mensal = Number(canal.metaMensalPorPessoa) || 0;
-  if (!mensal) return null;
-
-  // `quantasPessoas` é sempre 1 hoje: a Minha Performance é de uma pessoa só.
-  // O parâmetro ficou porque a conta é a mesma para um grupo — meta por pessoa
-  // vezes o tamanho do grupo —, e o dia em que alguma tela somar gente ela não
-  // vai precisar reescrever isto. Comparar o resultado de cinco pessoas com a
-  // meta de uma faria toda equipe parecer 400% acima do alvo.
-  var pessoas = Number(quantasPessoas) || 1;
-
-  /*
-   * A CONTA É EM DIA CORRIDO, e só.
-   *
-   * Houve aqui duas camadas que saíram a pedido do PO, nesta ordem: primeiro o
-   * motor de dia útil, com feriados nacionais calculados e uma aba para os da
-   * operação; depois o desconto de ausência, quando ele eliminou o calendário
-   * ("pelas regras de negócio ela não será mais necessária").
-   *
-   * O que sobrou é o mais simples de explicar a quem lê a barra: a meta do mês
-   * repartida pelos dias do período, sem exceção nenhuma.
-   */
-  var meusDias = diasEntre_(periodo.de, periodo.ate);
-
-  /*
-   * O denominador são os dias DAQUELE mês, e não 30 fixo.
-   *
-   * Com 30 cravado, um mês de 31 dias pedia 62 para uma meta de 60, e
-   * fevereiro pedia 56 — a mesma meta mensal virava três números diferentes
-   * conforme o mês. Pelos dias reais, um mês inteiro pede exatamente a meta
-   * do mês, que é o que a palavra "mensal" promete.
-   *
-   * Continua sendo DIA CORRIDO: fim de semana e feriado contam normalmente.
-   */
-  var diasDoMes = diasDoMesDe_(periodo.ate);
-
-  var alvo = Math.round((mensal / diasDoMes) * meusDias) * pessoas;
-  var feito = contarConcluidos_(meus, canal);
-
-  return {
-    alvo: alvo,
-    feito: feito,
-    pessoas: pessoas,
-    dias: meusDias,
-    // Passar da meta não vira 140% de barra: a barra enche e o número diz o
-    // resto. Barra estourando a caixa é defeito, não conquista.
-    percentual: alvo ? Math.min(Math.round((feito / alvo) * 100), 100) : 0,
-    percentualReal: alvo ? Math.round((feito / alvo) * 100) : 0,
-    mensal: mensal,
-    rotulo: alvo + ' caso(s) em ' + meusDias + ' dia(s), na proporção '
-      + 'da meta de ' + mensal + ' por mês'
-      + (pessoas > 1 ? ' para cada uma das ' + pessoas + ' pessoas' : '')
-  };
-}
-
-/** Quantos dias tem o mês a que esta data pertence — 28, 29, 30 ou 31. */
-function diasDoMesDe_(data) {
-  return new Date(data.getFullYear(), data.getMonth() + 1, 0).getDate();
-}
-
-// ============================================================================
-// A EVOLUÇÃO E A DISTRIBUIÇÃO
-// ============================================================================
-
-/**
- * Quantos casos por dia, no formato que o desenho de gráfico já entende.
- *
- * Dia sem caso entra ZERADO, e não some: uma linha que pula os dias vazios
- * mente sobre o ritmo — dois casos em dois dias seguidos e dois casos com
- * uma semana de intervalo desenhariam a mesma linha.
- */
-function serieDoPeriodo_(meus, canal, dias) {
-  if (!canal.colunaDaData) return null;
-
-  var porDia = {};
-  meus.forEach(function (caso) {
-    var data = converterParaData_(caso[canal.colunaDaData]);
-    if (!data) return;
-    var chave = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-    porDia[chave] = (porDia[chave] || 0) + 1;
-  });
-
-  var pontos = [];
-  var hoje = new Date();
-  // No máximo 45 colunas: acima disso a linha vira um borrão e cada ponto
-  // fica menor que o dedo de quem tenta tocar nele.
-  var quantos = Math.min(dias, 45);
-  for (var i = quantos - 1; i >= 0; i--) {
-    var dia = new Date(hoje.getTime() - i * 24 * 60 * 60 * 1000);
-    var chave = Utilities.formatDate(dia, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-    pontos.push({
-      chave: chave,
-      rotulo: Utilities.formatDate(dia, RECC_FUSO_HORARIO, 'dd/MM'),
-      valor: porDia[chave] || 0,
-      casos: porDia[chave] || 0,
-      tom: '',
-      serie: 0
-    });
-  }
-
-  return {
-    titulo: 'Seus casos por dia',
-    tipo: 'barrasComLinha',
-    largura: 2,
-    unidade: 'casos',
-    agregacao: 'contagem',
-    dimensao: 'Dia',
-    ehTempo: true,
-    pontos: pontos,
-    tendencia: mediaMovel_(pontos, 7),
-    aviso: ''
-  };
-}
-
-/** Uma pizza dos casos da pessoa, por uma coluna qualquer. */
-function distribuicao_(meus, canal, coluna, titulo) {
-  if (!coluna) return null;
-
-  var cores = coresDoCatalogo_(canal);
-  var ordem = ordemEstavelDaDimensao_(canal, coluna);
-  var soma = {};
-  var chaves = [];
-
-  meus.forEach(function (caso) {
-    var valor = String(caso[coluna] || '').trim() || 'Sem informação';
-    if (!Object.prototype.hasOwnProperty.call(soma, valor)) {
-      soma[valor] = 0;
-      chaves.push(valor);
-    }
-    soma[valor]++;
-  });
-
-  var pontos = chaves.map(function (chave) {
-    var normalizado = normalizarParaComparar_(chave);
-    var posicao = ordem.indexOf(normalizado);
-    return {
-      chave: chave,
-      rotulo: chave,
-      valor: soma[chave],
-      casos: soma[chave],
-      // A mesma regra do Painel: a cor segue a entidade, e não a posição.
-      tom: cores[normalizado] || '',
-      serie: posicao >= 0 ? (posicao % 6) + 1 : 6
-    };
-  }).sort(function (um, outro) { return outro.valor - um.valor; });
-
-  return {
-    titulo: titulo, tipo: 'pizza', largura: 1, unidade: 'casos',
-    agregacao: 'contagem', dimensao: titulo, ehTempo: false,
-    pontos: pontos.slice(0, RECC_MAXIMO_DE_FATIAS), tendencia: null, aviso: ''
-  };
-}
-
 
 /**
  * O VALOR POR SITUAÇÃO: quanto dinheiro está em cada desfecho.
  *
  * Pedido do PO, nestas palavras: "traga na produtividade RECC gráfico com
  * valor dos retidos, não retidos, sem sucesso, valor dos demais status e
- * total. O mesmo em minha performance".
+ * total".
  *
  * POR QUE NÃO É UM COMPONENTE DA ABA PAINEIS. O motor de componentes agrupa
  * pelo valor da coluna e, quando passa do limite, dobra o RESTO pelo tamanho —
@@ -3384,10 +2933,7 @@ function distribuicao_(meus, canal, coluna, titulo) {
  * aparecer valendo zero; sumir da tela faria a conta parecer completa quando
  * ela está com um pedaço faltando.
  *
- * UMA FUNÇÃO SÓ para as duas telas. A Produtividade RECC mostra o da equipe e
- * a Minha Performance o da pessoa — a diferença está em QUAIS casos entram, e
- * isso quem decide é quem chama. Escrever a conta duas vezes faria as duas
- * telas discordarem um dia, e aí ninguém saberia qual acreditar.
+ * Quem decide QUAIS casos entram é quem chama: hoje, a Produtividade RECC.
  *
  * Devolve `null` quando o canal não declarou a coluna do valor ou as situações
  * destacadas: canal sem isso não ganha um gráfico de dinheiro chutado.
@@ -3475,159 +3021,6 @@ function situacoesDestacadas_(canal) {
     .map(function (pedaco) { return String(pedaco).trim(); })
     .filter(function (pedaco) { return pedaco !== ''; });
 }
-
-// ============================================================================
-// A EQUIPE
-// ============================================================================
-
-/**
- * Como a pessoa está em relação à equipe — e o que ela pode ver disso.
- *
- * Quem só enxerga os próprios casos NÃO recebe a lista com o nome dos
- * colegas: recebe a própria posição contra a média. Mostrar a lista a quem
- * não pode ver os casos dos outros seria uma porta dos fundos — e, ainda por
- * cima, a mais constrangedora que existe num sistema de trabalho.
- *
- * Quem pode ver recebe a lista, mas com a MÉDIA marcada: "abaixo da média"
- * sem saber qual é a média não é informação, é só desconforto.
- */
-function comoVaiAEquipe_(noPeriodo, coluna, meuNome, quem, canal, minhaEquipe) {
-  if (!coluna) return { podeVerNomes: false, disponivel: false };
-
-  // Quando a pessoa TEM equipe, o ranking é dentro dela. Antes era dentro do
-  // canal inteiro, e isso colocava um analista ao lado de gente que nem atende
-  // a mesma coisa — a posição dizia menos do que parecia dizer. Quem não tem
-  // equipe (quem administra) continua vendo o canal, que é o que faz sentido
-  // para quem olha de cima.
-  var soEstes = null;
-  if (minhaEquipe && minhaEquipe.length) {
-    soEstes = {};
-    minhaEquipe.forEach(function (nome) {
-      soEstes[normalizarParaComparar_(nome)] = true;
-    });
-  }
-
-  var porPessoa = {};
-  var nomes = [];
-  noPeriodo.forEach(function (caso) {
-    var nome = String(caso[coluna] || '').trim();
-    if (!nome) return;
-    if (soEstes && !soEstes[normalizarParaComparar_(nome)]) return;
-    if (!Object.prototype.hasOwnProperty.call(porPessoa, nome)) {
-      porPessoa[nome] = 0;
-      nomes.push(nome);
-    }
-    porPessoa[nome]++;
-  });
-
-  if (!nomes.length) return { podeVerNomes: false, disponivel: false };
-
-  /*
-   * TODO MUNDO QUE APARECE ENTRA NA MÉDIA.
-   *
-   * Houve aqui um desconto por ausência: quem tirou férias no meio do período
-   * saía da média e da posição, para não puxar a equipe para baixo por um
-   * motivo que não é trabalho. Saiu junto com o calendário, a pedido do PO —
-   * "pelas regras de negócio ela não será mais necessária".
-   *
-   * Com isso a média voltou a ser o que a palavra diz: a soma de todos os que
-   * aparecem, dividida por quantos são. Saíram da resposta os dois números que
-   * só existiam para explicar o desconto — nada na tela os usava.
-   */
-  var lista = nomes.map(function (nome) {
-    return {
-      nome: nome,
-      valor: porPessoa[nome],
-      souEu: normalizarParaComparar_(nome) === normalizarParaComparar_(meuNome)
-    };
-  }).sort(function (um, outro) { return outro.valor - um.valor; });
-
-  lista.forEach(function (um, i) { um.posicao = i + 1; });
-
-  var soma = lista.reduce(function (total, um) { return total + um.valor; }, 0);
-  var media = Math.round((soma / lista.length) * 10) / 10;
-  var eu = lista.filter(function (um) { return um.souEu; })[0] || null;
-
-  var podeVerNomes = quem.permissoes.escopo === RECC_ESCOPOS.TODOS
-    || quem.permissoes.escopo === RECC_ESCOPOS.CANAL
-    || quem.permissoes.escopo === RECC_ESCOPOS.EQUIPE;
-
-  return {
-    disponivel: true,
-    podeVerNomes: podeVerNomes,
-    quantasPessoas: lista.length,
-    media: media,
-    minhaPosicao: eu ? eu.posicao : null,
-    meuValor: eu ? eu.valor : 0,
-    // A lista sai com os vizinhos de quem está olhando — e não do primeiro ao
-    // último. Um pódio completo diz muito pouco a quem está no meio e diz
-    // demais sobre quem está embaixo.
-    lista: podeVerNomes ? vizinhosNoRanking_(lista, eu) : []
-  };
-}
-
-function vizinhosNoRanking_(lista, eu) {
-  if (!eu) return lista.slice(0, RECC_VIZINHOS_NO_RANKING * 2 + 1);
-
-  var meu = eu.posicao - 1;
-  var de = Math.max(0, meu - RECC_VIZINHOS_NO_RANKING);
-  var ate = Math.min(lista.length, de + RECC_VIZINHOS_NO_RANKING * 2 + 1);
-  de = Math.max(0, ate - (RECC_VIZINHOS_NO_RANKING * 2 + 1));
-  return lista.slice(de, ate);
-}
-
-// ============================================================================
-// O QUE EU FIZ
-// ============================================================================
-
-/**
- * As últimas ações da própria pessoa, tiradas da trilha de auditoria.
- *
- * Só as dela: a trilha completa é da tela de Configurações, para quem
- * administra. Aqui é a memória de quem está olhando.
- */
-function oQueEuFiz_(quem, canal) {
-  var comoSeChama = {
-    'caso.criar': 'Cadastrou um caso',
-    'caso.editar': 'Alterou um caso',
-    'caso.status': 'Mudou a situação',
-    'caso.ocultar': 'Excluiu um caso',
-    'busca': 'Procurou um caso'
-  };
-
-  var meuId = converterParaIdentificador_(quem.usuario.Id);
-  // Abrir o caso daqui é "Trabalhar no caso", que é a EDIÇÃO — a leitura
-  // saiu do sistema. Sem a ação de editar, a linha fica só como lembrança.
-  var podeAbrir = podeFazer_(quem.permissoes, RECC_ACOES.EDITAR);
-
-  return lerRegistros_('AUDITORIA', { ultimas: 400 })
-    .filter(function (linha) {
-      if (converterParaIdentificador_(linha.UsuarioId) !== meuId) return false;
-      // Só o que é TRABALHO. Mexer numa configuração é ação de quem
-      // administra, e a trilha completa dessas está em Configurações — aqui
-      // é a memória de quem atende, e ela não pode virar um log de sistema.
-      return Object.prototype.hasOwnProperty.call(comoSeChama, String(linha.Acao));
-    })
-    .reverse()
-    .slice(0, 12)
-    .map(function (linha) {
-      return {
-        acao: comoSeChama[String(linha.Acao)] || String(linha.Acao),
-        detalhe: String(linha.Detalhe || ''),
-        registro: String(linha.RegistroId || ''),
-        entidade: String(linha.Entidade || ''),
-        // O caso só abre quando é deste canal: um Id da outra base abriria a
-        // tela errada, ou nada.
-        abre: podeAbrir && normalizarParaComparar_(linha.Entidade)
-          === normalizarParaComparar_(canal.aba) && !!linha.RegistroId,
-        quando: linha.DataHora
-          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,
-            'dd/MM/yyyy, HH:mm')
-          : ''
-      };
-    });
-}
-
 
 /* ############################################################################
    #
@@ -4176,8 +3569,8 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
 /**
  * UM gráfico de atendidos: conta por `dimensao`, separando sistema e chat.
  *
- * `topo` é quantas barras ficam; o resto vira "Demais valores" — somado, para o
- * total fechar. `semNome`, quando preenchido, é o balde dos que não trazem a
+ * `topo` é quantas barras ficam; o resto sai do gráfico, sem "Demais valores"
+ * (Etapa 53) — `foraDoTopo` diz quantos, para a tela avisar. `semNome`, quando preenchido, é o balde dos que não trazem a
  * informação e ENTRA no gráfico (analista, ramo); vazio, esses não entram no
  * ranking e são contados à parte em `semInformacao` — um top 5 de corretoras
  * liderado por "sem corretora" não diria nada.
@@ -4217,16 +3610,10 @@ function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, t
     return outro.valor - um.valor || (um.rotulo < outro.rotulo ? -1 : (um.rotulo > outro.rotulo ? 1 : 0));
   });
 
-  var dobrados = 0;
+  var foraDoTopo = 0;
   if (topo && pontos.length > topo) {
-    var resto = pontos.slice(topo);
-    dobrados = resto.length;
-    var soma = function (campo) {
-      return resto.reduce(function (total, ponto) { return total + ponto[campo]; }, 0);
-    };
+    foraDoTopo = pontos.length - topo;
     pontos = pontos.slice(0, topo);
-    pontos.push({ chave: '__outros', rotulo: 'Demais valores', sistema: soma('sistema'),
-      chat: soma('chat'), valor: soma('valor'), casos: soma('casos'), ehOutros: true });
   }
 
   pontos = pontos.map(function (ponto, i) {
@@ -4249,7 +3636,7 @@ function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, t
     pontos: pontos,
     tendencia: null,
     total: pontos.reduce(function (soma, ponto) { return soma + ponto.valor; }, 0),
-    dobradosEmOutros: dobrados,
+    foraDoTopo: foraDoTopo,
     semInformacao: semInformacao,
     aviso: ''
   };

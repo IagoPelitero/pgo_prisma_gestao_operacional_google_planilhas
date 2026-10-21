@@ -220,7 +220,7 @@ você. Abra uma questão.
 | Como a busca procura | `Back-End/Casos.gs` |
 | Os cartões do Trabalho e a fila | `Back-End/Indicadores.gs` |
 | As contas dos gráficos | `Back-End/Indicadores.gs` |
-| Os números de uma pessoa, a meta, o ranking | `Back-End/Indicadores.gs` |
+| O quadro por analista, os prêmios e as tentativas da RET | `Back-End/Indicadores.gs` |
 | Corretoras, produtos, SUSEPs bloqueadas | `Back-End/Cadastros.gs` |
 | A importação em lote | `Back-End/Cadastros.gs` |
 | Uma seção da tela de Configurações | `Back-End/Config.gs` |

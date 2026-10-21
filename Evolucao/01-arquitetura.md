@@ -40,8 +40,8 @@ sem tocar em código:
 
 ### Telas (menu lateral, presente em todas as abas)
 
-`Trabalho` · `Cadastrar Caso` · `Minha Performance` · `Buscar Caso` ·
-`Tabela de Corretoras` · `Produtividade RECC` · `Configurações`
+`Trabalho` · `Cadastrar Caso` · `Buscar Caso` · `Tabela de Corretoras` ·
+`Importação` · `Produtividade RECC` · `Configurações`
 
 ### Barra superior (presente em todas as abas)
 
@@ -421,8 +421,8 @@ NAVEGADOR (uma página só, servida por HtmlService)
   Aplicacao.html ..... a ponte com o servidor e o roteador entre telas
 
   Uma por item do menu (7):
-    Trabalho · CadastrarCaso · MinhaPerformance · BuscarCaso
-    TabelaCorretoras · PainelAnalitico · Configuracoes
+    Trabalho · CadastrarCaso · BuscarCaso · TabelaCorretoras
+    Importacao · Produtividade · Configuracoes
 
   SemAcesso.html ..... servida sozinha, a quem não está cadastrado
         │
@@ -449,7 +449,7 @@ APPS SCRIPT
   Indicadores.gs .. OS NÚMEROS
                        os cartões do dia e a fila (Trabalho)
                        os gráficos da operação (Produtividade RECC)
-                       a tela em que o analista se vê (Performance)
+                       o valor por situação e os atendidos do chat
 
   Cadastros.gs .... QUEM TRAZ O CASO PARA DENTRO
                        corretoras, produtos, SUSEPs bloqueadas
@@ -476,11 +476,10 @@ GOOGLE PLANILHAS  (13 abas + ANALISE_*)
 diretamente. Toda leitura e gravação passa por ele — é o que garante, num lugar
 só, o vínculo por cabeçalho e o formato texto antes da gravação.
 
-**Por que `Indicadores.gs` junta três telas.** Trabalho, Produtividade RECC e
-Minha Performance contam os MESMOS casos e respondem perguntas diferentes.
-Separá-los convida ao erro de mudar a regra de contagem num e esquecer dos
-outros dois — e aí o cartão diz 12, o gráfico diz 9, e ninguém sabe qual está
-certo. Juntos, a regra é uma só porque está à vista.
+**Por que `Indicadores.gs` junta duas telas.** Trabalho e Produtividade RECC
+contam os MESMOS casos e respondem perguntas diferentes. Separá-los convida ao
+erro de mudar a regra de contagem num e esquecer do outro — e aí o cartão diz 12,
+o gráfico diz 9, e ninguém sabe qual está certo. Juntos, a regra é uma só porque está à vista.
 
 ### 4.2 O que acontece ao abrir o sistema
 
@@ -554,7 +553,7 @@ inteiro; só a fila é recortada.
 | Campos do formulário (criar, tipo, máscara, seção, ordem, obrigatório) | `CAMPOS` | Criar/remover coluna: sim |
 | Quem vê cada campo | `CAMPOS.VisivelPara` | Sim |
 | Cards e gráficos de cada tela | `PAINEIS` | Sim |
-| Limite dos rankings (TOP 5, TOP 10, TOP N) | `PAINEIS.Limite` | Não |
+| Limite dos rankings (até 5 — Etapa 53) | `PAINEIS.Limite` | Não |
 | Status, motivos, origens, ramos, áreas | `CATALOGO` | Não |
 | Cargos e níveis de acesso | `CATALOGO` | Sim |
 | Canais | `CANAIS` | Sim |
@@ -636,7 +635,7 @@ Cada etapa entrega algo que funciona sozinho e pode ser conferido na planilha.
 | 6 | Configurações | Campos, catálogo, usuários, níveis, senha de ADM, reconciliação de colunas | **pronta** |
 | 7 | Buscar Caso | Base própria + planilha legada | **pronta** |
 | 8 | Produtividade RECC | Componentes configuráveis, exportação | **pronta** |
-| 9 | Minha Performance | Indicadores individuais, meta, ranking | **pronta** |
+| 9 | Minha Performance | Indicadores individuais, meta, ranking | **retirada na Etapa 52** |
 | 10 | Tabela de Corretoras | `CORRETORAS` + segmento + SUSEP bloqueada | **pronta** |
 | 11 | Abas de análise | Gerador `ANALISE_*` | **pronta** |
 | 12 | Diagnóstico | Verificação de build e de contrato | **pronta** |

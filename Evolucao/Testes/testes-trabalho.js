@@ -1049,17 +1049,18 @@ function rodarTestesDoTrabalho() {
       'o recado antigo não pode ter sobrado');
   });
 
-  secao('A caixa de filtros, nas três telas');
+  secao('A caixa de filtros, nas duas telas');
 
   // Pedido do PO: "envolva tudo que for filtro por uma parte de fundo branca
   // com título de filtro, o mesmo para minha performance e o mesmo para
-  // Produtividade". Caixa e seletor moram numa peça só: três cópias
-  // divergiriam no primeiro ajuste, e o PO veria três telas diferentes.
+  // Produtividade". Caixa e seletor moram numa peça só: cópias divergiriam no
+  // primeiro ajuste, e o PO veria telas diferentes. (A Minha Performance saiu
+  // na Etapa 52; a regra vale para as duas que ficaram.)
 
-  const asTresTelas = ['Trabalho', 'Produtividade', 'MinhaPerformance'];
+  const asDuasTelas = ['Trabalho', 'Produtividade'];
 
-  teste('as três telas põem os filtros na mesma caixa branca', () => {
-    asTresTelas.forEach((nome) => {
+  teste('as duas telas põem os filtros na mesma caixa branca', () => {
+    asDuasTelas.forEach((nome) => {
       contem(lerPeca(nome), 'Moldura.caixaDeFiltros(',
         nome + ' tem de usar a caixa compartilhada');
     });
@@ -1067,8 +1068,8 @@ function rodarTestesDoTrabalho() {
     contem(lerPeca('Estilos'), '.caixa-de-filtros', 'com o fundo branco declarado');
   });
 
-  teste('as três telas usam o MESMO seletor de período', () => {
-    asTresTelas.forEach((nome) => {
+  teste('as duas telas usam o MESMO seletor de período', () => {
+    asDuasTelas.forEach((nome) => {
       const tela = lerPeca(nome);
       contem(tela, 'SeletorDePeriodo.desenhar(', nome + ' desenha pelo seletor');
       contem(tela, 'SeletorDePeriodo.mudou(', nome + ' reage pelo seletor');
@@ -1106,7 +1107,7 @@ function rodarTestesDoTrabalho() {
     // O número ao lado de "Filtros" é o que impede a leitura errada: filtro
     // esquecido ligado, tela com três casos e ninguém entende o porquê.
     contem(lerPeca('Comuns'), 'caixa-de-filtros-cabeca');
-    asTresTelas.forEach((nome) => {
+    asDuasTelas.forEach((nome) => {
       const chamada = lerPeca(nome).split('Moldura.caixaDeFiltros(')[1];
       verdadeiro(chamada.indexOf(',') > 0,
         nome + ' tem de passar a contagem, não só o conteúdo');

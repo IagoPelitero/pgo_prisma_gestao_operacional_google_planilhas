@@ -452,10 +452,7 @@ var TelaProdutividade = (function () {
 
   function rodapeDosAtendidos(componente) {
     var notas = [];
-    if (componente.dobradosEmOutros) {
-      notas.push('Mais ' + componente.dobradosEmOutros + ' valor(es) somados em '
-        + '<strong>Demais valores</strong>.');
-    }
+    if (componente.foraDoTopo) notas.push(soOsMaiores(componente));
     if (componente.semInformacao) {
       notas.push(componente.semInformacao + ' atendimento(s) sem esta informação não entram '
         + 'neste ranking.');
@@ -557,9 +554,8 @@ var TelaProdutividade = (function () {
     });
 
     // A caixa de filtros e o seletor de período são PEÇAS COMPARTILHADAS: o
-    // Trabalho e a Minha Performance usam as mesmas. Três cópias divergiriam
-    // no primeiro ajuste, e aí "setembro" significaria uma coisa numa tela e
-    // outra na vizinha.
+    // Trabalho usa as mesmas. Duas cópias divergiriam no primeiro ajuste, e aí
+    // "setembro" significaria uma coisa numa tela e outra na vizinha.
     return Moldura.caixaDeFiltros(
       SeletorDePeriodo.desenhar(painel) + caixas.join(''),
       painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
@@ -613,11 +609,17 @@ var TelaProdutividade = (function () {
   function rodapeDoGrafico(componente) {
     if (componente.aviso || !componente.pontos.length) return '';
     return '<p class="grafico-pe">'
-      + (componente.dobradosEmOutros
-        ? 'Mais ' + componente.dobradosEmOutros + ' valor(es) somados em '
-          + '<strong>Demais valores</strong>. '
-        : '')
+      + (componente.foraDoTopo ? soOsMaiores(componente) + ' ' : '')
       + 'Clique para ver os casos.</p>';
+  }
+
+  /**
+   * Etapa 53, pedido do PO: só o top 5, sem "Demais valores". A rosca e a tabela
+   * somam o que aparece — e isto diz, para ninguém ler a soma como o total.
+   */
+  function soOsMaiores(componente) {
+    return 'Só os ' + componente.pontos.length + ' maiores aparecem; a soma e as '
+      + 'porcentagens são entre eles.';
   }
 
   /* --------------------------------------------------------- comportamento */

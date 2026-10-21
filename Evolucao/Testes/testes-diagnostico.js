@@ -300,7 +300,10 @@ function rodarTestesDeDiagnostico() {
 
   teste('campo apontando para coluna que não existe é falha', () => {
     const { chamar } = instalacaoNova();
-    const campo = chamar('lerRegistros_("CAMPOS")')[0];
+    // Um campo LIGADO: o desligado sem coluna não quebra nada (Etapa 51) e o
+    // diagnóstico não o reprova mais.
+    const campo = chamar('lerRegistros_("CAMPOS")')
+      .find((c) => String(c.Ativo).toUpperCase() === 'SIM');
     chamar('atualizarRegistro_')('CAMPOS', campo.Id,
       { Cabecalho: 'coluna que sumiu' });
 
@@ -411,10 +414,10 @@ function rodarTestesDeDiagnostico() {
 
   secao('Quando o painel lê só uma parte da base');
 
-  teste('as três telas dizem que leram só uma parte, e não deixam calado', () => {
+  teste('as duas telas dizem que leram só uma parte, e não deixam calado', () => {
     // Achado do teste de estresse. Com muito volume, os painéis leem só as
     // últimas N linhas — e a Produtividade RECC calculava esse "truncada" e
-    // NUNCA mostrava, enquanto Minha Performance nem calculava. Numa base de
+    // NUNCA mostrava. Numa base de
     // 200 mil casos, o gráfico mostrava um pedaço e parecia o total.
     const { chamar } = instalacaoNova();
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
@@ -440,12 +443,9 @@ function rodarTestesDeDiagnostico() {
     igual(comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).truncada, true, 'Trabalho');
     igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).truncada, true,
       'Produtividade RECC');
-    igual(chamar('minhaPerformance')(ret.id, 30).truncada, true,
-      'Minha Performance');
 
-    // E cada uma diz QUANTAS leu, para o aviso ser concreto em vez de vago.
+    // E ela diz QUANTAS leu, para o aviso ser concreto em vez de vago.
     igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).linhasLidas, 3);
-    igual(chamar('minhaPerformance')(ret.id, 30).linhasLidas, 3);
   });
 
   teste('com a base pequena, nenhuma tela avisa nada', () => {
@@ -454,14 +454,13 @@ function rodarTestesDeDiagnostico() {
     const ret = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_RET');
     igual(comAFilaDaTela(chamar('resumoDoCanal')(ret.id, {})).truncada, false);
     igual(chamar('produtividadeDaEquipe')(ret.id, {}, 30).truncada, false);
-    igual(chamar('minhaPerformance')(ret.id, 30).truncada, false);
   });
 
-  teste('as três telas mostram o aviso, e pelo mesmo texto', () => {
-    // Três frases diferentes para o mesmo fato é como a operação aprende que
+  teste('as duas telas mostram o aviso, e pelo mesmo texto', () => {
+    // Duas frases diferentes para o mesmo fato é como a operação aprende que
     // uma delas não é séria.
     const pasta = path.join(__dirname, '..', '..', 'Front-End');
-    ['Trabalho.html', 'Produtividade.html', 'MinhaPerformance.html']
+    ['Trabalho.html', 'Produtividade.html']
       .forEach((arquivo) => {
         const tela = fs.readFileSync(path.join(pasta, arquivo), 'utf8');
         verdadeiro(tela.indexOf('Moldura.avisoDeJanela(') >= 0,
@@ -706,7 +705,7 @@ function rodarTestesDeDiagnostico() {
       + servidor.map((a) => a.nome).join(', '));
 
     const telas = arquivosDe('Front-End', '.html');
-    igual(telas.length, 13, 'as treze telas: ' + telas.map((a) => a.nome).join(', '));
+    igual(telas.length, 12, 'as doze telas: ' + telas.map((a) => a.nome).join(', '));
   });
 
   teste('nenhum .gs tem o mesmo nome de um .html', () => {
@@ -2415,9 +2414,9 @@ function rodarTestesDeDiagnostico() {
     const quantosUsuarios = chamar('lerRegistros_("USUARIOS")').length;
 
     // Uma configuração ajustada à mão, do tipo que uma migração desastrada
-    // sobrescreveria: a meta do canal.
+    // sobrescreveria: as colunas em que a busca do canal procura.
     const ret = chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
-    chamar('atualizarRegistro_')('CANAIS', ret.id, { MetaMensalPorPessoa: 77 });
+    chamar('atualizarRegistro_')('CANAIS', ret.id, { ColunasDaBusca: 'nome do cliente, e-mail' });
     chamar('esquecerEstruturaLida_()');
 
     chamar('atualizarPGO()');
@@ -2425,9 +2424,9 @@ function rodarTestesDeDiagnostico() {
     igual(chamar('lerRegistros_("USUARIOS")').length, quantosUsuarios);
     verdadeiro(chamar('lerRegistros_("BASE_RET")')
       .some((linha) => String(linha['nome do cliente']) === 'Caso de antes'));
-    igual(Number(chamar('lerRegistros_("CANAIS")')
-      .find((c) => String(c.Aba) === 'BASE_RET').MetaMensalPorPessoa), 77,
-      'a meta ajustada à mão não pode ter sido sobrescrita');
+    igual(String(chamar('lerRegistros_("CANAIS")')
+      .find((c) => String(c.Aba) === 'BASE_RET').ColunasDaBusca), 'nome do cliente, e-mail',
+      'a configuração ajustada à mão não pode ter sido sobrescrita');
   });
 
   teste('quem já escolheu outra coluna de valor não é atropelado', () => {

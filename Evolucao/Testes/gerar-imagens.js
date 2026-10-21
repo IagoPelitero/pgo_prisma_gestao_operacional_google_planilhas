@@ -52,7 +52,6 @@ const FOTOS = [
 
   { arquivo: 'tela-trabalho', tela: 'trabalho', inteira: true },
   { arquivo: 'tela-cadastrar-caso', tela: 'cadastrarCaso', inteira: true },
-  { arquivo: 'tela-minha-performance', tela: 'minhaPerformance', inteira: true },
   { arquivo: 'tela-buscar-caso', tela: 'buscarCaso' },
   { arquivo: 'tela-tabela-corretoras', tela: 'tabelaCorretoras', inteira: true },
   { arquivo: 'tela-importacao', tela: 'importacao', inteira: true },

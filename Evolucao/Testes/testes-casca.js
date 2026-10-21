@@ -99,7 +99,7 @@ function rodarTestesDaCasca() {
     const listaDeItens = lateral.substring(
       lateral.indexOf('lateral-itens'), lateral.indexOf('</ul>'));
     const doMenu = listaDeItens.match(/<svg[\s\S]*?<\/svg>/g) || [];
-    igual(doMenu.length, 8, 'um desenho por item do menu');
+    igual(doMenu.length, 7, 'um desenho por item do menu');
 
     // A conta é contra o TAMANHO DO MENU, e não contra um número escrito aqui:
     // "8 itens, 8 desenhos" continua certo no dia em que nascer a nona tela, e
@@ -338,11 +338,11 @@ function rodarTestesDaCasca() {
 
   secao('O menu e a guarda de rota');
 
-  teste('o menu do Administrador traz as oito telas', () => {
+  teste('o menu do Administrador traz as sete telas', () => {
     const pacote = chamar('pacoteDePartida()');
-    igual(pacote.menu.length, 8);
+    igual(pacote.menu.length, 7);
     igual(pacote.menu[0].tela, 'trabalho');
-    igual(pacote.menu[7].titulo, 'Configurações');
+    igual(pacote.menu[6].titulo, 'Configurações');
   });
 
   teste('a guarda de rota vive no roteador, não no menu', () => {
@@ -537,7 +537,7 @@ function rodarTestesDaCasca() {
       'a ponte substituta precisa entrar na página');
     contem(gerada.paginaDoSistema, '"disponivel": true',
       'o pacote embutido é o que o servidor devolveu');
-    igual(gerada.pacote.menu.length, 8, 'o menu da prévia é o menu de verdade');
+    igual(gerada.pacote.menu.length, 7, 'o menu da prévia é o menu de verdade');
     contem(gerada.telaSemAcesso, 'Seu usuário ainda');
 
     verdadeiro(fs.existsSync(path.join(pasta, 'sistema.html')));

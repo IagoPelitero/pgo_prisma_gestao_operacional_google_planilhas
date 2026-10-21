@@ -267,9 +267,6 @@ function rodar(alvo) {
   medir('Produtividade RECC: os 6 gráficos', 0.5,
     () => chamar('produtividadeDaEquipe')(ret.id, {}, 30));
 
-  medir('Minha Performance: 30 dias', 0.5,
-    () => chamar('minhaPerformance')(ret.id, 30));
-
   medir('Tabela de Corretoras', 0.5,
     () => chamar('tabelaDeCorretoras')('', ''));
 

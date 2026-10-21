@@ -2173,75 +2173,6 @@ table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-n
   .grafico-corpo.pizza .desenho { flex-basis: 160px; }
 }
 
-/* ================================================== minha performance === */
-.meta { padding: 16px 18px; margin-top: 14px; }
-.meta header {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
-  margin-bottom: 12px;
-}
-.meta h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
-.meta-numero {
-  margin-left: auto; font-size: 22px; font-weight: 700;
-  font-variant-numeric: tabular-nums; color: var(--texto);
-}
-.meta-numero.bateu { color: var(--bom); }
-.meta-numero em { font-style: normal; font-size: 14px; font-weight: 400; color: var(--tenue); }
-
-.barra-da-meta {
-  height: 10px; border-radius: 999px; background: var(--superficie-2);
-  overflow: hidden;
-}
-.barra-da-meta span {
-  display: block; height: 100%; border-radius: 999px;
-  background: var(--destaque); transition: width var(--transicao);
-}
-.meta-explica { margin: 10px 0 0; font-size: 12.5px; color: var(--tenue); }
-
-/* A variação sabe quando "para baixo" é boa notícia: no tempo médio, cair é
-   bom, e pintar de vermelho ali daria a notícia errada. */
-.variacao.igual { color: var(--tenue); }
-
-.performance-baixo {
-  display: grid; gap: 14px; margin-top: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-  align-items: start;
-}
-.equipe { padding: 16px 18px; }
-.equipe h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: -.01em; }
-.equipe-lugar { margin: 0 0 12px; font-size: 13.5px; color: var(--suave); }
-.equipe-nota {
-  margin: 12px 0 0; font-size: 12px; color: var(--tenue); line-height: 1.45;
-}
-
-.ranking { list-style: none; margin: 0; padding: 0; }
-.ranking li {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: var(--raio-pequeno); font-size: 13.5px;
-}
-.ranking li.sou-eu { background: var(--destaque-tenue); font-weight: 600; }
-.ranking .posicao {
-  font-family: var(--fonte-dado); font-size: 12px; color: var(--tenue);
-  min-width: 26px;
-}
-.ranking li.sou-eu .posicao { color: var(--destaque); }
-.ranking .nome {
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ranking .nome em {
-  font-style: normal; font-size: 11px; color: var(--destaque);
-  text-transform: uppercase; letter-spacing: .06em; margin-left: 4px;
-}
-.ranking .valor {
-  font-variant-numeric: tabular-nums; font-weight: 600; color: var(--tom, var(--texto));
-}
-
-.passo-abre {
-  display: block; width: 100%; text-align: left; cursor: pointer;
-  background: none; border: 0; padding: 0; font: inherit; color: inherit;
-}
-.passo-abre:hover strong { color: var(--destaque); }
-
 /* ================================================ tabela de corretoras === */
 .busca-do-cadastro {
   flex: 1 1 220px; min-width: 0;
@@ -2498,10 +2429,6 @@ var Moldura = (function () {
     // sistema, e o desenho mais simples é o que se reconhece de relance.
     cadastrarCaso:
       '<path d="M12 4.6v14.8M4.6 12h14.8"></path>',
-
-    // desempenho: a linha de pulso, que sobe e desce como o dia da operação
-    minhaPerformance:
-      '<path d="M3.2 12.4h3.6l2.4-7 4 14.2 2.6-7.2h5"></path>',
 
     // buscar: a lupa
     buscarCaso:
@@ -2849,9 +2776,9 @@ var Moldura = (function () {
   /**
    * O aviso de que a tela leu só uma parte da base.
    *
-   * Num lugar só porque são TRÊS telas dizendo a mesma coisa — Trabalho,
-   * Produtividade RECC e Minha Performance —, e três textos diferentes para o
-   * mesmo fato é como a operação aprende que um deles não é sério.
+   * Num lugar só porque são DUAS telas dizendo a mesma coisa — Trabalho e
+   * Produtividade RECC —, e dois textos diferentes para o mesmo fato é como a
+   * operação aprende que um deles não é sério.
    *
    * A frase diz o que foi lido e o que fazer, nessa ordem. "Os números podem
    * estar incompletos" sozinho não ajuda ninguém: a pessoa precisa saber que
@@ -2873,7 +2800,7 @@ var Moldura = (function () {
   /**
    * A caixa que envolve os filtros de uma tela.
    *
-   * Três telas filtram — Trabalho, Minha Performance e Produtividade RECC — e
+   * Duas telas filtram — Trabalho e Produtividade RECC — e
    * até aqui os controles ficavam soltos sobre o fundo da página, encostados
    * no conteúdo. Numa tela com cartão, gráfico e tabela, a pessoa não sabia
    * onde o recorte acabava e o resultado começava.
@@ -4632,9 +4559,9 @@ var CasoEmModal = (function () {
 /* ============================================================================
    Graficos · os desenhos, num lugar só
    ============================================================================
-   Duas telas desenham gráficos: a Produtividade RECC e Minha Performance. Elas
-   não têm duas cópias disto — pela mesma razão que já custou caro aqui:
-   regra copiada em dois lugares é regra que um dia diverge, e num gráfico a
+   Os gráficos da Produtividade RECC saem daqui. Não há duas cópias disto —
+   pela mesma razão que já custou caro aqui: regra copiada em dois lugares é
+   regra que um dia diverge, e num gráfico a
    divergência não dá erro. Vira uma barra um pouco mais alta do que devia, e
    alguém decide alguma coisa com base nela.
 
@@ -5088,8 +5015,8 @@ var Graficos = (function () {
 /* ============================================================================
    PGO — SeletorDePeriodo · as três maneiras de escolher o tempo
    ============================================================================
-   TRÊS TELAS filtram por período — Trabalho, Minha Performance e Produtividade
-   RECC — e as três oferecem as mesmas três maneiras:
+   DUAS TELAS filtram por período — Trabalho e Produtividade RECC — e as duas
+   oferecem as mesmas maneiras:
 
      POR DIAS   "últimos 30 dias". É o do dia a dia, e é a abertura.
      POR DATA   duas datas, de/até. Responde uma pergunta específica.
@@ -6102,298 +6029,6 @@ var TelaCadastrarCaso = (function () {
   }
 
   return { montar: montar, ligar: ligar, desligar: desligar };
-})();
-</script>
-
-
-<!-- ==== MinhaPerformance.html ==== -->
-<script>
-/* ============================================================================
-   PGO — MinhaPerformance.html · a tela em que o analista se vê
-   ============================================================================
-   As outras telas mostram a operação. Esta mostra UMA PESSOA, e o cuidado
-   aqui é de outra natureza: um número mal escolhido no Trabalho atrapalha
-   uma decisão; um número mal escolhido aqui atrapalha alguém.
-
-   O QUE ISSO MUDOU NO DESENHO:
-
-     Todo número vem com a base dele — "8 casos" sozinho não diz nada, "8
-     contra 6 no período anterior" diz. Comparação sem referência é o jeito
-     mais rápido de transformar um painel em ansiedade.
-
-     No tempo médio, MENOS é melhor: cair 20% é boa notícia, e a tela pinta de
-     verde. A mesma seta para baixo em "concluídos" é o contrário.
-
-     O ranking mostra os VIZINHOS, não o pódio. Um pódio completo diz muito
-     pouco a quem está no meio e diz demais sobre quem está embaixo. E quem só
-     enxerga os próprios casos não vê nome de colega nenhum — vê a própria
-     posição contra a média.
-
-     A média da equipe aparece sempre. "Abaixo da média" sem saber qual é a
-     média não é informação, é só desconforto.
-
-   Quem desenha os gráficos é o Graficos — o mesmo da Produtividade RECC.
-   ============================================================================ */
-
-var TelaMinhaPerformance = (function () {
-
-  var canalEscolhido = '';
-  var dados = null;
-  // COMO o período foi escolhido. O mesmo seletor das outras duas telas.
-  var periodo = SeletorDePeriodo.padrao();
-
-  function escapar(texto) { return Moldura.escapar(texto); }
-  function elemento(id) { return document.getElementById(id); }
-
-  /* --------------------------------------------------------------- montar */
-
-  function montar(pacote) {
-    if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
-    return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="performance"><p class="carregando-campos">'
-      + 'Somando os seus números…</p></div>';
-  }
-
-  function carregar() {
-    var caixa = elemento('performance');
-    if (caixa) {
-      caixa.innerHTML = '<p class="carregando-campos">Somando os seus números…</p>';
-    }
-
-    Servidor.chamar('minhaPerformance', canalEscolhido, periodo)
-      .entao(function (resposta) { dados = resposta; desenhar(); })
-      .senao(function (erro) {
-        elemento('performance').innerHTML =
-          '<p class="carregando-campos erro-carga">'
-          + escapar(erro.message || String(erro)) + '</p>';
-      });
-  }
-
-  function desenhar() {
-    if (!dados.temResponsavel) {
-      elemento('performance').innerHTML = '<div class="cartao vazio">'
-        + '<strong>Este canal não diz quem é o responsável por cada caso.</strong>'
-        + '<p>Sem uma coluna de responsável não há "os meus casos" para somar. '
-        + 'Um administrador aponta essa coluna em Configurações › Canais de '
-        + 'trabalho.</p></div>';
-      return;
-    }
-
-    elemento('performance').innerHTML = desenharCabeca()
-      + Moldura.avisoDeJanela(dados, 'Estes números')
-      + desenharIndicadores()
-      + desenharMeta()
-      + '<div class="graficos">'
-      + (dados.porDia ? cartaoDeGrafico(dados.porDia) : '')
-      + (dados.porSituacao ? cartaoDeGrafico(dados.porSituacao) : '')
-      + (dados.porCanal ? cartaoDeGrafico(dados.porCanal) : '')
-      // O MESMO gráfico da Produtividade RECC, com os casos da pessoa. Vem
-      // por último porque é o mais largo, e porque é o que fecha a leitura:
-      // "o que eu fiz" acima, "quanto isso valeu" aqui.
-      + (dados.valorPorSituacao
-        ? cartaoDeValorPorSituacao(dados.valorPorSituacao) : '')
-      + '</div>'
-      + '<div class="performance-baixo">'
-      + desenharEquipe() + desenharRecentes() + '</div>';
-
-    ligar();
-  }
-
-  function desenharCabeca() {
-    // A caixa e o seletor são as PEÇAS COMPARTILHADAS, as mesmas do Trabalho e
-    // da Produtividade. A contagem aqui é quem está sendo medido — numa tela
-    // sobre uma pessoa, é o dado mais importante do recorte.
-    return Moldura.caixaDeFiltros(
-      SeletorDePeriodo.desenhar(dados),
-      escapar(dados.pessoa.nome)
-        + (dados.pessoa.cargo ? ' · ' + escapar(dados.pessoa.cargo) : '')
-        + (dados.pessoa.canal ? ' · ' + escapar(dados.pessoa.canal) : ''));
-  }
-
-  /* --------------------------------------------------------- indicadores */
-
-  function desenharIndicadores() {
-    return '<div class="cartoes">' + dados.indicadores.map(function (um) {
-      return '<div class="indicador" title="' + escapar(um.explicacao) + '">'
-        + '<span class="rotulo">' + escapar(um.rotulo) + '</span>'
-        + '<strong class="numero">' + escapar(comUnidade(um)) + '</strong>'
-        + variacao(um) + '</div>';
-    }).join('') + '</div>';
-  }
-
-  function comUnidade(indicador) {
-    if (indicador.unidade === 'dias') {
-      return String(indicador.valor).replace('.', ',') + ' dias';
-    }
-    return String(indicador.valor);
-  }
-
-  /**
-   * A variação, e o que ela significa.
-   *
-   * No tempo médio, MENOS é melhor: cair 20% é boa notícia. A mesma seta para
-   * baixo em "concluídos" é o contrário — e pintar as duas da mesma cor faria
-   * a tela dar a notícia errada.
-   */
-  function variacao(indicador) {
-    if (indicador.variacao === null || indicador.variacao === undefined) {
-      // Sem base de comparação, o espaço fica em branco. Inventar "+100%"
-      // porque saiu de zero é ruído que a operação aprende a ignorar.
-      return '<span class="variacao vazia" aria-hidden="true">—</span>';
-    }
-    var subiu = indicador.variacao >= 0;
-    var boaNoticia = indicador.menorEhMelhor ? !subiu : subiu;
-    if (indicador.variacao === 0) boaNoticia = null;
-
-    return '<span class="variacao ' + (boaNoticia === null ? 'igual'
-      : (boaNoticia ? 'subiu' : 'desceu')) + '">'
-      + (subiu ? '▲' : '▼') + ' ' + Math.abs(indicador.variacao) + '%'
-      + '<em>vs. período anterior</em></span>';
-  }
-
-  /* ---------------------------------------------------------------- meta */
-
-  function desenharMeta() {
-    if (!dados.meta) return '';
-    var meta = dados.meta;
-    var bateu = meta.percentualReal >= 100;
-
-    return '<section class="cartao meta">'
-      + '<header><h3>Meta do período</h3>'
-      + '<span class="meta-numero' + (bateu ? ' bateu' : '') + '">'
-      + meta.feito + ' <em>de ' + meta.alvo + '</em></span></header>'
-      + '<div class="barra-da-meta" role="progressbar" aria-valuenow="'
-      + meta.percentualReal + '" aria-valuemin="0" aria-valuemax="100"'
-      + ' aria-label="Progresso da meta">'
-      + '<span style="width:' + meta.percentual + '%"></span></div>'
-      + '<p class="meta-explica">' + escapar(meta.rotulo)
-      + (bateu ? ' · <strong>meta batida</strong>' : '') + '</p>'
-      + '</section>';
-  }
-
-  /* ------------------------------------------------------------- gráficos */
-
-  function cartaoDeGrafico(componente) {
-    return '<section class="cartao grafico largura-' + componente.largura + '">'
-      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
-      + '</h3></header>'
-      + Graficos.desenhar(componente) + '</section>';
-  }
-
-  /**
-   * O valor por situação, com o gráfico E a tabela.
-   *
-   * A tabela aparece porque os NÚMEROS são o pedido do PO — "valor dos
-   * retidos, não retidos, sem sucesso, valor dos demais status e total" —, e
-   * o total mora no pé dela. É o mesmo desenho da Produtividade RECC; o que
-   * muda são os casos que entraram na conta.
-   */
-  function cartaoDeValorPorSituacao(componente) {
-    return '<section class="cartao grafico largura-2">'
-      + '<header class="grafico-cabeca"><h3>' + escapar(componente.titulo)
-      + '</h3></header>'
-      + (componente.aviso
-        ? '<p class="grafico-vazio">' + escapar(componente.aviso) + '</p>'
-        : Graficos.desenhar(componente) + Graficos.tabela(componente))
-      + '</section>';
-  }
-
-  /* -------------------------------------------------------------- equipe */
-
-  function desenharEquipe() {
-    var equipe = dados.equipe;
-    if (!equipe.disponivel) return '';
-
-    var meuLugar = equipe.minhaPosicao
-      ? '<p class="equipe-lugar"><strong>' + equipe.meuValor + ' caso(s)</strong>'
-        + ' · a média da equipe é <strong>' + String(equipe.media).replace('.', ',')
-        + '</strong> entre ' + equipe.quantasPessoas + ' pessoas</p>'
-      : '<p class="equipe-lugar">Você ainda não tem casos neste período.</p>';
-
-    if (!equipe.podeVerNomes) {
-      // Quem só enxerga os próprios casos não vê nome de colega. Mostrar a
-      // lista aqui seria uma porta dos fundos — e a mais constrangedora que
-      // existe num sistema de trabalho.
-      return '<section class="cartao equipe">'
-        + '<h3>Você e a equipe</h3>' + meuLugar
-        + '<p class="equipe-nota">O seu nível de acesso mostra os seus casos, '
-        + 'então aqui você se compara com a <strong>média</strong> — e não com '
-        + 'uma lista de nomes.</p></section>';
-    }
-
-    var linhas = equipe.lista.map(function (pessoa) {
-      var acimaDaMedia = pessoa.valor >= equipe.media;
-      return '<li class="' + (pessoa.souEu ? 'sou-eu' : '') + '">'
-        + '<span class="posicao">' + pessoa.posicao + 'º</span>'
-        + '<span class="nome">' + escapar(pessoa.nome)
-        + (pessoa.souEu ? ' <em>você</em>' : '') + '</span>'
-        + '<span class="valor tom-' + (acimaDaMedia ? 'bom' : 'neutro') + '">'
-        + pessoa.valor + '</span></li>';
-    }).join('');
-
-    return '<section class="cartao equipe">'
-      + '<h3>Você e a equipe</h3>' + meuLugar
-      + '<ul class="ranking">' + linhas + '</ul>'
-      + '<p class="equipe-nota">A lista mostra quem está <strong>em volta de '
-      + 'você</strong>, e não o pódio: um pódio completo diz pouco a quem está '
-      + 'no meio e diz demais sobre quem está embaixo.</p></section>';
-  }
-
-  /* ------------------------------------------------------------ recentes */
-
-  function desenharRecentes() {
-    if (!dados.recentes.length) {
-      return '<section class="cartao equipe"><h3>O que você fez</h3>'
-        + '<p class="equipe-nota">Nada registrado ainda neste sistema.</p>'
-        + '</section>';
-    }
-
-    return '<section class="cartao equipe"><h3>O que você fez</h3>'
-      + '<ul class="trilha">' + dados.recentes.map(function (passo) {
-        var texto = '<strong>' + escapar(passo.acao) + '</strong>'
-          + (passo.detalhe ? '<em>' + escapar(passo.detalhe) + '</em>' : '')
-          + '<span>' + escapar(passo.quando) + '</span>';
-        return '<li>' + (passo.abre
-          ? '<button type="button" class="passo-abre" data-caso-recente="'
-            + escapar(passo.registro) + '">' + texto + '</button>'
-          : texto) + '</li>';
-      }).join('') + '</ul></section>';
-  }
-
-  /* ---------------------------------------------------------------- ligar */
-
-  function ligar() {
-    var caixas = document.querySelectorAll('#performance .filtro');
-    for (var i = 0; i < caixas.length; i++) {
-      caixas[i].addEventListener('change', function () {
-        var novo = SeletorDePeriodo.mudou(this, dados, 'performance');
-        // `false` é o de/até com uma data só: ainda não recarrega.
-        if (novo) { periodo = novo; carregar(); }
-      });
-    }
-
-    var abrir = document.querySelectorAll('[data-caso-recente]');
-    for (var i = 0; i < abrir.length; i++) {
-      abrir[i].addEventListener('click', function () {
-        CasoEmModal.abrir(canalEscolhido,
-          this.getAttribute('data-caso-recente'), carregar);
-      });
-    }
-
-    Graficos.ligarDica(elemento('performance'));
-  }
-
-  function ligarTela() {
-    SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhido = idDoCanal;
-      Aplicacao.remontar();
-    });
-    carregar();
-  }
-
-  function desligar() { Graficos.tirarDica(); }
-
-  return { montar: montar, ligar: ligarTela, desligar: desligar };
 })();
 </script>
 
@@ -8959,10 +8594,7 @@ var TelaProdutividade = (function () {
 
   function rodapeDosAtendidos(componente) {
     var notas = [];
-    if (componente.dobradosEmOutros) {
-      notas.push('Mais ' + componente.dobradosEmOutros + ' valor(es) somados em '
-        + '<strong>Demais valores</strong>.');
-    }
+    if (componente.foraDoTopo) notas.push(soOsMaiores(componente));
     if (componente.semInformacao) {
       notas.push(componente.semInformacao + ' atendimento(s) sem esta informação não entram '
         + 'neste ranking.');
@@ -9064,9 +8696,8 @@ var TelaProdutividade = (function () {
     });
 
     // A caixa de filtros e o seletor de período são PEÇAS COMPARTILHADAS: o
-    // Trabalho e a Minha Performance usam as mesmas. Três cópias divergiriam
-    // no primeiro ajuste, e aí "setembro" significaria uma coisa numa tela e
-    // outra na vizinha.
+    // Trabalho usa as mesmas. Duas cópias divergiriam no primeiro ajuste, e aí
+    // "setembro" significaria uma coisa numa tela e outra na vizinha.
     return Moldura.caixaDeFiltros(
       SeletorDePeriodo.desenhar(painel) + caixas.join(''),
       painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
@@ -9120,11 +8751,17 @@ var TelaProdutividade = (function () {
   function rodapeDoGrafico(componente) {
     if (componente.aviso || !componente.pontos.length) return '';
     return '<p class="grafico-pe">'
-      + (componente.dobradosEmOutros
-        ? 'Mais ' + componente.dobradosEmOutros + ' valor(es) somados em '
-          + '<strong>Demais valores</strong>. '
-        : '')
+      + (componente.foraDoTopo ? soOsMaiores(componente) + ' ' : '')
       + 'Clique para ver os casos.</p>';
+  }
+
+  /**
+   * Etapa 53, pedido do PO: só o top 5, sem "Demais valores". A rosca e a tabela
+   * somam o que aparece — e isto diz, para ninguém ler a soma como o total.
+   */
+  function soOsMaiores(componente) {
+    return 'Só os ' + componente.pontos.length + ' maiores aparecem; a soma e as '
+      + 'porcentagens são entre eles.';
   }
 
   /* --------------------------------------------------------- comportamento */
@@ -10309,7 +9946,7 @@ var TelaConfiguracoes = (function () {
           + escapar(canal.nome) + '</option>';
       }).join('') + '</select>'
       + '<em>O canal é também a EQUIPE da pessoa: quem está no mesmo canal '
-      + 'aparece junto na Minha Performance. Quem administra fica em "todos os '
+      + 'é a equipe dela na Produtividade RECC. Quem administra fica em "todos os '
       + 'canais" — pode cadastrar em qualquer uma e delegar, e não entra em '
       + 'equipe nenhuma.</em></label>';
   }
@@ -10942,8 +10579,8 @@ var TelaConfiguracoes = (function () {
     /*
       O status que FECHA o caso. Pedido do PO: o que é "concluído" muda de
       canal para canal — e no VG ele ainda vai decidir. É daqui que ele decide,
-      sem código: marcado, o status entra em "Concluídos" e sai de "Ainda em
-      aberto" em Minha Performance, e conta para a meta.
+      sem código: marcado, o status é um desfecho: encerra o prazo dos
+      sinalizadores e conta como encerrado.
 
       Não trava nada: um caso num status final continua aceitando mudança.
     */
@@ -11170,10 +10807,6 @@ var TelaConfiguracoes = (function () {
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
         + 'a busca não estourar numa base grande.')
-      + campoDeTexto('metaMensalPorPessoa', 'Meta de casos por pessoa, no mês',
-        canal.metaMensalPorPessoa,
-        'Aparece em Minha Performance como barra de progresso. Zero desliga: '
-        + 'canal sem meta não inventa uma.')
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -11196,7 +10829,7 @@ var TelaConfiguracoes = (function () {
       + caixaDeOpcoes('colunaDoValor', 'Coluna do valor', colunas,
         canal.colunaDoValor,
         'A coluna de dinheiro deste canal. É dela que sai o gráfico "Valor por '
-        + 'situação", na Produtividade RECC e na Minha Performance. Em branco, '
+        + 'situação", na Produtividade RECC. Em branco, '
         + 'o gráfico não aparece.')
       + campoDeTexto('situacoesDestacadas', 'Situações com barra própria',
         canal.situacoesDestacadas,
@@ -11232,7 +10865,6 @@ var TelaConfiguracoes = (function () {
         colunaDoStatus: valorDe('colunaDoStatus'),
         colunasDaFila: valorDe('colunasDaFila'),
         colunasDaBusca: valorDe('colunasDaBusca'),
-        metaMensalPorPessoa: valorDe('metaMensalPorPessoa'),
         colunaDaFinalizacao: valorDe('colunaDaFinalizacao'),
         colunaDaAreaResponsavel: valorDe('colunaDaAreaResponsavel'),
         slaHorasUteis: valorDe('slaHorasUteis'),
@@ -11416,11 +11048,9 @@ var TelaConfiguracoes = (function () {
         + '<div class="card-linha">'
         + '<label class="config-campo"><span>Mostrar no máximo</span>'
         + '<input type="text" data-card="' + posicao + '" data-parte="limite"'
-        + ' value="' + (grafico.limite || '') + '" placeholder="todos">'
-        + '<em>O resto vira uma fatia só, "Demais valores"'
-        + (grafico.tipo === 'pizza'
-          ? '. A pizza aceita no máximo ' + opcoes.maximoDeFatias + '.' : '.')
-        + '</em></label>'
+        + ' value="' + (grafico.limite || '') + '" placeholder="' + opcoes.topoDosGraficos + '">'
+        + '<em>No máximo os ' + opcoes.topoDosGraficos + ' maiores. O resto não aparece '
+        + '(não há "Demais valores"). A linha do tempo mostra todos os dias.</em></label>'
         + caixaSimples(posicao, 'largura', 'Tamanho na tela',
           [{ valor: '1', rotulo: 'Metade da linha' },
            { valor: '2', rotulo: 'Linha inteira' }], String(grafico.largura))
@@ -13211,13 +12841,6 @@ var Rotas = (function () {
       montar: function (pacote) { return TelaCadastrarCaso.montar(pacote); },
       ligar: function (pacote) { TelaCadastrarCaso.ligar(pacote); },
       desligar: function () { TelaCadastrarCaso.desligar(); }
-    },
-    minhaPerformance: {
-      titulo: 'Minha Performance',
-      subtitulo: 'Acompanhe seus resultados, evolução e principais indicadores.',
-      montar: function (pacote) { return TelaMinhaPerformance.montar(pacote); },
-      ligar: function (pacote) { TelaMinhaPerformance.ligar(pacote); },
-      desligar: function () { TelaMinhaPerformance.desligar(); }
     },
     buscarCaso: {
       titulo: 'Buscar Caso',

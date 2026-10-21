@@ -274,9 +274,6 @@ function pontePreparada(respostas) {
     + '        return recusar("A prévia não grava — ela é uma cópia estática "\n'
     + '          + "do sistema, sem planilha por trás.");\n'
     + '      },\n'
-    + '      minhaPerformance: function (idDoCanal) {\n'
-    + '        responder(respostas.performance[idDoCanal]);\n'
-    + '      },\n'
     + '      produtividadeDaEquipe: function (idDoCanal) {\n'
     + '        responder(respostas.analitico.paineis[idDoCanal]);\n'
     + '      },\n'
@@ -1084,26 +1081,10 @@ function gerar(pastaDeSaida) {
     exportados: exportados
   };
 
-  // Uma meta na RET, só na prévia, para a barra de progresso ter o que
-  // mostrar. O instalador de verdade deixa a meta em zero — canal sem meta
-  // declarada não inventa uma.
-  chamar('salvarCanal')(Object.assign(
-    {}, chamar('listarCanaisConfiguraveis()').find((m) => m.aba === 'BASE_RET'),
-    { metaMensalPorPessoa: 40 }));
-
-  // Minha Performance, de quem está entrando na prévia.
-  const performance = {};
-  pacote.canais.forEach((canal) => {
-    performance[canal.id] = chamar('minhaPerformance')(canal.id, 30);
-  });
-
   // Uma dos canais da prévia mostra o aviso de janela parcial, para ele poder
   // ser VISTO. Sem isto, o aviso mais importante do sistema em volume alto
   // seria o único pedaço que ninguém consegue olhar antes de a base crescer.
   const canalDoAviso = pacote.canais[0].id;
-  [paineis, analitico.paineis, performance].forEach(() => {});
-  performance[canalDoAviso].truncada = true;
-  performance[canalDoAviso].linhasLidas = 5000;
   analitico.paineis[canalDoAviso].truncada = true;
   analitico.paineis[canalDoAviso].linhasLidas = 5000;
 
@@ -1130,7 +1111,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, propostas, paineis, configuracoes,
-      busca, analitico, performance, corretoras, importacao
+      busca, analitico, corretoras, importacao
     })
       + '</head>');
 

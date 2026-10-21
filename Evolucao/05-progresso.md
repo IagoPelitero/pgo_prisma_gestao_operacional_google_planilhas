@@ -3082,6 +3082,96 @@ roteiro da importação agora confere a ordem alfabética e a busca do de-para.
 
 ---
 
+## Etapa 50 — O card removido não volta mais
+
+Relato do PO: **"em Configurações, na aba Painéis › Cards do Trabalho, quando clico para
+remover os 6 primeiros cards eles somem, mas quando carrega eles voltam — seria um bug,
+certo?"** Era (achado 105). Reproduzido no simulador antes de mexer.
+
+| Parte | O que ficou |
+|---|---|
+| **A causa** | Salvar desliga o card removido (`Ativo NAO`, `Ordem` 0) e o editor listava também os desligados, para dar como religar. O removido voltava desmarcado, e a Ordem 0 o punha no topo |
+| **O conserto** | O editor lista o card **escondido** (sem "Mostrar", com a posição dele) e **não lista o removido** (`Ordem` 0). A linha continua em `PAINEIS` |
+| **O que já estava desligado** | Some do editor na hora, sem migração — inclusive o que o `atualizarPGO` desligou ao montar os 4 cards da RET |
+| **Religar um removido** | Criar de novo em "+ card", ou, na planilha, `Ativo` SIM e uma `Ordem` |
+
+Na mesma rodada, o PO pediu para **tirar do contrato da RET a coluna agente da
+central**: já estava feito na Etapa 49 (com grupo e relacionamento). A coluna segue na
+planilha em uso, com o dado, até alguém apagá-la.
+
+6 testes novos em `testes-cards-filtros-e-busca.js`, e 1 antigo ajustado (dava como certo o
+card removido aparecer desmarcado). 4 quebras de propósito, 4 pegas.
+
+---
+
+## Etapa 51 — O diagnóstico não reprova o campo desligado sem coluna
+
+Relato do PO: **"aqui ele sinaliza que precisa incluir a coluna do agente da central"**.
+Era o diagnóstico (achado 106): o `atualizarPGO` da Etapa 49 tinha desligado o campo, o PO
+apagou a coluna na planilha — como o laudo dizia que podia —, e o diagnóstico dava
+**FALHA**, "Desligue o campo… ou acrescente a coluna", para um campo que já estava
+desligado.
+
+| Parte | O que ficou |
+|---|---|
+| **A regra** | Campo **ligado** sem coluna continua sendo FALHA (cadastrar estouraria). Campo **desligado** sem coluna vira uma linha informativa (OK): "nada quebra; se quiser a aba CAMPOS limpa, exclua a linha dele" |
+| **Conferido** | Formulário, cadastro, Trabalho, Produtividade, Importação e "Trabalhar no caso" funcionam sem a coluna |
+| **Excluir a linha em CAMPOS** | Pergunta do PO: o aviso não volta, e nada recria o campo — nem o `atualizarPGO` |
+
+4 testes novos em `testes-colunas-fora-da-ret.js`; 1 teste antigo ajustado (pegava o
+primeiro campo da aba, que é um desligado).
+
+---
+
+## Etapa 52 — A Minha Performance sai do sistema
+
+Pedido do PO: **"a aba Minha Performance não será mais necessária. Readeque o sistema,
+iremos trabalhar somente com as demais"**. As duas escolhas foram dele:
+
+| Pergunta | Escolha |
+|---|---|
+| A meta mensal por pessoa (a barra de progresso que só ela mostrava) e o código só dela | **Tirar tudo** |
+| A marca da tela nos níveis de acesso | **O `atualizarPGO()` tira, uma vez** |
+
+| Parte | O que ficou |
+|---|---|
+| **A tela** | `MinhaPerformance.html` saiu; a casca perdeu a rota, o ícone e o estilo; o menu tem 7 telas. Endereço guardado (`#minhaPerformance`) abre na primeira tela do menu |
+| **O servidor** | Saíram `minhaPerformance` e o que só ela usava: indicadores da pessoa, meta, série, distribuição, ranking da equipe, "o que eu fiz", `equipeParaComparar_`, `nomeDoCanalDaPessoa_` (580 linhas). Ficaram as peças da Produtividade: valor por situação, média móvel, a equipe do alcance |
+| **A meta** | O campo saiu de Configurações › Canais de trabalho e `MetaMensalPorPessoa` saiu do contrato de `CANAIS`. Na planilha em uso a coluna fica, com o dado, e o laudo avisa que sobrou |
+| **Os níveis** | Planilha nova nasce sem a tela; na em uso, o `atualizarPGO()` tira a marca de cada nível (`MIGRACAO.SEM_MINHA_PERFORMANCE`) e diz qual era |
+| **Os testes** | `testes-performance.js` virou `testes-sem-minha-performance.js`: cobra a saída peça por peça — e guarda os dois testes que não eram dela (o calendário que saiu inteiro e "status final não trava o caso") |
+
+---
+
+## Etapa 53 — Os gráficos da Produtividade RECC só com o top 5
+
+Pedido do PO: **"tirar da aba Produtividade RECC dos gráficos os demais valores. Deve
+aparecer somente o top 5 de cada tópico, não deve conter os demais valores"**.
+
+| Parte | O que ficou |
+|---|---|
+| **Os gráficos de Painéis** | No máximo os **5 maiores** (`RECC_TOPO_DOS_GRAFICOS`); um gráfico configurado com limite menor (TOP 3) fica com o dele, e o maior que 5 para no 5 — inclusive a pizza. **Não há mais a fatia/barra "Demais valores"**: o resto sai |
+| **Os atendidos da Mesa** | Os Top 5 (corretoras, SUSEPs, sucursais, assuntos, consultores) sem "Demais valores". **Atendidos por analista segue com até 15** — decisão do PO na Etapa 40 —, também sem "Demais valores" |
+| **A linha do tempo** | Não se corta: cada dia do período é um ponto |
+| **O aviso** | A rosca e a tabela somam o que aparece; o rodapé diz "Só os 5 maiores aparecem; a soma e as porcentagens são entre eles", para ninguém ler a soma como o total do canal. Os cartões de cima continuam com o total |
+| **O detalhe** | O clique em "Demais valores" deixou de existir; todo ponto clicável é um valor de verdade |
+| **Configurações** | "Mostrar no máximo" diz: "no máximo os 5 maiores; o resto não aparece (não há Demais valores)" |
+
+**Números das Etapas 50 a 53.** **1358 testes**, cinco execuções seguidas sem
+falha. Quebras de propósito: Etapa 50, 4 pegas; Etapas 51 e 52, 9 pegas; Etapa 53, 4 pegas.
+Navegador: ponta a ponta 22/22 no repositório e no pacote, as 7 telas em 12 larguras, o
+roteiro que clica em tudo e a base suja sem erro; varredura geral sem defeito.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆) — e **apague do projeto do Apps Script o arquivo
+   `MinhaPerformance`**, que saiu. (Se ficar, nada quebra: a página não o inclui mais.)
+2. Rode **`atualizarPGO()`**: ele tira a Minha Performance dos níveis de acesso e lista a
+   coluna `MetaMensalPorPessoa` como "saiu do contrato".
+3. **Implantar › Gerenciar implantações › editar › Versão: Nova versão**.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

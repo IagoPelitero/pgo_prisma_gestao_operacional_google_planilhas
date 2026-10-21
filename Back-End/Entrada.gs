@@ -347,7 +347,6 @@ function canaisVisiveis_() {
         colunaDoStatus: canal.ColunaDoStatus,
         colunasDaFila: canal.ColunasDaFila,
         colunasDaBusca: canal.ColunasDaBusca,
-        metaMensalPorPessoa: Number(canal.MetaMensalPorPessoa) || 0,
         colunaDaFinalizacao: canal.ColunaDaFinalizacao,
         colunaDaAreaResponsavel: canal.ColunaDaAreaResponsavel,
         colunaDoValor: String(canal.ColunaDoValor || ''),
@@ -604,7 +603,6 @@ const RECC_TELAS_DO_SISTEMA = [
   // diante o nome se muda pelo TÍTULO, que existe exatamente para isso.
   { tela: 'trabalho', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
-  { tela: 'minhaPerformance', titulo: 'Minha Performance' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
   { tela: 'tabelaCorretoras', titulo: 'Tabela de Corretoras' },
   { tela: 'importacao', titulo: 'Importação' },
@@ -972,11 +970,9 @@ function linhasNoMeuAlcance_(nomeDaAba, numerosDeLinha, quem) {
 /**
  * Quem é da MINHA equipe: as pessoas cadastradas no MESMO CANAL que eu.
  *
- * Mora aqui, fora do `filtrarPeloAlcance_`, porque duas telas fazem a mesma
- * pergunta por motivos diferentes — o alcance para RECORTAR o que eu vejo, e a
- * Minha Performance para COMPARAR o meu resultado com o do meu grupo. Escrever
- * a regra duas vezes faria as duas divergirem, e aí "a minha equipe" na
- * performance não seria a mesma "minha equipe" que o alcance enxerga.
+ * Mora aqui, fora do `filtrarPeloAlcance_`, porque duas coisas fazem a mesma
+ * pergunta — o alcance da fila e o alcance EQUIPE da Produtividade RECC.
+ * Escrever a regra duas vezes faria as duas divergirem.
  *
  * Devolve null — e não lista vazia — para quem NÃO PERTENCE a canal nenhum,
  * que é o caso de quem administra. As duas coisas são diferentes: "a minha
@@ -1011,49 +1007,6 @@ function nomesDaMinhaEquipe_(quem) {
     nomes.push(String(usuario.Nome));
   });
   return nomes;
-}
-
-/**
- * O NOME do canal da pessoa — que é o nome da equipe dela.
- *
- * A Minha Performance mostra isto ao lado do nome, e precisa do nome e não do
- * Id: "0000000002" embaixo do próprio nome não diz nada a ninguém. Vazio para
- * quem administra, que não pertence a canal nenhum, e vazio também para um
- * canal que foi apagado — melhor o espaço em branco que o Id cru na tela.
- */
-function nomeDoCanalDaPessoa_(quem) {
-  var meuCanal = converterParaIdentificador_((quem.usuario || {}).CanalId);
-  if (!meuCanal) return '';
-
-  var achado = '';
-  lerRegistros_('CANAIS').forEach(function (canal) {
-    if (converterParaIdentificador_(canal.Id) === meuCanal) {
-      achado = String(canal.Nome || '');
-    }
-  });
-  return achado;
-}
-
-/**
- * A equipe para COMPARAR — o grupo do ranking da Minha Performance.
- *
- * É quase sempre a mesma resposta de `nomesDaMinhaEquipe_`, com uma exceção:
- * QUEM OLHA DE CIMA compara com o canal inteiro.
- *
- * Quem tem escopo TODOS ou CANAL já enxerga os casos de todo mundo no Trabalho
- * e na Busca — `filtrarPeloAlcance_` nem chega a perguntar quem é a equipe
- * dessa pessoa. Devolver null aqui é dizer "sem recorte", e o ranking é o do
- * canal, que é o que faz sentido para quem olha de cima.
- *
- * Isto NÃO vale para a Produtividade RECC. Lá o alcance EQUIPE é uma escolha
- * explícita do nível, feita em Configurações; passar por cima dela faria
- * "equipe" e "canal" virarem a mesma coisa, e o seletor de alcance perderia
- * uma das quatro respostas.
- */
-function equipeParaComparar_(quem) {
-  var escopo = (quem.permissoes || {}).escopo;
-  if (escopo === RECC_ESCOPOS.TODOS || escopo === RECC_ESCOPOS.CANAL) return null;
-  return nomesDaMinhaEquipe_(quem);
 }
 
 // ============================================================================
