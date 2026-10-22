@@ -3214,12 +3214,12 @@ var TelaConfiguracoes = (function () {
     return '<div class="config-legado">'
       + '<h4>Planilha de cadastros — a segunda base</h4>'
       + '<p class="config-explica">Corretoras, SUSEPs bloqueadas e as duas '
-      + 'listas de analista podem morar em OUTRA planilha. O PGO lê dela '
-      + 'na hora, sem copiar nada: o que mudar lá vale aqui na leitura '
-      + 'seguinte. Isso deixa esta planilha mais leve e evita manter o mesmo '
-      + 'cadastro em dois lugares. <strong>O PGO só lê</strong> — para editar '
-      + 'um cadastro, edite a planilha de cadastros. Vazio traz tudo de volta '
-      + 'para cá.</p>'
+      + 'listas de analista podem morar em OUTRA planilha — <strong>escolha '
+      + 'quais</strong>; as outras continuam aqui. O PGO lê dela na hora, sem '
+      + 'copiar nada: o que mudar lá vale aqui na leitura seguinte. Isso deixa '
+      + 'esta planilha mais leve. Para cadastrar e editar por aqui, a aba de lá '
+      + 'precisa das colunas Id e _Visivel (o botão de conferir diz); sem elas, a '
+      + 'lista abre só para leitura. Id vazio traz tudo de volta para cá.</p>'
       + (cadastros.ligada
         ? '<p class="config-alerta suave">Ligada. Se essa planilha sair do ar '
           + 'ou perder o compartilhamento, a Tabela de Corretoras e o selo da '
@@ -3230,6 +3230,14 @@ var TelaConfiguracoes = (function () {
         cadastros.planilhaId,
         'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
         + 'precisa ter acesso a ela.')
+      + '<div class="config-campo"><span>Quais listas moram nela</span>'
+      + '<div class="config-marcadores">'
+      + cadastros.abas.map(function (uma) {
+        return '<label class="config-chave"><input type="checkbox" data-aba-de-fora="'
+          + escapar(uma.aba) + '"' + (cadastros.ligada && uma.naSegundaBase ? ' checked' : '')
+          + '><span>' + escapar(uma.titulo) + ' (' + escapar(uma.aba) + ')</span></label>';
+      }).join('')
+      + '</div><em>As desmarcadas continuam nesta planilha.</em></div>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao vazado" id="conferir-cadastros">'
       + 'Conferir a ligação</button>'
@@ -3244,12 +3252,19 @@ var TelaConfiguracoes = (function () {
       + '</div>';
   }
 
+  /** As listas marcadas para morar na segunda base (Etapa 55). */
+  function abasDeFora() {
+    return Array.prototype.filter.call(
+      document.querySelectorAll('[data-aba-de-fora]'), function (caixa) { return caixa.checked; })
+      .map(function (caixa) { return caixa.getAttribute('data-aba-de-fora'); });
+  }
+
   function ligarCadastros() {
     elemento('conferir-cadastros').addEventListener('click', function () {
       var caixa = elemento('laudo-dos-cadastros');
       caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
 
-      Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'))
+      Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'), abasDeFora())
         .entao(function (laudo) {
           caixa.innerHTML = '<p class="config-alerta'
             + (laudo.abre && !laudo.faltando.length ? ' suave' : '') + '">'
@@ -3279,7 +3294,7 @@ var TelaConfiguracoes = (function () {
       // Vai pela porta da senha, como as outras mudanças de estrutura.
       comSenhaDeAdministrador(function () {
         Servidor.chamar('salvarConfiguracaoDosCadastros',
-          { planilhaId: valorDe('cadastrosId') })
+          { planilhaId: valorDe('cadastrosId'), abas: abasDeFora() })
           .entao(function (nova) {
             dados.cadastros = nova;
             avisarSalvo(nova.ligada

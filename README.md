@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1358 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1379 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -336,7 +336,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1358 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1379 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -914,7 +914,8 @@ estavam):
 
 1. **Os cartões**, e **embaixo de cada status, a soma do prêmio anual** dos casos
    dele — "R$ 2.400,00 de prêmio anual". No **Retido**, a soma é a do **prêmio
-   retido** (`valor do prêmio retido`), o que de fato ficou.
+   retido** (`valor do prêmio retido`), o que de fato ficou. No **Não trabalhado**,
+   a do **prêmio mensal** (Etapa 54): é o que a operação preenche nesses casos.
 2. **O gráfico dos prêmios**, logo depois dos cartões: três barras — **prêmio
    anual** (`valor do prêmio`), **prêmio mensal** (`prêmio mensal`) e **prêmio
    retido** —, com a soma de cada um e de quantos casos ela vem. Não há "total":
@@ -1463,18 +1464,26 @@ Corretoras, SUSEPs bloqueadas e as duas listas de analista — Central e
 Cobrança Ativa — podem morar em **outra planilha**. O PGO lê dela na hora, sem
 copiar nada: o que mudar lá vale aqui na leitura seguinte.
 
+**A escolha é por lista** (Etapa 55): em Configurações › Estrutura, marca-se quais
+moram lá, e as desmarcadas continuam aqui. A operação usa assim: **só as SUSEPs
+bloqueadas** — 151 mil, pela Porto e pelas corretoras — na segunda base; as
+corretoras Diamante e os analistas, aqui. Com 151 mil linhas, a Tabela Corretoras
+mostra até 100 (as dos casos primeiro, depois as mais recentes), diz quantas há no
+total e procura nas 151 mil pela SUSEP, corretora, sucursal ou coordenador.
+
 Duas razões, e as duas importam:
 
-- **Tamanho.** As 7 mil SUSEPs e as 145 corretoras ocupam um pedaço
-  considerável do teto de 10 milhões de células. Tirá-las daqui deixa espaço
+- **Tamanho.** As 151 mil SUSEPs bloqueadas ocupam um pedaço considerável do
+  teto de 10 milhões de células. Tirá-las daqui deixa espaço
   para o que a planilha existe para guardar, que é caso.
 - **Dono.** Esses cadastros são mantidos por outras áreas. Manter a mesma lista
   em dois lugares é garantir que um dia elas divirjam.
 
-**O PGO lê e não escreve.** A planilha de cadastros é a fonte de verdade; para
-mudar um cadastro, edita-se lá. As portas de escrita recusam com uma frase que
-diz onde editar — duas mãos escrevendo na mesma lista, uma sem saber da outra, é
-como um cadastro começa a divergir.
+**O PGO escreve lá só quando a aba está pronta para isso.** A planilha de
+cadastros é a fonte de verdade. Com as colunas `Id` e `_Visivel` na aba de lá, o
+PGO cadastra, edita e exclui nela — o botão de conferir diz se estão. Sem elas, a
+lista abre **só para leitura**, e as portas de escrita recusam com uma frase que
+diz onde editar e o que falta.
 
 O que **não** sai desta planilha, e não deve sair: as bases de caso, a
 auditoria, os usuários e a configuração. Um sistema que depende de outra
@@ -1608,7 +1617,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1358 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1379 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

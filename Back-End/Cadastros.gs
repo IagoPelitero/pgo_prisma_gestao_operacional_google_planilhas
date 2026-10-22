@@ -327,11 +327,57 @@ function comoCriarAColuna_(nomeDaAba, cabecalho) {
       + '". Peça ao administrador para rodar atualizarPGO().';
 }
 
-function listarSusepsBloqueadas() {
-  exigirTela_('tabelaCorretoras');
-  var volumes = volumePorSusep_();
+/*
+ * A LISTA DE SUSEPs BLOQUEADAS com 151 mil linhas (Etapa 55, pedido do PO: elas
+ * vão para a segunda base, "pela corretora e pela Porto"). Antes a lista ia
+ * INTEIRA para a tela — com 151 mil linhas, uns 20 MB e o erro dos 40 segundos.
+ * Agora o servidor lê só as colunas de procura, escolhe até 100 linhas e lê só
+ * essas: primeiro as que aparecem nos casos (é o que a tela existe para
+ * mostrar), depois as mais recentes. A busca procura nas 151 mil.
+ */
+const RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA = 100;
 
-  return lerRegistros_('SUSEP_BLOQUEADAS')
+/** Até 100 SUSEPs bloqueadas — as dos casos primeiro —, ou as que a busca achar. */
+function listarSusepsBloqueadas(procurar) {
+  return resumoDasSusepsBloqueadas(procurar).bloqueadas;
+}
+
+/** A lista e as contagens, para a tela: quantas há, quantas a busca achou, se cortou. */
+function resumoDasSusepsBloqueadas(procurar) {
+  var quem = exigirTela_('tabelaCorretoras');
+  var volumes = volumePorSusep_();
+  var termo = normalizarParaComparar_(procurar);
+  var estrutura = estruturaDaAba_('SUSEP_BLOQUEADAS');
+  var coluna = function (cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) >= 0
+      ? lerColunaInteira_('SUSEP_BLOQUEADAS', cabecalho) : [];
+  };
+
+  var suseps = coluna('SUSEP');
+  var visiveis = coluna('_Visivel');
+  // As outras colunas de procura só são lidas quando há o que procurar.
+  var deProcura = termo ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
+
+  var quantasNoTotal = 0;
+  var candidatas = [];
+  for (var i = 0; i < suseps.length; i++) {
+    if (visiveis.length && normalizarParaComparar_(visiveis[i]) === 'nao') continue;
+    var chave = chaveDaSusep_(suseps[i]);
+    if (!chave) continue;
+    quantasNoTotal++;
+    if (termo && chave.indexOf(termo) < 0 && !deProcura.some(function (valores) {
+      return normalizarParaComparar_(valores[i]).indexOf(termo) >= 0;
+    })) continue;
+    candidatas.push({ linha: i + 2, casos: volumes.porSusep[chave] || 0 });
+  }
+  // As que mais trazem caso primeiro; empatadas, as mais recentes (mais embaixo).
+  candidatas.sort(function (uma, outra) {
+    return outra.casos - uma.casos || outra.linha - uma.linha;
+  });
+  var escolhidas = candidatas.slice(0, RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA);
+
+  var bloqueadas = lerLinhasEspecificas_('SUSEP_BLOQUEADAS',
+    escolhidas.map(function (uma) { return uma.linha; }))
     .map(function (linha) {
       var susep = susepComoSeEscreve_(linha.SUSEP);
       return {
@@ -347,8 +393,16 @@ function listarSusepsBloqueadas() {
           : '',
         casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
       };
-    })
-    .sort(function (uma, outra) { return outra.casos - uma.casos; });
+    });
+
+  return {
+    bloqueadas: bloqueadas,
+    quantasNoTotal: quantasNoTotal,
+    quantasAchadas: candidatas.length,
+    truncada: candidatas.length > bloqueadas.length,
+    procurar: String(procurar || ''),
+    podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR)
+  };
 }
 
 /**
@@ -376,7 +430,10 @@ function bloquearSusep(dados) {
    * isso agora é o COORDENADOR COMERCIAL: tem nome, e dá para perguntar.
    */
   var id = converterParaIdentificador_(dados.id);
-  var jaBloqueada = lerRegistros_('SUSEP_BLOQUEADAS').filter(function (linha) {
+  // Só a coluna da SUSEP, e as linhas em que ela bateu (Etapa 55): ler as 151
+  // mil linhas inteiras para conferir uma SUSEP estourava o tempo.
+  var jaBloqueada = buscarRegistros_('SUSEP_BLOQUEADAS', 'SUSEP', susep).filter(function (linha) {
+    if (normalizarParaComparar_(linha._Visivel) === 'nao') return false;
     return chaveDaSusep_(linha.SUSEP) === chaveDaSusep_(susep)
       && converterParaIdentificador_(linha.Id) !== id;
   })[0];

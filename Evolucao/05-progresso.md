@@ -3172,6 +3172,62 @@ roteiro que clica em tudo e a base suja sem erro; varredura geral sem defeito.
 
 ---
 
+## Etapa 54 — O cartão "Não trabalhado" da RET soma o prêmio mensal
+
+Pedido do PO: **"na aba RET temos o card Não trabalhado e pedi que fizesse prêmio anual,
+troca para o mensal. Na maioria das vezes não são preenchidos os anuais, sendo mais os
+mensais"**. Escolha dele: **só no Não trabalhado**.
+
+| Cartão | Soma embaixo |
+|---|---|
+| **Não trabalhado** | **prêmio mensal** (`prêmio mensal`) — antes, o anual, quase sempre vazio |
+| **Retido** | prêmio retido, como era |
+| Os outros status | prêmio anual, como era |
+
+1 teste novo em `testes-produtividade-da-ret.js` (o caso com o anual vazio e o mensal
+preenchido).
+
+---
+
+## Etapa 55 — A segunda base por lista: as 151 mil SUSEPs bloqueadas vão para lá
+
+Pedido do PO: **"vou usar a segunda base para as SUSEPs bloqueadas, que somam 151 mil,
+sendo pela corretora e pela Porto. Por esse motivo preciso que o PGO consiga manter a
+planilha atual e a segunda base"**. E a pergunta dele, sobre as corretoras Diamante (mais
+de 7 mil SUSEPs): ficam **na planilha atual** — escolha dele, pela recomendação: são as que
+o selo consulta primeiro, e 7 mil linhas em poucas colunas não pesam.
+
+| Parte | O que ficou |
+|---|---|
+| **A escolha por lista** | Configurações › Estrutura › Planilha de cadastros ganhou uma caixa por lista: Corretoras, SUSEPs bloqueadas, Analistas da Central, Analistas da Cobrança. **Só a marcada vai para lá**; as outras continuam aqui. Guardado em `CADASTROS.ABAS` |
+| **O conferir** | Cobra só as abas marcadas: uma segunda base que tem só `SUSEP_BLOQUEADAS` liga sem reclamar das outras. Ligar sem nenhuma marcada é recusado. Quem chama sem a escolha (página antiga) liga as quatro, como antes |
+| **Desligar** | Apagar o Id traz tudo de volta para cá e limpa a escolha |
+| **A Tabela Corretoras com 151 mil** | A aba de SUSEPs bloqueadas não manda mais a lista inteira para a tela (seriam uns 20 MB e o erro dos 40 segundos). O servidor lê só as colunas de procura e manda **até 100** (`RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA`): primeiro as que aparecem nos casos, depois as mais recentes. A tela diz quantas há no total ("151.000 SUSEP(s) bloqueada(s)") e ganhou a **busca** — SUSEP, corretora, sucursal ou coordenador — que procura nas 151 mil |
+| **O selo e o bloqueio** | O selo do formulário já procurava pela coluna; o **bloquear** passou a conferir a repetida do mesmo jeito (antes lia a aba inteira) e ignora a linha excluída |
+| **Os casos** | Continuam todos na planilha atual. Nada de caso, usuário, configuração ou auditoria vai para a segunda base |
+
+20 testes novos em `testes-suseps-na-segunda-base.js` — entre eles, uma segunda base com
+**151 mil linhas**: o corte em 100, a ordem, a busca nas 151 mil, o selo e o bloqueio de uma
+SUSEP lá do fundo, e a resposta para a tela abaixo de 60 KB.
+
+**Números das Etapas 54 e 55.** **1379 testes**, cinco execuções seguidas sem
+falha. Quebras de propósito: Etapas 54 e 55, 12 quebras, 12 pegas (o cartão do Não trabalhado, a escolha das listas, o conferir, a recusa sem lista, a gravação da escolha, a caixa marcada, o corte em 100, a busca, a ordem, a linha excluída no bloqueio e as duas telas). Navegador: ponta a ponta 22/22 no
+repositório e no pacote.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
+2. **Na segunda base**, crie a aba **`SUSEP_BLOQUEADAS`** com os cabeçalhos `SUSEP`,
+   `NomeCorretora`, `Sucursal`, `CoordenadorComercial`, `BloqueadaEm`, `BloqueadaPor`
+   (`Companhia` para a Porto, `Corretora` para a corretora). Para bloquear e editar pelo
+   PGO, acrescente também `Id` e `_Visivel`; sem elas a lista abre só para leitura.
+3. Em **Configurações › Estrutura › Planilha de cadastros**: cole o Id, marque **só
+   "SUSEPs bloqueadas"**, aperte **Conferir** e depois **Salvar** (pede a senha de
+   administrador).
+4. **Implantar › Gerenciar implantações › editar › Versão: Nova versão**.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

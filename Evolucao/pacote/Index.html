@@ -6373,6 +6373,7 @@ var TelaTabelaCorretoras = (function () {
 
   var abaAtual = 'corretoras';
   var procurar = '';
+  var procurarBloqueada = '';   // a busca da aba de SUSEPs bloqueadas (Etapa 55)
   var segmento = '';
   var dados = null;
   var editando = null;      // o item aberto no formulário lateral
@@ -6435,16 +6436,10 @@ var TelaTabelaCorretoras = (function () {
         })
         .senao(falhou);
     }
-    return Servidor.chamar('tabelaDeCorretoras', '', '')
-      .entao(function (resposta) {
-        var podeMexer = resposta.podeMexer;
-        Servidor.chamar('listarSusepsBloqueadas')
-          .entao(function (lista) {
-            dados = { bloqueadas: lista, podeMexer: podeMexer };
-            desenharBloqueadas();
-          })
-          .senao(falhou);
-      })
+    // Uma chamada só, e com teto (Etapa 55): com 151 mil SUSEPs na segunda
+    // base, a lista inteira não cabe na tela nem no tempo do Apps Script.
+    return Servidor.chamar('resumoDasSusepsBloqueadas', procurarBloqueada)
+      .entao(function (resposta) { dados = resposta; desenharBloqueadas(); })
       .senao(falhou);
   }
 
@@ -6727,6 +6722,11 @@ var TelaTabelaCorretoras = (function () {
    * vermelho, corretora em violeta. "Sem tipo" são as linhas de antes da
    * coluna existir — decisão do PO: ficam assim até alguém editar.
    */
+  /** 151000 → "151.000". */
+  function numeroComPonto(numero) {
+    return String(Number(numero) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
   function etiquetaDeQuemBloqueou(por) {
     if (por === 'Companhia') return '<span class="situacao tom-ruim">Companhia</span>';
     if (por === 'Corretora') return '<span class="situacao tom-violeta">Corretora</span>';
@@ -6754,13 +6754,25 @@ var TelaTabelaCorretoras = (function () {
     }).join('');
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.bloqueadas.length
-      + ' SUSEP(s) bloqueada(s)</span>'
+      + '<input type="search" id="procurar-bloqueada" class="busca-do-cadastro"'
+      + ' value="' + escapar(procurarBloqueada) + '" autocomplete="off"'
+      + ' placeholder="SUSEP, corretora, sucursal ou coordenador"'
+      + ' aria-label="Procurar SUSEP bloqueada">'
       + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
         ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
           + 'Bloquear SUSEP</button>' : '')
       + '</div>'
       + avisoDeOrigem('SUSEP_BLOQUEADAS')
+      + '<p class="config-explica"><strong>' + numeroComPonto(dados.quantasNoTotal)
+      + ' SUSEP(s) bloqueada(s)</strong>'
+      + (procurarBloqueada
+        ? ' · ' + numeroComPonto(dados.quantasAchadas) + ' com "' + escapar(procurarBloqueada) + '"'
+        : ' · a lista começa pelas que aparecem nos casos, depois as mais recentes')
+      + '.</p>'
+      + (dados.truncada
+        ? '<p class="aviso-fila">Mostrando ' + dados.bloqueadas.length + ' de '
+          + numeroComPonto(dados.quantasAchadas) + '. Procure pela SUSEP, pela corretora, '
+          + 'pela sucursal ou pelo coordenador para chegar nas outras.</p>' : '')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
       + 'o formulário passa a mostrar o selo — vermelho quando quem bloqueou '
       + 'foi a companhia, violeta quando foi a corretora —, e quem está '
@@ -6776,7 +6788,14 @@ var TelaTabelaCorretoras = (function () {
           + '<th>Desde</th><th class="direita">Casos</th>'
           + '<th class="acoes-coluna"></th></tr></thead>'
           + '<tbody>' + linhas + '</tbody></table></div>'
-        : '<p class="config-vazio">Nenhuma SUSEP bloqueada.</p>');
+        : '<p class="config-vazio">' + (procurarBloqueada
+          ? 'Nenhuma SUSEP bloqueada com "' + escapar(procurarBloqueada) + '".'
+          : 'Nenhuma SUSEP bloqueada.') + '</p>');
+
+    elemento('procurar-bloqueada').addEventListener('change', function () {
+      procurarBloqueada = this.value;
+      carregar();
+    });
 
     var nova = elemento('nova-bloqueada');
     if (nova) {
@@ -12215,12 +12234,12 @@ var TelaConfiguracoes = (function () {
     return '<div class="config-legado">'
       + '<h4>Planilha de cadastros — a segunda base</h4>'
       + '<p class="config-explica">Corretoras, SUSEPs bloqueadas e as duas '
-      + 'listas de analista podem morar em OUTRA planilha. O PGO lê dela '
-      + 'na hora, sem copiar nada: o que mudar lá vale aqui na leitura '
-      + 'seguinte. Isso deixa esta planilha mais leve e evita manter o mesmo '
-      + 'cadastro em dois lugares. <strong>O PGO só lê</strong> — para editar '
-      + 'um cadastro, edite a planilha de cadastros. Vazio traz tudo de volta '
-      + 'para cá.</p>'
+      + 'listas de analista podem morar em OUTRA planilha — <strong>escolha '
+      + 'quais</strong>; as outras continuam aqui. O PGO lê dela na hora, sem '
+      + 'copiar nada: o que mudar lá vale aqui na leitura seguinte. Isso deixa '
+      + 'esta planilha mais leve. Para cadastrar e editar por aqui, a aba de lá '
+      + 'precisa das colunas Id e _Visivel (o botão de conferir diz); sem elas, a '
+      + 'lista abre só para leitura. Id vazio traz tudo de volta para cá.</p>'
       + (cadastros.ligada
         ? '<p class="config-alerta suave">Ligada. Se essa planilha sair do ar '
           + 'ou perder o compartilhamento, a Tabela de Corretoras e o selo da '
@@ -12231,6 +12250,14 @@ var TelaConfiguracoes = (function () {
         cadastros.planilhaId,
         'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
         + 'precisa ter acesso a ela.')
+      + '<div class="config-campo"><span>Quais listas moram nela</span>'
+      + '<div class="config-marcadores">'
+      + cadastros.abas.map(function (uma) {
+        return '<label class="config-chave"><input type="checkbox" data-aba-de-fora="'
+          + escapar(uma.aba) + '"' + (cadastros.ligada && uma.naSegundaBase ? ' checked' : '')
+          + '><span>' + escapar(uma.titulo) + ' (' + escapar(uma.aba) + ')</span></label>';
+      }).join('')
+      + '</div><em>As desmarcadas continuam nesta planilha.</em></div>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao vazado" id="conferir-cadastros">'
       + 'Conferir a ligação</button>'
@@ -12245,12 +12272,19 @@ var TelaConfiguracoes = (function () {
       + '</div>';
   }
 
+  /** As listas marcadas para morar na segunda base (Etapa 55). */
+  function abasDeFora() {
+    return Array.prototype.filter.call(
+      document.querySelectorAll('[data-aba-de-fora]'), function (caixa) { return caixa.checked; })
+      .map(function (caixa) { return caixa.getAttribute('data-aba-de-fora'); });
+  }
+
   function ligarCadastros() {
     elemento('conferir-cadastros').addEventListener('click', function () {
       var caixa = elemento('laudo-dos-cadastros');
       caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
 
-      Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'))
+      Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'), abasDeFora())
         .entao(function (laudo) {
           caixa.innerHTML = '<p class="config-alerta'
             + (laudo.abre && !laudo.faltando.length ? ' suave' : '') + '">'
@@ -12280,7 +12314,7 @@ var TelaConfiguracoes = (function () {
       // Vai pela porta da senha, como as outras mudanças de estrutura.
       comSenhaDeAdministrador(function () {
         Servidor.chamar('salvarConfiguracaoDosCadastros',
-          { planilhaId: valorDe('cadastrosId') })
+          { planilhaId: valorDe('cadastrosId'), abas: abasDeFora() })
           .entao(function (nova) {
             dados.cadastros = nova;
             avisarSalvo(nova.ligada

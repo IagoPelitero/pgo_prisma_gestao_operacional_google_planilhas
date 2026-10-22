@@ -3542,6 +3542,7 @@ function configuracaoDosCadastros() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '')).trim();
+  var deFora = abasQueVemDeFora_();
 
   return {
     planilhaId: id,
@@ -3551,6 +3552,8 @@ function configuracaoDosCadastros() {
       return {
         aba: nome,
         titulo: esquema ? esquema.titulo : nome,
+        // Etapa 55: esta lista mora na segunda base? (A tela marca a caixa.)
+        naSegundaBase: deFora.indexOf(nome) >= 0,
         // As colunas que o PGO procura naquela aba. A planilha de cadastros
         // pode ter outras no meio — elas são lidas e ignoradas —, mas estas
         // precisam estar lá com estes nomes.
@@ -3583,9 +3586,19 @@ function salvarConfiguracaoDosCadastros(dados) {
   exigirSenhaDeAdministrador_();
 
   var id = String((dados || {}).planilhaId || '').trim();
+  // Quais listas vão para lá (Etapa 55). Sem a escolha — página antiga —, as
+  // quatro, como antes.
+  var abas = Array.isArray((dados || {}).abas)
+    ? dados.abas.map(function (nome) { return String(nome).trim().toUpperCase(); })
+      .filter(function (nome) { return RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nome) >= 0; })
+    : RECC_ABAS_QUE_PODEM_VIR_DE_FORA.slice();
+  if (id && !abas.length) {
+    throw new Error('Marque pelo menos uma lista para morar na planilha de cadastros — '
+      + 'ou apague o Id para desligá-la.');
+  }
 
   if (id) {
-    var laudo = conferirPlanilhaDeCadastros(id);
+    var laudo = conferirPlanilhaDeCadastros(id, abas);
     if (!laudo.abre) throw new Error(laudo.recado);
     if (laudo.faltando.length) {
       throw new Error('A planilha abriu, mas não está pronta:\n\n'
@@ -3596,8 +3609,9 @@ function salvarConfiguracaoDosCadastros(dados) {
   }
 
   gravarConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, id);
+  gravarConfiguracao_(RECC_CHAVE_DAS_ABAS_DE_FORA, id ? abas.join(',') : '');
   registrarAuditoria_('cadastros.configurar', 'CONFIG', '',
-    id ? 'ligada em ' + id : 'desligada');
+    id ? 'ligada em ' + id + ' · ' + abas.join(', ') : 'desligada');
 
   // A estrutura lida em memória aponta para a planilha antiga. Sem esquecer,
   // a próxima leitura desta execução ainda viria do lugar errado.
@@ -3611,8 +3625,15 @@ function salvarConfiguracaoDosCadastros(dados) {
  * É o botão "testar a ligação": responde se abre, quais abas tem e o que falta
  * em cada uma — antes de a operação depender dela.
  */
-function conferirPlanilhaDeCadastros(planilhaId) {
+function conferirPlanilhaDeCadastros(planilhaId, abasEscolhidas) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  // Só as listas que vão morar lá (Etapa 55); sem escolha, as quatro.
+  var abasParaConferir = Array.isArray(abasEscolhidas) && abasEscolhidas.length
+    ? RECC_ABAS_QUE_PODEM_VIR_DE_FORA.filter(function (nome) {
+      return abasEscolhidas.map(function (uma) { return String(uma).trim().toUpperCase(); })
+        .indexOf(nome) >= 0;
+    })
+    : RECC_ABAS_QUE_PODEM_VIR_DE_FORA;
 
   var id = String(planilhaId || '').trim();
   if (!id) {
@@ -3638,7 +3659,7 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   var avisos = [];
   var achadas = [];
 
-  RECC_ABAS_QUE_PODEM_VIR_DE_FORA.forEach(function (nome) {
+  abasParaConferir.forEach(function (nome) {
     var aba = planilha.getSheetByName(nome);
     if (!aba) {
       faltando.push('• Falta a aba "' + nome + '".');

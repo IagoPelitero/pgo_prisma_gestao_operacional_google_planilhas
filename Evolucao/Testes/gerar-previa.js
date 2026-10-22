@@ -238,6 +238,9 @@ function pontePreparada(respostas) {
     + '        responder(respostas.corretoras.origem);\n'
     + '      },\n'
     + '      listarSusepsBloqueadas: function () {\n'
+    + '        responder(respostas.corretoras.bloqueadas.bloqueadas);\n'
+    + '      },\n'
+    + '      resumoDasSusepsBloqueadas: function () {\n'
     + '        responder(respostas.corretoras.bloqueadas);\n'
     + '      },\n'
     + '      exportarCorretoras: function () {\n'
@@ -1096,7 +1099,7 @@ function gerar(pastaDeSaida) {
   const corretoras = {
     tabelas: tabelasDeCorretoras,
     origem: chamar('origemDosCadastros()'),
-    bloqueadas: chamar('listarSusepsBloqueadas()'),
+    bloqueadas: chamar('resumoDasSusepsBloqueadas')(''),
     exportado: chamar('exportarCorretoras')('', ''),
     importacoes: chamar('opcoesDaImportacao()'),
     conferidos: conferenciasDeExemplo(chamar)

@@ -89,6 +89,18 @@ function rodarTestesDaProdutividadeDaRet() {
     igual(retido.rotuloDaSoma, 'prêmio retido');
   });
 
+  teste('o cartão do Não trabalhado traz a soma do prêmio MENSAL (Etapa 54)', () => {
+    const t = retComPremios();
+    t.chamar('inserirRegistro_')('BASE_RET', { 'data de recepção do protocolo': new Date(),
+      analista: 'Ana Martins', status: 'Não trabalhado', 'nome do cliente': 'Sem anual',
+      'valor do prêmio': '', 'prêmio mensal': 87.5 });
+    const cartao = t.painel().cartoes.find((c) => c.chave === 'naotrabalhado');
+    igual(cartao.soma, 87.5, 'o anual vazio não zera a soma');
+    igual(cartao.rotuloDaSoma, 'prêmio mensal');
+    igual(t.painel().cartoes.find((c) => c.rotulo === 'Não retido').rotuloDaSoma, 'prêmio anual',
+      'os outros status seguem com o anual');
+  });
+
   teste('o cartão que não é de status não ganha soma', () => {
     const t = retComPremios();
     const total = t.painel().cartoes.find((c) => c.dimensao === 'total');

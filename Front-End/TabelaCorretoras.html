@@ -24,6 +24,7 @@ var TelaTabelaCorretoras = (function () {
 
   var abaAtual = 'corretoras';
   var procurar = '';
+  var procurarBloqueada = '';   // a busca da aba de SUSEPs bloqueadas (Etapa 55)
   var segmento = '';
   var dados = null;
   var editando = null;      // o item aberto no formulário lateral
@@ -86,16 +87,10 @@ var TelaTabelaCorretoras = (function () {
         })
         .senao(falhou);
     }
-    return Servidor.chamar('tabelaDeCorretoras', '', '')
-      .entao(function (resposta) {
-        var podeMexer = resposta.podeMexer;
-        Servidor.chamar('listarSusepsBloqueadas')
-          .entao(function (lista) {
-            dados = { bloqueadas: lista, podeMexer: podeMexer };
-            desenharBloqueadas();
-          })
-          .senao(falhou);
-      })
+    // Uma chamada só, e com teto (Etapa 55): com 151 mil SUSEPs na segunda
+    // base, a lista inteira não cabe na tela nem no tempo do Apps Script.
+    return Servidor.chamar('resumoDasSusepsBloqueadas', procurarBloqueada)
+      .entao(function (resposta) { dados = resposta; desenharBloqueadas(); })
       .senao(falhou);
   }
 
@@ -378,6 +373,11 @@ var TelaTabelaCorretoras = (function () {
    * vermelho, corretora em violeta. "Sem tipo" são as linhas de antes da
    * coluna existir — decisão do PO: ficam assim até alguém editar.
    */
+  /** 151000 → "151.000". */
+  function numeroComPonto(numero) {
+    return String(Number(numero) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
   function etiquetaDeQuemBloqueou(por) {
     if (por === 'Companhia') return '<span class="situacao tom-ruim">Companhia</span>';
     if (por === 'Corretora') return '<span class="situacao tom-violeta">Corretora</span>';
@@ -405,13 +405,25 @@ var TelaTabelaCorretoras = (function () {
     }).join('');
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
-      + '<span class="config-titulo">' + dados.bloqueadas.length
-      + ' SUSEP(s) bloqueada(s)</span>'
+      + '<input type="search" id="procurar-bloqueada" class="busca-do-cadastro"'
+      + ' value="' + escapar(procurarBloqueada) + '" autocomplete="off"'
+      + ' placeholder="SUSEP, corretora, sucursal ou coordenador"'
+      + ' aria-label="Procurar SUSEP bloqueada">'
       + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
         ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
           + 'Bloquear SUSEP</button>' : '')
       + '</div>'
       + avisoDeOrigem('SUSEP_BLOQUEADAS')
+      + '<p class="config-explica"><strong>' + numeroComPonto(dados.quantasNoTotal)
+      + ' SUSEP(s) bloqueada(s)</strong>'
+      + (procurarBloqueada
+        ? ' · ' + numeroComPonto(dados.quantasAchadas) + ' com "' + escapar(procurarBloqueada) + '"'
+        : ' · a lista começa pelas que aparecem nos casos, depois as mais recentes')
+      + '.</p>'
+      + (dados.truncada
+        ? '<p class="aviso-fila">Mostrando ' + dados.bloqueadas.length + ' de '
+          + numeroComPonto(dados.quantasAchadas) + '. Procure pela SUSEP, pela corretora, '
+          + 'pela sucursal ou pelo coordenador para chegar nas outras.</p>' : '')
       + '<p class="config-explica">Bloquear <strong>não impede cadastrar</strong>: '
       + 'o formulário passa a mostrar o selo — vermelho quando quem bloqueou '
       + 'foi a companhia, violeta quando foi a corretora —, e quem está '
@@ -427,7 +439,14 @@ var TelaTabelaCorretoras = (function () {
           + '<th>Desde</th><th class="direita">Casos</th>'
           + '<th class="acoes-coluna"></th></tr></thead>'
           + '<tbody>' + linhas + '</tbody></table></div>'
-        : '<p class="config-vazio">Nenhuma SUSEP bloqueada.</p>');
+        : '<p class="config-vazio">' + (procurarBloqueada
+          ? 'Nenhuma SUSEP bloqueada com "' + escapar(procurarBloqueada) + '".'
+          : 'Nenhuma SUSEP bloqueada.') + '</p>');
+
+    elemento('procurar-bloqueada').addEventListener('change', function () {
+      procurarBloqueada = this.value;
+      carregar();
+    });
 
     var nova = elemento('nova-bloqueada');
     if (nova) {

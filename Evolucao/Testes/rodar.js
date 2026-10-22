@@ -43,6 +43,7 @@ const { rodarTestesDaProdutividadeDaRet } = require('./testes-produtividade-da-r
 const { rodarTestesDasTentativas } = require('./testes-tentativas');
 const { rodarTestesDoDeParaLembrado } = require('./testes-depara-lembrado');
 const { rodarTestesDasColunasForaDaRet } = require('./testes-colunas-fora-da-ret');
+const { rodarTestesDasSusepsNaSegundaBase } = require('./testes-suseps-na-segunda-base');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -76,6 +77,7 @@ rodarTestesDaProdutividadeDaRet();
 rodarTestesDasTentativas();
 rodarTestesDoDeParaLembrado();
 rodarTestesDasColunasForaDaRet();
+rodarTestesDasSusepsNaSegundaBase();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

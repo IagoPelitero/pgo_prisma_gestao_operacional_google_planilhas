@@ -1920,6 +1920,9 @@ function graficoDosPremios_(casos, colunas) {
  * O valor embaixo de cada cartão de status (Etapa 46, pedido do PO): "embaixo
  * de cada status deve ter o valor anual das propostas, sendo apenas o retido
  * que irá trazer o valor total dos retidos da coluna prêmio retido".
+ *
+ * O "Não trabalhado" soma o prêmio MENSAL (Etapa 54, pedido do PO): "na maioria
+ * das vezes não são preenchidos os anuais, sendo mais os mensais".
  */
 function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
   var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
@@ -1933,9 +1936,10 @@ function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
     var doStatus = casos.filter(function (caso) {
       return normalizarParaComparar_(caso[colunaDoStatus]) === cartao.chave;
     });
-    var ehRetido = cartao.chave === 'retido';
-    cartao.soma = somaDaColuna_(doStatus, ehRetido ? colunas.retido : colunas.anual);
-    cartao.rotuloDaSoma = ehRetido ? 'prêmio retido' : 'prêmio anual';
+    var qual = cartao.chave === 'retido' ? 'retido'
+      : (cartao.chave === 'naotrabalhado' ? 'mensal' : 'anual');
+    cartao.soma = somaDaColuna_(doStatus, colunas[qual]);
+    cartao.rotuloDaSoma = 'prêmio ' + qual;
   });
 }
 

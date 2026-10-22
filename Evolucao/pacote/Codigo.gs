@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-21 19:49
+   Gerado em 2026-10-22 17:33
    ========================================================================== */
 
 
@@ -2215,6 +2215,14 @@ const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
 const RECC_CHAVE_DA_PLANILHA_DE_CADASTROS = 'CADASTROS.PLANILHA_ID';
 
 /*
+ * QUAIS cadastros moram nela (Etapa 55, pedido do PO): "vou usar a segunda base
+ * para as SUSEPs bloqueadas, que somam 151 mil" — e as corretoras ficam aqui.
+ * Abas separadas por vírgula. Vazio, com a planilha ligada, são as quatro: é
+ * como funcionava antes da escolha existir, e quem já usa não muda nada.
+ */
+const RECC_CHAVE_DAS_ABAS_DE_FORA = 'CADASTROS.ABAS';
+
+/*
  * A planilha de cadastros aberta, guardada pela execução inteira.
  *
  * `SpreadsheetApp.openById` é uma IDA ao serviço, das caras. Sem isto, uma
@@ -2231,10 +2239,20 @@ function idDaPlanilhaDeCadastros_() {
   return String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '') || '').trim();
 }
 
+/** As abas que vêm da planilha de cadastros — nenhuma, quando ela está desligada. */
+function abasQueVemDeFora_() {
+  if (!idDaPlanilhaDeCadastros_()) return [];
+  var escolhidas = String(valorDaConfiguracao_(RECC_CHAVE_DAS_ABAS_DE_FORA, '') || '')
+    .split(',')
+    .map(function (nome) { return String(nome).trim().toUpperCase(); })
+    .filter(function (nome) { return RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nome) >= 0; });
+  return escolhidas.length ? escolhidas : RECC_ABAS_QUE_PODEM_VIR_DE_FORA.slice();
+}
+
 /** Esta aba vem de fora? */
 function abaVemDeOutraPlanilha_(nomeDaAba) {
   if (RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nomeDaAba) < 0) return false;
-  return !!idDaPlanilhaDeCadastros_();
+  return abasQueVemDeFora_().indexOf(nomeDaAba) >= 0;
 }
 
 /**
@@ -3609,11 +3627,57 @@ function comoCriarAColuna_(nomeDaAba, cabecalho) {
       + '". Peça ao administrador para rodar atualizarPGO().';
 }
 
-function listarSusepsBloqueadas() {
-  exigirTela_('tabelaCorretoras');
-  var volumes = volumePorSusep_();
+/*
+ * A LISTA DE SUSEPs BLOQUEADAS com 151 mil linhas (Etapa 55, pedido do PO: elas
+ * vão para a segunda base, "pela corretora e pela Porto"). Antes a lista ia
+ * INTEIRA para a tela — com 151 mil linhas, uns 20 MB e o erro dos 40 segundos.
+ * Agora o servidor lê só as colunas de procura, escolhe até 100 linhas e lê só
+ * essas: primeiro as que aparecem nos casos (é o que a tela existe para
+ * mostrar), depois as mais recentes. A busca procura nas 151 mil.
+ */
+const RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA = 100;
 
-  return lerRegistros_('SUSEP_BLOQUEADAS')
+/** Até 100 SUSEPs bloqueadas — as dos casos primeiro —, ou as que a busca achar. */
+function listarSusepsBloqueadas(procurar) {
+  return resumoDasSusepsBloqueadas(procurar).bloqueadas;
+}
+
+/** A lista e as contagens, para a tela: quantas há, quantas a busca achou, se cortou. */
+function resumoDasSusepsBloqueadas(procurar) {
+  var quem = exigirTela_('tabelaCorretoras');
+  var volumes = volumePorSusep_();
+  var termo = normalizarParaComparar_(procurar);
+  var estrutura = estruturaDaAba_('SUSEP_BLOQUEADAS');
+  var coluna = function (cabecalho) {
+    return posicaoDaColuna_(estrutura, cabecalho) >= 0
+      ? lerColunaInteira_('SUSEP_BLOQUEADAS', cabecalho) : [];
+  };
+
+  var suseps = coluna('SUSEP');
+  var visiveis = coluna('_Visivel');
+  // As outras colunas de procura só são lidas quando há o que procurar.
+  var deProcura = termo ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
+
+  var quantasNoTotal = 0;
+  var candidatas = [];
+  for (var i = 0; i < suseps.length; i++) {
+    if (visiveis.length && normalizarParaComparar_(visiveis[i]) === 'nao') continue;
+    var chave = chaveDaSusep_(suseps[i]);
+    if (!chave) continue;
+    quantasNoTotal++;
+    if (termo && chave.indexOf(termo) < 0 && !deProcura.some(function (valores) {
+      return normalizarParaComparar_(valores[i]).indexOf(termo) >= 0;
+    })) continue;
+    candidatas.push({ linha: i + 2, casos: volumes.porSusep[chave] || 0 });
+  }
+  // As que mais trazem caso primeiro; empatadas, as mais recentes (mais embaixo).
+  candidatas.sort(function (uma, outra) {
+    return outra.casos - uma.casos || outra.linha - uma.linha;
+  });
+  var escolhidas = candidatas.slice(0, RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA);
+
+  var bloqueadas = lerLinhasEspecificas_('SUSEP_BLOQUEADAS',
+    escolhidas.map(function (uma) { return uma.linha; }))
     .map(function (linha) {
       var susep = susepComoSeEscreve_(linha.SUSEP);
       return {
@@ -3629,8 +3693,16 @@ function listarSusepsBloqueadas() {
           : '',
         casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
       };
-    })
-    .sort(function (uma, outra) { return outra.casos - uma.casos; });
+    });
+
+  return {
+    bloqueadas: bloqueadas,
+    quantasNoTotal: quantasNoTotal,
+    quantasAchadas: candidatas.length,
+    truncada: candidatas.length > bloqueadas.length,
+    procurar: String(procurar || ''),
+    podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR)
+  };
 }
 
 /**
@@ -3658,7 +3730,10 @@ function bloquearSusep(dados) {
    * isso agora é o COORDENADOR COMERCIAL: tem nome, e dá para perguntar.
    */
   var id = converterParaIdentificador_(dados.id);
-  var jaBloqueada = lerRegistros_('SUSEP_BLOQUEADAS').filter(function (linha) {
+  // Só a coluna da SUSEP, e as linhas em que ela bateu (Etapa 55): ler as 151
+  // mil linhas inteiras para conferir uma SUSEP estourava o tempo.
+  var jaBloqueada = buscarRegistros_('SUSEP_BLOQUEADAS', 'SUSEP', susep).filter(function (linha) {
+    if (normalizarParaComparar_(linha._Visivel) === 'nao') return false;
     return chaveDaSusep_(linha.SUSEP) === chaveDaSusep_(susep)
       && converterParaIdentificador_(linha.Id) !== id;
   })[0];
@@ -11640,6 +11715,7 @@ function configuracaoDosCadastros() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '')).trim();
+  var deFora = abasQueVemDeFora_();
 
   return {
     planilhaId: id,
@@ -11649,6 +11725,8 @@ function configuracaoDosCadastros() {
       return {
         aba: nome,
         titulo: esquema ? esquema.titulo : nome,
+        // Etapa 55: esta lista mora na segunda base? (A tela marca a caixa.)
+        naSegundaBase: deFora.indexOf(nome) >= 0,
         // As colunas que o PGO procura naquela aba. A planilha de cadastros
         // pode ter outras no meio — elas são lidas e ignoradas —, mas estas
         // precisam estar lá com estes nomes.
@@ -11681,9 +11759,19 @@ function salvarConfiguracaoDosCadastros(dados) {
   exigirSenhaDeAdministrador_();
 
   var id = String((dados || {}).planilhaId || '').trim();
+  // Quais listas vão para lá (Etapa 55). Sem a escolha — página antiga —, as
+  // quatro, como antes.
+  var abas = Array.isArray((dados || {}).abas)
+    ? dados.abas.map(function (nome) { return String(nome).trim().toUpperCase(); })
+      .filter(function (nome) { return RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nome) >= 0; })
+    : RECC_ABAS_QUE_PODEM_VIR_DE_FORA.slice();
+  if (id && !abas.length) {
+    throw new Error('Marque pelo menos uma lista para morar na planilha de cadastros — '
+      + 'ou apague o Id para desligá-la.');
+  }
 
   if (id) {
-    var laudo = conferirPlanilhaDeCadastros(id);
+    var laudo = conferirPlanilhaDeCadastros(id, abas);
     if (!laudo.abre) throw new Error(laudo.recado);
     if (laudo.faltando.length) {
       throw new Error('A planilha abriu, mas não está pronta:\n\n'
@@ -11694,8 +11782,9 @@ function salvarConfiguracaoDosCadastros(dados) {
   }
 
   gravarConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, id);
+  gravarConfiguracao_(RECC_CHAVE_DAS_ABAS_DE_FORA, id ? abas.join(',') : '');
   registrarAuditoria_('cadastros.configurar', 'CONFIG', '',
-    id ? 'ligada em ' + id : 'desligada');
+    id ? 'ligada em ' + id + ' · ' + abas.join(', ') : 'desligada');
 
   // A estrutura lida em memória aponta para a planilha antiga. Sem esquecer,
   // a próxima leitura desta execução ainda viria do lugar errado.
@@ -11709,8 +11798,15 @@ function salvarConfiguracaoDosCadastros(dados) {
  * É o botão "testar a ligação": responde se abre, quais abas tem e o que falta
  * em cada uma — antes de a operação depender dela.
  */
-function conferirPlanilhaDeCadastros(planilhaId) {
+function conferirPlanilhaDeCadastros(planilhaId, abasEscolhidas) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  // Só as listas que vão morar lá (Etapa 55); sem escolha, as quatro.
+  var abasParaConferir = Array.isArray(abasEscolhidas) && abasEscolhidas.length
+    ? RECC_ABAS_QUE_PODEM_VIR_DE_FORA.filter(function (nome) {
+      return abasEscolhidas.map(function (uma) { return String(uma).trim().toUpperCase(); })
+        .indexOf(nome) >= 0;
+    })
+    : RECC_ABAS_QUE_PODEM_VIR_DE_FORA;
 
   var id = String(planilhaId || '').trim();
   if (!id) {
@@ -11736,7 +11832,7 @@ function conferirPlanilhaDeCadastros(planilhaId) {
   var avisos = [];
   var achadas = [];
 
-  RECC_ABAS_QUE_PODEM_VIR_DE_FORA.forEach(function (nome) {
+  abasParaConferir.forEach(function (nome) {
     var aba = planilha.getSheetByName(nome);
     if (!aba) {
       faltando.push('• Falta a aba "' + nome + '".');
@@ -15189,6 +15285,9 @@ function graficoDosPremios_(casos, colunas) {
  * O valor embaixo de cada cartão de status (Etapa 46, pedido do PO): "embaixo
  * de cada status deve ter o valor anual das propostas, sendo apenas o retido
  * que irá trazer o valor total dos retidos da coluna prêmio retido".
+ *
+ * O "Não trabalhado" soma o prêmio MENSAL (Etapa 54, pedido do PO): "na maioria
+ * das vezes não são preenchidos os anuais, sendo mais os mensais".
  */
 function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
   var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
@@ -15202,9 +15301,10 @@ function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
     var doStatus = casos.filter(function (caso) {
       return normalizarParaComparar_(caso[colunaDoStatus]) === cartao.chave;
     });
-    var ehRetido = cartao.chave === 'retido';
-    cartao.soma = somaDaColuna_(doStatus, ehRetido ? colunas.retido : colunas.anual);
-    cartao.rotuloDaSoma = ehRetido ? 'prêmio retido' : 'prêmio anual';
+    var qual = cartao.chave === 'retido' ? 'retido'
+      : (cartao.chave === 'naotrabalhado' ? 'mensal' : 'anual');
+    cartao.soma = somaDaColuna_(doStatus, colunas[qual]);
+    cartao.rotuloDaSoma = 'prêmio ' + qual;
   });
 }
 

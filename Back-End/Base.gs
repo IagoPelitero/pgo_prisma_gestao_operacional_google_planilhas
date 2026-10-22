@@ -2197,6 +2197,14 @@ const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
 const RECC_CHAVE_DA_PLANILHA_DE_CADASTROS = 'CADASTROS.PLANILHA_ID';
 
 /*
+ * QUAIS cadastros moram nela (Etapa 55, pedido do PO): "vou usar a segunda base
+ * para as SUSEPs bloqueadas, que somam 151 mil" — e as corretoras ficam aqui.
+ * Abas separadas por vírgula. Vazio, com a planilha ligada, são as quatro: é
+ * como funcionava antes da escolha existir, e quem já usa não muda nada.
+ */
+const RECC_CHAVE_DAS_ABAS_DE_FORA = 'CADASTROS.ABAS';
+
+/*
  * A planilha de cadastros aberta, guardada pela execução inteira.
  *
  * `SpreadsheetApp.openById` é uma IDA ao serviço, das caras. Sem isto, uma
@@ -2213,10 +2221,20 @@ function idDaPlanilhaDeCadastros_() {
   return String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '') || '').trim();
 }
 
+/** As abas que vêm da planilha de cadastros — nenhuma, quando ela está desligada. */
+function abasQueVemDeFora_() {
+  if (!idDaPlanilhaDeCadastros_()) return [];
+  var escolhidas = String(valorDaConfiguracao_(RECC_CHAVE_DAS_ABAS_DE_FORA, '') || '')
+    .split(',')
+    .map(function (nome) { return String(nome).trim().toUpperCase(); })
+    .filter(function (nome) { return RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nome) >= 0; });
+  return escolhidas.length ? escolhidas : RECC_ABAS_QUE_PODEM_VIR_DE_FORA.slice();
+}
+
 /** Esta aba vem de fora? */
 function abaVemDeOutraPlanilha_(nomeDaAba) {
   if (RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nomeDaAba) < 0) return false;
-  return !!idDaPlanilhaDeCadastros_();
+  return abasQueVemDeFora_().indexOf(nomeDaAba) >= 0;
 }
 
 /**
