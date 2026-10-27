@@ -44,6 +44,8 @@ const { rodarTestesDasTentativas } = require('./testes-tentativas');
 const { rodarTestesDoDeParaLembrado } = require('./testes-depara-lembrado');
 const { rodarTestesDasColunasForaDaRet } = require('./testes-colunas-fora-da-ret');
 const { rodarTestesDasSusepsNaSegundaBase } = require('./testes-suseps-na-segunda-base');
+const { rodarTestesDoLimparFiltros } = require('./testes-limpar-filtros');
+const { rodarTestesDosPopupsDaImportacao } = require('./testes-popups-da-importacao');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -78,6 +80,8 @@ rodarTestesDasTentativas();
 rodarTestesDoDeParaLembrado();
 rodarTestesDasColunasForaDaRet();
 rodarTestesDasSusepsNaSegundaBase();
+rodarTestesDoLimparFiltros();
+rodarTestesDosPopupsDaImportacao();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

@@ -557,7 +557,8 @@ var TelaProdutividade = (function () {
     // Trabalho usa as mesmas. Duas cópias divergiriam no primeiro ajuste, e aí
     // "setembro" significaria uma coisa numa tela e outra na vizinha.
     return Moldura.caixaDeFiltros(
-      SeletorDePeriodo.desenhar(painel) + caixas.join(''),
+      SeletorDePeriodo.desenhar(painel) + caixas.join('')
+        + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade'),
       painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
   }
 
@@ -644,6 +645,20 @@ var TelaProdutividade = (function () {
       ramoDosAtendidos = escolhido;
       desenhar();
     });
+
+    // O estado inicial (Etapa 56): o período da abertura — do dia 1 do mês
+    // até hoje —, sem filtro de lista e, nos Atendidos da Mesa, Todos e Total.
+    // A aba (Equipe ou Atendidos) fica onde a pessoa está: é lugar, não filtro.
+    var limpar = elemento('limpar-filtros-da-produtividade');
+    if (limpar) {
+      limpar.addEventListener('click', function () {
+        filtros = {};
+        periodo = SeletorDePeriodo.padrao();
+        origemDosAtendidos = 'todos';
+        ramoDosAtendidos = 'total';
+        carregar();
+      });
+    }
 
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {

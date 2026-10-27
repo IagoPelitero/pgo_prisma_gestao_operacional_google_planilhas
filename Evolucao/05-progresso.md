@@ -3228,12 +3228,65 @@ repositório e no pacote.
 
 ---
 
+## Etapa 56 — O período abre no dia 1 do mês, e todo filtro tem "Limpar"
+
+Dois pedidos do PO: **"notei que os filtros não possuem a limpeza para deixá-los em seu
+estado inicial. Crie para todos"** — onde: **"todas as abas que possuírem filtros"** — e
+**"no filtro de/para, o de deve sempre iniciar no dia 01 de cada mês e o para deve sempre
+ser o dia que estamos"**.
+
+| Parte | O que ficou |
+|---|---|
+| **A abertura** | "Por data" abre **do dia 1 do mês corrente até hoje** (no dia 1, só hoje). Era os últimos 30 dias (`OPERACAO.JANELA_DIAS`). Vale para o Trabalho e a Produtividade RECC. Os casos sem data de recepção continuam aparecendo na abertura, como antes |
+| **De "Por mês" para "Por data"** | Volta para o dia 1 até hoje. Até a Etapa 55 trazia as datas do mês que estava escolhido — o "sempre" do pedido |
+| **A comparação dos cartões** | Como era: uma janela do mesmo tamanho, logo antes do dia 1 (de 01/10 a 27/10 compara com 04/09 a 30/09) |
+| **"Limpar filtros"** | Uma peça só (`Moldura.botaoLimparFiltros`), **sempre visível** — no Trabalho ele só aparecia com filtro escolhido, e por isso parecia não existir |
+| **Trabalho** | Limpa a busca, o cartão clicado, os filtros de lista e **volta o período** para o dia 1 até hoje. O "Mostrar" fica (não é filtro) |
+| **Produtividade RECC** | Volta o período e os filtros de lista; nos Atendidos da Mesa, volta Origem para Todos e Ramo para Total. A aba (Equipe ou Atendidos) fica onde está |
+| **Tabela Corretoras** | Corretoras: a busca e o segmento. SUSEPs bloqueadas: a busca |
+| **Buscar Caso** | O termo, todos os canais marcados, a base legada desmarcada, e o resultado sai da tela |
+
+14 testes novos em `testes-limpar-filtros.js` e 1 no ponta a ponta (abre no dia 1, troca
+para "Por mês" e um filtro, o Limpar volta tudo; no Trabalho, a busca). 2 testes antigos
+ajustados à regra nova (a abertura dos 30 dias e o "Por mês → Por data" com as datas do
+mês). A prévia passou a montar os números com o período da abertura.
+
+---
+
+## Etapa 57 — As sinalizações da Importação em pop-up
+
+Pedido do PO: **"falta pop-ups na aba de importação para sinalizações"**. Escolha dele: os
+avisos da conferência, a confirmação do Importar e as mensagens de erro.
+
+| Parte | O que ficou |
+|---|---|
+| **A peça** | `Formulario.avisar`, no `Comuns.html`: o pop-up do sistema, com a faixa da cor do tom (amarelo para aviso, vermelho para erro, azul para pergunta). Esc e clicar fora fecham; na pergunta, só o botão principal confirma |
+| **Conferir** | Se o laudo tem algum aviso, abre um pop-up listando todos: nada vai entrar, passou do limite, repetidas **já no PGO** e **na própria planilha**, linhas em branco, coluna de controle de produtividade escolhida, coluna obrigatória faltando (chat), nomes fora do cadastro (até 10), linhas sem data ou analista, TMO que não é número. Os avisos amarelos continuam no laudo, com o detalhe. Laudo limpo, nenhum pop-up |
+| **Importar** | A confirmação ("Importar 120 caso(s) em RET?") é o pop-up do sistema, e não mais a caixinha cinza do navegador |
+| **Erros** | "Não deu para conferir" e "Não deu para importar" também |
+
+10 testes novos em `testes-popups-da-importacao.js`; o ponta a ponta da importação do chat
+passou a fechar o pop-up dos avisos (que lista o nome fora do cadastro) e a confirmar pelo
+pop-up do sistema.
+
+**Números das Etapas 56 e 57.** **1403 testes**, cinco execuções seguidas sem
+falha. Quebras de propósito: 6, todas pegas — só as regras que dariam número ou passo errado em silêncio: o dia 1, o tamanho do período, o caso sem data na abertura, as repetidas no pop-up, o pop-up depois de conferir e a confirmação que grava. Navegador: ponta a ponta 23/23 no
+repositório e no pacote; o "Limpar filtros" nas cinco telas e o pop-up, a 1440 e a 390 px,
+sem rolagem lateral; o roteiro que clica em tudo e a base suja sem erro.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
+2. **Implantar › Gerenciar implantações › editar › Versão: Nova versão**.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
 |---|---|
 | **Escopo `EQUIPE`** | Implementado como "mesmo canal que atende", única noção de equipe que a estrutura tem. Se a operação usa hierarquia de supervisão, vira uma coluna nova em `USUARIOS` e só `filtrarPeloAlcance_` muda |
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
-| **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha. São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
+| **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha (a janela deixou de ser a abertura na Etapa 56 — hoje só vale para pedido sem período). São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
 | **Apagar canal** | Criar um canal novo já passa por Configurações › Canais de trabalho (cria a aba; pede senha). Apagar não existe de propósito: o canal se desliga, e a aba com os casos fica |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

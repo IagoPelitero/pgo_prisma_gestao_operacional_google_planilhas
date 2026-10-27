@@ -797,14 +797,93 @@ var TelaImportacao = (function () {
         laudo = resposta;
         deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
         desenhar();
+        avisarDaConferencia();
       })
       .senao(function (erro) {
         if (botao) {
           botao.disabled = false;
           botao.textContent = 'Conferir antes de importar';
         }
-        window.alert(erro.message || String(erro));
+        avisarDoErro('Não deu para conferir', erro);
       });
+  }
+
+  /**
+   * As SINALIZAÇÕES da conferência num pop-up (Etapa 57, pedido do PO: "falta
+   * pop-ups na aba de importação para sinalizações"). Os avisos amarelos
+   * continuam no laudo, com o detalhe; o pop-up junta todos de uma vez para
+   * nenhum passar batido no meio da tela. Sem aviso, não abre nada.
+   */
+  function avisosDaConferencia() {
+    var avisos = [];
+    var motivos = laudo.motivosParaPular || {};
+    var deQue = motivos.pelaProposta ? 'proposta(s)' : oQue(false) + '(s)';
+
+    if (!laudo.vaoEntrar) {
+      avisos.push('<strong>Nenhum ' + oQue(false) + ' vai entrar.</strong> Confira o de-para e '
+        + 'a origem antes de importar.');
+    }
+    if (laudo.passaDoLimite) {
+      avisos.push('São <strong>' + laudo.linhasNaFonte + ' linhas</strong>, e o limite é '
+        + laudo.limite + '. Divida em levas.');
+    }
+    if (motivos.jaNoPgo) {
+      avisos.push('<strong>' + motivos.jaNoPgo + ' ' + deQue + '</strong> vão ficar de fora porque '
+        + 'já estão no PGO' + (motivos.mes ? ' em ' + escapar(motivos.mes) : '') + '.');
+    }
+    if (motivos.repetidaNoArquivo) {
+      avisos.push('<strong>' + motivos.repetidaNoArquivo + ' ' + deQue + '</strong> vão ficar de fora '
+        + 'porque se repetem na própria planilha (entra só a primeira).');
+    }
+    if (motivos.vazia) {
+      avisos.push('<strong>' + motivos.vazia + ' linha(s) em branco</strong> vão ser puladas.');
+    }
+    if (algumCarimboEscolhido(laudo.dePara || [])) {
+      avisos.push('Você apontou uma coluna de <strong>controle de produtividade</strong>. Confira '
+        + 'nas linhas traduzidas se a data chegou certa.');
+    }
+    if (laudo.faltando && laudo.faltando.length) {
+      avisos.push('Falta ligar no de-para a coluna de: <strong>'
+        + escapar(laudo.faltando.join(' e ')) + '</strong>.');
+    }
+    if (laudo.analistasDesconhecidos && laudo.analistasDesconhecidos.length) {
+      avisos.push('<strong>' + laudo.analistasDesconhecidos.length + ' nome(s)</strong> não estão no '
+        + 'cadastro de usuários: ' + escapar(laudo.analistasDesconhecidos.slice(0, 10).join(', '))
+        + (laudo.analistasDesconhecidos.length > 10
+          ? ' e mais ' + (laudo.analistasDesconhecidos.length - 10) : '') + '.');
+    }
+    if (laudo.semDataOuAnalista) {
+      avisos.push('<strong>' + laudo.semDataOuAnalista + ' linha(s)</strong> sem data ou sem '
+        + 'analista ficam de fora.');
+    }
+    if (laudo.tmoQueNaoENumero) {
+      avisos.push('<strong>' + laudo.tmoQueNaoENumero + ' linha(s)</strong> com um TMO que não é '
+        + 'número entram com o TMO em branco.');
+    }
+    return avisos;
+  }
+
+  function avisarDaConferencia() {
+    var avisos = avisosDaConferencia();
+    if (!avisos.length) return;
+    Formulario.avisar({
+      tom: 'atencao',
+      titulo: avisos.length === 1 ? '1 ponto de atenção na conferência'
+        : avisos.length + ' pontos de atenção na conferência',
+      html: '<ul>' + avisos.map(function (aviso) { return '<li>' + aviso + '</li>'; }).join('')
+        + '</ul><p>O detalhe de cada um está no laudo, abaixo.</p>',
+      botao: 'Entendi'
+    });
+  }
+
+  /** O erro do servidor no pop-up do sistema, e não na caixinha do navegador. */
+  function avisarDoErro(titulo, erro) {
+    Formulario.avisar({
+      tom: 'ruim',
+      titulo: titulo,
+      html: '<p>' + escapar(erro && erro.message ? erro.message : String(erro)) + '</p>',
+      botao: 'Entendi'
+    });
   }
 
   function importar() {
@@ -815,10 +894,18 @@ var TelaImportacao = (function () {
     });
 
     // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
-    // fácil: importar errado se desfaz apagando linha por linha.
-    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em '
-      + laudo.canal.nome + '? Desfazer isso é apagar as linhas uma a uma.')) return;
+    // fácil: importar errado se desfaz apagando linha por linha. É o pop-up
+    // do sistema (Etapa 57), e não mais a caixinha do navegador.
+    Formulario.avisar({
+      tom: 'destaque',
+      titulo: 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em ' + laudo.canal.nome + '?',
+      html: '<p>Desfazer isso é apagar as linhas uma a uma.</p>',
+      botao: 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)',
+      aoConfirmar: function () { gravar(escolhidos); }
+    });
+  }
 
+  function gravar(escolhidos) {
     var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
@@ -848,7 +935,7 @@ var TelaImportacao = (function () {
           botao.disabled = false;
           botao.textContent = 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)';
         }
-        window.alert(erro.message || String(erro));
+        avisarDoErro('Não deu para importar', erro);
       });
   }
 

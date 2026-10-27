@@ -1815,6 +1815,22 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   display: flex; flex-direction: column; max-height: min(86vh, 720px);
 }
 .dialogo-caixa.aviso-de-prazo h3 { color: var(--atencao); }
+/*
+  O POP-UP DO SISTEMA (Etapa 57): avisos, perguntas e erros que eram a caixinha
+  do navegador. A faixa de cima tem a cor do tom (amarelo para aviso, vermelho
+  para erro, azul para pergunta); a lista rola dentro da caixa quando os avisos
+  não cabem, e os botões ficam sempre à vista.
+*/
+.dialogo-caixa.aviso-do-sistema {
+  max-width: 520px; border-top: 4px solid var(--tom);
+  display: flex; flex-direction: column; max-height: min(86vh, 720px);
+}
+.dialogo-caixa.aviso-do-sistema h3 { color: var(--tom); }
+.texto-do-aviso { overflow-y: auto; flex: 1 1 auto; margin-bottom: 14px; font-size: 13px; line-height: 1.5; }
+.texto-do-aviso ul { margin: 0; padding-left: 18px; }
+.texto-do-aviso li { margin: 0 0 8px; overflow-wrap: anywhere; }
+.texto-do-aviso li strong, .texto-do-aviso p strong { color: var(--texto); }
+.texto-do-aviso p { white-space: pre-line; }
 .lista-de-prazo {
   list-style: none; margin: 0 0 14px; padding: 0; overflow-y: auto; flex: 1 1 auto;
   border-top: 1px solid var(--linha);
@@ -2822,8 +2838,21 @@ var Moldura = (function () {
       + '</section>';
   }
 
+  /**
+   * O "Limpar filtros", o mesmo em toda tela que filtra (Etapa 56, pedido do
+   * PO: "os filtros não possuem a limpeza para deixá-los em seu estado
+   * inicial. Crie para todos"). Fica SEMPRE visível: escondido até haver
+   * filtro, como era no Trabalho, a pessoa não sabia que ele existia. O que
+   * "estado inicial" quer dizer é de cada tela — ela liga o clique.
+   */
+  function botaoLimparFiltros(id) {
+    return '<button type="button" class="limpar-filtros" id="' + escapar(id) + '">'
+      + 'Limpar filtros</button>';
+  }
+
   return {
     avisoDeJanela: avisoDeJanela,
+    botaoLimparFiltros: botaoLimparFiltros,
     caixaDeFiltros: caixaDeFiltros,
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
@@ -3379,6 +3408,59 @@ var Formulario = (function () {
       if (aoConfirmar) aoConfirmar();
     });
     document.getElementById('cancelar-exclusao').focus();
+  }
+
+  /**
+   * O POP-UP DO SISTEMA para avisar e perguntar (Etapa 57, pedido do PO:
+   * "falta pop-ups na aba de importação para sinalizações"). Toma o lugar da
+   * caixinha cinza do navegador (o alert e o confirm), que não segue o tema e
+   * se parece com o aviso de qualquer site.
+   *
+   *   tom          'atencao' (faixa amarela), 'ruim' (vermelha, o erro) ou
+   *                'destaque' (azul, a pergunta)
+   *   titulo       texto puro — é escapado aqui
+   *   html         o corpo, JÁ escapado por quem chama
+   *   botao        o rótulo do botão principal ("Entendi", "Importar 120 casos")
+   *   aoConfirmar  se vier, é PERGUNTA: aparece o Cancelar, e só o botão
+   *                principal a chama. Esc, clicar fora e Cancelar só fecham.
+   */
+  function avisar(opcoes) {
+    if (document.getElementById('dialogo-aviso')) return;
+    var pergunta = typeof opcoes.aoConfirmar === 'function';
+
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-aviso';
+    caixa.innerHTML = '<div class="dialogo-caixa aviso-do-sistema tom-' + (opcoes.tom || 'atencao') + '"'
+      + ' role="' + (pergunta ? 'dialog' : 'alertdialog') + '" aria-modal="true"'
+      + ' aria-labelledby="titulo-aviso" aria-describedby="texto-aviso">'
+      + '<h3 id="titulo-aviso">' + Moldura.escapar(opcoes.titulo) + '</h3>'
+      + '<div id="texto-aviso" class="texto-do-aviso">' + (opcoes.html || '') + '</div>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="confirmar-aviso">'
+      + Moldura.escapar(opcoes.botao || 'Entendi') + '</button>'
+      + (pergunta ? '<button type="button" class="botao vazado" id="cancelar-aviso">'
+        + 'Cancelar</button>' : '')
+      + '</div></div>';
+    document.body.appendChild(caixa);
+
+    function sair() {
+      if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+      document.removeEventListener('keydown', aoTeclar);
+    }
+    function aoTeclar(evento) {
+      if (evento.key === 'Escape') { evento.preventDefault(); sair(); }
+    }
+    document.addEventListener('keydown', aoTeclar);
+    caixa.addEventListener('mousedown', function (evento) {
+      if (evento.target === caixa) sair();
+    });
+    if (pergunta) document.getElementById('cancelar-aviso').addEventListener('click', sair);
+    document.getElementById('confirmar-aviso').addEventListener('click', function () {
+      sair();
+      if (pergunta) opcoes.aoConfirmar();
+    });
+    document.getElementById('confirmar-aviso').focus();
   }
 
   /**
@@ -4068,6 +4150,7 @@ var Formulario = (function () {
     aplicarPadroes: aplicarPadroes,
     confirmarExclusao: confirmarExclusao,
     confirmarAtencao: confirmarAtencao,
+    avisar: avisar,
     valores: valores,
     preencher: preencher,
     limparErros: limparErros,
@@ -5040,10 +5123,10 @@ var SeletorDePeriodo = (function () {
   function escapar(texto) { return Moldura.escapar(texto); }
 
   /**
-   * O período de abertura: "Por data", sem as datas — o servidor devolve a
-   * janela da configuração já como de/até. Etapa 43, pedido do PO: "nos filtros
-   * tire os de dias e deixe apenas por data e por mês. Por padrão vem o por
-   * data".
+   * O período de abertura: "Por data", sem as datas — o servidor devolve do
+   * dia 1 do mês até hoje, já como de/até (Etapa 56). Etapa 43, pedido do PO:
+   * "nos filtros tire os de dias e deixe apenas por data e por mês. Por padrão
+   * vem o por data".
    */
   function padrao() {
     return { tipo: 'intervalo', dias: 0, de: '', ate: '', mes: '' };
@@ -5121,20 +5204,16 @@ var SeletorDePeriodo = (function () {
     var qual = caixa.getAttribute('data-periodo');
     if (!qual) return null;
 
-    var periodo = resposta.periodo || {};
-
     if (qual === 'como') {
       var novo = { tipo: caixa.value, dias: 0, de: '', ate: '', mes: '' };
       if (novo.tipo === 'mes') {
         var meses = resposta.mesesDisponiveis || [];
         if (meses.length) novo.mes = meses[0].valor;   // o mês corrente
       }
-      if (novo.tipo === 'intervalo') {
-        // Abre já preenchido com o período que estava valendo, para a pessoa
-        // ajustar uma ponta em vez de digitar as duas do zero.
-        novo.de = periodo.de;
-        novo.ate = periodo.ate;
-      }
+      // "Por data" volta sem as datas, e o servidor devolve a abertura: do dia
+      // 1 do mês até hoje. Etapa 56, pedido do PO: "o de deve SEMPRE iniciar
+      // no dia 01 de cada mês e o para deve sempre ser o dia que estamos".
+      // (Até a Etapa 55 trazia as datas do mês que estava escolhido.)
       return novo;
     }
 
@@ -5304,10 +5383,6 @@ var TelaTrabalho = (function () {
         + opcoes.join('') + '</select>';
     });
 
-    var algumAtivo = Object.keys(filtrosEscolhidos).some(function (chave) {
-      return filtrosEscolhidos[chave];
-    });
-
     // A BUSCA DIGITADA vem primeiro — pedido do PO: "o filtro por busca
     // digitada para cada canal". É um filtro como os outros: vai no mesmo
     // pacote de filtros, e trocar de canal limpa junto. Busca ao apertar Enter
@@ -5329,10 +5404,7 @@ var TelaTrabalho = (function () {
       busca
         + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
-        + (algumAtivo
-          ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
-            + 'Limpar filtros</button>'
-          : ''),
+        + Moldura.botaoLimparFiltros('limpar-filtros'),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
@@ -5751,10 +5823,14 @@ var TelaTrabalho = (function () {
       campoDaBusca.addEventListener('search', function () { buscar(this); });
     }
 
+    // O estado inicial (Etapa 56): sem busca, sem cartão, sem filtro de lista
+    // e o período da abertura — do dia 1 do mês até hoje. O "Mostrar" fica:
+    // não é filtro.
     var limpar = elemento('limpar-filtros');
     if (limpar) {
       limpar.addEventListener('click', function () {
         filtrosEscolhidos = {};
+        periodo = SeletorDePeriodo.padrao();
         carregar();
       });
     }
@@ -6076,6 +6152,7 @@ var TelaBuscarCaso = (function () {
       + ' aria-label="O que procurar">'
       + '<button type="submit" class="botao" id="botao-buscar">'
       + Moldura.icone('buscarCaso') + ' Buscar</button>'
+      + Moldura.botaoLimparFiltros('limpar-filtros-da-busca')
       + '</div>'
       + '<div id="onde-procurar" class="busca-onde"></div>'
       + '</form></div>'
@@ -6317,6 +6394,19 @@ var TelaBuscarCaso = (function () {
       procurar();
     });
 
+    // O estado inicial (Etapa 56): sem termo, todos os canais marcados, a base
+    // legada desmarcada e nenhum resultado na tela.
+    elemento('limpar-filtros-da-busca').addEventListener('click', function () {
+      if (procurando || !opcoes) return;
+      elemento('termo-da-busca').value = '';
+      ultimoTermo = '';
+      opcoes.canais.forEach(function (canal) { canaisEscolhidas[canal.id] = true; });
+      incluirLegado = false;
+      desenharOnde();
+      elemento('resultado-da-busca').innerHTML = '';
+      elemento('termo-da-busca').focus();
+    });
+
     Servidor.chamar('opcoesDaBusca')
       .entao(function (resposta) {
         opcoes = resposta;
@@ -6464,6 +6554,7 @@ var TelaTabelaCorretoras = (function () {
       + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
       + ' aria-label="Procurar corretora">'
       + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
+      + Moldura.botaoLimparFiltros('limpar-filtros-corretoras')
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
           + 'Cadastrar corretora</button>' : '')
@@ -6593,6 +6684,14 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('segmento-da-corretora').addEventListener('change', function () {
       segmento = this.value;
+      editando = null;
+      carregar();
+    });
+
+    // O estado inicial (Etapa 56): sem busca e com todos os segmentos.
+    elemento('limpar-filtros-corretoras').addEventListener('click', function () {
+      procurar = '';
+      segmento = '';
       editando = null;
       carregar();
     });
@@ -6758,6 +6857,7 @@ var TelaTabelaCorretoras = (function () {
       + ' value="' + escapar(procurarBloqueada) + '" autocomplete="off"'
       + ' placeholder="SUSEP, corretora, sucursal ou coordenador"'
       + ' aria-label="Procurar SUSEP bloqueada">'
+      + Moldura.botaoLimparFiltros('limpar-filtros-bloqueadas')
       + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
         ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
           + 'Bloquear SUSEP</button>' : '')
@@ -6794,6 +6894,12 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('procurar-bloqueada').addEventListener('change', function () {
       procurarBloqueada = this.value;
+      carregar();
+    });
+
+    // O estado inicial (Etapa 56): sem busca — as dos casos primeiro.
+    elemento('limpar-filtros-bloqueadas').addEventListener('click', function () {
+      procurarBloqueada = '';
       carregar();
     });
 
@@ -8095,14 +8201,93 @@ var TelaImportacao = (function () {
         laudo = resposta;
         deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
         desenhar();
+        avisarDaConferencia();
       })
       .senao(function (erro) {
         if (botao) {
           botao.disabled = false;
           botao.textContent = 'Conferir antes de importar';
         }
-        window.alert(erro.message || String(erro));
+        avisarDoErro('Não deu para conferir', erro);
       });
+  }
+
+  /**
+   * As SINALIZAÇÕES da conferência num pop-up (Etapa 57, pedido do PO: "falta
+   * pop-ups na aba de importação para sinalizações"). Os avisos amarelos
+   * continuam no laudo, com o detalhe; o pop-up junta todos de uma vez para
+   * nenhum passar batido no meio da tela. Sem aviso, não abre nada.
+   */
+  function avisosDaConferencia() {
+    var avisos = [];
+    var motivos = laudo.motivosParaPular || {};
+    var deQue = motivos.pelaProposta ? 'proposta(s)' : oQue(false) + '(s)';
+
+    if (!laudo.vaoEntrar) {
+      avisos.push('<strong>Nenhum ' + oQue(false) + ' vai entrar.</strong> Confira o de-para e '
+        + 'a origem antes de importar.');
+    }
+    if (laudo.passaDoLimite) {
+      avisos.push('São <strong>' + laudo.linhasNaFonte + ' linhas</strong>, e o limite é '
+        + laudo.limite + '. Divida em levas.');
+    }
+    if (motivos.jaNoPgo) {
+      avisos.push('<strong>' + motivos.jaNoPgo + ' ' + deQue + '</strong> vão ficar de fora porque '
+        + 'já estão no PGO' + (motivos.mes ? ' em ' + escapar(motivos.mes) : '') + '.');
+    }
+    if (motivos.repetidaNoArquivo) {
+      avisos.push('<strong>' + motivos.repetidaNoArquivo + ' ' + deQue + '</strong> vão ficar de fora '
+        + 'porque se repetem na própria planilha (entra só a primeira).');
+    }
+    if (motivos.vazia) {
+      avisos.push('<strong>' + motivos.vazia + ' linha(s) em branco</strong> vão ser puladas.');
+    }
+    if (algumCarimboEscolhido(laudo.dePara || [])) {
+      avisos.push('Você apontou uma coluna de <strong>controle de produtividade</strong>. Confira '
+        + 'nas linhas traduzidas se a data chegou certa.');
+    }
+    if (laudo.faltando && laudo.faltando.length) {
+      avisos.push('Falta ligar no de-para a coluna de: <strong>'
+        + escapar(laudo.faltando.join(' e ')) + '</strong>.');
+    }
+    if (laudo.analistasDesconhecidos && laudo.analistasDesconhecidos.length) {
+      avisos.push('<strong>' + laudo.analistasDesconhecidos.length + ' nome(s)</strong> não estão no '
+        + 'cadastro de usuários: ' + escapar(laudo.analistasDesconhecidos.slice(0, 10).join(', '))
+        + (laudo.analistasDesconhecidos.length > 10
+          ? ' e mais ' + (laudo.analistasDesconhecidos.length - 10) : '') + '.');
+    }
+    if (laudo.semDataOuAnalista) {
+      avisos.push('<strong>' + laudo.semDataOuAnalista + ' linha(s)</strong> sem data ou sem '
+        + 'analista ficam de fora.');
+    }
+    if (laudo.tmoQueNaoENumero) {
+      avisos.push('<strong>' + laudo.tmoQueNaoENumero + ' linha(s)</strong> com um TMO que não é '
+        + 'número entram com o TMO em branco.');
+    }
+    return avisos;
+  }
+
+  function avisarDaConferencia() {
+    var avisos = avisosDaConferencia();
+    if (!avisos.length) return;
+    Formulario.avisar({
+      tom: 'atencao',
+      titulo: avisos.length === 1 ? '1 ponto de atenção na conferência'
+        : avisos.length + ' pontos de atenção na conferência',
+      html: '<ul>' + avisos.map(function (aviso) { return '<li>' + aviso + '</li>'; }).join('')
+        + '</ul><p>O detalhe de cada um está no laudo, abaixo.</p>',
+      botao: 'Entendi'
+    });
+  }
+
+  /** O erro do servidor no pop-up do sistema, e não na caixinha do navegador. */
+  function avisarDoErro(titulo, erro) {
+    Formulario.avisar({
+      tom: 'ruim',
+      titulo: titulo,
+      html: '<p>' + escapar(erro && erro.message ? erro.message : String(erro)) + '</p>',
+      botao: 'Entendi'
+    });
   }
 
   function importar() {
@@ -8113,10 +8298,18 @@ var TelaImportacao = (function () {
     });
 
     // A confirmação diz o NÚMERO, porque é o número que não tem desfazer
-    // fácil: importar errado se desfaz apagando linha por linha.
-    if (!window.confirm('Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em '
-      + laudo.canal.nome + '? Desfazer isso é apagar as linhas uma a uma.')) return;
+    // fácil: importar errado se desfaz apagando linha por linha. É o pop-up
+    // do sistema (Etapa 57), e não mais a caixinha do navegador.
+    Formulario.avisar({
+      tom: 'destaque',
+      titulo: 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em ' + laudo.canal.nome + '?',
+      html: '<p>Desfazer isso é apagar as linhas uma a uma.</p>',
+      botao: 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)',
+      aoConfirmar: function () { gravar(escolhidos); }
+    });
+  }
 
+  function gravar(escolhidos) {
     var botao = elemento('importar-agora');
     if (botao) { botao.disabled = true; botao.textContent = 'Gravando…'; }
 
@@ -8146,7 +8339,7 @@ var TelaImportacao = (function () {
           botao.disabled = false;
           botao.textContent = 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)';
         }
-        window.alert(erro.message || String(erro));
+        avisarDoErro('Não deu para importar', erro);
       });
   }
 
@@ -8718,7 +8911,8 @@ var TelaProdutividade = (function () {
     // Trabalho usa as mesmas. Duas cópias divergiriam no primeiro ajuste, e aí
     // "setembro" significaria uma coisa numa tela e outra na vizinha.
     return Moldura.caixaDeFiltros(
-      SeletorDePeriodo.desenhar(painel) + caixas.join(''),
+      SeletorDePeriodo.desenhar(painel) + caixas.join('')
+        + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade'),
       painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
   }
 
@@ -8805,6 +8999,20 @@ var TelaProdutividade = (function () {
       ramoDosAtendidos = escolhido;
       desenhar();
     });
+
+    // O estado inicial (Etapa 56): o período da abertura — do dia 1 do mês
+    // até hoje —, sem filtro de lista e, nos Atendidos da Mesa, Todos e Total.
+    // A aba (Equipe ou Atendidos) fica onde a pessoa está: é lugar, não filtro.
+    var limpar = elemento('limpar-filtros-da-produtividade');
+    if (limpar) {
+      limpar.addEventListener('click', function () {
+        filtros = {};
+        periodo = SeletorDePeriodo.padrao();
+        origemDosAtendidos = 'todos';
+        ramoDosAtendidos = 'total';
+        carregar();
+      });
+    }
 
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {

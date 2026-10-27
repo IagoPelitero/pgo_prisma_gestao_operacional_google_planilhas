@@ -1752,13 +1752,16 @@ function rodarTestesDeCadastro() {
     contem(antigo, '<option value="intervalo" selected>Por data</option>');
   });
 
-  teste('de "Por mês" para "Por data", as datas do mês vêm preenchidas', () => {
+  teste('de "Por mês" para "Por data", volta para a abertura: do dia 1 do mês até hoje (Etapa 56)', () => {
+    // Até a Etapa 55 trazia as datas do mês escolhido. O PO: "o de deve SEMPRE
+    // iniciar no dia 01 de cada mês e o para deve sempre ser o dia que estamos"
+    // — sem datas, o servidor devolve a abertura.
     const periodo = pecaRodando('SeletorDePeriodo').SeletorDePeriodo;
     const como = elementoFalso('select', { 'data-periodo': 'como' });
     como.value = 'intervalo';
     const novo = periodo.mudou(como, { periodo: { tipo: 'mes', de: '01/09/2026', ate: '30/09/2026', dias: 30 } });
     igual(novo.tipo, 'intervalo');
-    igual(novo.de + '|' + novo.ate, '01/09/2026|30/09/2026');
+    igual(novo.de + '|' + novo.ate, '|');
   });
 
 

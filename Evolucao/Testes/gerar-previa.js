@@ -20,6 +20,9 @@ const path = require('path');
 const { carregar } = require('./ferramentas');
 
 const PASTA_PADRAO = path.join(__dirname, '..', 'previa');
+// O que a tela manda ao abrir: "Por data" sem as datas — o servidor resolve
+// do dia 1 do mês até hoje (Etapa 56).
+const ABERTURA = { tipo: 'intervalo', de: '', ate: '' };
 
 /**
  * Substitui o google.script.run por respostas vindas do servidor de verdade.
@@ -939,13 +942,14 @@ function gerar(pastaDeSaida) {
     // O painel sem filtro, e uma variação por opção de cada filtro. Guardar
     // só o que muda (cartões, fila e totais) evita repetir as listas de
     // opções em dezenas de cópias.
-    const base = chamar('resumoDoCanal')(canal.id, {});
+    // O período da abertura, como a tela pede: do dia 1 do mês até hoje (Etapa 56).
+    const base = chamar('resumoDoCanal')(canal.id, {}, ABERTURA);
     const variantes = {};
     base.filtrosDisponiveis.forEach((filtro) => {
       filtro.opcoes.forEach((opcao) => {
         const escolha = {};
         escolha[filtro.chave] = opcao.valor;
-        const resumo = chamar('resumoDoCanal')(canal.id, escolha);
+        const resumo = chamar('resumoDoCanal')(canal.id, escolha, ABERTURA);
         variantes[filtro.chave + '=' + opcao.valor] = {
           cartoes: resumo.cartoes, fila: resumo.fila, total: resumo.total
         };
@@ -1067,14 +1071,14 @@ function gerar(pastaDeSaida) {
   const detalhesDoPainel = {};
   const exportados = {};
   pacote.canais.forEach((canal) => {
-    const analitico = chamar('produtividadeDaEquipe')(canal.id, {}, 30);
+    const analitico = chamar('produtividadeDaEquipe')(canal.id, {}, ABERTURA);
     paineisAnaliticos[canal.id] = analitico;
     analitico.componentes.forEach((componente) => {
       exportados[componente.id] =
-        chamar('exportarComponente')(canal.id, componente.id, {}, 30);
+        chamar('exportarComponente')(canal.id, componente.id, {}, ABERTURA);
       componente.pontos.forEach((ponto) => {
         detalhesDoPainel[canal.id + '|' + componente.id + '|' + ponto.chave] =
-          chamar('detalharComponente')(canal.id, componente.id, ponto.chave, {}, 30);
+          chamar('detalharComponente')(canal.id, componente.id, ponto.chave, {}, ABERTURA);
       });
     });
   });

@@ -115,6 +115,7 @@ var TelaTabelaCorretoras = (function () {
       + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
       + ' aria-label="Procurar corretora">'
       + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
+      + Moldura.botaoLimparFiltros('limpar-filtros-corretoras')
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
           + 'Cadastrar corretora</button>' : '')
@@ -244,6 +245,14 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('segmento-da-corretora').addEventListener('change', function () {
       segmento = this.value;
+      editando = null;
+      carregar();
+    });
+
+    // O estado inicial (Etapa 56): sem busca e com todos os segmentos.
+    elemento('limpar-filtros-corretoras').addEventListener('click', function () {
+      procurar = '';
+      segmento = '';
       editando = null;
       carregar();
     });
@@ -409,6 +418,7 @@ var TelaTabelaCorretoras = (function () {
       + ' value="' + escapar(procurarBloqueada) + '" autocomplete="off"'
       + ' placeholder="SUSEP, corretora, sucursal ou coordenador"'
       + ' aria-label="Procurar SUSEP bloqueada">'
+      + Moldura.botaoLimparFiltros('limpar-filtros-bloqueadas')
       + (dados.podeMexer && podeMexerNesta('SUSEP_BLOQUEADAS')
         ? '<button type="button" class="botao pequeno" id="nova-bloqueada">'
           + 'Bloquear SUSEP</button>' : '')
@@ -445,6 +455,12 @@ var TelaTabelaCorretoras = (function () {
 
     elemento('procurar-bloqueada').addEventListener('change', function () {
       procurarBloqueada = this.value;
+      carregar();
+    });
+
+    // O estado inicial (Etapa 56): sem busca — as dos casos primeiro.
+    elemento('limpar-filtros-bloqueadas').addEventListener('click', function () {
+      procurarBloqueada = '';
       carregar();
     });
 

@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1379 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1403 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -336,7 +336,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1379 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1403 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -837,7 +837,7 @@ a tela de leitura. O tamanho da trilha não pesa mais no clique.
 
 ## Achar um caso que a fila não mostra mais
 
-O Trabalho mostra os últimos 30 dias, de propósito. Quando o cliente liga
+O Trabalho abre no mês corrente — do dia 1 até hoje —, de propósito. Quando o cliente liga
 citando um protocolo de abril, é aqui que se procura.
 
 **A busca da barra superior** leva para cá: digite e aperte Enter, de qualquer
@@ -1069,13 +1069,19 @@ ajuste, e a operação veria duas telas diferentes fazendo a mesma pergunta.
 
 | Maneira | Para quê |
 |---|---|
-| **Por data** | Duas datas, de/até, no calendário do navegador (até hoje). **É a abertura**: as caixas já vêm com os últimos 30 dias (`OPERACAO.JANELA_DIAS`), e a pessoa ajusta uma ponta. Responde também uma pergunta específica: a semana da campanha, os dias da virada |
+| **Por data** | Duas datas, de/até, no calendário do navegador (até hoje). **É a abertura**: as caixas já vêm **do dia 1 do mês até hoje** (Etapa 56, pedido do PO), e a pessoa ajusta uma ponta. Voltar de "Por mês" para "Por data" também traz o dia 1 até hoje. Responde também uma pergunta específica: a semana da campanha, os dias da virada |
 | **Por mês** | "Setembro de 2026". É como a operação REPORTA — e é diferente de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias pegam metade de setembro e metade de outubro, e nenhum fechamento se faz assim |
 
 O **"Por dias"** ("Últimos 7, 15, 30… dias") saiu na Etapa 43, pedido do PO: "nos
 filtros tire os de dias e deixe apenas por data e por mês. Por padrão vem o por
 data". O servidor ainda entende o formato antigo, para uma página aberta antes da
 atualização não quebrar — e ela aparece como "Por data".
+
+**"Limpar filtros"** (Etapa 56) — em toda tela que filtra, sempre visível: no
+Trabalho e na Produtividade RECC ele volta a busca, os filtros de lista e o
+**período** (o dia 1 até hoje); na Produtividade da Mesa, também Origem e Ramo dos
+Atendidos; na Tabela Corretoras, a busca e o segmento (e a busca das bloqueadas);
+no Buscar Caso, o termo e os canais marcados.
 
 Na **abertura** (o "Por data" com as datas que a tela já trouxe), os casos **sem
 data de recepção** continuam aparecendo, como no "Por dias" de antes — a Etapa 43
@@ -1240,8 +1246,10 @@ São três passos, e **o do meio é a razão de a tela existir**:
    Colar funciona sempre; o link é melhor para quem repete toda semana, e exige
    que a conta que roda o PGO tenha acesso àquela planilha.
 2. **Conferir.** O servidor devolve para onde cada coluna vai, quantas linhas
-   entram, quantas repetem — e **as três primeiras já traduzidas**.
-3. **Importar.**
+   entram, quantas repetem — e **as três primeiras já traduzidas**. Se houver
+   algum ponto de atenção (repetidas, nomes fora do cadastro, linhas em branco,
+   limite), um **pop-up** lista todos de uma vez (Etapa 57); o detalhe fica no laudo.
+3. **Importar**, depois de confirmar no pop-up do sistema, que diz quantos vão entrar.
 
 O passo 2 não é burocracia. Um mapeamento trocado é invisível olhando o
 cabeçalho e óbvio olhando o dado: ver `11999998888` na coluna "CPF" custa cinco
@@ -1617,7 +1625,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1379 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1403 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

@@ -530,16 +530,15 @@ function rodarTestesDaProdutividade() {
     });
   });
 
-  teste('"Por data" sem as datas é a abertura: a janela da configuração, já como datas', () => {
-    // Etapa 43: a tela abre em "Por data" e manda o intervalo vazio.
+  teste('"Por data" sem as datas é a abertura: do dia 1 do mês até hoje (Etapa 56)', () => {
+    // Etapa 43: a tela abre em "Por data" e manda o intervalo vazio. Etapa 56:
+    // "o de deve sempre iniciar no dia 01 de cada mês e o para deve sempre ser
+    // o dia que estamos".
     const painel = chamar('produtividadeDaEquipe')(ret.id, {}, { tipo: 'intervalo', de: '', ate: '' });
     igual(painel.periodo.tipo, 'intervalo');
-    igual(painel.periodo.dias, 30, 'os mesmos 30 dias de antes');
-    verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(painel.periodo.de), 'de: ' + painel.periodo.de);
-    verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(painel.periodo.ate), 'até: ' + painel.periodo.ate);
-    const antes = chamar('produtividadeDaEquipe')(ret.id, {}, { tipo: 'dias', dias: 30 });
-    igual(painel.periodo.de + '|' + painel.periodo.ate, antes.periodo.de + '|' + antes.periodo.ate,
-      'as mesmas datas que "últimos 30 dias" dava');
+    igual(painel.periodo.de, '01/' + comZero(hoje.getMonth() + 1) + '/' + hoje.getFullYear());
+    igual(painel.periodo.ate, diasAtras(0));
+    igual(painel.periodo.dias, hoje.getDate(), 'do dia 1 até hoje, com as duas pontas');
   });
 
   teste('caso sem data fica no atalho e sai do período fechado', () => {

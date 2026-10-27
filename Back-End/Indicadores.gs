@@ -297,11 +297,17 @@ function resolverPeriodo_(pedido, diasPadrao) {
     var de = converterParaData_(pedido.de);
     var ate = converterParaData_(pedido.ate);
     // "Por data" sem as duas datas é a ABERTURA da tela (Etapa 43: o PO tirou
-    // o "Por dias" e pediu "Por data" como padrão). Vale a mesma janela de
-    // sempre — os últimos N dias da configuração —, já escrita como datas,
-    // para as caixas de/até abrirem preenchidas.
+    // o "Por dias" e pediu "Por data" como padrão). Etapa 56, pedido do PO: "o
+    // de deve sempre iniciar no dia 01 de cada mês e o para deve sempre ser o
+    // dia que estamos" — do dia 1 do mês corrente até hoje, já escrito como
+    // datas, para as caixas de/até abrirem preenchidas. No dia 1, é só hoje.
     if (!pedido.de && !pedido.ate) {
-      var janela = periodoPorDias_(padrao);
+      // As duas pontas à meia-noite: o período compara por dia (yyyy-MM-dd), e
+      // com a hora de agora no "até" o tamanho arredondaria um dia para mais —
+      // e a janela de comparação dos cartões sairia um dia mais longa.
+      var agora = new Date();
+      var hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+      var doDia1 = new Date(agora.getFullYear(), agora.getMonth(), 1);
       return {
         tipo: 'intervalo',
         // É a ABERTURA: o caso sem data continua aparecendo, como no antigo
@@ -309,10 +315,10 @@ function resolverPeriodo_(pedido, diasPadrao) {
         // troca da abertura para "Por data" escondeu os casos importados sem
         // data de recepção — e os cartões passaram a contar menos.
         abertura: true,
-        de: janela.de,
-        ate: janela.ate,
-        dias: janela.dias,
-        rotulo: 'de ' + comoSeEscreve_(janela.de) + ' a ' + comoSeEscreve_(janela.ate)
+        de: doDia1,
+        ate: hoje,
+        dias: diasEntre_(doDia1, hoje),
+        rotulo: 'de ' + comoSeEscreve_(doDia1) + ' a ' + comoSeEscreve_(hoje)
       };
     }
     if (de && ate) {

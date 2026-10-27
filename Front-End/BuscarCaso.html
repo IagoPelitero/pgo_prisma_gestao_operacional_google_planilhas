@@ -40,6 +40,7 @@ var TelaBuscarCaso = (function () {
       + ' aria-label="O que procurar">'
       + '<button type="submit" class="botao" id="botao-buscar">'
       + Moldura.icone('buscarCaso') + ' Buscar</button>'
+      + Moldura.botaoLimparFiltros('limpar-filtros-da-busca')
       + '</div>'
       + '<div id="onde-procurar" class="busca-onde"></div>'
       + '</form></div>'
@@ -279,6 +280,19 @@ var TelaBuscarCaso = (function () {
     elemento('form-da-busca').addEventListener('submit', function (evento) {
       evento.preventDefault();
       procurar();
+    });
+
+    // O estado inicial (Etapa 56): sem termo, todos os canais marcados, a base
+    // legada desmarcada e nenhum resultado na tela.
+    elemento('limpar-filtros-da-busca').addEventListener('click', function () {
+      if (procurando || !opcoes) return;
+      elemento('termo-da-busca').value = '';
+      ultimoTermo = '';
+      opcoes.canais.forEach(function (canal) { canaisEscolhidas[canal.id] = true; });
+      incluirLegado = false;
+      desenharOnde();
+      elemento('resultado-da-busca').innerHTML = '';
+      elemento('termo-da-busca').focus();
     });
 
     Servidor.chamar('opcoesDaBusca')

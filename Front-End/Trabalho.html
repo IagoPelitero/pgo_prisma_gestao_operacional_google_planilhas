@@ -116,10 +116,6 @@ var TelaTrabalho = (function () {
         + opcoes.join('') + '</select>';
     });
 
-    var algumAtivo = Object.keys(filtrosEscolhidos).some(function (chave) {
-      return filtrosEscolhidos[chave];
-    });
-
     // A BUSCA DIGITADA vem primeiro — pedido do PO: "o filtro por busca
     // digitada para cada canal". É um filtro como os outros: vai no mesmo
     // pacote de filtros, e trocar de canal limpa junto. Busca ao apertar Enter
@@ -141,10 +137,7 @@ var TelaTrabalho = (function () {
       busca
         + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
-        + (algumAtivo
-          ? '<button type="button" class="limpar-filtros" id="limpar-filtros">'
-            + 'Limpar filtros</button>'
-          : ''),
+        + Moldura.botaoLimparFiltros('limpar-filtros'),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + escapar(resumo.periodo.rotulo));
   }
@@ -563,10 +556,14 @@ var TelaTrabalho = (function () {
       campoDaBusca.addEventListener('search', function () { buscar(this); });
     }
 
+    // O estado inicial (Etapa 56): sem busca, sem cartão, sem filtro de lista
+    // e o período da abertura — do dia 1 do mês até hoje. O "Mostrar" fica:
+    // não é filtro.
     var limpar = elemento('limpar-filtros');
     if (limpar) {
       limpar.addEventListener('click', function () {
         filtrosEscolhidos = {};
+        periodo = SeletorDePeriodo.padrao();
         carregar();
       });
     }

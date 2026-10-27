@@ -769,6 +769,12 @@ async function rodar() {
     await pagina.fill('#planilha-aba', 'Atendimentos');
     await pagina.click('#conferir-importacao');
     await pagina.waitForSelector('#importar-agora', { timeout: 10000 });
+    // Etapa 57: as sinalizações da conferência abrem num pop-up do sistema.
+    await pagina.waitForSelector('#dialogo-aviso', { timeout: 10000 });
+    contem(await pagina.textContent('#dialogo-aviso'), 'Bianca Souza',
+      'o pop-up lista o nome que não está no cadastro');
+    await pagina.click('#confirmar-aviso');
+    verdadeiro(!(await pagina.locator('#dialogo-aviso').count()), '"Entendi" fecha o pop-up');
     // "Conferir" sugere o de-para pelo nome do cabeçalho: "Atendente" é o Analista.
     const laudo = await pagina.textContent('#importacao');
     contem(laudo, 'Bianca Souza', 'o analista que não é usuário é avisado antes de gravar');
@@ -786,6 +792,10 @@ async function rodar() {
     contem(await pagina.textContent('#importar-agora'), 'Importar 3');
     await pagina.fill('#nome-do-lote', 'Chat de hoje');
     await pagina.click('#importar-agora');
+    // A confirmação é o pop-up do sistema (Etapa 57), e não mais a caixinha do navegador.
+    await pagina.waitForSelector('#dialogo-aviso', { timeout: 10000 });
+    contem(await pagina.textContent('#dialogo-aviso'), 'Importar 3 atendimento(s)');
+    await pagina.click('#confirmar-aviso');
     await pagina.waitForSelector('#importar-outro-lote', { timeout: 10000 });
     const gravados = naPlanilha('ATENDIMENTOS_CHAT');
     igual(gravados.length, 3, 'os três atendimentos foram para a aba do chat');
@@ -1033,6 +1043,50 @@ async function rodar() {
       document.querySelectorAll('#detalhe-do-painel tbody tr').length > 100, null, { timeout: 10000 });
     igual(chamadasDoNavegador.detalharComponente, antes + 2, 'uma ida para abrir, outra para "todos"');
     verdadeiro(!(await pagina.locator('#detalhe-todos').count()), 'com tudo na tela, o botão some');
+  });
+
+  await teste('o período abre no dia 1 até hoje, e o "Limpar filtros" volta tudo ao início (Etapa 56)', async () => {
+    const agora = new Date();
+    const comZero = (n) => (n < 10 ? '0' : '') + n;
+    const noCalendario = (dia) => agora.getFullYear() + '-' + comZero(agora.getMonth() + 1) + '-' + comZero(dia);
+    const valor = (seletor) => pagina.$eval(seletor, (el) => el.value);
+
+    // Produtividade (a RET do teste anterior): abre do dia 1 até hoje.
+    igual(await valor('#analitico [data-periodo="de"]'), noCalendario(1), 'de: dia 1');
+    igual(await valor('#analitico [data-periodo="ate"]'), noCalendario(agora.getDate()), 'até: hoje');
+
+    // Muda o período para "Por mês" e escolhe um filtro de lista…
+    await pagina.selectOption('#analitico [data-periodo="como"]', 'mes');
+    await pagina.waitForSelector('#analitico [data-periodo="mes"]', { timeout: 10000 });
+    const lista = pagina.locator('#analitico select[data-filtro]').first();
+    const opcao = await lista.locator('option').nth(1).getAttribute('value');
+    await lista.selectOption(opcao);
+    await pagina.waitForFunction((v) => {
+      const caixa = document.querySelector('#analitico select[data-filtro]');
+      return caixa && caixa.value === v;
+    }, opcao, { timeout: 10000 });
+
+    // …e o Limpar volta os dois.
+    await pagina.click('#limpar-filtros-da-produtividade');
+    await pagina.waitForSelector('#analitico [data-periodo="de"]', { timeout: 10000 });
+    igual(await valor('#analitico [data-periodo="como"]'), 'intervalo', 'volta para "Por data"');
+    igual(await valor('#analitico [data-periodo="de"]'), noCalendario(1));
+    igual(await valor('#analitico select[data-filtro]'), '', 'o filtro de lista volta vazio');
+
+    // Trabalho: a busca digitada sai com o Limpar.
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('#busca-na-fila', { timeout: 10000 });
+    await pagina.fill('#busca-na-fila', 'Fila grande 7');
+    await pagina.press('#busca-na-fila', 'Enter');
+    await pagina.waitForTimeout(900);
+    await pagina.waitForSelector('#busca-na-fila', { timeout: 10000 });
+    igual(await valor('#busca-na-fila'), 'Fila grande 7', 'a busca ficou valendo');
+    await pagina.click('#limpar-filtros');
+    await pagina.waitForFunction(() => {
+      const campo = document.getElementById('busca-na-fila');
+      return campo && campo.value === '';
+    }, null, { timeout: 10000 });
+    igual(await valor('#painel [data-periodo="de"]'), noCalendario(1), 'e o período volta ao dia 1');
   });
 
   /* ------------------------------------------------------------- o final -- */

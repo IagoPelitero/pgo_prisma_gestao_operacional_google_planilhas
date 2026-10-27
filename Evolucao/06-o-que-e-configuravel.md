@@ -87,7 +87,7 @@ Funciona, e é editável — mas exige abrir a aba e digitar na célula, o que n
 
 | Assunto | Onde mora | Por que ainda não tem tela |
 |---|---|---|
-| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Um número solto; é o próximo a ganhar campo. Agora é só a **abertura** das telas: quem está olhando troca o período na própria tela, por data (a abertura, já com essa janela em de/até) ou por mês |
+| **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Deixou de ser a abertura na Etapa 56: as telas abrem **do dia 1 do mês até hoje** (`resolverPeriodo_`, no `Indicadores.gs`). O número só vale quando um pedido chega sem período (uma página antiga, um endereço guardado) |
 | **Tema padrão da operação** | `CONFIG` → `OPERACAO.TEMA_PADRAO` | Idem |
 | **Visibilidade de campo por nível** | `CATALOGO` → `Configuracao.campos` | O servidor já respeita (oculto, leitura, edição). Falta a tela — hoje é um JSON |
 

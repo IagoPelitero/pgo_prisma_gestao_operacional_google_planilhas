@@ -1806,6 +1806,22 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   display: flex; flex-direction: column; max-height: min(86vh, 720px);
 }
 .dialogo-caixa.aviso-de-prazo h3 { color: var(--atencao); }
+/*
+  O POP-UP DO SISTEMA (Etapa 57): avisos, perguntas e erros que eram a caixinha
+  do navegador. A faixa de cima tem a cor do tom (amarelo para aviso, vermelho
+  para erro, azul para pergunta); a lista rola dentro da caixa quando os avisos
+  não cabem, e os botões ficam sempre à vista.
+*/
+.dialogo-caixa.aviso-do-sistema {
+  max-width: 520px; border-top: 4px solid var(--tom);
+  display: flex; flex-direction: column; max-height: min(86vh, 720px);
+}
+.dialogo-caixa.aviso-do-sistema h3 { color: var(--tom); }
+.texto-do-aviso { overflow-y: auto; flex: 1 1 auto; margin-bottom: 14px; font-size: 13px; line-height: 1.5; }
+.texto-do-aviso ul { margin: 0; padding-left: 18px; }
+.texto-do-aviso li { margin: 0 0 8px; overflow-wrap: anywhere; }
+.texto-do-aviso li strong, .texto-do-aviso p strong { color: var(--texto); }
+.texto-do-aviso p { white-space: pre-line; }
 .lista-de-prazo {
   list-style: none; margin: 0 0 14px; padding: 0; overflow-y: auto; flex: 1 1 auto;
   border-top: 1px solid var(--linha);
