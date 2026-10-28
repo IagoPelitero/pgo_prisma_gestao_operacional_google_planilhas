@@ -76,6 +76,7 @@ com nome, num lugar só.
 | **As tentativas até o sucesso** | `RECC_COLUNAS_DAS_TENTATIVAS`, `RECC_STATUS_DE_SUCESSO`, `RECC_STATUS_SEM_SUCESSO` e `RECC_CPFS_LISTADOS`, no `Indicadores.gs` | Tentativas = Data do 1º e do 2º contato; sucesso = Retido ou Não retido; sem sucesso = "Sem sucesso de contato"; 100 CPFs na tabela. Renomear um desses status em Ajustes Gerais pede mudar aqui também |
 | **Quantos valores cada gráfico mostra** | `RECC_TOPO_DOS_GRAFICOS`, no `Indicadores.gs` | 5, pedido do PO (Etapa 53). O resto não aparece — não há "Demais valores". Os atendidos por analista da Mesa usam 15 |
 | **Quantas SUSEPs bloqueadas a Tabela Corretoras mostra** | `RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA`, no `Cadastros.gs` | 100 (Etapa 55, para as 151 mil da segunda base): as dos casos primeiro, depois as mais recentes. A busca procura em todas |
+| **A hora da finalização** | `RECC_COLUNA_HORA_DA_FINALIZACAO`, no `Indicadores.gs` | "horário da finalização", ao lado da *Data da finalização* (a coluna de finalização do canal). O fim do prazo da Mesa é a data com essa hora (Etapa 58) |
 | **Quantas propostas repetidas o laudo lista** | `RECC_REPETIDOS_LISTADOS`, no `Casos.gs` | 50 de cada motivo; o número total vem sempre |
 
 ---

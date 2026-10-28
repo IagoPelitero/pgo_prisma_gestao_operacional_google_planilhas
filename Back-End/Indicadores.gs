@@ -1225,6 +1225,47 @@ function pontoDoFim_(data, hora, fecha) {
   return { dia: relogio.dia, minuto: minuto };
 }
 
+/*
+ * A HORA DA FINALIZAÇÃO, ao lado da data (contrato da Mesa Diamante). Lida
+ * pela grafia da planilha; canal sem a coluna usa a hora guardada na própria
+ * data, ou o fim do expediente — ver `pontoDoFim_`.
+ */
+const RECC_COLUNA_HORA_DA_FINALIZACAO = 'horário da finalização';
+
+/**
+ * Quando o caso foi FINALIZADO, pela data e hora que estão na planilha — ou
+ * null, sem a data.
+ *
+ * Etapa 58, pedido do PO: "o que deve prevalecer sempre é, se houver data e
+ * hora de finalização, ela; na ausência, o status concluído e o carimbo da
+ * data em que foi salvo. Caso seja ajustada depois, a data e hora da
+ * finalização deve prevalecer". Antes valia a data da última mudança de
+ * status — o dia em que alguém SALVOU —, e caso finalizado no prazo e
+ * registrado depois aparecia como estourado.
+ */
+function pontoDaFinalizacao_(registro, canal, fecha) {
+  if (!canal.colunaDaFinalizacao) return null;
+  var data = converterParaDataEHora_(registro[canal.colunaDaFinalizacao]);
+  if (!data) return null;
+  var colunaDaHora = grafiaDaColuna_(canal.aba, RECC_COLUNA_HORA_DA_FINALIZACAO);
+  return pontoDoFim_(data, registro[colunaDaHora], fecha);
+}
+
+/**
+ * O canal FECHA o caso pela finalização? Sim quando algum status final carimba
+ * a coluna de finalização do canal — na Mesa, Concluído e Concluído na mesa
+ * carimbam a "Data da finalização". Na RET a coluna de finalização é a "data da
+ * transmissão", que nenhum desfecho carimba: lá nada muda.
+ */
+function fechaPelaFinalizacao_(canal, situacoes) {
+  if (!canal.colunaDaFinalizacao) return false;
+  var finalizacao = normalizarParaComparar_(canal.colunaDaFinalizacao);
+  return Object.keys(situacoes || {}).some(function (chave) {
+    var situacao = situacoes[chave];
+    return situacao.final && normalizarParaComparar_(situacao.colunaDeCarimbo) === finalizacao;
+  });
+}
+
 /** "2h10", "45min", e a partir de um expediente inteiro, "3 dias úteis". */
 function duracaoParaLer_(minutos, expediente) {
   if (minutos >= expediente) {
@@ -1269,14 +1310,15 @@ function slaDoCaso_(registro, canal, finais, agora) {
     var situacao = canal.colunaDoStatus
       ? normalizarParaComparar_(registro[canal.colunaDoStatus]) : '';
     var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
-    var finalizadoEm = canal.colunaDaFinalizacao
-      ? converterParaData_(registro[canal.colunaDaFinalizacao]) : '';
-    if (finais[situacao] && mudou) {
+    // A data e hora da finalização vêm antes da mudança de status: é o que o
+    // analista informou, e não o dia em que alguém salvou (Etapa 58).
+    var finalizado = pontoDaFinalizacao_(registro, canal, fecha);
+    if (finalizado) {
+      parouEm = 'encerramento';
+      ate = finalizado;
+    } else if (finais[situacao] && mudou) {
       parouEm = 'encerramento';
       ate = relogioDeParede_(mudou);
-    } else if (finalizadoEm) {
-      parouEm = 'encerramento';
-      ate = pontoDoFim_(finalizadoEm, '', fecha);
     }
   }
   var parou = parouEm !== 'agora';
@@ -1540,17 +1582,25 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
   if (encerrado) {
     // Quando parou: pela condição, é o carimbo dela; pelo status, a última
     // mudança de status ou o carimbo do próprio status.
+    // No canal que fecha pela finalização (a Mesa), a data e hora da
+    // finalização vêm ANTES de tudo: é o que o analista informou (Etapa 58).
     var quandoFechou;
-    if (comCondicao) {
-      quandoFechou = converterParaDataEHora_(registro[sinalizador.colunaDaDataDaCondicao]);
+    var finalizado = !comCondicao && fechaPelaFinalizacao_(canal, situacoes)
+      ? pontoDaFinalizacao_(registro, canal, sinalizador.fecha) : null;
+    if (finalizado) {
+      ate = finalizado;
     } else {
-      var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
-      var carimbo = situacao.colunaDeCarimbo
-        ? converterParaDataEHora_(registro[situacao.colunaDeCarimbo]) : '';
-      quandoFechou = mudou || carimbo;
+      if (comCondicao) {
+        quandoFechou = converterParaDataEHora_(registro[sinalizador.colunaDaDataDaCondicao]);
+      } else {
+        var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+        var carimbo = situacao.colunaDeCarimbo
+          ? converterParaDataEHora_(registro[situacao.colunaDeCarimbo]) : '';
+        quandoFechou = mudou || carimbo;
+      }
+      if (!quandoFechou) return null;
+      ate = relogioDeParede_(quandoFechou);
     }
-    if (!quandoFechou) return null;
-    ate = relogioDeParede_(quandoFechou);
   }
 
   var porUnidade = minutosDeUmaUnidade_(sinalizador);

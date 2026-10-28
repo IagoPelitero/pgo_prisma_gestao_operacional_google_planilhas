@@ -969,6 +969,7 @@ function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCamp
   // transmissão", e trocar para Final faria Retido, Pago e os outros
   // desfechos escreverem uma data de transmissão que não aconteceu.
   if (canal.colunaDaFinalizacao && !atual[canal.colunaDaFinalizacao]
+    && !jaVeioNaAlteracao_(alteracao, canal.colunaDaFinalizacao)
     && normalizarParaComparar_(achada.gravadoComo).indexOf('conclu') === 0) {
     alteracao[canal.colunaDaFinalizacao] = new Date();
   }
@@ -1122,8 +1123,22 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
 
   var jaTem = String(registroAtual[coluna] || '').trim();
   if (jaTem) return;
+  // Nem o que a pessoa informou NESTE salvamento (Etapa 58): quem muda para
+  // Concluído e digita a data da finalização na mesma hora tinha a data dele
+  // trocada pelo "agora" do carimbo.
+  if (jaVeioNaAlteracao_(alteracao, coluna)) return;
 
   alteracao[coluna] = carimboParaAColuna_(estrutura, posicao);
+}
+
+/** A alteração já traz valor nesta coluna, escrita como a planilha ou não? */
+function jaVeioNaAlteracao_(alteracao, coluna) {
+  var procurada = normalizarParaComparar_(coluna);
+  return Object.keys(alteracao).some(function (chave) {
+    var valor = alteracao[chave];
+    return normalizarParaComparar_(chave) === procurada
+      && String(valor === null || valor === undefined ? '' : valor).trim() !== '';
+  });
 }
 
 /**

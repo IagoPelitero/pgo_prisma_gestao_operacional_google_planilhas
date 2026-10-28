@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1403 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1416 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -336,7 +336,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1403 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1416 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -518,8 +518,14 @@ SLA da Mesa). O selo aparece embaixo da situação, ao lado do SLA:
 | Canal | O prazo | Conta desde | Amarelo |
 |---|---|---|---|
 | **RET** | **3 dias úteis** para o caso chegar a um desfecho. Não retido, pago, cancelado e sem sucesso de contato **param o relógio sozinhos**; o **Retido** só para quando o *Status proposta* for **Transmitido** ou **Sem alteração** | a **primeira mudança de status** — *Data da primeira mudança de status*, que o sistema carimba quando o caso sai de "Não trabalhado". Até lá, **prazo cheio** | no 3º dia útil |
-| **Mesa** | **48 horas úteis** para o caso ser concluído. Para quando o status vira Concluído (ou Concluído na mesa, ou Sem retorno) | **Data em andamento**, que o sistema carimba quando o caso entra no status Em andamento — o cadastrado pela tela já nasce assim; o **importado entra sem status** e começa quando alguém o põe em Em andamento | nas últimas 10 horas |
+| **Mesa** | **48 horas úteis** para o caso ser concluído. Para na **data e horário da finalização** que o analista informou; sem ela, quando o status vira Concluído (ou Concluído na mesa, ou Sem retorno) — Etapa 58 | **Data em andamento**, que o sistema carimba quando o caso entra no status Em andamento — o cadastrado pela tela já nasce assim; o **importado entra sem status** e começa quando alguém o põe em Em andamento | nas últimas 10 horas |
 | **VG** | ainda não definido: a linha existe, **desligada**, para o PO preencher | — | — |
+
+Na Mesa, **a finalização informada prevalece** (Etapa 58, pedido do PO): com a
+*Data da finalização* e o *horário da finalização* preenchidos, o prazo para ali,
+mesmo que o caso tenha sido salvo como concluído dias depois — e ajustar a
+finalização depois muda o selo. Concluir pelo formulário digitando a finalização
+guarda a data digitada; sem digitar, o carimbo põe a do salvamento.
 
 Quando o caso chega a um status final, o relógio **para** e o selo mostra o
 resultado — *cumprido em 1 dia útil e 1h* (verde) ou *estourado, 1 dia útil e 1h
@@ -1625,7 +1631,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1403 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1416 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

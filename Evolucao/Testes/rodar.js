@@ -46,6 +46,7 @@ const { rodarTestesDasColunasForaDaRet } = require('./testes-colunas-fora-da-ret
 const { rodarTestesDasSusepsNaSegundaBase } = require('./testes-suseps-na-segunda-base');
 const { rodarTestesDoLimparFiltros } = require('./testes-limpar-filtros');
 const { rodarTestesDosPopupsDaImportacao } = require('./testes-popups-da-importacao');
+const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -82,6 +83,7 @@ rodarTestesDasColunasForaDaRet();
 rodarTestesDasSusepsNaSegundaBase();
 rodarTestesDoLimparFiltros();
 rodarTestesDosPopupsDaImportacao();
+rodarTestesDaDataDaFinalizacao();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

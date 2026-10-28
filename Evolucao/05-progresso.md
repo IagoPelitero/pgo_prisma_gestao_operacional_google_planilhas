@@ -3281,6 +3281,39 @@ sem rolagem lateral; o roteiro que clica em tudo e a base suja sem erro.
 
 ---
 
+## Etapa 58 — A data e hora da finalização prevalecem (Mesa Diamante)
+
+Relato do PO: **"ao ajustar e incluir a data de finalização de casos da Mesa Diamante, o
+PGO está considerando o dia em que foi salvo e não a data que o analista incluiu como
+finalizado. Isso está impactando, pois indica que o caso está estourado e muitas vezes
+não está"**. A regra, palavra dele: **"se houver data e hora de finalização, ela prevalece;
+na ausência, o status concluído e o carimbo da data em que foi salvo. Caso seja ajustada
+depois, a data e hora da finalização deve prevalecer"**. Achado 107.
+
+| Parte | O que ficou |
+|---|---|
+| **O selo das 48 horas** | O fim do prazo é a **Data da finalização** com o **horário da finalização**. Sem o horário, vale a hora guardada na própria data; só a data, o fim do expediente daquele dia. Sem a finalização, vale como antes: o momento em que o caso foi salvo como Concluído (Concluído na mesa, Sem retorno) |
+| **Ajuste depois** | Corrigir a finalização muda o selo na hora — a data do salvamento não pesa mais |
+| **O SLA da primeira resposta** | Sem a resposta, para na finalização informada antes da mudança de status (era o contrário) |
+| **O carimbo** | Concluir pelo formulário digitando a finalização no mesmo salvamento **guarda a data do analista**; antes o carimbo a trocava pela de agora. Sem digitar, o carimbo põe a data do salvamento, como antes |
+| **Só a Mesa** | Vale para o canal cujo status final carimba a coluna de finalização (`fechaPelaFinalizacao_`). Na RET a coluna de finalização é a "data da transmissão", que nenhum desfecho carimba: lá nada muda |
+
+13 testes novos em `testes-data-da-finalizacao.js` (a regra, a hora contando dos dois lados
+do limite, o ajuste depois, a RET intacta, o SLA e o carimbo no formulário). Quebras de
+propósito: 4, todas pegas (o selo, o SLA, o carimbo e a hora).
+
+**Números da Etapa 58.** **1416 testes**, cinco execuções seguidas sem falha;
+ponta a ponta 23/23 no repositório e no pacote.
+
+### Para quem já usa
+
+1. Cole os arquivos marcados (◆). Não há passo novo no `atualizarPGO()`.
+2. **Implantar › Gerenciar implantações › editar › Versão: Nova versão**.
+3. Os casos já concluídos com a finalização preenchida passam a mostrar o selo pela
+   finalização assim que a tela recarregar — nada a corrigir na planilha.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

@@ -2210,6 +2210,23 @@ desligado vira uma linha informativa. A suíte apaga as três colunas depois do
 `atualizarPGO`, confere o laudo sem FALHA, confere que um campo ligado sem coluna
 continua reprovado, e que excluir a linha do campo não faz nada recriá-lo.
 
+### 107 · O prazo da Mesa contava até o dia em que alguém salvou, e não até a finalização
+
+**Sintoma.** Relato do PO: caso da Mesa Diamante finalizado dentro das 48 horas, com a
+data e o horário da finalização preenchidos, aparecia **estourado**.
+
+**Causa.** Duas. O selo do prazo lia primeiro a *Data da última mudança de status* — o
+momento em que o caso foi SALVO como Concluído — e só na falta dela a *Data da
+finalização*; o analista que registrava depois o que fez antes ganhava vermelho. E,
+concluindo pelo formulário com a finalização digitada no mesmo salvamento, o carimbo do
+Concluído conferia só se a coluna estava vazia **na planilha**, e trocava a data digitada
+pela de agora.
+
+**Defesa.** No canal que fecha pela finalização, a data e o horário da finalização vêm
+antes de tudo, no selo e no SLA; o carimbo não sobrescreve o que veio no mesmo
+salvamento. A suíte conta o selo com e sem a finalização, com a hora dos dois lados do
+limite, ajustada depois, e confere que a RET não muda.
+
 ---
 
 ## O que esta lista ensina
@@ -2447,3 +2464,6 @@ Daí as duas práticas que o projeto não abre mão:
     `atualizarPGO` dizia "pode apagar a coluna" e o diagnóstico, depois, "acrescente a
     coluna". Quando uma ferramenta autoriza um passo, as outras precisam ter sido
     ensaiadas DEPOIS dele — foi o ensaio que faltou.
+58. **A data que a pessoa informa vale mais que a data em que o sistema a viu.** No item
+    107, "quando salvou" passava na frente de "quando finalizou". Carimbo é o plano B
+    para quando ninguém disse nada — nunca a resposta a quem disse.
