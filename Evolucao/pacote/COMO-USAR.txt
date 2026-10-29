@@ -13,9 +13,13 @@ São três arquivos, em vez dos 19 do repositório. No editor do Apps Script:
 ATENÇÃO AOS NOMES: no Apps Script o arquivo se chama "Index", e não
 "Index.html" — sem extensão, sem acento, com as maiúsculas iguais.
 
-  5. Publique como aplicativo da web (executar como você).
-  6. Execute instalarRECC() UMA vez, sobre uma planilha VAZIA.
-  7. Execute diagnosticoRECC() para conferir tudo.
+  5. O FUSO DO PROJETO: Configurações do projeto (a engrenagem) > Fuso
+     horário > (GMT-03:00) Horário de Brasília - São Paulo. Fora dele, toda
+     data digitada recua um dia. (Quem preferir: marque "Mostrar o arquivo de
+     manifesto appsscript.json" e cole o appsscript.json deste pacote.)
+  6. Publique como aplicativo da web (executar como você).
+  7. Execute instalarRECC() UMA vez, sobre uma planilha VAZIA.
+  8. Execute diagnosticoRECC() para conferir tudo — ele confere os dois fusos.
 
 SE A PLANILHA JÁ FOI USADA
 --------------------------
@@ -44,6 +48,7 @@ O QUE TEM DENTRO
 Codigo.gs      7 arquivos: Base.gs, Cadastros.gs, Casos.gs, Config.gs, Entrada.gs, Indicadores.gs, Instalacao.gs
 Index.html     10 telas: Estilos, Comuns, Trabalho, CadastrarCaso, BuscarCaso, TabelaCorretoras, Importacao, Produtividade, Configuracoes, Aplicacao
 SemAcesso.html a tela de acesso negado, servida sozinha pelo doGet
+appsscript.json o manifesto do projeto, com o fuso em São Paulo (opcional)
 
 NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode
 node Evolucao/Testes/gerar-pacote.js de novo.

@@ -3338,6 +3338,29 @@ que era antes desta etapa.
 
 ---
 
+## Etapa 60 — O fuso do PROJETO, e não só o da planilha
+
+Segunda correção da análise de 29/10 (achado 109). As datas digitadas — "07/10/2026" — viram
+data no fuso do **projeto do Apps Script**, e o sistema as lê no de São Paulo. Com o projeto
+em outro fuso, toda data recua um dia: filtros, prazos e o mês dos relatórios, sem erro
+nenhum. O diagnóstico conferia só o fuso da **planilha**.
+
+| Parte | O que ficou |
+|---|---|
+| **O diagnóstico** | Bloco "O ambiente" ganhou "O fuso do projeto": OK em `America/Sao_Paulo`, **FALHA** em outro fuso (com o que acontece e como acertar) e ATENÇÃO quando o Apps Script não responde qual é |
+| **O atualizarPGO** | O fuso do projeto não se acerta por código: o laudo diz, em "Para você", o fuso que está e o caminho para trocar |
+| **O manifesto** | `Back-End/appsscript.json` (São Paulo, V8) entrou no repositório, no pacote e no Excel. O `COMO-USAR.txt` ganhou o passo do fuso do projeto |
+
+7 testes novos em `testes-fuso-do-projeto.js`; 3 quebras de propósito, 3 pegas.
+
+### Para quem já usa
+
+No editor do Apps Script: **Configurações do projeto (a engrenagem) › Fuso horário ›
+(GMT-03:00) Horário de Brasília - São Paulo**. Depois rode o diagnóstico: o item novo diz se
+ficou certo.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

@@ -122,6 +122,8 @@ function gerar(pastaDeSaida) {
   fs.writeFileSync(path.join(destino, 'Codigo.gs'), servidor.conteudo);
   fs.writeFileSync(path.join(destino, 'Index.html'), telas.conteudo);
   fs.writeFileSync(path.join(destino, 'SemAcesso.html'), semAcesso);
+  // O manifesto, com o fuso do projeto em São Paulo (Etapa 60).
+  fs.copyFileSync(path.join(SERVIDOR, 'appsscript.json'), path.join(destino, 'appsscript.json'));
 
   const comoUsar = [
     'COMO USAR ESTE PACOTE',
@@ -140,9 +142,13 @@ function gerar(pastaDeSaida) {
     'ATENÇÃO AOS NOMES: no Apps Script o arquivo se chama "Index", e não',
     '"Index.html" — sem extensão, sem acento, com as maiúsculas iguais.',
     '',
-    '  5. Publique como aplicativo da web (executar como você).',
-    '  6. Execute instalarRECC() UMA vez, sobre uma planilha VAZIA.',
-    '  7. Execute diagnosticoRECC() para conferir tudo.',
+    '  5. O FUSO DO PROJETO: Configurações do projeto (a engrenagem) > Fuso',
+    '     horário > (GMT-03:00) Horário de Brasília - São Paulo. Fora dele, toda',
+    '     data digitada recua um dia. (Quem preferir: marque "Mostrar o arquivo de',
+    '     manifesto appsscript.json" e cole o appsscript.json deste pacote.)',
+    '  6. Publique como aplicativo da web (executar como você).',
+    '  7. Execute instalarRECC() UMA vez, sobre uma planilha VAZIA.',
+    '  8. Execute diagnosticoRECC() para conferir tudo — ele confere os dois fusos.',
     '',
     'SE A PLANILHA JÁ FOI USADA',
     '--------------------------',
@@ -172,6 +178,7 @@ function gerar(pastaDeSaida) {
       + servidor.arquivos.join(', '),
     'Index.html     ' + telas.coladas.length + ' telas: ' + telas.coladas.join(', '),
     'SemAcesso.html a tela de acesso negado, servida sozinha pelo doGet',
+    'appsscript.json o manifesto do projeto, com o fuso em São Paulo (opcional)',
     '',
     'NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode',
     'node Evolucao/Testes/gerar-pacote.js de novo.',

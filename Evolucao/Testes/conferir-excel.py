@@ -38,7 +38,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 PLANILHA = os.path.join(RAIZ, 'Evolucao', 'pacote', 'PGO-codigo-completo.xlsx')
 
 # De qual pasta vem cada arquivo. É a mesma lista que o gerador usa.
-ONDE_MORA = {'.gs': 'Back-End', '.html': 'Front-End'}
+ONDE_MORA = {'.gs': 'Back-End', '.html': 'Front-End', '.json': 'Back-End'}
 FORA_DO_PADRAO = {'conferir-projeto.gs': 'Evolucao'}
 
 

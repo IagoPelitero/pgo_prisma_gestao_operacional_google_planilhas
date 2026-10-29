@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1431 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1438 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -171,7 +171,13 @@ São duas situações, e cada uma tem o seu caminho:
    > única rotina que cria estrutura; depois dela, nenhum caminho do sistema
    > cria, renomeia ou apaga aba por conta própria.
 
-5. **Publique.** *Implantar › Nova implantação › App da Web*:
+5. **O fuso do projeto.** No editor do Apps Script: *Configurações do projeto (a
+   engrenagem) › Fuso horário › (GMT-03:00) Horário de Brasília - São Paulo*. O
+   instalador acerta o fuso da planilha, mas o do projeto não se acerta por
+   código — e fora de São Paulo toda data digitada recua um dia (Etapa 60). O
+   `appsscript.json` do repositório já vem com o fuso certo.
+
+6. **Publique.** *Implantar › Nova implantação › App da Web*:
    - **Executar como:** você.
    - **Quem pode acessar:** as pessoas da sua organização.
 
@@ -181,7 +187,7 @@ São duas situações, e cada uma tem o seu caminho:
    > dono é reconhecido: os outros veem a tela de acesso negado. Publique com
    > a conta da empresa.
 
-6. **Confira.** Execute **`diagnosticoRECC`** no editor. São doze blocos — fuso,
+7. **Confira.** Execute **`diagnosticoRECC`** no editor. São doze blocos — fuso,
    estrutura, sequências de Id, Ids repetidos, canais, campos, painéis,
    análises, sinalizadores, quem consegue configurar, a tela e os estilos — e
    cada problema vem com o que fazer. Ela só lê. A mesma conferência está em
@@ -193,7 +199,7 @@ São duas situações, e cada uma tem o seu caminho:
    > execute **`oQueFaltaNoProjeto`**: ela não depende de nenhum outro arquivo
    > do PGO. Depois, apague-a.
 
-7. **Abra o sistema** pelo endereço da implantação, defina a senha de
+8. **Abra o sistema** pelo endereço da implantação, defina a senha de
    administrador em **Configurações › Identidade** e cadastre a equipe em
    **Configurações › Usuários** — cada pessoa com o seu canal e o seu nível de
    acesso.
@@ -336,7 +342,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1431 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1438 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1632,7 +1638,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1431 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1438 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

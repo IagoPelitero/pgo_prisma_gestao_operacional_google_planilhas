@@ -126,6 +126,8 @@ def arquivos_do_codigo():
         for nome in sorted(os.listdir(caminho)):
             if nome.endswith(extensao):
                 achados.append((pasta, nome, papel))
+    # O manifesto (Etapa 60): o fuso do projeto em São Paulo.
+    achados.append(('Back-End', 'appsscript.json', 'manifesto'))
     # A conferência avulsa vai junto: é o que a pessoa roda quando algo falta.
     achados.append(('Evolucao', 'conferir-projeto.gs', 'conferência'))
     return achados

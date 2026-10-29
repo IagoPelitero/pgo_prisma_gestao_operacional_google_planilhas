@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 12:21
+   Gerado em 2026-10-29 13:10
    ========================================================================== */
 
 
@@ -18470,6 +18470,13 @@ function atualizarPGO() {
   var feito = [];
   var pulados = [];
   var paraVoce = [];
+  // O fuso do PROJETO não se acerta por código: só dizer (Etapa 60).
+  var fusoDoProjeto = fusoDoProjeto_();
+  if (fusoDoProjeto && fusoDoProjeto !== RECC_FUSO_HORARIO) {
+    paraVoce.push('O projeto do Apps Script está no fuso "' + fusoDoProjeto + '", e não em "'
+      + RECC_FUSO_HORARIO + '": toda data digitada recua um dia. '
+      + RECC_COMO_ACERTAR_O_FUSO_DO_PROJETO);
+  }
   // Algumas migrações escrevem direto na aba (uma coluna inteira, um
   // cabeçalho). O cache da configuração (Etapa 42) é esquecido no começo e no
   // fim, para nada do que mudou aqui ficar 5 minutos escondido.
@@ -20945,6 +20952,8 @@ function blocoDoAmbiente_() {
       'Arquivo › Configurações da planilha › Fuso horário. Enquanto estiver '
         + 'diferente, um caso registrado depois das 21 h cai no dia seguinte.'));
 
+  itens.push(itemDoFusoDoProjeto_());
+
   // O teto de 10 milhões de células é o único limite duro da plataforma, e o
   // único que não avisa antes: a planilha simplesmente para de aceitar linha
   // nova. Ver a porcentagem subindo é o que dá tempo de planejar a segunda
@@ -20976,6 +20985,42 @@ function blocoDoAmbiente_() {
 
   return itens;
 }
+
+/**
+ * O FUSO DO PROJETO do Apps Script — que não é o da planilha (Etapa 60).
+ *
+ * Achado da análise de 29/10: as datas digitadas ("07/10/2026") viram data no
+ * fuso do PROJETO, e o sistema as lê no de São Paulo. Projeto em outro fuso faz
+ * toda data recuar um dia — filtro, prazo e mês —, sem erro nenhum. O
+ * diagnóstico só conferia o fuso da planilha.
+ */
+function fusoDoProjeto_() {
+  try {
+    return typeof Session !== 'undefined' && Session.getScriptTimeZone
+      ? String(Session.getScriptTimeZone() || '') : '';
+  } catch (erro) {
+    return '';
+  }
+}
+
+function itemDoFusoDoProjeto_() {
+  var fuso = fusoDoProjeto_();
+  if (!fuso) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO, 'Não consegui ler o fuso do projeto',
+      'O Apps Script não respondeu qual é o fuso do projeto.',
+      RECC_COMO_ACERTAR_O_FUSO_DO_PROJETO);
+  }
+  return fuso === RECC_FUSO_HORARIO
+    ? item_(RECC_SITUACOES_DO_LAUDO.OK, 'O fuso do projeto é ' + fuso)
+    : item_(RECC_SITUACOES_DO_LAUDO.FALHA, 'O projeto do Apps Script está em outro fuso',
+      'O projeto diz "' + fuso + '" e o sistema conta o dia em "' + RECC_FUSO_HORARIO
+        + '". Toda data digitada recua um dia: filtros, prazos e o mês dos relatórios.',
+      RECC_COMO_ACERTAR_O_FUSO_DO_PROJETO);
+}
+
+const RECC_COMO_ACERTAR_O_FUSO_DO_PROJETO = 'No editor do Apps Script: Configurações do projeto '
+  + '(a engrenagem) › Fuso horário › (GMT-03:00) Horário de Brasília - São Paulo. Ou cole o '
+  + 'appsscript.json do pacote, que já vem com "America/Sao_Paulo".';
 
 function blocoDaEstrutura_() {
   var itens = [];

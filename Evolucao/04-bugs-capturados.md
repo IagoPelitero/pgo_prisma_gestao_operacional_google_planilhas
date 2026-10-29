@@ -2240,6 +2240,18 @@ caso novo. A mensagem ainda apontava para "um arquivo .gs que não foi copiado".
 duas vezes o mesmo código (Etapa 59). A suíte grava duas vezes com o mesmo código e confere
 uma linha só — em cadastrar, editar, status e importar.
 
+### 109 · O diagnóstico não conferia o fuso do projeto, só o da planilha
+
+**Sintoma.** Achado da análise de 29/10, ainda sem relato da operação: com o projeto do Apps
+Script fora de São Paulo, toda data digitada recuaria um dia.
+
+**Causa.** `converterParaData_` monta a data com `new Date(ano, mês, dia)`, que usa o fuso
+do PROJETO; a leitura formata no de São Paulo. O instalador acerta o fuso da planilha, mas o
+do projeto não se acerta por código — e ninguém conferia.
+
+**Defesa.** O diagnóstico confere `Session.getScriptTimeZone()` (FALHA fora de São Paulo), o
+`atualizarPGO` avisa, e o manifesto com o fuso certo vai no pacote (Etapa 60).
+
 ---
 
 ## O que esta lista ensina
@@ -2483,3 +2495,5 @@ Daí as duas práticas que o projeto não abre mão:
 59. **Desistir do lado da tela não desfaz nada do lado do servidor.** No item 108 o relógio
     de 40 segundos era tratado como "não gravou". Toda gravação que pode ser repetida
     precisa de um jeito de reconhecer a repetição.
+60. **Dois relógios precisam ser conferidos como dois.** No item 109 o "fuso" era um só
+    para o diagnóstico, e eram dois: o da planilha e o do projeto.

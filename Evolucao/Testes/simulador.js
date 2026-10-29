@@ -418,6 +418,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
    * mudança feita direto na planilha aparece quando o prazo vence.
    */
   const valoresDoCache = new Map();
+  // O fuso do PROJETO do Apps Script (Etapa 60): o certo, até o teste trocar.
+  const ambienteDoFuso = { fusoDoProjeto: 'America/Sao_Paulo' };
   let adiantadoEmMs = 0;
   const cache = {
     agora: () => Date.now() + adiantadoEmMs,
@@ -458,6 +460,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
      */
     trocarTelaPor(nome, conteudo) { telasTrocadas.set(nome, conteudo); },
     emailAtual() { return emailAtual; },
+    get fusoDoProjeto() { return ambienteDoFuso.fusoDoProjeto; },
+    set fusoDoProjeto(fuso) { ambienteDoFuso.fusoDoProjeto = fuso; },
     /**
      * Cria uma planilha "de fora" e devolve o Id.
      *
@@ -595,6 +599,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       // `comoUsuario` dos testes troca só quem CHAMA, que é o que acontece
       // quando outra pessoa usa o aplicativo publicado "como você".
       Session: {
+        // O fuso do PROJETO (Etapa 60). O teste troca em ambiente.fusoDoProjeto.
+        getScriptTimeZone: () => ambienteDoFuso.fusoDoProjeto,
         getActiveUser: () => ({ getEmail: () => emailAtual }),
         getEffectiveUser: () => ({ getEmail: () => email })
       },
