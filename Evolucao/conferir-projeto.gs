@@ -30,7 +30,7 @@ function oQueFaltaNoProjeto() {
     'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'camposDaSituacao', 'casoParaEditar', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
     'Config.gs': ['aplicarMudancasDaPlanilha', 'conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDoArquivoDaBase', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarErros', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'opcoesDoCarimboDoItem', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarHistoricoDaBase', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarPlanilhaDasAnalises', 'salvarSinalizador', 'usoDoItemDoCatalogo'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
-    'Indicadores.gs': ['detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'opcoesDaImportacaoDoChat', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'salvarComponentesDoPainel']
+    'Indicadores.gs': ['detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'opcoesDaImportacaoDoChat', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'resumoDoCanal', 'resumoDoInicio', 'salvarComponentesDoPainel']
   };
 
   var faltando = [];
@@ -47,7 +47,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 84 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 85 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

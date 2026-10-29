@@ -1244,6 +1244,95 @@ function casosPertoDeVencer_(registros, canal) {
   });
 }
 
+/** Os casos com algum prazo já estourado e ainda não encerrados (Etapa 67). */
+function casosEstourados_(registros, canal) {
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  if (!sinalizadores.length) return [];
+  var situacoes = situacoesPorChave_(canal);
+  var agora = relogioDeParede_(new Date());
+  return registros.filter(function (registro) {
+    return sinalizadores.some(function (sinalizador) {
+      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      return sinal !== null && sinal.tom === 'ruim' && !sinal.encerrado;
+    });
+  });
+}
+
+/*
+ * A TELA INICIAL (Etapa 67). Decisões do PO: abre o sistema, para todos, com
+ * "Meu dia" (os meus abertos, perto de vencer e estourados), "O dia da
+ * operação" (entradas e encerrados hoje, perto de vencer e estourados da
+ * equipe — só para quem não tem o alcance restrito aos próprios casos),
+ * atalhos e novidades da versão.
+ *
+ * O PERÍODO é o da abertura do Trabalho — do dia 1 do mês até hoje —, lido do
+ * mesmo jeito (registrosDosPeriodos_). É de propósito: o número da tela inicial
+ * leva ao Trabalho, e lá ele tem de ser o mesmo.
+ */
+function resumoDoInicio() {
+  var quem = exigirTela_('inicio');
+  var periodo = resolverPeriodo_({ tipo: 'intervalo', de: '', ate: '' });   // a abertura
+  var hoje = Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var doDia = function (valor) {
+    var data = converterParaData_(valor);
+    return !!data && Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') === hoje;
+  };
+  var euMesmo = normalizarParaComparar_(quem.usuario.Nome);
+  var daOperacao = quem.permissoes.escopo !== 'PROPRIOS';
+
+  var canais = canaisQueEuVejo_(quem).map(function (umCanal) {
+    var canal = comAGrafiaDaAba_(umCanal);
+    var situacoes = situacoesPorChave_(canal);
+    var ehFinal = function (registro) {
+      var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
+      return !!(situacao && situacao.final);
+    };
+    var registros = filtrarPeloAlcance_(registrosDosPeriodos_(canal, [{ de: periodo.de,
+      ate: periodo.ate, guardarSemData: true }]).registros, canal.aba, quem);
+    var abertos = registros.filter(function (registro) { return !ehFinal(registro); });
+    var responsavel = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
+    var meus = abertos.filter(function (registro) {
+      return responsavel && normalizarParaComparar_(registro[responsavel]) === euMesmo;
+    });
+
+    return {
+      id: canal.id,
+      nome: canal.nome,
+      icone: canal.icone,
+      meuDia: {
+        abertos: meus.length,
+        pertoDeVencer: casosPertoDeVencer_(meus, canal).length,
+        estourados: casosEstourados_(meus, canal).length
+      },
+      operacao: daOperacao ? {
+        entradasHoje: canal.colunaDaData ? registros.filter(function (registro) {
+          return doDia(registro[canal.colunaDaData]);
+        }).length : 0,
+        // Encerrado hoje: status Final, com a finalização, o carimbo do próprio
+        // status ou a última mudança de status de hoje — num caso encerrado, a
+        // última mudança É o encerramento.
+        encerradosHoje: registros.filter(function (registro) {
+          if (!ehFinal(registro)) return false;
+          var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
+          return (canal.colunaDaFinalizacao && doDia(registro[canal.colunaDaFinalizacao]))
+            || (situacao.colunaDeCarimbo && doDia(registro[situacao.colunaDeCarimbo]))
+            || doDia(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+        }).length,
+        abertos: abertos.length,
+        pertoDeVencer: casosPertoDeVencer_(abertos, canal).length,
+        estourados: casosEstourados_(abertos, canal).length
+      } : null
+    };
+  });
+
+  return {
+    usuario: quem.usuario.Nome,
+    periodo: periodo.rotulo,
+    canais: canais,
+    versao: RECC_VERSAO
+  };
+}
+
 /* ============================================================================
    O SLA EM HORAS ÚTEIS
    ============================================================================

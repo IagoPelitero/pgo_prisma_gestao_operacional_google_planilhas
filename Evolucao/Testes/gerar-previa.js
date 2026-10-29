@@ -232,6 +232,9 @@ function pontePreparada(respostas) {
     + '      opcoesDaBusca: function () {\n'
     + '        responder(respostas.busca.opcoes);\n'
     + '      },\n'
+    + '      resumoDoInicio: function () {\n'
+    + '        responder(respostas.busca.inicio);\n'
+    + '      },\n'
     + '      tabelaDeCorretoras: function (procurar, segmento) {\n'
     + '        var chave = String(procurar || "") + "|" + String(segmento || "");\n'
     + '        responder(respostas.corretoras.tabelas[chave]\n'
@@ -1062,6 +1065,8 @@ function gerar(pastaDeSaida) {
   const opcoesDaBusca = chamar('opcoesDaBusca()');
 
   const busca = {
+    // A tela inicial (Etapa 67) vem junto da busca: as duas são de todo mundo.
+    inicio: chamar('resumoDoInicio')(),
     opcoes: opcoesDaBusca,
     legado: chamar('configuracaoDoLegado()'),
     resultados: resultadosDaBusca,

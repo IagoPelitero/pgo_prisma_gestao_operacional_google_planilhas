@@ -259,6 +259,12 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 var Rotas = (function () {
 
   var TELAS = {
+    inicio: {
+      titulo: 'Início',
+      subtitulo: 'O seu dia e o da operação, por canal, com os atalhos e as novidades.',
+      montar: function (pacote) { return TelaInicio.montar(pacote); },
+      ligar: function (pacote) { TelaInicio.ligar(pacote); }
+    },
     trabalho: {
       titulo: 'Trabalho',
       subtitulo: 'Visão do dia: indicadores e a fila de trabalho da sua equipe.',
@@ -576,7 +582,8 @@ var Aplicacao = (function () {
     elemento('aplicacao').hidden = false;
     restaurarEncolhido();
     aplicarTema(pacote.tema || 'padrao');
-    irPara(telaDoEndereco() || 'trabalho', true);
+    // A tela inicial abre o sistema (Etapa 67); quem não a tem cai no 1º item do menu.
+    irPara(telaDoEndereco() || 'inicio', true);
     ligarTeclado();
   }
 

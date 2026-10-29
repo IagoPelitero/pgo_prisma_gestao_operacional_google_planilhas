@@ -705,7 +705,7 @@ function rodarTestesDeDiagnostico() {
       + servidor.map((a) => a.nome).join(', '));
 
     const telas = arquivosDe('Front-End', '.html');
-    igual(telas.length, 12, 'as doze telas: ' + telas.map((a) => a.nome).join(', '));
+    igual(telas.length, 13, 'as treze telas (com o Início, Etapa 67): ' + telas.map((a) => a.nome).join(', '));
   });
 
   teste('nenhum .gs tem o mesmo nome de um .html', () => {

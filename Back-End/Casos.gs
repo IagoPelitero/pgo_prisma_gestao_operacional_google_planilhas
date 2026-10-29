@@ -1592,7 +1592,45 @@ function casoParaEditar(idDoCanal, idDoCaso) {
   });
 
   return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema,
-    versao: versaoDoCaso_(registro, canal.aba) };
+    versao: versaoDoCaso_(registro, canal.aba),
+    linhaDoTempo: linhaDoTempoDoCaso_(registro, estrutura, canal) };
+}
+
+/*
+ * A LINHA DO TEMPO DO CASO (Etapa 67, decisão do PO: dos carimbos do próprio
+ * caso). Toda coluna de data preenchida é um acontecimento — a entrada, o 1º e
+ * o 2º contato, cada status carimbado, a finalização —, em ordem de quando
+ * aconteceu. Vem da linha do caso: não some com o tempo, e vai junto para o
+ * histórico. A data da entrada leva a hora da entrada, quando o canal tem.
+ */
+function linhaDoTempoDoCaso_(registro, estrutura, canal) {
+  var eventos = [];
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    if (!cabecalho || cabecalho.charAt(0) === '_') return;
+    var tipo = estrutura.tipos[posicao];
+    if (tipo !== RECC_TIPO_DE_DADO.DATA && tipo !== RECC_TIPO_DE_DADO.DATA_HORA) return;
+    var quando = converterParaDataEHora_(registro[cabecalho]) || converterParaData_(registro[cabecalho]);
+    if (!quando) return;
+    var ehAEntrada = canal.colunaDaData
+      && normalizarParaComparar_(cabecalho) === normalizarParaComparar_(canal.colunaDaData);
+    if (ehAEntrada && canal.colunaDaHora) {
+      var hora = String(registro[canal.colunaDaHora] || '').match(/(\d{1,2}):(\d{2})/);
+      if (hora) quando = new Date(quando.getFullYear(), quando.getMonth(), quando.getDate(),
+        Number(hora[1]), Number(hora[2]));
+    }
+    var temHora = quando.getHours() || quando.getMinutes();
+    eventos.push({
+      quando: quando.getTime(),
+      data: Utilities.formatDate(quando, RECC_FUSO_HORARIO, temHora ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy'),
+      oQue: ehAEntrada ? 'Entrada do caso' : cabecalho,
+      entrada: !!ehAEntrada
+    });
+  });
+  // Em ordem; no mesmo instante, a entrada primeiro.
+  eventos.sort(function (um, outro) {
+    return um.quando - outro.quando || (outro.entrada ? 1 : 0) - (um.entrada ? 1 : 0);
+  });
+  return eventos.map(function (evento) { return { data: evento.data, oQue: evento.oQue }; });
 }
 
 /**

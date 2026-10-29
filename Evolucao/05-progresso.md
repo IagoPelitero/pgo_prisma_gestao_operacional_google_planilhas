@@ -3595,6 +3595,32 @@ de propósito: 8 pegas na primeira rodada; o teto de 150 pedaços escapou e ganh
 
 ---
 
+## Etapa 67 — A cara de sistema
+
+Oitava parte da rodada de 29/10 (o "deixar o PGO com cara de sistema de gestão"). Decisões do
+PO: a tela inicial **abre o sistema, para todos**, com os quatro blocos; a linha do tempo do
+caso vem **dos carimbos do próprio caso**.
+
+| Parte | O que ficou |
+|---|---|
+| **Tela inicial** (`Inicio.html`, `resumoDoInicio`) | Primeira tela do menu e a abertura do sistema. Por canal: **Meu dia** (meus abertos, perto de vencer, estourados) e **O dia da operação** (entradas e encerrados de hoje, abertos, perto de vencer e estourados — só para quem não tem o alcance restrito aos próprios casos). **Atalhos** para Cadastrar, Buscar e Importação (os que a pessoa pode abrir) e as **Novidades da versão**. Os números são os do Trabalho na abertura (do dia 1 até hoje, lidos do mesmo jeito), e clicar num canal abre o Trabalho daquele canal |
+| **Encerrado hoje** | Status Final com a finalização, o carimbo do próprio status ou a última mudança de status de hoje — num caso encerrado, a última mudança é o encerramento |
+| **Os níveis de acesso** | A instalação nova já traz a tela em todos os níveis; o `atualizarPGO` liga nos níveis de antes **uma vez só** (marca `INICIO.LIGADA`): quem tirar a tela de um nível não a vê voltar |
+| **Linha do tempo do caso** | No "Trabalhar no caso": toda coluna de data preenchida é um acontecimento — a entrada (com a hora, quando o canal tem), os contatos, cada status carimbado, a finalização —, em ordem. Vem da linha do caso: não some com o tempo e vai junto para o histórico |
+| **O aviso no canto** (`Moldura.toast`) | Um só para o sistema: havia duas cópias (Configurações e Tabela de Corretoras). Os avisos se empilham, entram com uma animação curta (que respeita "reduzir movimento") e o de erro fica mais tempo |
+| **Esqueleto de carregamento** (`Moldura.esqueleto`) | O desenho do que vem no Início, no Trabalho e na Produtividade, em vez da frase solta — a frase continua, para o leitor de tela |
+| **Versão e novidades** (`RECC_VERSAO`) | Versão 1.67 no rodapé do menu (vai no pacote de partida) e as novidades, na língua de quem usa, na tela inicial |
+
+15 testes novos em `testes-cara-de-sistema.js` (a tela primeiro e em todos os níveis, a ligação
+única nos níveis de antes, a abertura, Meu dia só com os meus, o dia da operação, os números
+iguais aos do Trabalho, o alcance restrito sem a operação, a versão, quem pode ver, a linha do
+tempo em ordem, o desenho dela, o aviso único, o esqueleto e a versão no rodapé) e 4 no ponta a
+ponta (abre no Início com a versão, o canal clicado abre o Trabalho dele, a linha do tempo no
+modal, o aviso que some sozinho). 7 quebras de propósito, 7 pegas. As contagens antigas do menu
+(7 telas) e dos arquivos de tela (12) passaram a 8 e 13.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

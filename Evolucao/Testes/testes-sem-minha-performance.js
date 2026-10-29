@@ -65,10 +65,10 @@ function rodarTestesSemMinhaPerformance() {
     verdadeiro(lerFonte('Front-End', 'Estilos.html').indexOf('.ranking') < 0, 'o do ranking');
   });
 
-  teste('o menu de quem administra tem as sete telas que ficaram', () => {
+  teste('o menu de quem administra tem as telas que ficaram (e o Início, da Etapa 67)', () => {
     const t = umaInstalacao();
     igual(t.chamar('pacoteDePartida()').menu.map((m) => m.tela).join(','),
-      'trabalho,cadastrarCaso,buscarCaso,tabelaCorretoras,importacao,produtividade,configuracoes');
+      'inicio,trabalho,cadastrarCaso,buscarCaso,tabelaCorretoras,importacao,produtividade,configuracoes');
   });
 
   teste('a tela não está na lista de telas do sistema, nem entre os títulos editáveis', () => {

@@ -161,7 +161,7 @@ function rodarTestesDeAcesso() {
       'e a CHAVE não muda com o nome — é ela que identifica a tela');
 
     ambiente.definirEmail('primeiro.adm@exemplo.com');
-    igual(chamar('pacoteDePartida()').menu.length, 7, 'o Administrador vê tudo');
+    igual(chamar('pacoteDePartida()').menu.length, 8, 'o Administrador vê tudo (com o Início, Etapa 67)');
   });
 
   teste('a guarda do servidor barra a ação que o nível não tem', () => {

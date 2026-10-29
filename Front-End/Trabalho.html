@@ -39,7 +39,7 @@ var TelaTrabalho = (function () {
   function montar(pacote) {
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
+      + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
 
   /**
@@ -641,7 +641,14 @@ var TelaTrabalho = (function () {
   // `opcoesDeMostrar` sai para o teste: é a regra do PO, "caso tenha a
   // quantidade", e vale conferir sem desenhar a tela. `casosPertoDeVencer` e
   // `rotuloDoCaso` também: decidem o que entra no aviso e como o caso aparece.
-  return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar,
+  /** A tela inicial (Etapa 67) abre o Trabalho já no canal clicado. */
+  function abrirNoCanal(idDoCanal) {
+    canalEscolhido = idDoCanal;
+    filtrosEscolhidos = {};
+    Aplicacao.irPara('trabalho');
+  }
+
+  return { montar: montar, ligar: ligar, abrirNoCanal: abrirNoCanal, opcoesDeMostrar: opcoesDeMostrar,
     casosPertoDeVencer: casosPertoDeVencer, rotuloDoCaso: rotuloDoCaso,
     expandirFila: expandirFila };
 })();

@@ -3727,16 +3727,9 @@ var TelaConfiguracoes = (function () {
     avisar(mensagem || 'Salvo.', 'bom');
   }
 
-  /** Um recado flutuante, no tom pedido. Some sozinho. */
+  /** Um recado flutuante, no tom pedido. Some sozinho (Moldura.toast, Etapa 67). */
   function avisar(mensagem, tom) {
-    var aviso = document.createElement('div');
-    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
-    aviso.setAttribute('role', 'status');
-    aviso.textContent = mensagem;
-    document.body.appendChild(aviso);
-    window.setTimeout(function () {
-      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
-    }, tom === 'ruim' ? 6000 : 3200);
+    Moldura.toast(mensagem, tom);
   }
 
   function mostrarErroNoPainel(erro) {

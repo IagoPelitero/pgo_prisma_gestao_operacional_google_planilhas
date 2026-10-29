@@ -49,6 +49,12 @@ var Moldura = (function () {
    * traço. É o que faz sete desenhos diferentes parecerem um conjunto.
    */
   var DESENHOS = {
+    // a tela inicial (Etapa 67): a casa, com o telhado e a porta
+    inicio:
+      '<path d="M3.8 11.2 12 4.4l8.2 6.8"></path>'
+      + '<path d="M6 9.6v9.9h12V9.6"></path>'
+      + '<path d="M10 19.5v-5h4v5"></path>',
+
     // painel: quatro áreas iguais, como os cartões da tela
     trabalho:
       '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
@@ -280,10 +286,12 @@ var Moldura = (function () {
     }).join('');
 
     var rodape = '';
-    if (pacote.identidade.plataforma || pacote.identidade.fabricante) {
+    if (pacote.identidade.plataforma || pacote.identidade.fabricante || pacote.versao) {
       rodape = '<div class="lateral-pe">'
         + '<div>' + escapar(pacote.identidade.plataforma) + '</div>'
         + '<div class="fabricante">' + escapar(pacote.identidade.fabricante) + '</div>'
+        // A versão (Etapa 67): quem liga para o suporte diz qual está usando.
+        + (pacote.versao ? '<div class="versao">Versão ' + escapar(pacote.versao) + '</div>' : '')
         + '</div>';
     }
 
@@ -473,12 +481,54 @@ var Moldura = (function () {
       + 'Limpar filtros</button>';
   }
 
+  /*
+    O AVISO DISCRETO NO CANTO (Etapa 67) — um só para o sistema inteiro. Havia
+    duas cópias dele (Configurações e Tabela de Corretoras); agora toda tela
+    usa esta, e os avisos se empilham em vez de cobrir um ao outro. O erro
+    fica mais tempo na tela: é o que mais precisa ser lido.
+  */
+  function toast(mensagem, tom) {
+    var pilha = document.getElementById('avisos-flutuantes');
+    if (!pilha) {
+      pilha = document.createElement('div');
+      pilha.id = 'avisos-flutuantes';
+      pilha.className = 'avisos-flutuantes';
+      pilha.setAttribute('aria-live', 'polite');
+      document.body.appendChild(pilha);
+    }
+    var aviso = document.createElement('div');
+    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
+    aviso.setAttribute('role', 'status');
+    aviso.textContent = mensagem;
+    pilha.appendChild(aviso);
+    window.setTimeout(function () {
+      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
+    }, tom === 'ruim' ? 6000 : 3200);
+    return aviso;
+  }
+
+  /*
+    O ESQUELETO DE CARREGAMENTO (Etapa 67): o desenho do que vem, em vez de uma
+    frase solta. A frase continua — é ela que o leitor de tela anuncia.
+  */
+  function esqueleto(texto, cartoes) {
+    var blocos = [];
+    for (var i = 0; i < (cartoes || 4); i++) blocos.push('<span class="esqueleto-cartao"></span>');
+    return '<div class="esqueleto" aria-busy="true">'
+      + '<p class="carregando-campos">' + escapar(texto || 'Carregando…') + '</p>'
+      + '<div class="esqueleto-cartoes">' + blocos.join('') + '</div>'
+      + '<span class="esqueleto-linha"></span><span class="esqueleto-linha"></span>'
+      + '<span class="esqueleto-linha curta"></span></div>';
+  }
+
   return {
     avisoDeJanela: avisoDeJanela,
     botaoLimparFiltros: botaoLimparFiltros,
     caixaDeFiltros: caixaDeFiltros,
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
+    toast: toast,
+    esqueleto: esqueleto,
     // Os desenhos são de todas as telas, e não só do menu: a fila usa o olho,
     // o lápis e a lixeira, e eles precisam vir da mesma grade e da mesma
     // espessura, senão a tela parece montada com peças de dois conjuntos.
@@ -1980,7 +2030,8 @@ var CasoEmModal = (function () {
       Formulario.ligar(corpo, 'editar-', canalAtual,
         oFormulario.canal.confereSusepBloqueada !== false, idAtual);
       Formulario.preencher(corpo, osValores.valores);
-      elemento('modal-do-sistema').innerHTML = desenharDoSistema(osValores.doSistema);
+      elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
+        + desenharDoSistema(osValores.doSistema);
       elemento('modal-salvar').disabled = false;
     }
 
@@ -2018,6 +2069,20 @@ var CasoEmModal = (function () {
     "Quem mudou o status" pareceria um campo que a pessoa esqueceu de
     preencher.
   */
+  /*
+    A LINHA DO TEMPO DO CASO (Etapa 67): os carimbos do próprio caso — a
+    entrada, os contatos, cada status carimbado, a finalização —, em ordem.
+  */
+  function desenharLinhaDoTempo(eventos) {
+    if (!eventos || !eventos.length) return '';
+    return '<section class="linha-do-tempo" aria-label="Linha do tempo do caso">'
+      + '<h4>Linha do tempo</h4><ol>'
+      + eventos.map(function (evento) {
+        return '<li><span class="quando">' + escapar(evento.data) + '</span>'
+          + '<span class="oque">' + escapar(evento.oQue) + '</span></li>';
+      }).join('') + '</ol></section>';
+  }
+
   function desenharDoSistema(linhas) {
     if (!linhas || !linhas.length) return '';
     var temSua = linhas.some(function (linha) { return linha.editavel; });

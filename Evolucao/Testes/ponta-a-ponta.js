@@ -240,6 +240,21 @@ async function rodar() {
       'o pacote injetado veio sem menu');
   });
 
+  await teste('o sistema abre na tela inicial, com a versão no rodapé (Etapa 67)', async () => {
+    // A abertura não grava endereço (é ela mesma): a prova é a tela no miolo.
+    await pagina.waitForSelector('#inicio .inicio-canal', { timeout: 10000 });
+    verdadeiro((await pagina.$$('#painel')).length === 0, 'abriu no Início, e não no Trabalho');
+    const canais = await pagina.$$eval('.inicio-canal', (es) => es.length);
+    verdadeiro(canais >= 2, canais + ' canais na tela inicial');
+    const textoDaTela = await pagina.$eval('#inicio', (el) => el.textContent);
+    verdadeiro(textoDaTela.indexOf('Meu dia') >= 0, 'o bloco "Meu dia"');
+    verdadeiro(textoDaTela.indexOf('O dia da operação') >= 0, 'o bloco da operação (o ADM vê todos)');
+    verdadeiro(textoDaTela.indexOf('Novidades da versão') >= 0, 'as novidades');
+    verdadeiro((await pagina.$$('[data-atalho="cadastrarCaso"]')).length === 1, 'o atalho do Cadastrar');
+    const versao = await pagina.$eval('.lateral-pe .versao', (el) => el.textContent);
+    verdadeiro(/Versão \d/.test(versao), 'a versão no rodapé do menu: ' + versao);
+  });
+
   await teste('abrir o sistema não pede o pacote ao servidor', async () => {
     // Era a segunda viagem em fila: a página chegava, e só então o navegador
     // perguntava quem é você. Agora a resposta vem junto com a página.
@@ -1087,6 +1102,40 @@ async function rodar() {
       return campo && campo.value === '';
     }, null, { timeout: 10000 });
     igual(await valor('#painel [data-periodo="de"]'), noCalendario(1), 'e o período volta ao dia 1');
+  });
+
+  /* ---------------------------------------------------- a cara de sistema -- */
+
+  console.log('\nA cara de sistema (Etapa 67)');
+
+  await teste('clicar num canal da tela inicial abre o Trabalho daquele canal', async () => {
+    await pagina.click('[data-tela="inicio"]');
+    await pagina.waitForSelector('.inicio-canal', { timeout: 10000 });
+    const segundo = await pagina.$$eval('[data-canal-do-inicio]', (es) => es[1].getAttribute('data-canal-do-inicio'));
+    await pagina.click('[data-canal-do-inicio="' + segundo + '"]');
+    await pagina.waitForSelector('#painel .caixa-de-filtros, #painel table', { timeout: 10000 });
+    igual(await pagina.evaluate(() => location.hash), '#trabalho');
+    const escolhido = await pagina.$eval('.canais .canal.atual', (el) => el.getAttribute('data-canal'));
+    igual(escolhido, segundo, 'o canal clicado veio escolhido');
+  });
+
+  await teste('o "Trabalhar no caso" mostra a linha do tempo do caso', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-trabalhar]', { timeout: 10000 });
+    await pagina.click('[data-trabalhar]');
+    await pagina.waitForSelector('#modal-do-sistema .linha-do-tempo li', { timeout: 10000 });
+    const eventos = await pagina.$$eval('#modal-do-sistema .linha-do-tempo .oque', (es) => es.map((e) => e.textContent));
+    verdadeiro(eventos.indexOf('Entrada do caso') >= 0, 'a entrada na linha do tempo: ' + eventos.join(' | '));
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForTimeout(300);
+  });
+
+  await teste('o aviso de salvo aparece no canto, e some sozinho', async () => {
+    await pagina.evaluate(() => Moldura.toast('Salvo no teste.', 'bom'));
+    const aviso = await pagina.$eval('#avisos-flutuantes .aviso-flutuante', (el) => el.textContent);
+    igual(aviso, 'Salvo no teste.');
+    await pagina.waitForFunction(() => !document.querySelector('#avisos-flutuantes .aviso-flutuante'),
+      null, { timeout: 6000 });
   });
 
   /* ------------------------------------------------------------- o final -- */

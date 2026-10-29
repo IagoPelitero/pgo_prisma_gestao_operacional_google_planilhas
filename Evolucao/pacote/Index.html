@@ -1446,15 +1446,72 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   border-color: color-mix(in srgb, var(--ruim) 85%, black);
 }
 
-.aviso-flutuante {
+.avisos-flutuantes {
   position: fixed; z-index: 70; right: 18px; bottom: 18px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
   max-width: min(420px, calc(100vw - 36px));
+}
+.aviso-flutuante {
+  animation: aviso-entra 0.18s ease-out;
   color: var(--tom); background: var(--tom-tenue);
   border: 1px solid color-mix(in srgb, var(--tom) 30%, transparent);
   border-radius: var(--raio-pequeno); padding: 10px 16px;
   font-size: 13.5px; font-weight: 600; line-height: 1.45;
   box-shadow: var(--sombra);
 }
+
+@keyframes aviso-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.esqueleto { display: grid; gap: 12px; }
+.esqueleto .carregando-campos { margin: 0; }
+.esqueleto-cartoes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.esqueleto-cartao, .esqueleto-linha {
+  display: block; border-radius: var(--raio-pequeno);
+  background: linear-gradient(90deg, var(--linha) 0%, var(--superficie) 50%, var(--linha) 100%);
+  background-size: 200% 100%; animation: esqueleto-brilha 1.3s ease-in-out infinite;
+}
+.esqueleto-cartao { height: 74px; }
+.esqueleto-linha { height: 14px; }
+.esqueleto-linha.curta { width: 55%; }
+@keyframes esqueleto-brilha { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto-cartao, .esqueleto-linha, .aviso-flutuante { animation: none; }
+}
+.lateral-pe .versao { opacity: 0.75; font-size: 11.5px; margin-top: 2px; }
+
+.linha-do-tempo { margin: 14px 0; }
+.linha-do-tempo h4 { margin: 0 0 8px; font-size: 13.5px; }
+.linha-do-tempo ol { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--linha); display: grid; gap: 8px; }
+.linha-do-tempo li { position: relative; display: grid; gap: 1px; }
+.linha-do-tempo li::before {
+  content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--destaque); border: 2px solid var(--superficie);
+}
+.linha-do-tempo .quando { font-size: 12px; opacity: 0.75; }
+.linha-do-tempo .oque { font-weight: 600; font-size: 13.5px; }
+
+.inicio-saudacao { margin: 0 0 14px; color: var(--texto-suave, inherit); }
+.inicio-atalhos { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.inicio-atalho { display: inline-flex; align-items: center; gap: 8px; }
+.inicio-atalho svg { width: 18px; height: 18px; }
+.inicio-canais { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.inicio-canal {
+  display: grid; gap: 10px; text-align: left; cursor: pointer; padding: 16px;
+  color: var(--texto); font: inherit;
+}
+.inicio-canal:hover { border-color: var(--linha-forte); }
+.inicio-canal-nome { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.inicio-canal-nome svg { width: 20px; height: 20px; }
+.inicio-bloco-titulo { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+.inicio-numeros { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); }
+.inicio-numero { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--raio-pequeno); background: var(--fundo, transparent); border: 1px solid var(--linha); }
+.inicio-numero strong { font-size: 20px; line-height: 1.1; }
+.inicio-numero span { font-size: 12px; opacity: 0.8; }
+.inicio-numero[class*="tom-"] { color: var(--tom); background: var(--tom-tenue); border-color: color-mix(in srgb, var(--tom) 30%, transparent); }
+.inicio-novidades { margin-top: 16px; padding: 16px; }
+.inicio-novidades h3 { margin: 0 0 8px; font-size: 15px; }
+.inicio-novidades small { font-weight: 400; opacity: 0.7; margin-left: 6px; }
+.inicio-novidades ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 
 .config-canais-cartao {
   display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr);
@@ -1892,6 +1949,11 @@ var Moldura = (function () {
 
   var DESENHOS = {
 
+    inicio:
+      '<path d="M3.8 11.2 12 4.4l8.2 6.8"></path>'
+      + '<path d="M6 9.6v9.9h12V9.6"></path>'
+      + '<path d="M10 19.5v-5h4v5"></path>',
+
     trabalho:
       '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
       + '<rect x="13.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
@@ -2064,10 +2126,12 @@ var Moldura = (function () {
     }).join('');
 
     var rodape = '';
-    if (pacote.identidade.plataforma || pacote.identidade.fabricante) {
+    if (pacote.identidade.plataforma || pacote.identidade.fabricante || pacote.versao) {
       rodape = '<div class="lateral-pe">'
         + '<div>' + escapar(pacote.identidade.plataforma) + '</div>'
         + '<div class="fabricante">' + escapar(pacote.identidade.fabricante) + '</div>'
+
+        + (pacote.versao ? '<div class="versao">Versão ' + escapar(pacote.versao) + '</div>' : '')
         + '</div>';
     }
 
@@ -2189,12 +2253,44 @@ var Moldura = (function () {
       + 'Limpar filtros</button>';
   }
 
+  function toast(mensagem, tom) {
+    var pilha = document.getElementById('avisos-flutuantes');
+    if (!pilha) {
+      pilha = document.createElement('div');
+      pilha.id = 'avisos-flutuantes';
+      pilha.className = 'avisos-flutuantes';
+      pilha.setAttribute('aria-live', 'polite');
+      document.body.appendChild(pilha);
+    }
+    var aviso = document.createElement('div');
+    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
+    aviso.setAttribute('role', 'status');
+    aviso.textContent = mensagem;
+    pilha.appendChild(aviso);
+    window.setTimeout(function () {
+      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
+    }, tom === 'ruim' ? 6000 : 3200);
+    return aviso;
+  }
+
+  function esqueleto(texto, cartoes) {
+    var blocos = [];
+    for (var i = 0; i < (cartoes || 4); i++) blocos.push('<span class="esqueleto-cartao"></span>');
+    return '<div class="esqueleto" aria-busy="true">'
+      + '<p class="carregando-campos">' + escapar(texto || 'Carregando…') + '</p>'
+      + '<div class="esqueleto-cartoes">' + blocos.join('') + '</div>'
+      + '<span class="esqueleto-linha"></span><span class="esqueleto-linha"></span>'
+      + '<span class="esqueleto-linha curta"></span></div>';
+  }
+
   return {
     avisoDeJanela: avisoDeJanela,
     botaoLimparFiltros: botaoLimparFiltros,
     caixaDeFiltros: caixaDeFiltros,
     montarLateral: montarLateral,
     montarSuperior: montarSuperior,
+    toast: toast,
+    esqueleto: esqueleto,
 
     icone: icone,
     escapar: escapar,
@@ -3121,7 +3217,8 @@ var CasoEmModal = (function () {
       Formulario.ligar(corpo, 'editar-', canalAtual,
         oFormulario.canal.confereSusepBloqueada !== false, idAtual);
       Formulario.preencher(corpo, osValores.valores);
-      elemento('modal-do-sistema').innerHTML = desenharDoSistema(osValores.doSistema);
+      elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
+        + desenharDoSistema(osValores.doSistema);
       elemento('modal-salvar').disabled = false;
     }
 
@@ -3149,6 +3246,16 @@ var CasoEmModal = (function () {
         quandoAsDuasChegarem();
       })
       .senao(falhou);
+  }
+
+  function desenharLinhaDoTempo(eventos) {
+    if (!eventos || !eventos.length) return '';
+    return '<section class="linha-do-tempo" aria-label="Linha do tempo do caso">'
+      + '<h4>Linha do tempo</h4><ol>'
+      + eventos.map(function (evento) {
+        return '<li><span class="quando">' + escapar(evento.data) + '</span>'
+          + '<span class="oque">' + escapar(evento.oQue) + '</span></li>';
+      }).join('') + '</ol></section>';
   }
 
   function desenharDoSistema(linhas) {
@@ -3811,6 +3918,118 @@ var SeletorDePeriodo = (function () {
 
 
 
+<!-- ==== Inicio.html ==== -->
+<script>
+
+var TelaInicio = (function () {
+
+  var pacoteDoSistema = null;
+  var ATALHOS = ['cadastrarCaso', 'buscarCaso', 'importacao'];
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function elemento(id) { return document.getElementById(id); }
+
+  function montar(pacote) {
+    pacoteDoSistema = pacote;
+    return '<div id="inicio">' + Moldura.esqueleto('Preparando o seu dia…', 3) + '</div>';
+  }
+
+  function numero(valor, rotulo, tom) {
+    return '<div class="inicio-numero' + (tom && valor ? ' tom-' + tom : '') + '">'
+      + '<strong>' + escapar(String(valor)) + '</strong><span>' + escapar(rotulo) + '</span></div>';
+  }
+
+  function cartaoDoCanal(canal) {
+    return '<button type="button" class="cartao inicio-canal" data-canal-do-inicio="'
+      + escapar(canal.id) + '" title="Abrir o Trabalho de ' + escapar(canal.nome) + '">'
+      + '<span class="inicio-canal-nome">' + SeletorDeCanal.icone(canal.icone)
+      + escapar(canal.nome) + '</span>'
+      + '<span class="inicio-bloco-titulo">Meu dia</span>'
+      + '<span class="inicio-numeros">'
+      + numero(canal.meuDia.abertos, 'meus abertos')
+      + numero(canal.meuDia.pertoDeVencer, 'perto de vencer', 'atencao')
+      + numero(canal.meuDia.estourados, 'estourados', 'ruim')
+      + '</span>'
+      + (canal.operacao
+        ? '<span class="inicio-bloco-titulo">O dia da operação</span>'
+          + '<span class="inicio-numeros">'
+          + numero(canal.operacao.entradasHoje, 'entradas hoje')
+          + numero(canal.operacao.encerradosHoje, 'encerrados hoje', 'bom')
+          + numero(canal.operacao.abertos, 'abertos')
+          + numero(canal.operacao.pertoDeVencer, 'perto de vencer', 'atencao')
+          + numero(canal.operacao.estourados, 'estourados', 'ruim')
+          + '</span>'
+        : '')
+      + '</button>';
+  }
+
+  function atalhos() {
+    var meus = pacoteDoSistema.menu.filter(function (item) {
+      return ATALHOS.indexOf(item.tela) >= 0;
+    });
+    if (!meus.length) return '';
+    return '<section class="inicio-atalhos" aria-label="Atalhos">'
+      + meus.map(function (item) {
+        return '<button type="button" class="botao vazado inicio-atalho" data-atalho="'
+          + escapar(item.tela) + '">' + Moldura.icone(item.tela)
+          + '<span>' + escapar(item.titulo) + '</span></button>';
+      }).join('') + '</section>';
+  }
+
+  function novidades(versao) {
+    if (!versao || !versao.novidades || !versao.novidades.length) return '';
+    return '<section class="cartao inicio-novidades">'
+      + '<h3>Novidades da versão ' + escapar(versao.numero)
+      + (versao.data ? ' <small>' + escapar(versao.data) + '</small>' : '') + '</h3>'
+      + '<ul>' + versao.novidades.map(function (linha) {
+        return '<li>' + escapar(linha) + '</li>';
+      }).join('') + '</ul></section>';
+  }
+
+  function desenhar(resumo) {
+    var caixa = elemento('inicio');
+    if (!caixa) return;
+    caixa.innerHTML = '<p class="inicio-saudacao">Olá, <strong>' + escapar(resumo.usuario)
+      + '</strong>. Os números são de ' + escapar(resumo.periodo) + '.</p>'
+      + atalhos()
+      + '<div class="inicio-canais">' + resumo.canais.map(cartaoDoCanal).join('') + '</div>'
+      + novidades(resumo.versao);
+    ligarCliques();
+  }
+
+  function ligarCliques() {
+    var canais = document.querySelectorAll('[data-canal-do-inicio]');
+    for (var i = 0; i < canais.length; i++) {
+      canais[i].addEventListener('click', function () {
+        TelaTrabalho.abrirNoCanal(this.getAttribute('data-canal-do-inicio'));
+      });
+    }
+    var botoes = document.querySelectorAll('[data-atalho]');
+    for (var j = 0; j < botoes.length; j++) {
+      botoes[j].addEventListener('click', function () {
+        Aplicacao.irPara(this.getAttribute('data-atalho'));
+      });
+    }
+  }
+
+  function ligar() {
+    Servidor.chamar('resumoDoInicio')
+      .entao(desenhar)
+      .senao(function (erro) {
+        var caixa = elemento('inicio');
+        if (caixa) {
+          caixa.innerHTML = '<p class="carregando-campos erro-carga">'
+            + escapar(erro.message || String(erro)) + '</p>' + atalhos();
+          ligarCliques();
+        }
+      });
+  }
+
+  return { montar: montar, ligar: ligar };
+})();
+</script>
+
+
 <!-- ==== Trabalho.html ==== -->
 <script>
 
@@ -3834,7 +4053,7 @@ var TelaTrabalho = (function () {
   function montar(pacote) {
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="painel"><p class="carregando-campos">Somando os casos…</p></div>';
+      + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
 
   function variacao(cartao) {
@@ -4292,7 +4511,13 @@ var TelaTrabalho = (function () {
     carregar();
   }
 
-  return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar,
+  function abrirNoCanal(idDoCanal) {
+    canalEscolhido = idDoCanal;
+    filtrosEscolhidos = {};
+    Aplicacao.irPara('trabalho');
+  }
+
+  return { montar: montar, ligar: ligar, abrirNoCanal: abrirNoCanal, opcoesDeMostrar: opcoesDeMostrar,
     casosPertoDeVencer: casosPertoDeVencer, rotuloDoCaso: rotuloDoCaso,
     expandirFila: expandirFila };
 })();
@@ -5498,14 +5723,7 @@ var TelaTabelaCorretoras = (function () {
   }
 
   function avisar(mensagem, tom) {
-    var aviso = document.createElement('div');
-    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
-    aviso.setAttribute('role', 'status');
-    aviso.textContent = mensagem;
-    document.body.appendChild(aviso);
-    window.setTimeout(function () {
-      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
-    }, tom === 'ruim' ? 6000 : 3200);
+    Moldura.toast(mensagem, tom);
   }
 
   function abrirCaixaDeExportar(arquivo) {
@@ -6420,7 +6638,7 @@ var TelaProdutividade = (function () {
   function montar(pacote) {
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
+      + '<div id="analitico">' + Moldura.esqueleto('Somando os números…') + '</div>';
   }
 
   function carregar() {
@@ -10383,14 +10601,7 @@ var TelaConfiguracoes = (function () {
   }
 
   function avisar(mensagem, tom) {
-    var aviso = document.createElement('div');
-    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
-    aviso.setAttribute('role', 'status');
-    aviso.textContent = mensagem;
-    document.body.appendChild(aviso);
-    window.setTimeout(function () {
-      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
-    }, tom === 'ruim' ? 6000 : 3200);
+    Moldura.toast(mensagem, tom);
   }
 
   function mostrarErroNoPainel(erro) {
@@ -10583,6 +10794,12 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 var Rotas = (function () {
 
   var TELAS = {
+    inicio: {
+      titulo: 'Início',
+      subtitulo: 'O seu dia e o da operação, por canal, com os atalhos e as novidades.',
+      montar: function (pacote) { return TelaInicio.montar(pacote); },
+      ligar: function (pacote) { TelaInicio.ligar(pacote); }
+    },
     trabalho: {
       titulo: 'Trabalho',
       subtitulo: 'Visão do dia: indicadores e a fila de trabalho da sua equipe.',
@@ -10852,7 +11069,8 @@ var Aplicacao = (function () {
     elemento('aplicacao').hidden = false;
     restaurarEncolhido();
     aplicarTema(pacote.tema || 'padrao');
-    irPara(telaDoEndereco() || 'trabalho', true);
+
+    irPara(telaDoEndereco() || 'inicio', true);
     ligarTeclado();
   }
 

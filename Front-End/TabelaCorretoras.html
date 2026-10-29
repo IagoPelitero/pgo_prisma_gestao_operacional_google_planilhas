@@ -862,14 +862,7 @@ var TelaTabelaCorretoras = (function () {
   }
 
   function avisar(mensagem, tom) {
-    var aviso = document.createElement('div');
-    aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
-    aviso.setAttribute('role', 'status');
-    aviso.textContent = mensagem;
-    document.body.appendChild(aviso);
-    window.setTimeout(function () {
-      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
-    }, tom === 'ruim' ? 6000 : 3200);
+    Moldura.toast(mensagem, tom);
   }
 
   function abrirCaixaDeExportar(arquivo) {

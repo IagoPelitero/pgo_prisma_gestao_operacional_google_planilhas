@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1517 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1532 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -111,7 +111,7 @@ São duas situações, e cada uma tem o seu caminho:
    | Cole este | Num arquivo chamado | Que é |
    |---|---|---|
    | `Codigo.gs` | `Codigo` (arquivo **.gs**) | os 7 arquivos do servidor |
-   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto, com as 7 telas dentro |
+   | `Index.html` | `Index` (arquivo **HTML**) | o esqueleto, com as 8 telas dentro |
    | `SemAcesso.html` | `SemAcesso` (arquivo **HTML**) | a tela de acesso negado |
 
    Os três vêm **sem os comentários** (Etapa 62): metade do tamanho na colagem.
@@ -122,8 +122,8 @@ São duas situações, e cada uma tem o seu caminho:
    uma aba por arquivo, e o losango ◆ no nome marca o que mudou na última
    versão.
 
-   **b) Arquivo por arquivo**, quando você vai mexer no código. São **19
-   arquivos**: os 7 de `Back-End/` e os 12 de `Front-End/`. A ordem não importa.
+   **b) Arquivo por arquivo**, quando você vai mexer no código. São **20
+   arquivos**: os 7 de `Back-End/` e os 13 de `Front-End/`. A ordem não importa.
 
    | Servidor (7) | Responde |
    |---|---|
@@ -135,16 +135,16 @@ São duas situações, e cada uma tem o seu caminho:
    | `Indicadores.gs` | os números |
    | `Instalacao.gs` | criar, atualizar e conferir a instalação |
 
-   | Tela (12) | O que é |
+   | Tela (13) | O que é |
    |---|---|
    | `Index.html` | o esqueleto, que manda incluir os outros |
    | `Estilos.html` | toda a aparência e os quatro temas |
    | `Comuns.html` | as peças que mais de uma tela usa |
    | `Aplicacao.html` | a ponte com o servidor e o roteador |
-   | `Trabalho.html` … `Configuracoes.html` | uma por item do menu (8) |
+   | `Inicio.html`, `Trabalho.html` … `Configuracoes.html` | uma por item do menu (8) |
    | `SemAcesso.html` | a tela de quem não está cadastrado |
 
-   **c) Pelo terminal, com o `clasp`**, a ferramenta oficial do Google: os 19
+   **c) Pelo terminal, com o `clasp`**, a ferramenta oficial do Google: os 20
    arquivos sobem de uma vez, e de novo a cada mudança.
 
    ```bash
@@ -345,7 +345,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1517 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1532 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1631,6 +1631,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | Erro que acontece longe da pessoa vai para a **aba ERROS** — nunca o recado de validação | O Logger ninguém abre: a tela quebrava num pedaço em branco e só se sabia quando alguém reclamava (Etapa 64) |
 | O período é achado pela **coluna da data**, e só as linhas dele são lidas | Ler as últimas 5.000 linhas deixava um mês antigo pela metade; uma tabela de totais à parte daria duas contas diferentes (Etapa 65) |
 | O caso **encerrado há mais de 13 meses** vai para uma **planilha de histórico**, e as análises para uma planilha própria | A planilha principal estava em metade do teto; o Buscar Caso continua achando o arquivado, e nenhum número das telas muda (Etapa 66) |
+| O sistema **abre na tela inicial**: o meu dia e o da operação, por canal, com atalhos e novidades | Quem chega precisa saber, de relance, o que é dele hoje — sem montar o filtro no Trabalho (Etapa 67) |
 | O **pacote vai sem comentários**; o repositório, com todos | A explicação mora onde se lê e se conserta. Na colagem, era metade do peso (Etapa 62) |
 | **Erro alto** em vez de padrão silencioso | Dado errado calado é pior que operação parada |
 | A estrutura da planilha **nunca muda sozinha** | Só o instalador cria estrutura, e só sobre planilha vazia |
@@ -1647,7 +1648,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1517 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1532 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

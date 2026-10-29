@@ -218,9 +218,29 @@ function montarPacoteDePartida_(quem) {
     canais: canaisQueEuVejo_(quem),
     ultimoRegistro: dataDoUltimoRegistro_(quem),
     tema: temaDoUsuario_(),
-    senhaDeAdministradorDefinida: existeSenhaDeAdministrador_()
+    senhaDeAdministradorDefinida: existeSenhaDeAdministrador_(),
+    // A versão, no rodapé do menu (Etapa 67).
+    versao: RECC_VERSAO.numero
   };
 }
+
+/*
+ * A VERSÃO E AS NOVIDADES (Etapa 67). O número aparece no rodapé do menu; as
+ * novidades, na tela inicial. A cada versão, quem a entrega troca aqui — em
+ * poucas linhas, na língua de quem usa, e não na de quem programa.
+ */
+const RECC_VERSAO = {
+  numero: '1.67',
+  data: '29/10/2026',
+  novidades: [
+    'Tela inicial: o seu dia e o da operação, por canal, com atalhos.',
+    'No "Trabalhar no caso", a linha do tempo do caso: entrada, contatos, status e finalização.',
+    'A Produtividade e o Trabalho mostram qualquer mês completo, não só os mais recentes.',
+    'O Buscar Caso também procura nos casos encerrados que foram para o histórico.',
+    'Gravar duas vezes o mesmo caso, depois dos 40 segundos, não duplica mais.',
+    'Erros que aconteciam longe da tela ficam registrados para quem configura.'
+  ]
+};
 
 // ============================================================================
 // TEMA
@@ -601,6 +621,8 @@ const RECC_TELAS_DO_SISTEMA = [
   // Com o PGO rodando, trocar uma chave é apagar as rotas que as pessoas
   // guardaram e as telas que os níveis de acesso liberam, de uma vez. Daqui em
   // diante o nome se muda pelo TÍTULO, que existe exatamente para isso.
+  // A tela inicial (Etapa 67): abre o sistema, para todos — decisão do PO.
+  { tela: 'inicio', titulo: 'Início' },
   { tela: 'trabalho', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },

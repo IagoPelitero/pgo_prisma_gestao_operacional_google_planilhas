@@ -58,7 +58,7 @@ var TelaProdutividade = (function () {
   function montar(pacote) {
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
+      + '<div id="analitico">' + Moldura.esqueleto('Somando os números…') + '</div>';
   }
 
   function carregar() {
