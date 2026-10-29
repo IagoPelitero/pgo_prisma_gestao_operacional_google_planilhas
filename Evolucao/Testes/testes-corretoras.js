@@ -203,7 +203,7 @@ function rodarTestesDeCorretoras() {
       bloqueadaPor: 'Companhia'
     });
 
-    const uma = chamar('listarSusepsBloqueadas()')
+    const uma = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((linha) => linha.susep === 'RET01A');
     verdadeiro(!!uma, 'entrou na lista');
     igual(uma.sucursal, '58');
@@ -255,7 +255,7 @@ function rodarTestesDeCorretoras() {
   });
 
   teste('a lista de bloqueadas mostra o volume e a data', () => {
-    const lista = chamar('listarSusepsBloqueadas()');
+    const lista = chamar('resumoDasSusepsBloqueadas()').bloqueadas;
     const bloqueada = lista.find((uma) => uma.susep === 'RET01A');
     verdadeiro(!!bloqueada);
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(bloqueada.bloqueadaEm),
@@ -271,7 +271,7 @@ function rodarTestesDeCorretoras() {
   });
 
   teste('liberar guarda o histórico, e o selo volta ao que o cadastro diz', () => {
-    const bloqueada = chamar('listarSusepsBloqueadas()')
+    const bloqueada = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === 'RET50M');
     chamar('desbloquearSusep')(bloqueada.id);
 
@@ -301,7 +301,7 @@ function rodarTestesDeCorretoras() {
     igual(daCorretora.bloqueadaPor, 'Corretora');
     contem(daCorretora.mensagem, 'SUSEP bloqueada pela corretora');
 
-    const lista = chamar('listarSusepsBloqueadas()');
+    const lista = chamar('resumoDasSusepsBloqueadas()').bloqueadas;
     igual(lista.find((uma) => uma.susep === 'RET60P').bloqueadaPor, 'Companhia');
     igual(lista.find((uma) => uma.susep === 'RET61Q').bloqueadaPor, 'Corretora');
   });
@@ -319,7 +319,7 @@ function rodarTestesDeCorretoras() {
     // As que já existiam ficam sem tipo — decisão do PO — até alguém editar.
     chamar('inserirRegistro_')('SUSEP_BLOQUEADAS', { SUSEP: 'RET63S',
       NomeCorretora: 'Antiga', BloqueadaEm: new Date() });
-    const antiga = chamar('listarSusepsBloqueadas()')
+    const antiga = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === 'RET63S');
     igual(antiga.bloqueadaPor, '');
     const selo = chamar('consultarSusep')('RET63S');
@@ -328,16 +328,16 @@ function rodarTestesDeCorretoras() {
 
     chamar('bloquearSusep')({ id: antiga.id, susep: 'RET63S',
       corretora: 'Antiga', bloqueadaPor: 'Corretora' });
-    igual(chamar('listarSusepsBloqueadas()')
+    igual(chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === 'RET63S').bloqueadaPor, 'Corretora');
   });
 
   teste('editar sem mandar o tipo não apaga o tipo; mandar em branco é recusado', () => {
-    const uma = chamar('listarSusepsBloqueadas()')
+    const uma = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((linha) => linha.susep === 'RET63S');
     chamar('bloquearSusep')({ id: uma.id, susep: 'RET63S', corretora: 'Antiga',
       sucursal: '77' });
-    const depois = chamar('listarSusepsBloqueadas()')
+    const depois = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((linha) => linha.susep === 'RET63S');
     igual(depois.sucursal, '77');
     igual(depois.bloqueadaPor, 'Corretora', 'o tipo de antes ficou');
@@ -354,7 +354,7 @@ function rodarTestesDeCorretoras() {
 
     lanca(() => noVelho('bloquearSusep')({ susep: 'RET64T',
       bloqueadaPor: 'Companhia' }), 'rodar atualizarPGO()');
-    igual(noVelho('listarSusepsBloqueadas()').length, 0,
+    igual(noVelho('resumoDasSusepsBloqueadas()').bloqueadas.length, 0,
       'e a lista continua abrindo');
   });
 
@@ -584,7 +584,7 @@ function rodarTestesDeCorretoras() {
       'SUSEP;Corretora;Sucursal;Coordenador comercial\n'
       + 'RET71W;Corretora Fora;58;Coordenação Norte');
 
-    const uma = chamar('listarSusepsBloqueadas')()
+    const uma = chamar('resumoDasSusepsBloqueadas')().bloqueadas
       .find((b) => b.susep === 'RET71W');
     verdadeiro(!!uma, 'entrou na lista de bloqueadas');
     igual(uma.coordenadorComercial, 'Coordenação Norte');
@@ -616,7 +616,7 @@ function rodarTestesDeCorretoras() {
       + 'RET76Z;Sem dizer;12;Coordenação Sul;');
     igual(feito.criadas, 3);
 
-    const lista = chamar('listarSusepsBloqueadas')();
+    const lista = chamar('resumoDasSusepsBloqueadas')().bloqueadas;
     igual(lista.find((b) => b.susep === 'RET72X').bloqueadaPor, 'Companhia');
     igual(lista.find((b) => b.susep === 'RET73Y').bloqueadaPor, 'Corretora');
     igual(lista.find((b) => b.susep === 'RET76Z').bloqueadaPor, '',
@@ -648,7 +648,7 @@ function rodarTestesDeCorretoras() {
       'SUSEP;Corretora;Sucursal;Coordenador comercial;Bloqueada por\n'
       + 'RET78B;Uma;12;C;\n'
       + 'RET79C;Outra;12;C;Companhia'), 'rodar atualizarPGO()');
-    igual(noVelho('listarSusepsBloqueadas()').length, 0,
+    igual(noVelho('resumoDasSusepsBloqueadas()').bloqueadas.length, 0,
       'nem a primeira linha, que não tinha tipo, foi gravada');
 
     const feito = noVelho('aplicarImportacao')('susepsBloqueadas',
@@ -794,7 +794,7 @@ function rodarTestesDeCorretoras() {
       { tipo: 'planilha', planilhaId: idDeFora, aba: 'Bloqueadas' });
     igual(feito.criadas, 1);
 
-    const bloqueada = chamar('listarSusepsBloqueadas')()
+    const bloqueada = chamar('resumoDasSusepsBloqueadas')().bloqueadas
       .find((uma) => uma.susep === 'RET74T');
     igual(bloqueada.coordenadorComercial, 'Usopp');
     igual(bloqueada.sucursal, '88');

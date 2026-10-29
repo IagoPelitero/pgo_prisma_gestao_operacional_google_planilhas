@@ -120,8 +120,8 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  // O PERÍODO é escolhido na tela, das três maneiras — por dias, por data e
-  // por mês. Antes era a janela fixa da CONFIG, igual para todo mundo: quem
+  // O PERÍODO é escolhido na tela — por data ou por mês, abrindo do dia 1 do
+  // mês até hoje. Antes era a janela fixa da CONFIG, igual para todo mundo: quem
   // precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);
@@ -133,7 +133,7 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
   // Linha sem data FICA no atalho e SAI dos períodos fechados — a mesma regra
-  // da Produtividade RECC, pelo mesmo motivo: num "últimos 30 dias" ela é um
+  // da Produtividade RECC, pelo mesmo motivo: na abertura da tela ela é um
   // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
   // o qual não dá para afirmar que é de setembro.
   var guardarSemData = guardaOsSemData_(periodo);
@@ -245,22 +245,24 @@ function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
 }
 
 // ============================================================================
-// O PERÍODO — três maneiras de escolher, uma só de contar
+// O PERÍODO — duas maneiras de escolher, uma só de contar
 // ============================================================================
 
 /**
- * As três maneiras de a operação dizer "deste tempo aqui".
+ * As duas maneiras de a operação dizer "deste tempo aqui" (Etapa 43: o PO
+ * tirou o "Por dias" da tela).
  *
- *   ATALHO    — "últimos 30 dias". É o que se usa no dia a dia, e continua
- *               sendo a abertura da tela.
  *   INTERVALO — "de 01/09 a 15/09". É o que responde uma pergunta específica:
- *               a semana da campanha, os dias da virada do sistema.
- *   MÊS       — "setembro de 2026". É como a operação REPORTA, e é diferente
- *               de "últimos 30 dias" — no dia 20 de outubro, os últimos 30
- *               dias pegam metade de setembro e metade de outubro, e nenhum
- *               fechamento mensal se faz assim.
+ *               a semana da campanha, os dias da virada do sistema. Sem as
+ *               duas datas, é a abertura da tela: do dia 1 do mês até hoje
+ *               (Etapa 56).
+ *   MÊS       — "setembro de 2026". É como a operação REPORTA: o fechamento
+ *               mensal.
  *
- * O servidor é quem resolve as três numa coisa só: duas datas. A tela escolhe;
+ * Os "últimos N dias" (periodoPorDias_) ficaram só para o pedido torto e para
+ * quem chama com um número — a tela não oferece mais.
+ *
+ * O servidor é quem resolve as duas numa coisa só: duas datas. A tela escolhe;
  * ela não calcula. Se ela calculasse, o dia que aparece no gráfico e o dia que
  * o servidor contou seriam dois relógios diferentes — o do navegador de quem
  * está olhando e o da planilha —, e num fechamento de mês essa diferença é um
@@ -2785,7 +2787,7 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
  * nada. Vírgula abriria tudo numa coluna só, e a pessoa desistiria no meio.
  */
 function exportarComponente(idDoCanal, idDoComponente, filtros, periodoPedido) {
-  var quem = exigirPermissao_(RECC_ACOES.EXPORTAR);
+  exigirPermissao_(RECC_ACOES.EXPORTAR);
   exigirTela_('produtividade');
 
   var painel = produtividadeDaEquipe(idDoCanal, filtros, periodoPedido);
@@ -2986,8 +2988,8 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
  * total".
  *
  * POR QUE NÃO É UM COMPONENTE DA ABA PAINEIS. O motor de componentes agrupa
- * pelo valor da coluna e, quando passa do limite, dobra o RESTO pelo tamanho —
- * os maiores ficam, os menores viram "Demais valores". Aqui a escolha é outra:
+ * pelo valor da coluna e, quando passa do limite, fica com os maiores — os
+ * menores saem do gráfico (o top 5, Etapa 53). Aqui a escolha é outra:
  * quem ganha barra própria são as situações que a operação DECLAROU, estejam
  * elas grandes ou zeradas. "Sem sucesso" sem nenhum caso no mês tem de
  * aparecer valendo zero; sumir da tela faria a conta parecer completa quando
@@ -3349,7 +3351,6 @@ function conferirImportacaoDoChat(pedido) {
     }),
     analistas: [],
     foraDaDivisao: [],
-    avisos: [],
     statusPadrao: ''
   };
 }

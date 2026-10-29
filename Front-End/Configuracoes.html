@@ -533,8 +533,6 @@ var TelaConfiguracoes = (function () {
     if (!campo) return painelVazio('Escolha um campo.');
 
     var opcoes = dados.opcoes;
-    var configuracao = campo.catalogo
-      ? 'catalogo' : (campo.listaDe ? 'listaDe' : '');
 
     elemento('config-painel').innerHTML = '<form class="config-form" id="form-campo">'
       + tituloDoPainel(campo.rotulo, 'Campo do formulário')
@@ -1981,7 +1979,6 @@ var TelaConfiguracoes = (function () {
   */
   function desenharGraficos() {
     if (respostaAtrasada('paineis')) return;
-    var opcoes = dados.opcoesDoGrafico;
 
     elemento('config-lista').innerHTML = '<div class="config-cabeca">'
       + '<span class="config-titulo">Gráficos da Produtividade RECC</span></div>'

@@ -337,11 +337,6 @@ function comoCriarAColuna_(nomeDaAba, cabecalho) {
  */
 const RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA = 100;
 
-/** Até 100 SUSEPs bloqueadas — as dos casos primeiro —, ou as que a busca achar. */
-function listarSusepsBloqueadas(procurar) {
-  return resumoDasSusepsBloqueadas(procurar).bloqueadas;
-}
-
 /** A lista e as contagens, para a tela: quantas há, quantas a busca achou, se cortou. */
 function resumoDasSusepsBloqueadas(procurar) {
   var quem = exigirTela_('tabelaCorretoras');

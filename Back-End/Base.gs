@@ -1304,11 +1304,6 @@ function proximosIdentificadores_(nomeDaAba, quantos) {
   return bloco;
 }
 
-/** Um Id só. É o bloco de tamanho um — não existe segunda regra. */
-function proximoIdentificador_(nomeDaAba) {
-  return proximosIdentificadores_(nomeDaAba, 1)[0];
-}
-
 /**
  * Realinha a sequência com a planilha, sem nunca baixá-la.
  * Chamada depois de uma carga feita direto na planilha.
@@ -3038,14 +3033,6 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
   } finally {
     trava.releaseLock();
   }
-}
-
-function reexibirRegistro_(nomeDaAba, id) {
-  return atualizarRegistro_(nomeDaAba, id, comCarimboSeHouver_(nomeDaAba, {
-    _Visivel: RECC_VISIVEL_SIM,
-    _ExcluidoEm: '',
-    _ExcluidoPor: ''
-  }));
 }
 
 // ============================================================================

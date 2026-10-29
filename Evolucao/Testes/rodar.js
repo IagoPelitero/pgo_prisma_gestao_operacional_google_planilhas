@@ -50,6 +50,7 @@ const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
 const { rodarTestesDaAuditoriaForaDaTrava } = require('./testes-auditoria-fora-da-trava');
+const { rodarTestesDaLimpeza } = require('./testes-limpeza-do-que-nao-e-usado');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -90,6 +91,7 @@ rodarTestesDaDataDaFinalizacao();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();
 rodarTestesDaAuditoriaForaDaTrava();
+rodarTestesDaLimpeza();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

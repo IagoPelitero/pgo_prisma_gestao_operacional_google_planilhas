@@ -3393,6 +3393,68 @@ a trava ocupada (`ambiente.travaOcupada`) e o registro de quanto cada chamada ac
 
 ---
 
+## Etapa 62 — Análise detalhada de funções, e o que ninguém usa sai
+
+Pedido do PO na rodada de 29/10: "acrescente uma análise detalhada de funções e exclua
+funções, textos, variáveis ou códigos que não são utilizados no PGO". Primeiro a análise,
+depois a lista de 14 itens para aprovação (aprovada inteira), depois a limpeza.
+
+**A análise** — cada função classificada por quem a usa (a tela pelo `Servidor.chamar`, o
+próprio servidor, o modelo HTML, o editor do Apps Script, o acionador pelo nome):
+
+| O que foi olhado | Quanto | Sem uso | Destino |
+|---|---|---|---|
+| Funções do servidor | 556 | 3, e mais 1 que só devolvia lista vazia | As 4 saíram (abaixo). As 552 que ficam: 453 chamadas pelo servidor, 89 pela tela, 6 pelo nome (instalar, atualizar, migrar, normalizar, verificar, diagnóstico), 2 pelo editor (os agendamentos), `incluir` pelo modelo e `doGet` pelo Apps Script |
+| Funções das telas | 458 | 1 (`normalizarTexto` do Trabalho — o nome existe em outras telas, e só o ESLint, que olha o escopo, a achou) | Saiu. Ficam 457, todas chamadas |
+| Membros que as peças das telas exportam | — | 7 que ninguém de fora chamava | Saíram da lista de exportação (a função continua, usada por dentro). Outros 11 ficam: os testes os chamam de fora da peça |
+| Classes do CSS | 321 | 0 | Nada a tirar — as montadas por pedaço (`'tom-' + x`) foram conferidas uma a uma |
+| Variáveis globais | 119 | 0 | Nada a tirar |
+| Variáveis locais e parâmetros (ESLint) | — | 14 (4 no servidor, 7 nas telas, os 3 parâmetros de `avisosDaImportacao_`) | Os 14 saíram. O ESLint agora termina sem nenhum aviso |
+| Comentários | ~9.900 de 36 mil linhas (27%) | — | Ficam no repositório; saem do pacote (abaixo) |
+
+**O que saiu:**
+
+| Onde | O quê | Por que não fazia falta |
+|---|---|---|
+| `Base.gs` | `proximoIdentificador_` | Ninguém chamava: tudo usa o bloco, `proximosIdentificadores_` (o achado do Id por linha) |
+| `Base.gs` | `reexibirRegistro_` | Nenhuma tela reexibe; reexibir é voltar o `_Visivel` para SIM na planilha. Só os testes a usavam — passaram a usar `atualizarRegistro_` |
+| `Cadastros.gs` | `listarSusepsBloqueadas` | A tela usa `resumoDasSusepsBloqueadas` desde a Etapa 55; a antiga era só um atalho para ela |
+| `Casos.gs` | `avisosDaImportacao_` e o `avisos` do laudo | Devolvia sempre lista vazia, guardando lugar. Os avisos da conferência nasceram na tela (Etapa 57), lendo as contagens do laudo |
+| `Indicadores.gs` | o `avisos: []` do laudo do chat, e um `var quem` sem uso | — |
+| `Config.gs` | dois `var quem` sem uso | A permissão continua conferida: só a variável saiu |
+| `Instalacao.gs` | `var canaisNovo` sem uso | — |
+| Telas | `normalizarTexto` (Trabalho), `formulario` (CasoEmModal), `configuracao` e um `opcoes` (Configurações), `pacoteDoSistema` (Produtividade), o `pacote` de dois `ligar` | Lidos por ninguém |
+| Telas | Exportações `Aplicacao.trocarTema`, `Moldura.iniciais`, `Formulario.ehCampoDeDinheiro`, `CasoEmModal.fechar`, `Graficos.porcento`, `Graficos.classeDoPonto`, `Graficos.encurtar` | Só usadas dentro da própria peça |
+| `Evolucao/` | `pacote/PGO-mudancas.xlsx` e `Testes/gerar-excel-das-mudancas.py` | Substituídos pelo `PGO-codigo-completo.xlsx` com o losango ◆ |
+
+**Textos que mentiam** — comentários que ainda falavam dos "últimos 30 dias" e das "três
+maneiras" de escolher o período (o "Por dias" saiu na Etapa 43; a abertura é do dia 1 do mês
+até hoje desde a Etapa 56), do "Demais valores" (saiu na Etapa 53) e de telas que já não
+existem. Corrigidos em `Casos.gs`, `Indicadores.gs`, `BuscarCaso.html`, `Comuns.html` e no
+`01-arquitetura.md` (a busca não tem "janela recente em memória": lê a coluna, depois as linhas).
+
+**O pacote sem comentários.** O `gerar-pacote.js` tira os comentários do `Codigo.gs` e do
+`Index.html` — os `//` e `/* */` do JavaScript, os do CSS e os `<!-- -->` do HTML. A leitura
+anda caractere a caractere e pula textos e expressões regulares inteiros (`'https://'` não é
+comentário); os scriptlets `<? ?>` ficam intactos. O repositório continua comentado.
+
+| Arquivo do pacote | Antes | Agora |
+|---|---|---|
+| `Codigo.gs` | 905 KB | 542 KB |
+| `Index.html` | 567 KB | 413 KB |
+
+Conferido com um analisador de sintaxe independente (espree): os 19 arquivos dão **a mesma
+árvore de sintaxe** com e sem comentários. E o ponta a ponta roda inteiro contra o pacote.
+
+10 testes novos em `testes-limpeza-do-que-nao-e-usado.js` (o que saiu não volta, quem ficou
+faz o trabalho, o laudo sem a lista vazia, nenhum comentário no pacote, o peso, tirar de novo
+não muda nada, `//` dentro de texto, **um dia de trabalho com o mesmo resultado nos arquivos
+soltos e no pacote**, todo `<script>` compila, o repositório comentado). Os testes que usavam
+as funções que saíram passaram a usar as que ficaram. 4 quebras de propósito no gerador, 4
+pegas. 1459 testes; ponta a ponta 23/23 no repositório e no pacote; 126 + 78 cliques sem erro.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

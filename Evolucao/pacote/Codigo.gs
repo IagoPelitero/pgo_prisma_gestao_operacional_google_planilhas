@@ -9,65 +9,13 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 14:10
+   Gerado em 2026-10-29 15:24
    ========================================================================== */
 
 
 
 /* ==== Base.gs ============================================================= */
 
-/**
- * ============================================================================
- * PGO — Base.gs · como o sistema fala com a planilha
- * ============================================================================
- * A fundação. Nada aqui sabe o que é um caso, um canal ou um usuário:
- * são as três peças que todo o resto usa para chegar à planilha.
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. O CONTRATO DAS ABAS
- *   2. O GERADOR DE Id
- *   3. A PORTA ÚNICA PARA O GOOGLE PLANILHAS
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 3 · O CONTRATO DAS ABAS
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * O contrato das abas
- * ============================================================================
- * Plataforma PGO (Pelitero Labs) · operação RECC (Porto Seguro)
- *
- * Este arquivo é só declaração: nomes de aba, cabeçalhos e tipos. Não chama
- * nada e não depende de nenhum outro arquivo — pode ser lido primeiro sem
- * risco.
- *
- * COMO LER
- * --------
- *   c = o Cabeçalho, exatamente como aparece na linha 1 da planilha
- *   t = o Tipo do dado, que decide o formato da célula
- *   p = Protegido: a interface não renomeia nem exclui (no máximo esconde)
- *
- * O cabeçalho é o contrato — não a posição da coluna. Reordenar colunas na
- * planilha não quebra nada. Ver Base.gs.
- * ============================================================================
- */
-
-/**
- * Os tipos de dado. Cada um decide, e isso é o ponto do arquivo inteiro,
- * COMO a célula é formatada antes de receber o valor.
- *
- *   ID       0000000010 precisa continuar 0000000010, e não virar o número 10
- *   DINHEIRO a célula guarda 1234.56 e MOSTRA R$ 1.234,56 — formato, não texto
- *   DATA     data de verdade, para o Power BI filtrar sem conversão
- */
 const RECC_TIPO_DE_DADO = {
   IDENTIFICADOR: 'identificador',
   TEXTO: 'texto',
@@ -80,7 +28,6 @@ const RECC_TIPO_DE_DADO = {
   SIM_OU_NAO: 'simOuNao'
 };
 
-/** O formato de célula de cada tipo. Aplicado na linha ANTES de gravar. */
 const RECC_FORMATO_DA_CELULA = {
   identificador: '@',
   texto: '@',
@@ -93,26 +40,10 @@ const RECC_FORMATO_DA_CELULA = {
   simOuNao: '@'
 };
 
-/** Fuso da operação. O Apps Script roda em UTC e viraria o dia às 21 h. */
 const RECC_FUSO_HORARIO = 'America/Sao_Paulo';
 
-/** Maior Id possível: 10 casas decimais. */
 const RECC_MAIOR_IDENTIFICADOR = 9999999999;
 
-/**
- * AS COLUNAS CALCULADAS — o valor que o sistema tira de outra coluna.
- *
- * Hoje é uma só: os meses de vigência do VG, contados do início até HOJE.
- *
- * O PO foi explícito sobre o comportamento: "ele grava apenas o registro, que
- * pode ser alterado se o analista o fizer". Ou seja, o número na planilha é um
- * RETRATO do último salvamento — não se atualiza sozinho com o passar dos
- * meses. Quem precisa estar certo hoje é o ALERTA da tela, e esse é
- * recalculado na hora em que a tela monta.
- *
- * Escrito como declaração, e não como um `if` no meio do cadastro, porque o
- * próximo canal vai querer a sua própria conta — e aí é uma linha aqui.
- */
 const RECC_COLUNAS_CALCULADAS = {
   BASE_VG: [
     {
@@ -123,17 +54,6 @@ const RECC_COLUNAS_CALCULADAS = {
   ]
 };
 
-/**
- * Quantos meses INTEIROS se passaram entre a data e hoje.
- *
- * Inteiros: de 15/03 até 14/09 são cinco meses, e não seis — o sexto só fecha
- * no dia 15. Contar o mês pela metade daria 18 a quem tem 17 e meio, e o
- * alerta de 18 meses, que é justamente o que a operação olha, deixaria passar.
- *
- * Data no futuro devolve 0, e não negativo: uma vigência que ainda não começou
- * tem zero mês de vigência. Negativo cairia no alerta de "menos de 18" e
- * pintaria de vermelho um caso que está só adiantado.
- */
 function mesesInteirosAteHoje_(data) {
   if (!data) return '';
 
@@ -141,20 +61,11 @@ function mesesInteirosAteHoje_(data) {
   var meses = (hoje.getFullYear() - data.getFullYear()) * 12
     + (hoje.getMonth() - data.getMonth());
 
-  // O mês corrente só conta quando o dia já chegou.
   if (hoje.getDate() < data.getDate()) meses--;
 
   return meses > 0 ? meses : 0;
 }
 
-/**
- * Preenche as colunas calculadas da aba, se ela tiver alguma.
- *
- * Chamada na criação E na edição: é o que faz o número acompanhar quando o
- * analista corrige a data de início. Coluna de origem em branco deixa a
- * calculada em branco — inventar zero diria "zero mês de vigência" para um
- * caso que só está com a data faltando.
- */
 function preencherColunasCalculadas_(nomeDaAba, paraGravar, registroAtual) {
   var regras = RECC_COLUNAS_CALCULADAS[nomeDaAba];
   if (!regras) return;
@@ -164,8 +75,6 @@ function preencherColunasCalculadas_(nomeDaAba, paraGravar, registroAtual) {
   regras.forEach(function (regra) {
     if (posicaoDaColuna_(estrutura, regra.cabecalho) < 0) return;
 
-    // O valor da origem pode vir na gravação ou já estar no registro: numa
-    // edição que não mexe na data de início, ela não vem em `paraGravar`.
     var origem = paraGravar.hasOwnProperty(regra.daColuna)
       ? paraGravar[regra.daColuna]
       : (registroAtual || {})[regra.daColuna];
@@ -179,23 +88,6 @@ function preencherColunasCalculadas_(nomeDaAba, paraGravar, registroAtual) {
   });
 }
 
-/**
- * OS ALERTAS DA LINHA — quando um valor pede atenção na tela.
- *
- * Pedido do PO no VG: vigência abaixo de 18 meses e margem abaixo de 25,5
- * ficam VERMELHAS. Ele foi específico sobre onde: **só nas telas do PGO**, e
- * não na planilha.
- *
- * A regra mora AQUI, e não espalhada na tela, porque ela vale em dois lugares
- * — a fila do Trabalho e o caso aberto — e duas cópias divergiriam no primeiro
- * ajuste de limite.
- *
- * `abaixoDe` é o vermelho. `noLimite` e `acima` são as outras duas cores, para
- * a regra que tem três faixas: pedido do PO para a vigência do VG — "abaixo de
- * 18 meses fica em vermelho, 18 meses exato fica amarelo e mais que 18 meses
- * fica verde, assim os analistas conseguem ver com mais facilidade". Regra sem
- * as duas continua só com o vermelho, como a margem.
- */
 const RECC_ALERTAS_DA_LINHA = {
   BASE_VG: [
     {
@@ -213,16 +105,6 @@ const RECC_ALERTAS_DA_LINHA = {
   ]
 };
 
-/**
- * A cor desta célula e o motivo — vermelho, amarelo ou verde —, ou null.
- *
- * O vermelho é o alerta de sempre (`abaixoDe`). O amarelo e o verde só existem
- * na regra que os declara: a vigência do VG.
- *
- * Compara pelo NOME da coluna, como todo o resto do sistema. Valor em branco
- * NÃO ganha cor: campo não preenchido é campo não preenchido, e pintar de
- * vermelho o que ninguém digitou ainda ensina a ignorar o vermelho.
- */
 function faixaDaCelula_(nomeDaAba, cabecalho, valor) {
   var regras = RECC_ALERTAS_DA_LINHA[nomeDaAba];
   if (!regras) return null;
@@ -247,13 +129,6 @@ function faixaDaCelula_(nomeDaAba, cabecalho, valor) {
   return null;
 }
 
-/**
- * Colunas de controle, acrescentadas ao FIM das abas de dado.
- *
- * O prefixo "_" marca coluna de sistema e sinaliza ao Power BI o que ignorar.
- * `_Visivel` é editável na mão, direto na planilha: é assim que uma linha
- * ocultada volta a aparecer.
- */
 const RECC_COLUNAS_DE_CONTROLE = [
   { cabecalho: '_Visivel', tipo: 'texto', protegido: true },
   { cabecalho: '_ExcluidoEm', tipo: 'dataHora', protegido: true },
@@ -261,104 +136,29 @@ const RECC_COLUNAS_DE_CONTROLE = [
   { cabecalho: '_Origem', tipo: 'texto', protegido: true }
 ];
 
-/*
- * O CARIMBO DA EXCLUSÃO — quando e quem ocultou — não existe nas bases de
- * CASO. Desde que o caso é excluído de vez (decisão do PO), ninguém oculta
- * caso, e as duas colunas ficavam vazias para sempre: numa base que caminha
- * para 200 mil linhas, 400 mil células reservadas sem uso. Pedido do PO:
- * "pode seguir e incluir". Nos cadastros elas continuam — lá a linha oculta
- * ainda existe, e o carimbo é o que explica por que ela está NAO depois que a
- * auditoria vai para o arquivo.
- */
 const RECC_CARIMBO_DE_EXCLUSAO = ['_ExcluidoEm', '_ExcluidoPor'];
 
-/** As colunas de controle de uma aba: base de caso não leva o carimbo. */
 function colunasDeControleDe_(ehBaseDeCaso) {
   return RECC_COLUNAS_DE_CONTROLE.filter(function (coluna) {
     return !ehBaseDeCaso || RECC_CARIMBO_DE_EXCLUSAO.indexOf(coluna.cabecalho) < 0;
   });
 }
 
-/*
- * `preenchidoPeloSistema: true` numa coluna quer dizer: a coluna é de DADO —
- * o Power BI lê, a exclusão não a esconde, ela aparece na exportação — mas
- * NINGUÉM a digita no formulário. Quem escreve nela é o sistema.
- *
- * É o caso das colunas de carimbo (o sistema grava a data quando o status
- * muda) e das duas da importação (o sistema grava de qual lote o caso veio).
- * Deixá-las como campo de tela seria pedir ao analista para digitar à mão
- * exatamente o dado que existe para não depender dele.
- *
- * Não confundir com `protegido`, que é sobre PODER MUDAR depois, nem com o
- * prefixo "_", que marca coluna de sistema e sai de todo relatório.
- */
-
-/*
- * As três colunas que toda mudança de status atualiza.
- *
- * O nome fica aqui, num lugar só, porque ele é escrito em dois momentos
- * distantes: quando a aba nasce (o Esquema, logo abaixo) e quando o status
- * muda (registrarAMudancaDeStatus_, no Casos.gs). Se o nome fosse digitado
- * nos dois lugares, trocar um e esquecer o outro faria o sistema procurar uma
- * coluna que não existe — e, como coluna ausente é ignorada de propósito, ele
- * pararia de registrar em silêncio. Erro calado é o pior tipo.
- */
 const RECC_COLUNA_QUANDO_MUDOU_O_STATUS = 'Data da última mudança de status';
 const RECC_COLUNA_QUEM_MUDOU_O_STATUS = 'Quem mudou o status';
 const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 
-/*
- * As duas colunas da importação, pelo mesmo motivo das de cima: o nome é
- * escrito quando a aba nasce (o Esquema) e lido quando o lote entra (o
- * importação, no Casos.gs) e quando a Produtividade RECC monta o gráfico.
- */
 const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
 const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
-/**
- * QUANDO o caso foi encaminhado para a área — carimbado pelo SISTEMA no
- * instante em que a `Área responsável` é escolhida. É um dado da operação (e
- * do Power BI); o prazo da Mesa NÃO conta mais dele: desde que o PO pediu
- * "conte a partir do status em andamento", conta de `Data em andamento`.
- * Quem quiser um prazo do encaminhamento cria outro sinalizador apontando para
- * esta coluna.
- */
 const RECC_COLUNA_DATA_DO_ENCAMINHAMENTO = 'Data do encaminhamento';
 
-/**
- * QUANDO o caso da Mesa entrou em "Em andamento" — carimbado pelo SISTEMA, como
- * o carimbo de qualquer status (`CATALOGO.ColunaDeCarimbo`). É daqui que o
- * sinalizador da Mesa conta as 48 horas úteis, até o caso ser concluído.
- * Pedido do PO: "conte a partir do status em andamento".
- */
 const RECC_COLUNA_DATA_EM_ANDAMENTO = 'Data em andamento';
 
-/**
- * QUANDO o Status proposta chegou num valor que encerra o prazo da RET
- * (Transmitido, Sem alteração) — carimbado pelo sistema na gravação. O
- * sinalizador da RET para "nos retidos, quando o status proposta aparecer
- * transmitido ou sem alteração", e precisa saber QUANDO isso aconteceu: o
- * Status proposta é um campo, e campo não guarda a data em que mudou.
- */
 const RECC_COLUNA_DATA_DO_STATUS_PROPOSTA = 'Data do status proposta';
 
-/**
- * QUANDO o caso mudou de status PELA PRIMEIRA VEZ — saiu do status em que
- * nasce ("Não trabalhado", o valor padrão do campo Status). Carimbado pelo
- * SISTEMA uma vez só: as mudanças seguintes não mexem nele.
- *
- * É daqui que os 3 dias úteis da RET contam. Pedido do PO: "a SLA de 3 dias
- * úteis da RET deve ser somente se o caso mudar de status. Casos não
- * trabalhados ficam com a SLA cheia". Enquanto esta coluna está vazia e o caso
- * continua no status de nascimento, o selo mostra o prazo cheio.
- */
 const RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS = 'Data da primeira mudança de status';
 
-/**
- * O expediente que um sinalizador usa quando não declarou o dele: de segunda
- * a sexta, das 08:15 às 18:30 — o da célula, palavra do PO. É o mesmo da
- * Mesa Diamante, e mora aqui para a RET não precisar repeti-lo em canal.
- */
 const RECC_EXPEDIENTE_PADRAO = { abre: '08:15', fecha: '18:30' };
 
 const RECC_VISIVEL_SIM = 'SIM';
@@ -366,20 +166,8 @@ const RECC_VISIVEL_NAO = 'NAO';
 const RECC_ORIGEM_SISTEMA = 'SISTEMA';
 const RECC_ORIGEM_PLANILHA = 'PLANILHA';
 
-/**
- * As 13 abas.
- *
- * `controle: true`  → recebe as colunas _Visivel / _ExcluidoEm / _ExcluidoPor /
- *                     _Origem, e exclusão vira ocultação.
- * `baseDeCaso: true` → base de caso: das de controle, só _Visivel e _Origem —
- *                     caso é excluído de vez, e o carimbo não teria uso.
- * `reserva`         → quantas linhas a aba nasce tendo. Célula vazia também
- *                     consome o teto de 10 milhões da planilha, então o
- *                     instalador corta o que sobra. Ver Instalacao.gs.
- */
 const RECC_ESQUEMA = {
 
-  // ------------------------------------------------------------------ bases
   BASE_RET: {
     aba: 'BASE_RET',
     baseDeCaso: true,
@@ -397,23 +185,17 @@ const RECC_ESQUEMA = {
       { cabecalho: 'nome do cliente', tipo: 'texto', protegido: true },
       { cabecalho: 'cod produto', tipo: 'identificador', protegido: true },
       { cabecalho: 'produto', tipo: 'texto', protegido: true },
-      // "grupo", "agente da central" e "relacionamento" saíram do contrato na
-      // Etapa 49, pedido do PO: "não estamos usando". Numa planilha em uso elas
-      // continuam lá, com o dado — o atualizarPGO só tira os campos do formulário.
+
       { cabecalho: 'sistema', tipo: 'texto', protegido: true },
       { cabecalho: 'valor do prêmio', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'valor do prêmio retido', tipo: 'dinheiro', protegido: true },
-      // Era "prêmio mensal retido" — nome errado, palavra do PO: "deve ser
-      // prêmio mensal". O retido é a coluna de cima. `atualizarPGO` renomeia.
+
       { cabecalho: 'prêmio mensal', tipo: 'dinheiro', protegido: true },
-      // Quem passou o caso adiante. Só aparece no formulário quando o canal
-      // de origem é a Central — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO.
+
       { cabecalho: 'nome de quem transferiu', tipo: 'texto', protegido: false },
       { cabecalho: 'canal', tipo: 'texto', protegido: true },
       { cabecalho: 'contato', tipo: 'texto', protegido: true },
-      // Texto, e não identificador: o protocolo da operação é alfanumérico
-      // ("RET-2026-1024"), e como identificador ele perderia as letras — o
-      // tipo identificador guarda só dígitos, de propósito.
+
       { cabecalho: 'protocolo', tipo: 'texto', protegido: true },
       { cabecalho: 'cod_sucursal', tipo: 'identificador', protegido: true },
       { cabecalho: 'cod_ramo', tipo: 'identificador', protegido: true },
@@ -429,22 +211,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'novo numero da proposta', tipo: 'identificador', protegido: true },
       { cabecalho: 'motivo do cancelamento', tipo: 'texto', protegido: true },
       { cabecalho: 'data da transmissão', tipo: 'data', protegido: true },
-      // TEXTO, e não número (achado 98). O campo sempre foi uma LISTA — "1ª
-      // tentativa", "2ª tentativa"… —, e com a coluna declarada número o texto
-      // era convertido para número, não dava, e a célula ficava em branco: a
-      // tentativa escolhida nunca chegou à planilha. Ninguém soma esta coluna.
+
       { cabecalho: 'tentativas de contato', tipo: 'texto', protegido: true },
 
-      // ---- OS CARIMBOS DE STATUS ----------------------------------------
-      // Uma coluna por status da RET, com a data e a hora em que o caso
-      // chegou nele. É o controle de produtividade: sem isto, saber quando o
-      // 1º contato aconteceu exigiria cruzar a auditoria com a base — e
-      // ninguém monta relatório assim.
-      //
-      // Quem liga cada status à sua coluna é o catálogo, na coluna
-      // ColunaDeCarimbo. Essas aqui são só as colunas de fábrica; o
-      // administrador cria outras em Configurações e aponta status novos
-      // para elas, sem programador.
       { cabecalho: 'Data aguardando transmissão', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: 'Data pendente', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: 'Data do 1º contato', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
@@ -453,31 +222,15 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Data reteve', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: 'Data concluído', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
 
-      // ---- TODA MUDANÇA DE STATUS DEIXA RASTRO ---------------------------
-      // Os carimbos acima gravam a PRIMEIRA vez que o caso chegou em cada
-      // status. Estas três respondem a outra pergunta: quando foi a última
-      // vez que alguém mexeu neste caso, quem mexeu, e quantas vezes o caso
-      // já andou. Um caso que volta de "Pendente" para "1º contato" e depois
-      // volta de novo não mexe em nenhum carimbo — mas mexe nestas, e é por
-      // isso que elas existem.
-      //
-      // Por que não na auditoria: troca de status é o evento mais frequente
-      // do sistema. Numa base de 200 mil casos seriam quase um milhão de
-      // linhas, empurrando a planilha para o teto de células. Aqui a
-      // informação fica na própria linha do caso, que é onde ela é lida.
       { cabecalho: RECC_COLUNA_QUANDO_MUDOU_O_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
-      // ---- A IMPORTAÇÃO --------------------------------------------------
-      // De qual lote o caso veio, quando ele entrou. Vazio quer dizer que o
-      // caso foi cadastrado um a um, na tela.
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
-      // QUANDO o Status proposta encerrou o prazo do Retido. O sistema carimba.
+
       { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
-      // QUANDO o caso saiu de "Não trabalhado" pela primeira vez. O sistema
-      // carimba, e é daqui que os 3 dias úteis da RET contam.
+
       { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
@@ -509,35 +262,20 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Hora resposta', tipo: 'hora', protegido: true },
       { cabecalho: 'Data da finalização', tipo: 'data', protegido: true },
       { cabecalho: 'horário da finalização', tipo: 'hora', protegido: true },
-      // Toda mudança de status deixa rastro na própria linha, igual à RET:
-      // quando foi a última, quem fez, e quantas vezes o caso já andou. Ver o
-      // bloco equivalente em BASE_RET, que explica por que não é na auditoria.
+
       { cabecalho: RECC_COLUNA_QUANDO_MUDOU_O_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
-      // De qual lote o caso veio. A Mesa importa casos de corretoras para ações
-      // diferenciadas; vazio quer dizer cadastrado um a um, na tela.
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
-      // QUANDO a área foi escolhida. O sistema carimba; ninguém digita.
+
       { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
-      // QUANDO o caso entrou em "Em andamento": é daqui que o prazo conta.
+
       { cabecalho: RECC_COLUNA_DATA_EM_ANDAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
-  /*
-   * O VG — VIDA EM GRUPO. O terceiro canal, e o primeiro que nasceu piloto.
-   *
-   * As colunas estão na ORDEM que o PO ditou, e não reagrupadas por tipo: é
-   * essa a ordem em que a operação lê e digita, e mexer nela para "ficar mais
-   * organizado" só atrapalha quem usa.
-   *
-   * Duas colunas têm ALERTA nas telas (nunca na planilha, decisão do PO):
-   * "Meses de vigência" abaixo de 18 e "Margem de contribuição" abaixo de
-   * 25,5. Quem declara os limites é `RECC_ALERTAS_DA_LINHA`, logo abaixo.
-   */
   BASE_VG: {
     aba: 'BASE_VG',
     baseDeCaso: true,
@@ -550,23 +288,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Analista', tipo: 'texto', protegido: true },
       { cabecalho: 'TK/Assunto', tipo: 'texto', protegido: true },
       { cabecalho: 'Entrada', tipo: 'data', protegido: true },
-      // CNPJ como identificador, e não número: identificador guarda só dígitos
-      // e não perde o zero à esquerda, que é a regra da casa desde o começo.
+
       { cabecalho: 'CNPJ', tipo: 'identificador', protegido: true },
       { cabecalho: 'Subestipulante', tipo: 'texto', protegido: true },
       { cabecalho: 'Início da vigência', tipo: 'data', protegido: true },
 
-      /*
-       * MESES DE VIGÊNCIA é a única coluna CALCULADA das três bases.
-       *
-       * O analista digita o início; o sistema conta os meses até HOJE e grava
-       * o número aqui, a cada gravação. O PO definiu assim: "ele grava apenas
-       * o registro, que pode ser alterado se o analista o fizer" — ou seja, o
-       * número é um retrato do último salvamento, e não se atualiza sozinho.
-       *
-       * O ALERTA da tela, esse, é recalculado na hora: é ele que precisa estar
-       * certo hoje, porque é ele que a pessoa olha para agir.
-       */
       { cabecalho: 'Meses de vigência', tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
       { cabecalho: 'Quantidade de vidas', tipo: 'numero', protegido: true },
@@ -578,18 +304,14 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Motivo da liberação ou recusa', tipo: 'texto', protegido: true },
       { cabecalho: 'Prêmio mensal', tipo: 'dinheiro', protegido: true },
       { cabecalho: 'Prêmio anual', tipo: 'dinheiro', protegido: true },
-      // Número simples, decisão do PO: grava 25,5 e não 0,255. Quem preenche é
-      // o analista — não se calcula a partir dos prêmios.
+
       { cabecalho: 'Margem de contribuição', tipo: 'numero', protegido: true },
       { cabecalho: 'Quantidade de parcelas vencidas', tipo: 'numero', protegido: true },
       { cabecalho: 'Obs', tipo: 'textoLongo', protegido: false },
       { cabecalho: 'Mês e ano', tipo: 'texto', protegido: true },
-      // Quando o protocolo entrou no PGO. Diferente da data do protocolo (que
-      // é da solicitação) e da entrada (que é da esteira do VG).
+
       { cabecalho: 'Data de inclusão do protocolo', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
 
-      // Rastro de status, igual aos outros dois canais. Ver o bloco em
-      // BASE_RET, que explica por que não é na auditoria.
       { cabecalho: RECC_COLUNA_QUANDO_MUDOU_O_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUEM_MUDOU_O_STATUS, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
@@ -599,7 +321,6 @@ const RECC_ESQUEMA = {
     ]
   },
 
-  // -------------------------------------------------------------- cadastros
   USUARIOS: {
     aba: 'USUARIOS',
     titulo: 'Usuários',
@@ -609,57 +330,18 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Email', tipo: 'texto', protegido: true },
-      // O canal em que a pessoa trabalha. VAZIO É VÁLIDO, e é o caso do
-      // administrador: quem administra não pertence a um canal, atende as
-      // duas e delega para quem for. Exigir canal dele obrigaria a inventar
-      // uma resposta para uma pergunta que não se aplica.
-      //
-      // Saíram daqui "Canal que atende" e "Matricula", a pedido do PO: o
-      // primeiro era texto livre que duplicava o que o NÍVEL já diz, e o
-      // segundo não tinha uso. A migração tira as duas de quem já instalou,
-      // sem perder o resto do cadastro.
+
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'CargoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'NivelAcessoId', tipo: 'identificador', protegido: true },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true },
-      /*
-       * A PESSOA ESTÁ RECEBENDO CASO HOJE?
-       *
-       * É DIFERENTE de `Ativo`, e a diferença é a razão desta coluna existir.
-       * `Ativo` é ACESSO: desativado não entra no sistema. Disponibilidade é
-       * DISTRIBUIÇÃO: quem está de férias continua entrando — o PO foi
-       * explícito sobre isso — e só para de receber lote novo.
-       *
-       * Juntar as duas numa coluna só obrigaria a escolher entre tirar o
-       * acesso de quem está de férias ou mandar casos para quem só volta em
-       * três semanas. As duas respostas são erradas.
-       *
-       * Os valores vêm da lista DISPONIBILIDADE, no catálogo, e não escritos
-       * aqui: a operação pode criar "licença médica" ou "treinamento" sem
-       * tocar em código. VAZIO VALE DISPONÍVEL — quem foi cadastrado antes
-       * desta coluna existir continua recebendo, como já recebia.
-       */
+
       { cabecalho: 'Disponibilidade', tipo: 'texto', protegido: false },
       { cabecalho: 'DataCadastro', tipo: 'dataHora', protegido: true },
       { cabecalho: 'UltimoAcesso', tipo: 'dataHora', protegido: true }
     ]
   },
 
-  /*
-   * AS CORRETORAS DIAMANTE — as cinco colunas que o PO pediu, nesta ordem.
-   *
-   * "Ela deve ser SUSEP, Nome corretora, Sucursal, Segmento e consultor."
-   *
-   * Saíram duas: `Nome`, que duplicava `Corretora` sem ninguém saber qual era
-   * qual, e `Canal`, que a operação não usa nesta tabela. Entrou `Sucursal`.
-   *
-   * A SUSEP é TEXTO, e isto é a mudança que mais pega quem leu o código
-   * antigo: ela era `identificador`, só dígito. O PO corrigiu — "todas as
-   * SUSEP's são no formato letras e números, ex: RET00J". Comparar SUSEP
-   * passou a ser comparar TEXTO (`chaveDaSusep_`), e usar
-   * `converterParaIdentificador_` nela hoje jogaria as letras fora em
-   * silêncio: "RET00J" viraria "00".
-   */
   CORRETORAS: {
     aba: 'CORRETORAS',
     titulo: 'Corretoras Diamante',
@@ -671,24 +353,11 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Corretora', tipo: 'texto', protegido: true },
       { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
       { cabecalho: 'Segmento', tipo: 'texto', protegido: true },
-      // Quem atende a corretora. Vem na mesma lista que a operação já mantém
-      // fora do sistema — 145 corretoras e mais de 7 mil SUSEPs —, e por isso
-      // entra pela importação em lote, não digitado uma linha por vez.
+
       { cabecalho: 'Consultor', tipo: 'texto', protegido: false }
     ]
   },
 
-  /*
-   * AS DUAS LISTAS DE ANALISTA que a operação mantém fora do PGO.
-   *
-   * Não são usuários do sistema: são as pessoas da Central e da Cobrança Ativa
-   * que APARECEM nos casos — quem transferiu, quem já tinha falado com o
-   * cliente. Elas não entram no PGO, e por isso não estão em USUARIOS.
-   *
-   * Nascem aqui com o contrato mínimo para o PGO saber ler. Quando vierem da
-   * planilha de cadastros, é lá que elas são mantidas; enquanto não vierem,
-   * ficam nestas abas, vazias, sem atrapalhar ninguém.
-   */
   ANALISTAS_CENTRAL: {
     aba: 'ANALISTAS_CENTRAL',
     titulo: 'Analistas da Central',
@@ -717,25 +386,6 @@ const RECC_ESQUEMA = {
     ]
   },
 
-  /*
-   * AS SUSEPs BLOQUEADAS — outra lista, com outras perguntas.
-   *
-   * "SUSEP's bloqueadas deve pedir: SUSEP, Corretora, Sucursal e coordenador
-   * comercial."
-   *
-   * Saíram do contrato `Motivo` e `CpfReincidente`, que o PO não listou. Numa
-   * planilha que já tem dado elas FICAM onde estão, fora do contrato: o
-   * sistema para de perguntar e de ler, e ninguém perde o que já escreveu.
-   * Apagar coluna com dado dentro nunca é decisão de uma migração.
-   *
-   * `BloqueadaEm` fica porque não é pergunta: é o sistema que a escreve, no
-   * dia em que o bloqueio nasce.
-   *
-   * `BloqueadaPor` diz QUEM bloqueou: a companhia ou a própria corretora.
-   * Pedido do PO: "as suseps bloqueadas são por 2 tipos". Vale 'Companhia' ou
-   * 'Corretora'. As linhas que já existiam antes dela ficam em branco — "sem
-   * tipo", decisão do PO — até alguém editar e escolher.
-   */
   SUSEP_BLOQUEADAS: {
     aba: 'SUSEP_BLOQUEADAS',
     titulo: 'SUSEPs bloqueadas',
@@ -748,14 +398,12 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
       { cabecalho: 'CoordenadorComercial', tipo: 'texto', protegido: false },
       { cabecalho: 'BloqueadaEm', tipo: 'data', protegido: false },
-      // Na planilha de cadastros de fora ela é AVISO, e não falta: quem já
-      // ligou a segunda base não pode ficar travado por uma coluna nova.
+
       { cabecalho: 'BloqueadaPor', tipo: 'texto', protegido: false,
         opcionalNaBaseDeFora: true }
     ]
   },
 
-  // ---------------------------------------------------------------- sistema
   CANAIS: {
     aba: 'CANAIS',
     titulo: 'Canais de trabalho',
@@ -766,84 +414,24 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Nome', tipo: 'texto', protegido: true },
       { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
       { cabecalho: 'Aba', tipo: 'texto', protegido: true },
-      // Quais colunas da base guardam quando o caso entrou. É daqui que sai a
-      // "data do último registro" da barra superior. Ficam declaradas, e não
-      // adivinhadas, porque cada canal nomeia essa coluna do seu jeito.
+
       { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
-      // O painel precisa saber onde o canal guarda cada coisa. Declarado, e
-      // não adivinhado pelo nome: cada canal batiza a coluna do seu jeito, e
-      // adivinhar acerta hoje e erra no canal que vier depois.
+
       { cabecalho: 'ColunaDoStatus', tipo: 'texto', protegido: false },
-      // As colunas da fila. Aceita duas escritas:
-      //
-      //   plana      Data de entrada, Status, Nome do segurado
-      //   agrupada   Situação: Data, Status; Dados da proposta: Protocolo…
-      //
-      // A agrupada junta várias colunas debaixo de um título só — é o que
-      // deixa a fila legível quando o caso tem trinta e cinco campos e a
-      // pessoa precisa achar o dele de relance.
+
       { cabecalho: 'ColunasDaFila', tipo: 'textoLongo', protegido: false },
-      // Em quais colunas a busca procura. É por elas, e só por elas, que o
-      // sistema lê a base inteira — ler as 35 colunas de 200 mil linhas são
-      // 7 milhões de células, e ler cinco são um milhão.
+
       { cabecalho: 'ColunasDaBusca', tipo: 'texto', protegido: false },
-      // "MetaMensalPorPessoa" saiu do contrato na Etapa 52: só a Minha
-      // Performance a lia, e a tela saiu do sistema. Na planilha em uso a
-      // coluna fica, com o que estiver nela.
+
       { cabecalho: 'ColunaDaFinalizacao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaAreaResponsavel', tipo: 'texto', protegido: false },
-      /*
-       * O DINHEIRO DESTE CANAL, e quais situações merecem barra própria no
-       * gráfico de valor por situação.
-       *
-       * Pedido do PO: "traga na produtividade RECC gráfico com valor dos
-       * retidos, não retidos, sem sucesso, valor dos demais status e total".
-       *
-       * Mora aqui, e não escrito no código, porque é decisão de operação: a
-       * RET mede prêmio, outro canal pode medir outra coisa, e quais situações
-       * são o desfecho que importa muda com o tempo. As DUAS em branco
-       * desligam o gráfico — canal que não declarou o que é valor para ele não
-       * ganha um gráfico de valor inventado.
-       */
+
       { cabecalho: 'ColunaDoValor', tipo: 'texto', protegido: false },
       { cabecalho: 'SituacoesDestacadas', tipo: 'textoLongo', protegido: false },
-      /*
-       * ESTE CANAL CONFERE A LISTA DE SUSEPs BLOQUEADAS?
-       *
-       * Pedido do PO: "no formulário de Mesa diamante não há necessidade de
-       * verificar se a SUSEP está ou não bloqueada, pode remover esse
-       * detalhe". A Mesa atende corretora Diamante; a lista de bloqueios é de
-       * outra área e de outro propósito.
-       *
-       * Mora aqui como coluna, e não escrito no código com o nome "Mesa",
-       * porque é regra de OPERAÇÃO e muda: amanhã um canal novo pode querer a
-       * conferência, e a Mesa pode voltar a querer. Vazio vale SIM — um canal
-       * que nunca ouviu falar desta coluna continua conferindo, que é o
-       * comportamento que já existia.
-       *
-       * Não conferir também custa menos: é uma leitura de coluna a menos na
-       * aba de 16 mil SUSEPs bloqueadas, a cada SUSEP digitada.
-       */
+
       { cabecalho: 'ConfereSusepBloqueada', tipo: 'simOuNao', protegido: false },
-      /*
-       * O SLA DO CANAL, em horas ÚTEIS — pedido do PO para a Mesa Diamante:
-       * "6 horas úteis; a célula funciona das 08:15 às 18:30". Conta de
-       * segunda a sexta, só dentro do expediente.
-       *
-       * Mora aqui, e não escrito no código com o nome "Mesa", porque é regra
-       * de operação: o prazo, o expediente e o canal que tem prazo mudam.
-       * Zero ou vazio desliga — canal sem SLA declarado não ganha um selo
-       * inventado na fila.
-       *
-       * O expediente é TEXTO ("08:15"), e não hora: é configuração que a
-       * pessoa lê e escreve, e uma hora de planilha atravessa fusos.
-       *
-       * O prazo PARA NA PRIMEIRA RESPOSTA — palavra do PO: "a SLA conta até a
-       * data da primeira resposta". As duas colunas dizem onde a base guarda
-       * a data e a hora dessa resposta; declaradas, e não adivinhadas, como as
-       * outras. Caso encerrado sem resposta para no encerramento.
-       */
+
       { cabecalho: 'SlaHorasUteis', tipo: 'numero', protegido: false },
       { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
@@ -895,28 +483,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Rotulo', tipo: 'texto', protegido: false },
       { cabecalho: 'PaiId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Cor', tipo: 'texto', protegido: false },
-      // SÓ PARA ITENS DE STATUS: em qual coluna da base gravar a data e a
-      // hora em que o caso CHEGOU a este status.
-      //
-      // É o que mede produtividade. Na RET interessa quando o 1º contato
-      // aconteceu; na Mesa Diamante, quando o caso foi concluído. Antes isso
-      // ficava na auditoria, longe do caso — e ninguém cruza auditoria com
-      // base para montar um relatório. Aqui o carimbo mora na MESMA linha do
-      // caso, na aba do próprio canal, e sai direto para o Power BI.
-      //
-      // Vazio quer dizer "este status não carimba nada", que é o normal para
-      // a maioria deles.
+
       { cabecalho: 'ColunaDeCarimbo', tipo: 'texto', protegido: false },
-      // SÓ PARA ITENS DE STATUS: SIM quando o status FECHA o caso.
-      //
-      // Pedido do PO: o que é "concluído" muda de canal para canal. Na RET é
-      // Cancelado, Pago, Não retido, Retido ou Sem sucesso de contato; na Mesa
-      // Diamante, Concluído, Concluído na mesa ou Sem retorno; no VG ele ainda
-      // vai decidir. Antes o sistema adivinhava pelo nome — status que começa
-      // com "conclu" — e um caso Retido aparecia como "ainda em aberto".
-      //
-      // Final NÃO TRAVA o caso: ele continua aceitando mudança de status. Só
-      // diz o que entra na conta de "Concluídos". Vazio quer dizer não.
+
       { cabecalho: 'Final', tipo: 'simOuNao', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
@@ -934,12 +503,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Tela', tipo: 'texto', protegido: true },
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Titulo', tipo: 'texto', protegido: false },
-      // 'cartao' no Trabalho; pizza, linha e barras na Produtividade RECC.
+
       { cabecalho: 'TipoWidget', tipo: 'texto', protegido: true },
-      // Para um cartão, é a regra de contagem: 'total', 'situacao',
-      // 'naCelula', 'preenchido' (a coluna do Filtro tem algo escrito) ou
-      // 'valor' (a coluna do CampoMedida tem o valor do Filtro). Para um
-      // gráfico, é o campo que vira eixo.
+
       { cabecalho: 'CampoDimensao', tipo: 'texto', protegido: false },
       { cabecalho: 'CampoMedida', tipo: 'texto', protegido: false },
       { cabecalho: 'Agregacao', tipo: 'texto', protegido: false },
@@ -947,24 +513,13 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Filtro', tipo: 'textoLongo', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Largura', tipo: 'numero', protegido: false },
-      // O tom, por NOME — 'bom', 'ruim', 'atencao'… Guardar '#15794A' aqui
-      // deixaria o verde do tema claro aparecendo no tema escuro.
+
       { cabecalho: 'Cor', tipo: 'texto', protegido: false },
       { cabecalho: 'VisivelPara', tipo: 'texto', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false }
     ]
   },
 
-  /*
-    As análises que o administrador montou.
-    Uma ABA, e não um JSON dentro de CONFIG, pela mesma razão que os cartões do
-    Trabalho saíram de CANAIS: é uma LISTA de coisas configuráveis, cada uma
-    com nome, canal, colunas e filtro próprios. Guardada como texto numa célula,
-    dava para escolher "quais" e para mais nada.
-
-    ATENÇÃO: esta aba guarda a RECEITA. A aba gerada — ANALISE_<Nome> — é outra
-    coisa, não está no contrato e é recriada a cada geração.
-  */
   ANALISES: {
     aba: 'ANALISES',
     titulo: 'Análises',
@@ -972,55 +527,25 @@ const RECC_ESQUEMA = {
     reserva: 100,
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
-      // Vira o nome da aba: 'Diamante' gera ANALISE_Diamante. Só letras,
-      // números e _ — é o que o Google Planilhas aceita sem aspas em fórmula.
+
       { cabecalho: 'Nome', tipo: 'texto', protegido: false },
       { cabecalho: 'Descricao', tipo: 'texto', protegido: false },
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
-      // Cabeçalhos separados por vírgula. Vazio = todas as colunas do canal.
+
       { cabecalho: 'Colunas', tipo: 'textoLongo', protegido: false },
-      // 'Coluna=valor' separados por ponto e vírgula. Vazio = sem filtro.
+
       { cabecalho: 'Filtros', tipo: 'textoLongo', protegido: false },
-      // Janela em dias, contada da coluna de data do canal. 0 = tudo.
+
       { cabecalho: 'Dias', tipo: 'numero', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
-      // O retrato: quando foi gerado e quantas linhas saíram. É o que faz a
-      // tela dizer "gerada ontem, 1.204 linhas" em vez de só "existe".
+
       { cabecalho: 'GeradaEm', tipo: 'dataHora', protegido: true },
       { cabecalho: 'GeradaPor', tipo: 'identificador', protegido: true },
       { cabecalho: 'Linhas', tipo: 'numero', protegido: true }
     ]
   },
 
-  /*
-   * OS SINALIZADORES — quanto tempo um caso tem para chegar a um status final.
-   *
-   * Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
-   * RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um
-   * desfecho; na Mesa, o caso tem 48 horas úteis, do status Em andamento até
-   * ser concluído.
-   *
-   * É uma aba, e não colunas em CANAIS, porque um canal pode ter mais de um
-   * (a Mesa tem o SLA de 6h, que mora em CANAIS, e este) e porque o PO ajusta
-   * tudo pela tela: prazo, quando acende o amarelo, e a partir de que coluna
-   * se conta. Nenhum sinalizador é escrito em código.
-   *
-   * Um sinalizador não tem "tipo". Ele é definido por três respostas:
-   *   QUANDO VALE   `ColunaQueLiga`: vazio vale para todo caso sem status final;
-   *                 com uma coluna, só vale quando ela está preenchida (a Mesa
-   *                 usa `Área responsável`).
-   *   DESDE QUANDO  `ColunaDaData` (+ `ColunaDaHora`): vazio usa a data e a hora
-   *                 de entrada do canal.
-   *   ATÉ QUANDO    sempre até o status final — vem do catálogo, e não daqui.
-   * Assim o VG, que ainda não definiu o dele, só precisa que o PO ligue o
-   * sinalizador que já está lá, desligado.
-   */
-  // Os atendimentos do CHAT da Mesa Diamante, trazidos pela tela de Importação.
-  // Pedido do PO: ler uma planilha à parte "ficou confuso e não consegui fazer
-  // a junção" — agora o chat entra como os casos entram (colar ou link, de-para,
-  // conferência) e mora aqui, dentro do PGO. A Produtividade da Mesa soma estas
-  // linhas aos casos do sistema.
   ATENDIMENTOS_CHAT: {
     aba: 'ATENDIMENTOS_CHAT',
     titulo: 'Atendimentos do chat',
@@ -1035,16 +560,12 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Assunto', tipo: 'texto', protegido: false },
       { cabecalho: 'Consultor', tipo: 'texto', protegido: false },
       { cabecalho: 'Ramo', tipo: 'texto', protegido: false },
-      // Etapa 41, pedido do PO: "na importação para os chats da mesa você não
-      // colocou a sucursal (...) acrescente a tabulação, sub assunto e TMO".
-      // Todas opcionais: o que a planilha de origem não trouxer fica em branco,
-      // para o PO preencher à mão. O TMO é em SEGUNDOS ("1.152" = 1152 s).
+
       { cabecalho: 'Sucursal', tipo: 'texto', protegido: false },
       { cabecalho: 'Tabulação', tipo: 'texto', protegido: false },
       { cabecalho: 'Sub assunto', tipo: 'texto', protegido: false },
       { cabecalho: 'TMO', tipo: 'numero', protegido: false },
-      // O lote, como na importação de casos: é por ele que se acha (e, se
-      // preciso, se apaga) uma leva importada errada.
+
       { cabecalho: 'Lote', tipo: 'texto', protegido: false },
       { cabecalho: 'ImportadoEm', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
     ]
@@ -1058,27 +579,23 @@ const RECC_ESQUEMA = {
     colunas: [
       { cabecalho: 'Id', tipo: 'identificador', protegido: true },
       { cabecalho: 'CanalId', tipo: 'identificador', protegido: false },
-      // O que aparece no selo: "Prazo de retorno · faltam 2 dias úteis".
+
       { cabecalho: 'Nome', tipo: 'texto', protegido: false },
-      // Quanto, e em quê. Zero não sinaliza nada.
+
       { cabecalho: 'Prazo', tipo: 'numero', protegido: false },
-      // 'dias' ou 'horas' — sempre ÚTEIS, de segunda a sexta, no expediente.
+
       { cabecalho: 'Unidade', tipo: 'texto', protegido: false },
-      // O amarelo: acende quando falta até isto para estourar, na mesma unidade.
+
       { cabecalho: 'AvisoFaltando', tipo: 'numero', protegido: false },
       { cabecalho: 'ColunaQueLiga', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaData', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHora', tipo: 'texto', protegido: false },
-      // Como "08:15" e "18:30". Em branco vale o expediente padrão.
+
       { cabecalho: 'InicioDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: false },
-      // QUANDO UM STATUS SÓ ENCERRA O PRAZO COM CONDIÇÃO. Na RET, "Retido" só
-      // para o relógio quando o Status proposta chega em Transmitido ou Sem
-      // alteração: status, coluna da condição e valores, separados por ";".
-      // A data é a coluna que o sistema carimba quando a condição passa a valer.
-      // Os quatro vazios: o status final encerra sozinho, como em todo canal.
+
       { cabecalho: 'StatusComCondicao', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaCondicao', tipo: 'texto', protegido: false },
       { cabecalho: 'ValoresDaCondicao', tipo: 'texto', protegido: false },
@@ -1118,13 +635,6 @@ const RECC_ESQUEMA = {
   }
 };
 
-/**
- * A ponte entre o tipo de DADO da coluna e o tipo de CAMPO do formulário.
- *
- * Existem os dois porque respondem a perguntas diferentes: o tipo de dado
- * decide o formato da célula; o tipo de campo decide o controle que aparece
- * na tela. "moeda" e "dinheiro" são a mesma coisa vista de dois lados.
- */
 const RECC_DO_DADO_PARA_O_CAMPO = {
   identificador: 'identificador',
   texto: 'texto',
@@ -1137,7 +647,6 @@ const RECC_DO_DADO_PARA_O_CAMPO = {
   simOuNao: 'simOuNao'
 };
 
-/** O caminho de volta, com os apelidos que a configuração aceita. */
 const RECC_DO_CAMPO_PARA_O_DADO = {
   identificador: 'identificador',
   documento: 'identificador',
@@ -1156,13 +665,8 @@ const RECC_DO_CAMPO_PARA_O_DADO = {
   simOuNao: 'simOuNao'
 };
 
-/** Prefixo reservado das abas geradas pelo gerador de análise. */
 const RECC_PREFIXO_ANALISE = 'ANALISE_';
 
-/**
- * A definição de uma aba, com as colunas de controle já anexadas.
- * É esta lista, e não `RECC_ESQUEMA[x].colunas`, que representa a aba inteira.
- */
 function esquemaDaAba_(nomeDaAba) {
   var definicao = RECC_ESQUEMA[nomeDaAba];
   if (!definicao) {
@@ -1181,56 +685,18 @@ function esquemaDaAba_(nomeDaAba) {
   };
 }
 
-/** Os nomes das abas do contrato, na ordem em que o instalador as cria. */
 function nomesDasAbasDoContrato_() {
   return Object.keys(RECC_ESQUEMA);
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 3 · O GERADOR DE Id
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * O gerador de Id
- * ============================================================================
- * O Id do RECC é DECIMAL, PROGRESSIVO, de 10 CASAS, começando em 0000000000.
- * Dez casas dão dez bilhões de combinações.
- *
- * Três regras, e cada uma existe por causa de um estrago real no sistema
- * anterior:
- *
- *   1. A sequência mora em Script Properties, NUNCA na planilha.
- *      A planilha é editável à mão; um contador dentro dela seria zerado sem
- *      querer numa tarde qualquer.
- *
- *   2. A sequência NUNCA anda para trás.
- *      Quando o Sheets deformava um Id, o gerador não o reconhecia, rebaixava
- *      o piso da aba e voltava a emitir Id já em uso. Aqui o piso é sempre
- *      max(último guardado, maior Id encontrado na aba).
- *
- *   3. Toda emissão acontece dentro de uma trava.
- *      Sem isso, dois usuários salvando no mesmo segundo recebem o mesmo Id.
- *      Quem chama (Base.gs) já segura a trava.
- * ============================================================================
- */
-
 const RECC_PREFIXO_DA_SEQUENCIA = 'RECC_SEQ_';
 
-/** 42 vira "0000000042". */
 function formatarIdentificador_(numero) {
   var texto = String(Math.floor(numero));
   while (texto.length < 10) texto = '0' + texto;
   return texto;
 }
 
-/**
- * O maior Id já presente na aba, como número. -1 quando a aba está vazia.
- * Ids deformados (texto que não é dígito) são ignorados de propósito: eles
- * não podem rebaixar nem levantar o piso.
- */
 function maiorIdentificadorDaAba_(nomeDaAba) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var iId = posicaoDaColuna_(estrutura, 'Id');
@@ -1250,25 +716,6 @@ function maiorIdentificadorDaAba_(nomeDaAba) {
   return maior;
 }
 
-/**
- * RESERVA UM BLOCO de Ids de uma vez, e devolve todos.
- *
- * DEVE ser chamada dentro de uma trava — inserirVariosRegistros_ já segura a
- * dela.
- *
- * POR QUE EM BLOCO, E NÃO UM POR VEZ. Esta função é a única do sistema que
- * fala com o PropertiesService durante uma gravação, e cada ida lá custa
- * dezenas de milissegundos no Apps Script. Emitindo um Id por vez, gravar
- * cinco mil casos eram DEZ MIL idas — dois minutos só de pedágio, dentro de
- * uma execução que tem seis. Reservando o bloco inteiro são DUAS: uma leitura
- * e uma gravação, para cinco mil linhas ou para uma.
- *
- * O bloco é reservado ANTES de qualquer linha ser escrita na planilha, e a
- * sequência já sai gravada no fim dele. Se a gravação estourar no meio, os
- * Ids reservados se perdem — e é o que tem de acontecer: a sequência nunca
- * anda para trás, mesmo que isso deixe buracos. Buraco na numeração não
- * quebra nada; Id reemitido quebra tudo, e foi o que aconteceu no PGO 5.x.
- */
 function proximosIdentificadores_(nomeDaAba, quantos) {
   if (quantos <= 0) return [];
 
@@ -1278,32 +725,13 @@ function proximosIdentificadores_(nomeDaAba, quantos) {
 
   var ultimo;
   if (guardado === null) {
-    // Primeira emissão desta aba nesta instalação: alinha com o que já existe
-    // na planilha, para nunca reemitir um Id que já está gravado.
+
     ultimo = maiorIdentificadorDaAba_(nomeDaAba);
   } else {
     ultimo = Number(guardado);
     if (!isFinite(ultimo)) ultimo = maiorIdentificadorDaAba_(nomeDaAba);
   }
 
-  /*
-   * ABA DE FORA: o piso vem SEMPRE da planilha, e não só na primeira vez.
-   *
-   * O contador mora no PropertiesService DESTE projeto; as linhas de uma aba
-   * de fora moram na planilha de cadastros. Nada garante que os dois estejam
-   * de acordo — e três coisas comuns os separam:
-   *
-   *   1. Uma segunda instalação do PGO apontando para o mesmo cadastro. Cada
-   *      uma tem o seu contador, e as duas emitiriam o mesmo Id.
-   *   2. Alguém acrescentando uma linha na planilha de cadastros à mão, que é
-   *      justamente o que se espera de uma base mantida por outra área.
-   *   3. Esta instalação sendo refeita: contador zerado, planilha cheia.
-   *
-   * Nos três, o Id repetido não daria erro na hora — daria uma linha gravada
-   * por cima de outra semanas depois. Uma leitura de coluna por inserção é
-   * barata num cadastro, que tem centenas de linhas e recebe uma de cada vez;
-   * e é o preço de o contador nunca mentir sobre uma planilha que não é nossa.
-   */
   if (abaVemDeOutraPlanilha_(nomeDaAba)) {
     var naPlanilhaDeFora = maiorIdentificadorDaAba_(nomeDaAba);
     if (naPlanilhaDeFora > ultimo) ultimo = naPlanilhaDeFora;
@@ -1322,15 +750,6 @@ function proximosIdentificadores_(nomeDaAba, quantos) {
   return bloco;
 }
 
-/** Um Id só. É o bloco de tamanho um — não existe segunda regra. */
-function proximoIdentificador_(nomeDaAba) {
-  return proximosIdentificadores_(nomeDaAba, 1)[0];
-}
-
-/**
- * Realinha a sequência com a planilha, sem nunca baixá-la.
- * Chamada depois de uma carga feita direto na planilha.
- */
 function realinharSequencia_(nomeDaAba) {
   var props = PropertiesService.getScriptProperties();
   var chave = RECC_PREFIXO_DA_SEQUENCIA + nomeDaAba;
@@ -1343,19 +762,6 @@ function realinharSequencia_(nomeDaAba) {
   return { aba: nomeDaAba, guardado: guardado, naAba: naAba, piso: piso };
 }
 
-/**
- * Carimba Id em linha que entrou direto na planilha — UMA aba. Quem roda é
- * `normalizarBase()`, no editor do Apps Script, para todas as abas.
- *
- * Quem digita uma linha à mão não gera Id. Sem Id não há relacionamento, e
- * a atualização por Id não acha o registro. Esta rotina percorre a aba, dá
- * Id a quem está sem, e realinha a sequência.
- *
- * Id REPETIDO ela só aponta, não corrige: qual das duas linhas é a cópia é
- * decisão de gente. Apagando o Id da cópia, a próxima rodada dá um novo.
- *
- * Só lê e escreve a coluna de Id: não toca em mais nada da linha.
- */
 function normalizarIdentificadoresDaAba_(nomeDaAba) {
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(30000)) {
@@ -1376,8 +782,6 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
 
     realinharSequencia_(nomeDaAba);
 
-    // Lê a aba inteira, e não só a coluna de Id: uma linha sem Id só se
-    // distingue de uma linha em branco olhando as outras colunas.
     var bloco = estrutura.aba
       .getRange(2, 1, totalDados, estrutura.cabecalhos.length)
       .getValues();
@@ -1388,8 +792,6 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
     var repetidos = [];
     var carimbados = 0;
 
-    // Os Ids novos saem num bloco só: um por linha seria uma ida ao
-    // PropertiesService para cada linha sem Id (ver proximosIdentificadores_).
     var precisam = 0;
     for (var j = 0; j < coluna.length; j++) {
       if (!converterParaIdentificador_(coluna[j][0]) && !linhaEstaVazia_(bloco[j])) precisam++;
@@ -1399,7 +801,7 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
     for (var i = 0; i < coluna.length; i++) {
       var atual = converterParaIdentificador_(coluna[i][0]);
       if (!atual) {
-        if (linhaEstaVazia_(bloco[i])) continue;   // linha em branco não ganha Id
+        if (linhaEstaVazia_(bloco[i])) continue;
         coluna[i][0] = novos[carimbados];
         carimbados++;
         continue;
@@ -1413,7 +815,6 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
       coluna[i][0] = normalizado;
     }
 
-    // Texto ANTES do valor: é o que impede 0000000010 de virar 10.
     faixa.setNumberFormat('@');
     faixa.setValues(coluna);
     esquecerCacheDaConfiguracao_(nomeDaAba);
@@ -1429,55 +830,8 @@ function normalizarIdentificadoresDaAba_(nomeDaAba) {
   }
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 3 de 3 · A PORTA ÚNICA PARA O GOOGLE PLANILHAS
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * A porta única para o Google Planilhas
- * ============================================================================
- * NENHUM outro arquivo chama SpreadsheetApp. Toda leitura e toda gravação
- * passam por aqui — é o que garante, num lugar só, as duas regras que
- * sustentam a integridade do dado:
- *
- *   1. A coluna é encontrada pelo NOME do cabeçalho, nunca pela posição.
- *      Reordenar coluna na planilha não quebra o sistema.
- *
- *   2. A linha é FORMATADA antes de receber o valor.
- *      Identificador vai para célula de texto (@), dinheiro para célula de
- *      moeda, data para célula de data. Formatar depois não desfaz nada:
- *      quando o Sheets converteu 0000000010 em 10, o zero já se foi.
- *
- * Nenhum código de topo depende de outro arquivo: as referências a
- * RECC_ESQUEMA e a Base.gs acontecem dentro de função.
- * ============================================================================
- */
-
-/** A estrutura já lida de cada aba, válida só durante esta execução. */
 var estruturasJaLidas = {};
 
-/**
- * ----------------------------------------------------------------------------
- * O MEMO DAS ABAS DE SISTEMA
- * ----------------------------------------------------------------------------
- * Abrir o Trabalho custava 48 idas ao Planilhas, e a maioria era a MESMA aba
- * lida de novo: num pacoteDePartida só, CONFIG era lido 10 vezes; num
- * resumoDoCanal, CATALOGO era lido 7. Ninguém escreveu isso de propósito — são
- * funções pequenas e corretas, cada uma lendo o que precisa, e o custo só
- * aparece quando se conta o total.
- *
- * Como cada chamada da tela é uma EXECUÇÃO NOVA no Apps Script, uma variável
- * de topo dura exatamente uma requisição. É o tempo certo: não há como servir
- * dado velho para a próxima chamada, porque não existe próxima chamada nesta
- * execução.
- *
- * SÓ ABAS DE SISTEMA ENTRAM. As bases operacionais ficam de fora, e não é
- * detalhe: BASE_RET com 200 mil linhas na memória estouraria a execução. A
- * lista é explícita para que ninguém precise adivinhar a regra.
- */
 var RECC_ABAS_QUE_VALE_GUARDAR = [
   'CONFIG', 'CATALOGO', 'CORRETORAS', 'CAMPOS', 'PAINEIS', 'ANALISES',
   'NIVEIS_ACESSO', 'USUARIOS'
@@ -1485,7 +839,6 @@ var RECC_ABAS_QUE_VALE_GUARDAR = [
 
 var registrosJaLidos = {};
 
-/** A chave leva as opções junto: "as últimas 500" não é a mesma coisa que tudo. */
 function chaveDoMemo_(nomeDaAba, opcoes) {
   return nomeDaAba + '|' + (Number(opcoes.ultimas) || 0)
     + '|' + (opcoes.incluirOcultos ? 1 : 0);
@@ -1495,15 +848,6 @@ function valeGuardarNaMemoria_(nomeDaAba) {
   return RECC_ABAS_QUE_VALE_GUARDAR.indexOf(nomeDaAba) >= 0;
 }
 
-/**
- * Uma cópia rasa de cada registro.
- *
- * Sem isso, duas partes do sistema que pedissem a mesma aba receberiam o
- * MESMO objeto — e uma que mexesse num campo mudaria o que a outra lê, num
- * defeito que só aparece na ordem certa de chamadas. Registro é um mapa
- * chato de valores, então cópia rasa basta, e copiar trezentas linhas custa
- * microssegundos contra os 25 ms de uma ida ao serviço.
- */
 function copiarRegistros_(lista) {
   return lista.map(function (registro) {
     var copia = {};
@@ -1516,7 +860,6 @@ function copiarRegistros_(lista) {
   });
 }
 
-/** O tipo das colunas que NÃO estão no contrato, declarado na aba CAMPOS. */
 var tiposDeclaradosJaLidos = null;
 var lendoTiposDeclarados = false;
 
@@ -1530,26 +873,12 @@ function esquecerEstruturaLida_(nomeDaAba) {
     estruturasJaLidas = {};
     esquecerRegistrosLidos_();
     tiposDeclaradosJaLidos = null;
-    // A planilha de cadastros aberta também é esquecida. Ela guarda a planilha
-    // que o Id APONTAVA — e quem chama isto sem nome de aba está dizendo "o
-    // que eu sabia não vale mais", que é exatamente o caso de quem acabou de
-    // trocar esse Id. Sem esta linha, ligar a segunda base só passaria a valer
-    // na execução seguinte, e a tela mostraria o cadastro antigo depois de
-    // dizer "salvo".
+
     planilhaDeCadastrosAberta = null;
     jaTenteiAbrirOsCadastros = false;
   }
 }
 
-/**
- * Joga fora o memo dos registros.
- *
- * Vive colado no esquecerEstruturaLida_ de propósito: TODO caminho de
- * gravação já chamava aquele, então este passa a ser chamado nos mesmos
- * lugares, sem ninguém precisar lembrar de um segundo. Memo que se esquece
- * num lugar e não no outro serve dado velho — e dado velho de configuração é
- * pior que lentidão, porque parece certo.
- */
 function esquecerRegistrosLidos_(nomeDaAba) {
   if (!nomeDaAba) { registrosJaLidos = {}; return; }
   Object.keys(registrosJaLidos).forEach(function (chave) {
@@ -1557,43 +886,14 @@ function esquecerRegistrosLidos_(nomeDaAba) {
   });
 }
 
-/**
- * ----------------------------------------------------------------------------
- * O CACHE DA CONFIGURAÇÃO — entre uma chamada e outra (Etapa 42)
- * ----------------------------------------------------------------------------
- * Relato do PO: lentidão no Trabalho, no "Trabalhar no caso" e no Cadastrar
- * Caso, com 9 pessoas ao mesmo tempo, e o erro dos 40 segundos. A medição
- * mostrou que cada ação da tela fazia de 30 a 60 idas ao Planilhas, e a maior
- * parte era RELER a configuração (CANAIS, CAMPOS, listas, prazos, usuários) —
- * que quase nunca muda. O memo de cima não resolve isso: cada clique é uma
- * execução nova, e ele morre com ela.
- *
- * O CacheService do Apps Script guarda a configuração por 5 minutos para todas
- * as execuções. A planilha continua sendo a dona do dado; o cache só evita a
- * ida até ela. As regras, escolhidas pelo PO:
- *   - salvar pelo sistema (as telas de Configurações, o cadastro de usuários,
- *     o atualizarPGO) LIMPA o cache da aba na hora — vale na mesma hora;
- *   - quem mexe DIRETO na planilha vê a mudança em até 5 minutos, ou na hora
- *     com o botão "Aplicar mudanças da planilha agora" (Configurações ›
- *     Estrutura).
- *
- * SÓ CONFIGURAÇÃO ENTRA. As bases de casos mudam a cada clique de 9 pessoas e
- * ficam de fora, como os cadastros de corretoras e SUSEPs bloqueadas.
- *
- * O cache NUNCA é necessário: se o serviço falhar, ou o valor não couber, o
- * sistema lê a planilha como sempre leu. Cache que derruba a tela seria pior
- * que a lentidão.
- */
 var RECC_ABAS_DO_CACHE = ['CONFIG', 'CANAIS', 'CAMPOS', 'CATALOGO', 'USUARIOS',
   'SINALIZADORES', 'PAINEIS'];
 var RECC_SEGUNDOS_DO_CACHE = 300;
 var RECC_PREFIXO_DO_CACHE = 'pgo-config-1|';
-// O CacheService aceita até 100 KB por valor. Pedaços de 40 mil caracteres
-// cabem com folga mesmo com acentos (que ocupam 2 bytes); até 6 pedaços por aba.
+
 var RECC_TAMANHO_DO_PEDACO = 40000;
 var RECC_PEDACOS_POR_ABA = 6;
 
-/** O que já veio do cache NESTA execução: um getAll só, na primeira vez. */
 var cacheDaConfiguracaoLido = null;
 
 function cacheDoScript_() {
@@ -1604,12 +904,10 @@ function cacheDoScript_() {
   }
 }
 
-/** Só a leitura "inteira" (sem `ultimas`) de uma aba de configuração entra. */
 function vaiParaOCache_(nomeDaAba, opcoes) {
   return RECC_ABAS_DO_CACHE.indexOf(nomeDaAba) >= 0 && !(Number(opcoes.ultimas) > 0);
 }
 
-/** As chaves dos pedaços de uma leitura: com e sem as linhas ocultas. */
 function chavesDoCache_(nomeDaAba, incluirOcultos) {
   var chaves = [];
   for (var i = 0; i < RECC_PEDACOS_POR_ABA; i++) {
@@ -1626,10 +924,6 @@ function todasAsChavesDoCache_(abas) {
   return chaves;
 }
 
-/**
- * Data não sobrevive ao JSON: vira texto. Ela vai marcada, e volta Date — o
- * resto do sistema compara datas, e um texto no lugar daria conta errada calada.
- */
 function paraOCache_(chave, valor) {
   var bruto = this[chave];
   if (Object.prototype.toString.call(bruto) === '[object Date]') {
@@ -1645,7 +939,6 @@ function doCache_(chave, valor) {
   return valor;
 }
 
-/** Os registros de uma aba que estão no cache, ou null. */
 function lerDoCacheDaConfiguracao_(nomeDaAba, opcoes) {
   var cache = cacheDoScript_();
   if (!cache) return null;
@@ -1661,7 +954,7 @@ function lerDoCacheDaConfiguracao_(nomeDaAba, opcoes) {
     var texto = primeiro.substring(separador + 1);
     for (var i = 1; i < quantos; i++) {
       var pedaco = cacheDaConfiguracaoLido[chaves[i]];
-      if (typeof pedaco !== 'string') return null;   // pedaço que expirou antes: lê a planilha
+      if (typeof pedaco !== 'string') return null;
       texto += pedaco;
     }
     return JSON.parse(texto, doCache_);
@@ -1670,7 +963,6 @@ function lerDoCacheDaConfiguracao_(nomeDaAba, opcoes) {
   }
 }
 
-/** Guarda os registros recém-lidos da planilha. Não couber ou falhar: não guarda. */
 function guardarNoCacheDaConfiguracao_(nomeDaAba, opcoes, registros) {
   var cache = cacheDoScript_();
   if (!cache) return;
@@ -1692,15 +984,10 @@ function guardarNoCacheDaConfiguracao_(nomeDaAba, opcoes, registros) {
       Object.keys(valores).forEach(function (k) { cacheDaConfiguracaoLido[k] = valores[k]; });
     }
   } catch (erro) {
-    // Sem cache, o sistema segue lendo a planilha.
+
   }
 }
 
-/**
- * Esquece o que o cache tem de uma aba — ou de todas, sem nome. Chamado em
- * toda gravação (por esquecerEstruturaLida_ e de novo depois de escrever, para
- * que uma leitura que corria ao lado não deixe o dado velho guardado).
- */
 function esquecerCacheDaConfiguracao_(nomeDaAba) {
   var abas = nomeDaAba ? [nomeDaAba] : RECC_ABAS_DO_CACHE;
   if (nomeDaAba && RECC_ABAS_DO_CACHE.indexOf(nomeDaAba) < 0) return;
@@ -1710,32 +997,15 @@ function esquecerCacheDaConfiguracao_(nomeDaAba) {
   }
   var cache = cacheDoScript_();
   if (!cache) return;
-  try { cache.removeAll(chaves); } catch (erro) { /* expira sozinho em 5 minutos */ }
+  try { cache.removeAll(chaves); } catch (erro) {   }
 }
 
-/* ============================================================================
-   O ENVIO ÚNICO — a mesma gravação não entra duas vezes (Etapa 59)
-   ============================================================================
-   Achado da análise de 29/10: a tela desiste em 40 segundos, mas o servidor
-   continua e termina de gravar. O botão voltava, a pessoa clicava de novo, e o
-   caso entrava em dobro.
-
-   Agora cada formulário manda um CÓDIGO DE ENVIO, o mesmo até a gravação dar
-   certo. O servidor anota o código antes de gravar ("em andamento") e guarda a
-   resposta depois ("feito"), por 6 horas:
-     · o mesmo código já feito devolve a resposta guardada, sem gravar de novo;
-     · o mesmo código ainda em andamento espera até 20 segundos pela resposta
-       e, se não vier, avisa — nunca grava a segunda vez;
-     · deu erro: o código é esquecido, e a pessoa corrige e manda de novo.
-   Sem código (quem chama de fora da tela), grava como sempre.
-   ============================================================================ */
 const RECC_PREFIXO_DO_ENVIO = 'ENVIO.';
 const RECC_ENVIO_EM_ANDAMENTO = '@andamento';
-const RECC_SEGUNDOS_DO_ENVIO_FEITO = 21600;      // 6 horas, o teto do CacheService
+const RECC_SEGUNDOS_DO_ENVIO_FEITO = 21600;
 const RECC_SEGUNDOS_DO_ENVIO_EM_ANDAMENTO = 600;
 const RECC_SEGUNDOS_ESPERANDO_O_ENVIO = 20;
 
-/** Grava uma vez só por código de envio — ver acima. */
 function comEnvioUnico_(envio, gravar) {
   var codigo = String(envio === null || envio === undefined ? '' : envio).trim();
   var cache = cacheDoScript_();
@@ -1767,22 +1037,12 @@ function comEnvioUnico_(envio, gravar) {
     cache.put(chave, JSON.stringify({ resposta: resposta === undefined ? null : resposta }),
       RECC_SEGUNDOS_DO_ENVIO_FEITO);
   } catch (erro) {
-    // Resposta grande demais para o cache: guarda só que foi feito.
+
     cache.put(chave, '{"resposta":null}', RECC_SEGUNDOS_DO_ENVIO_FEITO);
   }
   return resposta;
 }
 
-/**
- * O tipo das colunas criadas pelo administrador.
- *
- * Coluna do contrato tem tipo no Esquema. Coluna criada depois tem o tipo
- * declarado em CAMPOS — sem isso, uma coluna de moeda criada na tela receberia
- * "R$ 2.500,00" como texto, e o Power BI não somaria nada.
- *
- * A trava de reentrância existe porque ler CAMPOS passa por estruturaDaAba_, que é
- * justamente quem pergunta pelos tipos.
- */
 function tiposDeclaradosPeloAdministrador_() {
   if (tiposDeclaradosJaLidos) return tiposDeclaradosJaLidos;
   if (lendoTiposDeclarados) return {};
@@ -1796,8 +1056,7 @@ function tiposDeclaradosPeloAdministrador_() {
         var cabecalho = String(campo.Cabecalho || '').trim();
         if (!aba || !cabecalho) return;
         if (!mapa[aba]) mapa[aba] = {};
-        // A SUSEP é texto mesmo com o campo noutro tipo: identificador
-        // guardaria só os dígitos, e "jamjamm" iria para a célula vazia.
+
         mapa[aba][normalizarParaComparar_(cabecalho)] = ehASusep_(cabecalho)
           ? RECC_TIPO_DE_DADO.TEXTO
           : RECC_DO_CAMPO_PARA_O_DADO[campo.TipoCampo] || RECC_TIPO_DE_DADO.TEXTO;
@@ -1810,17 +1069,6 @@ function tiposDeclaradosPeloAdministrador_() {
   }
 }
 
-// ============================================================================
-// NORMALIZAÇÃO — como dois cabeçalhos são considerados o mesmo
-// ============================================================================
-
-/**
- * "Código origem da proposta" e "codigo origem da proposta" e
- * "CODIGO_ORIGEM_DA_PROPOSTA" viram a mesma chave.
- *
- * Tolerância deliberada: acento, caixa, espaço, sublinhado e pontuação não
- * distinguem colunas. O que distingue são as letras e os números.
- */
 function normalizarParaComparar_(texto) {
   return String(texto === null || texto === undefined ? '' : texto)
     .normalize('NFD')
@@ -1829,56 +1077,18 @@ function normalizarParaComparar_(texto) {
     .replace(/[^a-z0-9]/g, '');
 }
 
-/**
- * O e-mail em forma de CHAVE: sem espaço nas pontas e em minúsculas — e nada
- * além disso.
- *
- * NÃO passa por `normalizarParaComparar_`, que tira ponto, traço e
- * sublinhado: com ela, "joaosilva@" entrava como "joao.silva@", e um domínio
- * escolhido a dedo ("iago@peliteroportoseguro.com.br") entrava como
- * "iago.pelitero@portoseguro.com.br" — com o acesso dele. Em e-mail, cada
- * caractere identifica uma pessoa; só a caixa não importa.
- */
 function emailParaComparar_(texto) {
   return String(texto === null || texto === undefined ? '' : texto).trim().toLowerCase();
 }
 
-/**
- * A SUSEP em forma de CHAVE, para comparar, indexar e achar.
- *
- * A SUSEP é LETRA E NÚMERO — "RET00J", palavra do PO. Por isso ela não passa
- * por `converterParaIdentificador_`: aquela função guarda só dígito, e
- * "RET00J" sairia dela como "00", casando com qualquer outra SUSEP que
- * terminasse em dois zeros. Um bloqueio aplicado à corretora errada não dá
- * erro nenhum — só recusa a pessoa errada, um dia, no telefone.
- *
- * Existe como função com nome, e não como `normalizarParaComparar_` espalhado,
- * para que quem for mexer nisto daqui a um ano leia POR QUE a SUSEP se compara
- * assim, em vez de "arrumar" o código de volta para identificador.
- *
- * O que se GRAVA na planilha é o que a pessoa escreveu, sem as pontas. Só a
- * COMPARAÇÃO é normalizada: reescrever a SUSEP de todo mundo em maiúscula
- * mexeria em dado que ninguém pediu para mexer.
- */
 function chaveDaSusep_(valor) {
   return normalizarParaComparar_(valor);
 }
 
-/** A SUSEP como ela se escreve: o que a pessoa digitou, sem as pontas. */
 function susepComoSeEscreve_(valor) {
   return String(valor === null || valor === undefined ? '' : valor).trim();
 }
 
-/**
- * Os dados de um formulário, conferidos na PORTA da função que os grava.
- *
- * Achado da varredura geral (item 96): treze funções de gravar liam
- * `dados.nome`, `dados.id`… direto, e quando o objeto não vinha a pessoa lia
- * na tela "Cannot read properties of null (reading 'nome')". A tela de hoje
- * sempre manda o objeto — mas uma página ANTIGA, guardada no navegador depois
- * de uma atualização, manda o que a versão dela mandava. O recado diz o que
- * fazer, e a função para antes de mexer em qualquer coisa.
- */
 function dadosDaTela_(dados) {
   if (dados && typeof dados === 'object' && !Array.isArray(dados)) return dados;
   throw new Error('A tela não mandou os dados deste formulário. Recarregue a página '
@@ -1886,48 +1096,16 @@ function dadosDaTela_(dados) {
     + 'ser de uma versão antiga do sistema.');
 }
 
-/** Uma lista que veio da tela; o que não for lista vale como lista vazia. */
 function listaDaTela_(valor) {
   return Array.isArray(valor) ? valor : [];
 }
 
-/**
- * Este campo, ou esta coluna, é a SUSEP?
- *
- * Pedido do PO: a SUSEP aceita SÓ NÚMEROS, SÓ LETRAS ou OS DOIS — "7dmd8gs",
- * "jamjamm" e "77777777" são todas SUSEPs. E aceita qualquer que seja o tipo
- * escolhido para o campo em Configurações › Cadastrar Caso.
- *
- * Era aí que ela quebrava: com o campo SUSEP como "identificador" (ou
- * "documento", ou "número"), a conferência pedia ao menos um dígito, e a SUSEP
- * só de letras era recusada — "jamjamm" voltava com "precisa ter ao menos um
- * dígito", enquanto "7dmd8gs" passava. O tipo do campo vale para os outros
- * campos; a SUSEP é sempre texto, como no contrato das bases.
- */
 function ehASusep_(chaveOuCabecalho) {
   return normalizarParaComparar_(chaveOuCabecalho) === 'susep';
 }
 
-/**
- * A disponibilidade de quem acabou de ser cadastrado, e a única que recebe
- * caso na divisão de um lote.
- *
- * É o nome de um item da lista DISPONIBILIDADE, no catálogo. Fica numa
- * constante porque DUAS coisas dependem de ser exatamente este texto: o
- * semeador, que cria o item, e a divisão do lote, que compara com ele.
- * Escrito solto nos dois lugares, renomear o item na tela faria a divisão
- * parar de achar alguém disponível — e em silêncio.
- */
 var RECC_DISPONIBILIDADE_QUE_RECEBE = 'Disponível';
 
-/**
- * Esta pessoa entra na divisão de um lote?
- *
- * VAZIO É SIM, de propósito: quem foi cadastrado antes desta coluna existir
- * nunca escolheu "de férias", e tratar o vazio como indisponível esvaziaria a
- * distribuição de uma operação inteira na primeira importação depois da
- * atualização.
- */
 function estaDisponivelParaReceber_(usuario) {
   var situacao = String((usuario || {}).Disponibilidade || '').trim();
   if (!situacao) return true;
@@ -1935,17 +1113,12 @@ function estaDisponivelParaReceber_(usuario) {
     === normalizarParaComparar_(RECC_DISPONIBILIDADE_QUE_RECEBE);
 }
 
-/** Só os dígitos. É assim que identificador é comparado e gravado. */
 function apenasDigitos_(texto) {
   return String(texto === null || texto === undefined ? '' : texto).replace(/\D/g, '');
 }
 
-// ============================================================================
-// ESTRUTURA — ler a linha 1 e montar o mapa cabeçalho → coluna
-// ============================================================================
-
 function planilhaAtiva_() {
-  // SpreadsheetApp é o serviço do Google que dá acesso à planilha.
+
   var planilha = SpreadsheetApp.getActive();
   if (!planilha) {
     throw new Error('Nenhuma planilha vinculada a este projeto do Apps Script.');
@@ -1953,14 +1126,6 @@ function planilhaAtiva_() {
   return planilha;
 }
 
-/**
- * A estrutura de uma aba: a folha, os cabeçalhos como estão escritos na
- * linha 1, o mapa normalizado e o tipo de cada coluna.
- *
- * Coluna que existe na planilha mas não está no contrato entra como TEXTO —
- * é o caso de uma coluna acrescentada à mão, que o sistema respeita em vez
- * de ignorar.
- */
 function estruturaDaAba_(nomeDaAba, recarregar) {
   if (!recarregar && estruturasJaLidas[nomeDaAba]) return estruturasJaLidas[nomeDaAba];
 
@@ -2001,8 +1166,6 @@ function estruturaDaAba_(nomeDaAba, recarregar) {
     }
   }
 
-  // Ordem da decisão: o contrato manda; depois o que o administrador declarou
-  // em CAMPOS; e só então texto, que é o padrão seguro.
   var declarados = tiposDeclaradosPeloAdministrador_()[nomeDaAba] || {};
   var tipos = cabecalhos.map(function (cab) {
     var chave = normalizarParaComparar_(cab);
@@ -2020,25 +1183,11 @@ function estruturaDaAba_(nomeDaAba, recarregar) {
   return estrutura;
 }
 
-/** O índice (base 0) de uma coluna, ou -1 quando ela não existe. */
 function posicaoDaColuna_(estrutura, cabecalho) {
   var i = estrutura.mapa[normalizarParaComparar_(cabecalho)];
   return i === undefined ? -1 : i;
 }
 
-/**
- * O nome de uma coluna COMO ESTÁ ESCRITO na planilha.
- *
- * As configurações (CANAIS, SINALIZADORES, CAMPOS, CATALOGO) guardam nomes de
- * coluna, e a planilha pode ter a mesma coluna com outra grafia — "status" ×
- * "Status", "descrição" × "Descrição". Achar a coluna sempre ignorou maiúscula,
- * acento e espaço; mas o registro lido tem as chaves EXATAMENTE como no
- * cabeçalho, e ler `registro['status']` numa aba que diz "Status" devolve nada,
- * calado. Foi assim que a Descrição abria vazia (achado 88).
- *
- * Coluna que não existe, aba que não existe ou aba que não se deixa ler
- * devolvem o nome como veio: quem chama segue como seguia antes.
- */
 function grafiaDaColuna_(nomeDaAba, cabecalho) {
   var nome = String(cabecalho === null || cabecalho === undefined ? '' : cabecalho).trim();
   if (!nome || !nomeDaAba) return nome;
@@ -2052,7 +1201,6 @@ function grafiaDaColuna_(nomeDaAba, cabecalho) {
   return posicao < 0 ? nome : estrutura.cabecalhos[posicao];
 }
 
-/** Um objeto de valores com as chaves trocadas pela grafia da planilha. */
 function comAsChavesDaAba_(nomeDaAba, valores) {
   var saida = {};
   Object.keys(valores).forEach(function (chave) {
@@ -2070,16 +1218,6 @@ function exigirPosicaoDaColuna_(estrutura, cabecalho) {
   return i;
 }
 
-// ============================================================================
-// CONVERSÃO — o valor que chega vira o tipo que a célula espera
-// ============================================================================
-
-/**
- * Identificador: só dígitos, sempre texto.
- *
- * Lista de valores (o caso de "telefones de contato") preserva o ";" como
- * separador e limpa cada parte — senão dois telefones virariam um número só.
- */
 function converterParaIdentificador_(valor) {
   var bruto = String(valor === null || valor === undefined ? '' : valor).trim();
   if (!bruto) return '';
@@ -2092,7 +1230,6 @@ function converterParaIdentificador_(valor) {
   return apenasDigitos_(bruto);
 }
 
-/** Aceita 1234.56, "1234,56", "1.234,56" e "R$ 1.234,56". */
 function converterParaNumero_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   if (typeof valor === 'number') return isFinite(valor) ? valor : '';
@@ -2108,10 +1245,10 @@ function converterParaNumero_(valor) {
   texto = texto.replace(/[()\-]/g, '');
 
   if (texto.indexOf(',') >= 0) {
-    // Formato brasileiro: ponto é milhar, vírgula é decimal.
+
     texto = texto.replace(/\./g, '').replace(',', '.');
   } else if (/^\d{1,3}(\.\d{3})+$/.test(texto)) {
-    // 1.234.567 — só milhar, sem decimal.
+
     texto = texto.replace(/\./g, '');
   }
 
@@ -2120,7 +1257,6 @@ function converterParaNumero_(valor) {
   return negativo ? -n : n;
 }
 
-/** Aceita Date, "dd/MM/yyyy" e "yyyy-MM-dd". */
 function converterParaData_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   if (Object.prototype.toString.call(valor) === '[object Date]') {
@@ -2134,13 +1270,6 @@ function converterParaData_(valor) {
   return '';
 }
 
-/**
- * A data, se o dia existe no calendário — ou vazio.
- *
- * `new Date(2026, 1, 31)` não reclama: devolve 3 de março. Com o calendário do
- * navegador isso não chegava aqui; desde que a data é digitada com máscara,
- * "31/02/2026" pode chegar, e virar outro dia calado é o pior jeito de errar.
- */
 function diaQueExiste_(ano, mes, dia) {
   var data = new Date(ano, mes - 1, dia);
   if (data.getFullYear() !== ano || data.getMonth() !== mes - 1
@@ -2148,14 +1277,6 @@ function diaQueExiste_(ano, mes, dia) {
   return data;
 }
 
-/**
- * Hora do dia.
- *
- * A hora é carregada numa data de apoio, porque no Sheets a hora é a parte
- * fracionária de uma data. A data usada é 01/01/1970 de propósito: a época do
- * Sheets (30/12/1899) cai antes da padronização de fuso do Brasil — São Paulo
- * usava -03:06:28 —, e uma hora ancorada ali chega deslocada em minutos.
- */
 function converterParaHora_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   if (Object.prototype.toString.call(valor) === '[object Date]') {
@@ -2175,9 +1296,7 @@ function converterParaDataEHora_(valor) {
     return isNaN(valor.getTime()) ? '' : valor;
   }
   var texto = String(valor).trim();
-  // "dd/MM/yyyy", com ou sem a hora — como se escreve aqui, e como a outra
-  // planilha chega na importação (getDisplayValues). `new Date("03/10/2026")`
-  // lê no padrão americano: 10 de março, e "25/10/2026" nem lê (achado 104).
+
   var br = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
   if (br) {
     var dia = diaQueExiste_(Number(br[3]), Number(br[2]), Number(br[1]));
@@ -2225,45 +1344,19 @@ function converterParaOTipoDaColuna_(valor, tipo) {
       if (Object.prototype.toString.call(valor) === '[object Date]') return valor;
       return String(valor);
     default:
-      // Nada de cair em texto silenciosamente. Se um tipo novo for criado no
-      // Esquema e esquecido aqui, um CPF viraria texto com pontuação e um
-      // valor viraria texto em vez de número — e ninguém perceberia até o
-      // Power BI não somar. Erro alto é melhor que dado errado calado.
+
       throw new Error('Tipo de coluna desconhecido: "' + tipo + '". ' +
         'Todo tipo declarado em RECC_TIPO_DE_DADO precisa ter um caso em ' +
         'converterParaOTipoDaColuna_.');
   }
 }
 
-/** O formato de cada célula da linha, na ordem das colunas da aba. */
 function formatosDaLinha_(estrutura) {
   return estrutura.tipos.map(function (t) {
     return RECC_FORMATO_DA_CELULA[t] || '@';
   });
 }
 
-// ============================================================================
-// LEITURA
-// ============================================================================
-
-// ============================================================================
-// AS DUAS BASES — a operacional e a de cadastros
-// ============================================================================
-
-/**
- * As abas que PODEM morar em outra planilha.
- *
- * São os CADASTROS: listas grandes, que mudam pouco, e que a operação mantém
- * fora do PGO porque outras áreas também as usam. As 7 mil SUSEPs e as 145
- * corretoras sozinhas já ocupam um pedaço considerável do teto de 10 milhões
- * de células — tirá-las daqui deixa a planilha operacional com espaço para o
- * que ela existe para guardar, que é caso.
- *
- * O que NÃO entra nesta lista, e não deve entrar: as bases de caso, a
- * auditoria, os usuários e a configuração. Essas são do PGO, e um sistema que
- * depende de outra planilha para saber quem pode entrar é um sistema que para
- * de funcionar quando alguém mexe num compartilhamento.
- */
 const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
   'CORRETORAS',
   'SUSEP_BLOQUEADAS',
@@ -2271,35 +1364,17 @@ const RECC_ABAS_QUE_PODEM_VIR_DE_FORA = [
   'ANALISTAS_COBRANCA'
 ];
 
-/** Onde a planilha de cadastros está configurada. */
 const RECC_CHAVE_DA_PLANILHA_DE_CADASTROS = 'CADASTROS.PLANILHA_ID';
 
-/*
- * QUAIS cadastros moram nela (Etapa 55, pedido do PO): "vou usar a segunda base
- * para as SUSEPs bloqueadas, que somam 151 mil" — e as corretoras ficam aqui.
- * Abas separadas por vírgula. Vazio, com a planilha ligada, são as quatro: é
- * como funcionava antes da escolha existir, e quem já usa não muda nada.
- */
 const RECC_CHAVE_DAS_ABAS_DE_FORA = 'CADASTROS.ABAS';
 
-/*
- * A planilha de cadastros aberta, guardada pela execução inteira.
- *
- * `SpreadsheetApp.openById` é uma IDA ao serviço, das caras. Sem isto, uma
- * tela que lê corretoras, SUSEPs e analistas pagaria três aberturas da MESMA
- * planilha na mesma execução. Como cada `google.script.run` é uma execução
- * nova, a variável nasce vazia a cada chamada — não há risco de servir uma
- * planilha velha.
- */
 var planilhaDeCadastrosAberta = null;
 var jaTenteiAbrirOsCadastros = false;
 
-/** O Id configurado, ou vazio quando os cadastros moram aqui mesmo. */
 function idDaPlanilhaDeCadastros_() {
   return String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DE_CADASTROS, '') || '').trim();
 }
 
-/** As abas que vêm da planilha de cadastros — nenhuma, quando ela está desligada. */
 function abasQueVemDeFora_() {
   if (!idDaPlanilhaDeCadastros_()) return [];
   var escolhidas = String(valorDaConfiguracao_(RECC_CHAVE_DAS_ABAS_DE_FORA, '') || '')
@@ -2309,20 +1384,11 @@ function abasQueVemDeFora_() {
   return escolhidas.length ? escolhidas : RECC_ABAS_QUE_PODEM_VIR_DE_FORA.slice();
 }
 
-/** Esta aba vem de fora? */
 function abaVemDeOutraPlanilha_(nomeDaAba) {
   if (RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nomeDaAba) < 0) return false;
   return abasQueVemDeFora_().indexOf(nomeDaAba) >= 0;
 }
 
-/**
- * A aba, venha ela desta planilha ou da de cadastros.
- *
- * É o ponto ÚNICO em que o sistema decide de qual planilha ler. Todo o resto —
- * `lerRegistros_`, a busca, o selo da SUSEP, as listas do formulário — passa
- * por aqui sem saber que existem duas bases, e é por isso que ligar a segunda
- * não exigiu mexer em trinta lugares.
- */
 function abaOndeQuerQueElaMore_(nomeDaAba) {
   if (abaVemDeOutraPlanilha_(nomeDaAba)) {
     var deFora = planilhaDeCadastros_().getSheetByName(nomeDaAba);
@@ -2343,24 +1409,12 @@ function abaOndeQuerQueElaMore_(nomeDaAba) {
   return aqui;
 }
 
-/**
- * A planilha de cadastros, aberta uma vez por execução.
- *
- * Quando ela não abre, o erro DERRUBA com o motivo — e não devolve lista
- * vazia. Lista vazia aqui seria "nenhuma SUSEP está bloqueada" e "nenhuma
- * corretora existe": duas afirmações falsas que a operação acreditaria, e que
- * fariam um caso bloqueado passar como liberado. Parar e explicar é pior para
- * o dia e melhor para o dado.
- */
 function planilhaDeCadastros_() {
   if (planilhaDeCadastrosAberta) return planilhaDeCadastrosAberta;
 
   var id = idDaPlanilhaDeCadastros_();
   if (!id) throw new Error('Nenhuma planilha de cadastros está configurada.');
 
-  // Uma tentativa por execução. Sem isto, uma tela que lê três cadastros
-  // tentaria abrir três vezes a planilha que não abre, e o tempo de espera
-  // triplicaria antes de a pessoa ver o recado.
   if (jaTenteiAbrirOsCadastros) {
     throw new Error('A planilha de cadastros não abriu nesta execução.');
   }
@@ -2378,27 +1432,8 @@ function planilhaDeCadastros_() {
   return planilhaDeCadastrosAberta;
 }
 
-/**
- * O que uma aba de fora precisa ter para o PGO poder ESCREVER nela.
- *
- * `Id` porque é por ele que o sistema acha a linha para alterar. As colunas de
- * controle porque é nelas que mora a exclusão lógica — sem `_Visivel`, tirar um
- * cadastro da tela só seria possível apagando a linha, e apagar linha de uma
- * planilha que é de outra área não é decisão do PGO.
- */
 const RECC_COLUNAS_PARA_ESCREVER_DE_FORA = ['Id', '_Visivel'];
 
-/**
- * Esta aba de fora aceita escrita?
- *
- * A resposta vem do que a planilha TEM, e não de uma configuração. Uma lista de
- * corretoras montada à mão por outra área provavelmente não tem `_Visivel` — e
- * ela continua servindo para LER, que é metade do que se quer dela. Exigir as
- * colunas para poder ler seria transformar um cadastro útil em nenhum.
- *
- * Devolve o motivo quando não aceita, para a tela poder explicar em vez de
- * apenas desabilitar um botão.
- */
 function abaDeForaAceitaEscrita_(nomeDaAba) {
   if (!abaVemDeOutraPlanilha_(nomeDaAba)) return { aceita: true, faltando: [] };
 
@@ -2409,13 +1444,6 @@ function abaDeForaAceitaEscrita_(nomeDaAba) {
   return { aceita: faltando.length === 0, faltando: faltando };
 }
 
-/**
- * De onde esta aba vem, e se dá para editar por aqui — pronto para a tela.
- *
- * Toda tela de cadastro devolve isto junto com os dados. Uma tela que mostra
- * corretoras sem dizer de qual planilha elas vieram é uma tela em que alguém
- * vai editar achando que mexeu numa coisa e ter mexido em outra.
- */
 function deOndeVemAAba_(nomeDaAba) {
   if (!abaVemDeOutraPlanilha_(nomeDaAba)) {
     return { deFora: false, podeEditar: true, faltaParaEditar: [], planilha: '' };
@@ -2426,8 +1454,7 @@ function deOndeVemAAba_(nomeDaAba) {
   try {
     nome = planilhaDeCadastros_().getName();
   } catch (erro) {
-    // A tela não cai por causa do NOME da planilha. Se ela não abre, quem vai
-    // dizer isso é a leitura dos dados, com o recado inteiro.
+
     nome = '';
   }
 
@@ -2439,15 +1466,6 @@ function deOndeVemAAba_(nomeDaAba) {
   };
 }
 
-/**
- * Deixa escrever numa aba de fora — ou explica o que falta para isso.
- *
- * O PGO ESCREVE na planilha de cadastros, e isso é decisão da operação: é ela
- * que pediu para manusear tudo por aqui em vez de abrir duas planilhas. Quando
- * a aba de lá não tem o mínimo para ser escrita, o recado diz QUAIS COLUNAS
- * acrescentar — um "não permitido" seco mandaria a pessoa procurar uma
- * permissão que não é o problema.
- */
 function exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba) {
   if (!abaVemDeOutraPlanilha_(nomeDaAba)) return;
 
@@ -2462,17 +1480,6 @@ function exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba) {
     + 'a planilha de cadastros direto.');
 }
 
-/**
- * Abre uma planilha DE FORA, pelo Id.
- *
- * Mora aqui pela mesma razão que todo o resto: `SpreadsheetApp` é chamado num
- * lugar só. Antes disto, dois pontos da Busca abriam a planilha legada por
- * conta própria, cada um com o seu texto de erro — e o texto de erro é
- * justamente o que importa aqui, porque a causa é quase sempre a mesma e
- * quase nunca óbvia: a conta que roda o sistema não tem acesso à planilha.
- *
- * Nenhum contrato é aplicado ao que vem de fora. Ela é lida como está.
- */
 function abrirPlanilhaDeFora_(idDaPlanilha) {
   var id = String(idDaPlanilha || '').trim();
   if (!id) throw new Error('Informe o Id da planilha.');
@@ -2485,27 +1492,14 @@ function abrirPlanilhaDeFora_(idDaPlanilha) {
   }
 }
 
-/**
- * A última linha com CONTEÚDO na aba.
- *
- * getLastRow() olha conteúdo, não formatação — então a área de reserva que o
- * instalador pré-formata não infla esta conta.
- *
- * E é conteúdo de QUALQUER coluna, deliberadamente: usar a coluna de Id aqui
- * seria mais preciso e daria dois bugs. Uma linha digitada à mão nasce sem Id,
- * então ficaria invisível para o `normalizarBase()` — que existe justamente
- * para carimbá-la —, e a próxima inserção do sistema gravaria POR CIMA dela.
- */
 function ultimaLinhaComConteudo_(estrutura) {
   return Math.max(estrutura.aba.getLastRow(), 1);
 }
 
-/** Quantas linhas de dado a aba tem (sem contar o cabeçalho). */
 function quantidadeDeRegistros_(estrutura) {
   return Math.max(ultimaLinhaComConteudo_(estrutura) - 1, 0);
 }
 
-/** Buraco no meio da aba não é registro. */
 function linhaEstaVazia_(valores) {
   for (var i = 0; i < valores.length; i++) {
     var v = valores[i];
@@ -2514,17 +1508,6 @@ function linhaEstaVazia_(valores) {
   return true;
 }
 
-/**
- * Uma linha da planilha vira objeto, com as chaves iguais aos cabeçalhos.
- *
- * Além dos cabeçalhos, todo registro carrega `__id` e `__linha`.
- *
- * O `__id` existe porque a coluna de identificador NÃO tem o mesmo nome em
- * toda aba: é `ID` na Mesa Diamante, `id` na RET e `Id` nas abas de
- * sistema. Quem consome o registro não deveria precisar saber a grafia de
- * cada aba para achar o identificador — e quando precisava, lia `undefined`
- * em silêncio e seguia adiante com ele.
- */
 function montarRegistro_(estrutura, valores, numeroDaLinha) {
   var reg = {};
   for (var i = 0; i < estrutura.cabecalhos.length; i++) {
@@ -2537,15 +1520,6 @@ function montarRegistro_(estrutura, valores, numeroDaLinha) {
   return reg;
 }
 
-/**
- * Lê registros de uma aba.
- *
- *   opcoes.ultimas         lê só as N últimas linhas. A a base só acrescenta no fim, nunca reordena,
- *                          então o recente é sempre o fim — é o que permite
- *                          a fila de trabalho não ler 200 mil linhas para
- *                          mostrar 40.
- *   opcoes.incluirOcultos  traz também as linhas com _Visivel = NAO.
- */
 function lerRegistros_(nomeDaAba, opcoes) {
   opcoes = opcoes || {};
 
@@ -2596,11 +1570,6 @@ function lerRegistros_(nomeDaAba, opcoes) {
   return guardar ? copiarRegistros_(saida) : saida;
 }
 
-/**
- * Lê UMA coluna inteira. É a primeira metade de toda busca: numa base de
- * 200 mil linhas por 39 colunas, ler tudo são 7,8 milhões de células; ler
- * uma coluna são 200 mil.
- */
 function lerColunaInteira_(nomeDaAba, cabecalho) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
@@ -2611,24 +1580,8 @@ function lerColunaInteira_(nomeDaAba, cabecalho) {
   });
 }
 
-/** Lê só as linhas indicadas (números de linha da planilha). */
-/**
- * Até quantas linhas sem interesse vale a pena ler para não pagar outra ida.
- *
- * A conta é direta: uma ida ao serviço de planilha custa uns 25 ms, e ler uma
- * linha a mais custa a transferência de umas 39 células — menos de um décimo
- * de milissegundo. Ler cinquenta linhas à toa sai muito mais barato do que
- * atravessar a fronteira de novo.
- */
 var RECC_BURACO_QUE_VALE_PULAR = 50;
 
-/**
- * Junta os números de linha em BLOCOS contínuos, tolerando buracos pequenos.
- *
- * [12, 13, 14, 900, 901] com tolerância 50 vira dois blocos: 12–14 e 900–901.
- * [12, 30, 40] vira um só: 12–40, porque ler as 27 linhas do meio é mais
- * barato que duas idas a mais.
- */
 function blocosDeLinhas_(numerosDeLinha) {
   var ordenados = numerosDeLinha.slice().sort(function (um, outro) {
     return um - outro;
@@ -2645,20 +1598,6 @@ function blocosDeLinhas_(numerosDeLinha) {
   return blocos;
 }
 
-/**
- * Lê linhas escolhidas, agrupadas em blocos.
- *
- * É a segunda metade da busca: a primeira leu só as colunas de procura e
- * anotou em QUAIS linhas o termo apareceu; esta lê essas linhas inteiras.
- *
- * Uma ida por linha era o que fazia antes, e com o limite de 100 resultados
- * isso eram cem idas ao serviço — dois segundos e meio de pedágio numa tela
- * que a operação usa o dia inteiro. Agrupando, uma busca de cem resultados
- * que caem perto costuma sair numa ida só.
- *
- * A ordem de saída é a ordem PEDIDA, e não a da planilha: quem chamou já
- * ordenou por relevância, e reordenar aqui desfaria isso em silêncio.
- */
 function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
   if (!numerosDeLinha || !numerosDeLinha.length) return [];
 
@@ -2683,11 +1622,6 @@ function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
   return saida;
 }
 
-/**
- * Busca por valor numa coluna e devolve as linhas inteiras.
- * Identificador é comparado só pelos dígitos, então "1-2345678901" e
- * "12345678901" acham a mesma linha.
- */
 function buscarRegistros_(nomeDaAba, cabecalho, valor, limite) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
@@ -2713,29 +1647,15 @@ function buscarRegistros_(nomeDaAba, cabecalho, valor, limite) {
   return lerLinhasEspecificas_(nomeDaAba, linhas);
 }
 
-/**
- * Como buscarRegistros_, mas devolvendo só o que está VISÍVEL.
- *
- * buscarRegistros_ devolve a linha esteja ela oculta ou não — e tem de ser
- * assim, porque quem edita um registro precisa achá-lo mesmo depois de
- * excluído. Mas quem PERGUNTA sobre o estado de hoje não quer a linha
- * apagada: uma SUSEP desbloqueada continua na planilha, com _Visivel = NAO, e
- * responder "bloqueada" a partir dela seria ressuscitar o bloqueio.
- *
- * A mesma SUSEP pode ter várias linhas — bloqueada, desbloqueada, bloqueada de
- * novo. A última visível é a que vale, e é por isso que esta função não pede
- * limite: parar na primeira acharia justamente a mais antiga.
- */
 function buscarRegistroVisivel_(nomeDaAba, cabecalho, valor) {
   var achados = buscarRegistros_(nomeDaAba, cabecalho, valor)
     .filter(function (registro) {
-      if (!('_Visivel' in registro)) return true;   // aba sem exclusão lógica
+      if (!('_Visivel' in registro)) return true;
       return normalizarParaComparar_(registro._Visivel) !== 'nao';
     });
   return achados.length ? achados[achados.length - 1] : null;
 }
 
-/** Encontra a linha de um Id. Id repetido é erro, nunca "usa a primeira". */
 function linhaDoRegistro_(estrutura, id) {
   var iId = exigirPosicaoDaColuna_(estrutura, 'Id');
   var totalDados = quantidadeDeRegistros_(estrutura);
@@ -2757,20 +1677,11 @@ function linhaDoRegistro_(estrutura, id) {
   return achadas.length ? achadas[0] : -1;
 }
 
-// ============================================================================
-// GRAVAÇÃO — sempre em bloco, sempre com o formato aplicado antes
-// ============================================================================
-
-/**
- * Monta a linha inteira já coagida, na ordem real das colunas da aba.
- * `dados` pode vir com as chaves escritas de qualquer jeito: a busca é
- * normalizada.
- */
 function montarLinhaParaGravar_(estrutura, dados, valoresAtuais) {
   var porChave = {};
   var nomeInformado = {};
   Object.keys(dados).forEach(function (chaveInformada) {
-    // As chaves internas (__id, __linha) descrevem o registro, não são dele.
+
     if (chaveInformada.indexOf('__') === 0) return;
     var chave = normalizarParaComparar_(chaveInformada);
     porChave[chave] = dados[chaveInformada];
@@ -2791,9 +1702,6 @@ function montarLinhaParaGravar_(estrutura, dados, valoresAtuais) {
     }
   }
 
-  // Campo que não corresponde a nenhuma coluna vira ERRO, e não descarte.
-  // Descartar em silêncio é perda de dado calada: um "Protocolo" digitado
-  // "Protocolos" seria jogado fora e a tela ainda diria "salvo".
   var semColuna = Object.keys(porChave)
     .filter(function (chave) { return !usadas[chave]; })
     .map(function (chave) { return nomeInformado[chave]; });
@@ -2806,7 +1714,6 @@ function montarLinhaParaGravar_(estrutura, dados, valoresAtuais) {
   return linha;
 }
 
-/** Formata a faixa e só então grava. A ordem é a regra inteira. */
 function formatarEGravar_(estrutura, primeiraLinha, linhas) {
   var faixa = estrutura.aba.getRange(
     primeiraLinha, 1, linhas.length, estrutura.cabecalhos.length);
@@ -2814,22 +1721,15 @@ function formatarEGravar_(estrutura, primeiraLinha, linhas) {
   var formatos = linhas.map(function () { return formatoDaLinha; });
   faixa.setNumberFormats(formatos);
   faixa.setValues(linhas);
-  // De novo DEPOIS de escrever: uma leitura que corria em outra execução, entre
-  // o "esquecer" do começo da gravação e esta linha, pode ter guardado o dado
-  // de antes. Sem isto, o PO salvaria e veria o valor velho por 5 minutos.
+
   esquecerCacheDaConfiguracao_(estrutura.nomeDaAba);
 }
 
-/**
- * Insere um registro. Gera o Id se ele não vier pronto, marca a linha como
- * visível e registra que ela nasceu no sistema.
- */
 function inserirRegistro_(nomeDaAba, dados, contexto) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   return inserirVariosRegistros_(nomeDaAba, [dados], contexto)[0];
 }
 
-/** Insere vários registros numa gravação só. */
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
@@ -2845,12 +1745,6 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
   }
 }
 
-/**
- * O MIOLO de `inserirVariosRegistros_`, para quem JÁ segura a trava — a descarga
- * da fila da auditoria (Etapa 61). Pegar a trava de novo aqui dentro seria o
- * pior dos dois mundos: o `releaseLock` de dentro soltaria a de fora antes da
- * hora, e a gravação de fora seguiria sem proteção.
- */
 function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
   if (!lista || !lista.length) return [];
   contexto = contexto || {};
@@ -2859,10 +1753,6 @@ function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
   var temControle = posicaoDaColuna_(estrutura, '_Visivel') >= 0;
   var iId = posicaoDaColuna_(estrutura, 'Id');
 
-  // Quantas linhas precisam de Id novo — algumas já vêm com um. O bloco é
-  // reservado numa ida só ao PropertiesService, e não uma por linha: com uma
-  // por linha, gravar cinco mil casos eram dez mil idas e dois minutos de
-  // pedágio dentro de uma execução que tem seis.
   var precisamDeId = 0;
   if (iId >= 0) {
     for (var p = 0; p < lista.length; p++) {
@@ -2911,22 +1801,11 @@ function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
   return gravados;
 }
 
-/*
- * A LINHA PROCURADA ANTES DA TRAVA E CONFERIDA DENTRO DELA (Etapa 61).
- *
- * Achar a linha de um Id é ler a coluna de Id inteira — 30 mil células numa RET
- * de um ano —, e isso era feito DENTRO da trava, que é uma só para o sistema
- * inteiro: todo mundo esperava a leitura de cada um. Agora a procura é feita
- * antes; dentro da trava, só se confere UMA célula: o Id ainda está naquela
- * linha? Uma exclusão no meio do caminho sobe as linhas de baixo, e aí a
- * procura é refeita, ali dentro — o resultado é sempre o certo, só deixa de
- * custar a trava dos outros.
- */
 function linhaProcuradaAntesDaTrava_(nomeDaAba, id) {
   try {
     return linhaDoRegistro_(estruturaDaAba_(nomeDaAba), id);
   } catch (erro) {
-    return -1;   // a procura de dentro da trava diz o motivo, com a planilha fresca
+    return -1;
   }
 }
 
@@ -2939,17 +1818,12 @@ function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
         return linhaAchada;
       }
     } catch (erro) {
-      // linha que não existe mais (a grade encolheu): procura de novo, abaixo
+
     }
   }
   return linhaDoRegistro_(estrutura, id);
 }
 
-/**
- * Atualiza um registro pelo Id.
- * Lê a linha, mescla as alterações e regrava a linha inteira já formatada —
- * assim uma coluna nunca fica com o formato de outro tipo.
- */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
@@ -2974,10 +1848,6 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   }
 }
 
-/**
- * Exclusão do RECC: some da tela, permanece na planilha.
- * Nenhuma linha de base operacional é apagada — nunca.
- */
 function ocultarRegistro_(nomeDaAba, id, usuarioId) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (posicaoDaColuna_(estruturaDaAba_(nomeDaAba), '_Visivel') < 0) {
@@ -2992,11 +1862,6 @@ function ocultarRegistro_(nomeDaAba, id, usuarioId) {
   }));
 }
 
-/**
- * Tira do que vai ser gravado o carimbo da exclusão que a aba não tem — a
- * base de caso, desde que o carimbo saiu dela. `atualizarRegistro_` recusa
- * coluna que não existe, e ocultar não pode quebrar por falta de carimbo.
- */
 function comCarimboSeHouver_(nomeDaAba, campos) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   RECC_CARIMBO_DE_EXCLUSAO.forEach(function (cabecalho) {
@@ -3005,27 +1870,6 @@ function comCarimboSeHouver_(nomeDaAba, campos) {
   return campos;
 }
 
-/**
- * APAGA A LINHA DA PLANILHA. Não tem volta.
- *
- * O sistema inteiro é construído em cima de exclusão LÓGICA: `_Visivel` vira
- * NAO, a linha fica, e um administrador traz de volta. É a regra que protege
- * contra o clique errado, e ela continua valendo para corretora, produto,
- * SUSEP bloqueada e usuário.
- *
- * O CASO é a exceção, e foi decisão do PO: "o caso deve ser excluído
- * definitivamente da planilha". A razão é de operação — caso oculto continua
- * ocupando linha, e a base da RET caminha para 200 mil.
- *
- * Como não há desfazer, duas coisas compensam:
- *
- *   1. Quem chama registra na AUDITORIA o que havia na linha, antes de
- *      apagar. Sem isso, um caso excluído por engano não deixa nem rastro de
- *      que existiu — e alguém vai jurar que cadastrou.
- *   2. A tela pergunta antes, e o texto diz a verdade: não promete desfazer.
- *
- * Devolve o registro que foi apagado, para quem chamou poder registrá-lo.
- */
 function apagarRegistroDeVez_(nomeDaAba, id) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
@@ -3042,15 +1886,12 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
         + ' não encontrado na aba "' + nomeDaAba + '".');
     }
 
-    // Lido ANTES de apagar: depois não há de onde ler.
     var valores = estrutura.aba
       .getRange(linha, 1, 1, estrutura.cabecalhos.length).getValues()[0];
     var apagado = montarRegistro_(estrutura, valores, linha);
 
     estrutura.aba.deleteRows(linha, 1);
 
-    // A grade encolheu: toda posição de linha guardada em memória agora
-    // aponta para a linha de baixo. Esquecer é obrigatório, não higiene.
     esquecerEstruturaLida_(nomeDaAba);
     return apagado;
   } finally {
@@ -3058,30 +1899,11 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
   }
 }
 
-function reexibirRegistro_(nomeDaAba, id) {
-  return atualizarRegistro_(nomeDaAba, id, comCarimboSeHouver_(nomeDaAba, {
-    _Visivel: RECC_VISIVEL_SIM,
-    _ExcluidoEm: '',
-    _ExcluidoPor: ''
-  }));
-}
-
-// ============================================================================
-// ESTRUTURA — crescer a aba de propósito, nunca por acidente
-// ============================================================================
-
-/** A aba precisa ter linha suficiente na grade para receber a gravação. */
 function garantirLinhasNaGrade_(aba, ateLinha) {
   var faltam = ateLinha - aba.getMaxRows();
   if (faltam > 0) aba.insertRowsAfter(aba.getMaxRows(), faltam);
 }
 
-/**
- * Acrescenta uma coluna ao FIM da aba.
- *
- * Só é chamada por ação explícita do administrador — jamais durante um
- * salvamento comum. Recusa cabeçalho que já exista, mesmo escrito diferente.
- */
 function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var texto = String(cabecalho || '').trim();
@@ -3115,28 +1937,12 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
     trava.releaseLock();
   }
 
-  // Fora da trava, de propósito: inserirVariosRegistros_ pega a dela, e trava dentro
-  // de trava é como um deadlock nasce.
   registrarColunaEmCampos_(nomeDaAba, texto, tipo, nova);
   esquecerEstruturaLida_();
 
   return { aba: nomeDaAba, cabecalho: texto, tipo: tipo, coluna: nova };
 }
 
-/**
- * Garante que a aba tenha as colunas de controle do sistema — numa base de
- * caso, só `_Visivel` e `_Origem`.
- *
- * Elas são o que faz a exclusão lógica existir: sem `_Visivel`, "excluir um
- * caso" só poderia significar apagar a linha, e o PGO não apaga linha de caso.
- *
- * NÃO passa por `adicionarColuna_`, de propósito: aquela função registra a
- * coluna em CAMPOS, e coluna de controle não é campo de formulário — ela
- * apareceria em Cadastrar Caso pedindo para alguém digitar "_ExcluidoPor".
- *
- * Devolve os cabeçalhos que criou. Nada acontece se já estiverem todas lá, e
- * por isso ela é segura de chamar de novo.
- */
 function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
 
@@ -3163,8 +1969,7 @@ function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
       aba.getRange(2, proxima, altura, 1)
         .setNumberFormat(RECC_FORMATO_DA_CELULA[coluna.tipo] || '@');
       criadas.push(coluna.cabecalho);
-      // A estrutura em memória acabou de ficar velha: a próxima conferência
-      // de posição tem de ver a coluna que acabou de nascer.
+
       esquecerEstruturaLida_(nomeDaAba);
       estrutura = estruturaDaAba_(nomeDaAba, true);
       aba = estrutura.aba;
@@ -3177,19 +1982,6 @@ function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
   return criadas;
 }
 
-/**
- * Apaga uma coluna da aba — e, com ela, o que estava gravado nela.
- *
- * É a ação mais destrutiva do sistema, e a única que apaga dado de TODOS os
- * casos de uma vez. Não existe desfazer: a coluna sai da grade, e os valores
- * de todas as linhas saem junto.
- *
- * Por isso ela não é chamada por nenhuma gravação comum. Só o administrador
- * chega aqui, pela tela, com senha, e depois de confirmar o cabeçalho.
- *
- * Devolve quantas linhas tinham algum valor naquela coluna — é o número que a
- * auditoria guarda, e o único vestígio de quanto dado foi embora.
- */
 function removerColuna_(nomeDaAba, cabecalho) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var texto = String(cabecalho || '').trim();
@@ -3208,8 +2000,6 @@ function removerColuna_(nomeDaAba, cabecalho) {
       throw new Error('A aba "' + nomeDaAba + '" não tem coluna "' + texto + '".');
     }
 
-    // Contado ANTES de apagar, porque depois não há de onde contar. Serve de
-    // recado honesto: "saíram 1.248 valores" diz mais que "coluna removida".
     var aba = estrutura.aba;
     var altura = Math.max(aba.getMaxRows() - 1, 0);
     if (altura > 0) {
@@ -3222,9 +2012,6 @@ function removerColuna_(nomeDaAba, cabecalho) {
 
     aba.deleteColumns(posicao + 1, 1);
 
-    // A grade encolheu de lado: toda POSIÇÃO de coluna guardada em memória
-    // agora aponta para a coluna seguinte. Esquecer é obrigatório, não
-    // higiene — é o mesmo cuidado que apagarRegistroDeVez_ toma com as linhas.
     esquecerEstruturaLida_(nomeDaAba);
   } finally {
     trava.releaseLock();
@@ -3234,26 +2021,6 @@ function removerColuna_(nomeDaAba, cabecalho) {
   return { aba: nomeDaAba, cabecalho: texto, linhasComValor: quantasTinhamValor };
 }
 
-/**
- * Registra a coluna nova em CAMPOS — quando ela é coluna de um CANAL.
- *
- * Não é burocracia: é onde o tipo da coluna passa a morar. Sem esta linha, na
- * próxima execução a coluna voltaria a ser lida como texto — e uma coluna de
- * moeda guardaria "R$ 2.500,00" em vez de 2500.
- *
- * SÓ PARA ABA DE CANAL, e isto é o que impede lixo em CAMPOS.
- *
- * CAMPOS é o formulário de CADASTRAR CASO: cada linha é um campo de um canal.
- * Coluna de aba de controle — USUARIOS, CORRETORAS, SUSEP_BLOQUEADAS — não é
- * campo de formulário nenhum, e a linha nascia com CanalId vazio: invisível
- * para `camposAtivosDoCanal_`, inútil para todo mundo, e contada na tela de
- * Cadastrar Caso.
- *
- * Pior: apagada a coluna da planilha, a linha vira um campo apontando para
- * coluna que não existe, e o diagnóstico REPROVA a instalação. Foi assim que
- * isto apareceu — ensaiando o PO apagar à mão as colunas que saíram do
- * contrato, que é justamente o que a migração manda ele fazer quando quiser.
- */
 function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
   if (!planilhaAtiva_().getSheetByName('CAMPOS')) return null;
   if (!planilhaAtiva_().getSheetByName('CANAIS')) return null;
@@ -3284,18 +2051,6 @@ function registrarColunaEmCampos_(nomeDaAba, cabecalho, tipo, ordem) {
   });
 }
 
-// ============================================================================
-// CONFERÊNCIA — o sistema valida, nunca conserta sozinho
-// ============================================================================
-
-/**
- * As colunas que os CAMPOS do formulário ocupam, por aba: { BASE_RET: { chave: true } }.
- *
- * Inclui o campo desligado — ele continua sendo coluna conhecida — e os campos
- * que moram em mais de uma coluna (produto, proposta, apólice). Aba CAMPOS que
- * ainda não existe (instalação em andamento) ou ilegível vale como "nenhum":
- * a conferência da estrutura não pode depender dela para rodar.
- */
 function colunasDosCamposPorAba_() {
   var porAba = {};
   try {
@@ -3314,15 +2069,6 @@ function colunasDosCamposPorAba_() {
   return porAba;
 }
 
-/**
- * As colunas que são SÓ do PO numa aba: nem do contrato, nem de campo do
- * formulário — as que ele escreveu direto na planilha. Devolve { chave: true },
- * pela chave normalizada do cabeçalho.
- *
- * É a mesma separação do laudo (`aMais` em `conferirEstrutura_`), e é por ela que
- * "Trabalhar no caso" decide o que se corrige ali: a coluna sua sim; o carimbo do
- * sistema, não.
- */
 function colunasSuasDaAba_(nomeDaAba) {
   var conhecidas = {};
   if (RECC_ESQUEMA[nomeDaAba]) {
@@ -3341,17 +2087,6 @@ function colunasSuasDaAba_(nomeDaAba) {
   return suas;
 }
 
-/**
- * Compara o que o contrato espera com o que a planilha tem.
- * Não cria, não renomeia, não apaga e não reordena nada: devolve o laudo
- * para a tela de reconciliação decidir com o administrador.
- *
- * Coluna fora do contrato vem em DUAS listas, e a diferença é o pedido do PO
- * ("por que fica aparecendo as colunas que criei, sinalizando que são
- * ignoradas?"): `doFormulario` é a que ele criou em Configurações › Cadastrar
- * Caso — o sistema a conhece, grava nela e a mostra —, e `aMais` é a que
- * ninguém declarou. Só a segunda merece ser mencionada.
- */
 function conferirEstrutura_() {
   var planilha = planilhaAtiva_();
   var laudo = { ok: true, abas: [] };
@@ -3405,56 +2140,8 @@ function conferirEstrutura_() {
 
 /* ==== Cadastros.gs ======================================================== */
 
-/**
- * ============================================================================
- * PGO — Cadastros.gs · quem traz o caso para dentro
- * ============================================================================
- * Corretoras Diamante e SUSEPs bloqueadas — e o jeito de trazer essas duas
- * listas de fora sem digitar uma a uma.
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. OS DOIS CADASTROS
- *   2. COLAR, CONFERIR E APLICAR EM LOTE
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 2 · OS TRÊS CADASTROS
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Quem traz o caso para dentro
- * ============================================================================
- * Três cadastros que sustentam o resto do sistema e que, até aqui, só se
- * ajustavam abrindo a planilha:
- *
- *   CORRETORAS             corretoras, corretores e agentes, com o segmento
- *   SUSEP_BLOQUEADAS   quem está impedido, e por quê
- *
- * O QUE FAZ ESTA TELA VALER MAIS QUE UMA LISTA: ela cruza o cadastro com os
- * CASOS. Uma tabela de corretoras sem volume é uma agenda telefônica; com o
- * volume ao lado, ela responde "quem me dá trabalho" — e, principalmente,
- * mostra as SUSEPs que aparecem nos casos e NÃO estão cadastradas.
- *
- * Essa última é a informação mais útil daqui. Uma SUSEP fora do cadastro faz
- * o selo do formulário dizer "não encontrada" toda vez, e ninguém descobre
- * por quê — porque o sintoma aparece em outra tela, uma pessoa de cada vez.
- * Aqui elas aparecem juntas, com quantos casos cada uma já trouxe.
- * ============================================================================
- */
-
-/** Quantas corretoras a tela lista de uma vez. */
 const RECC_MAXIMO_DE_CORRETORAS = 300;
 
-/**
- * A tela inteira: os três cadastros e o cruzamento com os casos.
- */
 function tabelaDeCorretoras(procurar, segmento) {
   var quem = exigirTela_('tabelaCorretoras');
 
@@ -3469,26 +2156,13 @@ function tabelaDeCorretoras(procurar, segmento) {
       susep: susep,
       corretora: String(linha.Corretora || ''),
       sucursal: String(linha.Sucursal || ''),
-      // Cadastro sem segmento não vira "Diamante" por descuido: vira o que
-      // ele é, "Não encontrado", e a tela mostra isso.
+
       segmento: String(linha.Segmento || '') || 'Não encontrado',
       consultor: String(linha.Consultor || ''),
       casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
     };
   });
 
-  /*
-   * CORRETORA DIAMANTE NÃO TEM STATUS DE BLOQUEADA, e esta tabela não cruza
-   * mais com a lista de bloqueios.
-   *
-   * Decisão do PO: "corretoras Diamante não podem ter status de bloqueada por
-   * gentileza mesmo que o SUSEP esteja na lista de bloqueadas. Pertence a
-   * outra lista". Eram duas listas com dois donos e dois propósitos, e a
-   * pastilha vermelha aqui misturava as duas — quem olhava a tabela Diamante
-   * via um bloqueio que não é dela.
-   *
-   * O mesmo vale no selo do Cadastrar Caso: ver `consultarSusep`.
-   */
   var filtradas = todas.filter(function (uma) {
     if (segmentoProcurado
       && normalizarParaComparar_(uma.segmento) !== segmentoProcurado) return false;
@@ -3496,11 +2170,10 @@ function tabelaDeCorretoras(procurar, segmento) {
     if (normalizarParaComparar_(uma.corretora).indexOf(termo) >= 0) return true;
     if (normalizarParaComparar_(uma.sucursal).indexOf(termo) >= 0) return true;
     if (normalizarParaComparar_(uma.consultor).indexOf(termo) >= 0) return true;
-    // A SUSEP procura por TEXTO, e não por dígito: "RET" acha "RET00J".
+
     return chaveDaSusep_(uma.susep).indexOf(termo) >= 0;
   }).sort(function (uma, outra) {
-    // Quem mais traz caso primeiro: a tela existe para trabalhar, e o volume
-    // é o que dá ordem de importância a uma lista de trezentos nomes.
+
     if (outra.casos !== uma.casos) return outra.casos - uma.casos;
     return uma.corretora < outra.corretora ? -1 : 1;
   });
@@ -3511,15 +2184,11 @@ function tabelaDeCorretoras(procurar, segmento) {
     quantasNoTotal: todas.length,
     quantasFiltradas: filtradas.length,
     segmentos: segmentosConhecidos_(todas),
-    // As SUSEPs que os casos citam e o cadastro não conhece. É o achado desta
-    // tela: enquanto elas não entram, o selo do formulário diz "não
-    // encontrada" toda vez, e ninguém liga uma coisa à outra.
+
     foraDoCadastro: susepsForaDoCadastro_(volumes, todas),
     podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR),
-    // De onde vieram estes cadastros. A tela precisa dizer: editar achando que
-    // mexeu numa planilha e ter mexido em outra é o tipo de confusão que só
-    // aparece quando já tem gente trabalhando em cima do dado errado.
+
     origem: {
       corretoras: deOndeVemAAba_('CORRETORAS'),
       suseps: deOndeVemAAba_('SUSEP_BLOQUEADAS')
@@ -3527,12 +2196,10 @@ function tabelaDeCorretoras(procurar, segmento) {
   };
 }
 
-/** Quantos casos cada SUSEP trouxe, somando os canais. */
 function volumePorSusep_() {
   var porSusep = {};
   var nomePorSusep = {};
-  // Como a SUSEP aparece ESCRITA nos casos. A chave é normalizada para
-  // comparar; a tela precisa mostrar "RET00J", e não "ret00j".
+
   var comoSeEscreve = {};
 
   canaisVisiveis_().forEach(function (canal) {
@@ -3540,7 +2207,7 @@ function volumePorSusep_() {
     try {
       estrutura = estruturaDaAba_(canal.aba);
     } catch (erro) {
-      return;   // aba que sumiu não derruba a tela
+      return;
     }
 
     var colunaDaSusep = '';
@@ -3552,14 +2219,12 @@ function volumePorSusep_() {
     });
     if (!colunaDaSusep) return;
 
-    // Só a coluna da SUSEP, e a da corretora: a mesma regra da busca — ler as
-    // 39 colunas de todas as linhas para contar uma coisa não se paga.
     var suseps = lerColunaInteira_(canal.aba, colunaDaSusep);
     var corretoras = colunaDaCorretora
       ? lerColunaInteira_(canal.aba, colunaDaCorretora) : [];
 
     for (var i = 0; i < suseps.length; i++) {
-      // A chave é de TEXTO: a SUSEP tem letra. Ver chaveDaSusep_.
+
       var susep = chaveDaSusep_(suseps[i]);
       if (!susep) continue;
       porSusep[susep] = (porSusep[susep] || 0) + 1;
@@ -3577,31 +2242,18 @@ function volumePorSusep_() {
   };
 }
 
-/** As SUSEPs que aparecem nos casos e não estão no cadastro de canais. */
 function susepsForaDoCadastro_(volumes, cadastradas) {
   var conhecidas = {};
   cadastradas.forEach(function (uma) {
     if (uma.susep) conhecidas[chaveDaSusep_(uma.susep)] = true;
   });
 
-  /*
-   * A LISTA DE BLOQUEADAS NÃO CONTA MAIS COMO "CONHECIDA".
-   *
-   * Contava, enquanto o selo do formulário mostrava o bloqueio: uma SUSEP
-   * bloqueada era reconhecida, e listá-la como "fora do cadastro" seria um
-   * aviso que não batia com a tela. Agora o selo ignora o bloqueio quando a
-   * corretora é Diamante, e as duas listas são de donos diferentes — uma
-   * SUSEP que só está na lista de bloqueios continua FORA do cadastro de
-   * corretoras, e é isso que esta lista existe para dizer.
-   */
   var fora = [];
   Object.keys(volumes.porSusep).forEach(function (susep) {
     if (conhecidas[susep]) return;
     fora.push({
       susep: volumes.comoSeEscreve[susep] || susep,
-      // O nome que os próprios casos usam. É um palpite, e a tela diz que é:
-      // ele serve para a pessoa reconhecer a corretora, não para cadastrar
-      // no automático.
+
       nomeNosCasos: volumes.nomePorSusep[susep] || '',
       casos: volumes.porSusep[susep]
     });
@@ -3610,7 +2262,6 @@ function susepsForaDoCadastro_(volumes, cadastradas) {
   return fora.sort(function (uma, outra) { return outra.casos - uma.casos; });
 }
 
-/** Os segmentos que aparecem, para o filtro não ser uma lista escrita à mão. */
 function segmentosConhecidos_(todas) {
   var vistos = {};
   var lista = [];
@@ -3623,17 +2274,6 @@ function segmentosConhecidos_(todas) {
   return lista.sort();
 }
 
-// ============================================================================
-// MEXER NO CADASTRO
-// ============================================================================
-
-/**
- * Cria ou altera uma corretora.
- *
- * A SUSEP é única: duas linhas com a mesma SUSEP fariam o selo do formulário
- * escolher uma delas — e a escolha seria a ordem da planilha, que ninguém
- * controla.
- */
 function salvarCorretora(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
@@ -3646,9 +2286,7 @@ function salvarCorretora(dados) {
   if (!corretora) throw new Error('Informe o nome da corretora.');
 
   var id = converterParaIdentificador_(dados.id);
-  // Repetida pela CHAVE, não pelo texto: "ret00j" e "RET00J" são a mesma
-  // SUSEP, e deixar as duas entrarem faria o selo do formulário escolher uma
-  // delas pela ordem da planilha, que ninguém controla.
+
   var repetida = lerRegistros_('CORRETORAS').filter(function (linha) {
     return chaveDaSusep_(linha.SUSEP) === chaveDaSusep_(susep)
       && converterParaIdentificador_(linha.Id) !== id;
@@ -3677,7 +2315,6 @@ function salvarCorretora(dados) {
   return criada.__id;
 }
 
-/** Tira a corretora da tela. A linha permanece na planilha. */
 function ocultarCorretora(idDaCorretora) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
@@ -3691,24 +2328,8 @@ function ocultarCorretora(idDaCorretora) {
   return true;
 }
 
-// ============================================================================
-// AS SUSEPs BLOQUEADAS
-// ============================================================================
-
-/*
- * QUEM BLOQUEOU: A COMPANHIA OU A CORRETORA.
- *
- * Pedido do PO: "as suseps bloqueadas são por 2 tipos: bloqueadas pela
- * companhia e bloqueada pela corretora". O valor gravado na coluna
- * `BloqueadaPor` é um destes dois, escrito sempre igual — a planilha filtra
- * por ele, e "companhia", "Cia" e "COMPANHIA" seriam três tipos para o filtro.
- *
- * Em branco é o terceiro estado, e é de propósito: as linhas que já existiam
- * antes da coluna ficam SEM TIPO, decisão do PO, até alguém editar e escolher.
- */
 var RECC_QUEM_BLOQUEOU = ['Companhia', 'Corretora'];
 
-/** 'companhia', 'CORRETORA ' → 'Companhia', 'Corretora'. O resto vira ''. */
 function quemBloqueou_(texto) {
   var procurado = normalizarParaComparar_(texto);
   return RECC_QUEM_BLOQUEOU.filter(function (tipo) {
@@ -3716,16 +2337,10 @@ function quemBloqueou_(texto) {
   })[0] || '';
 }
 
-/** A aba já tem a coluna? Planilha que não rodou `atualizarPGO()` ainda não. */
 function abaTemBloqueadaPor_() {
   return posicaoDaColuna_(estruturaDaAba_('SUSEP_BLOQUEADAS'), 'BloqueadaPor') >= 0;
 }
 
-/**
- * Como criar a coluna que falta. Depende de onde a aba mora: aqui, o
- * `atualizarPGO()` cria; na planilha de cadastros de fora, quem cria é quem
- * cuida dela — o PGO não mexe na estrutura de uma planilha que não é sua.
- */
 function comoCriarAColuna_(nomeDaAba, cabecalho) {
   return abaVemDeOutraPlanilha_(nomeDaAba)
     ? 'A aba ' + nomeDaAba + ' da planilha de cadastros ainda não tem a coluna "'
@@ -3734,22 +2349,8 @@ function comoCriarAColuna_(nomeDaAba, cabecalho) {
       + '". Peça ao administrador para rodar atualizarPGO().';
 }
 
-/*
- * A LISTA DE SUSEPs BLOQUEADAS com 151 mil linhas (Etapa 55, pedido do PO: elas
- * vão para a segunda base, "pela corretora e pela Porto"). Antes a lista ia
- * INTEIRA para a tela — com 151 mil linhas, uns 20 MB e o erro dos 40 segundos.
- * Agora o servidor lê só as colunas de procura, escolhe até 100 linhas e lê só
- * essas: primeiro as que aparecem nos casos (é o que a tela existe para
- * mostrar), depois as mais recentes. A busca procura nas 151 mil.
- */
 const RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA = 100;
 
-/** Até 100 SUSEPs bloqueadas — as dos casos primeiro —, ou as que a busca achar. */
-function listarSusepsBloqueadas(procurar) {
-  return resumoDasSusepsBloqueadas(procurar).bloqueadas;
-}
-
-/** A lista e as contagens, para a tela: quantas há, quantas a busca achou, se cortou. */
 function resumoDasSusepsBloqueadas(procurar) {
   var quem = exigirTela_('tabelaCorretoras');
   var volumes = volumePorSusep_();
@@ -3762,7 +2363,7 @@ function resumoDasSusepsBloqueadas(procurar) {
 
   var suseps = coluna('SUSEP');
   var visiveis = coluna('_Visivel');
-  // As outras colunas de procura só são lidas quando há o que procurar.
+
   var deProcura = termo ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
 
   var quantasNoTotal = 0;
@@ -3777,7 +2378,7 @@ function resumoDasSusepsBloqueadas(procurar) {
     })) continue;
     candidatas.push({ linha: i + 2, casos: volumes.porSusep[chave] || 0 });
   }
-  // As que mais trazem caso primeiro; empatadas, as mais recentes (mais embaixo).
+
   candidatas.sort(function (uma, outra) {
     return outra.casos - uma.casos || outra.linha - uma.linha;
   });
@@ -3812,14 +2413,6 @@ function resumoDasSusepsBloqueadas(procurar) {
   };
 }
 
-/**
- * Bloqueia uma SUSEP.
- *
- * Bloquear não apaga caso nenhum e não impede cadastrar: o formulário passa a
- * mostrar o selo vermelho com o motivo, e quem está atendendo decide. Bloqueio
- * que impedisse o cadastro faria a pessoa registrar o caso em outro lugar —
- * num caderno, num e-mail — e o sistema perderia o caso de vista.
- */
 function bloquearSusep(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
@@ -3828,17 +2421,8 @@ function bloquearSusep(dados) {
   var susep = susepComoSeEscreve_(dados.susep);
   if (!susep) throw new Error('Informe a SUSEP a bloquear.');
 
-  /*
-   * O MOTIVO SAIU DAS PERGUNTAS, a pedido do PO: "SUSEP's bloqueadas deve
-   * pedir: SUSEP, Corretora, Sucursal e coordenador comercial".
-   *
-   * Ele era obrigatório, e o argumento era bom — quem vê o selo vermelho seis
-   * meses depois precisa saber o que fazer com a informação. Quem responde por
-   * isso agora é o COORDENADOR COMERCIAL: tem nome, e dá para perguntar.
-   */
   var id = converterParaIdentificador_(dados.id);
-  // Só a coluna da SUSEP, e as linhas em que ela bateu (Etapa 55): ler as 151
-  // mil linhas inteiras para conferir uma SUSEP estourava o tempo.
+
   var jaBloqueada = buscarRegistros_('SUSEP_BLOQUEADAS', 'SUSEP', susep).filter(function (linha) {
     if (normalizarParaComparar_(linha._Visivel) === 'nao') return false;
     return chaveDaSusep_(linha.SUSEP) === chaveDaSusep_(susep)
@@ -3855,11 +2439,6 @@ function bloquearSusep(dados) {
     CoordenadorComercial: String(dados.coordenadorComercial || '').trim()
   };
 
-  /*
-   * QUEM BLOQUEOU é obrigatório em todo bloqueio NOVO. Na edição, só muda se
-   * vier: quem chama sem o campo não está mexendo nele, e apagar o tipo em
-   * silêncio seria perder a resposta que alguém já deu.
-   */
   var vieramOTipo = dados.bloqueadaPor !== undefined;
   var tipo = quemBloqueou_(dados.bloqueadaPor);
   if ((!id || vieramOTipo) && !tipo) {
@@ -3883,7 +2462,6 @@ function bloquearSusep(dados) {
   return criada.__id;
 }
 
-/** Libera uma SUSEP. A linha permanece na planilha, com a data do bloqueio. */
 function desbloquearSusep(idDoBloqueio) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
@@ -3898,21 +2476,6 @@ function desbloquearSusep(idDoBloqueio) {
   return true;
 }
 
-// ============================================================================
-// DE ONDE VEM CADA CADASTRO
-// ============================================================================
-
-/**
- * De onde vem cada cadastro desta tela, numa chamada só.
- *
- * A tela tem duas abas de cadastro — corretoras e SUSEPs bloqueadas — e cada
- * uma carrega por conta própria. Perguntar a origem em cada carga seriam duas
- * idas ao servidor para uma resposta que não muda enquanto a tela está aberta.
- *
- * Havia aqui uma terceira aba, PRODUTOS, e as funções dela. Saiu a pedido do
- * PO: "produtos pode eliminar". A aba da planilha é apagada pela migração,
- * `atualizarPGO()`, porque ele pediu a aba também.
- */
 function origemDosCadastros() {
   exigirTela_('tabelaCorretoras');
 
@@ -3923,11 +2486,6 @@ function origemDosCadastros() {
   return resposta;
 }
 
-// ============================================================================
-// EXPORTAR
-// ============================================================================
-
-/** As corretoras em texto, do jeito que o Excel em português abre. */
 function exportarCorretoras(procurar, segmento) {
   exigirPermissao_(RECC_ACOES.EXPORTAR);
   var tabela = tabelaDeCorretoras(procurar, segmento);
@@ -3945,67 +2503,10 @@ function exportarCorretoras(procurar, segmento) {
   return { nome: 'corretoras.csv', conteudo: linhas.join('\n') };
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 2 · COLAR, CONFERIR E APLICAR EM LOTE
-   #
-   ############################################################################ */
-
-/**
- * Trazer listas prontas para dentro do sistema
- * ============================================================================
- * O cadastro de corretoras e a lista de SUSEPs bloqueadas já EXISTEM na
- * operação, em planilha, antes de o PGO nascer. Digitar centenas de linhas
- * uma a uma dentro do sistema não é trabalho: é desperdício, e é o caminho
- * mais curto para o cadastro nascer pela metade.
- *
- * Esta tela resolve isso com três passos, sempre nesta ordem:
- *
- *   1. APONTAR  de dois jeitos, à escolha de quem importa:
- *               COLANDO — copia da planilha dela e cola aqui. Aceita o que o
- *               Excel e o Google Planilhas colocam na área de transferência —
- *               colunas separadas por TAB — e também ponto e vírgula.
- *               PELO Id  — informa o Id de outra planilha e o nome da aba, e o
- *               sistema lê de lá. É o caminho para as listas grandes: colar
- *               sete mil SUSEPs numa caixa de texto é o que ninguém faz duas
- *               vezes. Daqui para baixo as duas fontes são a mesma coisa.
- *   2. CONFERIR o servidor lê o texto e devolve o que VAI acontecer com cada
- *               linha, sem gravar nada: nova, atualiza a que existe, ou
- *               recusada — e neste último caso, por quê.
- *   3. APLICAR  só então grava.
- *
- * Duas decisões que valem a pena estar escritas:
- *
- * O SEGUNDO PASSO NÃO É ENFEITE. Importação é a ação com maior alcance do
- * sistema: um erro escreve em quinhentas linhas de uma vez. Ver antes é o que
- * transforma "colei a coluna errada" num susto em vez de num estrago.
- *
- * O TERCEIRO PASSO NÃO CONFIA NO SEGUNDO. `aplicarImportacao` lê a FONTE
- * de novo e refaz a conferência inteira — não recebe do navegador a lista já
- * conferida. Se recebesse, bastaria alterar a lista no caminho para gravar o
- * que o servidor nunca aprovou.
- *
- * Nada aqui APAGA. Uma SUSEP que está no cadastro e não está no arquivo colado
- * fica onde está: o arquivo é uma correção, não a verdade inteira. Quem quiser
- * tirar uma corretora tira uma a uma, na tabela, e mesmo assim a linha
- * permanece na planilha.
- * ============================================================================
- */
-
-/** Quantas linhas o passo de conferência mostra na tela. */
 var RECC_LINHAS_NA_CONFERENCIA = 200;
 
-/** Teto de linhas por importação, para não estourar o tempo do Apps Script. */
 var RECC_MAXIMO_DA_IMPORTACAO = 2000;
 
-/**
- * O que dá para importar.
- *
- * Cada tipo diz em que aba grava, qual coluna é a CHAVE (a que decide se a
- * linha é nova ou é atualização) e quais colunas ele entende. A tela desenha o
- * cabeçalho de exemplo a partir daqui — assim o que a tela promete e o que o
- * servidor aceita não podem divergir.
- */
 var RECC_IMPORTACOES = {
   corretoras: {
     titulo: 'Corretoras Diamante',
@@ -4015,9 +2516,7 @@ var RECC_IMPORTACOES = {
       + 'caso, e é por ela que o sistema sabe se a linha é nova ou já existe. '
       + 'Ela tem letra e número — por exemplo RET00J.',
     colunas: [
-      // A SUSEP é TEXTO: "RET00J". Com `identificador`, a importação guardaria
-      // "00" e o cadastro inteiro entraria errado de uma vez — o jeito mais
-      // rápido que existe de estragar sete mil linhas.
+
       { chave: 'susep', titulo: 'SUSEP', coluna: 'SUSEP',
         tipo: 'texto', obrigatoria: true },
       { chave: 'corretora', titulo: 'Corretora', coluna: 'Corretora',
@@ -4047,24 +2546,13 @@ var RECC_IMPORTACOES = {
         tipo: 'texto' },
       { chave: 'coordenadorComercial', titulo: 'Coordenador comercial',
         coluna: 'CoordenadorComercial', tipo: 'texto' },
-      // "Companhia" ou "Corretora". Fora disso a linha é recusada — o tipo
-      // escrito de três jeitos viraria três tipos no filtro da planilha.
+
       { chave: 'bloqueadaPor', titulo: 'Bloqueada por', coluna: 'BloqueadaPor',
         tipo: 'quemBloqueou' }
     ]
   }
 };
 
-// ============================================================================
-// O QUE A TELA PRECISA SABER
-// ============================================================================
-
-/**
- * Os tipos de importação e as colunas de cada um.
- *
- * A tela não guarda essa lista: pede aqui. Acrescentar um tipo novo é mexer
- * em RECC_IMPORTACOES e em mais lugar nenhum.
- */
 function opcoesDaImportacao() {
   exigirTela_('tabelaCorretoras');
 
@@ -4086,32 +2574,12 @@ function opcoesDaImportacao() {
   });
 }
 
-// ============================================================================
-// LER A FONTE — O TEXTO COLADO OU A ABA DE OUTRA PLANILHA
-// ============================================================================
-
-/**
- * Descobre o separador das colunas.
- *
- * O Excel e o Google Planilhas colocam TAB na área de transferência. Quem
- * salvou um CSV em português tem ponto e vírgula. Vírgula fica por último de
- * propósito: nome de corretora tem vírgula ("SILVA, SOUZA & CIA"), e chutar
- * vírgula quebraria justamente as linhas mais compridas.
- */
 function separadorDoTexto_(primeiraLinha) {
   if (primeiraLinha.indexOf('\t') >= 0) return '\t';
   if (primeiraLinha.indexOf(';') >= 0) return ';';
   return ',';
 }
 
-/**
- * Reconhece a linha de cabeçalho.
- *
- * Quem copia da planilha quase sempre traz o cabeçalho junto. Sem reconhecer,
- * ele viraria uma corretora chamada "Corretora" com SUSEP "SUSEP" — recusada
- * por não ter dígito, mas aparecendo como erro numa importação que estava
- * certa.
- */
 function ehCabecalho_(pedacos, receita) {
   var conhecidos = 0;
   for (var i = 0; i < pedacos.length; i++) {
@@ -4126,17 +2594,6 @@ function ehCabecalho_(pedacos, receita) {
   return conhecidos >= 2;
 }
 
-/**
- * A ordem das colunas do texto colado.
- *
- * Com cabeçalho, a ordem é a que o cabeçalho disser — a pessoa pode ter
- * colado as colunas em qualquer ordem, e um título que o sistema não conhece
- * vira uma posição vazia, ignorada.
- *
- * Sem cabeçalho, a ordem é a declarada em RECC_IMPORTACOES. É a razão de a
- * primeira coluna de cada tipo ser sempre a chave e a segunda ser sempre a
- * obrigatória: quem cola sem cabeçalho cola o essencial.
- */
 function ordemDasColunas_(pedacos, receita) {
   if (!ehCabecalho_(pedacos, receita)) {
     return receita.colunas.map(function (coluna) { return coluna.chave; });
@@ -4150,19 +2607,6 @@ function ordemDasColunas_(pedacos, receita) {
   });
 }
 
-/**
- * A grade de uma importação de cadastro: uma lista de { numero, celulas }.
- *
- * Existe porque a MESMA conferência passou a servir duas fontes: o texto que a
- * pessoa cola e uma aba de OUTRA planilha, lida pelo Id. Antes disto, o leitor
- * só sabia partir texto — e a única forma de aproveitar a conferência inteira
- * com uma planilha de fora seria remontar as células num texto com separador,
- * que estraga a primeira corretora chamada "SILVA, SOUZA & CIA".
- *
- * `numero` é a linha de verdade — a da planilha de fora, ou a do texto colado
- * contando as vazias. A pessoa procura "a linha 14" onde o dado dela está, e
- * não na décima quarta linha que sobrou depois de o sistema pular as brancas.
- */
 function gradeDoTextoDaImportacao_(texto) {
   var linhas = String(texto || '').split(/\r\n|\r|\n/);
 
@@ -4172,11 +2616,7 @@ function gradeDoTextoDaImportacao_(texto) {
 
   var grade = [];
   for (var i = 0; i < linhas.length; i++) {
-    // A linha NÃO é aparada antes de ser partida. Parecia inofensivo, e não é:
-    // com TAB como separador, aparar come a primeira coluna quando ela vem
-    // vazia — e aí "«vazio» TAB Corretora Alfa" vira uma corretora chamada
-    // "Corretora Alfa" com SUSEP "Corretora Alfa", deslocando a linha inteira.
-    // Quem apara é cada CÉLULA, depois de partida.
+
     if (!linhas[i].trim().length) continue;
     grade.push({
       numero: i + 1,
@@ -4188,16 +2628,6 @@ function gradeDoTextoDaImportacao_(texto) {
   return grade;
 }
 
-/**
- * A grade de uma ABA DE OUTRA PLANILHA, pelo Id.
- *
- * Reaproveita `gradeDeOutraPlanilha_`, que é a mesma porta que a importação de
- * casos usa: uma ida só ao serviço, e `getDisplayValues` para a SUSEP chegar
- * como a pessoa a VÊ lá — "RET00J" inteiro, e não o que o número viraria.
- *
- * Linha toda vazia é pulada, mas sem mexer na contagem: buraco no meio da
- * planilha de origem é comum e não é erro de ninguém.
- */
 function gradeDaPlanilhaDaImportacao_(planilhaId, nomeDaAba) {
   var lida = gradeDeOutraPlanilha_(planilhaId, nomeDaAba);
   var grade = [];
@@ -4211,14 +2641,6 @@ function gradeDaPlanilhaDaImportacao_(planilhaId, nomeDaAba) {
   return grade;
 }
 
-/**
- * A grade, venha ela do texto colado ou de outra planilha.
- *
- * Aceita a STRING crua de propósito: `conferirImportacao` e `aplicarImportacao`
- * nasceram recebendo o texto, e há chamada em tela e em teste que manda só
- * isso. Quebrar essas chamadas para ganhar um campo `tipo` seria trocar
- * trabalho de verdade por formalidade.
- */
 function gradeDaFonteDoCadastro_(fonte) {
   if (typeof fonte === 'string' || fonte === null || fonte === undefined) {
     return gradeDoTextoDaImportacao_(fonte);
@@ -4229,11 +2651,6 @@ function gradeDaFonteDoCadastro_(fonte) {
   return gradeDoTextoDaImportacao_(fonte.texto);
 }
 
-/**
- * Transforma a grade numa lista de linhas com os campos nomeados.
- *
- * Não decide nada sobre gravar: só lê. Quem decide é `conferirImportacao_`.
- */
 function lerGradeDaImportacao_(grade, receita) {
   if (!grade.length) return { ordem: [], linhas: [], tinhaCabecalho: false };
 
@@ -4255,21 +2672,6 @@ function lerGradeDaImportacao_(grade, receita) {
   return { ordem: ordem, linhas: lidas, tinhaCabecalho: tinhaCabecalho };
 }
 
-// ============================================================================
-// CONFERIR
-// ============================================================================
-
-/**
- * O que vai acontecer com cada linha — sem gravar nada.
- *
- * É a mesma função que `aplicarImportacao` usa antes de escrever, e é de
- * propósito: conferência e gravação que seguem regras diferentes acabam
- * discordando, e a tela passa a mentir sobre o que o botão faz.
- *
- * `fonte` é o texto colado (uma string, ou { tipo: 'colado', texto }) ou uma
- * aba de outra planilha ({ tipo: 'planilha', planilhaId, aba }). Daqui para
- * baixo não há diferença entre as duas: o que chega é sempre uma grade.
- */
 function conferirImportacao_(tipo, fonte) {
   var receita = RECC_IMPORTACOES[tipo];
   if (!receita) {
@@ -4285,8 +2687,6 @@ function conferirImportacao_(tipo, fonte) {
       + 'grava metade.');
   }
 
-  // Ler o cadastro UMA vez, e não uma por linha. Com quinhentas linhas
-  // coladas, uma leitura por linha seriam quinhentas leituras da planilha.
   var colunaChave = colunaChaveDaImportacao_(receita);
   var existentes = {};
   lerRegistros_(receita.aba).forEach(function (linha) {
@@ -4305,8 +2705,7 @@ function conferirImportacao_(tipo, fonte) {
     colunas: receita.colunas.map(function (coluna) {
       return { chave: coluna.chave, titulo: coluna.titulo };
     }),
-    // Com cabeçalho reconhecido, dizer isso na tela evita a dúvida mais comum
-    // de todas: "ele contou o meu cabeçalho como corretora?".
+
     tinhaCabecalho: lido.tinhaCabecalho,
     linhas: resultado.slice(0, RECC_LINHAS_NA_CONFERENCIA),
     naoMostradas: Math.max(0, resultado.length - RECC_LINHAS_NA_CONFERENCIA),
@@ -4317,28 +2716,17 @@ function conferirImportacao_(tipo, fonte) {
       iguais: contarSituacao_(resultado, 'igual'),
       recusadas: contarSituacao_(resultado, 'recusada')
     },
-    // A lista completa fica aqui para `aplicarImportacao` usar. A tela recebe
-    // só as primeiras — e nem precisaria delas, já que quem grava é o servidor.
+
     todas: resultado
   };
 }
 
-/**
- * A chave de uma linha, para decidir se ela é nova ou atualização.
- *
- * Normaliza do mesmo jeito que o resto do sistema compara: identificador por
- * dígito, texto por `normalizarParaComparar_`. Importa porque a SUSEP é texto
- * desde que o PO corrigiu o formato — sem isto, "ret00j" colado sobre um
- * cadastro que tem "RET00J" entraria como linha NOVA, e o cadastro ficaria com
- * a mesma corretora duas vezes.
- */
 function chaveDaLinhaDaImportacao_(valor, colunaChave) {
   return colunaChave.tipo === 'identificador'
     ? converterParaIdentificador_(valor)
     : normalizarParaComparar_(valor);
 }
 
-/** A coluna que decide se a linha é nova ou é atualização. */
 function colunaChaveDaImportacao_(receita) {
   return receita.colunas.filter(function (coluna) {
     return coluna.chave === receita.chave;
@@ -4351,14 +2739,6 @@ function contarSituacao_(linhas, situacao) {
   }).length;
 }
 
-/**
- * O veredito de uma linha só.
- *
- * `vistas` guarda as chaves que já apareceram NESTE texto: duas linhas com a
- * mesma SUSEP no mesmo arquivo colado são um erro de quem montou o arquivo, e
- * gravar as duas deixaria o cadastro com a duplicidade que a tela de cadastro
- * recusa uma a uma.
- */
 function conferirUmaLinha_(linha, receita, existentes, vistas) {
   var campos = {};
   var problemas = [];
@@ -4414,13 +2794,6 @@ function conferirUmaLinha_(linha, receita, existentes, vistas) {
     porque: mudancas.join('; '), id: atual.__id };
 }
 
-/**
- * O que muda de fato entre a linha colada e a que já está no cadastro.
- *
- * Campo vazio no arquivo NÃO apaga o que existe. Quem cola só SUSEP e
- * Segmento para reclassificar um lote não quer perder o canal cadastrado —
- * e descobrir isso depois de gravar não tem desfazer.
- */
 function mudancasDaLinha_(campos, atual, receita) {
   var mudancas = [];
   receita.colunas.forEach(function (coluna) {
@@ -4435,27 +2808,15 @@ function mudancasDaLinha_(campos, atual, receita) {
   return mudancas;
 }
 
-// ============================================================================
-// AS DUAS FUNÇÕES QUE A TELA CHAMA
-// ============================================================================
-
-/** Passo 2: o que vai acontecer. Não grava nada. */
 function conferirImportacao(tipo, fonte) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
 
   var conferido = conferirImportacao_(tipo, fonte);
-  delete conferido.todas;   // a tela não precisa da lista inteira
+  delete conferido.todas;
   return conferido;
 }
 
-/**
- * Passo 3: grava.
- *
- * Pede a senha de administrador. Não é excesso de zelo: é a única ação do
- * sistema que escreve em centenas de linhas com um clique, e o critério para
- * pedir senha sempre foi o alcance, nunca a dificuldade.
- */
 function aplicarImportacao(tipo, fonte) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirTela_('tabelaCorretoras');
@@ -4464,12 +2825,6 @@ function aplicarImportacao(tipo, fonte) {
   var receita = RECC_IMPORTACOES[tipo];
   var conferido = conferirImportacao_(tipo, fonte);
 
-  /*
-   * COLUNA QUE A ABA AINDA NÃO TEM — a `BloqueadaPor`, numa planilha que não
-   * rodou `atualizarPGO()`. Em branco no arquivo, é só não escrever nela. Com
-   * valor, para ANTES de gravar a primeira linha: parar no meio deixaria
-   * metade do arquivo gravada e a outra metade não.
-   */
   var faltando = colunasDaImportacaoQueFaltam_(receita);
   var perderia = faltando.filter(function (coluna) {
     return conferido.todas.some(function (linha) {
@@ -4510,7 +2865,6 @@ function aplicarImportacao(tipo, fonte) {
   };
 }
 
-/** As colunas da importação que a aba de destino não tem. */
 function colunasDaImportacaoQueFaltam_(receita) {
   var estrutura = estruturaDaAba_(receita.aba);
   return receita.colunas.filter(function (coluna) {
@@ -4518,13 +2872,6 @@ function colunasDaImportacaoQueFaltam_(receita) {
   });
 }
 
-/**
- * Traduz os campos da importação para os nomes de coluna da aba.
- *
- * Numa atualização, campo vazio é OMITIDO — não vai como texto vazio. É o que
- * faz a regra do "vazio não apaga" valer também na hora de escrever, e não só
- * na hora de conferir.
- */
 function camposParaAAba_(campos, receita, ehNova, faltando) {
   var linha = {};
   receita.colunas.forEach(function (coluna) {
@@ -4534,12 +2881,6 @@ function camposParaAAba_(campos, receita, ehNova, faltando) {
     linha[coluna.coluna] = valor || '';
   });
 
-  // A coluna que a importação não pergunta, mas a aba espera: a data do
-  // bloqueio é do SISTEMA, e não de quem cola a planilha.
-  //
-  // Havia aqui também um `Nome` para a CORRETORAS, copiado do nome da
-  // corretora. A coluna saiu do contrato nesta rodada, a pedido do PO: ela
-  // duplicava `Corretora` e ninguém sabia qual era qual.
   if (ehNova && receita.aba === 'SUSEP_BLOQUEADAS') {
     linha.BloqueadaEm = new Date();
   }
@@ -4549,58 +2890,6 @@ function camposParaAAba_(campos, receita, ehNova, faltando) {
 
 /* ==== Casos.gs ============================================================ */
 
-/**
- * ============================================================================
- * PGO — Casos.gs · o caso, do formulário à busca
- * ============================================================================
- * A vida de um caso em três tempos: as perguntas que o formulário faz,
- * a gravação na planilha, e como achá-lo meses depois.
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. O MOTOR DO FORMULÁRIO
- *   2. REGISTRAR, EDITAR E EXCLUIR
- *   3. ACHAR UM CASO QUE A FILA NÃO MOSTRA MAIS
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 3 · O MOTOR DO FORMULÁRIO
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * O motor do formulário
- * ============================================================================
- * O formulário NÃO está escrito em lugar nenhum do código. Ele é montado a
- * partir da aba CAMPOS, campo a campo, toda vez que a tela abre.
- *
- * É isso que permite ao administrador criar, esconder, reordenar e mascarar
- * campo sem programador. E é isso que obriga o servidor a revalidar tudo: se o
- * formulário é dado, o que chega da tela também é — e dado não se confia.
- *
- * O caminho de um valor, da tela até a célula:
- *
- *   tela          000.123.456-78     como a pessoa digita, com máscara
- *   servidor      00012345678        só dígitos, conferido contra a máscara
- *   célula        00012345678        texto, formatado ANTES de gravar
- *
- * A máscara é aparência. O que cruza com outro sistema são os dígitos.
- * ============================================================================
- */
-
-/**
- * O formulário de um canal, pronto para a tela desenhar.
- *
- * Já vem filtrado pelo nível de acesso de quem pediu: campo marcado como
- * oculto para o nível não aparece na resposta — e não aparecer na resposta é
- * diferente de vir escondido no HTML. Esconder no HTML é enfeite; quem não
- * pode ver, não recebe.
- */
 function formularioDoCanal(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -4628,7 +2917,6 @@ function formularioDoCanal(idDoCanal) {
   };
 }
 
-/** Os campos ativos de um canal, na ordem escolhida pelo administrador. */
 function camposAtivosDoCanal_(idDoCanal) {
   var alvo = converterParaIdentificador_(idDoCanal);
   return lerRegistros_('CAMPOS')
@@ -4641,14 +2929,9 @@ function camposAtivosDoCanal_(idDoCanal) {
     });
 }
 
-/** Uma linha de CAMPOS vira a descrição que a tela sabe desenhar. */
 function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
   var configuracao = lerConfiguracaoDoCampo_(campo);
 
-  // O campo pode vir TRAVADO por dois motivos diferentes, e vale distinguir:
-  // o nível pode dar só leitura (visibilidade), ou o campo pode ser de quem
-  // não tem autorização para mexer nele — é o caso do Analista, que um
-  // analista não troca para o nome de outra pessoa.
   var travadoPeloCargo = campoTravadoParaMim_(configuracao, quem);
 
   return {
@@ -4663,41 +2946,17 @@ function campoParaATela_(campo, idDoCanal, visibilidade, quem) {
     somenteLeitura: visibilidade === RECC_VISIBILIDADE.LEITURA || travadoPeloCargo,
     travadoPeloCargo: travadoPeloCargo,
     valorPadrao: valorPadraoResolvido_(campo.ValorPadrao, quem),
-    // Aparece só quando outro campo estiver com um destes valores: { campo:
-    // 'chave', valores: ['Retido', 'Pago'] } — ver condicaoDoCampo_.
+
     mostrarSe: condicaoDoCampo_(configuracao),
-    // OBRIGATÓRIO só quando outro campo estiver com um destes valores — pedido
-    // do PO: "quando o status for Retido, o valor retido deve ser obrigatório".
-    // Mesmo formato do mostrarSe; o campo continua aparecendo nos outros casos,
-    // só deixa de ser cobrado.
+
     obrigatorioSe: condicaoDoCampo_({ mostrarSe: configuracao.obrigatorioSe }),
     largura: Number(configuracao.largura) || 1,
-    /*
-     * Data no futuro é RECUSADA por padrão: o caso descreve algo que já
-     * aconteceu, e "10/09/2027" numa data de protocolo é dedo escorregando no
-     * ano. Mas há campo em que o futuro é rotina — o início da vigência de uma
-     * apólice que começa mês que vem —, e para esses a recusa é que estava
-     * errada. Quem declara a exceção é o campo, em Configurações.
-     */
+
     aceitaFuturo: configuracao.aceitaFuturo === true,
     opcoes: opcoesDoCampo_(configuracao, idDoCanal)
   };
 }
 
-/**
- * O valor padrão, com os atalhos que dependem de QUEM e de QUANDO resolvidos.
- *
- * Um valor padrão escrito à mão não sabe que dia é hoje. Estes três atalhos
- * sabem, e o servidor é quem os resolve — não a tela. O relógio do navegador
- * é o da máquina de quem está olhando, e uma data de recepção com o fuso
- * errado só aparece semanas depois, num relatório que não fecha.
- *
- *   @HOJE   a data de hoje          (dd/MM/yyyy)
- *   @AGORA  a data e a hora de agora (dd/MM/yyyy HH:mm)
- *   @EU     o nome de quem está cadastrando
- *
- * Qualquer outro texto passa inteiro, como sempre passou.
- */
 function valorPadraoResolvido_(valorPadrao, quem) {
   var texto = String(valorPadrao || '').trim();
   if (texto.charAt(0) !== '@') return texto;
@@ -4715,39 +2974,16 @@ function valorPadraoResolvido_(valorPadrao, quem) {
   }
 }
 
-/**
- * Este campo está travado para esta pessoa?
- *
- * O pedido da operação: o Analista já vem preenchido com o nome de quem está
- * cadastrando e, se o cargo for analista, não pode ser trocado — cadastrar em
- * nome de outra pessoa é coisa de quem coordena.
- *
- * A trava olha o CARGO, e quem a desfaz é uma AÇÃO do nível (editar). São
- * coisas diferentes de propósito: cargo diz o que a pessoa faz, nível diz o
- * que ela pode. Um analista que precise cadastrar para a equipe ganha a ação,
- * sem precisar trocar de cargo.
- */
 function campoTravadoParaMim_(configuracao, quem) {
   var cargos = configuracao.travaPara;
   if (!Array.isArray(cargos) || !cargos.length) return false;
   if (!quem || !quem.cadastrado) return false;
 
-  // Quem pode editar caso dos outros não é travado por cargo nenhum.
   if (podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
     && quem.permissoes.escopo !== RECC_ESCOPOS.PROPRIOS) {
     return false;
   }
 
-  // COMPARA POR COMEÇO, não por igualdade.
-  //
-  // Os cargos da operação são "Analista RET" e "Analista Mesa Diamante", não
-  // "Analista" seco. Uma comparação exata não travaria ninguém — e não daria
-  // erro nenhum: o campo simplesmente ficaria editável, e só se descobriria
-  // quando alguém cadastrasse em nome de outra pessoa.
-  //
-  // Por começo, "Analista" pega os três cargos de analista de hoje e pegará
-  // o "Analista Pleno" que vier amanhã, sem ninguém precisar lembrar de
-  // acrescentá-lo aqui.
   var meuCargo = normalizarParaComparar_(quem.cargo);
   if (!meuCargo) return false;
   return cargos.some(function (cargo) {
@@ -4756,11 +2992,6 @@ function campoTravadoParaMim_(configuracao, quem) {
   });
 }
 
-/**
- * A coluna Configuracao guarda um JSON.
- * Vazia ou quebrada devolve objeto vazio: uma configuração com defeito não
- * pode derrubar o formulário inteiro — o campo apenas perde os extras.
- */
 function lerConfiguracaoDoCampo_(campo) {
   var texto = String(campo.Configuracao || '').trim();
   if (!texto) return {};
@@ -4774,15 +3005,6 @@ function lerConfiguracaoDoCampo_(campo) {
   }
 }
 
-/**
- * A condição que faz um campo APARECER: { campo, valores } — ou null, quando o
- * campo aparece sempre.
- *
- * `campo` é a chave técnica do campo que manda; `valores`, os que fazem este
- * aparecer (qualquer um deles). A forma antiga, de um valor só
- * ({ campo, valor }), continua sendo lida: foi assim que o "Nome de quem
- * transferiu" e os "Dados do pagamento" nasceram.
- */
 function condicaoDoCampo_(configuracao) {
   var regra = configuracao && configuracao.mostrarSe;
   if (!regra || !regra.campo) return null;
@@ -4792,11 +3014,6 @@ function condicaoDoCampo_(configuracao) {
   return valores.length ? { campo: String(regra.campo), valores: valores } : null;
 }
 
-/**
- * O valor faz a condição valer? Compara sem acento e sem caixa — a MESMA
- * conta que a tela faz (mesmoTexto, no Comuns.html): se servidor e tela
- * discordassem, um campo apareceria na tela e seria ignorado na gravação.
- */
 function condicaoBate_(condicao, valor) {
   function limpar(texto) {
     return String(texto === null || texto === undefined ? '' : texto).trim().toLowerCase()
@@ -4806,24 +3023,10 @@ function condicaoBate_(condicao, valor) {
   return condicao.valores.some(function (esperado) { return limpar(esperado) === alvo; });
 }
 
-/**
- * As colunas dos campos que ACABARAM DE SUMIR: o campo que manda estava com um
- * valor que o mostrava, e agora está com outro.
- *
- * Só a TRANSIÇÃO limpa. Esconder o campo não apaga o que já estava gravado nele
- * — um caso importado pode trazer valor numa coluna cujo campo hoje está
- * escondido, e apagar isso só porque alguém abriu o caso seria perder dado.
- * Mas passar de Retido para Pago é a pessoa dizendo que "situação da proposta"
- * não se aplica mais, e o valor que ficasse ali voltaria sozinho no dia em que
- * o caso voltasse a Retido.
- *
- * `alteracao` é o que vai ser gravado, por cabeçalho; o que não está nela vale
- * o que o caso já tem.
- */
 function dependentesQueSomem_(idDoCanal, atual, alteracao) {
   var ativos = camposAtivosDoCanal_(idDoCanal);
   var cabecalhoDe = {};
-  // Pela grafia da planilha: `atual` vem dela, e `alteracao` já vem assim.
+
   ativos.forEach(function (campo) {
     cabecalhoDe[String(campo.ChaveTecnica)] = grafiaDaColuna_(campo.Aba, campo.Cabecalho);
   });
@@ -4847,13 +3050,6 @@ function dependentesQueSomem_(idDoCanal, atual, alteracao) {
   return colunas;
 }
 
-/**
- * As opções de um seletor. Três origens possíveis:
- *
- *   { "catalogo": "STATUS" }      da aba CATALOGO, do canal ou global
- *   { "listaDe": "usuarios" }     de um cadastro: usuários, corretoras, canais
- *   { "opcoes": ["Sim", "Não"] }  lista escrita à mão na configuração
- */
 function opcoesDoCampo_(configuracao, idDoCanal) {
   if (Array.isArray(configuracao.opcoes)) {
     return configuracao.opcoes.map(function (opcao) {
@@ -4870,7 +3066,7 @@ function opcoesDoCampo_(configuracao, idDoCanal) {
     .filter(function (item) {
       if (normalizarParaComparar_(item.Tipo) !== tipo) return false;
       if (normalizarParaComparar_(item.Ativo) !== 'sim') return false;
-      // Item sem canal é global e serve a todos; com canal, só ao dele.
+
       var canalDoItem = converterParaIdentificador_(item.CanalId);
       return !canalDoItem || canalDoItem === doCanal;
     })
@@ -4886,14 +3082,6 @@ function opcoesDoCampo_(configuracao, idDoCanal) {
     });
 }
 
-/**
- * Opções vindas de um cadastro, e não do catálogo.
- *
- * O caso que motivou isto é o analista: a lista de quem atende já existe na
- * aba USUARIOS, e repetir os mesmos nomes no catálogo criaria duas verdades
- * sobre a mesma coisa — bastaria alguém sair da equipe para as duas
- * divergirem.
- */
 function opcoesDeUmCadastro_(qualCadastro) {
   var cadastro = String(qualCadastro).toLowerCase();
 
@@ -4907,14 +3095,6 @@ function opcoesDeUmCadastro_(qualCadastro) {
       .map(function (nome) { return { valor: nome, rotulo: nome }; });
   }
 
-  /*
-   * O cadastro de CORRETORAS. A chave `canais` continua aceita por ser a que
-   * as instalações antigas gravaram em CAMPOS, de quando a aba CORRETORAS se
-   * chamava CANAIS — trocar a chave sem mais apagaria a lista de um campo que
-   * já estava configurado, e ninguém ligaria uma coisa à outra.
-   *
-   * Havia aqui também o cadastro de `produtos`, que saiu a pedido do PO.
-   */
   if (cadastro === 'corretoras' || cadastro === 'canais') {
     return lerRegistros_('CORRETORAS').map(function (corretora) {
       var nome = String(corretora.Corretora || '');
@@ -4922,9 +3102,6 @@ function opcoesDeUmCadastro_(qualCadastro) {
     });
   }
 
-  // As duas listas de analista que a operação mantém fora do PGO: quem
-  // transferiu o caso, quem já tinha falado com o cliente. Não são usuários do
-  // sistema — não entram no PGO —, e por isso vêm de cadastro próprio.
   if (cadastro === 'analistascentral') {
     return nomesAtivosDoCadastro_('ANALISTAS_CENTRAL');
   }
@@ -4937,14 +3114,6 @@ function opcoesDeUmCadastro_(qualCadastro) {
     'analistasCobranca.');
 }
 
-/**
- * Os nomes ativos de um cadastro de pessoas, em ordem.
- *
- * Aba que ainda não existe devolve LISTA VAZIA em vez de estourar. Estas duas
- * nasceram depois do resto, e uma instalação mais antiga não as tem: derrubar
- * o formulário inteiro por causa de um seletor que ninguém configurou ainda
- * seria trocar um campo vazio por uma tela que não abre.
- */
 function nomesAtivosDoCadastro_(nomeDaAba) {
   var registros;
   try {
@@ -4955,9 +3124,7 @@ function nomesAtivosDoCadastro_(nomeDaAba) {
 
   return registros
     .filter(function (linha) {
-      // Sem coluna Ativo preenchida, a pessoa CONTA. Um cadastro que a
-      // operação acabou de colar não tem essa coluna marcada, e esconder todo
-      // mundo faria a lista parecer quebrada.
+
       var ativo = String(linha.Ativo === null || linha.Ativo === undefined
         ? '' : linha.Ativo).trim();
       return !ativo || normalizarParaComparar_(ativo) === 'sim';
@@ -4977,17 +3144,6 @@ function canalPeloId_(idDoCanal) {
   throw new Error('Canal "' + idDoCanal + '" não existe ou está desativado.');
 }
 
-/**
- * O canal pedido, SE esta pessoa puder vê-lo.
- *
- * É esta que as telas usam, e não a de cima. A tela não oferecer o canal na
- * lista não protege nada: a chamada ao servidor existe, e basta mandar outro
- * Id. Quem decide é o servidor, sempre — a tela só escolhe o que mostrar.
- *
- * A recusa diz quais canais a pessoa TEM, porque "sem acesso" sozinho manda
- * procurar no lugar errado: quase sempre é o nível que ficou com o canal
- * errado marcado, e quem lê a mensagem precisa saber disso.
- */
 function canalQueEuPossoVer_(idDoCanal, quem) {
   var canal = canalPeloId_(idDoCanal);
   var meus = canaisQueEuVejo_(quem);
@@ -5004,33 +3160,12 @@ function canalQueEuPossoVer_(idDoCanal, quem) {
         + 'o nível em Configurações › Níveis de acesso.'));
 }
 
-// ============================================================================
-// VALIDAÇÃO — no servidor, sempre
-// ============================================================================
-
-/**
- * Confere o que veio da tela e devolve os valores prontos para gravar,
- * com as chaves iguais aos cabeçalhos das colunas.
- *
- * Junta todos os problemas antes de reclamar. Devolver um erro por vez faria a
- * pessoa corrigir, salvar, descobrir o segundo, corrigir, salvar de novo.
- *
- * `ehCasoNovo` diz se o VALOR PADRÃO do campo entra quando nada veio da tela.
- * Num caso novo entra: o status da RET nasce em "Não trabalhado" mesmo que o
- * pedido chegue sem ele — é o que a importação precisa, porque uma base de 300
- * casos não traz status nenhum. Numa EDIÇÃO não entra: repor o padrão num
- * campo que a pessoa esvaziou seria desfazer o que ela acabou de fazer.
- */
 function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtual) {
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var problemas = [];
   var paraGravar = {};
   var ativos = camposAtivosDoCanal_(canal.id);
 
-  // O valor que um campo VAI TER depois desta gravação, para decidir se o campo
-  // que depende dele aparece: o que a tela mandou, senão o que o caso já tem,
-  // senão — no cadastro — o padrão (o "Não trabalhado" da RET manda no campo
-  // que depende do status, mesmo com a tela em branco).
   function valorQueVaiValer(chave) {
     var quemManda = ativos.filter(function (campo) {
       return String(campo.ChaveTecnica) === chave;
@@ -5050,22 +3185,15 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
   ativos.forEach(function (campo) {
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
 
-    // Campo que a pessoa não pode ver ou não pode editar é IGNORADO, mesmo
-    // que a tela mande um valor. A tela é do lado de lá; ela não decide.
     if (visibilidade !== RECC_VISIBILIDADE.EDICAO) return;
 
     var descricao = campoParaATela_(campo, canal.id, visibilidade, quem);
 
-    // Campo condicional que não é a vez dele não é perguntado: não se exige, e
-    // nada se grava nele. A tela já esconde — mas a tela não decide, e um
-    // campo obrigatório escondido não pode travar o salvamento.
     if (descricao.mostrarSe
       && !condicaoBate_(descricao.mostrarSe, valorQueVaiValer(descricao.mostrarSe.campo))) {
       return;
     }
 
-    // "Obrigatório quando…": vale o valor que o campo que manda VAI TER — o
-    // Retido escolhido agora cobra o valor retido nesta mesma gravação.
     if (descricao.obrigatorioSe
       && condicaoBate_(descricao.obrigatorioSe, valorQueVaiValer(descricao.obrigatorioSe.campo))) {
       descricao.obrigatorio = true;
@@ -5077,11 +3205,6 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     if (bruto === undefined) bruto = valoresDaTela[descricao.cabecalho];
     if (bruto === undefined || bruto === null) bruto = '';
 
-    // O padrão vem ANTES de conferir se é obrigatório, e é isso que faz o
-    // "Não trabalhado" da RET valer de verdade. Conferir primeiro recusaria um
-    // caso por falta de um valor que o próprio sistema tem guardado — e a tela
-    // até esconderia o problema, porque ela preenche o padrão sozinha. Quem
-    // pagaria a conta é a importação, que não passa por tela nenhuma.
     if (ehCasoNovo && String(bruto).trim() === '') {
       bruto = descricao.valorPadrao === undefined || descricao.valorPadrao === null
         ? '' : descricao.valorPadrao;
@@ -5093,17 +3216,6 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
       return;
     }
 
-    /*
-     * CAMPO ESVAZIADO NA EDIÇÃO É APAGADO NA PLANILHA.
-     *
-     * Antes, vazio era sempre "não mexer": a pessoa apagava a Área
-     * responsável, a tela dizia que salvou, e a área continuava lá — o caso
-     * nunca mais contava como finalizado na célula. Agora apaga, desde que o
-     * campo tenha VINDO no formulário (quem não manda a chave não está
-     * pedindo para apagar nada) e não seja travado (o responsável que o
-     * sistema preencheu, por exemplo, nem é enviado pela tela).
-     * No cadastro, vazio continua sendo só vazio: não há o que apagar.
-     */
     if (String(bruto).trim() === '') {
       if (!ehCasoNovo && veioDaTela && !descricao.somenteLeitura) {
         colunasDoCampo_(campo, descricao).forEach(function (cabecalho) {
@@ -5113,32 +3225,8 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
       return;
     }
 
-    /*
-     * ESPAÇO DE PONTA NÃO VAI PARA A PLANILHA.
-     *
-     * Quem copia a SUSEP de outra planilha traz " RET00J " junto, e o espaço
-     * é invisível na tela. O selo continuava achando a corretora — ele
-     * compara normalizado —, então nada parecia errado; o estrago aparecia
-     * depois, no Power BI, onde o join é pelo texto cru e " RET00J " não casa
-     * com "RET00J".
-     *
-     * Só as PONTAS. A SUSEP em si fica intacta: letra, dígito, caixa e
-     * pontuação do meio continuam exatamente como a pessoa colou, que é o que
-     * o PO pediu — "devem aceitar e colar exatamente essa susep". E vale para
-     * todo campo de texto, porque colar com espaço não é problema só da SUSEP;
-     * é assim que a importação já tratava, e as duas portas passam a
-     * concordar.
-     */
     if (typeof bruto === 'string') bruto = bruto.trim();
 
-    // Um seletor pode alimentar DUAS colunas. É o caso do produto, que a
-    // operação escolhe como "1101 - VIDA INDIVIDUAL" e a planilha guarda
-    // separado: o código numa coluna, o nome na outra.
-    //
-    // Escolher uma coisa e gravar duas é de propósito. Uma caixa só é menos
-    // uma chance de digitar o código de um produto e o nome de outro; e as
-    // colunas separadas são o que deixa o painel agrupar por código e o
-    // relatório mostrar o nome.
     var configuracaoDoCampo = lerConfiguracaoDoCampo_(campo);
 
     var separa = configuracaoDoCampo.separaEm;
@@ -5149,9 +3237,6 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
       return;
     }
 
-    // Um campo pode PARTIR EM várias colunas pelo hífen. É o caso da proposta
-    // e da apólice: digitadas inteiras, gravadas em pedaços. Ver
-    // partirPorHifen_, que é quem recusa o formato errado.
     var partir = configuracaoDoCampo.partirEm;
     if (partir && partir.colunas && partir.colunas.length > 1) {
       var pedacos;
@@ -5168,17 +3253,9 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
       return;
     }
 
-    // Documento é UM documento, e vai para a planilha só com os dígitos. Sem
-    // isto, a barra do CNPJ ("12.345.678/0001-90") seria lida como separador
-    // de lista — a regra dos telefones — e a célula receberia
-    // "12345678;000190". Apareceu quando a Mesa passou a aceitar CNPJ.
     if (descricao.tipo === 'documento' && !ehASusep_(descricao.chave)
       && !ehASusep_(descricao.cabecalho)) bruto = apenasDigitos_(bruto);
 
-    // O VALOR TEM DE CABER NA COLUNA. A coluna de número, de data ou de Id
-    // converte o que recebe; o que não converte vira VAZIO — e era assim, calado,
-    // que a tentativa de contato sumia (achado 98). Recusar com o motivo é melhor
-    // do que dizer "salvo" e gravar em branco.
     var naoCabe = valorQueNaoCabeNaColuna_(canal.aba, descricao.cabecalho, bruto);
     if (naoCabe) {
       problemas.push({ campo: descricao.chave, rotulo: descricao.rotulo, erro: naoCabe });
@@ -5188,11 +3265,8 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
     paraGravar[descricao.cabecalho] = bruto;
   });
 
-  // As chaves pela GRAFIA DA PLANILHA: é assim que o canal, os sinalizadores e
-  // os carimbos procuram as colunas daqui para a frente (ver grafiaDaColuna_).
   paraGravar = comAsChavesDaAba_(canal.aba, paraGravar);
 
-  // O campo que acabou de sumir (Retido → Pago) deixa o valor para trás? Não.
   if (!ehCasoNovo && registroAtual) {
     dependentesQueSomem_(canal.id, registroAtual, paraGravar).forEach(function (coluna) {
       paraGravar[coluna] = '';
@@ -5208,11 +3282,6 @@ function validarValores_(idDoCanal, valoresDaTela, quem, ehCasoNovo, registroAtu
   return paraGravar;
 }
 
-/**
- * As colunas da planilha que um campo do formulário preenche: uma, na maioria;
- * duas no seletor que separa código e nome (o produto); várias no campo que
- * se parte pelo hífen (a proposta e a apólice).
- */
 function colunasDoCampo_(campo, descricao) {
   var configuracao = lerConfiguracaoDoCampo_(campo);
   var separa = configuracao.separaEm;
@@ -5222,7 +3291,6 @@ function colunasDoCampo_(campo, descricao) {
   return [descricao.cabecalho];
 }
 
-/** Devolve a mensagem do problema, ou string vazia quando está tudo certo. */
 function conferirCampo_(campo, valor) {
   var texto = String(valor === null || valor === undefined ? '' : valor).trim();
 
@@ -5230,15 +3298,12 @@ function conferirCampo_(campo, valor) {
     return campo.obrigatorio ? 'é obrigatório' : '';
   }
 
-  // A SUSEP aceita só números, só letras ou os dois, seja qual for o tipo do
-  // campo. Ver ehASusep_.
   if (ehASusep_(campo.chave) || ehASusep_(campo.cabecalho)) return '';
 
   if (campo.tipo === 'identificador' || campo.tipo === 'documento') {
     var digitos = converterParaIdentificador_(texto);
     if (!digitos) return 'precisa ter ao menos um dígito';
-    // Máscaras alternativas, separadas por "|", aceitam qualquer um dos
-    // tamanhos: "000.000.000-00|00.000.000/0000-00" é CPF (11) ou CNPJ (14).
+
     var aceitos = String(campo.mascara || '').split('|')
       .map(quantosDigitosAMascaraPede_)
       .filter(function (quantos) { return quantos > 0; });
@@ -5273,10 +3338,6 @@ function conferirCampo_(campo, valor) {
     return 'precisa ser um e-mail';
   }
 
-  // Seletor com lista VAZIA aceita o que for digitado. Um cadastro ainda não
-  // preenchido não pode travar o campo: sem esta linha, escolher "corretoras"
-  // como origem antes de cadastrar produto nenhum deixaria o campo
-  // impossível de preencher e sem explicação na tela.
   if (campo.tipo === 'seletor' && campo.opcoes.length) {
     for (var i = 0; i < campo.opcoes.length; i++) {
       if (normalizarParaComparar_(campo.opcoes[i].valor) === normalizarParaComparar_(texto)) {
@@ -5289,16 +3350,6 @@ function conferirCampo_(campo, valor) {
   return '';
 }
 
-/**
- * O motivo de um valor NÃO caber no tipo da coluna da planilha — ou vazio, quando
- * cabe.
- *
- * Quem decide o tipo é o contrato da base (ou o campo, numa coluna criada por
- * Cadastrar Caso). Um texto numa coluna de número, ou de data, era convertido e
- * virava célula em branco, sem erro nenhum. Só reclama quando a conversão APAGA
- * o valor: número com vírgula, data em dd/mm/aaaa e o resto que a coluna entende
- * continuam passando como sempre.
- */
 var RECC_O_QUE_A_COLUNA_GUARDA = {
   identificador: 'um código só de dígitos', numero: 'número', dinheiro: 'valor em dinheiro',
   data: 'data', dataHora: 'data e hora', hora: 'hora', simOuNao: 'Sim ou Não'
@@ -5318,17 +3369,11 @@ function valorQueNaoCabeNaColuna_(nomeDaAba, cabecalho, valor) {
     + '" ficaria em branco nela. Escolha outro valor, ou peça para ajustar o tipo da coluna';
 }
 
-/** Numa máscara, cada zero é um dígito: 000.000.000-00 pede 11. */
 function quantosDigitosAMascaraPede_(mascara) {
   var zeros = String(mascara || '').match(/0/g);
   return zeros ? zeros.length : 0;
 }
 
-/**
- * Hoje em São Paulo, e não em UTC.
- * O Apps Script roda em UTC: depois das 21 h, "hoje" viraria amanhã e o
- * sistema recusaria um caso registrado à noite.
- */
 function dataEstaNoFuturo_(data) {
   var agora = new Date();
   var hojeAqui = Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
@@ -5336,41 +3381,6 @@ function dataEstaNoFuturo_(data) {
   return aDataDela > hojeAqui;
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 3 · REGISTRAR, EDITAR E EXCLUIR
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Registrar, editar e ocultar um caso
- * ============================================================================
- * É aqui que o dado entra na planilha. Três coisas acontecem, nesta ordem, e
- * nenhuma pode ser pulada:
- *
- *   1. confere a permissão      quem não pode criar, não cria — mesmo que a
- *                               tela tenha mostrado o botão
- *   2. valida os valores        campo a campo, contra a definição da aba
- *                               CAMPOS, no SERVIDOR
- *   3. grava                    pela porta única, que formata a linha antes
- *
- * A tela também valida, para a pessoa não descobrir o erro só depois de
- * clicar. Mas a validação da tela é cortesia; a que conta é esta.
- * ============================================================================
- */
-
-/**
- * Registra um caso novo.
- *
- * Devolve o Id gerado. A data e a hora de entrada são preenchidas pelo
- * SERVIDOR quando o canal declara essas colunas e a tela não mandou nada —
- * deixar o relógio do navegador decidir daria horários de fusos diferentes na
- * mesma base.
- *
- * `envio` é o código de envio da tela: o mesmo código não grava duas vezes
- * (Etapa 59, ver comEnvioUnico_).
- */
 function cadastrarCaso(idDoCanal, valores, envio) {
   return comEnvioUnico_(envio, function () { return cadastrarCasoUmaVez_(idDoCanal, valores); });
 }
@@ -5394,16 +3404,6 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
   return { id: gravado.__id, canal: canal.nome, aba: canal.aba };
 }
 
-/**
- * Altera um caso existente.
- *
- * A data de entrada NÃO é reescrita: histórico não muda sozinho. Se o campo
- * vier na alteração, ele é respeitado — mas o preenchimento automático só age
- * na criação.
- *
- * `envio`: ver cadastrarCaso. Sem ele, o segundo clique depois dos 40
- * segundos esbarrava na versão já gravada e dizia "outra pessoa alterou".
- */
 function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
   return comEnvioUnico_(envio, function () {
     return editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas);
@@ -5423,13 +3423,6 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   }
   exigirAlcanceSobre_(atual, canal, quem);
 
-  /*
-   * DUAS PESSOAS NO MESMO CASO. O formulário volta INTEIRO: quem abriu antes
-   * regravaria, por cima, os valores velhos dos campos que a outra pessoa
-   * acabou de mudar — sem erro e sem aviso. A versão é o retrato da linha no
-   * momento em que o caso abriu; se a linha mudou desde então, recusa e diz
-   * por quê. Sem versão (chamada direta, sem a tela), segue como antes.
-   */
   if (versaoQueAbriu && versaoQueAbriu !== versaoDoCaso_(atual, canal.aba)) {
     throw new Error('Este caso foi alterado por outra pessoa depois que você o '
       + 'abriu. Para não apagar a mudança dela, nada foi gravado: feche, abra o '
@@ -5439,15 +3432,11 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false, atual);
   acrescentarColunasSuas_(canal, colunasSuas, paraGravar);
 
-  // Trocar a situação pelo formulário inteiro é a mesma coisa que trocar pelo
-  // diálogo, e tem de deixar o mesmo rastro.
   carimbarSeOStatusMudou_(canal, atual, paraGravar, quem);
   carimbarOEncaminhamento_(canal, atual, paraGravar);
   carimbarAParadaDoPrazo_(canal, atual, paraGravar);
   carimbarOsItensDeLista_(canal, atual, paraGravar);
 
-  // E a conta refaz: é o que faz o número acompanhar quando o analista
-  // corrige a data de início da vigência.
   preencherColunasCalculadas_(canal.aba, paraGravar, atual);
 
   atualizarRegistro_(canal.aba, alvo, paraGravar);
@@ -5456,14 +3445,6 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   return { id: alvo, canal: canal.nome };
 }
 
-/**
- * As colunas SUAS que a pessoa corrigiu no "Trabalhar no caso" — e só elas.
- *
- * Confere de novo, no servidor, que cada uma é mesmo coluna do PO (nem do
- * contrato, nem de campo): a tela só desenha a caixa, e quem decide o que se
- * grava é daqui. Carimbo do sistema mandado por fora é recusado com o nome dele.
- * Vazio apaga — é a mesma regra do campo esvaziado na edição.
- */
 function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
   if (!colunasSuas || typeof colunasSuas !== 'object') return;
   var nomes = Object.keys(colunasSuas);
@@ -5481,19 +3462,6 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
   });
 }
 
-/**
- * Troca só a situação de um caso.
- *
- * Existe separado de `editarCaso` porque é o gesto mais frequente da
- * operação: o analista atende, muda a situação e segue. Abrir o formulário
- * inteiro de trinta e cinco campos para mexer num só é atrito que se paga
- * dezenas de vezes por dia.
- *
- * Segue a permissão de EDITAR: trocar a situação é editar o caso.
- *
- * `envio`: ver cadastrarCaso — sem ele, o segundo clique contava duas
- * mudanças de status.
- */
 function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
   return comEnvioUnico_(envio, function () {
     return alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos);
@@ -5529,28 +3497,15 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   var alteracao = {};
   alteracao[canal.colunaDoStatus] = achada.gravadoComo;
 
-  // OS CAMPOS QUE O STATUS PEDE. Pedido do PO: o valor retido é obrigatório no
-  // Retido — e o diálogo de status, que só trocava o status, deixava passar um
-  // Retido sem valor. Agora ele recebe os campos que aparecem ou são cobrados
-  // no status escolhido (o valor retido, o Status proposta, a tentativa de
-  // contato) e confere como o formulário confere. Ver camposDaSituacao.
   gravarOsCamposDaSituacao_(canal, quem, atual, achada.gravadoComo,
     valoresDosCampos || {}, alteracao);
 
-  // Concluir preenche a data de finalização quando o canal tem essa coluna e
-  // ela ainda está vazia — é o que a operação faria à mão logo em seguida.
-  //
-  // Continua pelo NOME ("conclu…"), e não pela coluna Final do catálogo, de
-  // propósito: na RET a coluna de finalização do canal é a "data da
-  // transmissão", e trocar para Final faria Retido, Pago e os outros
-  // desfechos escreverem uma data de transmissão que não aconteceu.
   if (canal.colunaDaFinalizacao && !atual[canal.colunaDaFinalizacao]
     && !jaVeioNaAlteracao_(alteracao, canal.colunaDaFinalizacao)
     && normalizarParaComparar_(achada.gravadoComo).indexOf('conclu') === 0) {
     alteracao[canal.colunaDaFinalizacao] = new Date();
   }
 
-  // Sair de Retido pelo diálogo também esvazia o que só fazia sentido nele.
   dependentesQueSomem_(canal.id, atual, alteracao).forEach(function (coluna) {
     alteracao[coluna] = '';
   });
@@ -5561,28 +3516,9 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
 
   atualizarRegistro_(canal.aba, alvo, alteracao);
 
-  // NÃO registra na auditoria, e isso é decisão da operação.
-  //
-  // Troca de status é o evento mais frequente do sistema: um caso passa por
-  // quatro ou cinco antes de fechar. Numa base de 200 mil casos isso são
-  // quase um milhão de linhas de auditoria — uma aba enorme, que empurra a
-  // planilha para o teto de células, e da qual ninguém tira relatório.
-  //
-  // O que a operação precisa saber é QUANDO cada etapa aconteceu, e isso
-  // agora fica carimbado na própria linha do caso, na aba do canal (ver
-  // carimbarOStatus_). Mesma informação, no lugar em que ela é usada.
-  //
-  // A auditoria continua guardando o que é raro e sem volta: criar, editar,
-  // ocultar, mexer em configuração.
-
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
 }
 
-/**
- * Os campos que um status PEDE: os que aparecem só nele (mostrarSe do campo de
- * status) e os que ficam obrigatórios nele (obrigatorioSe). É o que o diálogo
- * de "Alterar status" mostra ao escolher o status.
- */
 function camposPedidosPelaSituacao_(canal, quem, situacao) {
   var doStatus = '';
   var ativos = camposAtivosDoCanal_(canal.id);
@@ -5601,8 +3537,7 @@ function camposPedidosPelaSituacao_(canal, quem, situacao) {
       && condicaoBate_(descricao.mostrarSe, situacao);
     var cobrado = descricao.obrigatorioSe && descricao.obrigatorioSe.campo === doStatus
       && condicaoBate_(descricao.obrigatorioSe, situacao);
-    // Campo que depende de OUTRO campo (não do status) e não aparece agora não
-    // é pergunta deste diálogo.
+
     if (descricao.mostrarSe && descricao.mostrarSe.campo !== doStatus) return;
     if (!aparece && !cobrado) return;
     if (cobrado) descricao.obrigatorio = true;
@@ -5612,10 +3547,6 @@ function camposPedidosPelaSituacao_(canal, quem, situacao) {
   return pedidos;
 }
 
-/**
- * O que o diálogo de status mostra ao escolher um status: os campos que ele
- * pede, já com o valor que o caso tem.
- */
 function camposDaSituacao(idDoCanal, idDoCaso, situacao) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -5624,31 +3555,18 @@ function camposDaSituacao(idDoCanal, idDoCaso, situacao) {
   exigirAlcanceSobre_(atual, canal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
   return camposPedidosPelaSituacao_(canal, quem, String(situacao || '')).map(function (descricao) {
-    // O valor como o formulário o espera: o dinheiro como NÚMERO (a tela o
-    // escreve como R$, ver Formulario.preencher) e a data em dd/mm/aaaa.
+
     var valor = valorPelaGrafiaDaAba_(atual, estrutura, descricao.cabecalho);
     var tipoDaColuna = estrutura.tipos[posicaoDaColuna_(estrutura, descricao.cabecalho)];
     descricao.valor = Object.prototype.toString.call(valor) === '[object Date]'
       ? paraTexto_(valor, tipoDaColuna) : (valor === null || valor === undefined ? '' : valor);
-    // Quem decidiu se o campo aparece e se é cobrado foi o servidor, agora,
-    // para o status escolhido. A condição não vai para a tela: no diálogo o
-    // status é o seletor dele, e não um campo "status" — o formulário, sem
-    // achar quem manda, esconderia o campo que o status acabou de pedir.
+
     descricao.mostrarSe = null;
     descricao.obrigatorioSe = null;
     return descricao;
   });
 }
 
-/**
- * Confere e grava, na troca de status, os campos que o status pede.
- *
- * Vale o que a tela mandou; o que ela não mandou fica como está no caso. O
- * obrigatório vazio recusa a troca inteira — com o nome de cada campo —, e o
- * valor passa pelas MESMAS conferências do formulário (conferirCampo_ e o
- * "cabe na coluna"). Quem chama sem mandar nada (de fora da tela) também é
- * cobrado: o Retido sem valor não entra por nenhuma porta.
- */
 function gravarOsCamposDaSituacao_(canal, quem, atual, situacao, valores, alteracao) {
   var estrutura = estruturaDaAba_(canal.aba);
   var problemas = [];
@@ -5671,23 +3589,6 @@ function gravarOsCamposDaSituacao_(canal, quem, atual, situacao, valores, altera
   }
 }
 
-/**
- * Carimba data e hora na coluna que ESTE status declarou.
- *
- * Cada status diz, no catálogo, em qual coluna da base ele grava o momento em
- * que o caso chegou nele — "Data do 1º contato" na RET, "Data e horário de
- * finalização" na Mesa Diamante. É o que permite medir produtividade sem
- * cruzar duas abas.
- *
- * CARIMBA SÓ SE ESTIVER VAZIO. Um caso que volta para um status por onde já
- * passou não reescreve a data: o que interessa é quando aquilo aconteceu pela
- * primeira vez. Reescrever apagaria justamente o dado que se quer medir, e
- * apagaria em silêncio.
- *
- * Coluna declarada que não existe na base é ignorada, sem estourar: o caso
- * precisa ser salvo de qualquer jeito. Quem cobra isso é o diagnóstico, que
- * enxerga a instalação inteira e sabe explicar.
- */
 function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   var coluna = String(situacao.colunaDeCarimbo || '').trim();
   if (!coluna) return;
@@ -5695,19 +3596,16 @@ function carimbarOStatus_(canal, situacao, registroAtual, alteracao) {
   var estrutura = estruturaDaAba_(canal.aba);
   var posicao = posicaoDaColuna_(estrutura, coluna);
   if (posicao < 0) return;
-  coluna = estrutura.cabecalhos[posicao];   // a grafia da planilha
+  coluna = estrutura.cabecalhos[posicao];
 
   var jaTem = String(registroAtual[coluna] || '').trim();
   if (jaTem) return;
-  // Nem o que a pessoa informou NESTE salvamento (Etapa 58): quem muda para
-  // Concluído e digita a data da finalização na mesma hora tinha a data dele
-  // trocada pelo "agora" do carimbo.
+
   if (jaVeioNaAlteracao_(alteracao, coluna)) return;
 
   alteracao[coluna] = carimboParaAColuna_(estrutura, posicao);
 }
 
-/** A alteração já traz valor nesta coluna, escrita como a planilha ou não? */
 function jaVeioNaAlteracao_(alteracao, coluna) {
   var procurada = normalizarParaComparar_(coluna);
   return Object.keys(alteracao).some(function (chave) {
@@ -5717,15 +3615,6 @@ function jaVeioNaAlteracao_(alteracao, coluna) {
   });
 }
 
-/**
- * O "agora" do carimbo, do jeito que a coluna guarda.
- *
- * Coluna de data recebe a data. A coluna sua — criada direto na planilha —
- * o sistema não sabe que é de data, e grava como texto: um Date ali virava
- * "Wed Oct 14 2026 14:50:59 GMT+0000". Ela recebe "dd/MM/aaaa HH:mm", o mesmo
- * texto do @AGORA. O menu da coluna do carimbo oferece as colunas suas, e é
- * por isso que este cuidado passou a ser necessário.
- */
 function carimboParaAColuna_(estrutura, posicao) {
   var tipo = estrutura.tipos[posicao];
   var agora = new Date();
@@ -5733,13 +3622,6 @@ function carimboParaAColuna_(estrutura, posicao) {
   return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
 }
 
-/**
- * A situação do canal que corresponde a este valor gravado.
- *
- * Compara sem acento e sem maiúscula, porque o valor pode ter sido digitado na
- * planilha à mão. Devolve null quando não é situação conhecida — e aí quem
- * chamou decide se isso é erro (o diálogo) ou se é só não carimbar (a edição).
- */
 function situacaoDoCanalPeloValor_(canal, valor) {
   var procurado = normalizarParaComparar_(String(valor || '').trim());
   if (!procurado) return null;
@@ -5751,21 +3633,6 @@ function situacaoDoCanalPeloValor_(canal, valor) {
   return achada;
 }
 
-/**
- * Carimba a mudança de status vinda de QUALQUER porta.
- *
- * O PO pediu assim: "toda vez que mudar o status dos casos da RET ele deve
- * registrar". Toda vez — e não "toda vez que a pessoa usar o diálogo".
- *
- * O sistema tem duas portas para trocar a situação: o diálogo de situação, que
- * é o gesto de todo dia, e o formulário inteiro, aberto pelo lápis. Antes só o
- * diálogo carimbava. O mesmo caso, na mesma situação, ficava com data ou sem
- * data dependendo de onde a pessoa clicou — e a Produtividade RECC contava só
- * metade, sem errar em nada visível. Número que erra sozinho é o pior tipo.
- *
- * Só age quando a situação MUDOU de verdade: salvar o formulário sem mexer na
- * situação não é mudança, e contaria uma andada que não houve.
- */
 function carimbarSeOStatusMudou_(canal, registroAtual, alteracao, quem) {
   if (!canal.colunaDoStatus) return;
   if (!alteracao.hasOwnProperty(canal.colunaDoStatus)) return;
@@ -5775,67 +3642,22 @@ function carimbarSeOStatusMudou_(canal, registroAtual, alteracao, quem) {
   if (!agora) return;
   if (normalizarParaComparar_(agora) === normalizarParaComparar_(antes)) return;
 
-  // Situação que o catálogo não conhece ainda assim é mudança: as três colunas
-  // de rastro registram. O que não dá é carimbar, porque não há coluna
-  // declarada para ela — e inventar uma seria pior do que não ter.
   var achada = situacaoDoCanalPeloValor_(canal, agora);
   if (achada) carimbarOStatus_(canal, achada, registroAtual, alteracao);
   registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem);
 }
 
-/**
- * Carimba a situação em que o caso NASCE.
- *
- * Um caso cadastrado agora, em "Não trabalhado", chegou nessa situação agora —
- * e a Produtividade RECC precisa saber disso. Sem este carimbo, todo caso
- * nascido pelo formulário entrava sem data nenhuma, e só passava a ter data
- * quando alguém trocasse a situação pela primeira vez.
- *
- * NÃO vale para importação: lá o caso é antigo, e carimbar "agora" diria que
- * um contato de julho aconteceu hoje. A importação traz as datas da base
- * antiga, pelo de-para.
- */
 function carimbarOStatusDeNascimento_(canal, paraGravar) {
   if (!canal.colunaDoStatus) return;
 
   var achada = situacaoDoCanalPeloValor_(canal, paraGravar[canal.colunaDoStatus]);
   if (!achada) return;
 
-  // `paraGravar` nos dois lugares: se a coluna do carimbo já vier preenchida,
-  // o que veio manda. O carimbo nunca reescreve o que alguém informou.
   carimbarOStatus_(canal, achada, paraGravar, paraGravar);
 
-  // Caso que já NASCE trabalhado (cadastrado direto em "1º contato
-  // realizado", por exemplo) começa o prazo agora: ele não ficou parado em
-  // "Não trabalhado" nem um minuto.
   carimbarAPrimeiraMudancaDeStatus_(canal, null, paraGravar, estruturaDaAba_(canal.aba));
 }
 
-/**
- * Carimba QUANDO o caso foi encaminhado para a área.
- *
- * Um momento que só o sistema vê — deduzir de outra data (a de entrada, a da
- * resposta) contaria errado, e pedir ao analista que digite mais uma data seria
- * o jeito mais rápido de ela ficar em branco. Foi pensado para o prazo de 48
- * horas da área; o prazo da Mesa hoje conta de `Data em andamento`, e este
- * carimbo ficou como dado — e como base para um prazo do encaminhamento, se
- * a operação pedir um.
- *
- * QUANDO CARIMBA
- *   a área passou de vazia para escolhida     carimba agora;
- *   a área trocou de uma para outra           carimba agora: é um novo
- *                                             encaminhamento, com prazo novo;
- *   a área foi esvaziada                      limpa o carimbo: o caso voltou
- *                                             para a mesa, e não há prazo.
- * Salvar o formulário sem mexer na área não carimba nada — é o mesmo cuidado
- * do status: só a mudança de verdade conta.
- *
- * Canal sem coluna de área, ou base que ainda não ganhou a coluna do carimbo
- * (quem não rodou `atualizarPGO()`), segue gravando o caso: o diagnóstico é
- * quem cobra o que falta.
- *
- * `registroAtual` é null no cadastro.
- */
 function carimbarOEncaminhamento_(canal, registroAtual, paraGravar) {
   var area = String(canal.colunaDaAreaResponsavel || '').trim();
   if (!area || !paraGravar.hasOwnProperty(area)) return;
@@ -5850,24 +3672,6 @@ function carimbarOEncaminhamento_(canal, registroAtual, paraGravar) {
   paraGravar[RECC_COLUNA_DATA_DO_ENCAMINHAMENTO] = agora ? new Date() : '';
 }
 
-/**
- * Carimba QUANDO a condição que encerra o prazo passou a valer.
- *
- * Na RET, o prazo do "Retido" só termina quando o Status proposta chega em
- * Transmitido ou Sem alteração — e o Status proposta é um campo, que guarda o
- * valor e não a data em que mudou. Sem este carimbo o sistema saberia QUE o
- * prazo terminou, e não QUANDO: não daria para dizer se foi dentro dos 3 dias.
- *
- * QUANDO CARIMBA, igual ao encaminhamento: o campo mudou de valor.
- *   passou a um valor que encerra     carimba agora;
- *   passou a outro valor, ou a vazio  limpa: o prazo voltou a correr.
- * Salvar sem mexer no campo não carimba nada. Vale para os três jeitos de
- * gravar (cadastro, formulário e troca de status), e a troca de status conta:
- * sair de Retido esvazia o Status proposta, e o carimbo sai junto.
- *
- * Coluna do carimbo que a base ainda não tem (quem não rodou o
- * `atualizarPGO()`) segue gravando o caso, sem carimbo.
- */
 function carimbarAParadaDoPrazo_(canal, registroAtual, paraGravar) {
   condicoesDeParadaDoCanal_(canal).forEach(function (sinalizador) {
     var coluna = sinalizador.colunaDaCondicao;
@@ -5885,29 +3689,6 @@ function carimbarAParadaDoPrazo_(canal, registroAtual, paraGravar) {
   });
 }
 
-/**
- * Carimba data e hora quando um campo de LISTA chega num item que carimba.
- *
- * Pedido do PO: os status "1º contato realizado" e "2º contato realizado"
- * viraram um status só, "Contatando", com uma lista ao lado — "1ª tentativa
- * de contato sem sucesso", "2ª tentativa…". As colunas "Data do 1º contato" e
- * "Data do 2º contato" pararam de receber data, porque nenhum status apontava
- * mais para elas. Agora o ITEM da lista aponta, do mesmo jeito que o status:
- * "Coluna que recebe data e hora", em Configurações › Ajustes Gerais.
- *
- * A escolha mora na linha do item no CATÁLOGO (pelo Id), e não no nome dele:
- * trocar o rótulo do item não muda onde ele carimba.
- *
- * AS MESMAS REGRAS DO CARIMBO DE STATUS:
- *   - carimba só quando o campo MUDOU para aquele item (salvar sem mexer não
- *     carimba nada);
- *   - carimba só se a célula estiver vazia: voltar a um item por onde o caso
- *     já passou guarda a data da primeira vez;
- *   - coluna que a base não tem é ignorada, sem estourar — o caso é salvo.
- *
- * O status tem o carimbo dele (carimbarOStatus_), e por isso a lista de
- * STATUS fica de fora daqui: seriam dois carimbos para a mesma mudança.
- */
 function carimbarOsItensDeLista_(canal, registroAtual, paraGravar) {
   var estrutura = estruturaDaAba_(canal.aba);
   var doCanal = converterParaIdentificador_(canal.id);
@@ -5940,7 +3721,7 @@ function carimbarOsItensDeLista_(canal, registroAtual, paraGravar) {
 
     var posicao = posicaoDaColuna_(estrutura, item.ColunaDeCarimbo);
     if (posicao < 0) return;
-    var destino = estrutura.cabecalhos[posicao];   // a grafia da planilha
+    var destino = estrutura.cabecalhos[posicao];
 
     var jaTem = registroAtual ? String(registroAtual[destino] || '').trim() : '';
     if (jaTem || String(paraGravar[destino] || '').trim()) return;
@@ -5948,21 +3729,6 @@ function carimbarOsItensDeLista_(canal, registroAtual, paraGravar) {
   });
 }
 
-/**
- * As três colunas que TODA mudança de status atualiza, sempre.
- *
- * Diferente do carimbo, que grava só a primeira visita a cada status, estas
- * respondem "quando foi a última vez que alguém mexeu neste caso, quem mexeu
- * e quantas vezes o caso já andou". Um caso que vai e volta entre dois status
- * não mexe em carimbo nenhum — e sem estas colunas ele pareceria parado.
- *
- * É o pedido da operação: toda mudança de status precisa ficar registrada,
- * porque é disso que sai o controle de produtividade.
- *
- * Coluna que não existe na base é ignorada, sem estourar — igual ao carimbo.
- * Quem já tem o PGO instalado e ainda não tem estas colunas continua
- * trabalhando; o diagnóstico é que avisa o que falta.
- */
 function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
   var estrutura = estruturaDaAba_(canal.aba);
 
@@ -5974,41 +3740,18 @@ function registrarAMudancaDeStatus_(canal, registroAtual, alteracao, quem) {
     alteracao[RECC_COLUNA_QUANDO_MUDOU_O_STATUS] = new Date();
   }
   if (temAColuna(RECC_COLUNA_QUEM_MUDOU_O_STATUS)) {
-    // `quem.email`, minúsculo: é assim que usuarioAtual_ devolve. `quem.usuario`
-    // é a LINHA da aba USUARIOS, e ali a coluna se chama `Email`, com maiúscula.
-    // São dois objetos diferentes no mesmo lugar, e trocar um pelo outro grava
-    // vazio sem reclamar de nada — um teste pegou isso aqui.
-    //
-    // Guarda o e-mail, e não o Id: esta coluna é lida na própria planilha e no
-    // Power BI, onde um Id de dez dígitos não diz quem trabalhou o caso.
+
     alteracao[RECC_COLUNA_QUEM_MUDOU_O_STATUS] = quem.email || '';
   }
   carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estrutura);
   if (temAColuna(RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS)) {
-    // O valor guardado pode chegar como número, como texto ou vazio — a
-    // coluna é editável na planilha. Number('') é 0, e Number('abc') é NaN:
-    // os dois viram 0 aqui, então o contador nunca grava lixo.
+
     var quantas = Number(registroAtual[RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS]);
     if (!quantas || quantas < 0) quantas = 0;
     alteracao[RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS] = Math.floor(quantas) + 1;
   }
 }
 
-/**
- * Carimba a PRIMEIRA vez que o caso sai do status em que nasce.
- *
- * É o início dos 3 dias úteis da RET — "a SLA deve ser somente se o caso mudar
- * de status; casos não trabalhados ficam com a SLA cheia", palavra do PO. Ver
- * `RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS`.
- *
- * Uma vez só: já carimbado, nada mexe nele — nem o caso que volta para "Não
- * trabalhado" (o prazo já começou e continua correndo). E ir PARA o status de
- * nascimento não é começar: uma linha antiga com o status em branco que passa
- * a "Não trabalhado" continua sem prazo começado.
- *
- * Base sem a coluna (as que não são da RET, ou quem não rodou `atualizarPGO()`)
- * segue gravando, sem carimbo.
- */
 function carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estrutura) {
   var coluna = RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS;
   if (!canal.colunaDoStatus || posicaoDaColuna_(estrutura, coluna) < 0) return;
@@ -6020,13 +3763,6 @@ function carimbarAPrimeiraMudancaDeStatus_(canal, registroAtual, alteracao, estr
   alteracao[coluna] = new Date();
 }
 
-/**
- * As situações que o canal oferece, para o diálogo de troca.
- *
- * A situação que o caso tem hoje vem marcada. Se ela tiver sido desligada
- * depois, continua aparecendo — a pessoa precisa entender o que o caso tem,
- * mesmo que não possa escolher aquilo de novo.
- */
 function situacoesParaTrocar(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -6054,17 +3790,6 @@ function situacoesParaTrocar(idDoCanal, idDoCaso) {
   return { atual: hoje, opcoes: opcoes };
 }
 
-/**
- * O caso aberto em "Trabalhar no caso": os valores do formulário, e o resto
- * da linha como leitura.
- *
- * Os valores vêm pela CHAVE TÉCNICA do campo, que é como o formulário
- * identifica cada caixa — o mesmo formato que `cadastrarCaso` recebe de volta.
- *
- * Desde que o PO tirou a tela de leitura ("não tem necessidade do sistema
- * apenas mostrar o caso"), é aqui que o caso inteiro chega à tela. Por isso
- * vem também `doSistema` — ver abaixo.
- */
 function casoParaEditar(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -6078,47 +3803,19 @@ function casoParaEditar(idDoCanal, idDoCaso) {
 
   var estrutura = estruturaDaAba_(canal.aba);
   var valores = {};
-  // As colunas que algum campo ocupa — inclusive o campo OCULTO para este
-  // nível. Elas não podem reaparecer na lista de leitura abaixo: um campo
-  // escondido do nível viraria visível pela porta dos fundos.
+
   var deAlgumCampo = {};
 
   camposAtivosDoCanal_(canal.id).forEach(function (campo) {
     colunasQueOCampoOcupa_(campo).forEach(function (cabecalho) {
       deAlgumCampo[normalizarParaComparar_(cabecalho)] = true;
     });
-    // CAMPO GRAVADO EM VÁRIAS COLUNAS volta JUNTO — quem sabe remontar é
-    // `valorDoCampoNaLinha_`. Ler a coluna do próprio campo devolveria um
-    // pedaço só, e salvar em seguida apagaria os outros sem ninguém pedir.
+
     var valor = valorDoCampoNaLinha_(registro, campo, estrutura);
     if (valor === null) return;
     valores[String(campo.ChaveTecnica)] = valor;
   });
 
-  /*
-   * E TUDO O MAIS QUE ESTÁ PREENCHIDO NA PLANILHA, como leitura.
-   *
-   * Pedido antigo do PO, que a tela de leitura atendia e não podia sumir com
-   * ela: "precisa trazer todos os dados que foram preenchidos na planilha".
-   * Um caso importado chega com valor em colunas que o formulário não
-   * pergunta — os carimbos de contato, a origem da importação, a data dela.
-   *
-   * Só o que TEM VALOR entra. Coluna vazia que ninguém declarou encheria a
-   * tela de travessões e esconderia o que importa.
-   *
-   * É LEITURA, e não campo: deixar reescrever "Quem mudou o status" ou "Data
-   * da última mudança de status" à mão estragaria o carimbo de produtividade
-   * — o número da pessoa passaria a depender do que alguém digitou, e não do
-   * que aconteceu.
-   */
-  /*
-   * A COLUNA SUA SE CORRIGE AQUI. Pedido do PO: "preciso ter a opção de editar
-   * esse modal, assim fica mais fácil caso algo fique fora de formato" — e,
-   * perguntado, escolheu: só as colunas DELE (as escritas direto na planilha,
-   * que nem o contrato nem o formulário conhecem). O carimbo do sistema segue só
-   * leitura, pelo motivo de sempre. `editavel` diz qual é qual; quem grava é
-   * `editarCaso`, que confere de novo.
-   */
   var suas = colunasSuasDaAba_(canal.aba);
   var doSistema = [];
   estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
@@ -6137,13 +3834,6 @@ function casoParaEditar(idDoCanal, idDoCaso) {
     versao: versaoDoCaso_(registro, canal.aba) };
 }
 
-/**
- * O retrato de uma linha: muda sempre que qualquer célula do caso muda.
- *
- * É um resumo (FNV-1a de 32 bits) do conteúdo, e não a data da última
- * gravação, porque a planilha não guarda essa data — e quem edita direto na
- * célula também tem de ser percebido.
- */
 function versaoDoCaso_(registro, nomeDaAba) {
   var texto = estruturaDaAba_(nomeDaAba).cabecalhos.map(function (cabecalho) {
     var valor = registro[cabecalho];
@@ -6159,20 +3849,8 @@ function versaoDoCaso_(registro, nomeDaAba) {
   return texto.length + '-' + resumo.toString(16);
 }
 
-/**
- * Exclui o caso DEFINITIVAMENTE: a linha sai da planilha.
- *
- * Não há desfazer. Por isso a tela pergunta antes, num aviso de atenção (ver
- * `Formulario.confirmarExclusao`), e a auditoria guarda o que havia no caso.
- */
 function excluirCaso(idDoCanal, idDoCaso) {
-  // QUALQUER pessoa cadastrada exclui, em QUALQUER canal. Decisão do PO:
-  // "todos os canais e níveis de acesso podem excluir um caso criado".
-  //
-  // É o único ponto do sistema sem trava de nível nem de escopo, e está
-  // escrito assim de propósito, para ninguém "consertar" isso achando que foi
-  // esquecimento. Continua exigindo estar CADASTRADO: quem não entra no
-  // sistema não apaga nada.
+
   var quem = usuarioAtual_();
   if (!quem.cadastrado) throw new Error(quem.motivo);
 
@@ -6184,9 +3862,6 @@ function excluirCaso(idDoCanal, idDoCaso) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
 
-  // A auditoria PRIMEIRO, com o conteúdo da linha — porque depois não existe
-  // mais de onde tirar. Sem isto, um caso apagado por engano não deixa nem
-  // rastro de que existiu, e alguém vai jurar que cadastrou.
   registrarAuditoria_('caso.excluir', canal.aba, alvo,
     canal.nome + ' — ' + resumoDoCasoParaAuditoria_(atual, canal));
 
@@ -6194,13 +3869,6 @@ function excluirCaso(idDoCanal, idDoCaso) {
   return true;
 }
 
-/**
- * O caso em uma linha de texto, para a auditoria guardar antes de apagar.
- *
- * Não é o registro inteiro: uma linha da RET tem 36 colunas, e despejá-las
- * numa célula de auditoria daria um texto que ninguém lê. São os campos pelos
- * quais alguém procuraria o caso depois — quem era, de quem, e como estava.
- */
 function resumoDoCasoParaAuditoria_(registro, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var pedacos = [];
@@ -6222,22 +3890,10 @@ function resumoDoCasoParaAuditoria_(registro, canal) {
   return pedacos.length ? pedacos.join(' · ') : 'linha sem conteúdo';
 }
 
-/**
- * O escopo do nível também vale para escrever, não só para ler.
- *
- * Quem enxerga só os próprios casos não pode editar o caso de outra pessoa
- * mandando o Id direto — a tela não ofereceria o botão, mas a chamada existe.
- */
 function exigirAlcanceSobre_(registro, canal, quem) {
   var alcance = filtrarPeloAlcance_([registro], canal.aba, quem);
   if (alcance.length) return;
 
-  // A recusa nomeia o RESPONSÁVEL pelo caso, e não só o escopo.
-  //
-  // "Fora do seu alcance" sozinho manda a pessoa achar que o canal não
-  // permite aquela ação — foi exatamente assim que a operação leu, ao tentar
-  // excluir um caso da RET e conseguir na Mesa Diamante. Os dois canais
-  // sempre permitiram; o que barrava era o caso ser de outra pessoa.
   var estrutura = estruturaDaAba_(canal.aba);
   var coluna = colunaDoResponsavel_(estrutura);
   var dono = coluna ? String(registro[coluna] || '').trim() : '';
@@ -6252,14 +3908,6 @@ function exigirAlcanceSobre_(registro, canal, quem) {
     + 'escopo do seu nível em Configurações › Níveis de acesso.');
 }
 
-/**
- * Parte "1101 - VIDA INDIVIDUAL" em código e nome.
- *
- * O hífen separa, e só o PRIMEIRO separa: nome de produto pode ter hífen
- * dentro ("VIDA - PLANO A - OURO"), e partir em todos deixaria o nome pela
- * metade. Sem hífen nenhum, o texto inteiro é o nome e o código fica vazio —
- * é o que acontece com um produto antigo, cadastrado antes desta regra.
- */
 function separarCodigoENome_(valor) {
   var texto = String(valor || '').trim();
   var corte = texto.indexOf('-');
@@ -6268,12 +3916,6 @@ function separarCodigoENome_(valor) {
   var codigo = texto.substring(0, corte).trim();
   var nome = texto.substring(corte + 1).trim();
 
-  // Se o que veio antes do hífen não for um código, não há o que separar:
-  // era um nome com hífen, e parti-lo perderia metade dele.
-  //
-  // O que distingue um código de uma palavra é TER DÍGITO. "1101" e "A12" são
-  // códigos; "VIDA", em "VIDA - PLANO A", é o começo do nome. Aceitar
-  // qualquer coisa curta guardaria "VIDA" como código do produto, calado.
   var pareceCodigo = codigo.length <= 10
     && /^[0-9A-Za-z.]+$/.test(codigo)
     && /[0-9]/.test(codigo);
@@ -6281,27 +3923,6 @@ function separarCodigoENome_(valor) {
   return { codigo: codigo, nome: nome };
 }
 
-/**
- * Parte "12-1391-0000000" nos pedaços que vão para colunas separadas.
- *
- * Pedido do PO: a proposta e a apólice existem no mundo escritas com hífen, e
- * é assim que elas chegam ao analista. Na planilha elas precisam estar em
- * colunas separadas, porque é por elas que o relatório junta.
- *
- * O FORMATO É COBRADO, e isto é o ponto da função. "7-0000000" com duas
- * colunas vale; "70000000" não, porque não há como saber onde o código termina
- * — e adivinhar colocaria o número de uma proposta no campo do código de
- * outra, calado. Pedaço com letra também não: a coluna é de identificador, e
- * o relatório junta por ela.
- *
- * O QUE NÃO É COBRADO: quantos dígitos cada pedaço tem. O PO disse que o
- * código "pode ser 2 números ou um" e não falou do resto — fixar um tamanho
- * aqui recusaria amanhã uma proposta legítima, e o recado não explicaria nada
- * a quem a tem na mão.
- *
- * Lança o erro com o recado pronto para a tela: quem chama o transforma em
- * problema do campo, ao lado dele.
- */
 function partirPorHifen_(valor, partir, rotulo) {
   var quantas = partir.colunas.length;
   var texto = String(valor || '').trim();
@@ -6333,18 +3954,6 @@ function partirPorHifen_(valor, partir, rotulo) {
   return pedacos;
 }
 
-/**
- * Junta de volta o que `partirPorHifen_` separou, para o formulário de edição.
- *
- * Sem isto, abrir um caso para editar mostraria o campo da proposta VAZIO — o
- * formulário procura a coluna do próprio campo, e o valor está espalhado em
- * duas. A pessoa salvaria achando que não mexeu nele, e o campo em branco
- * apagaria as duas colunas.
- *
- * Pedaço faltando não inventa hífen solto: com um dos lados vazio, devolve o
- * que existe. "7-" na tela pareceria um dado pela metade que alguém digitou,
- * quando é um dado pela metade que estava na planilha.
- */
 function juntarComHifen_(registro, partir, estrutura) {
   var pedacos = partir.colunas.map(function (cabecalho) {
     var valor = valorPelaGrafiaDaAba_(registro, estrutura, cabecalho);
@@ -6354,14 +3963,6 @@ function juntarComHifen_(registro, partir, estrutura) {
   return pedacos.join('-');
 }
 
-/**
- * Junta o código e o nome de volta no formato da lista: "1101 - VIDA INDIVIDUAL".
- *
- * É o inverso exato de `separarCodigoENome_`, e o espaço em volta do hífen não
- * é enfeite: é o formato que as opções do seletor usam. Remontar como
- * "1101-VIDA INDIVIDUAL" devolveria um valor que a lista não tem, e salvar
- * seria recusado com "não é uma das opções da lista".
- */
 function juntarCodigoENome_(registro, separa, estrutura) {
   var noCodigo = valorPelaGrafiaDaAba_(registro, estrutura, separa.codigo);
   var noNome = valorPelaGrafiaDaAba_(registro, estrutura, separa.nome);
@@ -6372,24 +3973,6 @@ function juntarCodigoENome_(registro, separa, estrutura) {
   return codigo || nome;
 }
 
-/**
- * O valor de um campo, remontado a partir das COLUNAS em que ele foi gravado.
- *
- * Existe porque um campo pode morar em MAIS DE UMA coluna, e nesse caso ler a
- * coluna do próprio campo devolve só um pedaço. Eram três casos, tratados em
- * dois lugares diferentes — e eles divergiram, com dois defeitos que a
- * operação sentiu:
- *
- *   `partirEm`  proposta e apólice. A edição já juntava; a antiga tela de
- *               leitura não, e mostrava "0000000" no lugar de "58-0000000".
- *   `separaEm`  o produto. NENHUMA das duas juntava: a leitura mostrava só
- *               "1101", e a edição devolvia "1101" para um seletor cuja lista
- *               só tem "1101 - VIDA INDIVIDUAL" — então salvar um caso da RET
- *               com produto era RECUSADO, num campo que a pessoa nem tocou.
- *
- * Agora é um lugar só. A tela de leitura saiu do sistema ("Trabalhar no caso"
- * abre direto a edição), e a regra continua num ponto só.
- */
 function valorDoCampoNaLinha_(registro, campo, estrutura) {
   var configuracao = lerConfiguracaoDoCampo_(campo);
 
@@ -6404,37 +3987,16 @@ function valorDoCampoNaLinha_(registro, campo, estrutura) {
   }
 
   var posicao = posicaoDaColuna_(estrutura, campo.Cabecalho);
-  if (posicao < 0) return null;   // null = esta coluna não existe nesta aba
+  if (posicao < 0) return null;
   return paraTexto_(registro[estrutura.cabecalhos[posicao]], estrutura.tipos[posicao]);
 }
 
-/**
- * O valor de uma coluna pela GRAFIA QUE ESTÁ NA ABA, e não pela que está em
- * CAMPOS.
- *
- * O DEFEITO QUE ISTO CONSERTA, relatado pelo PO: "na aba Trabalho, ao clicar
- * em Trabalhar no caso, a Descrição não vem junto para ser editada". O campo
- * em CAMPOS se chama "descrição"; na planilha, a coluna pode estar escrita
- * "Descrição" ou "DESCRIÇÃO". Gravar sempre funcionou — a gravação procura a
- * coluna sem ligar para maiúscula, acento ou espaço —, mas o registro lido da
- * planilha tem as chaves EXATAMENTE como estão no cabeçalho, e ler
- * `registro['descrição']` devolvia nada. O campo abria vazio e, pior, salvar o
- * caso em seguida APAGAVA a descrição, porque campo esvaziado na edição é
- * apagado na planilha.
- */
 function valorPelaGrafiaDaAba_(registro, estrutura, cabecalho) {
   if (!estrutura) return registro[cabecalho];
   var posicao = posicaoDaColuna_(estrutura, cabecalho);
   return posicao < 0 ? undefined : registro[estrutura.cabecalhos[posicao]];
 }
 
-/**
- * As colunas da planilha que um campo ocupa — uma, duas ou três.
- *
- * Quem pergunta é `casoParaEditar`, para saber o que o formulário já mostra
- * antes de listar o resto da linha como leitura. Sem isto, a proposta apareceria duas
- * vezes: uma como campo ("58-0000000") e outra como coluna solta ("58").
- */
 function colunasQueOCampoOcupa_(campo) {
   var configuracao = lerConfiguracaoDoCampo_(campo);
 
@@ -6449,7 +4011,6 @@ function colunasQueOCampoOcupa_(campo) {
   return [String(campo.Cabecalho)];
 }
 
-/** Data e hora de entrada, decididas pelo servidor, só quando faltam. */
 function preencherEntradaAutomatica_(canal, paraGravar) {
   var agora = new Date();
   if (canal.colunaDaData && !paraGravar[canal.colunaDaData]) {
@@ -6462,29 +4023,12 @@ function preencherEntradaAutomatica_(canal, paraGravar) {
   }
 }
 
-/** O analista do caso é quem o registrou, quando a tela não disse outro. */
 function preencherResponsavelAutomatico_(canal, paraGravar, quem) {
   var estrutura = estruturaDaAba_(canal.aba);
   var coluna = colunaDoResponsavel_(estrutura);
   if (coluna && !paraGravar[coluna]) paraGravar[coluna] = quem.usuario.Nome;
 }
 
-// ============================================================================
-// O SELO DA SUSEP
-// ============================================================================
-
-/**
- * A situação de uma SUSEP, para a tela mostrar no instante em que ela é
- * digitada.
- *
- * Três respostas possíveis, e as três são informação — inclusive a terceira:
- *
- *   BLOQUEADA        está na aba SUSEP_BLOQUEADAS
- *   OK               está no cadastro de canais, com o segmento dela
- *   NAO_ENCONTRADA   não está em lugar nenhum. Isso NÃO é erro nem vazio:
- *                    é uma corretora que o cadastro não conhece, e a operação
- *                    precisa saber disso antes de seguir
- */
 function consultarSusep(susep, idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
 
@@ -6493,34 +4037,6 @@ function consultarSusep(susep, idDoCanal) {
     return { situacao: 'VAZIA', mensagem: 'Digite a SUSEP.' };
   }
 
-  // Procura pela COLUNA, não lendo a tabela inteira.
-  //
-  // Isto é digitado: o selo responde a cada SUSEP que alguém escreve no
-  // formulário. Ler as duas tabelas inteiras a cada digitação era ler mais de
-  // 140 mil células — com as 16 mil SUSEPs bloqueadas e as 7 mil do cadastro
-  // que a operação vai importar, o formulário travaria a cada campo
-  // preenchido, e travaria mais a cada corretora nova cadastrada.
-  //
-  // buscarRegistros_ lê só a coluna da SUSEP, acha em qual linha ela está, e
-  // só então lê aquela linha inteira. É a mesma regra que sustenta a busca de
-  // casos: ler a coluna antes de ler as linhas.
-  /*
-   * O CADASTRO DE CORRETORAS É CONSULTADO PRIMEIRO, e isto é decisão do PO.
-   *
-   * "Corretoras Diamante não podem ter status de bloqueada por gentileza mesmo
-   * que o SUSEP esteja na lista de bloqueadas. Pertence a outra lista."
-   *
-   * São duas listas, com dois donos e dois propósitos. Quem está no cadastro
-   * de corretoras é corretora Diamante, e para ela o selo é verde — mesmo que
-   * a mesma SUSEP apareça na lista de bloqueios, que é mantida por outra
-   * área. A ordem da consulta É a regra: o cadastro primeiro, o bloqueio
-   * depois.
-   *
-   * Isso tem um custo que vale dizer em voz alta: uma SUSEP cadastrada por
-   * engano como Diamante passa a sair liberada mesmo estando bloqueada. É o
-   * que o PO pediu, e quem corrige é quem mantém o cadastro — tirando a linha
-   * de Corretoras, na Tabela Corretoras.
-   */
   var corretora = buscarRegistroVisivel_('CORRETORAS', 'SUSEP', procurada);
 
   if (corretora) {
@@ -6535,21 +4051,6 @@ function consultarSusep(susep, idDoCanal) {
     };
   }
 
-  /*
-   * A LISTA DE BLOQUEIOS SÓ É CONSULTADA SE O CANAL PEDIR.
-   *
-   * Palavra do PO: "no formulário de Mesa diamante não há necessidade de
-   * verificar se a SUSEP está ou não bloqueada, pode remover esse detalhe".
-   * Quem decide é a coluna CANAIS.ConfereSusepBloqueada, e não o nome do
-   * canal escrito aqui dentro — amanhã a regra muda e ninguém vai querer
-   * mexer em código para isso.
-   *
-   * Sem canal informado, confere. É o caso de quem chama de fora de um
-   * formulário, e na dúvida a resposta mais completa é a mais segura.
-   *
-   * E economiza a leitura mais caro do selo: a coluna da aba de SUSEPs
-   * bloqueadas, que a operação vai encher com 16 mil linhas.
-   */
   if (!deveConferirOBloqueio_(idDoCanal, quem)) {
     return {
       situacao: 'NAO_ENCONTRADA',
@@ -6562,9 +4063,7 @@ function consultarSusep(susep, idDoCanal) {
   var bloqueada = buscarRegistroVisivel_('SUSEP_BLOQUEADAS', 'SUSEP', procurada);
 
   if (bloqueada) {
-    // Quem bloqueou muda o selo: pela companhia é vermelho, pela corretora é
-    // âmbar. Sem tipo — linha antiga, que ninguém classificou — fica vermelho,
-    // que é o lado seguro.
+
     var por = quemBloqueou_(bloqueada.BloqueadaPor);
     return {
       situacao: 'BLOQUEADA',
@@ -6587,13 +4086,6 @@ function consultarSusep(susep, idDoCanal) {
   };
 }
 
-/**
- * Este canal confere a lista de SUSEPs bloqueadas?
- *
- * Canal que não existe, ou que esta pessoa não enxerga, cai no SIM: a
- * pergunta "o canal dispensa a conferência?" só tem resposta confiável para
- * um canal de verdade, e na dúvida conferir é o lado seguro.
- */
 function deveConferirOBloqueio_(idDoCanal, quem) {
   var alvo = converterParaIdentificador_(idDoCanal);
   if (!alvo) return true;
@@ -6605,38 +4097,6 @@ function deveConferirOBloqueio_(idDoCanal, quem) {
   return canal ? canal.confereSusepBloqueada !== false : true;
 }
 
-// ============================================================================
-// O SELO DA PROPOSTA
-// ============================================================================
-
-/**
- * A mesma proposta já cadastrada no MESMO MÊS, e com quem ela está.
- *
- * Pedido do PO: "na RET queria que houvesse um identificador de propostas
- * duplicadas num único mês e/ou que identificasse quando aquela proposta está
- * com o analista (...) algo pequeno mas que sinalizasse, tipo os das SUSEPs
- * bloqueadas".
- *
- * SINALIZA, NÃO IMPEDE. O selo aparece abaixo do campo, como o da SUSEP, e o
- * cadastro segue normal. Quem decide se a repetição é erro ou é um segundo
- * pedido do mesmo cliente é quem está atendendo — o sistema só não deixa
- * passar sem ninguém ver.
- *
- * QUAL CANAL: o que tem o campo da proposta gravando em pedaços (o
- * `partirEm` do campo `numerodaproposta`) — hoje, só a RET. Não há coluna
- * nova em CANAIS para ligar isto: canal sem proposta não tem o que repetir.
- *
- * QUAL MÊS: o da data do caso, que é a coluna de data do canal. Com a data
- * ainda em branco no formulário, vale o mês de hoje — é nele que o servidor
- * vai carimbar a entrada do caso (ver preencherEntradaAutomatica_).
- *
- * NA EDIÇÃO, o próprio caso não conta: `idDoCasoAberto` sai da conta, senão
- * todo caso aberto acusaria a si mesmo.
- *
- * O CUSTO segue a regra da busca — ler a coluna antes de ler as linhas: lê a
- * coluna do NÚMERO da proposta, e só as linhas em que ele bateu, que costumam
- * ser nenhuma ou uma.
- */
 function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -6644,8 +4104,6 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
   var partir = partirDaPropostaDoCanal_(canal);
   if (!partir) return { situacao: 'SEM_PROPOSTA', mensagem: '' };
 
-  // Proposta pela metade não é conferida: o formato errado já é recusado ao
-  // salvar, com a mensagem que diz como escrever. O selo só ficaria calado.
   var pedacos;
   try {
     pedacos = partirPorHifen_(proposta, partir, 'Número da proposta');
@@ -6656,7 +4114,6 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
   var mes = converterParaData_(dataDoCaso) || new Date();
   var nomeDoMes = RECC_NOMES_DOS_MESES[mes.getMonth()] + ' de ' + mes.getFullYear();
 
-  // 1. Só a coluna do número — o último pedaço, o que distingue a proposta.
   var colunaDoNumero = partir.colunas[partir.colunas.length - 1];
   var numero = pedacos[pedacos.length - 1];
   var linhas = [];
@@ -6664,7 +4121,6 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
     if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
   });
 
-  // 2. Só as linhas em que bateu: confere os outros pedaços, o mês e o Id.
   var estrutura = estruturaDaAba_(canal.aba);
   var colunaDoAnalista = colunaDoResponsavel_(estrutura);
   var abertoAgora = converterParaIdentificador_(idDoCasoAberto);
@@ -6697,8 +4153,6 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
     };
   }
 
-  // "com a Ana Martins (caso 0000000012, Pendente)" — quem está com ela é a
-  // pergunta que o PO fez, então é a primeira coisa que o selo responde.
   var quais = repetidas.map(function (uma) {
     return (uma.analista ? 'com ' + uma.analista : 'sem analista')
       + ' (caso ' + uma.id + (uma.situacao ? ', ' + uma.situacao : '') + ')';
@@ -6710,12 +4164,6 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
   };
 }
 
-/**
- * Como o canal parte a proposta em colunas — ou null, se ele não tem proposta.
- *
- * Vem do campo, e não de uma lista de nomes de coluna escrita aqui: quem
- * mudar as colunas da proposta em Configurações muda também a conferência.
- */
 function partirDaPropostaDoCanal_(canal) {
   var campo = camposAtivosDoCanal_(canal.id).filter(function (um) {
     return normalizarParaComparar_(um.ChaveTecnica) === 'numerodaproposta';
@@ -6732,54 +4180,15 @@ function partirDaPropostaDoCanal_(canal) {
   return todasExistem ? partir : null;
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 3 de 3 · ACHAR UM CASO QUE A FILA NÃO MOSTRA MAIS
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Achar um caso que a fila não mostra mais
- * ============================================================================
- * O Trabalho mostra os últimos 30 dias. Isso é de propósito: ele responde
- * "o que eu tenho que trabalhar hoje". Quando o cliente liga citando um
- * protocolo de abril, é aqui que se procura.
- *
- * A REGRA QUE SUSTENTA ESTA TELA: **ler a coluna antes de ler as linhas.**
- *
- *   Uma base da RET com 200 mil linhas por 39 colunas são 7,8 milhões de
- *   células. Ler tudo para procurar um protocolo estoura o tempo do Apps
- *   Script e a cota da conta. Ler UMA coluna são 200 mil células; ler cinco
- *   colunas de busca é um milhão. Depois de saber QUAIS linhas casam — que
- *   costumam ser uma ou duas —, aí sim se lê a linha inteira.
- *
- * A comparação IGNORA MÁSCARA quando a coluna é identificador ou documento:
- * quem digita "1-2345678901" acha "12345678901", e quem digita
- * "123.456.789-01" acha "12345678901". Exigir o formato exato transformaria
- * a busca em adivinhação.
- *
- * E há a PLANILHA LEGADA: o histórico que ficou no sistema anterior. Ela é
- * lida como está — primeira linha é cabeçalho, e nada mais é assumido —,
- * porque não temos contrato sobre ela e nunca vamos ter.
- * ============================================================================
- */
-
-/** Quantos casos a busca devolve, no máximo, por origem. */
 const RECC_MAXIMO_DA_BUSCA = 100;
 
-/** Menos que isto é termo curto demais: acharia meia base. */
 const RECC_MINIMO_DO_TERMO = 3;
 
-/**
- * O que a tela precisa saber ao abrir: onde dá para procurar.
- */
 function opcoesDaBusca() {
   var quem = exigirTela_('buscarCaso');
 
   return {
-    // Só os canais desta pessoa. Oferecer os outros seria convidar a procurar
-    // onde a busca depois vai recusar.
+
     canais: canaisQueEuVejo_(quem).map(function (canal) {
       return {
         id: canal.id,
@@ -6797,12 +4206,6 @@ function opcoesDaBusca() {
   };
 }
 
-/**
- * Procura o termo nos canais escolhidos e, se estiver ligada, na base legada.
- *
- * `ondeProcurar` é a lista de ids de canal; vazio procura em todas as que a
- * pessoa enxerga. `incluirLegado` diz se a planilha antiga entra.
- */
 function buscarCasos(termo, ondeProcurar, incluirLegado) {
   var quem = exigirTela_('buscarCaso');
 
@@ -6816,8 +4219,6 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
   var escolhidas = listaDaTela_(ondeProcurar).map(converterParaIdentificador_);
   var resultados = [];
 
-  // E procura SÓ nos canais desta pessoa. A tela não oferecer os outros não
-  // basta: a chamada existe, e nada impede mandar o Id de um canal alheio.
   canaisQueEuVejo_(quem).forEach(function (canal) {
     if (escolhidas.length && escolhidas.indexOf(converterParaIdentificador_(canal.id)) < 0) {
       return;
@@ -6834,30 +4235,16 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
     return soma + origem.casos.length;
   }, 0);
 
-  // Só QUANTOS achou, nunca o termo: quem procura digita CPF e nome de
-  // segurado, e a auditoria é, por contrato, sem dado pessoal.
   registrarAuditoria_('busca', 'BUSCA', '', total + ' resultado(s)');
   return {
     termo: procurado,
     total: total,
     origens: resultados,
-    // A mesma resposta da fila do Trabalho: "Trabalhar no caso" e "Alterar
-    // status" aparecem só para quem pode editar — o servidor recusaria.
+
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 
-// ============================================================================
-// A BUSCA NA BASE PRÓPRIA
-// ============================================================================
-
-/**
- * As colunas em que o canal procura.
- *
- * Declaradas em `CANAIS.ColunasDaBusca`, e não adivinhadas: adivinhar acerta
- * no canal de hoje e erra na próxima. Sem nada declarado, procura na coluna
- * da situação e na da data — pouco, mas nunca na base inteira.
- */
 function colunasDaBusca_(canal) {
   var estrutura = estruturaDaAba_(canal.aba);
 
@@ -6876,9 +4263,6 @@ function colunasDaBusca_(canal) {
     });
 }
 
-/**
- * Procura num canal, lendo coluna por coluna e só depois as linhas que casam.
- */
 function procurarNoCanal_(canal, termo, quem) {
   comAGrafiaDaAba_(canal);
   var colunas = colunasDaBusca_(canal);
@@ -6897,15 +4281,13 @@ function procurarNoCanal_(canal, termo, quem) {
     };
   }
 
-  // Passo 1: ler só as colunas de busca, e anotar em QUAIS linhas o termo
-  // aparece. É aqui que a tela não estoura numa base grande.
   var linhasQueCasam = {};
   var ordemDasLinhas = [];
 
   colunas.forEach(function (coluna) {
     var valores = lerColunaInteira_(canal.aba, coluna.cabecalho);
     for (var i = 0; i < valores.length; i++) {
-      var numeroDaLinha = i + 2;   // a linha 1 é o cabeçalho
+      var numeroDaLinha = i + 2;
       if (linhasQueCasam[numeroDaLinha]) continue;
       if (!casaComOTermo_(valores[i], termo, coluna.tipo)) continue;
 
@@ -6914,23 +4296,20 @@ function procurarNoCanal_(canal, termo, quem) {
     }
   });
 
-  // O alcance vem ANTES do corte: os 100 lugares são dos casos que eu posso ver.
   ordemDasLinhas = linhasNoMeuAlcance_(canal.aba, ordemDasLinhas, quem);
 
   if (ordemDasLinhas.length > RECC_MAXIMO_DA_BUSCA) {
     aviso = 'A busca achou ' + ordemDasLinhas.length + ' casos e mostra os ' +
       RECC_MAXIMO_DA_BUSCA + ' mais recentes. Um termo mais específico ' +
       'chega mais perto.';
-    // Os mais recentes são os do fim da base, que só acrescenta no fim.
+
     ordemDasLinhas = ordemDasLinhas.slice(-RECC_MAXIMO_DA_BUSCA);
   }
 
-  // Passo 2: agora sim, ler as linhas inteiras — só essas.
   ordemDasLinhas.sort(function (uma, outra) { return outra - uma; });
   var registros = lerLinhasEspecificas_(canal.aba, ordemDasLinhas)
     .filter(function (registro) {
-      // Caso ocultado não volta na busca. A linha continua na planilha, e
-      // um administrador ainda a enxerga por lá.
+
       return normalizarParaComparar_(registro._Visivel) !== 'nao';
     });
 
@@ -6949,13 +4328,6 @@ function procurarNoCanal_(canal, termo, quem) {
   };
 }
 
-/**
- * O valor da célula casa com o que a pessoa digitou?
- *
- * Identificador e documento comparam só os DÍGITOS, dos dois lados: quem
- * digita "123.456.789-01" acha "12345678901", e vice-versa. O resto compara
- * texto sem acento e sem caixa, procurando o termo dentro do valor.
- */
 function casaComOTermo_(valor, termo, tipo) {
   if (valor === '' || valor === null || valor === undefined) return false;
 
@@ -6969,11 +4341,6 @@ function casaComOTermo_(valor, termo, tipo) {
     .indexOf(normalizarParaComparar_(termo)) >= 0;
 }
 
-// ============================================================================
-// A PLANILHA LEGADA
-// ============================================================================
-
-/** O que está configurado sobre a base antiga, sem tentar abri-la. */
 function descricaoDoLegado_() {
   var id = String(valorDaConfiguracao_('LEGADO.PLANILHA_ID', '')).trim();
   return {
@@ -6983,17 +4350,6 @@ function descricaoDoLegado_() {
   };
 }
 
-/**
- * Procura na planilha do sistema anterior.
- *
- * Ela não tem contrato: a primeira linha é entendida como cabeçalho e nada
- * mais é assumido — nem tipo de coluna, nem nome, nem ordem. Procura em
- * TODAS as colunas, porque não há como saber quais importam.
- *
- * Falhar aqui não pode derrubar a busca na base própria: uma planilha que
- * saiu do ar, ou uma permissão que caiu, viram um recado ao lado dos
- * resultados de verdade.
- */
 function procurarNoLegado_(termo) {
   var configurado = descricaoDoLegado_();
   if (!configurado.ligado) return null;
@@ -7010,9 +4366,7 @@ function procurarNoLegado_(termo) {
         '" não existe na planilha legada.');
     }
   } catch (erro) {
-    // Aqui a falha NÃO derruba a busca: a base própria já respondeu, e perder
-    // o histórico antigo é melhor que perder a busca inteira. O recado sai
-    // junto do resultado, na origem "legado".
+
     return recadoDoLegado_(configurado, 'Não consegui abrir a planilha legada. '
       + (erro.message || erro));
   }
@@ -7032,8 +4386,7 @@ function procurarNoLegado_(termo) {
   for (var linha = 1; linha < tudo.length && achados.length < RECC_MAXIMO_DA_BUSCA; linha++) {
     var casou = false;
     for (var coluna = 0; coluna < cabecalhos.length; coluna++) {
-      // Sem tipo declarado, tentamos as duas comparações: por dígitos e por
-      // texto. É o preço de ler uma planilha sobre a qual não temos contrato.
+
       if (casaComOTermo_(tudo[linha][coluna], termo, RECC_TIPO_DE_DADO.TEXTO)
         || casaComOTermo_(tudo[linha][coluna], termo,
           RECC_TIPO_DE_DADO.IDENTIFICADOR)) {
@@ -7065,8 +4418,7 @@ function procurarNoLegado_(termo) {
     colunas: [{ titulo: 'Registro', colunas: [] }],
     cabecalhos: cabecalhos,
     casos: achados,
-    // Um caso do legado NÃO abre no modal: ele não é um caso do sistema, é
-    // uma linha de histórico. Prometer edição ali seria mentira.
+
     somenteLeitura: true,
     aviso: achados.length >= RECC_MAXIMO_DA_BUSCA
       ? 'Mostrando os ' + RECC_MAXIMO_DA_BUSCA + ' primeiros da base legada.'
@@ -7088,11 +4440,6 @@ function recadoDoLegado_(configurado, mensagem) {
   };
 }
 
-// ============================================================================
-// CONFIGURAÇÃO DA BASE LEGADA
-// ============================================================================
-
-/** O que a tela de Configurações mostra sobre a base antiga. */
 function configuracaoDoLegado() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   return {
@@ -7102,13 +4449,6 @@ function configuracaoDoLegado() {
   };
 }
 
-/**
- * Aponta a base legada, conferindo NA HORA se dá para abri-la.
- *
- * Guardar um Id que não abre deixaria a busca com um recado de erro para
- * sempre, e ninguém saberia se o Id estava errado ou se a planilha tinha
- * sumido. Melhor recusar aqui, com o motivo.
- */
 function salvarConfiguracaoDoLegado(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -7117,9 +4457,7 @@ function salvarConfiguracaoDoLegado(dados) {
   var aba = String(dados.aba || '').trim();
 
   if (id) {
-    // Aqui a falha DERRUBA, e é de propósito: guardar um Id que não abre
-    // deixaria a busca com um recado de erro para sempre, sem ninguém saber
-    // se o Id estava errado ou se a planilha sumiu depois.
+
     var planilha = abrirPlanilhaDeFora_(id);
     if (aba && !planilha.getSheetByName(aba)) {
       throw new Error('A planilha abriu, mas não tem uma aba chamada "' + aba +
@@ -7138,70 +4476,10 @@ function salvarConfiguracaoDoLegado(dados) {
   return configuracaoDoLegado();
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 4 de 4 · A IMPORTAÇÃO — TRAZER UMA BASE INTEIRA DE FORA
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * A IMPORTAÇÃO
- * ============================================================================
- * Importar é trazer casos de OUTRA planilha para dentro do PGO, de uma vez: a
- * base de inadimplentes do Vida Individual, a do Vida em Grupo, a lista de
- * corretoras que a Mesa vai tratar com ação diferenciada. Cem casos, trezentos
- * casos, e geralmente toda semana.
- *
- * Por que não é "cadastrar caso num laço": porque as perguntas são outras.
- *
- *   ONDE ESTÁ O DADO. Numa planilha de fora, com os cabeçalhos DELA. Ninguém
- *   vai renomear as colunas da base de inadimplentes para agradar o PGO, então
- *   quem se adapta é o PGO: a importação casa cabeçalho com cabeçalho, sugere
- *   o que reconhece e deixa a pessoa corrigir o resto.
- *
- *   DE QUEM É O CASO. Uma base de trezentos chega sem responsável. O pedido da
- *   operação é dividir entre os analistas — então a importação distribui, em
- *   rodízio, entre os nomes escolhidos.
- *
- *   E SE JÁ ENTROU ANTES. A base é atualizada toda semana, e boa parte dela
- *   repete. Sem uma coluna que identifique o caso, o segunda importação
- *   duplica tudo. Com ela, o que já está dentro é PULADO, e o laudo diz quantos.
- *
- * A IMPORTAÇÃO NUNCA GRAVA SEM MOSTRAR ANTES. `conferirImportacaoDeCasos` devolve o
- * laudo — quantas linhas, para onde cada coluna vai, quantas serão puladas e
- * as três primeiras já traduzidas. `importarCasos` só então grava. Trezentas
- * linhas erradas dentro da base se desfazem apagando trezentas linhas na mão.
- * ============================================================================
- */
-
-/**
- * O teto de linhas por importação.
- *
- * Não é medo de volume: `inserirVariosRegistros_` grava tudo numa ida só, e
- * duas mil linhas passam folgado dentro dos seis minutos. O teto existe porque
- * acima disso quem errou o mapeamento erra em escala — e porque uma base de
- * dez mil linhas colada numa caixa de texto quase nunca é o que a pessoa
- * queria fazer.
- */
 const RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO = 2000;
 
-/** Quantas linhas do laudo vêm já traduzidas, para a pessoa conferir. */
 const RECC_LINHAS_DE_AMOSTRA = 3;
 
-// ----------------------------------------------------------------------------
-// LER A FONTE
-// ----------------------------------------------------------------------------
-
-/**
- * Transforma o texto colado numa grade de linhas e colunas.
- *
- * Aceita TABULAÇÃO e PONTO E VÍRGULA, e decide pela primeira linha: copiar de
- * uma planilha e colar dá tabulação; salvar como CSV em português dá ponto e
- * vírgula. Vírgula NÃO entra na disputa de propósito — "R$ 1.234,56" e
- * "Silva, João" são dado comum aqui, e um separador que parte esses dois no
- * meio erraria calado, deslocando todas as colunas da linha em diante.
- */
 function separarTextoColado_(texto) {
   var inteiro = String(texto || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   var linhas = inteiro.split('\n').filter(function (uma) {
@@ -7212,8 +4490,7 @@ function separarTextoColado_(texto) {
   var separador = linhas[0].indexOf('\t') >= 0 ? '\t' : ';';
   return linhas.map(function (uma) {
     return uma.split(separador).map(function (celula) {
-      // Planilha exporta texto com aspas em volta quando ele tem o separador
-      // dentro. Tirar as aspas das pontas é o mínimo para o valor chegar limpo.
+
       var valor = String(celula).trim();
       if (valor.length > 1 && valor.charAt(0) === '"'
         && valor.charAt(valor.length - 1) === '"') {
@@ -7224,12 +4501,6 @@ function separarTextoColado_(texto) {
   });
 }
 
-/**
- * A grade de uma aba de OUTRA planilha, pelo Id e pelo nome da aba.
- *
- * Lê tudo de uma vez — uma ida só ao serviço. Ler linha por linha numa base de
- * trezentas seriam trezentas idas, e o pedágio de 25 ms cada come a execução.
- */
 function gradeDeOutraPlanilha_(idDaPlanilha, nomeDaAba) {
   var planilha = abrirPlanilhaDeFora_(idDaPlanilha);
   var procurado = String(nomeDaAba || '').trim();
@@ -7246,14 +4517,9 @@ function gradeDeOutraPlanilha_(idDaPlanilha, nomeDaAba) {
   var largura = aba.getLastColumn();
   if (ultima < 1 || largura < 1) return [];
 
-  // getDisplayValues, e não getValues: o valor vem como a pessoa VÊ na tela da
-  // outra planilha. Um CPF formatado como texto ali chega inteiro; como número,
-  // chegaria sem o zero à esquerda. E a data chega no formato que ela mostra,
-  // que é o que converterParaData_ já sabe ler.
   return aba.getRange(1, 1, ultima, largura).getDisplayValues();
 }
 
-/** A grade, venha ela do texto colado ou de outra planilha. */
 function gradeDaFonte_(fonte) {
   var tipo = normalizarParaComparar_((fonte || {}).tipo);
   if (tipo === 'planilha') {
@@ -7262,28 +4528,8 @@ function gradeDaFonte_(fonte) {
   return separarTextoColado_((fonte || {}).texto);
 }
 
-// ----------------------------------------------------------------------------
-// CASAR AS COLUNAS
-// ----------------------------------------------------------------------------
-
-/**
- * Para cada cabeçalho da fonte, qual coluna do canal ele parece ser.
- *
- * O casamento é por nome normalizado — acento e caixa não contam, que é a
- * mesma regra que o resto do sistema usa para achar coluna. Sugere apenas: a
- * pessoa confirma ou troca cada um na tela, e o que ela mandar é o que vale.
- *
- * Coluna preenchida pelo sistema NÃO é sugerida. O carimbo do 1º contato, a
- * origem da importação e a data dele são do sistema; deixar a fonte escrever
- * ali apagaria o controle de produtividade com dado de outra planilha.
- */
 function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
-  // A lista do que PODE ser destino é uma só, e é a mesma que a tela oferece.
-  // Já errei isto aqui: eu montava a lista pelo contrato, pulando as colunas do
-  // sistema, e depois acrescentava "tudo o que está na aba e ainda não entrou"
-  // para pegar as colunas criadas em Configurações. Só que as do sistema tinham
-  // acabado de ficar de fora — então a segunda volta as trazia de novo, e o
-  // carimbo do 1º contato voltava a ser sugerido como destino.
+
   var porNome = {};
   colunasQueAImportacaoSugere_(canal).forEach(function (cabecalho) {
     porNome[normalizarParaComparar_(cabecalho)] = cabecalho;
@@ -7292,9 +4538,7 @@ function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
 
   return cabecalhosDaFonte.map(function (cabecalho) {
     var daFonte = normalizarParaComparar_(cabecalho);
-    // Primeiro o que a pessoa escolheu na última importação do canal (Etapa
-    // 48) — inclusive o "não trazer". Só vale se a coluna ainda pode ser
-    // sugerida: coluna que sumiu, ou carimbo, cai na regra do nome.
+
     if (Object.prototype.hasOwnProperty.call(lembrado, daFonte)) {
       var escolhida = normalizarParaComparar_(lembrado[daFonte]);
       if (!escolhida || porNome[escolhida]) {
@@ -7309,20 +4553,8 @@ function sugerirDeParaDaImportacao_(cabecalhosDaFonte, canal) {
   });
 }
 
-/*
- * O DE-PARA LEMBRADO (Etapa 48, pedido do PO): a importação de cada canal
- * guarda, ao gravar, para qual coluna foi cada cabeçalho da planilha de origem
- * — e a próxima já abre assim. A base que chega toda semana com os mesmos
- * cabeçalhos ("Nome do segurado", "Cod Proposta"…) não precisa ser casada de
- * novo, e ninguém precisa renomear coluna nenhuma da base para o nome casar.
- *
- * Fica na CONFIG, uma chave por canal, e vale para todo mundo que importa. A
- * importação seguinte soma ao que já estava: um cabeçalho que não veio desta
- * vez continua lembrado.
- */
 const RECC_CHAVE_DO_DE_PARA_LEMBRADO = 'IMPORTACAO.DEPARA.';
 
-/** { cabeçalho da origem (normalizado): coluna do canal, ou '' para "não trazer" }. */
 function deParaLembrado_(canal) {
   var texto = valorDaConfiguracao_(RECC_CHAVE_DO_DE_PARA_LEMBRADO + canal.id, '');
   if (!texto) return {};
@@ -7330,8 +4562,7 @@ function deParaLembrado_(canal) {
     var lido = JSON.parse(texto);
     return lido && typeof lido === 'object' && !Array.isArray(lido) ? lido : {};
   } catch (erro) {
-    // Alguém mexeu na célula e deixou um texto que não é JSON: esquece e casa
-    // pelo nome, como antes. Quebrar a importação por isso seria pior.
+
     return {};
   }
 }
@@ -7346,26 +4577,6 @@ function lembrarODeParaDoCanal_(canal, dePara) {
   gravarConfiguracao_(RECC_CHAVE_DO_DE_PARA_LEMBRADO + canal.id, JSON.stringify(lembrado));
 }
 
-/*
- * DUAS LISTAS, E A DIFERENÇA ENTRE ELAS É O PEDIDO DO PO.
- *
- * `Sugere` é o que a importação casa SOZINHA, olhando o nome da coluna.
- * `Aceita` é o que ela deixa a pessoa escolher no de-para.
- *
- * Elas eram uma só, e isso custava caro: o carimbo do 1º contato ficava fora
- * das duas, então 300 casos trazidos da base antiga entravam SEM data de
- * contato — e a Produtividade RECC dizia "Já contatados: 0" para uma leva
- * inteira de casos que tinham sido contatados, com a data guardada na planilha
- * de origem. O número estava errado e parecia certo.
- *
- * Sugerir continua proibido, e por um motivo que não mudou: uma coluna da
- * fonte chamada "Data do 1º contato" casando sozinha escreveria no controle de
- * produtividade sem ninguém decidir isso. Escolher, agora, pode — é uma
- * decisão consciente, tomada na tela de conferência, olhando as três primeiras
- * linhas já traduzidas.
- */
-
-/** O que a importação casa sozinha: nada que o sistema preencha. */
 function colunasQueAImportacaoSugere_(canal) {
   var doSistema = colunasPreenchidasPeloSistema_(canal);
 
@@ -7375,18 +4586,6 @@ function colunasQueAImportacaoSugere_(canal) {
   });
 }
 
-/**
- * O que a importação aceita como destino, se a pessoa escolher.
- *
- * É a lista do `Sugere` MAIS as colunas de carimbo. Elas voltam porque a base
- * antiga sabe quando cada contato aconteceu, e essa é a única forma de esse
- * dado entrar — o sistema não tem como inventá-lo, e carimbar "agora" diria
- * que um contato de julho aconteceu hoje.
- *
- * O que NÃO volta, em hipótese nenhuma, é a origem e a data da importação:
- * essas duas são o rastro do próprio lote, e deixar a fonte escrevê-las
- * apagaria a única forma de saber de onde cada caso veio.
- */
 function colunasQueAImportacaoAceita_(canal) {
   var carimbos = colunasDeCarimboDoCanal_(canal);
   var doSistema = colunasPreenchidasPeloSistema_(canal);
@@ -7399,7 +4598,6 @@ function colunasQueAImportacaoAceita_(canal) {
   });
 }
 
-/** As colunas que o esquema marcou como preenchidas pelo sistema. */
 function colunasPreenchidasPeloSistema_(canal) {
   var doSistema = {};
   esquemaDaAba_(canal.aba).colunas.forEach(function (coluna) {
@@ -7410,17 +4608,6 @@ function colunasPreenchidasPeloSistema_(canal) {
   return doSistema;
 }
 
-/**
- * As colunas em que os status deste canal carimbam.
- *
- * Sai do CATÁLOGO, e não de uma lista escrita aqui: o administrador cria
- * status novos em Configurações e aponta cada um para a sua coluna. Uma lista
- * fixa no código cobriria os sete de fábrica e deixaria de fora justamente os
- * que a operação criou depois — que são os que ela mais quer trazer.
- *
- * A origem e a data da importação NUNCA entram, mesmo que alguém aponte um
- * status para elas por engano: elas são o rastro do lote.
- */
 function colunasDeCarimboDoCanal_(canal) {
   var nunca = {};
   nunca[normalizarParaComparar_(RECC_COLUNA_ORIGEM_DA_IMPORTACAO)] = true;
@@ -7434,17 +4621,6 @@ function colunasDeCarimboDoCanal_(canal) {
   return carimbos;
 }
 
-// ----------------------------------------------------------------------------
-// O LAUDO, ANTES DE GRAVAR
-// ----------------------------------------------------------------------------
-
-/**
- * O que a importação vai fazer, sem fazer.
- *
- * Devolve o de-para sugerido, quantas linhas entram, quantas repetem e as
- * primeiras já traduzidas. É esta tela que evita o desastre: mapeamento errado
- * só aparece olhando o dado traduzido, e nunca olhando o cabeçalho.
- */
 function conferirImportacaoDeCasos(idDoCanal, pedido) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
@@ -7472,9 +4648,7 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
     cabecalhosDaFonte: cabecalhosDaFonte,
     colunasDoCanal: colunasQueAImportacaoAceita_(canal),
-    // Quais das oferecidas são CARIMBO. A tela marca essas na lista: escolher
-    // uma delas escreve no controle de produtividade, e quem está mapeando
-    // precisa saber disso antes, não depois.
+
     colunasDeCarimbo: Object.keys(colunasDeCarimboDoCanal_(canal)).length
       ? colunasQueAImportacaoAceita_(canal).filter(function (cabecalho) {
         return colunasDeCarimboDoCanal_(canal)[normalizarParaComparar_(cabecalho)];
@@ -7490,54 +4664,14 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
-    // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
-    // avisosDaImportacao_, que é onde o próximo aviso entra.
-    avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
     statusPadrao: statusDoLote_(canal, pedido.statusDoLote),
     premios: premios,
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal)
   };
 }
 
-/**
- * O que o laudo precisa dizer em voz alta antes de alguém apertar "importar".
- *
- * Está VAZIA hoje, e é de propósito que ela continua existindo. O único aviso
- * que havia — analista de férias recebendo um lote que ficaria parado — saiu
- * com o calendário, a pedido do PO. A função fica porque o laudo já a chama e
- * já sabe desenhar a lista: o próximo aviso que a operação pedir entra aqui,
- * numa linha, sem mexer no formato da resposta nem na tela.
- */
-function avisosDaImportacao_(escolhidos, canal, quantosEntram) {
-  return [];
-}
-
-/**
- * A opção "proposta no mesmo mês" da importação, como a tela a envia.
- *
- * Começa com @ porque não pode ser confundida com o nome de uma coluna — as
- * outras opções da mesma lista são cabeçalhos da base.
- */
 const RECC_REPETIR_PELA_PROPOSTA_NO_MES = '@PROPOSTA_NO_MES';
 
-/**
- * Como a importação reconhece um caso REPETIDO — ou null, para trazer tudo.
- *
- * Duas regras, escolhidas na tela:
- *
- *   UMA COLUNA         a que já existia. O valor daquela coluna está na base,
- *                      em qualquer mês, ou repete dentro do próprio arquivo.
- *
- *   PROPOSTA NO MÊS    pedido do PO para a RET: "casos importados com a mesma
- *                      proposta não irem para divisão". Código E número iguais,
- *                      no MESMO MÊS do caso — a mesma regra do selo do
- *                      cadastro, perguntada e escolhida: a mesma proposta em
- *                      outro mês é pedido novo do cliente, e entra.
- *
- * O laudo e a gravação usam esta MESMA regra (ver ehRepetido_). Se o laudo
- * contasse por uma e a gravação gravasse por outra, a tela prometeria um
- * número e a base receberia outro.
- */
 function regraDeRepeticao_(canal, escolha) {
   var escolhida = String(escolha || '').trim();
   if (!escolhida) return null;
@@ -7552,15 +4686,9 @@ function regraDeRepeticao_(canal, escolha) {
       + 'não dá para conferir repetição pela proposta. Escolha uma coluna.');
   }
 
-  // O caso IMPORTADO costuma chegar sem a data do canal — a importação não a
-  // inventa. O mês dele é então o da importação, a mesma conta que o lado do
-  // arquivo faz com "hoje". Sem esta reserva, a segunda importação da mesma
-  // proposta no mês passaria, porque a primeira estaria "sem mês".
   var reserva = posicaoDaColuna_(estruturaDaAba_(canal.aba),
     RECC_COLUNA_DATA_DA_IMPORTACAO) >= 0 ? RECC_COLUNA_DATA_DA_IMPORTACAO : '';
 
-  // A base, lida pelas COLUNAS: os pedaços da proposta e as datas do caso.
-  // Poucas idas ao serviço, e não uma por linha.
   var colunas = {};
   partir.colunas
     .concat(canal.colunaDaData ? [canal.colunaDaData] : [])
@@ -7578,8 +4706,7 @@ function regraDeRepeticao_(canal, escolha) {
     });
     var daData = canal.colunaDaData ? converterParaData_(colunas[canal.colunaDaData][i]) : '';
     naBase.__mes = daData || (reserva ? converterParaData_(colunas[reserva][i]) : '');
-    // Caso da base sem data NENHUMA não está em mês nenhum: não pode ser
-    // repetição "no mesmo mês" de ninguém.
+
     var chave = chaveDaPropostaNoMes_(naBase, partir, '__mes', null);
     if (chave) jaDentro[chave] = true;
   }
@@ -7587,11 +4714,7 @@ function regraDeRepeticao_(canal, escolha) {
   var hoje = new Date();
   return {
     partir: partir,
-    // Etapa 45, pedido do PO: "ao invés de 30 dias, vamos limitar apenas no
-    // mês vigente da importação". O caso da PLANILHA conta no mês de hoje,
-    // qualquer que seja a data que ele traga; o do PGO, no mês da data de
-    // recepção (ou, sem ela, da importação/cadastro). A mesma proposta que
-    // entrou em setembro e volta em outubro entra de novo.
+
     colunaDaData: '',
     hoje: hoje,
     mes: RECC_NOMES_DOS_MESES[hoje.getMonth()] + ' de ' + hoje.getFullYear(),
@@ -7599,13 +4722,6 @@ function regraDeRepeticao_(canal, escolha) {
   };
 }
 
-/**
- * "7-0000123|2026-10": os pedaços da proposta e o mês do caso.
- *
- * Vazio quando não há número — sem número, não há proposta a comparar, e o
- * caso entra. Sem data, vale o mês de `hoje`; com `hoje` nulo (o lado da
- * base), caso sem data fica de fora.
- */
 function chaveDaPropostaNoMes_(registro, partir, colunaDaData, hoje) {
   var pedacos = partir.colunas.map(function (cabecalho) {
     return converterParaIdentificador_(registro[cabecalho]);
@@ -7618,17 +4734,9 @@ function chaveDaPropostaNoMes_(registro, partir, colunaDaData, hoje) {
   return pedacos.join('-') + '|' + quando.getFullYear() + '-' + (quando.getMonth() + 1);
 }
 
-/**
- * O caso repete? E, se não repete, fica anotado para a próxima linha do
- * MESMO arquivo — duas linhas iguais no lote também são repetição.
- */
 function ehRepetido_(regra, caso, vistosNestaLeva) {
   if (!regra) return '';
 
-  // Devolve POR QUE repete (Etapa 45, pedido do PO: "deve ficar claro o porquê
-  // não foram importadas, se é pela planilha importada ou porque já tem no PGO
-  // naquele mês"): 'base' (já está no PGO) ou 'arquivo' (repete na planilha).
-  // Vazio quando não repete — e vazio é falso, para quem só pergunta se repete.
   if (regra.partir) {
     var chaveDoMes = chaveDaPropostaNoMes_(caso, regra.partir, regra.colunaDaData,
       regra.hoje);
@@ -7641,16 +4749,13 @@ function ehRepetido_(regra, caso, vistosNestaLeva) {
 
   var chave = normalizarParaComparar_(caso[regra.coluna]);
   var soDigitos = apenasDigitos_(caso[regra.coluna]);
-  // As duas formas são conferidas porque não sabemos aqui se a coluna é
-  // identificador: a base pode ter sido lida com um tipo e a fonte trazer o
-  // valor com máscara. Pular por qualquer das duas é o lado seguro.
+
   if (regra.jaDentro[chave] || (soDigitos && regra.jaDentro[soDigitos])) return 'base';
   if (vistosNestaLeva[chave || soDigitos]) return 'arquivo';
   vistosNestaLeva[chave || soDigitos] = true;
   return '';
 }
 
-/** Como a proposta (ou o valor da coluna) repetida aparece na lista do laudo. */
 function comoMostrarORepetido_(regra, caso) {
   if (regra.partir) {
     return regra.partir.colunas.map(function (cabecalho) {
@@ -7660,10 +4765,8 @@ function comoMostrarORepetido_(regra, caso) {
   return String(caso[regra.coluna] === undefined ? '' : caso[regra.coluna]).trim();
 }
 
-/** Quantas propostas repetidas o laudo lista, em cada motivo. */
 const RECC_REPETIDOS_LISTADOS = 50;
 
-/** Os motivos para pular, com a lista do que repetiu. */
 function novosMotivosParaPular_(regra) {
   return { vazia: 0, repetida: 0, repetidaNoArquivo: 0, jaNoPgo: 0,
     listaNoArquivo: [], listaNoPgo: [], mes: regra && regra.mes ? regra.mes : '',
@@ -7682,15 +4785,6 @@ function anotarORepetido_(motivos, regra, caso, porque) {
   }
 }
 
-/**
- * A data de recepção dos casos importados (Etapa 45, pedido do PO): "muitas
- * bases não têm uma data de recepção, e podemos escolher que venha com a data
- * de hoje ou deixar a da planilha".
- *   'hoje'     — a data de hoje em TODOS os casos (a da planilha é ignorada);
- *   'planilha' — a da planilha; o caso que veio sem data fica com a de hoje.
- * Sem escolha (página antiga), nada muda. Só vale para o canal que oferece a
- * escolha — a RET (ver `dataDeRecepcaoNaImportacao_`).
- */
 function aplicarDataDeRecepcao_(caso, canal, escolha, agora) {
   var coluna = dataDeRecepcaoNaImportacao_(canal);
   if (!coluna) return;
@@ -7702,7 +4796,6 @@ function aplicarDataDeRecepcao_(caso, canal, escolha, agora) {
   }
 }
 
-/** A coluna da data de recepção que a importação deixa escolher — só no canal com proposta (a RET). */
 function dataDeRecepcaoNaImportacao_(canal) {
   if (!canal.colunaDaData || !partirDaPropostaDoCanal_(canal)) return '';
   var estrutura = estruturaDaAba_(canal.aba);
@@ -7710,13 +4803,6 @@ function dataDeRecepcaoNaImportacao_(canal) {
     ? grafiaDaColuna_(canal.aba, canal.colunaDaData) : '';
 }
 
-/**
- * O prêmio que está sendo importado (Etapa 45, pedido do PO): "quando vamos
- * tombar casos sempre colocamos prêmio mensal ou anual — mostre o valor que
- * está sendo importado, se tiver uma coluna ou ambas". O anual é a coluna
- * "valor do prêmio"; o mensal, "prêmio mensal". Só entra o que o de-para
- * ligou, e só dos casos que vão entrar.
- */
 const RECC_PREMIOS_DA_IMPORTACAO = [
   { rotulo: 'Prêmio anual', coluna: 'valor do prêmio' },
   { rotulo: 'Prêmio mensal', coluna: 'prêmio mensal' }
@@ -7733,7 +4819,6 @@ function somarPremios_(premios, caso) {
   });
 }
 
-/** Os prêmios que o de-para leva para alguma coluna, zerados para somar. */
 function premiosDoDePara_(dePara, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var destinos = {};
@@ -7748,13 +4833,6 @@ function premiosDoDePara_(dePara, canal) {
   });
 }
 
-/**
- * Os valores que já estão na base, na coluna que identifica o caso.
- *
- * Lê a COLUNA inteira, e não as linhas: é a regra de desempenho da casa — uma
- * ida ao serviço para uma coluna, em vez de uma para cada linha. Sem a coluna
- * declarada, devolve um conjunto vazio, e nada é pulado.
- */
 function jaEstaNaBase_(canal, cabecalho) {
   var dentro = {};
   if (!cabecalho) return dentro;
@@ -7768,9 +4846,7 @@ function jaEstaNaBase_(canal, cabecalho) {
   }
 
   lerColunaInteira_(canal.aba, cabecalho).forEach(function (valor) {
-    // As DUAS formas entram no conjunto: a normalizada e a só-dígitos. Não
-    // sabemos de que jeito a outra planilha escreve o CPF, e guardar as duas
-    // aqui é mais barato que adivinhar na hora de comparar.
+
     var texto = normalizarParaComparar_(valor);
     if (texto) dentro[texto] = true;
     var soDigitos = apenasDigitos_(valor);
@@ -7779,14 +4855,6 @@ function jaEstaNaBase_(canal, cabecalho) {
   return dentro;
 }
 
-/**
- * Percorre a fonte contando o que entra, o que pula e por quê.
- *
- * Conta e traduz no MESMO laço que a gravação usa (`linhaDaFonteParaOCaso_`),
- * de propósito: se o laudo contasse por uma regra e a gravação gravasse por
- * outra, o laudo prometeria um número e a base receberia outro — e ninguém
- * descobre isso olhando a tela.
- */
 function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra, premios) {
   var motivos = novosMotivosParaPular_(regra);
   var amostra = [];
@@ -7817,7 +4885,6 @@ function contarOQueEntraEOQuePula_(corpo, cabecalhosDaFonte, dePara, regra, prem
   };
 }
 
-/** Uma linha da fonte virada num caso, com as chaves iguais aos cabeçalhos. */
 function linhaDaFonteParaOCaso_(linha, cabecalhosDaFonte, dePara) {
   var paraOnde = {};
   dePara.forEach(function (par) {
@@ -7843,38 +4910,6 @@ function temAlgumValor_(caso) {
   });
 }
 
-/**
- * Quem pode receber os casos: TODO MUNDO que está cadastrado e ativo.
- *
- * A primeira versão desta função só oferecia quem tivesse "Canal que atende"
- * igual ao nome do canal. Parecia certo e não funcionava: o campo era de
- * digitar livre, e a operação escrevia nele o que fazia sentido para ela —
- * "Vida Individual", "Vida em Grupo" —, quase nunca o nome do canal do PGO. O
- * resultado era a tela de Importação dizendo "nenhum analista cadastrado neste
- * canal" numa operação cheia de analistas. Só apareceu abrindo no navegador.
- *
- * Aquele campo saiu do cadastro desde então. A sugestão agora vem do CanalId,
- * que é escolha de lista e não texto digitado.
- *
- * TRÊS REGRAS, e as três são do PO:
- *
- *   1. SÓ QUEM É DO CANAL ESCOLHIDO. "Quero que quando for importar escolha o
- *      canal e ele distribua apenas para o canal que escolhi." Antes o canal
- *      só ORDENAVA a lista, e todo mundo aparecia — era proposital, para a
- *      operação em formação poder cruzar canais, e o PO decidiu o contrário.
- *      Quem administra, sem canal nenhum, também não entra: ele não é "do
- *      canal escolhido", e receber lote não é trabalho de quem administra.
- *
- *   2. SÓ QUEM ESTÁ DISPONÍVEL. Férias e afastamento tiram a pessoa da
- *      divisão sem tirar o acesso dela — ver `estaDisponivelParaReceber_`.
- *
- *   3. SÓ QUEM ESTÁ ATIVO E TEM NOME, que é a regra antiga e a mais
- *      importante: o nome tem de existir no cadastro, senão o caso fica no
- *      nome de ninguém e some da fila de todo mundo.
- *
- * A lista pode VOLTAR VAZIA, e isso é resposta, não erro: quer dizer que
- * ninguém deste canal está disponível hoje. Quem explica é a tela.
- */
 function analistasParaDistribuir_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
 
@@ -7888,9 +4923,7 @@ function analistasParaDistribuir_(canal) {
     .map(function (usuario) {
       return {
         nome: String(usuario.Nome),
-        // Continua saindo, e continua sempre true agora que a lista é só
-        // deste canal. A tela mostra a lista como ela vem, e um campo que
-        // some quebraria a tela de quem ainda não recarregou.
+
         atendeEsteCanal: true
       };
     })
@@ -7899,14 +4932,6 @@ function analistasParaDistribuir_(canal) {
     });
 }
 
-/**
- * Quem é deste canal, está ativo, e NÃO está disponível hoje.
- *
- * Vai junto da lista para a tela poder DIZER por que fulano não está lá. Sem
- * isto, a coordenação abre a Importação, não acha o nome de alguém que ela
- * sabe que trabalha ali, e a única conclusão possível é "o sistema está
- * errado" — quando o certo é "ela está de férias, e por isso não recebe".
- */
 function quemEstaForaDaDivisao_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
 
@@ -7928,25 +4953,10 @@ function quemEstaForaDaDivisao_(canal) {
     });
 }
 
-/** Só os nomes, para quem precisa conferir se alguém está na lista. */
 function nomesQuePodemReceberCasos_(canal) {
   return analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
 }
 
-/**
- * O status com que o caso IMPORTADO nasce: o padrão do canal — menos quando
- * esse status carimba uma data.
- *
- * Pedido do PO para a Mesa: "casos de importação da Mesa não têm status, e só
- * devem contar quando for alterado para Em andamento". O "Em andamento" é o
- * status padrão da Mesa E carimba `Data em andamento`, de onde contam as 48
- * horas. Pôr esse status na importação diria que o caso entrou nele sem dizer
- * quando — e a importação não carimba, de propósito. Então o caso entra SEM
- * status, e a data nasce quando alguém o põe em Em andamento de verdade.
- *
- * Status padrão sem carimbo ("Não trabalhado" na RET, "Aguardando" no VG)
- * continua sendo posto: não há data nenhuma a mentir.
- */
 function statusDaImportacaoDoCanal_(canal) {
   var padrao = statusPadraoDoCanal_(canal);
   var situacao = padrao ? situacaoDoCanalPeloValor_(canal, padrao) : null;
@@ -7954,19 +4964,6 @@ function statusDaImportacaoDoCanal_(canal) {
   return padrao;
 }
 
-/**
- * O status dos casos do LOTE — pedido do PO: "escolher importação deve permitir
- * que eu delegue o status de origem para todos os casos, e não mais por padrão
- * apenas Não trabalhado".
- *
- * `escolhido` undefined (quem chama sem escolher) é o padrão do canal, como
- * antes; vazio é "sem status", escolha de verdade; qualquer outro tem de ser um
- * status do canal. Vale para o caso que a fonte trouxe SEM status: o que veio
- * com status na coluna ligada no de-para continua com o dele.
- *
- * NÃO CARIMBA, por decisão do PO: o caso é antigo, e carimbar hoje diria que o
- * contato (ou o Retido) aconteceu hoje.
- */
 function statusDoLote_(canal, escolhido) {
   if (escolhido === undefined || escolhido === null) return statusDaImportacaoDoCanal_(canal);
   var texto = String(escolhido).trim();
@@ -7980,7 +4977,6 @@ function statusDoLote_(canal, escolhido) {
   return achada.gravadoComo;
 }
 
-/** O status com que o caso nasce no formulário, tirado do campo Status do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
   var achado = '';
@@ -7993,30 +4989,6 @@ function statusPadraoDoCanal_(canal) {
   return achado;
 }
 
-// ----------------------------------------------------------------------------
-// GRAVAR
-// ----------------------------------------------------------------------------
-
-/**
- * Traz a base para dentro.
- *
- * Numa gravação só, por `inserirVariosRegistros_`: trezentas chamadas
- * separadas seriam trezentas idas ao serviço e trezentos Ids pedidos um a um.
- *
- * O que a importação acrescenta a cada caso, além do que veio da fonte:
- *
- *   - o ANALISTA, em rodízio entre os escolhidos (ou um só, se for um só);
- *   - o STATUS padrão do canal, quando a fonte não trouxe um — é o
- *     "Não trabalhado" que a RET pediu;
- *   - a ORIGEM DA IMPORTAÇÃO, que é o nome do lote, e a DATA — as duas colunas
- *     que fazem o gráfico da Produtividade RECC existir;
- *   - `_Origem` = PLANILHA, porque o dado veio de fora e não da tela.
- *
- * A auditoria recebe UMA linha por lote, não uma por caso. Trezentas linhas de
- * auditoria dizendo a mesma coisa afogam as que importam.
- *
- * `pedido.envio`: ver cadastrarCaso — o mesmo lote não entra duas vezes.
- */
 function importarCasos(idDoCanal, pedido) {
   return comEnvioUnico_((pedido || {}).envio, function () {
     return importarCasosUmaVez_(idDoCanal, pedido);
@@ -8071,8 +5043,6 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
     var caso = linhaDaFonteParaOCaso_(corpo[i], cabecalhosDaFonte, dePara);
     if (!temAlgumValor_(caso)) { pulados.vazia++; continue; }
 
-    // ANTES da divisão: o repetido não chega a analista nenhum. Era o que o
-    // PO viu acontecer — a mesma proposta indo para duas pessoas.
     var porque = ehRepetido_(regra, caso, vistosNestaLeva);
     if (porque) {
       anotarORepetido_(pulados, regra, caso, porque);
@@ -8082,9 +5052,7 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
     aplicarDataDeRecepcao_(caso, canal, pedido.dataDeRecepcao, agora);
 
     if (colunaDoAnalista && analistas.length && !caso[colunaDoAnalista]) {
-      // Rodízio pelo número de casos JÁ MONTADOS, e não pelo índice da linha
-      // da fonte: linha pulada não pode fazer a fila do rodízio andar, senão a
-      // divisão sai torta sempre que a base tem repetição no meio.
+
       caso[colunaDoAnalista] = analistas[paraGravar.length % analistas.length];
     }
     if (canal.colunaDoStatus && !caso[canal.colunaDoStatus] && statusPadrao) {
@@ -8102,13 +5070,9 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
       + ' e ' + pulados.repetidaNoArquivo + ' repetidas na própria planilha. Nada foi gravado.');
   }
 
-  // _Origem = PLANILHA porque o dado veio de FORA, e não da tela do PGO. É o
-  // que permite, meses depois, separar o que a operação digitou do que foi
-  // importado — e conferir um contra o outro quando um número não fecha.
   var gravados = inserirVariosRegistros_(canal.aba, paraGravar,
     { origem: RECC_ORIGEM_PLANILHA });
-  // Os casos já entraram: lembrar o de-para não pode derrubar a importação —
-  // quem visse o erro importaria de novo. Se falhar, a próxima casa pelo nome.
+
   try {
     lembrarODeParaDoCanal_(canal, dePara);
   } catch (erro) {
@@ -8131,29 +5095,11 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   };
 }
 
-/**
- * Recusa uma importação que não levaria dado a coluna nenhuma.
- *
- * Sem isto, um de-para todo vazio gravaria trezentas linhas contendo só o Id, o
- * analista e a data — trezentas linhas em branco na base operacional, que
- * alguém teria de achar e apagar uma a uma.
- */
 function exigirQueODeParaLeveAAlgumLugar_(dePara, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var destinos = [];
   var inexistentes = [];
 
-  /*
-   * A lista do que se ACEITA é conferida AQUI, no servidor, e não só na tela.
-   *
-   * Antes esta trava só perguntava se a coluna EXISTE na aba — então a origem
-   * e a data da importação, que a tela nunca ofereceu, podiam ser escritas por
-   * quem montasse o de-para na mão. A proteção do rastro do lote era só um
-   * combinado visual, e combinado visual não é trava.
-   *
-   * Passou a importar agora que o carimbo virou destino escolhível: a linha
-   * entre "pode escolher" e "nunca" tem de ser a mesma nos dois lados.
-   */
   var aceitas = {};
   colunasQueAImportacaoAceita_(canal).forEach(function (cabecalho) {
     aceitas[normalizarParaComparar_(cabecalho)] = true;
@@ -8192,17 +5138,6 @@ function exigirQueODeParaLeveAAlgumLugar_(dePara, canal) {
   }
 }
 
-/**
- * Os analistas que vão receber os casos, conferidos contra o cadastro.
- *
- * Nome que não está cadastrado e ativo é RECUSADO, e não aceito calado: um
- * nome digitado errado vira trezentos casos no nome de ninguém, e eles somem
- * da fila de todo mundo — o escopo "próprios" não acha um responsável que não
- * existe. O caso estaria na planilha e invisível no sistema.
- *
- * O que NÃO é conferido é a que canal a pessoa atende: ver
- * analistasParaDistribuir_, que explica por quê.
- */
 function analistasEscolhidos_(escolhidos, canal) {
   var lista = Array.isArray(escolhidos) ? escolhidos : [];
   var limpos = [];
@@ -8219,15 +5154,7 @@ function analistasEscolhidos_(escolhidos, canal) {
     });
   });
   if (foraDoCadastro.length) {
-    /*
-     * O RECADO DIZ O MOTIVO CERTO, e isto não é capricho.
-     *
-     * Antes ele dizia sempre "não estão cadastrados e ativos". Depois que a
-     * divisão passou a ser só do canal e só de quem está disponível, esse
-     * texto virou mentira em dois dos três casos: a pessoa está cadastrada,
-     * está ativa, e mesmo assim não pode receber. Quem lesse iria cadastrar
-     * de novo alguém que já existe.
-     */
+
     var indisponiveis = {};
     quemEstaForaDaDivisao_(canal).forEach(function (um) {
       indisponiveis[normalizarParaComparar_(um.nome)] = um.porque || 'indisponível';
@@ -8246,9 +5173,6 @@ function analistasEscolhidos_(escolhidos, canal) {
       + 'dela — e importe depois.');
   }
 
-  // Devolve com a grafia do CADASTRO, e não a que veio da tela: é o nome do
-  // cadastro que a coluna de responsável guarda, e é por ele que o escopo
-  // "próprios" compara.
   return limpos.map(function (nome) {
     var achado = nome;
     podem.forEach(function (um) {
@@ -8258,21 +5182,11 @@ function analistasEscolhidos_(escolhidos, canal) {
   });
 }
 
-/**
- * Os lotes já importados neste canal, do mais recente para o mais antigo.
- *
- * Serve para a tela oferecer um nome que já existe — importar a mesma base toda
- * semana com o nome escrito de um jeito diferente a cada vez faria o gráfico
- * da Produtividade RECC mostrar cinco lotes onde há um.
- */
 function lotesJaImportados(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  // Coluna ausente devolve lista vazia, e não estoura: quem já tinha o PGO
-  // instalado antes da importação não tem esta coluna, e a tela precisa abrir
-  // do mesmo jeito para ele — é o diagnóstico que cobra o que falta.
   var estrutura = estruturaDaAba_(canal.aba);
   if (posicaoDaColuna_(estrutura, RECC_COLUNA_ORIGEM_DA_IMPORTACAO) < 0) return [];
 
@@ -8288,7 +5202,6 @@ function lotesJaImportados(idDoCanal) {
   }).sort(function (um, outro) { return outro.casos - um.casos; });
 }
 
-/** O que a tela de Importação precisa para abrir. */
 function opcoesDaImportacaoDeCasos(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
@@ -8299,25 +5212,22 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     canal: { id: canal.id, nome: canal.nome, aba: canal.aba },
     colunasDoCanal: colunasQueAImportacaoAceita_(canal),
     analistas: analistasParaDistribuir_(canal),
-    // Quem é deste canal e está de férias ou afastado. A tela diz o nome e o
-    // motivo, em vez de deixar a pessoa procurando alguém que não está lá.
+
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusDaImportacaoDoCanal_(canal),
-    // Os status que a pessoa pode escolher para o lote inteiro.
+
     statusDoCanal: canal.colunaDoStatus ? situacoesDoCanal_(canal).map(function (situacao) {
       return { valor: situacao.gravadoComo, rotulo: situacao.nome };
     }) : [],
-    // Status padrão que a importação NÃO põe (o da Mesa): a tela explica.
+
     statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
     lotes: lotesJaImportados(canal.id),
-    // Na Mesa, a mesma tela traz também os atendimentos do CHAT (Etapa 39).
+
     aceitaChat: canal.aba === 'BASE_MESA',
     limite: RECC_MAXIMO_DE_LINHAS_POR_IMPORTACAO,
-    // Canal com proposta (a RET) ganha a opção "proposta no mesmo mês", e ela
-    // já vem MARCADA — escolha do PO. Dá para trocar ou desmarcar na tela.
+
     repeticaoPelaProposta: repeticaoPelaProposta,
-    // Etapa 45: a escolha da data de recepção (hoje / da planilha) — só no
-    // canal com proposta, a RET. Vazio: a tela não mostra a escolha.
+
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
@@ -8326,74 +5236,6 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
 
 /* ==== Config.gs =========================================================== */
 
-/**
- * ============================================================================
- * PGO — Config.gs · o que se ajusta sem programador
- * ============================================================================
- * As nove seções da tela de Configurações, e o gerador das abas ANALISE_*
- * — que é configuração também: a receita mora na aba ANALISES.
- *
- * O nome é "Config", e não "Configuracoes", por um motivo da plataforma: no
- * Apps Script os arquivos moram todos num projeto só, sem pasta, e o nome é
- * único INDEPENDENTE DA EXTENSÃO. Como existe uma tela Configuracoes.html,
- * um Configuracoes.gs não entra. É o achado 26.
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. AS SEÇÕES DE CONFIGURAÇÕES
- *   2. AS ABAS ANALISE_* QUE O SISTEMA GERA
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 2 · AS SEÇÕES DE CONFIGURAÇÕES
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Onde o sistema é ajustado sem programador
- *
- * O nome é "Config", e não "Configuracoes", por um motivo da plataforma: no
- * Apps Script os arquivos moram todos num projeto só, sem pasta, e o nome é
- * único INDEPENDENTE da extensão. Já existe um `Configuracoes.html` — a tela
- * —, então um `Configuracoes.gs` simplesmente não pode ser criado ali.
- *
- * No repositório eles ficam em pastas diferentes e a colisão não aparece; no
- * Apps Script, aparece na hora de colar. Um teste da suíte confere que nenhum
- * .gs tenha o mesmo nome de um .html.
- * ============================================================================
- * Esta é a tela mais importante do produto. Tudo o que as outras fazem sai
- * daqui: quais campos o formulário pergunta, quais listas ele oferece, quem
- * entra, o que cada nível pode ver, quais situações viram cartão, o nome e a
- * marca da operação.
- *
- * TRÊS NÍVEIS DE RISCO, e cada um com uma guarda diferente:
- *
- *   1. mexer em CONTEÚDO        renomear uma situação, criar um motivo novo,
- *      permissão "configurar"   cadastrar um usuário. Reversível.
- *
- *   2. mexer em REGRA           o que um nível de acesso pode, quem vê qual
- *      permissão "configurar"   campo. Reversível, mas afeta todo mundo.
- *
- *   3. mexer em ESTRUTURA       criar coluna na planilha, apagar canal.
- *      + SENHA DE ADMINISTRADOR Isso não tem desfazer.
- *
- * A senha não é burocracia: criar coluna escreve na planilha de produção, e
- * não existe "Ctrl+Z" ali.
- * ============================================================================
- */
-
-/**
- * O panorama da tela de Configurações: quantos itens há em cada seção e o que
- * está pedindo atenção.
- *
- * Vem numa chamada só porque a tela abre mostrando as seis seções ao mesmo
- * tempo — seis idas ao servidor fariam a tela montar aos pedaços.
- */
 function resumoDasConfiguracoes() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var catalogo = lerRegistros_('CATALOGO');
@@ -8410,15 +5252,7 @@ function resumoDasConfiguracoes() {
     senhaDefinida: existeSenhaDeAdministrador_(),
     identidade: lerIdentidadeVisual_(),
     titulosDasTelas: titulosDasTelas(),
-    /*
-     * As opções de disponibilidade, para o cadastro de usuários.
-     *
-     * Vêm AQUI, e não numa chamada própria, porque este panorama já é lido
-     * uma vez quando Configurações abre — e o catálogo inteiro já está em
-     * memória nesta execução, por causa do `catalogo` ali em cima. Uma
-     * chamada só para isto seria uma ida ao serviço a mais numa tela que
-     * acabou de ser enxugada.
-     */
+
     disponibilidades: catalogo
       .filter(function (item) {
         return normalizarParaComparar_(item.Tipo) === 'disponibilidade'
@@ -8430,26 +5264,11 @@ function resumoDasConfiguracoes() {
       .map(function (item) {
         return { nome: String(item.Nome), cor: String(item.Cor || '') };
       }),
-    // Qual delas recebe caso. A tela precisa saber para explicar a escolha,
-    // e tirar isto do servidor evita a tela ter a palavra escrita nela.
-    disponibilidadeQueRecebe: RECC_DISPONIBILIDADE_QUE_RECEBE,
-    /*
-      Os títulos são CURTOS de propósito: o menu tem uma coluna só, e um
-      título que quebra em duas linhas desalinha a contagem do lado direito.
-      O que o título deixou de dizer, a descrição diz — ela aparece inteira
-      assim que a seção é escolhida.
-    */
-    secoes: [
-      /*
-        A SEÇÃO SE CHAMA PELO NOME DA TELA QUE ELA AJUSTA.
-        Era "Campos", e o PO pediu "Cadastrar Caso": "assim saberei que é onde
-        ajusto o formulário". A CHAVE continua `campos` — é ela que o menu, a
-        rota e o ícone usam, e trocá-la seria renomear um nome de código por
-        um motivo de tela.
 
-        As LISTAS continuam seção à parte, com o nome que ele deu: "Ajustes
-        Gerais", "que vou entender que são outros tipos de ajuste".
-      */
+    disponibilidadeQueRecebe: RECC_DISPONIBILIDADE_QUE_RECEBE,
+
+    secoes: [
+
       { chave: 'campos', titulo: 'Cadastrar Caso',
         descricao: 'Os campos que o formulário pergunta, em cada canal',
         quantidade: lerRegistros_('CAMPOS').length },
@@ -8501,19 +5320,11 @@ function resumoDasConfiguracoes() {
   };
 }
 
-// ============================================================================
-// CAMPOS DO FORMULÁRIO
-// ============================================================================
-
-/** Todos os campos de um canal, inclusive os desligados — aqui se administra. */
 function listarCamposDoCanal(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
 
-  // A aba CANAIS e o CATÁLOGO, lidos UMA VEZ para a lista inteira. Dentro do
-  // laço, isto eram duas idas ao serviço por campo — com 48 campos, 98 idas e
-  // dois segundos e meio de espera para abrir a tela.
   var jaLido = {
     linhaDoCanal: buscarRegistros_('CANAIS', 'Id',
       converterParaIdentificador_(canal.id), 1)[0],
@@ -8546,29 +5357,20 @@ function listarCamposDoCanal(idDoCanal) {
         catalogo: String(configuracao.catalogo || ''),
         listaDe: String(configuracao.listaDe || ''),
         largura: Number(configuracao.largura) || 1,
-        // Quando o campo aparece, e — para quem pode mandar nos outros — as
-        // opções que ele tem: é com elas que a tela monta "mostrar quando…".
+
         mostrarSe: condicaoDoCampo_(configuracao),
         obrigatorioSe: condicaoDoCampo_({ mostrarSe: configuracao.obrigatorioSe }),
         opcoes: String(campo.TipoCampo || '') === 'seletor'
           ? opcoesDoCampo_(configuracao, canal.id).map(function (opcao) { return opcao.valor; })
           : [],
-        // Coluna que sumiu da planilha aparece marcada, em vez de o campo
-        // simplesmente parar de funcionar sem ninguém entender por quê.
+
         colunaExiste: posicaoDaColuna_(estrutura, campo.Cabecalho) >= 0,
-        /*
-          Em que ajustes do canal esta coluna está citada — vazio quando em
-          nenhum. Vai junto da lista para a tela poder DIZER ANTES por que o
-          botão de excluir não está ali, em vez de deixar a pessoa clicar e
-          receber uma recusa. É a mesma informação que `excluirCampo` usa para
-          recusar; quem manda é o servidor, e a tela só não esconde o motivo.
-        */
+
         usadoPeloCanal: quemApontaParaAColuna_(canal, campo.Cabecalho, jaLido)
       };
     });
 }
 
-/** As opções que a tela oferece ao configurar um campo. */
 function opcoesDeConfiguracaoDeCampo() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   return {
@@ -8580,21 +5382,10 @@ function opcoesDeConfiguracaoDeCampo() {
   };
 }
 
-/**
- * As chaves de todas as listas: as que têm item e as criadas em Ajustes
- * Gerais que ainda estão vazias (o registro LISTA).
- */
 function tiposDeCatalogoExistentes_() {
   return listasDeAjustes_().map(function (lista) { return lista.chave; });
 }
 
-/**
- * Altera um campo que já existe.
- *
- * Não mexe na planilha: mudar rótulo, seção, máscara ou obrigatoriedade é
- * mexer em como o campo APARECE, e não em onde ele mora. Por isso não pede
- * senha. Trocar o CABEÇALHO, sim, seria mexer na coluna — e é recusado.
- */
 function salvarCampo(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -8609,8 +5400,7 @@ function salvarCampo(dados) {
       'reconciliação de colunas.');
   }
   if (normalizarParaComparar_(atual.Protegido) === 'sim' && dados.ativo === false) {
-    // Campo protegido pode ser escondido, mas nunca desligado do contrato.
-    // A distinção existe porque a coluna continua sendo gravada pelo sistema.
+
   }
 
   var configuracao = lerConfiguracaoDoCampo_(atual);
@@ -8632,7 +5422,7 @@ function salvarCampo(dados) {
     if (condicao) configuracao.mostrarSe = condicao;
     else delete configuracao.mostrarSe;
   }
-  // "Obrigatório quando…" — o valor retido no Retido, pedido do PO.
+
   if (dados.obrigatorioSe !== undefined) {
     var obrigacao = conferirACondicaoDoCampo_(atual, dados.obrigatorioSe, true);
     if (obrigacao) configuracao.obrigatorioSe = obrigacao;
@@ -8661,23 +5451,9 @@ function salvarCampo(dados) {
   return true;
 }
 
-/**
- * Confere a condição que a tela mandou — "mostrar este campo só quando OUTRO
- * campo for um destes valores" — e devolve a que vai ser guardada, ou null
- * para "aparece sempre".
- *
- * O que ela recusa, porque cada um vira um campo que nunca aparece (e ninguém
- * entende por quê):
- *   · o campo que manda não existir neste canal, ou ser o próprio campo;
- *   · um valor que não é opção do campo que manda — a digitação errada de
- *     "Transmitido" nunca faria a regra valer;
- *   · um ciclo: A aparece quando B tem valor, e B aparece quando A tem valor.
- * Os valores guardados são os NOMES das opções, como a lista os escreve.
- */
 function conferirACondicaoDoCampo_(campo, pedido, ehObrigacao) {
   if (!pedido || !pedido.campo) return null;
-  // A mesma conferência serve ao "obrigatório quando…": muda só o texto, e o
-  // ciclo não se aplica — ser cobrado não esconde campo nenhum.
+
   var oQue = ehObrigacao ? 'é obrigatório' : 'aparece';
 
   var doCanal = lerRegistros_('CAMPOS').filter(function (outro) {
@@ -8715,7 +5491,6 @@ function conferirACondicaoDoCampo_(campo, pedido, ehObrigacao) {
     return achada;
   });
 
-  // Ciclo: sobe de quem manda em quem manda; se chegar neste campo, volta.
   var subindo = ehObrigacao ? null : quemManda;
   for (var passo = 0; subindo && passo < 20; passo++) {
     var acima = condicaoDoCampo_(lerConfiguracaoDoCampo_(subindo));
@@ -8732,12 +5507,6 @@ function conferirACondicaoDoCampo_(campo, pedido, ehObrigacao) {
   return { campo: String(quemManda.ChaveTecnica), valores: valores };
 }
 
-/**
- * Cria um campo NOVO — e com ele uma coluna nova na planilha.
- *
- * É a ação mais cara da tela: escreve na base de produção e não tem desfazer.
- * Por isso exige senha de administrador, e não só a permissão de configurar.
- */
 function criarCampo(idDoCanal, dados) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
@@ -8753,8 +5522,6 @@ function criarCampo(idDoCanal, dados) {
     throw new Error('Tipo de campo desconhecido: "' + tipoDeCampo + '".');
   }
 
-  // O cabeçalho da coluna é o rótulo. Um nome para as duas coisas evita a
-  // pergunta "por que a planilha chama diferente da tela".
   var criada = adicionarColuna_(canal.aba, rotulo, tipoDeDado);
 
   var campo = buscarRegistros_('CAMPOS', 'Cabecalho', rotulo, 1)[0];
@@ -8774,12 +5541,6 @@ function criarCampo(idDoCanal, dados) {
   return { cabecalho: criada.cabecalho, coluna: criada.coluna, canal: canal.nome };
 }
 
-/**
- * Reordena os campos do formulário.
- *
- * Muda a ordem NA TELA, e nunca na planilha: a coluna fica onde está. Foi por
- * reordenar coluna que o sistema anterior corrompeu dado.
- */
 function reordenarCampos(idDoCanal, idsNaOrdem) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -8801,36 +5562,6 @@ function reordenarCampos(idDoCanal, idsNaOrdem) {
   return true;
 }
 
-/**
- * Exclui um campo DE VEZ — a linha de CAMPOS sai, e o campo deixa de existir.
- *
- * DESLIGAR E EXCLUIR SÃO COISAS DIFERENTES, e as duas foram pedidas.
- * Desligar ("Aparece no formulário = Não") tira o campo da tela e deixa tudo
- * no lugar: a coluna fica, o dado fica, e um dia ele volta. É o que se usa
- * quando a dúvida é "ainda vamos precisar disto?". Excluir é para o campo que
- * nasceu errado e não volta.
- *
- * A COLUNA É UMA SEGUNDA ESCOLHA, e é a parte sem volta:
- *
- *   apagarAColuna = false   a coluna fica na planilha, com todo o dado dela.
- *                           O sistema só para de perguntar e de gravar ali.
- *   apagarAColuna = true    a coluna sai da aba, e o que estava gravado nela
- *                           em TODOS os casos vai com ela.
- *
- * As duas pedem senha de administrador: a primeira muda o formulário de
- * produção, a segunda apaga dado de produção.
- *
- * O QUE NÃO SAI, e por quê:
- *
- *   campo PROTEGIDO        é coluna do contrato da aba — o Id, o analista, o
- *                          status, as colunas que o Power BI junta. Sem ela o
- *                          canal para de funcionar. Para tirar do formulário,
- *                          desligue; o dado continua indo para a planilha.
- *   coluna APONTADA pelo   se a coluna do status, da data, da finalização ou
- *   próprio canal          do responsável sair, a tela de Trabalho perde o
- *                          chão. Primeiro troque a referência em Canais de
- *                          trabalho, depois exclua.
- */
 function excluirCampo(idDoCanal, idDoCampo, apagarAColuna) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
@@ -8887,28 +5618,8 @@ function excluirCampo(idDoCanal, idDoCampo, apagarAColuna) {
   };
 }
 
-/**
- * Em que lugares da configuração do canal esta coluna está citada.
- *
- * Pelo NOME de cada ajuste, e não pelo nome da coluna da aba CANAIS: quem lê
- * o recado é quem vai trocar a referência na tela, e lá está escrito "Coluna
- * do status", não "ColunaDoStatus".
- */
 function quemApontaParaAColuna_(canal, cabecalho, jaLido) {
-  /*
-   * `jaLido` é o que faz esta função servir numa LISTA sem custar por item.
-   *
-   * ELA ERA A FUNÇÃO MAIS CARA DO SISTEMA, e por um motivo que não aparecia
-   * lendo o código dela: ela é chamada UMA VEZ POR CAMPO por
-   * `listarCamposDoCanal`, e lia a aba CANAIS e o CATÁLOGO a cada chamada.
-   * Com os 48 campos da RET, eram 98 idas ao serviço — a 25 ms cada, dois
-   * segundos e meio de pedágio só para abrir "Cadastrar Caso". Era a demora
-   * que a operação relatou.
-   *
-   * Agora quem chama em volta de um laço lê as duas coisas UMA vez e passa
-   * aqui. Quem chama uma vez só continua chamando sem o terceiro argumento, e
-   * a função lê por conta dela — nenhuma chamada precisou mudar de forma.
-   */
+
   var pronto = jaLido || {};
   var linha = pronto.linhaDoCanal || buscarRegistros_('CANAIS', 'Id',
     converterParaIdentificador_(canal.id), 1)[0];
@@ -8936,18 +5647,6 @@ function quemApontaParaAColuna_(canal, cabecalho, jaLido) {
     }
   });
 
-  /*
-   * E os CARIMBOS DE STATUS, que são o caso mais traiçoeiro de todos.
-   *
-   * Um status com "Coluna que recebe data e hora" apontando para uma coluna
-   * que não existe mais não dá erro nenhum: o caso muda de status, e o
-   * carimbo simplesmente não é escrito. Ninguém descobre até alguém
-   * estranhar que "Já contatados" está zerado — foi exatamente assim que o
-   * achado 43 apareceu, pela tela de Produtividade.
-   */
-  //
-  // E os itens de LISTA que carimbam (a tentativa de contato, por exemplo), e
-  // os itens sem canal, que valem para todos — inclusive para este.
   (pronto.catalogo || lerRegistros_('CATALOGO')).forEach(function (item) {
     var canalDoItem = converterParaIdentificador_(item.CanalId);
     if (canalDoItem && canalDoItem !== converterParaIdentificador_(canal.id)) return;
@@ -8959,10 +5658,6 @@ function quemApontaParaAColuna_(canal, cabecalho, jaLido) {
 
   return achados;
 }
-
-// ============================================================================
-// LISTAS (a aba CATALOGO)
-// ============================================================================
 
 function listarCatalogo(tipo, idDoCanal) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
@@ -8996,13 +5691,6 @@ function listarCatalogo(tipo, idDoCanal) {
     });
 }
 
-/**
- * Cria ou altera um item de lista.
- *
- * O NOME é o que fica gravado nos casos; o RÓTULO é o que aparece na tela.
- * Trocar o rótulo é seguro. Trocar o nome não renomeia o que já foi gravado —
- * e por isso o sistema avisa em vez de deixar acontecer calado.
- */
 function salvarItemDoCatalogo(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -9019,10 +5707,7 @@ function salvarItemDoCatalogo(dados) {
 
   var campos = {
     Tipo: tipo,
-    // O CANAL DO ITEM. Antes a tela não mandava o canal, e editar um status
-    // gravava o canal VAZIO: o status de um canal virava status de todos, e
-    // passava a aparecer na RET, na Mesa e no VG. Agora a tela manda; e quem
-    // chama sem mandar (de fora da tela) mantém o canal que o item já tinha.
+
     CanalId: dados.canalId === undefined && atual
       ? converterParaIdentificador_(atual.CanalId)
       : converterParaIdentificador_(dados.canalId),
@@ -9034,11 +5719,6 @@ function salvarItemDoCatalogo(dados) {
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
   };
 
-  // Carimba o status e o item de uma lista que algum campo do formulário usa
-  // (a tentativa de contato, pedido do PO). Guardar a coluna num item de lista
-  // que nenhum campo usa criaria uma configuração que não faz nada — e
-  // configuração que não faz nada é pior que configuração faltando, porque
-  // alguém a preenche e espera efeito.
   if (tipo === 'STATUS' || listaUsadaPorCampo_(tipo)) {
     campos.ColunaDeCarimbo = String(dados.colunaDeCarimbo || '').trim();
     var mudouOCarimbo = !atual || normalizarParaComparar_(atual.ColunaDeCarimbo)
@@ -9048,9 +5728,7 @@ function salvarItemDoCatalogo(dados) {
     }
   }
   if (tipo === 'STATUS') {
-    // Status FINAL: fecha o caso e entra em "Concluídos". Só grava se a
-    // planilha já tem a coluna — antes de rodar atualizarPGO ela não existe,
-    // e campo sem coluna é recusado, o que impediria salvar o status inteiro.
+
     if (posicaoDaColuna_(estruturaDaAba_('CATALOGO'), 'Final') >= 0) {
       campos.Final = dados.final === true ? 'SIM' : 'NAO';
     }
@@ -9079,15 +5757,6 @@ function salvarItemDoCatalogo(dados) {
   return criado.__id;
 }
 
-/**
- * O item renomeado leva junto os cartões que o contavam (Etapa 44).
- *
- * Relato do PO: os cards "não funcionam" e "ficam presos". A causa: o status
- * renomeado em Ajustes Gerais deixava o cartão apontando para o nome antigo —
- * contava zero, filtrava a fila para vazio e travava o salvar dos cartões.
- * Vale para o cartão de status e para o de valor de um campo cuja lista é a do
- * item renomeado.
- */
 function renomearNosCartoes_(antigo, novo, tipo, canalDoItem) {
   var velho = normalizarParaComparar_(antigo);
   var doItem = converterParaIdentificador_(canalDoItem);
@@ -9111,7 +5780,6 @@ function renomearNosCartoes_(antigo, novo, tipo, canalDoItem) {
   });
 }
 
-/** Algum campo do formulário usa esta lista? É o que faz um item dela carimbar. */
 function listaUsadaPorCampo_(tipo) {
   var procurada = normalizarParaComparar_(tipo);
   return lerRegistros_('CAMPOS').some(function (campo) {
@@ -9120,10 +5788,6 @@ function listaUsadaPorCampo_(tipo) {
   });
 }
 
-/**
- * Os canais em que um item de lista pode carimbar: o canal dele, ou — item de
- * todos os canais — os canais cujo formulário usa a lista (no status, todos).
- */
 function canaisDoCarimbo_(tipo, canalId) {
   var doItem = converterParaIdentificador_(canalId);
   var ehStatus = normalizarParaComparar_(tipo) === 'status';
@@ -9143,13 +5807,6 @@ function canaisDoCarimbo_(tipo, canalId) {
   });
 }
 
-/**
- * As colunas de uma base que podem receber o carimbo: as de DATA (do
- * contrato ou de um campo de data) e as colunas suas, criadas direto na
- * planilha — o sistema não sabe o tipo delas, e uma "Data da 1ª tentativa"
- * criada à mão tem de aparecer. Ficam de fora as de texto, número e lista:
- * carimbar data em "Nome do cliente" não tem volta.
- */
 function colunasQueRecebemCarimbo_(nomeDaAba) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var suas = colunasSuasDaAba_(nomeDaAba);
@@ -9161,13 +5818,6 @@ function colunasQueRecebemCarimbo_(nomeDaAba) {
   });
 }
 
-/**
- * O que o menu "Coluna que recebe data e hora" oferece, canal por canal.
- *
- * Pedido do PO: escolher a coluna num MENU, e não escrevendo o nome — "assim
- * evitamos troca de nomes no meio do caminho". Vai junto quais canais usam a
- * lista, para o item "de todos os canais" mostrar só o que faz sentido.
- */
 function opcoesDoCarimboDoItem(tipo) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var ehStatus = normalizarParaComparar_(tipo) === 'status';
@@ -9183,7 +5833,7 @@ function opcoesDoCarimboDoItem(tipo) {
       try {
         colunas = carimba ? colunasQueRecebemCarimbo_(canal.aba) : [];
       } catch (erro) {
-        colunas = [];   // aba ausente: o diagnóstico é quem explica
+        colunas = [];
       }
       return {
         id: converterParaIdentificador_(canal.id),
@@ -9195,12 +5845,6 @@ function opcoesDoCarimboDoItem(tipo) {
   };
 }
 
-/**
- * Recusa uma coluna de carimbo que nenhum canal do item aceita.
- *
- * Só é chamada quando a coluna MUDA: um status antigo, que carimba numa coluna
- * de antes desta regra, continua salvando como sempre.
- */
 function conferirColunaDoCarimbo_(tipo, canalId, coluna) {
   var canais = canaisDoCarimbo_(tipo, canalId);
   var aceitas = [];
@@ -9219,15 +5863,6 @@ function conferirColunaDoCarimbo_(tipo, canalId, coluna) {
     + (aceitas.length ? ': ' + aceitas.join(', ') : '') + '.');
 }
 
-/**
- * Em quantos casos este item de lista está gravado.
- *
- * Lê só as COLUNAS dos campos que usam a lista do item (o Assunto, para um
- * assunto; o Status, para um status) — e não a linha inteira de todas as
- * bases, que com 200 mil casos estouraria o tempo do Apps Script. Lista que
- * nenhum campo usa (Origem, Cargo, Disponibilidade) continua sendo procurada
- * em todas as colunas, como antes: não há como saber onde ela foi gravada.
- */
 function quantosCasosUsam_(item) {
   var procurado = normalizarParaComparar_(item.Nome);
   var lista = String(item.Tipo || '').trim().toUpperCase();
@@ -9273,52 +5908,22 @@ function quantosCasosUsam_(item) {
   return quantos;
 }
 
-/* ============================================================================
-   AS LISTAS EM SI — criar, renomear e excluir
-   ============================================================================
-   Pedido do PO: "na aba Ajustes Gerais quero que seja possível incluir,
-   excluir ou editar quaisquer" listas. Antes só os ITENS se mexiam pela tela:
-   uma lista nova tinha de ser criada à mão na planilha, porque a tela só
-   mostrava as listas que já tinham algum item.
-
-   A LISTA vira um registro na própria aba CATALOGO, com o tipo LISTA: o NOME
-   é a chave (ASSUNTO, CLASSIFICACAO), que é o que os campos e os itens
-   guardam; o RÓTULO é o nome que a pessoa lê ("Classificação"). É o que deixa
-   uma lista recém-criada, ainda sem item, aparecer na tela.
-
-   A CHAVE NÃO MUDA depois de criada: os itens e os campos apontam para ela, e
-   trocá-la seria trocar em três lugares. Renomear troca só o nome na tela.
-   ============================================================================ */
-
 const RECC_TIPO_LISTA = 'LISTA';
 
-/**
- * As listas que o próprio sistema usa por dentro — status, cargo,
- * disponibilidade e segmento. Os itens delas se editam e se excluem; a lista
- * inteira, não: sem ela, o cadastro de usuários, o de corretoras ou os
- * cartões do Trabalho perderiam o chão.
- */
 const RECC_LISTAS_DO_SISTEMA = ['STATUS', 'CARGO', 'DISPONIBILIDADE', 'SEGMENTO'];
 
-/** Tipos da aba CATALOGO que não são listas de formulário. */
 const RECC_TIPOS_FORA_DAS_LISTAS = ['NIVEL_ACESSO', RECC_TIPO_LISTA];
 
-/** "CANAL_ORIGEM" vira "Canal origem": o nome de quem ainda não ganhou um. */
 function nomeLegivelDaLista_(chave) {
   var texto = String(chave || '').toLowerCase().replace(/_/g, ' ');
   return texto.charAt(0).toUpperCase() + texto.substring(1);
 }
 
-/** "Classificação do caso" vira "CLASSIFICACAO_DO_CASO". */
 function chaveDaLista_(nome) {
   return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-/**
- * Todas as listas, com o nome na tela, quantos itens têm e em quais campos
- * aparecem — "usada em Assunto (Mesa Diamante)" é o que responde "onde fica".
- */
 function listasDeAjustes_() {
   var catalogo = lerRegistros_('CATALOGO');
   var porChave = {};
@@ -9370,7 +5975,6 @@ function acharLista_(chave) {
   return achada;
 }
 
-/** Cria uma lista vazia. Devolve a chave, que é o que os campos guardam. */
 function criarLista(nome) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var legivel = String(nome || '').trim();
@@ -9394,7 +5998,6 @@ function criarLista(nome) {
   return chave;
 }
 
-/** Troca o nome que aparece na tela. A chave fica: os campos apontam para ela. */
 function renomearLista(chave, nome) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var legivel = String(nome || '').trim();
@@ -9403,7 +6006,7 @@ function renomearLista(chave, nome) {
   if (lista.idDoRegistro) {
     atualizarRegistro_('CATALOGO', lista.idDoRegistro, { Rotulo: legivel });
   } else {
-    // Lista que veio da instalação, sem registro: ganha um agora.
+
     var criado = inserirRegistro_('CATALOGO', novoItemDeCatalogo_(RECC_TIPO_LISTA, '',
       lista.chave, 0, ''));
     atualizarRegistro_('CATALOGO', criado.__id, { Rotulo: legivel });
@@ -9413,12 +6016,6 @@ function renomearLista(chave, nome) {
   return true;
 }
 
-/**
- * Exclui a lista inteira, com todos os itens.
- *
- * Recusa a lista do sistema e a lista que algum campo usa — o campo ficaria
- * um seletor sem opção nenhuma. Os casos gravados não mudam: guardam o texto.
- */
 function excluirLista(chave) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var lista = acharLista_(chave);
@@ -9445,7 +6042,6 @@ function excluirLista(chave) {
   return { nome: lista.nome, itens: apagados };
 }
 
-/** Em quantos casos o item está gravado — para o aviso antes de excluir. */
 function usoDoItemDoCatalogo(id) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var item = buscarRegistros_('CATALOGO', 'Id', converterParaIdentificador_(id), 1)[0];
@@ -9453,11 +6049,6 @@ function usoDoItemDoCatalogo(id) {
   return { nome: String(item.Rotulo || item.Nome), casos: quantosCasosUsam_(item) };
 }
 
-/**
- * Exclui um item da lista, de vez — decisão do PO: "exclui, e os casos
- * mantêm o texto". O item some da lista e do formulário; o que já está
- * gravado nos casos fica como está. A tela avisa antes, dizendo em quantos.
- */
 function excluirItemDoCatalogo(id) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var alvo = converterParaIdentificador_(id);
@@ -9473,10 +6064,6 @@ function excluirItemDoCatalogo(id) {
     + (casos ? ' (gravado em ' + casos + ' caso(s), que mantêm o texto)' : ''));
   return { nome: String(item.Rotulo || item.Nome), casos: casos };
 }
-
-// ============================================================================
-// NÍVEIS DE ACESSO
-// ============================================================================
 
 function listarNiveisDeAcesso() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
@@ -9512,30 +6099,8 @@ function listarNiveisDeAcesso() {
     });
 }
 
-/**
- * CRIA ou altera um nível de acesso.
- *
- * Sem `id`, nasce um nível novo; com `id`, muda o que esse nível pode. Criar
- * pela tela foi pedido pelo PO — "não consigo cadastrar novos níveis de acesso
- * e preciso ter essa funcionalidade" —, e faz sentido: a operação está se
- * formando, e os quatro níveis que vêm na instalação são um ponto de partida,
- * não a estrutura final dela.
- *
- * A MESMA FUNÇÃO faz as duas coisas de propósito. Toda a conferência que vale
- * para editar vale igual para criar: ação que não existe, escopo inventado,
- * alcance desconhecido, canal que foi apagado. Duas funções separadas
- * dividiriam essas travas em dois lugares, e um dia uma delas ficaria para
- * trás — é assim que nasce o caminho que valida menos.
- *
- * Duas travas existem para ninguém se trancar do lado de fora: o último nível
- * que abre Configurações não pode perder essa tela, e o último que mexe em
- * estrutura não pode perder essa ação. Criar um nível não mexe nelas — nível
- * novo não tem gente —, mas passa pela mesma porta.
- *
- * Devolve o Id do nível, criado ou alterado.
- */
 function salvarNivelDeAcesso(dados) {
-  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
   var id = converterParaIdentificador_(dados.id);
   var atual = id ? buscarRegistros_('CATALOGO', 'Id', id, 1)[0] : null;
@@ -9547,13 +6112,6 @@ function salvarNivelDeAcesso(dados) {
       + 'escolhe o nível ao cadastrar alguém, e é ele que define a EQUIPE.');
   }
 
-  /*
-   * NOME REPETIDO É RECUSADO, e isto virou importante nesta rodada.
-   *
-   * O nível passou a ser a EQUIPE: quem tem o mesmo nível vê os números do
-   * mesmo grupo. Dois níveis chamados "Operação" seriam duas equipes com o
-   * mesmo nome na tela, e ninguém saberia em qual cadastrou quem.
-   */
   lerRegistros_('CATALOGO').forEach(function (item) {
     if (normalizarParaComparar_(item.Tipo) !== 'nivelacesso') return;
     if (converterParaIdentificador_(item.Id) === id) return;
@@ -9574,15 +6132,6 @@ function salvarNivelDeAcesso(dados) {
     if (!conhecida) throw new Error('Ação desconhecida: "' + acao + '".');
   });
 
-  /*
-   * O ALCANCE NA PRODUTIVIDADE RECC decide, sozinho, se a tela abre.
-   *
-   * A lista de telas é a fonte de verdade — é ela que `podeVerTela_` consulta
-   * em todo lugar —, então o seletor ESCREVE nela em vez de virar um segundo
-   * lugar para conferir. Escolher "Bloqueado" tira a tela; escolher qualquer
-   * outra coisa põe. Assim não existe o estado em que o seletor diz uma coisa
-   * e o menu faz outra.
-   */
   var naProdutividade = String(dados.escopoNaProdutividade || 'EQUIPE').toUpperCase();
   if (!RECC_ESCOPOS_DA_PRODUTIVIDADE[naProdutividade]) {
     throw new Error('Alcance desconhecido na Produtividade RECC: "' +
@@ -9597,10 +6146,6 @@ function salvarNivelDeAcesso(dados) {
       'são ' + Object.keys(RECC_ESCOPOS).join(', ') + '.');
   }
 
-  // Os canais que este nível enxerga. Lista vazia é TODOS, de propósito —
-  // ver lerPermissoesDoNivel_. Cada Id é conferido contra os canais que
-  // existem: guardar o Id de um canal apagado deixaria o nível enxergando
-  // nada, sem nenhuma mensagem dizendo por quê.
   var canaisQueExistem = {};
   canaisVisiveis_().forEach(function (canal) {
     canaisQueExistem[converterParaIdentificador_(canal.id)] = canal.nome;
@@ -9628,9 +6173,7 @@ function salvarNivelDeAcesso(dados) {
   });
 
   if (!atual) {
-    // A ORDEM nasce no fim da lista. Sem isto o nível novo apareceria
-    // misturado com os antigos, porque `Ordem` vazia lê como zero e zero
-    // vem antes de tudo.
+
     var ultima = 0;
     lerRegistros_('CATALOGO').forEach(function (item) {
       if (normalizarParaComparar_(item.Tipo) !== 'nivelacesso') return;
@@ -9664,13 +6207,6 @@ function salvarNivelDeAcesso(dados) {
   return id;
 }
 
-/**
- * Impede a mudança que deixaria a instalação sem quem a administre.
- *
- * Não é zelo excessivo: tirar "configurações" do único nível que a tem
- * tranca todo mundo do lado de fora, e a única saída seria editar a planilha
- * na mão — coisa que nem todo mundo sabe fazer sob pressão.
- */
 function exigirQueAlguemContinueEntrando_(idAlterado, telas, acoes) {
   var sobraramTelas = 0;
   var sobraramEstruturas = 0;
@@ -9701,14 +6237,6 @@ function exigirQueAlguemContinueEntrando_(idAlterado, telas, acoes) {
   }
 }
 
-/**
- * O que a tela precisa saber para montar um nível de acesso: quais telas
- * existem, quais ações e quais escopos.
- *
- * A lista de telas NÃO é escrita aqui — vem de RECC_TELAS_DO_SISTEMA, a mesma
- * que o menu percorre. Se um dia nascer uma tela nova, ela aparece nos dois
- * lugares no mesmo instante.
- */
 function opcoesDeNivelDeAcesso() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -9730,18 +6258,14 @@ function opcoesDeNivelDeAcesso() {
   };
 
   return {
-    // A Produtividade RECC sai da lista de telas: ela tem um seletor próprio,
-    // logo abaixo, que já liga e desliga. Duas caixas para a mesma tela é como
-    // alguém desliga a metade e jura que desligou.
+
     telas: RECC_TELAS_DO_SISTEMA
       .filter(function (item) { return item.tela !== 'produtividade'; })
       .map(function (item) {
         return { chave: item.tela, titulo: item.titulo };
       }),
     produtividade: {
-      // O nome de HOJE, que o administrador pode ter trocado. Escrever
-      // "Produtividade RECC" fixo aqui faria a tela de níveis falar de uma
-      // tela que o menu chama de outra coisa — é o achado 37.
+
       titulo: (titulosDasTelas().filter(function (uma) {
         return uma.tela === 'produtividade';
       })[0] || {}).titulo || 'Produtividade RECC',
@@ -9756,26 +6280,13 @@ function opcoesDeNivelDeAcesso() {
     escopos: Object.keys(RECC_ESCOPOS).map(function (chave) {
       return { chave: chave, descricao: oQueCadaEscopoAlcanca[chave] || '' };
     }),
-    // Quais canais existem, para o nível escolher os dele. Nenhum marcado
-    // quer dizer TODOS — é o caso de quem administra.
+
     canais: canaisVisiveis_().map(function (canal) {
       return { id: canal.id, nome: canal.nome, descricao: canal.descricao || '' };
     })
   };
 }
 
-// ============================================================================
-// CANAIS DE TRABALHO
-// ============================================================================
-
-/**
- * Os canais, inclusive as desligadas — aqui se administra.
- *
- * Vem com as colunas da base junto porque quase toda escolha desta seção é
- * "qual coluna guarda isto": escrever o nome da coluna à mão é como navegar
- * sem Log Pose — funciona até o dia em que você erra uma letra e o painel
- * fica em branco sem dizer por quê.
- */
 function listarCanaisConfiguraveis() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -9795,8 +6306,7 @@ function listarCanaisConfiguraveis() {
           return item.nome;
         });
       } catch (erro) {
-        // Aba que não existe não derruba a tela: o canal aparece marcado, e o
-        // administrador vê qual é o problema em vez de uma página branca.
+
         colunas = [];
       }
 
@@ -9815,7 +6325,7 @@ function listarCanaisConfiguraveis() {
         colunaDaAreaResponsavel: String(canal.ColunaDaAreaResponsavel || ''),
         colunaDoValor: String(canal.ColunaDoValor || ''),
         situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
-        // Vazio vale SIM, igual ao resto do sistema: a tela mostra marcado.
+
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
         slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
@@ -9832,14 +6342,6 @@ function listarCanaisConfiguraveis() {
     });
 }
 
-/**
- * Altera um canal que já existe.
- *
- * Muda o que o canal MOSTRA — nome, ícone, quais colunas viram fila, quais
- * situações viram cartão. Não muda onde ela mora: a aba é escolhida quando a
- * canal nasce, e trocá-la apontaria todos os casos já gravados para o lugar
- * errado. Criar canal novo é estrutura, e ainda não passa por aqui.
- */
 function salvarCanal(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -9862,16 +6364,14 @@ function salvarCanal(dados) {
     'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'].forEach(function (chave) {
     conferirQueAColunaExiste_(estrutura, dados[chave], atual.Aba);
   });
-  // As colunas da fila podem vir agrupadas — "Título: col, col; Título: col".
-  // Conferimos coluna por coluna, ignorando os títulos: título é texto livre,
-  // e é a coluna que precisa existir.
+
   String(dados.colunasDaBusca || '').split(',').forEach(function (pedaco) {
     conferirQueAColunaExiste_(estrutura, pedaco, atual.Aba);
   });
   String(dados.colunasDaFila || '').split(';').forEach(function (grupo) {
     var lista = grupo.indexOf(':') > 0
       ? grupo.substring(grupo.indexOf(':') + 1) : grupo;
-    // "A + B" junta duas colunas numa linha só: as DUAS precisam existir.
+
     lista.split(',').forEach(function (pedaco) {
       pedaco.split('+').forEach(function (parte) {
         conferirQueAColunaExiste_(estrutura, parte, atual.Aba);
@@ -9879,8 +6379,6 @@ function salvarCanal(dados) {
     });
   });
 
-  // Desligar o último canal ativo deixaria o Trabalho sem nada para mostrar,
-  // e o cadastro sem formulário — o sistema inteiro pareceria quebrado.
   if (dados.ativo === false) {
     var outrasAtivas = lerRegistros_('CANAIS').filter(function (canal) {
       return converterParaIdentificador_(canal.Id) !== id
@@ -9906,10 +6404,7 @@ function salvarCanal(dados) {
     ColunaDaAreaResponsavel: String(dados.colunaDaAreaResponsavel || ''),
     ColunaDoValor: String(dados.colunaDoValor || ''),
     SituacoesDestacadas: String(dados.situacoesDestacadas || ''),
-    // A tela que não mandar o campo não mexe nele — nem para desligar, nem
-    // para LIGAR. A tela de Configurações não tem esse campo: antes, salvar a
-    // Mesa Diamante por ela gravava SIM e religava, sem aviso, a conferência
-    // de SUSEP bloqueada que a Mesa não faz.
+
     ConfereSusepBloqueada: dados.confereSusepBloqueada === undefined
       ? String(atual.ConfereSusepBloqueada === undefined ? '' : atual.ConfereSusepBloqueada)
       : (dados.confereSusepBloqueada === false ? 'NAO' : 'SIM'),
@@ -9923,13 +6418,6 @@ function salvarCanal(dados) {
   return true;
 }
 
-/**
- * Os campos do SLA vindos de Configurações, conferidos — ou nada, numa
- * planilha que ainda não rodou a atualização e não tem as colunas.
- *
- * Campo que a tela não mandou fica como está: quem salva o canal por outro
- * caminho não pode desligar o SLA da Mesa por omissão.
- */
 function slaDoFormulario_(dados, atual) {
   var colunasDeCanais = estruturaDaAba_('CANAIS');
   if (posicaoDaColuna_(colunasDeCanais, 'SlaHorasUteis') < 0) return {};
@@ -9964,9 +6452,6 @@ function slaDoFormulario_(dados, atual) {
   };
 }
 
-/**
- * "8:15", "08:15" ou uma hora de planilha viram "08:15". Vazio ou torto: "".
- */
 function horaDoExpediente_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   if (Object.prototype.toString.call(valor) === '[object Date]') {
@@ -9986,38 +6471,8 @@ function minutosDaHoraDoExpediente_(texto) {
   return Number(partes[0]) * 60 + Number(partes[1]);
 }
 
-
-/**
- * Cria um CANAL NOVO: a aba na planilha e a linha dela em CANAIS.
- *
- * Pedido do PO: "na canais de trabalho devo conseguir cadastrar novos canais".
- * Faz sentido — a operação está se formando, e o VG nasceu de um pedido assim.
- * Até agora nascer um canal exigia mexer no código do instalador.
- *
- * DOIS CAMINHOS, e a diferença entre eles é o que já existe na planilha:
- *
- *   ABA QUE NÃO EXISTE  nasce com a coluna `id` e as quatro de controle, e
- *                       nada mais. Os campos do formulário são criados depois,
- *                       um a um, em Cadastrar Caso — é lá que se escolhe nome,
- *                       tipo e obrigatoriedade de cada um. Inventar aqui um
- *                       "analista" e um "status" seria chutar os nomes das
- *                       colunas de uma operação que ainda não existe.
- *
- *   ABA QUE JÁ EXISTE   (com `aproveitarAAba`) o canal passa a apontar para a
- *                       aba como ela está. O cabeçalho dela NÃO é tocado: as
- *                       colunas que já estão lá são registradas em CAMPOS, e
- *                       as de controle são acrescentadas se faltarem. É o
- *                       caminho de quem já tem a base na planilha e só quer
- *                       que o PGO a trabalhe.
- *
- * O que o canal novo NÃO ganha: cartão, gráfico, status e meta. Nada disso é
- * chutado. A tela diz os próximos passos, e cada um é uma escolha de quem
- * conduz a operação.
- *
- * Pede senha de administrador, como toda ação que escreve na estrutura.
- */
 function criarCanal(dados) {
-  var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
+  exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
   dados = dadosDaTela_(dados);
 
@@ -10055,7 +6510,7 @@ function criarCanal(dados) {
   }
 
   if (temDado) {
-    // A aba fica COMO ESTÁ. Só confere o mínimo e acrescenta o que falta.
+
     var estrutura = estruturaDaAba_(nomeDaAba, true);
     if (posicaoDaColuna_(estrutura, 'Id') < 0) {
       throw new Error('A aba "' + nomeDaAba + '" não tem coluna de Id, e sem '
@@ -10065,14 +6520,12 @@ function criarCanal(dados) {
     }
     garantirColunasDeControle_(nomeDaAba, true);
   } else {
-    // Aba nova, ou aba vazia que estava sobrando: nasce no tamanho exato.
+
     criarAbaDoContrato_(planilha, {
       aba: nomeDaAba,
       titulo: nome,
       controle: true,
-      // Pré-formatar linha custa célula do orçamento de 10 milhões, e canal
-      // novo começa sem volume. Duzentas é espaço para começar; a grade
-      // cresce sozinha quando encher, em garantirLinhasNaGrade_.
+
       reserva: 200,
       colunas: [{ cabecalho: 'id', tipo: 'identificador', protegido: true }]
         .concat(colunasDeControleDe_(true))
@@ -10099,7 +6552,7 @@ function criarCanal(dados) {
     ColunaDaAreaResponsavel: '',
     ColunaDoValor: '',
     SituacoesDestacadas: '',
-    // Canal novo nasce conferindo: é o lado seguro, e desligar é um clique.
+
     ConfereSusepBloqueada: true,
     Icone: String(dados.icone || ''),
     Ordem: ultima + 1,
@@ -10108,16 +6561,6 @@ function criarCanal(dados) {
 
   esquecerEstruturaLida_();
 
-  /*
-   * AS COLUNAS SÓ SÃO REGISTRADAS AGORA, depois de a linha de CANAIS existir.
-   *
-   * `registrarColunaEmCampos_` descobre o CanalId procurando, em CANAIS, quem
-   * aponta para esta aba. Chamado antes, ele não acha ninguém e grava o campo
-   * com CanalId vazio — o campo existe em CAMPOS e NÃO aparece em Cadastrar
-   * Caso, porque `listarCamposDoCanal` filtra por canal. O canal nasceria com
-   * o formulário vazio e a planilha cheia de colunas, sem nenhum erro no
-   * caminho. Foi exatamente o que aconteceu na primeira versão desta função.
-   */
   var colunasRegistradas = temDado ? registrarColunasQueJaExistem_(nomeDaAba) : [];
 
   esquecerEstruturaLida_();
@@ -10139,21 +6582,8 @@ function criarCanal(dados) {
   };
 }
 
-/**
- * O nome de aba que o sistema sugere para um canal chamado X.
- *
- * `BASE_` na frente porque é assim que se chamam as abas de caso, e o prefixo
- * é o que separa, de olho, a base do que é cadastro ou configuração.
- *
- * Acento e espaço saem: nome de aba com acento atravessa o Apps Script sem
- * problema, mas atravessa fórmula, exportação e Power BI com tropeço — e
- * descobrir isso depois custa mais do que o acento ali vale.
- */
 function nomeDeAbaSugerido_(nome) {
-  // NÃO usa `normalizarParaComparar_` aqui: aquela função também tira os
-  // espaços, e "Auto Frota" sairia como BASE_AUTOFROTA — uma palavra só, que
-  // ninguém reconhece de relance na barra de abas da planilha. Aqui o espaço
-  // precisa virar "_", e não desaparecer.
+
   var semAcento = String(nome || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   var limpo = semAcento.toUpperCase()
@@ -10161,13 +6591,6 @@ function nomeDeAbaSugerido_(nome) {
   return 'BASE_' + (limpo || 'NOVO');
 }
 
-/**
- * Recusa um nome de aba que o sistema não pode usar.
- *
- * Os dois prefixos reservados são os que o próprio sistema gera ou espera:
- * `ANALISE_` é do gerador de análises, que apaga e refaz essas abas; e um
- * nome que já é do contrato apontaria o canal novo para a base de outro.
- */
 function conferirQueONomeDaAbaServe_(nomeDaAba) {
   var nome = String(nomeDaAba || '').trim();
   if (!nome) throw new Error('Diga em que aba este canal vai gravar.');
@@ -10187,19 +6610,6 @@ function conferirQueONomeDaAbaServe_(nomeDaAba) {
   }
 }
 
-/**
- * Registra em CAMPOS as colunas que JÁ EXISTEM numa aba aproveitada.
- *
- * Sem isto, o canal apontaria para uma base cheia de colunas e o Cadastrar
- * Caso dele apareceria vazio: quem lista os campos do formulário é CAMPOS, e
- * não o cabeçalho da aba.
- *
- * As colunas de controle ficam de fora — elas são do sistema, e ninguém as
- * digita. O tipo de cada coluna nasce TEXTO, que é o padrão seguro: ele
- * aceita qualquer conteúdo, e quem souber que a coluna é data ou dinheiro
- * troca o tipo em Cadastrar Caso. Chutar o tipo pela amostra gravaria um
- * número onde havia um código com zero à esquerda.
- */
 function registrarColunasQueJaExistem_(nomeDaAba) {
   var estrutura = estruturaDaAba_(nomeDaAba, true);
   var jaEmCampos = {};
@@ -10221,12 +6631,6 @@ function registrarColunasQueJaExistem_(nomeDaAba) {
   return registradas;
 }
 
-/**
- * Recusa o nome de uma coluna que não existe na base do canal.
- *
- * Sem esta conferência o erro só apareceria no Trabalho, dias depois, como
- * uma coluna em branco — e ninguém ligaria a coisa à letra trocada aqui.
- */
 function conferirQueAColunaExiste_(estrutura, nomeDaColuna, nomeDaAba) {
   var nome = String(nomeDaColuna || '').trim();
   if (!nome) return;
@@ -10238,31 +6642,18 @@ function conferirQueAColunaExiste_(estrutura, nomeDaColuna, nomeDaAba) {
     }).join(', ') + '.');
 }
 
-// ============================================================================
-// CARTÕES DOS PAINÉIS
-// ============================================================================
-
-/** Quantos cartões uma operação aguenta antes de virar parede de números. */
 const RECC_MAXIMO_DE_CARTOES = 12;
 
-/**
- * Os cartões de uma tela, para um canal, e as opções que a tela oferece.
- *
- * Vem tudo junto porque a tela abre mostrando as duas coisas: a lista de
- * cartões e o que cada um pode contar.
- */
 function listarCardsDoPainel(tela, idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = normalizarParaComparar_(tela) || 'trabalho';
 
-  // `grupo` é só para a tela separar o menu em partes (optgroup): com os
-  // valores de cada campo, ele deixou de caber numa lista corrida.
   var oQueContar = [
     { chave: 'total', rotulo: 'Total de casos', filtro: '', grupo: 'Status' }
   ];
   situacoesDoCanal_(canal).forEach(function (situacao) {
-    // O cartão aponta para o que está GRAVADO no caso, e mostra o rótulo.
+
     oQueContar.push({
       chave: 'situacao', rotulo: situacao.nome, filtro: situacao.gravadoComo,
       grupo: 'Status'
@@ -10275,13 +6666,6 @@ function listarCardsDoPainel(tela, idDoCanal) {
     });
   }
 
-  // "Já passaram por" conta pelo CARIMBO, e não pelo status de hoje.
-  //
-  // É a diferença entre "quantos estão em 1º contato" e "quantos já foram
-  // contatados". O primeiro zera assim que o caso avança; o segundo não, e é
-  // esse que a operação usa para medir produtividade. Uma opção por status que
-  // declarou coluna de carimbo, e só se a coluna existe de verdade na base —
-  // oferecer uma que não existe seria oferecer um cartão que nunca aparece.
   var estruturaDaBase = estruturaDaAba_(canal.aba);
   situacoesDoCanal_(canal).forEach(function (situacao) {
     if (!situacao.colunaDeCarimbo) return;
@@ -10318,9 +6702,7 @@ function listarCardsDoPainel(tela, idDoCanal) {
         ordem: Number(linha.Ordem) || 0,
         mostrar: normalizarParaComparar_(linha.Ativo) === 'sim'
       };
-      // Etapa 44: o cartão que aponta para um status ou coluna que NÃO EXISTE
-      // MAIS vem marcado — a tela mostra o motivo, para trocar ou remover. Antes
-      // ele travava o salvar da lista inteira, e nenhum cartão saía mais.
+
       cartao.naoExiste = motivoDoCartaoQueNaoExiste_(cartao, canal, estruturaDaBase);
       return cartao;
     });
@@ -10336,25 +6718,10 @@ function listarCardsDoPainel(tela, idDoCanal) {
   };
 }
 
-/**
- * O cartão que a pessoa REMOVEU, e não o que ela só escondeu (Etapa 50).
- *
- * Os dois ficam desligados na aba, e a diferença é a ordem: quem esconde um
- * cartão (tira o "Mostrar") continua no lugar dele, com Ordem 1, 2, 3…; quem o
- * remove recebe Ordem 0 (ver salvarCardsDoPainel). O editor lista o escondido —
- * para dar como religá-lo — e não o removido. Antes listava os dois, e o cartão
- * removido voltava, desmarcado e no topo, na hora de recarregar. A linha do
- * removido continua na planilha: religar à mão é pôr Ativo SIM e uma Ordem.
- */
 function cartaoFoiRemovido_(linha) {
   return normalizarParaComparar_(linha.Ativo) !== 'sim' && !(Number(linha.Ordem) > 0);
 }
 
-/**
- * Por que este cartão não conta mais nada — ou vazio, quando está tudo certo.
- * Acontece quando o status é renomeado ou apagado em Ajustes Gerais, ou a
- * coluna some da planilha.
- */
 function motivoDoCartaoQueNaoExiste_(cartao, canal, estrutura) {
   if (cartao.dimensao === 'situacao') {
     var existe = situacoesDoCanal_(canal).some(function (situacao) {
@@ -10372,26 +6739,8 @@ function motivoDoCartaoQueNaoExiste_(cartao, canal, estrutura) {
   return '';
 }
 
-/** Tipos de coluna que são data ou hora: ficam de fora dos cartões por coluna. */
 const RECC_TIPOS_DE_DATA_PARA_OS_CARTOES = ['data', 'dataHora', 'hora'];
 
-/**
- * Os cartões que contam pelas OUTRAS colunas da base — pedido do PO: "os cards
- * estão limitados apenas a status? Vamos aumentar o leque para demais colunas,
- * menos as de data".
- *
- * Duas formas, conforme a coluna:
- *   - campo de LISTA (do catálogo ou escrita no campo) e SIM/NÃO: um cartão
- *     por valor — "Tentativa: 1ª tentativa de contato sem sucesso";
- *   - qualquer outra coluna (texto, número, as suas): "Preenchida: X",
- *     quantos casos têm alguma coisa escrita nela.
- *
- * Fica de fora: data e hora (a contagem por data é o carimbo, "Já passaram
- * por"), a coluna do status (já tem os cartões dela), as colunas técnicas
- * ("_…") e as que outra opção já cobre. Lista vinda de um cadastro (usuários,
- * corretoras) vira "Preenchida": são milhares de valores, e um cartão por
- * corretora não é cartão, é tabela.
- */
 function opcoesDeCartaoPelasColunas_(canal, jaOferecidas) {
   var estrutura = estruturaDaAba_(canal.aba);
   var doStatus = normalizarParaComparar_(canal.colunaDoStatus);
@@ -10401,7 +6750,6 @@ function opcoesDeCartaoPelasColunas_(canal, jaOferecidas) {
     if (opcao.chave === 'preenchido') cobertas[normalizarParaComparar_(opcao.filtro)] = true;
   });
 
-  // O campo do formulário de cada coluna, para saber o nome na tela e a lista.
   var campoDaColuna = {};
   lerRegistros_('CAMPOS').forEach(function (campo) {
     if (converterParaIdentificador_(campo.CanalId)
@@ -10414,7 +6762,7 @@ function opcoesDeCartaoPelasColunas_(canal, jaOferecidas) {
   estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
     var chave = normalizarParaComparar_(cabecalho);
     if (!chave || String(cabecalho).charAt(0) === '_') return;
-    // O id está em todo caso: "Preenchida: id" seria o Total com outro nome.
+
     if (chave === doStatus || chave === 'id' || cobertas[chave]) return;
     var tipo = estrutura.tipos[posicao];
     if (RECC_TIPOS_DE_DATA_PARA_OS_CARTOES.indexOf(tipo) >= 0) return;
@@ -10436,10 +6784,6 @@ function opcoesDeCartaoPelasColunas_(canal, jaOferecidas) {
   return valores.concat(preenchidas);
 }
 
-/**
- * Os valores que um cartão pode contar numa coluna: os itens da lista do
- * campo, ou Sim e Não. Vazio quando a coluna não é de valores fechados.
- */
 function opcoesDeValorDoCartao_(campo, tipo, canal) {
   var tipoDoCampo = campo ? String(campo.TipoCampo || '') : '';
   if (tipo === 'simOuNao' || tipoDoCampo === 'simOuNao') {
@@ -10448,22 +6792,11 @@ function opcoesDeValorDoCartao_(campo, tipo, canal) {
   if (!campo || tipoDoCampo !== 'seletor') return [];
 
   var configuracao = lerConfiguracaoDoCampo_(campo);
-  // Campo que grava em mais de uma coluna (o produto, a proposta) não tem o
-  // valor da lista inteiro em coluna nenhuma.
+
   if (configuracao.separaEm || configuracao.partirEm || configuracao.listaDe) return [];
   return opcoesDoCampo_(configuracao, canal.id);
 }
 
-/**
- * Grava a lista inteira de cartões de uma vez.
- *
- * A tela edita todos juntos e aperta Salvar uma vez só — então o servidor
- * recebe a lista inteira e a torna verdade. Gravar cartão por cartão deixaria
- * a tela e a planilha em estados diferentes se a conexão caísse no meio.
- *
- * Remover um cartão NÃO toca em caso nenhum: o cartão é uma forma de contar,
- * e apagar a conta não apaga o que foi contado.
- */
 function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -10480,10 +6813,6 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     return s.gravadoComo;
   });
 
-  // O que já está gravado, por Id. A conferência abaixo vale para o cartão
-  // NOVO ou MUDADO: um cartão antigo que aponta para um status renomeado não
-  // pode impedir de salvar a lista — nem de removê-lo (Etapa 44, o "card
-  // preso" do PO). Ele segue gravado e aparece marcado na tela.
   var comoEstava = {};
   lerRegistros_('PAINEIS').forEach(function (linha) {
     comoEstava[converterParaIdentificador_(linha.__id)] = [
@@ -10499,8 +6828,7 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
   }
 
   lista.forEach(function (cartao, posicao) {
-    // Card que chega vazio é página antiga ou tela quebrada: recado, e não erro
-    // cru do JavaScript (item 96).
+
     if (!cartao || typeof cartao !== 'object') {
       throw new Error('O card ' + (posicao + 1) + ' chegou vazio da tela. Recarregue a '
         + 'página (Ctrl+F5) e tente de novo.');
@@ -10516,13 +6844,11 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     }
     if (!mudou(cartao)) return;
     if (cartao.dimensao === 'preenchido') {
-      // A coluna tem de existir AGORA, e não na hora de desenhar. Guardar um
-      // cartão que aponta para coluna inexistente cria um cartão que some da
-      // tela sem explicação — e quem o criou vai jurar que salvou.
+
       conferirQueAColunaExiste_(estruturaDaAba_(canal.aba), cartao.filtro, canal.aba);
     }
     if (cartao.dimensao === 'valor') {
-      // O cartão "valor" aponta para DUAS coisas: a coluna e o valor nela.
+
       if (!String(cartao.coluna || '').trim() || !String(cartao.filtro || '').trim()) {
         throw new Error('O card "' + String(cartao.titulo).trim() + '" conta um '
           + 'valor de campo, e precisa da coluna e do valor.');
@@ -10540,7 +6866,6 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     }
   });
 
-  // O que estava lá antes, para saber o que sobrou de fora e desligar.
   var jaGravados = lerRegistros_('PAINEIS').filter(function (linha) {
     if (normalizarParaComparar_(linha.Tela) !== alvo) return false;
     if (normalizarParaComparar_(linha.TipoWidget) !== 'cartao') return false;
@@ -10556,14 +6881,11 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
       Titulo: String(cartao.titulo).trim(),
       TipoWidget: 'cartao',
       CampoDimensao: cartao.dimensao,
-      // No cartão "valor", a coluna onde o valor é procurado. Nos outros
-      // cartões não há medida — um gráfico usa este campo para outra coisa.
+
       CampoMedida: cartao.dimensao === 'valor' ? String(cartao.coluna).trim() : '',
       Agregacao: 'contagem',
       Limite: 0,
-      // O Filtro é o que o cartão aponta: o nome do status, ou — quando conta
-      // pelo carimbo — o nome da coluna. Nas outras contagens não há para onde
-      // apontar, e um valor sobrando ali só confundiria quem for ler a aba.
+
       Filtro: (cartao.dimensao === 'situacao' || cartao.dimensao === 'preenchido'
         || cartao.dimensao === 'valor')
         ? String(cartao.filtro || '') : '',
@@ -10583,11 +6905,6 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
     continuam[inserirRegistro_('PAINEIS', campos).__id] = true;
   });
 
-  // Cartão que a tela não mandou de volta foi removido lá. Ele é DESLIGADO,
-  // não apagado: a linha continua na planilha, e nenhum caso é tocado — um
-  // cartão é uma forma de contar, e apagar a conta não apaga o que foi
-  // contado. Em PAINEIS quem desliga é a coluna Ativo, porque a aba não tem
-  // exclusão lógica (ela não é base operacional).
   jaGravados.forEach(function (linha) {
     if (!continuam[linha.__id]) {
       atualizarRegistro_('PAINEIS', linha.__id, { Ativo: 'NAO', Ordem: 0 });
@@ -10599,11 +6916,6 @@ function salvarCardsDoPainel(tela, idDoCanal, cartoes) {
   return true;
 }
 
-// ============================================================================
-// IDENTIDADE E SEGURANÇA
-// ============================================================================
-
-/** Nome, subtítulo, operação, logo, cor e o rodapé do menu. */
 function salvarIdentidade(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -10631,20 +6943,11 @@ function salvarIdentidade(dados) {
     gravarConfiguracao_(chave, mudancas[chave]);
   });
 
-  // OS NOMES DAS TELAS NO MENU.
-  //
-  // Eles moravam em MENU.TITULOS desde o começo e nunca tiveram onde ser
-  // editados — configuração sem tela é configuração que ninguém usa. Foi o
-  // que apareceu quando a operação quis chamar o Trabalho de "Trabalho".
-  //
-  // O que identifica a tela é a CHAVE, nunca o texto: renomear aqui não mexe
-  // em rota, em nível de acesso nem em endereço guardado.
   if (dados.titulosDasTelas && typeof dados.titulosDasTelas === 'object') {
     var titulos = {};
     RECC_TELAS_DO_SISTEMA.forEach(function (item) {
       var escolhido = String(dados.titulosDasTelas[item.tela] || '').trim();
-      // Nome em branco volta ao de fábrica. Menu com item sem nome é um
-      // buraco na lateral, e ninguém descobre para onde ele leva.
+
       titulos[item.tela] = escolhido || item.titulo;
     });
     gravarConfiguracao_('MENU.TITULOS', JSON.stringify(titulos));
@@ -10654,13 +6957,6 @@ function salvarIdentidade(dados) {
   return lerIdentidadeVisual_();
 }
 
-/**
- * Como cada tela se chama hoje, e como ela se chamaria de fábrica.
- *
- * A tela de Configurações precisa das duas coisas: o nome atual, para
- * preencher o campo, e o de fábrica, para mostrar como dica — sem ele,
- * ninguém sabe ao que volta se apagar o texto.
- */
 function titulosDasTelas() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -10680,7 +6976,6 @@ function titulosDasTelas() {
   });
 }
 
-/** Grava uma chave da aba CONFIG, criando a linha se ela não existir. */
 function gravarConfiguracao_(chave, valor) {
   var alvo = normalizarParaComparar_(chave);
   var linhas = lerRegistros_('CONFIG');
@@ -10704,7 +6999,6 @@ function gravarConfiguracao_(chave, valor) {
   }).__id;
 }
 
-/** Define ou troca a senha de administrador. Chamada pelo navegador. */
 function definirSenhaDeAdministrador(senhaNova, senhaAtual) {
   exigirPermissao_(RECC_ACOES.ESTRUTURA);
   definirSenhaDeAdministrador_(senhaNova, senhaAtual);
@@ -10712,23 +7006,11 @@ function definirSenhaDeAdministrador(senhaNova, senhaAtual) {
   return true;
 }
 
-/** Libera a sessão para as ações sem volta. Chamada pelo navegador. */
 function liberarComSenha(senha) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   return conferirSenhaDeAdministrador_(senha);
 }
 
-// ============================================================================
-// ESTRUTURA DA PLANILHA
-// ============================================================================
-
-/**
- * O laudo da estrutura, pronto para a tela.
- *
- * Só lê. Coluna que sumiu e coluna que apareceu são mostradas lado a lado
- * para o administrador decidir — o sistema não adivinha que uma virou a
- * outra. Adivinhar erraria calado, e o dado iria para a coluna errada.
- */
 function conferirEstruturaDaPlanilha() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var laudo = conferirEstrutura_();
@@ -10748,12 +7030,10 @@ function conferirEstruturaDaPlanilha() {
   };
 }
 
-/** As últimas ações registradas, da mais recente para a mais antiga. */
 function listarAuditoria(quantas) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var limite = Number(quantas) || 50;
-  // O que está na fila ainda não chegou à aba (Etapa 61): descarrega antes,
-  // para a trilha mostrar o que acabou de acontecer.
+
   descarregarAFilaDaAuditoria_(5000);
 
   var nomes = {};
@@ -10778,33 +7058,11 @@ function listarAuditoria(quantas) {
     });
 }
 
-// ============================================================================
-// O ARQUIVO DA AUDITORIA — o que tem mais de 2 meses vai para outra planilha
-// ============================================================================
-
-/*
- * POR QUE EXISTE. Pedido do PO: "vamos implementar um arquivamento dos dados
- * de auditoria para cada 2 meses. Eu incluo o id da planilha destino e o
- * sistema transporta os dados e em seguida apaga da planilha principal."
- *
- * A auditoria só cresce: cada ajuste de configuração, cada importação e cada
- * exclusão vira uma linha. Ela não pesa na tela — a trilha lê só as últimas —,
- * mas ocupa célula do teto de 10 milhões da planilha.
- *
- * O QUE VAI: as linhas com mais de 2 meses (decisão do PO). Os 2 últimos
- * meses ficam, que é o que alguém costuma vir procurar.
- *
- * A ORDEM É A REGRA: copia, CONFERE a cópia, e só então apaga. Se a cópia
- * falhar no meio, nada é apagado — a auditoria fica com as linhas e o arquivo
- * pode ficar com parte delas repetida, que é o erro que dá para consertar.
- * O contrário (apagar e depois copiar) perderia o rastro de vez.
- */
 var RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA = 'AUDITORIA.ARQUIVO_ID';
 var RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO = 'AUDITORIA.ARQUIVADA_EM';
 var RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO = 'AUDITORIA.ARQUIVADAS';
 var RECC_MESES_QUE_A_AUDITORIA_GUARDA = 2;
 
-/** O que a tela mostra: o Id, o último arquivamento e até quando iria hoje. */
 function configuracaoDoArquivoDaAuditoria() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -10822,13 +7080,6 @@ function configuracaoDoArquivoDaAuditoria() {
   };
 }
 
-/**
- * Aponta a planilha de arquivo — ou desliga, com o Id em branco.
- *
- * Confere antes de gravar, como a planilha de cadastros: guardar um Id que
- * não abre faria o arquivamento falhar só daqui a dois meses, quando ninguém
- * lembra mais o que foi digitado.
- */
 function salvarArquivoDaAuditoria(planilhaId) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirSenhaDeAdministrador_();
@@ -10842,7 +7093,6 @@ function salvarArquivoDaAuditoria(planilhaId) {
   return configuracaoDoArquivoDaAuditoria();
 }
 
-/** O botão "Arquivar agora". Pede a senha: apaga linha da planilha. */
 function arquivarAuditoriaAgora() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirSenhaDeAdministrador_();
@@ -10855,21 +7105,6 @@ function arquivarAuditoriaAgora() {
   };
 }
 
-/**
- * Para o ACIONADOR DE TEMPO — o PO cria no editor do Apps Script, mensal.
- *
- * Roda de 2 em 2 meses: o acionador mensal chama todo mês, e esta função só
- * arquiva quando o último arquivamento foi há 2 meses ou mais. Conta por MÊS
- * do calendário, e não por milissegundo: o acionador do dia 1º às 8h pode
- * disparar às 8h01 num mês e às 7h59 no outro, e contar no relógio faria um
- * arquivamento escorregar um mês inteiro por dois minutos.
- *
- * Sem planilha de arquivo apontada, não faz nada e não reclama — o acionador
- * pode estar ligado numa instalação que ainda não decidiu para onde mandar.
- *
- * Mesmo chamada por fora do acionador, ela não faz nada que o acionador não
- * faria: obedece aos mesmos 2 meses, e copia antes de apagar.
- */
 function arquivarAuditoriaAgendada() {
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim();
   if (!id) return { arquivou: false, motivo: 'sem planilha de arquivo' };
@@ -10888,7 +7123,6 @@ function arquivarAuditoriaAgendada() {
   return { arquivou: true, arquivadas: resultado.arquivadas, ate: resultado.ate };
 }
 
-/** Linha com DataHora ANTES deste dia vai para o arquivo. */
 function limiteDoArquivamento_(agora) {
   return new Date(agora.getFullYear(),
     agora.getMonth() - RECC_MESES_QUE_A_AUDITORIA_GUARDA, agora.getDate());
@@ -10903,7 +7137,6 @@ function dataDoUltimoArquivamento_() {
     Number(m[4] || 0), Number(m[5] || 0));
 }
 
-/** Abre a planilha de arquivo, ou explica por que não abriu. */
 function abrirArquivoDaAuditoria_(id) {
   var planilha;
   try {
@@ -10913,8 +7146,7 @@ function abrirArquivoDaAuditoria_(id) {
       + (erro.message || erro) + ' Confira o Id (o pedaço do endereço entre '
       + '/d/ e /edit) e se esta conta tem acesso a ela.');
   }
-  // Apontar para a própria planilha não arquivaria nada: copiaria a linha
-  // para o fim da mesma aba e apagaria do começo.
+
   if (planilha.getId() === planilhaAtiva_().getId()) {
     throw new Error('Esse é o Id desta mesma planilha. O arquivo da auditoria '
       + 'precisa ser OUTRA planilha.');
@@ -10922,14 +7154,6 @@ function abrirArquivoDaAuditoria_(id) {
   return planilha;
 }
 
-/**
- * O arquivamento em si: copia, confere, apaga.
- *
- * Só as linhas do COMEÇO da aba: a auditoria é escrita sempre no fim, então
- * as mais velhas estão em cima. Parar na primeira linha nova — em vez de
- * caçar linha velha no meio — deixa o apagar num bloco só, que é uma ida à
- * planilha em vez de uma por linha.
- */
 function arquivarAuditoria_(agora) {
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim();
   if (!id) {
@@ -10938,7 +7162,7 @@ function arquivarAuditoria_(agora) {
   var destino = abrirArquivoDaAuditoria_(id);
   var limite = limiteDoArquivamento_(agora);
   var quantas = 0;
-  descarregarAFilaDaAuditoria_(10000);   // a fila vai para a aba antes do corte (Etapa 61)
+  descarregarAFilaDaAuditoria_(10000);
 
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(30000)) {
@@ -10964,11 +7188,9 @@ function arquivarAuditoria_(agora) {
       var velhas = valores.slice(0, quantas);
       copiarParaOArquivo_(destino, estrutura, velhas, iId);
 
-      // Apagar TODAS as linhas de dados com a grade justa daria erro no
-      // Sheets ("não dá para apagar todas as linhas não congeladas").
       garantirLinhasNaGrade_(estrutura.aba, quantas + 2);
       estrutura.aba.deleteRows(2, quantas);
-      // A grade encolheu: toda posição guardada aponta para outra linha.
+
       esquecerEstruturaLida_('AUDITORIA');
     }
   } finally {
@@ -10985,13 +7207,6 @@ function arquivarAuditoria_(agora) {
   return { arquivadas: quantas, ate: ate };
 }
 
-/**
- * Escreve as linhas na aba AUDITORIA da planilha de arquivo, e confere.
- *
- * As colunas casam pelo NOME, como em todo o sistema: se a auditoria ganhar
- * uma coluna um dia, ela nasce no fim do cabeçalho do arquivo, e as linhas
- * antigas de lá ficam em branco nela — nada escorrega para a coluna vizinha.
- */
 function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
   var aba = destino.getSheetByName('AUDITORIA')
     || destino.insertSheet('AUDITORIA');
@@ -11041,7 +7256,6 @@ function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
   faixa.setNumberFormats(paraEscrever.map(function () { return formatosLa; }));
   faixa.setValues(paraEscrever);
 
-  // CONFERE antes de quem chamou apagar: relê os Ids que acabaram de ir.
   var iIdLa = ondeLa[normalizarParaComparar_(estrutura.cabecalhos[iId])];
   var lidos = aba.getRange(inicio, iIdLa + 1, linhas.length, 1).getValues();
   for (var i = 0; i < linhas.length; i++) {
@@ -11053,73 +7267,10 @@ function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
   }
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 2 · AS ABAS ANALISE_* QUE O SISTEMA GERA
-   #
-   ############################################################################ */
-
-/**
- * As abas ANALISE_* que o sistema gera
- * ============================================================================
- * O pedido: *"permitir criar uma aba exclusiva que irá criar uma aba no
- * planilhas para análise de dados."*
- *
- * O administrador monta uma RECEITA — canal, colunas, filtros, período — e o
- * sistema escreve o resultado numa aba nova, chamada `ANALISE_<Nome>`, pronta
- * para tabela dinâmica ou para o Power BI apontar.
- *
- * ---------------------------------------------------------------------------
- * TRÊS DECISÕES QUE VALEM ESTAR ESCRITAS
- * ---------------------------------------------------------------------------
- *
- * 1. É UM RETRATO, E NÃO UMA FÓRMULA. A aba recebe VALORES gravados de uma
- *    vez. Poderia ser uma aba de `=FILTER(...)`, e seria "sempre atualizada" —
- *    mas uma fórmula que varre 30 mil linhas recalcula a cada abertura da
- *    planilha, e com três abas dessas a planilha inteira fica lenta para todo
- *    mundo, o dia todo. Retrato é estável: pesa uma vez, quando alguém pede.
- *
- * 2. SÓ ESCREVE EM ABA COM O PREFIXO `ANALISE_`. É a trava mais importante
- *    deste arquivo. Uma análise chamada "BASE_RET" apagaria a base de
- *    produção — e nenhuma outra proteção do sistema pegaria isso, porque
- *    apagar seria exatamente o que o código se propôs a fazer.
- *
- * 3. REGERAR PEDE SENHA; CRIAR PELA PRIMEIRA VEZ, NÃO. Criar uma aba nova não
- *    destrói nada. Regerar apaga o retrato anterior — e quem tinha uma tabela
- *    dinâmica apontada para ele vê os números mudarem embaixo dela.
- *
- * ---------------------------------------------------------------------------
- * A ABA GERADA NÃO ESTÁ NO CONTRATO
- * ---------------------------------------------------------------------------
- * `conferirEstrutura_` não reclama dela, e o instalador não a cria. É saída,
- * não é base: pode ser apagada à mão a qualquer momento, e a próxima geração
- * a refaz. A RECEITA é que está no contrato, na aba `ANALISES`.
- * ============================================================================
- */
-
-/** O prefixo obrigatório. Nenhuma aba sem ele é escrita por este arquivo. */
 var RECC_PREFIXO_DA_ANALISE = 'ANALISE_';
 
-/**
- * Teto de linhas por aba gerada.
- *
- * Não é medo de dado: é o teto de 10 milhões de células da planilha. Uma
- * análise de 50 mil linhas por 39 colunas são 1,95 milhão de células — um
- * quinto do orçamento inteiro numa aba só, que é saída e não base.
- */
 var RECC_MAXIMO_DA_ANALISE = 50000;
 
-// ============================================================================
-// A RECEITA
-// ============================================================================
-
-/**
- * Traduz a linha da aba ANALISES para o formato que a tela usa.
- *
- * Vem junto o estado da aba GERADA — existe? quantas linhas? de quando? —
- * porque é isso que a tela precisa mostrar, e é o que separa "a análise está
- * configurada" de "a análise está pronta para usar".
- */
 function analiseDaLinha_(linha, canais) {
   var canal = canais.filter(function (uma) {
     return String(uma.id) === String(linha.CanalId);
@@ -11149,14 +7300,12 @@ function analiseDaLinha_(linha, canais) {
   };
 }
 
-/** O nome da aba de uma análise. Vazio se o nome não serve. */
 function nomeDaAbaDeAnalise_(nome) {
   var limpo = String(nome || '').trim();
   if (!limpo) return '';
   return RECC_PREFIXO_DA_ANALISE + limpo;
 }
 
-/** 'a, b , c' → ['a', 'b', 'c']. Pedaço vazio some. */
 function separarPorVirgula_(texto) {
   return String(texto || '')
     .split(',')
@@ -11164,13 +7313,6 @@ function separarPorVirgula_(texto) {
     .filter(function (pedaco) { return pedaco.length > 0; });
 }
 
-/**
- * 'Status=Pendente; Canal=Chat' → [{ coluna: 'Status', valor: 'Pendente' }, …]
- *
- * Pedaço sem '=' é ignorado em silêncio, e é o único silêncio deste arquivo:
- * quem grava o filtro é a tela, com seletores — o texto solto só existe para
- * quem editar a aba ANALISES na mão, e aí meio filtro é melhor que nenhum.
- */
 function lerFiltrosEscritos_(texto) {
   return String(texto || '')
     .split(';')
@@ -11185,7 +7327,6 @@ function lerFiltrosEscritos_(texto) {
     .filter(function (filtro) { return filtro && filtro.coluna; });
 }
 
-/** O caminho de volta: a lista de filtros vira o texto que a aba guarda. */
 function escreverFiltros_(filtros) {
   return (filtros || [])
     .filter(function (filtro) {
@@ -11197,11 +7338,6 @@ function escreverFiltros_(filtros) {
     .join(';');
 }
 
-// ============================================================================
-// O QUE A TELA CHAMA
-// ============================================================================
-
-/** Todas as análises montadas, com o estado da aba de cada uma. */
 function listarAnalises() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -11211,13 +7347,6 @@ function listarAnalises() {
     .sort(function (uma, outra) { return uma.ordem - outra.ordem; });
 }
 
-/**
- * O que a tela oferece para montar uma análise: os canais, e de cada uma as
- * colunas e os filtros possíveis.
- *
- * Sai da estrutura da planilha, e não de uma lista escrita aqui: coluna nova
- * na base aparece como opção sozinha, no dia seguinte.
- */
 function opcoesDeAnalise() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -11232,8 +7361,7 @@ function opcoesDeAnalise() {
         aba: canal.aba,
         temColunaDeData: !!canal.colunaDaData,
         colunaDaData: canal.colunaDaData || '',
-        // As de controle ficam de fora da escolha: são do sistema, e numa
-        // tabela dinâmica só atrapalham. A geração acrescenta o que precisa.
+
         colunas: estrutura.cabecalhos.filter(function (cabecalho) {
           return String(cabecalho).charAt(0) !== '_';
         }),
@@ -11243,20 +7371,10 @@ function opcoesDeAnalise() {
   };
 }
 
-/**
- * Os campos do canal que dão para usar como filtro: os que já são lista.
- *
- * Não é `filtrosDoCanal_`, do Trabalho, por um motivo só: lá o teto é QUATRO,
- * porque cinco caixas de seleção em cima da fila viram uma parede. Aqui não há
- * parede — escolhe-se um filtro por vez, num formulário —, e cortar em quatro
- * deixaria de fora justamente o campo pelo qual alguém quer recortar.
- */
 function filtrosPossiveisDaAnalise_(canal) {
   var achados = [];
   camposAtivosDoCanal_(canal.id).forEach(function (campo) {
-    // Sem quem: aqui só interessam os SELETORES e as opções deles, para
-    // montar um filtro. Valor padrão e trava por cargo são coisas do
-    // formulário de cadastro, e não de uma receita de análise.
+
     var descricao = campoParaATela_(campo, canal.id, RECC_VISIBILIDADE.EDICAO, null);
     if (descricao.tipo !== 'seletor' || !descricao.opcoes.length) return;
     achados.push({
@@ -11268,13 +7386,6 @@ function filtrosPossiveisDaAnalise_(canal) {
   return achados;
 }
 
-/**
- * Cria ou altera uma receita de análise. Não gera nada — quem gera é
- * `gerarAnalise`.
- *
- * Salvar e gerar são separados de propósito: montar a receita é ajuste, e
- * ajuste não pode custar trinta segundos de espera a cada campo mexido.
- */
 function salvarAnalise(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -11332,13 +7443,6 @@ function salvarAnalise(dados) {
   return criada.__id;
 }
 
-/**
- * O nome vira nome de aba, e nome de aba tem regra.
- *
- * Espaço, acento e pontuação funcionariam na aba, mas obrigam a citá-la entre
- * aspas simples em toda fórmula — `='ANALISE_Ret Vida'!A1` — e é o tipo de
- * detalhe que ninguém lembra na hora de montar a tabela dinâmica.
- */
 function conferirNomeDaAnalise_(nome) {
   if (!nome) throw new Error('Dê um nome à análise. Ele vira o nome da aba.');
   if (!/^[A-Za-z0-9_]+$/.test(nome)) {
@@ -11352,7 +7456,6 @@ function conferirNomeDaAnalise_(nome) {
   }
 }
 
-/** Tira a análise da tela. A linha e a aba gerada permanecem. */
 function ocultarAnalise(idDaAnalise) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -11365,21 +7468,6 @@ function ocultarAnalise(idDaAnalise) {
   return true;
 }
 
-// ============================================================================
-// OS SINALIZADORES
-// ============================================================================
-
-/*
- * Os sinalizadores de prazo — RET, Mesa e o VG, que ainda não definiu.
- *
- * Pedido do PO: "devo conseguir ajustar na aba de configurações", numa seção
- * própria, "Sinalizadores". Cada linha da aba SINALIZADORES é um sinalizador
- * de um canal; o que ele faz está em Indicadores.gs. Ajustar prazo, margem do
- * amarelo ou a coluna de onde se conta é conteúdo — pede a permissão de
- * configurar, e não a senha de administrador: não mexe em estrutura nenhuma.
- */
-
-/** Todos os sinalizadores, com o nome do canal e a regra por extenso. */
 function listarSinalizadores() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
@@ -11400,18 +7488,11 @@ function listarSinalizadores() {
     });
 }
 
-/**
- * O que a tela oferece para montar um sinalizador: os canais e, de cada um, as
- * colunas que dão para escolher — todas, só as de data e só as de hora.
- *
- * Sai da estrutura da planilha: coluna nova na base aparece como opção sozinha.
- */
 function opcoesDeSinalizador() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
   return {
-    // Falso numa planilha que ainda não rodou atualizarPGO(): a tela explica o
-    // que fazer, em vez de oferecer um formulário que não tem onde gravar.
+
     abaExiste: !!planilhaAtiva_().getSheetByName('SINALIZADORES'),
     expedientePadrao: RECC_EXPEDIENTE_PADRAO,
     canais: canaisQueEuVejo_(quem).map(function (canal) {
@@ -11428,8 +7509,7 @@ function opcoesDeSinalizador() {
         }
         if (tipo === RECC_TIPO_DE_DADO.HORA) deHora.push(cabecalho);
       });
-      // As colunas que são campo com lista de opções, com as opções: é com elas
-      // que a tela monta os valores da condição de parada.
+
       var comLista = {};
       lerRegistros_('CAMPOS').forEach(function (campo) {
         if (String(campo.Aba) !== canal.aba) return;
@@ -11448,7 +7528,6 @@ function opcoesDeSinalizador() {
   };
 }
 
-/** Cria ou altera um sinalizador. */
 function salvarSinalizador(dados) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -11482,7 +7561,7 @@ function salvarSinalizador(dados) {
     throw new Error('Um sinalizador ligado precisa de prazo maior que zero — com '
       + 'zero ele não sinaliza nada. Defina o prazo, ou deixe-o desligado.');
   }
-  // O aviso só importa com prazo: o VG nasce desligado, com prazo zero.
+
   if (prazo > 0 && aviso >= prazo) {
     throw new Error('O amarelo acende quando faltam ' + aviso + ' para o prazo '
       + 'acabar, mas o prazo todo é ' + prazo + ': o caso já nasceria amarelo. '
@@ -11491,9 +7570,6 @@ function salvarSinalizador(dados) {
 
   var unidade = normalizarParaComparar_(dados.unidade).indexOf('hora') === 0 ? 'horas' : 'dias';
 
-  // As colunas precisam existir — e a de data precisa ser de data, a de hora
-  // de hora. Conferir o tipo evita o sinalizador que "funciona" e nunca conta,
-  // porque aponta para uma coluna de texto.
   var quandoVale = String(dados.colunaQueLiga || '').trim();
   var colunaDaData = String(dados.colunaDaData || '').trim();
   var colunaDaHora = String(dados.colunaDaHora || '').trim();
@@ -11510,16 +7586,6 @@ function salvarSinalizador(dados) {
     throw new Error('"' + colunaDaHora + '" não é uma coluna de hora.');
   }
 
-  /*
-   * A CONDIÇÃO DE PARADA — "este status só encerra o prazo quando esta coluna
-   * tiver um destes valores". Os quatro juntos, ou nenhum: metade da regra não
-   * para nada e não avisa. Cada parte é conferida, porque um valor com a
-   * digitação errada nunca encerraria o prazo, e o caso ficaria vermelho para
-   * sempre sem ninguém entender por quê.
-   */
-  // Pedido sem NENHUM dos quatro campos da condição vem de uma tela antiga, de
-  // antes de eles existirem: ela não está pedindo para tirar a condição, só não
-  // sabe dela. Salvar assim mantém a que o sinalizador já tem.
   var idDoSinalizador = converterParaIdentificador_(dados.id);
   var existente = idDoSinalizador
     ? buscarRegistros_('SINALIZADORES', 'Id', idDoSinalizador, 1)[0] : null;
@@ -11532,8 +7598,6 @@ function salvarSinalizador(dados) {
       data: String(existente.ColunaDaDataDaCondicao || '') }
     : conferirACondicaoDeParada_(canal, estrutura, dados);
 
-  // O expediente: em branco vale o padrão; preenchido, tem de ser legível e
-  // terminar depois de começar.
   var inicio = horaDoExpediente_(dados.inicioDoExpediente) || RECC_EXPEDIENTE_PADRAO.abre;
   var fim = horaDoExpediente_(dados.fimDoExpediente) || RECC_EXPEDIENTE_PADRAO.fecha;
   if (String(dados.inicioDoExpediente || '').trim() && !horaDoExpediente_(dados.inicioDoExpediente)
@@ -11576,16 +7640,6 @@ function salvarSinalizador(dados) {
   return criado.__id;
 }
 
-/**
- * Confere a condição de parada que a tela mandou e devolve a que vai ser
- * guardada: { status, coluna, valores, data } — tudo vazio quando não há.
- *
- * O status é conferido contra os do canal, e escrito como o canal o grava; a
- * coluna precisa existir; a data precisa ser de data e hora (a hora em que o
- * prazo parou conta, e uma data sem hora pararia sempre na abertura do dia);
- * e os valores, quando a coluna é um campo com lista, precisam ser opções
- * dela — escritos como a lista os escreve.
- */
 function conferirACondicaoDeParada_(canal, estrutura, dados) {
   var vazio = { status: '', coluna: '', valores: [], data: '' };
   var status = String(dados.statusComCondicao || '').trim();
@@ -11639,7 +7693,6 @@ function conferirACondicaoDeParada_(canal, estrutura, dados) {
   return { status: doStatus.gravadoComo, coluna: coluna, valores: certos, data: data };
 }
 
-/** Tira o sinalizador da tela e do selo. A linha permanece na planilha. */
 function ocultarSinalizador(idDoSinalizador) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -11652,18 +7705,6 @@ function ocultarSinalizador(idDoSinalizador) {
   return true;
 }
 
-// ============================================================================
-// A GERAÇÃO
-// ============================================================================
-
-/**
- * Escreve a aba `ANALISE_<Nome>`.
- *
- * Pede senha de administrador quando a aba JÁ EXISTE: regerar apaga o retrato
- * anterior, e quem tinha uma tabela dinâmica apontada para ele vê os números
- * mudarem embaixo dela. Criar pela primeira vez não destrói nada, e por isso
- * não pede.
- */
 function gerarAnalise(idDaAnalise) {
   var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
 
@@ -11700,23 +7741,6 @@ function gerarAnalise(idDaAnalise) {
   };
 }
 
-/**
- * Os dados da análise, já filtrados e recortados nas colunas escolhidas.
- *
- * O ALCANCE DE QUEM GERA NÃO SE APLICA AQUI, e é decisão, não esquecimento.
- * Dois motivos:
- *
- * 1. A aba gerada mora na MESMA planilha que a base. Quem consegue abrir
- *    ANALISE_Diamante consegue abrir BASE_RET ao lado — recortar por alcance
- *    não esconderia nada de ninguém, só deixaria a análise incompleta.
- * 2. O gatilho de horário roda sem ninguém logado. Se o recorte dependesse de
- *    quem gerou, a MESMA análise teria conteúdos diferentes conforme o botão
- *    ou o horário a tivesse gerado — e ninguém saberia qual dos dois está na
- *    aba naquele momento.
- *
- * Quem pode gerar é controlado onde tem de ser: `gerarAnalise` exige a
- * permissão de estrutura.
- */
 function montarConteudoDaAnalise_(receita, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
 
@@ -11752,17 +7776,6 @@ function montarConteudoDaAnalise_(receita, canal) {
   return { cabecalhos: cabecalhos, linhas: linhas, truncada: truncada };
 }
 
-/**
- * Escreve a aba, do zero.
- *
- * A TRAVA: recusa qualquer nome que não comece com `ANALISE_`. É a única
- * proteção que separa esta função de um apagador de base — e por isso ela é a
- * primeira linha, antes de qualquer outra coisa.
- *
- * A aba é REAPROVEITADA quando já existe, em vez de apagada e recriada. Apagar
- * mudaria o identificador interno dela, e todo Power BI ou tabela dinâmica
- * apontado para aquela aba perderia o alvo em silêncio.
- */
 function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
   if (String(nomeDaAba || '').indexOf(RECC_PREFIXO_DA_ANALISE) !== 0) {
     throw new Error('Recusado: "' + nomeDaAba + '" não começa com '
@@ -11791,17 +7804,10 @@ function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
   return aba;
 }
 
-/**
- * Deixa a grade da aba com exatamente o tamanho pedido.
- *
- * Célula vazia também consome o teto de 10 milhões da planilha. Uma aba nova
- * nasce com 1000 por 26 = 26 mil células; três análises pequenas deixadas no
- * tamanho de fábrica gastam mais espaço do que os dados que elas mostram.
- */
 function ajustarGrade_(aba, linhas, colunas) {
   var linhasAgora = aba.getMaxRows();
   if (linhas > linhasAgora) aba.insertRowsAfter(linhasAgora, linhas - linhasAgora);
-  // Uma linha tem de sobrar: o Google Planilhas não aceita aba sem nenhuma.
+
   if (linhas < linhasAgora) aba.deleteRows(linhas + 1, linhasAgora - linhas);
 
   var colunasAgora = aba.getMaxColumns();
@@ -11813,19 +7819,6 @@ function ajustarGrade_(aba, linhas, colunas) {
   }
 }
 
-/**
- * Regera todas as análises ligadas, uma atrás da outra.
- *
- * É esta a função para apontar um gatilho de horário no editor do Apps Script
- * (Acionadores › Adicionar acionador › `atualizarAnalisesAgendadas` › Baseado
- * em tempo). Ela é a única do arquivo que NÃO pede senha nem permissão: um
- * gatilho de horário roda sem ninguém logado, e uma senha ali não teria quem
- * digitar.
- *
- * Uma análise que estoura não derruba as outras: o erro é anotado e a próxima
- * segue. Uma aba com nome inválido não pode deixar as outras cinco sem
- * atualizar.
- */
 function atualizarAnalisesAgendadas() {
   var canais = canaisVisiveis_();
   var feitas = [];
@@ -11858,18 +7851,6 @@ function atualizarAnalisesAgendadas() {
   return { geradas: feitas, falharam: falharam };
 }
 
-// ============================================================================
-// A PLANILHA DE CADASTROS — a segunda base
-// ============================================================================
-
-/**
- * Onde os cadastros moram hoje, e o que cabe neles.
- *
- * Duas bases: a OPERACIONAL, que guarda caso, e a de CADASTROS, que guarda
- * corretora, SUSEP bloqueada, produto e as duas listas de analista. A segunda
- * é opcional — sem ela configurada, tudo continua morando aqui, como sempre
- * morou.
- */
 function configuracaoDosCadastros() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -11884,11 +7865,9 @@ function configuracaoDosCadastros() {
       return {
         aba: nome,
         titulo: esquema ? esquema.titulo : nome,
-        // Etapa 55: esta lista mora na segunda base? (A tela marca a caixa.)
+
         naSegundaBase: deFora.indexOf(nome) >= 0,
-        // As colunas que o PGO procura naquela aba. A planilha de cadastros
-        // pode ter outras no meio — elas são lidas e ignoradas —, mas estas
-        // precisam estar lá com estes nomes.
+
         colunas: esquema
           ? esquema.colunas.filter(function (coluna) {
             return coluna.cabecalho.charAt(0) !== '_';
@@ -11899,27 +7878,13 @@ function configuracaoDosCadastros() {
   };
 }
 
-/**
- * Aponta a planilha de cadastros — ou desliga, com o Id em branco.
- *
- * CONFERE ANTES DE GRAVAR, e a falha DERRUBA. Guardar um Id que não abre
- * deixaria a Tabela de Corretoras e o selo da SUSEP com recado de erro para
- * sempre, e ninguém saberia se o Id estava errado, se a planilha sumiu ou se
- * faltou compartilhar — que são três conversas diferentes.
- *
- * A conferência olha ABA POR ABA e cobra as colunas que o PGO procura. Um Id
- * certo apontando para uma planilha sem as colunas certas abre sem reclamar e
- * devolve lista vazia depois, que é o pior dos dois mundos.
- */
 function salvarConfiguracaoDosCadastros(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  // Apontar a segunda base muda de onde o sistema INTEIRO lê os cadastros.
-  // É mudança de estrutura, e passa pela mesma porta que as outras.
+
   exigirSenhaDeAdministrador_();
 
   var id = String((dados || {}).planilhaId || '').trim();
-  // Quais listas vão para lá (Etapa 55). Sem a escolha — página antiga —, as
-  // quatro, como antes.
+
   var abas = Array.isArray((dados || {}).abas)
     ? dados.abas.map(function (nome) { return String(nome).trim().toUpperCase(); })
       .filter(function (nome) { return RECC_ABAS_QUE_PODEM_VIR_DE_FORA.indexOf(nome) >= 0; })
@@ -11945,21 +7910,13 @@ function salvarConfiguracaoDosCadastros(dados) {
   registrarAuditoria_('cadastros.configurar', 'CONFIG', '',
     id ? 'ligada em ' + id + ' · ' + abas.join(', ') : 'desligada');
 
-  // A estrutura lida em memória aponta para a planilha antiga. Sem esquecer,
-  // a próxima leitura desta execução ainda viria do lugar errado.
   esquecerEstruturaLida_();
   return configuracaoDosCadastros();
 }
 
-/**
- * Confere uma planilha de cadastros SEM ligar nada.
- *
- * É o botão "testar a ligação": responde se abre, quais abas tem e o que falta
- * em cada uma — antes de a operação depender dela.
- */
 function conferirPlanilhaDeCadastros(planilhaId, abasEscolhidas) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
-  // Só as listas que vão morar lá (Etapa 55); sem escolha, as quatro.
+
   var abasParaConferir = Array.isArray(abasEscolhidas) && abasEscolhidas.length
     ? RECC_ABAS_QUE_PODEM_VIR_DE_FORA.filter(function (nome) {
       return abasEscolhidas.map(function (uma) { return String(uma).trim().toUpperCase(); })
@@ -12011,7 +7968,7 @@ function conferirPlanilhaDeCadastros(planilhaId, abasEscolhidas) {
         if (coluna.cabecalho.charAt(0) === '_') return false;
         return cabecalhos.indexOf(normalizarParaComparar_(coluna.cabecalho)) < 0;
       });
-    // Coluna nova que a segunda base pode ainda não ter: vira aviso.
+
     ausentes.filter(function (coluna) { return coluna.opcionalNaBaseDeFora; })
       .forEach(function (coluna) {
         avisos.push('• A aba "' + nome + '" está sem a coluna ' + coluna.cabecalho
@@ -12025,15 +7982,6 @@ function conferirPlanilhaDeCadastros(planilhaId, abasEscolhidas) {
       faltando.push('• A aba "' + nome + '" está sem: ' + ausentes.join(', ') + '.');
     }
 
-    /*
-     * EDITAR DAQUI é outra pergunta, e por isso é um aviso e não uma falta.
-     *
-     * Para o PGO gravar na aba ela precisa de Id e das colunas de controle —
-     * é nelas que mora a exclusão lógica. Uma lista montada por outra área
-     * provavelmente não as tem, e ela continua servindo para LER, que é metade
-     * do que se quer dela. Exigi-las para poder ligar transformaria um cadastro
-     * útil em nenhum.
-     */
     var semEscrita = RECC_COLUNAS_PARA_ESCREVER_DE_FORA.filter(function (coluna) {
       return cabecalhos.indexOf(normalizarParaComparar_(coluna)) < 0;
     });
@@ -12067,20 +8015,11 @@ function conferirPlanilhaDeCadastros(planilhaId, abasEscolhidas) {
     abas: achadas,
     faltando: faltando,
     avisos: avisos,
-    // O que acrescentar numa aba para ela virar editável pelo PGO. A tela
-    // mostra isto junto do aviso, para ninguém precisar adivinhar.
+
     colunasParaEditar: RECC_COLUNAS_PARA_ESCREVER_DE_FORA
   };
 }
 
-/**
- * O botão "Aplicar mudanças da planilha agora", em Configurações › Estrutura.
- *
- * A configuração fica guardada por 5 minutos no cache (Etapa 42). Salvar pelas
- * telas já limpa o cache na hora; quem mexeu DIRETO na planilha — numa aba como
- * CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES ou PAINEIS — aperta
- * este botão em vez de esperar.
- */
 function aplicarMudancasDaPlanilha() {
   exigirPermissao_(RECC_ACOES.ESTRUTURA);
   esquecerEstruturaLida_();
@@ -12091,47 +8030,6 @@ function aplicarMudancasDaPlanilha() {
 
 /* ==== Entrada.gs ========================================================== */
 
-/**
- * ============================================================================
- * PGO — Entrada.gs · quem entra e o que pode
- * ============================================================================
- * Da porta da rua até o cadastro: o doGet que decide o que servir, os níveis
- * que dizem o que cada um alcança, e a lista de quem pode entrar.
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. A PORTA DE ENTRADA (doGet)
- *   2. NÍVEIS, ESCOPO E A SENHA DE ADMINISTRADOR
- *   3. O CADASTRO DE QUEM PODE ENTRAR
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 3 · A PORTA DE ENTRADA (doGet)
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * A porta de entrada
- * ============================================================================
- * doGet é a função que o Google chama quando alguém abre o endereço do
- * sistema. Ela decide entre duas coisas, e só duas:
- *
- *   e-mail cadastrado     → serve o sistema
- *   e-mail não cadastrado → serve a tela institucional, sem carregar dado
- *                           nenhum da planilha
- *
- * Aqui também mora o PACOTE DE PARTIDA: tudo que a tela precisa para se
- * montar chega numa ÚNICA ida ao servidor. Sete chamadas separadas custariam
- * sete viagens de rede e a tela piscaria montando aos pedaços.
- * ============================================================================
- */
-
-/** Chamada pelo Google quando alguém abre o endereço do sistema. */
 function doGet() {
   var quem = usuarioAtual_();
   var identidade = lerIdentidadeVisual_();
@@ -12140,9 +8038,7 @@ function doGet() {
     var bloqueio = HtmlService.createTemplateFromFile('SemAcesso');
     bloqueio.email = quem.email;
     bloqueio.motivo = quem.motivo;
-    // O código da recusa, e não só a frase: o título da tela muda conforme o
-    // caso, e comparar texto para decidir isso quebraria no dia em que
-    // alguém corrigir uma vírgula na frase.
+
     bloqueio.situacao = quem.situacao || 'NAO_CADASTRADO';
     bloqueio.identidade = identidade;
     return bloqueio.evaluate()
@@ -12152,25 +8048,9 @@ function doGet() {
 
   registrarUltimoAcesso_(quem.usuario);
 
-  // A identidade PRECISA ser entregue ao template: o Index a usa no título e
-  // na marca de abertura. Sem isso a página nem chega a ser montada.
   var pagina = HtmlService.createTemplateFromFile('Index');
   pagina.identidade = identidade;
 
-  // E o pacote de partida vai JUNTO, dentro da própria página.
-  //
-  // Antes, abrir o sistema eram DUAS viagens ao servidor em fila: o doGet
-  // trazia a página, e só então o navegador pedia o pacoteDePartida. A
-  // segunda recomeçava do zero — outra execução, outro login, outra leitura
-  // das mesmas abas — para devolver o que esta execução aqui JÁ TEM na mão.
-  //
-  // O que a operação sentia disso era a tela de "Conferindo o seu acesso…"
-  // parada. Não era a planilha sendo lenta: era uma viagem inteira, com o
-  // custo fixo de uma chamada do Apps Script, para repetir trabalho feito.
-  //
-  // A tela continua sabendo pedir o pacote pelo caminho antigo (ver
-  // Aplicacao.html): se a injeção falhar, ela pergunta ao servidor como
-  // sempre fez. Atalho que não tem volta vira um jeito novo de quebrar.
   pagina.pacoteDePartida = comoTextoParaDentroDeScript_(montarPacoteDePartida_(quem));
 
   return pagina.evaluate()
@@ -12178,15 +8058,6 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/**
- * JSON pronto para morar dentro de uma tag <script> da página.
- *
- * O `<` vira `\u003c` — e isso não é capricho. Um valor de configuração que
- * contivesse o texto de fechamento de script encerraria a tag ali, no meio do
- * JSON, e o resto do pacote viraria HTML solto na página. Escapando o `<`, não
- * existe sequência que feche a tag, e o JSON continua válido: `\u003c` é
- * exatamente o mesmo caractere para quem faz JSON.parse.
- */
 function comoTextoParaDentroDeScript_(valor) {
   return JSON.stringify(valor)
     .replace(/</g, '\\u003c')
@@ -12194,21 +8065,6 @@ function comoTextoParaDentroDeScript_(valor) {
     .replace(/&/g, '\\u0026');
 }
 
-/**
- * Cola um arquivo .html dentro de outro.
- * É assim que o Apps Script faz "incluir": não existe import de HTML.
- *
- * QUANDO O ARQUIVO NÃO ESTÁ NO PROJETO, o Apps Script diz apenas
- * "nenhum arquivo html com o nome X foi encontrado", com o número da linha —
- * e mais nada. Quem recebe isso não sabe se o nome está errado, se o arquivo
- * ficou para trás na cópia, ou se é defeito do sistema.
- *
- * Então trocamos a mensagem por uma que diz as três coisas que resolvem: o
- * nome EXATO que o projeto espera, a regra de nomenclatura (sem .html, sem
- * acento) e — o que mais poupa tempo — TODOS os arquivos que faltam, e não só
- * o primeiro. Sem isso a pessoa copia um, recarrega, descobre o próximo, e
- * repete quinze vezes.
- */
 function incluir_(nomeDoArquivo) {
   try {
     return HtmlService.createHtmlOutputFromFile(nomeDoArquivo).getContent();
@@ -12225,9 +8081,6 @@ function recadoDoArquivoQueFalta_(nomeDoArquivo) {
     + '".html" no nome, sem acento e com as maiúsculas iguais. O Apps Script '
     + 'diferencia maiúsculas de minúsculas.';
 
-  // A lista completa é o que evita descobrir um arquivo por vez. Vai num try
-  // próprio: se o Instalacao.gs também tiver ficado para trás na cópia, o
-  // recado principal continua saindo em vez de virar um segundo erro.
   try {
     var faltando = arquivosDeTelaQueFaltam_();
     if (faltando.length > 1) {
@@ -12241,35 +8094,14 @@ function recadoDoArquivoQueFalta_(nomeDoArquivo) {
   return recado;
 }
 
-/** Atalho para os templates escreverem <?!= incluir('Estilos') ?> */
 function incluir(nomeDoArquivo) {
   return incluir_(nomeDoArquivo);
 }
 
-// ============================================================================
-// O PACOTE DE PARTIDA
-// ============================================================================
-
-/**
- * Tudo que a tela precisa para se montar, numa chamada só.
- *
- * Quando algo dá errado aqui, a resposta diz O QUE deu errado. Devolver uma
- * lista de permissões vazia seria pior do que devolver erro: o menu apareceria
- * vazio e todo mundo leria isso como "não tenho acesso", quando o problema é
- * outro. Já aconteceu no sistema anterior e custou uma tarde.
- */
 function pacoteDePartida() {
   return montarPacoteDePartida_(usuarioAtual_());
 }
 
-/**
- * O pacote de verdade, a partir de um usuário que JÁ foi lido.
- *
- * Existe separado da função acima por um motivo só: o doGet já leu o usuário
- * para decidir qual página servir, e passar esse resultado adiante evita ler
- * tudo de novo. A função pública continua onde estava, com o nome que a tela
- * conhece — quem chama de fora não precisa saber dessa divisão.
- */
 function montarPacoteDePartida_(quem) {
   if (!quem.cadastrado) {
     return {
@@ -12315,19 +8147,9 @@ function montarPacoteDePartida_(quem) {
   };
 }
 
-// ============================================================================
-// TEMA
-// ============================================================================
-
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
 const RECC_CHAVE_DO_TEMA = 'RECC_TEMA_ESCOLHIDO';
 
-/**
- * O tema escolhido pela pessoa, ou o padrão da operação.
- *
- * Fica em UserProperties, e não no navegador: assim a escolha acompanha a
- * pessoa em qualquer computador que ela abrir o sistema.
- */
 function temaDoUsuario_() {
   var escolhido = PropertiesService.getUserProperties()
     .getProperty(RECC_CHAVE_DO_TEMA);
@@ -12337,13 +8159,6 @@ function temaDoUsuario_() {
   return RECC_TEMAS.indexOf(daOperacao) >= 0 ? daOperacao : 'padrao';
 }
 
-/**
- * Guarda o tema escolhido. Chamada pelo navegador.
- *
- * Não exige permissão nenhuma de propósito: escolher a cor da própria tela
- * não é uma decisão sobre dado. Exige apenas estar cadastrado — senão
- * qualquer visitante encheria as propriedades da instalação.
- */
 function salvarTemaDoUsuario(tema) {
   var quem = usuarioAtual_();
   if (!quem.cadastrado) {
@@ -12357,7 +8172,6 @@ function salvarTemaDoUsuario(tema) {
   return tema;
 }
 
-/** O menu lateral, já filtrado pelo nível e com os nomes que o ADM escolheu. */
 function montarMenu_(permissoes) {
   var titulos = {};
   try {
@@ -12366,8 +8180,6 @@ function montarMenu_(permissoes) {
     titulos = {};
   }
 
-  // A ordem sai de RECC_TELAS_DO_SISTEMA, a mesma lista que a tela de
-  // Configurações oferece ao montar um nível. Uma lista só, um lugar só.
   return RECC_TELAS_DO_SISTEMA
     .filter(function (item) { return podeVerTela_(permissoes, item.tela); })
     .map(function (item) {
@@ -12375,16 +8187,6 @@ function montarMenu_(permissoes) {
     });
 }
 
-/** Os canais ativos, na ordem definida na aba CANAIS. */
-/**
- * Os canais que ESTA pessoa enxerga.
- *
- * canaisVisiveis_ responde "quais canais existem e estão ligados". Esta aqui
- * responde outra coisa: "quais deles são desta pessoa". Confundir as duas é o
- * erro que faz um analista da RET abrir a fila da Mesa Diamante.
- *
- * Nível sem canal declarado vê todos — ver lerPermissoesDoNivel_.
- */
 function canaisQueEuVejo_(quem) {
   var todos = canaisVisiveis_();
   if (!quem || !quem.cadastrado) return [];
@@ -12397,16 +8199,6 @@ function canaisQueEuVejo_(quem) {
   });
 }
 
-/**
- * As colunas que o canal declara em CANAIS, trocadas pela grafia da planilha.
- *
- * Uma vez por objeto de canal. Quem lê as colunas do canal (o status, a data
- * de entrada, a finalização…) passa a achar o valor mesmo se a planilha
- * escrever o cabeçalho com outra maiúscula ou acento. Mora aqui, e não em
- * `canaisVisiveis_`, por custo: resolver os três canais leria o cabeçalho das
- * três bases em toda chamada, e a tela quase sempre usa uma só — a que esta
- * chamada já vai ler.
- */
 var RECC_COLUNAS_QUE_O_CANAL_DECLARA = ['colunaDaData', 'colunaDaHora', 'colunaDoStatus',
   'colunaDaFinalizacao', 'colunaDaAreaResponsavel', 'colunaDoValor',
   'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'];
@@ -12444,12 +8236,10 @@ function canaisVisiveis_() {
         colunaDaAreaResponsavel: canal.ColunaDaAreaResponsavel,
         colunaDoValor: String(canal.ColunaDoValor || ''),
         situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
-        // VAZIO VALE SIM, de propósito: um canal cadastrado antes desta coluna
-        // existir continua conferindo o bloqueio, que é o que ele já fazia.
-        // Só quem disser "Não" em letras deixa de conferir.
+
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
-        // O SLA em horas úteis. Zero ou vazio: canal sem prazo, e sem selo.
+
         slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
         inicioDoExpediente: canal.InicioDoExpediente,
         fimDoExpediente: canal.FimDoExpediente,
@@ -12460,33 +8250,13 @@ function canaisVisiveis_() {
     });
 }
 
-// ============================================================================
-// A DATA DO ÚLTIMO REGISTRO
-// ============================================================================
-
-/**
- * Quando entrou o caso mais recente, entre todos os canais ativos.
- *
- * Fica na barra superior e responde a uma pergunta que a operação faz o dia
- * inteiro: "a base está atualizada?". Data velha ali é aviso de que alguma
- * carga não rodou.
- *
- * Custa pouco: a base só acrescenta no fim, então basta olhar as últimas
- * linhas de cada canal — não se percorre a base para descobrir isso.
- */
 function dataDoUltimoRegistro_(quem) {
-  // Sem quem, pergunta. Chamar sem argumento e receber "nenhum canal" seria o
-  // pior dos dois mundos: a barra ficaria vazia sem ninguém entender por quê,
-  // e pareceria base desatualizada — que é exatamente o alarme que ela existe
-  // para dar.
+
   quem = quem || usuarioAtual_();
 
   var maisRecente = null;
   var deQualCanal = '';
 
-  // Só os canais de quem está olhando. A barra superior responde "a minha
-  // base está atualizada?" — trazer a data de um canal que a pessoa nem
-  // enxerga responderia a pergunta de outra pessoa.
   canaisQueEuVejo_(quem).forEach(function (canal) {
     comAGrafiaDaAba_(canal);
     if (!canal.aba || !canal.colunaDaData) return;
@@ -12495,7 +8265,7 @@ function dataDoUltimoRegistro_(quem) {
     try {
       ultimos = lerRegistros_(canal.aba, { ultimas: 5 });
     } catch (erro) {
-      return;   // aba fora do contrato não pode derrubar a barra superior
+      return;
     }
     if (!ultimos.length) return;
 
@@ -12523,7 +8293,6 @@ function dataDoUltimoRegistro_(quem) {
   };
 }
 
-/** Junta a coluna de data com a de hora, quando o canal tem as duas. */
 function juntarDataEHora_(valorDaData, valorDaHora) {
   var data = converterParaData_(valorDaData);
   if (!data) return null;
@@ -12539,11 +8308,6 @@ function temHora_(data) {
   return data.getHours() !== 0 || data.getMinutes() !== 0;
 }
 
-// ============================================================================
-// CONFIGURAÇÃO
-// ============================================================================
-
-/** Um valor da aba CONFIG, com um padrão para quando a chave não existir. */
 function valorDaConfiguracao_(chave, valorPadrao) {
   var alvo = normalizarParaComparar_(chave);
   var linhas = lerRegistros_('CONFIG');
@@ -12556,19 +8320,6 @@ function valorDaConfiguracao_(chave, valorPadrao) {
   return valorPadrao;
 }
 
-/**
- * Guarda a logo da operação. Chamada pelo navegador.
- *
- * Aceita duas formas, e as duas evitam hospedar arquivo:
- *
- *   1. um endereço https de uma imagem que a empresa já publica;
- *   2. a própria imagem embutida em texto (data:image/...;base64,...),
- *      que é o caminho sem dependência nenhuma — a imagem passa a morar
- *      dentro da célula de CONFIG.
- *
- * A imagem NUNCA vai para o código. É assim que a mesma plataforma serve
- * outra operação trocando só uma linha da planilha.
- */
 function definirLogo(enderecoOuImagem) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -12597,12 +8348,6 @@ function definirLogo(enderecoOuImagem) {
   throw new Error('A chave IDENTIDADE.LOGO_URL não existe na aba CONFIG.');
 }
 
-/**
- * Nome, subtítulo, operação, logo e cor.
- *
- * Mora em CONFIG e não em código de propósito: a plataforma é o PGO, e o RECC
- * é uma operação dela. Servir outra operação é trocar estas linhas.
- */
 function lerIdentidadeVisual_() {
   return {
     nome: valorDaConfiguracao_('IDENTIDADE.NOME', 'RECC'),
@@ -12616,52 +8361,17 @@ function lerIdentidadeVisual_() {
   };
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 3 · NÍVEIS, ESCOPO E A SENHA DE ADMINISTRADOR
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Quem entra, e o que cada um pode
- * ============================================================================
- * Duas coisas diferentes, e confundi-las é o erro mais caro que este sistema
- * pode cometer:
- *
- *   CARGO         é o que a pessoa É na organização. Texto livre, muda quando
- *                 o RH quiser. Aparece embaixo do nome na barra superior e
- *                 NÃO decide nada.
- *
- *   NÍVEL DE      é o que a pessoa PODE. Daqui saem as telas do menu, os
- *   ACESSO        campos que ela enxerga no formulário, os componentes de cada
- *                 painel, as ações permitidas e o alcance sobre os dados.
- *
- * Nunca escreva `if (cargo === 'ADM')`. O nome do cargo é editável pelo
- * próprio administrador; a permissão sumiria junto com o texto.
- *
- * A OUTRA REGRA: esconder botão não é segurança. A tela esconde por educação;
- * o servidor confere por obrigação. Toda função sensível chama
- * exigirPermissao_ antes de fazer qualquer coisa.
- * ============================================================================
- */
-
-/** As ações que um nível de acesso pode conceder. */
 const RECC_ACOES = {
   CRIAR: 'criar',
   EDITAR: 'editar',
   OCULTAR: 'ocultar',
   EXPORTAR: 'exportar',
-  // Importar é trazer uma base inteira de outra planilha para dentro do PGO —
-  // cem, trezentos casos de uma vez. É separado de `criar` de propósito: quem
-  // cadastra um caso por vez erra um caso; quem importa errado suja a base toda,
-  // e o desfazer é apagar trezentas linhas na mão.
+
   IMPORTAR: 'importar',
   CONFIGURAR: 'configurar',
   ESTRUTURA: 'estrutura'
 };
 
-/** O alcance de cada pessoa sobre os dados. */
 const RECC_ESCOPOS = {
   PROPRIOS: 'PROPRIOS',
   EQUIPE: 'EQUIPE',
@@ -12669,31 +8379,8 @@ const RECC_ESCOPOS = {
   TODOS: 'TODOS'
 };
 
-/**
- * As telas do sistema, na ordem em que aparecem no menu.
- *
- * Mora AQUI, junto das ações e dos escopos, porque é uma lista de permissão:
- * é ela que a tela de Configurações oferece ao montar um nível de acesso, e é
- * ela que o menu percorre. Ter a lista escrita em dois lugares é como ter dois
- * mapas do mesmo mar: um dia eles divergem, e a tela nova nasce inacessível
- * porque ninguém lembrou de acrescentá-la no segundo.
- *
- * O título aqui é o nome de fábrica. O administrador pode trocá-lo em
- * MENU.TITULOS sem que o sistema perca de vista qual tela é qual — o que
- * identifica a tela é a CHAVE, nunca o texto.
- */
 const RECC_TELAS_DO_SISTEMA = [
-  // A CHAVE é o que identifica a tela para sempre; o título é só o que se lê.
-  // As duas começam iguais aqui, e é só aqui que elas se encontram: trocar o
-  // título em Configurações não mexe na chave, e é isso que deixa renomear uma
-  // tela sem quebrar rota gravada, nível de acesso nem endereço guardado.
-  //
-  // AS CHAVES SÓ SE TROCAM COM O SISTEMA FORA DO AR. Duas delas mudaram uma
-  // vez — "dashboard" virou "trabalho" e "painelAnalitico" virou
-  // "produtividade" —, e deu para fazer porque nada estava instalado ainda.
-  // Com o PGO rodando, trocar uma chave é apagar as rotas que as pessoas
-  // guardaram e as telas que os níveis de acesso liberam, de uma vez. Daqui em
-  // diante o nome se muda pelo TÍTULO, que existe exatamente para isso.
+
   { tela: 'trabalho', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
@@ -12703,24 +8390,6 @@ const RECC_TELAS_DO_SISTEMA = [
   { tela: 'configuracoes', titulo: 'Configurações' }
 ];
 
-/**
- * De quem são os números que a Produtividade RECC mostra, por nível de acesso.
- *
- * A tela é DA EQUIPE por natureza — é para isso que ela existe. Mas quem vê a
- * produtividade de quem é decisão da operação, não do código: em algumas
- * equipes o analista acompanha o grupo dele e isso puxa todo mundo para cima;
- * em outras, o mesmo número vira constrangimento. Quem sabe qual é o caso é
- * quem conduz a equipe, e por isso isto é NÍVEL DE ACESSO.
- *
- * BLOQUEADO não é um escopo, é a ausência da tela: escolher isto tira a
- * Produtividade RECC do menu daquele nível. Fica na mesma lista porque é ali
- * que a pessoa está decidindo sobre esta tela, e obrigá-la a lembrar de uma
- * segunda caixa noutro canto é como se esquece de desligar a metade.
- *
- * "O canal inteiro" já é o teto: QUAIS canais o nível abre continua sendo a
- * lista de canais dele. Um nível que abre só a RET e vê "o canal inteiro" vê a
- * RET inteira, e não a Mesa Diamante.
- */
 const RECC_ESCOPOS_DA_PRODUTIVIDADE = {
   BLOQUEADO: 'Não abre a Produtividade RECC',
   PROPRIOS: 'Só os casos da própria pessoa',
@@ -12728,26 +8397,12 @@ const RECC_ESCOPOS_DA_PRODUTIVIDADE = {
   CANAL: 'O canal inteiro, de todos os analistas'
 };
 
-/** Como um campo pode aparecer para um nível de acesso. */
 const RECC_VISIBILIDADE = {
   OCULTO: 'oculto',
   LEITURA: 'leitura',
   EDICAO: 'edicao'
 };
 
-// ============================================================================
-// QUEM ESTÁ ENTRANDO
-// ============================================================================
-
-/**
- * A pessoa autenticada no Google, conferida contra a aba USUARIOS.
- *
- * Devolve SEMPRE um objeto, nunca lança: não estar cadastrado é uma resposta
- * legítima do sistema, não um erro. Quem trata isso é a tela.
- *
- *   { cadastrado: false, email: '...', motivo: '...' }
- *   { cadastrado: true,  email, usuario, cargo, nivel, permissoes }
- */
 function usuarioAtual_() {
   var email = String(Session.getActiveUser().getEmail() || '').trim();
   if (!email) {
@@ -12819,7 +8474,6 @@ function usuarioAtual_() {
   };
 }
 
-/** Um item do catálogo pelo Id. Devolve null quando o item foi excluído. */
 function itemDoCatalogo_(idDoItem) {
   var alvo = converterParaIdentificador_(idDoItem);
   if (!alvo) return null;
@@ -12830,18 +8484,6 @@ function itemDoCatalogo_(idDoItem) {
   return null;
 }
 
-// ============================================================================
-// O QUE O NÍVEL PERMITE
-// ============================================================================
-
-/**
- * Traduz a coluna Configuracao do nível — que é um texto em JSON — no objeto
- * de permissões que o resto do sistema consulta.
- *
- * Configuração quebrada NÃO vira permissão vazia em silêncio. Um menu vazio
- * seria lido como "não tenho acesso", quando na verdade é "a configuração
- * está com defeito" — e alguém passaria a tarde procurando no lugar errado.
- */
 function lerPermissoesDoNivel_(nivel) {
   var permissoes = {
     escopo: RECC_ESCOPOS.PROPRIOS,
@@ -12871,34 +8513,12 @@ function lerPermissoesDoNivel_(nivel) {
 
   permissoes.escopo = RECC_ESCOPOS[lido.escopo] || RECC_ESCOPOS.PROPRIOS;
 
-  // QUAIS CANAIS ESTE NÍVEL ENXERGA.
-  //
-  // RET e Mesa Diamante são operações distintas: tratativas diferentes,
-  // colunas diferentes, gente diferente. Quem atende a RET não tem o que
-  // fazer com a fila da Mesa, e o contrário também vale.
-  //
-  // LISTA VAZIA QUER DIZER TODOS, e isso é decisão, não descuido. É o caso de
-  // quem administra — e é também o que mantém de pé todo nível criado antes
-  // desta regra existir: nível antigo continua enxergando o que enxergava, em
-  // vez de amanhecer sem canal nenhum e sem ninguém entender por quê.
   permissoes.canais = Array.isArray(lido.canais)
     ? lido.canais.map(function (id) { return converterParaIdentificador_(id); })
       .filter(function (id) { return id !== ''; })
     : [];
   permissoes.telas = Array.isArray(lido.telas) ? lido.telas : [];
 
-  /*
-   * O ALCANCE NA PRODUTIVIDADE RECC.
-   *
-   * Nível sem isto declarado cai em EQUIPE, e é decisão: a tela foi pedida
-   * para mostrar a equipe, e um nível antigo que amanhecesse mostrando só os
-   * próprios números estaria mostrando outra coisa sem ninguém ter escolhido.
-   *
-   * Se a tela não está na lista de telas, o alcance é BLOQUEADO — os dois não
-   * podem divergir, e quem manda é a lista de telas, que é o que `podeVerTela_`
-   * já consulta em todo lugar. Uma segunda fonte de verdade aqui seria o
-   * achado 34 outra vez.
-   */
   if (permissoes.telas.indexOf('produtividade') < 0) {
     permissoes.escopoNaProdutividade = 'BLOQUEADO';
   } else {
@@ -12923,10 +8543,6 @@ function podeFazer_(permissoes, acao) {
   return permissoes.acoes.indexOf(acao) >= 0;
 }
 
-/**
- * A guarda do servidor. Chame no começo de TODA função sensível.
- * Devolve o usuário para quem passou, para a função não precisar buscar de novo.
- */
 function exigirPermissao_(acao) {
   var quem = usuarioAtual_();
   if (!quem.cadastrado) {
@@ -12942,13 +8558,6 @@ function exigirPermissao_(acao) {
   return quem;
 }
 
-/**
- * A guarda de quem só quer VER uma tela.
- *
- * Abrir o Trabalho não é uma ação como criar ou editar — é uma tela. Exigir
- * "criar" para ver o painel tiraria o painel de quem só consulta, e exigir
- * nada deixaria qualquer nível abrir qualquer tela pelo endereço.
- */
 function exigirTela_(nomeDaTela) {
   var quem = usuarioAtual_();
   if (!quem.cadastrado) throw new Error('Acesso negado: ' + quem.motivo);
@@ -12962,13 +8571,6 @@ function exigirTela_(nomeDaTela) {
   return quem;
 }
 
-/**
- * Como cada campo aparece para este nível.
- *
- * O padrão é EDIÇÃO: um campo novo criado pelo administrador nasce visível
- * para todos, e ele restringe se quiser. O contrário — nascer oculto —
- * faria todo campo novo sumir e ninguém entenderia por quê.
- */
 function visibilidadeDoCampo_(permissoes, chaveDoCampo) {
   var declarada = permissoes.campos[chaveDoCampo];
   if (declarada === RECC_VISIBILIDADE.OCULTO) return RECC_VISIBILIDADE.OCULTO;
@@ -12976,16 +8578,6 @@ function visibilidadeDoCampo_(permissoes, chaveDoCampo) {
   return RECC_VISIBILIDADE.EDICAO;
 }
 
-// ============================================================================
-// ALCANCE SOBRE OS DADOS
-// ============================================================================
-
-/**
- * A coluna que diz de quem é o registro.
- *
- * Nas duas bases é o analista, e ela guarda o NOME, não o Id — foi pedido
- * assim. Por isso a comparação é por nome normalizado.
- */
 function colunaDoResponsavel_(estrutura) {
   var candidatas = ['analista', 'responsavel'];
   for (var i = 0; i < estrutura.cabecalhos.length; i++) {
@@ -12996,14 +8588,6 @@ function colunaDoResponsavel_(estrutura) {
   return '';
 }
 
-/**
- * Filtra os registros pelo alcance do nível.
- *
- * EQUIPE é definida pelo NÍVEL DE ACESSO do usuário — é a
- * única noção de equipe que existe na estrutura hoje. Se a operação passar a
- * ter hierarquia de supervisão, isso vira uma coluna nova em USUARIOS e só
- * esta função muda.
- */
 function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
   if (quem.permissoes.escopo === RECC_ESCOPOS.TODOS) return registros;
   if (quem.permissoes.escopo === RECC_ESCOPOS.CANAL) return registros;
@@ -13019,7 +8603,6 @@ function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
     });
   }
 
-  // EQUIPE
   var nomesDaEquipe = nomesDaMinhaEquipe_(quem);
   if (nomesDaEquipe === null) return [];
 
@@ -13032,15 +8615,6 @@ function filtrarPeloAlcance_(registros, nomeDaAba, quem) {
   });
 }
 
-/**
- * Os números de linha que estão no meu alcance — a mesma regra de
- * `filtrarPeloAlcance_`, lendo só a coluna do responsável.
- *
- * Existe para a busca, que acha as linhas antes de ler os casos. Recortar o
- * alcance só depois de cortar nos 100 mais recentes fazia um analista com
- * "só os meus casos" não achar os dele — os 100 lugares iam para casos de
- * outras pessoas, que ele nem pode ver —, e o aviso ainda contava esses casos.
- */
 function linhasNoMeuAlcance_(nomeDaAba, numerosDeLinha, quem) {
   var escopo = quem.permissoes.escopo;
   if (escopo === RECC_ESCOPOS.TODOS || escopo === RECC_ESCOPOS.CANAL) return numerosDeLinha;
@@ -13060,36 +8634,8 @@ function linhasNoMeuAlcance_(nomeDaAba, numerosDeLinha, quem) {
   });
 }
 
-/**
- * Quem é da MINHA equipe: as pessoas cadastradas no MESMO CANAL que eu.
- *
- * Mora aqui, fora do `filtrarPeloAlcance_`, porque duas coisas fazem a mesma
- * pergunta — o alcance da fila e o alcance EQUIPE da Produtividade RECC.
- * Escrever a regra duas vezes faria as duas divergirem.
- *
- * Devolve null — e não lista vazia — para quem NÃO PERTENCE a canal nenhum,
- * que é o caso de quem administra. As duas coisas são diferentes: "a minha
- * equipe não tem ninguém" e "eu não tenho equipe" pedem respostas diferentes
- * na tela, e quem decide o que fazer com cada uma é quem chama.
- */
 function nomesDaMinhaEquipe_(quem) {
-  /*
-   * A EQUIPE É O CANAL, por decisão do PO: "a Equipe deve vir atrelada aos
-   * canais existentes. Se escolhi um específico já dá para saber a qual equipe
-   * pertence".
-   *
-   * Já foram duas outras coisas, e vale saber por quê. Primeiro foi o campo
-   * "Canal que atende" do cadastro — texto livre, que a operação preenchia com
-   * o que fazia sentido para ela ("Vida Individual", "Vida em Grupo"), quase
-   * nunca com o nome do canal do PGO: dois analistas da mesma equipe
-   * escrevendo diferente viravam duas equipes de um. Depois foi o nível de
-   * acesso, por uma rodada.
-   *
-   * O CANAL resolve o problema do texto livre sem o efeito colateral do nível:
-   * é escolha de lista, então não há como divergir por grafia; e separa quem
-   * faz trabalho diferente, o que o nível não fazia — a RET e o VG podem ter
-   * o mesmo nível de acesso e são equipes distintas.
-   */
+
   var meuCanal = converterParaIdentificador_((quem.usuario || {}).CanalId);
   if (!meuCanal) return null;
 
@@ -13102,10 +8648,6 @@ function nomesDaMinhaEquipe_(quem) {
   return nomes;
 }
 
-// ============================================================================
-// SENHA DE ADMINISTRADOR — para o que não tem volta
-// ============================================================================
-
 const RECC_CHAVE_DA_SENHA = 'RECC_SENHA_DO_ADMINISTRADOR';
 const RECC_CHAVE_DAS_TENTATIVAS = 'RECC_TENTATIVAS_DE_SENHA';
 const RECC_CHAVE_DA_LIBERACAO = 'RECC_SENHA_LIBERADA_ATE';
@@ -13113,16 +8655,6 @@ const RECC_MINUTOS_LIBERADOS = 5;
 const RECC_TENTATIVAS_ATE_BLOQUEAR = 3;
 const RECC_HORAS_DE_BLOQUEIO = 24;
 
-/**
- * A senha NUNCA é guardada. Guarda-se a impressão digital dela.
- *
- * SHA-256 sobre "tempero + senha", e o tempero é sorteado uma vez por
- * instalação. Sem tempero, duas instalações com a mesma senha teriam a mesma
- * impressão digital, e uma tabela pronta de senhas comuns quebraria as duas.
- *
- * Tudo isso mora em Script Properties, FORA da planilha: quem abre a planilha
- * não pode ver nem trocar a senha.
- */
 function impressaoDigitalDaSenha_(tempero, senha) {
   var bytes = Utilities.computeDigest(
     Utilities.DigestAlgorithm.SHA_256, tempero + '|' + senha, Utilities.Charset.UTF_8);
@@ -13138,10 +8670,6 @@ function existeSenhaDeAdministrador_() {
   return !!PropertiesService.getScriptProperties().getProperty(RECC_CHAVE_DA_SENHA);
 }
 
-/**
- * Define ou troca a senha. Trocar exige a senha atual — senão qualquer pessoa
- * com a permissão de configurar poderia se promover sozinha.
- */
 function definirSenhaDeAdministrador_(senhaNova, senhaAtual) {
   if (String(senhaNova || '').length < 6) {
     throw new Error('A senha precisa ter ao menos 6 caracteres.');
@@ -13157,10 +8685,6 @@ function definirSenhaDeAdministrador_(senhaNova, senhaAtual) {
   return true;
 }
 
-/**
- * Confere a senha e libera a sessão por alguns minutos.
- * Três erros seguidos bloqueiam por 24 horas.
- */
 function conferirSenhaDeAdministrador_(senha) {
   var propriedades = PropertiesService.getScriptProperties();
   var guardado = propriedades.getProperty(RECC_CHAVE_DA_SENHA);
@@ -13218,30 +8742,6 @@ function gravarTentativasDeSenha_(tentativas) {
     .setProperty(RECC_CHAVE_DAS_TENTATIVAS, JSON.stringify(tentativas));
 }
 
-/**
- * A guarda das ações sem volta: criar ou remover coluna, apagar canal, mexer
- * em nível de acesso, gerar aba de análise sobre uma existente, normalizar
- * base, ocultar em massa.
- *
- * QUEM É ADMINISTRADOR NÃO PRECISA DIGITAR A SENHA. É decisão, e vale a pena
- * estar escrita.
- *
- * A senha nunca foi uma segunda identidade: o sistema já sabe quem está
- * chamando, pela conta Google, e já conferiu a permissão. O que ela é, e
- * sempre foi, é um FREIO — um segundo de parada antes de uma ação que não tem
- * desfazer. Para quem tem a permissão de estrutura, esse freio é atrito sem
- * ganho: a pessoa que pode mexer na estrutura é a mesma que define a senha, e
- * pedir a ela um segredo que ela mesma escolheu não protege nada.
- *
- * Para quem NÃO é administrador e mesmo assim recebeu a ação — porque alguém
- * montou um nível assim —, o freio continua valendo inteiro. É justamente aí
- * que ele serve: a ação é cara, e quem a está fazendo não é quem cuida do
- * sistema.
- *
- * Instalação sem senha definida NÃO libera ninguém: continua barrando, e
- * dizendo onde definir. Do contrário, não definir senha viraria o jeito mais
- * fácil de desligar a guarda.
- */
 function exigirSenhaDeAdministrador_() {
   var quem = usuarioAtual_();
   if (quem.cadastrado && podeFazer_(quem.permissoes, RECC_ACOES.ESTRUTURA)) {
@@ -13263,23 +8763,6 @@ function exigirSenhaDeAdministrador_() {
   return true;
 }
 
-// ============================================================================
-// AUDITORIA
-// ============================================================================
-
-/**
- * Deixa rastro do que foi feito, sem gravar dado pessoal.
- * Nunca derruba a operação: falhar ao auditar não pode desfazer o que já
- * aconteceu — só registra o problema no log do Apps Script.
- *
- * FORA DA FILA DE GRAVAÇÃO (Etapa 61, achado 110). A auditoria gravava direto
- * na planilha, e para isso pegava a trava — que é uma só para o sistema
- * inteiro. Quem só BUSCAVA um caso esperava na fila de quem gravava, e quem
- * cadastrava passava pela trava duas vezes (o caso e a auditoria), até 50
- * segundos de espera. Agora o registro entra numa FILA durável (o
- * PropertiesService, que não precisa de trava) e quem achar a trava livre
- * grava a fila inteira, em lote. Ninguém espera pela auditoria.
- */
 function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
   try {
     var registro = {
@@ -13294,25 +8777,17 @@ function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
       descarregarAFilaDaAuditoria_(0);
       return;
     }
-    // Grande demais para a fila (o caso excluído, com o conteúdo inteiro) ou
-    // fila cheia: grava direto, como era — esperando a trava.
+
     inserirRegistro_('AUDITORIA', registro);
   } catch (erro) {
     Logger.log('Falha ao registrar auditoria: ' + erro.message);
   }
 }
 
-/*
- * A FILA DA AUDITORIA. Cada registro é UMA propriedade do script, com a hora
- * na chave: gravar uma propriedade não precisa de trava, e chaves diferentes
- * não se atropelam. O PropertiesService guarda 9 KB por valor e 500 KB no
- * total — o registro maior que isso, ou a fila cheia, vai direto para a aba.
- */
 const RECC_PREFIXO_DA_FILA_DA_AUDITORIA = 'AUDITORIA.FILA.';
-const RECC_MAIOR_REGISTRO_NA_FILA = 8000;      // caracteres; o teto é 9 KB
-const RECC_DESCARGA_DA_AUDITORIA = 500;        // registros por descarga
+const RECC_MAIOR_REGISTRO_NA_FILA = 8000;
+const RECC_DESCARGA_DA_AUDITORIA = 500;
 
-/** Põe o registro na fila. Devolve false quando ele não cabe (vai direto). */
 function entrarNaFilaDaAuditoria_(registro) {
   var texto = JSON.stringify({
     d: registro.DataHora.getTime(), u: registro.UsuarioId, a: registro.Acao,
@@ -13329,19 +8804,6 @@ function entrarNaFilaDaAuditoria_(registro) {
   }
 }
 
-/**
- * Grava a fila inteira na aba AUDITORIA, em lote e em ordem de hora.
- *
- * `esperarMs` 0 — o normal — tenta a trava e, ocupada, desiste na hora: o
- * próximo que registrar alguma coisa descarrega. Quem LÊ a auditoria (a trilha,
- * o arquivamento, o diagnóstico) espera um pouco, para ler o que acabou de
- * acontecer. Devolve quantos registros gravou.
- *
- * Grava ANTES de tirar da fila: se a gravação falhar, a fila continua inteira
- * para a próxima vez. O pior caso — falhar entre gravar e tirar — é um registro
- * repetido na auditoria, que é o erro que dá para ver; o contrário seria
- * perder o rastro.
- */
 function descarregarAFilaDaAuditoria_(esperarMs) {
   var props = PropertiesService.getScriptProperties();
   var trava = LockService.getScriptLock();
@@ -13357,7 +8819,7 @@ function descarregarAFilaDaAuditoria_(esperarMs) {
     var registros = [];
     chaves.forEach(function (chave) {
       var lido;
-      try { lido = JSON.parse(todas[chave]); } catch (erro) { return; }   // lixo: sai da fila
+      try { lido = JSON.parse(todas[chave]); } catch (erro) { return; }
       registros.push({
         DataHora: new Date(Number(lido.d)), UsuarioId: lido.u || '', Acao: lido.a || '',
         Entidade: lido.e || '', RegistroId: lido.r || '', Detalhe: lido.t || ''
@@ -13371,41 +8833,12 @@ function descarregarAFilaDaAuditoria_(esperarMs) {
   }
 }
 
-/** Quantos registros esperam na fila — para o diagnóstico. */
 function tamanhoDaFilaDaAuditoria_() {
   return Object.keys(PropertiesService.getScriptProperties().getProperties())
     .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
     .length;
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 3 de 3 · O CADASTRO DE QUEM PODE ENTRAR
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * O cadastro de quem pode entrar
- * ============================================================================
- * Não existe senha própria: a pessoa entra com a conta Google dela, e o
- * sistema confere o e-mail autenticado contra esta aba. Cadastrar alguém é,
- * literalmente, dar acesso.
- *
- * As funções SEM sublinhado no fim são chamadas pelo navegador. Todas elas
- * começam conferindo permissão — a tela esconde o botão por educação, o
- * servidor confere por obrigação.
- * ============================================================================
- */
-
-/**
- * A lista de usuários, com cargo, nível e canal já traduzidos para nome.
- *
- * Tudo sai como TEXTO — inclusive as datas. Elas atravessam a fronteira do
- * `google.script.run` em JSON, e um `Date` atravessa como um texto ISO que a
- * tela teria de reinterpretar; formatar aqui deixa uma regra só, do lado que
- * conhece o fuso da operação.
- */
 function listarUsuarios() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
 
@@ -13426,7 +8859,7 @@ function listarUsuarios() {
       nome: String(usuario.Nome || ''),
       email: String(usuario.Email || ''),
       canalId: canalId,
-      // Sem canal NÃO é falta de dado: é o administrador, que atende todas.
+
       canal: canalId ? (canais[canalId] || 'Canal desligada') : '',
       cargoId: converterParaIdentificador_(usuario.CargoId),
       cargo: catalogo[converterParaIdentificador_(usuario.CargoId)] || 'Sem cargo',
@@ -13434,9 +8867,7 @@ function listarUsuarios() {
       nivelAcesso:
         catalogo[converterParaIdentificador_(usuario.NivelAcessoId)] || 'Sem dados',
       ativo: normalizarParaComparar_(usuario.Ativo) === 'sim',
-      // Vazio volta como "Disponível" para a tela não mostrar um campo em
-      // branco em quem foi cadastrado antes desta coluna existir — e o que
-      // ela mostra é a verdade: vazio recebe caso.
+
       disponibilidade: String(usuario.Disponibilidade || '').trim()
         || RECC_DISPONIBILIDADE_QUE_RECEBE,
       recebeCasos: estaDisponivelParaReceber_(usuario),
@@ -13447,7 +8878,6 @@ function listarUsuarios() {
   });
 }
 
-/** Uma data da planilha vira texto legível. Vazio continua vazio. */
 function comoDataEHora_(valor) {
   if (!valor) return '';
   var data = converterParaData_(valor);
@@ -13455,13 +8885,6 @@ function comoDataEHora_(valor) {
   return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
 }
 
-/**
- * Cria ou atualiza um usuário.
- *
- * "Sem dados" no cargo ou no nível não é aceitável na hora de gravar: nível
- * inexistente deixaria a pessoa cadastrada e sem conseguir entrar, e ela não
- * teria como descobrir o motivo sozinha.
- */
 function salvarUsuario(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
@@ -13478,9 +8901,6 @@ function salvarUsuario(dados) {
       'Sem nível válido a pessoa fica cadastrada e não consegue entrar.');
   }
 
-  // O canal é OPCIONAL — quem administra não pertence a nenhuma. Mas se vier
-  // preenchida, tem de existir: um canal que sumiu deixaria a pessoa apontando
-  // para o nada, e ninguém descobriria até alguém estranhar o Trabalho vazio.
   var canalEscolhido = converterParaIdentificador_(dados.canalId);
   if (canalEscolhido) {
     var existe = lerRegistros_('CANAIS').filter(function (canal) {
@@ -13508,28 +8928,13 @@ function salvarUsuario(dados) {
   var campos = {
     Nome: String(dados.nome).trim(),
     Email: email,
-    // Canal VAZIA é válida: é o administrador, que atende todas e delega.
+
     CanalId: converterParaIdentificador_(dados.canalId),
     CargoId: converterParaIdentificador_(dados.cargoId),
     NivelAcessoId: converterParaIdentificador_(dados.nivelAcessoId),
     Ativo: dados.ativo === false ? 'NAO' : 'SIM'
   };
 
-  /*
-   * A DISPONIBILIDADE SÓ É GRAVADA SE A COLUNA EXISTIR.
-   *
-   * Numa planilha que ainda não rodou `atualizarPGO()` a coluna não existe, e
-   * gravar nela derruba o salvar com "a aba USUARIOS não tem coluna para:
-   * Disponibilidade". Quem só queria corrigir um e-mail levaria um erro sobre
-   * um campo que nunca viu.
-   *
-   * A migração é RECOMENDADA, não obrigatória: até ela rodar, o cadastro
-   * continua funcionando e todo mundo continua recebendo lote, que é o
-   * comportamento de antes.
-   *
-   * Quem não mandar nada nasce disponível — vale para a tela antiga, que não
-   * conhece o campo, e para qualquer chamada que não o informe.
-   */
   if (posicaoDaColuna_(estruturaDaAba_('USUARIOS'), 'Disponibilidade') >= 0) {
     campos.Disponibilidade = String(dados.disponibilidade || '').trim()
       || RECC_DISPONIBILIDADE_QUE_RECEBE;
@@ -13548,13 +8953,6 @@ function salvarUsuario(dados) {
   return gravado.__id;
 }
 
-/**
- * Tira o acesso da pessoa sem apagar o histórico dela.
- *
- * Desativar e ocultar são coisas diferentes: desativado continua na tela de
- * usuários, com o acesso fechado; ocultado sai da tela. O que nunca acontece
- * é apagar a linha — os registros que ela criou apontam para este Id.
- */
 function desativarUsuario(idDoUsuario) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var alvo = converterParaIdentificador_(idDoUsuario);
@@ -13574,7 +8972,6 @@ function desativarUsuario(idDoUsuario) {
   return true;
 }
 
-/** O nível de acesso que pode mexer na estrutura é o de administrador. */
 function ehAdministrador_(idDoUsuario) {
   var alvo = converterParaIdentificador_(idDoUsuario);
   var usuarios = lerRegistros_('USUARIOS');
@@ -13596,12 +8993,6 @@ function contarAdministradoresAtivos_() {
   return quantidade;
 }
 
-/**
- * Carimba o último acesso.
- *
- * Falhar aqui não pode impedir alguém de entrar: é informação de apoio, não
- * de controle. Por isso o erro é engolido e só vai para o log.
- */
 function registrarUltimoAcesso_(usuario) {
   try {
     atualizarRegistro_('USUARIOS', usuario.Id, { UltimoAcesso: new Date() });
@@ -13613,95 +9004,11 @@ function registrarUltimoAcesso_(usuario) {
 
 /* ==== Indicadores.gs ====================================================== */
 
-/**
- * ============================================================================
- * PGO — Indicadores.gs · os números
- * ============================================================================
- * Duas telas que contam os mesmos casos e respondem perguntas diferentes:
- * "o que eu trabalho hoje" e "o que está acontecendo na operação". Por isso
- * moram juntas — mudar a regra de contagem num lugar e esquecer do outro é o
- * erro que este arquivo evita. (Uma terceira, a Minha Performance, saiu na
- * Etapa 52, a pedido do PO.)
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. OS CARTÕES DO DIA E A FILA
- *   2. OS GRÁFICOS DA OPERAÇÃO
- *   3. O VALOR POR SITUAÇÃO E OS ATENDIDOS DO CHAT
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 3 · OS CARTÕES DO DIA E A FILA
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Os números do dia e a fila de trabalho
- * ============================================================================
- * O Trabalho responde três perguntas, nesta ordem de importância:
- *
- *   quanto tem?        os cartões, contados por situação
- *   o que fazer agora? a fila, filtrável
- *   está atualizado?   a data do último registro, na barra superior
- *
- * Tudo respeita o ALCANCE do nível: quem enxerga só os próprios casos vê
- * cartões contando só os dele. Um cartão que conta o que a pessoa não pode
- * abrir é pior que cartão nenhum — ela passaria a tarde procurando um caso
- * que a fila nunca vai mostrar.
- * ============================================================================
- */
-
-/**
- * Quantas linhas do FIM da aba os painéis leem antes de filtrar por data.
- *
- * A base só acrescenta no fim, então o recente está nas últimas linhas: ler o
- * fim e filtrar por data custa uma leitura só, em vez de percorrer tudo.
- *
- * O NÚMERO IMPORTA, E MUDA COM O VOLUME. Com 200 mil casos espalhados em um
- * ano, uma janela de 30 dias tem umas 15 mil linhas — e 5.000 mostrariam um
- * terço do período, calados. Por isso é configurável, e por isso toda tela que
- * usa esta janela devolve `truncada` quando bate no teto.
- *
- * Ler 50 mil linhas por 39 colunas são 1,95 milhão de células, cerca de dois
- * segundos: cabe. O que não cabe é ler a base inteira a cada abertura de tela.
- */
 const RECC_LINHAS_DO_PAINEL_PADRAO = 5000;
 
-/**
- * Quantos casos a FILA do Trabalho mostra de cara, e as outras quantidades
- * que a pessoa pode escolher.
- *
- * Pedido do PO, em três passos. Primeiro: "mostrar apenas os 5 mais
- * recentes". Depois: "deve ser possível escolher 5, 10, 20, 50, 100 ou todos".
- * Por fim, a correção que vale: "não queria um filtro; queria que visualmente
- * mostrasse 5, mas fosse possível mostrar todos, limitando nas opções que eu
- * informei caso tenha a quantidade".
- *
- * Por isso o servidor manda a fila INTEIRA, e quem mostra 5, 10 ou todos é a
- * tela — na hora, sem outra ida ao servidor. As opções moram aqui, num lugar
- * só, e a tela oferece só as que o canal tem: com 12 casos, 5, 10 e "todos".
- * Os cartões, a busca e os filtros continuam olhando todos os casos.
- */
 const RECC_CASOS_NA_FILA = 5;
 const RECC_OPCOES_DE_CASOS_NA_FILA = [5, 10, 20, 50, 100];
 
-/**
- * Quantos casos da fila o Trabalho recebe ao ABRIR: os da maior opção do
- * "Mostrar" (100). "Todos" é que vai buscar o resto.
- *
- * O PO relatou: "a aba Trabalho vem demorando para carregar e, quando carrega,
- * traz o erro de 40 s para responder". A fila ia INTEIRA para a tela, e com
- * 5.000 casos no período a resposta tinha 6 MB — o Apps Script leva dezenas
- * de segundos para atravessar isso até o navegador, e a tela desistia nos 40.
- * Perguntado, ele escolheu: abrir com os 100 mais recentes (5, 10, 20, 50 e
- * 100 continuam na hora) e "Todos" ir ao servidor quando clicado. Os cartões,
- * os filtros e o aviso de prazo continuam olhando TODOS os casos.
- */
 const RECC_FILA_NA_ABERTURA = RECC_OPCOES_DE_CASOS_NA_FILA[RECC_OPCOES_DE_CASOS_NA_FILA.length - 1];
 
 function linhasQueOPainelOlha_() {
@@ -13710,13 +9017,6 @@ function linhasQueOPainelOlha_() {
   return RECC_LINHAS_DO_PAINEL_PADRAO;
 }
 
-/**
- * As cores que uma situação pode ter, na coluna Cor da aba CATALOGO.
- *
- * São nomes, e não códigos hexadecimais, de propósito: cada tema pinta o seu
- * "bom" e o seu "ruim". Gravar #15794A na planilha deixaria o verde do tema
- * claro aparecendo no tema escuro.
- */
 const RECC_TONS = ['neutro', 'destaque', 'bom', 'atencao', 'ruim', 'violeta'];
 
 function tomValido_(cor) {
@@ -13724,55 +9024,34 @@ function tomValido_(cor) {
   return RECC_TONS.indexOf(tom) >= 0 ? tom : 'neutro';
 }
 
-/**
- * Tudo que o Trabalho precisa, numa chamada.
- *
- * `filtros` é um objeto simples: { chaveDoCampo: valorEscolhido }. As chaves
- * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
- * inventa filtro, ela oferece o que o canal tem.
- */
 function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  // O PERÍODO é escolhido na tela, das três maneiras — por dias, por data e
-  // por mês. Antes era a janela fixa da CONFIG, igual para todo mundo: quem
-  // precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);
 
-  // A base só acrescenta no fim, então o recente está nas últimas linhas.
-  // Ler por data exigiria percorrer tudo; ler o fim e depois filtrar por data
-  // custa uma leitura só, e o `truncada` avisa quando a janela não coube.
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  // Linha sem data FICA no atalho e SAI dos períodos fechados — a mesma regra
-  // da Produtividade RECC, pelo mesmo motivo: num "últimos 30 dias" ela é um
-  // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
-  // o qual não dá para afirmar que é de setembro.
   var guardarSemData = guardaOsSemData_(periodo);
 
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
     guardarSemData);
   var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
 
-  // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
   var anterior = filtrarPeloAlcance_(
     entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
 
   var disponiveis = filtrosDoCanal_(canal, quem);
-  // A BUSCA DIGITADA entra junto com os filtros, e vale para os cartões E para
-  // a fila: o número do cartão continua sendo o dos casos que a busca achou.
+
   var termo = String((filtros || {}).busca || '').trim();
   var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
   var pertoDeVencer = casosPertoDeVencer_(filtrados, canal);
-  // O CARTÃO CLICADO filtra a FILA pelo que ele conta (Etapa 44) — o status, o
-  // valor de uma coluna (o Status proposta), a coluna preenchida. Os cartões
-  // continuam contando sem ele: clicar em "Pendente" não pode zerar os outros.
+
   var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
 
   return {
@@ -13789,17 +9068,11 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: disponiveis,
     colunas: colunasDaFila_(canal),
-    // A fila, o mais recente em cima: os 100 mais recentes, ou todos quando a
-    // tela pede "Todos". Ver RECC_FILA_NA_ABERTURA. Vai COMPACTA — só os
-    // valores; o nome de cada coluna já está em `colunas`, e a tela remonta.
-    // `total` continua sendo a fila inteira.
+
     fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
       ? naFila : naFila.slice(-RECC_FILA_NA_ABERTURA), canal)),
     filaCompacta: true,
-    // O aviso de prazo olha a fila INTEIRA — um caso perto de vencer que não
-    // está entre os 100 mais recentes é justamente o que mais precisa do aviso.
-    // A LISTA do aviso vai com até 100 (os mais recentes); o número, inteiro.
-    // Um aviso de 2.000 linhas pesaria tanto quanto a fila — e ninguém o lê.
+
     pertoDeVencer: compactarFila_(montarFila_(
       pertoDeVencer.slice(-RECC_FILA_NA_ABERTURA), canal)),
     quantosPertoDeVencer: pertoDeVencer.length,
@@ -13813,16 +9086,6 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   };
 }
 
-/**
- * Só o que entrou na janela.
- *
- * `recuo` desloca a janela para trás: 0 é o período atual, `dias` é o período
- * imediatamente anterior, do mesmo tamanho — é assim que sai a comparação
- * "vs. período anterior" dos cartões.
- *
- * Registro sem data FICA no período atual. Some-lo por omissão esconderia
- * justamente as linhas mal preenchidas, que são as que precisam de atenção.
- */
 function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
   if (!canal.colunaDaData) return recuo ? [] : registros;
 
@@ -13834,19 +9097,6 @@ function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
   return entreDuasDatas_(registros, canal, inicio, fim, !recuo);
 }
 
-/**
- * Os registros cuja data está entre duas datas, inclusive as duas pontas.
- *
- * Compara em texto `yyyy-MM-dd`, e não em milissegundos: a hora não importa
- * aqui, e comparar objetos Date faria "hoje às 14h" ficar de fora de um
- * período que termina "hoje", porque hoje às 14h é depois de hoje às 00h.
- *
- * `guardarSemData` diz o que fazer com a linha que não tem data preenchida.
- * No período atual ela FICA: sumir por omissão esconderia justamente as linhas
- * mal preenchidas, que são as que precisam de atenção. Num período fechado —
- * "setembro", "de 01 a 15" — ela sai, porque não dá para afirmar que ela é
- * daquele mês.
- */
 function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
   var de = Utilities.formatDate(inicio, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
   var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
@@ -13859,49 +9109,16 @@ function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
   });
 }
 
-// ============================================================================
-// O PERÍODO — três maneiras de escolher, uma só de contar
-// ============================================================================
-
-/**
- * As três maneiras de a operação dizer "deste tempo aqui".
- *
- *   ATALHO    — "últimos 30 dias". É o que se usa no dia a dia, e continua
- *               sendo a abertura da tela.
- *   INTERVALO — "de 01/09 a 15/09". É o que responde uma pergunta específica:
- *               a semana da campanha, os dias da virada do sistema.
- *   MÊS       — "setembro de 2026". É como a operação REPORTA, e é diferente
- *               de "últimos 30 dias" — no dia 20 de outubro, os últimos 30
- *               dias pegam metade de setembro e metade de outubro, e nenhum
- *               fechamento mensal se faz assim.
- *
- * O servidor é quem resolve as três numa coisa só: duas datas. A tela escolhe;
- * ela não calcula. Se ela calculasse, o dia que aparece no gráfico e o dia que
- * o servidor contou seriam dois relógios diferentes — o do navegador de quem
- * está olhando e o da planilha —, e num fechamento de mês essa diferença é um
- * dia inteiro de casos.
- */
-/** Quantos meses fechados a tela oferece para trás. */
 const RECC_MESES_PARA_TRAS = 12;
 
 const RECC_NOMES_DOS_MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio',
   'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-/**
- * Transforma o que a tela pediu em duas datas, um tamanho e um rótulo.
- *
- * Pedido torto NÃO estoura: cai no atalho padrão. Um endereço guardado, um
- * clique repetido ou uma data digitada pela metade chegam aqui o tempo todo, e
- * uma tela de número que mostra erro em vez de número é uma tela que ninguém
- * abre de novo.
- */
 function resolverPeriodo_(pedido, diasPadrao) {
   var padrao = Number(diasPadrao)
     || Number(valorDaConfiguracao_('OPERACAO.JANELA_DIAS', '30')) || 30;
   pedido = pedido || {};
 
-  // Compatibilidade: quem chamar só com um número continua funcionando. É o
-  // que o Trabalho fazia, e não há motivo para mexer nele.
   if (typeof pedido === 'number' || typeof pedido === 'string') {
     return periodoPorDias_(Number(pedido) || padrao);
   }
@@ -13911,24 +9128,15 @@ function resolverPeriodo_(pedido, diasPadrao) {
   if (tipo === 'intervalo') {
     var de = converterParaData_(pedido.de);
     var ate = converterParaData_(pedido.ate);
-    // "Por data" sem as duas datas é a ABERTURA da tela (Etapa 43: o PO tirou
-    // o "Por dias" e pediu "Por data" como padrão). Etapa 56, pedido do PO: "o
-    // de deve sempre iniciar no dia 01 de cada mês e o para deve sempre ser o
-    // dia que estamos" — do dia 1 do mês corrente até hoje, já escrito como
-    // datas, para as caixas de/até abrirem preenchidas. No dia 1, é só hoje.
+
     if (!pedido.de && !pedido.ate) {
-      // As duas pontas à meia-noite: o período compara por dia (yyyy-MM-dd), e
-      // com a hora de agora no "até" o tamanho arredondaria um dia para mais —
-      // e a janela de comparação dos cartões sairia um dia mais longa.
+
       var agora = new Date();
       var hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
       var doDia1 = new Date(agora.getFullYear(), agora.getMonth(), 1);
       return {
         tipo: 'intervalo',
-        // É a ABERTURA: o caso sem data continua aparecendo, como no antigo
-        // "últimos 30 dias" (ver guardaOsSemData_). Etapa 44: sem esta marca, a
-        // troca da abertura para "Por data" escondeu os casos importados sem
-        // data de recepção — e os cartões passaram a contar menos.
+
         abertura: true,
         de: doDia1,
         ate: hoje,
@@ -13937,9 +9145,7 @@ function resolverPeriodo_(pedido, diasPadrao) {
       };
     }
     if (de && ate) {
-      // Datas invertidas se endireitam em vez de devolver lista vazia. Quem
-      // digitou "de 30/09 a 01/09" quis setembro, e uma tela zerada faria a
-      // pessoa procurar defeito no dado.
+
       if (de > ate) { var troca = de; de = ate; ate = troca; }
       return {
         tipo: 'intervalo',
@@ -13959,12 +9165,6 @@ function resolverPeriodo_(pedido, diasPadrao) {
   return periodoPorDias_(Number(pedido.dias) || padrao);
 }
 
-/**
- * O caso SEM data entra neste período? Na abertura da tela (e no antigo "por
- * dias"), sim: é um caso mal preenchido, e some-lo esconderia justamente quem
- * precisa de atenção. Num período escolhido de/até ou num mês, não: não dá
- * para afirmar que ele é desse período.
- */
 function guardaOsSemData_(periodo) {
   return periodo.tipo === 'dias' || periodo.abertura === true;
 }
@@ -13982,15 +9182,13 @@ function periodoPorDias_(dias) {
   };
 }
 
-/** Do dia 1 ao último dia do mês. `mes` chega como "2026-09". */
 function periodoDoMes_(mes) {
   var partes = mes.split('-');
   var ano = Number(partes[0]);
   var numero = Number(partes[1]);
 
   var de = new Date(ano, numero - 1, 1);
-  // Dia ZERO do mês seguinte é o último dia deste. Evita a tabela de "30 ou
-  // 31", e acerta fevereiro bissexto sem ninguém precisar lembrar dele.
+
   var ate = new Date(ano, numero, 0);
 
   return {
@@ -14003,17 +9201,6 @@ function periodoDoMes_(mes) {
   };
 }
 
-/**
- * O período imediatamente anterior, para a comparação dos cartões.
- *
- * Num MÊS, o anterior é o mês anterior inteiro — e não "os 30 dias antes do
- * dia 1". Comparar setembro com "os 30 dias antes de setembro" daria quase
- * agosto, mas não agosto: fevereiro contra os 30 dias antes dele pegaria três
- * dias de janeiro a mais, e a comparação que a operação reporta estaria errada
- * por três dias todo ano.
- *
- * Nos outros dois, é uma janela do mesmo tamanho, encostada antes.
- */
 function periodoAnterior_(periodo) {
   if (periodo.tipo === 'mes') {
     var partes = periodo.mes.split('-');
@@ -14023,11 +9210,6 @@ function periodoAnterior_(periodo) {
     return periodoDoMes_(ano + '-' + (numero < 10 ? '0' : '') + numero);
   }
 
-  // O tamanho é o VÃO REAL entre as duas datas, e não o `dias` que o pedido
-  // trouxe: "últimos 30 dias" pega 31 datas (de hoje-30 até hoje, com as duas
-  // pontas), e usar o 30 aqui deixaria a janela anterior um dia mais curta que
-  // a atual. Comparar duas janelas de tamanhos diferentes é o tipo de erro que
-  // some numa variação de 3% e ninguém confere.
   var quantos = diasEntre_(periodo.de, periodo.ate);
 
   var ate = new Date(periodo.de.getTime());
@@ -14038,12 +9220,6 @@ function periodoAnterior_(periodo) {
   return { tipo: periodo.tipo, de: de, ate: ate, dias: periodo.dias, rotulo: '' };
 }
 
-/**
- * Quantas DATAS o intervalo cobre, contando as duas pontas.
- *
- * De 10/09 a 19/09 são DEZ dias, e não nove. Contar a subtração crua daria
- * nove, e a janela de comparação sairia um dia mais curta que a medida.
- */
 function diasEntre_(de, ate) {
   var umDia = 24 * 60 * 60 * 1000;
   var cru = Math.round((ate.getTime() - de.getTime()) / umDia);
@@ -14054,7 +9230,6 @@ function comoSeEscreve_(data) {
   return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
 }
 
-/** "2026-09" quando o texto é um mês de verdade; vazio quando não é. */
 function mesValido_(texto) {
   var limpo = String(texto || '').trim();
   if (!/^\d{4}-\d{2}$/.test(limpo)) return '';
@@ -14062,7 +9237,6 @@ function mesValido_(texto) {
   return (numero >= 1 && numero <= 12) ? limpo : '';
 }
 
-/** Os meses que a tela oferece: deste para trás, com o nome por extenso. */
 function mesesParaEscolher_() {
   var lista = [];
   var hoje = new Date();
@@ -14078,33 +9252,11 @@ function mesesParaEscolher_() {
   return lista;
 }
 
-/**
- * Os filtros que o canal oferece: os campos que já são lista.
- *
- * Não há lista de filtros escrita em código. Se o administrador transformar
- * um campo em seletor, ele vira filtro sozinho; se desligar o campo, o filtro
- * some junto.
- */
-/** Quantas caixas de filtro o Trabalho mostra. Era 4; o PO pediu o Status proposta (Etapa 44). */
 const RECC_FILTROS_NO_TRABALHO = 6;
 
 function filtrosDoCanal_(canal, quem) {
   var disponiveis = [];
 
-  // O STATUS VEM PRIMEIRO, sempre.
-  //
-  // O teto de quatro filtros pegava os quatro primeiros seletores na ordem em
-  // que os campos aparecem no formulário. Quando a operação reordenou o
-  // formulário e o Status foi para o fim — ele é a última coisa que se
-  // preenche no atendimento —, ele caiu fora do corte. Sem erro nenhum: o
-  // filtro mais usado do sistema simplesmente deixou de existir na tela.
-  //
-  // A ordem do FORMULÁRIO segue o caminho de quem atende; a ordem dos FILTROS
-  // segue o que a operação recorta. Amarrar uma na outra foi o defeito.
-  //
-  // Etapa 44, pedido do PO: o filtro do Status proposta. Logo depois do Status
-  // vêm os campos que APARECEM conforme o status (o Status proposta aparece no
-  // Retido); depois os outros campos de lista. Até 6 caixas.
   var colunaDoStatus = normalizarParaComparar_(canal.colunaDoStatus || '');
   var ativos = camposAtivosDoCanal_(canal.id);
   var chaveDoStatus = '';
@@ -14126,7 +9278,7 @@ function filtrosDoCanal_(canal, quem) {
   }).map(function (item) { return item.campo; });
 
   campos.forEach(function (campo) {
-    if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;   // mais vira parede de caixas
+    if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 
@@ -14161,26 +9313,6 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
   });
 }
 
-/**
- * A busca digitada do Trabalho: os casos em que o termo aparece.
- *
- * Pedido do PO: "o filtro por busca digitada para cada canal". Procura em
- * DOIS conjuntos de colunas, juntos:
- *
- *   · as que a FILA mostra — quem lê "Endosso urgente" na fila espera achar o
- *     caso digitando "endosso";
- *   · as COLUNAS DA BUSCA do canal (Configurações › Canais de trabalho) — as
- *     mesmas do Buscar Caso: CPF, apólice, protocolo.
- *
- * A comparação é a do Buscar Caso (`casaComOTermo_`): sem acento e sem caixa,
- * e só os dígitos nas colunas de identificador — "123.456.789-01" acha
- * "12345678901". A proposta da fila, que junta código e número, também é
- * procurada inteira: digitar "7-0000123" acha o caso.
- *
- * Procura só no que o período e os filtros já separaram, em memória: a base
- * já foi lida para montar o painel, e procurar de novo na planilha seria
- * pagar a leitura duas vezes.
- */
 function aplicarBusca_(registros, canal, termo) {
   if (!termo) return registros;
 
@@ -14203,13 +9335,7 @@ function aplicarBusca_(registros, canal, termo) {
     });
   });
   colunasDaBusca_(canal).forEach(guardar);
-  // E TODAS as outras colunas do caso (Etapa 44, pedido do PO): "digitando
-  // 'aguardando transmissão' não acha os casos" — o Status proposta, criado
-  // fora do contrato, não estava na fila nem nas colunas da busca. As técnicas
-  // ("_Visivel"…) ficam de fora.
-  // Nas colunas de IDENTIFICADOR que entram só por esta regra, a busca vale
-  // quando o termo parece um número (CPF, Id, protocolo): elas comparam só os
-  // dígitos, e "Caso número 1" acharia o caso de Id 0000000001.
+
   var termoEhNumero = /^[\d\s.\-\/]+$/.test(String(termo).trim());
   var estrutura = estruturaDaAba_(canal.aba);
   estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
@@ -14228,9 +9354,7 @@ function aplicarBusca_(registros, canal, termo) {
         }).filter(function (texto) { return texto !== ''; }).join('-');
         return casaComOTermo_(inteira, termo, '');
       }
-      // Pelo TEXTO da coluna, como a fila mostra, e não pelo valor cru: uma
-      // data crua vira "Mon Oct 06 2026…", e buscar "Mon" de "Monkey"
-      // acharia todo caso que tem data.
+
       var valor = coluna.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR
         ? registro[coluna.cabecalho]
         : paraTexto_(registro[coluna.cabecalho], coluna.tipo);
@@ -14239,26 +9363,6 @@ function aplicarBusca_(registros, canal, termo) {
   });
 }
 
-// ============================================================================
-// OS CARTÕES
-// ============================================================================
-
-/**
- * Total, um cartão por situação, e — quando o canal tem as colunas para isso —
- * quantos foram finalizados na própria célula.
- *
- * A contagem por situação sai do CATÁLOGO, e não dos valores encontrados na
- * base: assim uma situação sem nenhum caso aparece com zero, em vez de sumir
- * do painel. Sumir esconde justamente a informação de que ela zerou.
- */
-/**
- * A regra de contagem de um cartão, na forma canônica.
- *
- * Existe porque a comparação de textos do sistema ignora acento e caixa: sem
- * este mapa, o servidor devolvia `nacelula` para a tela e recusava o mesmo
- * `nacelula` de volta na hora de salvar. O que sai e o que entra têm de ser a
- * mesma coisa.
- */
 function dimensaoDoCartao_(valor) {
   var canonicas = ['total', 'situacao', 'naCelula', 'preenchido', 'valor'];
   var procurado = normalizarParaComparar_(valor);
@@ -14277,28 +9381,20 @@ function contarCartoes_(registros, anteriores, canal, tela) {
     tons[situacao.chave] = situacao.tom;
   });
 
-  // Cada cartão sai dizendo a regra pela qual contou (`dimensao`). É com ela que
-  // o Trabalho decide se clicar filtra a fila pelo status: só o cartão de
-  // status filtra. Antes a tela deduzia pela chave, e um cartão "Já passaram
-  // por" clicado filtrava a fila por um status com o nome do cartão — fila
-  // vazia, sem erro.
   var existentes = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
     existentes[normalizarParaComparar_(situacao.gravadoComo)] = true;
   });
 
   return cartoesDoCanal_(canal, tela).map(function (cartao) {
-    // O cartão de um status que NÃO EXISTE MAIS (renomeado ou apagado em Ajustes
-    // Gerais) some, em vez de aparecer com zero e parecer um problema da
-    // operação. Em Configurações ele aparece marcado, para trocar ou remover.
+
     if (cartao.dimensao === 'situacao' && !existentes[normalizarParaComparar_(cartao.filtro)]) {
       return null;
     }
     var feito = umCartao(cartao);
     if (feito) {
       feito.dimensao = cartao.dimensao;
-      // Clicar filtra a fila pelo que o cartão CONTA (Etapa 44). O "Total" é
-      // o desligar; "Finalizados na célula" não é uma regra de linha.
+
       feito.id = cartao.id;
       feito.filtravel = cartao.dimensao !== 'naCelula';
     }
@@ -14339,12 +9435,6 @@ function contarCartoes_(registros, anteriores, canal, tela) {
   }
 }
 
-/**
- * Os casos que um cartão conta — para a fila, quando a pessoa clica nele
- * (Etapa 44). A regra é a MESMA da contagem: o número do cartão e o tamanho da
- * fila filtrada têm de bater. Cartão que não existe (ou o "Total"): a fila
- * inteira.
- */
 function filtrarPeloCartao_(registros, canal, idDoCartao) {
   var id = converterParaIdentificador_(idDoCartao);
   if (!id) return registros;
@@ -14371,17 +9461,6 @@ function filtrarPeloCartao_(registros, canal, idDoCartao) {
   });
 }
 
-/**
- * Quantos casos têm ESTE valor nesta coluna — "1ª tentativa de contato sem
- * sucesso" em Tentativa, "Sim" em Abertura indevida.
- *
- * Pedido do PO: os cartões não podiam ficar só no status. É a foto de HOJE,
- * como o cartão de status: o caso que sai do valor sai da conta. O que fica
- * para sempre é o carimbo ("Já passaram por").
- *
- * Compara sem acento e sem caixa, como o resto do sistema. Coluna que não
- * existe na base devolve null e o cartão some, igual ao "preenchido".
- */
 function contarComOValor_(registros, canal, cabecalho, valor) {
   var coluna = String(cabecalho || '').trim();
   var procurado = normalizarParaComparar_(valor);
@@ -14396,17 +9475,6 @@ function contarComOValor_(registros, canal, cabecalho, valor) {
   return quantos;
 }
 
-/**
- * Quantos casos têm ESTA coluna preenchida.
- *
- * É o que responde "quantos já contatou". Contar pelo STATUS não responderia:
- * um caso que já passou do "1º contato realizado" e hoje está em "Reteve"
- * continua tendo sido contatado, mas não conta mais em nenhum status. O
- * carimbo, esse, não some — é exatamente para isso que ele existe.
- *
- * Devolve null quando a coluna não existe na base. O cartão some, em vez de
- * aparecer zerado e parecer um problema da operação quando é de instalação.
- */
 function contarComColunaPreenchida_(registros, canal, cabecalho) {
   var coluna = String(cabecalho || '').trim();
   if (!coluna) return null;
@@ -14420,21 +9488,6 @@ function contarComColunaPreenchida_(registros, canal, cabecalho) {
   return quantos;
 }
 
-/**
- * Os cartões declarados para o Trabalho deste canal, na ordem escolhida.
- *
- * Cada cartão é uma linha de `PAINEIS`, e não um pedaço de texto dentro de
- * `CANAIS`: assim ele tem nome, cor e ordem próprios, e o administrador
- * renomeia "Concluído" para "Resolvido no primeiro contato" sem que isso
- * mexa no que está gravado nos casos.
- *
- * Desligar um cartão só o tira da tela — nenhum caso é tocado.
- *
- * `tela` diz de qual tela são os cartões. O Trabalho tem os dele; a
- * Produtividade RECC tem os dela, que respondem outra pergunta — quantos
- * reteve, quantos contatou — e por isso não são os mesmos. Mesma máquina,
- * duas listas, e as duas se editam em Configurações › Painéis.
- */
 function cartoesDoCanal_(canal, tela) {
   var doCanal = converterParaIdentificador_(canal.id);
   var qual = normalizarParaComparar_(tela || 'trabalho');
@@ -14455,13 +9508,12 @@ function cartoesDoCanal_(canal, tela) {
         titulo: String(linha.Titulo || ''),
         dimensao: dimensaoDoCartao_(linha.CampoDimensao) || 'total',
         filtro: String(linha.Filtro || ''),
-        // Só o cartão "valor" usa: a coluna onde o valor do Filtro é procurado.
+
         coluna: String(linha.CampoMedida || ''),
         cor: tomValido_(linha.Cor)
       };
     });
 }
-
 
 function contarPorSituacao_(registros, canal) {
   var contagem = {};
@@ -14472,13 +9524,6 @@ function contarPorSituacao_(registros, canal) {
   return contagem;
 }
 
-/**
- * A variação vem como número ou como null.
- *
- * Sem nada no período anterior, NÃO existe variação — mostrar "+100%" porque
- * saiu de zero é ruído que a operação aprende a ignorar, e junto com ele
- * ignora a variação que importa.
- */
 function montarCartao_(chave, rotulo, valor, valorAnterior, tom, explicacao) {
   var variacao = null;
   if (valorAnterior > 0) {
@@ -14495,7 +9540,6 @@ function montarCartao_(chave, rotulo, valor, valorAnterior, tom, explicacao) {
   };
 }
 
-
 function situacoesDoCanal_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
   return lerRegistros_('CATALOGO')
@@ -14511,9 +9555,7 @@ function situacoesDoCanal_(canal) {
     .map(function (item) {
       return {
         chave: normalizarParaComparar_(item.Nome),
-        // O que a pessoa LÊ é o rótulo; o que está GRAVADO no caso é o nome.
-        // Um cartão que apontasse para o rótulo pararia de contar no dia em
-        // que alguém trocasse o texto da tela.
+
         nome: String(item.Rotulo || item.Nome),
         gravadoComo: String(item.Nome),
         tom: tomValido_(item.Cor),
@@ -14523,16 +9565,6 @@ function situacoesDoCanal_(canal) {
     });
 }
 
-/**
- * Quantas demandas foram resolvidas sem sair da célula.
- *
- * A conta é: finalização preenchida E área responsável vazia. Não é coluna
- * gravada, é conta — assim ela não mente quando alguém edita a área
- * responsável direto na planilha.
- *
- * Devolve null quando o canal não declarou as duas colunas: o cartão não
- * aparece, em vez de aparecer sempre zerado e parecer um problema.
- */
 function contarFinalizadosNaCelula_(registros, canal) {
   if (!canal.colunaDaFinalizacao || !canal.colunaDaAreaResponsavel) return null;
 
@@ -14545,41 +9577,10 @@ function contarFinalizadosNaCelula_(registros, canal) {
   return quantos;
 }
 
-// ============================================================================
-// A FILA
-// ============================================================================
-
-/** As colunas que o canal escolheu mostrar na fila. */
-/**
- * As colunas da fila, agrupadas.
- *
- * `ColunasDaFila` aceita duas escritas, e a diferença é só o dois-pontos:
- *
- *   plana      Data de entrada, Status, Nome do segurado
- *   agrupada   Situação: Data, Status; Dados cadastrais: Nome, CPF
- *
- * A agrupada existe porque um caso da RET tem trinta e cinco colunas. Seis
- * lado a lado perdem o resto; trinta e cinco não cabem na tela. Juntar as que
- * se leem de uma vez só — proposta com apólice, nome com CPF — resolve as
- * duas coisas.
- *
- * DUAS COLUNAS NUMA LINHA SÓ: "Código origem da proposta + número da
- * proposta" mostra "7-0000000". Pedido do PO para a fila da RET — a proposta
- * inteira em destaque, e não só o número. Os pedaços saem juntos com o hífen,
- * que é como a proposta é escrita no mundo; pedaço vazio não deixa hífen solto.
- *
- * Coluna que não existe na aba é DESCARTADA em silêncio aqui, e não é
- * descuido: a fila é leitura, e derrubar o Trabalho inteiro porque alguém
- * renomeou uma coluna seria pior. Quem cobra o nome errado é Configurações,
- * na hora de salvar o canal.
- */
 function colunasDaFila_(canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var declarado = String(canal.colunasDaFila || '');
 
-  // Sem nenhum dois-pontos, é a escrita plana: cada coluna vira um grupo com
-  // o próprio nome. É o que faz um canal antigo continuar funcionando igual,
-  // sem ninguém precisar reescrever a linha dela na planilha.
   var pedacos = declarado.indexOf(':') < 0
     ? declarado.split(',')
     : declarado.split(';');
@@ -14589,10 +9590,6 @@ function colunasDaFila_(canal) {
     .filter(function (grupo) { return grupo && grupo.colunas.length; });
 }
 
-/**
- * Uma entrada da lista de um grupo — uma coluna, ou várias juntas com "+".
- * Null quando nenhuma das colunas citadas existe na aba.
- */
 function colunaDaFila_(texto, estrutura, canal) {
   var existentes = String(texto || '').split('+')
     .map(function (nome) { return nome.trim(); })
@@ -14621,7 +9618,6 @@ function colunaDaFila_(texto, estrutura, canal) {
   };
 }
 
-/** Um pedaço de `ColunasDaFila` vira um grupo com o seu título. */
 function grupoDaFila_(pedaco, estrutura, canal) {
   var texto = String(pedaco || '').trim();
   if (!texto) return null;
@@ -14639,29 +9635,22 @@ function grupoDaFila_(pedaco, estrutura, canal) {
     .filter(function (coluna) { return coluna !== null; });
 
   return {
-    // Sem título declarado, o grupo se chama como a sua única coluna — é o
-    // que faz a escrita plana continuar valendo, sem um segundo caminho.
+
     titulo: titulo || (colunas.length ? colunas[0].cabecalho : ''),
     colunas: colunas
   };
 }
 
-
 function montarFila_(registros, canal) {
   var grupos = colunasDaFila_(canal);
 
-  // O SLA só existe em canal que declara um. Os status finais e o "agora" são
-  // calculados uma vez por fila, e não uma por caso.
   var comSla = Number(canal.slaHorasUteis) > 0;
   var finais = {};
-  // Os sinalizadores (RET: 3 dias úteis; Mesa: 48h da área). O relógio é um
-  // só por fila, e a leitura da aba também.
+
   var sinalizadores = sinalizadoresDoCanal_(canal);
   var situacoes = sinalizadores.length ? situacoesPorChave_(canal) : null;
   var agora = (comSla || sinalizadores.length) ? relogioDeParede_(new Date()) : null;
 
-  // A cor de cada situação, para a etiqueta da fila sair pintada. Numa fila
-  // de trinta linhas, é a cor que faz "não trabalhado" saltar aos olhos.
   var tons = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
     tons[situacao.chave] = situacao.tom;
@@ -14671,18 +9660,10 @@ function montarFila_(registros, canal) {
   return registros.slice().reverse().map(function (registro) {
     var celulas = grupos.map(function (grupo) {
       return grupo.colunas.map(function (coluna) {
-        /*
-         * O ALERTA sai do valor que está na base, na hora de montar a fila.
-         *
-         * No VG são dois: vigência abaixo de 18 meses e margem abaixo de
-         * 25,5. O PO pediu vermelho só aqui, nas telas — nunca na célula da
-         * planilha. `recado` vem junto porque uma cor sozinha não diz o
-         * motivo, e quem chega novo na operação não adivinha.
-         */
+
         var faixa = faixaDaCelula_(canal.aba, coluna.cabecalho,
           registro[coluna.cabecalho]);
 
-        // Colunas juntas ("código + número") saem numa linha só, com hífen.
         var valor = coluna.juntar
           ? coluna.juntar.map(function (pedaco) {
             return paraTexto_(registro[pedaco.cabecalho], pedaco.tipo);
@@ -14693,8 +9674,7 @@ function montarFila_(registros, canal) {
           cabecalho: coluna.cabecalho,
           valor: valor,
           ehStatus: coluna.ehStatus,
-          // O motivo da cor, para a dica; e a cor: vermelho ("ruim"), amarelo
-          // ("atencao") ou verde ("bom") — as duas últimas, só na vigência do VG.
+
           alerta: faixa ? faixa.recado : '',
           tomDoAlerta: faixa ? faixa.tom : ''
         };
@@ -14707,10 +9687,9 @@ function montarFila_(registros, canal) {
       celulas: celulas,
       situacao: situacao,
       tom: tons[normalizarParaComparar_(situacao)] || 'neutro',
-      // O SLA, quando o canal declara um (hoje, a Mesa Diamante).
+
       sla: comSla ? slaDoCaso_(registro, canal, finais, agora) : null,
-      // Os sinalizadores deste caso, na ordem da aba. Vazio quando nenhum se
-      // aplica — e é o que faz a tela não desenhar nada.
+
       sinais: sinalizadores.map(function (sinalizador) {
         return sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
       }).filter(function (sinal) { return sinal !== null; })
@@ -14718,16 +9697,6 @@ function montarFila_(registros, canal) {
   });
 }
 
-/**
- * A fila em forma COMPACTA, para atravessar até o navegador.
- *
- * Cada célula ia como um objeto com o nome da coluna, se é status e o alerta —
- * 1,1 KB por caso, quase tudo repetido. Aqui vai só o valor (ou, quando há
- * alerta, [valor, recado, tom]); o nome e o "é status" a tela tira de
- * `colunas`, que já vem na mesma resposta e na mesma ordem. Cinco vezes menor.
- * A tela remonta o formato de antes (`expandirFila`, em Trabalho.html), e o
- * resto do desenho não mudou.
- */
 function compactarFila_(fila) {
   return fila.map(function (caso) {
     return {
@@ -14746,13 +9715,6 @@ function compactarFila_(fila) {
   });
 }
 
-/**
- * Os casos no AMARELO de algum sinalizador — o que o aviso do Trabalho mostra
- * ao entrar no canal. Mesma regra da tela: amarelo e ainda não encerrado.
- *
- * Olha todos os casos que a pessoa enxerga, e não só os da fila que foi para
- * a tela. O relógio e a leitura dos sinalizadores são uma vez só, como na fila.
- */
 function casosPertoDeVencer_(registros, canal) {
   var sinalizadores = sinalizadoresDoCanal_(canal);
   if (!sinalizadores.length) return [];
@@ -14766,34 +9728,6 @@ function casosPertoDeVencer_(registros, canal) {
   });
 }
 
-/* ============================================================================
-   O SLA EM HORAS ÚTEIS
-   ============================================================================
-   Pedido do PO para a Mesa Diamante: "não mostra se o caso está dentro da SLA
-   de 6 horas úteis. A célula funciona das 08:15 às 18:30". De segunda a
-   sexta, escolha dele — e sem feriados, porque o sistema não tem mais a lista.
-
-   A CONTA É FEITA NO RELÓGIO DE PAREDE de São Paulo, em minutos do dia, e não
-   em milissegundos: "08:15" é 08:15 em qualquer dia, e misturar fuso com hora
-   de planilha (que o Sheets ancora numa data antiga) foi o que já deslocou
-   horários em minutos neste sistema.
-
-   COMEÇA na data e hora de entrada. Caso que chega fora do expediente — às
-   20h, no sábado — começa a contar na próxima abertura. Sem a hora, conta da
-   abertura daquele dia.
-
-   PARA NA PRIMEIRA RESPOSTA — palavra do PO: "a SLA conta até a data da
-   primeira resposta". Sem a hora dela, vale a hora guardada junto da data; sem
-   nenhuma das duas, o fim do expediente daquele dia.
-
-   SEM RESPOSTA, PARA NO ENCERRAMENTO — decisão do PO, perguntada: caso que foi
-   encerrado sem a primeira resposta preenchida para na mudança para o status
-   final ou, sem ela, na data da finalização. Senão ficaria "fora do prazo"
-   crescendo para sempre, num caso que ninguém mais vai trabalhar. O resto
-   conta até agora.
-   ============================================================================ */
-
-/** O dia e o minuto do dia, no relógio de São Paulo. */
 function relogioDeParede_(data) {
   var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm');
   var partes = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(texto);
@@ -14804,7 +9738,6 @@ function relogioDeParede_(data) {
   };
 }
 
-/** Os minutos do dia de uma hora da planilha, ou de um texto "14:30". */
 function minutoDaHora_(valor) {
   if (valor === null || valor === undefined || valor === '') return null;
   if (Object.prototype.toString.call(valor) === '[object Date]') {
@@ -14814,12 +9747,11 @@ function minutoDaHora_(valor) {
   return partes ? Number(partes[1]) * 60 + Number(partes[2]) : null;
 }
 
-/** Minutos ÚTEIS entre dois pontos do relógio — segunda a sexta, no expediente. */
 function minutosUteisEntre_(de, ate, abre, fecha) {
   if (ate.dia < de.dia || (ate.dia === de.dia && ate.minuto <= de.minuto)) return 0;
   var total = 0;
   for (var dia = de.dia; dia <= ate.dia; dia++) {
-    var semana = new Date(dia * 86400000).getUTCDay();   // 0 domingo, 6 sábado
+    var semana = new Date(dia * 86400000).getUTCDay();
     if (semana === 0 || semana === 6) continue;
     var inicio = dia === de.dia ? Math.max(abre, de.minuto) : abre;
     var fim = dia === ate.dia ? Math.min(fecha, ate.minuto) : fecha;
@@ -14828,11 +9760,6 @@ function minutosUteisEntre_(de, ate, abre, fecha) {
   return total;
 }
 
-/**
- * O ponto do relógio em que o prazo parou: o dia da data e a hora da coluna
- * de hora. Sem a hora, vale a guardada junto da data (quem conclui pelo
- * diálogo grava data e hora numa célula só); sem nenhuma, o fim do expediente.
- */
 function pontoDoFim_(data, hora, fecha) {
   var relogio = relogioDeParede_(data);
   var minuto = minutoDaHora_(hora);
@@ -14840,24 +9767,8 @@ function pontoDoFim_(data, hora, fecha) {
   return { dia: relogio.dia, minuto: minuto };
 }
 
-/*
- * A HORA DA FINALIZAÇÃO, ao lado da data (contrato da Mesa Diamante). Lida
- * pela grafia da planilha; canal sem a coluna usa a hora guardada na própria
- * data, ou o fim do expediente — ver `pontoDoFim_`.
- */
 const RECC_COLUNA_HORA_DA_FINALIZACAO = 'horário da finalização';
 
-/**
- * Quando o caso foi FINALIZADO, pela data e hora que estão na planilha — ou
- * null, sem a data.
- *
- * Etapa 58, pedido do PO: "o que deve prevalecer sempre é, se houver data e
- * hora de finalização, ela; na ausência, o status concluído e o carimbo da
- * data em que foi salvo. Caso seja ajustada depois, a data e hora da
- * finalização deve prevalecer". Antes valia a data da última mudança de
- * status — o dia em que alguém SALVOU —, e caso finalizado no prazo e
- * registrado depois aparecia como estourado.
- */
 function pontoDaFinalizacao_(registro, canal, fecha) {
   if (!canal.colunaDaFinalizacao) return null;
   var data = converterParaDataEHora_(registro[canal.colunaDaFinalizacao]);
@@ -14866,12 +9777,6 @@ function pontoDaFinalizacao_(registro, canal, fecha) {
   return pontoDoFim_(data, registro[colunaDaHora], fecha);
 }
 
-/**
- * O canal FECHA o caso pela finalização? Sim quando algum status final carimba
- * a coluna de finalização do canal — na Mesa, Concluído e Concluído na mesa
- * carimbam a "Data da finalização". Na RET a coluna de finalização é a "data da
- * transmissão", que nenhum desfecho carimba: lá nada muda.
- */
 function fechaPelaFinalizacao_(canal, situacoes) {
   if (!canal.colunaDaFinalizacao) return false;
   var finalizacao = normalizarParaComparar_(canal.colunaDaFinalizacao);
@@ -14881,7 +9786,6 @@ function fechaPelaFinalizacao_(canal, situacoes) {
   });
 }
 
-/** "2h10", "45min", e a partir de um expediente inteiro, "3 dias úteis". */
 function duracaoParaLer_(minutos, expediente) {
   if (minutos >= expediente) {
     var dias = Math.floor(minutos / expediente);
@@ -14893,10 +9797,6 @@ function duracaoParaLer_(minutos, expediente) {
   return horas + 'h' + (resto ? (resto < 10 ? '0' : '') + resto : '');
 }
 
-/**
- * O SLA de um caso, pronto para o selo da fila — ou null, quando não dá para
- * contar (sem data de entrada, ou canal sem expediente válido).
- */
 function slaDoCaso_(registro, canal, finais, agora) {
   var abre = minutoDaHora_(canal.inicioDoExpediente);
   var fecha = minutoDaHora_(canal.fimDoExpediente);
@@ -14911,8 +9811,6 @@ function slaDoCaso_(registro, canal, finais, agora) {
     minuto: horaDaEntrada === null ? abre : horaDaEntrada
   };
 
-  // Onde o prazo parou: na primeira resposta, no encerramento ou em lugar
-  // nenhum ainda ("agora"). A tela usa para explicar o selo na dica.
   var ate = agora;
   var parouEm = 'agora';
   var resposta = canal.colunaDaPrimeiraResposta
@@ -14925,8 +9823,7 @@ function slaDoCaso_(registro, canal, finais, agora) {
     var situacao = canal.colunaDoStatus
       ? normalizarParaComparar_(registro[canal.colunaDoStatus]) : '';
     var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
-    // A data e hora da finalização vêm antes da mudança de status: é o que o
-    // analista informou, e não o dia em que alguém salvou (Etapa 58).
+
     var finalizado = pontoDaFinalizacao_(registro, canal, fecha);
     if (finalizado) {
       parouEm = 'encerramento';
@@ -14962,42 +9859,8 @@ function slaDoCaso_(registro, canal, finais, agora) {
   };
 }
 
-
-/* ============================================================================
-   OS SINALIZADORES DE PRAZO
-   ============================================================================
-   Pedido do PO: "um sinalizador de caso, na aba Trabalho e na Produtividade
-   RECC". Na RET, o caso cadastrado tem 3 dias úteis para chegar a um status
-   final; na Mesa, o caso tem 48 horas úteis, do status Em andamento até ser
-   concluído.
-
-   É o mesmo relógio do SLA da Mesa — minutos ÚTEIS, de segunda a sexta, dentro
-   do expediente —, e por isso reaproveita as mesmas contas. O que muda é o que
-   cada sinalizador declara na aba SINALIZADORES: quando vale, desde quando
-   conta, quanto tempo tem e quando o amarelo acende. Nada disso é escrito
-   aqui; o PO ajusta em Configurações › Sinalizadores.
-
-   AS TRÊS CORES
-     verde      dentro do prazo, com folga;
-     amarelo    dentro do prazo, mas faltando pouco — por padrão, o último dia
-                útil. Na RET: dias 1 e 2 verdes, dia 3 amarelo;
-     vermelho   passou do prazo.
-   "Faltando pouco" é uma MARGEM, e não "exatamente 3 dias": em tempo corrido
-   o instante exato dura um minuto, e o amarelo nunca apareceria. Foi o PO quem
-   escolheu esta leitura, perguntado.
-
-   ATÉ QUANDO conta: até o caso chegar a um status FINAL — a lista de status
-   finais do canal, que já existe. Parou, o selo vira "cumprido" (verde) ou
-   "estourado" (vermelho): não é mais um aviso do que está correndo, é o
-   resultado. Caso final sem nenhuma data de quando fechou — os antigos, de
-   antes do carimbo — não ganha selo: não dá para dizer se cumpriu, e inventar
-   vermelho em milhares de casos encerrados ensinaria a ignorar o vermelho.
-   ============================================================================ */
-
-/** Os sinalizadores LIGADOS de um canal, prontos para contar. */
 function sinalizadoresDoCanal_(canal) {
-  // A aba é nova: quem ainda não rodou `atualizarPGO()` segue com o Trabalho
-  // funcionando, sem selo, em vez de uma tela que estoura.
+
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
 
   var doCanal = converterParaIdentificador_(canal.id);
@@ -15011,9 +9874,7 @@ function sinalizadoresDoCanal_(canal) {
     .sort(function (um, outro) { return um.ordem - outro.ordem; })
     .map(function (sinalizador) { return colunasDoSinalizadorPelaGrafia_(sinalizador, canal); })
     .map(function (sinalizador) {
-      // O prazo que conta da PRIMEIRA MUDANÇA DE STATUS fica cheio enquanto o
-      // caso não sai do status em que nasce. Para saber qual é esse status,
-      // uma leitura por canal, e não uma por caso.
+
       if (normalizarParaComparar_(sinalizador.colunaDaData)
         === normalizarParaComparar_(RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS)) {
         sinalizador.statusDeNascimento = normalizarParaComparar_(statusPadraoDoCanal_(canal));
@@ -15022,13 +9883,6 @@ function sinalizadoresDoCanal_(canal) {
     });
 }
 
-/**
- * Os sinalizadores do canal que têm CONDIÇÃO DE PARADA — ligados ou não.
- *
- * Quem carimba a condição precisa enxergar também o sinalizador desligado:
- * o PO que o desliga por uma semana e o religa não pode encontrar os casos
- * dessa semana sem a data em que a proposta foi transmitida.
- */
 function condicoesDeParadaDoCanal_(canal) {
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) return [];
   var doCanal = converterParaIdentificador_(canal.id);
@@ -15039,11 +9893,6 @@ function condicoesDeParadaDoCanal_(canal) {
     .map(function (sinalizador) { return colunasDoSinalizadorPelaGrafia_(sinalizador, canal); });
 }
 
-/**
- * As colunas que o sinalizador cita, pela grafia da planilha do canal — ver
- * `grafiaDaColuna_`. Sem isto, "Status proposta" escrito de outro jeito na
- * aba faria o Retido nunca encerrar o prazo, sem erro nenhum.
- */
 function colunasDoSinalizadorPelaGrafia_(sinalizador, canal) {
   ['colunaQueLiga', 'colunaDaData', 'colunaDaHora', 'colunaDaCondicao',
     'colunaDaDataDaCondicao'].forEach(function (chave) {
@@ -15052,12 +9901,10 @@ function colunasDoSinalizadorPelaGrafia_(sinalizador, canal) {
   return sinalizador;
 }
 
-/** Uma linha da aba vira o sinalizador com as contas já resolvidas. */
 function sinalizadorDaLinha_(linha) {
   var abre = minutoDaHora_(linha.InicioDoExpediente);
   var fecha = minutoDaHora_(linha.FimDoExpediente);
-  // Expediente em branco, ilegível ou que termina antes de começar volta ao
-  // padrão: contar com ele quebrado zeraria todos os prazos.
+
   if (abre === null || fecha === null || fecha <= abre) {
     abre = minutoDaHora_(RECC_EXPEDIENTE_PADRAO.abre);
     fecha = minutoDaHora_(RECC_EXPEDIENTE_PADRAO.fecha);
@@ -15078,8 +9925,7 @@ function sinalizadorDaLinha_(linha) {
     fecha: fecha,
     ordem: Number(linha.Ordem) || 0,
     ativo: normalizarParaComparar_(linha.Ativo) === 'sim',
-    // O status que só encerra o prazo com uma condição ("Retido" só com o
-    // Status proposta Transmitido ou Sem alteração). Os quatro vazios: não há.
+
     statusComCondicao: String(linha.StatusComCondicao || '').trim(),
     colunaDaCondicao: String(linha.ColunaDaCondicao || '').trim(),
     valoresDaCondicao: valoresDaCondicaoDoSinalizador_(linha.ValoresDaCondicao),
@@ -15087,44 +9933,32 @@ function sinalizadorDaLinha_(linha) {
   };
 }
 
-/** "Transmitido; Sem alteração" → ['Transmitido', 'Sem alteração']. */
 function valoresDaCondicaoDoSinalizador_(texto) {
   return String(texto === undefined || texto === null ? '' : texto).split(';')
     .map(function (valor) { return valor.trim(); })
     .filter(function (valor) { return valor !== ''; });
 }
 
-/** O sinalizador tem condição de parada? (Os quatro campos, juntos.) */
 function temCondicaoDeParada_(sinalizador) {
   return !!(sinalizador.statusComCondicao && sinalizador.colunaDaCondicao
     && sinalizador.valoresDaCondicao.length && sinalizador.colunaDaDataDaCondicao);
 }
 
-/** O valor da coluna da condição é um dos que encerram o prazo? */
 function condicaoDeParadaCumprida_(sinalizador, registro) {
   return condicaoBate_({ valores: sinalizador.valoresDaCondicao },
     registro[sinalizador.colunaDaCondicao]);
 }
 
-/** 495 → "08:15". */
 function horaDoMinuto_(minutos) {
   var horas = Math.floor(minutos / 60);
   var resto = minutos % 60;
   return (horas < 10 ? '0' : '') + horas + ':' + (resto < 10 ? '0' : '') + resto;
 }
 
-/** Um dia útil, em minutos, no expediente deste sinalizador. */
 function minutosDeUmaUnidade_(sinalizador) {
   return sinalizador.unidade === 'dias' ? sinalizador.fecha - sinalizador.abre : 60;
 }
 
-/**
- * "1 dia útil", "2 dias úteis e 3h", "35h", "20min".
- *
- * Prazo em HORAS fala em horas: quem pediu "48 horas úteis" lê "faltam 46h30",
- * e não "4 dias úteis e 5h" — que obrigaria a refazer a conta de cabeça com
- * um dia de 10h15.
- */
 function duracaoDoPrazo_(minutos, expediente, emHoras) {
   if (emHoras) return duracaoParaLer_(minutos, Number.MAX_VALUE);
   if (minutos < 60) return minutos + 'min';
@@ -15134,7 +9968,6 @@ function duracaoDoPrazo_(minutos, expediente, emHoras) {
   return dias + (dias === 1 ? ' dia útil' : ' dias úteis') + (horas ? ' e ' + horas + 'h' : '');
 }
 
-/** A regra por extenso, para a tela de Configurações e a Produtividade. */
 function regraDoSinalizador_(sinalizador) {
   var unidade = sinalizador.unidade === 'dias' ? 'dia útil' : 'hora útil';
   var plural = sinalizador.unidade === 'dias' ? 'dias úteis' : 'horas úteis';
@@ -15154,18 +9987,12 @@ function regraDoSinalizador_(sinalizador) {
       : '');
 }
 
-/**
- * O sinalizador de UM caso — ou null, quando não se aplica ou não dá para
- * contar. `situacoes` é o catálogo do canal por chave: de lá sai se o status é
- * final e em que coluna ele carimba.
- */
 function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
-  // QUANDO VALE
+
   if (sinalizador.colunaQueLiga && String(
     registro[sinalizador.colunaQueLiga] === undefined ? '' : registro[sinalizador.colunaQueLiga]
   ).trim() === '') return null;
 
-  // DESDE QUANDO. Sem coluna própria, a data e a hora de entrada do canal.
   var colunaDaData = sinalizador.colunaDaData || canal.colunaDaData;
   var colunaDaHora = sinalizador.colunaDaHora
     || (sinalizador.colunaDaData ? '' : canal.colunaDaHora);
@@ -15176,15 +10003,10 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
   var minutoDaHora = colunaDaHora ? minutoDaHora_(registro[colunaDaHora]) : null;
   var de = {
     dia: relogio.dia,
-    // Sem hora declarada, vale a que a própria data carrega (o carimbo do
-    // encaminhamento é data E hora); só data pura começa na abertura do dia.
+
     minuto: minutoDaHora !== null ? minutoDaHora : (relogio.minuto > 0 ? relogio.minuto : sinalizador.abre)
   };
 
-  // ATÉ QUANDO: o status final — e, no status que declarou uma CONDIÇÃO, só
-  // quando a condição vale. Na RET, "Retido" é um desfecho, mas só encerra o
-  // prazo quando a proposta foi transmitida (ou não precisou mudar); antes
-  // disso o relógio segue correndo, e é o que o PO pediu.
   var situacao = canal.colunaDoStatus
     ? situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])] : null;
   var comCondicao = temCondicaoDeParada_(sinalizador) && canal.colunaDoStatus
@@ -15195,10 +10017,7 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
     : !!(situacao && situacao.final);
   var ate = agora;
   if (encerrado) {
-    // Quando parou: pela condição, é o carimbo dela; pelo status, a última
-    // mudança de status ou o carimbo do próprio status.
-    // No canal que fecha pela finalização (a Mesa), a data e hora da
-    // finalização vêm ANTES de tudo: é o que o analista informou (Etapa 58).
+
     var quandoFechou;
     var finalizado = !comCondicao && fechaPelaFinalizacao_(canal, situacoes)
       ? pontoDaFinalizacao_(registro, canal, sinalizador.fecha) : null;
@@ -15236,8 +10055,7 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
     resto = duracaoDoPrazo_(gasto - prazo, expediente, emHoras) + ' além do prazo';
   } else if (prazo - gasto <= aviso) {
     tom = 'atencao';
-    // Exatamente no limite (ex.: a sexta fechou e o prazo acabou junto): o
-    // próximo minuto de expediente já estoura. "vence em 0min" leria como erro.
+
     resto = prazo - gasto <= 0 ? 'no limite do prazo'
       : 'vence em ' + duracaoDoPrazo_(prazo - gasto, expediente, emHoras);
   } else {
@@ -15258,16 +10076,6 @@ function sinalDoCaso_(registro, canal, sinalizador, situacoes, agora) {
   };
 }
 
-/**
- * O selo do caso cujo prazo AINDA NÃO COMEÇOU: "Prazo de retorno · prazo cheio,
- * 3 dias úteis". Ou null, quando não é o caso.
- *
- * Só vale para o sinalizador que conta da primeira mudança de status (o da RET)
- * e para o caso que continua no status em que nasce — "casos não trabalhados
- * ficam com a SLA cheia", palavra do PO. Caso em outro status sem a data (uma
- * linha antiga que ninguém soube datar) fica sem selo, como sempre: dizer
- * "prazo cheio" para ele seria mentir.
- */
 function prazoQueNaoComecou_(registro, canal, sinalizador) {
   if (sinalizador.statusDeNascimento === undefined || !canal.colunaDoStatus) return null;
   var status = normalizarParaComparar_(registro[canal.colunaDoStatus]);
@@ -15290,11 +10098,10 @@ function prazoQueNaoComecou_(registro, canal, sinalizador) {
   };
 }
 
-/** Os status do canal por chave, para o sinalizador saber o que é final. */
 function situacoesPorChave_(canal) {
   var porChave = {};
   situacoesDoCanal_(canal).forEach(function (situacao) {
-    // O carimbo pela grafia da planilha: é lido caso a caso pelo sinalizador.
+
     if (situacao.colunaDeCarimbo) {
       situacao.colunaDeCarimbo = grafiaDaColuna_(canal.aba, situacao.colunaDeCarimbo);
     }
@@ -15303,7 +10110,6 @@ function situacoesPorChave_(canal) {
   return porChave;
 }
 
-/** O texto que identifica o caso numa lista: a 1ª coluna do 2º grupo da fila. */
 function rotuloDoCasoNaFila_(registro, grupos) {
   var grupo = grupos.length > 1 ? grupos[1] : grupos[0];
   var coluna = grupo && grupo.colunas[0];
@@ -15316,17 +10122,8 @@ function rotuloDoCasoNaFila_(registro, grupos) {
   return valor || String(registro.__id || '');
 }
 
-/** Quantos casos cabem na lista da Produtividade; o resto vira "e mais N". */
 const RECC_MAXIMO_NA_LISTA_DE_PRAZOS = 50;
 
-/**
- * O resumo de prazos que a Produtividade RECC mostra: quantos estão em cada
- * cor, QUAIS casos passaram do prazo e de QUEM — "o nome do analista que
- * deixou estourar", palavra do PO.
- *
- * `avaliados` é uma lista de { registro, tom, encerrado, alem }: vale tanto
- * para o sinalizador quanto para o SLA da Mesa, que é o mesmo desenho.
- */
 function resumirPrazos_(avaliados, canal, expediente, emHoras) {
   var grupos = colunasDaFila_(canal);
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
@@ -15374,11 +10171,6 @@ function resumirPrazos_(avaliados, canal, expediente, emHoras) {
   return r;
 }
 
-/**
- * O controle de prazos da Produtividade RECC: o SLA do canal, quando ele tem,
- * e cada sinalizador ligado. `null` quando o canal não tem nenhum dos dois — e
- * aí a tela não desenha o bloco.
- */
 function controleDePrazos_(casos, canal) {
   var situacoes = situacoesPorChave_(canal);
   var finais = {};
@@ -15427,14 +10219,6 @@ function controleDePrazos_(casos, canal) {
   return { sla: sla, sinalizadores: sinalizadores };
 }
 
-
-/**
- * O valor pronto para a tela.
- *
- * Data vira texto AQUI, no servidor. Um objeto de data atravessando a ponte
- * para o navegador chega com o fuso de quem abriu, e o mesmo caso apareceria
- * com dias diferentes para pessoas diferentes.
- */
 function paraTexto_(valor, tipo) {
   if (valor === null || valor === undefined || valor === '') return '';
 
@@ -15458,18 +10242,6 @@ function paraTexto_(valor, tipo) {
       .replace(/\B(?=(\d{3})+(?!\d)(?=,))/g, '.');
   }
 
-  /*
-   * NÚMERO sai em português: vírgula no decimal.
-   *
-   * Isto caía no `String(valor)` e a margem de contribuição aparecia na fila
-   * como "19.8". Nenhum canal tinha mostrado antes: a RET só tem número
-   * inteiro na fila, e inteiro sai igual nos dois idiomas. O VG foi o
-   * primeiro com decimal, e o defeito estava ali desde sempre.
-   *
-   * Sem casas fixas: 27 continua "27", e não "27,00". A coluna guarda tanto
-   * quantidade de vidas quanto porcentagem, e forçar duas casas encheria a
-   * fila de zeros que não dizem nada.
-   */
   if (tipo === RECC_TIPO_DE_DADO.NUMERO) {
     var quanto = converterParaNumero_(valor);
     if (quanto === '') return '';
@@ -15479,39 +10251,6 @@ function paraTexto_(valor, tipo) {
   return String(valor);
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 3 · OS GRÁFICOS DA OPERAÇÃO
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * Os números por trás da operação
- * ============================================================================
- * O Trabalho responde "o que eu tenho que trabalhar hoje". Esta tela responde
- * outra pergunta: "o que está acontecendo na operação". São coisas diferentes,
- * e por isso são telas diferentes.
- *
- * NADA AQUI É ESCRITO EM CÓDIGO. Cada gráfico é uma linha da aba `PAINEIS`:
- * o tipo, o campo que vira eixo, o que se mede, o limite do TOP N e a ordem.
- * Acrescentar um gráfico é acrescentar uma linha, em Configurações.
- *
- * DUAS REGRAS DE LEITURA que o código obedece, e que valem a pena entender:
- *
- *   UM EIXO SÓ. "Barras com linha" não são duas escalas no mesmo gráfico —
- *   isso faz a mesma altura significar duas coisas, e é o erro mais comum de
- *   gráfico que existe. Aqui a linha é a MÉDIA MÓVEL da própria barra, na
- *   mesma escala: ela mostra a tendência por cima do ruído do dia a dia.
- *
- *   COR SEGUE A ENTIDADE, NUNCA A POSIÇÃO. "Concluído" é verde porque o
- *   catálogo diz que é, e continua verde quando um filtro o joga do primeiro
- *   para o quarto lugar. Cor por posição faria o gráfico inteiro se repintar
- *   a cada filtro, e ninguém conseguiria comparar duas telas.
- * ============================================================================
- */
-
-/** Os tipos de gráfico que a tela sabe desenhar. */
 const RECC_TIPOS_DE_GRAFICO = {
   pizza: 'Pizza',
   barras: 'Barras em pé',
@@ -15520,27 +10259,14 @@ const RECC_TIPOS_DE_GRAFICO = {
   barrasComLinha: 'Barras com linha de tendência'
 };
 
-/** Como se mede. */
 const RECC_AGREGACOES = {
   contagem: 'Contagem de casos',
   soma: 'Soma de um valor',
   media: 'Média de um valor'
 };
 
-/**
- * Quantos valores um gráfico da Produtividade RECC mostra: os 5 maiores (Etapa
- * 53, pedido do PO: "tirar dos gráficos os demais valores. Deve aparecer somente
- * o top 5 de cada tópico"). O resto NÃO vira uma fatia "Demais valores" — sai
- * do gráfico, e o rodapé avisa que a soma e as porcentagens são entre os
- * mostrados. Um gráfico com limite menor (TOP 3) fica com o dele.
- */
 const RECC_TOPO_DOS_GRAFICOS = 5;
 
-/**
- * As três colunas de prêmio da RET (Etapa 46): anual = "valor do prêmio",
- * mensal = "prêmio mensal", retido = "valor do prêmio retido". `null` quando o
- * canal não tem as três — e aí nada disto aparece (hoje, só a RET tem).
- */
 function colunasDosPremios_(canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var achar = function (nome) {
@@ -15559,7 +10285,6 @@ function somaDaColuna_(casos, coluna) {
   }, 0);
 }
 
-/** "Prêmios: anual, mensal e retido" — três barras, a soma de cada coluna nos casos da tela. */
 function graficoDosPremios_(casos, colunas) {
   var pontos = [['anual', 'Prêmio anual', colunas.anual], ['mensal', 'Prêmio mensal', colunas.mensal],
     ['retido', 'Prêmio retido', colunas.retido]].map(function (par) {
@@ -15581,20 +10306,12 @@ function graficoDosPremios_(casos, colunas) {
     ehTempo: false,
     pontos: pontos,
     tendencia: null,
-    // Somar anual, mensal e retido não dá um número que signifique alguma coisa.
+
     total: null,
     aviso: ''
   };
 }
 
-/**
- * O valor embaixo de cada cartão de status (Etapa 46, pedido do PO): "embaixo
- * de cada status deve ter o valor anual das propostas, sendo apenas o retido
- * que irá trazer o valor total dos retidos da coluna prêmio retido".
- *
- * O "Não trabalhado" soma o prêmio MENSAL (Etapa 54, pedido do PO): "na maioria
- * das vezes não são preenchidos os anuais, sendo mais os mensais".
- */
 function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
   var colunaDoStatus = canal.colunaDoStatus ? grafiaDaColuna_(canal.aba, canal.colunaDoStatus) : '';
   if (!colunaDoStatus) return;
@@ -15614,11 +10331,6 @@ function somarPremiosNosCartoes_(cartoes, casos, canal, colunas) {
   });
 }
 
-/**
- * A produtividade de cada analista, uma linha por pessoa (Etapa 46, pedido do
- * PO: "por último a produtividade por analista mostrando tudo
- * individualmente"): o total, quantos em cada status e os três prêmios.
- */
 function quadroPorAnalista_(casos, canal, colunas) {
   var estrutura = estruturaDaAba_(canal.aba);
   var colunaDoAnalista = colunaDoResponsavel_(estrutura);
@@ -15641,7 +10353,7 @@ function quadroPorAnalista_(casos, canal, colunas) {
     var doStatus = colunaDoStatus ? normalizarParaComparar_(caso[colunaDoStatus]) : '';
     linha.porStatus[doStatus] = (linha.porStatus[doStatus] || 0) + 1;
   });
-  // Só os status que aparecem em alguém: uma coluna de zeros não diz nada.
+
   var usados = status.filter(function (s) {
     return ordem.some(function (chave) { return porAnalista[chave].porStatus[s.chave]; });
   });
@@ -15675,31 +10387,12 @@ function quadroPorAnalista_(casos, canal, colunas) {
   };
 }
 
-/*
- * TENTATIVAS ATÉ O SUCESSO (Etapa 47, pedido do PO): "precisamos medir quantas
- * vezes precisamos contatar o cliente para ter sucesso". A regra da operação,
- * palavra do PO: enquanto tenta, o analista usa o status Contatando, e a 1ª e
- * a 2ª tentativa sem sucesso ficam carimbadas em "Data do 1º contato" e "Data
- * do 2º contato"; na 3ª, o status vira "Sem sucesso de contato". Sucesso é
- * Retido ou Não retido — falou com o cliente.
- *
- * Nada novo é gravado: a conta sai dos carimbos, que não se apagam quando o
- * caso muda de status. A coluna "tentativas de contato" NÃO entra — ela se
- * esvazia quando o caso sai do Contatando.
- */
 const RECC_COLUNAS_DAS_TENTATIVAS = ['Data do 1º contato', 'Data do 2º contato'];
 const RECC_STATUS_DE_SUCESSO = ['Retido', 'Não retido'];
 const RECC_STATUS_SEM_SUCESSO = 'Sem sucesso de contato';
-/** Quantos CPFs a tabela lista (os de mais contatos); o total vem sempre. */
+
 const RECC_CPFS_LISTADOS = 100;
 
-/**
- * Cada caso vira: quantos contatos houve e como terminou.
- *   sucesso      1 + as tentativas carimbadas (o contato que deu certo conta);
- *   semSucesso   1 + as tentativas carimbadas (a 3ª, que virou o status);
- *   emAndamento  só as tentativas carimbadas.
- * `null` no canal sem as colunas (hoje, só a RET as tem).
- */
 function tentativasAteOSucesso_(casos, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var achar = function (nome) {
@@ -15735,7 +10428,6 @@ function tentativasAteOSucesso_(casos, canal) {
     };
   });
 
-  // Sucesso no 1º, 2º, 3º contato… — quantas faixas os dados pedirem.
   function faixas(grupo) {
     var porContato = [];
     grupo.forEach(function (lido) {
@@ -15753,7 +10445,7 @@ function tentativasAteOSucesso_(casos, canal) {
       porContato: faixas(grupo),
       semSucesso: grupo.filter(function (lido) { return lido.desfecho === 'semSucesso'; }).length,
       emAndamento: grupo.filter(function (lido) { return lido.desfecho === 'emAndamento'; }).length,
-      // Contatos por sucesso, com uma casa: "1,6 contato até falar com o cliente".
+
       media: sucessos.length ? Math.round(contatos / sucessos.length * 10) / 10 : null
     };
   }
@@ -15766,7 +10458,6 @@ function tentativasAteOSucesso_(casos, canal) {
   }).concat([{ chave: 'semsucesso', rotulo: 'Sem sucesso', valor: geral.semSucesso,
     casos: geral.semSucesso, ehOutros: false, tom: 'atencao', serie: 0 }]);
 
-  // Por analista: a mesma conta, pessoa a pessoa.
   var porAnalista = {};
   var ordem = [];
   lidos.forEach(function (lido) {
@@ -15780,7 +10471,7 @@ function tentativasAteOSucesso_(casos, canal) {
     linha.analista = porAnalista[chave].analista;
     return linha;
   });
-  // Todas as linhas com as mesmas colunas (a conta geral tem as faixas de todos).
+
   analistas.forEach(function (linha) {
     for (var i = 0; i < geral.porContato.length; i++) linha.porContato[i] = linha.porContato[i] || 0;
   });
@@ -15788,7 +10479,6 @@ function tentativasAteOSucesso_(casos, canal) {
     return outro.sucessos - um.sucessos || (um.analista < outro.analista ? -1 : 1);
   });
 
-  // Por CPF: o mesmo cliente pode ter mais de um caso — os contatos somam.
   var porCpf = {};
   var cpfs = [];
   var semCpf = 0;
@@ -15841,12 +10531,6 @@ function tentativasAteOSucesso_(casos, canal) {
   };
 }
 
-/**
- * O painel inteiro: todos os gráficos do canal, já calculados.
- *
- * Vem numa chamada só porque a tela abre mostrando todos ao mesmo tempo —
- * seis idas ao servidor fariam a tela montar aos pedaços.
- */
 function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -15857,17 +10541,12 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
   var truncada = recentes.length >= linhasQueOPainelOlha_();
 
-  // Linha sem data FICA no atalho e SAI dos períodos fechados. Num "últimos 30
-  // dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela
-  // é um caso sobre o qual não dá para afirmar que é de setembro.
   var guardarSemData = guardaOsSemData_(periodo);
 
   var noPeriodo = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
     canal, quem);
 
-  // O período ANTERIOR, para os cartões dizerem se subiu ou desceu. Um número
-  // sozinho não diz nada: 40 retenções é bom ou ruim?
   var anterior = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal, quem);
 
@@ -15892,7 +10571,7 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
       ate: comoSeEscreve_(periodo.ate),
       rotulo: periodo.rotulo
     },
-    // Os meses que a tela oferece, para ela não precisar calcular nenhum.
+
     mesesDisponiveis: mesesParaEscolher_(),
     total: casos.length,
     truncada: truncada,
@@ -15900,95 +10579,28 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
     filtrosDisponiveis: disponiveis,
     cartoes: cartoes,
     componentes: componentes,
-    /*
-      ETAPA 46, pedido do PO (só a RET por enquanto): "o gráfico que mostra o
-      valor do prêmio anual total, mensal e retido deve ser o primeiro", e "por
-      último a produtividade por analista mostrando tudo individualmente". Vêm
-      FORA de `componentes`, como o valor por situação: são do canal (as
-      colunas de prêmio), e não da lista que Configurações edita. `null` no
-      canal que não tem as colunas de prêmio.
-    */
+
     premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
     porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
-    // Etapa 47: em qual contato o cliente atendeu, por analista e por CPF.
-    tentativas: tentativasAteOSucesso_(casos, canal),
-    /*
-      O VALOR POR SITUAÇÃO vem FORA de `componentes`, e de propósito.
-      `componentes` é a lista que a tela de Configurações edita — tirar,
-      reordenar, trocar a medida. Este gráfico não se edita ali: as duas
-      coisas que ele precisa saber (a coluna do valor e quais situações
-      destacar) moram na aba CANAIS, porque são do canal e não do painel.
-      Misturá-lo na lista faria aparecer um gráfico que a tela de
-      Configurações mostra e não consegue mexer.
 
-      `null` quando o canal não declarou nada — e aí a tela não desenha nada.
-    */
+    tentativas: tentativasAteOSucesso_(casos, canal),
+
     valorPorSituacao: valorPorSituacao_(casos, canal),
-    /*
-      OS PRAZOS: o SLA do canal (dentro e fora) e cada sinalizador, com os
-      casos que passaram do prazo e o nome de quem deixou passar. Vem FORA de
-      `componentes` pelo mesmo motivo do valor por situação: o que ele mostra é
-      ajustado em Configurações › Sinalizadores, e não na lista de gráficos.
-      `null` quando o canal não tem prazo nenhum.
-    */
+
     prazos: controleDePrazos_(casos, canal),
-    /*
-      OS ATENDIDOS DA MESA: o que está no sistema mais o que veio da planilha
-      do chat. Vem FORA de `componentes` pelo mesmo motivo do valor por
-      situação e dos prazos: não mora na aba PAINEIS, e a tela de Configurações
-      não o edita. Usa o período e o alcance da tela, e NÃO os filtros — o chat
-      não tem as colunas deles. `null` fora da Mesa.
-    */
+
     atendimentos: atendimentosDaMesa_(noPeriodo, canal, quem, periodo),
     podeExportar: podeFazer_(quem.permissoes, RECC_ACOES.EXPORTAR)
   };
 }
 
-// ----------------------------------------------------------------------------
-// O ALCANCE DESTA TELA
-// ----------------------------------------------------------------------------
-
-/**
- * De quem são os números desta tela. Quem responde é o NÍVEL DE ACESSO.
- *
- * A Produtividade RECC é a tela da equipe — é para isso que ela existe, e por
- * isso ela não tem botão de "só os meus". Quem quiser o número de uma pessoa
- * usa o filtro de Analista — isso é recortar a equipe.
- *
- * Mas QUEM vê a produtividade de quem não é decisão do código. Em algumas
- * equipes o analista acompanhar o grupo puxa todo mundo para cima; em outras,
- * o mesmo número vira constrangimento. Quem sabe qual é o caso é quem conduz a
- * equipe — então isto mora em Configurações › Níveis de acesso, com quatro
- * respostas possíveis:
- *
- *   BLOQUEADO  a tela não abre para este nível
- *   PROPRIOS   só os casos da própria pessoa
- *   EQUIPE     quem atende o mesmo canal que ela          (o padrão)
- *   CANAL      o canal inteiro, de todos os analistas
- *
- * ISTO NÃO ALARGA O RESTO. O escopo geral do nível continua mandando no
- * Trabalho, na Busca e em tudo mais: um analista com escopo "próprios" e
- * Produtividade em "equipe" vê a equipe AQUI e continua vendo só os casos dele
- * na fila de trabalho. São duas perguntas diferentes — "o que eu tenho para
- * fazer" e "como a equipe está indo" —, e elas não precisam ter a mesma
- * resposta.
- *
- * QUAIS canais o nível abre continua sendo a lista de canais dele. Um nível
- * que abre só a RET e tem "o canal inteiro" vê a RET inteira, e não a Mesa.
- */
 function alcanceDaProdutividade_(registros, canal, quem) {
   var alcance = quem.permissoes.escopoNaProdutividade || 'EQUIPE';
 
-  // O canal inteiro é o que a tela já mostraria sem recorte por pessoa. Não é
-  // "ver tudo": a lista de canais do nível é quem diz quais canais existem
-  // para ele, e essa conferência já aconteceu em canalQueEuPossoVer_.
   if (alcance === 'CANAL') return registros;
 
   var coluna = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
 
-  // Sem coluna de responsável não há como recortar por pessoa. Mostrar a base
-  // inteira porque faltou uma coluna seria trocar uma regra de acesso por um
-  // descuido de configuração — então vale o alcance normal do nível.
   if (!coluna) return filtrarPeloAlcance_(registros, canal.aba, quem);
 
   if (alcance === 'PROPRIOS') {
@@ -15999,11 +10611,8 @@ function alcanceDaProdutividade_(registros, canal, quem) {
     });
   }
 
-  // EQUIPE, que é o padrão.
   var minhaEquipe = nomesDaMinhaEquipe_(quem);
 
-  // Quem não pertence a canal nenhum — quem administra — não tem "a minha
-  // equipe". Para ele o alcance normal do nível vale, e ele já é amplo.
   if (!minhaEquipe || !minhaEquipe.length) {
     return filtrarPeloAlcance_(registros, canal.aba, quem);
   }
@@ -16017,16 +10626,13 @@ function alcanceDaProdutividade_(registros, canal, quem) {
   });
 }
 
-/** Os gráficos declarados para este canal, na ordem escolhida. */
 function componentesDoCanal_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
 
   return lerRegistros_('PAINEIS')
     .filter(function (linha) {
       if (normalizarParaComparar_(linha.Ativo) !== 'sim') return false;
-      // Um gráfico SEM canal vale para todos — é como se declara um gráfico
-      // comum às duas operações. Por isso a conferência do canal é aqui, e
-      // não dentro de ehGraficoDoPainel_, que responde sobre um canal certo.
+
       var canalDaLinha = converterParaIdentificador_(linha.CanalId);
       if (canalDaLinha && canalDaLinha !== doCanal) return false;
       return ehGraficoDoPainel_(linha, canalDaLinha || doCanal);
@@ -16066,17 +10672,6 @@ function agregacaoValida_(valor) {
   return achado;
 }
 
-// ============================================================================
-// O CÁLCULO
-// ============================================================================
-
-/**
- * Um gráfico, já somado e ordenado, pronto para a tela desenhar.
- *
- * A tela recebe NÚMEROS, e não decide nada sobre eles: quem escolhe o TOP N,
- * quem dobra o resto em "Outros" e quem calcula a média móvel é aqui. Assim a
- * mesma conta vale para a tela, para a exportação e para o detalhamento.
- */
 function calcularComponente_(componente, casos, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var posicaoDaDimensao = posicaoDaColuna_(estrutura, componente.dimensao);
@@ -16115,11 +10710,6 @@ function calcularComponente_(componente, casos, canal) {
       ? 1 : (converterParaNumero_(caso[componente.medida]) || 0);
   });
 
-  // Coluna VAZIA em todos os casos não vira um gráfico com uma barra só
-  // chamada "Sem informação". Esse gráfico não diz nada e parece defeito — e é
-  // o estado normal de um gráfico sobre a importação antes do primeiro
-  // importação. A tela mostra o recado, que explica, no lugar do desenho, que
-  // não explica.
   if (ordemDasChaves.length === 1 && ordemDasChaves[0] === 'Sem informação') {
     return semDados_(componente, 'Nenhum caso do período tem "'
       + componente.dimensao + '" preenchida, então não há o que agrupar.');
@@ -16136,8 +10726,6 @@ function calcularComponente_(componente, casos, canal) {
     };
   });
 
-  // Tempo se ordena pelo tempo; o resto, do maior para o menor — é o que a
-  // pessoa quer ver primeiro num gráfico de magnitude.
   if (ehTempo) {
     pontos.sort(function (um, outro) {
       return um.chave < outro.chave ? -1 : (um.chave > outro.chave ? 1 : 0);
@@ -16146,8 +10734,6 @@ function calcularComponente_(componente, casos, canal) {
     pontos.sort(function (um, outro) { return outro.valor - um.valor; });
   }
 
-  // O top 5, e só ele: o que passa SAI do gráfico (Etapa 53). O tempo não se
-  // corta — cada dia do período é um ponto da linha.
   var foraDoTopo = 0;
   if (!ehTempo) {
     var teto = componente.limite > 0
@@ -16174,8 +10760,7 @@ function calcularComponente_(componente, casos, canal) {
     tendencia: componente.tipo === 'barrasComLinha'
       ? mediaMovel_(pintado, 7) : null,
     total: pintado.reduce(function (soma, ponto) { return soma + ponto.valor; }, 0),
-    // Quantos valores ficaram fora do top 5 — a tela avisa que a soma e as
-    // porcentagens são só entre os mostrados.
+
     foraDoTopo: foraDoTopo,
     aviso: ''
   };
@@ -16200,20 +10785,8 @@ function semDados_(componente, aviso) {
   };
 }
 
-/**
- * A cor de cada ponto — e ela SEGUE A ENTIDADE, nunca a posição no gráfico.
- *
- * Quando a dimensão é uma lista do catálogo, a cor já está declarada lá:
- * "Concluído" é verde porque o catálogo diz que é, e continua verde quando um
- * filtro o joga do primeiro para o quarto lugar. Sem isso, o gráfico inteiro
- * se repintaria a cada filtro e ninguém conseguiria comparar duas telas.
- *
- * Fora do catálogo, a cor sai da paleta categórica pela posição do valor na
- * lista COMPLETA da dimensão — que também não muda com o filtro.
- */
 function pintarPontos_(pontos, componente, canal, ehTempo) {
-  // Magnitude ao longo do tempo, ou barra simples: um tom só. Oito cores para
-  // dizer "quanto" é o jeito mais rápido de enterrar a informação.
+
   if (ehTempo || componente.tipo === 'barras'
     || componente.tipo === 'barrasDeitadas' || componente.tipo === 'linha'
     || componente.tipo === 'barrasComLinha') {
@@ -16245,14 +10818,12 @@ function pintarPontos_(pontos, componente, canal, ehTempo) {
       casos: ponto.casos,
       ehOutros: false,
       tom: doCatalogo[normalizado] || '',
-      // 1 a 6, fixo pela entidade. Fora da lista conhecida, cai no último
-      // slot em vez de inventar uma cor.
+
       serie: posicao >= 0 ? (posicao % 6) + 1 : 6
     };
   });
 }
 
-/** O tom que o catálogo já declarou para cada valor deste canal. */
 function coresDoCatalogo_(canal) {
   var doCanal = converterParaIdentificador_(canal.id);
   var cores = {};
@@ -16265,12 +10836,6 @@ function coresDoCatalogo_(canal) {
   return cores;
 }
 
-/**
- * A ordem COMPLETA dos valores possíveis de uma dimensão.
- *
- * Sai do catálogo, e não dos casos que sobraram no filtro: é isso que faz a
- * cor de um valor ser sempre a mesma, esteja ele em primeiro ou em último.
- */
 function ordemEstavelDaDimensao_(canal, cabecalho) {
   var campo = null;
   camposAtivosDoCanal_(canal.id).forEach(function (umCampo) {
@@ -16283,7 +10848,6 @@ function ordemEstavelDaDimensao_(canal, cabecalho) {
     .map(function (opcao) { return normalizarParaComparar_(opcao.valor); });
 }
 
-/** Em que unidade o número é lido, para a tela formatar certo. */
 function unidadeDaMedida_(componente, estrutura) {
   if (componente.agregacao === 'contagem') return 'casos';
   var posicao = posicaoDaColuna_(estrutura, componente.medida);
@@ -16291,7 +10855,6 @@ function unidadeDaMedida_(componente, estrutura) {
   return estrutura.tipos[posicao] === RECC_TIPO_DE_DADO.DINHEIRO ? 'dinheiro' : '';
 }
 
-/** A data de um caso, no formato que ordena sozinho. */
 function diaDoCaso_(valor) {
   var data = converterParaData_(valor);
   if (!data) return '';
@@ -16304,13 +10867,6 @@ function rotuloDoDia_(chave) {
   return partes.length === 3 ? partes[2] + '/' + partes[1] : chave;
 }
 
-/**
- * A média móvel, que é a linha do "barras com linha".
- *
- * É a média dos últimos N pontos, na MESMA escala das barras. Não é um
- * segundo eixo: dois eixos no mesmo gráfico fazem a mesma altura significar
- * duas coisas diferentes, e é o erro de gráfico mais comum que existe.
- */
 function mediaMovel_(pontos, janela) {
   return pontos.map(function (ponto, i) {
     var de = Math.max(0, i - janela + 1);
@@ -16320,16 +10876,6 @@ function mediaMovel_(pontos, janela) {
   });
 }
 
-// ============================================================================
-// O DETALHAMENTO
-// ============================================================================
-
-/**
- * Os casos por trás de uma fatia ou de uma barra.
- *
- * É o que transforma um número numa lista de protocolos para trabalhar — sem
- * isso, o painel só informa, e informar não resolve caso nenhum.
- */
 function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   periodoPedido, quantos) {
   var quem = exigirTela_('produtividade');
@@ -16346,9 +10892,7 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
 
   var periodo = resolverPeriodo_(periodoPedido);
   var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  // O MESMO período e o MESMO alcance do painel. Sem isto, clicar numa barra
-  // abriria uma lista de tamanho diferente do número que a barra mostrava — e
-  // a pessoa concluiria, com razão, que um dos dois está errado.
+
   var meus = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
       guardaOsSemData_(periodo)),
@@ -16361,8 +10905,7 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
     || estrutura.tipos[posicao] === RECC_TIPO_DE_DADO.DATA_HORA);
 
   var procurado = String(chaveDoPonto || '');
-  // Sem "Demais valores" desde a Etapa 53: todo ponto clicável é um valor de
-  // verdade da coluna.
+
   var escolhidos = casos.filter(function (caso) {
     var valor = ehTempo
       ? diaDoCaso_(caso[componente.dimensao])
@@ -16374,33 +10917,18 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
     titulo: componente.titulo,
     ponto: ehTempo ? rotuloDoDia_(procurado) : procurado,
     colunas: colunasDaFila_(canal),
-    // Os 100 mais recentes, compactos — "todos" quando a tela pede. Achado da
-    // varredura geral (item 97): a lista ia INTEIRA, e com 5.000 casos o
-    // clique numa fatia devolvia 6,6 MB e estourava os 40 segundos, o mesmo
-    // defeito do Trabalho (item 95). O PO escolheu o mesmo remédio. `total`
-    // continua sendo a fatia inteira.
+
     casos: compactarFila_(montarFila_(quantos === 'todos'
       ? escolhidos : escolhidos.slice(-RECC_FILA_NA_ABERTURA), canal)),
     filaCompacta: true,
     total: escolhidos.length,
-    // "Trabalhar no caso" abre a EDIÇÃO; quem não pode editar não ganha o
-    // botão, em vez de ganhar um botão que a chamada recusa.
+
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
 }
 
-// ============================================================================
-// EXPORTAR
-// ============================================================================
-
-/**
- * Os números de um gráfico em texto separado por ponto e vírgula.
- *
- * Ponto e vírgula, e não vírgula: o Excel em português abre assim sem pedir
- * nada. Vírgula abriria tudo numa coluna só, e a pessoa desistiria no meio.
- */
 function exportarComponente(idDoCanal, idDoComponente, filtros, periodoPedido) {
-  var quem = exigirPermissao_(RECC_ACOES.EXPORTAR);
+  exigirPermissao_(RECC_ACOES.EXPORTAR);
   exigirTela_('produtividade');
 
   var painel = produtividadeDaEquipe(idDoCanal, filtros, periodoPedido);
@@ -16426,7 +10954,6 @@ function exportarComponente(idDoCanal, idDoComponente, filtros, periodoPedido) {
   };
 }
 
-/** Número em vírgula decimal, que é como o Excel em português espera. */
 function formatarParaExportar_(valor) {
   if (typeof valor !== 'number') return String(valor === undefined ? '' : valor);
   return (Math.round(valor * 100) / 100).toString().replace('.', ',');
@@ -16437,11 +10964,6 @@ function nomeDeArquivo_(titulo) {
   return limpo.replace(/^-+|-+$/g, '') || 'painel';
 }
 
-// ============================================================================
-// CONFIGURAÇÃO DOS COMPONENTES
-// ============================================================================
-
-/** O que a tela de Configurações oferece ao montar um gráfico. */
 function opcoesDosGraficos(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -16455,8 +10977,7 @@ function opcoesDosGraficos(idDoCanal) {
     if (tipo === RECC_TIPO_DE_DADO.DINHEIRO || tipo === RECC_TIPO_DE_DADO.NUMERO) {
       medidas.push(cabecalho);
     }
-    // Identificador não vira eixo: agrupar por um Id dá um grupo por caso, e
-    // um gráfico com trezentas barras de altura 1 não diz nada.
+
     if (tipo !== RECC_TIPO_DE_DADO.IDENTIFICADOR) dimensoes.push(cabecalho);
   });
 
@@ -16474,16 +10995,6 @@ function opcoesDosGraficos(idDoCanal) {
   };
 }
 
-/**
- * Esta linha de PAINEIS é um GRÁFICO da Produtividade RECC deste canal?
- *
- * A Produtividade RECC tem duas coisas na mesma aba: os cartões, em cima, e os
- * gráficos, embaixo. As duas se distinguem só pela coluna TipoWidget, e a
- * pergunta é feita em três lugares — desenhar, listar em Configurações e
- * gravar. Escrever a regra três vezes é como o `salvarComponentesDoPainel`
- * quase apagou os cartões: ele recolhia "tudo desta tela neste canal" e
- * desligava o que não estivesse na lista de gráficos. Os cartões não estavam.
- */
 function ehGraficoDoPainel_(linha, idDoCanal) {
   if (normalizarParaComparar_(linha.Tela) !== 'produtividade') return false;
   if (normalizarParaComparar_(linha.TipoWidget) === 'cartao') return false;
@@ -16491,7 +11002,6 @@ function ehGraficoDoPainel_(linha, idDoCanal) {
     === converterParaIdentificador_(idDoCanal);
 }
 
-/** Os gráficos de um canal, para a tela de Configurações editar. */
 function listarComponentesDoPainel(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -16516,7 +11026,6 @@ function listarComponentesDoPainel(idDoCanal) {
     });
 }
 
-/** Grava a lista inteira de gráficos de um canal, como os cards do Trabalho. */
 function salvarComponentesDoPainel(idDoCanal, componentes) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -16587,32 +11096,6 @@ function salvarComponentesDoPainel(idDoCanal, componentes) {
   return true;
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 3 de 3 · O VALOR POR SITUAÇÃO E OS ATENDIDOS DO CHAT
-   #
-   ############################################################################ */
-
-/**
- * O VALOR POR SITUAÇÃO: quanto dinheiro está em cada desfecho.
- *
- * Pedido do PO, nestas palavras: "traga na produtividade RECC gráfico com
- * valor dos retidos, não retidos, sem sucesso, valor dos demais status e
- * total".
- *
- * POR QUE NÃO É UM COMPONENTE DA ABA PAINEIS. O motor de componentes agrupa
- * pelo valor da coluna e, quando passa do limite, dobra o RESTO pelo tamanho —
- * os maiores ficam, os menores viram "Demais valores". Aqui a escolha é outra:
- * quem ganha barra própria são as situações que a operação DECLAROU, estejam
- * elas grandes ou zeradas. "Sem sucesso" sem nenhum caso no mês tem de
- * aparecer valendo zero; sumir da tela faria a conta parecer completa quando
- * ela está com um pedaço faltando.
- *
- * Quem decide QUAIS casos entram é quem chama: hoje, a Produtividade RECC.
- *
- * Devolve `null` quando o canal não declarou a coluna do valor ou as situações
- * destacadas: canal sem isso não ganha um gráfico de dinheiro chutado.
- */
 function valorPorSituacao_(casos, canal) {
   var colunaDoValor = String(canal.colunaDoValor || '').trim();
   var colunaDoStatus = String(canal.colunaDoStatus || '').trim();
@@ -16632,9 +11115,6 @@ function valorPorSituacao_(casos, canal) {
     };
   }
 
-  // Um balde por situação declarada, na ORDEM em que ela foi declarada —
-  // "retidos, não retidos, sem sucesso" é como a operação lê o resultado, e
-  // reordenar por tamanho embaralharia a leitura a cada mês.
   var baldes = destacadas.map(function (nome) {
     return { chave: nome, rotulo: nome, valor: 0, casos: 0 };
   });
@@ -16672,24 +11152,19 @@ function valorPorSituacao_(casos, canal) {
         valor: ponto.valor,
         casos: ponto.casos,
         ehOutros: !!ponto.ehOutros,
-        // A cor segue a SITUAÇÃO, como em todo o resto do sistema: "Reteve" é
-        // verde porque o catálogo diz que é, e continua verde em qualquer
-        // filtro e em qualquer tela.
+
         tom: cores[normalizarParaComparar_(ponto.chave)] || '',
         serie: 0
       };
     }),
     tendencia: null,
-    // O TOTAL é pedido explícito, e é a soma de TODAS as situações — inclusive
-    // das que caíram em "Demais". Somar só as barras destacadas daria um total
-    // menor que a realidade, e um total que não fecha é pior que total nenhum.
+
     total: pontos.reduce(function (soma, ponto) { return soma + ponto.valor; }, 0),
     totalDeCasos: pontos.reduce(function (soma, ponto) { return soma + ponto.casos; }, 0),
     aviso: ''
   };
 }
 
-/** As situações que o canal declarou destacar, já separadas e limpas. */
 function situacoesDestacadas_(canal) {
   return String(canal.situacoesDestacadas || '')
     .split(',')
@@ -16697,41 +11172,6 @@ function situacoesDestacadas_(canal) {
     .filter(function (pedaco) { return pedaco !== ''; });
 }
 
-/* ############################################################################
-   #
-   #  OS ATENDIMENTOS DO CHAT da Mesa Diamante — trazidos pela Importação
-   #
-   ############################################################################ */
-
-/*
- * Pedido do PO: "implemente na Produtividade RECC, para a Mesa Diamante, a
- * leitura de uma planilha apartada de casos atendidos pelo chat" e, na
- * Produtividade da Mesa, "os gráficos de atendidos, somando os casos
- * cadastrados no sistema e os casos atendidos por nome do analista,
- * integrando o nome da corretora para mostrar a quantidade e o top 5; SUSEPs,
- * assuntos, consultor e vida individual ou em grupo, a mesma coisa".
- *
- * O QUE SOMA COM O QUÊ: o atendido do sistema é todo caso da Mesa no período
- * (o mesmo recorte e o mesmo alcance dos cartões), e o do chat é toda linha da
- * aba ATENDIMENTOS_CHAT no período. A soma NÃO tira repetido: se o mesmo atendimento estiver
- * nas duas bases, ele conta duas vezes — o sistema não tem como saber.
- */
-
-/*
- * DESDE A ETAPA 39 O CHAT ENTRA PELA IMPORTAÇÃO. Antes o PO apontava, em
- * Configurações › Estrutura, a planilha do chat, a aba e qual coluna dela era
- * cada coisa — e o sistema lia de lá a cada abertura. Palavra dele: "ficou
- * confuso e não consegui fazer a junção". Agora os atendimentos são trazidos
- * pela tela de Importação, como os casos (colar ou link, de-para, conferência),
- * e moram na aba ATENDIMENTOS_CHAT do próprio PGO. A configuração antiga (as
- * chaves CHAT.* da CONFIG) deixou de ser lida.
- */
-
-/**
- * As colunas da aba ATENDIMENTOS_CHAT. `palavras` serve só para SUGERIR, no
- * de-para da importação, qual coluna da origem é cada coisa; quem decide é a
- * pessoa.
- */
 const RECC_COLUNAS_DO_CHAT = [
   { chave: 'data', cabecalho: 'Data', rotulo: 'Data do atendimento', obrigatoria: true,
     palavras: ['data', 'dataatendimento', 'datadoatendimento', 'dia'] },
@@ -16756,17 +11196,9 @@ const RECC_COLUNAS_DO_CHAT = [
     palavras: ['tmo', 'tempomedio', 'tempomediodeatendimento', 'tempodeatendimento'] }
 ];
 
-/** As colunas de texto livre do chat, copiadas como vieram (sem espaço nas pontas). */
 const RECC_TEXTOS_DO_CHAT = ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo', 'Sucursal',
   'Tabulação', 'Sub assunto'];
 
-/**
- * O TMO em segundos, como a planilha de origem o escreve: o número (1152), o
- * texto com o ponto de milhar ("1.152") ou sem ele ("1152"), e a vírgula
- * decimal ("12,5"). Vazio é vazio; o que não for número devolve `null` — a
- * conferência conta essas linhas e o TMO delas fica em branco, em vez de virar
- * um número inventado.
- */
 function segundosDoTmo_(valor) {
   if (valor === null || valor === undefined) return '';
   if (typeof valor === 'number') return isFinite(valor) && valor >= 0 ? valor : null;
@@ -16780,7 +11212,6 @@ function segundosDoTmo_(valor) {
 
 const RECC_ABA_DO_CHAT = 'ATENDIMENTOS_CHAT';
 
-/** O de-para sugerido: cada coluna da origem para a do chat de mesmo sentido. */
 function sugerirDeParaDoChat_(cabecalhosDaFonte) {
   var usadas = {};
   var porPosicao = {};
@@ -16800,7 +11231,6 @@ function sugerirDeParaDoChat_(cabecalhosDaFonte) {
   });
 }
 
-/** O que a tela de Importação precisa para trazer atendimentos do chat. */
 function opcoesDaImportacaoDoChat() {
   exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
@@ -16823,7 +11253,6 @@ function opcoesDaImportacaoDoChat() {
   };
 }
 
-/** Os lotes do chat já importados, do mais recente para o mais antigo. */
 function lotesDoChat_() {
   var porLote = {};
   lerRegistros_(RECC_ABA_DO_CHAT).forEach(function (linha) {
@@ -16836,21 +11265,6 @@ function lotesDoChat_() {
   });
 }
 
-/**
- * Monta as linhas do chat a partir da fonte, e diz o que entra e o que fica de
- * fora — é o miolo da conferência e da gravação, que precisam concordar.
- *
- * Fica de fora: linha sem data ou sem analista (não há como recortar o período,
- * nem de quem somar), data que não é data, e a linha que JÁ ESTÁ na aba. Sem
- * esta última regra, importar a mesma planilha duas vezes contaria cada
- * atendimento em dobro.
- *
- * O "já está" conta QUANTAS vezes: duas linhas idênticas no mesmo arquivo são
- * dois atendimentos (o corretor que chamou duas vezes no dia, pelo mesmo
- * assunto) e entram as duas; se a aba já tem uma igual, entra só a outra. Assim
- * reimportar o mesmo arquivo não dobra nada, e nenhum atendimento de verdade
- * some por parecer com outro.
- */
 function linhasDoChatDaFonte_(pedido) {
   var grade = gradeDaFonte_(pedido.fonte);
   if (grade.length < 2) {
@@ -16868,10 +11282,6 @@ function linhasDoChatDaFonte_(pedido) {
     return d.obrigatoria && !destinos[d.cabecalho];
   }).map(function (d) { return d.rotulo; });
 
-  // As quatro colunas da Etapa 41 (sucursal, tabulação, sub assunto e TMO) NÃO
-  // entram na chave: as linhas importadas antes delas existirem estão com elas
-  // em branco, e reimportar o mesmo arquivo — agora com os valores — contaria
-  // tudo em dobro.
   var chave = function (linha) {
     return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
       linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
@@ -16911,9 +11321,6 @@ function linhasDoChatDaFonte_(pedido) {
     entram.push(pronta);
   });
 
-  // O analista que o cadastro de usuários não conhece: a soma por analista
-  // juntaria o chat a um nome que não existe no sistema — é a "junção" que o PO
-  // não conseguia fazer. O laudo diz quem é, antes de gravar.
   var conhecidos = {};
   lerRegistros_('USUARIOS').forEach(function (usuario) {
     conhecidos[normalizarParaComparar_(usuario.Nome)] = true;
@@ -16931,7 +11338,6 @@ function linhasDoChatDaFonte_(pedido) {
     tmoQueNaoENumero: tmoQueNaoENumero };
 }
 
-/** O passo "conferir antes de importar", para os atendimentos do chat. */
 function conferirImportacaoDoChat(pedido) {
   exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
@@ -16964,15 +11370,10 @@ function conferirImportacaoDoChat(pedido) {
     }),
     analistas: [],
     foraDaDivisao: [],
-    avisos: [],
     statusPadrao: ''
   };
 }
 
-/**
- * Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. `pedido.envio`: o
- * mesmo lote não entra duas vezes (Etapa 59, ver comEnvioUnico_).
- */
 function importarAtendimentosDoChat(pedido) {
   return comEnvioUnico_((pedido || {}).envio, function () {
     return importarAtendimentosDoChatUmaVez_(pedido);
@@ -17026,13 +11427,6 @@ function importarAtendimentosDoChatUmaVez_(pedido) {
   };
 }
 
-/**
- * Os atendimentos do chat, lidos da aba ATENDIMENTOS_CHAT — o fim dela, com o
- * mesmo teto de linhas que a tela usa para a base do sistema.
- *
- * Nunca lança: a Produtividade da Mesa continua com os números do sistema.
- * `ligado` é haver alguma linha — sem nada importado, a tela diz como trazer.
- */
 function lerAtendimentosDoChat_() {
   var vazio = { ligado: false, linhas: [], aviso: '', truncada: false, lidas: 0 };
   try {
@@ -17051,10 +11445,6 @@ function lerAtendimentosDoChat_() {
   }
 }
 
-/**
- * A data de uma linha do chat. Aceita a data de verdade (a da aba) e o texto:
- * "13/10/2026", "13/10/2026 14:05" e "2026-10-13…".
- */
 function dataDoAtendimentoDoChat_(texto) {
   if (Object.prototype.toString.call(texto) === '[object Date]') {
     return isNaN(texto.getTime()) ? '' : texto;
@@ -17063,7 +11453,6 @@ function dataDoAtendimentoDoChat_(texto) {
   return achou ? converterParaData_(achou[1]) : '';
 }
 
-/** "Vida individual" e "Vida em grupo", seja como for que cada base escreva. */
 function ramoDoAtendimento_(texto) {
   var bruto = String(texto === null || texto === undefined ? '' : texto).trim();
   if (!bruto) return { chave: '', rotulo: '' };
@@ -17073,7 +11462,6 @@ function ramoDoAtendimento_(texto) {
   return { chave: n, rotulo: bruto };
 }
 
-/** O cadastro de corretoras por SUSEP: o nome e o consultor que valem para os dois lados. */
 function indiceDeCorretorasPorSusep_() {
   var indice = {};
   lerRegistros_('CORRETORAS').forEach(function (linha) {
@@ -17089,15 +11477,6 @@ function indiceDeCorretorasPorSusep_() {
   return indice;
 }
 
-/**
- * Os gráficos de ATENDIDOS da Mesa Diamante: o que está no sistema mais o que
- * veio do chat.
- *
- * `casosDoSistema` já chega no recorte da tela (período e alcance da pessoa);
- * as linhas do chat passam pelas mesmas duas regras — o período pela data
- * delas, o alcance pelo nome do analista, pela MESMA função da tela. Devolve
- * `null` para qualquer canal que não seja a Mesa, e a tela não desenha nada.
- */
 function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
   if (!canal || canal.aba !== 'BASE_MESA') return null;
 
@@ -17110,7 +11489,6 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
   var colunas = { susep: achar('SUSEP'), corretora: achar('Corretora'),
     assunto: achar('Assunto'), ramo: achar('Ramo') };
 
-  // O CHAT: lê, recorta o período e o alcance.
   var doChat = lerAtendimentosDoChat_();
   var de = Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
   var ate = Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
@@ -17129,7 +11507,6 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
   doChatNoPeriodo = alcanceDaProdutividade_(comoRegistros, canal, quem)
     .map(function (registro) { return registro.__chat; });
 
-  // As duas listas viram uma só, com as mesmas seis dimensões.
   var cadastro = indiceDeCorretorasPorSusep_();
   var nomesDosUsuarios = {};
   lerRegistros_('USUARIOS').forEach(function (usuario) {
@@ -17148,8 +11525,7 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
       analista: [normalizarParaComparar_(analista),
         nomesDosUsuarios[normalizarParaComparar_(analista)] || analista],
       susep: [chaveDaSusep_(susep), susep],
-      // O nome do CADASTRO vale quando a SUSEP é conhecida: duas bases que
-      // escrevem a mesma corretora de dois jeitos viram uma barra só.
+
       corretora: (function () {
         var nome = (doCadastro && doCadastro.corretora) || String(bruto.corretora || '').trim();
         return [normalizarParaComparar_(nome), nome];
@@ -17159,9 +11535,7 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
         var nome = (doCadastro && doCadastro.consultor) || String(bruto.consultor || '').trim();
         return [normalizarParaComparar_(nome), nome];
       })(),
-      // A sucursal que o chat TROUXE vale (Etapa 41, a planilha de origem tem a
-      // coluna); sem ela — o caso do sistema, ou o chat em branco —, a do
-      // cadastro de corretoras, pela SUSEP.
+
       sucursal: (function () {
         var doChat = String(bruto.sucursal === undefined || bruto.sucursal === null
           ? '' : bruto.sucursal).trim();
@@ -17183,17 +11557,6 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
   });
   doChatNoPeriodo.forEach(function (linha) { acrescentar('chat', linha); });
 
-  // AS VISÕES. A tela tem dois seletores — a origem (Todos / E-mail / Chat) e o
-  // ramo (Total / Vida em grupo / Vida individual) — e trocar um deles não volta
-  // ao servidor: cada combinação já vem pronta. O "Top 5" de Vida em grupo não
-  // é o do total filtrado na tela (os cinco primeiros são outros), e por isso
-  // cada visão é montada do zero, pela MESMA função dos gráficos. A visão
-  // "todos|total" é a de sempre (`totais` e `graficos`); as outras oito vão em
-  // `visoes`, para a resposta não carregar a mesma coisa duas vezes.
-  //
-  // E-MAIL é o caso cadastrado no sistema; CHAT, o atendimento importado. A
-  // definição é do PO ("E-mail: casos do sistema e chat: casos importados"):
-  // o campo Canal do caso (Chat, Retorno | chat, E-mail) não entra nela.
   var ORIGENS = [['todos', null], ['sistema', 'sistema'], ['chat', 'chat']];
   var RAMOS = [['total', null], ['vg', 'vg'], ['vi', 'vi']];
   var visoes = {};
@@ -17224,9 +11587,7 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
             'barrasDeitadas', 1, 5, '')
         ]
       };
-      // A rosca de Vida individual × Vida em grupo É a divisão por ramo: ela
-      // só existe na visão "Total". Numa visão de um ramo só seria uma fatia de
-      // 100%.
+
       if (!ramo[1]) {
         visao.graficos.push(graficoDeAtendidos_(recorte, 'ramo', 'Vida individual ou Vida em grupo',
           'Ramo', 'pizza', 1, 6, 'Sem informação'));
@@ -17250,19 +11611,6 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
   };
 }
 
-/**
- * UM gráfico de atendidos: conta por `dimensao`, separando sistema e chat.
- *
- * `topo` é quantas barras ficam; o resto sai do gráfico, sem "Demais valores"
- * (Etapa 53) — `foraDoTopo` diz quantos, para a tela avisar. `semNome`, quando preenchido, é o balde dos que não trazem a
- * informação e ENTRA no gráfico (analista, ramo); vazio, esses não entram no
- * ranking e são contados à parte em `semInformacao` — um top 5 de corretoras
- * liderado por "sem corretora" não diria nada.
- *
- * O formato é o que `Graficos` da tela já sabe desenhar. Não tem `id`: não mora
- * na aba PAINEIS, e por isso não detalha por clique (mesma regra do valor por
- * situação).
- */
 function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, tipo, largura,
   topo, semNome) {
   var baldes = {};
@@ -17289,7 +11637,7 @@ function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, t
     return { chave: balde.chave, rotulo: balde.rotulo, sistema: balde.sistema, chat: balde.chat,
       valor: balde.sistema + balde.chat, casos: balde.sistema + balde.chat, ehOutros: false };
   }).sort(function (um, outro) {
-    // O balde "sem informação" fica por último, e o resto por tamanho.
+
     if ((um.chave === '__sem') !== (outro.chave === '__sem')) return um.chave === '__sem' ? 1 : -1;
     return outro.valor - um.valor || (um.rotulo < outro.rotulo ? -1 : (um.rotulo > outro.rotulo ? 1 : 0));
   });
@@ -17301,7 +11649,7 @@ function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, t
   }
 
   pontos = pontos.map(function (ponto, i) {
-    // Barra: um tom só (a magnitude é o que importa). Rosca: uma cor por fatia.
+
     return Object.assign(ponto, {
       tom: ponto.ehOutros ? 'neutro' : '',
       serie: tipo === 'pizza' ? (ponto.ehOutros ? 0 : (i % 6) + 1) : 0
@@ -17329,59 +11677,8 @@ function graficoDeAtendidos_(atendimentos, dimensao, titulo, rotuloDaDimensao, t
 
 /* ==== Instalacao.gs ======================================================= */
 
-/**
- * ============================================================================
- * PGO — Instalacao.gs · criar e conferir a instalação
- * ============================================================================
- * As duas rotinas que se rodam NO EDITOR do Apps Script, não pela tela:
- * a que cria a planilha do zero e a que diz o que está errado nela.
- * São as duas pontas da mesma pergunta — "esta instalação está de pé?".
- *
- * O QUE TEM AQUI DENTRO, nesta ordem:
- *
- *   1. A ÚNICA ROTINA QUE CRIA ESTRUTURA
- *   2. O LAUDO QUE RODA DENTRO DO APPS SCRIPT
- *
- * Procure pelo banner com ##### para pular de uma seção à outra.
- * ============================================================================
- */
-
-/* ############################################################################
-   #
-   #  SEÇÃO 1 de 2 · A ÚNICA ROTINA QUE CRIA ESTRUTURA
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * A única rotina que cria estrutura
- * ============================================================================
- * Rode `instalarRECC()` UMA vez, no editor do Apps Script, sobre uma planilha
- * VAZIA. Ela recusa rodar se qualquer aba do contrato já tiver dado.
- *
- * Depois da instalação, nenhum caminho do produto cria, renomeia, apaga ou
- * reordena aba e coluna por conta própria. Abrir o sistema apenas VALIDA.
- *
- * O que a instalação faz:
- *   1. acerta o fuso da planilha para America/Sao_Paulo;
- *   2. cria as 13 abas, com cabeçalho, formato de coluna e linha 1 congelada;
- *   3. CORTA cada aba para o tamanho do contrato — célula vazia também consome
- *      o teto de 10 milhões da planilha;
- *   4. semeia catálogo, canais, campos e configuração — tudo editável depois;
- *   5. cadastra QUEM EXECUTOU como o primeiro Administrador.
- *
- * O passo 5 não é conveniência. O acesso é pelo e-mail autenticado conferido
- * contra a aba USUARIOS: base recém-criada tem essa aba vazia, e sem ninguém
- * dentro ninguém entra — nem para cadastrar o primeiro usuário.
- *
- * NENHUM dado operacional é semeado. As bases, os canais, os produtos e as
- * SUSEPs bloqueadas nascem vazios.
- * ============================================================================
- */
-
 const RECC_TETO_DE_CELULAS = 10000000;
 
-/** Ponto de entrada da instalação. */
 function instalarRECC() {
   var planilha = planilhaAtiva_();
   var email = Session.getActiveUser().getEmail();
@@ -17431,7 +11728,6 @@ function instalarRECC() {
   return laudo;
 }
 
-/** Instalação sobre planilha em uso não existe. */
 function abortarSeAPlanilhaTiverDado_(planilha) {
   var comDado = [];
   nomesDasAbasDoContrato_().forEach(function (nomeDaAba) {
@@ -17447,13 +11743,6 @@ function abortarSeAPlanilhaTiverDado_(planilha) {
   }
 }
 
-/**
- * Quantas linhas de DADO a aba tem, de verdade.
- *
- * Conferir só getLastRow() não bastaria numa reinstalação: uma tentativa
- * anterior pode ter deixado a aba criada e formatada, e formato não é dado.
- * Aqui a pergunta é se existe algum valor abaixo do cabeçalho.
- */
 function quantasLinhasPreenchidas_(aba) {
   var ultima = aba.getLastRow();
   var largura = aba.getLastColumn();
@@ -17470,14 +11759,6 @@ function quantasLinhasPreenchidas_(aba) {
   return preenchidas;
 }
 
-/**
- * Cria (ou reaproveita, se estiver vazia) a aba e a deixa no tamanho exato do
- * contrato.
- *
- * O corte importa: uma aba nova nasce com 1.000 linhas × 26 colunas, ou seja
- * 26.000 células do orçamento, todas em branco. Multiplicado por 13 abas isso
- * já seria 312 mil células guardando nada.
- */
 function criarAbaDoContrato_(planilha, esquema) {
   var aba = planilha.getSheetByName(esquema.aba);
   if (!aba) aba = planilha.insertSheet(esquema.aba);
@@ -17503,8 +11784,6 @@ function criarAbaDoContrato_(planilha, esquema) {
   linha1.setFontWeight('bold');
   aba.setFrozenRows(1);
 
-  // Pré-formata a área de dados coluna a coluna. Assim até uma linha digitada
-  // à mão, sem passar pelo sistema, já cai na célula com o formato certo.
   for (var i = 0; i < esquema.colunas.length; i++) {
     var formato = RECC_FORMATO_DA_CELULA[esquema.colunas[i].tipo] || '@';
     aba.getRange(2, i + 1, esquema.reserva, 1).setNumberFormat(formato);
@@ -17513,44 +11792,23 @@ function criarAbaDoContrato_(planilha, esquema) {
   return esquema.aba;
 }
 
-// ============================================================================
-// SEMENTE — padrão, nunca fixado. Tudo editável e excluível depois.
-// ============================================================================
-
 function semearDadosIniciais_(emailDoInstalador) {
   var contagem = { niveis: 0, cargos: 0, catalogo: 0, canais: 0, campos: 0, config: 0 };
 
-  // --- níveis de acesso -----------------------------------------------------
-  // O nível é a unidade de permissão: telas, campos, widgets, ações e escopo
-  // saem DAQUI. O cargo é só o rótulo organizacional.
-  // Cada nível traz a SUA lista de ações. Dar a mesma lista a todo mundo que
-  // não é administrador já deixou um nível chamado "Consulta" podendo criar
-  // caso — o nome dizia uma coisa e a permissão fazia outra.
   var niveis = inserirVariosRegistros_('CATALOGO', [
-    /*
-     * O ALCANCE NA PRODUTIVIDADE RECC é o sexto parâmetro, e cada nível tem o
-     * seu — é o que a operação pediu: poder liberar e poder bloquear.
-     *
-     * Ele é INDEPENDENTE do escopo geral. A Operação enxerga só os casos dela
-     * no Trabalho e na Busca (escopo PROPRIOS) e vê A EQUIPE na Produtividade:
-     * são duas perguntas diferentes — "o que eu tenho para fazer" e "como a
-     * equipe está indo" —, e elas não precisam ter a mesma resposta.
-     */
+
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar', 'configurar', 'estrutura'],
       ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade', 'configuracoes'],
       'CANAL'),
-    // A Coordenação importa: é ela quem recebe a base de inadimplentes e
-    // distribui. A Operação não — um analista não traz trezentos casos para
-    // dentro da base, ele trabalha os que chegaram.
+
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar'],
       ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade'],
       'CANAL'),
-    // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
-    // "próprios" no resto do sistema.
+
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
       ['trabalho', 'cadastrarCaso', 'buscarCaso',
@@ -17564,7 +11822,6 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.niveis = niveis.length;
   var idAdministrador = niveis[0]['Id'];
 
-  // --- cargos ---------------------------------------------------------------
   var cargos = inserirVariosRegistros_('CATALOGO', [
     novoItemDeCatalogo_('CARGO', '', 'Analista RET', 1),
     novoItemDeCatalogo_('CARGO', '', 'Analista Mesa Diamante', 2),
@@ -17575,18 +11832,6 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.cargos = cargos.length;
   var idCargoAdm = cargos[2]['Id'];
 
-  /*
-   * --- disponibilidade -------------------------------------------------------
-   *
-   * Se a pessoa está recebendo caso HOJE. Pedido do PO: "pode atribuir um flag
-   * de ativo ou férias para que ele NÃO considere o analista e divida apenas
-   * por quem está ativo".
-   *
-   * É lista do catálogo, e não duas opções escritas no código, porque a
-   * operação vai querer mais motivos — licença médica, treinamento, um
-   * projeto. Qualquer item NOVO desta lista tira a pessoa da divisão: só
-   * "Disponível" recebe, e é por isso que o nome dele mora numa constante.
-   */
   var disponibilidades = inserirVariosRegistros_('CATALOGO', [
     novoItemDeCatalogo_('DISPONIBILIDADE', '',
       RECC_DISPONIBILIDADE_QUE_RECEBE, 1, 'bom'),
@@ -17595,7 +11840,6 @@ function semearDadosIniciais_(emailDoInstalador) {
   ]);
   contagem.disponibilidades = disponibilidades.length;
 
-  // --- canais ----------------------------------------------------------------
   var canais = inserirVariosRegistros_('CANAIS', [
     {
       Nome: 'RET',
@@ -17604,12 +11848,7 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'data de recepção do protocolo',
       ColunaDaHora: '',
       ColunaDoStatus: 'status',
-      // Fila agrupada: cinco colunas na tela, e cada uma junta o que a
-      // pessoa lê de uma vez só. Trinta e cinco colunas lado a lado não
-      // cabem, e escolher seis perde o resto.
-      // "Dados da proposta" abre com a proposta INTEIRA (7-0000000) e não
-      // tem mais protocolo — "não é usado", palavra do PO. "Dados
-      // cadastrais" abre com o telefone, também a pedido dele.
+
       ColunasDaFila: 'Situação: data de recepção do protocolo, status'
         + '; Dados da proposta: Código origem da proposta + número da proposta'
         + ', Num_apolice, produto'
@@ -17620,24 +11859,12 @@ function semearDadosIniciais_(emailDoInstalador) {
         + 'nome do cliente',
       ColunaDaFinalizacao: 'data da transmissão',
       ColunaDaAreaResponsavel: '',
-      /*
-       * O GRÁFICO DE VALOR POR SITUAÇÃO da RET, pedido pelo PO: "valor dos
-       * retidos, não retidos, sem sucesso, valor dos demais status e total".
-       *
-       * A coluna é `valor do prêmio`, e não `valor do prêmio retido`. É o
-       * prêmio EM JOGO em cada caso, e é a única leitura em que as cinco
-       * contas que ele pediu querem dizer algo: com a coluna do retido, a
-       * barra de "Não retido" seria sempre zero — caso não retido não tem
-       * prêmio retido —, e o gráfico pareceria quebrado.
-       *
-       * As duas são editáveis em Configurações › Canais de trabalho. Se a
-       * operação medir outra coisa, troca ali, sem código.
-       */
+
       ColunaDoValor: 'valor do prêmio',
       SituacoesDestacadas: 'Retido, Não retido, Sem sucesso de contato',
-      // A RET trabalha inadimplência, e para ela o bloqueio importa.
+
       ConfereSusepBloqueada: true,
-      // Sem SLA: a RET não pediu prazo em horas.
+
       SlaHorasUteis: 0,
       InicioDoExpediente: '',
       FimDoExpediente: '',
@@ -17654,8 +11881,7 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
       ColunaDoStatus: 'Status',
-      // O título do e-mail abre "Dados do caso": é por ele que a Mesa acha o
-      // caso no dia a dia, palavra do PO.
+
       ColunasDaFila: 'Situação: Data de entrada, Status'
         + '; Dados do caso: Título do e-mail, Ramo, Assunto'
         + '; Dados cadastrais: Nome do segurado, Documento (CPF)'
@@ -17664,29 +11890,12 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunasDaBusca: 'Nome do segurado, Documento (CPF), SUSEP, Corretora',
       ColunaDaFinalizacao: 'Data da finalização',
       ColunaDaAreaResponsavel: 'Área responsável',
-      // Sem coluna de valor: a Mesa Diamante não mede dinheiro por situação, e
-      // o gráfico simplesmente não aparece nela. Um dia que ela meça, é um
-      // campo preenchido em Configurações, não uma linha de código.
+
       ColunaDoValor: '',
       SituacoesDestacadas: '',
-      /*
-       * A MESA DIAMANTE NÃO CONFERE BLOQUEIO. Pedido do PO: "no formulário de
-       * Mesa diamante não há necessidade de verificar se a SUSEP está ou não
-       * bloqueada, pode remover esse detalhe".
-       *
-       * A razão é de negócio: a Mesa atende corretora Diamante, e a lista de
-       * bloqueios é mantida por outra área, para outro propósito. Fica como
-       * campo em Configurações › Canais de trabalho — se um dia a Mesa quiser
-       * conferir, é marcar lá.
-       */
+
       ConfereSusepBloqueada: false,
-      /*
-       * O SLA DA MESA, pedido do PO: "6 horas úteis; a célula funciona das
-       * 08:15 às 18:30". Segunda a sexta. O prazo começa na data e na hora de
-       * entrada e para na PRIMEIRA RESPOSTA ("a SLA conta até a data da
-       * primeira resposta"). Tudo editável em Configurações › Canais de
-       * trabalho.
-       */
+
       SlaHorasUteis: 6,
       InicioDoExpediente: '08:15',
       FimDoExpediente: '18:30',
@@ -17696,14 +11905,7 @@ function semearDadosIniciais_(emailDoInstalador) {
       Ordem: 2,
       Ativo: true
     },
-    /*
-     * O VG — VIDA EM GRUPO, o terceiro canal, nascido piloto.
-     *
-     * SEM META e SEM CARTÕES de propósito: o PO pediu para começar assim e
-     * montar os indicadores depois, em Configurações › Painéis. Um cartão
-     * inventado por mim estaria na tela da operação amanhã, medindo o que
-     * ninguém pediu.
-     */
+
     {
       Nome: 'VG',
       Descricao: 'Vida em Grupo',
@@ -17711,26 +11913,20 @@ function semearDadosIniciais_(emailDoInstalador) {
       ColunaDaData: 'Data do protocolo da solicitação',
       ColunaDaHora: '',
       ColunaDoStatus: 'Status',
-      // "Vigência" abre com os MESES, em destaque e com cor — vermelho abaixo
-      // de 18, amarelo em 18, verde acima. Pedido do PO.
+
       ColunasDaFila: 'Situação: Data do protocolo da solicitação, Status'
         + '; Vigência: Meses de vigência, Início da vigência'
         + '; Cliente: CNPJ, Subestipulante, Quantidade de vidas'
         + '; Financeiro: Prêmio mensal, Margem de contribuição'
         + '; Responsável: Analista',
       ColunasDaBusca: 'CNPJ, Subestipulante, SUSEP, TK/Assunto',
-      // Sem coluna de finalização: nenhum dos seis status do VG é "concluído"
-      // no sentido de encerrar o caso — "Pago" e "Retido" são desfechos, e o
-      // PO não pediu uma data para eles. Fica vazio até ele pedir.
+
       ColunaDaFinalizacao: '',
       ColunaDaAreaResponsavel: '',
-      // O VG tem prêmio mensal e prêmio anual, e o PO não disse qual é "o
-      // valor" dele nem quais situações destacar. Fica em branco: o gráfico
-      // nasce desligado aqui, e liga no dia em que ele escolher.
+
       ColunaDoValor: '',
       SituacoesDestacadas: '',
-      // O VG é piloto e o PO não disse o contrário: segue conferindo, que é o
-      // padrão de quem não declarou nada.
+
       ConfereSusepBloqueada: true,
       SlaHorasUteis: 0,
       InicioDoExpediente: '',
@@ -17747,42 +11943,11 @@ function semearDadosIniciais_(emailDoInstalador) {
   var idCanal = canais[1]['Id'];
   var idVg = canais[2]['Id'];
 
-  // --- sinalizadores -----------------------------------------------------
   contagem.sinalizadores = inserirVariosRegistros_('SINALIZADORES',
     sinalizadoresDeFabrica_(idRet, idCanal, idVg)).length;
 
-  // --- catálogo por canal ----------------------------------------------------
   var itens = [];
-  // Cada situação com a sua cor. A cor não é enfeite: numa fila de trinta
-  // linhas, ela é o que faz "não trabalhado" saltar aos olhos sem ninguém
-  // precisar ler. As cores válidas estão em RECC_TONS.
-  // OS STATUS DA RET, cada um com a coluna onde carimba data e hora.
-  //
-  // É daqui que sai o controle de produtividade da RET: toda vez que um caso
-  // muda de status, o momento fica gravado na PRÓPRIA LINHA do caso, na
-  // coluna que o status declarou. É isso que permite ao painel responder
-  // "quantos contatou, e quando foi cada contato" sem cruzar duas abas.
-  //
-  // "Não trabalhado" é o estado de nascimento e não carimba nada: carimbar a
-  // hora em que o caso entrou seria repetir a data de recepção.
-  //
-  // "SEM SUCESSO DE CONTATO", em LARANJA (`atencao`): nem o caso foi retido,
-  // nem foi perdido — a tentativa de contato não chegou a ninguém. Fica depois
-  // dos desfechos que já existiam, na mesma ordem que a migração usa numa
-  // instalação em uso: duas ordens diferentes para o mesmo status confundiriam
-  // quem olha as duas planilhas. A ordem é editável em Configurações › Ajustes Gerais.
-  //
-  // OS DESFECHOS, com os nomes do PO: "um caso concluído é cancelado, pago,
-  // não retido, retido ou sem sucesso de contato". São os cinco marcados como
-  // FINAL (o quarto item de cada linha). NÃO EXISTE "Concluído" na RET — o PO
-  // pediu para tirar: concluir é chegar a um desses cinco.
-  //
-  // Os carimbos de Não retido e Retido continuam nas colunas "Data não reteve"
-  // e "Data reteve": coluna da base é contrato com o Power BI, e mudar o nome
-  // dela por causa do nome do status quebraria o relatório. Sem sucesso,
-  // Cancelado e Pago não carimbam: o PO não pediu coluna para eles, e criar
-  // coluna que ninguém pediu enche a base para medir o que não se decidiu
-  // medir. A data da última mudança de status registra os cinco do mesmo jeito.
+
   [['Não trabalhado', 'ruim', ''],
    ['Aguardando transmissão', 'destaque', 'Data aguardando transmissão'],
    ['Pendente', 'atencao', 'Data pendente'],
@@ -17796,20 +11961,7 @@ function semearDadosIniciais_(emailDoInstalador) {
     itens.push(novoItemDeCatalogo_('STATUS', idRet, linha[0], i + 1, linha[1],
       linha[2], linha[3]));
   });
-  // A Mesa Diamante tem quatro status. O formulário nasce com "Em andamento"
-  // já escolhido — é o estado em que todo caso começa, e deixar em branco
-  // obrigaria a escolher o óbvio em toda abertura.
-  //
-  // "Concluído na mesa" é diferente de "Concluído": a mesa resolveu sem
-  // devolver para a área. A operação mede os dois separados. Os três últimos
-  // FECHAM o caso, palavra do PO: "concluído, concluído na mesa e sem
-  // retorno".
-  //
-  // "Sem retorno" NÃO carimba a data da finalização, embora seja final: a
-  // conta de "Finalizados na célula" é finalização preenchida sem área
-  // responsável, e um caso sem retorno entraria ali como resolvido.
-  // "Em andamento" carimba QUANDO o caso entrou nele: é de lá que o sinalizador
-  // da Mesa conta as 48 horas, até o caso ser concluído.
+
   [['Em andamento', 'atencao', RECC_COLUNA_DATA_EM_ANDAMENTO],
    ['Concluído', 'bom', 'Data da finalização', true],
    ['Concluído na mesa', 'destaque', 'Data da finalização', true],
@@ -17817,17 +11969,7 @@ function semearDadosIniciais_(emailDoInstalador) {
     itens.push(novoItemDeCatalogo_('STATUS', idCanal, linha[0], i + 1, linha[1],
       linha[2], linha[3]));
   });
-  /*
-   * Os SEIS status do VG, como o PO listou: "reativado, negado, aguardando,
-   * cancelado, pago e retido". Ele confirmou que são seis — "pago" e "retido"
-   * são desfechos distintos.
-   *
-   * NENHUM carimba, e isso é decisão dele por omissão: ele não pediu colunas
-   * de data por status no VG, e criar sete colunas que ninguém pediu encheria
-   * a base para medir o que a operação ainda não decidiu medir. O rastro de
-   * "quando mudou pela última vez e quem mudou" continua existindo, como nos
-   * outros dois canais.
-   */
+
   [['Aguardando', 'atencao', ''],
    ['Reativado', 'bom', ''],
    ['Retido', 'bom', ''],
@@ -17841,13 +11983,11 @@ function semearDadosIniciais_(emailDoInstalador) {
     itens.push(novoItemDeCatalogo_('SEGMENTO', '', nome, i + 1));
   });
 
-  // Listas que o formulário oferece. Padrão, não fixado: o administrador
-  // renomeia, reordena, desliga e cria quantas quiser em Configurações.
   var listasGlobais = {
-    // Por onde o caso chegou na RET. A operação pediu estes quatro.
+
     CANAL_ORIGEM: ['URA', 'Central', 'Base de Inadimplentes',
       'Piloto Formulário - Cancelamento'],
-    // Por onde o caso chegou na Mesa Diamante.
+
     CANAL: ['Chat', 'Retorno | chat', 'E-mail'],
     TIPO: ['Consultas', 'Problemas', 'Solicitações'],
     RAMO: ['Vida em grupo', 'Vida individual'],
@@ -17857,34 +11997,22 @@ function semearDadosIniciais_(emailDoInstalador) {
     MOTIVO: ['Aumento do prêmio na renovação', 'Dificuldade financeira',
       'Portabilidade', 'Proposta de concorrente', 'Insatisfação com atendimento',
       'Coberturas', 'Outros'],
-    // "ADC - TODAS PARCELAS" é a opção que faz aparecer o campo "Dados de
-    // pagamento" — ver mostrarSe, em RECC_PADRAO_DO_FORMULARIO. Renomear
-    // este item aqui sem ajustar lá desligaria a regra em silêncio.
+
     FORMA_PAGAMENTO: ['ADC - TODAS PARCELAS', 'Boleto', 'Débito em conta',
       'Cartão de crédito', 'PIX'],
-    // Quantas vezes já se tentou falar com o cliente. É seletor, e não número
-    // digitado, porque a operação vai pendurar regra nisso mais para a frente.
+
     TENTATIVA: ['1ª tentativa', '2ª tentativa', '3ª tentativa',
       'Contato efetivado', 'Sem contato'],
-    // O produto vem no formato "código - nome", num seletor só. O sistema
-    // separa os dois ao gravar, para o painel agrupar por código.
-    // A RET trata Vida Individual e, agora, Vida em Grupo. A lista é ponto de
-    // partida: a operação acrescenta produto em Configurações › Ajustes Gerais, sem
-    // programador — é o que mantém o sistema aberto enquanto ela se forma.
+
     PRODUTO: ['1101 - VIDA INDIVIDUAL', '1102 - VIDA EM GRUPO',
       '1103 - PRESTAMISTA', '1104 - ACIDENTES PESSOAIS'],
     ORIGEM: ['Base de inadimplência', 'Central: Pessoa', 'URA', 'Site', 'Chat',
       'Telefone', 'Corretora'],
 
-    // --- as três listas do VG, ditadas pelo PO ----------------------------
-    // Só as duas do título da coluna, como ele disse: "é uma lista suspensa
-    // com apenas as opções do título".
     MOVIMENTACAO: ['MOVSINT', 'MOVESEG'],
-    // De quanto em quanto tempo o cliente paga. O PO descreveu "todo mês, a
-    // cada 3 meses, 6 meses ou anual" e escolheu os nomes do mercado.
+
     PERIODICIDADE: ['Mensal', 'Trimestral', 'Semestral', 'Anual'],
-    // De onde veio a oportunidade. "Banguela" é o termo da operação para o
-    // caso que vem sem origem definida — mantido como ele escreveu.
+
     LEAD: ['Banguela', 'Reativação', 'Inadimplência', 'Renovação', 'Cobrança']
   };
   Object.keys(listasGlobais).forEach(function (tipo) {
@@ -17895,18 +12023,9 @@ function semearDadosIniciais_(emailDoInstalador) {
   contagem.catalogo = inserirVariosRegistros_('CATALOGO', itens).length +
     contagem.niveis + contagem.cargos;
 
-  // --- cartões do Trabalho -------------------------------------------------
-  // Os cartões moram em PAINEIS, e não em CANAIS: são uma LISTA de coisas
-  // configuráveis, cada uma com nome, cor e ordem próprios. Guardá-los como
-  // um texto separado por vírgula dentro do canal dava conta de escolher
-  // QUAIS, e de mais nada — não de renomear um, nem de trocar a cor.
   contagem.paineis = inserirVariosRegistros_('PAINEIS',
     cartoesIniciaisDoPainel_(idRet, idCanal)).length;
 
-  // --- análises de partida --------------------------------------------------
-  // Duas, uma por canal, para a operação ver a ideia funcionando antes de
-  // montar as dela. Nascem LIGADAS mas NÃO GERADAS: criar aba na instalação
-  // custaria o dobro do tempo, e ninguém pediu a aba ainda.
   contagem.analises = inserirVariosRegistros_('ANALISES', [
     { Nome: 'RET', Descricao: 'Tudo da RET dos últimos 90 dias',
       CanalId: idRet, Colunas: '', Filtros: '', Dias: 90, Ordem: 1, Ativo: true },
@@ -17915,16 +12034,12 @@ function semearDadosIniciais_(emailDoInstalador) {
       CanalId: idCanal, Colunas: '', Filtros: '', Dias: 90, Ordem: 2, Ativo: true }
   ]).length;
 
-  // --- campos do formulário -------------------------------------------------
-  // Gerados a partir do contrato: é isto que faz CAMPOS ser o mapa
-  // campo ↔ coluna, e não uma segunda verdade que diverge da planilha.
   var campos = []
     .concat(camposDoFormularioDaBase_('BASE_RET', idRet))
     .concat(camposDoFormularioDaBase_('BASE_MESA', idCanal))
     .concat(camposDoFormularioDaBase_('BASE_VG', idVg));
   contagem.campos = inserirVariosRegistros_('CAMPOS', campos).length;
 
-  // --- configuração ---------------------------------------------------------
   var config = inserirVariosRegistros_('CONFIG', [
     novaConfiguracao_('IDENTIDADE.NOME', 'RECC',
       'Nome exibido na barra superior. Editável.'),
@@ -17958,9 +12073,7 @@ function semearDadosIniciais_(emailDoInstalador) {
       + 'telas avisam quando isso acontece.'),
     novaConfiguracao_('OPERACAO.TEMA_PADRAO', 'padrao',
       'padrao | rosa | dark | brasil'),
-    // Semeado A PARTIR de RECC_TELAS_DO_SISTEMA, e não digitado de novo aqui.
-    // Escrever a lista duas vezes é ter dois mapas do mesmo mar: um dia eles
-    // divergem, e a tela nova nasce com o nome errado no menu — ou sem nome.
+
     novaConfiguracao_('MENU.TITULOS', JSON.stringify(
       RECC_TELAS_DO_SISTEMA.reduce(function (mapa, item) {
         mapa[item.tela] = item.titulo;
@@ -17971,7 +12084,6 @@ function semearDadosIniciais_(emailDoInstalador) {
   ]);
   contagem.config = config.length;
 
-  // --- primeiro administrador ----------------------------------------------
   inserirVariosRegistros_('USUARIOS', [{
     Nome: emailDoInstalador.split('@')[0],
     Email: emailDoInstalador,
@@ -18000,8 +12112,7 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas, naProdutividade) 
       escopo: escopo,
       telas: telas,
       acoes: acoes,
-      // De quem são os números da Produtividade RECC para este nível. Sem
-      // declarar, EQUIPE — a tela foi pedida para mostrar a equipe.
+
       escopoNaProdutividade: naProdutividade || 'EQUIPE',
       campos: {},
       widgets: {}
@@ -18009,14 +12120,6 @@ function novoNivelDeAcesso_(nome, ordem, escopo, acoes, telas, naProdutividade) 
   };
 }
 
-/**
- * Os cartões que o Trabalho mostra quando o sistema nasce.
- *
- * A RET mostra todas as situações; a Mesa Diamante mostra duas. Não é
- * capricho: a Mesa Diamante tem muito menos volume, e sete cartões de números pequenos
- * viram uma parede que ninguém lê. Tudo isso é editável em Configurações —
- * este é o ponto de partida, não a regra.
- */
 function cartoesIniciaisDoPainel_(idRet, idCanal) {
   var cartoes = [];
 
@@ -18039,10 +12142,6 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     };
   }
 
-  // A RET mostra o total e as cinco situações que ainda pedem trabalho. Os
-  // desfechos (Retido, Não retido e os outros finais) NÃO ganham cartão: o
-  // Trabalho responde "o que eu tenho que trabalhar hoje", e caso fechado não
-  // é trabalho. Quem quiser o número acrescenta o cartão em Configurações.
   cartoes.push(novoCartao(idRet, 'Total de casos', 'total', '', 'destaque', 1));
   [['Aguardando transmissão', 'destaque'], ['Pendente', 'atencao'],
    ['1º contato realizado', 'violeta'], ['2º contato realizado', 'violeta'],
@@ -18050,28 +12149,11 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     cartoes.push(novoCartao(idRet, par[0], 'situacao', par[0], par[1], i + 2));
   });
 
-  // A Mesa Diamante tem menos volume: quatro cartões bastam, e sete seriam
-  // ruído. Os nomes acompanham os três status que ela usa.
   cartoes.push(novoCartao(idCanal, 'Total de casos', 'total', '', 'destaque', 1));
   cartoes.push(novoCartao(idCanal, 'Em andamento', 'situacao', 'Em andamento', 'atencao', 2));
   cartoes.push(novoCartao(idCanal, 'Concluído', 'situacao', 'Concluído', 'bom', 3));
-  // "Finalizados na célula" é CALCULADO — conta o que fechou sem passar por
-  // outra área —, e por isso vale mais que um cartão preso ao status de mesmo
-  // nome: ele continua certo se alguém renomear o status. O status existe
-  // para quem atende marcar; o cartão, para a operação medir.
-  cartoes.push(novoCartao(idCanal, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
 
-  // ---- os cartões da Produtividade RECC -----------------------------------
-  //
-  // São OUTRA pergunta, e por isso outros cartões. O Trabalho responde "o que
-  // eu tenho que fazer hoje" e por isso só mostra o que ainda dá trabalho. A
-  // Produtividade responde "o que a gente entregou", e aí o que interessa é
-  // justamente o que já fechou: quantos reteve, quantos não reteve, quantos
-  // foram contatados.
-  //
-  // Contatados sai do CARIMBO, e não do status. Um caso que já passou do "1º
-  // contato realizado" e hoje está em "Retido" continua tendo sido contatado —
-  // mas não conta mais em status nenhum. A coluna de carimbo não esquece.
+  cartoes.push(novoCartao(idCanal, 'Finalizados na célula', 'naCelula', '', 'bom', 4));
 
   function cartaoDaProdutividade(canalId, titulo, dimensao, filtro, cor, ordem) {
     return novoCartao(canalId, titulo, dimensao, filtro, cor, ordem,
@@ -18096,9 +12178,6 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
   cartoes.push(cartaoDaProdutividade(idCanal, 'Em andamento', 'situacao',
     'Em andamento', 'atencao', 4));
 
-  // ---- os gráficos da Produtividade RECC ------------------------------------
-  // Cada um responde a UMA pergunta. Gráfico que não responde pergunta
-  // nenhuma é enfeite, e enfeite numa tela de trabalho é ruído.
   function novoGrafico(canalId, titulo, tipo, dimensao, agregacao, medida,
     limite, largura, ordem) {
     return {
@@ -18109,35 +12188,22 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     };
   }
 
-  // Barras COM LINHA: a linha é a média móvel da própria barra, na mesma
-  // escala. Não são dois eixos — dois eixos fazem a mesma altura significar
-  // duas coisas, e é o erro de gráfico mais comum que existe.
   cartoes.push(novoGrafico(idRet, 'Entradas por dia, e a tendência',
     'barrasComLinha', 'data de recepção do protocolo', 'contagem', '', 0, 2, 1));
-  // Pizza é parte-do-todo, de relance, com poucas fatias. Para comparar
-  // valores próximos ela é péssima — para isso existem as barras abaixo.
+
   cartoes.push(novoGrafico(idRet, 'Situação dos casos',
     'pizza', 'status', 'contagem', '', 6, 1, 2));
-  // Nome comprido pede barra DEITADA: em pé, o rótulo vira uma escadinha
-  // ilegível ou é cortado.
+
   cartoes.push(novoGrafico(idRet, 'Por que pediram o cancelamento',
     'barrasDeitadas', 'motivo do cancelamento', 'contagem', '', 6, 1, 3));
   cartoes.push(novoGrafico(idRet, 'Prêmio retido por produto',
     'barras', 'produto', 'soma', 'valor do prêmio retido', 6, 1, 4));
   cartoes.push(novoGrafico(idRet, 'Casos por canal de entrada',
     'barras', 'canal', 'contagem', '', 6, 1, 5));
-  // Por analista: a mesma pergunta do "por área", uma camada abaixo. O
-  // recorte por área já existe sem gráfico nenhum — é o seletor de canal no
-  // alto da tela, e cada canal tem os gráficos dele. O que faltava era ver a
-  // distribuição DENTRO da área, e é isto.
+
   cartoes.push(novoGrafico(idRet, 'Casos por analista',
     'barrasDeitadas', 'analista', 'contagem', '', 6, 1, 6));
-  // OS DOIS DA IMPORTAÇÃO, que a operação pediu: "no dia 05 incluímos 100
-  // casos da base de inadimplentes Vida Presente". São duas perguntas, e por
-  // isso dois gráficos — QUANDO entraram, e DE QUAL base.
-  //
-  // Largura 2 no de datas: uma barra por dia ao longo de um mês não cabe em
-  // meia tela sem as datas virarem uma escadinha ilegível.
+
   cartoes.push(novoGrafico(idRet, 'Casos importados por dia',
     'barrasComLinha', 'Data da importação', 'contagem', '', 0, 2, 7));
   cartoes.push(novoGrafico(idRet, 'De qual base os casos vieram',
@@ -18153,8 +12219,7 @@ function cartoesIniciaisDoPainel_(idRet, idCanal) {
     'barras', 'Canal', 'contagem', '', 6, 1, 4));
   cartoes.push(novoGrafico(idCanal, 'Casos por analista',
     'barrasDeitadas', 'Analista', 'contagem', '', 6, 1, 5));
-  // A Mesa também importa: casos planilhados de corretoras, para ação
-  // diferenciada. Mesmos dois gráficos, mesma pergunta.
+
   cartoes.push(novoGrafico(idCanal, 'Casos importados por dia',
     'barrasComLinha', 'Data da importação', 'contagem', '', 0, 2, 6));
   cartoes.push(novoGrafico(idCanal, 'De qual base os casos vieram',
@@ -18172,20 +12237,13 @@ function novoItemDeCatalogo_(tipo, canalId, nome, ordem, cor, colunaDeCarimbo, e
     Rotulo: nome,
     PaiId: '',
     Cor: cor || '',
-    // Em qual coluna da base gravar data e hora quando o caso CHEGAR a este
-    // status. Só status usa; o resto do catálogo ignora.
+
     ColunaDeCarimbo: colunaDeCarimbo || '',
     Ordem: ordem,
     Ativo: true,
     Configuracao: ''
   };
-  // SIM quando o status FECHA o caso — é o que entra em "Concluídos". Vazio é
-  // não: o VG nasce sem nenhum, porque o PO ainda vai decidir.
-  //
-  // A chave só vai quando é SIM. Uma planilha que ainda não rodou a
-  // atualização não tem a coluna Final, e campo sem coluna é recusado ao
-  // gravar — um cargo ou uma disponibilidade novos estourariam ali por causa
-  // de uma coluna que nem é deles.
+
   if (ehFinal) item.Final = true;
   return item;
 }
@@ -18200,36 +12258,8 @@ function novaConfiguracao_(chave, valor, descricao) {
   };
 }
 
-/**
- * Como cada campo NASCE no formulário: em que seção, se é obrigatório, se é
- * uma lista, com que máscara e ocupando quantas colunas da grade.
- *
- * Isto é semente, não regra: tudo aqui é editável em Configurações depois. Só
- * existe para o cadastro já nascer utilizável, em vez de virar uma parede de
- * caixas de texto soltas que alguém teria de organizar à mão.
- *
- * A chave é a ChaveTecnica — o cabeçalho normalizado, sem acento nem espaço.
- */
 const RECC_PADRAO_DO_FORMULARIO = {
-  /*
-   * A SEQUÊNCIA E AS SEÇÕES SÃO AS QUE A OPERAÇÃO PEDIU, campo a campo.
-   *
-   * `ordem` manda na posição na tela — não a ordem das colunas na planilha.
-   * São coisas diferentes de propósito: a coluna nasce onde o histórico a
-   * deixou, e o formulário segue o caminho que quem atende percorre ao
-   * telefone. Amarrar um ao outro obrigaria a mexer na base para mudar a tela.
-   *
-   * Campo da base que a operação não listou não é apagado: vai para a seção
-   * "Outros" no fim, ligado. Apagar perderia dado já gravado, e desligar
-   * calado esconderia o que alguém ainda usa. Tudo isso é editável em
-   * Configurações › Cadastrar Caso — aqui é só o ponto de partida.
-   */
 
-  // ==========================================================================
-  // RET VIDA
-  // ==========================================================================
-
-  // --- Caso
   dataderecepcaodoprotocolo: { secao: 'Caso', ordem: 1, rotulo: 'Data',
     valorPadrao: '@HOJE' },
   protocolo: { secao: 'Caso', ordem: 2, rotulo: 'Protocolo', obrigatorio: false },
@@ -18241,7 +12271,6 @@ const RECC_PADRAO_DO_FORMULARIO = {
     rotulo: 'Nome de quem transferiu', obrigatorio: false,
     mostrarSe: { campo: 'canal', valor: 'Central' } },
 
-  // --- Cliente
   nomedocliente: { secao: 'Cliente', ordem: 10, rotulo: 'Nome do cliente',
     obrigatorio: true, largura: 2 },
   cpf: { secao: 'Cliente', ordem: 11, rotulo: 'CPF', tipoCampo: 'documento',
@@ -18250,30 +12279,6 @@ const RECC_PADRAO_DO_FORMULARIO = {
     rotulo: 'Telefone de contato', tipoCampo: 'telefone' },
   email: { secao: 'Cliente', ordem: 13, rotulo: 'E-mail', tipoCampo: 'email' },
 
-  /*
-   * --- Seguro
-   *
-   * PROPOSTA E APÓLICE SE DIGITAM INTEIRAS E SE GRAVAM EM PEDAÇOS.
-   *
-   * Pedido do PO: "no cadastrar caso da RET já traga por padrão o número da
-   * proposta e ele vem separado por 1 hífen ex 7-0000000 ou 58-0000000 podem
-   * ser 2 números ou um mas na planilha deve vir em colunas separadas (...)
-   * em apólice faremos igual a diferença é que serão 2 hífens ex
-   * 12-1391-0000000. Nova proposta segue a mesma regra de proposta".
-   *
-   * É UM CAMPO SÓ NA TELA e duas ou três colunas na planilha. O analista
-   * recebe a proposta escrita do jeito que ela existe no mundo —
-   * "58-0000000" — e digita isso. Pedir dois campos faria cada pessoa decidir
-   * sozinha onde o número começa, e um dia o código de uma proposta estaria
-   * na coluna do número de outra.
-   *
-   * As colunas separadas não são capricho: é por elas que o relatório junta
-   * proposta com apólice, e é por isso que elas recebem SÓ DÍGITO.
-   *
-   * O campo que hospeda a digitação é o do NÚMERO, e o do código fica
-   * desligado no formulário — a coluna continua existindo e recebendo o
-   * pedaço dela. Quem quiser os dois campos de volta liga em Cadastrar Caso.
-   */
   codigoorigemdaproposta: { secao: 'Seguro', ordem: 20,
     rotulo: 'Código origem da proposta', ativo: false },
   numerodaproposta: { secao: 'Seguro', ordem: 21, rotulo: 'Número da proposta',
@@ -18284,23 +12289,16 @@ const RECC_PADRAO_DO_FORMULARIO = {
       colunas: ['Código origem da proposta', 'número da proposta'],
       exemplo: '7-0000000'
     } },
-  // Um seletor só para código e nome do produto, no formato "1234 - VIDA
-  // INDIVIDUAL". Quem atende escolhe uma coisa; a planilha recebe duas, em
-  // colunas separadas, porque o painel agrupa por código e o relatório mostra
-  // o nome. Quem separa é o servidor, ao gravar — ver separarCodigoENome_.
+
   codproduto: { secao: 'Seguro', ordem: 22, rotulo: 'Cód. do produto e produto',
     tipoCampo: 'seletor', catalogo: 'PRODUTO', largura: 2,
     separaEm: { codigo: 'cod produto', nome: 'produto' } },
   produto: { secao: 'Seguro', ordem: 23, ativo: false },
-  // Sem o underscore: a chave técnica sai de normalizarParaComparar_, que
-  // tira acento, caixa e pontuação. "cod_sucursal" na planilha vira
-  // "codsucursal" aqui — escrever com underscore faria o campo cair em
-  // "Outros" sem nenhum erro, que foi o que aconteceu na primeira tentativa.
+
   codsucursal: { secao: 'Seguro', ordem: 24, rotulo: 'Cod_sucursal',
     ativo: false },
   codramo: { secao: 'Seguro', ordem: 25, rotulo: 'Cod_ramo', ativo: false },
-  // A apólice tem TRÊS pedaços, e o PO escolheu estas três colunas quando
-  // perguntei: cod_sucursal, cod_ramo e Num_apolice.
+
   numapolice: { secao: 'Seguro', ordem: 26, rotulo: 'Apólice',
     tipoCampo: 'texto', largura: 2,
     descricao: 'Com os dois hífens, como está na apólice: 12-1391-0000000. '
@@ -18312,9 +12310,7 @@ const RECC_PADRAO_DO_FORMULARIO = {
   valordopremio: { secao: 'Seguro', ordem: 27, rotulo: 'Valor do prêmio anual' },
   premiomensal: { secao: 'Seguro', ordem: 28,
     rotulo: 'Valor do prêmio mensal' },
-  // Obrigatório no Retido, pedido do PO: "quando o status for preenchido como
-  // retido, o valor retido deve ser obrigatório". Nos outros status, continua
-  // aparecendo e não é cobrado.
+
   valordopremioretido: { secao: 'Seguro', ordem: 29,
     rotulo: 'Valor do prêmio retido',
     obrigatorioSe: { campo: 'status', valores: ['Retido'] } },
@@ -18323,33 +12319,21 @@ const RECC_PADRAO_DO_FORMULARIO = {
   dadosdopagamento: { secao: 'Seguro', ordem: 31, rotulo: 'Dados de pagamento',
     mostrarSe: { campo: 'formadepagamento', valor: 'ADC - TODAS PARCELAS' } },
 
-  // --- Corretora
-  // A SUSEP não tem campo "bloqueada?" para digitar, e isso é decisão: a
-  // resposta está na base de SUSEPs bloqueadas, e o selo ao lado do campo já
-  // a mostra no instante em que a SUSEP é digitada — verde para liberada,
-  // vermelho para bloqueada. Um campo digitado ao lado de um selo automático
-  // seria a mesma informação em dois lugares, divergindo no primeiro dia.
-  // A SUSEP é TEXTO, e não identificador: ela tem letra — "RET00J", palavra do
-  // PO. Com tipo identificador, o formulário aceitaria a letra e a planilha
-  // guardaria só os dígitos, em silêncio.
   susep: { secao: 'Corretora', ordem: 40, rotulo: 'SUSEP', tipoCampo: 'texto',
     descricao: 'Letras e números, como a SUSEP é escrita — por exemplo RET00J.' },
   segmento: { secao: 'Corretora', ordem: 41, rotulo: 'Segmento',
     tipoCampo: 'seletor', catalogo: 'SEGMENTO' },
 
-  // --- Situação
   motivodocancelamento: { secao: 'Situação', ordem: 50,
     rotulo: 'Motivo do cancelamento', tipoCampo: 'seletor', catalogo: 'MOTIVO' },
-  // Nasce NÃO TRABALHADO, por decisão da operação: quem cadastra registra o
-  // caso; quem trabalha ajusta o status depois. Deixar em branco obrigaria a
-  // escolher na hora do cadastro, que é justamente quando ainda não se sabe.
+
   status: { secao: 'Situação', ordem: 51, rotulo: 'Status', tipoCampo: 'seletor',
     catalogo: 'STATUS', obrigatorio: true, valorPadrao: 'Não trabalhado' },
   tentativasdecontato: { secao: 'Situação', ordem: 52,
     rotulo: 'Tentativas de contato', tipoCampo: 'seletor', catalogo: 'TENTATIVA' },
   datadatransmissao: { secao: 'Situação', ordem: 53,
     rotulo: 'Data da transmissão' },
-  // A nova proposta segue a MESMA regra da proposta, palavra do PO.
+
   novocodorigemproposta: { secao: 'Situação', ordem: 54,
     rotulo: 'Cód. origem da nova proposta', ativo: false },
   novonumerodaproposta: { secao: 'Situação', ordem: 55,
@@ -18360,16 +12344,10 @@ const RECC_PADRAO_DO_FORMULARIO = {
       exemplo: '7-0000000'
     } },
 
-  // --- Outros: da base, fora da lista da operação. Ficam ligados.
   sistema: { secao: 'Outros', ordem: 91 },
   contato: { secao: 'Outros', ordem: 94 },
   descricao: { secao: 'Outros', ordem: 95, largura: 3 },
 
-  // ==========================================================================
-  // MESA DIAMANTE
-  // ==========================================================================
-
-  // --- Caso
   datadeentrada: { secao: 'Caso', ordem: 1,
     rotulo: 'Data de recepção do caso', valorPadrao: '@HOJE' },
   horario: { secao: 'Caso', ordem: 2, rotulo: 'Horário de recepção' },
@@ -18378,24 +12356,18 @@ const RECC_PADRAO_DO_FORMULARIO = {
   assunto: { secao: 'Caso', ordem: 5, tipoCampo: 'seletor',
     catalogo: 'ASSUNTO', largura: 2 },
 
-  // --- Situação
   aberturaindevida: { secao: 'Situação', ordem: 13,
     rotulo: 'Abertura indevida?' },
 
-  // --- Cliente
   nomedosegurado: { secao: 'Cliente', ordem: 20, rotulo: 'Nome',
     obrigatorio: true, largura: 2 },
-  // CPF OU CNPJ, a pedido do PO: a máscara se ajusta pelo tamanho, e a
-  // planilha recebe só os números. A coluna continua "Documento (CPF)" —
-  // nome de coluna é contrato com o Power BI.
+
   documentocpf: { secao: 'Cliente', ordem: 21, rotulo: 'CPF ou CNPJ',
     tipoCampo: 'documento', mascara: '000.000.000-00|00.000.000/0000-00' },
 
-  // --- Corretora
   corretora: { secao: 'Corretora', ordem: 31, rotulo: 'Nome da corretora' },
   ramo: { secao: 'Corretora', ordem: 32, tipoCampo: 'seletor', catalogo: 'RAMO' },
 
-  // --- Encaminhamento
   arearesponsavel: { secao: 'Encaminhamento', ordem: 40, tipoCampo: 'seletor',
     catalogo: 'AREA' },
   dataresposta: { secao: 'Encaminhamento', ordem: 41,
@@ -18408,28 +12380,8 @@ const RECC_PADRAO_DO_FORMULARIO = {
     rotulo: 'Horário da finalização' }
 };
 
-/*
- * Os campos que as DUAS bases têm com o mesmo nome técnico, e que precisam de
- * seção e ordem diferentes em cada uma.
- *
- * `analista`, `status`, `canal`, `susep` e `tipo` existem nos dois canais. O
- * mapa acima guarda um valor por chave, então o que difere mora aqui, por
- * aba. Sem isto, a Mesa Diamante herdaria as seções da RET — e o Status
- * apareceria numa seção "Situação" que na Mesa vem antes do Cliente.
- */
 const RECC_PADRAO_POR_ABA = {
-  /*
-   * O FORMULÁRIO DO VG, na ordem exata em que o PO ditou as colunas.
-   *
-   * A ordem não foi reagrupada por tipo nem "organizada": é a ordem em que a
-   * operação lê e digita, e mexer nela para ficar bonito só atrapalha quem
-   * usa. As seções separam o que se lê de uma vez — o caso, o cliente, a
-   * vigência, o financeiro.
-   *
-   * `mesesdevigencia` NÃO está aqui porque é calculada: o Esquema a marca
-   * `preenchidoPeloSistema`, e isso já a deixa fora do formulário e dentro da
-   * base. Quem a preenche é `preencherColunasCalculadas_`.
-   */
+
   BASE_VG: {
     datadoprotocolodasolicitacao: { secao: 'Caso', ordem: 1,
       rotulo: 'Data do protocolo da solicitação', obrigatorio: true,
@@ -18445,10 +12397,6 @@ const RECC_PADRAO_POR_ABA = {
     susep: { secao: 'Cliente', ordem: 12, rotulo: 'SUSEP', tipoCampo: 'texto' },
     quantidadedevidas: { secao: 'Cliente', ordem: 13 },
 
-    // A ÚNICA data do sistema que aceita o futuro, e com razão: uma apólice
-    // que começa a valer mês que vem é rotina em Vida em Grupo. Sem isto o
-    // cadastro recusava o caso com "o caso descreve algo que já aconteceu",
-    // que aqui simplesmente não é verdade.
     iniciodavigencia: { secao: 'Vigência', ordem: 20,
       rotulo: 'Início da vigência', aceitaFuturo: true },
     movsintmoveseg: { secao: 'Vigência', ordem: 21, rotulo: 'MOVSINT/MOVESEG',
@@ -18463,8 +12411,7 @@ const RECC_PADRAO_POR_ABA = {
 
     premiomensal: { secao: 'Financeiro', ordem: 40, rotulo: 'Prêmio mensal' },
     premioanual: { secao: 'Financeiro', ordem: 41, rotulo: 'Prêmio anual' },
-    // Número, e não porcentagem: o PO escolheu gravar 25,5 e não 0,255. Quem
-    // preenche é o analista — não se calcula a partir dos prêmios.
+
     margemdecontribuicao: { secao: 'Financeiro', ordem: 42,
       rotulo: 'Margem de contribuição (%)' },
     quantidadedeparcelasvencidas: { secao: 'Financeiro', ordem: 43 },
@@ -18486,20 +12433,6 @@ const RECC_PADRAO_POR_ABA = {
   }
 };
 
-/**
- * Um campo de formulário para cada coluna da base.
- *
- * As colunas de controle (_Visivel e companhia) ficam de fora: elas são do
- * sistema, não do formulário. A coluna Id entra desativada — precisa estar no
- * mapa, mas ninguém digita um Id.
- *
- * Também entram desativadas as colunas marcadas `preenchidoPeloSistema` no
- * Esquema: os carimbos de status e as duas da importação. Elas PRECISAM estar
- * em CAMPOS — é lá que mora o tipo da coluna, e sem isso a data do carimbo
- * voltaria a ser lida como texto — mas não são campo de tela. Quem quiser
- * ligar uma delas no formulário liga em Configurações; ninguém precisa mexer
- * em código para isso.
- */
 function camposDoFormularioDaBase_(nomeDaAba, canalId) {
   var esquema = esquemaDaAba_(nomeDaAba);
   var campos = [];
@@ -18513,8 +12446,6 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
     var ehId = (chave === 'id');
     var quemPreencheEhOSistema = (coluna.preenchidoPeloSistema === true);
 
-    // O que vale para ESTA aba vence o que vale para todas: `status` e
-    // `canal` existem nos dois canais, em seções diferentes.
     var padrao = daAba[chave] || RECC_PADRAO_DO_FORMULARIO[chave] || {};
 
     var configuracao = {};
@@ -18533,13 +12464,9 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
       Aba: nomeDaAba,
       ChaveTecnica: chave,
       Cabecalho: coluna.cabecalho,
-      // O rótulo é o que a pessoa LÊ; o cabeçalho é o que está gravado. Poder
-      // trocar um sem mexer no outro é o que permite escrever "Valor do
-      // prêmio anual" na tela sem renomear uma coluna com dado dentro.
+
       Rotulo: padrao.rotulo || coluna.cabecalho,
-      // A dica embaixo do campo. Vinha sempre vazia, e isso deixava de fora o
-      // único lugar em que cabe explicar um formato — "7-0000000" — na hora em
-      // que a pessoa está digitando. Continua editável em Cadastrar Caso.
+
       Descricao: padrao.descricao || '',
       TipoCampo: padrao.tipoCampo || RECC_DO_DADO_PARA_O_CAMPO[coluna.tipo] || 'texto',
       Secao: padrao.secao || (quemPreencheEhOSistema ? 'Preenchido pelo sistema' : 'Outros'),
@@ -18547,8 +12474,7 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
       Obrigatorio: padrao.obrigatorio === true,
       Protegido: coluna.protegido === true,
       Ativo: !ehId && !quemPreencheEhOSistema && padrao.ativo !== false,
-      // A ordem vem da LISTA da operação, não da posição da coluna na
-      // planilha. Coluna sem lugar declarado cai no fim, junto das outras.
+
       Ordem: padrao.ordem || (semLugarNaLista++),
       VisivelPara: '',
       ValorPadrao: padrao.valorPadrao || '',
@@ -18559,87 +12485,32 @@ function camposDoFormularioDaBase_(nomeDaAba, canalId) {
   return campos;
 }
 
-// ============================================================================
-// CONFERÊNCIA — para rodar no editor depois de publicar
-// ============================================================================
-
-/**
- * Confere o que foi copiado, contra o contrato. Só LÊ.
- *
- * É a conferência de DOIS SEGUNDOS, para rodar logo depois de copiar os
- * arquivos. Duas metades, e as duas importam:
- *
- *   as ABAS      contra o contrato do Esquema;
- *   os ARQUIVOS  de tela que o Index manda incluir.
- *
- * A segunda metade nasceu de um caso real: o `Comuns.html` ficou para trás
- * na cópia, e o sistema só disse "nenhum arquivo html com o nome Formulario
- * foi encontrado", com um número de linha. Nenhum teste rodado fora do Apps
- * Script pega isso — os testes leem a PASTA do repositório, onde o arquivo
- * está; quem não tem o arquivo é o PROJETO.
- *
- * Para a conferência completa — sequências, Ids, canais, campos, permissões —
- * existe `diagnosticoRECC()`. As duas leem o mesmo `conferirEstrutura_`: não
- * há duas versões da regra, há uma curta e uma completa.
- */
-/**
- * ----------------------------------------------------------------------------
- * ATUALIZAR UMA INSTALAÇÃO QUE JÁ TEM DADO
- * ----------------------------------------------------------------------------
- * Rode `atualizarPGO()` no editor do Apps Script, sobre a planilha que já está
- * em uso. Ela NÃO APAGA NADA, e é segura de rodar quantas vezes quiser: cada
- * passo confere antes de agir.
- *
- * POR QUE ELA EXISTE. Pedido do PO, nestas palavras: "já cadastrei usuários no
- * sistema e gostaria que interpretasse para que não precise excluir as abas ou
- * criar do zero". O `instalarRECC()` recusa rodar sobre planilha com dado, de
- * propósito — então sem esta função a única saída seria recomeçar, e quem já
- * cadastrou usuários e casos perderia os dois.
- *
- * É A PORTA ÚNICA. Ela chama as migrações antigas e acrescenta as desta
- * rodada, e devolve um laudo só. Quem atualiza não precisa saber quais
- * migrações existem nem em que ordem — é sempre `atualizarPGO()`.
- *
- * O QUE ELA NÃO FAZ, de propósito: não cria coluna que falta nas bases de
- * caso, não mexe nos cartões, nos gráficos e nas listas que você ajustou, e
- * não apaga nada que saiu do contrato. A única coluna que ela tira é a que
- * está VAZIA e o PO mandou tirar: o carimbo da exclusão das bases de caso. O laudo diz o que sobrou para você
- * decidir, e `diagnosticoRECC()` mostra o resto.
- * ----------------------------------------------------------------------------
- */
 function atualizarPGO() {
   exigirPortaDoEditor_('atualizarPGO');
   var feito = [];
   var pulados = [];
   var paraVoce = [];
-  // O fuso do PROJETO não se acerta por código: só dizer (Etapa 60).
+
   var fusoDoProjeto = fusoDoProjeto_();
   if (fusoDoProjeto && fusoDoProjeto !== RECC_FUSO_HORARIO) {
     paraVoce.push('O projeto do Apps Script está no fuso "' + fusoDoProjeto + '", e não em "'
       + RECC_FUSO_HORARIO + '": toda data digitada recua um dia. '
       + RECC_COMO_ACERTAR_O_FUSO_DO_PROJETO);
   }
-  // Algumas migrações escrevem direto na aba (uma coluna inteira, um
-  // cabeçalho). O cache da configuração (Etapa 42) é esquecido no começo e no
-  // fim, para nada do que mudou aqui ficar 5 minutos escondido.
+
   esquecerCacheDaConfiguracao_();
-  // A fila da auditoria vai para a aba antes de qualquer migração (Etapa 61).
+
   var daFila = descarregarAFilaDaAuditoria_(10000);
   if (daFila) feito.push(daFila + ' registro(s) da fila da auditoria gravados na aba AUDITORIA');
 
-  // --- 1. as migrações antigas, que são seguras de repetir -----------------
   var deCanais = migrarParaCanais_();
   feito = feito.concat(deCanais.feito);
   pulados = pulados.concat(deCanais.pulados);
 
-  // --- 2. as colunas novas da aba CANAIS -----------------------------------
-  //
-  // São desta rodada: o gráfico de valor por situação precisa saber qual é a
-  // coluna de dinheiro do canal e quais situações ganham barra própria.
   [['CANAIS', 'ColunaDoValor', 'texto'],
    ['CANAIS', 'SituacoesDestacadas', 'textoLongo'],
    ['CANAIS', 'ConfereSusepBloqueada', 'simOuNao'],
-   // O SLA por canal — pedido do PO para a Mesa Diamante.
+
    ['CANAIS', 'SlaHorasUteis', 'numero'],
    ['CANAIS', 'InicioDoExpediente', 'texto'],
    ['CANAIS', 'FimDoExpediente', 'texto'],
@@ -18657,10 +12528,6 @@ function atualizarPGO() {
 
   esquecerEstruturaLida_();
 
-  // --- 3. o que o PO pediu para a RET e para a Mesa -------------------------
-  //
-  // A coluna Final do catálogo vem PRIMEIRO: as etapas abaixo criam status
-  // finais, e gravar um campo sem coluna é recusado.
   feito = feito.concat(criarColunasDoContrato_('CATALOGO', pulados));
   feito = feito.concat(ligarOValorPorSituacaoDaRet_(pulados));
   feito = feito.concat(tirarAConferenciaDeBloqueioDaMesa_(pulados));
@@ -18671,73 +12538,44 @@ function atualizarPGO() {
   feito = feito.concat(aceitarCnpjNaMesa_(pulados, paraVoce));
   feito = feito.concat(ligarOSlaDaMesa_(pulados));
 
-  // --- 4. as colunas novas dos dois cadastros ------------------------------
-  //
-  // O PO corrigiu o que cada um dos dois cadastros pede. As colunas que ele
-  // acrescentou nascem aqui, com o dado que já existe intacto. Elas nascem NO
-  // FIM da aba, e não na posição em que o contrato as declara: o sistema
-  // inteiro acha coluna pelo NOME do cabeçalho, nunca pela posição, e inserir
-  // no meio empurraria sete mil linhas de lado sem nenhum ganho.
   feito = feito.concat(criarColunasDoContrato_('CORRETORAS', pulados));
   feito = feito.concat(criarColunasDoContrato_('SUSEP_BLOQUEADAS', pulados));
 
-  // --- 5. a equipe passa a ser o CANAL -------------------------------------
   feito = feito.concat(ligarOCanalDeQuemJaEstaCadastrado_(pulados, paraVoce));
 
-  // --- 5b. a disponibilidade do analista -----------------------------------
   feito = feito.concat(criarColunasDoContrato_('USUARIOS', pulados));
   feito = feito.concat(criarAListaDeDisponibilidade_(pulados));
   feito = feito.concat(avisarQuemPodeFicarSemLote_(canaisSemAnalista_(), paraVoce));
 
-  // --- 6. a aba PRODUTOS sai da planilha -----------------------------------
   feito = feito.concat(apagarAAbaDeProdutos_(pulados, paraVoce));
 
-  // --- 6b. o lixo que uma versão desta migração deixou em CAMPOS -----------
   feito = feito.concat(limparCamposSemCanal_(pulados));
 
-  // --- 6b2. os sinalizadores e o carimbo do encaminhamento ------------------
   feito = feito.concat(criarOsSinalizadores_(pulados));
   feito = feito.concat(criarColunasDoContrato_('SINALIZADORES', pulados));
   feito = feito.concat(criarOCarimboDoEncaminhamento_(pulados));
 
-  // --- 6b3. o prazo da Mesa conta do status Em andamento ----------------------
   feito = feito.concat(criarUmaColunaDoSistema_('BASE_MESA', RECC_COLUNA_DATA_EM_ANDAMENTO,
     'o sistema carimba quando o caso entra em Em andamento', pulados));
   feito = feito.concat(ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce));
 
-  // --- 6b4. o prazo da RET só para no Retido com o Status proposta pronto -----
   feito = feito.concat(criarUmaColunaDoSistema_('BASE_RET', RECC_COLUNA_DATA_DO_STATUS_PROPOSTA,
     'o sistema carimba quando o Status proposta encerra o prazo', pulados));
   feito = feito.concat(ligarAParadaDoRetido_(pulados, paraVoce));
 
-  // --- 6b5. o prazo da RET conta da primeira mudança de status --------------
   feito = feito.concat(criarUmaColunaDoSistema_('BASE_RET',
     RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS,
     'o sistema carimba quando o caso sai de "Não trabalhado"', pulados));
   feito = feito.concat(ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce));
 
-  // --- 6b6. a coluna "prêmio mensal retido" da RET vira "prêmio mensal" -------
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
 
-  // --- 6b7. o valor retido é obrigatório no Retido ---------------------------
   feito = feito.concat(ligarOValorRetidoNoRetido_(pulados, paraVoce));
 
-  // --- 6b8. os atendimentos do chat entram pela Importação --------------------
   feito = feito.concat(criarAAbaDoChat_(pulados, paraVoce));
 
-  // --- 6c. o carimbo da exclusão sai das bases de caso, se estiver vazio ---
   feito = feito.concat(tirarOCarimboDasBasesDeCaso_(pulados, paraVoce));
 
-  // --- 7. o que SOBROU, e que é decisão sua --------------------------------
-  //
-  // Nada aqui é apagado pelo sistema. São coisas que saíram do contrato nesta
-  // rodada e continuam na planilha, inofensivas: o PGO simplesmente não olha
-  // mais para elas. Apagar coluna com dado dentro nunca é decisão de uma
-  // migração.
-  // As colunas que saíram do contrato nesta rodada, aba por aba. A lista é
-  // declarada e não adivinhada: "tudo que está na planilha e não está no
-  // contrato" apontaria também para coluna que a pessoa criou por conta dela,
-  // e mandar apagar o trabalho de alguém não é recado de migração.
   [['BASE_RET', RECC_COLUNAS_QUE_SAIRAM_DA_RET,
     'Não estavam em uso, a seu pedido (Etapa 49); o campo saiu do formulário.'],
    ['CANAIS', ['MetaMensalPorPessoa'],
@@ -18771,13 +12609,10 @@ function atualizarPGO() {
       + par[1] + ' Apague a aba quando quiser.');
   });
 
-  // --- Etapa 44: os 4 cards do Trabalho da RET, na ordem do PO -------------
   feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
 
-  // --- Etapa 49: grupo, agente da central e relacionamento saem do formulário
   feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
 
-  // --- Etapa 52: a Minha Performance saiu do sistema — e dos níveis de acesso
   feito = feito.concat(tirarAMinhaPerformanceDosNiveis_(pulados));
 
   esquecerCacheDaConfiguracao_();
@@ -18786,25 +12621,6 @@ function atualizarPGO() {
   return recado;
 }
 
-/**
- * A PORTA DO EDITOR — quem pode rodar as funções feitas para o editor.
- *
- * `atualizarPGO()`, `migrarParaCanais()`, `normalizarBase()`,
- * `diagnosticoRECC()` e `verificarEstruturaRECC()` são feitas para o editor do
- * Apps Script. Só que toda função sem "_" no fim também pode ser chamada pelo
- * navegador, por qualquer pessoa com o sistema aberto: o `google.script.run`
- * não sabe quais funções a tela usa. Achado 68.
- *
- * O aplicativo roda "como você" (o dono). Por isso a conta que EXECUTA é
- * sempre a do dono, e a que CHAMA é a de quem está do outro lado:
- *
- *   no editor          quem chama = quem executa      → passa
- *   pelo navegador     quem chama ≠ quem executa      → só administrador
- *
- * Administrador cadastrado (permissão de estrutura) passa pelas duas, que é
- * o que ele já podia fazer pela tela. Não pede permissão nova ao instalar:
- * ler o e-mail de quem executa usa a mesma que o sistema já tem.
- */
 function exigirPortaDoEditor_(nomeDaFuncao) {
   var quemChama = emailParaComparar_(Session.getActiveUser().getEmail());
   var quemExecuta = emailParaComparar_(Session.getEffectiveUser().getEmail());
@@ -18816,19 +12632,6 @@ function exigirPortaDoEditor_(nomeDaFuncao) {
     + 'lá, ou peça a um administrador.');
 }
 
-/**
- * Tira `_ExcluidoEm` e `_ExcluidoPor` das bases de caso — só se estiverem
- * VAZIAS.
- *
- * Desde que o caso é excluído de vez, ninguém mais oculta caso e as duas
- * colunas não recebem nada. Pedido do PO: tirá-las das bases de caso e
- * mantê-las nos cadastros.
- *
- * Coluna com valor FICA, e vira decisão do PO: é caso que foi ocultado antes
- * da exclusão definitiva, e apagar o carimbo dele é decisão de gente, não de
- * migração. Vale para toda aba de canal — as três de fábrica e as que o PO
- * criou pela tela.
- */
 function tirarOCarimboDasBasesDeCaso_(pulados, paraVoce) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName('CANAIS')) {
@@ -18864,17 +12667,6 @@ function tirarOCarimboDasBasesDeCaso_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Cria, numa aba que já existe, as colunas que o contrato declara e ela não
- * tem — e devolve o que foi feito.
- *
- * Serve às duas abas de cadastro que o PO corrigiu nesta rodada. Não apaga
- * coluna nenhuma, não reordena nada e não escreve em linha de dado: só
- * acrescenta o cabeçalho que falta, com o formato do tipo declarado, para a
- * linha que já está lá continuar valendo e passar a aceitar o campo novo.
- *
- * Rodar duas vezes não estraga nada: na segunda, todas já existem.
- */
 function criarColunasDoContrato_(nomeDaAba, pulados) {
   var feito = [];
   var esquema = RECC_ESQUEMA[nomeDaAba];
@@ -18903,24 +12695,6 @@ function criarColunasDoContrato_(nomeDaAba, pulados) {
   return feito;
 }
 
-/**
- * Preenche o CanalId de quem já está cadastrado, lendo o canal que a pessoa
- * tinha digitado na coluna antiga "Canal que atende".
- *
- * POR QUE PRECISA EXISTIR. A equipe passou a ser o CANAL nesta rodada: quem
- * atende o mesmo canal aparece junto na Produtividade e na Performance. Quem
- * foi cadastrado antes pode ter o canal escrito só na coluna de texto, com o
- * CanalId em branco — e então o sistema novo não enxerga equipe nenhuma para
- * essa pessoa. Não é dado inventado: é o canal que o PO já digitou, lido de
- * onde ele digitou e ligado ao canal que tem esse nome.
- *
- * NÃO SOBRESCREVE. Quem já tem CanalId tem porque alguém escolheu — e a
- * coluna de texto, mais velha, não ganha de uma escolha mais nova.
- *
- * Nome que não casa com nenhum canal fica para o PO decidir: pode ser um
- * canal que ainda vai nascer, e chutar o mais parecido colocaria a pessoa na
- * equipe errada sem ninguém ver.
- */
 function ligarOCanalDeQuemJaEstaCadastrado_(pulados, paraVoce) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName('USUARIOS')) {
@@ -18968,18 +12742,6 @@ function ligarOCanalDeQuemJaEstaCadastrado_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Apaga a aba PRODUTOS da planilha.
- *
- * É o único passo desta migração que APAGA algo, e está aqui porque o PO
- * pediu as duas pontas, nestas palavras: "Produtos pode eliminar" — e, quando
- * perguntei qual aba, "a aba da tela e a aba da planilha".
- *
- * O laudo diz quantas linhas foram com ela, de propósito: é o único vestígio
- * que sobra na resposta. O histórico de versões do Google Planilhas guarda a
- * aba por 30 dias (Arquivo › Histórico de versões), e é de lá que ela volta se
- * alguém mudar de ideia.
- */
 function apagarAAbaDeProdutos_(pulados, paraVoce) {
   var feito = [];
   var aba = planilhaAtiva_().getSheetByName('PRODUTOS');
@@ -18999,24 +12761,6 @@ function apagarAAbaDeProdutos_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Deixa a Mesa Diamante de fora da conferência de SUSEP bloqueada.
- *
- * Pedido do PO: "no formulário de Mesa diamante não há necessidade de
- * verificar se a SUSEP está ou não bloqueada, pode remover esse detalhe".
- *
- * NÃO BASTA CRIAR A COLUNA. Ela nasce VAZIA, e vazio vale SIM — é o que faz
- * um canal antigo continuar conferindo, como já conferia. Então, para a
- * instalação que já existe, criar a coluna deixava a Mesa exatamente como
- * estava: conferindo. O pedido valia só para quem instalasse do zero.
- *
- * Achado conferindo pedido por pedido numa planilha antiga atualizada —
- * foi o único dos vinte e quatro que não atravessou a migração.
- *
- * SÓ MEXE NO QUE ESTÁ EM BRANCO. Quem já marcou alguma coisa ali escolheu de
- * propósito, e uma migração que passa por cima desfaz o trabalho de alguém
- * sem avisar.
- */
 function tirarAConferenciaDeBloqueioDaMesa_(pulados) {
   var feito = [];
   var mesa = lerRegistros_('CANAIS').filter(function (canal) {
@@ -19039,19 +12783,6 @@ function tirarAConferenciaDeBloqueioDaMesa_(pulados) {
   return feito;
 }
 
-/**
- * Apaga as linhas de CAMPOS que apontam para aba de CONTROLE.
- *
- * CAMPOS é o formulário de Cadastrar Caso: cada linha é um campo de um canal.
- * Uma versão desta migração criava linha ali para as colunas novas de
- * USUARIOS, CORRETORAS e SUSEP_BLOQUEADAS, que não são canal nenhum — elas
- * nasciam com CanalId vazio, invisíveis para o formulário e contadas na tela.
- *
- * `registrarColunaEmCampos_` não cria mais essas linhas. Isto aqui tira as
- * que já nasceram, e só elas: a condição é ser de uma aba que o contrato
- * declara como de controle E estar sem canal. Campo de canal, criado pelo PO
- * na tela, não entra nessa conta em nenhuma hipótese.
- */
 function limparCamposSemCanal_(pulados) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName('CAMPOS')) {
@@ -19084,22 +12815,6 @@ function limparCamposSemCanal_(pulados) {
   return feito;
 }
 
-/**
- * Os sinalizadores com que o sistema nasce — palavra do PO.
- *
- *   RET   "temos até 3 dias para alterar para o status final": 3 dias úteis,
- *         da PRIMEIRA MUDANÇA DE STATUS até um dos cinco desfechos — "casos
- *         não trabalhados ficam com a SLA cheia". Verde nos dois primeiros
- *         dias, amarelo no terceiro (o último), vermelho depois.
- *   MESA  o caso tem 48 horas úteis para ser concluído, contadas do momento
- *         em que ele entrou em "Em andamento" (o carimbo do status). Para
- *         quando o status vira um dos que fecham o caso. O amarelo acende nas
- *         últimas 10 horas úteis — um expediente, o "último dia".
- *   VG    o PO ainda não definiu. A linha existe, DESLIGADA e com prazo zero,
- *         para ele só preencher e ligar em Configurações › Sinalizadores.
- *
- * O expediente é o da célula, 08:15 às 18:30, nos três.
- */
 function sinalizadoresDeFabrica_(idRet, idMesa, idVg) {
   function linha(canalId, nome, prazo, unidade, aviso, quandoVale, desde, ordem, ligado) {
     return {
@@ -19120,14 +12835,6 @@ function sinalizadoresDeFabrica_(idRet, idMesa, idVg) {
   ];
 }
 
-/**
- * Cria a aba SINALIZADORES e as linhas de fábrica, numa instalação em uso.
- *
- * Só semeia o canal que NÃO tem nenhuma linha, nem oculta: quem tirou o
- * sinalizador da RET de propósito não o vê renascer a cada atualização, e
- * quem ajustou o prazo continua com o prazo dele. Canal que o PO criou depois
- * não ganha sinalizador — não há o que supor sobre ele.
- */
 function criarOsSinalizadores_(pulados) {
   var feito = [];
   var planilha = planilhaAtiva_();
@@ -19166,39 +12873,11 @@ function criarOsSinalizadores_(pulados) {
   return feito;
 }
 
-/**
- * Cria `Data do encaminhamento` na base da Mesa que já está em uso.
- *
- * É uma das exceções à regra de que a atualização não cria coluna em base de
- * caso (ver `criarUmaColunaDoSistema_`) — e existe porque o PO decidiu que o
- * sistema carimba o momento do encaminhamento. O prazo da Mesa não conta mais dela (ver
- * `ligarOPrazoDaMesaAoEmAndamento_`), mas ela segue sendo carimbada: é dado.
- *
- * A coluna é do SISTEMA: entra em CAMPOS desligada, na seção "Preenchido pelo
- * sistema", como o carimbo de status. Ligada, apareceria no formulário
- * pedindo para alguém digitar uma data que o sistema já sabe.
- *
- * Os casos que já estavam encaminhados antes dela ficam sem o carimbo — e
- * sem prazo, de propósito: inventar a data deles seria contar o prazo errado.
- */
 function criarOCarimboDoEncaminhamento_(pulados) {
   return criarUmaColunaDoSistema_('BASE_MESA', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO,
     'o sistema carimba quando a área é escolhida', pulados);
 }
 
-/**
- * Cria numa base de caso em uso uma coluna que SÓ O SISTEMA preenche: uma data
- * e hora carimbada (`Data em andamento`, `Data do status proposta`…).
- *
- * É a exceção à regra de que a atualização não cria coluna em base de caso, e
- * existe porque o prazo precisa de um momento que o sistema viu e nenhum outro
- * campo guarda. A coluna entra em CAMPOS desligada, na seção "Preenchido pelo
- * sistema": ligada, apareceria no formulário pedindo para alguém digitar uma
- * data que o sistema já sabe.
- *
- * Os casos que já existiam ficam com ela vazia — e sem prazo, de propósito:
- * inventar a data deles seria contar o prazo errado.
- */
 function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName(nomeDaAba)) {
@@ -19226,21 +12905,6 @@ function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
   return feito;
 }
 
-/**
- * O prazo da Mesa passa a contar do status "Em andamento", e não do
- * encaminhamento para a área. Pedido do PO: "conte a partir do status em
- * andamento, assim ele irá contar corretamente; quando o status for concluído,
- * ele para".
- *
- * Três passos, e nenhum atropela o que o PO ajustou:
- *   1. o status "Em andamento" passa a carimbar `Data em andamento` — se ainda
- *      não carimbava nada;
- *   2. o sinalizador da Mesa, se ainda é o de fábrica de antes (contar de
- *      `Data do encaminhamento`, só com Área responsável), passa a contar do
- *      carimbo novo. Se o PO já o mudou, fica como está e vira DECISÃO SUA;
- *   3. avisa quantos casos já em andamento NÃO têm a data nova: sem ela eles
- *      ficam sem selo, e o sistema não inventa a data.
- */
 function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
   var feito = [];
   var planilha = planilhaAtiva_();
@@ -19255,7 +12919,6 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
   if (!mesa) { pulados.push('o canal BASE_MESA não está cadastrado'); return feito; }
   var idDaMesa = converterParaIdentificador_(mesa.Id);
 
-  // 1. o status carimba
   var status = lerRegistros_('CATALOGO').filter(function (item) {
     return normalizarParaComparar_(item.Tipo) === 'status'
       && converterParaIdentificador_(item.CanalId) === idDaMesa
@@ -19275,7 +12938,6 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
       + 'contar certo, escolha essa coluna em Configurações › Ajustes Gerais › Situações.');
   }
 
-  // 2. o sinalizador
   var linhas = lerRegistros_('SINALIZADORES').filter(function (linha) {
     return converterParaIdentificador_(linha.CanalId) === idDaMesa;
   });
@@ -19302,7 +12964,6 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
       + '" e deixe "Só vale quando…" em branco.');
   }
 
-  // 3. quem já estava em andamento e não tem a data
   var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_MESA'; })[0]);
   var situacoes = canal ? situacoesPorChave_(canal) : {};
   var semData = lerRegistros_('BASE_MESA').filter(function (registro) {
@@ -19320,25 +12981,6 @@ function ligarOPrazoDaMesaAoEmAndamento_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * O prazo da RET para quando o caso chega a um desfecho — e o Retido só
- * quando o Status proposta chega em Transmitido ou Sem alteração. Pedido do
- * PO: "para os retidos, quando o status proposta aparecer transmitido ou sem
- * alteração".
- *
- * O Status proposta é um campo que a operação cria (lista, campo e condição
- * pelas telas de Configurações): não nasce com o sistema, e o nome da coluna
- * é o que quem criou escreveu. Por isso esta etapa PROCURA a coluna — com
- * "Status proposta" no nome, sem ligar para acento e caixa — e a lista dela:
- *   achou as duas, com Transmitido e Sem alteração   liga a condição, sozinha;
- *   não achou, ou a lista não tem os dois valores    não inventa: diz o que
- *                                                    fazer, e o Retido segue
- *                                                    parando como antes;
- *   o sinalizador já tem condição                    não mexe: foi o PO.
- *
- * E avisa o que a regra muda no que já existe: Retido que ainda não tem o
- * Status proposta passa a contar como em aberto.
- */
 function ligarAParadaDoRetido_(pulados, paraVoce) {
   var feito = [];
   var planilha = planilhaAtiva_();
@@ -19426,34 +13068,6 @@ function ligarAParadaDoRetido_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * O prazo da RET passa a contar da PRIMEIRA MUDANÇA DE STATUS, e não da
- * recepção do protocolo. Pedido do PO: "a SLA de 3 dias úteis da RET deve ser
- * somente se o caso mudar de status. Casos não trabalhados ficam com a SLA
- * cheia".
- *
- * Três passos, e nenhum atropela o que o PO ajustou:
- *   1. o sinalizador da RET, se ainda conta da data de entrada do canal (o de
- *      fábrica), passa a contar de `Data da primeira mudança de status`. Se o
- *      PO já o apontou para outra coluna, fica como está e vira DECISÃO SUA;
- *   2. os casos que JÁ SAÍRAM de "Não trabalhado" ganham a data — a MAIS
- *      ANTIGA que a própria linha já guarda: a última mudança de status ou o
- *      carimbo de qualquer status ("Data do 1º contato", "Data reteve"…).
- *      Não é data inventada: é um momento em que o caso comprovadamente já
- *      tinha mudado. Se a primeira mudança foi para um status sem carimbo, a
- *      data achada pode ser POSTERIOR à verdadeira — o caso ganha prazo a mais,
- *      nunca a menos;
- *   3. avisa quantos ficaram sem data nenhuma (sem carimbo e sem última
- *      mudança): esses ficam sem selo, porque não há o que contar.
- *
- * Os casos em "Não trabalhado" não ganham data: ficam com o prazo cheio, que é
- * exatamente o pedido.
- */
-/**
- * A aba ATENDIMENTOS_CHAT, onde o chat da Mesa passa a morar (Etapa 39). Quem
- * tinha a planilha à parte configurada é avisado: ela não é mais lida, e os
- * atendimentos se trazem pela tela de Importação.
- */
 function criarAAbaDoChat_(pulados, paraVoce) {
   var feito = [];
   var planilha = planilhaAtiva_();
@@ -19463,8 +13077,7 @@ function criarAAbaDoChat_(pulados, paraVoce) {
     feito.push('aba ATENDIMENTOS_CHAT criada — os atendimentos do chat entram pela Importação');
   } else {
     pulados.push('aba ATENDIMENTOS_CHAT já existe');
-    // Etapa 41: Sucursal, Tabulação, Sub assunto e TMO. Só acrescenta o
-    // cabeçalho que falta; as linhas já importadas ficam com eles em branco.
+
     feito = feito.concat(criarColunasDoContrato_('ATENDIMENTOS_CHAT', pulados));
   }
   var antiga = '';
@@ -19479,14 +13092,6 @@ function criarAAbaDoChat_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Liga, numa instalação que já existe, a regra do PO: "quando o status for
- * Retido, o valor retido deve ser obrigatório".
- *
- * Só liga se o campo não tem condição de obrigatório nenhuma — o que o PO já
- * configurou, ele configurou de propósito. Campo marcado "Obrigatório" sempre
- * já é mais exigente, e também fica como está.
- */
 function ligarOValorRetidoNoRetido_(pulados, paraVoce) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName('CAMPOS') || !planilhaAtiva_().getSheetByName('CANAIS')) {
@@ -19535,7 +13140,6 @@ function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
   })[0];
   if (!ret) { pulados.push('o canal BASE_RET não está cadastrado'); return feito; }
 
-  // --- 1. o sinalizador
   var linha = lerRegistros_('SINALIZADORES').filter(function (outra) {
     return converterParaIdentificador_(outra.CanalId) === converterParaIdentificador_(ret.Id);
   })[0];
@@ -19561,7 +13165,6 @@ function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
     }
   }
 
-  // --- 2. a data dos casos que já saíram de "Não trabalhado"
   var canal = comAGrafiaDaAba_(canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0]);
   esquecerEstruturaLida_('BASE_RET');
   var estrutura = estruturaDaAba_('BASE_RET', true);
@@ -19625,26 +13228,6 @@ function ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * A coluna "prêmio mensal retido" da RET passa a se chamar "prêmio mensal".
- *
- * Pedido do PO: "a coluna prêmio mensal retido está com nome errado e deve ser
- * prêmio mensal". O dado dentro dela NÃO muda — é a mesma coluna, com o nome
- * certo. O retido continua na "valor do prêmio retido".
- *
- * Cada passo confere antes e vale sozinho, para a função poder rodar de novo
- * sem estrago — inclusive se o PO já tiver trocado o cabeçalho à mão:
- *   1. o CABEÇALHO, na aba BASE_RET;
- *   2. o CAMPO em CAMPOS: cabeçalho e chave técnica (premiomensal), que é a
- *      que o instalador daria hoje;
- *   3. o que cita a chave antiga: a permissão do campo em cada nível e a
- *      condição "aparece só quando" de outro campo;
- *   4. o que cita o NOME antigo em texto: colunas da fila e da busca, coluna
- *      de valor, gráficos, análises e sinalizadores.
- *
- * Se as DUAS colunas existirem, nada é mexido: juntar duas colunas com dado é
- * decisão do PO, e vira DECISÃO SUA.
- */
 function renomearOPremioMensalDaRet_(pulados, paraVoce) {
   var feito = [];
   var planilha = planilhaAtiva_();
@@ -19656,7 +13239,6 @@ function renomearOPremioMensalDaRet_(pulados, paraVoce) {
   var CHAVE_ANTIGA = normalizarParaComparar_(ANTIGO);
   var CHAVE_NOVA = normalizarParaComparar_(NOVO);
 
-  // --- 1. o cabeçalho
   esquecerEstruturaLida_('BASE_RET');
   var estrutura = estruturaDaAba_('BASE_RET', true);
   var naAntiga = posicaoDaColuna_(estrutura, ANTIGO);
@@ -19682,7 +13264,6 @@ function renomearOPremioMensalDaRet_(pulados, paraVoce) {
     return feito;
   }
 
-  // --- 2. o campo
   var chaveTrocou = false;
   lerRegistros_('CAMPOS').forEach(function (campo) {
     if (String(campo.Aba) !== 'BASE_RET'
@@ -19692,15 +13273,14 @@ function renomearOPremioMensalDaRet_(pulados, paraVoce) {
       mudanca.ChaveTecnica = CHAVE_NOVA;
       chaveTrocou = true;
     }
-    // O rótulo é do PO. Só acompanha quando era o próprio nome antigo.
+
     if (normalizarParaComparar_(campo.Rotulo) === CHAVE_ANTIGA) mudanca.Rotulo = NOVO;
     atualizarRegistro_('CAMPOS', campo.__id, mudanca);
     feito.push('CAMPOS: o campo da RET aponta para "' + NOVO + '"');
   });
 
-  // --- 3. quem cita a chave antiga
   if (chaveTrocou) {
-    // Os níveis de acesso moram no CATALOGO, com Tipo NIVEL_ACESSO.
+
     lerRegistros_('CATALOGO').forEach(function (nivel) {
       if (normalizarParaComparar_(nivel.Tipo) !== 'nivelacesso') return;
       var lido;
@@ -19722,7 +13302,6 @@ function renomearOPremioMensalDaRet_(pulados, paraVoce) {
     });
   }
 
-  // --- 4. quem cita o nome antigo em texto
   var nomeAntigo = /pr[eê]mio mensal retido/gi;
   [['CANAIS', ['ColunasDaFila', 'ColunasDaBusca', 'ColunaDoValor', 'ColunaDaData',
     'ColunaDaFinalizacao', 'ColunaDaAreaResponsavel']],
@@ -19751,12 +13330,6 @@ function renomearOPremioMensalDaRet_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Cria a lista DISPONIBILIDADE no catálogo, se ela ainda não existir.
- *
- * Só cria o que FALTA, item por item: quem já renomeou "Afastado" para
- * "Licença" não pode ver o item antigo renascer ao lado do dele.
- */
 function criarAListaDeDisponibilidade_(pulados) {
   var feito = [];
   var jaTem = {};
@@ -19781,14 +13354,6 @@ function criarAListaDeDisponibilidade_(pulados) {
   return feito;
 }
 
-/**
- * Os canais ativos que ficaram sem NINGUÉM para receber lote.
- *
- * A importação passou a dividir só entre quem é DO CANAL escolhido. Numa
- * instalação antiga, em que o canal da pessoa nunca foi preenchido, isso
- * deixa a lista vazia — e a coordenação descobriria na hora de importar, com
- * o lote já colado na tela.
- */
 function canaisSemAnalista_() {
   var vazios = [];
   canaisVisiveis_().forEach(function (canal) {
@@ -19797,7 +13362,6 @@ function canaisSemAnalista_() {
   return vazios;
 }
 
-/** Transforma essa lista em um recado, quando houver o que dizer. */
 function avisarQuemPodeFicarSemLote_(vazios, paraVoce) {
   if (!vazios.length) return [];
   paraVoce.push('A importação agora divide o lote SÓ entre quem é do canal '
@@ -19808,13 +13372,6 @@ function avisarQuemPodeFicarSemLote_(vazios, paraVoce) {
   return [];
 }
 
-/**
- * Liga o gráfico de valor por situação na RET, se ela ainda não o tiver.
- *
- * Só preenche o que está EM BRANCO. Quem já escolheu outra coluna de valor —
- * ou outras situações — escolheu de propósito, e uma migração que passa por
- * cima disso desfaz o trabalho de alguém sem avisar.
- */
 function ligarOValorPorSituacaoDaRet_(pulados) {
   var feito = [];
   var ret = lerRegistros_('CANAIS').filter(function (canal) {
@@ -19849,14 +13406,6 @@ function ligarOValorPorSituacaoDaRet_(pulados) {
   return feito;
 }
 
-/**
- * O status "Sem sucesso de contato" da RET, em laranja, como o PO pediu.
- *
- * Nasceu como "Sem sucesso" e o PO renomeou depois. Os DOIS nomes contam como
- * "já existe": procurar só o nome novo faria esta etapa recriar o antigo numa
- * planilha que ainda não passou pela troca de nomes — e procurar só o antigo
- * o recriaria em toda atualização depois da troca.
- */
 function criarOStatusSemSucesso_(pulados) {
   var feito = [];
   var ret = lerRegistros_('CANAIS').filter(function (canal) {
@@ -19871,10 +13420,7 @@ function criarOStatusSemSucesso_(pulados) {
     if (normalizarParaComparar_(item.Tipo) !== 'status') return;
     if (converterParaIdentificador_(item.CanalId) !== doCanal) return;
     ultimaOrdem = Math.max(ultimaOrdem, Number(item.Ordem) || 0);
-    // `normalizarParaComparar_` tira o espaço também: "Sem sucesso" vira
-    // "semsucesso". Comparar com 'sem sucesso' nunca casaria, e o status
-    // nasceria de novo a cada atualização — foi o que aconteceu na primeira
-    // versão, e quem pegou foi o teste de rodar duas vezes.
+
     var nome = normalizarParaComparar_(item.Nome);
     if (nome === normalizarParaComparar_('Sem sucesso')
       || nome === normalizarParaComparar_('Sem sucesso de contato')) jaExiste = true;
@@ -19885,8 +13431,6 @@ function criarOStatusSemSucesso_(pulados) {
     return feito;
   }
 
-  // Sem coluna de carimbo: o PO não pediu data para este status. Final, sim:
-  // é um dos desfechos que ele listou.
   inserirRegistro_('CATALOGO', novoItemDeCatalogo_('STATUS', ret.Id,
     'Sem sucesso de contato', ultimaOrdem + 1, 'atencao', '', true));
   esquecerEstruturaLida_();
@@ -19894,18 +13438,6 @@ function criarOStatusSemSucesso_(pulados) {
   return feito;
 }
 
-/**
- * Os status da RET e da Mesa Diamante com os NOMES DO PO, e quais FECHAM o
- * caso.
- *
- * Pedido do PO: "na RET não precisa ter a opção concluído pois não existe esse
- * status. Um caso concluído é cancelado, pago, não retido, retido ou sem
- * sucesso de contato (...) Na mesa temos concluído, concluído na mesa e sem
- * retorno. Do VG ainda vou resolver". E, perguntado: "exclui da planilha e
- * prepara para que ele altere no código que já tenho funcional".
- *
- * O VG fica de fora até o PO decidir.
- */
 const RECC_STATUS_DO_PO = [
   {
     aba: 'BASE_RET',
@@ -19918,8 +13450,7 @@ const RECC_STATUS_DO_PO = [
   {
     aba: 'BASE_MESA',
     trocar: [['Concluído na célula', 'Concluído na mesa']],
-    // O cartão da Produtividade tem o nome no PLURAL — "Concluídos na
-    // célula" — e por isso não é achado pelo nome do status. Vai declarado.
+
     titulos: [['Concluídos na célula', 'Concluídos na mesa']],
     excluir: [],
     criar: [['Sem retorno', 'atencao']],
@@ -19927,32 +13458,6 @@ const RECC_STATUS_DO_PO = [
   }
 ];
 
-/**
- * Aplica RECC_STATUS_DO_PO na planilha que já está em uso.
- *
- * TROCAR UM NOME É TROCAR EM QUATRO LUGARES, e esta etapa troca nos quatro:
- *
- *   1. o catálogo (Nome e, se ninguém tinha personalizado, o Rótulo);
- *   2. os CASOS já gravados na base — senão os antigos ficariam "fora da
- *      lista", sem cor e fora de toda conta;
- *   3. os cartões e gráficos que filtram por aquele status — o cartão
- *      "Reteve" da Produtividade pararia de contar no dia da troca, calado;
- *   4. as situações destacadas do gráfico de valor do canal.
- *
- * Trocar só o catálogo deixaria o sistema inteiro discordando de si mesmo, e
- * o número errado não daria erro nenhum.
- *
- * EXCLUIR apaga a linha do catálogo — "exclui da planilha", palavra do PO. Se
- * algum caso ainda estiver naquele status, ele NÃO é mexido: vai para a
- * "DECISÃO SUA" com a contagem, porque escolher o status novo de um caso é
- * decisão de quem conhece o caso.
- *
- * FINAL é marcado só onde a célula está EM BRANCO. Quem já escreveu NÃO num
- * deles escolheu, e rodar a atualização de novo não pode desfazer isso.
- *
- * RODAR DUAS VEZES NÃO MUDA NADA: na segunda, todo nome novo já existe, todo
- * excluído já sumiu e todo final já está marcado.
- */
 function aplicarOsStatusDoPO_(pulados, paraVoce) {
   var feito = [];
 
@@ -19975,7 +13480,6 @@ function aplicarOsStatusDoPO_(pulados, paraVoce) {
       })[0];
     }
 
-    // 1. os nomes trocados, nos quatro lugares
     regra.trocar.forEach(function (par) {
       var antigo = par[0];
       var novo = par[1];
@@ -19984,7 +13488,7 @@ function aplicarOsStatusDoPO_(pulados, paraVoce) {
         return;
       }
       var item = acharStatus(antigo);
-      if (!item) return;   // nem o antigo nem o novo: a etapa 3 cria, se for o caso
+      if (!item) return;
 
       var rotulo = String(item.Rotulo || '').trim();
       atualizarRegistro_('CATALOGO', item.__id, {
@@ -20000,7 +13504,6 @@ function aplicarOsStatusDoPO_(pulados, paraVoce) {
         + casos + ' caso(s) e em ' + paineis + ' cartão(ões)/gráfico(s)');
     });
 
-    // 2. os que saem
     regra.excluir.forEach(function (nome) {
       var item = acharStatus(nome);
       if (!item) {
@@ -20020,7 +13523,6 @@ function aplicarOsStatusDoPO_(pulados, paraVoce) {
       }
     });
 
-    // 3. os que faltam, no fim da lista
     regra.criar.forEach(function (par) {
       if (acharStatus(par[0])) {
         pulados.push(nomeDoCanal + ': o status "' + par[0] + '" já existe');
@@ -20038,7 +13540,6 @@ function aplicarOsStatusDoPO_(pulados, paraVoce) {
       feito.push(nomeDoCanal + ': status "' + par[0] + '" criado');
     });
 
-    // 4. o que fecha o caso
     var marcados = [];
     regra.finais.forEach(function (nome) {
       var item = acharStatus(nome);
@@ -20058,13 +13559,6 @@ function aplicarOsStatusDoPO_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Troca o status nos casos já gravados do canal. Devolve quantos mudaram.
- *
- * Lê só a coluna do status e escreve só ela, e só se algo mudou: numa base de
- * 200 mil casos, reescrever a aba inteira para trocar uma palavra seria o
- * tipo de gravação que estoura o tempo do Apps Script no meio.
- */
 function trocarStatusNosCasos_(canal, antigo, novo) {
   var aba = String(canal.Aba);
   var coluna = String(canal.ColunaDoStatus || '');
@@ -20086,7 +13580,6 @@ function trocarStatusNosCasos_(canal, antigo, novo) {
   return trocados;
 }
 
-/** Quantos casos do canal estão num status. */
 function contarCasosNoStatus_(canal, nome) {
   var coluna = String(canal.ColunaDoStatus || '');
   if (!coluna || posicaoDaColuna_(estruturaDaAba_(String(canal.Aba)), coluna) < 0) return 0;
@@ -20096,11 +13589,6 @@ function contarCasosNoStatus_(canal, nome) {
   }).length;
 }
 
-/**
- * Troca o status nos cartões e gráficos do canal: no filtro, que é o que conta,
- * e no título, quando o título era o próprio nome do status ou um dos
- * `titulos` declarados na regra (o plural de um cartão, por exemplo).
- */
 function trocarStatusNosPaineis_(doCanal, antigo, novo, titulos) {
   var procurado = normalizarParaComparar_(antigo);
   var titulosTrocados = {};
@@ -20122,10 +13610,6 @@ function trocarStatusNosPaineis_(doCanal, antigo, novo, titulos) {
   return trocados;
 }
 
-/**
- * Troca (ou tira, com `novo` vazio) um status da lista de situações destacadas
- * do gráfico de valor do canal — a lista é texto separado por vírgula.
- */
 function trocarStatusNasDestacadas_(canal, antigo, novo) {
   var lista = String(canal.SituacoesDestacadas || '').trim();
   if (!lista) return;
@@ -20143,15 +13627,6 @@ function trocarStatusNasDestacadas_(canal, antigo, novo) {
   atualizarRegistro_('CANAIS', canal.Id, { SituacoesDestacadas: canal.SituacoesDestacadas });
 }
 
-/**
- * Os grupos da fila que o PO pediu, como estavam e como ficam.
- *
- * "Na aba trabalho em dados da proposta tire do destaque o protocolo pois não
- * é usado e substitua pelo cod da proposta e proposta e na coluna de dados
- * cadastrais inclua também o telefone e deixe o em destaque" — e, na Mesa, o
- * título do e-mail em destaque. Depois, no VG: "deixe em destaque o período de
- * vigência". O primeiro item de cada grupo é o destaque.
- */
 const RECC_FILA_DO_PO = [
   { aba: 'BASE_RET', grupo: 'Dados da proposta',
     de: 'protocolo, número da proposta, Num_apolice, produto',
@@ -20162,22 +13637,12 @@ const RECC_FILA_DO_PO = [
   { aba: 'BASE_MESA', grupo: 'Dados do caso',
     de: 'Ramo, Assunto',
     para: 'Título do e-mail, Ramo, Assunto' },
-  // VG: os meses de vigência em destaque, com a cor das três faixas.
+
   { aba: 'BASE_VG', grupo: 'Vigência',
     de: 'Início da vigência, Meses de vigência',
     para: 'Meses de vigência, Início da vigência' }
 ];
 
-/**
- * Aplica RECC_FILA_DO_PO na planilha em uso, grupo por grupo.
- *
- * TROCA SÓ O GRUPO QUE ESTÁ COMO A INSTALAÇÃO DEIXOU. As colunas da fila são
- * editáveis em Configurações › Canais de trabalho, e um grupo que alguém já reescreveu foi
- * reescrito de propósito: passar por cima seria desfazer o trabalho de alguém
- * sem avisar. Esse vai para a "DECISÃO SUA", com o texto pronto para colar.
- *
- * Os outros grupos e o título do grupo ficam exatamente como estão.
- */
 function ajustarAsColunasDaFila_(pulados, paraVoce) {
   var feito = [];
   function comoLista(texto) {
@@ -20238,25 +13703,6 @@ function ajustarAsColunasDaFila_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * O campo CPF da Mesa Diamante passa a aceitar CNPJ — na planilha em uso.
- *
- * Só se a máscara ainda for a da instalação. Máscara personalizada foi
- * escolhida por alguém, e vai para a "DECISÃO SUA" com o valor a usar. O
- * rótulo vira "CPF ou CNPJ" só se ainda for "CPF": rótulo reescrito também foi
- * escolha de alguém.
- */
-/**
- * O SLA da Mesa Diamante na planilha em uso: 6 horas úteis, das 08:15 às
- * 18:30, pedido do PO.
- *
- * As colunas nascem vazias, e vazio é "sem SLA" — criar a coluna sozinha
- * deixaria a Mesa sem selo, e o pedido valeria só para quem instalasse do
- * zero — a mesma lição da conferência de bloqueio da Mesa, logo abaixo. Por
- * isso preenche.
- *
- * SÓ PREENCHE O QUE ESTÁ EM BRANCO: SLA que alguém já escreveu foi escolhido.
- */
 function ligarOSlaDaMesa_(pulados) {
   var feito = [];
   var mesa = lerRegistros_('CANAIS').filter(function (canal) {
@@ -20270,9 +13716,7 @@ function ligarOSlaDaMesa_(pulados) {
     pulados.push('a Mesa já tem SLA declarado (' + mesa.SlaHorasUteis + ' horas úteis)');
     return feito;
   }
-  // A primeira resposta mora em "Data resposta" e "Hora resposta" — só se a
-  // base da Mesa tiver as duas com esse nome. Coluna que não existe não é
-  // apontada: o diagnóstico reprovaria o canal.
+
   var estruturaDaMesa = estruturaDaAba_(String(mesa.Aba));
   function seExistir(cabecalho) {
     return posicaoDaColuna_(estruturaDaMesa, cabecalho) >= 0 ? cabecalho : '';
@@ -20333,32 +13777,14 @@ function aceitarCnpjNaMesa_(pulados, paraVoce) {
   return feito;
 }
 
-/**
- * Faz a proposta e a apólice virarem um campo só, que grava em pedaços.
- *
- * A LISTA DE QUAIS CAMPOS vem de `RECC_PADRAO_POR_ABA`, a mesma que o
- * instalador usa. Escrevê-la aqui de novo faria a instalação nova e a
- * migração divergirem no dia em que alguém mexesse só numa das duas — e aí o
- * PO teria duas planilhas com formulários diferentes e nenhuma explicação.
- *
- * Esta é a única parte da atualização que MEXE em CAMPOS, e mexe porque é
- * justamente o que foi pedido. Tudo o que ela faz se desfaz em Configurações ›
- * Cadastrar Caso, e o laudo diz campo por campo o que mudou.
- */
 function ligarAPropostaEAApoliceEmPedacos_(pulados) {
   var feito = [];
 
-  // As abas são as dos CANAIS que existem, e não uma lista escrita aqui:
-  // assim um canal criado pela tela, apontando para uma base com as mesmas
-  // colunas, também é atendido.
   lerRegistros_('CANAIS').forEach(function (canal) {
     var nomeDaAba = String(canal.Aba || '').trim();
     if (!nomeDaAba) return;
     if (!planilhaAtiva_().getSheetByName(nomeDaAba)) return;
 
-    // A MESMA precedência do instalador: o que vale para ESTA aba vence o que
-    // vale para todas. Ver camposDoFormularioDaBase_, que lê os dois na mesma
-    // ordem — ler diferente aqui faria a migração e a instalação divergirem.
     var daAba = {};
     Object.keys(RECC_PADRAO_DO_FORMULARIO).forEach(function (chave) {
       daAba[chave] = RECC_PADRAO_DO_FORMULARIO[chave];
@@ -20374,20 +13800,9 @@ function ligarAPropostaEAApoliceEmPedacos_(pulados) {
       var padrao = daAba[chave];
       if (!padrao.partirEm || !padrao.partirEm.colunas) return;
 
-      /*
-       * O CAMPO PRIMEIRO, e em silêncio quando ele não existe.
-       *
-       * `RECC_PADRAO_DO_FORMULARIO` vale para TODAS as bases, então a regra da
-       * proposta é oferecida também à Mesa Diamante e ao VG — que não têm
-       * coluna de proposta nenhuma. Reclamar disso encheria o laudo de seis
-       * linhas que não querem dizer nada, e o PO pararia de ler o laudo.
-       */
       var hospede = camposDaAbaPorChave_(nomeDaAba)[chave];
       if (!hospede) return;
 
-      // Sem TODAS as colunas de destino, não liga: o campo aceitaria o valor
-      // inteiro e jogaria um pedaço no vazio, sem erro nenhum. Aqui o aviso
-      // vale, porque o campo existe e deixou de funcionar como devia.
       var faltando = padrao.partirEm.colunas.filter(function (cabecalho) {
         return posicaoDaColuna_(estrutura, cabecalho) < 0;
       });
@@ -20415,8 +13830,6 @@ function ligarAPropostaEAApoliceEmPedacos_(pulados) {
       feito.push(nomeDaAba + ': "' + (padrao.rotulo || chave) + '" passa a ser '
         + 'um campo só, gravando em ' + padrao.partirEm.colunas.join(' + '));
 
-      // E os campos das OUTRAS colunas do mesmo valor saem do formulário: o
-      // pedaço deles vem deste campo agora. A coluna continua recebendo.
       padrao.partirEm.colunas.forEach(function (cabecalho) {
         if (normalizarParaComparar_(cabecalho)
           === normalizarParaComparar_(hospede.Cabecalho)) return;
@@ -20436,15 +13849,6 @@ function ligarAPropostaEAApoliceEmPedacos_(pulados) {
   return feito;
 }
 
-/*
- * ETAPA 49, pedido do PO: "remova do contrato a coluna agente da central. Não
- * estamos usando; remova também a coluna relacionamento. A coluna grupo".
- * Na planilha em uso a coluna FICA, com o que estiver nela — apagar coluna com
- * dado nunca é decisão de migração (o recado de "o que sobrou" avisa). O que
- * sai é o CAMPO, do formulário: desligado, e não apagado, para voltar com um
- * clique em Configurações › Cadastrar Caso. Roda uma vez só: quem religar o
- * campo depois não o vê desligado de novo.
- */
 const RECC_COLUNAS_QUE_SAIRAM_DA_RET = ['grupo', 'agente da central', 'relacionamento'];
 const RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET = 'MIGRACAO.COLUNAS_FORA_DA_RET';
 
@@ -20459,8 +13863,7 @@ function tirarDoFormularioOQueSaiuDaRet_(pulados) {
     return feito;
   }
   var sairam = RECC_COLUNAS_QUE_SAIRAM_DA_RET.map(normalizarParaComparar_);
-  // Todos os campos da coluna, e não só o primeiro: uma planilha antiga pode
-  // ter dois para o mesmo cabeçalho.
+
   lerRegistros_('CAMPOS').forEach(function (campo) {
     if (normalizarParaComparar_(campo.Aba) !== 'baseret') return;
     if (sairam.indexOf(normalizarParaComparar_(campo.Cabecalho)) < 0) return;
@@ -20474,15 +13877,6 @@ function tirarDoFormularioOQueSaiuDaRet_(pulados) {
   return feito;
 }
 
-/*
- * ETAPA 52, pedido do PO: "a aba Minha Performance não será mais necessária.
- * Readeque o sistema". A tela saiu; o que sobra numa planilha em uso é a marca
- * dela dentro de cada NÍVEL DE ACESSO (a lista de telas que o nível abre). Sem
- * efeito nenhum — o menu só mostra o que existe —, mas a configuração ficaria
- * com uma tela que não há mais. Tirada uma vez só, com o nível dizendo qual era.
- * A coluna CANAIS.MetaMensalPorPessoa (a barra de progresso dela) fica na
- * planilha, com o dado: ver "o que sobrou", acima.
- */
 const RECC_TELA_QUE_SAIU = 'minhaPerformance';
 const RECC_CHAVE_DA_TELA_QUE_SAIU = 'MIGRACAO.SEM_MINHA_PERFORMANCE';
 
@@ -20514,7 +13908,6 @@ function tirarAMinhaPerformanceDosNiveis_(pulados) {
   return feito;
 }
 
-/** Os campos de uma aba, indexados pela chave técnica. */
 function camposDaAbaPorChave_(nomeDaAba) {
   var porChave = {};
   lerRegistros_('CAMPOS').forEach(function (campo) {
@@ -20524,7 +13917,6 @@ function camposDaAbaPorChave_(nomeDaAba) {
   return porChave;
 }
 
-/** Os campos de uma aba, indexados pelo cabeçalho normalizado. */
 function camposDaAbaPorCabecalho_(nomeDaAba) {
   var porCabecalho = {};
   lerRegistros_('CAMPOS').forEach(function (campo) {
@@ -20534,35 +13926,6 @@ function camposDaAbaPorCabecalho_(nomeDaAba) {
   return porCabecalho;
 }
 
-/**
- * ----------------------------------------------------------------------------
- * A MIGRAÇÃO DE QUEM JÁ TEM O PGO INSTALADO
- * ----------------------------------------------------------------------------
- * Rode `migrarParaCanais()` UMA vez, no editor do Apps Script, sobre uma
- * planilha que já tem dado. Ela NÃO apaga nada.
- *
- * POR QUE ELA EXISTE. Numa rodada, "mesa" virou "canal" em todo o sistema, e
- * a aba CANAIS — que guardava CORRETORAS — cedeu o nome. Uma instalação feita
- * antes disso continua com as abas antigas, e o código novo procura as novas:
- * o sistema abre, mas sem canal nenhum, e o Trabalho nasce vazio.
- *
- * O `instalarRECC()` não serve aqui: ele recusa rodar sobre planilha com dado,
- * de propósito. Sem esta função, a única saída seria apagar tudo e recomeçar —
- * e quem já cadastrou usuários e casos perderia os dois.
- *
- * O QUE ELA FAZ, e só isso: renomeia as duas abas, renomeia a coluna que
- * mudou de nome e acrescenta as colunas novas do contrato.
- *
- * O QUE ELA NÃO FAZ, de propósito: não mexe em CAMPOS, PAINEIS nem CATALOGO
- * além do nome da coluna. O formulário, os cartões e as listas ganharam
- * padrões novos, mas a sua instalação pode ter sido ajustada à mão — e
- * sobrescrever ajuste de configuração é perder trabalho em silêncio. Para
- * pegar os padrões novos, use Configurações, ou reinstale numa planilha vazia.
- *
- * É SEGURO RODAR DE NOVO: cada passo confere antes de agir, e uma segunda
- * execução não faz nada.
- * ----------------------------------------------------------------------------
- */
 function migrarParaCanais() {
   exigirPortaDoEditor_('migrarParaCanais');
   var migracao = migrarParaCanais_();
@@ -20572,24 +13935,14 @@ function migrarParaCanais() {
   return recado;
 }
 
-/** O trabalho de `migrarParaCanais`, sem o laudo: o atualizarPGO junta ao dele. */
 function migrarParaCanais_() {
   var planilha = planilhaAtiva_();
   var feito = [];
   var pulados = [];
 
-  // --- 1. as abas, NESTA ORDEM -------------------------------------------
-  // CANAIS (corretoras) tem de sair do caminho ANTES de MESAS assumir o nome.
-  // Invertendo, a segunda renomeação encontraria o nome ocupado — e o Sheets
-  // aceitaria criar "CANAIS 2", deixando duas abas parecidas e nenhuma certa.
   var corretoras = planilha.getSheetByName('CANAIS');
-  var canaisNovo = planilha.getSheetByName('CANAIS');
   var mesas = planilha.getSheetByName('MESAS');
 
-  // Só é a aba de corretoras se tiver a cara dela: uma instalação já migrada
-  // tem uma CANAIS que é de canais, e renomeá-la seria desfazer a migração.
-  // GUARDA O QUE FOI RENOMEADO DE VERDADE. O passo 3, das sequências, depende
-  // disto — ver o comentário grande lá embaixo, que conta o estrago.
   var renomeouCorretoras = false;
   var renomeouCanais = false;
 
@@ -20612,15 +13965,13 @@ function migrarParaCanais_() {
 
   esquecerEstruturaLida_();
 
-  // --- 2. a coluna que mudou de nome -------------------------------------
   ['USUARIOS', 'CAMPOS', 'PAINEIS', 'ANALISES', 'CATALOGO'].forEach(function (nome) {
     var aba = planilha.getSheetByName(nome);
     if (!aba) return;
     var cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
     for (var i = 0; i < cabecalhos.length; i++) {
       if (normalizarParaComparar_(cabecalhos[i]) === 'mesaid') {
-        // Só o CABEÇALHO muda. Os Ids gravados nas linhas continuam os
-        // mesmos — é a mesma coluna, com outro nome.
+
         aba.getRange(1, i + 1).setValue('CanalId');
         feito.push(nome + '.MesaId renomeada para CanalId');
         return;
@@ -20630,34 +13981,6 @@ function migrarParaCanais_() {
 
   esquecerEstruturaLida_();
 
-  // --- 3. AS SEQUÊNCIAS DE Id, que carregam o nome da aba ----------------
-  //
-  // Este é o passo que não pode faltar, e é o menos óbvio de todos.
-  //
-  // A sequência de cada aba mora no PropertiesService sob a chave
-  // RECC_SEQ_<NOME DA ABA>. Ao renomear a aba, a chave antiga fica órfã e a
-  // nova não existe — então a sequência recomeça do zero e a próxima gravação
-  // REEMITE UM Id JÁ EM USO.
-  //
-  // Foi exatamente isso que custou 4.328 colisões no PGO 5.x. Aqui o
-  // diagnóstico pega ("a sequência está ABAIXO do maior Id gravado"), mas
-  // pegar depois de gravar é tarde: o Id duplicado já está na planilha.
-  //
-  // A ordem é a mesma das abas, e pelo mesmo motivo: CANAIS precisa ceder a
-  // chave antes de MESAS assumi-la.
-  //
-  // SÓ MOVE A SEQUÊNCIA DA ABA QUE FOI RENOMEADA DE VERDADE.
-  //
-  // Sem esta condição o passo rodava sempre — inclusive numa planilha JÁ
-  // migrada, que é a de quem só está atualizando o código. E aí ele fazia o
-  // oposto do que existe para evitar: copiava RECC_SEQ_CANAIS (a sequência
-  // dos CANAIS, em 2 ou 3) por cima de RECC_SEQ_CORRETORAS (em 139) e
-  // apagava a dos canais. A próxima corretora cadastrada nasceria com o Id 3,
-  // que já existe.
-  //
-  // Achado ensaiando a atualização numa planilha cheia, antes de a equipe
-  // rodar. O diagnóstico pegava depois — "a sequência está ABAIXO do maior Id
-  // gravado" —, mas pegar depois de gravar é tarde.
   var propriedades = PropertiesService.getScriptProperties();
   [['CANAIS', 'CORRETORAS', renomeouCorretoras],
    ['MESAS', 'CANAIS', renomeouCanais]].forEach(function (trio) {
@@ -20681,7 +14004,6 @@ function migrarParaCanais_() {
       + ' (em ' + valor + ')');
   });
 
-  // --- 4. as colunas novas do contrato -----------------------------------
   [['CORRETORAS', 'Consultor', 'texto'],
    ['CATALOGO', 'ColunaDeCarimbo', 'texto'],
    ['BASE_RET', 'nome de quem transferiu', 'texto']].forEach(function (par) {
@@ -20700,11 +14022,6 @@ function migrarParaCanais_() {
   return { feito: feito, pulados: pulados };
 }
 
-/**
- * Como o laudo junta as conferências parecidas numa linha só: o padrão do
- * texto, o nome do grupo e o item que entra na lista. O que não casa com
- * nenhum padrão aparece como veio.
- */
 var RECC_GRUPOS_DO_LAUDO = [
   [/^([A-Z][A-Z0-9_]*)\.(.+) já existe$/,
     function (m) { return m[1] + ' já tinha'; }, function (m) { return m[2]; }],
@@ -20727,17 +14044,6 @@ var RECC_GRUPOS_DO_LAUDO = [
     function () { return 'Canais que já tinham sinalizador'; }, function (m) { return m[1]; }]
 ];
 
-/**
- * O laudo de uma atualização, na ordem em que ele é lido: o que MUDOU, o que
- * pede uma DECISÃO SUA e, por último, o que já estava em dia.
- *
- * "Já estava em dia" é a maior parte do texto e a que menos importa, então
- * vem no fim e AGRUPADA por aba — "CATALOGO já tinha: Id, Tipo, Nome…" numa
- * linha, e não treze linhas de "CATALOGO.Id já existe". Era assim antes: o
- * laudo do atualizarPGO trazia oitenta linhas iguais e, colado embaixo, o
- * laudo inteiro da migração de canais, com o seu próprio "Nada a fazer" e a
- * mesma frase final repetida.
- */
 function laudoDaAtualizacao_(titulo, feito, pulados, paraVoce) {
   var grupos = {};
   var ordem = [];
@@ -20767,14 +14073,6 @@ function laudoDaAtualizacao_(titulo, feito, pulados, paraVoce) {
     + '\n\nPara conferir o sistema inteiro, rode diagnosticoRECC().';
 }
 
-/**
- * Esta aba é o cadastro de corretoras, e não o de canais?
- *
- * As duas se chamaram CANAIS em momentos diferentes. O que as distingue é a
- * coluna SUSEP: corretora tem, canal de atendimento não. Decidir pelo nome
- * seria decidir pelo que é ambíguo — e renomear a aba errada trocaria o
- * cadastro de canais pelo de corretoras, sem erro nenhum na hora.
- */
 function ehAAbaDeCorretoras_(aba) {
   var cabecalhos = aba.getRange(1, 1, 1, aba.getMaxColumns()).getValues()[0];
   var temSusep = false;
@@ -20787,17 +14085,6 @@ function ehAAbaDeCorretoras_(aba) {
   return temSusep && !temAba;
 }
 
-/**
- * NORMALIZAR BASE — para rodar no editor do Apps Script, sem parâmetro.
- *
- * Dá Id a toda linha que entrou direto na planilha sem ele, em todas as abas
- * do contrato que têm Id, e realinha cada sequência sem nunca baixá-la. Id
- * repetido ela aponta no laudo, e não corrige: apague o Id da linha que é a
- * cópia e rode de novo.
- *
- * Aba de outra planilha (a de cadastros) que não aceita escrita fica de fora,
- * com o motivo no laudo.
- */
 function normalizarBase() {
   exigirPortaDoEditor_('normalizarBase');
   var linhas = [];
@@ -20875,10 +14162,6 @@ function verificarEstruturaRECC() {
   return texto;
 }
 
-/**
- * Quanto do teto de 10 milhões de células a planilha já ocupa.
- * Conta a GRADE, não o preenchimento: célula vazia também pesa.
- */
 function orcamentoDeCelulas_(planilha) {
   var usadas = 0;
   planilha.getSheets().forEach(function (aba) {
@@ -20890,79 +14173,10 @@ function orcamentoDeCelulas_(planilha) {
   };
 }
 
-/* ############################################################################
-   #
-   #  SEÇÃO 2 de 2 · O LAUDO QUE RODA DENTRO DO APPS SCRIPT
-   #
-   ############################################################################ */
-
-/**
- * ============================================================================
- * O laudo que roda DENTRO do Apps Script
- * ============================================================================
- * A suíte de testes prova que o código está certo. Ela não prova que ESTA
- * instalação está certa: a planilha é editável à mão, e o que a suíte conferiu
- * numa planilha de mentira pode não valer na de verdade seis meses depois.
- *
- * Este arquivo é a outra metade. Ele roda na instalação real e responde uma
- * pergunta só: **este sistema, aqui, agora, está inteiro?**
- *
- * Duas portas:
- *
- *   diagnosticoRECC()       no editor do Apps Script, sem abrir o sistema.
- *                           Escreve o laudo no log e devolve o objeto.
- *   diagnosticoDoSistema()  pela tela, em Configurações › Estrutura.
- *
- * Existe ainda `verificarEstruturaRECC()`, no Instalador: ela confere SÓ a
- * estrutura das abas, em dois segundos, e é a que se roda logo depois de
- * copiar os arquivos. As duas leem o mesmo `conferirEstrutura_` — não há duas
- * versões da regra, há uma conferência curta e uma completa.
- *
- * ---------------------------------------------------------------------------
- * A REGRA QUE MANDA NESTE ARQUIVO
- * ---------------------------------------------------------------------------
- * **Bloco que não consegue rodar é FALHA, nunca "pulado".**
- *
- * Está escrito nas armadilhas herdadas do PGO 5.x, e custou caro lá: o
- * diagnóstico antigo, quando um arquivo faltava, pulava o bloco que dependia
- * dele — e terminava aprovando o build. Um verificador que aprova o que não
- * conseguiu verificar é pior que verificador nenhum: ele dá confiança sem
- * base.
- *
- * Por isso `rodarBloco_` embrulha cada bloco: qualquer erro dentro dele vira
- * um item de falha, com o erro escrito. Nunca some.
- *
- * ---------------------------------------------------------------------------
- * TRÊS SITUAÇÕES, E O QUE CADA UMA QUER DIZER
- * ---------------------------------------------------------------------------
- *   ok       está como deveria.
- *   atencao  funciona, mas alguém precisa olhar. Coluna a mais na planilha,
- *            campo obrigatório desligado. Nada quebra hoje.
- *   falha    alguma coisa vai dar errado, ou já está dando. Aba faltando,
- *            Id repetido, canal apontando para coluna que não existe.
- * ============================================================================
- */
-
 var RECC_SITUACOES_DO_LAUDO = { OK: 'ok', ATENCAO: 'atencao', FALHA: 'falha' };
 
-/**
- * Quantas linhas de exemplo o laudo cita quando encontra muitas iguais.
- * Listar duzentos Ids repetidos não ajuda ninguém a arrumar o primeiro.
- */
 var RECC_EXEMPLOS_NO_LAUDO = 5;
 
-// ============================================================================
-// AS DUAS PORTAS
-// ============================================================================
-
-/**
- * Para rodar no editor do Apps Script, direto, sem abrir o sistema.
- *
- * É a porta que importa quando o sistema NÃO abre: se `doGet` está quebrado,
- * a tela não serve para diagnosticar nada. No editor ela não pede senha nem
- * cadastro — a porta do editor passa sem ler aba nenhuma. Pelo navegador,
- * só administrador: o laudo descreve a planilha e cita e-mails do cadastro.
- */
 function diagnosticoRECC() {
   exigirPortaDoEditor_('diagnosticoRECC');
   var laudo = rodarDiagnostico_();
@@ -20970,7 +14184,6 @@ function diagnosticoRECC() {
   return laudo;
 }
 
-/** A mesma coisa, pedida pela tela de Configurações. */
 function diagnosticoDoSistema() {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var laudo = rodarDiagnostico_();
@@ -20978,10 +14191,6 @@ function diagnosticoDoSistema() {
     laudo.resumo.falhas + ' falha(s), ' + laudo.resumo.atencoes + ' atenção(ões)');
   return laudo;
 }
-
-// ============================================================================
-// O LAUDO
-// ============================================================================
 
 function rodarDiagnostico_() {
   var blocos = [
@@ -21019,20 +14228,11 @@ function rodarDiagnostico_() {
   };
 }
 
-/**
- * Roda um bloco e garante que ele apareça no laudo aconteça o que acontecer.
- *
- * É AQUI que mora a regra do arquivo. Um bloco que estoura — porque a aba de
- * que ele depende sumiu, porque uma função dele foi renomeada — vira uma
- * falha com o erro escrito, e não um bloco ausente. Bloco ausente passa
- * despercebido; falha escrita, não.
- */
 function rodarBloco_(chave, titulo, funcao) {
   try {
     var itens = funcao();
     if (!itens || !itens.length) {
-      // Bloco que não produziu item nenhum também é suspeito: ou não rodou,
-      // ou não tem o que conferir — e nos dois casos alguém precisa olhar.
+
       return { chave: chave, titulo: titulo, itens: [item_(
         RECC_SITUACOES_DO_LAUDO.FALHA, 'O bloco não conferiu nada',
         'A verificação rodou e não devolveu nenhum item.',
@@ -21072,16 +14272,11 @@ function piorSituacao_(itens) {
   return pior;
 }
 
-/** 'a, b, c e mais 12' — para não despejar duzentos exemplos no laudo. */
 function algunsExemplos_(lista) {
   var mostrados = lista.slice(0, RECC_EXEMPLOS_NO_LAUDO).join(', ');
   var sobram = lista.length - RECC_EXEMPLOS_NO_LAUDO;
   return sobram > 0 ? mostrados + ' e mais ' + sobram : mostrados;
 }
-
-// ============================================================================
-// OS BLOCOS
-// ============================================================================
 
 function blocoDoAmbiente_() {
   var itens = [];
@@ -21099,10 +14294,6 @@ function blocoDoAmbiente_() {
 
   itens.push(itemDoFusoDoProjeto_());
 
-  // O teto de 10 milhões de células é o único limite duro da plataforma, e o
-  // único que não avisa antes: a planilha simplesmente para de aceitar linha
-  // nova. Ver a porcentagem subindo é o que dá tempo de planejar a segunda
-  // planilha em vez de descobrir numa terça-feira de manhã.
   var orcamento = orcamentoDeCelulas_(planilha);
   itens.push(orcamento.percentual < 80
     ? item_(RECC_SITUACOES_DO_LAUDO.OK,
@@ -21133,11 +14324,6 @@ function blocoDoAmbiente_() {
   return itens;
 }
 
-/*
- * A FILA DA AUDITORIA (Etapa 61). Ela se esvazia sozinha: cada registro novo
- * tenta descarregá-la. Fila que só cresce quer dizer trava sempre ocupada — uma
- * rotina presa, ou um volume de gravação que a planilha não acompanha.
- */
 const RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA = 200;
 
 function itemDaFilaDaAuditoria_() {
@@ -21152,14 +14338,6 @@ function itemDaFilaDaAuditoria_() {
         + 'confira se há uma importação ou rotina presa.');
 }
 
-/**
- * O FUSO DO PROJETO do Apps Script — que não é o da planilha (Etapa 60).
- *
- * Achado da análise de 29/10: as datas digitadas ("07/10/2026") viram data no
- * fuso do PROJETO, e o sistema as lê no de São Paulo. Projeto em outro fuso faz
- * toda data recuar um dia — filtro, prazo e mês —, sem erro nenhum. O
- * diagnóstico só conferia o fuso da planilha.
- */
 function fusoDoProjeto_() {
   try {
     return typeof Session !== 'undefined' && Session.getScriptTimeZone
@@ -21210,14 +14388,7 @@ function blocoDaEstrutura_() {
       return;
     }
     if (aba.aMais.length) {
-      /*
-       * COLUNA SUA, e não problema. Era ATENÇÃO, dizendo que o sistema "ignora o
-       * que não conhece" e que a coluna "fica vazia para sempre" — e as duas
-       * frases erravam: a coluna que o PO cria em Cadastrar Caso é conhecida (e
-       * nem chega aqui, ver `doFormulario`), e a que ele escreve na planilha, com
-       * valor, aparece em "Trabalhar no caso" como leitura. Fica a informação,
-       * sem o alarme.
-       */
+
       itens.push(item_(RECC_SITUACOES_DO_LAUDO.OK,
         aba.aba + ': ' + aba.aMais.length + ' coluna(s) suas, fora do contrato',
         algunsExemplos_(aba.aMais),
@@ -21234,13 +14405,6 @@ function blocoDaEstrutura_() {
   return itens;
 }
 
-/**
- * A sequência nunca pode estar ABAIXO do maior Id gravado.
- *
- * Foi exatamente isto que reemitiu Id em uso no PGO 5.x: a sequência
- * rebaixada devolvia números que já estavam na planilha, e duas linhas
- * diferentes passavam a responder pelo mesmo identificador.
- */
 function blocoDasSequencias_() {
   var itens = [];
   var props = PropertiesService.getScriptProperties();
@@ -21293,13 +14457,6 @@ function blocoDasSequencias_() {
   return itens;
 }
 
-/**
- * Id repetido e Id em célula de formato Geral.
- *
- * As duas metades da armadilha mais cara do PGO 5.x: o Sheets converteu
- * `00000010` em `10` porque a célula era Geral, e daí saíram 4.328 colisões
- * em 200 mil registros. Uma confere a causa, a outra confere o efeito.
- */
 function blocoDosIds_() {
   var itens = [];
 
@@ -21373,7 +14530,6 @@ function blocoDosIds_() {
   return itens;
 }
 
-/** Toda coluna que um canal declara precisa existir na aba dele. */
 function blocoDasCanais_() {
   var itens = [];
   var canais = lerRegistros_('CANAIS');
@@ -21442,11 +14598,6 @@ function blocoDasCanais_() {
         + (ligada ? '' : ' (desligada)')));
   });
 
-  // STATUS SEM CANAL. A tela de Ajustes Gerais apagava o canal de todo status
-  // editado nela — ele virava status de todos os canais, e aparecia na RET, na
-  // Mesa e no VG. A tela foi corrigida; os que já perderam o canal ficam como
-  // estão, porque o sistema não tem como saber de qual canal eles eram. Quem
-  // sabe é o PO, e o laudo diz quais são.
   var statusSemCanal = lerRegistros_('CATALOGO').filter(function (item) {
     return normalizarParaComparar_(item.Tipo) === 'status'
       && !converterParaIdentificador_(item.CanalId);
@@ -21470,13 +14621,6 @@ function blocoDasCanais_() {
   return itens;
 }
 
-/**
- * As colunas citadas num texto de configuração, seja ele plano ou em grupos.
- *
- * ColunasDaFila aceita as duas escritas: "a,b,c" e "Grupo: a,b; Outro: c".
- * Ler só uma delas faria o diagnóstico acusar coluna inexistente num canal
- * perfeitamente configurada.
- */
 function colunasCitadas_(texto) {
   var declarado = String(texto || '');
   if (!declarado.trim()) return [];
@@ -21488,7 +14632,6 @@ function colunasCitadas_(texto) {
       return corte < 0 ? grupo : grupo.substring(corte + 1);
     }).join(',').split(',');
 
-  // "A + B" é a junção da fila: cita as duas colunas, e as duas são conferidas.
   return pedacos.join('+').split('+')
     .map(function (um) { return um.trim(); })
     .filter(function (um) { return um.length > 0; });
@@ -21525,10 +14668,7 @@ function blocoDosCampos_() {
 
     if (!estrutura || posicaoDaColuna_(estrutura, cabecalho) < 0) {
       var qual = String(campo.Rotulo || cabecalho) + ' → ' + nomeDaAba + '.' + cabecalho;
-      // Só o campo LIGADO estoura ao cadastrar. O desligado não aparece no
-      // formulário, e é justamente o que se faz com o campo cuja coluna saiu
-      // (Etapa 51: o PO apagou a coluna "agente da central", e o laudo pedia
-      // para desligar o campo que já estava desligado).
+
       if (normalizarParaComparar_(campo.Ativo) === 'sim') semColuna.push(qual);
       else desligadosSemColuna.push(qual);
       return;
@@ -21561,13 +14701,6 @@ function blocoDosCampos_() {
         + 'a marca de obrigatório, para o cadastro não mentir.'));
   }
 
-  /*
-   * A GRAFIA DIFERENTE não quebra mais nada — o sistema lê pela grafia da
-   * planilha (`grafiaDaColuna_`). Mas foi ela que escondeu o achado 88: este
-   * bloco dizia "os campos apontam para colunas que existem", e a Descrição
-   * abria vazia. Fica à vista, para quem lê a planilha e o CAMPOS não ver dois
-   * nomes para a mesma coisa sem saber por quê.
-   */
   if (grafiaDiferente.length) {
     itens.push(item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
       grafiaDiferente.length + ' campo(s) com o nome escrito diferente da planilha',
@@ -21622,8 +14755,6 @@ function blocoDosPaineis_() {
       return;
     }
 
-    // Cartão do Trabalho não cita coluna: a dimensão dele é uma regra de
-    // contagem ('total', 'situacao', 'naCelula'), e não um cabeçalho.
     if (normalizarParaComparar_(componente.TipoWidget) === 'cartao') return;
 
     var estrutura = estruturaDaAba_(String(canal.Aba || ''));
@@ -21704,14 +14835,6 @@ function blocoDasAnalises_() {
   return itens;
 }
 
-/**
- * Os sinalizadores de prazo apontam para coisas que existem?
- *
- * Um sinalizador com a coluna errada não estoura: ele simplesmente não
- * sinaliza, e o caso vencido passa com a etiqueta verde — o pior jeito de
- * falhar num controle de prazo. Por isso o laudo confere, um a um, o canal, as
- * colunas e se há um status final onde o prazo possa parar.
- */
 function blocoDosSinalizadores_() {
   if (!planilhaAtiva_().getSheetByName('SINALIZADORES')) {
     return [item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
@@ -21772,9 +14895,6 @@ function blocoDosSinalizadores_() {
       return;
     }
 
-    // A condição de parada: os quatro juntos, e cada um apontando para algo
-    // que existe. Pela metade ela não para nada — e o Retido encerraria como
-    // se a condição não existisse, ou nunca encerraria.
     var preenchidos = [sinalizador.statusComCondicao, sinalizador.colunaDaCondicao,
       sinalizador.valoresDaCondicao.length, sinalizador.colunaDaDataDaCondicao]
       .filter(Boolean).length;
@@ -21845,14 +14965,6 @@ function blocoDosSinalizadores_() {
   return itens;
 }
 
-/**
- * O sistema precisa continuar tendo dono.
- *
- * "Deixar a instalação sem nenhum administrador" está na lista do que o
- * sistema nunca faz — e o jeito mais fácil de acontecer é aos poucos: alguém
- * desativa um usuário, alguém tira uma permissão, e um dia não sobra ninguém
- * que consiga abrir Configurações para desfazer.
- */
 function blocoDoAcesso_() {
   var itens = [];
   var usuarios = lerRegistros_('USUARIOS');
@@ -21930,14 +15042,6 @@ function blocoDoAcesso_() {
   return itens;
 }
 
-/**
- * A ligação entre a tela e o servidor — o "build" desta etapa.
- *
- * A tela chama o servidor pelo NOME da função, em texto. Renomear uma função
- * no servidor não quebra nada na hora: quebra quando alguém clica no botão,
- * semanas depois, e a mensagem que aparece é a do Apps Script, que não diz
- * qual função faltou. Este bloco encontra isso antes.
- */
 function blocoDaTela_() {
   var itens = [];
   var telas = telasIncluidasNoIndex_();
@@ -21996,8 +15100,6 @@ function blocoDaTela_() {
         + 'no servidor'));
   }
 
-  // O menu promete telas; o roteador é quem as monta. Item de menu sem rota
-  // leva a uma tela em branco, e em branco ninguém sabe se é erro ou é vazio.
   var roteador = '';
   try {
     roteador = HtmlService.createTemplateFromFile('Aplicacao').getRawContent();
@@ -22029,21 +15131,12 @@ function blocoDaTela_() {
   return itens;
 }
 
-/**
- * Os arquivos de tela que o Index manda incluir e que NÃO estão no projeto.
- *
- * Mora aqui, e não no Principal, porque é a mesma conferência que o bloco da
- * tela faz — e duas versões dela acabariam discordando. É usada por três
- * lugares: o bloco do diagnóstico, o recado de erro do `incluir_` e a
- * conferência rápida do Instalador.
- */
 function arquivosDeTelaQueFaltam_() {
   return telasIncluidasNoIndex_().filter(function (nome) {
     return !existeArquivoDeTela_(nome);
   });
 }
 
-/** O arquivo HTML existe no projeto do Apps Script? */
 function existeArquivoDeTela_(nome) {
   try {
     HtmlService.createTemplateFromFile(nome).getRawContent();
@@ -22053,23 +15146,6 @@ function existeArquivoDeTela_(nome) {
   }
 }
 
-/**
- * A folha de estilos está inteira, e cobre o que as telas usam?
- *
- * NASCEU DE UMA PERGUNTA DA OPERAÇÃO: "desconfigurou a estilização, o que pode
- * ser?". O sistema abria, o conteúdo estava lá, e a aparência não. Desse lado
- * não dava para ver nada: o arquivo aqui estava certo. O que estava
- * desatualizado era a CÓPIA no projeto do Apps Script.
- *
- * É o caso mais comum de todos numa cópia manual: o `Estilos` fica para trás
- * enquanto as telas avançam, e o resultado é uma página que carrega e fica
- * feia — sem erro nenhum no console, porque CSS que não existe não reclama,
- * só não pinta.
- *
- * Então o bloco compara o que as telas USAM com o que o Estilos DEFINE, e diz
- * os nomes que faltam. Com a lista na mão, "está desconfigurado" vira "o
- * Estilos do projeto é mais antigo que as telas".
- */
 function blocoDosEstilos_() {
   var itens = [];
 
@@ -22084,8 +15160,6 @@ function blocoDosEstilos_() {
         + 'chamado exatamente "Estilos".')];
   }
 
-  // Truncada no meio é o que acontece quando a colagem de 70 KB não vai
-  // inteira. As chaves desequilibradas denunciam isso na hora.
   var semComentario = folha.replace(/\/\*[\s\S]*?\*\//g, '');
   var abre = (semComentario.match(/\{/g) || []).length;
   var fecha = (semComentario.match(/\}/g) || []).length;
@@ -22116,16 +15190,6 @@ function blocoDosEstilos_() {
   return itens;
 }
 
-/**
- * As classes escritas nas telas que a folha não define.
- *
- * Só as ESTÁTICAS — as que aparecem como class="alguma-coisa" no HTML. Classe
- * montada em tempo de execução não dá para conferir daqui, e chutar geraria
- * alarme falso, que é pior que não conferir.
- *
- * A tela de acesso negado fica de fora: ela é servida sozinha, sem o Estilos,
- * e carrega o próprio <style> dentro.
- */
 function classesSemEstilo_(folha) {
   var definidas = {};
   (folha.match(/\.[a-z][a-z0-9-]*/g) || []).forEach(function (achado) {
@@ -22138,7 +15202,7 @@ function classesSemEstilo_(folha) {
     if (!existeArquivoDeTela_(nomeDaTela)) return;
 
     var fonte = HtmlService.createTemplateFromFile(nomeDaTela).getRawContent();
-    // Uma tela com <style> próprio define as suas: não são do Estilos.
+
     var temEstiloProprio = fonte.indexOf('<style>') >= 0;
 
     (fonte.match(/class="[a-z0-9 _-]+"/g) || []).forEach(function (achado) {
@@ -22153,7 +15217,6 @@ function classesSemEstilo_(folha) {
   return faltando;
 }
 
-/** Os nomes das telas que o Index.html manda incluir. */
 function telasIncluidasNoIndex_() {
   var fonte;
   try {
@@ -22170,16 +15233,6 @@ function telasIncluidasNoIndex_() {
   return nomes;
 }
 
-// ============================================================================
-// O LAUDO EM TEXTO, PARA O LOG DO EDITOR
-// ============================================================================
-
-/**
- * O mesmo laudo, escrito para caber no log do Apps Script.
- *
- * Quem roda `diagnosticoRECC()` no editor não tem tela: tem o log. Um objeto
- * JSON de trezentas linhas ali é ilegível, e ilegível é o mesmo que ausente.
- */
 function laudoEmTexto_(laudo) {
   var marcas = { ok: '  . ', atencao: '  ! ', falha: '  X ' };
   var linhas = [];
@@ -22210,20 +15263,8 @@ function laudoEmTexto_(laudo) {
   return linhas.join('\n');
 }
 
-/** A marca de que os cards da RET já foram montados — para não desfazer o que o PO mudar depois. */
 const RECC_CHAVE_DOS_CARDS_DA_RET = 'MIGRACAO.CARDS_DA_RET';
 
-/**
- * Monta os cards do Trabalho da RET na ordem que o PO pediu (Etapa 44): "total
- * de casos, aguardando transmissão (que vem da coluna Status proposta que
- * criei depois), pendente, contatando".
- *
- * Roda UMA VEZ: depois disso, quem manda nos cards é a tela de Configurações, e
- * rodar o atualizarPGO de novo não pode desfazer o que o PO arrumou lá. Só mexe
- * se achar as quatro coisas — o campo Status proposta com "Aguardando
- * transmissão" e os status Pendente e Contatando. Faltando alguma, não mexe em
- * nada e diz o que falta: montar pela metade trocaria os cards dele por menos.
- */
 function montarOsCardsDaRet_(pulados, paraVoce) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName('PAINEIS') || !planilhaAtiva_().getSheetByName('CANAIS')) {

@@ -93,11 +93,6 @@ var TelaTrabalho = (function () {
       + '</div>';
   }
 
-  function normalizarTexto(texto) {
-    return String(texto === null || texto === undefined ? '' : texto)
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  }
-
   function desenharFiltros() {
     var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
       // A primeira opção é o nome do filtro puro — "Analista", "Status".
@@ -631,7 +626,7 @@ var TelaTrabalho = (function () {
     }
   }
 
-  function ligar(pacote) {
+  function ligar() {
     SeletorDeCanal.ligar(function (idDoCanal) {
       canalEscolhido = idDoCanal;
       filtrosEscolhidos = {};

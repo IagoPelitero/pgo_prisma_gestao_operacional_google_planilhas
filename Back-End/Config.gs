@@ -1207,7 +1207,7 @@ function listarNiveisDeAcesso() {
  * Devolve o Id do nível, criado ou alterado.
  */
 function salvarNivelDeAcesso(dados) {
-  var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
   var id = converterParaIdentificador_(dados.id);
   var atual = id ? buscarRegistros_('CATALOGO', 'Id', id, 1)[0] : null;
@@ -1689,7 +1689,7 @@ function minutosDaHoraDoExpediente_(texto) {
  * Pede senha de administrador, como toda ação que escreve na estrutura.
  */
 function criarCanal(dados) {
-  var quem = exigirPermissao_(RECC_ACOES.ESTRUTURA);
+  exigirPermissao_(RECC_ACOES.ESTRUTURA);
   exigirSenhaDeAdministrador_();
   dados = dadosDaTela_(dados);
 

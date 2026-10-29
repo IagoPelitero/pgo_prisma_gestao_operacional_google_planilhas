@@ -886,8 +886,9 @@ function rodarTestesDeDiagnostico() {
     const original = fs.readFileSync(path.join(raiz, 'Front-End', 'Index.html'), 'utf8');
     (original.match(/incluir\('([A-Za-z0-9_]+)'\)/g) || []).forEach((achado) => {
       const nome = achado.replace("incluir('", '').replace("')", '');
-      const tela = fs.readFileSync(
-        path.join(raiz, 'Front-End', nome + '.html'), 'utf8').trim();
+      // O pacote vai sem os comentários (Etapa 62): o pedaço sai da tela sem eles.
+      const tela = require('./gerar-pacote').semComentariosNoHtml(fs.readFileSync(
+        path.join(raiz, 'Front-End', nome + '.html'), 'utf8')).trim();
       // Um pedaço do meio, para não casar por acaso com o comentário do nome.
       const meio = tela.substring(Math.floor(tela.length / 2),
         Math.floor(tela.length / 2) + 80);
@@ -1912,7 +1913,7 @@ function rodarTestesDeDiagnostico() {
 
     // A SUSEP que já estava bloqueada fica SEM TIPO — decisão do PO —, e o
     // selo continua vermelho, sem dizer por quem.
-    const antiga = chamar('listarSusepsBloqueadas()')
+    const antiga = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === '7654321');
     igual(antiga.bloqueadaPor, '', 'sem tipo, até alguém editar');
     const seloDaAntiga = chamar('consultarSusep')('7654321');
@@ -2170,7 +2171,7 @@ function rodarTestesDeDiagnostico() {
 
     chamar('bloquearSusep')({ susep: 'RET66N', corretora: 'B',
       sucursal: '1', coordenadorComercial: 'C', bloqueadaPor: 'Companhia' });
-    verdadeiro(chamar('listarSusepsBloqueadas()')
+    verdadeiro(chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .some((uma) => uma.susep === 'RET66N'));
 
     verdadeiro(chamar('listarUsuarios()').length > 0);

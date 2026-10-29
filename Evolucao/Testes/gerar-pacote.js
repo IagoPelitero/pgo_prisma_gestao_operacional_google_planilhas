@@ -35,6 +35,8 @@
  * já os avaliaria, e substitui cada `incluir('X')` do Index pelo conteúdo de
  * `X.html`. Se o pacote se comportar diferente dos arquivos soltos, é bug
  * daqui — e há teste comparando os dois.
+ *
+ * O que ele TIRA são os comentários (Etapa 62) — ver semComentariosNoJs.
  * ============================================================================
  */
 
@@ -62,14 +64,115 @@ function cabecalho(oQueEste, deQuais) {
     + '   ========================================================================== */\n\n';
 }
 
-/** Os 18 arquivos do servidor, na MESMA ordem em que o Apps Script os avalia. */
+/*
+  OS COMENTÁRIOS FICAM NO REPOSITÓRIO (Etapa 62)
+
+  Quase um terço das linhas é explicação: por que a regra é assim, que achado
+  ela conserta. Isso mora no repositório, onde se lê e se conserta. No pacote,
+  que só se cola, era peso — o Codigo.gs cai pela metade sem ela.
+
+  O cuidado é não confundir comentário com código: "//" dentro de um texto
+  ('https://...') ou de uma expressão regular não é comentário. Por isso a
+  leitura anda caractere a caractere, pulando textos e expressões regulares
+  inteiros, em vez de um replace com regex.
+*/
+
+/** O JavaScript sem os comentários. Textos e expressões regulares ficam. */
+function semComentariosNoJs(fonte) {
+  let saida = '';
+  let anterior = '';   // o último caractere que não é espaço
+  let i = 0;
+  const n = fonte.length;
+  while (i < n) {
+    const c = fonte[i];
+    const d = fonte[i + 1];
+
+    if (c === '/' && d === '/') {
+      while (i < n && fonte[i] !== '\n') i++;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      const fecha = fonte.indexOf('*/', i + 2);
+      const fim = fecha < 0 ? n : fecha + 2;
+      // O bloco vira as quebras que tinha: "a/* x */b" não pode virar "ab".
+      const quebras = (fonte.slice(i, fim).match(/\n/g) || []).length;
+      saida += quebras ? '\n'.repeat(quebras) : ' ';
+      i = fim;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < n && fonte[j] !== c) {
+        if (fonte[j] === '\\') j++;
+        j++;
+      }
+      saida += fonte.slice(i, j + 1);
+      i = j + 1;
+      anterior = c;
+      continue;
+    }
+    // Barra depois de operador, abertura ou "return" começa uma expressão
+    // regular; depois de nome, número ou ")" é divisão.
+    if (c === '/' && (anterior === '' || '=(,:!&|?{};[+-*%<>~^'.indexOf(anterior) >= 0
+      || /\b(return|typeof)\s*$/.test(saida.slice(-40)))) {
+      let j = i + 1;
+      let naClasse = false;
+      while (j < n) {
+        const x = fonte[j];
+        if (x === '\\') { j += 2; continue; }
+        if (x === '[') naClasse = true;
+        else if (x === ']') naClasse = false;
+        else if (x === '/' && !naClasse) break;
+        j++;
+      }
+      j++;
+      while (j < n && /[gimsuy]/.test(fonte[j])) j++;
+      saida += fonte.slice(i, j);
+      i = j;
+      anterior = '/';
+      continue;
+    }
+
+    saida += c;
+    if (!/\s/.test(c)) anterior = c;
+    i++;
+  }
+  // A linha que ficou só com espaço fica vazia; várias vazias viram uma.
+  return saida.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n');
+}
+
+/**
+ * O HTML sem os comentários: os <!-- -->, os do CSS e os do JavaScript. Os
+ * scriptlets <? ?> ficam intactos — o Apps Script os avalia ao servir.
+ */
+function semComentariosNoHtml(html) {
+  return html.replace(
+    /(<script\b[^>]*>)([\s\S]*?)(<\/script>)|(<style\b[^>]*>)([\s\S]*?)(<\/style>)|<!--[\s\S]*?-->/g,
+    function (tudo, abreScript, js, fechaScript, abreEstilo, css, fechaEstilo) {
+      if (abreScript) {
+        // O scriptlet sai do caminho antes e volta depois, exatamente igual.
+        const scriptlets = [];
+        const semScriptlet = js.replace(/<\?[\s\S]*?\?>/g, function (s) {
+          scriptlets.push(s);
+          return '__SCRIPTLET_' + (scriptlets.length - 1) + '__';
+        });
+        return abreScript + semComentariosNoJs(semScriptlet)
+          .replace(/__SCRIPTLET_(\d+)__/g, (m, k) => scriptlets[Number(k)]) + fechaScript;
+      }
+      if (abreEstilo) return abreEstilo + css.replace(/\/\*[\s\S]*?\*\//g, '') + fechaEstilo;
+      return '';
+    })
+    .replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n');
+}
+
+/** Os arquivos do servidor, na MESMA ordem em que o Apps Script os avalia. */
 function juntarOServidor() {
   const arquivos = fs.readdirSync(SERVIDOR)
     .filter((nome) => nome.endsWith('.gs'))
     .sort();
 
   const pedacos = arquivos.map((nome) => {
-    const fonte = fs.readFileSync(path.join(SERVIDOR, nome), 'utf8');
+    const fonte = semComentariosNoJs(fs.readFileSync(path.join(SERVIDOR, nome), 'utf8'));
     return '\n\n/* ==== ' + nome + ' '
       + '='.repeat(Math.max(0, 68 - nome.length)) + ' */\n\n' + fonte.trim();
   });
@@ -89,7 +192,7 @@ function juntarOServidor() {
  * o conteúdo de X passa a estar ali.
  */
 function juntarAsTelas() {
-  let index = fs.readFileSync(path.join(TELAS, 'Index.html'), 'utf8');
+  let index = semComentariosNoHtml(fs.readFileSync(path.join(TELAS, 'Index.html'), 'utf8'));
   const coladas = [];
 
   index = index.replace(/^[ \t]*<\?!=\s*incluir\('([A-Za-z0-9_]+)'\)\s*\?>[ \t]*$/gm,
@@ -100,7 +203,7 @@ function juntarAsTelas() {
       }
       coladas.push(nome);
       return '\n<!-- ==== ' + nome + '.html ==== -->\n'
-        + fs.readFileSync(caminho, 'utf8').trim() + '\n';
+        + semComentariosNoHtml(fs.readFileSync(caminho, 'utf8')).trim() + '\n';
     });
 
   const sobrou = index.match(/incluir\('([A-Za-z0-9_]+)'\)/g);
@@ -182,6 +285,9 @@ function gerar(pastaDeSaida) {
     '',
     'NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode',
     'node Evolucao/Testes/gerar-pacote.js de novo.',
+    '',
+    'Eles vêm SEM OS COMENTÁRIOS, para pesarem a metade na colagem. A explicação',
+    'de cada regra continua no repositório, arquivo por arquivo.',
     ''
   ].join('\n');
   fs.writeFileSync(path.join(destino, 'COMO-USAR.txt'), comoUsar);
@@ -209,7 +315,7 @@ function contarArquivosSoltos_() {
   return gs + html;
 }
 
-module.exports = { gerar };
+module.exports = { gerar, semComentariosNoJs, semComentariosNoHtml };
 
 if (require.main === module) {
   const feito = gerar();

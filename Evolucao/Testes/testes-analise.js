@@ -175,7 +175,7 @@ function rodarTestesDeAnalise() {
     igual(chamar('gerarAnalise')(id).linhas, 2,
       'a linha continua na planilha, mas não é dado de análise');
 
-    chamar('reexibirRegistro_')('BASE_MESA', casos[0].__id);
+    chamar('atualizarRegistro_')('BASE_MESA', casos[0].__id, { _Visivel: 'SIM' });
   });
 
   secao('Regerar');

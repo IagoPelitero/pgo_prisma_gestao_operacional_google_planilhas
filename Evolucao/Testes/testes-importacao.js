@@ -902,16 +902,17 @@ function rodarTestesDeImportacao() {
       'e ainda tem o recado de quantos estão fora');
   });
 
-  teste('o laudo continua com a lista de avisos, agora vazia', () => {
-    // `avisos` fica na resposta de propósito: o laudo já sabe desenhar a lista,
-    // e o próximo aviso que a operação pedir entra sem mexer na tela. O que
-    // não pode é a lista deixar de existir e a tela quebrar ao ler.
+  teste('o laudo não traz mais a lista de avisos vazia: a tela monta os seus', () => {
+    // A lista vinha sempre vazia, guardando lugar para um aviso futuro. Os
+    // avisos da conferência nasceram na tela (Etapa 57), lendo as contagens do
+    // laudo — e a lista vazia saiu na limpeza da Etapa 62.
     const laudo = chamar('conferirImportacaoDeCasos')(ret.id, {
       fonte: colado([['CPF', 'nome do cliente'], ['11122233305', 'Sem aviso']]),
       analistas: ['Marcos Vieira']
     });
-    verdadeiro(Array.isArray(laudo.avisos), 'a lista tem de existir');
-    igual(laudo.avisos.length, 0);
+    igual(laudo.avisos, undefined);
+    verdadeiro(lerPeca('Importacao').indexOf('laudo.avisos') < 0,
+      'a tela não lê a lista que saiu');
   });
 
   secao('O carimbo trazido da base antiga');

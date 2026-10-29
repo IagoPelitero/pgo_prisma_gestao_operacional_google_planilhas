@@ -502,7 +502,7 @@ O Apps Script tem ~6 minutos por execução e cada chamada ao Sheets é rede.
 |---|---|
 | Ler **um bloco** com `getValues()`, nunca célula a célula | 1 chamada de rede em vez de 5.000 |
 | Gravar **um bloco** com `setValues()` | Idem |
-| A fila de trabalho lê só a **janela recente** (30 dias, configurável) | Não se lê 200 mil linhas para mostrar 40 |
+| O Trabalho lê só as **últimas linhas** da aba (`OPERACAO.LINHAS_DO_PAINEL`, 5.000 por padrão) e filtra pelo período, que abre do dia 1 do mês até hoje | Não se lê 200 mil linhas para mostrar 40 |
 | A base **só acrescenta no fim**, nunca reordena | O recente é sempre o fim da aba — leitura barata |
 | Catálogo guardado em memória (`CacheService`), renovado por versão | O catálogo muda uma vez por semana, é lido a cada clique |
 | Totais guardados em memória, com chave formada por canal + filtros + período | Dez pessoas abrindo o mesmo painel = um cálculo |
@@ -511,11 +511,10 @@ O Apps Script tem ~6 minutos por execução e cada chamada ao Sheets é rede.
 
 ### 4.4 Busca
 
-**Buscar Caso** cobre dois casos, e a diferença é o pedido dos 30 dias:
+**Buscar Caso** acha o caso que a fila não mostra mais:
 
 | Alcance | Onde busca | Como |
 |---|---|---|
-| Recente (≤ 30 dias) | Janela guardada em memória | Instantâneo |
 | Histórico | Base completa | Lê **só a coluna** escolhida → acha as posições → lê **só as linhas** que casaram |
 | Legado | Planilha externa, por ID | Abre somente leitura, lista as abas, lê a linha 1 como cabeçalho |
 
@@ -731,7 +730,7 @@ estagiário no primeiro dia.
 | Não | Sim |
 |---|---|
 | `plLer_` | `lerRegistros_` |
-| `seqProximoId_` | `proximoIdentificador_` |
+| `seqProximoId_` | `proximosIdentificadores_` |
 | `{ c: 'CPF', t: 'id', p: true }` | `{ cabecalho: 'CPF', tipo: 'identificador', protegido: true }` |
 | `def`, `ss`, `qtd` | `esquema`, `planilha`, `quantidade` |
 

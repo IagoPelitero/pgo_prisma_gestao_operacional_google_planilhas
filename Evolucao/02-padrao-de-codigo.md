@@ -13,7 +13,7 @@ toda vez. Não vale a troca.
 | Não escreva | Escreva |
 |---|---|
 | `plLer_` | `lerRegistros_` |
-| `seqProximoId_` | `proximoIdentificador_` |
+| `seqProximoId_` | `proximosIdentificadores_` |
 | `instSemear_` | `semearDadosIniciais_` |
 | `{ c: 'CPF', t: 'id', p: true }` | `{ cabecalho: 'CPF', tipo: 'identificador', protegido: true }` |
 | `def`, `ss`, `cfg`, `qtd`, `tmp` | `esquema`, `planilha`, `configuracao`, `quantidade` |

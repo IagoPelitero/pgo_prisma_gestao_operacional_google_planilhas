@@ -49,7 +49,6 @@ var TelaProdutividade = (function () {
   // Onde abre a lista dos casos de uma fatia — nas duas abas, o mesmo lugar.
   var LUGAR_DO_DETALHE = '<div id="detalhe-do-painel"></div>';
   var tabelasAbertas = {};
-  var pacoteDoSistema = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -57,7 +56,6 @@ var TelaProdutividade = (function () {
   /* --------------------------------------------------------------- montar */
 
   function montar(pacote) {
-    pacoteDoSistema = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + '<div id="analitico"><p class="carregando-campos">Somando os números…</p></div>';
@@ -853,8 +851,7 @@ var TelaProdutividade = (function () {
 
   /* ---------------------------------------------------------------- ligar */
 
-  function ligar(pacote) {
-    if (pacote) pacoteDoSistema = pacote;
+  function ligar() {
     SeletorDeCanal.ligar(function (idDoCanal) {
       canalEscolhido = idDoCanal;
       filtros = {};

@@ -52,3 +52,6 @@ appsscript.json o manifesto do projeto, com o fuso em São Paulo (opcional)
 
 NÃO EDITE ESTES TRÊS ARQUIVOS. Eles são gerados. Mexa no repositório e rode
 node Evolucao/Testes/gerar-pacote.js de novo.
+
+Eles vêm SEM OS COMENTÁRIOS, para pesarem a metade na colagem. A explicação
+de cada regra continua no repositório, arquivo por arquivo.

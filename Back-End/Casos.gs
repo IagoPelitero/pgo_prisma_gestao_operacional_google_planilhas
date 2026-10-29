@@ -2191,7 +2191,8 @@ function partirDaPropostaDoCanal_(canal) {
  * ============================================================================
  * Achar um caso que a fila não mostra mais
  * ============================================================================
- * O Trabalho mostra os últimos 30 dias. Isso é de propósito: ele responde
+ * O Trabalho mostra o período escolhido, e abre do dia 1 do mês até hoje.
+ * Isso é de propósito: ele responde
  * "o que eu tenho que trabalhar hoje". Quando o cliente liga citando um
  * protocolo de abril, é aqui que se procura.
  *
@@ -2939,26 +2940,10 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     amostra: contagem.amostra,
     analistas: analistasParaDistribuir_(canal),
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
-    // O que o laudo precisa dizer antes de importar. Hoje vem vazio — ver
-    // avisosDaImportacao_, que é onde o próximo aviso entra.
-    avisos: avisosDaImportacao_(pedido.analistas, canal, contagem.entram),
     statusPadrao: statusDoLote_(canal, pedido.statusDoLote),
     premios: premios,
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal)
   };
-}
-
-/**
- * O que o laudo precisa dizer em voz alta antes de alguém apertar "importar".
- *
- * Está VAZIA hoje, e é de propósito que ela continua existindo. O único aviso
- * que havia — analista de férias recebendo um lote que ficaria parado — saiu
- * com o calendário, a pedido do PO. A função fica porque o laudo já a chama e
- * já sabe desenhar a lista: o próximo aviso que a operação pedir entra aqui,
- * numa linha, sem mexer no formato da resposta nem na tela.
- */
-function avisosDaImportacao_(escolhidos, canal, quantosEntram) {
-  return [];
 }
 
 /**

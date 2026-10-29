@@ -3252,7 +3252,6 @@ function migrarParaCanais_() {
   // Invertendo, a segunda renomeação encontraria o nome ocupado — e o Sheets
   // aceitaria criar "CANAIS 2", deixando duas abas parecidas e nenhuma certa.
   var corretoras = planilha.getSheetByName('CANAIS');
-  var canaisNovo = planilha.getSheetByName('CANAIS');
   var mesas = planilha.getSheetByName('MESAS');
 
   // Só é a aba de corretoras se tiver a cara dela: uma instalação já migrada

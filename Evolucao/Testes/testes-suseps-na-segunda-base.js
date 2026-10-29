@@ -195,10 +195,6 @@ function rodarTestesDasSusepsNaSegundaBase() {
     igual(t.resumo().quantasNoTotal, 3);
   });
 
-  teste('listarSusepsBloqueadas segue existindo, com o mesmo corte', () => {
-    igual(grande.chamar('listarSusepsBloqueadas')().length, 100);
-  });
-
   /* ----------------------------------------------------------------------- */
   secao('As telas');
 

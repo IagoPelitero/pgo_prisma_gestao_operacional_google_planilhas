@@ -444,10 +444,11 @@ var Moldura = (function () {
    * onde o recorte acabava e o resultado começava.
    *
    * A caixa resolve isso com fundo próprio e um título: o que está DENTRO
-   * muda o que está FORA. É uma peça só, usada pelas três, para elas não
+   * muda o que está FORA. É uma peça só, usada pelas duas, para elas não
    * divergirem no primeiro ajuste — foi assim com o formulário.
    *
-   * `contagem` é o texto do canto direito ("7 casos · últimos 30 dias"): ele é
+   * `contagem` é o texto do canto direito ("7 casos · de 01/10/2026 a
+   * 29/10/2026"): ele é
    * o resultado do recorte, e por isso mora na mesma caixa que o recorte.
    */
   function caixaDeFiltros(conteudo, contagem) {
@@ -483,8 +484,7 @@ var Moldura = (function () {
     // espessura, senão a tela parece montada com peças de dois conjuntos.
     icone: icone,
     escapar: escapar,
-    dicaDaCelula: dicaDaCelula,
-    iniciais: iniciais
+    dicaDaCelula: dicaDaCelula
   };
 })();
 </script>
@@ -1766,7 +1766,6 @@ var Formulario = (function () {
   return {
     aplicarMascara: aplicarMascara,
     aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
-    ehCampoDeDinheiro: ehCampoDeDinheiro,
     desenhar: desenhar,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
@@ -1822,7 +1821,6 @@ var CasoEmModal = (function () {
   // A versão do caso quando ele abriu: salvar devolve ao servidor, que recusa
   // se outra pessoa gravou no meio do caminho (ver editarCaso).
   var versaoAoAbrir = '';
-  var formulario = null;
   /*
     O FORMULÁRIO DE CADA CANAL, GUARDADO.
 
@@ -1973,7 +1971,6 @@ var CasoEmModal = (function () {
       if (deuErro || !oFormulario || !osValores) return;
       var corpo = corpoDaEdicao();
       if (!corpo) return;   // a pessoa fechou antes de chegar
-      formulario = oFormulario;
       elemento('modal-subtitulo').textContent = 'Trabalhar no caso · '
         + (osValores.canal || oFormulario.canal.nome || '');
       corpo.innerHTML = Formulario.desenhar(oFormulario, 'editar-');
@@ -2264,7 +2261,7 @@ var CasoEmModal = (function () {
       });
   }
 
-  return { abrir: abrir, fechar: fechar, trocarSituacao: trocarSituacao };
+  return { abrir: abrir, trocarSituacao: trocarSituacao };
 })();
 </script>
 
@@ -2715,9 +2712,6 @@ var Graficos = (function () {
     desenhar: desenhar,
     tabela: tabela,
     numero: numero,
-    porcento: porcento,
-    classeDoPonto: classeDoPonto,
-    encurtar: encurtar,
     ligarDica: ligarDica,
     tirarDica: tirarDica
   };
@@ -2730,18 +2724,17 @@ var Graficos = (function () {
 
 <script>
 /* ============================================================================
-   PGO — SeletorDePeriodo · as três maneiras de escolher o tempo
+   PGO — SeletorDePeriodo · as duas maneiras de escolher o tempo
    ============================================================================
    DUAS TELAS filtram por período — Trabalho e Produtividade RECC — e as duas
    oferecem as mesmas maneiras:
 
-     POR DIAS   "últimos 30 dias". É o do dia a dia, e é a abertura.
-     POR DATA   duas datas, de/até. Responde uma pergunta específica.
-     POR MÊS    "setembro de 2026". É como a operação REPORTA — e é diferente
-                de "últimos 30 dias": no dia 20 de outubro, os últimos 30 dias
-                pegam metade de setembro e metade de outubro.
+     POR DATA   duas datas, de/até. Responde uma pergunta específica. É a
+                abertura: do dia 1 do mês até hoje (Etapa 56).
+     POR MÊS    "setembro de 2026". É como a operação REPORTA: o fechamento
+                mensal.
 
-   ESTÁ AQUI, E NÃO EM CADA TELA, pelo mesmo motivo do formulário: três cópias
+   ESTÁ AQUI, E NÃO EM CADA TELA, pelo mesmo motivo do formulário: duas cópias
    divergem no primeiro ajuste, e aí o mesmo "setembro" significa uma coisa
    numa tela e outra na vizinha — que é o jeito mais rápido de a operação parar
    de confiar nos dois números.

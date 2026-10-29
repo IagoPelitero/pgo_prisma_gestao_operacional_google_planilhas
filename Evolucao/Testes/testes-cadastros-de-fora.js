@@ -255,7 +255,7 @@ function rodarTestesDeCadastrosDeFora() {
       'mas avisa');
 
     // A linha que já existia lá aparece "sem tipo".
-    igual(chamar('listarSusepsBloqueadas()')
+    igual(chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === 'RETF99').bloqueadaPor, '');
 
     // Bloquear pede a coluna — e o recado diz ONDE criar: lá, não aqui.
@@ -273,13 +273,13 @@ function rodarTestesDeCadastrosDeFora() {
   teste('bloquear e liberar SUSEP funciona na base de fora', () => {
     chamar('bloquearSusep')({ susep: 'RETF50',
       coordenadorComercial: 'Teste de escrita', bloqueadaPor: 'Corretora' });
-    igual(chamar('listarSusepsBloqueadas()')
+    igual(chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === 'RETF50').bloqueadaPor, 'Corretora',
     'o tipo foi gravado lá');
     igual(chamar('consultarSusep')('RETF50').situacao, 'BLOQUEADA',
       'o selo já enxerga o bloqueio gravado lá');
 
-    const bloqueada = chamar('listarSusepsBloqueadas()')
+    const bloqueada = chamar('resumoDasSusepsBloqueadas()').bloqueadas
       .find((uma) => uma.susep === 'RETF50');
     chamar('desbloquearSusep')(bloqueada.id);
     verdadeiro(chamar('consultarSusep')('RETF50').situacao !== 'BLOQUEADA',

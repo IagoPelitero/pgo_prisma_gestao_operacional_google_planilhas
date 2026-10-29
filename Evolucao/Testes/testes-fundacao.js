@@ -304,12 +304,13 @@ function rodarTestesDaFundacao() {
       'o dado da linha não foi apagado');
   });
 
-  teste('reexibir traz a linha de volta', () => {
-    chamar('reexibirRegistro_("BASE_MESA", "0000000000")');
+  teste('_Visivel de volta a SIM traz a linha de volta', () => {
+    chamar('atualizarRegistro_')('BASE_MESA', '0000000000', { _Visivel: 'SIM' });
     igual(celula(planilha, 'BASE_MESA', 2, '_Visivel'), 'SIM');
+    igual(chamar('lerRegistros_("BASE_MESA")').filter((l) => String(l.__id) === '0000000000').length, 1);
   });
 
-  teste('no cadastro, ocultar carimba quando e quem; reexibir limpa o carimbo', () => {
+  teste('no cadastro, ocultar carimba quando e quem', () => {
     const criada = chamar('inserirRegistro_')('CORRETORAS', { SUSEP: 'RET01F',
       Corretora: 'Carimbada' });
     chamar('ocultarRegistro_')('CORRETORAS', criada.__id, '0000000007');
@@ -318,9 +319,6 @@ function rodarTestesDaFundacao() {
     igual(String(oculta._Visivel), 'NAO');
     verdadeiro(!!oculta._ExcluidoEm, 'quando');
     igual(String(oculta._ExcluidoPor), '0000000007', 'quem');
-    chamar('reexibirRegistro_')('CORRETORAS', criada.__id);
-    const devolta = chamar('lerRegistros_')('CORRETORAS').find((l) => l.__id === criada.__id);
-    igual(String(devolta._ExcluidoEm || ''), '', 'o carimbo sai junto');
   });
 
   teste('_Visivel editado na mão, direto na planilha, é obedecido', () => {
