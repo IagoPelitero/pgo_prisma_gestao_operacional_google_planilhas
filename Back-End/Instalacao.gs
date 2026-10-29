@@ -207,7 +207,7 @@ function semearDadosIniciais_(emailDoInstalador) {
      */
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar', 'configurar', 'estrutura'],
-      ['inicio', 'trabalho', 'cadastrarCaso', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade', 'configuracoes'],
       'CANAL'),
     // A Coordenação importa: é ela quem recebe a base de inadimplentes e
@@ -215,19 +215,19 @@ function semearDadosIniciais_(emailDoInstalador) {
     // dentro da base, ele trabalha os que chegaram.
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar'],
-      ['inicio', 'trabalho', 'cadastrarCaso', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade'],
       'CANAL'),
     // A Operação abre a Produtividade e vê a EQUIPE dela — mesmo com escopo
     // "próprios" no resto do sistema.
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
-      ['inicio', 'trabalho', 'cadastrarCaso', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'produtividade'],
       'EQUIPE'),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
       ['exportar'],
-      ['inicio', 'trabalho', 'buscarCaso', 'produtividade'],
+      ['trabalho', 'buscarCaso', 'produtividade'],
       'CANAL')
   ]);
   contagem.niveis = niveis.length;
@@ -1463,8 +1463,8 @@ function atualizarPGO() {
   // --- Etapa 52: a Minha Performance saiu do sistema — e dos níveis de acesso
   feito = feito.concat(tirarAMinhaPerformanceDosNiveis_(pulados));
 
-  // --- Etapa 67: a tela inicial entra em todos os níveis, uma vez -----------
-  feito = feito.concat(ligarATelaInicialNosNiveis_(pulados));
+  // --- Etapa 68: a tela inicial saiu do sistema — e dos níveis de acesso ----
+  feito = feito.concat(tirarATelaInicialDosNiveis_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -3202,20 +3202,15 @@ function tirarAMinhaPerformanceDosNiveis_(pulados) {
 }
 
 /*
- * A TELA INICIAL EM TODOS OS NÍVEIS (Etapa 67, decisão do PO: abre o sistema,
- * para todos). Uma vez só, com a marca na CONFIG: quem depois tirar a tela de
- * um nível, em Configurações, não a vê voltar a cada atualização.
+ * A TELA INICIAL SAIU (Etapa 68, pedido do PO: "vai deixar minha operação
+ * confusa"). Quem rodou o atualizarPGO da Etapa 67 tem a tela nos níveis de
+ * acesso; aqui ela sai deles. Sem marca na CONFIG: a tela não existe mais, então
+ * ninguém a liga de novo, e rodar outra vez não acha nada para tirar.
  */
-const RECC_CHAVE_DA_TELA_INICIAL = 'INICIO.LIGADA';
-
-function ligarATelaInicialNosNiveis_(pulados) {
+function tirarATelaInicialDosNiveis_(pulados) {
   var feito = [];
-  if (!planilhaAtiva_().getSheetByName('CATALOGO') || !planilhaAtiva_().getSheetByName('CONFIG')) {
-    pulados.push('a tela inicial nos níveis: as abas ainda não existem');
-    return feito;
-  }
-  if (String(valorDaConfiguracao_(RECC_CHAVE_DA_TELA_INICIAL, '') || '').trim()) {
-    pulados.push('a tela inicial já foi ligada nos níveis de acesso');
+  if (!planilhaAtiva_().getSheetByName('CATALOGO')) {
+    pulados.push('a tela inicial dos níveis: a aba CATALOGO ainda não existe');
     return feito;
   }
   lerRegistros_('CATALOGO').forEach(function (item) {
@@ -3223,13 +3218,13 @@ function ligarATelaInicialNosNiveis_(pulados) {
     var configuracao;
     try { configuracao = JSON.parse(String(item.Configuracao || '{}')); } catch (erro) { return; }
     if (!configuracao || !Array.isArray(configuracao.telas)) return;
-    if (configuracao.telas.indexOf('inicio') >= 0) return;
-    configuracao.telas = ['inicio'].concat(configuracao.telas);
+    if (configuracao.telas.indexOf('inicio') < 0) return;
+    configuracao.telas = configuracao.telas.filter(function (tela) { return tela !== 'inicio'; });
     atualizarRegistro_('CATALOGO', item.__id, { Configuracao: JSON.stringify(configuracao) });
-    feito.push('Nível "' + (item.Rotulo || item.Nome) + '": a tela inicial passou a abrir o sistema');
+    feito.push('Nível "' + (item.Rotulo || item.Nome) + '": a tela inicial saiu das telas que ele '
+      + 'abre (a tela deixou de existir; o sistema volta a abrir no Trabalho)');
   });
-  gravarConfiguracao_(RECC_CHAVE_DA_TELA_INICIAL, 'Etapa 67 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  if (!feito.length) pulados.push('nenhum nível de acesso tinha a tela inicial');
   return feito;
 }
 

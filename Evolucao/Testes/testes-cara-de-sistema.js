@@ -1,17 +1,17 @@
 /**
  * ============================================================================
- * PGO — testes-cara-de-sistema.js · a tela inicial e o acabamento (Etapa 67)
+ * PGO — testes-cara-de-sistema.js · o acabamento (Etapa 67) e a versão
  * ============================================================================
- * Decisões do PO: a tela inicial abre o sistema, para todos, com "Meu dia",
- * "O dia da operação", atalhos e novidades; a linha do tempo do caso vem dos
- * carimbos do próprio caso. E o acabamento: o aviso discreto no canto (um só
- * para o sistema), o esqueleto de carregamento e a versão no rodapé.
+ * A linha do tempo do caso vem dos carimbos do próprio caso (decisão do PO). E
+ * o acabamento: o aviso discreto no canto (um só para o sistema), o esqueleto
+ * de carregamento e a versão no rodapé. A tela inicial, que nasceu aqui, saiu
+ * na Etapa 68 a pedido do PO ("vai deixar minha operação confusa").
  * ============================================================================
  */
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem } = require('./ferramentas');
 
 const TELAS = path.join(__dirname, '..', '..', 'Front-End');
 const tela = (nome) => fs.readFileSync(path.join(TELAS, nome + '.html'), 'utf8');
@@ -27,8 +27,6 @@ function preparar() {
   const t = carregar('primeiro.adm@exemplo.com');
   t.chamar('instalarRECC()');
   t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
-  t.inicio = () => t.chamar('resumoDoInicio')();
-  t.daRet = () => t.inicio().canais.find((c) => c.id === t.ret.id);
   return t;
 }
 
@@ -37,99 +35,78 @@ function niveis(t) {
     .map((item) => ({ item, configuracao: JSON.parse(item.Configuracao) }));
 }
 
+const PROGRESSO = path.join(__dirname, '..', '05-progresso.md');
+
 function rodarTestesDaCaraDeSistema() {
-  console.log('\nEtapa 67: a cara de sistema');
+  console.log('\nEtapa 67: a cara de sistema (a tela inicial saiu na Etapa 68)');
 
   /* ----------------------------------------------------------------------- */
-  secao('A tela inicial abre o sistema, para todos');
+  secao('A tela inicial saiu (Etapa 68, pedido do PO)');
 
-  teste('é a primeira tela do sistema, e todo nível nasce com ela', () => {
+  teste('não há mais tela inicial: o menu começa no Trabalho, e o sistema abre nele', () => {
     const t = preparar();
-    igual(t.chamar('RECC_TELAS_DO_SISTEMA')[0].tela, 'inicio');
-    niveis(t).forEach(({ item, configuracao }) => igual(configuracao.telas[0], 'inicio', item.Nome));
-    igual(t.chamar('pacoteDePartida()').menu[0].tela, 'inicio');
+    verdadeiro(!t.chamar('RECC_TELAS_DO_SISTEMA').some((uma) => uma.tela === 'inicio'));
+    niveis(t).forEach(({ item, configuracao }) =>
+      verdadeiro(configuracao.telas.indexOf('inicio') < 0, item.Nome + ' sem a tela inicial'));
+    igual(t.chamar('pacoteDePartida()').menu[0].tela, 'trabalho');
+    contem(tela('Aplicacao'), "irPara(telaDoEndereco() || 'trabalho', true);");
+    verdadeiro(tela('Aplicacao').indexOf('TelaInicio') < 0, 'a rota saiu');
+    verdadeiro(tela('Index').indexOf("incluir('Inicio')") < 0, 'o arquivo saiu do esqueleto');
+    verdadeiro(!fs.existsSync(path.join(TELAS, 'Inicio.html')), 'e do repositório');
   });
 
-  teste('o atualizarPGO liga a tela nos níveis de antes, uma vez só', () => {
+  teste('o código só dela saiu junto', () => {
     const t = preparar();
-    // Uma planilha de antes da Etapa 67: nenhum nível com a tela.
+    ['resumoDoInicio', 'casosEstourados_'].forEach((nome) =>
+      igual(t.chamar('typeof ' + nome), 'undefined', nome));
+    verdadeiro(tela('Trabalho').indexOf('abrirNoCanal') < 0, 'o atalho do Trabalho');
+    verdadeiro(tela('Estilos').indexOf('.inicio-') < 0, 'os estilos');
+  });
+
+  teste('o atualizarPGO tira a tela dos níveis de quem rodou a Etapa 67', () => {
+    const t = preparar();
+    // Uma planilha da Etapa 67: todo nível com a tela inicial na frente.
     niveis(t).forEach(({ item, configuracao }) => {
-      configuracao.telas = configuracao.telas.filter((tela) => tela !== 'inicio');
+      configuracao.telas = ['inicio'].concat(configuracao.telas);
       t.chamar('atualizarRegistro_')('CATALOGO', item.__id, { Configuracao: JSON.stringify(configuracao) });
     });
-    contem(t.chamar('atualizarPGO()'), 'a tela inicial passou a abrir o sistema');
-    niveis(t).forEach(({ item, configuracao }) => igual(configuracao.telas[0], 'inicio', item.Nome));
+    contem(t.chamar('atualizarPGO()'), 'a tela inicial saiu das telas que ele abre');
+    niveis(t).forEach(({ item, configuracao }) => {
+      verdadeiro(configuracao.telas.indexOf('inicio') < 0, item.Nome);
+      verdadeiro(configuracao.telas.length > 0, item.Nome + ' continua com as outras telas');
+    });
+    verdadeiro(t.chamar('atualizarPGO()').indexOf('a tela inicial saiu das telas') < 0,
+      'a segunda vez não acha nada para tirar');
+  });
 
-    // Quem depois tira a tela de um nível não a vê voltar.
+  teste('um nível que só tinha a tela inicial cai no que sobrar, sem quebrar o menu', () => {
+    const t = preparar();
     const consulta = niveis(t).find(({ item }) => item.Nome === 'Consulta');
-    consulta.configuracao.telas = consulta.configuracao.telas.filter((tela) => tela !== 'inicio');
+    consulta.configuracao.telas = ['inicio', 'buscarCaso'];
     t.chamar('atualizarRegistro_')('CATALOGO', consulta.item.__id,
       { Configuracao: JSON.stringify(consulta.configuracao) });
     t.chamar('atualizarPGO()');
-    verdadeiro(niveis(t).find(({ item }) => item.Nome === 'Consulta').configuracao.telas.indexOf('inicio') < 0);
-  });
-
-  teste('a tela abre no Início; sem a tela, no primeiro item do menu', () => {
-    const aplicacao = tela('Aplicacao');
-    contem(aplicacao, "irPara(telaDoEndereco() || 'inicio', true);");
-    contem(aplicacao, "inicio: {");
-    contem(tela('Index'), "incluir('Inicio')");
+    igual(niveis(t).find(({ item }) => item.Nome === 'Consulta').configuracao.telas.join(','), 'buscarCaso');
   });
 
   /* ----------------------------------------------------------------------- */
-  secao('Meu dia e o dia da operação');
+  secao('A versão no rodapé');
 
-  const t = preparar();
-  t.chamar('inserirVariosRegistros_')('BASE_RET', [
-    { [COLUNA]: diasAtras(2), analista: 'primeiro.adm', status: 'Pendente', 'nome do cliente': 'Meu atrasado',
-      'Data da primeira mudança de status': diasAtras(20) },
-    { [COLUNA]: diasAtras(1), analista: 'primeiro.adm', status: 'Não trabalhado', 'nome do cliente': 'Meu novo' },
-    { [COLUNA]: diasAtras(1), analista: 'Outra Pessoa', status: 'Pendente', 'nome do cliente': 'Dos outros' },
-    { [COLUNA]: new Date(), analista: 'Outra Pessoa', status: 'Pendente', 'nome do cliente': 'Entrou hoje' }
-  ]);
-  const encerrado = t.chamar('cadastrarCaso')(t.ret.id, { nomedocliente: 'Encerrado hoje', status: 'Pendente' });
-  t.chamar('alterarSituacaoDoCaso')(t.ret.id, encerrado.id, 'Pago', {});
-
-  teste('Meu dia: só os MEUS abertos, e os estourados entre eles', () => {
-    const ret = t.daRet();
-    igual(ret.meuDia.abertos, 2, 'o atrasado e o novo; o dos outros e o encerrado não');
-    igual(ret.meuDia.estourados, 1, 'o de 20 dias passou dos 3 dias úteis');
+  teste('a versão vai no pacote de partida e aparece no rodapé do menu', () => {
+    const t = preparar();
+    igual(t.chamar('pacoteDePartida()').versao, t.chamar('RECC_VERSAO').numero);
+    contem(tela('Comuns'), "'<div class=\"versao\">Versão '");
   });
 
-  teste('o dia da operação: entradas e encerrados de hoje, e os abertos de todos', () => {
-    const ret = t.daRet();
-    igual(ret.operacao.entradasHoje, 2, 'o que entrou hoje e o cadastrado hoje');
-    igual(ret.operacao.encerradosHoje, 1, 'o Pago de hoje');
-    igual(ret.operacao.abertos, 4);
-  });
-
-  teste('os números contam como o Trabalho conta (perto de vencer e estourados)', () => {
-    const canal = t.chamar('canalPeloId_')(t.ret.id);
-    const abertos = t.chamar('lerRegistros_')('BASE_RET').filter((r) => r.status !== 'Pago');
-    igual(t.daRet().operacao.estourados, t.chamar('casosEstourados_')(abertos, canal).length);
-    igual(t.daRet().operacao.pertoDeVencer, t.chamar('casosPertoDeVencer_')(abertos, canal).length);
-  });
-
-  teste('quem só vê os próprios casos não recebe o dia da operação', () => {
-    const operacao = t.chamar('lerRegistros_')('CATALOGO')
-      .find((item) => item.Tipo === 'NIVEL_ACESSO' && item.Nome === 'Operação');
-    t.chamar('salvarUsuario')({ nome: 'Outra Pessoa', email: 'outra@exemplo.com',
-      nivelAcessoId: operacao.Id, canalId: '', ativo: true });
-    comoUsuario(t.ambiente, 'outra@exemplo.com', () => {
-      const ret = t.daRet();
-      igual(ret.operacao, null);
-      igual(ret.meuDia.abertos, 2, 'os dois dela');
-    });
-  });
-
-  teste('a versão e as novidades vêm junto; o pacote de partida leva o número', () => {
-    const resumo = t.inicio();
-    verdadeiro(resumo.versao.novidades.length > 0);
-    igual(t.chamar('pacoteDePartida()').versao, resumo.versao.numero);
-  });
-
-  teste('a tela inicial é só de quem a tem', () => {
-    comoUsuario(t.ambiente, 'ninguem@exemplo.com', () => lanca(() => t.inicio()));
+  teste('o número condiz com o que foi entregue: "1." e a última etapa do progresso', () => {
+    // A regra do número: "1" é este sistema, construído do zero; depois do
+    // ponto, a última etapa registrada em 05-progresso.md. Etapa nova sem
+    // trocar a versão — ou versão nova sem a etapa registrada — falha aqui.
+    const t = preparar();
+    const etapas = (fs.readFileSync(PROGRESSO, 'utf8').match(/^## Etapa (\d+)\b/gm) || [])
+      .map((linha) => Number(linha.replace(/\D/g, '')));
+    const ultima = Math.max.apply(null, etapas);
+    igual(t.chamar('RECC_VERSAO').numero, '1.' + ultima);
   });
 
   /* ----------------------------------------------------------------------- */
@@ -170,14 +147,9 @@ function rodarTestesDaCaraDeSistema() {
     });
   });
 
-  teste('o Trabalho, a Produtividade e o Início carregam com o esqueleto', () => {
+  teste('o Trabalho e a Produtividade carregam com o esqueleto', () => {
     contem(tela('Trabalho'), "Moldura.esqueleto('Somando os casos…')");
     contem(tela('Produtividade'), "Moldura.esqueleto('Somando os números…')");
-    contem(tela('Inicio'), "Moldura.esqueleto('Preparando o seu dia…', 3)");
-  });
-
-  teste('a versão aparece no rodapé do menu', () => {
-    contem(tela('Comuns'), "'<div class=\"versao\">Versão '");
   });
 }
 

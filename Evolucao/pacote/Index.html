@@ -1490,29 +1490,6 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 .linha-do-tempo .quando { font-size: 12px; opacity: 0.75; }
 .linha-do-tempo .oque { font-weight: 600; font-size: 13.5px; }
 
-.inicio-saudacao { margin: 0 0 14px; color: var(--texto-suave, inherit); }
-.inicio-atalhos { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
-.inicio-atalho { display: inline-flex; align-items: center; gap: 8px; }
-.inicio-atalho svg { width: 18px; height: 18px; }
-.inicio-canais { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-.inicio-canal {
-  display: grid; gap: 10px; text-align: left; cursor: pointer; padding: 16px;
-  color: var(--texto); font: inherit;
-}
-.inicio-canal:hover { border-color: var(--linha-forte); }
-.inicio-canal-nome { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
-.inicio-canal-nome svg { width: 20px; height: 20px; }
-.inicio-bloco-titulo { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
-.inicio-numeros { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); }
-.inicio-numero { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--raio-pequeno); background: var(--fundo, transparent); border: 1px solid var(--linha); }
-.inicio-numero strong { font-size: 20px; line-height: 1.1; }
-.inicio-numero span { font-size: 12px; opacity: 0.8; }
-.inicio-numero[class*="tom-"] { color: var(--tom); background: var(--tom-tenue); border-color: color-mix(in srgb, var(--tom) 30%, transparent); }
-.inicio-novidades { margin-top: 16px; padding: 16px; }
-.inicio-novidades h3 { margin: 0 0 8px; font-size: 15px; }
-.inicio-novidades small { font-weight: 400; opacity: 0.7; margin-left: 6px; }
-.inicio-novidades ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
-
 .config-canais-cartao {
   display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr);
   margin-bottom: 16px;
@@ -1948,11 +1925,6 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 var Moldura = (function () {
 
   var DESENHOS = {
-
-    inicio:
-      '<path d="M3.8 11.2 12 4.4l8.2 6.8"></path>'
-      + '<path d="M6 9.6v9.9h12V9.6"></path>'
-      + '<path d="M10 19.5v-5h4v5"></path>',
 
     trabalho:
       '<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"></rect>'
@@ -3920,118 +3892,6 @@ var SeletorDePeriodo = (function () {
 
 
 
-<!-- ==== Inicio.html ==== -->
-<script>
-
-var TelaInicio = (function () {
-
-  var pacoteDoSistema = null;
-  var ATALHOS = ['cadastrarCaso', 'buscarCaso', 'importacao'];
-
-  function escapar(texto) { return Moldura.escapar(texto); }
-  function elemento(id) { return document.getElementById(id); }
-
-  function montar(pacote) {
-    pacoteDoSistema = pacote;
-    return '<div id="inicio">' + Moldura.esqueleto('Preparando o seu dia…', 3) + '</div>';
-  }
-
-  function numero(valor, rotulo, tom) {
-    return '<div class="inicio-numero' + (tom && valor ? ' tom-' + tom : '') + '">'
-      + '<strong>' + escapar(String(valor)) + '</strong><span>' + escapar(rotulo) + '</span></div>';
-  }
-
-  function cartaoDoCanal(canal) {
-    return '<button type="button" class="cartao inicio-canal" data-canal-do-inicio="'
-      + escapar(canal.id) + '" title="Abrir o Trabalho de ' + escapar(canal.nome) + '">'
-      + '<span class="inicio-canal-nome">' + SeletorDeCanal.icone(canal.icone)
-      + escapar(canal.nome) + '</span>'
-      + '<span class="inicio-bloco-titulo">Meu dia</span>'
-      + '<span class="inicio-numeros">'
-      + numero(canal.meuDia.abertos, 'meus abertos')
-      + numero(canal.meuDia.pertoDeVencer, 'perto de vencer', 'atencao')
-      + numero(canal.meuDia.estourados, 'estourados', 'ruim')
-      + '</span>'
-      + (canal.operacao
-        ? '<span class="inicio-bloco-titulo">O dia da operação</span>'
-          + '<span class="inicio-numeros">'
-          + numero(canal.operacao.entradasHoje, 'entradas hoje')
-          + numero(canal.operacao.encerradosHoje, 'encerrados hoje', 'bom')
-          + numero(canal.operacao.abertos, 'abertos')
-          + numero(canal.operacao.pertoDeVencer, 'perto de vencer', 'atencao')
-          + numero(canal.operacao.estourados, 'estourados', 'ruim')
-          + '</span>'
-        : '')
-      + '</button>';
-  }
-
-  function atalhos() {
-    var meus = pacoteDoSistema.menu.filter(function (item) {
-      return ATALHOS.indexOf(item.tela) >= 0;
-    });
-    if (!meus.length) return '';
-    return '<section class="inicio-atalhos" aria-label="Atalhos">'
-      + meus.map(function (item) {
-        return '<button type="button" class="botao vazado inicio-atalho" data-atalho="'
-          + escapar(item.tela) + '">' + Moldura.icone(item.tela)
-          + '<span>' + escapar(item.titulo) + '</span></button>';
-      }).join('') + '</section>';
-  }
-
-  function novidades(versao) {
-    if (!versao || !versao.novidades || !versao.novidades.length) return '';
-    return '<section class="cartao inicio-novidades">'
-      + '<h3>Novidades da versão ' + escapar(versao.numero)
-      + (versao.data ? ' <small>' + escapar(versao.data) + '</small>' : '') + '</h3>'
-      + '<ul>' + versao.novidades.map(function (linha) {
-        return '<li>' + escapar(linha) + '</li>';
-      }).join('') + '</ul></section>';
-  }
-
-  function desenhar(resumo) {
-    var caixa = elemento('inicio');
-    if (!caixa) return;
-    caixa.innerHTML = '<p class="inicio-saudacao">Olá, <strong>' + escapar(resumo.usuario)
-      + '</strong>. Os números são de ' + escapar(resumo.periodo) + '.</p>'
-      + atalhos()
-      + '<div class="inicio-canais">' + resumo.canais.map(cartaoDoCanal).join('') + '</div>'
-      + novidades(resumo.versao);
-    ligarCliques();
-  }
-
-  function ligarCliques() {
-    var canais = document.querySelectorAll('[data-canal-do-inicio]');
-    for (var i = 0; i < canais.length; i++) {
-      canais[i].addEventListener('click', function () {
-        TelaTrabalho.abrirNoCanal(this.getAttribute('data-canal-do-inicio'));
-      });
-    }
-    var botoes = document.querySelectorAll('[data-atalho]');
-    for (var j = 0; j < botoes.length; j++) {
-      botoes[j].addEventListener('click', function () {
-        Aplicacao.irPara(this.getAttribute('data-atalho'));
-      });
-    }
-  }
-
-  function ligar() {
-    Servidor.chamar('resumoDoInicio')
-      .entao(desenhar)
-      .senao(function (erro) {
-        var caixa = elemento('inicio');
-        if (caixa) {
-          caixa.innerHTML = '<p class="carregando-campos erro-carga">'
-            + escapar(erro.message || String(erro)) + '</p>' + atalhos();
-          ligarCliques();
-        }
-      });
-  }
-
-  return { montar: montar, ligar: ligar };
-})();
-</script>
-
-
 <!-- ==== Trabalho.html ==== -->
 <script>
 
@@ -4513,13 +4373,7 @@ var TelaTrabalho = (function () {
     carregar();
   }
 
-  function abrirNoCanal(idDoCanal) {
-    canalEscolhido = idDoCanal;
-    filtrosEscolhidos = {};
-    Aplicacao.irPara('trabalho');
-  }
-
-  return { montar: montar, ligar: ligar, abrirNoCanal: abrirNoCanal, opcoesDeMostrar: opcoesDeMostrar,
+  return { montar: montar, ligar: ligar, opcoesDeMostrar: opcoesDeMostrar,
     casosPertoDeVencer: casosPertoDeVencer, rotuloDoCaso: rotuloDoCaso,
     expandirFila: expandirFila };
 })();
@@ -10799,12 +10653,6 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 var Rotas = (function () {
 
   var TELAS = {
-    inicio: {
-      titulo: 'Início',
-      subtitulo: 'O seu dia e o da operação, por canal, com os atalhos e as novidades.',
-      montar: function (pacote) { return TelaInicio.montar(pacote); },
-      ligar: function (pacote) { TelaInicio.ligar(pacote); }
-    },
     trabalho: {
       titulo: 'Trabalho',
       subtitulo: 'Visão do dia: indicadores e a fila de trabalho da sua equipe.',
@@ -11074,8 +10922,7 @@ var Aplicacao = (function () {
     elemento('aplicacao').hidden = false;
     restaurarEncolhido();
     aplicarTema(pacote.tema || 'padrao');
-
-    irPara(telaDoEndereco() || 'inicio', true);
+    irPara(telaDoEndereco() || 'trabalho', true);
     ligarTeclado();
   }
 

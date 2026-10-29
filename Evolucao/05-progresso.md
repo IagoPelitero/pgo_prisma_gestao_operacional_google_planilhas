@@ -3,7 +3,8 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** 10 de 12 etapas construídas · 269 testes passando.
+**Estado geral:** versão 1.68 — a última etapa entregue é a 68. A regra do número está
+na Etapa 68.
 
 ---
 
@@ -3621,7 +3622,7 @@ modal, o aviso que some sozinho). 7 quebras de propósito, 7 pegas. As contagens
 
 ---
 
-## Ajustes da Produtividade RECC (29/10)
+## Etapa 68 — Ajustes da Produtividade RECC, e a tela inicial sai
 
 Pedido do PO, antes de mandar o Excel: cinco ajustes nos gráficos da Produtividade RECC.
 Decisões dele: os itens 1 a 3 valem **nos dois canais** (RET e Mesa); a situação traz
@@ -3650,7 +3651,30 @@ CPFs de um caso só.
 
 ---
 
-## O README de apresentação (30/10)
+### A tela inicial sai
+
+Pedido do PO: "exclua a primeira aba chamada Início, não gostei dela, e vai
+deixar minha operação confusa. Mas só a aba é desnecessária. Gostei de mostrar a
+versão correta do PGO".
+
+| O que | Como ficou |
+|---|---|
+| **A tela** | Saíram `Inicio.html`, a rota, o item do menu, o ícone, os estilos, `resumoDoInicio` e `casosEstourados_` (só ela usava) e o `abrirNoCanal` do Trabalho. O sistema volta a abrir no **Trabalho** |
+| **Os níveis de acesso** | A instalação nova não traz mais a tela. O `atualizarPGO` tira a tela dos níveis de quem rodou a Etapa 67 (`tirarATelaInicialDosNiveis_`); a segunda vez não acha nada |
+| **O que fica da Etapa 67** | A **versão no rodapé**, a linha do tempo do caso, o aviso no canto e o esqueleto de carregamento |
+| **As novidades da versão** | Só a tela inicial as mostrava; saíram com ela. O que muda em cada versão continua aqui, neste arquivo |
+
+### A versão, validada
+
+A regra do número, agora escrita no código e conferida por teste: **"1"** é este
+sistema, construído do zero (o PGO 5.x é o antigo); **depois do ponto, a última
+etapa entregue**. A versão estava em **1.67**, mas depois dela entraram os ajustes
+da Produtividade (código novo, sem trocar o número) — o rodapé mostrava uma
+versão atrás. Passou a **1.68**. Um teste novo lê este arquivo e falha se a
+versão não for "1." mais a última etapa registrada: etapa nova sem trocar o
+número, ou número novo sem a etapa, não passa mais calado.
+
+## O README de apresentação (29/10)
 
 Pedido do PO: o README tinha ficado gigante (1.675 linhas) e devia virar uma
 apresentação do sistema para empresas de grande porte.
@@ -3664,8 +3688,10 @@ Os testes que conferem o README (a instalação cria as 18 abas, a regra da
 organização do Google Workspace, o comando da responsividade) continuam valendo
 sobre o README novo.
 
-A Etapa 68 (backup diário, homologação, GitHub Actions, relatório semanal) foi
-**cancelada pelo PO**: "não há necessidade".
+As rotinas que estavam propostas para a Etapa 68 (backup diário, homologação,
+GitHub Actions, relatório semanal) foram **canceladas pelo PO**: "não há
+necessidade". O número 68 ficou com os ajustes da Produtividade e a saída da
+tela inicial.
 
 ---
 

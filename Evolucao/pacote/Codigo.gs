@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 21:34
+   Gerado em 2026-10-29 22:18
    ========================================================================== */
 
 
@@ -8629,16 +8629,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.67',
-  data: '29/10/2026',
-  novidades: [
-    'Tela inicial: o seu dia e o da operação, por canal, com atalhos.',
-    'No "Trabalhar no caso", a linha do tempo do caso: entrada, contatos, status e finalização.',
-    'A Produtividade e o Trabalho mostram qualquer mês completo, não só os mais recentes.',
-    'O Buscar Caso também procura nos casos encerrados que foram para o histórico.',
-    'Gravar duas vezes o mesmo caso, depois dos 40 segundos, não duplica mais.',
-    'Erros que aconteciam longe da tela ficam registrados para quem configura.'
-  ]
+  numero: '1.68',
+  data: '29/10/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -8875,7 +8867,6 @@ const RECC_ESCOPOS = {
 
 const RECC_TELAS_DO_SISTEMA = [
 
-  { tela: 'inicio', titulo: 'Início' },
   { tela: 'trabalho', titulo: 'Trabalho' },
   { tela: 'cadastrarCaso', titulo: 'Cadastrar Caso' },
   { tela: 'buscarCaso', titulo: 'Buscar Caso' },
@@ -10366,81 +10357,6 @@ function casosPertoDeVencer_(registros, canal) {
       return sinal !== null && sinal.tom === 'atencao' && !sinal.encerrado;
     });
   });
-}
-
-function casosEstourados_(registros, canal) {
-  var sinalizadores = sinalizadoresDoCanal_(canal);
-  if (!sinalizadores.length) return [];
-  var situacoes = situacoesPorChave_(canal);
-  var agora = relogioDeParede_(new Date());
-  return registros.filter(function (registro) {
-    return sinalizadores.some(function (sinalizador) {
-      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
-      return sinal !== null && sinal.tom === 'ruim' && !sinal.encerrado;
-    });
-  });
-}
-
-function resumoDoInicio() {
-  var quem = exigirTela_('inicio');
-  var periodo = resolverPeriodo_({ tipo: 'intervalo', de: '', ate: '' });
-  var hoje = Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var doDia = function (valor) {
-    var data = converterParaData_(valor);
-    return !!data && Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') === hoje;
-  };
-  var euMesmo = normalizarParaComparar_(quem.usuario.Nome);
-  var daOperacao = quem.permissoes.escopo !== 'PROPRIOS';
-
-  var canais = canaisQueEuVejo_(quem).map(function (umCanal) {
-    var canal = comAGrafiaDaAba_(umCanal);
-    var situacoes = situacoesPorChave_(canal);
-    var ehFinal = function (registro) {
-      var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
-      return !!(situacao && situacao.final);
-    };
-    var registros = filtrarPeloAlcance_(registrosDosPeriodos_(canal, [{ de: periodo.de,
-      ate: periodo.ate, guardarSemData: true }]).registros, canal.aba, quem);
-    var abertos = registros.filter(function (registro) { return !ehFinal(registro); });
-    var responsavel = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
-    var meus = abertos.filter(function (registro) {
-      return responsavel && normalizarParaComparar_(registro[responsavel]) === euMesmo;
-    });
-
-    return {
-      id: canal.id,
-      nome: canal.nome,
-      icone: canal.icone,
-      meuDia: {
-        abertos: meus.length,
-        pertoDeVencer: casosPertoDeVencer_(meus, canal).length,
-        estourados: casosEstourados_(meus, canal).length
-      },
-      operacao: daOperacao ? {
-        entradasHoje: canal.colunaDaData ? registros.filter(function (registro) {
-          return doDia(registro[canal.colunaDaData]);
-        }).length : 0,
-
-        encerradosHoje: registros.filter(function (registro) {
-          if (!ehFinal(registro)) return false;
-          var situacao = situacoes[normalizarParaComparar_(registro[canal.colunaDoStatus])];
-          return (canal.colunaDaFinalizacao && doDia(registro[canal.colunaDaFinalizacao]))
-            || (situacao.colunaDeCarimbo && doDia(registro[situacao.colunaDeCarimbo]))
-            || doDia(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
-        }).length,
-        abertos: abertos.length,
-        pertoDeVencer: casosPertoDeVencer_(abertos, canal).length,
-        estourados: casosEstourados_(abertos, canal).length
-      } : null
-    };
-  });
-
-  return {
-    usuario: quem.usuario.Nome,
-    periodo: periodo.rotulo,
-    canais: canais,
-    versao: RECC_VERSAO
-  };
 }
 
 function relogioDeParede_(data) {
@@ -12568,24 +12484,24 @@ function semearDadosIniciais_(emailDoInstalador) {
 
     novoNivelDeAcesso_('Administrador', 1, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar', 'configurar', 'estrutura'],
-      ['inicio', 'trabalho', 'cadastrarCaso', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade', 'configuracoes'],
       'CANAL'),
 
     novoNivelDeAcesso_('Coordenação', 2, 'TODOS',
       ['criar', 'editar', 'ocultar', 'exportar', 'importar'],
-      ['inicio', 'trabalho', 'cadastrarCaso', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'importacao', 'produtividade'],
       'CANAL'),
 
     novoNivelDeAcesso_('Operação', 3, 'PROPRIOS',
       ['criar', 'editar', 'exportar'],
-      ['inicio', 'trabalho', 'cadastrarCaso', 'buscarCaso',
+      ['trabalho', 'cadastrarCaso', 'buscarCaso',
        'tabelaCorretoras', 'produtividade'],
       'EQUIPE'),
     novoNivelDeAcesso_('Consulta', 4, 'TODOS',
       ['exportar'],
-      ['inicio', 'trabalho', 'buscarCaso', 'produtividade'],
+      ['trabalho', 'buscarCaso', 'produtividade'],
       'CANAL')
   ]);
   contagem.niveis = niveis.length;
@@ -13398,7 +13314,7 @@ function atualizarPGO() {
 
   feito = feito.concat(tirarAMinhaPerformanceDosNiveis_(pulados));
 
-  feito = feito.concat(ligarATelaInicialNosNiveis_(pulados));
+  feito = feito.concat(tirarATelaInicialDosNiveis_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -14693,16 +14609,10 @@ function tirarAMinhaPerformanceDosNiveis_(pulados) {
   return feito;
 }
 
-const RECC_CHAVE_DA_TELA_INICIAL = 'INICIO.LIGADA';
-
-function ligarATelaInicialNosNiveis_(pulados) {
+function tirarATelaInicialDosNiveis_(pulados) {
   var feito = [];
-  if (!planilhaAtiva_().getSheetByName('CATALOGO') || !planilhaAtiva_().getSheetByName('CONFIG')) {
-    pulados.push('a tela inicial nos níveis: as abas ainda não existem');
-    return feito;
-  }
-  if (String(valorDaConfiguracao_(RECC_CHAVE_DA_TELA_INICIAL, '') || '').trim()) {
-    pulados.push('a tela inicial já foi ligada nos níveis de acesso');
+  if (!planilhaAtiva_().getSheetByName('CATALOGO')) {
+    pulados.push('a tela inicial dos níveis: a aba CATALOGO ainda não existe');
     return feito;
   }
   lerRegistros_('CATALOGO').forEach(function (item) {
@@ -14710,13 +14620,13 @@ function ligarATelaInicialNosNiveis_(pulados) {
     var configuracao;
     try { configuracao = JSON.parse(String(item.Configuracao || '{}')); } catch (erro) { return; }
     if (!configuracao || !Array.isArray(configuracao.telas)) return;
-    if (configuracao.telas.indexOf('inicio') >= 0) return;
-    configuracao.telas = ['inicio'].concat(configuracao.telas);
+    if (configuracao.telas.indexOf('inicio') < 0) return;
+    configuracao.telas = configuracao.telas.filter(function (tela) { return tela !== 'inicio'; });
     atualizarRegistro_('CATALOGO', item.__id, { Configuracao: JSON.stringify(configuracao) });
-    feito.push('Nível "' + (item.Rotulo || item.Nome) + '": a tela inicial passou a abrir o sistema');
+    feito.push('Nível "' + (item.Rotulo || item.Nome) + '": a tela inicial saiu das telas que ele '
+      + 'abre (a tela deixou de existir; o sistema volta a abrir no Trabalho)');
   });
-  gravarConfiguracao_(RECC_CHAVE_DA_TELA_INICIAL, 'Etapa 67 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  if (!feito.length) pulados.push('nenhum nível de acesso tinha a tela inicial');
   return feito;
 }
 

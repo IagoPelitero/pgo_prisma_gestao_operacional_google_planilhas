@@ -27,11 +27,7 @@ Desenvolvido por **Pelitero Labs**.
 
 ## O que a operação ganha
 
-**Início** — cada pessoa abre o sistema no seu dia: os seus casos abertos, os
-perto de vencer e os estourados; e, para a liderança, o dia da operação inteira,
-canal por canal.
-
-**Trabalho** — a fila da equipe com cartões que filtram num clique, prazos com
+**Trabalho** — a tela que abre o sistema: a fila da equipe com cartões que filtram num clique, prazos com
 selo verde, amarelo e vermelho, e o aviso dos casos perto de vencer logo na
 entrada.
 
@@ -95,6 +91,8 @@ sistema inteiro a um clique.
 
 **Experiência**
 - Quatro temas por usuário (Padrão, Rosa, Escuro e Brasil) e uso no celular.
+- A versão em uso sempre visível no rodapé do menu — quem liga para o suporte
+  diz qual está usando.
 
 | | | |
 |---|---|---|
@@ -106,7 +104,7 @@ sistema inteiro a um clique.
 
 Cada versão só é entregue quando passa por:
 
-- **1553 testes** automatizados, que simulam a planilha e o Apps Script;
+- **1549 testes** automatizados, que simulam a planilha e o Apps Script;
 - **testes de ponta a ponta** num navegador de verdade;
 - uma **varredura que clica em tudo**, inclusive com dados malformados;
 - a **conferência de responsividade** em todas as telas e larguras de tela;
