@@ -49,6 +49,7 @@ const { rodarTestesDosPopupsDaImportacao } = require('./testes-popups-da-importa
 const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
+const { rodarTestesDaAuditoriaForaDaTrava } = require('./testes-auditoria-fora-da-trava');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -88,6 +89,7 @@ rodarTestesDosPopupsDaImportacao();
 rodarTestesDaDataDaFinalizacao();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();
+rodarTestesDaAuditoriaForaDaTrava();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

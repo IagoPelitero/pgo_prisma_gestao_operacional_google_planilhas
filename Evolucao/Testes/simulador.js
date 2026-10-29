@@ -420,6 +420,8 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   const valoresDoCache = new Map();
   // O fuso do PROJETO do Apps Script (Etapa 60): o certo, até o teste trocar.
   const ambienteDoFuso = { fusoDoProjeto: 'America/Sao_Paulo' };
+  // A trava do script (Etapa 61): livre, até o teste ocupar.
+  const ambienteDaTrava = { ocupada: false, esperas: [] };
   let adiantadoEmMs = 0;
   const cache = {
     agora: () => Date.now() + adiantadoEmMs,
@@ -462,6 +464,9 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     emailAtual() { return emailAtual; },
     get fusoDoProjeto() { return ambienteDoFuso.fusoDoProjeto; },
     set fusoDoProjeto(fuso) { ambienteDoFuso.fusoDoProjeto = fuso; },
+    get travaOcupada() { return ambienteDaTrava.ocupada; },
+    set travaOcupada(sim) { ambienteDaTrava.ocupada = !!sim; },
+    get esperasDaTrava() { return ambienteDaTrava.esperas; },
     /**
      * Cria uma planilha "de fora" e devolve o Id.
      *
@@ -533,7 +538,13 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
             medidor.propriedadesGravadas++;
             propriedades.set(k, String(v));
           },
-          deleteProperty: (k) => { propriedades.delete(k); }
+          deleteProperty: (k) => { propriedades.delete(k); },
+          getProperties: () => {
+            medidor.propriedadesLidas++;
+            const todas = {};
+            propriedades.forEach((v, k) => { todas[k] = v; });
+            return todas;
+          }
         }),
         getUserProperties: () => ({
           getProperty: (k) =>
@@ -590,7 +601,13 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       },
       LockService: {
         getScriptLock: () => ({
-          tryLock: () => { medidor.travasPedidas++; return true; },
+          // Etapa 61: o teste pode deixar a trava OCUPADA (ambiente.travaOcupada)
+          // e ver quanto cada chamada aceitou esperar (ambiente.esperasDaTrava).
+          tryLock: (ms) => {
+            medidor.travasPedidas++;
+            ambienteDaTrava.esperas.push(Number(ms) || 0);
+            return !ambienteDaTrava.ocupada;
+          },
           waitLock: () => true,
           releaseLock: () => {}
         })

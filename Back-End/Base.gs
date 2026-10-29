@@ -2815,71 +2815,116 @@ function inserirRegistro_(nomeDaAba, dados, contexto) {
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
-  contexto = contexto || {};
 
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
-    esquecerEstruturaLida_(nomeDaAba);
-    var estrutura = estruturaDaAba_(nomeDaAba, true);
-    var temControle = posicaoDaColuna_(estrutura, '_Visivel') >= 0;
-    var iId = posicaoDaColuna_(estrutura, 'Id');
-
-    // Quantas linhas precisam de Id novo — algumas já vêm com um. O bloco é
-    // reservado numa ida só ao PropertiesService, e não uma por linha: com uma
-    // por linha, gravar cinco mil casos eram dez mil idas e dois minutos de
-    // pedágio dentro de uma execução que tem seis.
-    var precisamDeId = 0;
-    if (iId >= 0) {
-      for (var p = 0; p < lista.length; p++) {
-        if (!converterParaIdentificador_(lista[p][estrutura.cabecalhos[iId]])) {
-          precisamDeId++;
-        }
-      }
-    }
-    var idsReservados = proximosIdentificadores_(nomeDaAba, precisamDeId);
-    var proximoDoBloco = 0;
-
-    var linhas = [];
-    var gravados = [];
-    for (var i = 0; i < lista.length; i++) {
-      var dados = {};
-      Object.keys(lista[i]).forEach(function (k) { dados[k] = lista[i][k]; });
-
-      if (iId >= 0) {
-        var idInformado = converterParaIdentificador_(dados[estrutura.cabecalhos[iId]]);
-        if (!idInformado) {
-          dados[estrutura.cabecalhos[iId]] = idsReservados[proximoDoBloco];
-          proximoDoBloco++;
-        }
-      }
-      if (temControle) {
-        if (dados._Visivel === undefined) dados._Visivel = RECC_VISIVEL_SIM;
-        if (dados._Origem === undefined) {
-          dados._Origem = contexto.origem || RECC_ORIGEM_SISTEMA;
-        }
-      }
-      linhas.push(montarLinhaParaGravar_(estrutura, dados, null));
-      gravados.push(dados);
-    }
-
-    var primeira = ultimaLinhaComConteudo_(estrutura) + 1;
-    if (primeira < 2) primeira = 2;
-    garantirLinhasNaGrade_(estrutura.aba, primeira + linhas.length - 1);
-    formatarEGravar_(estrutura, primeira, linhas);
-
-    for (var j = 0; j < gravados.length; j++) {
-      gravados[j].__linha = primeira + j;
-      gravados[j].__id = iId >= 0
-        ? converterParaIdentificador_(gravados[j][estrutura.cabecalhos[iId]])
-        : '';
-    }
-    return gravados;
+    return inserirComATravaNaMao_(nomeDaAba, lista, contexto);
   } finally {
     trava.releaseLock();
   }
+}
+
+/**
+ * O MIOLO de `inserirVariosRegistros_`, para quem JÁ segura a trava — a descarga
+ * da fila da auditoria (Etapa 61). Pegar a trava de novo aqui dentro seria o
+ * pior dos dois mundos: o `releaseLock` de dentro soltaria a de fora antes da
+ * hora, e a gravação de fora seguiria sem proteção.
+ */
+function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
+  if (!lista || !lista.length) return [];
+  contexto = contexto || {};
+  esquecerEstruturaLida_(nomeDaAba);
+  var estrutura = estruturaDaAba_(nomeDaAba, true);
+  var temControle = posicaoDaColuna_(estrutura, '_Visivel') >= 0;
+  var iId = posicaoDaColuna_(estrutura, 'Id');
+
+  // Quantas linhas precisam de Id novo — algumas já vêm com um. O bloco é
+  // reservado numa ida só ao PropertiesService, e não uma por linha: com uma
+  // por linha, gravar cinco mil casos eram dez mil idas e dois minutos de
+  // pedágio dentro de uma execução que tem seis.
+  var precisamDeId = 0;
+  if (iId >= 0) {
+    for (var p = 0; p < lista.length; p++) {
+      if (!converterParaIdentificador_(lista[p][estrutura.cabecalhos[iId]])) {
+        precisamDeId++;
+      }
+    }
+  }
+  var idsReservados = proximosIdentificadores_(nomeDaAba, precisamDeId);
+  var proximoDoBloco = 0;
+
+  var linhas = [];
+  var gravados = [];
+  for (var i = 0; i < lista.length; i++) {
+    var dados = {};
+    Object.keys(lista[i]).forEach(function (k) { dados[k] = lista[i][k]; });
+
+    if (iId >= 0) {
+      var idInformado = converterParaIdentificador_(dados[estrutura.cabecalhos[iId]]);
+      if (!idInformado) {
+        dados[estrutura.cabecalhos[iId]] = idsReservados[proximoDoBloco];
+        proximoDoBloco++;
+      }
+    }
+    if (temControle) {
+      if (dados._Visivel === undefined) dados._Visivel = RECC_VISIVEL_SIM;
+      if (dados._Origem === undefined) {
+        dados._Origem = contexto.origem || RECC_ORIGEM_SISTEMA;
+      }
+    }
+    linhas.push(montarLinhaParaGravar_(estrutura, dados, null));
+    gravados.push(dados);
+  }
+
+  var primeira = ultimaLinhaComConteudo_(estrutura) + 1;
+  if (primeira < 2) primeira = 2;
+  garantirLinhasNaGrade_(estrutura.aba, primeira + linhas.length - 1);
+  formatarEGravar_(estrutura, primeira, linhas);
+
+  for (var j = 0; j < gravados.length; j++) {
+    gravados[j].__linha = primeira + j;
+    gravados[j].__id = iId >= 0
+      ? converterParaIdentificador_(gravados[j][estrutura.cabecalhos[iId]])
+      : '';
+  }
+  return gravados;
+}
+
+/*
+ * A LINHA PROCURADA ANTES DA TRAVA E CONFERIDA DENTRO DELA (Etapa 61).
+ *
+ * Achar a linha de um Id é ler a coluna de Id inteira — 30 mil células numa RET
+ * de um ano —, e isso era feito DENTRO da trava, que é uma só para o sistema
+ * inteiro: todo mundo esperava a leitura de cada um. Agora a procura é feita
+ * antes; dentro da trava, só se confere UMA célula: o Id ainda está naquela
+ * linha? Uma exclusão no meio do caminho sobe as linhas de baixo, e aí a
+ * procura é refeita, ali dentro — o resultado é sempre o certo, só deixa de
+ * custar a trava dos outros.
+ */
+function linhaProcuradaAntesDaTrava_(nomeDaAba, id) {
+  try {
+    return linhaDoRegistro_(estruturaDaAba_(nomeDaAba), id);
+  } catch (erro) {
+    return -1;   // a procura de dentro da trava diz o motivo, com a planilha fresca
+  }
+}
+
+function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
+  if (linhaAchada > 1) {
+    try {
+      var iId = exigirPosicaoDaColuna_(estrutura, 'Id');
+      var naLinha = estrutura.aba.getRange(linhaAchada, iId + 1, 1, 1).getValues()[0][0];
+      if (converterParaIdentificador_(naLinha) === converterParaIdentificador_(id)) {
+        return linhaAchada;
+      }
+    } catch (erro) {
+      // linha que não existe mais (a grade encolheu): procura de novo, abaixo
+    }
+  }
+  return linhaDoRegistro_(estrutura, id);
 }
 
 /**
@@ -2889,6 +2934,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
  */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
+  var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -2896,7 +2942,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   try {
     esquecerEstruturaLida_(nomeDaAba);
     var estrutura = estruturaDaAba_(nomeDaAba, true);
-    var linha = linhaDoRegistro_(estrutura, id);
+    var linha = linhaConferidaNaTrava_(estrutura, id, linhaAchada);
     if (linha < 0) {
       throw new Error('Registro ' + converterParaIdentificador_(id) + ' não encontrado na aba "' +
         nomeDaAba + '".');
@@ -2964,6 +3010,7 @@ function comCarimboSeHouver_(nomeDaAba, campos) {
  */
 function apagarRegistroDeVez_(nomeDaAba, id) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
+  var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -2971,7 +3018,7 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
   try {
     esquecerEstruturaLida_(nomeDaAba);
     var estrutura = estruturaDaAba_(nomeDaAba, true);
-    var linha = linhaDoRegistro_(estrutura, id);
+    var linha = linhaConferidaNaTrava_(estrutura, id, linhaAchada);
     if (linha < 0) {
       throw new Error('Registro ' + converterParaIdentificador_(id)
         + ' não encontrado na aba "' + nomeDaAba + '".');

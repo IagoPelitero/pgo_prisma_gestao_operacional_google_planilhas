@@ -507,6 +507,7 @@ O Apps Script tem ~6 minutos por execução e cada chamada ao Sheets é rede.
 | Catálogo guardado em memória (`CacheService`), renovado por versão | O catálogo muda uma vez por semana, é lido a cada clique |
 | Totais guardados em memória, com chave formada por canal + filtros + período | Dez pessoas abrindo o mesmo painel = um cálculo |
 | `LockService` em toda gravação | Sheets não tem transação. Dois salvamentos simultâneos se atropelam |
+| A **auditoria fora da trava**: fila no `PropertiesService`, descarregada em lote com `tryLock(0)`; a linha do caso é procurada antes da trava e conferida dentro (Etapa 61) | A trava é uma só para o script inteiro: o que entra nela, todo mundo espera |
 
 ### 4.4 Busca
 

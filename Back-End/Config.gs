@@ -2424,6 +2424,9 @@ function conferirEstruturaDaPlanilha() {
 function listarAuditoria(quantas) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var limite = Number(quantas) || 50;
+  // O que está na fila ainda não chegou à aba (Etapa 61): descarrega antes,
+  // para a trilha mostrar o que acabou de acontecer.
+  descarregarAFilaDaAuditoria_(5000);
 
   var nomes = {};
   lerRegistros_('USUARIOS').forEach(function (usuario) {
@@ -2607,6 +2610,7 @@ function arquivarAuditoria_(agora) {
   var destino = abrirArquivoDaAuditoria_(id);
   var limite = limiteDoArquivamento_(agora);
   var quantas = 0;
+  descarregarAFilaDaAuditoria_(10000);   // a fila vai para a aba antes do corte (Etapa 61)
 
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(30000)) {

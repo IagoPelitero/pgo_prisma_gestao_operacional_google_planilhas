@@ -1292,6 +1292,9 @@ function atualizarPGO() {
   // cabeçalho). O cache da configuração (Etapa 42) é esquecido no começo e no
   // fim, para nada do que mudou aqui ficar 5 minutos escondido.
   esquecerCacheDaConfiguracao_();
+  // A fila da auditoria vai para a aba antes de qualquer migração (Etapa 61).
+  var daFila = descarregarAFilaDaAuditoria_(10000);
+  if (daFila) feito.push(daFila + ' registro(s) da fila da auditoria gravados na aba AUDITORIA');
 
   // --- 1. as migrações antigas, que são seguras de repetir -----------------
   var deCanais = migrarParaCanais_();
@@ -3794,7 +3797,28 @@ function blocoDoAmbiente_() {
         + 'aba de análise — estão travadas.',
       'Configurações › Identidade › Senha de administrador.'));
 
+  itens.push(itemDaFilaDaAuditoria_());
+
   return itens;
+}
+
+/*
+ * A FILA DA AUDITORIA (Etapa 61). Ela se esvazia sozinha: cada registro novo
+ * tenta descarregá-la. Fila que só cresce quer dizer trava sempre ocupada — uma
+ * rotina presa, ou um volume de gravação que a planilha não acompanha.
+ */
+const RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA = 200;
+
+function itemDaFilaDaAuditoria_() {
+  var naFila = tamanhoDaFilaDaAuditoria_();
+  return naFila < RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA
+    ? item_(RECC_SITUACOES_DO_LAUDO.OK, 'Fila da auditoria: ' + naFila + ' registro(s) esperando')
+    : item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Fila da auditoria: ' + naFila + ' registro(s) esperando',
+      'Os registros estão guardados e não se perdem, mas não estão chegando à aba AUDITORIA: '
+        + 'a trava de gravação vive ocupada.',
+      'Execute atualizarPGO() no editor: ele descarrega a fila. Se ela voltar a crescer, '
+        + 'confira se há uma importação ou rotina presa.');
 }
 
 /**

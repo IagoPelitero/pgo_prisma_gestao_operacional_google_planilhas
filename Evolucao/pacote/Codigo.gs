@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 13:10
+   Gerado em 2026-10-29 14:10
    ========================================================================== */
 
 
@@ -2833,71 +2833,116 @@ function inserirRegistro_(nomeDaAba, dados, contexto) {
 function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   if (!lista || !lista.length) return [];
-  contexto = contexto || {};
 
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
-    esquecerEstruturaLida_(nomeDaAba);
-    var estrutura = estruturaDaAba_(nomeDaAba, true);
-    var temControle = posicaoDaColuna_(estrutura, '_Visivel') >= 0;
-    var iId = posicaoDaColuna_(estrutura, 'Id');
-
-    // Quantas linhas precisam de Id novo — algumas já vêm com um. O bloco é
-    // reservado numa ida só ao PropertiesService, e não uma por linha: com uma
-    // por linha, gravar cinco mil casos eram dez mil idas e dois minutos de
-    // pedágio dentro de uma execução que tem seis.
-    var precisamDeId = 0;
-    if (iId >= 0) {
-      for (var p = 0; p < lista.length; p++) {
-        if (!converterParaIdentificador_(lista[p][estrutura.cabecalhos[iId]])) {
-          precisamDeId++;
-        }
-      }
-    }
-    var idsReservados = proximosIdentificadores_(nomeDaAba, precisamDeId);
-    var proximoDoBloco = 0;
-
-    var linhas = [];
-    var gravados = [];
-    for (var i = 0; i < lista.length; i++) {
-      var dados = {};
-      Object.keys(lista[i]).forEach(function (k) { dados[k] = lista[i][k]; });
-
-      if (iId >= 0) {
-        var idInformado = converterParaIdentificador_(dados[estrutura.cabecalhos[iId]]);
-        if (!idInformado) {
-          dados[estrutura.cabecalhos[iId]] = idsReservados[proximoDoBloco];
-          proximoDoBloco++;
-        }
-      }
-      if (temControle) {
-        if (dados._Visivel === undefined) dados._Visivel = RECC_VISIVEL_SIM;
-        if (dados._Origem === undefined) {
-          dados._Origem = contexto.origem || RECC_ORIGEM_SISTEMA;
-        }
-      }
-      linhas.push(montarLinhaParaGravar_(estrutura, dados, null));
-      gravados.push(dados);
-    }
-
-    var primeira = ultimaLinhaComConteudo_(estrutura) + 1;
-    if (primeira < 2) primeira = 2;
-    garantirLinhasNaGrade_(estrutura.aba, primeira + linhas.length - 1);
-    formatarEGravar_(estrutura, primeira, linhas);
-
-    for (var j = 0; j < gravados.length; j++) {
-      gravados[j].__linha = primeira + j;
-      gravados[j].__id = iId >= 0
-        ? converterParaIdentificador_(gravados[j][estrutura.cabecalhos[iId]])
-        : '';
-    }
-    return gravados;
+    return inserirComATravaNaMao_(nomeDaAba, lista, contexto);
   } finally {
     trava.releaseLock();
   }
+}
+
+/**
+ * O MIOLO de `inserirVariosRegistros_`, para quem JÁ segura a trava — a descarga
+ * da fila da auditoria (Etapa 61). Pegar a trava de novo aqui dentro seria o
+ * pior dos dois mundos: o `releaseLock` de dentro soltaria a de fora antes da
+ * hora, e a gravação de fora seguiria sem proteção.
+ */
+function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
+  if (!lista || !lista.length) return [];
+  contexto = contexto || {};
+  esquecerEstruturaLida_(nomeDaAba);
+  var estrutura = estruturaDaAba_(nomeDaAba, true);
+  var temControle = posicaoDaColuna_(estrutura, '_Visivel') >= 0;
+  var iId = posicaoDaColuna_(estrutura, 'Id');
+
+  // Quantas linhas precisam de Id novo — algumas já vêm com um. O bloco é
+  // reservado numa ida só ao PropertiesService, e não uma por linha: com uma
+  // por linha, gravar cinco mil casos eram dez mil idas e dois minutos de
+  // pedágio dentro de uma execução que tem seis.
+  var precisamDeId = 0;
+  if (iId >= 0) {
+    for (var p = 0; p < lista.length; p++) {
+      if (!converterParaIdentificador_(lista[p][estrutura.cabecalhos[iId]])) {
+        precisamDeId++;
+      }
+    }
+  }
+  var idsReservados = proximosIdentificadores_(nomeDaAba, precisamDeId);
+  var proximoDoBloco = 0;
+
+  var linhas = [];
+  var gravados = [];
+  for (var i = 0; i < lista.length; i++) {
+    var dados = {};
+    Object.keys(lista[i]).forEach(function (k) { dados[k] = lista[i][k]; });
+
+    if (iId >= 0) {
+      var idInformado = converterParaIdentificador_(dados[estrutura.cabecalhos[iId]]);
+      if (!idInformado) {
+        dados[estrutura.cabecalhos[iId]] = idsReservados[proximoDoBloco];
+        proximoDoBloco++;
+      }
+    }
+    if (temControle) {
+      if (dados._Visivel === undefined) dados._Visivel = RECC_VISIVEL_SIM;
+      if (dados._Origem === undefined) {
+        dados._Origem = contexto.origem || RECC_ORIGEM_SISTEMA;
+      }
+    }
+    linhas.push(montarLinhaParaGravar_(estrutura, dados, null));
+    gravados.push(dados);
+  }
+
+  var primeira = ultimaLinhaComConteudo_(estrutura) + 1;
+  if (primeira < 2) primeira = 2;
+  garantirLinhasNaGrade_(estrutura.aba, primeira + linhas.length - 1);
+  formatarEGravar_(estrutura, primeira, linhas);
+
+  for (var j = 0; j < gravados.length; j++) {
+    gravados[j].__linha = primeira + j;
+    gravados[j].__id = iId >= 0
+      ? converterParaIdentificador_(gravados[j][estrutura.cabecalhos[iId]])
+      : '';
+  }
+  return gravados;
+}
+
+/*
+ * A LINHA PROCURADA ANTES DA TRAVA E CONFERIDA DENTRO DELA (Etapa 61).
+ *
+ * Achar a linha de um Id é ler a coluna de Id inteira — 30 mil células numa RET
+ * de um ano —, e isso era feito DENTRO da trava, que é uma só para o sistema
+ * inteiro: todo mundo esperava a leitura de cada um. Agora a procura é feita
+ * antes; dentro da trava, só se confere UMA célula: o Id ainda está naquela
+ * linha? Uma exclusão no meio do caminho sobe as linhas de baixo, e aí a
+ * procura é refeita, ali dentro — o resultado é sempre o certo, só deixa de
+ * custar a trava dos outros.
+ */
+function linhaProcuradaAntesDaTrava_(nomeDaAba, id) {
+  try {
+    return linhaDoRegistro_(estruturaDaAba_(nomeDaAba), id);
+  } catch (erro) {
+    return -1;   // a procura de dentro da trava diz o motivo, com a planilha fresca
+  }
+}
+
+function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
+  if (linhaAchada > 1) {
+    try {
+      var iId = exigirPosicaoDaColuna_(estrutura, 'Id');
+      var naLinha = estrutura.aba.getRange(linhaAchada, iId + 1, 1, 1).getValues()[0][0];
+      if (converterParaIdentificador_(naLinha) === converterParaIdentificador_(id)) {
+        return linhaAchada;
+      }
+    } catch (erro) {
+      // linha que não existe mais (a grade encolheu): procura de novo, abaixo
+    }
+  }
+  return linhaDoRegistro_(estrutura, id);
 }
 
 /**
@@ -2907,6 +2952,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
  */
 function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
+  var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -2914,7 +2960,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   try {
     esquecerEstruturaLida_(nomeDaAba);
     var estrutura = estruturaDaAba_(nomeDaAba, true);
-    var linha = linhaDoRegistro_(estrutura, id);
+    var linha = linhaConferidaNaTrava_(estrutura, id, linhaAchada);
     if (linha < 0) {
       throw new Error('Registro ' + converterParaIdentificador_(id) + ' não encontrado na aba "' +
         nomeDaAba + '".');
@@ -2982,6 +3028,7 @@ function comCarimboSeHouver_(nomeDaAba, campos) {
  */
 function apagarRegistroDeVez_(nomeDaAba, id) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
+  var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -2989,7 +3036,7 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
   try {
     esquecerEstruturaLida_(nomeDaAba);
     var estrutura = estruturaDaAba_(nomeDaAba, true);
-    var linha = linhaDoRegistro_(estrutura, id);
+    var linha = linhaConferidaNaTrava_(estrutura, id, linhaAchada);
     if (linha < 0) {
       throw new Error('Registro ' + converterParaIdentificador_(id)
         + ' não encontrado na aba "' + nomeDaAba + '".');
@@ -10705,6 +10752,9 @@ function conferirEstruturaDaPlanilha() {
 function listarAuditoria(quantas) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var limite = Number(quantas) || 50;
+  // O que está na fila ainda não chegou à aba (Etapa 61): descarrega antes,
+  // para a trilha mostrar o que acabou de acontecer.
+  descarregarAFilaDaAuditoria_(5000);
 
   var nomes = {};
   lerRegistros_('USUARIOS').forEach(function (usuario) {
@@ -10888,6 +10938,7 @@ function arquivarAuditoria_(agora) {
   var destino = abrirArquivoDaAuditoria_(id);
   var limite = limiteDoArquivamento_(agora);
   var quantas = 0;
+  descarregarAFilaDaAuditoria_(10000);   // a fila vai para a aba antes do corte (Etapa 61)
 
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(30000)) {
@@ -13220,20 +13271,111 @@ function exigirSenhaDeAdministrador_() {
  * Deixa rastro do que foi feito, sem gravar dado pessoal.
  * Nunca derruba a operação: falhar ao auditar não pode desfazer o que já
  * aconteceu — só registra o problema no log do Apps Script.
+ *
+ * FORA DA FILA DE GRAVAÇÃO (Etapa 61, achado 110). A auditoria gravava direto
+ * na planilha, e para isso pegava a trava — que é uma só para o sistema
+ * inteiro. Quem só BUSCAVA um caso esperava na fila de quem gravava, e quem
+ * cadastrava passava pela trava duas vezes (o caso e a auditoria), até 50
+ * segundos de espera. Agora o registro entra numa FILA durável (o
+ * PropertiesService, que não precisa de trava) e quem achar a trava livre
+ * grava a fila inteira, em lote. Ninguém espera pela auditoria.
  */
 function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
   try {
-    inserirRegistro_('AUDITORIA', {
+    var registro = {
       DataHora: new Date(),
       UsuarioId: (usuarioAtual_().usuario || {}).Id || '',
       Acao: acao,
       Entidade: entidade || '',
       RegistroId: idDoRegistro || '',
       Detalhe: detalhe || ''
-    });
+    };
+    if (entrarNaFilaDaAuditoria_(registro)) {
+      descarregarAFilaDaAuditoria_(0);
+      return;
+    }
+    // Grande demais para a fila (o caso excluído, com o conteúdo inteiro) ou
+    // fila cheia: grava direto, como era — esperando a trava.
+    inserirRegistro_('AUDITORIA', registro);
   } catch (erro) {
     Logger.log('Falha ao registrar auditoria: ' + erro.message);
   }
+}
+
+/*
+ * A FILA DA AUDITORIA. Cada registro é UMA propriedade do script, com a hora
+ * na chave: gravar uma propriedade não precisa de trava, e chaves diferentes
+ * não se atropelam. O PropertiesService guarda 9 KB por valor e 500 KB no
+ * total — o registro maior que isso, ou a fila cheia, vai direto para a aba.
+ */
+const RECC_PREFIXO_DA_FILA_DA_AUDITORIA = 'AUDITORIA.FILA.';
+const RECC_MAIOR_REGISTRO_NA_FILA = 8000;      // caracteres; o teto é 9 KB
+const RECC_DESCARGA_DA_AUDITORIA = 500;        // registros por descarga
+
+/** Põe o registro na fila. Devolve false quando ele não cabe (vai direto). */
+function entrarNaFilaDaAuditoria_(registro) {
+  var texto = JSON.stringify({
+    d: registro.DataHora.getTime(), u: registro.UsuarioId, a: registro.Acao,
+    e: registro.Entidade, r: registro.RegistroId, t: registro.Detalhe
+  });
+  if (texto.length > RECC_MAIOR_REGISTRO_NA_FILA) return false;
+  var chave = RECC_PREFIXO_DA_FILA_DA_AUDITORIA + ('0000000000000' + registro.DataHora.getTime()).slice(-13)
+    + '.' + Math.random().toString(36).slice(2, 10);
+  try {
+    PropertiesService.getScriptProperties().setProperty(chave, texto);
+    return true;
+  } catch (erro) {
+    return false;
+  }
+}
+
+/**
+ * Grava a fila inteira na aba AUDITORIA, em lote e em ordem de hora.
+ *
+ * `esperarMs` 0 — o normal — tenta a trava e, ocupada, desiste na hora: o
+ * próximo que registrar alguma coisa descarrega. Quem LÊ a auditoria (a trilha,
+ * o arquivamento, o diagnóstico) espera um pouco, para ler o que acabou de
+ * acontecer. Devolve quantos registros gravou.
+ *
+ * Grava ANTES de tirar da fila: se a gravação falhar, a fila continua inteira
+ * para a próxima vez. O pior caso — falhar entre gravar e tirar — é um registro
+ * repetido na auditoria, que é o erro que dá para ver; o contrário seria
+ * perder o rastro.
+ */
+function descarregarAFilaDaAuditoria_(esperarMs) {
+  var props = PropertiesService.getScriptProperties();
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(esperarMs || 0)) return 0;
+  try {
+    var todas = props.getProperties();
+    var chaves = Object.keys(todas)
+      .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
+      .sort()
+      .slice(0, RECC_DESCARGA_DA_AUDITORIA);
+    if (!chaves.length) return 0;
+
+    var registros = [];
+    chaves.forEach(function (chave) {
+      var lido;
+      try { lido = JSON.parse(todas[chave]); } catch (erro) { return; }   // lixo: sai da fila
+      registros.push({
+        DataHora: new Date(Number(lido.d)), UsuarioId: lido.u || '', Acao: lido.a || '',
+        Entidade: lido.e || '', RegistroId: lido.r || '', Detalhe: lido.t || ''
+      });
+    });
+    if (registros.length) inserirComATravaNaMao_('AUDITORIA', registros);
+    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+    return registros.length;
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+/** Quantos registros esperam na fila — para o diagnóstico. */
+function tamanhoDaFilaDaAuditoria_() {
+  return Object.keys(PropertiesService.getScriptProperties().getProperties())
+    .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
+    .length;
 }
 
 /* ############################################################################
@@ -18481,6 +18623,9 @@ function atualizarPGO() {
   // cabeçalho). O cache da configuração (Etapa 42) é esquecido no começo e no
   // fim, para nada do que mudou aqui ficar 5 minutos escondido.
   esquecerCacheDaConfiguracao_();
+  // A fila da auditoria vai para a aba antes de qualquer migração (Etapa 61).
+  var daFila = descarregarAFilaDaAuditoria_(10000);
+  if (daFila) feito.push(daFila + ' registro(s) da fila da auditoria gravados na aba AUDITORIA');
 
   // --- 1. as migrações antigas, que são seguras de repetir -----------------
   var deCanais = migrarParaCanais_();
@@ -20983,7 +21128,28 @@ function blocoDoAmbiente_() {
         + 'aba de análise — estão travadas.',
       'Configurações › Identidade › Senha de administrador.'));
 
+  itens.push(itemDaFilaDaAuditoria_());
+
   return itens;
+}
+
+/*
+ * A FILA DA AUDITORIA (Etapa 61). Ela se esvazia sozinha: cada registro novo
+ * tenta descarregá-la. Fila que só cresce quer dizer trava sempre ocupada — uma
+ * rotina presa, ou um volume de gravação que a planilha não acompanha.
+ */
+const RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA = 200;
+
+function itemDaFilaDaAuditoria_() {
+  var naFila = tamanhoDaFilaDaAuditoria_();
+  return naFila < RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA
+    ? item_(RECC_SITUACOES_DO_LAUDO.OK, 'Fila da auditoria: ' + naFila + ' registro(s) esperando')
+    : item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Fila da auditoria: ' + naFila + ' registro(s) esperando',
+      'Os registros estão guardados e não se perdem, mas não estão chegando à aba AUDITORIA: '
+        + 'a trava de gravação vive ocupada.',
+      'Execute atualizarPGO() no editor: ele descarrega a fila. Se ela voltar a crescer, '
+        + 'confira se há uma importação ou rotina presa.');
 }
 
 /**

@@ -1178,20 +1178,111 @@ function exigirSenhaDeAdministrador_() {
  * Deixa rastro do que foi feito, sem gravar dado pessoal.
  * Nunca derruba a operação: falhar ao auditar não pode desfazer o que já
  * aconteceu — só registra o problema no log do Apps Script.
+ *
+ * FORA DA FILA DE GRAVAÇÃO (Etapa 61, achado 110). A auditoria gravava direto
+ * na planilha, e para isso pegava a trava — que é uma só para o sistema
+ * inteiro. Quem só BUSCAVA um caso esperava na fila de quem gravava, e quem
+ * cadastrava passava pela trava duas vezes (o caso e a auditoria), até 50
+ * segundos de espera. Agora o registro entra numa FILA durável (o
+ * PropertiesService, que não precisa de trava) e quem achar a trava livre
+ * grava a fila inteira, em lote. Ninguém espera pela auditoria.
  */
 function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
   try {
-    inserirRegistro_('AUDITORIA', {
+    var registro = {
       DataHora: new Date(),
       UsuarioId: (usuarioAtual_().usuario || {}).Id || '',
       Acao: acao,
       Entidade: entidade || '',
       RegistroId: idDoRegistro || '',
       Detalhe: detalhe || ''
-    });
+    };
+    if (entrarNaFilaDaAuditoria_(registro)) {
+      descarregarAFilaDaAuditoria_(0);
+      return;
+    }
+    // Grande demais para a fila (o caso excluído, com o conteúdo inteiro) ou
+    // fila cheia: grava direto, como era — esperando a trava.
+    inserirRegistro_('AUDITORIA', registro);
   } catch (erro) {
     Logger.log('Falha ao registrar auditoria: ' + erro.message);
   }
+}
+
+/*
+ * A FILA DA AUDITORIA. Cada registro é UMA propriedade do script, com a hora
+ * na chave: gravar uma propriedade não precisa de trava, e chaves diferentes
+ * não se atropelam. O PropertiesService guarda 9 KB por valor e 500 KB no
+ * total — o registro maior que isso, ou a fila cheia, vai direto para a aba.
+ */
+const RECC_PREFIXO_DA_FILA_DA_AUDITORIA = 'AUDITORIA.FILA.';
+const RECC_MAIOR_REGISTRO_NA_FILA = 8000;      // caracteres; o teto é 9 KB
+const RECC_DESCARGA_DA_AUDITORIA = 500;        // registros por descarga
+
+/** Põe o registro na fila. Devolve false quando ele não cabe (vai direto). */
+function entrarNaFilaDaAuditoria_(registro) {
+  var texto = JSON.stringify({
+    d: registro.DataHora.getTime(), u: registro.UsuarioId, a: registro.Acao,
+    e: registro.Entidade, r: registro.RegistroId, t: registro.Detalhe
+  });
+  if (texto.length > RECC_MAIOR_REGISTRO_NA_FILA) return false;
+  var chave = RECC_PREFIXO_DA_FILA_DA_AUDITORIA + ('0000000000000' + registro.DataHora.getTime()).slice(-13)
+    + '.' + Math.random().toString(36).slice(2, 10);
+  try {
+    PropertiesService.getScriptProperties().setProperty(chave, texto);
+    return true;
+  } catch (erro) {
+    return false;
+  }
+}
+
+/**
+ * Grava a fila inteira na aba AUDITORIA, em lote e em ordem de hora.
+ *
+ * `esperarMs` 0 — o normal — tenta a trava e, ocupada, desiste na hora: o
+ * próximo que registrar alguma coisa descarrega. Quem LÊ a auditoria (a trilha,
+ * o arquivamento, o diagnóstico) espera um pouco, para ler o que acabou de
+ * acontecer. Devolve quantos registros gravou.
+ *
+ * Grava ANTES de tirar da fila: se a gravação falhar, a fila continua inteira
+ * para a próxima vez. O pior caso — falhar entre gravar e tirar — é um registro
+ * repetido na auditoria, que é o erro que dá para ver; o contrário seria
+ * perder o rastro.
+ */
+function descarregarAFilaDaAuditoria_(esperarMs) {
+  var props = PropertiesService.getScriptProperties();
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(esperarMs || 0)) return 0;
+  try {
+    var todas = props.getProperties();
+    var chaves = Object.keys(todas)
+      .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
+      .sort()
+      .slice(0, RECC_DESCARGA_DA_AUDITORIA);
+    if (!chaves.length) return 0;
+
+    var registros = [];
+    chaves.forEach(function (chave) {
+      var lido;
+      try { lido = JSON.parse(todas[chave]); } catch (erro) { return; }   // lixo: sai da fila
+      registros.push({
+        DataHora: new Date(Number(lido.d)), UsuarioId: lido.u || '', Acao: lido.a || '',
+        Entidade: lido.e || '', RegistroId: lido.r || '', Detalhe: lido.t || ''
+      });
+    });
+    if (registros.length) inserirComATravaNaMao_('AUDITORIA', registros);
+    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+    return registros.length;
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+/** Quantos registros esperam na fila — para o diagnóstico. */
+function tamanhoDaFilaDaAuditoria_() {
+  return Object.keys(PropertiesService.getScriptProperties().getProperties())
+    .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
+    .length;
 }
 
 /* ############################################################################

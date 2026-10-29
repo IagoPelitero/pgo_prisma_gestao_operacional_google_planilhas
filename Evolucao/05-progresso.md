@@ -3361,6 +3361,38 @@ ficou certo.
 
 ---
 
+## Etapa 61 — A auditoria fora da trava, e menos tempo dentro dela
+
+Terceira correção da análise de 29/10 (achado 110). A trava de gravação é **uma só para o
+sistema inteiro**, e a auditoria passava por ela: quem só buscava um caso esperava na fila de
+quem gravava, e quem cadastrava passava pela trava duas vezes (o caso e a auditoria) — até 50
+segundos de espera, mais que os 40 da tela. Escolha do PO: buscar e exportar **continuam** na
+auditoria, mas fora da fila.
+
+| Parte | O que ficou |
+|---|---|
+| **A fila da auditoria** | `registrarAuditoria_` põe o registro numa fila durável — o PropertiesService, uma propriedade por registro, com a hora na chave — e tenta a trava **sem esperar** (`tryLock(0)`). Achou livre, grava a fila inteira em lote, em ordem de hora; ocupada, o próximo que registrar alguma coisa grava. Ninguém espera pela auditoria |
+| **Grava antes de tirar da fila** | Se a gravação falhar, a fila fica inteira para a próxima vez — o pior caso é um registro repetido, nunca um perdido |
+| **O que vai direto** | Registro maior que 8 mil caracteres (o caso excluído, com o conteúdo inteiro) ou fila cheia (500 KB): grava direto na aba, como era |
+| **Quem lê descarrega antes** | A trilha de Configurações espera até 5 segundos pela trava, o arquivamento até 10, e o `atualizarPGO` também descarrega e diz quantos |
+| **O diagnóstico** | Bloco "O ambiente" ganhou "Fila da auditoria": OK abaixo de 200 registros esperando; ATENÇÃO acima — a trava vive ocupada |
+| **Menos tempo na trava** | Achar a linha de um caso (ler a coluna de Id inteira) saiu de dentro da trava: a procura é feita antes, e lá dentro só se confere **uma célula** — o Id ainda está naquela linha? Uma exclusão no meio do caminho é percebida e a procura é refeita ali dentro. Vale para atualizar e para excluir |
+| **O miolo da gravação** | `inserirComATravaNaMao_`: gravar para quem JÁ segura a trava, sem pegá-la de novo (o `releaseLock` de dentro soltaria a de fora) |
+
+**Medido no volume de produção** (30 mil casos na RET, 20 mil na Mesa): mudar o status lê
+**148 células com a trava na mão, contra 30.147** antes; na Mesa, 88 contra 20.087. A busca,
+a exportação e o diagnóstico não esperam mais a trava. O custo: cada ação auditada faz 3
+idas a mais ao PropertiesService (gravar, ler a fila, apagar), uns décimos de segundo — fora
+da trava.
+
+12 testes novos em `testes-auditoria-fora-da-trava.js` (a trava livre e a ocupada, a ordem,
+o registro grande, a falha que não perde nada, o lixo na fila, quem lê descarrega, o
+diagnóstico, as células dentro da trava e a exclusão no meio do caminho). O simulador ganhou
+a trava ocupada (`ambiente.travaOcupada`) e o registro de quanto cada chamada aceitou esperar.
+6 quebras de propósito, 6 pegas.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

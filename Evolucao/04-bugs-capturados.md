@@ -2252,6 +2252,21 @@ do projeto não se acerta por código — e ninguém conferia.
 **Defesa.** O diagnóstico confere `Session.getScriptTimeZone()` (FALHA fora de São Paulo), o
 `atualizarPGO` avisa, e o manifesto com o fuso certo vai no pacote (Etapa 60).
 
+### 110 · A auditoria fazia quem só buscava esperar na fila de quem gravava
+
+**Sintoma.** Achado da análise de 29/10: com várias pessoas trabalhando, a busca e o
+cadastro passavam dos 40 segundos da tela.
+
+**Causa.** A trava do Apps Script é uma só para o script inteiro, e esperava até 25 segundos.
+A auditoria gravava direto na aba e, por isso, entrava nessa fila — inclusive nas ações que
+só leem (buscar, exportar, diagnóstico). O cadastro passava duas vezes: o caso e a auditoria.
+E dentro da trava se lia a coluna de Id inteira para achar a linha.
+
+**Defesa.** Auditoria numa fila durável, descarregada em lote por quem achar a trava livre,
+sem esperar; a linha do caso procurada antes da trava e conferida dentro com uma célula só
+(Etapa 61). A suíte ocupa a trava e confere que a busca não espera, que nada se perde e que a
+mudança de status lê menos de 500 células com a trava na mão.
+
 ---
 
 ## O que esta lista ensina
@@ -2497,3 +2512,6 @@ Daí as duas práticas que o projeto não abre mão:
     precisa de um jeito de reconhecer a repetição.
 60. **Dois relógios precisam ser conferidos como dois.** No item 109 o "fuso" era um só
     para o diagnóstico, e eram dois: o da planilha e o do projeto.
+61. **Tudo o que entra numa trava compartilhada é pago por todo mundo.** No item 110 o rastro
+    de quem só olhava esperava junto com quem gravava. Dentro da trava, só o que precisa
+    estar lá — e o rastro não precisa.
