@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 15:24
+   Gerado em 2026-10-29 16:32
    ========================================================================== */
 
 
@@ -1622,6 +1622,56 @@ function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
   return saida;
 }
 
+var RECC_LETRAS_COM_ACENTO = {
+  a: 'àáâãäå', c: 'ç', e: 'èéêë', i: 'ìíîï', n: 'ñ', o: 'òóôõö', u: 'ùúûü', y: 'ýÿ'
+};
+
+var RECC_SEPARADOR_DE_TEXTO = '[^0-9A-Za-zÀ-ÖØ-öø-ÿ]*';
+
+var RECC_SEPARADOR_DE_IDENTIFICADOR = '[^0-9]*';
+
+function buscaRapidaLigada_() {
+  return normalizarParaComparar_(valorDaConfiguracao_('OPERACAO.BUSCA_RAPIDA', 'SIM')) !== 'nao';
+}
+
+function expressaoDaBuscaRapida_(alvo, ehIdentificador, inteira) {
+  var separador = ehIdentificador ? RECC_SEPARADOR_DE_IDENTIFICADOR : RECC_SEPARADOR_DE_TEXTO;
+  var letras = String(alvo).split('').map(function (letra) {
+    if (/[0-9]/.test(letra)) return letra;
+    var acentos = RECC_LETRAS_COM_ACENTO[letra] || '';
+    return '[' + letra + letra.toUpperCase() + acentos + acentos.toUpperCase() + ']';
+  });
+  var miolo = letras.join(separador);
+  return inteira ? '^' + separador + miolo + separador + '$' : miolo;
+}
+
+function linhasDaBuscaRapida_(estrutura, indiceDaColuna, alvo, ehIdentificador, inteira) {
+  if (!alvo || !/^[a-z0-9]+$/.test(alvo) || !buscaRapidaLigada_()) return null;
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return [];
+  try {
+    return estrutura.aba.getRange(2, indiceDaColuna + 1, total, 1)
+      .createTextFinder(expressaoDaBuscaRapida_(alvo, ehIdentificador, inteira))
+      .useRegularExpression(true)
+      .matchFormulaText(false)
+      .findAll()
+      .map(function (celula) { return celula.getRow(); })
+      .sort(function (uma, outra) { return uma - outra; });
+  } catch (erro) {
+    return null;
+  }
+}
+
+function valoresNasLinhas_(estrutura, indiceDaColuna, numerosDeLinha) {
+  var porLinha = {};
+  blocosDeLinhas_(numerosDeLinha).forEach(function (bloco) {
+    var quantas = bloco.fim - bloco.inicio + 1;
+    estrutura.aba.getRange(bloco.inicio, indiceDaColuna + 1, quantas, 1).getValues()
+      .forEach(function (linha, k) { porLinha[bloco.inicio + k] = linha[0]; });
+  });
+  return porLinha;
+}
+
 function buscarRegistros_(nomeDaAba, cabecalho, valor, limite) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
@@ -1632,6 +1682,17 @@ function buscarRegistros_(nomeDaAba, cabecalho, valor, limite) {
     ? converterParaIdentificador_(valor)
     : normalizarParaComparar_(valor);
   if (alvo === '') return [];
+
+  var candidatas = linhasDaBuscaRapida_(estrutura, i, alvo, ehIdentificador, true);
+  var ehOId = i === posicaoDaColuna_(estrutura, 'Id');
+  if (candidatas !== null) {
+    var conferidos = lerLinhasEspecificas_(nomeDaAba, candidatas).filter(function (registro) {
+      var atualNaLinha = registro[estrutura.cabecalhos[i]];
+      return (ehIdentificador ? converterParaIdentificador_(atualNaLinha)
+        : normalizarParaComparar_(atualNaLinha)) === alvo;
+    });
+    if (conferidos.length || !ehOId) return limite ? conferidos.slice(0, limite) : conferidos;
+  }
 
   var coluna = lerColunaInteira_(nomeDaAba, cabecalho);
   var linhas = [];
@@ -1662,10 +1723,20 @@ function linhaDoRegistro_(estrutura, id) {
   if (totalDados <= 0) return -1;
 
   var alvo = converterParaIdentificador_(id);
-  var coluna = estrutura.aba.getRange(2, iId + 1, totalDados, 1).getValues();
   var achadas = [];
-  for (var i = 0; i < coluna.length; i++) {
-    if (converterParaIdentificador_(coluna[i][0]) === alvo) achadas.push(i + 2);
+
+  var candidatas = linhasDaBuscaRapida_(estrutura, iId, alvo, true, true);
+  if (candidatas && candidatas.length) {
+    var valores = valoresNasLinhas_(estrutura, iId, candidatas);
+    achadas = candidatas.filter(function (linha) {
+      return converterParaIdentificador_(valores[linha]) === alvo;
+    });
+  }
+  if (!achadas.length) {
+    var coluna = estrutura.aba.getRange(2, iId + 1, totalDados, 1).getValues();
+    for (var i = 0; i < coluna.length; i++) {
+      if (converterParaIdentificador_(coluna[i][0]) === alvo) achadas.push(i + 2);
+    }
   }
   if (achadas.length > 1) {
     throw new Error('O Id ' + alvo + ' aparece em ' + achadas.length +
@@ -1803,7 +1874,12 @@ function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
 
 function linhaProcuradaAntesDaTrava_(nomeDaAba, id) {
   try {
-    return linhaDoRegistro_(estruturaDaAba_(nomeDaAba), id);
+    var estrutura = estruturaDaAba_(nomeDaAba);
+
+    var candidatas = linhasDaBuscaRapida_(estrutura, exigirPosicaoDaColuna_(estrutura, 'Id'),
+      converterParaIdentificador_(id), true, true);
+    if (candidatas && candidatas.length === 1) return candidatas[0];
+    return linhaDoRegistro_(estrutura, id);
   } catch (erro) {
     return -1;
   }
@@ -2364,7 +2440,9 @@ function resumoDasSusepsBloqueadas(procurar) {
   var suseps = coluna('SUSEP');
   var visiveis = coluna('_Visivel');
 
-  var deProcura = termo ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
+  var achadasPeloTermo = termo ? linhasDoTermoNasBloqueadas_(estrutura, termo) : null;
+  var deProcura = termo && !achadasPeloTermo
+    ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
 
   var quantasNoTotal = 0;
   var candidatas = [];
@@ -2373,9 +2451,10 @@ function resumoDasSusepsBloqueadas(procurar) {
     var chave = chaveDaSusep_(suseps[i]);
     if (!chave) continue;
     quantasNoTotal++;
-    if (termo && chave.indexOf(termo) < 0 && !deProcura.some(function (valores) {
-      return normalizarParaComparar_(valores[i]).indexOf(termo) >= 0;
-    })) continue;
+    if (termo && (achadasPeloTermo ? !achadasPeloTermo[i + 2]
+      : chave.indexOf(termo) < 0 && !deProcura.some(function (valores) {
+        return normalizarParaComparar_(valores[i]).indexOf(termo) >= 0;
+      }))) continue;
     candidatas.push({ linha: i + 2, casos: volumes.porSusep[chave] || 0 });
   }
 
@@ -2411,6 +2490,19 @@ function resumoDasSusepsBloqueadas(procurar) {
     procurar: String(procurar || ''),
     podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR)
   };
+}
+
+function linhasDoTermoNasBloqueadas_(estrutura, termo) {
+  var linhas = {};
+  var colunas = ['SUSEP', 'NomeCorretora', 'Sucursal', 'CoordenadorComercial'];
+  for (var c = 0; c < colunas.length; c++) {
+    var posicao = posicaoDaColuna_(estrutura, colunas[c]);
+    if (posicao < 0) continue;
+    var achadas = linhasDaBuscaRapida_(estrutura, posicao, termo, false, false);
+    if (achadas === null) return null;
+    achadas.forEach(function (linha) { linhas[linha] = true; });
+  }
+  return linhas;
 }
 
 function bloquearSusep(dados) {
@@ -4116,12 +4208,17 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
 
   var colunaDoNumero = partir.colunas[partir.colunas.length - 1];
   var numero = pedacos[pedacos.length - 1];
-  var linhas = [];
-  lerColunaInteira_(canal.aba, colunaDoNumero).forEach(function (valor, i) {
-    if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
-  });
-
   var estrutura = estruturaDaAba_(canal.aba);
+
+  var linhas = linhasDaBuscaRapida_(estrutura,
+    exigirPosicaoDaColuna_(estrutura, colunaDoNumero), numero, true, true);
+  if (linhas === null) {
+    linhas = [];
+    lerColunaInteira_(canal.aba, colunaDoNumero).forEach(function (valor, i) {
+      if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
+    });
+  }
+
   var colunaDoAnalista = colunaDoResponsavel_(estrutura);
   var abertoAgora = converterParaIdentificador_(idDoCasoAberto);
 
@@ -12071,6 +12168,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       'Quantas linhas do fim da base os painéis leem antes de filtrar por '
       + 'data. Com muito volume, 5.000 podem não cobrir a janela de dias — as '
       + 'telas avisam quando isso acontece.'),
+    novaConfiguracao_('OPERACAO.BUSCA_RAPIDA', 'SIM',
+      'SIM: SUSEP, Id e proposta são achados pelo localizador do Sheets, sem '
+      + 'ler a coluna inteira. NAO: volta à leitura da coluna — mais lenta. '
+      + 'O diagnóstico confere se o localizador acha as linhas da planilha.'),
     novaConfiguracao_('OPERACAO.TEMA_PADRAO', 'padrao',
       'padrao | rosa | dark | brasil'),
 
@@ -14320,8 +14421,61 @@ function blocoDoAmbiente_() {
       'Configurações › Identidade › Senha de administrador.'));
 
   itens.push(itemDaFilaDaAuditoria_());
+  itens.push(itemDaBuscaRapida_());
 
   return itens;
+}
+
+function itemDaBuscaRapida_() {
+  if (!buscaRapidaLigada_()) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Busca rápida: desligada (OPERACAO.BUSCA_RAPIDA = NAO)',
+      'SUSEP, Id e proposta são achados lendo a coluna inteira — certo, mas mais lento.',
+      'Para religar, ponha SIM em OPERACAO.BUSCA_RAPIDA, na aba CONFIG, e rode o '
+        + 'diagnóstico de novo.');
+  }
+  var abas = canaisVisiveis_().map(function (canal) { return canal.aba; })
+    .concat(['CORRETORAS', 'SUSEP_BLOQUEADAS']);
+  var conferidas = 0;
+  var erradas = [];
+  abas.forEach(function (nomeDaAba) {
+    var estrutura;
+    try { estrutura = estruturaDaAba_(nomeDaAba); } catch (erro) { return; }
+    var total = quantidadeDeRegistros_(estrutura);
+    if (total <= 0) return;
+    var colunas = [{ nome: 'Id', ehIdentificador: true }];
+    if (nomeDaAba === 'CORRETORAS' || nomeDaAba === 'SUSEP_BLOQUEADAS') {
+      colunas.push({ nome: 'SUSEP', ehIdentificador: false });
+    }
+    var linhas = total > 1 ? [2, total + 1] : [2];
+    colunas.forEach(function (coluna) {
+      var indice = posicaoDaColuna_(estrutura, coluna.nome);
+      if (indice < 0) return;
+      var valores = valoresNasLinhas_(estrutura, indice, linhas);
+      linhas.forEach(function (linha) {
+        var alvo = coluna.ehIdentificador ? converterParaIdentificador_(valores[linha])
+          : normalizarParaComparar_(valores[linha]);
+        if (!alvo || !/^[a-z0-9]+$/.test(alvo)) return;
+        conferidas++;
+        var achadas = linhasDaBuscaRapida_(estrutura, indice, alvo, coluna.ehIdentificador, true);
+        if (!achadas || achadas.indexOf(linha) < 0) {
+          erradas.push(nomeDaAba + ' › ' + coluna.nome + ' "' + alvo + '" (linha ' + linha + ')');
+        }
+      });
+    });
+  });
+  if (erradas.length) {
+    return item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+      'Busca rápida: o localizador não achou ' + erradas.length + ' de ' + conferidas
+        + ' linha(s) conferidas',
+      'Não achou: ' + erradas.join('; ') + '. Ao consultar uma SUSEP, a resposta poderia '
+        + 'sair "não encontrada" estando na lista.',
+      'Ponha NAO em OPERACAO.BUSCA_RAPIDA, na aba CONFIG (crie a linha, se não houver): '
+        + 'as buscas voltam a ler a coluna inteira. E avise quem cuida do sistema.');
+  }
+  return item_(RECC_SITUACOES_DO_LAUDO.OK,
+    conferidas ? 'Busca rápida: o localizador achou as ' + conferidas + ' linha(s) conferidas'
+      : 'Busca rápida: ligada — ainda não há linha para conferir');
 }
 
 const RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA = 200;

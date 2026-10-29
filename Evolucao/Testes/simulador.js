@@ -100,6 +100,69 @@ function tamanhoQueCabe(linhas) {
   return [Math.max(1000, quantas), Math.max(26, largura)];
 }
 
+/** O valor como a pessoa VÊ na célula — sempre texto. */
+function comoAPessoaVe(valor) {
+  const doisDigitos = (n) => (n < 10 ? '0' : '') + n;
+  if (valor === null || valor === undefined || valor === '') return '';
+  if (valor instanceof Date) {
+    return doisDigitos(valor.getDate()) + '/'
+      + doisDigitos(valor.getMonth() + 1) + '/' + valor.getFullYear();
+  }
+  return String(valor);
+}
+
+/*
+  O teste pode deixar o localizador CEGO (ambiente.localizadorCego: não acha
+  nada) ou TORTO (ambiente.localizadorTorto: aponta a linha vizinha). É o
+  retrato de uma planilha real em que o localizador se comportasse diferente
+  do simulador — e o que as proteções da Etapa 63 (a conferência na linha, a
+  leitura da coluna quando o Id some, e o diagnóstico) têm de pegar.
+*/
+const comportamentoDoLocalizador = { cego: false, torto: false };
+
+class Localizador {
+  constructor(faixa, texto) {
+    this.faixa = faixa;
+    this.texto = texto;
+    this.regex = false;
+    this.caixa = false;
+    this.inteira = false;
+  }
+  useRegularExpression(sim) { this.regex = !!sim; return this; }
+  matchCase(sim) { this.caixa = !!sim; return this; }
+  matchEntireCell(sim) { this.inteira = !!sim; return this; }
+  matchFormulaText() { return this; }
+  ignoreDiacritics() { return this; }
+  findAll() {
+    medidor.idasParaLer++;
+    medidor.buscasRapidas++;
+    if (comportamentoDoLocalizador.cego) return [];
+    const bate = this.regex
+      ? (() => {
+        const er = new RegExp(this.inteira ? '^(?:' + this.texto + ')$' : this.texto,
+          this.caixa ? '' : 'i');
+        return (visto) => er.test(visto);
+      })()
+      : (visto) => {
+        const a = this.caixa ? visto : visto.toLowerCase();
+        const b = this.caixa ? this.texto : this.texto.toLowerCase();
+        return this.inteira ? a === b : a.indexOf(b) >= 0;
+      };
+    const achadas = [];
+    for (let i = 0; i < this.faixa.nLinhas; i++) {
+      for (let j = 0; j < this.faixa.nColunas; j++) {
+        const l = this.faixa.linha + i;
+        const c = this.faixa.coluna + j;
+        const visto = comoAPessoaVe(this.faixa.aba.valores[l - 1][c - 1]);
+        if (visto === '' || !bate(visto)) continue;
+        const vizinha = l + 1 < this.faixa.linha + this.faixa.nLinhas ? l + 1 : l - 1;
+        achadas.push(new Faixa(this.faixa.aba, comportamentoDoLocalizador.torto ? vizinha : l, c, 1, 1));
+      }
+    }
+    return achadas;
+  }
+}
+
 class Faixa {
   constructor(aba, linha, coluna, nLinhas, nColunas) {
     this.aba = aba;
@@ -136,15 +199,18 @@ class Faixa {
    * importação nunca tinha sido rodado por teste nenhum — nem o dos casos.
    */
   getDisplayValues() {
-    const doisDigitos = (n) => (n < 10 ? '0' : '') + n;
-    return this.getValues().map((linha) => linha.map((valor) => {
-      if (valor === null || valor === undefined || valor === '') return '';
-      if (valor instanceof Date) {
-        return doisDigitos(valor.getDate()) + '/'
-          + doisDigitos(valor.getMonth() + 1) + '/' + valor.getFullYear();
-      }
-      return String(valor);
-    }));
+    return this.getValues().map((linha) => linha.map(comoAPessoaVe));
+  }
+  /**
+   * O localizador do Sheets (Etapa 63): procura do lado do Google e devolve
+   * só as células que bateram. Uma ida, e nenhuma célula trazida para cá —
+   * é por isso que ele existe.
+   *
+   * Procura no texto que a célula MOSTRA, como o de verdade. Só o que o PGO
+   * usa: expressão regular, caixa, célula inteira e findAll.
+   */
+  createTextFinder(texto) {
+    return new Localizador(this, String(texto));
   }
   setValues(matriz) {
     medidor.idasParaGravar++;
@@ -309,6 +375,7 @@ const medidor = {
   idasParaLer: 0,
   idasParaGravar: 0,
   faixasPedidas: 0,
+  buscasRapidas: 0,
   propriedadesLidas: 0,
   propriedadesGravadas: 0,
   travasPedidas: 0,
@@ -319,6 +386,7 @@ const medidor = {
   zerar() {
     this.celulasLidas = 0; this.celulasGravadas = 0;
     this.idasParaLer = 0; this.idasParaGravar = 0; this.faixasPedidas = 0;
+    this.buscasRapidas = 0;
     this.propriedadesLidas = 0; this.propriedadesGravadas = 0;
     this.travasPedidas = 0;
     this.cacheLidos = 0; this.cacheGravados = 0;
@@ -329,6 +397,7 @@ const medidor = {
       celulasLidas: this.celulasLidas, celulasGravadas: this.celulasGravadas,
       idasParaLer: this.idasParaLer, idasParaGravar: this.idasParaGravar,
       faixasPedidas: this.faixasPedidas,
+      buscasRapidas: this.buscasRapidas,
       propriedadesLidas: this.propriedadesLidas,
       propriedadesGravadas: this.propriedadesGravadas,
       travasPedidas: this.travasPedidas,
@@ -386,6 +455,9 @@ class Planilha {
 /** Monta o ambiente global falso que os arquivos .gs enxergam. */
 function criarAmbienteFalso(email = 'analista@exemplo.com') {
   const planilha = new Planilha();
+  // Cada ambiente nasce com o localizador enxergando direito.
+  comportamentoDoLocalizador.cego = false;
+  comportamentoDoLocalizador.torto = false;
   const propriedades = new Map();
   const propriedadesDoUsuario = new Map();
   const registros = [];
@@ -464,6 +536,10 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     emailAtual() { return emailAtual; },
     get fusoDoProjeto() { return ambienteDoFuso.fusoDoProjeto; },
     set fusoDoProjeto(fuso) { ambienteDoFuso.fusoDoProjeto = fuso; },
+    get localizadorCego() { return comportamentoDoLocalizador.cego; },
+    set localizadorCego(sim) { comportamentoDoLocalizador.cego = !!sim; },
+    get localizadorTorto() { return comportamentoDoLocalizador.torto; },
+    set localizadorTorto(sim) { comportamentoDoLocalizador.torto = !!sim; },
     get travaOcupada() { return ambienteDaTrava.ocupada; },
     set travaOcupada(sim) { ambienteDaTrava.ocupada = !!sim; },
     get esperasDaTrava() { return ambienteDaTrava.esperas; },

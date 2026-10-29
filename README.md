@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1459 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1472 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -345,7 +345,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1459 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1472 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1627,6 +1627,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | Toda **mudança de status carimba** data e hora na linha do caso — por qualquer porta: diálogo, formulário ou cadastro | É o controle de produtividade. Na auditoria seriam quase um milhão de linhas numa base de 200 mil casos |
 | Toda gravação da tela leva um **código de envio**, e o mesmo código não grava duas vezes | A tela desiste em 40 segundos, o servidor não: sem isso, o segundo clique duplicava o caso (Etapa 59) |
 | A **auditoria não espera a trava**: entra numa fila durável e é gravada em lote; dentro da trava, só o que precisa estar lá | A trava é uma só para o sistema inteiro. Rastro de quem só olhava esperava junto com quem gravava (Etapa 61) |
+| Achar uma SUSEP ou um Id é com o **localizador do Sheets**, conferido pela regra de sempre, com chave para desligar e conferência no diagnóstico | Ler 151 mil células a cada SUSEP digitada era o selo mais caro do sistema (Etapa 63) |
 | O **pacote vai sem comentários**; o repositório, com todos | A explicação mora onde se lê e se conserta. Na colagem, era metade do peso (Etapa 62) |
 | **Erro alto** em vez de padrão silencioso | Dado errado calado é pior que operação parada |
 | A estrutura da planilha **nunca muda sozinha** | Só o instalador cria estrutura, e só sobre planilha vazia |
@@ -1643,7 +1644,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1459 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1472 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

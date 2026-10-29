@@ -516,6 +516,10 @@ O Apps Script tem ~6 minutos por execução e cada chamada ao Sheets é rede.
 | Alcance | Onde busca | Como |
 |---|---|---|
 | Histórico | Base completa | Lê **só a coluna** escolhida → acha as posições → lê **só as linhas** que casaram |
+
+Achar **um** valor — a SUSEP do selo, o Id do caso, a proposta repetida — nem lê a coluna:
+o localizador do Sheets aponta as linhas, e a regra de sempre confere nelas (Etapa 63,
+`linhasDaBuscaRapida_`, no `Base.gs`; desliga com `OPERACAO.BUSCA_RAPIDA` = NAO).
 | Legado | Planilha externa, por ID | Abre somente leitura, lista as abas, lê a linha 1 como cabeçalho |
 
 O fluxo do legado é exatamente o descrito: escolhe a planilha → escolhe a aba →

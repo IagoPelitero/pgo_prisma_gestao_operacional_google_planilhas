@@ -625,6 +625,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       'Quantas linhas do fim da base os painéis leem antes de filtrar por '
       + 'data. Com muito volume, 5.000 podem não cobrir a janela de dias — as '
       + 'telas avisam quando isso acontece.'),
+    novaConfiguracao_('OPERACAO.BUSCA_RAPIDA', 'SIM',
+      'SIM: SUSEP, Id e proposta são achados pelo localizador do Sheets, sem '
+      + 'ler a coluna inteira. NAO: volta à leitura da coluna — mais lenta. '
+      + 'O diagnóstico confere se o localizador acha as linhas da planilha.'),
     novaConfiguracao_('OPERACAO.TEMA_PADRAO', 'padrao',
       'padrao | rosa | dark | brasil'),
     // Semeado A PARTIR de RECC_TELAS_DO_SISTEMA, e não digitado de novo aqui.
@@ -3797,8 +3801,67 @@ function blocoDoAmbiente_() {
       'Configurações › Identidade › Senha de administrador.'));
 
   itens.push(itemDaFilaDaAuditoria_());
+  itens.push(itemDaBuscaRapida_());
 
   return itens;
+}
+
+/*
+ * A BUSCA RÁPIDA (Etapa 63). O localizador do Sheets só se testa aqui num
+ * simulador; esta é a conferência na planilha DE VERDADE: algumas linhas de
+ * cada base — a primeira e a última —, procuradas pelo Id (e, nas listas de
+ * SUSEP, pela SUSEP). O localizador tem de achar cada uma, e só ela.
+ */
+function itemDaBuscaRapida_() {
+  if (!buscaRapidaLigada_()) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Busca rápida: desligada (OPERACAO.BUSCA_RAPIDA = NAO)',
+      'SUSEP, Id e proposta são achados lendo a coluna inteira — certo, mas mais lento.',
+      'Para religar, ponha SIM em OPERACAO.BUSCA_RAPIDA, na aba CONFIG, e rode o '
+        + 'diagnóstico de novo.');
+  }
+  var abas = canaisVisiveis_().map(function (canal) { return canal.aba; })
+    .concat(['CORRETORAS', 'SUSEP_BLOQUEADAS']);
+  var conferidas = 0;
+  var erradas = [];
+  abas.forEach(function (nomeDaAba) {
+    var estrutura;
+    try { estrutura = estruturaDaAba_(nomeDaAba); } catch (erro) { return; }
+    var total = quantidadeDeRegistros_(estrutura);
+    if (total <= 0) return;
+    var colunas = [{ nome: 'Id', ehIdentificador: true }];
+    if (nomeDaAba === 'CORRETORAS' || nomeDaAba === 'SUSEP_BLOQUEADAS') {
+      colunas.push({ nome: 'SUSEP', ehIdentificador: false });
+    }
+    var linhas = total > 1 ? [2, total + 1] : [2];
+    colunas.forEach(function (coluna) {
+      var indice = posicaoDaColuna_(estrutura, coluna.nome);
+      if (indice < 0) return;
+      var valores = valoresNasLinhas_(estrutura, indice, linhas);
+      linhas.forEach(function (linha) {
+        var alvo = coluna.ehIdentificador ? converterParaIdentificador_(valores[linha])
+          : normalizarParaComparar_(valores[linha]);
+        if (!alvo || !/^[a-z0-9]+$/.test(alvo)) return;
+        conferidas++;
+        var achadas = linhasDaBuscaRapida_(estrutura, indice, alvo, coluna.ehIdentificador, true);
+        if (!achadas || achadas.indexOf(linha) < 0) {
+          erradas.push(nomeDaAba + ' › ' + coluna.nome + ' "' + alvo + '" (linha ' + linha + ')');
+        }
+      });
+    });
+  });
+  if (erradas.length) {
+    return item_(RECC_SITUACOES_DO_LAUDO.FALHA,
+      'Busca rápida: o localizador não achou ' + erradas.length + ' de ' + conferidas
+        + ' linha(s) conferidas',
+      'Não achou: ' + erradas.join('; ') + '. Ao consultar uma SUSEP, a resposta poderia '
+        + 'sair "não encontrada" estando na lista.',
+      'Ponha NAO em OPERACAO.BUSCA_RAPIDA, na aba CONFIG (crie a linha, se não houver): '
+        + 'as buscas voltam a ler a coluna inteira. E avise quem cuida do sistema.');
+  }
+  return item_(RECC_SITUACOES_DO_LAUDO.OK,
+    conferidas ? 'Busca rápida: o localizador achou as ' + conferidas + ' linha(s) conferidas'
+      : 'Busca rápida: ligada — ainda não há linha para conferir');
 }
 
 /*

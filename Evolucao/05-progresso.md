@@ -3455,6 +3455,47 @@ pegas. 1459 testes; ponta a ponta 23/23 no repositório e no pacote; 126 + 78 cl
 
 ---
 
+## Etapa 63 — A busca rápida: o localizador do próprio Sheets
+
+Quarta correção da análise de 29/10. Cada SUSEP digitada no formulário lia a coluna inteira
+das 151 mil bloqueadas, e cada caso aberto, salvo ou com status trocado lia a coluna de Id
+inteira da base. Agora o **localizador do Sheets (TextFinder)** procura do lado do Google e
+devolve só as células que bateram.
+
+| Parte | O que ficou |
+|---|---|
+| **A mesma comparação de antes** | O PGO compara a SUSEP sem acento, sem caixa e sem separador ("RET-00J" é "ret00j"), e o identificador só pelos dígitos. A procura vira uma expressão regular que aceita exatamente isso: cada letra em qualquer caixa e acento, e qualquer separador entre uma e outra (`expressaoDaBuscaRapida_`). O que o localizador devolve é **candidato**: a regra de sempre confere na linha |
+| **Onde vale** | `buscarRegistros_` (o selo da SUSEP nas duas listas, abrir/salvar/mudar status do caso e todo achar-pelo-Id), `linhaDoRegistro_` (a linha de um Id para gravar), a proposta repetida no mês e a busca da Tabela Corretoras nas bloqueadas (o "contém" nas quatro colunas de procura) |
+| **O Id nunca depende só dele** | Sem candidata confirmada, a coluna é lida como antes. Antes da trava, uma candidata só nem é conferida: a trava confere a célula dela (Etapa 61). Id repetido continua sendo erro |
+| **Proteção 1: a chave** | `OPERACAO.BUSCA_RAPIDA` na CONFIG — SIM (padrão; a instalação nova já traz a linha) ou NAO, que volta à leitura da coluna sem mexer em código. Planilha já instalada sem a linha vale SIM |
+| **Proteção 2: o diagnóstico** | Bloco "O ambiente", item "Busca rápida": procura a primeira e a última linha de cada base pelo Id (e, nas listas de SUSEP, pela SUSEP) e exige que o localizador ache cada uma. Não achou: FALHA, dizendo quais e como desligar. Desligada: ATENÇÃO |
+
+**Medido no volume de produção** (estimativa por modelo, a mesma bancada da análise):
+
+| Chamada | Antes | Agora |
+|---|---|---|
+| Consultar SUSEP (151 mil bloqueadas) | 158.032 células · ~2,0 s | 32 células · ~0,4 s |
+| Abrir o caso (Trabalhar no caso) | 30.098 células · ~0,5 s | 98 células · ~0,2 s |
+| Mudar o status | 60.197 células · ~1,3 s | 197 células · ~0,7 s |
+| Proposta repetida | 30.099 células · ~0,5 s | 98 células · ~0,2 s |
+| Busca nas bloqueadas (Tabela Corretoras) | 826.220 células · ~9,3 s | 373.220 células · ~4,9 s |
+| Diagnóstico | 82 idas · ~13,9 s | 111 idas · ~16,2 s (a conferência nova) |
+
+O modelo conta o localizador como uma ida sem células trazidas. Na planilha real ele não é de
+graça — o Google varre a coluna —, mas é muito mais rápido que transferir 151 mil células para
+o Apps Script. É exatamente o que o diagnóstico confere na planilha de verdade.
+
+13 testes novos em `testes-busca-rapida.js` (as SUSEPs escritas de todo jeito dão o mesmo
+resultado com e sem o localizador; o selo, abrir, mudar status e a proposta lendo um punhado
+de células; a busca das bloqueadas igual com acento, espaço e pedaço; Id repetido; a chave; o
+localizador cego e o torto; o diagnóstico OK, FALHA e ATENÇÃO). O simulador ganhou o
+localizador (procurando no texto que a célula mostra), e os modos cego e torto. 8 quebras de
+propósito: 2 escaparam na primeira rodada — dois guardas do Id que se cobriam —, o código ficou
+com um guarda só e o teste do localizador torto passou a pegar as 8. O teste de velocidade do
+status mede depois da página aberta (é ela que põe a CONFIG no cache).
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

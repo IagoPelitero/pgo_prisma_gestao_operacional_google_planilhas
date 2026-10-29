@@ -51,6 +51,7 @@ const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
 const { rodarTestesDaAuditoriaForaDaTrava } = require('./testes-auditoria-fora-da-trava');
 const { rodarTestesDaLimpeza } = require('./testes-limpeza-do-que-nao-e-usado');
+const { rodarTestesDaBuscaRapida } = require('./testes-busca-rapida');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -92,6 +93,7 @@ rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();
 rodarTestesDaAuditoriaForaDaTrava();
 rodarTestesDaLimpeza();
+rodarTestesDaBuscaRapida();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

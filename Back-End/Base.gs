@@ -2660,6 +2660,89 @@ function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
   return saida;
 }
 
+// ============================================================================
+// A BUSCA RÁPIDA — o localizador do próprio Sheets (Etapa 63)
+// ============================================================================
+/*
+ * Achar uma SUSEP entre 151 mil, ou o Id de um caso entre 30 mil, era trazer a
+ * coluna inteira para cá e comparar uma a uma. O localizador do Sheets
+ * (TextFinder) procura do lado do Google e devolve só as células que bateram:
+ * uma ida, e nenhuma coluna trazida.
+ *
+ * A COMPARAÇÃO TEM DE SER A MESMA DE ANTES. O PGO compara a SUSEP sem acento,
+ * sem caixa e sem nada que não seja letra ou número ("RET-00J" é "ret00j"), e
+ * o identificador só pelos dígitos. O localizador não sabe disso — então a
+ * procura vira uma expressão regular que aceita o que o PGO aceitaria: cada
+ * letra em qualquer caixa e acento, e qualquer separador entre uma e outra. O
+ * que ele devolve é CANDIDATO: quem chamou ainda confere com a regra de sempre.
+ *
+ * DUAS PROTEÇÕES, a pedido do PO, porque o localizador só se testa aqui num
+ * simulador: `OPERACAO.BUSCA_RAPIDA` = NAO na CONFIG volta à leitura da coluna,
+ * sem mexer em código; e o diagnóstico confere linhas reais da planilha. E
+ * achar um Id nunca depende só dele: sem candidato, a coluna é lida como antes.
+ */
+var RECC_LETRAS_COM_ACENTO = {
+  a: 'àáâãäå', c: 'ç', e: 'èéêë', i: 'ìíîï', n: 'ñ', o: 'òóôõö', u: 'ùúûü', y: 'ýÿ'
+};
+// O que normalizarParaComparar_ joga fora: tudo que não é letra nem número.
+var RECC_SEPARADOR_DE_TEXTO = '[^0-9A-Za-zÀ-ÖØ-öø-ÿ]*';
+// O que converterParaIdentificador_ joga fora: tudo que não é dígito.
+var RECC_SEPARADOR_DE_IDENTIFICADOR = '[^0-9]*';
+
+/** A busca rápida está ligada? Só `NAO` na CONFIG a desliga. */
+function buscaRapidaLigada_() {
+  return normalizarParaComparar_(valorDaConfiguracao_('OPERACAO.BUSCA_RAPIDA', 'SIM')) !== 'nao';
+}
+
+/**
+ * A expressão que acha, no texto que a célula mostra, o que a comparação do
+ * PGO acharia. `inteira`: a célula toda (SUSEP, Id); senão, um pedaço dela
+ * (a busca das bloqueadas, que procura "contém").
+ */
+function expressaoDaBuscaRapida_(alvo, ehIdentificador, inteira) {
+  var separador = ehIdentificador ? RECC_SEPARADOR_DE_IDENTIFICADOR : RECC_SEPARADOR_DE_TEXTO;
+  var letras = String(alvo).split('').map(function (letra) {
+    if (/[0-9]/.test(letra)) return letra;
+    var acentos = RECC_LETRAS_COM_ACENTO[letra] || '';
+    return '[' + letra + letra.toUpperCase() + acentos + acentos.toUpperCase() + ']';
+  });
+  var miolo = letras.join(separador);
+  return inteira ? '^' + separador + miolo + separador + '$' : miolo;
+}
+
+/**
+ * As linhas em que o localizador acha o alvo, na ordem da planilha — ou null,
+ * quando a busca rápida está desligada ou não deu: aí quem chamou lê a coluna.
+ * `alvo` já vem na forma de comparar (normalizado, ou só dígitos).
+ */
+function linhasDaBuscaRapida_(estrutura, indiceDaColuna, alvo, ehIdentificador, inteira) {
+  if (!alvo || !/^[a-z0-9]+$/.test(alvo) || !buscaRapidaLigada_()) return null;
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return [];
+  try {
+    return estrutura.aba.getRange(2, indiceDaColuna + 1, total, 1)
+      .createTextFinder(expressaoDaBuscaRapida_(alvo, ehIdentificador, inteira))
+      .useRegularExpression(true)
+      .matchFormulaText(false)
+      .findAll()
+      .map(function (celula) { return celula.getRow(); })
+      .sort(function (uma, outra) { return uma - outra; });
+  } catch (erro) {
+    return null;   // o localizador falhou: a leitura da coluna responde
+  }
+}
+
+/** O valor de uma coluna em algumas linhas, lido em blocos: { linha: valor }. */
+function valoresNasLinhas_(estrutura, indiceDaColuna, numerosDeLinha) {
+  var porLinha = {};
+  blocosDeLinhas_(numerosDeLinha).forEach(function (bloco) {
+    var quantas = bloco.fim - bloco.inicio + 1;
+    estrutura.aba.getRange(bloco.inicio, indiceDaColuna + 1, quantas, 1).getValues()
+      .forEach(function (linha, k) { porLinha[bloco.inicio + k] = linha[0]; });
+  });
+  return porLinha;
+}
+
 /**
  * Busca por valor numa coluna e devolve as linhas inteiras.
  * Identificador é comparado só pelos dígitos, então "1-2345678901" e
@@ -2675,6 +2758,20 @@ function buscarRegistros_(nomeDaAba, cabecalho, valor, limite) {
     ? converterParaIdentificador_(valor)
     : normalizarParaComparar_(valor);
   if (alvo === '') return [];
+
+  // Etapa 63: o localizador aponta as candidatas, e a regra de sempre confere
+  // na linha que já ia ser lida. Id sem candidata cai na leitura da coluna:
+  // achar o caso para gravar nunca depende só do localizador.
+  var candidatas = linhasDaBuscaRapida_(estrutura, i, alvo, ehIdentificador, true);
+  var ehOId = i === posicaoDaColuna_(estrutura, 'Id');
+  if (candidatas !== null) {
+    var conferidos = lerLinhasEspecificas_(nomeDaAba, candidatas).filter(function (registro) {
+      var atualNaLinha = registro[estrutura.cabecalhos[i]];
+      return (ehIdentificador ? converterParaIdentificador_(atualNaLinha)
+        : normalizarParaComparar_(atualNaLinha)) === alvo;
+    });
+    if (conferidos.length || !ehOId) return limite ? conferidos.slice(0, limite) : conferidos;
+  }
 
   var coluna = lerColunaInteira_(nomeDaAba, cabecalho);
   var linhas = [];
@@ -2719,10 +2816,21 @@ function linhaDoRegistro_(estrutura, id) {
   if (totalDados <= 0) return -1;
 
   var alvo = converterParaIdentificador_(id);
-  var coluna = estrutura.aba.getRange(2, iId + 1, totalDados, 1).getValues();
   var achadas = [];
-  for (var i = 0; i < coluna.length; i++) {
-    if (converterParaIdentificador_(coluna[i][0]) === alvo) achadas.push(i + 2);
+  // Etapa 63: o localizador aponta, e só as células apontadas são lidas para
+  // conferir. Nenhuma candidata confirmada: a coluna inteira, como antes.
+  var candidatas = linhasDaBuscaRapida_(estrutura, iId, alvo, true, true);
+  if (candidatas && candidatas.length) {
+    var valores = valoresNasLinhas_(estrutura, iId, candidatas);
+    achadas = candidatas.filter(function (linha) {
+      return converterParaIdentificador_(valores[linha]) === alvo;
+    });
+  }
+  if (!achadas.length) {
+    var coluna = estrutura.aba.getRange(2, iId + 1, totalDados, 1).getValues();
+    for (var i = 0; i < coluna.length; i++) {
+      if (converterParaIdentificador_(coluna[i][0]) === alvo) achadas.push(i + 2);
+    }
   }
   if (achadas.length > 1) {
     throw new Error('O Id ' + alvo + ' aparece em ' + achadas.length +
@@ -2901,7 +3009,14 @@ function inserirComATravaNaMao_(nomeDaAba, lista, contexto) {
  */
 function linhaProcuradaAntesDaTrava_(nomeDaAba, id) {
   try {
-    return linhaDoRegistro_(estruturaDaAba_(nomeDaAba), id);
+    var estrutura = estruturaDaAba_(nomeDaAba);
+    // Etapa 63: uma candidata só, do localizador, nem precisa ser conferida
+    // aqui — a trava confere a célula dela (linhaConferidaNaTrava_). Nenhuma
+    // ou várias: a procura completa, que diz o motivo.
+    var candidatas = linhasDaBuscaRapida_(estrutura, exigirPosicaoDaColuna_(estrutura, 'Id'),
+      converterParaIdentificador_(id), true, true);
+    if (candidatas && candidatas.length === 1) return candidatas[0];
+    return linhaDoRegistro_(estrutura, id);
   } catch (erro) {
     return -1;   // a procura de dentro da trava diz o motivo, com a planilha fresca
   }

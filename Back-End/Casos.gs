@@ -2108,13 +2108,19 @@ function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAbert
   // 1. Só a coluna do número — o último pedaço, o que distingue a proposta.
   var colunaDoNumero = partir.colunas[partir.colunas.length - 1];
   var numero = pedacos[pedacos.length - 1];
-  var linhas = [];
-  lerColunaInteira_(canal.aba, colunaDoNumero).forEach(function (valor, i) {
-    if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
-  });
+  var estrutura = estruturaDaAba_(canal.aba);
+  // Etapa 63: o localizador do Sheets aponta as linhas, sem trazer a coluna.
+  // As apontadas são conferidas abaixo, pedaço por pedaço, como sempre.
+  var linhas = linhasDaBuscaRapida_(estrutura,
+    exigirPosicaoDaColuna_(estrutura, colunaDoNumero), numero, true, true);
+  if (linhas === null) {
+    linhas = [];
+    lerColunaInteira_(canal.aba, colunaDoNumero).forEach(function (valor, i) {
+      if (converterParaIdentificador_(valor) === numero) linhas.push(i + 2);
+    });
+  }
 
   // 2. Só as linhas em que bateu: confere os outros pedaços, o mês e o Id.
-  var estrutura = estruturaDaAba_(canal.aba);
   var colunaDoAnalista = colunaDoResponsavel_(estrutura);
   var abertoAgora = converterParaIdentificador_(idDoCasoAberto);
 

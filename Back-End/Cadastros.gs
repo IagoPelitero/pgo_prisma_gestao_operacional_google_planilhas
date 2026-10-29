@@ -350,8 +350,12 @@ function resumoDasSusepsBloqueadas(procurar) {
 
   var suseps = coluna('SUSEP');
   var visiveis = coluna('_Visivel');
-  // As outras colunas de procura só são lidas quando há o que procurar.
-  var deProcura = termo ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
+  // Etapa 63: com termo, o localizador do Sheets diz em quais linhas ele
+  // aparece, sem trazer as três colunas que só servem à busca. Sem o
+  // localizador, elas são lidas e comparadas aqui, como antes.
+  var achadasPeloTermo = termo ? linhasDoTermoNasBloqueadas_(estrutura, termo) : null;
+  var deProcura = termo && !achadasPeloTermo
+    ? ['NomeCorretora', 'Sucursal', 'CoordenadorComercial'].map(coluna) : [];
 
   var quantasNoTotal = 0;
   var candidatas = [];
@@ -360,9 +364,10 @@ function resumoDasSusepsBloqueadas(procurar) {
     var chave = chaveDaSusep_(suseps[i]);
     if (!chave) continue;
     quantasNoTotal++;
-    if (termo && chave.indexOf(termo) < 0 && !deProcura.some(function (valores) {
-      return normalizarParaComparar_(valores[i]).indexOf(termo) >= 0;
-    })) continue;
+    if (termo && (achadasPeloTermo ? !achadasPeloTermo[i + 2]
+      : chave.indexOf(termo) < 0 && !deProcura.some(function (valores) {
+        return normalizarParaComparar_(valores[i]).indexOf(termo) >= 0;
+      }))) continue;
     candidatas.push({ linha: i + 2, casos: volumes.porSusep[chave] || 0 });
   }
   // As que mais trazem caso primeiro; empatadas, as mais recentes (mais embaixo).
@@ -398,6 +403,24 @@ function resumoDasSusepsBloqueadas(procurar) {
     procurar: String(procurar || ''),
     podeMexer: podeFazer_(quem.permissoes, RECC_ACOES.CONFIGURAR)
   };
+}
+
+/**
+ * As linhas da SUSEP_BLOQUEADAS em que o termo aparece — na SUSEP, na
+ * corretora, na sucursal ou no coordenador —, pelo localizador: { linha: true }.
+ * null quando a busca rápida não está disponível.
+ */
+function linhasDoTermoNasBloqueadas_(estrutura, termo) {
+  var linhas = {};
+  var colunas = ['SUSEP', 'NomeCorretora', 'Sucursal', 'CoordenadorComercial'];
+  for (var c = 0; c < colunas.length; c++) {
+    var posicao = posicaoDaColuna_(estrutura, colunas[c]);
+    if (posicao < 0) continue;
+    var achadas = linhasDaBuscaRapida_(estrutura, posicao, termo, false, false);
+    if (achadas === null) return null;
+    achadas.forEach(function (linha) { linhas[linha] = true; });
+  }
+  return linhas;
 }
 
 /**

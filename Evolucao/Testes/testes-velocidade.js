@@ -94,6 +94,9 @@ function rodarTestesDeVelocidade() {
     verdadeiro(quente.idasParaLer < frio.idasParaLer / 2,
       'cadastrar: ' + frio.idasParaLer + ' → ' + quente.idasParaLer + ' leituras');
     const id = quente.resultado.id;
+    // A página aberta já pôs a CONFIG no cache (Etapa 63: a chave da busca
+    // rápida mora lá) — é o caminho de todo dia: ninguém troca status sem abrir.
+    t.medir(() => t.chamar('pacoteDePartida()'));
     const status = t.medir(() => t.chamar('alterarSituacaoDoCaso')(t.ret.id, id, 'Pago', {}));
     verdadeiro(status.idasParaLer <= 8, 'trocar status: ' + status.idasParaLer + ' leituras');
   });
