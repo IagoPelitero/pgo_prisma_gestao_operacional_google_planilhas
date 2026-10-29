@@ -3650,6 +3650,25 @@ CPFs de um caso só.
 
 ---
 
+## O README de apresentação (30/10)
+
+Pedido do PO: o README tinha ficado gigante (1.675 linhas) e devia virar uma
+apresentação do sistema para empresas de grande porte.
+
+| O que | Onde ficou |
+|---|---|
+| **README novo**, de 155 linhas | Por que o PGO, o que a operação ganha, governança, escala, continuidade, marca branca, qualidade comprovada, a implantação em cinco passos e a documentação. Só afirma o que o sistema faz hoje |
+| **O README antigo, inteiro** | Virou `Evolucao/07-manual-completo.md` — a instalação passo a passo, cada tela e cada regra continuam lá, com os links ajustados à pasta nova. O README aponta para ele |
+
+Os testes que conferem o README (a instalação cria as 18 abas, a regra da
+organização do Google Workspace, o comando da responsividade) continuam valendo
+sobre o README novo.
+
+A Etapa 68 (backup diário, homologação, GitHub Actions, relatório semanal) foi
+**cancelada pelo PO**: "não há necessidade".
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
