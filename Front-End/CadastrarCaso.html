@@ -15,6 +15,9 @@ var TelaCadastrarCaso = (function () {
 
   var canalEscolhido = '';
   var salvando = false;
+  // O código de envio deste caso (Etapa 59): o mesmo até gravar, para o clique
+  // repetido depois dos 40 segundos não cadastrar o caso duas vezes.
+  var envio = '';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -120,9 +123,11 @@ var TelaCadastrarCaso = (function () {
     Formulario.comecouAGravar(elemento('salvar-caso'),
       elemento('formulario-do-caso'));
 
-    Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()))
+    if (!envio) envio = Servidor.novoEnvio();
+    Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()), envio)
       .entao(function () {
         salvando = false;
+        envio = '';
         /*
           GRAVOU: VAI PARA O TRABALHO.
 
@@ -158,6 +163,7 @@ var TelaCadastrarCaso = (function () {
     });
     elemento('limpar-caso').addEventListener('click', function () {
       recado('', '');
+      envio = '';   // formulário limpo é caso novo
       carregarFormulario();
     });
     document.addEventListener('keydown', atalhoDeSalvar);

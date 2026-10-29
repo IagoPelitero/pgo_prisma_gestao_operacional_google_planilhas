@@ -816,8 +816,15 @@ function dataEstaNoFuturo_(data) {
  * SERVIDOR quando o canal declara essas colunas e a tela não mandou nada —
  * deixar o relógio do navegador decidir daria horários de fusos diferentes na
  * mesma base.
+ *
+ * `envio` é o código de envio da tela: o mesmo código não grava duas vezes
+ * (Etapa 59, ver comEnvioUnico_).
  */
-function cadastrarCaso(idDoCanal, valores) {
+function cadastrarCaso(idDoCanal, valores, envio) {
+  return comEnvioUnico_(envio, function () { return cadastrarCasoUmaVez_(idDoCanal, valores); });
+}
+
+function cadastrarCasoUmaVez_(idDoCanal, valores) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -842,8 +849,17 @@ function cadastrarCaso(idDoCanal, valores) {
  * A data de entrada NÃO é reescrita: histórico não muda sozinho. Se o campo
  * vier na alteração, ele é respeitado — mas o preenchimento automático só age
  * na criação.
+ *
+ * `envio`: ver cadastrarCaso. Sem ele, o segundo clique depois dos 40
+ * segundos esbarrava na versão já gravada e dizia "outra pessoa alterou".
  */
-function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
+function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
+  return comEnvioUnico_(envio, function () {
+    return editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas);
+  });
+}
+
+function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -923,8 +939,17 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
  * dezenas de vezes por dia.
  *
  * Segue a permissão de EDITAR: trocar a situação é editar o caso.
+ *
+ * `envio`: ver cadastrarCaso — sem ele, o segundo clique contava duas
+ * mudanças de status.
  */
-function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos) {
+function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
+  return comEnvioUnico_(envio, function () {
+    return alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos);
+  });
+}
+
+function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = converterParaIdentificador_(idDoCaso);
@@ -3438,8 +3463,16 @@ function statusPadraoDoCanal_(canal) {
  *
  * A auditoria recebe UMA linha por lote, não uma por caso. Trezentas linhas de
  * auditoria dizendo a mesma coisa afogam as que importam.
+ *
+ * `pedido.envio`: ver cadastrarCaso — o mesmo lote não entra duas vezes.
  */
 function importarCasos(idDoCanal, pedido) {
+  return comEnvioUnico_((pedido || {}).envio, function () {
+    return importarCasosUmaVez_(idDoCanal, pedido);
+  });
+}
+
+function importarCasosUmaVez_(idDoCanal, pedido) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);

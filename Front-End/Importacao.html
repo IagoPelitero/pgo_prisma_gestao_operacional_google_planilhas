@@ -32,6 +32,10 @@ var TelaImportacao = (function () {
   var pacoteDoSistema = null;
   var opcoes = null;          // colunas, analistas, lotes já importados
   var laudo = null;           // o resultado do passo 2, enquanto não se grava
+  // O código de envio do lote conferido (Etapa 59): o "Importar" repetido
+  // depois de uma demora não grava o mesmo lote duas vezes. Conferir de novo
+  // é outro lote, e ganha outro código.
+  var envioDoLote = '';
   var resultado = null;       // o que entrou, depois de gravar
 
   var fonte = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
@@ -795,6 +799,7 @@ var TelaImportacao = (function () {
     conferencia
       .entao(function (resposta) {
         laudo = resposta;
+        envioDoLote = Servidor.novoEnvio();
         deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
         desenhar();
         avisarDaConferencia();
@@ -911,11 +916,13 @@ var TelaImportacao = (function () {
 
     var gravacao = ehChat()
       ? Servidor.chamarSemPressa('importarAtendimentosDoChat', {
+        envio: envioDoLote,
         fonte: fonte,
         dePara: deParaEscolhido || laudo.dePara,
         origem: nomeDoLote
       })
       : Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
+        envio: envioDoLote,
         fonte: fonte,
         dePara: deParaEscolhido || laudo.dePara,
         colunaQueIdentifica: colunaQueIdentifica || '',

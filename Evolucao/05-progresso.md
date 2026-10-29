@@ -3314,6 +3314,30 @@ ponta a ponta 23/23 no repositório e no pacote.
 
 ---
 
+## Etapa 59 — A mesma gravação não entra duas vezes (envio único)
+
+Primeira etapa da rodada de correções que saiu da análise de 29/10 (achado 108). A tela
+desiste em 40 segundos, mas o servidor continua e termina de gravar: o botão voltava, a
+pessoa clicava de novo, e o caso entrava **em dobro**.
+
+| Parte | O que ficou |
+|---|---|
+| **O código de envio** | Cada formulário gera um código (`Servidor.novoEnvio`) e o manda junto, o **mesmo até a gravação dar certo**: Cadastrar caso (zera ao gravar e no Limpar), Trabalhar no caso (um por caso aberto), Mudar status (um por status escolhido) e Importação (um por lote conferido, casos e chat) |
+| **O servidor** | `comEnvioUnico_`, no `Base.gs`: anota "em andamento" antes de gravar e guarda a resposta por 6 horas. O mesmo código já feito devolve a resposta guardada sem gravar; ainda em andamento, espera até 20 segundos e, se não terminar, avisa — **nunca grava a segunda vez**. Deu erro, o código é esquecido e a pessoa corrige e manda de novo. Sem código (quem chama de fora da tela), grava como sempre |
+| **As funções** | `cadastrarCaso`, `editarCaso`, `alterarSituacaoDoCaso`, `importarCasos` e `importarAtendimentosDoChat` ganharam o código; o corpo de cada uma foi para a versão `…UmaVez_` |
+| **A mensagem dos 40 segundos** | Diz a causa provável — demora, a planilha ocupada ou lenta — e que quem gravava pode clicar de novo sem duplicar. O arquivo .gs que faltou continua citado, como a outra causa |
+
+15 testes novos em `testes-envio-unico.js` (o mesmo código, códigos diferentes, sem código,
+formato inválido, erro que não fica guardado, gravação em andamento, editar, status,
+importar casos e chat, e o que cada tela manda); 1 ajustado (a mensagem dos 40 segundos).
+4 quebras de propósito, 4 pegas.
+
+**O limite, dito em voz alta:** o CacheService é "melhor esforço" — numa falta de memória do
+Google o código pode ser esquecido antes das 6 horas. É raro, e o pior caso é voltar a ser o
+que era antes desta etapa.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

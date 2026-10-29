@@ -221,7 +221,7 @@ function rodarTestesDasColunasSuas() {
   teste('a coluna sua vira caixa de texto, e o que está nela vai junto ao salvar', () => {
     const tela = lerTela('Comuns.html');
     contem(tela, 'data-coluna-sua="');
-    contem(tela, 'versaoAoAbrir, colunasSuasNaTela())', 'o salvar manda as colunas suas');
+    contem(tela, 'versaoAoAbrir, colunasSuasNaTela(), envio)', 'o salvar manda as colunas suas (e o envio, Etapa 59)');
     verdadeiro(/\.par-do-caso\.coluna-sua > input/.test(lerTela('Estilos.html')),
       'a caixa tem estilo próprio');
   });

@@ -123,12 +123,16 @@ var Servidor = (function () {
       if (jaRespondeu) return;
       jaRespondeu = true;
       if (!aTelaAindaEAMesma()) return;
+      // A causa mais comum é DEMORA — a planilha ocupada com outras gravações
+      // ou lenta —, e não arquivo faltando (análise de 29/10, Etapa 59). Quem
+      // estava gravando pode repetir: o envio único não grava duas vezes.
       var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
-        + segundosAteDesistir + ' segundos.\n\n'
-        + 'Pode ter sido só demora: antes de repetir, confira se o que você '
-        + 'pediu já não foi feito. Se acontece sempre, costuma ser um arquivo '
-        + '.gs que não foi copiado para o projeto do Apps Script — execute '
-        + 'diagnosticoRECC() no editor, que lista o que falta.');
+        + segundosAteDesistir + ' segundos. Quase sempre é demora: a planilha '
+        + 'ocupada com outras gravações, ou lenta.\n\n'
+        + 'Se você estava gravando, pode clicar de novo: o PGO reconhece o mesmo '
+        + 'envio e não grava duas vezes. Se acontece em toda tela, mesmo com '
+        + 'pouca gente usando, pode ser um arquivo .gs que não foi copiado — '
+        + 'execute diagnosticoRECC() no editor, que lista o que falta.');
       if (aoDarErrado) aoDarErrado(erro);
       else console.error(erro);
     }, segundosAteDesistir * 1000);
@@ -183,7 +187,19 @@ var Servidor = (function () {
     return acompanhamento;
   }
 
-  return { chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela };
+  /**
+   * Um CÓDIGO DE ENVIO novo (Etapa 59). O formulário guarda o mesmo código
+   * até a gravação dar certo: o servidor não grava duas vezes o mesmo código,
+   * e é isso que deixa clicar de novo depois dos 40 segundos sem duplicar.
+   */
+  function novoEnvio() {
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+
+  return {
+    chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela,
+    novoEnvio: novoEnvio
+  };
 })();
 
 /* ----------------------------------------------------------------- rotas */

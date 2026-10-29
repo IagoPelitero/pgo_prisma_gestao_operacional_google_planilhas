@@ -1227,7 +1227,9 @@ function rodarTestesDeDiagnostico() {
     desistencia.funcao();
     const recado = vm.runInContext('globalThis.__d || ""', contexto);
     contem(recado, 'umaQueSomeNoAr', 'diz qual função não respondeu');
-    contem(recado, 'não foi copiado', 'e a causa mais provável');
+    contem(recado, 'Quase sempre é demora', 'a causa mais provável (Etapa 59)');
+    contem(recado, 'não grava duas vezes', 'quem gravava pode repetir sem duplicar');
+    contem(recado, 'não foi copiado', 'e a outra causa');
     contem(recado, 'diagnosticoRECC', 'e onde ver a lista do que falta');
   });
 

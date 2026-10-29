@@ -4214,6 +4214,7 @@ var CasoEmModal = (function () {
   */
   var formularioDeCadaCanal = {};
   var salvando = false;
+  var envio = '';             // o código de envio da edição (Etapa 59)
   var aoFechar = null;        // o que a tela quer fazer quando algo mudou
   var mudouAlgo = false;
 
@@ -4232,6 +4233,7 @@ var CasoEmModal = (function () {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
     versaoAoAbrir = '';
+    envio = '';
     aoFechar = quandoMudar || null;
     mudouAlgo = false;
     salvando = false;
@@ -4473,8 +4475,9 @@ var CasoEmModal = (function () {
     // gravação está a caminho — nem o X, nem o "Fechar".
     Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
+    if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
-      versaoAoAbrir, colunasSuasNaTela())
+      versaoAoAbrir, colunasSuasNaTela(), envio)
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
@@ -4558,6 +4561,11 @@ var CasoEmModal = (function () {
         document.body.appendChild(caixa);
 
         var gravando = false;
+        // Um código de envio por status escolhido (Etapa 59): o segundo clique
+        // depois dos 40 segundos não conta duas mudanças de status. Escolher
+        // OUTRO status é outra mudança, e ganha outro código.
+        var envio = '';
+        var statusDoEnvio = '';
         function sair() {
           if (gravando) return;
           if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
@@ -4607,9 +4615,13 @@ var CasoEmModal = (function () {
           // Os três pontinhos, e nada clicável até a resposta: dois cliques
           // gravariam duas mudanças, e o contador de mudanças contaria duas.
           Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
+          if (!envio || statusDoEnvio !== elemento('situacao-nova').value) {
+            envio = Servidor.novoEnvio();
+            statusDoEnvio = elemento('situacao-nova').value;
+          }
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
             elemento('situacao-nova').value,
-            Formulario.valores(elemento('campos-da-situacao')))
+            Formulario.valores(elemento('campos-da-situacao')), envio)
             .entao(function () {
               gravando = false;
               sair();
@@ -5938,6 +5950,9 @@ var TelaCadastrarCaso = (function () {
 
   var canalEscolhido = '';
   var salvando = false;
+  // O código de envio deste caso (Etapa 59): o mesmo até gravar, para o clique
+  // repetido depois dos 40 segundos não cadastrar o caso duas vezes.
+  var envio = '';
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -6043,9 +6058,11 @@ var TelaCadastrarCaso = (function () {
     Formulario.comecouAGravar(elemento('salvar-caso'),
       elemento('formulario-do-caso'));
 
-    Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()))
+    if (!envio) envio = Servidor.novoEnvio();
+    Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()), envio)
       .entao(function () {
         salvando = false;
+        envio = '';
         /*
           GRAVOU: VAI PARA O TRABALHO.
 
@@ -6081,6 +6098,7 @@ var TelaCadastrarCaso = (function () {
     });
     elemento('limpar-caso').addEventListener('click', function () {
       recado('', '');
+      envio = '';   // formulário limpo é caso novo
       carregarFormulario();
     });
     document.addEventListener('keydown', atalhoDeSalvar);
@@ -7436,6 +7454,10 @@ var TelaImportacao = (function () {
   var pacoteDoSistema = null;
   var opcoes = null;          // colunas, analistas, lotes já importados
   var laudo = null;           // o resultado do passo 2, enquanto não se grava
+  // O código de envio do lote conferido (Etapa 59): o "Importar" repetido
+  // depois de uma demora não grava o mesmo lote duas vezes. Conferir de novo
+  // é outro lote, e ganha outro código.
+  var envioDoLote = '';
   var resultado = null;       // o que entrou, depois de gravar
 
   var fonte = { tipo: 'colado', texto: '', planilhaId: '', aba: '' };
@@ -8199,6 +8221,7 @@ var TelaImportacao = (function () {
     conferencia
       .entao(function (resposta) {
         laudo = resposta;
+        envioDoLote = Servidor.novoEnvio();
         deParaEscolhido = null;   // o servidor acabou de sugerir; a tela obedece
         desenhar();
         avisarDaConferencia();
@@ -8315,11 +8338,13 @@ var TelaImportacao = (function () {
 
     var gravacao = ehChat()
       ? Servidor.chamarSemPressa('importarAtendimentosDoChat', {
+        envio: envioDoLote,
         fonte: fonte,
         dePara: deParaEscolhido || laudo.dePara,
         origem: nomeDoLote
       })
       : Servidor.chamarSemPressa('importarCasos', canalEscolhido, {
+        envio: envioDoLote,
         fonte: fonte,
         dePara: deParaEscolhido || laudo.dePara,
         colunaQueIdentifica: colunaQueIdentifica || '',
@@ -13004,12 +13029,16 @@ var Servidor = (function () {
       if (jaRespondeu) return;
       jaRespondeu = true;
       if (!aTelaAindaEAMesma()) return;
+      // A causa mais comum é DEMORA — a planilha ocupada com outras gravações
+      // ou lenta —, e não arquivo faltando (análise de 29/10, Etapa 59). Quem
+      // estava gravando pode repetir: o envio único não grava duas vezes.
       var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
-        + segundosAteDesistir + ' segundos.\n\n'
-        + 'Pode ter sido só demora: antes de repetir, confira se o que você '
-        + 'pediu já não foi feito. Se acontece sempre, costuma ser um arquivo '
-        + '.gs que não foi copiado para o projeto do Apps Script — execute '
-        + 'diagnosticoRECC() no editor, que lista o que falta.');
+        + segundosAteDesistir + ' segundos. Quase sempre é demora: a planilha '
+        + 'ocupada com outras gravações, ou lenta.\n\n'
+        + 'Se você estava gravando, pode clicar de novo: o PGO reconhece o mesmo '
+        + 'envio e não grava duas vezes. Se acontece em toda tela, mesmo com '
+        + 'pouca gente usando, pode ser um arquivo .gs que não foi copiado — '
+        + 'execute diagnosticoRECC() no editor, que lista o que falta.');
       if (aoDarErrado) aoDarErrado(erro);
       else console.error(erro);
     }, segundosAteDesistir * 1000);
@@ -13064,7 +13093,19 @@ var Servidor = (function () {
     return acompanhamento;
   }
 
-  return { chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela };
+  /**
+   * Um CÓDIGO DE ENVIO novo (Etapa 59). O formulário guarda o mesmo código
+   * até a gravação dar certo: o servidor não grava duas vezes o mesmo código,
+   * e é isso que deixa clicar de novo depois dos 40 segundos sem duplicar.
+   */
+  function novoEnvio() {
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+
+  return {
+    chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela,
+    novoEnvio: novoEnvio
+  };
 })();
 
 /* ----------------------------------------------------------------- rotas */

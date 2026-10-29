@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-28 13:35
+   Gerado em 2026-10-29 12:21
    ========================================================================== */
 
 
@@ -1711,6 +1711,66 @@ function esquecerCacheDaConfiguracao_(nomeDaAba) {
   var cache = cacheDoScript_();
   if (!cache) return;
   try { cache.removeAll(chaves); } catch (erro) { /* expira sozinho em 5 minutos */ }
+}
+
+/* ============================================================================
+   O ENVIO ÚNICO — a mesma gravação não entra duas vezes (Etapa 59)
+   ============================================================================
+   Achado da análise de 29/10: a tela desiste em 40 segundos, mas o servidor
+   continua e termina de gravar. O botão voltava, a pessoa clicava de novo, e o
+   caso entrava em dobro.
+
+   Agora cada formulário manda um CÓDIGO DE ENVIO, o mesmo até a gravação dar
+   certo. O servidor anota o código antes de gravar ("em andamento") e guarda a
+   resposta depois ("feito"), por 6 horas:
+     · o mesmo código já feito devolve a resposta guardada, sem gravar de novo;
+     · o mesmo código ainda em andamento espera até 20 segundos pela resposta
+       e, se não vier, avisa — nunca grava a segunda vez;
+     · deu erro: o código é esquecido, e a pessoa corrige e manda de novo.
+   Sem código (quem chama de fora da tela), grava como sempre.
+   ============================================================================ */
+const RECC_PREFIXO_DO_ENVIO = 'ENVIO.';
+const RECC_ENVIO_EM_ANDAMENTO = '@andamento';
+const RECC_SEGUNDOS_DO_ENVIO_FEITO = 21600;      // 6 horas, o teto do CacheService
+const RECC_SEGUNDOS_DO_ENVIO_EM_ANDAMENTO = 600;
+const RECC_SEGUNDOS_ESPERANDO_O_ENVIO = 20;
+
+/** Grava uma vez só por código de envio — ver acima. */
+function comEnvioUnico_(envio, gravar) {
+  var codigo = String(envio === null || envio === undefined ? '' : envio).trim();
+  var cache = cacheDoScript_();
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(codigo) || !cache) return gravar();
+
+  var chave = RECC_PREFIXO_DO_ENVIO + codigo;
+  var visto = cache.get(chave);
+  for (var i = 0; visto === RECC_ENVIO_EM_ANDAMENTO && i < RECC_SEGUNDOS_ESPERANDO_O_ENVIO; i++) {
+    Utilities.sleep(1000);
+    visto = cache.get(chave);
+  }
+  if (visto === RECC_ENVIO_EM_ANDAMENTO) {
+    throw new Error('Esta gravação ainda está em andamento no servidor. Aguarde alguns '
+      + 'segundos e confira na fila se ela já entrou antes de tentar de novo.');
+  }
+  if (visto) {
+    try { return JSON.parse(visto).resposta; } catch (erro) { return null; }
+  }
+
+  cache.put(chave, RECC_ENVIO_EM_ANDAMENTO, RECC_SEGUNDOS_DO_ENVIO_EM_ANDAMENTO);
+  var resposta;
+  try {
+    resposta = gravar();
+  } catch (erro) {
+    cache.remove(chave);
+    throw erro;
+  }
+  try {
+    cache.put(chave, JSON.stringify({ resposta: resposta === undefined ? null : resposta }),
+      RECC_SEGUNDOS_DO_ENVIO_FEITO);
+  } catch (erro) {
+    // Resposta grande demais para o cache: guarda só que foi feito.
+    cache.put(chave, '{"resposta":null}', RECC_SEGUNDOS_DO_ENVIO_FEITO);
+  }
+  return resposta;
 }
 
 /**
@@ -5260,8 +5320,15 @@ function dataEstaNoFuturo_(data) {
  * SERVIDOR quando o canal declara essas colunas e a tela não mandou nada —
  * deixar o relógio do navegador decidir daria horários de fusos diferentes na
  * mesma base.
+ *
+ * `envio` é o código de envio da tela: o mesmo código não grava duas vezes
+ * (Etapa 59, ver comEnvioUnico_).
  */
-function cadastrarCaso(idDoCanal, valores) {
+function cadastrarCaso(idDoCanal, valores, envio) {
+  return comEnvioUnico_(envio, function () { return cadastrarCasoUmaVez_(idDoCanal, valores); });
+}
+
+function cadastrarCasoUmaVez_(idDoCanal, valores) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -5286,8 +5353,17 @@ function cadastrarCaso(idDoCanal, valores) {
  * A data de entrada NÃO é reescrita: histórico não muda sozinho. Se o campo
  * vier na alteração, ele é respeitado — mas o preenchimento automático só age
  * na criação.
+ *
+ * `envio`: ver cadastrarCaso. Sem ele, o segundo clique depois dos 40
+ * segundos esbarrava na versão já gravada e dizia "outra pessoa alterou".
  */
-function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
+function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
+  return comEnvioUnico_(envio, function () {
+    return editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas);
+  });
+}
+
+function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -5367,8 +5443,17 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
  * dezenas de vezes por dia.
  *
  * Segue a permissão de EDITAR: trocar a situação é editar o caso.
+ *
+ * `envio`: ver cadastrarCaso — sem ele, o segundo clique contava duas
+ * mudanças de status.
  */
-function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos) {
+function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
+  return comEnvioUnico_(envio, function () {
+    return alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos);
+  });
+}
+
+function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var alvo = converterParaIdentificador_(idDoCaso);
@@ -7882,8 +7967,16 @@ function statusPadraoDoCanal_(canal) {
  *
  * A auditoria recebe UMA linha por lote, não uma por caso. Trezentas linhas de
  * auditoria dizendo a mesma coisa afogam as que importam.
+ *
+ * `pedido.envio`: ver cadastrarCaso — o mesmo lote não entra duas vezes.
  */
 function importarCasos(idDoCanal, pedido) {
+  return comEnvioUnico_((pedido || {}).envio, function () {
+    return importarCasosUmaVez_(idDoCanal, pedido);
+  });
+}
+
+function importarCasosUmaVez_(idDoCanal, pedido) {
   var quem = exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
@@ -16734,8 +16827,17 @@ function conferirImportacaoDoChat(pedido) {
   };
 }
 
-/** Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. */
+/**
+ * Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. `pedido.envio`: o
+ * mesmo lote não entra duas vezes (Etapa 59, ver comEnvioUnico_).
+ */
 function importarAtendimentosDoChat(pedido) {
+  return comEnvioUnico_((pedido || {}).envio, function () {
+    return importarAtendimentosDoChatUmaVez_(pedido);
+  });
+}
+
+function importarAtendimentosDoChatUmaVez_(pedido) {
   exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   pedido = dadosDaTela_(pedido || {});

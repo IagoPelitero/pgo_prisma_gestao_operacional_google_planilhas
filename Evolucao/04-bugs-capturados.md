@@ -2227,6 +2227,19 @@ antes de tudo, no selo e no SLA; o carimbo não sobrescreve o que veio no mesmo
 salvamento. A suíte conta o selo com e sem a finalização, com a hora dos dois lados do
 limite, ajustada depois, e confere que a RET não muda.
 
+### 108 · Depois do erro dos 40 segundos, o segundo clique gravava o caso em dobro
+
+**Sintoma.** Achado da análise de 29/10: com a planilha ocupada, a tela dizia que o servidor
+não respondeu em 40 segundos; a pessoa clicava de novo, e o caso aparecia duas vezes.
+
+**Causa.** A tela desiste no relógio dela, mas o servidor continua e termina de gravar. O
+botão voltava ativo com o formulário preenchido, e nada distinguia o segundo clique de um
+caso novo. A mensagem ainda apontava para "um arquivo .gs que não foi copiado".
+
+**Defesa.** Código de envio por formulário, o mesmo até dar certo, e o servidor que não grava
+duas vezes o mesmo código (Etapa 59). A suíte grava duas vezes com o mesmo código e confere
+uma linha só — em cadastrar, editar, status e importar.
+
 ---
 
 ## O que esta lista ensina
@@ -2467,3 +2480,6 @@ Daí as duas práticas que o projeto não abre mão:
 58. **A data que a pessoa informa vale mais que a data em que o sistema a viu.** No item
     107, "quando salvou" passava na frente de "quando finalizou". Carimbo é o plano B
     para quando ninguém disse nada — nunca a resposta a quem disse.
+59. **Desistir do lado da tela não desfaz nada do lado do servidor.** No item 108 o relógio
+    de 40 segundos era tratado como "não gravou". Toda gravação que pode ser repetida
+    precisa de um jeito de reconhecer a repetição.

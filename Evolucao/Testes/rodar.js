@@ -47,6 +47,7 @@ const { rodarTestesDasSusepsNaSegundaBase } = require('./testes-suseps-na-segund
 const { rodarTestesDoLimparFiltros } = require('./testes-limpar-filtros');
 const { rodarTestesDosPopupsDaImportacao } = require('./testes-popups-da-importacao');
 const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
+const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -84,6 +85,7 @@ rodarTestesDasSusepsNaSegundaBase();
 rodarTestesDoLimparFiltros();
 rodarTestesDosPopupsDaImportacao();
 rodarTestesDaDataDaFinalizacao();
+rodarTestesDoEnvioUnico();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

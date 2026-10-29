@@ -1836,6 +1836,7 @@ var CasoEmModal = (function () {
   */
   var formularioDeCadaCanal = {};
   var salvando = false;
+  var envio = '';             // o código de envio da edição (Etapa 59)
   var aoFechar = null;        // o que a tela quer fazer quando algo mudou
   var mudouAlgo = false;
 
@@ -1854,6 +1855,7 @@ var CasoEmModal = (function () {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
     versaoAoAbrir = '';
+    envio = '';
     aoFechar = quandoMudar || null;
     mudouAlgo = false;
     salvando = false;
@@ -2095,8 +2097,9 @@ var CasoEmModal = (function () {
     // gravação está a caminho — nem o X, nem o "Fechar".
     Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
 
+    if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
-      versaoAoAbrir, colunasSuasNaTela())
+      versaoAoAbrir, colunasSuasNaTela(), envio)
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
@@ -2180,6 +2183,11 @@ var CasoEmModal = (function () {
         document.body.appendChild(caixa);
 
         var gravando = false;
+        // Um código de envio por status escolhido (Etapa 59): o segundo clique
+        // depois dos 40 segundos não conta duas mudanças de status. Escolher
+        // OUTRO status é outra mudança, e ganha outro código.
+        var envio = '';
+        var statusDoEnvio = '';
         function sair() {
           if (gravando) return;
           if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
@@ -2229,9 +2237,13 @@ var CasoEmModal = (function () {
           // Os três pontinhos, e nada clicável até a resposta: dois cliques
           // gravariam duas mudanças, e o contador de mudanças contaria duas.
           Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
+          if (!envio || statusDoEnvio !== elemento('situacao-nova').value) {
+            envio = Servidor.novoEnvio();
+            statusDoEnvio = elemento('situacao-nova').value;
+          }
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
             elemento('situacao-nova').value,
-            Formulario.valores(elemento('campos-da-situacao')))
+            Formulario.valores(elemento('campos-da-situacao')), envio)
             .entao(function () {
               gravando = false;
               sair();

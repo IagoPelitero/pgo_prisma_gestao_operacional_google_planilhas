@@ -1695,6 +1695,66 @@ function esquecerCacheDaConfiguracao_(nomeDaAba) {
   try { cache.removeAll(chaves); } catch (erro) { /* expira sozinho em 5 minutos */ }
 }
 
+/* ============================================================================
+   O ENVIO ÚNICO — a mesma gravação não entra duas vezes (Etapa 59)
+   ============================================================================
+   Achado da análise de 29/10: a tela desiste em 40 segundos, mas o servidor
+   continua e termina de gravar. O botão voltava, a pessoa clicava de novo, e o
+   caso entrava em dobro.
+
+   Agora cada formulário manda um CÓDIGO DE ENVIO, o mesmo até a gravação dar
+   certo. O servidor anota o código antes de gravar ("em andamento") e guarda a
+   resposta depois ("feito"), por 6 horas:
+     · o mesmo código já feito devolve a resposta guardada, sem gravar de novo;
+     · o mesmo código ainda em andamento espera até 20 segundos pela resposta
+       e, se não vier, avisa — nunca grava a segunda vez;
+     · deu erro: o código é esquecido, e a pessoa corrige e manda de novo.
+   Sem código (quem chama de fora da tela), grava como sempre.
+   ============================================================================ */
+const RECC_PREFIXO_DO_ENVIO = 'ENVIO.';
+const RECC_ENVIO_EM_ANDAMENTO = '@andamento';
+const RECC_SEGUNDOS_DO_ENVIO_FEITO = 21600;      // 6 horas, o teto do CacheService
+const RECC_SEGUNDOS_DO_ENVIO_EM_ANDAMENTO = 600;
+const RECC_SEGUNDOS_ESPERANDO_O_ENVIO = 20;
+
+/** Grava uma vez só por código de envio — ver acima. */
+function comEnvioUnico_(envio, gravar) {
+  var codigo = String(envio === null || envio === undefined ? '' : envio).trim();
+  var cache = cacheDoScript_();
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(codigo) || !cache) return gravar();
+
+  var chave = RECC_PREFIXO_DO_ENVIO + codigo;
+  var visto = cache.get(chave);
+  for (var i = 0; visto === RECC_ENVIO_EM_ANDAMENTO && i < RECC_SEGUNDOS_ESPERANDO_O_ENVIO; i++) {
+    Utilities.sleep(1000);
+    visto = cache.get(chave);
+  }
+  if (visto === RECC_ENVIO_EM_ANDAMENTO) {
+    throw new Error('Esta gravação ainda está em andamento no servidor. Aguarde alguns '
+      + 'segundos e confira na fila se ela já entrou antes de tentar de novo.');
+  }
+  if (visto) {
+    try { return JSON.parse(visto).resposta; } catch (erro) { return null; }
+  }
+
+  cache.put(chave, RECC_ENVIO_EM_ANDAMENTO, RECC_SEGUNDOS_DO_ENVIO_EM_ANDAMENTO);
+  var resposta;
+  try {
+    resposta = gravar();
+  } catch (erro) {
+    cache.remove(chave);
+    throw erro;
+  }
+  try {
+    cache.put(chave, JSON.stringify({ resposta: resposta === undefined ? null : resposta }),
+      RECC_SEGUNDOS_DO_ENVIO_FEITO);
+  } catch (erro) {
+    // Resposta grande demais para o cache: guarda só que foi feito.
+    cache.put(chave, '{"resposta":null}', RECC_SEGUNDOS_DO_ENVIO_FEITO);
+  }
+  return resposta;
+}
+
 /**
  * O tipo das colunas criadas pelo administrador.
  *

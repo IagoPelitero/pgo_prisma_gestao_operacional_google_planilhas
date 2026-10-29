@@ -600,6 +600,9 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
       },
       Logger: { log: (m) => registros.push(String(m)) },
       Utilities: {
+        // O envio único espera a gravação anterior em passos de 1 segundo; aqui
+        // não há o que esperar — o teste controla o cache.
+        sleep: () => {},
         /**
          * Formatação de verdade, e não String(data).
          *

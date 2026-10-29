@@ -3354,8 +3354,17 @@ function conferirImportacaoDoChat(pedido) {
   };
 }
 
-/** Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. */
+/**
+ * Grava os atendimentos do chat na aba ATENDIMENTOS_CHAT. `pedido.envio`: o
+ * mesmo lote não entra duas vezes (Etapa 59, ver comEnvioUnico_).
+ */
 function importarAtendimentosDoChat(pedido) {
+  return comEnvioUnico_((pedido || {}).envio, function () {
+    return importarAtendimentosDoChatUmaVez_(pedido);
+  });
+}
+
+function importarAtendimentosDoChatUmaVez_(pedido) {
   exigirPermissao_(RECC_ACOES.IMPORTAR);
   exigirTela_('importacao');
   pedido = dadosDaTela_(pedido || {});

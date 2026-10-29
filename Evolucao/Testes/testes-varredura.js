@@ -177,7 +177,7 @@ function rodarTestesDaVarredura() {
     const peca = lerPeca('CasoEmModal');
     contem(peca, "versaoAoAbrir = caso.versao || '';");
     contem(peca, "Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),\n"
-      + '      versaoAoAbrir, colunasSuasNaTela())', 'a versão vai junto (e, depois dela, as colunas suas)');
+      + '      versaoAoAbrir, colunasSuasNaTela(), envio)', 'a versão vai junto (e, depois dela, as colunas suas e o envio)');
   });
 
   /* ----------------------------------------------------------------------- */
@@ -311,7 +311,8 @@ function rodarTestesDaVarredura() {
   });
 
   teste('desistir de esperar avisa que a ação pode ter sido feita', () => {
-    contem(ler('Front-End/Aplicacao.html'), 'antes de repetir, confira se o que você');
+    // Etapa 59: e que repetir não duplica — o envio único reconhece o mesmo código.
+    contem(ler('Front-End/Aplicacao.html'), 'o PGO reconhece o mesmo');
   });
 
   /* ----------------------------------------------------------------------- */
