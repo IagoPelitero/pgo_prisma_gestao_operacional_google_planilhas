@@ -20,6 +20,7 @@ var TelaBuscarCaso = (function () {
   var opcoes = null;
   var canaisEscolhidas = {};     // id → true
   var incluirLegado = false;
+  var incluirHistorico = true;   // Etapa 66: marcado de saída
   var procurando = false;
   var ultimoTermo = '';
   var podeEditar = false;        // vem com a resposta da busca
@@ -58,6 +59,15 @@ var TelaBuscarCaso = (function () {
         + '</em></span></label>';
     });
 
+    // Os casos arquivados (Etapa 66): marcado de saída — quem procura um caso
+    // antigo não deveria precisar lembrar que ele foi para o histórico.
+    if (opcoes.historico && opcoes.historico.ligado) {
+      caixas.push('<label class="config-chave">'
+        + '<input type="checkbox" id="incluir-historico"'
+        + (incluirHistorico ? ' checked' : '') + '>'
+        + '<span>Histórico<em>os casos encerrados arquivados, em leitura</em></span></label>');
+    }
+
     if (opcoes.legado.ligado) {
       caixas.push('<label class="config-chave">'
         + '<input type="checkbox" id="incluir-legado"'
@@ -86,6 +96,10 @@ var TelaBuscarCaso = (function () {
     if (legado) {
       legado.addEventListener('change', function () { incluirLegado = this.checked; });
     }
+    var historico = elemento('incluir-historico');
+    if (historico) {
+      historico.addEventListener('change', function () { incluirHistorico = this.checked; });
+    }
   }
 
   /* -------------------------------------------------------------- procurar */
@@ -105,7 +119,8 @@ var TelaBuscarCaso = (function () {
     elemento('resultado-da-busca').innerHTML =
       '<p class="carregando-campos">Procurando…</p>';
 
-    Servidor.chamar('buscarCasos', termo, onde, incluirLegado)
+    Servidor.chamar('buscarCasos', termo, onde, incluirLegado,
+      incluirHistorico && !!(opcoes.historico && opcoes.historico.ligado))
       .entao(function (resposta) {
         procurando = false;
         elemento('botao-buscar').disabled = false;
@@ -175,9 +190,11 @@ var TelaBuscarCaso = (function () {
   }
 
   function tabelaDoCanal(origem) {
+    // O histórico (Etapa 66) é só leitura: sem a coluna das ações.
+    var comAcoes = !origem.somenteLeitura;
     var cabecalho = origem.colunas.map(function (grupo) {
       return '<th>' + escapar(grupo.titulo) + '</th>';
-    }).join('') + '<th class="acoes-coluna">Ações</th>';
+    }).join('') + (comAcoes ? '<th class="acoes-coluna">Ações</th>' : '');
 
     var linhas = origem.casos.map(function (caso) {
       var celulas = caso.celulas.map(function (grupo, i) {
@@ -194,8 +211,8 @@ var TelaBuscarCaso = (function () {
         }).join('') + '</td>';
       }).join('');
 
-      return '<tr>' + celulas + '<td class="acoes-coluna">'
-        + acoesDoAchado(caso, origem) + '</td></tr>';
+      return '<tr>' + celulas + (comAcoes ? '<td class="acoes-coluna">'
+        + acoesDoAchado(caso, origem) + '</td>' : '') + '</tr>';
     }).join('');
 
     return '<div class="rolagem-tabela"><table class="fila agrupada">'

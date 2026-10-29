@@ -54,6 +54,7 @@ const { rodarTestesDaLimpeza } = require('./testes-limpeza-do-que-nao-e-usado');
 const { rodarTestesDaBuscaRapida } = require('./testes-busca-rapida');
 const { rodarTestesDoRegistroDeErros } = require('./testes-registro-de-erros');
 const { rodarTestesDoPeriodoPelaData } = require('./testes-periodo-pela-data');
+const { rodarTestesDoHistoricoDaBase } = require('./testes-historico-da-base');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -98,6 +99,7 @@ rodarTestesDaLimpeza();
 rodarTestesDaBuscaRapida();
 rodarTestesDoRegistroDeErros();
 rodarTestesDoPeriodoPelaData();
+rodarTestesDoHistoricoDaBase();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

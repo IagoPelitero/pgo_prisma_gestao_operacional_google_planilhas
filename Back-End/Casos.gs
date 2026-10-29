@@ -2256,6 +2256,8 @@ function opcoesDaBusca() {
       };
     }),
     legado: descricaoDoLegado_(),
+    // Os casos arquivados (Etapa 66): a busca também procura lá.
+    historico: { ligado: String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim() !== '' },
     minimo: RECC_MINIMO_DO_TERMO,
     maximo: RECC_MAXIMO_DA_BUSCA,
     escopo: quem.permissoes.escopo
@@ -2268,7 +2270,7 @@ function opcoesDaBusca() {
  * `ondeProcurar` é a lista de ids de canal; vazio procura em todas as que a
  * pessoa enxerga. `incluirLegado` diz se a planilha antiga entra.
  */
-function buscarCasos(termo, ondeProcurar, incluirLegado) {
+function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico) {
   var quem = exigirTela_('buscarCaso');
 
   var procurado = String(termo || '').trim();
@@ -2288,6 +2290,11 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
       return;
     }
     resultados.push(procurarNoCanal_(canal, procurado, quem));
+    // O que foi arquivado deste canal (Etapa 66) — só leitura.
+    if (incluirHistorico) {
+      var doHistorico = procurarNoHistorico_(canal, procurado, quem);
+      if (doHistorico) resultados.push(doHistorico);
+    }
   });
 
   if (incluirLegado) {
@@ -2412,6 +2419,67 @@ function procurarNoCanal_(canal, termo, quem) {
     procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
     aviso: aviso
   };
+}
+
+/**
+ * Procura no HISTÓRICO do canal (Etapa 66): a aba HIST_<aba> da planilha de
+ * histórico, com as mesmas colunas de busca e o mesmo alcance da base. Volta
+ * SÓ LEITURA: o caso arquivado está encerrado, e editar lá não voltaria para
+ * cá. Sem nada arquivado deste canal, não volta origem nenhuma.
+ */
+function procurarNoHistorico_(canal, termo, quem) {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
+  if (!id) return null;
+  comAGrafiaDaAba_(canal);
+  var origem = { tipo: 'historico', id: canal.id, nome: canal.nome + ' · histórico',
+    icone: canal.icone, colunas: colunasDaFila_(canal), casos: [], somenteLeitura: true, aviso: '' };
+  var aba;
+  try {
+    aba = abrirPlanilhaDeFora_(id).getSheetByName(RECC_PREFIXO_DO_HISTORICO + canal.aba);
+  } catch (erro) {
+    origem.aviso = 'O histórico não abriu: ' + erro.message;
+    return origem;
+  }
+  if (!aba || aba.getLastRow() < 2) return null;
+
+  var total = aba.getLastRow() - 1;
+  var largura = aba.getLastColumn();
+  var cabecalhos = aba.getRange(1, 1, 1, largura).getValues()[0].map(function (v) {
+    return String(v === null || v === undefined ? '' : v).trim();
+  });
+  var onde = {};
+  cabecalhos.forEach(function (cabecalho, i) { if (cabecalho) onde[normalizarParaComparar_(cabecalho)] = i; });
+
+  var linhas = [];
+  var jaAchada = {};
+  colunasDaBusca_(canal).forEach(function (coluna) {
+    var i = onde[normalizarParaComparar_(coluna.cabecalho)];
+    if (i === undefined) return;
+    aba.getRange(2, i + 1, total, 1).getValues().forEach(function (valor, k) {
+      if (!jaAchada[k + 2] && casaComOTermo_(valor[0], termo, coluna.tipo)) {
+        jaAchada[k + 2] = true;
+        linhas.push(k + 2);
+      }
+    });
+  });
+  if (!linhas.length) return origem;
+
+  linhas.sort(function (uma, outra) { return uma - outra; });
+  if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = 'A busca achou ' + linhas.length + ' casos no histórico e mostra os '
+      + RECC_MAXIMO_DA_BUSCA + ' mais recentes.';
+    linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
+  }
+  var iId = onde[normalizarParaComparar_('Id')];
+  var registros = linhas.map(function (linha) {
+    var valores = aba.getRange(linha, 1, 1, largura).getValues()[0];
+    var registro = { __linha: linha };
+    cabecalhos.forEach(function (cabecalho, i) { if (cabecalho) registro[cabecalho] = valores[i]; });
+    registro.__id = iId === undefined ? '' : converterParaIdentificador_(valores[iId]);
+    return registro;
+  });
+  origem.casos = montarFila_(filtrarPeloAlcance_(registros, canal.aba, quem), canal);
+  return origem;
 }
 
 /**

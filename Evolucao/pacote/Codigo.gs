@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 18:04
+   Gerado em 2026-10-29 19:21
    ========================================================================== */
 
 
@@ -4320,13 +4320,15 @@ function opcoesDaBusca() {
       };
     }),
     legado: descricaoDoLegado_(),
+
+    historico: { ligado: String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim() !== '' },
     minimo: RECC_MINIMO_DO_TERMO,
     maximo: RECC_MAXIMO_DA_BUSCA,
     escopo: quem.permissoes.escopo
   };
 }
 
-function buscarCasos(termo, ondeProcurar, incluirLegado) {
+function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico) {
   var quem = exigirTela_('buscarCaso');
 
   var procurado = String(termo || '').trim();
@@ -4344,6 +4346,11 @@ function buscarCasos(termo, ondeProcurar, incluirLegado) {
       return;
     }
     resultados.push(procurarNoCanal_(canal, procurado, quem));
+
+    if (incluirHistorico) {
+      var doHistorico = procurarNoHistorico_(canal, procurado, quem);
+      if (doHistorico) resultados.push(doHistorico);
+    }
   });
 
   if (incluirLegado) {
@@ -4446,6 +4453,61 @@ function procurarNoCanal_(canal, termo, quem) {
     procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
     aviso: aviso
   };
+}
+
+function procurarNoHistorico_(canal, termo, quem) {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
+  if (!id) return null;
+  comAGrafiaDaAba_(canal);
+  var origem = { tipo: 'historico', id: canal.id, nome: canal.nome + ' · histórico',
+    icone: canal.icone, colunas: colunasDaFila_(canal), casos: [], somenteLeitura: true, aviso: '' };
+  var aba;
+  try {
+    aba = abrirPlanilhaDeFora_(id).getSheetByName(RECC_PREFIXO_DO_HISTORICO + canal.aba);
+  } catch (erro) {
+    origem.aviso = 'O histórico não abriu: ' + erro.message;
+    return origem;
+  }
+  if (!aba || aba.getLastRow() < 2) return null;
+
+  var total = aba.getLastRow() - 1;
+  var largura = aba.getLastColumn();
+  var cabecalhos = aba.getRange(1, 1, 1, largura).getValues()[0].map(function (v) {
+    return String(v === null || v === undefined ? '' : v).trim();
+  });
+  var onde = {};
+  cabecalhos.forEach(function (cabecalho, i) { if (cabecalho) onde[normalizarParaComparar_(cabecalho)] = i; });
+
+  var linhas = [];
+  var jaAchada = {};
+  colunasDaBusca_(canal).forEach(function (coluna) {
+    var i = onde[normalizarParaComparar_(coluna.cabecalho)];
+    if (i === undefined) return;
+    aba.getRange(2, i + 1, total, 1).getValues().forEach(function (valor, k) {
+      if (!jaAchada[k + 2] && casaComOTermo_(valor[0], termo, coluna.tipo)) {
+        jaAchada[k + 2] = true;
+        linhas.push(k + 2);
+      }
+    });
+  });
+  if (!linhas.length) return origem;
+
+  linhas.sort(function (uma, outra) { return uma - outra; });
+  if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = 'A busca achou ' + linhas.length + ' casos no histórico e mostra os '
+      + RECC_MAXIMO_DA_BUSCA + ' mais recentes.';
+    linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
+  }
+  var iId = onde[normalizarParaComparar_('Id')];
+  var registros = linhas.map(function (linha) {
+    var valores = aba.getRange(linha, 1, 1, largura).getValues()[0];
+    var registro = { __linha: linha };
+    cabecalhos.forEach(function (cabecalho, i) { if (cabecalho) registro[cabecalho] = valores[i]; });
+    registro.__id = iId === undefined ? '' : converterParaIdentificador_(valores[iId]);
+    return registro;
+  });
+  origem.casos = montarFila_(filtrarPeloAlcance_(registros, canal.aba, quem), canal);
+  return origem;
 }
 
 function casaComOTermo_(valor, termo, tipo) {
@@ -7290,19 +7352,20 @@ function dataDoUltimoArquivamento_() {
     Number(m[4] || 0), Number(m[5] || 0));
 }
 
-function abrirArquivoDaAuditoria_(id) {
+function abrirArquivoDaAuditoria_(id, deQue) {
   var planilha;
   try {
     planilha = SpreadsheetApp.openById(id);
   } catch (erro) {
-    throw new Error('Não consegui abrir a planilha de arquivo da auditoria: '
+    throw new Error('Não consegui abrir a planilha ' + (deQue || 'de arquivo da auditoria') + ': '
       + (erro.message || erro) + ' Confira o Id (o pedaço do endereço entre '
       + '/d/ e /edit) e se esta conta tem acesso a ela.');
   }
 
   if (planilha.getId() === planilhaAtiva_().getId()) {
-    throw new Error('Esse é o Id desta mesma planilha. O arquivo da auditoria '
-      + 'precisa ser OUTRA planilha.');
+    throw new Error('Esse é o Id desta mesma planilha. ' + (deQue
+      ? 'A planilha ' + deQue + ' precisa ser OUTRA.'
+      : 'O arquivo da auditoria precisa ser OUTRA planilha.'));
   }
   return planilha;
 }
@@ -7360,9 +7423,10 @@ function arquivarAuditoria_(agora) {
   return { arquivadas: quantas, ate: ate };
 }
 
-function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
-  var aba = destino.getSheetByName('AUDITORIA')
-    || destino.insertSheet('AUDITORIA');
+function copiarParaOArquivo_(destino, estrutura, linhas, iId, nomeDaAbaLa) {
+
+  var nomeLa = nomeDaAbaLa || 'AUDITORIA';
+  var aba = destino.getSheetByName(nomeLa) || destino.insertSheet(nomeLa);
 
   var larguraLa = aba.getLastColumn();
   var cabecalhoLa = larguraLa
@@ -7415,9 +7479,219 @@ function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
     if (converterParaIdentificador_(lidos[i][0])
       !== converterParaIdentificador_(linhas[i][iId])) {
       throw new Error('A cópia para a planilha de arquivo não confere na linha '
-        + (inicio + i) + '. Nada foi apagado da auditoria.');
+        + (inicio + i) + ' da aba ' + nomeLa + '. Nada foi apagado daqui.');
     }
   }
+}
+
+var RECC_CHAVE_DO_HISTORICO_DA_BASE = 'BASE.HISTORICO_ID';
+var RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE = 'BASE.ULTIMO_ARQUIVAMENTO';
+var RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE = 'BASE.QUANTO_FOI_ARQUIVADO';
+const RECC_BATIMENTO_DO_ACIONADOR_DA_BASE = 'BASE.ACIONADOR_RODOU';
+const RECC_MESES_QUE_A_BASE_GUARDA = 13;
+const RECC_CASOS_ARQUIVADOS_POR_VEZ = 5000;
+const RECC_PEDACOS_ARQUIVADOS_POR_VEZ = 150;
+
+const RECC_SEGUNDOS_DO_ARQUIVAMENTO_PELO_BOTAO = 60;
+const RECC_SEGUNDOS_DO_ARQUIVAMENTO_AGENDADO = 240;
+const RECC_PREFIXO_DO_HISTORICO = 'HIST_';
+
+var RECC_CHAVE_DA_PLANILHA_DAS_ANALISES = 'ANALISES.PLANILHA_ID';
+
+function limiteDoHistoricoDaBase_(agora) {
+  return new Date(agora.getFullYear(), agora.getMonth() - RECC_MESES_QUE_A_BASE_GUARDA,
+    agora.getDate());
+}
+
+function configuracaoDoArquivoDaBase() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var ultimo = String(valorDaConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE, '') || '');
+  return {
+    planilhaId: String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim(),
+    meses: RECC_MESES_QUE_A_BASE_GUARDA,
+    ultimoEm: ultimo,
+    ultimoQuantos: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, 0)) || 0,
+    arquivariaAte: Utilities.formatDate(limiteDoHistoricoDaBase_(new Date()),
+      RECC_FUSO_HORARIO, 'dd/MM/yyyy'),
+    planilhaDasAnalises: String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, '')).trim()
+  };
+}
+
+function salvarHistoricoDaBase(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var id = String(planilhaId || '').trim();
+  if (id) abrirArquivoDaAuditoria_(id, 'de histórico da base');
+  gravarConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, id);
+  registrarAuditoria_('base.configurar', 'CONFIG', '', id ? 'histórico em ' + id : 'histórico desligado');
+  return configuracaoDoArquivoDaBase();
+}
+
+function salvarPlanilhaDasAnalises(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var id = String(planilhaId || '').trim();
+  if (id) abrirArquivoDaAuditoria_(id, 'das análises');
+  gravarConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, id);
+  planilhaDasAnalisesAberta = null;
+  registrarAuditoria_('analise.planilha', 'CONFIG', '', id ? 'análises em ' + id : 'análises nesta planilha');
+  return configuracaoDoArquivoDaBase();
+}
+
+function arquivarBaseAgora() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var resultado = arquivarBase_(new Date(), RECC_SEGUNDOS_DO_ARQUIVAMENTO_PELO_BOTAO);
+  resultado.configuracao = configuracaoDoArquivoDaBase();
+  return resultado;
+}
+
+function arquivarBaseAgendada() {
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_BASE, String(new Date().getTime()));
+  } catch (erro) {   }
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
+  if (!id) return { arquivou: false, motivo: 'sem planilha de histórico' };
+  return arquivarBase_(new Date(), RECC_SEGUNDOS_DO_ARQUIVAMENTO_AGENDADO);
+}
+
+function arquivarBase_(agora, segundos) {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
+  if (!id) throw new Error('Informe antes o Id da planilha de histórico da base.');
+  var destino = abrirArquivoDaAuditoria_(id, 'de histórico da base');
+  var limite = limiteDoHistoricoDaBase_(agora);
+  var ate = new Date().getTime() + (Number(segundos) || 0) * 1000;
+  var porCanal = {};
+  var arquivados = 0;
+  var faltam = 0;
+
+  var canais = canaisVisiveis_().map(function (umCanal) {
+    var canal = canalPeloId_(umCanal.id);
+    var finais = {};
+    situacoesDoCanal_(canal).forEach(function (situacao) {
+      if (situacao.final) finais[situacao.chave] = true;
+    });
+    porCanal[canal.id] = { canal: canal.nome, arquivados: 0, faltam: 0 };
+    if (!canal.colunaDaData || !canal.colunaDoStatus || !Object.keys(finais).length) {
+      porCanal[canal.id].motivo = 'sem coluna de data, de status ou status Final';
+      return null;
+    }
+    return { canal: canal, finais: finais };
+  }).filter(function (um) { return um; });
+
+  do {
+    faltam = 0;
+    canais.forEach(function (um) {
+      var feito = arquivarUmCanal_(um.canal, um.finais, limite, destino);
+      porCanal[um.canal.id].arquivados += feito.arquivados;
+      porCanal[um.canal.id].faltam = feito.faltam;
+      arquivados += feito.arquivados;
+      faltam += feito.faltam;
+    });
+  } while (faltam > 0 && new Date().getTime() < ate);
+  porCanal = Object.keys(porCanal).map(function (chave) { return porCanal[chave]; });
+
+  var antesDe = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE,
+    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, String(arquivados));
+  registrarAuditoria_('base.arquivar', 'BASE', '', arquivados + ' caso(s) encerrados de antes de '
+    + antesDe + ' → ' + id + (faltam ? ' · faltam ' + faltam : ''));
+  return { arquivados: arquivados, faltam: faltam, ate: antesDe, porCanal: porCanal };
+}
+
+function arquivarUmCanal_(canal, finais, limite, destino) {
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(30000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(canal.aba);
+    var estrutura = estruturaDaAba_(canal.aba, true);
+    var total = quantidadeDeRegistros_(estrutura);
+    if (total <= 0) return { arquivados: 0, faltam: 0 };
+    var iData = exigirPosicaoDaColuna_(estrutura, canal.colunaDaData);
+    var iStatus = exigirPosicaoDaColuna_(estrutura, canal.colunaDoStatus);
+    var iId = exigirPosicaoDaColuna_(estrutura, 'Id');
+    var largura = estrutura.cabecalhos.length;
+    var coluna = function (i) {
+      return estrutura.aba.getRange(2, i + 1, total, 1).getValues()
+        .map(function (linha) { return linha[0]; });
+    };
+    var datas = coluna(iData);
+    var status = coluna(iStatus);
+
+    var linhas = [];
+    for (var k = 0; k < total; k++) {
+      var quando = converterParaData_(datas[k]);
+      if (quando && quando.getTime() < limite.getTime()
+        && finais[normalizarParaComparar_(status[k])]) linhas.push(k + 2);
+    }
+    if (!linhas.length) return { arquivados: 0, faltam: 0 };
+    var todas = linhas.length;
+    var corridas = corridasDeLinhas_(linhas).slice(0, RECC_PEDACOS_ARQUIVADOS_POR_VEZ);
+    linhas = [];
+    corridas.forEach(function (corrida) {
+      for (var n = corrida.inicio; n <= corrida.fim; n++) linhas.push(n);
+    });
+    if (linhas.length > RECC_CASOS_ARQUIVADOS_POR_VEZ) {
+      linhas = linhas.slice(0, RECC_CASOS_ARQUIVADOS_POR_VEZ);
+      corridas = corridasDeLinhas_(linhas);
+    }
+    var faltam = todas - linhas.length;
+
+    var porLinha = {};
+    blocosDeLinhas_(linhas).forEach(function (bloco) {
+      estrutura.aba.getRange(bloco.inicio, 1, bloco.fim - bloco.inicio + 1, largura).getValues()
+        .forEach(function (valoresDaLinha, k) { porLinha[bloco.inicio + k] = valoresDaLinha; });
+    });
+    var valores = linhas.map(function (n) { return porLinha[n]; });
+
+    var nomeLa = RECC_PREFIXO_DO_HISTORICO + canal.aba;
+    var jaLa = idsQueJaEstaoLa_(destino, nomeLa, estrutura.cabecalhos[iId]);
+    var novas = valores.filter(function (linha) {
+      return !jaLa[converterParaIdentificador_(linha[iId])];
+    });
+    if (novas.length) copiarParaOArquivo_(destino, estrutura, novas, iId, nomeLa);
+
+    garantirLinhasNaGrade_(estrutura.aba, total + 2);
+    corridas.slice().reverse().forEach(function (corrida) {
+      estrutura.aba.deleteRows(corrida.inicio, corrida.fim - corrida.inicio + 1);
+    });
+    esquecerEstruturaLida_(canal.aba);
+    return { arquivados: linhas.length, faltam: faltam };
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+function corridasDeLinhas_(numerosDeLinha) {
+  var corridas = [];
+  numerosDeLinha.slice().sort(function (um, outro) { return um - outro; })
+    .forEach(function (linha) {
+      var ultima = corridas[corridas.length - 1];
+      if (ultima && linha === ultima.fim + 1) ultima.fim = linha;
+      else corridas.push({ inicio: linha, fim: linha });
+    });
+  return corridas;
+}
+
+function idsQueJaEstaoLa_(destino, nomeLa, cabecalhoDoId) {
+  var aba = destino.getSheetByName(nomeLa);
+  if (!aba || aba.getLastRow() < 2) return {};
+  var cabecalhos = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+  var onde = -1;
+  cabecalhos.forEach(function (cabecalho, i) {
+    if (normalizarParaComparar_(cabecalho) === normalizarParaComparar_(cabecalhoDoId)) onde = i;
+  });
+  if (onde < 0) return {};
+  var ids = {};
+  aba.getRange(2, onde + 1, aba.getLastRow() - 1, 1).getValues().forEach(function (linha) {
+    var id = converterParaIdentificador_(linha[0]);
+    if (id) ids[id] = true;
+  });
+  return ids;
 }
 
 var RECC_PREFIXO_DA_ANALISE = 'ANALISE_';
@@ -7430,7 +7704,10 @@ function analiseDaLinha_(linha, canais) {
   })[0];
 
   var nomeDaAba = nomeDaAbaDeAnalise_(linha.Nome);
-  var aba = nomeDaAba ? planilhaAtiva_().getSheetByName(nomeDaAba) : null;
+  var aba = null;
+  try {
+    aba = nomeDaAba ? planilhaDasAnalises_().getSheetByName(nomeDaAba) : null;
+  } catch (erro) { aba = null; }
 
   return {
     id: linha.__id,
@@ -7929,6 +8206,16 @@ function montarConteudoDaAnalise_(receita, canal) {
   return { cabecalhos: cabecalhos, linhas: linhas, truncada: truncada };
 }
 
+var planilhaDasAnalisesAberta = null;
+function planilhaDasAnalises_() {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, '')).trim();
+  if (!id) return planilhaAtiva_();
+  if (!planilhaDasAnalisesAberta || planilhaDasAnalisesAberta.getId() !== id) {
+    planilhaDasAnalisesAberta = abrirArquivoDaAuditoria_(id, 'das análises');
+  }
+  return planilhaDasAnalisesAberta;
+}
+
 function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
   if (String(nomeDaAba || '').indexOf(RECC_PREFIXO_DA_ANALISE) !== 0) {
     throw new Error('Recusado: "' + nomeDaAba + '" não começa com '
@@ -7937,7 +8224,7 @@ function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
       + 'gera.');
   }
 
-  var planilha = planilhaAtiva_();
+  var planilha = planilhaDasAnalises_();
   var aba = planilha.getSheetByName(nomeDaAba);
   if (!aba) aba = planilha.insertSheet(nomeDaAba);
 
@@ -7954,6 +8241,11 @@ function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
   }
   aba.setFrozenRows(1);
   esquecerEstruturaLida_(nomeDaAba);
+
+  if (planilha.getId() !== planilhaAtiva_().getId()) {
+    var antiga = planilhaAtiva_().getSheetByName(nomeDaAba);
+    if (antiga) planilhaAtiva_().deleteSheet(antiga);
+  }
   return aba;
 }
 
@@ -14640,6 +14932,7 @@ function blocoDoAmbiente_() {
   itens.push(itemDaBuscaRapida_());
   itens.push(itemDosErros_());
   itens.push(itemDoAcionadorDaAuditoria_());
+  itens.push(itemDoAcionadorDaBase_());
   itensDasListasDeAnalistas_().forEach(function (item) { itens.push(item); });
 
   return itens;
@@ -14672,31 +14965,38 @@ function itemDosErros_() {
 const RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA = 35;
 
 function itemDoAcionadorDaAuditoria_() {
-  var arquivo = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '') || '').trim();
-  if (!arquivo) {
-    return item_(RECC_SITUACOES_DO_LAUDO.OK,
-      'Arquivamento da auditoria: sem planilha de arquivo (a auditoria fica toda aqui)');
-  }
-  var batimento = Number(PropertiesService.getScriptProperties()
-    .getProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA) || 0);
+  return itemDoAcionador_('Arquivamento da auditoria', RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA,
+    RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA, 'arquivarAuditoriaAgendada',
+    'sem planilha de arquivo (a auditoria fica toda aqui)', 'a aba AUDITORIA só cresce');
+}
+
+function itemDoAcionadorDaBase_() {
+  return itemDoAcionador_('Histórico da base', RECC_CHAVE_DO_HISTORICO_DA_BASE,
+    RECC_BATIMENTO_DO_ACIONADOR_DA_BASE, 'arquivarBaseAgendada',
+    'sem planilha de histórico (os casos ficam todos na base)', 'a base só cresce');
+}
+
+function itemDoAcionador_(rotulo, chaveDaPlanilha, chaveDoBatimento, funcao, semPlanilha, semEle) {
+  var arquivo = String(valorDaConfiguracao_(chaveDaPlanilha, '') || '').trim();
+  if (!arquivo) return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': ' + semPlanilha);
+  var batimento = Number(PropertiesService.getScriptProperties().getProperty(chaveDoBatimento) || 0);
   var comoCriar = 'No editor do Apps Script: Acionadores › Adicionar acionador › '
-    + 'arquivarAuditoriaAgendada › Baseado no tempo › Mensal.';
+    + funcao + ' › Baseado no tempo › Mensal.';
   if (!batimento) {
     return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
-      'Arquivamento da auditoria: o acionador ainda não rodou',
-      'Há planilha de arquivo, mas arquivarAuditoriaAgendada nunca foi chamada — o '
-        + 'acionador mensal pode não ter sido criado. Sem ele, a aba AUDITORIA só cresce.',
+      rotulo + ': o acionador ainda não rodou',
+      'Há planilha apontada, mas ' + funcao + ' nunca foi chamada — o acionador mensal '
+        + 'pode não ter sido criado. Sem ele, ' + semEle + '.',
       comoCriar);
   }
   var dias = Math.floor((new Date().getTime() - batimento) / (24 * 3600 * 1000));
   if (dias > RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA) {
     return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
-      'Arquivamento da auditoria: o acionador não roda há ' + dias + ' dias',
+      rotulo + ': o acionador não roda há ' + dias + ' dias',
       'Ele é mensal. Acionador apagado ou com erro não avisa ninguém.',
       'Confira em Acionadores, no editor. ' + comoCriar);
   }
-  return item_(RECC_SITUACOES_DO_LAUDO.OK,
-    'Arquivamento da auditoria: o acionador rodou há ' + dias + ' dia(s)');
+  return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': o acionador rodou há ' + dias + ' dia(s)');
 }
 
 function itensDasListasDeAnalistas_() {

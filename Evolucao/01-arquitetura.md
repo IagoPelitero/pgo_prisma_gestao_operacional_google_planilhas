@@ -351,6 +351,10 @@ formulário (no momento em que a SUSEP é digitada) e no dashboard.
 | `CONFIG` | `Id` · `Chave` · `Valor` · `Descricao` · `AtualizadoPor` · `Data` | Parâmetros gerais (nome do sistema, janela de dias, metas…) |
 | `AUDITORIA` | `Id` · `DataHora` · `UsuarioId` · `Acao` · `Entidade` · `RegistroId` · `Detalhe` | Trilha das ações relevantes. Sem dado pessoal |
 | `ERROS` | `Id` · `DataHora` · `UsuarioId` · `Origem` · `Onde` · `Mensagem` · `Detalhe` | Os erros que antes iam para o Logger (Etapa 64): os 2.000 mais recentes. Quem configura vê em Configurações › Estrutura |
+
+Fora da planilha principal, desde a Etapa 66: a **planilha de histórico** (`BASE.HISTORICO_ID`),
+com uma aba `HIST_<aba>` por canal — os casos encerrados há mais de 13 meses, que o Buscar Caso
+também procura — e a **planilha das análises** (`ANALISES.PLANILHA_ID`), com as abas `ANALISE_*`.
 | `SINALIZADORES` | `Id` · `CanalId` · `Nome` · `Prazo` · `Unidade` · `AvisoFaltando` · `ColunaQueLiga` · `ColunaDaData` · `ColunaDaHora` · `InicioDoExpediente` · `FimDoExpediente` · `Ordem` · `Ativo` · `StatusComCondicao` · `ColunaDaCondicao` · `ValoresDaCondicao` · `ColunaDaDataDaCondicao` | Os **prazos** que o caso tem em cada canal (RET: 3 dias úteis, e o Retido só para com o Status proposta pronto; Mesa: 48 horas úteis do status Em andamento até concluir; VG: preparado, desligado). Unidade `dias` ou `horas`, sempre úteis. Os quatro últimos campos são a **condição de parada** de um status: `StatusComCondicao` só encerra o prazo quando `ColunaDaCondicao` tem um dos `ValoresDaCondicao` (separados por `;`), e `ColunaDaDataDaCondicao` guarda quando isso passou a valer. Linha nova = prazo novo, sem código |
 | `ANALISES` | `Id` · `Nome` · `Descricao` · `CanalId` · `Colunas` · `Filtros` · `Dias` · `Ordem` · `Ativo` · `GeradaEm` · `GeradaPor` · `Linhas` | A **receita** de cada aba `ANALISE_*`. A aba gerada é outra coisa, e não está no contrato |
 

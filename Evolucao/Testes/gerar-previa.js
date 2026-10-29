@@ -378,6 +378,9 @@ function pontePreparada(respostas) {
     + '      configuracaoDoArquivoDaAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.arquivoDaAuditoria);\n'
     + '      },\n'
+    + '      configuracaoDoArquivoDaBase: function () {\n'
+    + '        responder(respostas.configuracoes.arquivoDaBase);\n'
+    + '      },\n'
     + gravacoesRecusadas(['salvarCampo', 'criarCampo', 'excluirCampo', 'reordenarCampos',
       'criarCanal',
       'salvarItemDoCatalogo', 'criarLista', 'renomearLista', 'excluirLista',
@@ -391,7 +394,8 @@ function pontePreparada(respostas) {
       'salvarAnalise', 'gerarAnalise', 'ocultarAnalise',
       'salvarConfiguracaoDoLegado', 'importarAtendimentosDoChat', 'importarCasos',
       'salvarConfiguracaoDosCadastros', 'salvarArquivoDaAuditoria',
-      'arquivarAuditoriaAgora', 'salvarSinalizador', 'ocultarSinalizador'])
+      'arquivarAuditoriaAgora', 'salvarSinalizador', 'ocultarSinalizador',
+      'salvarHistoricoDaBase', 'salvarPlanilhaDasAnalises', 'arquivarBaseAgora'])
     + '    };\n'
     + '  }\n'
     + '\n'
@@ -1025,6 +1029,7 @@ function gerar(pastaDeSaida) {
     cadastros: chamar('configuracaoDosCadastros()'),
     chatDaImportacao: chamar('opcoesDaImportacaoDoChat()'),
     arquivoDaAuditoria: chamar('configuracaoDoArquivoDaAuditoria()'),
+    arquivoDaBase: chamar('configuracaoDoArquivoDaBase()'),
     resumo: chamar('resumoDasConfiguracoes()'),
     opcoesDeCampo: opcoesDeCampo,
     opcoesDeNivel: chamar('opcoesDeNivelDeAcesso()'),

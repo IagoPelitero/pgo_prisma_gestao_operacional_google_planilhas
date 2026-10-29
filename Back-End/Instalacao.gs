@@ -3814,6 +3814,7 @@ function blocoDoAmbiente_() {
   itens.push(itemDaBuscaRapida_());
   itens.push(itemDosErros_());
   itens.push(itemDoAcionadorDaAuditoria_());
+  itens.push(itemDoAcionadorDaBase_());
   itensDasListasDeAnalistas_().forEach(function (item) { itens.push(item); });
 
   return itens;
@@ -3856,31 +3857,39 @@ function itemDosErros_() {
 const RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA = 35;
 
 function itemDoAcionadorDaAuditoria_() {
-  var arquivo = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '') || '').trim();
-  if (!arquivo) {
-    return item_(RECC_SITUACOES_DO_LAUDO.OK,
-      'Arquivamento da auditoria: sem planilha de arquivo (a auditoria fica toda aqui)');
-  }
-  var batimento = Number(PropertiesService.getScriptProperties()
-    .getProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA) || 0);
+  return itemDoAcionador_('Arquivamento da auditoria', RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA,
+    RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA, 'arquivarAuditoriaAgendada',
+    'sem planilha de arquivo (a auditoria fica toda aqui)', 'a aba AUDITORIA só cresce');
+}
+
+/* O mesmo para o histórico da base (Etapa 66). */
+function itemDoAcionadorDaBase_() {
+  return itemDoAcionador_('Histórico da base', RECC_CHAVE_DO_HISTORICO_DA_BASE,
+    RECC_BATIMENTO_DO_ACIONADOR_DA_BASE, 'arquivarBaseAgendada',
+    'sem planilha de histórico (os casos ficam todos na base)', 'a base só cresce');
+}
+
+function itemDoAcionador_(rotulo, chaveDaPlanilha, chaveDoBatimento, funcao, semPlanilha, semEle) {
+  var arquivo = String(valorDaConfiguracao_(chaveDaPlanilha, '') || '').trim();
+  if (!arquivo) return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': ' + semPlanilha);
+  var batimento = Number(PropertiesService.getScriptProperties().getProperty(chaveDoBatimento) || 0);
   var comoCriar = 'No editor do Apps Script: Acionadores › Adicionar acionador › '
-    + 'arquivarAuditoriaAgendada › Baseado no tempo › Mensal.';
+    + funcao + ' › Baseado no tempo › Mensal.';
   if (!batimento) {
     return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
-      'Arquivamento da auditoria: o acionador ainda não rodou',
-      'Há planilha de arquivo, mas arquivarAuditoriaAgendada nunca foi chamada — o '
-        + 'acionador mensal pode não ter sido criado. Sem ele, a aba AUDITORIA só cresce.',
+      rotulo + ': o acionador ainda não rodou',
+      'Há planilha apontada, mas ' + funcao + ' nunca foi chamada — o acionador mensal '
+        + 'pode não ter sido criado. Sem ele, ' + semEle + '.',
       comoCriar);
   }
   var dias = Math.floor((new Date().getTime() - batimento) / (24 * 3600 * 1000));
   if (dias > RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA) {
     return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
-      'Arquivamento da auditoria: o acionador não roda há ' + dias + ' dias',
+      rotulo + ': o acionador não roda há ' + dias + ' dias',
       'Ele é mensal. Acionador apagado ou com erro não avisa ninguém.',
       'Confira em Acionadores, no editor. ' + comoCriar);
   }
-  return item_(RECC_SITUACOES_DO_LAUDO.OK,
-    'Arquivamento da auditoria: o acionador rodou há ' + dias + ' dia(s)');
+  return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': o acionador rodou há ' + dias + ' dia(s)');
 }
 
 /*

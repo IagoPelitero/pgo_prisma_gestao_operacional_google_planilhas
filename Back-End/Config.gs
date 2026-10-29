@@ -2613,20 +2613,21 @@ function dataDoUltimoArquivamento_() {
 }
 
 /** Abre a planilha de arquivo, ou explica por que não abriu. */
-function abrirArquivoDaAuditoria_(id) {
+function abrirArquivoDaAuditoria_(id, deQue) {
   var planilha;
   try {
     planilha = SpreadsheetApp.openById(id);
   } catch (erro) {
-    throw new Error('Não consegui abrir a planilha de arquivo da auditoria: '
+    throw new Error('Não consegui abrir a planilha ' + (deQue || 'de arquivo da auditoria') + ': '
       + (erro.message || erro) + ' Confira o Id (o pedaço do endereço entre '
       + '/d/ e /edit) e se esta conta tem acesso a ela.');
   }
   // Apontar para a própria planilha não arquivaria nada: copiaria a linha
   // para o fim da mesma aba e apagaria do começo.
   if (planilha.getId() === planilhaAtiva_().getId()) {
-    throw new Error('Esse é o Id desta mesma planilha. O arquivo da auditoria '
-      + 'precisa ser OUTRA planilha.');
+    throw new Error('Esse é o Id desta mesma planilha. ' + (deQue
+      ? 'A planilha ' + deQue + ' precisa ser OUTRA.'
+      : 'O arquivo da auditoria precisa ser OUTRA planilha.'));
   }
   return planilha;
 }
@@ -2701,9 +2702,10 @@ function arquivarAuditoria_(agora) {
  * uma coluna um dia, ela nasce no fim do cabeçalho do arquivo, e as linhas
  * antigas de lá ficam em branco nela — nada escorrega para a coluna vizinha.
  */
-function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
-  var aba = destino.getSheetByName('AUDITORIA')
-    || destino.insertSheet('AUDITORIA');
+function copiarParaOArquivo_(destino, estrutura, linhas, iId, nomeDaAbaLa) {
+  // A aba de lá: AUDITORIA, ou HIST_<aba> no histórico da base (Etapa 66).
+  var nomeLa = nomeDaAbaLa || 'AUDITORIA';
+  var aba = destino.getSheetByName(nomeLa) || destino.insertSheet(nomeLa);
 
   var larguraLa = aba.getLastColumn();
   var cabecalhoLa = larguraLa
@@ -2757,9 +2759,263 @@ function copiarParaOArquivo_(destino, estrutura, linhas, iId) {
     if (converterParaIdentificador_(lidos[i][0])
       !== converterParaIdentificador_(linhas[i][iId])) {
       throw new Error('A cópia para a planilha de arquivo não confere na linha '
-        + (inicio + i) + '. Nada foi apagado da auditoria.');
+        + (inicio + i) + ' da aba ' + nomeLa + '. Nada foi apagado daqui.');
     }
   }
+}
+
+/* ============================================================================
+ * O HISTÓRICO DA BASE (Etapa 66)
+ * ============================================================================
+ * Achado da análise de 29/10: a planilha estava em metade do teto de 10 milhões
+ * de células, e toda leitura fica mais lenta com ela cheia. Decisões do PO:
+ *
+ *   - sai o caso ENCERRADO (status marcado como Final em Configurações ›
+ *     Ajustes) que entrou há MAIS DE 13 MESES (pela data do caso). A
+ *     Produtividade oferece os últimos 12: nenhum número das telas muda. Caso
+ *     aberto nunca sai, por mais antigo que seja;
+ *   - vai para uma PLANILHA DE HISTÓRICO própria, uma aba por canal
+ *     (HIST_BASE_RET...), e o Buscar Caso também procura lá;
+ *   - botão "Arquivar agora" (com a senha) e acionador mensal, como a auditoria.
+ *
+ * COPIA, CONFERE, APAGA — nessa ordem, com a trava na mão. E roda duas vezes
+ * sem estragar: o caso que já está no histórico (uma rodada que caiu entre
+ * copiar e apagar) não é copiado de novo, só sai daqui. No máximo 5.000 casos
+ * e 150 pedaços contínuos por canal por vez — cada pedaço é uma exclusão, e a
+ * trava fica na mão enquanto isso (uns 15 segundos, no pior caso); o resto vai
+ * na próxima, e a resposta diz quantos faltam.
+ */
+var RECC_CHAVE_DO_HISTORICO_DA_BASE = 'BASE.HISTORICO_ID';
+var RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE = 'BASE.ULTIMO_ARQUIVAMENTO';
+var RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE = 'BASE.QUANTO_FOI_ARQUIVADO';
+const RECC_BATIMENTO_DO_ACIONADOR_DA_BASE = 'BASE.ACIONADOR_RODOU';
+const RECC_MESES_QUE_A_BASE_GUARDA = 13;
+const RECC_CASOS_ARQUIVADOS_POR_VEZ = 5000;
+const RECC_PEDACOS_ARQUIVADOS_POR_VEZ = 150;
+// Quanto tempo um arquivamento repete rodadas, soltando a trava entre uma e
+// outra para quem estiver gravando passar: o botão volta em um minuto, o
+// acionador da noite usa quatro (dos seis do Apps Script).
+const RECC_SEGUNDOS_DO_ARQUIVAMENTO_PELO_BOTAO = 60;
+const RECC_SEGUNDOS_DO_ARQUIVAMENTO_AGENDADO = 240;
+const RECC_PREFIXO_DO_HISTORICO = 'HIST_';
+// E a planilha das abas ANALISE_* (Etapa 66): vazia, elas ficam aqui.
+var RECC_CHAVE_DA_PLANILHA_DAS_ANALISES = 'ANALISES.PLANILHA_ID';
+
+/** Caso com a data ANTES deste dia (e encerrado) vai para o histórico. */
+function limiteDoHistoricoDaBase_(agora) {
+  return new Date(agora.getFullYear(), agora.getMonth() - RECC_MESES_QUE_A_BASE_GUARDA,
+    agora.getDate());
+}
+
+/** O que a seção Estrutura mostra do histórico e da planilha das análises. */
+function configuracaoDoArquivoDaBase() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var ultimo = String(valorDaConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE, '') || '');
+  return {
+    planilhaId: String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim(),
+    meses: RECC_MESES_QUE_A_BASE_GUARDA,
+    ultimoEm: ultimo,
+    ultimoQuantos: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, 0)) || 0,
+    arquivariaAte: Utilities.formatDate(limiteDoHistoricoDaBase_(new Date()),
+      RECC_FUSO_HORARIO, 'dd/MM/yyyy'),
+    planilhaDasAnalises: String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, '')).trim()
+  };
+}
+
+/** Aponta a planilha de histórico — ou desliga, com o Id em branco. Confere antes. */
+function salvarHistoricoDaBase(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var id = String(planilhaId || '').trim();
+  if (id) abrirArquivoDaAuditoria_(id, 'de histórico da base');
+  gravarConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, id);
+  registrarAuditoria_('base.configurar', 'CONFIG', '', id ? 'histórico em ' + id : 'histórico desligado');
+  return configuracaoDoArquivoDaBase();
+}
+
+/**
+ * Aponta a planilha das análises. As abas ANALISE_* passam a ser escritas lá,
+ * e cada uma SAI DAQUI quando for gerada de novo (o acionador das análises
+ * leva todas na primeira noite). Quem aponta tabela dinâmica ou Power BI para
+ * elas reaponta uma vez — está escrito na tela.
+ */
+function salvarPlanilhaDasAnalises(planilhaId) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var id = String(planilhaId || '').trim();
+  if (id) abrirArquivoDaAuditoria_(id, 'das análises');
+  gravarConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, id);
+  planilhaDasAnalisesAberta = null;
+  registrarAuditoria_('analise.planilha', 'CONFIG', '', id ? 'análises em ' + id : 'análises nesta planilha');
+  return configuracaoDoArquivoDaBase();
+}
+
+/** O botão "Arquivar agora". Pede a senha: apaga linha da base. */
+function arquivarBaseAgora() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var resultado = arquivarBase_(new Date(), RECC_SEGUNDOS_DO_ARQUIVAMENTO_PELO_BOTAO);
+  resultado.configuracao = configuracaoDoArquivoDaBase();
+  return resultado;
+}
+
+/** Para o ACIONADOR DE TEMPO, mensal — criado no editor do Apps Script. */
+function arquivarBaseAgendada() {
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_BASE, String(new Date().getTime()));
+  } catch (erro) { /* o batimento é aviso, não pode impedir o arquivamento */ }
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
+  if (!id) return { arquivou: false, motivo: 'sem planilha de histórico' };
+  return arquivarBase_(new Date(), RECC_SEGUNDOS_DO_ARQUIVAMENTO_AGENDADO);
+}
+
+/**
+ * O arquivamento: canal por canal, copia, confere, apaga — e repete enquanto
+ * houver o que levar e couber nos `segundos` (sem eles, uma rodada só).
+ */
+function arquivarBase_(agora, segundos) {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
+  if (!id) throw new Error('Informe antes o Id da planilha de histórico da base.');
+  var destino = abrirArquivoDaAuditoria_(id, 'de histórico da base');
+  var limite = limiteDoHistoricoDaBase_(agora);
+  var ate = new Date().getTime() + (Number(segundos) || 0) * 1000;
+  var porCanal = {};
+  var arquivados = 0;
+  var faltam = 0;
+
+  var canais = canaisVisiveis_().map(function (umCanal) {
+    var canal = canalPeloId_(umCanal.id);
+    var finais = {};
+    situacoesDoCanal_(canal).forEach(function (situacao) {
+      if (situacao.final) finais[situacao.chave] = true;
+    });
+    porCanal[canal.id] = { canal: canal.nome, arquivados: 0, faltam: 0 };
+    if (!canal.colunaDaData || !canal.colunaDoStatus || !Object.keys(finais).length) {
+      porCanal[canal.id].motivo = 'sem coluna de data, de status ou status Final';
+      return null;
+    }
+    return { canal: canal, finais: finais };
+  }).filter(function (um) { return um; });
+
+  do {
+    faltam = 0;
+    canais.forEach(function (um) {
+      var feito = arquivarUmCanal_(um.canal, um.finais, limite, destino);
+      porCanal[um.canal.id].arquivados += feito.arquivados;
+      porCanal[um.canal.id].faltam = feito.faltam;
+      arquivados += feito.arquivados;
+      faltam += feito.faltam;
+    });
+  } while (faltam > 0 && new Date().getTime() < ate);
+  porCanal = Object.keys(porCanal).map(function (chave) { return porCanal[chave]; });
+
+  var antesDe = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE,
+    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+  gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, String(arquivados));
+  registrarAuditoria_('base.arquivar', 'BASE', '', arquivados + ' caso(s) encerrados de antes de '
+    + antesDe + ' → ' + id + (faltam ? ' · faltam ' + faltam : ''));
+  return { arquivados: arquivados, faltam: faltam, ate: antesDe, porCanal: porCanal };
+}
+
+function arquivarUmCanal_(canal, finais, limite, destino) {
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(30000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    esquecerEstruturaLida_(canal.aba);
+    var estrutura = estruturaDaAba_(canal.aba, true);
+    var total = quantidadeDeRegistros_(estrutura);
+    if (total <= 0) return { arquivados: 0, faltam: 0 };
+    var iData = exigirPosicaoDaColuna_(estrutura, canal.colunaDaData);
+    var iStatus = exigirPosicaoDaColuna_(estrutura, canal.colunaDoStatus);
+    var iId = exigirPosicaoDaColuna_(estrutura, 'Id');
+    var largura = estrutura.cabecalhos.length;
+    var coluna = function (i) {
+      return estrutura.aba.getRange(2, i + 1, total, 1).getValues()
+        .map(function (linha) { return linha[0]; });
+    };
+    var datas = coluna(iData);
+    var status = coluna(iStatus);
+
+    var linhas = [];
+    for (var k = 0; k < total; k++) {
+      var quando = converterParaData_(datas[k]);
+      if (quando && quando.getTime() < limite.getTime()
+        && finais[normalizarParaComparar_(status[k])]) linhas.push(k + 2);
+    }
+    if (!linhas.length) return { arquivados: 0, faltam: 0 };
+    var todas = linhas.length;
+    var corridas = corridasDeLinhas_(linhas).slice(0, RECC_PEDACOS_ARQUIVADOS_POR_VEZ);
+    linhas = [];
+    corridas.forEach(function (corrida) {
+      for (var n = corrida.inicio; n <= corrida.fim; n++) linhas.push(n);
+    });
+    if (linhas.length > RECC_CASOS_ARQUIVADOS_POR_VEZ) {
+      linhas = linhas.slice(0, RECC_CASOS_ARQUIVADOS_POR_VEZ);
+      corridas = corridasDeLinhas_(linhas);
+    }
+    var faltam = todas - linhas.length;
+
+    // As linhas inteiras, como estão — lidas em blocos (um buraco pequeno é
+    // lido junto: sai mais barato que outra ida).
+    var porLinha = {};
+    blocosDeLinhas_(linhas).forEach(function (bloco) {
+      estrutura.aba.getRange(bloco.inicio, 1, bloco.fim - bloco.inicio + 1, largura).getValues()
+        .forEach(function (valoresDaLinha, k) { porLinha[bloco.inicio + k] = valoresDaLinha; });
+    });
+    var valores = linhas.map(function (n) { return porLinha[n]; });
+
+    // Rodar duas vezes não estraga: o que já está lá não vai de novo.
+    var nomeLa = RECC_PREFIXO_DO_HISTORICO + canal.aba;
+    var jaLa = idsQueJaEstaoLa_(destino, nomeLa, estrutura.cabecalhos[iId]);
+    var novas = valores.filter(function (linha) {
+      return !jaLa[converterParaIdentificador_(linha[iId])];
+    });
+    if (novas.length) copiarParaOArquivo_(destino, estrutura, novas, iId, nomeLa);
+
+    // Apaga de baixo para cima: apagar em cima subiria as linhas de baixo.
+    garantirLinhasNaGrade_(estrutura.aba, total + 2);
+    corridas.slice().reverse().forEach(function (corrida) {
+      estrutura.aba.deleteRows(corrida.inicio, corrida.fim - corrida.inicio + 1);
+    });
+    esquecerEstruturaLida_(canal.aba);
+    return { arquivados: linhas.length, faltam: faltam };
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+/** As linhas, em corridas EXATAMENTE contínuas: [{ inicio, fim }]. */
+function corridasDeLinhas_(numerosDeLinha) {
+  var corridas = [];
+  numerosDeLinha.slice().sort(function (um, outro) { return um - outro; })
+    .forEach(function (linha) {
+      var ultima = corridas[corridas.length - 1];
+      if (ultima && linha === ultima.fim + 1) ultima.fim = linha;
+      else corridas.push({ inicio: linha, fim: linha });
+    });
+  return corridas;
+}
+
+/** Os Ids que a aba do histórico já tem: { id: true }. */
+function idsQueJaEstaoLa_(destino, nomeLa, cabecalhoDoId) {
+  var aba = destino.getSheetByName(nomeLa);
+  if (!aba || aba.getLastRow() < 2) return {};
+  var cabecalhos = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+  var onde = -1;
+  cabecalhos.forEach(function (cabecalho, i) {
+    if (normalizarParaComparar_(cabecalho) === normalizarParaComparar_(cabecalhoDoId)) onde = i;
+  });
+  if (onde < 0) return {};
+  var ids = {};
+  aba.getRange(2, onde + 1, aba.getLastRow() - 1, 1).getValues().forEach(function (linha) {
+    var id = converterParaIdentificador_(linha[0]);
+    if (id) ids[id] = true;
+  });
+  return ids;
 }
 
 /* ############################################################################
@@ -2835,7 +3091,10 @@ function analiseDaLinha_(linha, canais) {
   })[0];
 
   var nomeDaAba = nomeDaAbaDeAnalise_(linha.Nome);
-  var aba = nomeDaAba ? planilhaAtiva_().getSheetByName(nomeDaAba) : null;
+  var aba = null;
+  try {
+    aba = nomeDaAba ? planilhaDasAnalises_().getSheetByName(nomeDaAba) : null;
+  } catch (erro) { aba = null; }   // a planilha das análises não abriu: "não gerada"
 
   return {
     id: linha.__id,
@@ -3472,6 +3731,17 @@ function montarConteudoDaAnalise_(receita, canal) {
  * mudaria o identificador interno dela, e todo Power BI ou tabela dinâmica
  * apontado para aquela aba perderia o alvo em silêncio.
  */
+/** A planilha onde moram as abas ANALISE_* — a das análises, ou esta. */
+var planilhaDasAnalisesAberta = null;
+function planilhaDasAnalises_() {
+  var id = String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, '')).trim();
+  if (!id) return planilhaAtiva_();
+  if (!planilhaDasAnalisesAberta || planilhaDasAnalisesAberta.getId() !== id) {
+    planilhaDasAnalisesAberta = abrirArquivoDaAuditoria_(id, 'das análises');
+  }
+  return planilhaDasAnalisesAberta;
+}
+
 function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
   if (String(nomeDaAba || '').indexOf(RECC_PREFIXO_DA_ANALISE) !== 0) {
     throw new Error('Recusado: "' + nomeDaAba + '" não começa com '
@@ -3480,7 +3750,7 @@ function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
       + 'gera.');
   }
 
-  var planilha = planilhaAtiva_();
+  var planilha = planilhaDasAnalises_();
   var aba = planilha.getSheetByName(nomeDaAba);
   if (!aba) aba = planilha.insertSheet(nomeDaAba);
 
@@ -3497,6 +3767,12 @@ function escreverAbaDeAnalise_(nomeDaAba, cabecalhos, linhas) {
   }
   aba.setFrozenRows(1);
   esquecerEstruturaLida_(nomeDaAba);
+  // Etapa 66: com a planilha das análises apontada, a cópia antiga desta aba
+  // SAI DAQUI — é o que deixa a planilha principal leve.
+  if (planilha.getId() !== planilhaAtiva_().getId()) {
+    var antiga = planilhaAtiva_().getSheetByName(nomeDaAba);
+    if (antiga) planilhaAtiva_().deleteSheet(antiga);
+  }
   return aba;
 }
 

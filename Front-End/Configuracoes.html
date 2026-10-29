@@ -3016,13 +3016,18 @@ var TelaConfiguracoes = (function () {
                 Servidor.chamar('configuracaoDoArquivoDaAuditoria')
                   .entao(function (arquivo) {
                     dados.arquivoDaAuditoria = arquivo;
-                    Servidor.chamar('listarAuditoria', 40)
-                      .entao(function (trilha) {
-                        dados.trilha = trilha;
-                        Servidor.chamar('listarErros', 40)
-                          .entao(function (erros) {
-                            dados.erros = erros;
-                            desenharEstrutura();
+                    Servidor.chamar('configuracaoDoArquivoDaBase')
+                      .entao(function (daBase) {
+                        dados.arquivoDaBase = daBase;
+                        Servidor.chamar('listarAuditoria', 40)
+                          .entao(function (trilha) {
+                            dados.trilha = trilha;
+                            Servidor.chamar('listarErros', 40)
+                              .entao(function (erros) {
+                                dados.erros = erros;
+                                desenharEstrutura();
+                              })
+                              .senao(falhou);
                           })
                           .senao(falhou);
                       })
@@ -3073,11 +3078,12 @@ var TelaConfiguracoes = (function () {
     elemento('config-lista').innerHTML += desenharDiagnostico()
       + desenharMudancasDaPlanilha()
       + desenharCadastros() + desenharChat() + desenharArquivoDaAuditoria()
-      + desenharLegado();
+      + desenharArquivoDaBase() + desenharLegado();
     ligarDiagnostico();
     ligarMudancasDaPlanilha();
     ligarCadastros();
     ligarArquivoDaAuditoria();
+    ligarArquivoDaBase();
     ligarLegado();
 
     elemento('config-painel').innerHTML = '<div class="config-form">'
@@ -3415,6 +3421,100 @@ var TelaConfiguracoes = (function () {
                   ? resultado.arquivadas + ' linha(s) arquivada(s).'
                   : 'Nada a arquivar: nenhuma linha de antes de '
                     + resultado.ate + '.');
+                carregarEstrutura();
+              })
+              .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+          });
+        });
+    });
+  }
+
+  /*
+    O HISTÓRICO DA BASE E A PLANILHA DAS ANÁLISES (Etapa 66). Decisões do PO:
+    sai o caso encerrado (status Final) que entrou há mais de 13 meses, para
+    uma planilha de histórico que o Buscar Caso também procura; e as abas
+    ANALISE_* moram numa planilha própria. Os três botões pedem a senha.
+  */
+  function desenharArquivoDaBase() {
+    var base = dados.arquivoDaBase;
+    if (!base) return '';
+    return '<div class="config-legado" id="caixa-do-historico">'
+      + '<h4>Histórico da base</h4>'
+      + '<p class="config-explica">Sai da base o caso <strong>encerrado</strong> (status '
+      + 'marcado como Final em Ajustes) que entrou há <strong>mais de ' + base.meses
+      + ' meses</strong>: é copiado para a aba HIST_ do canal em outra planilha, conferido '
+      + 'lá, e só então apagado daqui. Caso aberto nunca sai. A Produtividade mostra os '
+      + 'últimos 12 meses, então nenhum número muda — e o Buscar Caso continua achando o '
+      + 'caso arquivado.</p>'
+      + '<p class="config-explica">Arquivar agora levaria os encerrados de antes de <strong>'
+      + escapar(base.arquivariaAte) + '</strong>. '
+      + (base.ultimoEm ? 'Último arquivamento: ' + escapar(base.ultimoEm) + ', '
+        + base.ultimoQuantos + ' caso(s).' : 'Nenhum arquivamento feito ainda.') + '</p>'
+      + '<form class="config-form" id="form-historico-da-base">'
+      + campoDeTexto('historicoId', 'Id da planilha de histórico', base.planilhaId,
+        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha.')
+      + '<div class="config-acoes">'
+      + '<button type="submit" class="botao">Salvar</button>'
+      + (base.planilhaId ? '<button type="button" class="botao vazado" id="arquivar-base-agora">'
+        + 'Arquivar agora</button>' : '')
+      + '</div></form>'
+      + '<details class="config-explica"><summary>Para arquivar sozinho, todo mês</summary>'
+      + '<p>No editor do Apps Script, em Acionadores, crie um acionador <strong>por tempo, '
+      + 'mensal</strong>, para a função <code>arquivarBaseAgendada</code>. Ela leva até 5.000 '
+      + 'casos por canal a cada vez.</p></details>'
+      + '<h4>Planilha das análises</h4>'
+      + '<p class="config-explica">As abas ANALISE_* passam a morar em outra planilha: cada '
+      + 'uma sai daqui quando for gerada de novo. <strong>Tabela dinâmica ou Power BI '
+      + 'apontado para elas precisa ser reapontado</strong> para a planilha nova. Em branco, '
+      + 'elas ficam aqui.</p>'
+      + '<form class="config-form" id="form-planilha-das-analises">'
+      + campoDeTexto('analisesId', 'Id da planilha das análises', base.planilhaDasAnalises,
+        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha.')
+      + '<div class="config-acoes"><button type="submit" class="botao">Salvar</button></div>'
+      + '</form></div>';
+  }
+
+  function ligarArquivoDaBase() {
+    if (!dados.arquivoDaBase) return;
+    var depoisDeSalvar = function (mensagem) {
+      return function (novo) {
+        dados.arquivoDaBase = novo;
+        avisarSalvo(mensagem);
+        carregarEstrutura();
+      };
+    };
+    elemento('form-historico-da-base').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarHistoricoDaBase', valorDe('historicoId'))
+          .entao(depoisDeSalvar('Planilha de histórico conferida e salva.'))
+          .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+      });
+    });
+    elemento('form-planilha-das-analises').addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarPlanilhaDasAnalises', valorDe('analisesId'))
+          .entao(depoisDeSalvar('Planilha das análises conferida e salva.'))
+          .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });
+      });
+    });
+    var agora = elemento('arquivar-base-agora');
+    if (!agora) return;
+    agora.addEventListener('click', function () {
+      Formulario.confirmarAtencao('Arquivar os casos encerrados agora?',
+        'Os casos encerrados de antes de <strong>' + escapar(dados.arquivoDaBase.arquivariaAte)
+        + '</strong> vão para a planilha de histórico e são <strong>apagados da base</strong> '
+        + 'depois de conferidos lá.',
+        'Arquivar', function () {
+          comSenhaDeAdministrador(function () {
+            Servidor.chamarSemPressa('arquivarBaseAgora')
+              .entao(function (resultado) {
+                dados.arquivoDaBase = resultado.configuracao;
+                avisarSalvo(resultado.arquivados
+                  ? resultado.arquivados + ' caso(s) arquivado(s).'
+                    + (resultado.faltam ? ' Faltam ' + resultado.faltam + ': arquive de novo.' : '')
+                  : 'Nada a arquivar: nenhum caso encerrado de antes de ' + resultado.ate + '.');
                 carregarEstrutura();
               })
               .senao(function (erro) { avisar(erro.message || String(erro), 'ruim'); });

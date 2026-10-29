@@ -3562,6 +3562,39 @@ distinguiam o caminho certo do errado —, os dois foram refeitos e agora pegam 
 
 ---
 
+## Etapa 66 — O histórico da base e a planilha das análises
+
+Sétima correção da análise de 29/10 (item 6). A planilha estava em metade do teto de 10 milhões
+de células — metade disso a cópia das análises —, e toda leitura fica mais lenta com ela cheia.
+Decisões do PO:
+
+| Decisão | O que ficou |
+|---|---|
+| **O que sai** | O caso **encerrado** — status marcado como Final em Configurações › Ajustes (RET: Retido, Não retido, Sem sucesso de contato, Cancelado, Pago; Mesa: Concluído, Concluído na mesa, Sem retorno) — que entrou há **mais de 13 meses**, pela data do caso. A Produtividade oferece os últimos 12: nenhum número das telas muda. Caso aberto nunca sai; caso sem data também não. O VG, sem status Final, não arquiva nada |
+| **Para onde** | Uma **planilha de histórico** própria (Configurações › Estrutura › Histórico da base), uma aba por canal: `HIST_BASE_RET`, `HIST_BASE_MESA`. As colunas casam pelo nome |
+| **Achar depois** | O Buscar Caso ganhou a opção **Histórico** (marcada de saída): o caso arquivado volta numa origem "· histórico", **só leitura**, com as colunas da fila e o mesmo alcance |
+| **Quando** | Botão **Arquivar agora** (com a senha) e acionador **mensal** `arquivarBaseAgendada`. O diagnóstico cobra o acionador como o da auditoria |
+| **As análises** | As abas ANALISE_* moram numa **planilha das análises** (mesma seção). Cada uma é escrita lá e **sai daqui** quando for gerada de novo — o acionador das análises leva todas na primeira noite. Quem usa tabela dinâmica ou Power BI nelas reaponta uma vez (está escrito na tela) |
+
+**Seguro de rodar.** Copia, confere (relê os Ids lá), e só então apaga — com a trava na mão, de
+baixo para cima. Rodar duas vezes não estraga: o caso que já está no histórico (uma rodada que
+caiu entre copiar e apagar) não é copiado de novo, só sai daqui.
+
+**O custo, medido.** A primeira versão, numa RET de 30 mil casos com um aberto a cada quatro
+(o pior caso: cada pedaço contínuo é uma exclusão), fazia 1.698 idas — uns 141 segundos com a
+trava presa. Ficou assim: lê em blocos; cada **rodada** leva no máximo 5.000 casos e 150 pedaços
+por canal (~16 s de trava no pior caso); e o arquivamento **repete rodadas soltando a trava entre
+uma e outra** — o botão por até um minuto, o acionador por até quatro. Uma base de anos sai
+inteira em uma noite, sem prender ninguém por muito tempo.
+
+17 testes novos em `testes-historico-da-base.js` (a planilha conferida, o que sai e o que fica,
+os mesmos Ids no histórico, rodar duas vezes, a rodada que cai depois de copiar, a Mesa, o teto
+por rodada, as rodadas que soltam a trava, a Produtividade que não muda, o Buscar Caso com e sem
+o histórico, a tela só leitura, as análises na outra planilha, o diagnóstico e a tela). 9 quebras
+de propósito: 8 pegas na primeira rodada; o teto de 150 pedaços escapou e ganhou teste próprio.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
