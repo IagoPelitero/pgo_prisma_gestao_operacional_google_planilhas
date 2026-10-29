@@ -42,7 +42,10 @@
  */
 
 /**
- * Quantas linhas do FIM da aba os painéis leem antes de filtrar por data.
+ * Até quantas linhas os painéis leem de uma vez. Desde a Etapa 65 são linhas
+ * DO PERÍODO, achadas pela coluna da data (ver registrosDosPeriodos_); o texto
+ * abaixo conta a história de quando eram as linhas do FIM da aba — e continua
+ * valendo para o chat da Mesa e para o canal sem coluna de data.
  *
  * A base só acrescenta no fim, então o recente está nas últimas linhas: ler o
  * fim e filtrar por data custa uma leitura só, em vez de percorrer tudo.
@@ -126,17 +129,19 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);
 
-  // A base só acrescenta no fim, então o recente está nas últimas linhas.
-  // Ler por data exigiria percorrer tudo; ler o fim e depois filtrar por data
-  // custa uma leitura só, e o `truncada` avisa quando a janela não coube.
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  var truncada = recentes.length >= linhasQueOPainelOlha_();
-
   // Linha sem data FICA no atalho e SAI dos períodos fechados — a mesma regra
   // da Produtividade RECC, pelo mesmo motivo: na abertura da tela ela é um
   // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
   // o qual não dá para afirmar que é de setembro.
   var guardarSemData = guardaOsSemData_(periodo);
+
+  // Só as linhas do período e do anterior, achadas pela coluna da data
+  // (Etapa 65) — qualquer mês completo. Ver registrosDosPeriodos_.
+  var lido = registrosDosPeriodos_(canal, [
+    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
+    { de: antes.de, ate: antes.ate }]);
+  var recentes = lido.registros;
+  var truncada = lido.truncada;
 
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
     guardarSemData);
@@ -242,6 +247,92 @@ function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
     var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
+}
+
+/*
+ * O PERÍODO LIDO PELA COLUNA DE DATA (Etapa 65, decisão do PO).
+ *
+ * Antes, o Trabalho e a Produtividade liam as últimas LINHAS_DO_PAINEL linhas
+ * e filtravam por data: um mês de três meses atrás saía pela metade, com um
+ * aviso que ninguém lia como "o número está errado". Agora a regra é a do
+ * Buscar Caso — ler a coluna antes de ler as linhas: lê a coluna da data
+ * inteira (uma coluna só), acha as linhas que caem nos períodos pedidos (o da
+ * tela e o anterior, dos cartões) e lê só essas. Qualquer mês sai completo.
+ *
+ * A CONTA É A MESMA de antes, e não uma parecida: as linhas lidas passam pelo
+ * mesmo entreDuasDatas_ de sempre. Esta função só decide QUAIS linhas trazer.
+ *
+ * O TETO é o de sempre, `OPERACAO.LINHAS_DO_PAINEL` (5.000), mas agora conta
+ * linhas DO PERÍODO, e não do fim da base: o custo nunca passa do de antes, e
+ * qualquer período com até 5.000 casos sai inteiro. Passou do teto: as linhas
+ * do período da tela vêm primeiro (as mais recentes), o anterior completa o
+ * que sobrar, e a tela avisa (`truncada`). Canal sem coluna de data: as
+ * últimas linhas, como antes.
+ *
+ * A BASE FORA DE ORDEM. O caso entra no fim no dia em que chega, então as
+ * linhas de um mês ficam juntas, e lê-las custa uma ou duas idas. Mas uma base
+ * colada fora da ordem das datas espalha cada mês em dezenas de pedaços, e
+ * cada pedaço é uma ida. Acima de RECC_PEDACOS_DO_PERIODO_NO_MAXIMO pedaços, o
+ * PGO volta a ler as últimas linhas, como antes — e agora sabe dizer, pela
+ * coluna da data, se ficou caso do período de fora (`truncada`).
+ */
+const RECC_PEDACOS_DO_PERIODO_NO_MAXIMO = 20;
+
+/** As linhas dos períodos [{ de, ate, guardarSemData }]: { registros, truncada }. */
+function registrosDosPeriodos_(canal, periodos) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var posicao = canal.colunaDaData ? posicaoDaColuna_(estrutura, canal.colunaDaData) : -1;
+  if (posicao < 0) {
+    var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
+    return { registros: recentes, truncada: recentes.length >= linhasQueOPainelOlha_() };
+  }
+
+  var limites = periodos.map(function (periodo) {
+    return {
+      de: Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
+      ate: Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
+      semData: periodo.guardarSemData === true
+    };
+  });
+  var dele = function (limite, dela) {
+    return dela ? dela >= limite.de && dela <= limite.ate : limite.semData;
+  };
+  var doPrimeiro = [];   // o período da tela
+  var dosOutros = [];    // o anterior, dos cartões
+  lerColunaInteira_(canal.aba, estrutura.cabecalhos[posicao]).forEach(function (valor, i) {
+    var data = converterParaData_(valor);
+    var dela = data ? Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '';
+    if (dele(limites[0], dela)) doPrimeiro.push(i + 2);
+    else if (limites.slice(1).some(function (limite) { return dele(limite, dela); })) dosOutros.push(i + 2);
+  });
+
+  var teto = linhasQueOPainelOlha_();
+  var truncada = doPrimeiro.length + dosOutros.length > teto;
+  var linhas = doPrimeiro.slice(-teto);
+  if (linhas.length < teto && dosOutros.length) {
+    linhas = dosOutros.slice(-(teto - linhas.length)).concat(linhas)
+      .sort(function (uma, outra) { return uma - outra; });
+  }
+
+  if (blocosDeLinhas_(linhas).length > RECC_PEDACOS_DO_PERIODO_NO_MAXIMO) {
+    var primeiraDaJanela = Math.max(2, quantidadeDeRegistros_(estrutura) + 2 - teto);
+    return {
+      registros: lerRegistros_(canal.aba, { ultimas: teto }),
+      truncada: doPrimeiro.concat(dosOutros).some(function (linha) { return linha < primeiraDaJanela; })
+    };
+  }
+
+  // O que lerRegistros_ já tirava: a linha excluída e a linha toda em branco.
+  var iVisivel = posicaoDaColuna_(estrutura, '_Visivel');
+  var registros = lerLinhasEspecificas_(canal.aba, linhas).filter(function (registro) {
+    if (iVisivel >= 0
+      && normalizarParaComparar_(registro[estrutura.cabecalhos[iVisivel]]) === 'nao') return false;
+    return estrutura.cabecalhos.some(function (cabecalho) {
+      var v = cabecalho ? registro[cabecalho] : '';
+      return v !== '' && v !== null && v !== undefined;
+    });
+  });
+  return { registros: registros, truncada: truncada };
 }
 
 // ============================================================================
@@ -2241,13 +2332,17 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);
 
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  var truncada = recentes.length >= linhasQueOPainelOlha_();
-
-  // Linha sem data FICA no atalho e SAI dos períodos fechados. Num "últimos 30
-  // dias" ela é um caso mal preenchido que precisa aparecer; num "setembro" ela
-  // é um caso sobre o qual não dá para afirmar que é de setembro.
+  // Linha sem data FICA no atalho e SAI dos períodos fechados. Na abertura ela
+  // é um caso mal preenchido que precisa aparecer; num "setembro" ela é um
+  // caso sobre o qual não dá para afirmar que é de setembro.
   var guardarSemData = guardaOsSemData_(periodo);
+
+  // Só as linhas do período e do anterior, pela coluna da data (Etapa 65).
+  var lido = registrosDosPeriodos_(canal, [
+    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
+    { de: antes.de, ate: antes.ate }]);
+  var recentes = lido.registros;
+  var truncada = lido.truncada;
 
   var noPeriodo = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
@@ -2732,7 +2827,8 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   }
 
   var periodo = resolverPeriodo_(periodoPedido);
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
+  var recentes = registrosDosPeriodos_(canal, [{ de: periodo.de, ate: periodo.ate,
+    guardarSemData: guardaOsSemData_(periodo) }]).registros;
   // O MESMO período e o MESMO alcance do painel. Sem isto, clicar numa barra
   // abriria uma lista de tamanho diferente do número que a barra mostrava — e
   // a pessoa concluiria, com razão, que um dos dois está errado.

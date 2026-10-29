@@ -622,9 +622,9 @@ function semearDadosIniciais_(emailDoInstalador) {
     novaConfiguracao_('OPERACAO.JANELA_DIAS', '30',
       'Quantos dias a fila de trabalho carrega. Acima disso, use Buscar Caso.'),
     novaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', '5000',
-      'Quantas linhas do fim da base os painéis leem antes de filtrar por '
-      + 'data. Com muito volume, 5.000 podem não cobrir a janela de dias — as '
-      + 'telas avisam quando isso acontece.'),
+      'Até quantas linhas do período o Trabalho e a Produtividade leem de uma '
+      + 'vez (as linhas são achadas pela coluna da data). Período com mais casos '
+      + 'que isso vem com as mais recentes — as telas avisam.'),
     novaConfiguracao_('OPERACAO.BUSCA_RAPIDA', 'SIM',
       'SIM: SUSEP, Id e proposta são achados pelo localizador do Sheets, sem '
       + 'ler a coluna inteira. NAO: volta à leitura da coluna — mais lenta. '

@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 17:06
+   Gerado em 2026-10-29 18:04
    ========================================================================== */
 
 
@@ -9270,10 +9270,13 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);
 
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  var truncada = recentes.length >= linhasQueOPainelOlha_();
-
   var guardarSemData = guardaOsSemData_(periodo);
+
+  var lido = registrosDosPeriodos_(canal, [
+    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
+    { de: antes.de, ate: antes.ate }]);
+  var recentes = lido.registros;
+  var truncada = lido.truncada;
 
   var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
     guardarSemData);
@@ -9346,6 +9349,63 @@ function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
     var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
+}
+
+const RECC_PEDACOS_DO_PERIODO_NO_MAXIMO = 20;
+
+function registrosDosPeriodos_(canal, periodos) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var posicao = canal.colunaDaData ? posicaoDaColuna_(estrutura, canal.colunaDaData) : -1;
+  if (posicao < 0) {
+    var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
+    return { registros: recentes, truncada: recentes.length >= linhasQueOPainelOlha_() };
+  }
+
+  var limites = periodos.map(function (periodo) {
+    return {
+      de: Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
+      ate: Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
+      semData: periodo.guardarSemData === true
+    };
+  });
+  var dele = function (limite, dela) {
+    return dela ? dela >= limite.de && dela <= limite.ate : limite.semData;
+  };
+  var doPrimeiro = [];
+  var dosOutros = [];
+  lerColunaInteira_(canal.aba, estrutura.cabecalhos[posicao]).forEach(function (valor, i) {
+    var data = converterParaData_(valor);
+    var dela = data ? Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '';
+    if (dele(limites[0], dela)) doPrimeiro.push(i + 2);
+    else if (limites.slice(1).some(function (limite) { return dele(limite, dela); })) dosOutros.push(i + 2);
+  });
+
+  var teto = linhasQueOPainelOlha_();
+  var truncada = doPrimeiro.length + dosOutros.length > teto;
+  var linhas = doPrimeiro.slice(-teto);
+  if (linhas.length < teto && dosOutros.length) {
+    linhas = dosOutros.slice(-(teto - linhas.length)).concat(linhas)
+      .sort(function (uma, outra) { return uma - outra; });
+  }
+
+  if (blocosDeLinhas_(linhas).length > RECC_PEDACOS_DO_PERIODO_NO_MAXIMO) {
+    var primeiraDaJanela = Math.max(2, quantidadeDeRegistros_(estrutura) + 2 - teto);
+    return {
+      registros: lerRegistros_(canal.aba, { ultimas: teto }),
+      truncada: doPrimeiro.concat(dosOutros).some(function (linha) { return linha < primeiraDaJanela; })
+    };
+  }
+
+  var iVisivel = posicaoDaColuna_(estrutura, '_Visivel');
+  var registros = lerLinhasEspecificas_(canal.aba, linhas).filter(function (registro) {
+    if (iVisivel >= 0
+      && normalizarParaComparar_(registro[estrutura.cabecalhos[iVisivel]]) === 'nao') return false;
+    return estrutura.cabecalhos.some(function (cabecalho) {
+      var v = cabecalho ? registro[cabecalho] : '';
+      return v !== '' && v !== null && v !== undefined;
+    });
+  });
+  return { registros: registros, truncada: truncada };
 }
 
 const RECC_MESES_PARA_TRAS = 12;
@@ -10777,10 +10837,13 @@ function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);
 
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
-  var truncada = recentes.length >= linhasQueOPainelOlha_();
-
   var guardarSemData = guardaOsSemData_(periodo);
+
+  var lido = registrosDosPeriodos_(canal, [
+    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
+    { de: antes.de, ate: antes.ate }]);
+  var recentes = lido.registros;
+  var truncada = lido.truncada;
 
   var noPeriodo = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate, guardarSemData),
@@ -11130,7 +11193,8 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   }
 
   var periodo = resolverPeriodo_(periodoPedido);
-  var recentes = lerRegistros_(canal.aba, { ultimas: linhasQueOPainelOlha_() });
+  var recentes = registrosDosPeriodos_(canal, [{ de: periodo.de, ate: periodo.ate,
+    guardarSemData: guardaOsSemData_(periodo) }]).registros;
 
   var meus = alcanceDaProdutividade_(
     entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
@@ -12307,9 +12371,9 @@ function semearDadosIniciais_(emailDoInstalador) {
     novaConfiguracao_('OPERACAO.JANELA_DIAS', '30',
       'Quantos dias a fila de trabalho carrega. Acima disso, use Buscar Caso.'),
     novaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', '5000',
-      'Quantas linhas do fim da base os painéis leem antes de filtrar por '
-      + 'data. Com muito volume, 5.000 podem não cobrir a janela de dias — as '
-      + 'telas avisam quando isso acontece.'),
+      'Até quantas linhas do período o Trabalho e a Produtividade leem de uma '
+      + 'vez (as linhas são achadas pela coluna da data). Período com mais casos '
+      + 'que isso vem com as mais recentes — as telas avisam.'),
     novaConfiguracao_('OPERACAO.BUSCA_RAPIDA', 'SIM',
       'SIM: SUSEP, Id e proposta são achados pelo localizador do Sheets, sem '
       + 'ler a coluna inteira. NAO: volta à leitura da coluna — mais lenta. '

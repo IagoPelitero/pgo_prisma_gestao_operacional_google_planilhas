@@ -503,7 +503,7 @@ O Apps Script tem ~6 minutos por execução e cada chamada ao Sheets é rede.
 |---|---|
 | Ler **um bloco** com `getValues()`, nunca célula a célula | 1 chamada de rede em vez de 5.000 |
 | Gravar **um bloco** com `setValues()` | Idem |
-| O Trabalho lê só as **últimas linhas** da aba (`OPERACAO.LINHAS_DO_PAINEL`, 5.000 por padrão) e filtra pelo período, que abre do dia 1 do mês até hoje | Não se lê 200 mil linhas para mostrar 40 |
+| O Trabalho e a Produtividade leem a **coluna da data** e só as **linhas do período** (até `OPERACAO.LINHAS_DO_PAINEL`, 5.000 por padrão) — o período abre do dia 1 do mês até hoje (Etapa 65, `registrosDosPeriodos_`) | Não se lê 200 mil linhas para mostrar 40, e qualquer mês sai completo |
 | A base **só acrescenta no fim**, nunca reordena | O recente é sempre o fim da aba — leitura barata |
 | Catálogo guardado em memória (`CacheService`), renovado por versão | O catálogo muda uma vez por semana, é lido a cada clique |
 | Totais guardados em memória, com chave formada por canal + filtros + período | Dez pessoas abrindo o mesmo painel = um cálculo |

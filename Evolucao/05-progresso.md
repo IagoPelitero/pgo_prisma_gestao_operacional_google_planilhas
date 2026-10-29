@@ -3521,6 +3521,47 @@ de tirar da fila — e a conferência saiu.
 
 ---
 
+## Etapa 65 — O período lido pela coluna de data: qualquer mês completo
+
+Sexta correção da análise de 29/10 (item 5). O Trabalho e a Produtividade liam as últimas
+`OPERACAO.LINHAS_DO_PAINEL` linhas (5.000) e filtravam por data: com uns 30 mil casos por ano,
+um mês de mais de dois meses atrás saía pela metade — com um aviso que ninguém lia como "o
+número está errado".
+
+**A decisão do PO, em vez da tabela fato do plano.** Ao estudar o código, a tabela fato noturna
+(totais por dia, canal, analista e status) cobriria só os cartões e o quadro por analista: os
+gráficos por outras colunas, os 6 filtros, as tentativas por CPF e os prazos com a lista de
+casos continuariam nas últimas 5.000 linhas — duas contas que podem divergir. O PO escolheu
+**ler pela coluna de data**: sem acionador e sem aba nova.
+
+| Parte | O que ficou |
+|---|---|
+| **A regra do Buscar Caso** | `registrosDosPeriodos_` lê a coluna da data inteira (uma coluna), acha as linhas do período da tela e do anterior (o dos cartões) e lê só essas. Vale para o Trabalho, a Produtividade e o detalhe de um gráfico |
+| **A mesma conta** | As linhas lidas passam pelo mesmo `entreDuasDatas_` de sempre — a linha sem data só na abertura, a excluída fora. O teste compara a resposta inteira com a da base toda |
+| **O teto** | O de sempre, `OPERACAO.LINHAS_DO_PAINEL` (5.000), mas agora em linhas **do período**: o custo não passa do de antes, e qualquer período com até 5.000 casos sai inteiro. Passou: as mais recentes do período da tela vêm primeiro, o anterior completa o que sobrar, e a tela avisa |
+| **A base fora de ordem** | Base colada fora da ordem das datas espalha cada mês em dezenas de pedaços, e cada pedaço é uma ida. Acima de 20 pedaços, volta a ler o fim, como antes — e agora sabe dizer, pela coluna da data, se ficou caso do período de fora |
+
+**Medido no volume de produção** (estimativa por modelo; base em ordem de data, como a real):
+
+| Chamada | Antes | Agora |
+|---|---|---|
+| Trabalho · abrir RET | 247.439 células · ~3,1 s | 266.071 células · ~3,4 s |
+| Trabalho · abrir Mesa | 145.029 células · ~1,6 s | 20.029 células · ~0,4 s |
+| Produtividade · RET abertura | 245.049 células · ~2,6 s | 263.731 células · ~2,9 s |
+| Produtividade · Mesa (abertura e mês) | 305.057 células · ~3,5 s | 180.057 células · ~2,3 s |
+| Um mês de 5 meses atrás | **0 casos** (fora das 5.000 linhas) | **o mês inteiro** |
+
+Na base espalhada de propósito (cada mês em 82 pedaços), o custo fica no de antes mais a coluna
+da data (~0,4 s). O custo novo é ler a coluna da data — uns 0,3 s na RET de um ano.
+
+7 testes novos em `testes-periodo-pela-data.js` (o mês antigo inteiro, a mesma resposta da base
+toda no Trabalho e na Produtividade, o excluído e o sem data, o detalhe do gráfico, o custo, o
+teto com a prioridade do período da tela, e a base fora de ordem com as idas limitadas). 5 quebras
+de propósito: na primeira rodada 3 escaparam — o teste do teto e o da base fora de ordem não
+distinguiam o caminho certo do errado —, os dois foram refeitos e agora pegam as 5.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
