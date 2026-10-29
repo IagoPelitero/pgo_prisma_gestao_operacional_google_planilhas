@@ -163,7 +163,8 @@ function rodarTestesDaProdutividade() {
       }
     });
     const painel = so.painel();
-    painel.componentes.filter((g) => !g.ehTempo && !g.aviso).forEach((grafico) => {
+    // A situação é a exceção (pedido do PO, 29/10): traz todos os status.
+    painel.componentes.filter((g) => !g.ehTempo && !g.aviso && g.titulo !== 'Situação dos casos').forEach((grafico) => {
       verdadeiro(grafico.pontos.length <= 5, grafico.titulo + ': ' + grafico.pontos.length + ' pontos');
       verdadeiro(!grafico.pontos.some((p) => p.ehOutros), grafico.titulo + ' sem "Demais valores"');
     });
@@ -176,7 +177,7 @@ function rodarTestesDaProdutividade() {
     const lista = chamar('listarComponentesDoPainel')(ret.id);
     chamar('salvarComponentesDoPainel')(ret.id, lista.map((grafico) =>
       Object.assign({}, grafico, { limite: 20 })));
-    painelDaRet().componentes.filter((g) => !g.ehTempo).forEach((grafico) => {
+    painelDaRet().componentes.filter((g) => !g.ehTempo && g.titulo !== 'Situação dos casos').forEach((grafico) => {
       verdadeiro(grafico.pontos.length <= 5, grafico.titulo);
     });
     chamar('salvarComponentesDoPainel')(ret.id, lista);
@@ -289,14 +290,23 @@ function rodarTestesDaProdutividade() {
   });
 
   teste('coluna vazia em todos os casos vira recado, e não uma barra só', () => {
-    // O estado normal de um gráfico sobre a importação ANTES do primeiro
-    // importação: uma barra única chamada "Sem informação", que não diz nada e
-    // parece defeito. O recado explica; o desenho, não.
+    // Uma barra única chamada "Sem informação" não diz nada e parece defeito.
+    // O recado explica; o desenho, não.
+    const so = retSo();
+    so.chamar('inserirRegistro_')('BASE_RET', { analista: 'Marcos Vieira', status: 'Pendente',
+      'data de recepção do protocolo': diasAtras(1), 'nome do cliente': 'Sem motivo' });
+    const porMotivo = so.painel().componentes.find((c) =>
+      c.titulo === 'Por que pediram o cancelamento');
+    igual(porMotivo.pontos.length, 0, 'nenhum ponto para desenhar');
+    contem(porMotivo.aviso, 'não há o que agrupar');
+    contem(porMotivo.aviso, 'motivo do cancelamento', 'e diz qual coluna está vazia');
+  });
+
+  teste('a base de origem vazia não é recado: é o caso do sistema (pedido do PO, 29/10)', () => {
     const porBase = painelDaRet().componentes.find((c) =>
       c.titulo === 'De qual base os casos vieram');
-    igual(porBase.pontos.length, 0, 'nenhum ponto para desenhar');
-    contem(porBase.aviso, 'não há o que agrupar');
-    contem(porBase.aviso, 'Origem da importação', 'e diz qual coluna está vazia');
+    igual(porBase.aviso, '');
+    igual(porBase.pontos.map((p) => p.rotulo).join('|'), 'Sistema');
   });
 
   teste('basta UM caso com a coluna preenchida para o gráfico voltar', () => {
@@ -312,9 +322,9 @@ function rodarTestesDaProdutividade() {
 
     const porBase = painelDaRet().componentes.find((c) =>
       c.titulo === 'De qual base os casos vieram');
-    verdadeiro(porBase.pontos.length >= 2, 'o lote e os sem informação');
+    verdadeiro(porBase.pontos.length >= 2, 'o lote e os do sistema');
     verdadeiro(porBase.pontos.some((p) => p.rotulo === 'Base de teste'));
-    verdadeiro(porBase.pontos.some((p) => p.rotulo === 'Sem informação'));
+    verdadeiro(porBase.pontos.some((p) => p.rotulo === 'Sistema'));
   });
 
   secao('Os cartões da Produtividade RECC');

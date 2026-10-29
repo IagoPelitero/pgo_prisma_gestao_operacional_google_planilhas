@@ -98,7 +98,7 @@ function rodarTestesDoChatDaMesa() {
     const opcoes = t.chamar('opcoesDaImportacaoDoChat')();
     igual(opcoes.abaExiste, true, 'a instalação cria a aba ATENDIMENTOS_CHAT');
     igual(opcoes.colunasDoCanal.join(','),
-      'Data,Analista,SUSEP,Corretora,Assunto,Consultor,Ramo,Sucursal,Tabulação,Sub assunto,TMO');
+      'Data,Analista,SUSEP,Corretora,Assunto,Consultor,Ramo,Sucursal,Tabulação,Sub assunto,TMO,Fila');
     igual(opcoes.obrigatorias.join(','), 'Data,Analista', 'só a data e o analista são obrigatórios');
     igual(opcoes.lotes.length, 0);
   });
@@ -500,7 +500,8 @@ function rodarTestesDoChatDaMesa() {
       'chat|total,chat|vg,chat|vi,sistema|total,sistema|vg,sistema|vi,todos|vg,todos|vi');
     igual(a.totais.total, 6);
     igual(a.graficos.map((g) => g.titulo).join('|'), 'Atendidos por analista|Top 5 corretoras|'
-      + 'Top 5 SUSEPs|Top 5 sucursais|Top 5 assuntos|Top 5 consultores|Vida individual ou Vida em grupo');
+      + 'Top 5 SUSEPs|Top 5 sucursais|Top 5 assuntos|Top 5 consultores|Vida individual ou Vida em grupo|'
+      + 'Atendimentos do chat por fila');
   });
 
   teste('Vida em grupo: o top 5 é só dos atendimentos de Vida em grupo', () => {
@@ -635,7 +636,7 @@ function rodarTestesDoChatDaMesa() {
     igual(a.chat.ligado, false);
     igual(a.totais.sistema, 2);
     igual(a.totais.chat, 0);
-    verdadeiro(a.graficos.length === 7, 'os sete gráficos existem mesmo assim');
+    verdadeiro(a.graficos.length === 8, 'os oito gráficos existem mesmo assim');
     contem(lerTela('Produtividade.html'), 'Traga o chat pela tela de Importação');
   });
 

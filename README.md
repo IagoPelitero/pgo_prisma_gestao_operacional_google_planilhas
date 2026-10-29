@@ -79,7 +79,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](Evolucao/04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](Evolucao/05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](Evolucao/06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1532 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1553 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -345,7 +345,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1532 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1553 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -971,8 +971,10 @@ O bloco mostra **quantos sucessos**, a **média de contatos por sucesso**, quant
 sem sucesso e quantos ainda tentando; o gráfico "Em qual contato o cliente atendeu";
 a mesma conta **por analista**; e **Contatos por CPF** — o mesmo cliente em dois
 casos soma os contatos, e o desfecho diz em qual contato deu certo ("Retido no 2º
-contato"). A tabela lista os 100 CPFs com mais contatos e diz quantos são ao todo;
-caso sem CPF fica fora dela, e é contado.
+contato"). A tabela traz **só os CPFs com 2 casos ou mais** no período (pedido do PO,
+29/10: é a tabela dos clientes que voltaram) e diz quantos de um caso só ficaram fora;
+lista os 100 com mais contatos e diz quantos são ao todo; caso sem CPF fica fora dela,
+e é contado.
 
 > **Vale para o que foi trabalhado com os carimbos ligados.** Um caso de antes de
 > a 1ª e a 2ª tentativa carimbarem aparece como sucesso no 1º contato. O filtro de
@@ -1026,6 +1028,7 @@ chat; escolhida uma origem, só o total dela.
 | **Top 5 assuntos** | o mesmo, por assunto |
 | **Top 5 consultores** | o consultor também vem do cadastro de corretoras, pela SUSEP |
 | **Vida individual ou Vida em grupo** | uma rosca, **só na visão Total** (num ramo só seria uma fatia de 100%). `VG`, `vida em grupo`, `VI` e `Vida Individual` valem; outro texto fica como veio |
+| **Atendimentos do chat por fila** | pedido do PO (29/10): uma barra por fila (até 15), **só das linhas do chat** — o caso do sistema não tem fila, e por isso a visão E-mail não traz o gráfico. A coluna **Fila** nasce em branco na aba `ATENDIMENTOS_CHAT` e já aparece no de-para da importação; a linha sem fila é contada à parte, no rodapé |
 
 Cada gráfico traz, embaixo, a **tabela com os atendimentos** — uma coluna só,
 porque o número é o pedido; quem quer ver só e-mail ou só chat usa o seletor de
@@ -1045,7 +1048,7 @@ PGO, na aba `ATENDIMENTOS_CHAT`, e a Produtividade lê de lá.
   coisa pelo nome do cabeçalho ("Atendente" vira **Analista**), e a pessoa
   confirma. **Data** e **analista** são obrigatórios; SUSEP, corretora, assunto,
   consultor, vida individual/grupo, **sucursal, tabulação, sub assunto e TMO**
-  (Etapa 41) são opcionais. O que a planilha de origem não trouxer fica **em
+  (Etapa 41) e a **fila** (29/10) são opcionais. O que a planilha de origem não trouxer fica **em
   branco** na aba, para preencher à mão.
 - **O TMO é em segundos.** Vale o número da planilha (1152), o texto com ponto de
   milhar ("1.152") ou sem ele, e a vírgula decimal ("12,5"). O que não for número
@@ -1132,7 +1135,17 @@ separação mínima sob daltonismo, 19,6 na visão normal.
 
 **Só o top 5, sem "Demais valores"** (Etapa 53, pedido do PO). Cada gráfico mostra no
 máximo os 5 maiores — um gráfico configurado com limite menor fica com o dele — e o resto
-**sai**, em vez de virar uma fatia somada. A linha do tempo não se corta. Como a rosca e a
+**sai**, em vez de virar uma fatia somada. A linha do tempo não se corta, e a **situação
+dos casos** também não: ela traz **todos os status do canal, até os zerados** (pedido do
+PO, 29/10 — ver o que está em zero também é análise). O zerado fica na legenda, com o 0,
+e não vira fatia.
+
+**Os casos que não vieram de importação** (pedido do PO, 29/10). O caso cadastrado no
+sistema não passa pela importação e tinha as duas colunas dela em branco — os gráficos
+"Casos importados por dia" e "De qual base os casos vieram" mostravam um vazio. Só no
+gráfico, e no clique nele (a planilha não muda): a **Data da importação** vazia vale a
+**data de entrada do caso no canal** e, sem ela, a da **primeira mudança de status**; a
+**Origem da importação** vazia vira **Sistema**. Vale nos dois canais. Como a rosca e a
 tabela somam o que aparece, o rodapé avisa: "Só os 5 maiores aparecem; a soma e as
 porcentagens são entre eles". O total do canal está nos cartões, em cima. E como três dos seis ficam abaixo de
 3:1 de contraste, todo gráfico traz o **número visível**, a **tabela** a um
@@ -1648,7 +1661,7 @@ Etapa 52, a pedido do PO. O detalhe de cada uma está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1532 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
+1553 testes, cinco execuções seguidas sem falha, mais as varreduras de navegador:
 responsividade em 7 telas × 12 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

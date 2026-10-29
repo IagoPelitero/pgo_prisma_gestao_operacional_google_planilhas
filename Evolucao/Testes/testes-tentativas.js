@@ -116,18 +116,31 @@ function rodarTestesDasTentativas() {
   });
 
   teste('o "Sem sucesso" conta a 3ª tentativa: duas carimbadas + o status', () => {
-    const d = retComTentativas().painel().tentativas.porCpf.linhas.find((l) => l.cpf === '44444444444');
+    const t = retComTentativas();
+    t.caso('Ana Martins', 'Pendente', 0, '44444444444', 'Cliente D');
+    const d = t.painel().tentativas.porCpf.linhas.find((l) => l.cpf === '44444444444');
     igual(d.contatos, 3);
-    igual(d.desfecho, 'Sem sucesso de contato');
+    igual(d.desfecho, 'Sem sucesso de contato, Pendente');
   });
 
   teste('os CPFs vêm dos que tiveram mais contatos; caso sem CPF fica fora, e é contado', () => {
     const t = retComTentativas();
     t.caso('Ana Martins', 'Retido', 0, '', 'Sem CPF');
+    t.caso('Ana Martins', 'Pendente', 0, '44444444444', 'Cliente D');
     const porCpf = t.painel().tentativas.porCpf;
     igual(porCpf.linhas[0].contatos, 3);
-    igual(porCpf.total, 4);
+    igual(porCpf.total, 2);
     igual(porCpf.semCpf, 1);
+  });
+
+  teste('só os CPFs com 2 casos ou mais (pedido do PO, 29/10); os de um caso só são contados', () => {
+    const porCpf = retComTentativas().painel().tentativas.porCpf;
+    igual(porCpf.linhas.map((l) => l.cpf).join('|'), '11111111111');
+    igual(porCpf.total, 1);
+    igual(porCpf.deUmCasoSo, 3, 'B, C e D');
+    contem(lerTela('Produtividade.html'), "'Só os CPFs com 2 casos ou mais no período.'");
+    contem(lerTela('Produtividade.html'), "if (tentativas.porCpf.deUmCasoSo) {\n      notasDoCpf.push("
+      + "tentativas.porCpf.deUmCasoSo + ' CPF(s) com um caso só ficaram fora.');");
   });
 
   teste('CPF com pontuação é o mesmo CPF', () => {
@@ -164,8 +177,9 @@ function rodarTestesDasTentativas() {
     const caso = t.chamar('lerRegistros_')('BASE_RET').find((c) => c['nome do cliente'] === 'Importado');
     const d = caso['Data do 1º contato'];
     igual(d.getDate() + '/' + (d.getMonth() + 1), '25/10');
+    t.caso('Ana Martins', 'Pendente', 0, '55555555555', 'Importado');   // a tabela é de quem tem 2 casos
     const linha = t.painel().tentativas.porCpf.linhas.find((l) => l.cpf === '55555555555');
-    igual(linha.desfecho, 'Retido no 2º contato');
+    igual(linha.desfecho, 'Retido no 2º contato, Pendente');
   });
 
   /* ----------------------------------------------------------------------- */

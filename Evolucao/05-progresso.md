@@ -3621,6 +3621,35 @@ modal, o aviso que some sozinho). 7 quebras de propósito, 7 pegas. As contagens
 
 ---
 
+## Ajustes da Produtividade RECC (29/10)
+
+Pedido do PO, antes de mandar o Excel: cinco ajustes nos gráficos da Produtividade RECC.
+Decisões dele: os itens 1 a 3 valem **nos dois canais** (RET e Mesa); a situação traz
+**todos os status, até os zerados**; a data vazia da importação vira **a de recepção e
+depois a 1ª mudança de status**, só no gráfico.
+
+| Pedido | O que ficou |
+|---|---|
+| **1. Situação dos casos** | Todos os status do canal (os ativos do catálogo, na ordem dele) entram no gráfico, os zerados com 0, sem o corte do top 5. O status gravado que saiu do catálogo e o vazio continuam aparecendo. A rosca não desenha a fatia zerada; a legenda mostra o 0 |
+| **2. Casos importados por dia** | `chaveDoCasoNoGrafico_`: a "Data da importação" vazia vale a data de entrada do caso (`colunaDaData` do canal) e, sem ela, a "Data da primeira mudança de status". A mesma conta no gráfico e no clique (`detalharComponente`), para a lista sair do tamanho da barra |
+| **3. De qual base os casos vieram** | A "Origem da importação" vazia vira **Sistema**, na mesma função. As outras colunas seguem com "Sem informação" e o recado de coluna vazia |
+| **4. Contatos por CPF** | Só os CPFs com 2 casos ou mais no período (`RECC_CASOS_PARA_LISTAR_O_CPF`); a tela diz quantos de um caso só ficaram fora |
+| **5. A Fila do chat (Mesa)** | Coluna **Fila** na aba `ATENDIMENTOS_CHAT` — nasce em branco, o `atualizarPGO` a acrescenta numa aba que já existe, e a importação do chat a oferece no de-para (sugere pelo cabeçalho "Fila"). Gráfico novo **"Atendimentos do chat por fila"**, só das linhas do chat (até 15 filas), nas visões Todos e Chat |
+
+Um conserto que veio junto: o clique num dia vazio da linha do tempo procurava a chave
+vazia, e a barra se chamava "Sem informação" — a lista saía vazia. Com a função única, os
+dois falam a mesma língua.
+
+19 testes novos em `testes-ajustes-da-produtividade.js`, 1 em `testes-tentativas.js` e 1 em
+`testes-produtividade.js` (a origem vazia não é mais recado); os
+testes antigos do top 5, do recado de coluna vazia (agora sobre o motivo do cancelamento),
+da tabela por CPF e das colunas e gráficos do chat (e o ponta a ponta da Mesa) foram
+ajustados à regra nova. 17 quebras de propósito, 17 pegas — 3 escaparam na primeira rodada
+e ganharam teste: o status repetido no catálogo, o período sem caso nenhum e o aviso dos
+CPFs de um caso só.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

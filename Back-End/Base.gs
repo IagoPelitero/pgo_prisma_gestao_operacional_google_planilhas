@@ -1025,6 +1025,10 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Tabulação', tipo: 'texto', protegido: false },
       { cabecalho: 'Sub assunto', tipo: 'texto', protegido: false },
       { cabecalho: 'TMO', tipo: 'numero', protegido: false },
+      // Pedido do PO (29/10): a fila do atendimento. Nasce em branco; a
+      // importação já a oferece no de-para, para quando a planilha de origem
+      // a trouxer.
+      { cabecalho: 'Fila', tipo: 'texto', protegido: false },
       // O lote, como na importação de casos: é por ele que se acha (e, se
       // preciso, se apaga) uma leva importada errada.
       { cabecalho: 'Lote', tipo: 'texto', protegido: false },

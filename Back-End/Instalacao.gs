@@ -2149,8 +2149,9 @@ function criarAAbaDoChat_(pulados, paraVoce) {
     feito.push('aba ATENDIMENTOS_CHAT criada — os atendimentos do chat entram pela Importação');
   } else {
     pulados.push('aba ATENDIMENTOS_CHAT já existe');
-    // Etapa 41: Sucursal, Tabulação, Sub assunto e TMO. Só acrescenta o
-    // cabeçalho que falta; as linhas já importadas ficam com eles em branco.
+    // Etapa 41: Sucursal, Tabulação, Sub assunto e TMO; em 29/10, a Fila. Só
+    // acrescenta o cabeçalho que falta; as linhas já importadas ficam com eles
+    // em branco.
     feito = feito.concat(criarColunasDoContrato_('ATENDIMENTOS_CHAT', pulados));
   }
   var antiga = '';

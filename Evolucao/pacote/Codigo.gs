@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 19:55
+   Gerado em 2026-10-29 21:34
    ========================================================================== */
 
 
@@ -565,6 +565,8 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Tabulação', tipo: 'texto', protegido: false },
       { cabecalho: 'Sub assunto', tipo: 'texto', protegido: false },
       { cabecalho: 'TMO', tipo: 'numero', protegido: false },
+
+      { cabecalho: 'Fila', tipo: 'texto', protegido: false },
 
       { cabecalho: 'Lote', tipo: 'texto', protegido: false },
       { cabecalho: 'ImportadoEm', tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
@@ -11106,6 +11108,8 @@ const RECC_STATUS_SEM_SUCESSO = 'Sem sucesso de contato';
 
 const RECC_CPFS_LISTADOS = 100;
 
+const RECC_CASOS_PARA_LISTAR_O_CPF = 2;
+
 function tentativasAteOSucesso_(casos, canal) {
   var estrutura = estruturaDaAba_(canal.aba);
   var achar = function (nome) {
@@ -11211,7 +11215,12 @@ function tentativasAteOSucesso_(casos, canal) {
       ? lido.status + ' no ' + lido.contatos + 'º contato' : lido.status;
     if (linha.desfechos.indexOf(desfecho) < 0) linha.desfechos.push(desfecho);
   });
-  var linhasDosCpfs = cpfs.map(function (cpf) {
+  var deUmCasoSo = 0;
+  var linhasDosCpfs = cpfs.filter(function (cpf) {
+    if (porCpf[cpf].casos >= RECC_CASOS_PARA_LISTAR_O_CPF) return true;
+    deUmCasoSo++;
+    return false;
+  }).map(function (cpf) {
     var linha = porCpf[cpf];
     return { cpf: linha.cpf, cliente: linha.cliente, casos: linha.casos, contatos: linha.contatos,
       desfecho: linha.desfechos.join(', ') };
@@ -11239,7 +11248,8 @@ function tentativasAteOSucesso_(casos, canal) {
     porCpf: {
       linhas: linhasDosCpfs.slice(0, RECC_CPFS_LISTADOS),
       total: linhasDosCpfs.length,
-      semCpf: semCpf
+      semCpf: semCpf,
+      deUmCasoSo: deUmCasoSo
     }
   };
 }
@@ -11410,11 +11420,19 @@ function calcularComponente_(componente, casos, canal) {
   var quantidades = {};
   var ordemDasChaves = [];
 
+  var ehStatus = ehDimensaoDoStatus_(componente, canal);
+  if (ehStatus) {
+    situacoesDoCanal_(canal).forEach(function (situacao) {
+      var chave = situacao.gravadoComo.trim();
+      if (!chave || Object.prototype.hasOwnProperty.call(somas, chave)) return;
+      somas[chave] = 0;
+      quantidades[chave] = 0;
+      ordemDasChaves.push(chave);
+    });
+  }
+
   casos.forEach(function (caso) {
-    var chave = ehTempo
-      ? diaDoCaso_(caso[componente.dimensao])
-      : String(caso[componente.dimensao] || '').trim();
-    if (chave === '') chave = 'Sem informação';
+    var chave = chaveDoCasoNoGrafico_(caso, componente, canal, ehTempo);
 
     if (!Object.prototype.hasOwnProperty.call(somas, chave)) {
       somas[chave] = 0;
@@ -11426,7 +11444,9 @@ function calcularComponente_(componente, casos, canal) {
       ? 1 : (converterParaNumero_(caso[componente.medida]) || 0);
   });
 
-  if (ordemDasChaves.length === 1 && ordemDasChaves[0] === 'Sem informação') {
+  if (casos.length && ordemDasChaves.every(function (chave) {
+    return chave === 'Sem informação' || !quantidades[chave];
+  })) {
     return semDados_(componente, 'Nenhum caso do período tem "'
       + componente.dimensao + '" preenchida, então não há o que agrupar.');
   }
@@ -11451,7 +11471,7 @@ function calcularComponente_(componente, casos, canal) {
   }
 
   var foraDoTopo = 0;
-  if (!ehTempo) {
+  if (!ehTempo && !ehStatus) {
     var teto = componente.limite > 0
       ? Math.min(componente.limite, RECC_TOPO_DOS_GRAFICOS) : RECC_TOPO_DOS_GRAFICOS;
     if (pontos.length > teto) {
@@ -11571,6 +11591,29 @@ function unidadeDaMedida_(componente, estrutura) {
   return estrutura.tipos[posicao] === RECC_TIPO_DE_DADO.DINHEIRO ? 'dinheiro' : '';
 }
 
+function ehDimensaoDoStatus_(componente, canal) {
+  return !!canal.colunaDoStatus && normalizarParaComparar_(componente.dimensao)
+    === normalizarParaComparar_(canal.colunaDoStatus);
+}
+
+function chaveDoCasoNoGrafico_(caso, componente, canal, ehTempo) {
+  var dimensao = normalizarParaComparar_(componente.dimensao);
+  var chave;
+  if (ehTempo) {
+    chave = diaDoCaso_(caso[componente.dimensao]);
+    if (chave === '' && dimensao === normalizarParaComparar_(RECC_COLUNA_DATA_DA_IMPORTACAO)) {
+      chave = (canal.colunaDaData ? diaDoCaso_(caso[canal.colunaDaData]) : '')
+        || diaDoCaso_(caso[RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS]);
+    }
+  } else {
+    chave = String(caso[componente.dimensao] || '').trim();
+    if (chave === '' && dimensao === normalizarParaComparar_(RECC_COLUNA_ORIGEM_DA_IMPORTACAO)) {
+      chave = 'Sistema';
+    }
+  }
+  return chave === '' ? 'Sem informação' : chave;
+}
+
 function diaDoCaso_(valor) {
   var data = converterParaData_(valor);
   if (!data) return '';
@@ -11624,9 +11667,7 @@ function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   var procurado = String(chaveDoPonto || '');
 
   var escolhidos = casos.filter(function (caso) {
-    var valor = ehTempo
-      ? diaDoCaso_(caso[componente.dimensao])
-      : (String(caso[componente.dimensao] || '').trim() || 'Sem informação');
+    var valor = chaveDoCasoNoGrafico_(caso, componente, canal, ehTempo);
     return normalizarParaComparar_(valor) === normalizarParaComparar_(procurado);
   });
 
@@ -11910,11 +11951,13 @@ const RECC_COLUNAS_DO_CHAT = [
   { chave: 'subassunto', cabecalho: 'Sub assunto', rotulo: 'Sub assunto', obrigatoria: false,
     palavras: ['subassunto', 'submotivo'] },
   { chave: 'tmo', cabecalho: 'TMO', rotulo: 'TMO (em segundos)', obrigatoria: false,
-    palavras: ['tmo', 'tempomedio', 'tempomediodeatendimento', 'tempodeatendimento'] }
+    palavras: ['tmo', 'tempomedio', 'tempomediodeatendimento', 'tempodeatendimento'] },
+  { chave: 'fila', cabecalho: 'Fila', rotulo: 'Fila', obrigatoria: false,
+    palavras: ['fila', 'filadeatendimento', 'nomedafila'] }
 ];
 
 const RECC_TEXTOS_DO_CHAT = ['SUSEP', 'Corretora', 'Assunto', 'Consultor', 'Ramo', 'Sucursal',
-  'Tabulação', 'Sub assunto'];
+  'Tabulação', 'Sub assunto', 'Fila'];
 
 function segundosDoTmo_(valor) {
   if (valor === null || valor === undefined) return '';
@@ -12153,7 +12196,8 @@ function lerAtendimentosDoChat_() {
     var linhas = registros.map(function (r) {
       return { data: r.Data, analista: String(r.Analista || '').trim(), susep: r.SUSEP,
         corretora: r.Corretora, assunto: r.Assunto, consultor: r.Consultor, ramo: r.Ramo,
-        sucursal: r.Sucursal, tabulacao: r['Tabulação'], subassunto: r['Sub assunto'], tmo: r.TMO };
+        sucursal: r.Sucursal, tabulacao: r['Tabulação'], subassunto: r['Sub assunto'], tmo: r.TMO,
+        fila: r.Fila };
     }).filter(function (linha) { return linha.data || linha.analista; });
     return { ligado: linhas.length > 0, linhas: linhas, aviso: '',
       truncada: registros.length >= teto, lidas: registros.length };
@@ -12259,7 +12303,9 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
         var nome = doChat || (doCadastro && doCadastro.sucursal) || '';
         return [normalizarParaComparar_(nome), nome];
       })(),
-      ramo: [ramo.chave, ramo.rotulo]
+      ramo: [ramo.chave, ramo.rotulo],
+
+      fila: [normalizarParaComparar_(bruto.fila), String(bruto.fila || '').trim()]
     });
   }
 
@@ -12308,6 +12354,12 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
       if (!ramo[1]) {
         visao.graficos.push(graficoDeAtendidos_(recorte, 'ramo', 'Vida individual ou Vida em grupo',
           'Ramo', 'pizza', 1, 6, 'Sem informação'));
+      }
+
+      if (origem[0] !== 'sistema') {
+        visao.graficos.push(graficoDeAtendidos_(recorte.filter(function (atendimento) {
+          return atendimento.origem === 'chat';
+        }), 'fila', 'Atendimentos do chat por fila', 'Fila', 'barrasDeitadas', 1, 15, ''));
       }
       if (origem[0] === 'todos' && ramo[0] === 'total') padrao = visao;
       else visoes[origem[0] + '|' + ramo[0]] = visao;

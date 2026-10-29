@@ -3504,6 +3504,8 @@ var Graficos = (function () {
     var anguloAtual = -Math.PI / 2;
 
     var fatias = componente.pontos.map(function (ponto) {
+
+      if (!ponto.valor) return '';
       var fracao = ponto.valor / total;
       var angulo = fracao * Math.PI * 2;
       var caminho = arcoDaRosca(centro, centro, raio, buraco, anguloAtual,
@@ -6740,13 +6742,16 @@ var TelaProdutividade = (function () {
         + '<td class="direita">' + linha.contatos + '</td>'
         + '<td>' + escapar(linha.desfecho) + '</td></tr>';
     }).join('');
-    var notasDoCpf = [];
+    var notasDoCpf = ['Só os CPFs com 2 casos ou mais no período.'];
     if (tentativas.porCpf.total > tentativas.porCpf.linhas.length) {
       notasDoCpf.push('Mostrando os ' + tentativas.porCpf.linhas.length + ' CPFs com mais contatos, de '
         + tentativas.porCpf.total + '.');
     }
     if (tentativas.porCpf.semCpf) {
       notasDoCpf.push(tentativas.porCpf.semCpf + ' caso(s) sem CPF ficaram fora desta tabela.');
+    }
+    if (tentativas.porCpf.deUmCasoSo) {
+      notasDoCpf.push(tentativas.porCpf.deUmCasoSo + ' CPF(s) com um caso só ficaram fora.');
     }
     return '<section class="cartao tentativas" aria-labelledby="titulo-tentativas">'
       + '<header class="grafico-cabeca"><h3 id="titulo-tentativas">' + escapar(tentativas.titulo)

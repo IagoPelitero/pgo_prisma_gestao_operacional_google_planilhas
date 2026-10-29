@@ -833,7 +833,7 @@ async function rodar() {
 
     const titulos = () => pagina.$$eval('.atendimentos + .graficos .grafico h3', (es) => es.map((e) => e.textContent));
     igual((await titulos()).join('|'), 'Atendidos por analista|Top 5 corretoras|Top 5 SUSEPs|Top 5 sucursais'
-      + '|Top 5 assuntos|Top 5 consultores|Vida individual ou Vida em grupo');
+      + '|Top 5 assuntos|Top 5 consultores|Vida individual ou Vida em grupo|Atendimentos do chat por fila');
     const analistas = () => pagina.$$eval('.atendimentos + .graficos .grafico:first-child tbody tr',
       (es) => es.map((e) => Array.from(e.querySelectorAll('td')).map((c) => c.textContent).join(' ')));
     const numeros = () => pagina.$$eval('.atendimentos .indicador .numero', (es) => es.map((e) => e.textContent));

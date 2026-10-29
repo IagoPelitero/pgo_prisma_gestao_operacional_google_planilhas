@@ -2421,6 +2421,8 @@ var Graficos = (function () {
     var anguloAtual = -Math.PI / 2;   // começa no topo
 
     var fatias = componente.pontos.map(function (ponto) {
+      // O status zerado fica na legenda, com o 0, mas não vira fatia.
+      if (!ponto.valor) return '';
       var fracao = ponto.valor / total;
       var angulo = fracao * Math.PI * 2;
       var caminho = arcoDaRosca(centro, centro, raio, buraco, anguloAtual,
