@@ -66,7 +66,42 @@ var Servidor = (function () {
   var SEGUNDOS_DAS_CHAMADAS_LONGAS = 380;
 
   /** Chamada pelo roteador, toda vez que o miolo é remontado. */
-  function trocouDeTela() { geracaoDaTela++; }
+  function trocouDeTela(tela) {
+    geracaoDaTela++;
+    if (tela) telaDaVez = tela;
+  }
+
+  /*
+    O ERRO QUE A PESSOA NÃO VÊ VAI PARA A ABA ERROS (Etapa 64).
+
+    Um erro de JavaScript deixa um pedaço da tela em branco, e o único
+    vestígio era o console, que ninguém abre. Agora a tela avisa o servidor,
+    sem esperar resposta e sem atrapalhar ninguém. O mesmo erro, uma vez por
+    página; no máximo dez por página — uma tela em laço não enche a aba.
+  */
+  var telaDaVez = '';
+  var errosJaAvisados = {};
+  var errosAvisadosNestaPagina = 0;
+  var MAXIMO_DE_ERROS_POR_PAGINA = 10;
+
+  function avisarErro(tipo, mensagem, detalhe) {
+    try {
+      var texto = String(mensagem || 'Erro sem mensagem').slice(0, 1000);
+      var chave = tipo + '|' + texto;
+      if (errosJaAvisados[chave] || errosAvisadosNestaPagina >= MAXIMO_DE_ERROS_POR_PAGINA) return;
+      errosJaAvisados[chave] = true;
+      errosAvisadosNestaPagina++;
+      if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+      var corrida = google.script.run.withFailureHandler(function () {});
+      if (typeof corrida.registrarErroDaTela !== 'function') return;
+      corrida.registrarErroDaTela({
+        tela: telaDaVez, tipo: tipo, mensagem: texto,
+        detalhe: String(detalhe || '').slice(0, 3000)
+      });
+    } catch (erro) {
+      // avisar o erro não pode virar outro erro
+    }
+  }
 
   /**
    * Chama uma função do Apps Script.
@@ -133,6 +168,8 @@ var Servidor = (function () {
         + 'envio e não grava duas vezes. Se acontece em toda tela, mesmo com '
         + 'pouca gente usando, pode ser um arquivo .gs que não foi copiado — '
         + 'execute diagnosticoRECC() no editor, que lista o que falta.');
+      avisarErro('tempo', 'O servidor não respondeu "' + nomeDaFuncao + '" em '
+        + segundosAteDesistir + ' segundos', '');
       if (aoDarErrado) aoDarErrado(erro);
       else console.error(erro);
     }, segundosAteDesistir * 1000);
@@ -179,6 +216,7 @@ var Servidor = (function () {
       }
       corrida[nomeDaFuncao].apply(corrida, argumentos);
     } catch (erro) {
+      avisarErro('servidor', erro.message, nomeDaFuncao);
       setTimeout(function () {
         if (aoDarErrado) aoDarErrado(erro);
         else console.error(erro);
@@ -198,9 +236,24 @@ var Servidor = (function () {
 
   return {
     chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela,
-    novoEnvio: novoEnvio
+    novoEnvio: novoEnvio, avisarErro: avisarErro
   };
 })();
+
+// Todo erro de JavaScript que escapar de uma tela, e toda promessa recusada
+// sem quem a tratasse, vão para a aba ERROS (Etapa 64).
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('error', function (evento) {
+    var pilha = evento.error && evento.error.stack ? evento.error.stack : '';
+    Servidor.avisarErro('javascript', evento.message,
+      (evento.filename || '') + ':' + (evento.lineno || '') + (pilha ? '\n' + pilha : ''));
+  });
+  window.addEventListener('unhandledrejection', function (evento) {
+    var motivo = evento.reason;
+    Servidor.avisarErro('javascript', motivo && motivo.message ? motivo.message : String(motivo),
+      motivo && motivo.stack ? motivo.stack : '');
+  });
+}
 
 /* ----------------------------------------------------------------- rotas */
 var Rotas = (function () {
@@ -322,7 +375,7 @@ var Aplicacao = (function () {
    */
   function irPara(tela, semHistorico) {
     // Antes de qualquer coisa: o que estava a caminho era para a tela antiga.
-    Servidor.trocouDeTela();
+    Servidor.trocouDeTela(tela);
 
     if (!Rotas.existe(tela) || !podeVer(tela)) {
       tela = pacote.menu.length ? pacote.menu[0].tela : 'trabalho';

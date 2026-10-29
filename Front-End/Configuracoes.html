@@ -3019,7 +3019,12 @@ var TelaConfiguracoes = (function () {
                     Servidor.chamar('listarAuditoria', 40)
                       .entao(function (trilha) {
                         dados.trilha = trilha;
-                        desenharEstrutura();
+                        Servidor.chamar('listarErros', 40)
+                          .entao(function (erros) {
+                            dados.erros = erros;
+                            desenharEstrutura();
+                          })
+                          .senao(falhou);
                       })
                       .senao(falhou);
                   })
@@ -3087,6 +3092,30 @@ var TelaConfiguracoes = (function () {
         }).join('') + '</ul>'
         : '<p class="config-vazio">Nada foi alterado ainda. A trilha começa a '
           + 'encher no primeiro ajuste — e guarda quem fez, o quê e quando.</p>')
+      + desenharErrosRecentes()
+      + '</div>';
+  }
+
+  /*
+    OS ERROS RECENTES (Etapa 64). O que antes ia para o Logger — a tela que
+    quebrou, a auditoria que não gravou, o servidor que não respondeu a tempo —
+    fica na aba ERROS, e quem configura vê aqui (decisão do PO).
+  */
+  function desenharErrosRecentes() {
+    var erros = dados.erros || [];
+    return '<div id="erros-recentes">'
+      + tituloDoPainel('Erros recentes', 'Os 40 mais recentes')
+      + (erros.length
+        ? '<ul class="trilha">' + erros.map(function (erro) {
+          return '<li><span class="quando">' + escapar(erro.dataHora) + '</span>'
+            + '<span class="oque">' + escapar(erro.onde) + ' — ' + escapar(erro.mensagem) + '</span>'
+            + '<span class="quem">' + escapar(erro.quem)
+            + (erro.detalhe ? ' · ' + escapar(erro.detalhe.slice(0, 300)) : '')
+            + '</span></li>';
+        }).join('') + '</ul>'
+        : '<p class="config-vazio">Nenhum erro registrado. Quando a tela quebrar, a '
+          + 'auditoria não gravar ou o servidor não responder a tempo, aparece aqui — '
+          + 'com quem, quando e onde. A planilha guarda os 2.000 mais recentes, na aba ERROS.</p>')
       + '</div>';
   }
 

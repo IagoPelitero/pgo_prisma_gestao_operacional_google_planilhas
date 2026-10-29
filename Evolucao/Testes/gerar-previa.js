@@ -372,6 +372,9 @@ function pontePreparada(respostas) {
     + '      listarAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.trilha);\n'
     + '      },\n'
+    + '      listarErros: function () {\n'
+    + '        responder(respostas.configuracoes.erros);\n'
+    + '      },\n'
     + '      configuracaoDoArquivoDaAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.arquivoDaAuditoria);\n'
     + '      },\n'
@@ -1033,6 +1036,7 @@ function gerar(pastaDeSaida) {
     canais: chamar('listarCanaisConfiguraveis()'),
     laudo: chamar('conferirEstruturaDaPlanilha()'),
     trilha: chamar('listarAuditoria')(40),
+    erros: chamar('listarErros')(40),
     opcoesDoGrafico: opcoesDoGrafico,
     componentes: componentes,
     opcoesDeAnalise: chamar('opcoesDeAnalise()'),

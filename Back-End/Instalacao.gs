@@ -1299,6 +1299,16 @@ function atualizarPGO() {
   // A fila da auditoria vai para a aba antes de qualquer migração (Etapa 61).
   var daFila = descarregarAFilaDaAuditoria_(10000);
   if (daFila) feito.push(daFila + ' registro(s) da fila da auditoria gravados na aba AUDITORIA');
+  // A aba dos erros (Etapa 64), e a fila que esperava por ela.
+  if (!planilhaAtiva_().getSheetByName('ERROS')) {
+    criarAbaDoContrato_(planilhaAtiva_(), esquemaDaAba_('ERROS'));
+    esquecerEstruturaLida_();
+    feito.push('aba ERROS criada — os erros do sistema passam a ficar registrados');
+  } else {
+    pulados.push('aba ERROS já existe');
+  }
+  var errosDaFila = descarregarAFilaDosErros_(10000);
+  if (errosDaFila) feito.push(errosDaFila + ' erro(s) da fila gravados na aba ERROS');
 
   // --- 1. as migrações antigas, que são seguras de repetir -----------------
   var deCanais = migrarParaCanais_();
@@ -3802,7 +3812,109 @@ function blocoDoAmbiente_() {
 
   itens.push(itemDaFilaDaAuditoria_());
   itens.push(itemDaBuscaRapida_());
+  itens.push(itemDosErros_());
+  itens.push(itemDoAcionadorDaAuditoria_());
+  itensDasListasDeAnalistas_().forEach(function (item) { itens.push(item); });
 
+  return itens;
+}
+
+/*
+ * OS ERROS DA SEMANA (Etapa 64). Qualquer erro registrado é ATENÇÃO: ninguém
+ * precisava ter visto a tela quebrar para saber que ela quebrou.
+ */
+const RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO = 7;
+
+function itemDosErros_() {
+  if (!planilhaAtiva_().getSheetByName('ERROS')) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO, 'Erros: a aba ERROS não existe',
+      'Os erros que o sistema registra ficam esperando numa fila, sem lugar para ir.',
+      'Execute atualizarPGO() no editor: ele cria a aba.');
+  }
+  descarregarAFilaDosErros_(5000);
+  var desde = new Date().getTime() - RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO * 24 * 3600 * 1000;
+  var daSemana = lerRegistros_('ERROS', { ultimas: RECC_ERROS_GUARDADOS }).filter(function (linha) {
+    return linha.DataHora && new Date(linha.DataHora).getTime() >= desde;
+  });
+  if (!daSemana.length) {
+    return item_(RECC_SITUACOES_DO_LAUDO.OK,
+      'Erros: nenhum nos últimos ' + RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO + ' dias');
+  }
+  var ultimo = daSemana[daSemana.length - 1];
+  return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+    'Erros: ' + daSemana.length + ' nos últimos ' + RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO + ' dias',
+    'O mais recente: ' + String(ultimo.Onde || '') + ' — ' + String(ultimo.Mensagem || '').slice(0, 200),
+    'Configurações › Estrutura › Erros recentes mostra cada um, com quem, quando e onde.');
+}
+
+/*
+ * O ACIONADOR DO ARQUIVAMENTO DA AUDITORIA (Etapa 64). Ele é criado à mão no
+ * editor, e acionador apagado não avisa: a auditoria só cresce. Cada chamada
+ * dele guarda a hora (o batimento); mensal, mais de 35 dias sem batimento é
+ * acionador parado.
+ */
+const RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA = 35;
+
+function itemDoAcionadorDaAuditoria_() {
+  var arquivo = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '') || '').trim();
+  if (!arquivo) {
+    return item_(RECC_SITUACOES_DO_LAUDO.OK,
+      'Arquivamento da auditoria: sem planilha de arquivo (a auditoria fica toda aqui)');
+  }
+  var batimento = Number(PropertiesService.getScriptProperties()
+    .getProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA) || 0);
+  var comoCriar = 'No editor do Apps Script: Acionadores › Adicionar acionador › '
+    + 'arquivarAuditoriaAgendada › Baseado no tempo › Mensal.';
+  if (!batimento) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Arquivamento da auditoria: o acionador ainda não rodou',
+      'Há planilha de arquivo, mas arquivarAuditoriaAgendada nunca foi chamada — o '
+        + 'acionador mensal pode não ter sido criado. Sem ele, a aba AUDITORIA só cresce.',
+      comoCriar);
+  }
+  var dias = Math.floor((new Date().getTime() - batimento) / (24 * 3600 * 1000));
+  if (dias > RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Arquivamento da auditoria: o acionador não roda há ' + dias + ' dias',
+      'Ele é mensal. Acionador apagado ou com erro não avisa ninguém.',
+      'Confira em Acionadores, no editor. ' + comoCriar);
+  }
+  return item_(RECC_SITUACOES_DO_LAUDO.OK,
+    'Arquivamento da auditoria: o acionador rodou há ' + dias + ' dia(s)');
+}
+
+/*
+ * AS LISTAS DE ANALISTAS (Etapa 64). Lista que não se lê — a segunda base
+ * fora do ar — vira caixa de texto no formulário sem dizer por quê: FALHA. A
+ * vazia é dita, sem alarme. Só confere a lista cuja aba existe: a que nunca
+ * foi criada é de propósito (ver nomesAtivosDoCadastro_).
+ */
+function itensDasListasDeAnalistas_() {
+  var itens = [];
+  ['ANALISTAS_CENTRAL', 'ANALISTAS_COBRANCA'].forEach(function (nomeDaAba) {
+    var existe;
+    try {
+      existe = abaVemDeOutraPlanilha_(nomeDaAba) || !!planilhaAtiva_().getSheetByName(nomeDaAba);
+    } catch (erro) { existe = true; }
+    if (!existe) return;
+    var nomes;
+    try {
+      nomes = lerRegistros_(nomeDaAba).filter(function (linha) {
+        return String(linha.Nome || '').trim() !== '';
+      }).length;
+    } catch (erro) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA, 'Lista ' + nomeDaAba + ': não se lê',
+        erro.message + ' O campo dela, no formulário, vira caixa de texto sem a lista.',
+        'Confira a aba (e a planilha de cadastros, se ela mora lá).'));
+      return;
+    }
+    itens.push(nomes
+      ? item_(RECC_SITUACOES_DO_LAUDO.OK, 'Lista ' + nomeDaAba + ': ' + nomes + ' nome(s)')
+      // Vazia é escolha possível (a instalação nasce assim): diz, sem alarme.
+      : item_(RECC_SITUACOES_DO_LAUDO.OK, 'Lista ' + nomeDaAba + ': vazia',
+        'O campo dela, no formulário, vira caixa de texto: "A lista ainda está vazia". '
+          + 'Para virar lista, preencha a coluna Nome da aba ' + nomeDaAba + '.'));
+  });
   return itens;
 }
 

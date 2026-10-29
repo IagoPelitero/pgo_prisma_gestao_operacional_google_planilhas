@@ -52,6 +52,7 @@ const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
 const { rodarTestesDaAuditoriaForaDaTrava } = require('./testes-auditoria-fora-da-trava');
 const { rodarTestesDaLimpeza } = require('./testes-limpeza-do-que-nao-e-usado');
 const { rodarTestesDaBuscaRapida } = require('./testes-busca-rapida');
+const { rodarTestesDoRegistroDeErros } = require('./testes-registro-de-erros');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -94,6 +95,7 @@ rodarTestesDoFusoDoProjeto();
 rodarTestesDaAuditoriaForaDaTrava();
 rodarTestesDaLimpeza();
 rodarTestesDaBuscaRapida();
+rodarTestesDoRegistroDeErros();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

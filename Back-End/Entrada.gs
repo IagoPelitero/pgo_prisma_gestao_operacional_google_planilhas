@@ -1205,7 +1205,9 @@ function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
     // fila cheia: grava direto, como era — esperando a trava.
     inserirRegistro_('AUDITORIA', registro);
   } catch (erro) {
-    Logger.log('Falha ao registrar auditoria: ' + erro.message);
+    // Etapa 64: o rastro que se perdeu fica, ao menos, registrado como erro.
+    registrarErro_('servidor', 'auditoria', 'Falha ao registrar auditoria: ' + erro.message,
+      acao + ' · ' + (entidade || '') + ' · ' + (idDoRegistro || ''));
   }
 }
 
@@ -1283,6 +1285,118 @@ function tamanhoDaFilaDaAuditoria_() {
   return Object.keys(PropertiesService.getScriptProperties().getProperties())
     .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
     .length;
+}
+
+/*
+ * O REGISTRO DE ERROS (Etapa 64).
+ *
+ * Achado da análise de 29/10: o erro que acontecia longe da pessoa — a tela
+ * que quebrava num pedaço em branco, a auditoria que não gravou, a análise da
+ * madrugada que falhou — ia para o Logger, que ninguém abre. Agora vai para a
+ * aba ERROS; quem configura vê em Configurações › Estrutura (decisão do PO), e
+ * o diagnóstico conta os da semana.
+ *
+ * Recado de validação ("Confira 1 campo") NÃO é erro do sistema: é a regra
+ * falando com quem digita, e não entra aqui.
+ *
+ * O caminho é o da auditoria (Etapa 61): fila no PropertiesService, gravada em
+ * lote quando a trava está livre. Registrar um erro nunca espera nem derruba
+ * nada. O mesmo erro, no mesmo lugar, entra uma vez por hora — um campo com a
+ * configuração quebrada não enche a aba a cada formulário aberto. A aba guarda
+ * os 2.000 mais recentes (decisão do PO).
+ */
+const RECC_PREFIXO_DA_FILA_DOS_ERROS = 'ERROS.FILA.';
+const RECC_ERROS_GUARDADOS = 2000;
+const RECC_ERROS_NA_FILA = 200;        // fila cheia: os novos ficam só no Logger
+const RECC_TAMANHO_DO_TEXTO_DO_ERRO = 3000;
+const RECC_SEGUNDOS_SEM_REPETIR_O_ERRO = 3600;
+
+/** Registra um erro. `origem`: 'servidor' ou 'tela'; `onde`: a função ou a tela. */
+function registrarErro_(origem, onde, mensagem, detalhe) {
+  var cortar = function (texto) {
+    return String(texto === null || texto === undefined ? '' : texto)
+      .slice(0, RECC_TAMANHO_DO_TEXTO_DO_ERRO);
+  };
+  try {
+    Logger.log('Erro (' + origem + ' · ' + onde + '): ' + mensagem);
+    var memoria = CacheService.getScriptCache();
+    var jaVisto = ('pgo-erro|' + origem + '|' + onde + '|' + mensagem).slice(0, 240);
+    if (memoria.get(jaVisto)) return;
+    memoria.put(jaVisto, '1', RECC_SEGUNDOS_SEM_REPETIR_O_ERRO);
+
+    var props = PropertiesService.getScriptProperties();
+    var naFila = Object.keys(props.getProperties()).filter(function (chave) {
+      return chave.indexOf(RECC_PREFIXO_DA_FILA_DOS_ERROS) === 0;
+    }).length;
+    if (naFila >= RECC_ERROS_NA_FILA) return;
+
+    var usuarioId = '';
+    try { usuarioId = (usuarioAtual_().usuario || {}).Id || ''; } catch (semUsuario) { usuarioId = ''; }
+    var agora = new Date();
+    props.setProperty(RECC_PREFIXO_DA_FILA_DOS_ERROS
+      + ('0000000000000' + agora.getTime()).slice(-13) + '.' + Math.random().toString(36).slice(2, 10),
+      JSON.stringify({ d: agora.getTime(), u: usuarioId, o: cortar(origem), w: cortar(onde),
+        m: cortar(mensagem), t: cortar(detalhe) }));
+    descarregarAFilaDosErros_(0);
+  } catch (erro) {
+    Logger.log('Nem o registro de erros conseguiu gravar: ' + erro.message);
+  }
+}
+
+/**
+ * Grava a fila dos erros na aba ERROS e apara a aba nos 2.000 mais recentes.
+ * Grava ANTES de tirar da fila: sem a aba (instalação de antes da Etapa 64,
+ * até o atualizarPGO), a gravação falha e a fila espera inteira. Devolve
+ * quantos gravou.
+ */
+function descarregarAFilaDosErros_(esperarMs) {
+  var props = PropertiesService.getScriptProperties();
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(esperarMs || 0)) return 0;
+  try {
+    var todas = props.getProperties();
+    var chaves = Object.keys(todas)
+      .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DOS_ERROS) === 0; })
+      .sort();
+    if (!chaves.length) return 0;
+
+    var registros = [];
+    chaves.forEach(function (chave) {
+      var lido;
+      try { lido = JSON.parse(todas[chave]); } catch (erro) { return; }   // lixo: sai da fila
+      registros.push({
+        DataHora: new Date(Number(lido.d)), UsuarioId: lido.u || '', Origem: lido.o || '',
+        Onde: lido.w || '', Mensagem: lido.m || '', Detalhe: lido.t || ''
+      });
+    });
+    if (registros.length) inserirComATravaNaMao_('ERROS', registros);
+    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+
+    esquecerEstruturaLida_('ERROS');
+    var estrutura = estruturaDaAba_('ERROS', true);
+    var sobra = quantidadeDeRegistros_(estrutura) - RECC_ERROS_GUARDADOS;
+    if (sobra > 0) {
+      estrutura.aba.deleteRows(2, sobra);   // as mais antigas: as de cima
+      esquecerEstruturaLida_('ERROS');
+    }
+    return registros.length;
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+/**
+ * A tela avisa um erro que aconteceu nela — um erro de JavaScript, ou o
+ * servidor que não respondeu a tempo. Chamada pelo navegador, sem esperar
+ * resposta. Quem não está cadastrado é recusado, como em toda porta.
+ */
+function registrarErroDaTela(dados) {
+  var quem = usuarioAtual_();
+  if (!quem.cadastrado) throw new Error('Acesso negado: ' + quem.motivo);
+  dados = dados && typeof dados === 'object' ? dados : {};
+  registrarErro_('tela', String(dados.tela || 'sem tela') + ' · ' + String(dados.tipo || 'erro'),
+    String(dados.mensagem || 'Erro sem mensagem'), String(dados.detalhe || ''));
+  return true;
 }
 
 /* ############################################################################
@@ -1513,6 +1627,7 @@ function registrarUltimoAcesso_(usuario) {
   try {
     atualizarRegistro_('USUARIOS', usuario.Id, { UltimoAcesso: new Date() });
   } catch (erro) {
-    Logger.log('Não consegui carimbar o último acesso: ' + erro.message);
+    registrarErro_('servidor', 'último acesso', 'Não consegui carimbar o último acesso: '
+      + erro.message, usuario && usuario.Id);
   }
 }

@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 16:32
+   Gerado em 2026-10-29 17:06
    ========================================================================== */
 
 
@@ -630,6 +630,22 @@ const RECC_ESQUEMA = {
       { cabecalho: 'Acao', tipo: 'texto', protegido: true },
       { cabecalho: 'Entidade', tipo: 'texto', protegido: false },
       { cabecalho: 'RegistroId', tipo: 'identificador', protegido: false },
+      { cabecalho: 'Detalhe', tipo: 'textoLongo', protegido: false }
+    ]
+  },
+
+  ERROS: {
+    aba: 'ERROS',
+    titulo: 'Erros',
+    controle: false,
+    reserva: 200,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'DataHora', tipo: 'dataHora', protegido: true },
+      { cabecalho: 'UsuarioId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Origem', tipo: 'texto', protegido: true },
+      { cabecalho: 'Onde', tipo: 'texto', protegido: true },
+      { cabecalho: 'Mensagem', tipo: 'textoLongo', protegido: true },
       { cabecalho: 'Detalhe', tipo: 'textoLongo', protegido: false }
     ]
   }
@@ -3091,8 +3107,8 @@ function lerConfiguracaoDoCampo_(campo) {
     var lido = JSON.parse(texto);
     return lido && typeof lido === 'object' ? lido : {};
   } catch (erro) {
-    Logger.log('Configuração inválida no campo "' + campo.Cabecalho + '": ' +
-      erro.message);
+    registrarErro_('servidor', 'campo ' + campo.Cabecalho, 'Configuração inválida no campo "'
+      + campo.Cabecalho + '": ' + erro.message, texto);
     return {};
   }
 }
@@ -3211,6 +3227,13 @@ function nomesAtivosDoCadastro_(nomeDaAba) {
   try {
     registros = lerRegistros_(nomeDaAba);
   } catch (erro) {
+
+    try {
+      if (abaVemDeOutraPlanilha_(nomeDaAba) || planilhaAtiva_().getSheetByName(nomeDaAba)) {
+        registrarErro_('servidor', 'lista ' + nomeDaAba, 'A lista de ' + nomeDaAba
+          + ' não pôde ser lida: ' + erro.message, '');
+      }
+    } catch (outro) {   }
     return [];
   }
 
@@ -5173,7 +5196,8 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   try {
     lembrarODeParaDoCanal_(canal, dePara);
   } catch (erro) {
-    Logger.log('O de-para desta importação não foi lembrado: ' + erro.message);
+    registrarErro_('servidor', 'importação', 'O de-para desta importação não foi lembrado: '
+      + erro.message, canal.nome);
   }
 
   registrarAuditoria_('caso.importar', canal.aba, '',
@@ -7155,6 +7179,31 @@ function listarAuditoria(quantas) {
     });
 }
 
+function listarErros(quantos) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  if (!planilhaAtiva_().getSheetByName('ERROS')) return [];
+  descarregarAFilaDosErros_(5000);
+
+  var nomes = {};
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    nomes[usuario.__id] = String(usuario.Nome);
+  });
+  return lerRegistros_('ERROS', { ultimas: Number(quantos) || 40 })
+    .reverse()
+    .map(function (linha) {
+      return {
+        dataHora: linha.DataHora
+          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm')
+          : '',
+        quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || (linha.UsuarioId ? 'Sem dados' : 'o sistema'),
+        origem: String(linha.Origem || ''),
+        onde: String(linha.Onde || ''),
+        mensagem: String(linha.Mensagem || ''),
+        detalhe: String(linha.Detalhe || '')
+      };
+    });
+}
+
 var RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA = 'AUDITORIA.ARQUIVO_ID';
 var RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO = 'AUDITORIA.ARQUIVADA_EM';
 var RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO = 'AUDITORIA.ARQUIVADAS';
@@ -7202,7 +7251,14 @@ function arquivarAuditoriaAgora() {
   };
 }
 
+const RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA = 'AUDITORIA.ACIONADOR_RODOU';
+
 function arquivarAuditoriaAgendada() {
+
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA, String(new Date().getTime()));
+  } catch (erro) {   }
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim();
   if (!id) return { arquivou: false, motivo: 'sem planilha de arquivo' };
 
@@ -7937,7 +7993,8 @@ function atualizarAnalisesAgendadas() {
       feitas.push(receita.aba + ' (' + conteudo.linhas.length + ')');
     } catch (erro) {
       falharam.push(receita.nome + ': ' + erro.message);
-      Logger.log('Análise ' + receita.nome + ' falhou: ' + erro.message);
+      registrarErro_('servidor', 'análise agendada', 'Análise ' + receita.nome + ' falhou: '
+        + erro.message, receita.aba);
     }
   });
 
@@ -8877,7 +8934,9 @@ function registrarAuditoria_(acao, entidade, idDoRegistro, detalhe) {
 
     inserirRegistro_('AUDITORIA', registro);
   } catch (erro) {
-    Logger.log('Falha ao registrar auditoria: ' + erro.message);
+
+    registrarErro_('servidor', 'auditoria', 'Falha ao registrar auditoria: ' + erro.message,
+      acao + ' · ' + (entidade || '') + ' · ' + (idDoRegistro || ''));
   }
 }
 
@@ -8934,6 +8993,88 @@ function tamanhoDaFilaDaAuditoria_() {
   return Object.keys(PropertiesService.getScriptProperties().getProperties())
     .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
     .length;
+}
+
+const RECC_PREFIXO_DA_FILA_DOS_ERROS = 'ERROS.FILA.';
+const RECC_ERROS_GUARDADOS = 2000;
+const RECC_ERROS_NA_FILA = 200;
+const RECC_TAMANHO_DO_TEXTO_DO_ERRO = 3000;
+const RECC_SEGUNDOS_SEM_REPETIR_O_ERRO = 3600;
+
+function registrarErro_(origem, onde, mensagem, detalhe) {
+  var cortar = function (texto) {
+    return String(texto === null || texto === undefined ? '' : texto)
+      .slice(0, RECC_TAMANHO_DO_TEXTO_DO_ERRO);
+  };
+  try {
+    Logger.log('Erro (' + origem + ' · ' + onde + '): ' + mensagem);
+    var memoria = CacheService.getScriptCache();
+    var jaVisto = ('pgo-erro|' + origem + '|' + onde + '|' + mensagem).slice(0, 240);
+    if (memoria.get(jaVisto)) return;
+    memoria.put(jaVisto, '1', RECC_SEGUNDOS_SEM_REPETIR_O_ERRO);
+
+    var props = PropertiesService.getScriptProperties();
+    var naFila = Object.keys(props.getProperties()).filter(function (chave) {
+      return chave.indexOf(RECC_PREFIXO_DA_FILA_DOS_ERROS) === 0;
+    }).length;
+    if (naFila >= RECC_ERROS_NA_FILA) return;
+
+    var usuarioId = '';
+    try { usuarioId = (usuarioAtual_().usuario || {}).Id || ''; } catch (semUsuario) { usuarioId = ''; }
+    var agora = new Date();
+    props.setProperty(RECC_PREFIXO_DA_FILA_DOS_ERROS
+      + ('0000000000000' + agora.getTime()).slice(-13) + '.' + Math.random().toString(36).slice(2, 10),
+      JSON.stringify({ d: agora.getTime(), u: usuarioId, o: cortar(origem), w: cortar(onde),
+        m: cortar(mensagem), t: cortar(detalhe) }));
+    descarregarAFilaDosErros_(0);
+  } catch (erro) {
+    Logger.log('Nem o registro de erros conseguiu gravar: ' + erro.message);
+  }
+}
+
+function descarregarAFilaDosErros_(esperarMs) {
+  var props = PropertiesService.getScriptProperties();
+  var trava = LockService.getScriptLock();
+  if (!trava.tryLock(esperarMs || 0)) return 0;
+  try {
+    var todas = props.getProperties();
+    var chaves = Object.keys(todas)
+      .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DOS_ERROS) === 0; })
+      .sort();
+    if (!chaves.length) return 0;
+
+    var registros = [];
+    chaves.forEach(function (chave) {
+      var lido;
+      try { lido = JSON.parse(todas[chave]); } catch (erro) { return; }
+      registros.push({
+        DataHora: new Date(Number(lido.d)), UsuarioId: lido.u || '', Origem: lido.o || '',
+        Onde: lido.w || '', Mensagem: lido.m || '', Detalhe: lido.t || ''
+      });
+    });
+    if (registros.length) inserirComATravaNaMao_('ERROS', registros);
+    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+
+    esquecerEstruturaLida_('ERROS');
+    var estrutura = estruturaDaAba_('ERROS', true);
+    var sobra = quantidadeDeRegistros_(estrutura) - RECC_ERROS_GUARDADOS;
+    if (sobra > 0) {
+      estrutura.aba.deleteRows(2, sobra);
+      esquecerEstruturaLida_('ERROS');
+    }
+    return registros.length;
+  } finally {
+    trava.releaseLock();
+  }
+}
+
+function registrarErroDaTela(dados) {
+  var quem = usuarioAtual_();
+  if (!quem.cadastrado) throw new Error('Acesso negado: ' + quem.motivo);
+  dados = dados && typeof dados === 'object' ? dados : {};
+  registrarErro_('tela', String(dados.tela || 'sem tela') + ' · ' + String(dados.tipo || 'erro'),
+    String(dados.mensagem || 'Erro sem mensagem'), String(dados.detalhe || ''));
+  return true;
 }
 
 function listarUsuarios() {
@@ -9094,7 +9235,8 @@ function registrarUltimoAcesso_(usuario) {
   try {
     atualizarRegistro_('USUARIOS', usuario.Id, { UltimoAcesso: new Date() });
   } catch (erro) {
-    Logger.log('Não consegui carimbar o último acesso: ' + erro.message);
+    registrarErro_('servidor', 'último acesso', 'Não consegui carimbar o último acesso: '
+      + erro.message, usuario && usuario.Id);
   }
 }
 
@@ -12604,6 +12746,16 @@ function atualizarPGO() {
   var daFila = descarregarAFilaDaAuditoria_(10000);
   if (daFila) feito.push(daFila + ' registro(s) da fila da auditoria gravados na aba AUDITORIA');
 
+  if (!planilhaAtiva_().getSheetByName('ERROS')) {
+    criarAbaDoContrato_(planilhaAtiva_(), esquemaDaAba_('ERROS'));
+    esquecerEstruturaLida_();
+    feito.push('aba ERROS criada — os erros do sistema passam a ficar registrados');
+  } else {
+    pulados.push('aba ERROS já existe');
+  }
+  var errosDaFila = descarregarAFilaDosErros_(10000);
+  if (errosDaFila) feito.push(errosDaFila + ' erro(s) da fila gravados na aba ERROS');
+
   var deCanais = migrarParaCanais_();
   feito = feito.concat(deCanais.feito);
   pulados = pulados.concat(deCanais.pulados);
@@ -14422,7 +14574,93 @@ function blocoDoAmbiente_() {
 
   itens.push(itemDaFilaDaAuditoria_());
   itens.push(itemDaBuscaRapida_());
+  itens.push(itemDosErros_());
+  itens.push(itemDoAcionadorDaAuditoria_());
+  itensDasListasDeAnalistas_().forEach(function (item) { itens.push(item); });
 
+  return itens;
+}
+
+const RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO = 7;
+
+function itemDosErros_() {
+  if (!planilhaAtiva_().getSheetByName('ERROS')) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO, 'Erros: a aba ERROS não existe',
+      'Os erros que o sistema registra ficam esperando numa fila, sem lugar para ir.',
+      'Execute atualizarPGO() no editor: ele cria a aba.');
+  }
+  descarregarAFilaDosErros_(5000);
+  var desde = new Date().getTime() - RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO * 24 * 3600 * 1000;
+  var daSemana = lerRegistros_('ERROS', { ultimas: RECC_ERROS_GUARDADOS }).filter(function (linha) {
+    return linha.DataHora && new Date(linha.DataHora).getTime() >= desde;
+  });
+  if (!daSemana.length) {
+    return item_(RECC_SITUACOES_DO_LAUDO.OK,
+      'Erros: nenhum nos últimos ' + RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO + ' dias');
+  }
+  var ultimo = daSemana[daSemana.length - 1];
+  return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+    'Erros: ' + daSemana.length + ' nos últimos ' + RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO + ' dias',
+    'O mais recente: ' + String(ultimo.Onde || '') + ' — ' + String(ultimo.Mensagem || '').slice(0, 200),
+    'Configurações › Estrutura › Erros recentes mostra cada um, com quem, quando e onde.');
+}
+
+const RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA = 35;
+
+function itemDoAcionadorDaAuditoria_() {
+  var arquivo = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '') || '').trim();
+  if (!arquivo) {
+    return item_(RECC_SITUACOES_DO_LAUDO.OK,
+      'Arquivamento da auditoria: sem planilha de arquivo (a auditoria fica toda aqui)');
+  }
+  var batimento = Number(PropertiesService.getScriptProperties()
+    .getProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA) || 0);
+  var comoCriar = 'No editor do Apps Script: Acionadores › Adicionar acionador › '
+    + 'arquivarAuditoriaAgendada › Baseado no tempo › Mensal.';
+  if (!batimento) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Arquivamento da auditoria: o acionador ainda não rodou',
+      'Há planilha de arquivo, mas arquivarAuditoriaAgendada nunca foi chamada — o '
+        + 'acionador mensal pode não ter sido criado. Sem ele, a aba AUDITORIA só cresce.',
+      comoCriar);
+  }
+  var dias = Math.floor((new Date().getTime() - batimento) / (24 * 3600 * 1000));
+  if (dias > RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      'Arquivamento da auditoria: o acionador não roda há ' + dias + ' dias',
+      'Ele é mensal. Acionador apagado ou com erro não avisa ninguém.',
+      'Confira em Acionadores, no editor. ' + comoCriar);
+  }
+  return item_(RECC_SITUACOES_DO_LAUDO.OK,
+    'Arquivamento da auditoria: o acionador rodou há ' + dias + ' dia(s)');
+}
+
+function itensDasListasDeAnalistas_() {
+  var itens = [];
+  ['ANALISTAS_CENTRAL', 'ANALISTAS_COBRANCA'].forEach(function (nomeDaAba) {
+    var existe;
+    try {
+      existe = abaVemDeOutraPlanilha_(nomeDaAba) || !!planilhaAtiva_().getSheetByName(nomeDaAba);
+    } catch (erro) { existe = true; }
+    if (!existe) return;
+    var nomes;
+    try {
+      nomes = lerRegistros_(nomeDaAba).filter(function (linha) {
+        return String(linha.Nome || '').trim() !== '';
+      }).length;
+    } catch (erro) {
+      itens.push(item_(RECC_SITUACOES_DO_LAUDO.FALHA, 'Lista ' + nomeDaAba + ': não se lê',
+        erro.message + ' O campo dela, no formulário, vira caixa de texto sem a lista.',
+        'Confira a aba (e a planilha de cadastros, se ela mora lá).'));
+      return;
+    }
+    itens.push(nomes
+      ? item_(RECC_SITUACOES_DO_LAUDO.OK, 'Lista ' + nomeDaAba + ': ' + nomes + ' nome(s)')
+
+      : item_(RECC_SITUACOES_DO_LAUDO.OK, 'Lista ' + nomeDaAba + ': vazia',
+        'O campo dela, no formulário, vira caixa de texto: "A lista ainda está vazia". '
+          + 'Para virar lista, preencha a coluna Nome da aba ' + nomeDaAba + '.'));
+  });
   return itens;
 }
 

@@ -261,7 +261,7 @@ function gerar(pastaDeSaida) {
     '  COMEÇAR DO ZERO (o mais simples)',
     '  Apague as abas do sistema na planilha: BASE_RET, BASE_MESA, USUARIOS,',
     '  CORRETORAS, SUSEP_BLOQUEADAS, CANAIS, CAMPOS, CATALOGO,',
-    '  PAINEIS, ANALISES, CONFIG, AUDITORIA — e as ANALISE_* que houver.',
+    '  PAINEIS, ANALISES, CONFIG, AUDITORIA, ERROS — e as ANALISE_* que houver.',
     '  Deixe UMA aba qualquer (o Sheets não aceita planilha sem aba nenhuma).',
     '  Depois rode instalarRECC().',
     '',

@@ -9751,7 +9751,12 @@ var TelaConfiguracoes = (function () {
                     Servidor.chamar('listarAuditoria', 40)
                       .entao(function (trilha) {
                         dados.trilha = trilha;
-                        desenharEstrutura();
+                        Servidor.chamar('listarErros', 40)
+                          .entao(function (erros) {
+                            dados.erros = erros;
+                            desenharEstrutura();
+                          })
+                          .senao(falhou);
                       })
                       .senao(falhou);
                   })
@@ -9819,6 +9824,25 @@ var TelaConfiguracoes = (function () {
         }).join('') + '</ul>'
         : '<p class="config-vazio">Nada foi alterado ainda. A trilha começa a '
           + 'encher no primeiro ajuste — e guarda quem fez, o quê e quando.</p>')
+      + desenharErrosRecentes()
+      + '</div>';
+  }
+
+  function desenharErrosRecentes() {
+    var erros = dados.erros || [];
+    return '<div id="erros-recentes">'
+      + tituloDoPainel('Erros recentes', 'Os 40 mais recentes')
+      + (erros.length
+        ? '<ul class="trilha">' + erros.map(function (erro) {
+          return '<li><span class="quando">' + escapar(erro.dataHora) + '</span>'
+            + '<span class="oque">' + escapar(erro.onde) + ' — ' + escapar(erro.mensagem) + '</span>'
+            + '<span class="quem">' + escapar(erro.quem)
+            + (erro.detalhe ? ' · ' + escapar(erro.detalhe.slice(0, 300)) : '')
+            + '</span></li>';
+        }).join('') + '</ul>'
+        : '<p class="config-vazio">Nenhum erro registrado. Quando a tela quebrar, a '
+          + 'auditoria não gravar ou o servidor não responder a tempo, aparece aqui — '
+          + 'com quem, quando e onde. A planilha guarda os 2.000 mais recentes, na aba ERROS.</p>')
       + '</div>';
   }
 
@@ -10306,7 +10330,34 @@ var Servidor = (function () {
 
   var SEGUNDOS_DAS_CHAMADAS_LONGAS = 380;
 
-  function trocouDeTela() { geracaoDaTela++; }
+  function trocouDeTela(tela) {
+    geracaoDaTela++;
+    if (tela) telaDaVez = tela;
+  }
+
+  var telaDaVez = '';
+  var errosJaAvisados = {};
+  var errosAvisadosNestaPagina = 0;
+  var MAXIMO_DE_ERROS_POR_PAGINA = 10;
+
+  function avisarErro(tipo, mensagem, detalhe) {
+    try {
+      var texto = String(mensagem || 'Erro sem mensagem').slice(0, 1000);
+      var chave = tipo + '|' + texto;
+      if (errosJaAvisados[chave] || errosAvisadosNestaPagina >= MAXIMO_DE_ERROS_POR_PAGINA) return;
+      errosJaAvisados[chave] = true;
+      errosAvisadosNestaPagina++;
+      if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+      var corrida = google.script.run.withFailureHandler(function () {});
+      if (typeof corrida.registrarErroDaTela !== 'function') return;
+      corrida.registrarErroDaTela({
+        tela: telaDaVez, tipo: tipo, mensagem: texto,
+        detalhe: String(detalhe || '').slice(0, 3000)
+      });
+    } catch (erro) {
+
+    }
+  }
 
   function chamar(nomeDaFuncao) {
     return chamarComPrazo(SEGUNDOS_ATE_DESISTIR, nomeDaFuncao,
@@ -10358,6 +10409,8 @@ var Servidor = (function () {
         + 'envio e não grava duas vezes. Se acontece em toda tela, mesmo com '
         + 'pouca gente usando, pode ser um arquivo .gs que não foi copiado — '
         + 'execute diagnosticoRECC() no editor, que lista o que falta.');
+      avisarErro('tempo', 'O servidor não respondeu "' + nomeDaFuncao + '" em '
+        + segundosAteDesistir + ' segundos', '');
       if (aoDarErrado) aoDarErrado(erro);
       else console.error(erro);
     }, segundosAteDesistir * 1000);
@@ -10386,6 +10439,7 @@ var Servidor = (function () {
       }
       corrida[nomeDaFuncao].apply(corrida, argumentos);
     } catch (erro) {
+      avisarErro('servidor', erro.message, nomeDaFuncao);
       setTimeout(function () {
         if (aoDarErrado) aoDarErrado(erro);
         else console.error(erro);
@@ -10400,9 +10454,22 @@ var Servidor = (function () {
 
   return {
     chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela,
-    novoEnvio: novoEnvio
+    novoEnvio: novoEnvio, avisarErro: avisarErro
   };
 })();
+
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('error', function (evento) {
+    var pilha = evento.error && evento.error.stack ? evento.error.stack : '';
+    Servidor.avisarErro('javascript', evento.message,
+      (evento.filename || '') + ':' + (evento.lineno || '') + (pilha ? '\n' + pilha : ''));
+  });
+  window.addEventListener('unhandledrejection', function (evento) {
+    var motivo = evento.reason;
+    Servidor.avisarErro('javascript', motivo && motivo.message ? motivo.message : String(motivo),
+      motivo && motivo.stack ? motivo.stack : '');
+  });
+}
 
 var Rotas = (function () {
 
@@ -10501,7 +10568,7 @@ var Aplicacao = (function () {
 
   function irPara(tela, semHistorico) {
 
-    Servidor.trocouDeTela();
+    Servidor.trocouDeTela(tela);
 
     if (!Rotas.existe(tela) || !podeVer(tela)) {
       tela = pacote.menu.length ? pacote.menu[0].tela : 'trabalho';

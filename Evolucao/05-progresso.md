@@ -3496,6 +3496,31 @@ status mede depois da página aberta (é ela que põe a CONFIG no cache).
 
 ---
 
+## Etapa 64 — O registro de erros: o que ninguém via passa a ficar escrito
+
+Quinta correção da análise de 29/10 (itens 7, 8 e 10). O erro que acontecia longe da pessoa —
+a tela que quebrava num pedaço em branco, a auditoria que não gravava, a análise da madrugada
+que falhava — ia para o Logger, que ninguém abre. Decisões do PO: **quem configura vê**, em
+Configurações; a aba guarda os **2.000 mais recentes**.
+
+| Parte | O que ficou |
+|---|---|
+| **A aba ERROS** | Nova no contrato: `Id`, `DataHora`, `UsuarioId`, `Origem` (servidor ou tela), `Onde`, `Mensagem`, `Detalhe`. A instalação nova cria; o `atualizarPGO` cria nas planilhas de antes |
+| **`registrarErro_`** | O mesmo caminho da auditoria (Etapa 61): fila no PropertiesService, gravada em lote com a trava livre — registrar um erro nunca espera nem derruba nada. O mesmo erro no mesmo lugar entra uma vez por hora (um campo com a configuração quebrada não enche a aba a cada formulário). Passou de 2.000, as mais antigas saem |
+| **O que entra** | A auditoria que não gravou; a configuração quebrada de um campo; o de-para que não foi lembrado; a análise agendada que falhou; o último acesso que não carimbou; a lista de analistas que existe e não se lê (a segunda base fora do ar). Recado de validação ("Confira 1 campo") **não** entra: é a regra falando com quem digita |
+| **A tela avisa** | Todo erro de JavaScript que escapar de uma tela, e toda promessa recusada sem tratamento (`window.onerror` / `unhandledrejection`), mais os 40 s sem resposta e a função que não existe no servidor, vão por `registrarErroDaTela` — com a tela e o tipo. Sem esperar resposta; o mesmo erro uma vez por página, no máximo 10 por página |
+| **Quem configura vê** | Configurações › Estrutura, abaixo de "O que foi feito": **Erros recentes**, os 40 mais recentes, com quando, onde, o quê e quem (`listarErros`, só com a permissão de Configurar) |
+| **O diagnóstico** | Bloco "O ambiente" ganhou três conferências: **Erros** (OK sem nenhum na semana; ATENÇÃO com algum, dizendo o mais recente e onde ver); **Arquivamento da auditoria** — `arquivarAuditoriaAgendada` agora deixa um batimento a cada chamada, e com planilha de arquivo apontada o acionador que nunca rodou ou está parado há mais de 35 dias é ATENÇÃO, com o passo a passo; **Listas de analistas** — a que não se lê é FALHA, a vazia é dita sem alarme (a instalação nasce assim) |
+
+21 testes novos em `testes-registro-de-erros.js` (a aba, a trava livre e a ocupada, uma vez
+por hora, o teto de 2.000, a auditoria perdida, o campo quebrado, a lista que não se lê e a
+vazia, a tela e os 40 s, o erro de JavaScript e o teto por página, quem pode ver, o diagnóstico
+dos erros e do acionador, e a planilha de antes). 6 quebras de propósito: 5 pegas; a sexta
+mostrou que conferir a aba antes de gravar era redundante — sem a aba a gravação já falha antes
+de tirar da fila — e a conferência saiu.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

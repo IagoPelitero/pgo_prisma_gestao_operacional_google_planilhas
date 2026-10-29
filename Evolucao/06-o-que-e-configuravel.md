@@ -78,6 +78,7 @@ com nome, num lugar só.
 | **Quantas SUSEPs bloqueadas a Tabela Corretoras mostra** | `RECC_MAXIMO_DE_BLOQUEADAS_NA_TELA`, no `Cadastros.gs` | 100 (Etapa 55, para as 151 mil da segunda base): as dos casos primeiro, depois as mais recentes. A busca procura em todas |
 | **A hora da finalização** | `RECC_COLUNA_HORA_DA_FINALIZACAO`, no `Indicadores.gs` | "horário da finalização", ao lado da *Data da finalização* (a coluna de finalização do canal). O fim do prazo da Mesa é a data com essa hora (Etapa 58) |
 | **A fila da auditoria** | `RECC_MAIOR_REGISTRO_NA_FILA` e `RECC_DESCARGA_DA_AUDITORIA`, no `Entrada.gs`; `RECC_FILA_DA_AUDITORIA_QUE_PREOCUPA`, no `Instalacao.gs` | Registro de até 8 mil caracteres vai para a fila (maior, direto na aba); até 500 registros por descarga; o diagnóstico avisa com 200 ou mais esperando (Etapa 61) |
+| **O registro de erros** | `RECC_ERROS_GUARDADOS`, `RECC_SEGUNDOS_SEM_REPETIR_O_ERRO` e `RECC_ERROS_NA_FILA`, no `Entrada.gs`; `RECC_DIAS_DOS_ERROS_NO_DIAGNOSTICO` e `RECC_DIAS_SEM_O_ACIONADOR_DA_AUDITORIA`, no `Instalacao.gs`; `MAXIMO_DE_ERROS_POR_PAGINA`, no `Aplicacao.html` | 2.000 erros na aba (decisão do PO); o mesmo erro uma vez por hora; até 200 na fila; o diagnóstico olha 7 dias e cobra o acionador mensal depois de 35 dias; até 10 avisos por página (Etapa 64) |
 | **Quantas propostas repetidas o laudo lista** | `RECC_REPETIDOS_LISTADOS`, no `Casos.gs` | 50 de cada motivo; o número total vem sempre |
 
 ---

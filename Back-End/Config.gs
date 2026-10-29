@@ -2450,6 +2450,35 @@ function listarAuditoria(quantas) {
     });
 }
 
+/**
+ * Os erros mais recentes, para Configurações › Estrutura (Etapa 64). Quem vê é
+ * quem configura — decisão do PO. Descarrega a fila antes, como a trilha.
+ */
+function listarErros(quantos) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  if (!planilhaAtiva_().getSheetByName('ERROS')) return [];
+  descarregarAFilaDosErros_(5000);
+
+  var nomes = {};
+  lerRegistros_('USUARIOS').forEach(function (usuario) {
+    nomes[usuario.__id] = String(usuario.Nome);
+  });
+  return lerRegistros_('ERROS', { ultimas: Number(quantos) || 40 })
+    .reverse()
+    .map(function (linha) {
+      return {
+        dataHora: linha.DataHora
+          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm')
+          : '',
+        quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || (linha.UsuarioId ? 'Sem dados' : 'o sistema'),
+        origem: String(linha.Origem || ''),
+        onde: String(linha.Onde || ''),
+        mensagem: String(linha.Mensagem || ''),
+        detalhe: String(linha.Detalhe || '')
+      };
+    });
+}
+
 // ============================================================================
 // O ARQUIVO DA AUDITORIA — o que tem mais de 2 meses vai para outra planilha
 // ============================================================================
@@ -2527,6 +2556,9 @@ function arquivarAuditoriaAgora() {
   };
 }
 
+/** Quando o acionador rodou pela última vez — guardado a cada chamada. */
+const RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA = 'AUDITORIA.ACIONADOR_RODOU';
+
 /**
  * Para o ACIONADOR DE TEMPO — o PO cria no editor do Apps Script, mensal.
  *
@@ -2543,6 +2575,11 @@ function arquivarAuditoriaAgora() {
  * faria: obedece aos mesmos 2 meses, e copia antes de apagar.
  */
 function arquivarAuditoriaAgendada() {
+  // O batimento do acionador (Etapa 64): o diagnóstico confere se ele roda.
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty(RECC_BATIMENTO_DO_ACIONADOR_DA_AUDITORIA, String(new Date().getTime()));
+  } catch (erro) { /* o batimento é aviso, não pode impedir o arquivamento */ }
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim();
   if (!id) return { arquivou: false, motivo: 'sem planilha de arquivo' };
 
@@ -3519,7 +3556,8 @@ function atualizarAnalisesAgendadas() {
       feitas.push(receita.aba + ' (' + conteudo.linhas.length + ')');
     } catch (erro) {
       falharam.push(receita.nome + ': ' + erro.message);
-      Logger.log('Análise ' + receita.nome + ' falhou: ' + erro.message);
+      registrarErro_('servidor', 'análise agendada', 'Análise ' + receita.nome + ' falhou: '
+        + erro.message, receita.aba);
     }
   });
 

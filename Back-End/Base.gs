@@ -1097,6 +1097,24 @@ const RECC_ESQUEMA = {
       { cabecalho: 'RegistroId', tipo: 'identificador', protegido: false },
       { cabecalho: 'Detalhe', tipo: 'textoLongo', protegido: false }
     ]
+  },
+
+  // Os erros que antes iam para o Logger, que ninguém abre (Etapa 64). Guarda
+  // os 2.000 mais recentes — ver registrarErro_, no Entrada.gs.
+  ERROS: {
+    aba: 'ERROS',
+    titulo: 'Erros',
+    controle: false,
+    reserva: 200,
+    colunas: [
+      { cabecalho: 'Id', tipo: 'identificador', protegido: true },
+      { cabecalho: 'DataHora', tipo: 'dataHora', protegido: true },
+      { cabecalho: 'UsuarioId', tipo: 'identificador', protegido: true },
+      { cabecalho: 'Origem', tipo: 'texto', protegido: true },
+      { cabecalho: 'Onde', tipo: 'texto', protegido: true },
+      { cabecalho: 'Mensagem', tipo: 'textoLongo', protegido: true },
+      { cabecalho: 'Detalhe', tipo: 'textoLongo', protegido: false }
+    ]
   }
 };
 

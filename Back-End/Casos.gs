@@ -217,8 +217,8 @@ function lerConfiguracaoDoCampo_(campo) {
     var lido = JSON.parse(texto);
     return lido && typeof lido === 'object' ? lido : {};
   } catch (erro) {
-    Logger.log('Configuração inválida no campo "' + campo.Cabecalho + '": ' +
-      erro.message);
+    registrarErro_('servidor', 'campo ' + campo.Cabecalho, 'Configuração inválida no campo "'
+      + campo.Cabecalho + '": ' + erro.message, texto);
     return {};
   }
 }
@@ -399,6 +399,15 @@ function nomesAtivosDoCadastro_(nomeDaAba) {
   try {
     registros = lerRegistros_(nomeDaAba);
   } catch (erro) {
+    // Aba que não existe é de propósito (acima). A que existe e não se lê — a
+    // segunda base fora do ar — vira erro registrado (Etapa 64): a lista vazia
+    // no formulário não diz o motivo, e alguém precisa saber.
+    try {
+      if (abaVemDeOutraPlanilha_(nomeDaAba) || planilhaAtiva_().getSheetByName(nomeDaAba)) {
+        registrarErro_('servidor', 'lista ' + nomeDaAba, 'A lista de ' + nomeDaAba
+          + ' não pôde ser lida: ' + erro.message, '');
+      }
+    } catch (outro) { /* conferir a aba também falhou: nada a acrescentar */ }
     return [];
   }
 
@@ -3552,7 +3561,8 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   try {
     lembrarODeParaDoCanal_(canal, dePara);
   } catch (erro) {
-    Logger.log('O de-para desta importação não foi lembrado: ' + erro.message);
+    registrarErro_('servidor', 'importação', 'O de-para desta importação não foi lembrado: '
+      + erro.message, canal.nome);
   }
 
   registrarAuditoria_('caso.importar', canal.aba, '',
