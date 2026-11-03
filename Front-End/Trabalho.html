@@ -134,7 +134,10 @@ var TelaTrabalho = (function () {
         + caixas.join('')
         + Moldura.botaoLimparFiltros('limpar-filtros'),
       resumo.total + ' de ' + resumo.totalNoPeriodo
-        + ' casos · ' + escapar(resumo.periodo.rotulo));
+        + ' casos · ' + (resumo.buscaNaPlanilhaToda
+          // A busca não olha o período (Etapa 69): a caixa diz onde ela procurou.
+          ? 'busca na planilha toda, de qualquer data'
+          : escapar(resumo.periodo.rotulo)));
   }
 
   /**
@@ -216,6 +219,15 @@ var TelaTrabalho = (function () {
   }
 
   function desenharFila() {
+    if (!resumo.fila.length && resumo.buscaNaPlanilhaToda) {
+      return '<div class="cartao vazio">'
+        + '<strong>Nenhum caso para mostrar aqui.</strong>'
+        + '<p>' + (resumo.totalNoPeriodo
+          ? 'A busca achou ' + resumo.totalNoPeriodo + ' casos na planilha toda, mas '
+            + 'nenhum passa pelos filtros escolhidos.'
+          : 'A busca não achou nenhum caso com esse texto na planilha toda, de '
+            + 'qualquer data.') + '</p></div>';
+    }
     if (!resumo.fila.length) {
       return '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
@@ -474,12 +486,23 @@ var TelaTrabalho = (function () {
     document.getElementById('fechar-aviso-de-prazo').focus();
   }
 
+  /**
+   * A busca achou mais casos do que o painel lê de uma vez (Etapa 69): vieram
+   * os mais recentes. O aviso do período não serve — a busca não tem período.
+   */
+  function avisoDaBusca() {
+    if (!resumo.truncada) return '';
+    return '<p class="aviso-janela" role="status"><strong>A busca achou mais casos do que '
+      + 'o painel lê de uma vez</strong>: estes números e esta fila são dos mais recentes. '
+      + 'Escreva um texto mais específico, ou use Buscar Caso para o histórico inteiro.</p>';
+  }
+
   function desenharPainel() {
     // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
     // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
     // na fila, dava a entender que os números em cima estavam completos.
     elemento('painel').innerHTML =
-      Moldura.avisoDeJanela(resumo, 'Estes números e esta fila')
+      (resumo.buscaNaPlanilhaToda ? avisoDaBusca() : Moldura.avisoDeJanela(resumo, 'Estes números e esta fila'))
       + desenharCartoes() + desenharFiltros() + desenharFila();
     ligarPainel();
     var busca = elemento('busca-na-fila');

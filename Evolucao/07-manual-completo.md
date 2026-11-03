@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1549 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1562 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -349,7 +349,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1549 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1562 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -399,6 +399,19 @@ quando o termo parece número — senão "caso número 1" acharia o caso de Id
 `123.456.789-01` acha `12345678901`. A proposta inteira (`7-0000123`) também
 acha. O "x" do campo limpa a busca na hora, e trocar de canal limpa junto com
 os outros filtros. É uma ida ao servidor por Enter, e não uma por letra.
+
+**A busca procura na planilha toda, de qualquer data** (Etapa 69, pedido do PO:
+"os filtros de texto ficam condicionados à data, prejudicando a busca"). Com
+texto digitado, o período não vale: a fila e os cartões mostram o que a busca
+achou em toda a base do canal, e a caixa dos filtros diz "busca na planilha
+toda, de qualquer data". Os **outros filtros continuam valendo** — o analista,
+o status, o cartão clicado — e quem só vê os próprios casos continua vendo só os
+seus. Sem período, a seta "vs. período anterior" dos cartões fica vazia. Quem
+procura é o localizador do Sheets (o mesmo da busca rápida, Etapa 63), que lê só
+as linhas em que o texto aparece; com mais casos achados do que o painel lê de
+uma vez (`OPERACAO.LINHAS_DO_PAINEL`), vêm os mais recentes e a tela avisa. Com
+a busca rápida desligada, ela procura nas linhas mais recentes até esse teto.
+Apagar o texto volta ao período.
 
 Depois vem o **período**, nas mesmas maneiras da Produtividade RECC (ver
 adiante): **por data** (a abertura) e **por mês**. Antes o Trabalho olhava só a janela
@@ -1658,7 +1671,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.68** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.69** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1666,7 +1679,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1549 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1562 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

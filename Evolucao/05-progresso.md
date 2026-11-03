@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.68 — a última etapa entregue é a 68. A regra do número está
+**Estado geral:** versão 1.69 — a última etapa entregue é a 69. A regra do número está
 na Etapa 68.
 
 ---
@@ -3692,6 +3692,36 @@ As rotinas que estavam propostas para a Etapa 68 (backup diário, homologação,
 GitHub Actions, relatório semanal) foram **canceladas pelo PO**: "não há
 necessidade". O número 68 ficou com os ajustes da Produtividade e a saída da
 tela inicial.
+
+---
+
+## Etapa 69 — A busca do Trabalho na planilha toda
+
+Pedido do PO: "os filtros de texto da aba Trabalho ficam condicionados à data,
+prejudicando a busca de todos os canais. Conseguimos permitir que o filtro busque
+em toda a planilha? Somente o de texto precisa dessa correção." Decisões dele:
+com texto digitado, **os cartões contam os mesmos casos da fila**, e **os outros
+filtros continuam valendo**, sobre a planilha toda.
+
+| O que | Como ficou |
+|---|---|
+| **A busca** (`registrosDaBuscaNaPlanilha_`) | Com texto, o Trabalho não lê o período: o localizador do Sheets procura o texto em todas as colunas da base do canal e devolve as linhas candidatas; só elas são lidas, e `aplicarBusca_` confere com a regra de sempre (sem acento, sem caixa, documento com ou sem pontuação). A proposta que junta duas colunas (`7-0000123`) é procurada também pelo maior pedaço de número |
+| **Os cartões** | Contam o que a busca achou — o mesmo que a fila. Sem período, não há anterior: a seta fica vazia |
+| **Os outros filtros, o cartão clicado e o alcance** | Continuam valendo sobre o que a busca achou. O caso excluído não volta |
+| **O teto** | O do painel (`OPERACAO.LINHAS_DO_PAINEL`): achou mais que ele, vêm os mais recentes, e a tela avisa com uma frase própria da busca |
+| **A busca rápida desligada** | `OPERACAO.BUSCA_RAPIDA` = NAO: procura nas linhas mais recentes até o teto |
+| **A tela** | A caixa dos filtros diz "busca na planilha toda, de qualquer data", e a fila vazia explica se a busca não achou nada ou se os filtros tiraram o que ela achou. Apagar o texto volta ao período |
+| **Versão** | 1.69 |
+
+Junto, um teste antigo que dependia da data (`testes-periodo-pela-data`): ele
+comparava a abertura com o mês de 3 dias atrás, e nos três primeiros dias de cada
+mês os dois já são meses diferentes. Passou a comparar com o mês de hoje. O
+defeito era do teste, não do sistema.
+
+13 testes novos em `testes-busca-na-planilha-toda.js`; o teste da busca sem
+resultado, em `testes-trabalho.js`, passou a esperar o total da planilha toda.
+15 quebras de propósito, 15 pegas — 2 escaparam na primeira rodada e ganharam
+teste: a chave da busca rápida e o aviso do teto.
 
 ---
 

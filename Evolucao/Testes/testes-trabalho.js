@@ -1671,7 +1671,9 @@ function rodarTestesDoTrabalho() {
     const resumo = buscar(mesaDaBusca, 'Barba Branca');
     igual(resumo.total, 0);
     igual(resumo.fila.length, 0);
-    verdadeiro(resumo.totalNoPeriodo >= 3, 'o período continua com os casos');
+    // Desde a Etapa 69 a busca olha a planilha toda: o total é o que ela achou.
+    igual(resumo.totalNoPeriodo, 0, 'a busca não achou nada na planilha toda');
+    igual(resumo.buscaNaPlanilhaToda, true);
   });
 
   teste('busca vazia ou só com espaços é o mesmo que nenhuma', () => {

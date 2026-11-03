@@ -135,26 +135,37 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
   // o qual não dá para afirmar que é de setembro.
   var guardarSemData = guardaOsSemData_(periodo);
 
-  // Só as linhas do período e do anterior, achadas pela coluna da data
-  // (Etapa 65) — qualquer mês completo. Ver registrosDosPeriodos_.
-  var lido = registrosDosPeriodos_(canal, [
-    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
-    { de: antes.de, ate: antes.ate }]);
-  var recentes = lido.registros;
-  var truncada = lido.truncada;
-
-  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-    guardarSemData);
-  var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
-
-  // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
-  var anterior = filtrarPeloAlcance_(
-    entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
+  // A BUSCA DIGITADA procura na PLANILHA TODA, sem o período (Etapa 69, pedido
+  // do PO: "os filtros de texto ficam condicionados à data, prejudicando a
+  // busca"). Os outros filtros continuam valendo, e os cartões contam o que a
+  // busca achou — o mesmo que a fila. Sem período, não há o anterior para
+  // comparar: a seta dos cartões fica vazia.
+  var termo = String((filtros || {}).busca || '').trim();
+  var meus;
+  var anterior;
+  var truncada;
+  if (termo) {
+    var achado = registrosDaBuscaNaPlanilha_(canal, termo);
+    meus = filtrarPeloAlcance_(achado.registros, canal.aba, quem);
+    anterior = [];
+    truncada = achado.truncada;
+  } else {
+    // Só as linhas do período e do anterior, achadas pela coluna da data
+    // (Etapa 65) — qualquer mês completo. Ver registrosDosPeriodos_.
+    var lido = registrosDosPeriodos_(canal, [
+      { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
+      { de: antes.de, ate: antes.ate }]);
+    truncada = lido.truncada;
+    meus = filtrarPeloAlcance_(entreDuasDatas_(lido.registros, canal, periodo.de, periodo.ate,
+      guardarSemData), canal.aba, quem);
+    // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
+    anterior = filtrarPeloAlcance_(
+      entreDuasDatas_(lido.registros, canal, antes.de, antes.ate, false), canal.aba, quem);
+  }
 
   var disponiveis = filtrosDoCanal_(canal, quem);
-  // A BUSCA DIGITADA entra junto com os filtros, e vale para os cartões E para
-  // a fila: o número do cartão continua sendo o dos casos que a busca achou.
-  var termo = String((filtros || {}).busca || '').trim();
+  // A busca entra junto com os filtros, e vale para os cartões E para a fila:
+  // o número do cartão continua sendo o dos casos que a busca achou.
   var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
@@ -196,7 +207,9 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     mostrarNaFila: { padrao: RECC_CASOS_NA_FILA, opcoes: RECC_OPCOES_DE_CASOS_NA_FILA,
       naAbertura: RECC_FILA_NA_ABERTURA },
     total: naFila.length,
+    // Com busca, é quantos a busca achou na planilha toda (antes dos filtros).
     totalNoPeriodo: meus.length,
+    buscaNaPlanilhaToda: !!termo,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
@@ -322,9 +335,14 @@ function registrosDosPeriodos_(canal, periodos) {
     };
   }
 
-  // O que lerRegistros_ já tirava: a linha excluída e a linha toda em branco.
+  return { registros: semExcluidasNemVazias_(estrutura,
+    lerLinhasEspecificas_(canal.aba, linhas)), truncada: truncada };
+}
+
+/** O que lerRegistros_ já tirava: a linha excluída e a linha toda em branco. */
+function semExcluidasNemVazias_(estrutura, registros) {
   var iVisivel = posicaoDaColuna_(estrutura, '_Visivel');
-  var registros = lerLinhasEspecificas_(canal.aba, linhas).filter(function (registro) {
+  return registros.filter(function (registro) {
     if (iVisivel >= 0
       && normalizarParaComparar_(registro[estrutura.cabecalhos[iVisivel]]) === 'nao') return false;
     return estrutura.cabecalhos.some(function (cabecalho) {
@@ -332,7 +350,73 @@ function registrosDosPeriodos_(canal, periodos) {
       return v !== '' && v !== null && v !== undefined;
     });
   });
-  return { registros: registros, truncada: truncada };
+}
+
+/**
+ * A busca digitada do Trabalho na PLANILHA TODA (Etapa 69).
+ *
+ * O localizador do Sheets procura o texto em todas as colunas, do lado do
+ * Google, e devolve as linhas em que ele aparece — a mesma expressão da busca
+ * rápida (Etapa 63): sem caixa, sem acento, com qualquer separador. São
+ * CANDIDATAS: quem chamou ainda confere com aplicarBusca_, a regra de sempre.
+ * Só essas linhas são lidas.
+ *
+ * O teto é o mesmo do painel: com mais linhas achadas que ele, vêm as mais
+ * recentes e a tela avisa. Sem o localizador (desligado na CONFIG, ou falhou),
+ * lê as linhas mais recentes até o teto, e aplicarBusca_ separa.
+ */
+function registrosDaBuscaNaPlanilha_(canal, termo) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var teto = linhasQueOPainelOlha_();
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return { registros: [], truncada: false };
+
+  var linhas = linhasDoTermoNaPlanilha_(estrutura, termo, total);
+  if (linhas === null) {
+    return { registros: lerRegistros_(canal.aba, { ultimas: teto }), truncada: total > teto };
+  }
+  return {
+    registros: semExcluidasNemVazias_(estrutura,
+      lerLinhasEspecificas_(canal.aba, linhas.slice(-teto))),
+    truncada: linhas.length > teto
+  };
+}
+
+/** O menor pedaço de número da proposta que vale procurar sozinho. */
+const RECC_PEDACO_MINIMO_DA_BUSCA = 4;
+
+/**
+ * As linhas da planilha em que o localizador acha o termo, em ordem — ou null,
+ * quando ele está desligado, falhou ou o termo não cabe na expressão.
+ *
+ * A proposta da fila junta duas colunas ("7-0000123"), e nenhuma célula tem as
+ * duas: quando o termo é só número em pedaços, procura também o maior pedaço
+ * (de 4 dígitos ou mais), e a conferência decide.
+ */
+function linhasDoTermoNaPlanilha_(estrutura, termo, total) {
+  if (!buscaRapidaLigada_()) return null;
+  var procurados = [normalizarParaComparar_(termo)];
+  var pedacos = String(termo).split(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/).filter(function (p) { return p; });
+  if (pedacos.length > 1 && pedacos.every(function (p) { return /^[0-9]+$/.test(p); })) {
+    var maior = pedacos.reduce(function (um, outro) { return outro.length > um.length ? outro : um; });
+    if (maior.length >= RECC_PEDACO_MINIMO_DA_BUSCA) procurados.push(maior);
+  }
+  if (procurados.some(function (alvo) { return !/^[a-z0-9]+$/.test(alvo); })) return null;
+
+  var achadas = {};
+  try {
+    var faixa = estrutura.aba.getRange(2, 1, total, estrutura.cabecalhos.length);
+    procurados.forEach(function (alvo) {
+      faixa.createTextFinder(expressaoDaBuscaRapida_(alvo, false, false))
+        .useRegularExpression(true)
+        .matchFormulaText(false)
+        .findAll()
+        .forEach(function (celula) { achadas[celula.getRow()] = true; });
+    });
+  } catch (erro) {
+    return null;   // o localizador falhou: a leitura das recentes responde
+  }
+  return Object.keys(achadas).map(Number).sort(function (uma, outra) { return uma - outra; });
 }
 
 // ============================================================================
@@ -655,9 +739,9 @@ function aplicarFiltros_(registros, disponiveis, escolhidos) {
  * "12345678901". A proposta da fila, que junta código e número, também é
  * procurada inteira: digitar "7-0000123" acha o caso.
  *
- * Procura só no que o período e os filtros já separaram, em memória: a base
- * já foi lida para montar o painel, e procurar de novo na planilha seria
- * pagar a leitura duas vezes.
+ * Procura nos registros que recebe. No Trabalho, desde a Etapa 69, eles vêm da
+ * planilha toda (registrosDaBuscaNaPlanilha_), e não do período: o localizador
+ * acha as candidatas, e é aqui que se confere.
  */
 function aplicarBusca_(registros, canal, termo) {
   if (!termo) return registros;

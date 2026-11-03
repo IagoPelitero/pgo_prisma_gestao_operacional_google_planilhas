@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-10-29 22:18
+   Gerado em 2026-11-03 17:09
    ========================================================================== */
 
 
@@ -8629,8 +8629,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.68',
-  data: '29/10/2026'
+  numero: '1.69',
+  data: '03/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -9604,22 +9604,30 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
 
   var guardarSemData = guardaOsSemData_(periodo);
 
-  var lido = registrosDosPeriodos_(canal, [
-    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
-    { de: antes.de, ate: antes.ate }]);
-  var recentes = lido.registros;
-  var truncada = lido.truncada;
+  var termo = String((filtros || {}).busca || '').trim();
+  var meus;
+  var anterior;
+  var truncada;
+  if (termo) {
+    var achado = registrosDaBuscaNaPlanilha_(canal, termo);
+    meus = filtrarPeloAlcance_(achado.registros, canal.aba, quem);
+    anterior = [];
+    truncada = achado.truncada;
+  } else {
 
-  var noPeriodo = entreDuasDatas_(recentes, canal, periodo.de, periodo.ate,
-    guardarSemData);
-  var meus = filtrarPeloAlcance_(noPeriodo, canal.aba, quem);
+    var lido = registrosDosPeriodos_(canal, [
+      { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
+      { de: antes.de, ate: antes.ate }]);
+    truncada = lido.truncada;
+    meus = filtrarPeloAlcance_(entreDuasDatas_(lido.registros, canal, periodo.de, periodo.ate,
+      guardarSemData), canal.aba, quem);
 
-  var anterior = filtrarPeloAlcance_(
-    entreDuasDatas_(recentes, canal, antes.de, antes.ate, false), canal.aba, quem);
+    anterior = filtrarPeloAlcance_(
+      entreDuasDatas_(lido.registros, canal, antes.de, antes.ate, false), canal.aba, quem);
+  }
 
   var disponiveis = filtrosDoCanal_(canal, quem);
 
-  var termo = String((filtros || {}).busca || '').trim();
   var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
@@ -9653,7 +9661,9 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     mostrarNaFila: { padrao: RECC_CASOS_NA_FILA, opcoes: RECC_OPCOES_DE_CASOS_NA_FILA,
       naAbertura: RECC_FILA_NA_ABERTURA },
     total: naFila.length,
+
     totalNoPeriodo: meus.length,
+    buscaNaPlanilhaToda: !!termo,
     truncada: truncada,
     escopo: quem.permissoes.escopo,
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
@@ -9728,8 +9738,13 @@ function registrosDosPeriodos_(canal, periodos) {
     };
   }
 
+  return { registros: semExcluidasNemVazias_(estrutura,
+    lerLinhasEspecificas_(canal.aba, linhas)), truncada: truncada };
+}
+
+function semExcluidasNemVazias_(estrutura, registros) {
   var iVisivel = posicaoDaColuna_(estrutura, '_Visivel');
-  var registros = lerLinhasEspecificas_(canal.aba, linhas).filter(function (registro) {
+  return registros.filter(function (registro) {
     if (iVisivel >= 0
       && normalizarParaComparar_(registro[estrutura.cabecalhos[iVisivel]]) === 'nao') return false;
     return estrutura.cabecalhos.some(function (cabecalho) {
@@ -9737,7 +9752,51 @@ function registrosDosPeriodos_(canal, periodos) {
       return v !== '' && v !== null && v !== undefined;
     });
   });
-  return { registros: registros, truncada: truncada };
+}
+
+function registrosDaBuscaNaPlanilha_(canal, termo) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var teto = linhasQueOPainelOlha_();
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return { registros: [], truncada: false };
+
+  var linhas = linhasDoTermoNaPlanilha_(estrutura, termo, total);
+  if (linhas === null) {
+    return { registros: lerRegistros_(canal.aba, { ultimas: teto }), truncada: total > teto };
+  }
+  return {
+    registros: semExcluidasNemVazias_(estrutura,
+      lerLinhasEspecificas_(canal.aba, linhas.slice(-teto))),
+    truncada: linhas.length > teto
+  };
+}
+
+const RECC_PEDACO_MINIMO_DA_BUSCA = 4;
+
+function linhasDoTermoNaPlanilha_(estrutura, termo, total) {
+  if (!buscaRapidaLigada_()) return null;
+  var procurados = [normalizarParaComparar_(termo)];
+  var pedacos = String(termo).split(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/).filter(function (p) { return p; });
+  if (pedacos.length > 1 && pedacos.every(function (p) { return /^[0-9]+$/.test(p); })) {
+    var maior = pedacos.reduce(function (um, outro) { return outro.length > um.length ? outro : um; });
+    if (maior.length >= RECC_PEDACO_MINIMO_DA_BUSCA) procurados.push(maior);
+  }
+  if (procurados.some(function (alvo) { return !/^[a-z0-9]+$/.test(alvo); })) return null;
+
+  var achadas = {};
+  try {
+    var faixa = estrutura.aba.getRange(2, 1, total, estrutura.cabecalhos.length);
+    procurados.forEach(function (alvo) {
+      faixa.createTextFinder(expressaoDaBuscaRapida_(alvo, false, false))
+        .useRegularExpression(true)
+        .matchFormulaText(false)
+        .findAll()
+        .forEach(function (celula) { achadas[celula.getRow()] = true; });
+    });
+  } catch (erro) {
+    return null;
+  }
+  return Object.keys(achadas).map(Number).sort(function (uma, outra) { return uma - outra; });
 }
 
 const RECC_MESES_PARA_TRAS = 12;

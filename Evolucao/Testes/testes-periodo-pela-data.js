@@ -94,7 +94,10 @@ function rodarTestesDoPeriodoPelaData() {
     const doMes = t.chamar('produtividadeDaEquipe')(t.ret.id, {}, mesDe(150));
     verdadeiro(doMes.total === 1200, 'o excluído não conta');
     const abertura = t.chamar('resumoDoCanal')(t.ret.id, {}, { tipo: 'intervalo', de: '', ate: '' });
-    const fechado = t.chamar('resumoDoCanal')(t.ret.id, {}, mesDe(3));
+    // O mês fechado é o MESMO da abertura (o mês de hoje): a diferença são só os
+    // sem data. Com o mês de 3 dias atrás, a conta quebrava nos três primeiros
+    // dias de cada mês — a abertura já é outro mês.
+    const fechado = t.chamar('resumoDoCanal')(t.ret.id, {}, mesDe(0));
     igual(abertura.totalNoPeriodo - fechado.totalNoPeriodo, 3, 'os 3 sem data, só na abertura');
     igual(comOJeitoDeAntes(t, () => t.chamar('resumoDoCanal')(t.ret.id, {}, { tipo: 'intervalo', de: '', ate: '' }))
       .totalNoPeriodo, abertura.totalNoPeriodo, 'a abertura guarda os sem data, como antes');
