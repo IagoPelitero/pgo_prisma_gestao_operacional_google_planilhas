@@ -119,7 +119,7 @@ function tomValido_(cor) {
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -170,7 +170,15 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
-  var pertoDeVencer = casosPertoDeVencer_(filtrados, canal);
+  // O AVISO DE PRAZO olha TODOS os casos abertos da planilha, de qualquer data
+  // (Etapa 70, pedido do PO): no começo do mês, o período já não tinha os casos
+  // do mês anterior que continuavam abertos — e eram eles que vencendo. Vale o
+  // alcance e os filtros da tela, como antes; só o período deixa de valer. A
+  // tela só pede o aviso ao entrar no canal (`comOAviso` = false nas outras
+  // cargas), e aí a coluna de status não é lida à toa.
+  var pertoDeVencer = comOAviso === false ? [] : casosPertoDeVencer_(
+    aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal), canal.aba, quem),
+      disponiveis, filtros || {}), canal, termo), canal);
   // O CARTÃO CLICADO filtra a FILA pelo que ele conta (Etapa 44) — o status, o
   // valor de uma coluna (o Status proposta), a coluna preenchida. Os cartões
   // continuam contando sem ele: clicar em "Pendente" não pode zerar os outros.
@@ -197,8 +205,9 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
       ? naFila : naFila.slice(-RECC_FILA_NA_ABERTURA), canal)),
     filaCompacta: true,
-    // O aviso de prazo olha a fila INTEIRA — um caso perto de vencer que não
-    // está entre os 100 mais recentes é justamente o que mais precisa do aviso.
+    // O aviso de prazo olha todos os casos ABERTOS da planilha (Etapa 70), e não
+    // só a fila — um caso perto de vencer que não está entre os 100 mais
+    // recentes, ou nem no período, é justamente o que mais precisa do aviso.
     // A LISTA do aviso vai com até 100 (os mais recentes); o número, inteiro.
     // Um aviso de 2.000 linhas pesaria tanto quanto a fila — e ninguém o lê.
     pertoDeVencer: compactarFila_(montarFila_(
@@ -1306,6 +1315,53 @@ function compactarFila_(fila) {
       sinais: caso.sinais
     };
   });
+}
+
+/** Até quantos pedaços da planilha o aviso de prazo lê; passou, ficam os mais recentes. */
+const RECC_PEDACOS_DO_AVISO_NO_MAXIMO = 60;
+
+/**
+ * Os casos ABERTOS da planilha toda, para o aviso de prazo (Etapa 70).
+ *
+ * Lê a coluna do status inteira — uma coluna, e não a planilha — e separa as
+ * linhas que ainda podem estar correndo prazo: status que não é Final, status
+ * vazio ou fora do catálogo, e o status que só encerra com uma CONDIÇÃO (na RET,
+ * o Retido antes de a proposta ser transmitida). Só essas linhas são lidas; o
+ * sinalizador decide, caso a caso, o que está no amarelo.
+ *
+ * Os limites são os do painel: até `OPERACAO.LINHAS_DO_PAINEL` linhas abertas,
+ * em até 60 pedaços da planilha — passou, ficam as mais recentes. Sem
+ * sinalizador no canal, não lê nada: não há prazo para avisar.
+ */
+function casosAbertosDaPlanilha_(canal) {
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  if (!sinalizadores.length) return [];
+  var estrutura = estruturaDaAba_(canal.aba);
+  var teto = linhasQueOPainelOlha_();
+  var posicao = canal.colunaDoStatus ? posicaoDaColuna_(estrutura, canal.colunaDoStatus) : -1;
+  if (posicao < 0) return lerRegistros_(canal.aba, { ultimas: teto });
+
+  var situacoes = situacoesPorChave_(canal);
+  var comCondicao = {};
+  sinalizadores.forEach(function (sinalizador) {
+    if (temCondicaoDeParada_(sinalizador)) {
+      comCondicao[normalizarParaComparar_(sinalizador.statusComCondicao)] = true;
+    }
+  });
+  var linhas = [];
+  lerColunaInteira_(canal.aba, estrutura.cabecalhos[posicao]).forEach(function (valor, i) {
+    var chave = normalizarParaComparar_(valor);
+    var situacao = situacoes[chave];
+    if (!situacao || !situacao.final || comCondicao[chave]) linhas.push(i + 2);
+  });
+  linhas = linhas.slice(-teto);
+
+  var blocos = blocosDeLinhas_(linhas);
+  if (blocos.length > RECC_PEDACOS_DO_AVISO_NO_MAXIMO) {
+    var primeira = blocos[blocos.length - RECC_PEDACOS_DO_AVISO_NO_MAXIMO].inicio;
+    linhas = linhas.filter(function (linha) { return linha >= primeira; });
+  }
+  return semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas));
 }
 
 /**

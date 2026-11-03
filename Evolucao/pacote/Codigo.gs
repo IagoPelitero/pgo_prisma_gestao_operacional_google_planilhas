@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-03 17:09
+   Gerado em 2026-11-03 17:54
    ========================================================================== */
 
 
@@ -8629,7 +8629,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.69',
+  numero: '1.70',
   data: '03/11/2026'
 };
 
@@ -9595,7 +9595,7 @@ function tomValido_(cor) {
   return RECC_TONS.indexOf(tom) >= 0 ? tom : 'neutro';
 }
 
-function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -9632,7 +9632,10 @@ function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila) {
     canal, termo);
   var anterioresFiltrados = aplicarBusca_(
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
-  var pertoDeVencer = casosPertoDeVencer_(filtrados, canal);
+
+  var pertoDeVencer = comOAviso === false ? [] : casosPertoDeVencer_(
+    aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal), canal.aba, quem),
+      disponiveis, filtros || {}), canal, termo), canal);
 
   var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
 
@@ -10403,6 +10406,39 @@ function compactarFila_(fila) {
       sinais: caso.sinais
     };
   });
+}
+
+const RECC_PEDACOS_DO_AVISO_NO_MAXIMO = 60;
+
+function casosAbertosDaPlanilha_(canal) {
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  if (!sinalizadores.length) return [];
+  var estrutura = estruturaDaAba_(canal.aba);
+  var teto = linhasQueOPainelOlha_();
+  var posicao = canal.colunaDoStatus ? posicaoDaColuna_(estrutura, canal.colunaDoStatus) : -1;
+  if (posicao < 0) return lerRegistros_(canal.aba, { ultimas: teto });
+
+  var situacoes = situacoesPorChave_(canal);
+  var comCondicao = {};
+  sinalizadores.forEach(function (sinalizador) {
+    if (temCondicaoDeParada_(sinalizador)) {
+      comCondicao[normalizarParaComparar_(sinalizador.statusComCondicao)] = true;
+    }
+  });
+  var linhas = [];
+  lerColunaInteira_(canal.aba, estrutura.cabecalhos[posicao]).forEach(function (valor, i) {
+    var chave = normalizarParaComparar_(valor);
+    var situacao = situacoes[chave];
+    if (!situacao || !situacao.final || comCondicao[chave]) linhas.push(i + 2);
+  });
+  linhas = linhas.slice(-teto);
+
+  var blocos = blocosDeLinhas_(linhas);
+  if (blocos.length > RECC_PEDACOS_DO_AVISO_NO_MAXIMO) {
+    var primeira = blocos[blocos.length - RECC_PEDACOS_DO_AVISO_NO_MAXIMO].inicio;
+    linhas = linhas.filter(function (linha) { return linha >= primeira; });
+  }
+  return semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas));
 }
 
 function casosPertoDeVencer_(registros, canal) {

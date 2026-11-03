@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.69 — a última etapa entregue é a 69. A regra do número está
+**Estado geral:** versão 1.70 — a última etapa entregue é a 70. A regra do número está
 na Etapa 68.
 
 ---
@@ -3722,6 +3722,29 @@ defeito era do teste, não do sistema.
 resultado, em `testes-trabalho.js`, passou a esperar o total da planilha toda.
 15 quebras de propósito, 15 pegas — 2 escaparam na primeira rodada e ganharam
 teste: a chave da busca rápida e o aviso do teto.
+
+---
+
+## Etapa 70 — O aviso de prazo olha todos os casos abertos
+
+Achado da Etapa 69, e a decisão do PO: "faça o aviso olhar todos os casos
+abertos". O aviso dos casos perto de vencer só olhava o período da tela (do dia 1
+até hoje), e nos primeiros dias de cada mês os casos do mês anterior que
+continuavam abertos — justamente os que estavam vencendo — sumiam dele.
+
+| O que | Como ficou |
+|---|---|
+| **De onde vêm** (`casosAbertosDaPlanilha_`) | A coluna do status é lida inteira — uma coluna, não a planilha —, e só as linhas que ainda correm prazo são lidas: status não Final, vazio ou fora do catálogo, e o status que só encerra com condição (o Retido esperando a transmissão). O sinalizador decide, caso a caso, quem está no amarelo |
+| **O que continua valendo** | O alcance do nível (quem só vê os seus é avisado só dos seus) e os filtros escolhidos. O caso excluído não volta |
+| **Os limites** | Até `OPERACAO.LINHAS_DO_PAINEL` linhas abertas, em até 60 pedaços da planilha; passou, ficam as mais recentes. Canal sem sinalizador ligado (o VG) não lê nada |
+| **O custo** | A tela só pede o aviso na primeira carga do canal, que é quando ele abre (`resumoDoCanal`, 5º parâmetro); nas outras cargas — filtro, busca, gravação — a coluna do status nem é lida |
+| **Versão** | 1.70 |
+
+8 testes novos em `testes-aviso-de-prazo-sem-periodo.js`; o teste do custo da
+busca (Etapa 69) passou a pedir sem o aviso, como a tela pede, e o que confere a
+chamada da tela, em `testes-trabalho-rapido.js`, acompanha o parâmetro novo.
+10 quebras de propósito, 10 pegas — a do canal sem sinalizador escapou na
+primeira rodada (a base do VG estava vazia) e ganhou casos no teste.
 
 ---
 

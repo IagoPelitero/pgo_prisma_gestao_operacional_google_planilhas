@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1562 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1570 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -349,7 +349,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1562 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1570 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -588,8 +588,15 @@ a SLA próxima deve ter um pop-up sinalizando qual caso está próximo de
 vencer"*. Ao entrar num canal do Trabalho, se algum caso estiver no **amarelo**
 do sinalizador, abre um aviso com a lista: o caso, o status, quanto falta e um
 botão **Trabalhar no caso** em cada um. Sai **uma vez por canal** enquanto a
-página estiver aberta — não a cada filtro nem depois de cada gravação. Entram só
-os casos que a pessoa enxerga na fila (o alcance do nível vale aqui também).
+página estiver aberta — não a cada filtro nem depois de cada gravação. **Olha
+todos os casos abertos da planilha, de qualquer data** (Etapa 70, pedido do PO):
+antes ele só via o período da tela, e no começo do mês os casos do mês anterior
+que continuavam abertos sumiam dele. Lê a coluna do status inteira e só as linhas
+que ainda correm prazo — status não Final, vazio ou fora do catálogo, e o Retido
+que espera a condição —, até o teto do painel (`OPERACAO.LINHAS_DO_PAINEL`), em
+até 60 pedaços da planilha; passou disso, ficam as mais recentes. Entram só os
+casos que a pessoa enxerga (o alcance do nível vale aqui também), e os filtros
+escolhidos continuam valendo.
 O vermelho já venceu e não entra; o caso parado com prazo cheio também não.
 Vale para **RET e Mesa Diamante**: na Mesa, o aviso traz os casos nas últimas
 10 das 48 horas úteis. Canal sem sinalizador ligado (o VG, hoje) não abre aviso.
@@ -1671,7 +1678,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.69** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.70** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1679,7 +1686,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1562 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1570 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

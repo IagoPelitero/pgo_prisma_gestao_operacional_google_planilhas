@@ -528,8 +528,10 @@ var TelaTrabalho = (function () {
     if (painel) painel.innerHTML = '<p class="carregando-campos">'
       + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
 
+    // O aviso de prazo lê os casos abertos da planilha toda (Etapa 70): só se
+    // pede quando ele vai abrir, na primeira carga do canal.
     Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo,
-      quantosNaFila === 'todos' ? 'todos' : '')
+      quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)
       .entao(function (resposta) {
         resumo = resposta;
         if (resposta.filaCompacta) {

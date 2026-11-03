@@ -121,7 +121,8 @@ function rodarTestesDaBuscaNaPlanilhaToda() {
     t.casos(muitas);
     const largura = t.chamar('estruturaDaAba_')('BASE_RET').cabecalhos.length;
     t.ambiente.medidor.zerar();
-    igual(t.trabalho({ busca: 'barba branca' }).total, 1);
+    // Como a tela pede depois da primeira carga: sem o aviso de prazo (Etapa 70).
+    igual(t.chamar('resumoDoCanal')(t.ret.id, { busca: 'barba branca' }, undefined, '', false).total, 1);
     const celulas = t.ambiente.medidor.retrato().celulasLidas;
     verdadeiro(celulas < 300 * largura, celulas + ' células (a base inteira: ' + 3003 * largura + ')');
   });

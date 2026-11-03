@@ -175,7 +175,7 @@ function rodarTestesDoTrabalhoRapido() {
     const tela = lerTela('Trabalho.html');
     contem(tela, "if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {");
     contem(tela, "carregar('Trazendo os ' + totalDaFila() + ' casos…');");
-    contem(tela, "quantosNaFila === 'todos' ? 'todos' : '')");
+    contem(tela, "quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)");
   });
 
   teste('a barra do "Mostrar" fala da fila inteira, e não só do que veio', () => {

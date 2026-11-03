@@ -4276,7 +4276,7 @@ var TelaTrabalho = (function () {
       + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
 
     Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo,
-      quantosNaFila === 'todos' ? 'todos' : '')
+      quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)
       .entao(function (resposta) {
         resumo = resposta;
         if (resposta.filaCompacta) {
