@@ -51,6 +51,10 @@
  * pode ver, não recebe.
  */
 function formularioDoCanal(idDoCanal) {
+  return cronometrado_('formularioDoCanal', formularioDoCanalSemRelogio_, arguments);
+}
+
+function formularioDoCanalSemRelogio_(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -830,6 +834,10 @@ function dataEstaNoFuturo_(data) {
  * (Etapa 59, ver comEnvioUnico_).
  */
 function cadastrarCaso(idDoCanal, valores, envio) {
+  return cronometrado_('cadastrarCaso', cadastrarCasoSemRelogio_, arguments);
+}
+
+function cadastrarCasoSemRelogio_(idDoCanal, valores, envio) {
   return comEnvioUnico_(envio, function () { return cadastrarCasoUmaVez_(idDoCanal, valores); });
 }
 
@@ -863,6 +871,10 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
  * segundos esbarrava na versão já gravada e dizia "outra pessoa alterou".
  */
 function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
+  return cronometrado_('editarCaso', editarCasoSemRelogio_, arguments);
+}
+
+function editarCasoSemRelogio_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
   return comEnvioUnico_(envio, function () {
     return editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas);
   });
@@ -953,6 +965,10 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
  * mudanças de status.
  */
 function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
+  return cronometrado_('alterarSituacaoDoCaso', alterarSituacaoDoCasoSemRelogio_, arguments);
+}
+
+function alterarSituacaoDoCasoSemRelogio_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
   return comEnvioUnico_(envio, function () {
     return alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos);
   });
@@ -1524,6 +1540,10 @@ function situacoesParaTrocar(idDoCanal, idDoCaso) {
  * vem também `doSistema` — ver abaixo.
  */
 function casoParaEditar(idDoCanal, idDoCaso) {
+  return cronometrado_('casoParaEditar', casoParaEditarSemRelogio_, arguments);
+}
+
+function casoParaEditarSemRelogio_(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -2309,6 +2329,10 @@ function opcoesDaBusca() {
  * pessoa enxerga. `incluirLegado` diz se a planilha antiga entra.
  */
 function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico) {
+  return cronometrado_('buscarCasos', buscarCasosSemRelogio_, arguments);
+}
+
+function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHistorico) {
   var quem = exigirTela_('buscarCaso');
 
   var procurado = String(termo || '').trim();

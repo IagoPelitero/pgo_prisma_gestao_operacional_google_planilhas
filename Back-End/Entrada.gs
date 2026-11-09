@@ -166,6 +166,10 @@ function incluir(nomeDoArquivo) {
  * outro. Já aconteceu no sistema anterior e custou uma tarde.
  */
 function pacoteDePartida() {
+  return cronometrado_('pacoteDePartida', pacoteDePartidaSemRelogio_, arguments);
+}
+
+function pacoteDePartidaSemRelogio_() {
   return montarPacoteDePartida_(usuarioAtual_());
 }
 
@@ -231,8 +235,8 @@ function montarPacoteDePartida_(quem) {
  * o que mudou em Evolucao/05-progresso.md.
  */
 const RECC_VERSAO = {
-  numero: '1.70',
-  data: '03/11/2026'
+  numero: '1.71',
+  data: '09/11/2026'
 };
 
 // ============================================================================
@@ -1323,6 +1327,79 @@ const RECC_ERROS_GUARDADOS = 2000;
 const RECC_ERROS_NA_FILA = 200;        // fila cheia: os novos ficam só no Logger
 const RECC_TAMANHO_DO_TEXTO_DO_ERRO = 3000;
 const RECC_SEGUNDOS_SEM_REPETIR_O_ERRO = 3600;
+
+/*
+ * O CRONÔMETRO DAS CHAMADAS LENTAS (Etapa 71). O PO relatou o erro dos 40
+ * segundos atrapalhando a equipe, e a medição no volume dele (3 mil linhas na
+ * RET) não chega perto disso: o tempo está indo para algum lugar que só a
+ * planilha de verdade mostra. Então o sistema passa a medir.
+ *
+ * As chamadas que a operação mais faz passam por `cronometrado_`. A que demorar
+ * mais que o limite (8 s; `OPERACAO.SEGUNDOS_DA_CHAMADA_LENTA` na CONFIG) vai
+ * para a aba ERROS como "lento", dizendo quanto do tempo foi ESPERANDO A TRAVA
+ * (outra gravação na frente) e quanto foi LENDO A PLANILHA. A tela faz a outra
+ * metade: avisa quando ELA esperou mais que isso — tela lenta com servidor
+ * rápido é fila do Google, e não a planilha.
+ */
+const RECC_SEGUNDOS_DA_CHAMADA_LENTA = 8;
+var RECC_RELOGIO = null;   // o da chamada em curso; uma execução, uma chamada
+
+/** A hora, em milissegundos. À parte para o teste poder adiantar o relógio. */
+function agoraEmMs_() { return Date.now(); }
+
+function segundosDaChamadaLenta_() {
+  var declarado = Number(valorDaConfiguracao_('OPERACAO.SEGUNDOS_DA_CHAMADA_LENTA', ''));
+  return isFinite(declarado) && declarado > 0 ? declarado : RECC_SEGUNDOS_DA_CHAMADA_LENTA;
+}
+
+function cronometrado_(nome, fazer, argumentos) {
+  // Chamada dentro de chamada (a exportação chama a Produtividade): conta a de fora.
+  if (RECC_RELOGIO) return fazer.apply(null, argumentos);
+  RECC_RELOGIO = { inicio: agoraEmMs_(), trava: 0, leitura: 0, lendo: 0 };
+  try {
+    return fazer.apply(null, argumentos);
+  } finally {
+    var relogio = RECC_RELOGIO;
+    RECC_RELOGIO = null;
+    registrarSeFoiLenta_(nome, relogio, agoraEmMs_() - relogio.inicio);
+  }
+}
+
+function registrarSeFoiLenta_(nome, relogio, total) {
+  try {
+    if (total < segundosDaChamadaLenta_() * 1000) return;
+    var segundos = function (ms) { return Math.round(ms / 100) / 10; };
+    registrarErro_('lento', nome, 'Levou ' + segundos(total) + ' s no servidor: '
+      + segundos(relogio.trava) + ' s esperando a trava, ' + segundos(relogio.leitura)
+      + ' s lendo a planilha, ' + segundos(Math.max(0, total - relogio.trava - relogio.leitura))
+      + ' s no resto', '');
+  } catch (erro) {
+    Logger.log('O cronômetro não conseguiu registrar: ' + erro.message);
+  }
+}
+
+/** Espera a trava, somando a espera ao relógio da chamada. */
+function esperarATrava_(trava, milissegundos) {
+  var inicio = agoraEmMs_();
+  try {
+    return trava.tryLock(milissegundos);
+  } finally {
+    if (RECC_RELOGIO) RECC_RELOGIO.trava += agoraEmMs_() - inicio;
+  }
+}
+
+/** Uma leitura da planilha, somada ao relógio. Leitura dentro de leitura conta uma vez. */
+function lendoAPlanilha_(ler, argumentos) {
+  if (!RECC_RELOGIO || RECC_RELOGIO.lendo) return ler.apply(null, argumentos);
+  var inicio = agoraEmMs_();
+  RECC_RELOGIO.lendo = 1;
+  try {
+    return ler.apply(null, argumentos);
+  } finally {
+    RECC_RELOGIO.lendo = 0;
+    RECC_RELOGIO.leitura += agoraEmMs_() - inicio;
+  }
+}
 
 /** Registra um erro. `origem`: 'servidor' ou 'tela'; `onde`: a função ou a tela. */
 function registrarErro_(origem, onde, mensagem, detalhe) {

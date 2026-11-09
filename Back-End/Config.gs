@@ -2651,7 +2651,7 @@ function arquivarAuditoria_(agora) {
   descarregarAFilaDaAuditoria_(10000);   // a fila vai para a aba antes do corte (Etapa 61)
 
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(30000)) {
+  if (!esperarATrava_(trava, 30000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -2921,7 +2921,7 @@ function arquivarBase_(agora, segundos) {
 
 function arquivarUmCanal_(canal, finais, limite, destino) {
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(30000)) {
+  if (!esperarATrava_(trava, 30000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {

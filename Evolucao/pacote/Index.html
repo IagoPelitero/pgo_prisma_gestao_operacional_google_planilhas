@@ -9949,6 +9949,11 @@ var TelaConfiguracoes = (function () {
     var erros = dados.erros || [];
     return '<div id="erros-recentes">'
       + tituloDoPainel('Erros recentes', 'Os 40 mais recentes')
+
+      + '<p class="config-explica">As linhas <strong>lento</strong> são do cronômetro: chamada que '
+      + 'passou de 8 segundos. "Levou N s no servidor" diz quanto foi esperando a trava (outra '
+      + 'gravação na frente) e quanto foi lendo a planilha. "A tela esperou N s", sem uma linha do '
+      + 'servidor por perto, é fila do Google: gente demais chamando ao mesmo tempo.</p>'
       + (erros.length
         ? '<ul class="trilha">' + erros.map(function (erro) {
           return '<li><span class="quando">' + escapar(erro.dataHora) + '</span>'
@@ -10538,6 +10543,14 @@ var Servidor = (function () {
   var errosAvisadosNestaPagina = 0;
   var MAXIMO_DE_ERROS_POR_PAGINA = 10;
 
+  var SEGUNDOS_DA_CHAMADA_LENTA = 8;
+
+  function avisarSeDemorou(nomeDaFuncao, milissegundos) {
+    if (milissegundos < SEGUNDOS_DA_CHAMADA_LENTA * 1000) return;
+    avisarErro('lento', 'A tela esperou ' + Math.round(milissegundos / 1000) + ' s por "'
+      + nomeDaFuncao + '"', '');
+  }
+
   function avisarErro(tipo, mensagem, detalhe) {
     try {
       var texto = String(mensagem || 'Erro sem mensagem').slice(0, 1000);
@@ -10613,10 +10626,13 @@ var Servidor = (function () {
       else console.error(erro);
     }, segundosAteDesistir * 1000);
 
+    var saiuAs = Date.now();
     function responder(oQueFazer, valor) {
       if (jaRespondeu) return;
       jaRespondeu = true;
       clearTimeout(relogio);
+
+      if (segundosAteDesistir === SEGUNDOS_ATE_DESISTIR) avisarSeDemorou(nomeDaFuncao, Date.now() - saiuAs);
       if (!aTelaAindaEAMesma()) return;
       if (oQueFazer) oQueFazer(valor);
       else if (valor instanceof Error) console.error(valor);

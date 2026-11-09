@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.70 — a última etapa entregue é a 70. A regra do número está
+**Estado geral:** versão 1.71 — a última etapa entregue é a 71. A regra do número está
 na Etapa 68.
 
 ---
@@ -3745,6 +3745,30 @@ busca (Etapa 69) passou a pedir sem o aviso, como a tela pede, e o que confere a
 chamada da tela, em `testes-trabalho-rapido.js`, acompanha o parâmetro novo.
 10 quebras de propósito, 10 pegas — a do canal sem sinalizador escapou na
 primeira rodada (a base do VG estava vazia) e ganhou casos no teste.
+
+---
+
+## Etapa 71 — O cronômetro das chamadas lentas
+
+O PO relatou: "caçar o problema com o erro dos 40 s que está atrapalhando a
+produtividade da equipe, principalmente a RET", com a RET em cerca de 3 mil linhas
+e 40 a 50 colunas. Medido nesse volume, o código sozinho fica em 1 a 3 segundos
+por chamada — o tempo está indo para algo que só a planilha de verdade mostra
+(planilha lenta, fila de execuções do Google, espera pela trava). Primeira de cinco
+etapas aprovadas (71 a 75): **medir antes de consertar**.
+
+| O que | Como ficou |
+|---|---|
+| **O servidor mede** (`cronometrado_`) | As dez chamadas do dia a dia (abrir o Trabalho e a Produtividade, o clique no gráfico, abrir, salvar e cadastrar caso, mudar status, buscar, o formulário e a abertura) passam pelo cronômetro. A que leva mais de 8 s vai para a aba ERROS como **lento**: "Levou N s no servidor: X s esperando a trava, Y s lendo a planilha, Z s no resto" |
+| **A trava e a leitura** | Toda gravação espera a trava por `esperarATrava_`, e as três leituras da base (`lerRegistros_`, `lerColunaInteira_`, `lerLinhasEspecificas_`) passam por `lendoAPlanilha_` — é o que separa "outra gravação na frente" de "planilha lenta" |
+| **A tela mede** | Quando ELA esperou mais de 8 s por uma resposta, avisa: "A tela esperou N s por …". Tela lenta sem linha do servidor por perto é fila do Google. As chamadas sem pressa (importar, diagnóstico) ficam de fora |
+| **Onde se lê** | Configurações › Estrutura › Erros recentes, com a explicação das duas metades — e na aba ERROS |
+| **O limite** | 8 s; muda em `OPERACAO.SEGUNDOS_DA_CHAMADA_LENTA`, na CONFIG |
+| **Versão** | 1.71 |
+
+Nenhuma regra mudou: as funções públicas viraram uma casca fina que chama a de
+sempre (`…SemRelogio_`). 11 testes novos em `testes-cronometro.js` (o relógio é do
+teste: `agoraEmMs_`). 10 quebras de propósito, 10 pegas.
 
 ---
 

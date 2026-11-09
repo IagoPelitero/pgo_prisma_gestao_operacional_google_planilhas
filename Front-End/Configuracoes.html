@@ -3111,6 +3111,11 @@ var TelaConfiguracoes = (function () {
     var erros = dados.erros || [];
     return '<div id="erros-recentes">'
       + tituloDoPainel('Erros recentes', 'Os 40 mais recentes')
+      // Como ler o cronômetro (Etapa 71): as duas metades, lado a lado.
+      + '<p class="config-explica">As linhas <strong>lento</strong> são do cronômetro: chamada que '
+      + 'passou de 8 segundos. "Levou N s no servidor" diz quanto foi esperando a trava (outra '
+      + 'gravação na frente) e quanto foi lendo a planilha. "A tela esperou N s", sem uma linha do '
+      + 'servidor por perto, é fila do Google: gente demais chamando ao mesmo tempo.</p>'
       + (erros.length
         ? '<ul class="trilha">' + erros.map(function (erro) {
           return '<li><span class="quando">' + escapar(erro.dataHora) + '</span>'

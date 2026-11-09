@@ -120,6 +120,10 @@ function tomValido_(cor) {
  * inventa filtro, ela oferece o que o canal tem.
  */
 function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
+  return cronometrado_('resumoDoCanal', resumoDoCanalSemRelogio_, arguments);
+}
+
+function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -2474,6 +2478,10 @@ function tentativasAteOSucesso_(casos, canal) {
  * seis idas ao servidor fariam a tela montar aos pedaços.
  */
 function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
+  return cronometrado_('produtividadeDaEquipe', produtividadeDaEquipeSemRelogio_, arguments);
+}
+
+function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -3009,6 +3017,11 @@ function mediaMovel_(pontos, janela) {
  * isso, o painel só informa, e informar não resolve caso nenhum.
  */
 function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
+  periodoPedido, quantos) {
+  return cronometrado_('detalharComponente', detalharComponenteSemRelogio_, arguments);
+}
+
+function detalharComponenteSemRelogio_(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   periodoPedido, quantos) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);

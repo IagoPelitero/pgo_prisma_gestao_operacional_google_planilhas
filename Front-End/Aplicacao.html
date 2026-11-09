@@ -84,6 +84,14 @@ var Servidor = (function () {
   var errosAvisadosNestaPagina = 0;
   var MAXIMO_DE_ERROS_POR_PAGINA = 10;
 
+  var SEGUNDOS_DA_CHAMADA_LENTA = 8;
+
+  function avisarSeDemorou(nomeDaFuncao, milissegundos) {
+    if (milissegundos < SEGUNDOS_DA_CHAMADA_LENTA * 1000) return;
+    avisarErro('lento', 'A tela esperou ' + Math.round(milissegundos / 1000) + ' s por "'
+      + nomeDaFuncao + '"', '');
+  }
+
   function avisarErro(tipo, mensagem, detalhe) {
     try {
       var texto = String(mensagem || 'Erro sem mensagem').slice(0, 1000);
@@ -174,10 +182,15 @@ var Servidor = (function () {
       else console.error(erro);
     }, segundosAteDesistir * 1000);
 
+    // A outra metade do cronômetro (Etapa 71): quanto A TELA esperou. Tela
+    // lenta com servidor rápido é fila do Google, e não a planilha.
+    var saiuAs = Date.now();
     function responder(oQueFazer, valor) {
       if (jaRespondeu) return;
       jaRespondeu = true;
       clearTimeout(relogio);
+      // As chamadas sem pressa (importar, diagnóstico) demoram de propósito.
+      if (segundosAteDesistir === SEGUNDOS_ATE_DESISTIR) avisarSeDemorou(nomeDaFuncao, Date.now() - saiuAs);
       if (!aTelaAindaEAMesma()) return;
       if (oQueFazer) oQueFazer(valor);
       else if (valor instanceof Error) console.error(valor);

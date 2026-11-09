@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-03 17:54
+   Gerado em 2026-11-09 21:18
    ========================================================================== */
 
 
@@ -782,7 +782,7 @@ function realinharSequencia_(nomeDaAba) {
 
 function normalizarIdentificadoresDaAba_(nomeDaAba) {
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(30000)) {
+  if (!esperarATrava_(trava, 30000)) {
     throw new Error('A planilha está ocupada. Tente de novo.');
   }
   try {
@@ -1539,6 +1539,10 @@ function montarRegistro_(estrutura, valores, numeroDaLinha) {
 }
 
 function lerRegistros_(nomeDaAba, opcoes) {
+  return lendoAPlanilha_(lerRegistrosSemRelogio_, arguments);
+}
+
+function lerRegistrosSemRelogio_(nomeDaAba, opcoes) {
   opcoes = opcoes || {};
 
   var chave = chaveDoMemo_(nomeDaAba, opcoes);
@@ -1589,6 +1593,10 @@ function lerRegistros_(nomeDaAba, opcoes) {
 }
 
 function lerColunaInteira_(nomeDaAba, cabecalho) {
+  return lendoAPlanilha_(lerColunaInteiraSemRelogio_, arguments);
+}
+
+function lerColunaInteiraSemRelogio_(nomeDaAba, cabecalho) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
   var totalDados = quantidadeDeRegistros_(estrutura);
@@ -1617,6 +1625,10 @@ function blocosDeLinhas_(numerosDeLinha) {
 }
 
 function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
+  return lendoAPlanilha_(lerLinhasEspecificasSemRelogio_, arguments);
+}
+
+function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha) {
   if (!numerosDeLinha || !numerosDeLinha.length) return [];
 
   var estrutura = estruturaDaAba_(nomeDaAba);
@@ -1824,7 +1836,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
   if (!lista || !lista.length) return [];
 
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -1922,7 +1934,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -1968,7 +1980,7 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -2006,7 +2018,7 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
 
   var nova;
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada. Tente de novo.');
   }
   try {
@@ -2042,7 +2054,7 @@ function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
 
   var criadas = [];
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada. Tente de novo.');
   }
   try {
@@ -2083,7 +2095,7 @@ function removerColuna_(nomeDaAba, cabecalho) {
 
   var quantasTinhamValor = 0;
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -3001,6 +3013,10 @@ function camposParaAAba_(campos, receita, ehNova, faltando) {
 /* ==== Casos.gs ============================================================ */
 
 function formularioDoCanal(idDoCanal) {
+  return cronometrado_('formularioDoCanal', formularioDoCanalSemRelogio_, arguments);
+}
+
+function formularioDoCanalSemRelogio_(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -3499,6 +3515,10 @@ function dataEstaNoFuturo_(data) {
 }
 
 function cadastrarCaso(idDoCanal, valores, envio) {
+  return cronometrado_('cadastrarCaso', cadastrarCasoSemRelogio_, arguments);
+}
+
+function cadastrarCasoSemRelogio_(idDoCanal, valores, envio) {
   return comEnvioUnico_(envio, function () { return cadastrarCasoUmaVez_(idDoCanal, valores); });
 }
 
@@ -3522,6 +3542,10 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
 }
 
 function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
+  return cronometrado_('editarCaso', editarCasoSemRelogio_, arguments);
+}
+
+function editarCasoSemRelogio_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
   return comEnvioUnico_(envio, function () {
     return editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas);
   });
@@ -3580,6 +3604,10 @@ function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
 }
 
 function alterarSituacaoDoCaso(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
+  return cronometrado_('alterarSituacaoDoCaso', alterarSituacaoDoCasoSemRelogio_, arguments);
+}
+
+function alterarSituacaoDoCasoSemRelogio_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos, envio) {
   return comEnvioUnico_(envio, function () {
     return alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valoresDosCampos);
   });
@@ -3908,6 +3936,10 @@ function situacoesParaTrocar(idDoCanal, idDoCaso) {
 }
 
 function casoParaEditar(idDoCanal, idDoCaso) {
+  return cronometrado_('casoParaEditar', casoParaEditarSemRelogio_, arguments);
+}
+
+function casoParaEditarSemRelogio_(idDoCanal, idDoCaso) {
   var quem = exigirPermissao_(RECC_ACOES.EDITAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -4362,6 +4394,10 @@ function opcoesDaBusca() {
 }
 
 function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico) {
+  return cronometrado_('buscarCasos', buscarCasosSemRelogio_, arguments);
+}
+
+function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHistorico) {
   var quem = exigirTela_('buscarCaso');
 
   var procurado = String(termo || '').trim();
@@ -7414,7 +7450,7 @@ function arquivarAuditoria_(agora) {
   descarregarAFilaDaAuditoria_(10000);
 
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(30000)) {
+  if (!esperarATrava_(trava, 30000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -7636,7 +7672,7 @@ function arquivarBase_(agora, segundos) {
 
 function arquivarUmCanal_(canal, finais, limite, destino) {
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(30000)) {
+  if (!esperarATrava_(trava, 30000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -8578,6 +8614,10 @@ function incluir(nomeDoArquivo) {
 }
 
 function pacoteDePartida() {
+  return cronometrado_('pacoteDePartida', pacoteDePartidaSemRelogio_, arguments);
+}
+
+function pacoteDePartidaSemRelogio_() {
   return montarPacoteDePartida_(usuarioAtual_());
 }
 
@@ -8629,8 +8669,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.70',
-  data: '03/11/2026'
+  numero: '1.71',
+  data: '09/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -9333,6 +9373,63 @@ const RECC_ERROS_NA_FILA = 200;
 const RECC_TAMANHO_DO_TEXTO_DO_ERRO = 3000;
 const RECC_SEGUNDOS_SEM_REPETIR_O_ERRO = 3600;
 
+const RECC_SEGUNDOS_DA_CHAMADA_LENTA = 8;
+var RECC_RELOGIO = null;
+
+function agoraEmMs_() { return Date.now(); }
+
+function segundosDaChamadaLenta_() {
+  var declarado = Number(valorDaConfiguracao_('OPERACAO.SEGUNDOS_DA_CHAMADA_LENTA', ''));
+  return isFinite(declarado) && declarado > 0 ? declarado : RECC_SEGUNDOS_DA_CHAMADA_LENTA;
+}
+
+function cronometrado_(nome, fazer, argumentos) {
+
+  if (RECC_RELOGIO) return fazer.apply(null, argumentos);
+  RECC_RELOGIO = { inicio: agoraEmMs_(), trava: 0, leitura: 0, lendo: 0 };
+  try {
+    return fazer.apply(null, argumentos);
+  } finally {
+    var relogio = RECC_RELOGIO;
+    RECC_RELOGIO = null;
+    registrarSeFoiLenta_(nome, relogio, agoraEmMs_() - relogio.inicio);
+  }
+}
+
+function registrarSeFoiLenta_(nome, relogio, total) {
+  try {
+    if (total < segundosDaChamadaLenta_() * 1000) return;
+    var segundos = function (ms) { return Math.round(ms / 100) / 10; };
+    registrarErro_('lento', nome, 'Levou ' + segundos(total) + ' s no servidor: '
+      + segundos(relogio.trava) + ' s esperando a trava, ' + segundos(relogio.leitura)
+      + ' s lendo a planilha, ' + segundos(Math.max(0, total - relogio.trava - relogio.leitura))
+      + ' s no resto', '');
+  } catch (erro) {
+    Logger.log('O cronômetro não conseguiu registrar: ' + erro.message);
+  }
+}
+
+function esperarATrava_(trava, milissegundos) {
+  var inicio = agoraEmMs_();
+  try {
+    return trava.tryLock(milissegundos);
+  } finally {
+    if (RECC_RELOGIO) RECC_RELOGIO.trava += agoraEmMs_() - inicio;
+  }
+}
+
+function lendoAPlanilha_(ler, argumentos) {
+  if (!RECC_RELOGIO || RECC_RELOGIO.lendo) return ler.apply(null, argumentos);
+  var inicio = agoraEmMs_();
+  RECC_RELOGIO.lendo = 1;
+  try {
+    return ler.apply(null, argumentos);
+  } finally {
+    RECC_RELOGIO.lendo = 0;
+    RECC_RELOGIO.leitura += agoraEmMs_() - inicio;
+  }
+}
+
 function registrarErro_(origem, onde, mensagem, detalhe) {
   var cortar = function (texto) {
     return String(texto === null || texto === undefined ? '' : texto)
@@ -9596,6 +9693,10 @@ function tomValido_(cor) {
 }
 
 function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
+  return cronometrado_('resumoDoCanal', resumoDoCanalSemRelogio_, arguments);
+}
+
+function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -11266,6 +11367,10 @@ function tentativasAteOSucesso_(casos, canal) {
 }
 
 function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
+  return cronometrado_('produtividadeDaEquipe', produtividadeDaEquipeSemRelogio_, arguments);
+}
+
+function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -11647,6 +11752,11 @@ function mediaMovel_(pontos, janela) {
 }
 
 function detalharComponente(idDoCanal, idDoComponente, chaveDoPonto, filtros,
+  periodoPedido, quantos) {
+  return cronometrado_('detalharComponente', detalharComponenteSemRelogio_, arguments);
+}
+
+function detalharComponenteSemRelogio_(idDoCanal, idDoComponente, chaveDoPonto, filtros,
   periodoPedido, quantos) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);

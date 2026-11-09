@@ -1357,7 +1357,7 @@ function realinharSequencia_(nomeDaAba) {
  */
 function normalizarIdentificadoresDaAba_(nomeDaAba) {
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(30000)) {
+  if (!esperarATrava_(trava, 30000)) {
     throw new Error('A planilha está ocupada. Tente de novo.');
   }
   try {
@@ -2546,6 +2546,10 @@ function montarRegistro_(estrutura, valores, numeroDaLinha) {
  *   opcoes.incluirOcultos  traz também as linhas com _Visivel = NAO.
  */
 function lerRegistros_(nomeDaAba, opcoes) {
+  return lendoAPlanilha_(lerRegistrosSemRelogio_, arguments);
+}
+
+function lerRegistrosSemRelogio_(nomeDaAba, opcoes) {
   opcoes = opcoes || {};
 
   var chave = chaveDoMemo_(nomeDaAba, opcoes);
@@ -2601,6 +2605,10 @@ function lerRegistros_(nomeDaAba, opcoes) {
  * uma coluna são 200 mil.
  */
 function lerColunaInteira_(nomeDaAba, cabecalho) {
+  return lendoAPlanilha_(lerColunaInteiraSemRelogio_, arguments);
+}
+
+function lerColunaInteiraSemRelogio_(nomeDaAba, cabecalho) {
   var estrutura = estruturaDaAba_(nomeDaAba);
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
   var totalDados = quantidadeDeRegistros_(estrutura);
@@ -2659,6 +2667,10 @@ function blocosDeLinhas_(numerosDeLinha) {
  * ordenou por relevância, e reordenar aqui desfaria isso em silêncio.
  */
 function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
+  return lendoAPlanilha_(lerLinhasEspecificasSemRelogio_, arguments);
+}
+
+function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha) {
   if (!numerosDeLinha || !numerosDeLinha.length) return [];
 
   var estrutura = estruturaDaAba_(nomeDaAba);
@@ -2942,7 +2954,7 @@ function inserirVariosRegistros_(nomeDaAba, lista, contexto) {
   if (!lista || !lista.length) return [];
 
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -3068,7 +3080,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -3144,7 +3156,7 @@ function apagarRegistroDeVez_(nomeDaAba, id) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
@@ -3196,7 +3208,7 @@ function adicionarColuna_(nomeDaAba, cabecalho, tipo) {
 
   var nova;
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada. Tente de novo.');
   }
   try {
@@ -3248,7 +3260,7 @@ function garantirColunasDeControle_(nomeDaAba, ehBaseDeCaso) {
 
   var criadas = [];
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada. Tente de novo.');
   }
   try {
@@ -3303,7 +3315,7 @@ function removerColuna_(nomeDaAba, cabecalho) {
 
   var quantasTinhamValor = 0;
   var trava = LockService.getScriptLock();
-  if (!trava.tryLock(25000)) {
+  if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
   }
   try {
