@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.73 — a última etapa entregue é a 73. A regra do número está
+**Estado geral:** versão 1.74 — a última etapa entregue é a 74. A regra do número está
 na Etapa 68.
 
 ---
@@ -3828,6 +3828,44 @@ a ponta. 20 quebras de propósito, 20 pegas — a do prazo escapou na primeira r
 navegador de teste, mas a página publicada pelo Apps Script roda num quadro isolado
 que pode barrar o download. Se barrar, o texto logo abaixo serve para copiar, como
 nos outros "Exportar".
+
+---
+
+## Etapa 74 — O aviso de prazo lê só as colunas do prazo
+
+Quarta das cinco etapas aprovadas (71 a 75): "leitura mais leve". Antes de mexer,
+a medição, na RET como o PO a descreveu (3 mil linhas; aqui com 69 colunas e a
+maioria dos casos aberta):
+
+| A chamada | O que lia |
+|---|---|
+| Abrir o Trabalho (com o aviso de prazo) | 248 mil células |
+| Cada filtro, busca ou gravação depois (sem o aviso) | 34 mil células |
+| Abrir a Produtividade | 34 mil células |
+
+Quatro quintos do que a abertura lia eram do **aviso de prazo**: ele lia todas as
+linhas abertas, inteiras, para no fim mostrar as poucas que estão no amarelo.
+
+| O que | Como ficou |
+|---|---|
+| **O aviso** (`linhasQuePodemEstarNoAmarelo_`) | Lê primeiro só as colunas de que o sinalizador precisa para dizer "amarelo e ainda correndo" — o status, a coluna que liga o prazo, a data e a hora em que ele começa e a da condição de parada —, faz a mesma conta de sempre, e **só as linhas que passam são lidas inteiras**. Depois, com a linha inteira, `casosPertoDeVencer_` confere de novo |
+| **O que não muda** | O que o aviso mostra: os mesmos casos, a mesma contagem, o alcance e os filtros. Com poucas linhas abertas, ler colunas inteiras sairia mais caro — aí a leitura segue como era |
+| **O ganho medido** | A abertura do Trabalho, na mesma base: de 248 mil para **47 mil células**. Quando os casos no amarelo estão espalhados pela planilha, o ganho é menor (linhas próximas são lidas juntas) |
+| **Versão** | 1.74 |
+
+**O que ficou como estava, e por quê.** O plano dizia "o Trabalho lê só as colunas
+que a tela usa". A leitura do período **não** foi trocada: ela já é a parte leve
+(34 mil células), e as colunas que a tela usa vêm da configuração — cartões,
+filtros, a busca em todas as colunas, gráficos, sinalizadores. Uma coluna esquecida
+viraria número errado sem erro nenhum, para ganhar menos de um segundo. O aviso é
+diferente: quem o consome é uma função só, e a prova de que nada mudou cabe num
+teste. E nenhuma das duas explica 40 segundos — esse continua sendo o trabalho do
+cronômetro (Etapa 71).
+
+8 testes novos em `testes-leitura-leve-do-aviso.js`, que comparam o aviso novo com
+a leitura inteira, na RET e na Mesa. 9 quebras de propósito, 9 pegas — três
+escaparam na primeira rodada (os dados do teste andavam juntos) e o teste foi
+refeito.
 
 ---
 

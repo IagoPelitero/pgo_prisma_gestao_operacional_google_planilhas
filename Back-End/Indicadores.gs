@@ -181,7 +181,7 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
   // tela só pede o aviso ao entrar no canal (`comOAviso` = false nas outras
   // cargas), e aí a coluna de status não é lida à toa.
   var pertoDeVencer = comOAviso === false ? [] : casosPertoDeVencer_(
-    aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal), canal.aba, quem),
+    aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal, true), canal.aba, quem),
       disponiveis, filtros || {}), canal, termo), canal);
   // O CARTÃO CLICADO filtra a FILA pelo que ele conta (Etapa 44) — o status, o
   // valor de uma coluna (o Status proposta), a coluna preenchida. Os cartões
@@ -1369,7 +1369,7 @@ const RECC_PEDACOS_DO_AVISO_NO_MAXIMO = 60;
  * em até 60 pedaços da planilha — passou, ficam as mais recentes. Sem
  * sinalizador no canal, não lê nada: não há prazo para avisar.
  */
-function casosAbertosDaPlanilha_(canal) {
+function casosAbertosDaPlanilha_(canal, soOsQuePodemAvisar) {
   var sinalizadores = sinalizadoresDoCanal_(canal);
   if (!sinalizadores.length) return [];
   var estrutura = estruturaDaAba_(canal.aba);
@@ -1391,6 +1391,9 @@ function casosAbertosDaPlanilha_(canal) {
     if (!situacao || !situacao.final || comCondicao[chave]) linhas.push(i + 2);
   });
   linhas = linhas.slice(-teto);
+  if (soOsQuePodemAvisar === true) {
+    linhas = linhasQuePodemEstarNoAmarelo_(canal, estrutura, sinalizadores, situacoes, linhas);
+  }
 
   var blocos = blocosDeLinhas_(linhas);
   if (blocos.length > RECC_PEDACOS_DO_AVISO_NO_MAXIMO) {
@@ -1398,6 +1401,62 @@ function casosAbertosDaPlanilha_(canal) {
     linhas = linhas.filter(function (linha) { return linha >= primeira; });
   }
   return semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas));
+}
+
+/**
+ * Das linhas abertas, as que PODEM estar no amarelo (Etapa 74).
+ *
+ * O aviso lia todas as linhas abertas, inteiras — na RET com 3 mil casos e 50
+ * colunas, dois terços de tudo o que a abertura do Trabalho lia —, para no fim
+ * mostrar as poucas que estão no amarelo. Agora lê primeiro só as colunas de
+ * que o sinalizador precisa para dizer "amarelo e ainda correndo" — a que liga
+ * o prazo, a data e a hora em que ele começa e a da condição de parada —, faz
+ * a conta, e só as linhas que passam são lidas inteiras.
+ *
+ * A conta é a MESMA de `casosPertoDeVencer_`, com um registro que tem só essas
+ * colunas: o que falta nele (os carimbos, a finalização) só entra na conta do
+ * caso já encerrado, e o encerrado nunca está no amarelo. Depois, com a linha
+ * inteira, `casosPertoDeVencer_` confere de novo.
+ *
+ * Com poucas linhas abertas, ler as colunas inteiras sairia mais caro do que
+ * ler as linhas: aí devolve as mesmas linhas, e a leitura segue como era.
+ */
+function linhasQuePodemEstarNoAmarelo_(canal, estrutura, sinalizadores, situacoes, linhas) {
+  var nomes = [];
+  var jaTem = {};
+  function precisa(nome) {
+    var posicao = nome ? posicaoDaColuna_(estrutura, nome) : -1;
+    if (posicao < 0 || jaTem[posicao]) return;
+    jaTem[posicao] = true;
+    nomes.push({ pedida: nome, daPlanilha: estrutura.cabecalhos[posicao] });
+  }
+  precisa(canal.colunaDoStatus);
+  sinalizadores.forEach(function (sinalizador) {
+    precisa(sinalizador.colunaQueLiga);
+    precisa(sinalizador.colunaDaData || canal.colunaDaData);
+    precisa(sinalizador.colunaDaHora || (sinalizador.colunaDaData ? '' : canal.colunaDaHora));
+    if (temCondicaoDeParada_(sinalizador)) precisa(sinalizador.colunaDaCondicao);
+  });
+
+  var total = quantidadeDeRegistros_(estrutura);
+  if (linhas.length * estrutura.cabecalhos.length <= nomes.length * total * 2) return linhas;
+
+  var colunas = nomes.map(function (nome) {
+    return { nome: nome, valores: lerColunaInteira_(canal.aba, nome.daPlanilha) };
+  });
+  var agora = relogioDeParede_(new Date());
+  return linhas.filter(function (linha) {
+    var registro = {};
+    colunas.forEach(function (coluna) {
+      var valor = coluna.valores[linha - 2];
+      registro[coluna.nome.daPlanilha] = valor;
+      registro[coluna.nome.pedida] = valor;
+    });
+    return sinalizadores.some(function (sinalizador) {
+      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      return sinal !== null && sinal.tom === 'atencao' && !sinal.encerrado;
+    });
+  });
 }
 
 /**

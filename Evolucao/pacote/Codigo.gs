@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-09 22:04
+   Gerado em 2026-11-09 22:26
    ========================================================================== */
 
 
@@ -8670,7 +8670,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.73',
+  numero: '1.74',
   data: '09/11/2026'
 };
 
@@ -9736,7 +9736,7 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     aplicarFiltros_(anterior, disponiveis, filtros || {}), canal, termo);
 
   var pertoDeVencer = comOAviso === false ? [] : casosPertoDeVencer_(
-    aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal), canal.aba, quem),
+    aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal, true), canal.aba, quem),
       disponiveis, filtros || {}), canal, termo), canal);
 
   var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
@@ -10535,7 +10535,7 @@ function compactarFila_(fila) {
 
 const RECC_PEDACOS_DO_AVISO_NO_MAXIMO = 60;
 
-function casosAbertosDaPlanilha_(canal) {
+function casosAbertosDaPlanilha_(canal, soOsQuePodemAvisar) {
   var sinalizadores = sinalizadoresDoCanal_(canal);
   if (!sinalizadores.length) return [];
   var estrutura = estruturaDaAba_(canal.aba);
@@ -10557,6 +10557,9 @@ function casosAbertosDaPlanilha_(canal) {
     if (!situacao || !situacao.final || comCondicao[chave]) linhas.push(i + 2);
   });
   linhas = linhas.slice(-teto);
+  if (soOsQuePodemAvisar === true) {
+    linhas = linhasQuePodemEstarNoAmarelo_(canal, estrutura, sinalizadores, situacoes, linhas);
+  }
 
   var blocos = blocosDeLinhas_(linhas);
   if (blocos.length > RECC_PEDACOS_DO_AVISO_NO_MAXIMO) {
@@ -10564,6 +10567,44 @@ function casosAbertosDaPlanilha_(canal) {
     linhas = linhas.filter(function (linha) { return linha >= primeira; });
   }
   return semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas));
+}
+
+function linhasQuePodemEstarNoAmarelo_(canal, estrutura, sinalizadores, situacoes, linhas) {
+  var nomes = [];
+  var jaTem = {};
+  function precisa(nome) {
+    var posicao = nome ? posicaoDaColuna_(estrutura, nome) : -1;
+    if (posicao < 0 || jaTem[posicao]) return;
+    jaTem[posicao] = true;
+    nomes.push({ pedida: nome, daPlanilha: estrutura.cabecalhos[posicao] });
+  }
+  precisa(canal.colunaDoStatus);
+  sinalizadores.forEach(function (sinalizador) {
+    precisa(sinalizador.colunaQueLiga);
+    precisa(sinalizador.colunaDaData || canal.colunaDaData);
+    precisa(sinalizador.colunaDaHora || (sinalizador.colunaDaData ? '' : canal.colunaDaHora));
+    if (temCondicaoDeParada_(sinalizador)) precisa(sinalizador.colunaDaCondicao);
+  });
+
+  var total = quantidadeDeRegistros_(estrutura);
+  if (linhas.length * estrutura.cabecalhos.length <= nomes.length * total * 2) return linhas;
+
+  var colunas = nomes.map(function (nome) {
+    return { nome: nome, valores: lerColunaInteira_(canal.aba, nome.daPlanilha) };
+  });
+  var agora = relogioDeParede_(new Date());
+  return linhas.filter(function (linha) {
+    var registro = {};
+    colunas.forEach(function (coluna) {
+      var valor = coluna.valores[linha - 2];
+      registro[coluna.nome.daPlanilha] = valor;
+      registro[coluna.nome.pedida] = valor;
+    });
+    return sinalizadores.some(function (sinalizador) {
+      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      return sinal !== null && sinal.tom === 'atencao' && !sinal.encerrado;
+    });
+  });
 }
 
 function casosPertoDeVencer_(registros, canal) {
