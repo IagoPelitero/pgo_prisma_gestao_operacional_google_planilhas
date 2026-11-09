@@ -550,7 +550,11 @@ var TelaProdutividade = (function () {
       SeletorDePeriodo.desenhar(painel) + caixas.join('')
         + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade')
         + FiltroMultiplo.etiquetas(painel.filtrosDisponiveis, filtros),
-      painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
+      painel.total + ' casos · ' + escapar(painel.periodo.rotulo),
+      // O relatório de casos (Etapa 73): só para quem pode exportar.
+      painel.podeExportar
+        ? '<button type="button" class="botao pequeno" id="exportar-relatorio">Exportar relatório</button>'
+        : '');
   }
 
   /* ------------------------------------------------------------- gráficos */
@@ -650,6 +654,9 @@ var TelaProdutividade = (function () {
         carregar();
       });
     }
+
+    var relatorio = elemento('exportar-relatorio');
+    if (relatorio) relatorio.addEventListener('click', abrirRelatorio);
 
     FiltroMultiplo.ligar(elemento('analitico'), painel.filtrosDisponiveis, filtros,
       function (chave, valores) {
@@ -849,6 +856,262 @@ var TelaProdutividade = (function () {
   }
 
   /* ---------------------------------------------------------------- ligar */
+
+  /* --------------------------------------------------- exportar relatório */
+
+  /*
+    O RELATÓRIO DE CASOS (Etapa 73, pedido do PO): "em Produtividade RECC será
+    onde irá ficar a exportação, onde a sênior irá escolher a data, a coluna ou
+    alguns prontos". Uma caixa com três escolhas — o período, qual relatório e
+    as colunas do arquivo —, o resumo do que vai sair e só então o arquivo.
+    O período é o DA CAIXA: abre igual ao da tela e muda sem mexer nela.
+  */
+  function abrirRelatorio() {
+    Servidor.chamar('opcoesDoRelatorio', canalEscolhido)
+      .entao(function (opcoes) { desenharRelatorio(opcoes); })
+      .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
+  }
+
+  function desenharRelatorio(opcoes) {
+    var escolha = {
+      periodo: {
+        tipo: painel.periodo.tipo === 'mes' ? 'mes' : 'intervalo', dias: 0,
+        de: painel.periodo.de || '', ate: painel.periodo.ate || '', mes: painel.periodo.mes || ''
+      },
+      relatorio: opcoes.relatorios[0].id,
+      coluna: opcoes.listas.length ? opcoes.listas[0].cabecalho : '',
+      valores: []
+    };
+    var conferido = null;
+
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-relatorio';
+    caixa.innerHTML = '<div class="dialogo-caixa relatorio" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="titulo-relatorio">'
+      + '<h3 id="titulo-relatorio">Exportar relatório · ' + escapar(opcoes.canal.nome) + '</h3>'
+      + '<div class="relatorio-miolo">'
+      + '<section class="relatorio-grupo"><strong>1. Período</strong>'
+      + '<div class="filtros" id="relatorio-periodo"></div>'
+      + (opcoes.colunaDaData ? '<small>Pela coluna "' + escapar(opcoes.colunaDaData) + '".</small>' : '')
+      + '</section>'
+      + '<section class="relatorio-grupo"><strong>2. Qual relatório</strong>'
+      + '<div class="relatorio-prontos">' + opcoes.relatorios.map(function (um, i) {
+        return '<label class="relatorio-pronto' + (i === 0 ? ' marcado' : '') + '">'
+          + '<input type="radio" name="relatorio-qual" value="' + escapar(um.id) + '"'
+          + (i === 0 ? ' checked' : '') + '><span>' + escapar(um.nome)
+          + '<small>' + escapar(um.detalhe) + '</small></span></label>';
+      }).join('') + '</div><div id="relatorio-coluna"></div></section>'
+      + '<section class="relatorio-grupo"><strong>3. Colunas do arquivo'
+      + ' <span id="relatorio-quantas-colunas"></span></strong>'
+      + '<div class="relatorio-atalhos">'
+      + '<button type="button" class="botao-texto" data-relatorio-colunas="todas">Marcar todas</button>'
+      + '<button type="button" class="botao-texto" data-relatorio-colunas="fila">Só as da fila</button>'
+      + '<button type="button" class="botao-texto" data-relatorio-colunas="nenhuma">Desmarcar todas</button>'
+      + '</div><div class="relatorio-colunas">' + opcoes.colunas.map(function (coluna) {
+        return '<label class="relatorio-coluna"><input type="checkbox" value="'
+          + escapar(coluna.cabecalho) + '"' + (coluna.marcada ? ' checked' : '')
+          + (coluna.daFila ? ' data-da-fila="sim"' : '') + '><span>'
+          + escapar(coluna.cabecalho) + '</span></label>';
+      }).join('') + '</div><small>A escolha das colunas fica guardada para a próxima vez.</small>'
+      + '</section>'
+      + '<div id="relatorio-resumo" aria-live="polite"></div>'
+      + '</div><div class="config-acoes" id="relatorio-pe"></div></div>';
+    document.body.appendChild(caixa);
+
+    function dentro(seletor) { return caixa.querySelector(seletor); }
+    function todos(seletor) { return Array.prototype.slice.call(caixa.querySelectorAll(seletor)); }
+    function sair() {
+      document.removeEventListener('keydown', aoTeclar);
+      if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+    }
+    function aoTeclar(evento) { if (evento.key === 'Escape') sair(); }
+    document.addEventListener('keydown', aoTeclar);
+    caixa.addEventListener('mousedown', function (evento) { if (evento.target === caixa) sair(); });
+
+    function colunasMarcadas() {
+      return todos('.relatorio-coluna input:checked').map(function (marca) { return marca.value; });
+    }
+
+    /** Qualquer mudança invalida o resumo: o que foi conferido já não é o que vai sair. */
+    function mudou() {
+      conferido = null;
+      dentro('#relatorio-resumo').innerHTML = '';
+      dentro('#relatorio-quantas-colunas').textContent =
+        '(' + colunasMarcadas().length + ' de ' + opcoes.colunas.length + ')';
+      desenharPe();
+    }
+
+    function periodoDoRelatorio() {
+      dentro('#relatorio-periodo').innerHTML = SeletorDePeriodo.desenhar(
+        { periodo: escolha.periodo, mesesDisponiveis: painel.mesesDisponiveis });
+      todos('#relatorio-periodo [data-periodo]').forEach(function (campo) {
+        campo.addEventListener('change', function () {
+          var qual = this.getAttribute('data-periodo');
+          if (qual === 'como') {
+            escolha.periodo.tipo = this.value;
+            var meses = painel.mesesDisponiveis || [];
+            if (this.value === 'mes' && !escolha.periodo.mes && meses.length) {
+              escolha.periodo.mes = meses[0].valor;
+            }
+            periodoDoRelatorio();
+          } else if (qual === 'mes') {
+            escolha.periodo.mes = this.value;
+          } else {
+            escolha.periodo[qual] = SeletorDePeriodo.paraOServidor(this.value);
+          }
+          mudou();
+        });
+      });
+    }
+
+    /** "Por uma coluna, à escolha": a lista e os valores dela, só quando é esse o relatório. */
+    function desenharEscolhaDaColuna() {
+      var onde = dentro('#relatorio-coluna');
+      if (escolha.relatorio !== 'coluna') { onde.innerHTML = ''; return; }
+      var lista = opcoes.listas.filter(function (uma) { return uma.cabecalho === escolha.coluna; })[0];
+      onde.innerHTML = '<div class="relatorio-escolha"><select class="filtro" id="relatorio-qual-coluna"'
+        + ' aria-label="Coluna do relatório">' + opcoes.listas.map(function (uma) {
+          return '<option value="' + escapar(uma.cabecalho) + '"'
+            + (uma.cabecalho === escolha.coluna ? ' selected' : '') + '>' + escapar(uma.rotulo) + '</option>';
+        }).join('') + '</select><div class="relatorio-valores">'
+        + (lista ? lista.opcoes : []).map(function (opcao) {
+          return '<label class="relatorio-coluna"><input type="checkbox" data-relatorio-valor value="'
+            + escapar(opcao.valor) + '"' + (escolha.valores.indexOf(opcao.valor) >= 0 ? ' checked' : '')
+            + '><span>' + escapar(opcao.rotulo) + '</span></label>';
+        }).join('') + '</div></div>';
+      dentro('#relatorio-qual-coluna').addEventListener('change', function () {
+        escolha.coluna = this.value;
+        escolha.valores = [];
+        desenharEscolhaDaColuna();
+        mudou();
+      });
+      todos('[data-relatorio-valor]').forEach(function (marca) {
+        marca.addEventListener('change', function () {
+          escolha.valores = todos('[data-relatorio-valor]:checked')
+            .map(function (uma) { return uma.value; });
+          mudou();
+        });
+      });
+    }
+
+    function desenharPe() {
+      var pe = dentro('#relatorio-pe');
+      pe.innerHTML = '<button type="button" class="botao vazado" id="relatorio-cancelar">Cancelar</button>'
+        + (conferido
+          ? '<button type="button" class="botao" id="relatorio-exportar"'
+            + (conferido.quantos ? '' : ' disabled') + '>'
+            + (conferido.quantos ? 'Exportar ' + conferido.quantos + ' caso'
+              + (conferido.quantos === 1 ? '' : 's') : 'Nenhum caso para exportar') + '</button>'
+          : '<button type="button" class="botao" id="relatorio-conferir">Conferir</button>');
+      dentro('#relatorio-cancelar').addEventListener('click', sair);
+      var conferir = dentro('#relatorio-conferir');
+      if (conferir) conferir.addEventListener('click', function () { pedir(true, this); });
+      var exportar = dentro('#relatorio-exportar');
+      if (exportar) exportar.addEventListener('click', function () { pedir(false, this); });
+    }
+
+    function pedir(soConferir, botao) {
+      if (escolha.periodo.tipo !== 'mes' && !(escolha.periodo.de && escolha.periodo.ate)) {
+        Moldura.toast('Preencha as duas datas do período.', 'ruim');
+        return;
+      }
+      botao.disabled = true;
+      Servidor.chamar('relatorioDeCasos', canalEscolhido, {
+        relatorio: escolha.relatorio, periodo: escolha.periodo, colunas: colunasMarcadas(),
+        coluna: escolha.coluna, valores: escolha.valores, filtros: filtros, soConferir: soConferir
+      }).entao(function (resposta) {
+        if (!caixa.parentNode) return;
+        if (soConferir) {
+          conferido = resposta;
+          dentro('#relatorio-resumo').innerHTML = resumoDoRelatorio(resposta);
+          desenharPe();
+        } else {
+          entregarRelatorio(caixa, resposta, sair);
+        }
+      }).senao(function (erro) {
+        botao.disabled = false;
+        Moldura.toast(erro.message || String(erro), 'ruim');
+      });
+    }
+
+    todos('input[name="relatorio-qual"]').forEach(function (marca) {
+      marca.addEventListener('change', function () {
+        escolha.relatorio = this.value;
+        todos('.relatorio-pronto').forEach(function (rotulo) {
+          rotulo.className = 'relatorio-pronto' + (rotulo.querySelector('input').checked ? ' marcado' : '');
+        });
+        desenharEscolhaDaColuna();
+        mudou();
+      });
+    });
+    todos('.relatorio-coluna input').forEach(function (marca) {
+      marca.addEventListener('change', mudou);
+    });
+    todos('[data-relatorio-colunas]').forEach(function (atalho) {
+      atalho.addEventListener('click', function () {
+        var qual = this.getAttribute('data-relatorio-colunas');
+        todos('.relatorio-colunas input').forEach(function (marca) {
+          marca.checked = qual === 'todas'
+            || (qual === 'fila' && marca.getAttribute('data-da-fila') === 'sim');
+        });
+        mudou();
+      });
+    });
+
+    periodoDoRelatorio();
+    desenharEscolhaDaColuna();
+    mudou();
+  }
+
+  /** O que vai sair, em uma linha — lido antes de exportar. */
+  function resumoDoRelatorio(resposta) {
+    return '<p class="relatorio-resumo"><strong>' + resposta.quantos + ' caso'
+      + (resposta.quantos === 1 ? '' : 's') + '</strong> · de ' + escapar(resposta.periodo.de)
+      + ' a ' + escapar(resposta.periodo.ate) + ' · ' + escapar(resposta.descricao)
+      + ' · ' + resposta.colunas + ' coluna' + (resposta.colunas === 1 ? '' : 's')
+      + ' · arquivo CSV, que abre no Excel</p>'
+      + (resposta.truncada
+        ? '<p class="relatorio-resumo atencao">O período tem mais casos do que o sistema lê de uma '
+          + 'vez: o arquivo traria só os mais recentes. Exporte em períodos menores.</p>' : '');
+  }
+
+  /*
+    O ARQUIVO. O botão "Baixar" é um link de verdade para o arquivo montado no
+    navegador (com a marca que faz o Excel ler os acentos). Onde o navegador
+    barrar o download — o Apps Script serve a página num quadro isolado —, o
+    texto fica logo abaixo para copiar, como nos outros "Exportar".
+  */
+  function entregarRelatorio(caixa, arquivo, sair) {
+    var endereco = '';
+    try {
+      endereco = URL.createObjectURL(new Blob(['\uFEFF' + arquivo.conteudo],
+        { type: 'text/csv;charset=utf-8' }));
+    } catch (erro) { endereco = ''; }
+
+    caixa.querySelector('.dialogo-caixa').innerHTML = '<h3>Relatório pronto</h3>'
+      + '<p><strong>' + arquivo.quantos + ' caso' + (arquivo.quantos === 1 ? '' : 's')
+      + '</strong> em <span class="relatorio-arquivo">' + escapar(arquivo.nome) + '</span>.'
+      + ' Separado por ponto e vírgula, que é como o Excel em português abre sem perguntar nada.</p>'
+      + '<textarea id="texto-do-relatorio" rows="8" readonly>' + escapar(arquivo.conteudo) + '</textarea>'
+      + '<div class="config-acoes">'
+      + (endereco ? '<a class="botao" id="baixar-relatorio" href="' + endereco + '" download="'
+        + escapar(arquivo.nome) + '">Baixar arquivo</a>' : '')
+      + '<button type="button" class="botao vazado" id="copiar-relatorio">Copiar</button>'
+      + '<button type="button" class="botao vazado" id="fechar-relatorio">Fechar</button></div>';
+
+    var area = elemento('texto-do-relatorio');
+    elemento('fechar-relatorio').addEventListener('click', function () {
+      if (endereco) URL.revokeObjectURL(endereco);
+      sair();
+    });
+    elemento('copiar-relatorio').addEventListener('click', function () {
+      area.select();
+      var deuCerto = false;
+      try { deuCerto = document.execCommand('copy'); } catch (erro) { deuCerto = false; }
+      this.textContent = deuCerto ? 'Copiado' : 'Aperte Ctrl+C';
+    });
+  }
 
   function ligar() {
     SeletorDeCanal.ligar(function (idDoCanal) {

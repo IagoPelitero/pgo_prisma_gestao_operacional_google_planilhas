@@ -3159,6 +3159,361 @@ function nomeDeArquivo_(titulo) {
   return limpo.replace(/^-+|-+$/g, '') || 'painel';
 }
 
+// ----------------------------------------------------------------------------
+// O RELATÓRIO DE CASOS (Etapa 73)
+// ----------------------------------------------------------------------------
+
+/*
+ * Pedido do PO: "minha sênior precisava emitir um relatório com os casos que
+ * vieram da central" — e, na conferência do plano: "em Produtividade RECC será
+ * onde irá ficar a exportação, onde a sênior irá escolher a data, a coluna ou
+ * alguns prontos".
+ *
+ * Uma linha por caso, com as colunas que a pessoa marcar. O período é o do
+ * próprio relatório (não o da tela), lido pela coluna de data do canal, e o
+ * alcance é o da Produtividade: ninguém exporta o que não enxerga.
+ */
+
+/** Onde fica lembrada a escolha de colunas — por pessoa e por canal. */
+const RECC_CHAVE_DAS_COLUNAS_DO_RELATORIO = 'RECC_RELATORIO_COLUNAS_';
+
+/** Os campos de lista do canal que este nível enxerga — todos, sem o teto dos filtros. */
+function listasDoCanal_(canal, quem) {
+  var listas = [];
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
+    var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
+    if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
+    var descricao = campoParaATela_(campo, canal.id, visibilidade, quem);
+    if (descricao.tipo !== 'seletor' || !descricao.opcoes.length) return;
+    listas.push({ chave: descricao.chave, cabecalho: descricao.cabecalho,
+      rotulo: descricao.rotulo, opcoes: descricao.opcoes });
+  });
+  return listas;
+}
+
+/**
+ * A lista que diz por onde o caso chegou, quando uma das opções dela é a
+ * Central. É a coluna "canal" (rótulo "Canal de origem"); o canal que não a
+ * tem, ou que não tem a Central entre as opções, não ganha o relatório pronto.
+ */
+function listaDaOrigemComCentral_(listas) {
+  for (var i = 0; i < listas.length; i++) {
+    var nome = normalizarParaComparar_(listas[i].cabecalho);
+    if (nome !== 'canal' && nome !== 'canaldeorigem') continue;
+    var temCentral = listas[i].opcoes.some(function (opcao) {
+      return normalizarParaComparar_(opcao.valor).indexOf('central') >= 0;
+    });
+    if (temCentral) return listas[i];
+  }
+  return null;
+}
+
+/** O caso passou de algum prazo — sinalizador ou SLA —, aberto ou já encerrado. */
+function casosForaDoPrazo_(casos, canal) {
+  var situacoes = situacoesPorChave_(canal);
+  var finais = {};
+  Object.keys(situacoes).forEach(function (chave) {
+    if (situacoes[chave].final) finais[chave] = true;
+  });
+  var agora = relogioDeParede_(new Date());
+  var sinalizadores = sinalizadoresDoCanal_(canal);
+  var temSla = Number(canal.slaHorasUteis) > 0;
+
+  return casos.filter(function (registro) {
+    var estourou = sinalizadores.some(function (sinalizador) {
+      var um = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      return !!um && um.dentro === false;
+    });
+    if (estourou || !temSla) return estourou;
+    var sla = slaDoCaso_(registro, canal, finais, agora);
+    return !!sla && sla.dentro === false;
+  });
+}
+
+/**
+ * Os relatórios que este canal oferece. Cada um diz o nome, o que recorta e
+ * como recorta; os que dependem de algo que o canal não tem ficam de fora.
+ */
+function relatoriosDoCanal_(canal, quem) {
+  var listas = listasDoCanal_(canal, quem);
+  var relatorios = [];
+
+  var origem = listaDaOrigemComCentral_(listas);
+  if (origem) {
+    relatorios.push({
+      id: 'central', nome: 'Casos que vieram da Central',
+      detalhe: origem.rotulo + ' com "Central"',
+      recortar: function (casos) {
+        return casos.filter(function (registro) {
+          return normalizarParaComparar_(registro[origem.cabecalho]).indexOf('central') >= 0;
+        });
+      }
+    });
+  }
+
+  relatorios.push({
+    id: 'todos', nome: 'Todos os casos do período', detalhe: 'Sem filtro nenhum',
+    recortar: function (casos) { return casos; }
+  });
+
+  if (sinalizadoresDoCanal_(canal).length || Number(canal.slaHorasUteis) > 0) {
+    relatorios.push({
+      id: 'foraDoPrazo', nome: 'Casos fora do prazo',
+      detalhe: 'Prazo estourado, abertos ou não',
+      recortar: function (casos) { return casosForaDoPrazo_(casos, canal); }
+    });
+  }
+
+  var situacoes = situacoesPorChave_(canal);
+  var retido = normalizarParaComparar_('Retido');
+  var naoRetido = normalizarParaComparar_('Não retido');
+  if (canal.colunaDoStatus && situacoes[retido] && situacoes[naoRetido]) {
+    relatorios.push({
+      id: 'retidos', nome: 'Retidos e não retidos',
+      detalhe: 'Os casos com status Retido ou Não retido',
+      recortar: function (casos) {
+        return casos.filter(function (registro) {
+          var status = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+          return status === retido || status === naoRetido;
+        });
+      }
+    });
+  }
+
+  if (listas.length) {
+    relatorios.push({
+      id: 'coluna', nome: 'Por uma coluna, à escolha',
+      detalhe: 'Escolha a coluna e os valores que entram',
+      recortar: function (casos, pedido) {
+        var alvo = normalizarParaComparar_(pedido.coluna);
+        var lista = listas.filter(function (uma) {
+          return normalizarParaComparar_(uma.cabecalho) === alvo;
+        })[0];
+        if (!lista) throw new Error('Escolha a coluna do relatório.');
+        var aceitos = opcoesEscolhidas_(pedido.valores);
+        if (!aceitos.length) throw new Error('Marque pelo menos um valor de "' + lista.rotulo + '".');
+        this.descricao = lista.rotulo + ': ' + lista.opcoes.filter(function (opcao) {
+          return aceitos.indexOf(normalizarParaComparar_(opcao.valor)) >= 0;
+        }).map(function (opcao) { return opcao.rotulo; }).join(', ');
+        return casos.filter(function (registro) {
+          return aceitos.indexOf(normalizarParaComparar_(registro[lista.cabecalho])) >= 0;
+        });
+      }
+    });
+  }
+
+  relatorios.push({
+    id: 'filtrado', nome: 'O que está filtrado na tela',
+    detalhe: 'Os filtros de cima, como estão agora',
+    recortar: function (casos, pedido) {
+      var disponiveis = filtrosDoCanal_(canal, quem);
+      var escolhidos = pedido.filtros || {};
+      var ligados = disponiveis.map(function (filtro) {
+        var aceitos = opcoesEscolhidas_(escolhidos[filtro.chave]);
+        if (!aceitos.length) return '';
+        return filtro.rotulo + ': ' + filtro.opcoes.filter(function (opcao) {
+          return aceitos.indexOf(normalizarParaComparar_(opcao.valor)) >= 0;
+        }).map(function (opcao) { return opcao.rotulo; }).join(', ');
+      }).filter(function (texto) { return texto !== ''; });
+      this.descricao = ligados.length ? ligados.join(' · ') : 'Nenhum filtro ligado na tela';
+      return aplicarFiltros_(casos, disponiveis, escolhidos);
+    }
+  });
+
+  return { relatorios: relatorios, listas: listas };
+}
+
+/**
+ * As colunas que podem ir para o arquivo: as da planilha, na ordem dela —
+ * inclusive as que a operação criou fora do contrato. Ficam de fora as de
+ * controle (começam com "_") e os campos que o nível não enxerga.
+ */
+function colunasDoRelatorio_(canal, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var alvo = converterParaIdentificador_(canal.id);
+  var ocultas = {};
+  lerRegistros_('CAMPOS').forEach(function (campo) {
+    if (converterParaIdentificador_(campo.CanalId) !== alvo) return;
+    if (visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica) === RECC_VISIBILIDADE.OCULTO) {
+      ocultas[normalizarParaComparar_(campo.Cabecalho)] = true;
+    }
+  });
+
+  var daFila = {};
+  colunasDaFila_(canal).forEach(function (grupo) {
+    grupo.colunas.forEach(function (coluna) {
+      (coluna.juntar || [coluna]).forEach(function (uma) {
+        daFila[normalizarParaComparar_(uma.cabecalho)] = true;
+      });
+    });
+  });
+
+  var colunas = [];
+  estrutura.cabecalhos.forEach(function (cabecalho, posicao) {
+    var nome = String(cabecalho || '').trim();
+    if (!nome || nome.charAt(0) === '_') return;
+    if (ocultas[normalizarParaComparar_(nome)]) return;
+    colunas.push({ cabecalho: cabecalho, tipo: estrutura.tipos[posicao],
+      daFila: daFila[normalizarParaComparar_(nome)] === true });
+  });
+  return colunas;
+}
+
+/** As colunas que a pessoa marcou da última vez neste canal — ou [] se nunca exportou. */
+function colunasLembradasDoRelatorio_(canal) {
+  try {
+    var lido = JSON.parse(PropertiesService.getUserProperties()
+      .getProperty(RECC_CHAVE_DAS_COLUNAS_DO_RELATORIO + canal.id) || '[]');
+    return Array.isArray(lido) ? lido.map(String) : [];
+  } catch (erro) {
+    return [];
+  }
+}
+
+/** O que a caixa "Exportar relatório" precisa para se desenhar. */
+function opcoesDoRelatorio(idDoCanal) {
+  exigirPermissao_(RECC_ACOES.EXPORTAR);
+  var quem = exigirTela_('produtividade');
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+
+  var doCanal = relatoriosDoCanal_(canal, quem);
+  var colunas = colunasDoRelatorio_(canal, quem);
+  var lembradas = {};
+  colunasLembradasDoRelatorio_(canal).forEach(function (cabecalho) {
+    lembradas[normalizarParaComparar_(cabecalho)] = true;
+  });
+  // Lembrada que ainda existe vale; se nenhuma sobrou, as da fila.
+  var temLembrada = colunas.some(function (coluna) {
+    return lembradas[normalizarParaComparar_(coluna.cabecalho)];
+  });
+
+  return {
+    canal: { id: canal.id, nome: canal.nome },
+    colunaDaData: String(canal.colunaDaData || ''),
+    relatorios: doCanal.relatorios.map(function (um) {
+      return { id: um.id, nome: um.nome, detalhe: um.detalhe };
+    }),
+    listas: doCanal.listas.map(function (lista) {
+      return { cabecalho: lista.cabecalho, rotulo: lista.rotulo, opcoes: lista.opcoes };
+    }),
+    colunas: colunas.map(function (coluna) {
+      return {
+        cabecalho: coluna.cabecalho,
+        daFila: coluna.daFila,
+        marcada: temLembrada ? lembradas[normalizarParaComparar_(coluna.cabecalho)] === true
+          : coluna.daFila
+      };
+    })
+  };
+}
+
+/**
+ * O relatório. Com `pedido.soConferir`, só conta — é o resumo que a pessoa lê
+ * antes de exportar; sem ele, devolve o arquivo, lembra as colunas e registra
+ * na auditoria.
+ *
+ * `pedido`: { relatorio, periodo, colunas: [cabeçalhos], coluna, valores,
+ * filtros, soConferir }.
+ */
+function relatorioDeCasos(idDoCanal, pedido) {
+  exigirPermissao_(RECC_ACOES.EXPORTAR);
+  var quem = exigirTela_('produtividade');
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  pedido = pedido || {};
+
+  var relatorio = relatoriosDoCanal_(canal, quem).relatorios.filter(function (um) {
+    return um.id === String(pedido.relatorio || '');
+  })[0];
+  if (!relatorio) throw new Error('Escolha qual relatório exportar.');
+
+  var pedidas = {};
+  (Array.isArray(pedido.colunas) ? pedido.colunas : []).forEach(function (cabecalho) {
+    pedidas[normalizarParaComparar_(cabecalho)] = true;
+  });
+  var colunas = colunasDoRelatorio_(canal, quem).filter(function (coluna) {
+    return pedidas[normalizarParaComparar_(coluna.cabecalho)] === true;
+  });
+  if (!colunas.length) throw new Error('Marque pelo menos uma coluna para o arquivo.');
+
+  var periodo = resolverPeriodo_(pedido.periodo);
+  var guardarSemData = guardaOsSemData_(periodo);
+  var lido = registrosDosPeriodos_(canal, [
+    { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData }]);
+  var noPeriodo = alcanceDaProdutividade_(
+    entreDuasDatas_(lido.registros, canal, periodo.de, periodo.ate, guardarSemData), canal, quem);
+  var casos = relatorio.recortar(noPeriodo, pedido);
+
+  var resposta = {
+    relatorio: relatorio.nome,
+    descricao: relatorio.descricao || relatorio.detalhe,
+    quantos: casos.length,
+    colunas: colunas.length,
+    periodo: { de: comoSeEscreve_(periodo.de), ate: comoSeEscreve_(periodo.ate), rotulo: periodo.rotulo },
+    // O período tem mais casos do que o sistema lê de uma vez: o arquivo viria
+    // incompleto sem ninguém saber. A tela avisa e pede um período menor.
+    truncada: lido.truncada === true
+  };
+  if (pedido.soConferir) return resposta;
+
+  var linhas = [colunas.map(function (coluna) {
+    return celulaDoRelatorio_(coluna.cabecalho, RECC_TIPO_DE_DADO.TEXTO);
+  }).join(';')];
+  casos.forEach(function (registro) {
+    linhas.push(colunas.map(function (coluna) {
+      return celulaDoRelatorio_(registro[coluna.cabecalho], coluna.tipo);
+    }).join(';'));
+  });
+
+  PropertiesService.getUserProperties().setProperty(
+    RECC_CHAVE_DAS_COLUNAS_DO_RELATORIO + canal.id,
+    JSON.stringify(colunas.map(function (coluna) { return coluna.cabecalho; })));
+  registrarAuditoria_('relatorio.exportar', canal.aba, '', relatorio.nome + ' · '
+    + resposta.descricao + ' · ' + resposta.periodo.de + ' a ' + resposta.periodo.ate
+    + ' · ' + casos.length + ' casos · ' + colunas.length + ' colunas');
+
+  resposta.nome = 'relatorio-' + nomeDeArquivo_(canal.nome) + '-' + relatorio.id.toLowerCase() + '-'
+    + Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyyMMdd') + '-a-'
+    + Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyyMMdd') + '.csv';
+  resposta.conteudo = linhas.join('\n');
+  return resposta;
+}
+
+/**
+ * Uma célula do arquivo, do jeito que o Excel em português abre certo.
+ *
+ * - Data sai dd/mm/aaaa; número e dinheiro, com vírgula decimal e sem "R$".
+ * - Identificador só de dígitos que o Excel estragaria — zero à esquerda (CPF)
+ *   ou 12 dígitos ou mais (vira 1,23E+11) — sai como ="…", que ele lê como texto.
+ * - Texto que começa com = + @ ou - ganha um apóstrofo: o Excel o leria como
+ *   fórmula, e um caso digitado assim viraria #NOME? (ou coisa pior).
+ * - Quebra de linha vira espaço: uma linha do arquivo é um caso.
+ */
+function celulaDoRelatorio_(valor, tipo) {
+  if (valor === null || valor === undefined || valor === '') return '';
+
+  var texto;
+  var ehData = tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.HORA
+    || tipo === RECC_TIPO_DE_DADO.DATA_HORA;
+  if (ehData) {
+    texto = paraTexto_(valor, tipo) || String(valor);
+  } else if (valor instanceof Date) {
+    texto = paraTexto_(valor, RECC_TIPO_DE_DADO.DATA_HORA);
+  } else if (tipo === RECC_TIPO_DE_DADO.DINHEIRO || tipo === RECC_TIPO_DE_DADO.NUMERO) {
+    var numero = converterParaNumero_(valor);
+    return numero === '' ? textoDoRelatorio_(String(valor)) : formatarParaExportar_(numero);
+  } else {
+    texto = String(valor);
+  }
+  return textoDoRelatorio_(texto);
+}
+
+function textoDoRelatorio_(texto) {
+  texto = String(texto).replace(/\s*[\r\n]+\s*/g, ' ').trim();
+  if (/^0\d+$/.test(texto) || /^\d{12,}$/.test(texto)) return '"=""' + texto + '"""';
+  if (/^[=+@\t]/.test(texto) || /^-(?!\d)/.test(texto)) texto = "'" + texto;
+  return /[;"]/.test(texto) ? '"' + texto.replace(/"/g, '""') + '"' : texto;
+}
+
 // ============================================================================
 // CONFIGURAÇÃO DOS COMPONENTES
 // ============================================================================

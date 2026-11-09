@@ -288,6 +288,15 @@ function pontePreparada(respostas) {
     + '      exportarComponente: function (idDoCanal, idDoComponente) {\n'
     + '        responder(respostas.analitico.exportados[idDoComponente]);\n'
     + '      },\n'
+    // O relatório de casos (Etapa 73): as opções de cada canal e o relatório
+    // "todos os casos" já feito — a prévia não recorta, só mostra o caminho.
+    + '      opcoesDoRelatorio: function (idDoCanal) {\n'
+    + '        responder(respostas.analitico.relatorios[idDoCanal].opcoes);\n'
+    + '      },\n'
+    + '      relatorioDeCasos: function (idDoCanal, pedido) {\n'
+    + '        var feito = respostas.analitico.relatorios[idDoCanal];\n'
+    + '        responder(pedido && pedido.soConferir ? feito.conferido : feito.arquivo);\n'
+    + '      },\n'
     // A busca da prévia procura nos resultados que o servidor de verdade
     // devolveu para alguns termos. Termo que não foi gravado responde vazio,
     // e a tela diz honestamente que não achou — em vez de fingir.
@@ -1088,10 +1097,22 @@ function gerar(pastaDeSaida) {
       });
     });
   });
+  const relatorios = {};
+  pacote.canais.forEach((canal) => {
+    const opcoes = chamar('opcoesDoRelatorio')(canal.id);
+    const pedido = { relatorio: 'todos', periodo: ABERTURA,
+      colunas: opcoes.colunas.filter((c) => c.marcada).map((c) => c.cabecalho) };
+    relatorios[canal.id] = {
+      opcoes,
+      conferido: chamar('relatorioDeCasos')(canal.id, Object.assign({ soConferir: true }, pedido)),
+      arquivo: chamar('relatorioDeCasos')(canal.id, pedido)
+    };
+  });
   const analitico = {
     paineis: paineisAnaliticos,
     detalhes: detalhesDoPainel,
-    exportados: exportados
+    exportados: exportados,
+    relatorios: relatorios
   };
 
   // Uma dos canais da prévia mostra o aviso de janela parcial, para ele poder

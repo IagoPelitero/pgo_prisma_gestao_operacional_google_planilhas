@@ -2234,12 +2234,53 @@ table.fila.legado td { color: var(--suave); }
 table.fila.numeros { min-width: 320px; }
 table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-nums; }
 
-#dialogo-exportar textarea {
+#dialogo-exportar textarea, #dialogo-relatorio textarea {
   width: 100%; border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
   background: var(--superficie-2); color: var(--texto);
   padding: 10px 12px; font-family: var(--fonte-dado); font-size: 12.5px;
   resize: vertical;
 }
+
+/* O relatório de casos (Etapa 73): período, qual relatório e as colunas. */
+.caixa-de-filtros-cabeca #exportar-relatorio { margin-left: 4px; }
+.dialogo-caixa.relatorio {
+  max-width: 720px; display: flex; flex-direction: column; max-height: min(90vh, 860px);
+}
+.relatorio-miolo { overflow-y: auto; min-height: 0; padding-right: 4px; }
+.relatorio-grupo { margin: 12px 0 0; }
+.relatorio-grupo > strong {
+  display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--suave);
+}
+.relatorio-grupo > strong span { font-weight: 600; letter-spacing: 0; text-transform: none; }
+.relatorio-grupo small { display: block; margin-top: 6px; font-size: 12.5px; color: var(--suave); }
+.relatorio-grupo .filtros { margin-bottom: 0; }
+.relatorio-prontos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.relatorio-pronto {
+  display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno); font-size: 14px;
+}
+.relatorio-pronto.marcado { border-color: var(--destaque); background: var(--destaque-tenue); }
+.relatorio-pronto input { margin-top: 3px; accent-color: var(--destaque); }
+.relatorio-pronto small { margin-top: 1px; }
+.relatorio-escolha { margin-top: 10px; display: grid; gap: 8px; }
+.relatorio-atalhos { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; }
+.relatorio-colunas, .relatorio-valores { display: flex; flex-wrap: wrap; gap: 6px; }
+.relatorio-colunas { max-height: 190px; overflow-y: auto; }
+.relatorio-coluna {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: 99px; font-size: 13px;
+}
+.relatorio-coluna input { accent-color: var(--destaque); }
+.relatorio-resumo {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: var(--raio-pequeno);
+  background: var(--superficie-2); font-size: 13.5px; color: var(--texto);
+}
+.relatorio-resumo.atencao { background: var(--atencao-tenue); color: var(--atencao); font-weight: 600; }
+.relatorio .config-acoes { justify-content: flex-end; margin-top: 14px; }
+.relatorio-arquivo { font-family: var(--fonte-dado); color: var(--texto); }
+a.botao { text-decoration: none; }
+@media (max-width: 560px) { .relatorio-prontos { grid-template-columns: 1fr; } }
 
 @media (max-width: 560px) {
   .grafico { padding: 14px 14px 10px; }

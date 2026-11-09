@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1593 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1615 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -349,7 +349,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1593 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1615 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -955,6 +955,32 @@ resposta.
 
 E **quais** canais aparecem continua sendo a lista de canais do nível: quem abre
 só a RET e tem "o canal inteiro" vê a RET inteira, não a Mesa Diamante.
+
+### Exportar relatório: os casos, uma linha cada
+
+Na caixa de filtros, o botão **Exportar relatório** (Etapa 73, pedido do PO)
+aparece para quem tem a permissão *exportar*. A caixa pede três escolhas:
+
+1. **O período** — o do relatório, e não o da tela: abre igual ao da tela e muda
+   sem mexer nela. Por data ou por mês, pela coluna de data do canal.
+2. **Qual relatório** — os prontos (**Casos que vieram da Central**, **Todos os
+   casos do período**, **Casos fora do prazo**, **Retidos e não retidos**), **Por
+   uma coluna, à escolha** (um campo de lista e os valores que entram) ou **O que
+   está filtrado na tela**. O canal só mostra os que fazem sentido para ele.
+3. **As colunas do arquivo** — as da planilha, inclusive as que a operação criou.
+   Abre com as da fila, e a escolha fica guardada para a próxima vez, por pessoa
+   e por canal.
+
+**Conferir** mostra o resumo — quantos casos, de quando a quando, qual recorte,
+quantas colunas — e só então o botão vira **Exportar N casos**. Qualquer mudança
+pede a conferência de novo: o que sai é sempre o que foi lido no resumo.
+
+O arquivo é um CSV separado por ponto e vírgula, que o Excel em português abre
+sem perguntar nada: uma linha por caso, data em dd/mm/aaaa, dinheiro como número,
+e o CPF sem perder o zero à esquerda. "Baixar arquivo" entrega o arquivo; se o
+navegador barrar o download, o texto fica logo abaixo para copiar. Cada exportação
+entra na auditoria (`relatorio.exportar`). Quem só enxerga os próprios casos na
+Produtividade exporta só os seus, e o campo oculto para o nível não sai no arquivo.
 
 ### A RET: os prêmios primeiro, a equipe por último
 
@@ -1688,7 +1714,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.72** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.73** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1696,7 +1722,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1593 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1615 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

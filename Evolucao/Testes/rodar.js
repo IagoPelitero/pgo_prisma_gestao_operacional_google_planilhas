@@ -61,6 +61,7 @@ const { rodarTestesDaBuscaNaPlanilhaToda } = require('./testes-busca-na-planilha
 const { rodarTestesDoAvisoDePrazoSemPeriodo } = require('./testes-aviso-de-prazo-sem-periodo');
 const { rodarTestesDoCronometro } = require('./testes-cronometro');
 const { rodarTestesDosFiltrosComVariasOpcoes } = require('./testes-filtros-com-varias-opcoes');
+const { rodarTestesDoRelatorioDeCasos } = require('./testes-relatorio-de-casos');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -112,6 +113,7 @@ rodarTestesDaBuscaNaPlanilhaToda();
 rodarTestesDoAvisoDePrazoSemPeriodo();
 rodarTestesDoCronometro();
 rodarTestesDosFiltrosComVariasOpcoes();
+rodarTestesDoRelatorioDeCasos();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

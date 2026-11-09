@@ -1100,6 +1100,33 @@ async function rodar() {
     igual(await valor('#painel [data-periodo="de"]'), noCalendario(1), 'e o período volta ao dia 1');
   });
 
+  await teste('exportar relatório: escolhe, confere e só então exporta (Etapa 73)', async () => {
+    await pagina.click('[data-tela="produtividade"]');
+    await pagina.waitForSelector('#exportar-relatorio', { timeout: 10000 });
+    await pagina.click('#exportar-relatorio');
+    await pagina.waitForSelector('#dialogo-relatorio .relatorio-pronto', { timeout: 10000 });
+    await pagina.check('input[name="relatorio-qual"][value="todos"]');
+    await pagina.click('[data-relatorio-colunas="todas"]');
+    verdadeiro(!(await pagina.locator('#relatorio-exportar').count()), 'sem conferir, não há "Exportar"');
+    await pagina.click('#relatorio-conferir');
+    await pagina.waitForSelector('#relatorio-exportar', { timeout: 10000 });
+    contem(await pagina.textContent('#relatorio-resumo'), 'arquivo CSV');
+
+    // Mudar qualquer escolha pede a conferência de novo.
+    await pagina.click('[data-relatorio-colunas="fila"]');
+    igual(await pagina.locator('#relatorio-conferir').count(), 1, 'voltou a pedir "Conferir"');
+    igual(await pagina.textContent('#relatorio-resumo'), '', 'e o resumo antigo saiu');
+    await pagina.click('#relatorio-conferir');
+    await pagina.waitForSelector('#relatorio-exportar:not([disabled])', { timeout: 10000 });
+    await pagina.click('#relatorio-exportar');
+    await pagina.waitForSelector('#texto-do-relatorio', { timeout: 10000 });
+    const linhas = (await pagina.$eval('#texto-do-relatorio', (el) => el.value)).split('\n');
+    verdadeiro(linhas.length > 1 && linhas[0].indexOf(';') > 0, 'o arquivo tem cabeçalho e casos');
+    verdadeiro(await pagina.locator('#baixar-relatorio').count() === 1, 'e o botão de baixar');
+    await pagina.click('#fechar-relatorio');
+    verdadeiro(!(await pagina.locator('#dialogo-relatorio').count()), 'a caixa fecha');
+  });
+
   /* ---------------------------------------------------- a cara de sistema -- */
 
   console.log('\nA cara de sistema (Etapa 67)');

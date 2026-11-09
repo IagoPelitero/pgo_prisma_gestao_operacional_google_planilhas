@@ -453,11 +453,13 @@ var Moldura = (function () {
    * 29/10/2026"): ele é
    * o resultado do recorte, e por isso mora na mesma caixa que o recorte.
    */
-  function caixaDeFiltros(conteudo, contagem) {
+  function caixaDeFiltros(conteudo, contagem, acao) {
     return '<section class="caixa-de-filtros">'
       + '<header class="caixa-de-filtros-cabeca">'
       + '<h3>' + icone('filtro') + 'Filtros</h3>'
       + (contagem ? '<span class="contagem">' + contagem + '</span>' : '')
+      // Um botão da tela ao lado da contagem (o "Exportar relatório", Etapa 73).
+      + (acao || '')
       + '</header>'
       + '<div class="filtros">' + conteudo + '</div>'
       + '</section>';

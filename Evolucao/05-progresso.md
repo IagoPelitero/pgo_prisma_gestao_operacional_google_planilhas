@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.72 — a última etapa entregue é a 72. A regra do número está
+**Estado geral:** versão 1.73 — a última etapa entregue é a 73. A regra do número está
 na Etapa 68.
 
 ---
@@ -3797,6 +3797,37 @@ onde o tempo está indo.
 
 12 testes novos em `testes-filtros-com-varias-opcoes.js`; o ponta a ponta marca
 duas opções, aplica e limpa. 12 quebras de propósito, 12 pegas.
+
+---
+
+## Etapa 73 — Exportar relatório na Produtividade RECC
+
+Pedido do PO: "minha sênior trouxe que precisava emitir um relatório com os casos
+que vieram da central" — e, na conferência do plano: "em Produtividade RECC será
+onde irá ficar a exportação, onde a sênior irá escolher a data que deseja, a
+coluna ou alguns prontos". Terceira das cinco etapas aprovadas (71 a 75).
+
+| O que | Como ficou |
+|---|---|
+| **Onde** | O botão **Exportar relatório**, na caixa de filtros da Produtividade RECC, para quem tem a permissão *exportar*. Os "Exportar" de cada gráfico continuam como eram |
+| **1. O período** | O da própria caixa: abre igual ao da tela e muda sem mexer nela. Por data ou por mês, lido pela coluna de data do canal |
+| **2. Qual relatório** | Prontos: **Casos que vieram da Central** (canal de origem com "Central" — vale também se a opção se chamar "Central de atendimento"), **Todos os casos do período**, **Casos fora do prazo** (sinalizador ou SLA estourado, abertos ou não) e **Retidos e não retidos**. E dois livres: **Por uma coluna, à escolha** (qualquer campo de lista, com os valores marcados) e **O que está filtrado na tela**. O canal só oferece o que tem: sem a Central entre as origens, sem prazo ou sem os dois status, o relatório não aparece |
+| **3. As colunas** | Todas as da planilha, na ordem dela — inclusive as criadas pela operação fora do contrato. Abre com as da fila; "Marcar todas", "Só as da fila" e "Desmarcar todas". A escolha fica guardada por pessoa e por canal |
+| **Conferir antes** | "Conferir" diz quantos casos, de quando a quando, com qual recorte e quantas colunas; só então aparece "Exportar N casos". Mudar qualquer escolha pede a conferência de novo. Período maior do que o sistema lê de uma vez (`OPERACAO.LINHAS_DO_PAINEL`) avisa e pede um período menor |
+| **O arquivo** | CSV com ponto e vírgula, uma linha por caso: data em dd/mm/aaaa, dinheiro como número com vírgula, CPF com zero à esquerda e identificador longo como texto (`="…"`), texto que começa com `=` `+` `@` `-` com apóstrofo (não vira fórmula), quebra de linha vira espaço. "Baixar arquivo" e, logo abaixo, o texto para copiar |
+| **Quem pode** | Permissão *exportar* e a tela da Produtividade, conferidas no servidor nas duas chamadas. O alcance é o da Produtividade (quem só vê os seus exporta só os seus), e o campo oculto para o nível não aparece nem sai |
+| **Auditoria** | `relatorio.exportar`, com o relatório, o recorte, o período, quantos casos e quantas colunas |
+| **Versão** | 1.73 |
+
+`opcoesDoRelatorio` e `relatorioDeCasos`, em `Indicadores.gs`; a caixa, em
+`Produtividade.html`. 22 testes novos em `testes-relatorio-de-casos.js` e um ponta
+a ponta. 20 quebras de propósito, 20 pegas — a do prazo escapou na primeira rodada
+(nenhum caso estava com o prazo correndo) e ganhou um caso no teste.
+
+**O que não foi possível conferir daqui:** o botão "Baixar arquivo" funciona no
+navegador de teste, mas a página publicada pelo Apps Script roda num quadro isolado
+que pode barrar o download. Se barrar, o texto logo abaixo serve para copiar, como
+nos outros "Exportar".
 
 ---
 
