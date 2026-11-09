@@ -151,7 +151,7 @@ function rodarTestesDoLimparFiltros() {
     const tela = lerPeca('TabelaCorretoras');
     const corretoras = blocoDoClique(tela, 'limpar-filtros-corretoras');
     contem(corretoras, "procurar = '';");
-    contem(corretoras, "segmento = '';");
+    contem(corretoras, "segmento = [];");
     contem(blocoDoClique(tela, 'limpar-filtros-bloqueadas'), "procurarBloqueada = '';");
   });
 

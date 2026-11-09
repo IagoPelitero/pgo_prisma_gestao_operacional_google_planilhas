@@ -661,6 +661,156 @@ var SenhaDeAdministrador = (function () {
    escolhe o dela sem passar por código.
    ============================================================================ */
 
+/* ============================================================================
+   O FILTRO COM VÁRIAS OPÇÕES (Etapa 72) — peça de toda tela que filtra
+   ============================================================================
+   Pedido do PO: "melhorar os filtros para ser possível selecionar mais de um".
+   No lugar da caixa de uma opção só, um botão que abre a lista de marcar: cada
+   opção com quantos casos tem, um campo de procurar quando a lista é longa, e
+   "Marcar todos" / "Limpar". O botão fechado diz quantas estão marcadas, e as
+   escolhas aparecem embaixo como etiquetas, cada uma com o seu "×".
+
+   A lista fica aberta enquanto a pessoa marca; a tela só vai ao servidor
+   quando ela FECHA (clicar fora, Esc ou "Aplicar") — uma ida para várias
+   marcações, e não uma por clique.
+
+   O estado é da tela que usa: { chaveDoFiltro: [valores] }.
+   ============================================================================ */
+var FiltroMultiplo = (function () {
+
+  var OPCOES_PARA_TER_BUSCA = 8;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function semAcento(texto) {
+    return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+  function lista(valor) {
+    if (Array.isArray(valor)) return valor.slice();
+    return valor === undefined || valor === null || valor === '' ? [] : [valor];
+  }
+
+  /** O botão fechado: o nome do filtro e quantas opções estão marcadas. */
+  function desenhar(filtro, escolhidos) {
+    var marcadas = lista(escolhidos[filtro.chave]);
+    return '<span class="filtro-multiplo" data-multiplo="' + escapar(filtro.chave) + '">'
+      + '<button type="button" class="filtro filtro-multiplo-botao' + (marcadas.length ? ' com-escolha' : '') + '"'
+      + ' aria-haspopup="listbox" aria-expanded="false"'
+      + ' aria-label="Filtrar por ' + escapar(filtro.rotulo)
+      + (marcadas.length ? ' (' + marcadas.length + ' marcadas)' : '') + '">'
+      + '<span>' + escapar(filtro.rotulo) + '</span>'
+      + (marcadas.length ? '<b>' + marcadas.length + '</b>' : '')
+      + '<i aria-hidden="true">▾</i></button></span>';
+  }
+
+  /** As etiquetas do que está escolhido, cada uma com o "×" que a tira. */
+  function etiquetas(filtros, escolhidos) {
+    var feitas = filtros.map(function (filtro) {
+      var marcadas = lista(escolhidos[filtro.chave]);
+      if (!marcadas.length) return '';
+      var rotulos = marcadas.map(function (valor) {
+        var opcao = filtro.opcoes.filter(function (uma) { return uma.valor === valor; })[0];
+        return opcao ? opcao.rotulo : valor;
+      });
+      return '<span class="filtro-etiqueta">' + escapar(filtro.rotulo) + ': ' + escapar(rotulos.join(', '))
+        + '<button type="button" data-tirar-filtro="' + escapar(filtro.chave) + '"'
+        + ' aria-label="Tirar o filtro ' + escapar(filtro.rotulo) + '">×</button></span>';
+    }).join('');
+    return feitas ? '<div class="filtro-etiquetas"><span>Filtrando por</span>' + feitas + '</div>' : '';
+  }
+
+  function painel(filtro, marcadas) {
+    return '<div class="filtro-multiplo-painel" role="listbox" aria-multiselectable="true">'
+      + (filtro.opcoes.length > OPCOES_PARA_TER_BUSCA
+        ? '<input type="text" class="filtro-multiplo-busca" placeholder="Procurar opção…"'
+          + ' aria-label="Procurar opção">' : '')
+      + '<div class="filtro-multiplo-opcoes">'
+      + filtro.opcoes.map(function (opcao) {
+        return '<label class="filtro-multiplo-opcao"><input type="checkbox" value="'
+          + escapar(opcao.valor) + '"' + (marcadas.indexOf(opcao.valor) >= 0 ? ' checked' : '') + '>'
+          + '<span>' + escapar(opcao.rotulo) + '</span>'
+          + (opcao.quantos === undefined ? '' : '<small>' + opcao.quantos + '</small>') + '</label>';
+      }).join('') + '</div>'
+      + '<div class="filtro-multiplo-pe"><button type="button" data-multiplo-acao="todos">Marcar todos</button>'
+      + '<button type="button" data-multiplo-acao="limpar">Limpar</button>'
+      + '<button type="button" class="botao pequeno" data-multiplo-acao="aplicar">Aplicar</button></div></div>';
+  }
+
+  function iguais(uma, outra) {
+    return uma.length === outra.length && uma.every(function (valor) { return outra.indexOf(valor) >= 0; });
+  }
+
+  /**
+   * Liga os filtros desenhados dentro de `raiz`. `aoMudar(chave, valores)` é
+   * chamada uma vez, quando a lista fecha com escolha diferente da que abriu —
+   * e quando um "×" de etiqueta é clicado, com a lista vazia.
+   */
+  function ligar(raiz, filtros, escolhidos, aoMudar) {
+    if (!raiz) return;
+    var caixas = raiz.querySelectorAll('[data-multiplo]');
+    for (var i = 0; i < caixas.length; i++) ligarUma(caixas[i]);
+    var tirar = raiz.querySelectorAll('[data-tirar-filtro]');
+    for (var j = 0; j < tirar.length; j++) {
+      tirar[j].addEventListener('click', function () { aoMudar(this.getAttribute('data-tirar-filtro'), []); });
+    }
+
+    function ligarUma(caixa) {
+      var chave = caixa.getAttribute('data-multiplo');
+      var filtro = filtros.filter(function (um) { return um.chave === chave; })[0];
+      var botao = caixa.querySelector('.filtro-multiplo-botao');
+      if (!filtro || !botao) return;
+      var aberto = null;
+
+      function marcadasAgora() {
+        var marcas = aberto.querySelectorAll('input[type="checkbox"]:checked');
+        return Array.prototype.map.call(marcas, function (marca) { return marca.value; });
+      }
+      function fechar() {
+        if (!aberto) return;
+        var escolha = marcadasAgora();
+        caixa.removeChild(aberto);
+        aberto = null;
+        botao.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', aoClicarFora, true);
+        if (!iguais(escolha, lista(escolhidos[chave]))) aoMudar(chave, escolha);
+      }
+      function aoClicarFora(evento) { if (aberto && !caixa.contains(evento.target)) fechar(); }
+      function abrir() {
+        caixa.insertAdjacentHTML('beforeend', painel(filtro, lista(escolhidos[chave])));
+        aberto = caixa.querySelector('.filtro-multiplo-painel');
+        botao.setAttribute('aria-expanded', 'true');
+        document.addEventListener('mousedown', aoClicarFora, true);
+        aberto.addEventListener('keydown', function (evento) {
+          if (evento.key === 'Escape') { evento.stopPropagation(); fechar(); botao.focus(); }
+        });
+        aberto.addEventListener('click', function (evento) {
+          var acao = evento.target.getAttribute && evento.target.getAttribute('data-multiplo-acao');
+          if (!acao) return;
+          if (acao === 'aplicar') { fechar(); return; }
+          var marcas = aberto.querySelectorAll('.filtro-multiplo-opcao:not([hidden]) input');
+          for (var k = 0; k < marcas.length; k++) marcas[k].checked = acao === 'todos';
+        });
+        var busca = aberto.querySelector('.filtro-multiplo-busca');
+        if (busca) {
+          busca.addEventListener('input', function () {
+            var termo = semAcento(this.value);
+            var opcoes = aberto.querySelectorAll('.filtro-multiplo-opcao');
+            for (var k = 0; k < opcoes.length; k++) {
+              opcoes[k].hidden = termo !== '' && semAcento(opcoes[k].textContent).indexOf(termo) < 0;
+            }
+          });
+          busca.focus();
+        } else {
+          var primeira = aberto.querySelector('input');
+          if (primeira) primeira.focus();
+        }
+      }
+      botao.addEventListener('click', function () { if (aberto) fechar(); else abrir(); });
+    }
+  }
+
+  return { desenhar: desenhar, etiquetas: etiquetas, ligar: ligar, lista: lista };
+})();
+
 var SeletorDeCanal = (function () {
 
   var DESENHOS = {

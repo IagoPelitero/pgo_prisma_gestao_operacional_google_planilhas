@@ -53,7 +53,8 @@ function tabelaDeCorretoras(procurar, segmento) {
 
   var volumes = volumePorSusep_();
   var termo = normalizarParaComparar_(procurar);
-  var segmentoProcurado = normalizarParaComparar_(segmento);
+  // Vários segmentos de uma vez (Etapa 72); um só, como antes, continua valendo.
+  var segmentosProcurados = opcoesEscolhidas_(segmento);
 
   var todas = lerRegistros_('CORRETORAS').map(function (linha) {
     var susep = susepComoSeEscreve_(linha.SUSEP);
@@ -83,8 +84,8 @@ function tabelaDeCorretoras(procurar, segmento) {
    * O mesmo vale no selo do Cadastrar Caso: ver `consultarSusep`.
    */
   var filtradas = todas.filter(function (uma) {
-    if (segmentoProcurado
-      && normalizarParaComparar_(uma.segmento) !== segmentoProcurado) return false;
+    if (segmentosProcurados.length
+      && segmentosProcurados.indexOf(normalizarParaComparar_(uma.segmento)) < 0) return false;
     if (!termo) return true;
     if (normalizarParaComparar_(uma.corretora).indexOf(termo) >= 0) return true;
     if (normalizarParaComparar_(uma.sucursal).indexOf(termo) >= 0) return true;

@@ -200,7 +200,7 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     },
     mesesDisponiveis: mesesParaEscolher_(),
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
-    filtrosDisponiveis: disponiveis,
+    filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, meus),
     colunas: colunasDaFila_(canal),
     // A fila, o mais recente em cima: os 100 mais recentes, ou todos quando a
     // tela pede "Todos". Ver RECC_FILA_NA_ABERTURA. Vai COMPACTA — só os
@@ -720,19 +720,51 @@ function filtrosDoCanal_(canal, quem) {
 }
 
 function aplicarFiltros_(registros, disponiveis, escolhidos) {
-  var ativos = disponiveis.filter(function (filtro) {
-    return String(escolhidos[filtro.chave] || '').trim() !== '';
-  });
+  // Cada filtro aceita VÁRIAS opções (Etapa 72, pedido do PO): o caso passa
+  // quando tem QUALQUER uma das escolhidas naquele filtro, e precisa passar em
+  // TODOS os filtros. Um valor só, como a tela mandava antes, continua valendo.
+  var ativos = disponiveis.map(function (filtro) {
+    return { cabecalho: filtro.cabecalho, aceitos: opcoesEscolhidas_(escolhidos[filtro.chave]) };
+  }).filter(function (filtro) { return filtro.aceitos.length > 0; });
   if (!ativos.length) return registros;
 
   return registros.filter(function (registro) {
     for (var i = 0; i < ativos.length; i++) {
-      var esperado = normalizarParaComparar_(escolhidos[ativos[i].chave]);
-      if (normalizarParaComparar_(registro[ativos[i].cabecalho]) !== esperado) {
+      if (ativos[i].aceitos.indexOf(normalizarParaComparar_(registro[ativos[i].cabecalho])) < 0) {
         return false;
       }
     }
     return true;
+  });
+}
+
+/** O que a tela escolheu num filtro — um valor ou uma lista —, pronto para comparar. */
+function opcoesEscolhidas_(escolha) {
+  return (Array.isArray(escolha) ? escolha : [escolha]).map(function (valor) {
+    return normalizarParaComparar_(valor === null || valor === undefined ? '' : valor);
+  }).filter(function (valor) { return valor !== ''; });
+}
+
+/**
+ * Os filtros com QUANTOS casos cada opção tem (Etapa 72): a lista de marcar
+ * mostra o número ao lado, e a pessoa não marca uma opção vazia sem saber. A
+ * conta é sobre os casos do período, antes de qualquer filtro — o número não
+ * some quando outra opção é marcada.
+ */
+function comAContagemDasOpcoes_(disponiveis, registros) {
+  return disponiveis.map(function (filtro) {
+    var quantos = {};
+    registros.forEach(function (registro) {
+      var valor = normalizarParaComparar_(registro[filtro.cabecalho]);
+      if (valor) quantos[valor] = (quantos[valor] || 0) + 1;
+    });
+    return {
+      chave: filtro.chave, cabecalho: filtro.cabecalho, rotulo: filtro.rotulo,
+      opcoes: filtro.opcoes.map(function (opcao) {
+        return { valor: opcao.valor, rotulo: opcao.rotulo,
+          quantos: quantos[normalizarParaComparar_(opcao.valor)] || 0 };
+      })
+    };
   });
 }
 
@@ -2535,7 +2567,7 @@ function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
     total: casos.length,
     truncada: truncada,
     linhasLidas: recentes.length,
-    filtrosDisponiveis: disponiveis,
+    filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, noPeriodo),
     cartoes: cartoes,
     componentes: componentes,
     /*

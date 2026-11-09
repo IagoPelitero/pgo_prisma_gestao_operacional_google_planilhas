@@ -538,20 +538,9 @@ var TelaProdutividade = (function () {
   }
 
   function desenharFiltros() {
+    // Cada filtro aceita várias opções (Etapa 72), pela mesma peça do Trabalho.
     var caixas = painel.filtrosDisponiveis.map(function (filtro) {
-      // A primeira opção é o nome do filtro puro — "Analista", "Status".
-      // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
-      // fechada mostrava a palavra que menos importa, e em tela estreita o
-      // nome do filtro era justamente o pedaço que ficava cortado.
-      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
-      filtro.opcoes.forEach(function (opcao) {
-        opcoes.push('<option value="' + escapar(opcao.valor) + '"'
-          + (filtros[filtro.chave] === opcao.valor ? ' selected' : '') + '>'
-          + escapar(opcao.rotulo) + '</option>');
-      });
-      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
-        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
-        + opcoes.join('') + '</select>';
+      return FiltroMultiplo.desenhar(filtro, filtros);
     });
 
     // A caixa de filtros e o seletor de período são PEÇAS COMPARTILHADAS: o
@@ -559,7 +548,8 @@ var TelaProdutividade = (function () {
     // "setembro" significaria uma coisa numa tela e outra na vizinha.
     return Moldura.caixaDeFiltros(
       SeletorDePeriodo.desenhar(painel) + caixas.join('')
-        + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade'),
+        + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade')
+        + FiltroMultiplo.etiquetas(painel.filtrosDisponiveis, filtros),
       painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
   }
 
@@ -660,6 +650,12 @@ var TelaProdutividade = (function () {
         carregar();
       });
     }
+
+    FiltroMultiplo.ligar(elemento('analitico'), painel.filtrosDisponiveis, filtros,
+      function (chave, valores) {
+        filtros[chave] = valores;
+        carregar();
+      });
 
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {

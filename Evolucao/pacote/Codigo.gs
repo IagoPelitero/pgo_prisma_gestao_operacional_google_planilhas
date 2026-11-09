@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-09 21:18
+   Gerado em 2026-11-09 21:42
    ========================================================================== */
 
 
@@ -2253,7 +2253,8 @@ function tabelaDeCorretoras(procurar, segmento) {
 
   var volumes = volumePorSusep_();
   var termo = normalizarParaComparar_(procurar);
-  var segmentoProcurado = normalizarParaComparar_(segmento);
+
+  var segmentosProcurados = opcoesEscolhidas_(segmento);
 
   var todas = lerRegistros_('CORRETORAS').map(function (linha) {
     var susep = susepComoSeEscreve_(linha.SUSEP);
@@ -2270,8 +2271,8 @@ function tabelaDeCorretoras(procurar, segmento) {
   });
 
   var filtradas = todas.filter(function (uma) {
-    if (segmentoProcurado
-      && normalizarParaComparar_(uma.segmento) !== segmentoProcurado) return false;
+    if (segmentosProcurados.length
+      && segmentosProcurados.indexOf(normalizarParaComparar_(uma.segmento)) < 0) return false;
     if (!termo) return true;
     if (normalizarParaComparar_(uma.corretora).indexOf(termo) >= 0) return true;
     if (normalizarParaComparar_(uma.sucursal).indexOf(termo) >= 0) return true;
@@ -8669,7 +8670,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.71',
+  numero: '1.72',
   data: '09/11/2026'
 };
 
@@ -9752,7 +9753,7 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     },
     mesesDisponiveis: mesesParaEscolher_(),
     cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
-    filtrosDisponiveis: disponiveis,
+    filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, meus),
     colunas: colunasDaFila_(canal),
 
     fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
@@ -10091,19 +10092,42 @@ function filtrosDoCanal_(canal, quem) {
 }
 
 function aplicarFiltros_(registros, disponiveis, escolhidos) {
-  var ativos = disponiveis.filter(function (filtro) {
-    return String(escolhidos[filtro.chave] || '').trim() !== '';
-  });
+
+  var ativos = disponiveis.map(function (filtro) {
+    return { cabecalho: filtro.cabecalho, aceitos: opcoesEscolhidas_(escolhidos[filtro.chave]) };
+  }).filter(function (filtro) { return filtro.aceitos.length > 0; });
   if (!ativos.length) return registros;
 
   return registros.filter(function (registro) {
     for (var i = 0; i < ativos.length; i++) {
-      var esperado = normalizarParaComparar_(escolhidos[ativos[i].chave]);
-      if (normalizarParaComparar_(registro[ativos[i].cabecalho]) !== esperado) {
+      if (ativos[i].aceitos.indexOf(normalizarParaComparar_(registro[ativos[i].cabecalho])) < 0) {
         return false;
       }
     }
     return true;
+  });
+}
+
+function opcoesEscolhidas_(escolha) {
+  return (Array.isArray(escolha) ? escolha : [escolha]).map(function (valor) {
+    return normalizarParaComparar_(valor === null || valor === undefined ? '' : valor);
+  }).filter(function (valor) { return valor !== ''; });
+}
+
+function comAContagemDasOpcoes_(disponiveis, registros) {
+  return disponiveis.map(function (filtro) {
+    var quantos = {};
+    registros.forEach(function (registro) {
+      var valor = normalizarParaComparar_(registro[filtro.cabecalho]);
+      if (valor) quantos[valor] = (quantos[valor] || 0) + 1;
+    });
+    return {
+      chave: filtro.chave, cabecalho: filtro.cabecalho, rotulo: filtro.rotulo,
+      opcoes: filtro.opcoes.map(function (opcao) {
+        return { valor: opcao.valor, rotulo: opcao.rotulo,
+          quantos: quantos[normalizarParaComparar_(opcao.valor)] || 0 };
+      })
+    };
   });
 }
 
@@ -11418,7 +11442,7 @@ function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
     total: casos.length,
     truncada: truncada,
     linhasLidas: recentes.length,
-    filtrosDisponiveis: disponiveis,
+    filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, noPeriodo),
     cartoes: cartoes,
     componentes: componentes,
 

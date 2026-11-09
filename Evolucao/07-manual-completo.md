@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1581 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1593 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -349,7 +349,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1581 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1593 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -386,6 +386,16 @@ caixa nas duas telas que filtram — Trabalho e Produtividade RECC —, desenhad
 por uma peça só (`Moldura.caixaDeFiltros`). A contagem ao
 lado do título é o que evita a leitura errada mais comum: um filtro esquecido
 ligado, a tela com três casos, e ninguém entendendo por quê.
+
+Cada filtro de lista aceita **várias opções** (Etapa 72, pedido do PO). O botão
+abre a lista de marcar, com quantos casos do período cada opção tem; "Aplicar",
+Esc ou um clique fora fecham a lista, e só então a tela vai ao servidor — uma
+vez, com tudo o que foi marcado. Dentro do filtro vale **qualquer uma** das
+opções marcadas; entre filtros, o caso precisa passar em **todos** (Status
+"Pendente ou Retido" **e** Canal "Telefone"). O que está escolhido aparece em
+etiquetas "Filtrando por", cada uma com o "×" que a tira. A mesma peça
+(`FiltroMultiplo`) serve o Trabalho, a Produtividade RECC e o segmento da Tabela
+de Corretoras.
 
 O primeiro filtro é a **busca digitada**, do canal escolhido — pedido do PO.
 Digite e aperte **Enter**: a fila e os cartões passam a contar só os casos em
@@ -1678,7 +1688,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.71** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.72** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1686,7 +1696,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1581 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1593 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

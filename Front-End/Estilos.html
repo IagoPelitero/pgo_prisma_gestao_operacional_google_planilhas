@@ -1896,6 +1896,39 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 .linha-do-tempo .quando { font-size: 12px; opacity: 0.75; }
 .linha-do-tempo .oque { font-weight: 600; font-size: 13.5px; }
 
+/* O filtro com várias opções (Etapa 72). */
+.filtro-multiplo { position: relative; display: inline-block; }
+.filtro-multiplo-botao { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-align: left; }
+.filtro-multiplo-botao.com-escolha { border-color: var(--destaque); background: var(--destaque-tenue); font-weight: 600; }
+.filtro-multiplo-botao b {
+  background: var(--destaque); color: var(--destaque-sobre); border-radius: 99px;
+  font-size: 11.5px; padding: 0 7px; line-height: 18px;
+}
+.filtro-multiplo-botao i { font-style: normal; font-size: 11px; opacity: .7; }
+.filtro-multiplo-painel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 280px; max-width: 86vw;
+  background: var(--superficie); border: 1px solid var(--linha-forte); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 10px;
+}
+.filtro-multiplo-busca {
+  width: 100%; height: 34px; margin-bottom: 6px; padding: 0 10px; font: inherit; font-size: 13.5px;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno); background: var(--superficie); color: var(--texto);
+}
+.filtro-multiplo-opcoes { max-height: 260px; overflow-y: auto; }
+.filtro-multiplo-opcao { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.filtro-multiplo-opcao[hidden] { display: none; }
+.filtro-multiplo-opcao:hover { background: var(--superficie-2); }
+.filtro-multiplo-opcao small { margin-left: auto; color: var(--tenue); }
+.filtro-multiplo-pe {
+  display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--linha);
+  margin-top: 6px; padding: 8px 4px 0;
+}
+.filtro-multiplo-pe button:not(.botao) { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--destaque); cursor: pointer; }
+.filtro-multiplo-pe .botao { margin-left: auto; }
+.filtro-etiquetas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; margin-top: 4px; font-size: 13px; color: var(--suave); }
+.filtro-etiqueta { background: var(--destaque-tenue); color: var(--destaque-escuro); border-radius: 6px; padding: 3px 4px 3px 10px; font-weight: 600; }
+.filtro-etiqueta button { background: none; border: 0; cursor: pointer; font: inherit; color: inherit; padding: 0 6px; opacity: .75; }
+
 /* ------------------------------------------------- os cards dos painéis -- */
 .config-canais-cartao {
   display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr);

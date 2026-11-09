@@ -1066,20 +1066,23 @@ async function rodar() {
     // Muda o período para "Por mês" e escolhe um filtro de lista…
     await pagina.selectOption('#analitico [data-periodo="como"]', 'mes');
     await pagina.waitForSelector('#analitico [data-periodo="mes"]', { timeout: 10000 });
-    const lista = pagina.locator('#analitico select[data-filtro]').first();
-    const opcao = await lista.locator('option').nth(1).getAttribute('value');
-    await lista.selectOption(opcao);
-    await pagina.waitForFunction((v) => {
-      const caixa = document.querySelector('#analitico select[data-filtro]');
-      return caixa && caixa.value === v;
-    }, opcao, { timeout: 10000 });
+    //    (Etapa 72) a lista aceita várias opções: marca duas e aplica uma vez.
+    await pagina.locator('#analitico .filtro-multiplo-botao').first().click();
+    await pagina.waitForSelector('#analitico .filtro-multiplo-painel', { timeout: 10000 });
+    const marcas = pagina.locator('#analitico .filtro-multiplo-painel input[type="checkbox"]');
+    await marcas.nth(0).check();
+    await marcas.nth(1).check();
+    await pagina.click('#analitico [data-multiplo-acao="aplicar"]');
+    await pagina.waitForSelector('#analitico .filtro-etiqueta', { timeout: 10000 });
+    igual(await pagina.locator('#analitico .filtro-multiplo-botao b').first().textContent(), '2',
+      'o botão diz quantas opções estão marcadas');
 
     // …e o Limpar volta os dois.
     await pagina.click('#limpar-filtros-da-produtividade');
     await pagina.waitForSelector('#analitico [data-periodo="de"]', { timeout: 10000 });
     igual(await valor('#analitico [data-periodo="como"]'), 'intervalo', 'volta para "Por data"');
     igual(await valor('#analitico [data-periodo="de"]'), noCalendario(1));
-    igual(await valor('#analitico select[data-filtro]'), '', 'o filtro de lista volta vazio');
+    igual(await pagina.locator('#analitico .filtro-etiqueta').count(), 0, 'o filtro de lista volta vazio');
 
     // Trabalho: a busca digitada sai com o Limpar.
     await pagina.click('[data-tela="trabalho"]');

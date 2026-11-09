@@ -94,21 +94,10 @@ var TelaTrabalho = (function () {
   }
 
   function desenharFiltros() {
+    // Cada filtro aceita várias opções (Etapa 72): a peça é a FiltroMultiplo,
+    // a mesma da Produtividade e da Tabela de Corretoras.
     var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
-      // A primeira opção é o nome do filtro puro — "Analista", "Status".
-      // Era "Todos — Analista", e o "Todos —" só ocupava espaço: a caixa
-      // fechada mostrava a palavra que menos importa, e em tela estreita o
-      // nome do filtro era justamente o pedaço que ficava cortado.
-      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
-      filtro.opcoes.forEach(function (opcao) {
-        var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
-          ? ' selected' : '';
-        opcoes.push('<option value="' + escapar(opcao.valor) + '"' + marcado + '>'
-          + escapar(opcao.rotulo) + '</option>');
-      });
-      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
-        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
-        + opcoes.join('') + '</select>';
+      return FiltroMultiplo.desenhar(filtro, filtrosEscolhidos);
     });
 
     // A BUSCA DIGITADA vem primeiro — pedido do PO: "o filtro por busca
@@ -132,7 +121,8 @@ var TelaTrabalho = (function () {
       busca
         + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
-        + Moldura.botaoLimparFiltros('limpar-filtros'),
+        + Moldura.botaoLimparFiltros('limpar-filtros')
+        + FiltroMultiplo.etiquetas(resumo.filtrosDisponiveis, filtrosEscolhidos),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + (resumo.buscaNaPlanilhaToda
           // A busca não olha o período (Etapa 69): a caixa diz onde ela procurou.
@@ -552,6 +542,11 @@ var TelaTrabalho = (function () {
   }
 
   function ligarPainel() {
+    FiltroMultiplo.ligar(elemento('painel'), resumo.filtrosDisponiveis, filtrosEscolhidos,
+      function (chave, valores) {
+        filtrosEscolhidos[chave] = valores;
+        carregar();
+      });
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {

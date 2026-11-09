@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.71 — a última etapa entregue é a 71. A regra do número está
+**Estado geral:** versão 1.72 — a última etapa entregue é a 72. A regra do número está
 na Etapa 68.
 
 ---
@@ -3769,6 +3769,34 @@ etapas aprovadas (71 a 75): **medir antes de consertar**.
 Nenhuma regra mudou: as funções públicas viraram uma casca fina que chama a de
 sempre (`…SemRelogio_`). 11 testes novos em `testes-cronometro.js` (o relógio é do
 teste: `agoraEmMs_`). 10 quebras de propósito, 10 pegas.
+
+---
+
+## Etapa 72 — Filtros com várias opções
+
+Pedido do PO: "melhorar os filtros para ser possível selecionar mais de um
+filtro" — e, na conferência do plano, "precisa ser em todos que tenham filtro".
+Segunda das cinco etapas aprovadas (71 a 75).
+
+| O que | Como ficou |
+|---|---|
+| **A regra** (`aplicarFiltros_`, `opcoesEscolhidas_`) | Cada filtro de lista aceita várias opções. Dentro do filtro, o caso passa com **qualquer uma** das marcadas; entre filtros, precisa passar em **todos**. Um valor só, como a tela mandava antes, continua valendo; lista vazia não filtra |
+| **Onde** | Trabalho, Produtividade RECC (os gráficos, o clique na barra e o CSV seguem o mesmo recorte) e o segmento da Tabela de Corretoras — as três telas que têm filtro de lista |
+| **A peça** (`FiltroMultiplo`, em `Comuns.html`) | Uma só para as três telas: o botão com o nome do filtro e quantas opções estão marcadas; a lista de marcar, com "Marcar todos", "Limpar" e "Aplicar", e a busca de opção quando passam de 8; as etiquetas "Filtrando por", cada uma com o "×" que a tira. Fecha com Aplicar, Esc ou um clique fora |
+| **Quantos casos cada opção tem** (`comAContagemDasOpcoes_`) | O número ao lado de cada opção, contado nos casos do período antes dos filtros — marcar uma opção não zera o número das outras |
+| **As idas ao servidor** | **Uma**, quando a lista fecha com escolha diferente da que abriu — marcar cinco opções custa uma chamada, não cinco |
+| **Versão** | 1.72 |
+
+**Diferente do desenho aprovado, e por quê.** A imagem da proposta dizia "filtra
+na hora, sem ir ao servidor". Não foi feito assim: filtrar na tela pediria mandar
+ao navegador todos os casos do período (hoje vão os 100 da fila) e repetir na tela
+as regras dos cartões — a abertura ficaria mais pesada justamente enquanto se
+investiga a lentidão (Etapa 71). Ficou uma ida por lista fechada. Filtrar sem
+servidor continua possível, como etapa própria, depois que o cronômetro disser
+onde o tempo está indo.
+
+12 testes novos em `testes-filtros-com-varias-opcoes.js`; o ponta a ponta marca
+duas opções, aplica e limpa. 12 quebras de propósito, 12 pegas.
 
 ---
 

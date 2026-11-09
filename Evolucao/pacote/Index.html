@@ -1490,6 +1490,38 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 .linha-do-tempo .quando { font-size: 12px; opacity: 0.75; }
 .linha-do-tempo .oque { font-weight: 600; font-size: 13.5px; }
 
+.filtro-multiplo { position: relative; display: inline-block; }
+.filtro-multiplo-botao { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; text-align: left; }
+.filtro-multiplo-botao.com-escolha { border-color: var(--destaque); background: var(--destaque-tenue); font-weight: 600; }
+.filtro-multiplo-botao b {
+  background: var(--destaque); color: var(--destaque-sobre); border-radius: 99px;
+  font-size: 11.5px; padding: 0 7px; line-height: 18px;
+}
+.filtro-multiplo-botao i { font-style: normal; font-size: 11px; opacity: .7; }
+.filtro-multiplo-painel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 280px; max-width: 86vw;
+  background: var(--superficie); border: 1px solid var(--linha-forte); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 10px;
+}
+.filtro-multiplo-busca {
+  width: 100%; height: 34px; margin-bottom: 6px; padding: 0 10px; font: inherit; font-size: 13.5px;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno); background: var(--superficie); color: var(--texto);
+}
+.filtro-multiplo-opcoes { max-height: 260px; overflow-y: auto; }
+.filtro-multiplo-opcao { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; font-size: 14px; cursor: pointer; }
+.filtro-multiplo-opcao[hidden] { display: none; }
+.filtro-multiplo-opcao:hover { background: var(--superficie-2); }
+.filtro-multiplo-opcao small { margin-left: auto; color: var(--tenue); }
+.filtro-multiplo-pe {
+  display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--linha);
+  margin-top: 6px; padding: 8px 4px 0;
+}
+.filtro-multiplo-pe button:not(.botao) { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--destaque); cursor: pointer; }
+.filtro-multiplo-pe .botao { margin-left: auto; }
+.filtro-etiquetas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; margin-top: 4px; font-size: 13px; color: var(--suave); }
+.filtro-etiqueta { background: var(--destaque-tenue); color: var(--destaque-escuro); border-radius: 6px; padding: 3px 4px 3px 10px; font-weight: 600; }
+.filtro-etiqueta button { background: none; border: 0; cursor: pointer; font: inherit; color: inherit; padding: 0 6px; opacity: .75; }
+
 .config-canais-cartao {
   display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr);
   margin-bottom: 16px;
@@ -2343,6 +2375,134 @@ var SenhaDeAdministrador = (function () {
 </script>
 
 <script>
+
+var FiltroMultiplo = (function () {
+
+  var OPCOES_PARA_TER_BUSCA = 8;
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+  function semAcento(texto) {
+    return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+  function lista(valor) {
+    if (Array.isArray(valor)) return valor.slice();
+    return valor === undefined || valor === null || valor === '' ? [] : [valor];
+  }
+
+  function desenhar(filtro, escolhidos) {
+    var marcadas = lista(escolhidos[filtro.chave]);
+    return '<span class="filtro-multiplo" data-multiplo="' + escapar(filtro.chave) + '">'
+      + '<button type="button" class="filtro filtro-multiplo-botao' + (marcadas.length ? ' com-escolha' : '') + '"'
+      + ' aria-haspopup="listbox" aria-expanded="false"'
+      + ' aria-label="Filtrar por ' + escapar(filtro.rotulo)
+      + (marcadas.length ? ' (' + marcadas.length + ' marcadas)' : '') + '">'
+      + '<span>' + escapar(filtro.rotulo) + '</span>'
+      + (marcadas.length ? '<b>' + marcadas.length + '</b>' : '')
+      + '<i aria-hidden="true">▾</i></button></span>';
+  }
+
+  function etiquetas(filtros, escolhidos) {
+    var feitas = filtros.map(function (filtro) {
+      var marcadas = lista(escolhidos[filtro.chave]);
+      if (!marcadas.length) return '';
+      var rotulos = marcadas.map(function (valor) {
+        var opcao = filtro.opcoes.filter(function (uma) { return uma.valor === valor; })[0];
+        return opcao ? opcao.rotulo : valor;
+      });
+      return '<span class="filtro-etiqueta">' + escapar(filtro.rotulo) + ': ' + escapar(rotulos.join(', '))
+        + '<button type="button" data-tirar-filtro="' + escapar(filtro.chave) + '"'
+        + ' aria-label="Tirar o filtro ' + escapar(filtro.rotulo) + '">×</button></span>';
+    }).join('');
+    return feitas ? '<div class="filtro-etiquetas"><span>Filtrando por</span>' + feitas + '</div>' : '';
+  }
+
+  function painel(filtro, marcadas) {
+    return '<div class="filtro-multiplo-painel" role="listbox" aria-multiselectable="true">'
+      + (filtro.opcoes.length > OPCOES_PARA_TER_BUSCA
+        ? '<input type="text" class="filtro-multiplo-busca" placeholder="Procurar opção…"'
+          + ' aria-label="Procurar opção">' : '')
+      + '<div class="filtro-multiplo-opcoes">'
+      + filtro.opcoes.map(function (opcao) {
+        return '<label class="filtro-multiplo-opcao"><input type="checkbox" value="'
+          + escapar(opcao.valor) + '"' + (marcadas.indexOf(opcao.valor) >= 0 ? ' checked' : '') + '>'
+          + '<span>' + escapar(opcao.rotulo) + '</span>'
+          + (opcao.quantos === undefined ? '' : '<small>' + opcao.quantos + '</small>') + '</label>';
+      }).join('') + '</div>'
+      + '<div class="filtro-multiplo-pe"><button type="button" data-multiplo-acao="todos">Marcar todos</button>'
+      + '<button type="button" data-multiplo-acao="limpar">Limpar</button>'
+      + '<button type="button" class="botao pequeno" data-multiplo-acao="aplicar">Aplicar</button></div></div>';
+  }
+
+  function iguais(uma, outra) {
+    return uma.length === outra.length && uma.every(function (valor) { return outra.indexOf(valor) >= 0; });
+  }
+
+  function ligar(raiz, filtros, escolhidos, aoMudar) {
+    if (!raiz) return;
+    var caixas = raiz.querySelectorAll('[data-multiplo]');
+    for (var i = 0; i < caixas.length; i++) ligarUma(caixas[i]);
+    var tirar = raiz.querySelectorAll('[data-tirar-filtro]');
+    for (var j = 0; j < tirar.length; j++) {
+      tirar[j].addEventListener('click', function () { aoMudar(this.getAttribute('data-tirar-filtro'), []); });
+    }
+
+    function ligarUma(caixa) {
+      var chave = caixa.getAttribute('data-multiplo');
+      var filtro = filtros.filter(function (um) { return um.chave === chave; })[0];
+      var botao = caixa.querySelector('.filtro-multiplo-botao');
+      if (!filtro || !botao) return;
+      var aberto = null;
+
+      function marcadasAgora() {
+        var marcas = aberto.querySelectorAll('input[type="checkbox"]:checked');
+        return Array.prototype.map.call(marcas, function (marca) { return marca.value; });
+      }
+      function fechar() {
+        if (!aberto) return;
+        var escolha = marcadasAgora();
+        caixa.removeChild(aberto);
+        aberto = null;
+        botao.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('mousedown', aoClicarFora, true);
+        if (!iguais(escolha, lista(escolhidos[chave]))) aoMudar(chave, escolha);
+      }
+      function aoClicarFora(evento) { if (aberto && !caixa.contains(evento.target)) fechar(); }
+      function abrir() {
+        caixa.insertAdjacentHTML('beforeend', painel(filtro, lista(escolhidos[chave])));
+        aberto = caixa.querySelector('.filtro-multiplo-painel');
+        botao.setAttribute('aria-expanded', 'true');
+        document.addEventListener('mousedown', aoClicarFora, true);
+        aberto.addEventListener('keydown', function (evento) {
+          if (evento.key === 'Escape') { evento.stopPropagation(); fechar(); botao.focus(); }
+        });
+        aberto.addEventListener('click', function (evento) {
+          var acao = evento.target.getAttribute && evento.target.getAttribute('data-multiplo-acao');
+          if (!acao) return;
+          if (acao === 'aplicar') { fechar(); return; }
+          var marcas = aberto.querySelectorAll('.filtro-multiplo-opcao:not([hidden]) input');
+          for (var k = 0; k < marcas.length; k++) marcas[k].checked = acao === 'todos';
+        });
+        var busca = aberto.querySelector('.filtro-multiplo-busca');
+        if (busca) {
+          busca.addEventListener('input', function () {
+            var termo = semAcento(this.value);
+            var opcoes = aberto.querySelectorAll('.filtro-multiplo-opcao');
+            for (var k = 0; k < opcoes.length; k++) {
+              opcoes[k].hidden = termo !== '' && semAcento(opcoes[k].textContent).indexOf(termo) < 0;
+            }
+          });
+          busca.focus();
+        } else {
+          var primeira = aberto.querySelector('input');
+          if (primeira) primeira.focus();
+        }
+      }
+      botao.addEventListener('click', function () { if (aberto) fechar(); else abrir(); });
+    }
+  }
+
+  return { desenhar: desenhar, etiquetas: etiquetas, ligar: ligar, lista: lista };
+})();
 
 var SeletorDeCanal = (function () {
 
@@ -3952,18 +4112,9 @@ var TelaTrabalho = (function () {
   }
 
   function desenharFiltros() {
-    var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
 
-      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
-      filtro.opcoes.forEach(function (opcao) {
-        var marcado = filtrosEscolhidos[filtro.chave] === opcao.valor
-          ? ' selected' : '';
-        opcoes.push('<option value="' + escapar(opcao.valor) + '"' + marcado + '>'
-          + escapar(opcao.rotulo) + '</option>');
-      });
-      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
-        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
-        + opcoes.join('') + '</select>';
+    var caixas = resumo.filtrosDisponiveis.map(function (filtro) {
+      return FiltroMultiplo.desenhar(filtro, filtrosEscolhidos);
     });
 
     var busca = '<input type="search" class="filtro busca-na-fila" data-filtro="busca"'
@@ -3976,7 +4127,8 @@ var TelaTrabalho = (function () {
       busca
         + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
-        + Moldura.botaoLimparFiltros('limpar-filtros'),
+        + Moldura.botaoLimparFiltros('limpar-filtros')
+        + FiltroMultiplo.etiquetas(resumo.filtrosDisponiveis, filtrosEscolhidos),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + (resumo.buscaNaPlanilhaToda
 
@@ -4297,6 +4449,11 @@ var TelaTrabalho = (function () {
   }
 
   function ligarPainel() {
+    FiltroMultiplo.ligar(elemento('painel'), resumo.filtrosDisponiveis, filtrosEscolhidos,
+      function (chave, valores) {
+        filtrosEscolhidos[chave] = valores;
+        carregar();
+      });
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
@@ -4854,7 +5011,7 @@ var TelaTabelaCorretoras = (function () {
   var abaAtual = 'corretoras';
   var procurar = '';
   var procurarBloqueada = '';
-  var segmento = '';
+  var segmento = [];
   var dados = null;
   var editando = null;
   var tipoDaImportacao = '';
@@ -4914,19 +5071,21 @@ var TelaTabelaCorretoras = (function () {
       + escapar(erro.message || String(erro)) + '</p>';
   }
 
+  function filtrosDasCorretoras() {
+    return [{ chave: 'segmento', rotulo: 'Segmento',
+      opcoes: dados.segmentos.map(function (um) { return { valor: um, rotulo: um }; }) }];
+  }
+
   function desenharCorretoras() {
-    var opcoes = ['<option value="">Todos os segmentos</option>']
-      .concat(dados.segmentos.map(function (um) {
-        return '<option value="' + escapar(um) + '"'
-          + (um === segmento ? ' selected' : '') + '>' + escapar(um) + '</option>';
-      })).join('');
+
+    var filtroDoSegmento = filtrosDasCorretoras()[0];
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
       + '<input type="search" id="procurar-corretora" class="busca-do-cadastro"'
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
       + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
       + ' aria-label="Procurar corretora">'
-      + '<select id="segmento-da-corretora" aria-label="Segmento">' + opcoes + '</select>'
+      + FiltroMultiplo.desenhar(filtroDoSegmento, { segmento: segmento })
       + Moldura.botaoLimparFiltros('limpar-filtros-corretoras')
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
         ? '<button type="button" class="botao pequeno" id="nova-corretora">'
@@ -5028,15 +5187,16 @@ var TelaTabelaCorretoras = (function () {
       carregar();
     });
 
-    elemento('segmento-da-corretora').addEventListener('change', function () {
-      segmento = this.value;
-      editando = null;
-      carregar();
-    });
+    FiltroMultiplo.ligar(elemento('corretoras-lista'), filtrosDasCorretoras(), { segmento: segmento },
+      function (chave, valores) {
+        segmento = valores;
+        editando = null;
+        carregar();
+      });
 
     elemento('limpar-filtros-corretoras').addEventListener('click', function () {
       procurar = '';
-      segmento = '';
+      segmento = [];
       editando = null;
       carregar();
     });
@@ -6921,22 +7081,15 @@ var TelaProdutividade = (function () {
   }
 
   function desenharFiltros() {
-    var caixas = painel.filtrosDisponiveis.map(function (filtro) {
 
-      var opcoes = ['<option value="">' + escapar(filtro.rotulo) + '</option>'];
-      filtro.opcoes.forEach(function (opcao) {
-        opcoes.push('<option value="' + escapar(opcao.valor) + '"'
-          + (filtros[filtro.chave] === opcao.valor ? ' selected' : '') + '>'
-          + escapar(opcao.rotulo) + '</option>');
-      });
-      return '<select class="filtro" data-filtro="' + escapar(filtro.chave) + '"'
-        + ' aria-label="Filtrar por ' + escapar(filtro.rotulo) + '">'
-        + opcoes.join('') + '</select>';
+    var caixas = painel.filtrosDisponiveis.map(function (filtro) {
+      return FiltroMultiplo.desenhar(filtro, filtros);
     });
 
     return Moldura.caixaDeFiltros(
       SeletorDePeriodo.desenhar(painel) + caixas.join('')
-        + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade'),
+        + Moldura.botaoLimparFiltros('limpar-filtros-da-produtividade')
+        + FiltroMultiplo.etiquetas(painel.filtrosDisponiveis, filtros),
       painel.total + ' casos · ' + escapar(painel.periodo.rotulo));
   }
 
@@ -7012,6 +7165,12 @@ var TelaProdutividade = (function () {
         carregar();
       });
     }
+
+    FiltroMultiplo.ligar(elemento('analitico'), painel.filtrosDisponiveis, filtros,
+      function (chave, valores) {
+        filtros[chave] = valores;
+        carregar();
+      });
 
     var caixas = document.querySelectorAll('#analitico .filtro');
     for (var i = 0; i < caixas.length; i++) {

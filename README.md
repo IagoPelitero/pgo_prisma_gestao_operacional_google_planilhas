@@ -104,7 +104,7 @@ sistema inteiro a um clique.
 
 Cada versão só é entregue quando passa por:
 
-- **1581 testes** automatizados, que simulam a planilha e o Apps Script;
+- **1593 testes** automatizados, que simulam a planilha e o Apps Script;
 - **testes de ponta a ponta** num navegador de verdade;
 - uma **varredura que clica em tudo**, inclusive com dados malformados;
 - a **conferência de responsividade** em todas as telas e larguras de tela;
