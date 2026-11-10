@@ -1643,7 +1643,7 @@ function horaDoExpediente_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   if (Object.prototype.toString.call(valor) === '[object Date]') {
     return isNaN(valor.getTime()) ? ''
-      : Utilities.formatDate(valor, RECC_FUSO_HORARIO, 'HH:mm');
+      : formatarData_(valor, 'HH:mm');
   }
   var partes = /^(\d{1,2})[:h](\d{2})$/.exec(String(valor).trim());
   if (!partes) return '';
@@ -2438,8 +2438,7 @@ function listarAuditoria(quantas) {
     .map(function (linha) {
       return {
         dataHora: linha.DataHora
-          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,
-            'dd/MM/yyyy HH:mm')
+          ? formatarData_(new Date(linha.DataHora), 'dd/MM/yyyy HH:mm')
           : '',
         quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || 'Sem dados',
         acao: String(linha.Acao || ''),
@@ -2468,7 +2467,7 @@ function listarErros(quantos) {
     .map(function (linha) {
       return {
         dataHora: linha.DataHora
-          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm')
+          ? formatarData_(new Date(linha.DataHora), 'dd/MM/yyyy HH:mm')
           : '',
         quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || (linha.UsuarioId ? 'Sem dados' : 'o sistema'),
         origem: String(linha.Origem || ''),
@@ -2514,12 +2513,11 @@ function configuracaoDoArquivoDaAuditoria() {
     planilhaId: String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim(),
     meses: RECC_MESES_QUE_A_AUDITORIA_GUARDA,
     ultimoEm: ultimo
-      ? Utilities.formatDate(ultimo, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm') : '',
+      ? formatarData_(ultimo, 'dd/MM/yyyy HH:mm') : '',
     ultimoQuantas: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO, 0)) || 0,
     linhasNaAuditoria: Math.max(
       ultimaLinhaComConteudo_(estruturaDaAba_('AUDITORIA')) - 1, 0),
-    arquivariaAte: Utilities.formatDate(limiteDoArquivamento_(new Date()),
-      RECC_FUSO_HORARIO, 'dd/MM/yyyy')
+    arquivariaAte: formatarData_(limiteDoArquivamento_(new Date()), 'dd/MM/yyyy')
   };
 }
 
@@ -2685,9 +2683,9 @@ function arquivarAuditoria_(agora) {
     trava.releaseLock();
   }
 
-  var ate = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  var ate = formatarData_(limite, 'dd/MM/yyyy');
   gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO,
-    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm'));
+    formatarData_(agora, 'yyyy-MM-dd HH:mm'));
   gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO, String(quantas));
   registrarAuditoria_('auditoria.arquivar', 'AUDITORIA', '',
     quantas + ' linha(s) de antes de ' + ate + ' → ' + id);
@@ -2816,8 +2814,7 @@ function configuracaoDoArquivoDaBase() {
     meses: RECC_MESES_QUE_A_BASE_GUARDA,
     ultimoEm: ultimo,
     ultimoQuantos: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, 0)) || 0,
-    arquivariaAte: Utilities.formatDate(limiteDoHistoricoDaBase_(new Date()),
-      RECC_FUSO_HORARIO, 'dd/MM/yyyy'),
+    arquivariaAte: formatarData_(limiteDoHistoricoDaBase_(new Date()), 'dd/MM/yyyy'),
     planilhaDasAnalises: String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, '')).trim()
   };
 }
@@ -2910,9 +2907,9 @@ function arquivarBase_(agora, segundos) {
   } while (faltam > 0 && new Date().getTime() < ate);
   porCanal = Object.keys(porCanal).map(function (chave) { return porCanal[chave]; });
 
-  var antesDe = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  var antesDe = formatarData_(limite, 'dd/MM/yyyy');
   gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE,
-    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    formatarData_(agora, 'dd/MM/yyyy HH:mm'));
   gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, String(arquivados));
   registrarAuditoria_('base.arquivar', 'BASE', '', arquivados + ' caso(s) encerrados de antes de '
     + antesDe + ' → ' + id + (faltam ? ' · faltam ' + faltam : ''));
@@ -3110,8 +3107,7 @@ function analiseDaLinha_(linha, canais) {
     aba: nomeDaAba,
     abaExiste: !!aba,
     geradaEm: linha.GeradaEm
-      ? Utilities.formatDate(new Date(linha.GeradaEm), RECC_FUSO_HORARIO,
-        'dd/MM/yyyy HH:mm')
+      ? formatarData_(new Date(linha.GeradaEm), 'dd/MM/yyyy HH:mm')
       : '',
     linhasGeradas: Number(linha.Linhas) || 0
   };

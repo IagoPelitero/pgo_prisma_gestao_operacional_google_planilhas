@@ -4882,7 +4882,7 @@ var TelaBuscarCaso = (function () {
       '<p class="carregando-campos">Procurando…</p>';
 
     Servidor.chamar('buscarCasos', termo, onde, incluirLegado,
-      incluirHistorico && !!(opcoes.historico && opcoes.historico.ligado))
+      incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado))
       .entao(function (resposta) {
         procurando = false;
         elemento('botao-buscar').disabled = false;
@@ -10505,7 +10505,8 @@ var TelaConfiguracoes = (function () {
 
       + '<p class="config-explica">As linhas <strong>lento</strong> são do cronômetro: chamada que '
       + 'passou de 8 segundos. "Levou N s no servidor" diz quanto foi esperando a trava (outra '
-      + 'gravação na frente) e quanto foi lendo a planilha. "A tela esperou N s", sem uma linha do '
+      + 'gravação na frente), lendo a planilha, procurando (o localizador, o histórico e a base '
+      + 'antiga) e formatando datas. "A tela esperou N s", sem uma linha do '
       + 'servidor por perto, é fila do Google: gente demais chamando ao mesmo tempo.</p>'
       + (erros.length
         ? '<ul class="trilha">' + erros.map(function (erro) {
@@ -11227,6 +11228,8 @@ var Servidor = (function () {
 
 if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('error', function (evento) {
+
+    if (/^ResizeObserver loop/.test(String(evento.message || ''))) return;
     var pilha = evento.error && evento.error.stack ? evento.error.stack : '';
     Servidor.avisarErro('javascript', evento.message,
       (evento.filename || '') + ':' + (evento.lineno || '') + (pilha ? '\n' + pilha : ''));

@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.75 — a última etapa entregue é a 75. A regra do número está
+**Estado geral:** versão 1.76 — a última etapa entregue é a 76. A regra do número está
 na Etapa 68.
 
 ---
@@ -3899,6 +3899,53 @@ das telas ficaram como estavam.
 
 7 testes novos em `testes-acabamento.js` e dois ponta a ponta. 7 quebras de
 propósito, 7 pegas.
+
+---
+
+## Etapa 76 — Os 40 segundos, pela medição
+
+O PO mandou a aba ERROS da operação — 251 linhas, de 30/10 a 10/11, com o
+cronômetro da Etapa 71 ligado no último dia. Foi para isto que ele foi feito.
+
+**O que a aba mostrou** (99 chamadas lentas medidas no servidor, em 10/11):
+
+| | |
+|---|---|
+| **Esperando a trava** | 0 s, em todas. Não é uma gravação na frente da outra |
+| **Lendo a planilha** | 3,5 s na mediana, 8,6 s no pior caso — 14% do tempo |
+| **"No resto"** | 7,3 s na mediana, e 86% do tempo somado |
+| **Fila do Google** | A tela esperou sempre uns 4 s a mais do que o servidor levou. Não é gente demais ao mesmo tempo |
+| **Quem sofre** | Abrir o Trabalho: 80 das 99 (11 s na mediana; uma em cada dez passa de 24 s). O Buscar Caso: poucas, mas de 40 a 70 s cada |
+
+O tempo estava no servidor, fora da trava e fora da leitura. Medindo o que o
+código faz nesse "resto", na mesma base de 3 mil casos: a conta em si leva
+centésimos de segundo, e a abertura do Trabalho fazia **mais de 5 mil idas ao
+formatador de datas do Google** (`Utilities.formatDate`) — uma por linha, só para
+saber de que dia ela é.
+
+| O que | Como ficou |
+|---|---|
+| **A data lembrada** (`formatarData_`) | O texto de cada instante e formato é guardado enquanto a execução dura, e as 46 chamadas do servidor passam por ela. O texto é o que o Google devolveria: nenhuma conta de fuso é refeita. Na mesma base, a abertura do Trabalho foi de 5.414 idas para 256 |
+| **O cronômetro diz mais** | A linha ganha duas partes: "N s procurando" (o localizador da planilha, a planilha de histórico e a base do sistema anterior) e "N s formatando datas". O Buscar Caso de 40 a 70 s tinha só 7 s de leitura — o resto vai ganhar nome na próxima aba ERROS |
+| **Buscar Caso** | `Cannot read properties of null (reading 'historico')`, 17 vezes na aba: quem apertava Buscar antes de as opções da tela chegarem não buscava nada. Agora busca |
+| **Ruído** | "ResizeObserver loop…" é aviso do navegador, e não erro: deixou de ir para a aba (eram 23 linhas) |
+| **Versão** | 1.76 |
+
+**O que é medição e o que é aposta.** Que o tempo está no "resto", e não na trava,
+na leitura nem na fila, a aba mostra. Que o "resto" é o formatador de datas é o
+que o código mostra — é a única ida ao serviço que se repete aos milhares —, mas
+quanto cada ida custa na planilha de verdade só a próxima aba ERROS confirma: se
+for isso, o "resto" do Trabalho cai para perto de zero; se sobrar, "formatando
+datas" e "procurando" dirão quanto é de cada um.
+
+**O que a aba mostrou e este código não resolve:** duas chamadas travaram por
+muito tempo (148 s e 1.220 s, com menos de 2 s de leitura) — isso é o serviço do
+Google parado, e não conta do sistema. E a leitura de verdade é umas quatro vezes
+mais lenta do que a estimada aqui: a Etapa 74, que ainda não estava na operação
+quando a aba foi tirada, corta a maior parte dela na abertura.
+
+11 testes novos em `testes-o-que-a-aba-erros-mostrou.js`. 10 quebras de propósito,
+10 pegas.
 
 ---
 

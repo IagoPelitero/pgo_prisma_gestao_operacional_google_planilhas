@@ -257,6 +257,9 @@ var Servidor = (function () {
 // sem quem a tratasse, vão para a aba ERROS (Etapa 64).
 if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('error', function (evento) {
+    // "ResizeObserver loop…" é um aviso do navegador, e não um erro da tela:
+    // nada quebra. Na aba ERROS do PO eram 23 linhas de ruído (Etapa 76).
+    if (/^ResizeObserver loop/.test(String(evento.message || ''))) return;
     var pilha = evento.error && evento.error.stack ? evento.error.stack : '';
     Servidor.avisarErro('javascript', evento.message,
       (evento.filename || '') + ':' + (evento.lineno || '') + (pilha ? '\n' + pilha : ''));

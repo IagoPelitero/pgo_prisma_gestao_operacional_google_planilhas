@@ -2750,6 +2750,10 @@ function expressaoDaBuscaRapida_(alvo, ehIdentificador, inteira) {
  * `alvo` já vem na forma de comparar (normalizado, ou só dígitos).
  */
 function linhasDaBuscaRapida_(estrutura, indiceDaColuna, alvo, ehIdentificador, inteira) {
+  return procurandoNaPlanilha_(linhasDaBuscaRapidaSemRelogio_, arguments);
+}
+
+function linhasDaBuscaRapidaSemRelogio_(estrutura, indiceDaColuna, alvo, ehIdentificador, inteira) {
   if (!alvo || !/^[a-z0-9]+$/.test(alvo) || !buscaRapidaLigada_()) return null;
   var total = quantidadeDeRegistros_(estrutura);
   if (total <= 0) return [];

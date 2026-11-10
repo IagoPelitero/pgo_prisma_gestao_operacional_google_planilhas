@@ -235,8 +235,8 @@ function montarPacoteDePartida_(quem) {
  * o que mudou em Evolucao/05-progresso.md.
  */
 const RECC_VERSAO = {
-  numero: '1.75',
-  data: '09/11/2026'
+  numero: '1.76',
+  data: '10/11/2026'
 };
 
 // ============================================================================
@@ -441,7 +441,7 @@ function dataDoUltimoRegistro_(quem) {
 
   var padrao = deQualCanal && !temHora_(maisRecente) ? 'dd/MM/yyyy' : 'dd/MM/yyyy HH:mm';
   return {
-    texto: Utilities.formatDate(maisRecente, RECC_FUSO_HORARIO, padrao),
+    texto: formatarData_(maisRecente, padrao),
     canal: deQualCanal,
     existe: true
   };
@@ -1355,7 +1355,7 @@ function segundosDaChamadaLenta_() {
 function cronometrado_(nome, fazer, argumentos) {
   // Chamada dentro de chamada (a exportação chama a Produtividade): conta a de fora.
   if (RECC_RELOGIO) return fazer.apply(null, argumentos);
-  RECC_RELOGIO = { inicio: agoraEmMs_(), trava: 0, leitura: 0, lendo: 0 };
+  RECC_RELOGIO = { inicio: agoraEmMs_(), trava: 0, leitura: 0, busca: 0, datas: 0, lendo: 0 };
   try {
     return fazer.apply(null, argumentos);
   } finally {
@@ -1371,7 +1371,9 @@ function registrarSeFoiLenta_(nome, relogio, total) {
     var segundos = function (ms) { return Math.round(ms / 100) / 10; };
     registrarErro_('lento', nome, 'Levou ' + segundos(total) + ' s no servidor: '
       + segundos(relogio.trava) + ' s esperando a trava, ' + segundos(relogio.leitura)
-      + ' s lendo a planilha, ' + segundos(Math.max(0, total - relogio.trava - relogio.leitura))
+      + ' s lendo a planilha, ' + segundos(relogio.busca) + ' s procurando, '
+      + segundos(relogio.datas) + ' s formatando datas, '
+      + segundos(Math.max(0, total - relogio.trava - relogio.leitura - relogio.busca - relogio.datas))
       + ' s no resto', '');
   } catch (erro) {
     Logger.log('O cronômetro não conseguiu registrar: ' + erro.message);
@@ -1390,15 +1392,67 @@ function esperarATrava_(trava, milissegundos) {
 
 /** Uma leitura da planilha, somada ao relógio. Leitura dentro de leitura conta uma vez. */
 function lendoAPlanilha_(ler, argumentos) {
-  if (!RECC_RELOGIO || RECC_RELOGIO.lendo) return ler.apply(null, argumentos);
+  return noRelogio_('leitura', ler, argumentos);
+}
+
+/**
+ * Uma PROCURA, somada ao relógio à parte da leitura (Etapa 76): o localizador
+ * da planilha, a planilha de histórico e a base do sistema anterior. Na aba
+ * ERROS do PO, o Buscar Caso levava de 40 a 70 s com só 7 s de leitura — o
+ * resto estava aqui, sem nome.
+ */
+function procurandoNaPlanilha_(procurar, argumentos) {
+  return noRelogio_('busca', procurar, argumentos);
+}
+
+/** Soma o tempo de `fazer` à parte do relógio. Uma parte dentro de outra conta na de fora. */
+function noRelogio_(parte, fazer, argumentos) {
+  if (!RECC_RELOGIO || RECC_RELOGIO.lendo) return fazer.apply(null, argumentos);
   var inicio = agoraEmMs_();
   RECC_RELOGIO.lendo = 1;
   try {
-    return ler.apply(null, argumentos);
+    return fazer.apply(null, argumentos);
   } finally {
     RECC_RELOGIO.lendo = 0;
-    RECC_RELOGIO.leitura += agoraEmMs_() - inicio;
+    RECC_RELOGIO[parte] += agoraEmMs_() - inicio;
   }
+}
+
+/*
+ * A DATA EM TEXTO, NO FUSO DO SISTEMA — E LEMBRADA (Etapa 76).
+ *
+ * A aba ERROS do PO mostrou onde estavam os 40 segundos: nenhum esperando a
+ * trava, uns 3,5 s lendo a planilha e 7 s ou mais "no resto". O resto era
+ * isto: `Utilities.formatDate` é uma ida ao serviço do Google, e abrir o
+ * Trabalho com 3 mil casos fazia mais de 4 mil — uma por linha, só para
+ * saber de que dia ela é.
+ *
+ * As datas se repetem (3 mil casos caem em poucas dezenas de dias), então a
+ * resposta de cada instante e formato é guardada enquanto a execução durar. O
+ * texto é o MESMO que o Google devolveria — nenhuma conta de fuso é refeita
+ * aqui. O que sobrar de ida ao serviço entra no relógio como "formatando datas".
+ */
+var RECC_DATAS_JA_FORMATADAS = {};
+var RECC_QUANTAS_DATAS_FORMATADAS = 0;
+const RECC_DATAS_LEMBRADAS_NO_MAXIMO = 20000;
+
+function formatarData_(data, formato) {
+  var chave = data.getTime() + '|' + formato;
+  var pronta = RECC_DATAS_JA_FORMATADAS[chave];
+  if (pronta !== undefined) return pronta;
+
+  var cronometrar = RECC_RELOGIO && !RECC_RELOGIO.lendo;
+  var inicio = cronometrar ? agoraEmMs_() : 0;
+  var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, formato);
+  if (cronometrar) RECC_RELOGIO.datas += agoraEmMs_() - inicio;
+
+  if (RECC_QUANTAS_DATAS_FORMATADAS >= RECC_DATAS_LEMBRADAS_NO_MAXIMO) {
+    RECC_DATAS_JA_FORMATADAS = {};
+    RECC_QUANTAS_DATAS_FORMATADAS = 0;
+  }
+  RECC_DATAS_JA_FORMATADAS[chave] = texto;
+  RECC_QUANTAS_DATAS_FORMATADAS++;
+  return texto;
 }
 
 /** Registra um erro. `origem`: 'servidor' ou 'tela'; `onde`: a função ou a tela. */
@@ -1563,7 +1617,7 @@ function comoDataEHora_(valor) {
   if (!valor) return '';
   var data = converterParaData_(valor);
   if (!data) return '';
-  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+  return formatarData_(data, 'dd/MM/yyyy HH:mm');
 }
 
 /**

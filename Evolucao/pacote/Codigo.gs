@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-10 08:06
+   Gerado em 2026-11-10 17:49
    ========================================================================== */
 
 
@@ -1676,6 +1676,10 @@ function expressaoDaBuscaRapida_(alvo, ehIdentificador, inteira) {
 }
 
 function linhasDaBuscaRapida_(estrutura, indiceDaColuna, alvo, ehIdentificador, inteira) {
+  return procurandoNaPlanilha_(linhasDaBuscaRapidaSemRelogio_, arguments);
+}
+
+function linhasDaBuscaRapidaSemRelogio_(estrutura, indiceDaColuna, alvo, ehIdentificador, inteira) {
   if (!alvo || !/^[a-z0-9]+$/.test(alvo) || !buscaRapidaLigada_()) return null;
   var total = quantidadeDeRegistros_(estrutura);
   if (total <= 0) return [];
@@ -2506,8 +2510,7 @@ function resumoDasSusepsBloqueadas(procurar) {
         coordenadorComercial: String(linha.CoordenadorComercial || ''),
         bloqueadaPor: quemBloqueou_(linha.BloqueadaPor),
         bloqueadaEm: linha.BloqueadaEm
-          ? Utilities.formatDate(new Date(linha.BloqueadaEm), RECC_FUSO_HORARIO,
-            'dd/MM/yyyy')
+          ? formatarData_(new Date(linha.BloqueadaEm), 'dd/MM/yyyy')
           : '',
         casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
       };
@@ -3091,9 +3094,9 @@ function valorPadraoResolvido_(valorPadrao, quem) {
   var agora = new Date();
   switch (texto.toUpperCase()) {
     case '@HOJE':
-      return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+      return formatarData_(agora, 'dd/MM/yyyy');
     case '@AGORA':
-      return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+      return formatarData_(agora, 'dd/MM/yyyy HH:mm');
     case '@EU':
       return quem && quem.usuario ? String(quem.usuario.Nome || '') : '';
     default:
@@ -3510,8 +3513,8 @@ function quantosDigitosAMascaraPede_(mascara) {
 
 function dataEstaNoFuturo_(data) {
   var agora = new Date();
-  var hojeAqui = Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var aDataDela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var hojeAqui = formatarData_(agora, 'yyyy-MM-dd');
+  var aDataDela = formatarData_(data, 'yyyy-MM-dd');
   return aDataDela > hojeAqui;
 }
 
@@ -3765,7 +3768,7 @@ function carimboParaAColuna_(estrutura, posicao) {
   var tipo = estrutura.tipos[posicao];
   var agora = new Date();
   if (tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.DATA_HORA) return agora;
-  return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+  return formatarData_(agora, 'dd/MM/yyyy HH:mm');
 }
 
 function situacaoDoCanalPeloValor_(canal, valor) {
@@ -4003,7 +4006,7 @@ function linhaDoTempoDoCaso_(registro, estrutura, canal) {
     var temHora = quando.getHours() || quando.getMinutes();
     eventos.push({
       quando: quando.getTime(),
-      data: Utilities.formatDate(quando, RECC_FUSO_HORARIO, temHora ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy'),
+      data: formatarData_(quando, temHora ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy'),
       oQue: ehAEntrada ? 'Entrada do caso' : cabecalho,
       entrada: !!ehAEntrada
     });
@@ -4196,11 +4199,11 @@ function preencherEntradaAutomatica_(canal, paraGravar) {
   var agora = new Date();
   if (canal.colunaDaData && !paraGravar[canal.colunaDaData]) {
     paraGravar[canal.colunaDaData] =
-      Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+      formatarData_(agora, 'dd/MM/yyyy');
   }
   if (canal.colunaDaHora && !paraGravar[canal.colunaDaHora]) {
     paraGravar[canal.colunaDaHora] =
-      Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'HH:mm');
+      formatarData_(agora, 'HH:mm');
   }
 }
 
@@ -4526,6 +4529,10 @@ function procurarNoCanal_(canal, termo, quem) {
 }
 
 function procurarNoHistorico_(canal, termo, quem) {
+  return procurandoNaPlanilha_(procurarNoHistoricoSemRelogio_, arguments);
+}
+
+function procurarNoHistoricoSemRelogio_(canal, termo, quem) {
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
   if (!id) return null;
   comAGrafiaDaAba_(canal);
@@ -4603,6 +4610,10 @@ function descricaoDoLegado_() {
 }
 
 function procurarNoLegado_(termo) {
+  return procurandoNaPlanilha_(procurarNoLegadoSemRelogio_, arguments);
+}
+
+function procurarNoLegadoSemRelogio_(termo) {
   var configurado = descricaoDoLegado_();
   if (!configurado.ligado) return null;
 
@@ -6709,7 +6720,7 @@ function horaDoExpediente_(valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   if (Object.prototype.toString.call(valor) === '[object Date]') {
     return isNaN(valor.getTime()) ? ''
-      : Utilities.formatDate(valor, RECC_FUSO_HORARIO, 'HH:mm');
+      : formatarData_(valor, 'HH:mm');
   }
   var partes = /^(\d{1,2})[:h](\d{2})$/.exec(String(valor).trim());
   if (!partes) return '';
@@ -7299,8 +7310,7 @@ function listarAuditoria(quantas) {
     .map(function (linha) {
       return {
         dataHora: linha.DataHora
-          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO,
-            'dd/MM/yyyy HH:mm')
+          ? formatarData_(new Date(linha.DataHora), 'dd/MM/yyyy HH:mm')
           : '',
         quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || 'Sem dados',
         acao: String(linha.Acao || ''),
@@ -7325,7 +7335,7 @@ function listarErros(quantos) {
     .map(function (linha) {
       return {
         dataHora: linha.DataHora
-          ? Utilities.formatDate(new Date(linha.DataHora), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm')
+          ? formatarData_(new Date(linha.DataHora), 'dd/MM/yyyy HH:mm')
           : '',
         quem: nomes[converterParaIdentificador_(linha.UsuarioId)] || (linha.UsuarioId ? 'Sem dados' : 'o sistema'),
         origem: String(linha.Origem || ''),
@@ -7349,12 +7359,11 @@ function configuracaoDoArquivoDaAuditoria() {
     planilhaId: String(valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '')).trim(),
     meses: RECC_MESES_QUE_A_AUDITORIA_GUARDA,
     ultimoEm: ultimo
-      ? Utilities.formatDate(ultimo, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm') : '',
+      ? formatarData_(ultimo, 'dd/MM/yyyy HH:mm') : '',
     ultimoQuantas: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO, 0)) || 0,
     linhasNaAuditoria: Math.max(
       ultimaLinhaComConteudo_(estruturaDaAba_('AUDITORIA')) - 1, 0),
-    arquivariaAte: Utilities.formatDate(limiteDoArquivamento_(new Date()),
-      RECC_FUSO_HORARIO, 'dd/MM/yyyy')
+    arquivariaAte: formatarData_(limiteDoArquivamento_(new Date()), 'dd/MM/yyyy')
   };
 }
 
@@ -7483,9 +7492,9 @@ function arquivarAuditoria_(agora) {
     trava.releaseLock();
   }
 
-  var ate = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  var ate = formatarData_(limite, 'dd/MM/yyyy');
   gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO,
-    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm'));
+    formatarData_(agora, 'yyyy-MM-dd HH:mm'));
   gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO, String(quantas));
   registrarAuditoria_('auditoria.arquivar', 'AUDITORIA', '',
     quantas + ' linha(s) de antes de ' + ate + ' → ' + id);
@@ -7581,8 +7590,7 @@ function configuracaoDoArquivoDaBase() {
     meses: RECC_MESES_QUE_A_BASE_GUARDA,
     ultimoEm: ultimo,
     ultimoQuantos: Number(valorDaConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, 0)) || 0,
-    arquivariaAte: Utilities.formatDate(limiteDoHistoricoDaBase_(new Date()),
-      RECC_FUSO_HORARIO, 'dd/MM/yyyy'),
+    arquivariaAte: formatarData_(limiteDoHistoricoDaBase_(new Date()), 'dd/MM/yyyy'),
     planilhaDasAnalises: String(valorDaConfiguracao_(RECC_CHAVE_DA_PLANILHA_DAS_ANALISES, '')).trim()
   };
 }
@@ -7662,9 +7670,9 @@ function arquivarBase_(agora, segundos) {
   } while (faltam > 0 && new Date().getTime() < ate);
   porCanal = Object.keys(porCanal).map(function (chave) { return porCanal[chave]; });
 
-  var antesDe = Utilities.formatDate(limite, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  var antesDe = formatarData_(limite, 'dd/MM/yyyy');
   gravarConfiguracao_(RECC_CHAVE_DO_ULTIMO_ARQUIVAMENTO_DA_BASE,
-    Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    formatarData_(agora, 'dd/MM/yyyy HH:mm'));
   gravarConfiguracao_(RECC_CHAVE_DO_QUANTO_FOI_ARQUIVADO_DA_BASE, String(arquivados));
   registrarAuditoria_('base.arquivar', 'BASE', '', arquivados + ' caso(s) encerrados de antes de '
     + antesDe + ' → ' + id + (faltam ? ' · faltam ' + faltam : ''));
@@ -7793,8 +7801,7 @@ function analiseDaLinha_(linha, canais) {
     aba: nomeDaAba,
     abaExiste: !!aba,
     geradaEm: linha.GeradaEm
-      ? Utilities.formatDate(new Date(linha.GeradaEm), RECC_FUSO_HORARIO,
-        'dd/MM/yyyy HH:mm')
+      ? formatarData_(new Date(linha.GeradaEm), 'dd/MM/yyyy HH:mm')
       : '',
     linhasGeradas: Number(linha.Linhas) || 0
   };
@@ -8670,8 +8677,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.75',
-  data: '09/11/2026'
+  numero: '1.76',
+  data: '10/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -8814,7 +8821,7 @@ function dataDoUltimoRegistro_(quem) {
 
   var padrao = deQualCanal && !temHora_(maisRecente) ? 'dd/MM/yyyy' : 'dd/MM/yyyy HH:mm';
   return {
-    texto: Utilities.formatDate(maisRecente, RECC_FUSO_HORARIO, padrao),
+    texto: formatarData_(maisRecente, padrao),
     canal: deQualCanal,
     existe: true
   };
@@ -9387,7 +9394,7 @@ function segundosDaChamadaLenta_() {
 function cronometrado_(nome, fazer, argumentos) {
 
   if (RECC_RELOGIO) return fazer.apply(null, argumentos);
-  RECC_RELOGIO = { inicio: agoraEmMs_(), trava: 0, leitura: 0, lendo: 0 };
+  RECC_RELOGIO = { inicio: agoraEmMs_(), trava: 0, leitura: 0, busca: 0, datas: 0, lendo: 0 };
   try {
     return fazer.apply(null, argumentos);
   } finally {
@@ -9403,7 +9410,9 @@ function registrarSeFoiLenta_(nome, relogio, total) {
     var segundos = function (ms) { return Math.round(ms / 100) / 10; };
     registrarErro_('lento', nome, 'Levou ' + segundos(total) + ' s no servidor: '
       + segundos(relogio.trava) + ' s esperando a trava, ' + segundos(relogio.leitura)
-      + ' s lendo a planilha, ' + segundos(Math.max(0, total - relogio.trava - relogio.leitura))
+      + ' s lendo a planilha, ' + segundos(relogio.busca) + ' s procurando, '
+      + segundos(relogio.datas) + ' s formatando datas, '
+      + segundos(Math.max(0, total - relogio.trava - relogio.leitura - relogio.busca - relogio.datas))
       + ' s no resto', '');
   } catch (erro) {
     Logger.log('O cronômetro não conseguiu registrar: ' + erro.message);
@@ -9420,15 +9429,46 @@ function esperarATrava_(trava, milissegundos) {
 }
 
 function lendoAPlanilha_(ler, argumentos) {
-  if (!RECC_RELOGIO || RECC_RELOGIO.lendo) return ler.apply(null, argumentos);
+  return noRelogio_('leitura', ler, argumentos);
+}
+
+function procurandoNaPlanilha_(procurar, argumentos) {
+  return noRelogio_('busca', procurar, argumentos);
+}
+
+function noRelogio_(parte, fazer, argumentos) {
+  if (!RECC_RELOGIO || RECC_RELOGIO.lendo) return fazer.apply(null, argumentos);
   var inicio = agoraEmMs_();
   RECC_RELOGIO.lendo = 1;
   try {
-    return ler.apply(null, argumentos);
+    return fazer.apply(null, argumentos);
   } finally {
     RECC_RELOGIO.lendo = 0;
-    RECC_RELOGIO.leitura += agoraEmMs_() - inicio;
+    RECC_RELOGIO[parte] += agoraEmMs_() - inicio;
   }
+}
+
+var RECC_DATAS_JA_FORMATADAS = {};
+var RECC_QUANTAS_DATAS_FORMATADAS = 0;
+const RECC_DATAS_LEMBRADAS_NO_MAXIMO = 20000;
+
+function formatarData_(data, formato) {
+  var chave = data.getTime() + '|' + formato;
+  var pronta = RECC_DATAS_JA_FORMATADAS[chave];
+  if (pronta !== undefined) return pronta;
+
+  var cronometrar = RECC_RELOGIO && !RECC_RELOGIO.lendo;
+  var inicio = cronometrar ? agoraEmMs_() : 0;
+  var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, formato);
+  if (cronometrar) RECC_RELOGIO.datas += agoraEmMs_() - inicio;
+
+  if (RECC_QUANTAS_DATAS_FORMATADAS >= RECC_DATAS_LEMBRADAS_NO_MAXIMO) {
+    RECC_DATAS_JA_FORMATADAS = {};
+    RECC_QUANTAS_DATAS_FORMATADAS = 0;
+  }
+  RECC_DATAS_JA_FORMATADAS[chave] = texto;
+  RECC_QUANTAS_DATAS_FORMATADAS++;
+  return texto;
 }
 
 function registrarErro_(origem, onde, mensagem, detalhe) {
@@ -9550,7 +9590,7 @@ function comoDataEHora_(valor) {
   if (!valor) return '';
   var data = converterParaData_(valor);
   if (!data) return '';
-  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+  return formatarData_(data, 'dd/MM/yyyy HH:mm');
 }
 
 function salvarUsuario(dados) {
@@ -9787,13 +9827,13 @@ function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
 }
 
 function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
-  var de = Utilities.formatDate(inicio, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var de = formatarData_(inicio, 'yyyy-MM-dd');
+  var ate = formatarData_(fim, 'yyyy-MM-dd');
 
   return registros.filter(function (registro) {
     var data = converterParaData_(registro[canal.colunaDaData]);
     if (!data) return guardarSemData === true;
-    var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+    var dela = formatarData_(data, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
 }
@@ -9810,8 +9850,8 @@ function registrosDosPeriodos_(canal, periodos) {
 
   var limites = periodos.map(function (periodo) {
     return {
-      de: Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
-      ate: Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
+      de: formatarData_(periodo.de, 'yyyy-MM-dd'),
+      ate: formatarData_(periodo.ate, 'yyyy-MM-dd'),
       semData: periodo.guardarSemData === true
     };
   });
@@ -9822,7 +9862,7 @@ function registrosDosPeriodos_(canal, periodos) {
   var dosOutros = [];
   lerColunaInteira_(canal.aba, estrutura.cabecalhos[posicao]).forEach(function (valor, i) {
     var data = converterParaData_(valor);
-    var dela = data ? Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '';
+    var dela = data ? formatarData_(data, 'yyyy-MM-dd') : '';
     if (dele(limites[0], dela)) doPrimeiro.push(i + 2);
     else if (limites.slice(1).some(function (limite) { return dele(limite, dela); })) dosOutros.push(i + 2);
   });
@@ -9879,6 +9919,10 @@ function registrosDaBuscaNaPlanilha_(canal, termo) {
 const RECC_PEDACO_MINIMO_DA_BUSCA = 4;
 
 function linhasDoTermoNaPlanilha_(estrutura, termo, total) {
+  return procurandoNaPlanilha_(linhasDoTermoNaPlanilhaSemRelogio_, arguments);
+}
+
+function linhasDoTermoNaPlanilhaSemRelogio_(estrutura, termo, total) {
   if (!buscaRapidaLigada_()) return null;
   var procurados = [normalizarParaComparar_(termo)];
   var pedacos = String(termo).split(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/).filter(function (p) { return p; });
@@ -10022,7 +10066,7 @@ function diasEntre_(de, ate) {
 }
 
 function comoSeEscreve_(data) {
-  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  return formatarData_(data, 'dd/MM/yyyy');
 }
 
 function mesValido_(texto) {
@@ -10621,7 +10665,7 @@ function casosPertoDeVencer_(registros, canal) {
 }
 
 function relogioDeParede_(data) {
-  var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm');
+  var texto = formatarData_(data, 'yyyy-MM-dd HH:mm');
   var partes = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(texto);
   return {
     dia: Math.round(Date.UTC(Number(partes[1]), Number(partes[2]) - 1,
@@ -11116,16 +11160,16 @@ function paraTexto_(valor, tipo) {
 
   if (tipo === RECC_TIPO_DE_DADO.DATA) {
     var data = converterParaData_(valor);
-    return data ? Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy') : '';
+    return data ? formatarData_(data, 'dd/MM/yyyy') : '';
   }
   if (tipo === RECC_TIPO_DE_DADO.HORA) {
     var hora = converterParaHora_(valor);
-    return hora ? Utilities.formatDate(hora, RECC_FUSO_HORARIO, 'HH:mm') : '';
+    return hora ? formatarData_(hora, 'HH:mm') : '';
   }
   if (tipo === RECC_TIPO_DE_DADO.DATA_HORA) {
     var momento = converterParaDataEHora_(valor);
     return momento
-      ? Utilities.formatDate(momento, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm') : '';
+      ? formatarData_(momento, 'dd/MM/yyyy HH:mm') : '';
   }
   if (tipo === RECC_TIPO_DE_DADO.DINHEIRO) {
     var numero = converterParaNumero_(valor);
@@ -11798,7 +11842,7 @@ function chaveDoCasoNoGrafico_(caso, componente, canal, ehTempo) {
 function diaDoCaso_(valor) {
   var data = converterParaData_(valor);
   if (!data) return '';
-  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  return formatarData_(data, 'yyyy-MM-dd');
 }
 
 function rotuloDoDia_(chave) {
@@ -12178,8 +12222,8 @@ function relatorioDeCasos(idDoCanal, pedido) {
     + ' · ' + casos.length + ' casos · ' + colunas.length + ' colunas');
 
   resposta.nome = 'relatorio-' + nomeDeArquivo_(canal.nome) + '-' + relatorio.id.toLowerCase() + '-'
-    + Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyyMMdd') + '-a-'
-    + Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyyMMdd') + '.csv';
+    + formatarData_(periodo.de, 'yyyyMMdd') + '-a-'
+    + formatarData_(periodo.ate, 'yyyyMMdd') + '.csv';
   resposta.conteudo = linhas.join('\n');
   return resposta;
 }
@@ -12531,7 +12575,7 @@ function linhasDoChatDaFonte_(pedido) {
   }).map(function (d) { return d.rotulo; });
 
   var chave = function (linha) {
-    return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
+    return [linha.Data ? formatarData_(linha.Data, 'yyyy-MM-dd') : '',
       linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
       .map(normalizarParaComparar_).join('|');
   };
@@ -12612,7 +12656,7 @@ function conferirImportacaoDoChat(pedido) {
       var vista = {};
       Object.keys(linha).forEach(function (coluna) {
         vista[coluna] = coluna === 'Data'
-          ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'dd/MM/yyyy') : linha[coluna];
+          ? formatarData_(linha.Data, 'dd/MM/yyyy') : linha[coluna];
       });
       return vista;
     }),
@@ -12739,13 +12783,13 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
     assunto: achar('Assunto'), ramo: achar('Ramo') };
 
   var doChat = lerAtendimentosDoChat_();
-  var de = Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var ate = Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var de = formatarData_(periodo.de, 'yyyy-MM-dd');
+  var ate = formatarData_(periodo.ate, 'yyyy-MM-dd');
   var semData = 0;
   var doChatNoPeriodo = doChat.linhas.filter(function (linha) {
     var data = dataDoAtendimentoDoChat_(linha.data);
     if (!data) { semData++; return false; }
-    var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+    var dela = formatarData_(data, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
   var comoRegistros = doChatNoPeriodo.map(function (linha) {
@@ -15146,7 +15190,7 @@ function tirarDoFormularioOQueSaiuDaRet_(pulados) {
       + 'coluna continua na planilha, com o que estava nela');
   });
   gravarConfiguracao_(RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET, 'Etapa 49 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
   return feito;
 }
 
@@ -15177,7 +15221,7 @@ function tirarAMinhaPerformanceDosNiveis_(pulados) {
       + 'que ele abre (a tela deixou de existir)');
   });
   gravarConfiguracao_(RECC_CHAVE_DA_TELA_QUE_SAIU, 'Etapa 52 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
   return feito;
 }
 
@@ -15514,8 +15558,7 @@ function rodarDiagnostico_() {
   });
 
   return {
-    quando: Utilities.formatDate(new Date(), RECC_FUSO_HORARIO,
-      'dd/MM/yyyy HH:mm'),
+    quando: formatarData_(new Date(), 'dd/MM/yyyy HH:mm'),
     aprovado: resumo.falhas === 0,
     resumo: resumo,
     blocos: blocos
@@ -16763,7 +16806,7 @@ function montarOsCardsDaRet_(pulados, paraVoce) {
       cor: contatando.tom || 'neutro', mostrar: true }
   ]);
   gravarConfiguracao_(RECC_CHAVE_DOS_CARDS_DA_RET, 'Etapa 44 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
   feito.push('RET: os cards do Trabalho ficaram Total de casos, Aguardando transmissão (do '
     + 'Status proposta), Pendente e Contatando — os outros foram desligados');
   return feito;

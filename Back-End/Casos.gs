@@ -158,9 +158,9 @@ function valorPadraoResolvido_(valorPadrao, quem) {
   var agora = new Date();
   switch (texto.toUpperCase()) {
     case '@HOJE':
-      return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+      return formatarData_(agora, 'dd/MM/yyyy');
     case '@AGORA':
-      return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+      return formatarData_(agora, 'dd/MM/yyyy HH:mm');
     case '@EU':
       return quem && quem.usuario ? String(quem.usuario.Nome || '') : '';
     default:
@@ -793,8 +793,8 @@ function quantosDigitosAMascaraPede_(mascara) {
  */
 function dataEstaNoFuturo_(data) {
   var agora = new Date();
-  var hojeAqui = Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var aDataDela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var hojeAqui = formatarData_(agora, 'yyyy-MM-dd');
+  var aDataDela = formatarData_(data, 'yyyy-MM-dd');
   return aDataDela > hojeAqui;
 }
 
@@ -1204,7 +1204,7 @@ function carimboParaAColuna_(estrutura, posicao) {
   var tipo = estrutura.tipos[posicao];
   var agora = new Date();
   if (tipo === RECC_TIPO_DE_DADO.DATA || tipo === RECC_TIPO_DE_DADO.DATA_HORA) return agora;
-  return Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm');
+  return formatarData_(agora, 'dd/MM/yyyy HH:mm');
 }
 
 /**
@@ -1641,7 +1641,7 @@ function linhaDoTempoDoCaso_(registro, estrutura, canal) {
     var temHora = quando.getHours() || quando.getMinutes();
     eventos.push({
       quando: quando.getTime(),
-      data: Utilities.formatDate(quando, RECC_FUSO_HORARIO, temHora ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy'),
+      data: formatarData_(quando, temHora ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy'),
       oQue: ehAEntrada ? 'Entrada do caso' : cabecalho,
       entrada: !!ehAEntrada
     });
@@ -1970,11 +1970,11 @@ function preencherEntradaAutomatica_(canal, paraGravar) {
   var agora = new Date();
   if (canal.colunaDaData && !paraGravar[canal.colunaDaData]) {
     paraGravar[canal.colunaDaData] =
-      Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+      formatarData_(agora, 'dd/MM/yyyy');
   }
   if (canal.colunaDaHora && !paraGravar[canal.colunaDaHora]) {
     paraGravar[canal.colunaDaHora] =
-      Utilities.formatDate(agora, RECC_FUSO_HORARIO, 'HH:mm');
+      formatarData_(agora, 'HH:mm');
   }
 }
 
@@ -2490,6 +2490,10 @@ function procurarNoCanal_(canal, termo, quem) {
  * cá. Sem nada arquivado deste canal, não volta origem nenhuma.
  */
 function procurarNoHistorico_(canal, termo, quem) {
+  return procurandoNaPlanilha_(procurarNoHistoricoSemRelogio_, arguments);
+}
+
+function procurarNoHistoricoSemRelogio_(canal, termo, quem) {
   var id = String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim();
   if (!id) return null;
   comAGrafiaDaAba_(canal);
@@ -2590,6 +2594,10 @@ function descricaoDoLegado_() {
  * resultados de verdade.
  */
 function procurarNoLegado_(termo) {
+  return procurandoNaPlanilha_(procurarNoLegadoSemRelogio_, arguments);
+}
+
+function procurarNoLegadoSemRelogio_(termo) {
   var configurado = descricaoDoLegado_();
   if (!configurado.ligado) return null;
 

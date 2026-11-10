@@ -64,6 +64,7 @@ const { rodarTestesDosFiltrosComVariasOpcoes } = require('./testes-filtros-com-v
 const { rodarTestesDoRelatorioDeCasos } = require('./testes-relatorio-de-casos');
 const { rodarTestesDaLeituraLeveDoAviso } = require('./testes-leitura-leve-do-aviso');
 const { rodarTestesDoAcabamento } = require('./testes-acabamento');
+const { rodarTestesDoQueAAbaErrosMostrou } = require('./testes-o-que-a-aba-erros-mostrou');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -118,6 +119,7 @@ rodarTestesDosFiltrosComVariasOpcoes();
 rodarTestesDoRelatorioDeCasos();
 rodarTestesDaLeituraLeveDoAviso();
 rodarTestesDoAcabamento();
+rodarTestesDoQueAAbaErrosMostrou();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

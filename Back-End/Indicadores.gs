@@ -264,13 +264,13 @@ function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
  * daquele mês.
  */
 function entreDuasDatas_(registros, canal, inicio, fim, guardarSemData) {
-  var de = Utilities.formatDate(inicio, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var ate = Utilities.formatDate(fim, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var de = formatarData_(inicio, 'yyyy-MM-dd');
+  var ate = formatarData_(fim, 'yyyy-MM-dd');
 
   return registros.filter(function (registro) {
     var data = converterParaData_(registro[canal.colunaDaData]);
     if (!data) return guardarSemData === true;
-    var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+    var dela = formatarData_(data, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
 }
@@ -315,8 +315,8 @@ function registrosDosPeriodos_(canal, periodos) {
 
   var limites = periodos.map(function (periodo) {
     return {
-      de: Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
-      ate: Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd'),
+      de: formatarData_(periodo.de, 'yyyy-MM-dd'),
+      ate: formatarData_(periodo.ate, 'yyyy-MM-dd'),
       semData: periodo.guardarSemData === true
     };
   });
@@ -327,7 +327,7 @@ function registrosDosPeriodos_(canal, periodos) {
   var dosOutros = [];    // o anterior, dos cartões
   lerColunaInteira_(canal.aba, estrutura.cabecalhos[posicao]).forEach(function (valor, i) {
     var data = converterParaData_(valor);
-    var dela = data ? Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '';
+    var dela = data ? formatarData_(data, 'yyyy-MM-dd') : '';
     if (dele(limites[0], dela)) doPrimeiro.push(i + 2);
     else if (limites.slice(1).some(function (limite) { return dele(limite, dela); })) dosOutros.push(i + 2);
   });
@@ -407,6 +407,10 @@ const RECC_PEDACO_MINIMO_DA_BUSCA = 4;
  * (de 4 dígitos ou mais), e a conferência decide.
  */
 function linhasDoTermoNaPlanilha_(estrutura, termo, total) {
+  return procurandoNaPlanilha_(linhasDoTermoNaPlanilhaSemRelogio_, arguments);
+}
+
+function linhasDoTermoNaPlanilhaSemRelogio_(estrutura, termo, total) {
   if (!buscaRapidaLigada_()) return null;
   var procurados = [normalizarParaComparar_(termo)];
   var pedacos = String(termo).split(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/).filter(function (p) { return p; });
@@ -626,7 +630,7 @@ function diasEntre_(de, ate) {
 }
 
 function comoSeEscreve_(data) {
-  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy');
+  return formatarData_(data, 'dd/MM/yyyy');
 }
 
 /** "2026-09" quando o texto é um mês de verdade; vazio quando não é. */
@@ -1508,7 +1512,7 @@ function casosPertoDeVencer_(registros, canal) {
 
 /** O dia e o minuto do dia, no relógio de São Paulo. */
 function relogioDeParede_(data) {
-  var texto = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd HH:mm');
+  var texto = formatarData_(data, 'yyyy-MM-dd HH:mm');
   var partes = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(texto);
   return {
     dia: Math.round(Date.UTC(Number(partes[1]), Number(partes[2]) - 1,
@@ -2153,16 +2157,16 @@ function paraTexto_(valor, tipo) {
 
   if (tipo === RECC_TIPO_DE_DADO.DATA) {
     var data = converterParaData_(valor);
-    return data ? Utilities.formatDate(data, RECC_FUSO_HORARIO, 'dd/MM/yyyy') : '';
+    return data ? formatarData_(data, 'dd/MM/yyyy') : '';
   }
   if (tipo === RECC_TIPO_DE_DADO.HORA) {
     var hora = converterParaHora_(valor);
-    return hora ? Utilities.formatDate(hora, RECC_FUSO_HORARIO, 'HH:mm') : '';
+    return hora ? formatarData_(hora, 'HH:mm') : '';
   }
   if (tipo === RECC_TIPO_DE_DADO.DATA_HORA) {
     var momento = converterParaDataEHora_(valor);
     return momento
-      ? Utilities.formatDate(momento, RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm') : '';
+      ? formatarData_(momento, 'dd/MM/yyyy HH:mm') : '';
   }
   if (tipo === RECC_TIPO_DE_DADO.DINHEIRO) {
     var numero = converterParaNumero_(valor);
@@ -3072,7 +3076,7 @@ function chaveDoCasoNoGrafico_(caso, componente, canal, ehTempo) {
 function diaDoCaso_(valor) {
   var data = converterParaData_(valor);
   if (!data) return '';
-  return Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  return formatarData_(data, 'yyyy-MM-dd');
 }
 
 function rotuloDoDia_(chave) {
@@ -3531,8 +3535,8 @@ function relatorioDeCasos(idDoCanal, pedido) {
     + ' · ' + casos.length + ' casos · ' + colunas.length + ' colunas');
 
   resposta.nome = 'relatorio-' + nomeDeArquivo_(canal.nome) + '-' + relatorio.id.toLowerCase() + '-'
-    + Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyyMMdd') + '-a-'
-    + Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyyMMdd') + '.csv';
+    + formatarData_(periodo.de, 'yyyyMMdd') + '-a-'
+    + formatarData_(periodo.ate, 'yyyyMMdd') + '.csv';
   resposta.conteudo = linhas.join('\n');
   return resposta;
 }
@@ -4011,7 +4015,7 @@ function linhasDoChatDaFonte_(pedido) {
   // em branco, e reimportar o mesmo arquivo — agora com os valores — contaria
   // tudo em dobro.
   var chave = function (linha) {
-    return [linha.Data ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'yyyy-MM-dd') : '',
+    return [linha.Data ? formatarData_(linha.Data, 'yyyy-MM-dd') : '',
       linha.Analista, linha.SUSEP, linha.Corretora, linha.Assunto, linha.Consultor, linha.Ramo]
       .map(normalizarParaComparar_).join('|');
   };
@@ -4096,7 +4100,7 @@ function conferirImportacaoDoChat(pedido) {
       var vista = {};
       Object.keys(linha).forEach(function (coluna) {
         vista[coluna] = coluna === 'Data'
-          ? Utilities.formatDate(linha.Data, RECC_FUSO_HORARIO, 'dd/MM/yyyy') : linha[coluna];
+          ? formatarData_(linha.Data, 'dd/MM/yyyy') : linha[coluna];
       });
       return vista;
     }),
@@ -4250,13 +4254,13 @@ function atendimentosDaMesa_(casosDoSistema, canal, quem, periodo) {
 
   // O CHAT: lê, recorta o período e o alcance.
   var doChat = lerAtendimentosDoChat_();
-  var de = Utilities.formatDate(periodo.de, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
-  var ate = Utilities.formatDate(periodo.ate, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+  var de = formatarData_(periodo.de, 'yyyy-MM-dd');
+  var ate = formatarData_(periodo.ate, 'yyyy-MM-dd');
   var semData = 0;
   var doChatNoPeriodo = doChat.linhas.filter(function (linha) {
     var data = dataDoAtendimentoDoChat_(linha.data);
     if (!data) { semData++; return false; }
-    var dela = Utilities.formatDate(data, RECC_FUSO_HORARIO, 'yyyy-MM-dd');
+    var dela = formatarData_(data, 'yyyy-MM-dd');
     return dela >= de && dela <= ate;
   });
   var comoRegistros = doChatNoPeriodo.map(function (linha) {

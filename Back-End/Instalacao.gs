@@ -3157,7 +3157,7 @@ function tirarDoFormularioOQueSaiuDaRet_(pulados) {
       + 'coluna continua na planilha, com o que estava nela');
   });
   gravarConfiguracao_(RECC_CHAVE_DAS_COLUNAS_QUE_SAIRAM_DA_RET, 'Etapa 49 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
   return feito;
 }
 
@@ -3197,7 +3197,7 @@ function tirarAMinhaPerformanceDosNiveis_(pulados) {
       + 'que ele abre (a tela deixou de existir)');
   });
   gravarConfiguracao_(RECC_CHAVE_DA_TELA_QUE_SAIU, 'Etapa 52 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
   return feito;
 }
 
@@ -3724,8 +3724,7 @@ function rodarDiagnostico_() {
   });
 
   return {
-    quando: Utilities.formatDate(new Date(), RECC_FUSO_HORARIO,
-      'dd/MM/yyyy HH:mm'),
+    quando: formatarData_(new Date(), 'dd/MM/yyyy HH:mm'),
     aprovado: resumo.falhas === 0,
     resumo: resumo,
     blocos: blocos
@@ -5164,7 +5163,7 @@ function montarOsCardsDaRet_(pulados, paraVoce) {
       cor: contatando.tom || 'neutro', mostrar: true }
   ]);
   gravarConfiguracao_(RECC_CHAVE_DOS_CARDS_DA_RET, 'Etapa 44 — '
-    + Utilities.formatDate(new Date(), RECC_FUSO_HORARIO, 'dd/MM/yyyy HH:mm'));
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
   feito.push('RET: os cards do Trabalho ficaram Total de casos, Aguardando transmissão (do '
     + 'Status proposta), Pendente e Contatando — os outros foram desligados');
   return feito;

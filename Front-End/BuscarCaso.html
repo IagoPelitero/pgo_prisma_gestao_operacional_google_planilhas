@@ -120,7 +120,7 @@ var TelaBuscarCaso = (function () {
       '<p class="carregando-campos">Procurando…</p>';
 
     Servidor.chamar('buscarCasos', termo, onde, incluirLegado,
-      incluirHistorico && !!(opcoes.historico && opcoes.historico.ligado))
+      incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado))
       .entao(function (resposta) {
         procurando = false;
         elemento('botao-buscar').disabled = false;

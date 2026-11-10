@@ -389,8 +389,7 @@ function resumoDasSusepsBloqueadas(procurar) {
         coordenadorComercial: String(linha.CoordenadorComercial || ''),
         bloqueadaPor: quemBloqueou_(linha.BloqueadaPor),
         bloqueadaEm: linha.BloqueadaEm
-          ? Utilities.formatDate(new Date(linha.BloqueadaEm), RECC_FUSO_HORARIO,
-            'dd/MM/yyyy')
+          ? formatarData_(new Date(linha.BloqueadaEm), 'dd/MM/yyyy')
           : '',
         casos: volumes.porSusep[chaveDaSusep_(susep)] || 0
       };
