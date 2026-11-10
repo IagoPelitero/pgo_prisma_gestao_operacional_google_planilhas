@@ -1845,16 +1845,40 @@ var Formulario = (function () {
    *               não se aplica — e `aplicarCondicoes` limpa o que sobrou.
    */
   function faltaPreencher(raiz) {
-    if (!raiz) return null;
+    return camposQueFaltam(raiz)[0] || null;
+  }
+
+  /** Todos os obrigatórios ainda vazios, na ordem do formulário. */
+  function camposQueFaltam(raiz) {
+    var faltam = [];
+    if (!raiz) return faltam;
     var exigidos = raiz.querySelectorAll('[aria-required="true"]');
     for (var i = 0; i < exigidos.length; i++) {
       var campo = exigidos[i];
       if (campo.disabled) continue;
       var bloco = campo.closest ? campo.closest('[data-campo]') : null;
       if (bloco && bloco.hidden) continue;
-      if (!String(campo.value || '').trim()) return campo;
+      if (!String(campo.value || '').trim()) faltam.push(campo);
     }
-    return null;
+    return faltam;
+  }
+
+  /**
+   * "Faltam 2 obrigatórios: Nome do cliente, Canal de origem" (Etapa 75) — o
+   * botão apagado dizia que faltava algo, e não o quê. Até três nomes; passou
+   * disso, "e mais N". Vazio quando não falta nada.
+   */
+  function textoDoQueFalta(raiz) {
+    var nomes = [];
+    camposQueFaltam(raiz).forEach(function (campo) {
+      var bloco = campo.closest ? campo.closest('[data-campo]') : null;
+      var rotulo = bloco ? bloco.querySelector('label') : null;
+      var nome = rotulo ? String(rotulo.textContent).replace(/\*/g, '').trim() : '';
+      if (nome && nomes.indexOf(nome) < 0) nomes.push(nome);
+    });
+    if (!nomes.length) return '';
+    return (nomes.length === 1 ? 'Falta 1 obrigatório: ' : 'Faltam ' + nomes.length + ' obrigatórios: ')
+      + nomes.slice(0, 3).join(', ') + (nomes.length > 3 ? ' e mais ' + (nomes.length - 3) : '');
   }
 
   /**
@@ -1871,12 +1895,13 @@ var Formulario = (function () {
    * e duas mãos no mesmo botão acenderiam o nome de volta no meio da
    * gravação.
    */
-  function vigiarObrigatorios(raiz, botao) {
+  function vigiarObrigatorios(raiz, botao, aviso) {
     if (!raiz || !botao) return;
 
     function conferir() {
       if (botao.getAttribute('data-gravando') === 'sim') return;
       var falta = faltaPreencher(raiz);
+      if (aviso) aviso.textContent = textoDoQueFalta(raiz);
       botao.disabled = !!falta;
       botao.title = falta
         ? 'Preencha os campos obrigatórios (marcados com *) para cadastrar.'
@@ -1973,6 +1998,7 @@ var Formulario = (function () {
     limparErros: limparErros,
     mostrarProblemas: mostrarProblemas,
     faltaPreencher: faltaPreencher,
+    textoDoQueFalta: textoDoQueFalta,
     vigiarObrigatorios: vigiarObrigatorios,
     comecouAGravar: comecouAGravar,
     acabouDeGravar: acabouDeGravar

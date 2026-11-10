@@ -881,6 +881,25 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
   padding-top: 18px; border-top: 1px solid var(--linha);
 }
+
+#acoes-do-caso {
+  position: sticky; bottom: 0; z-index: 4; background: var(--superficie);
+  margin-top: 18px; padding-bottom: 14px;
+}
+.falta-preencher { font-size: 13.5px; font-weight: 600; color: var(--atencao); }
+.falta-preencher:empty { display: none; }
+
+.config-busca {
+  width: 100%; height: 38px; margin: 10px 0 4px; padding: 0 12px; font: inherit; font-size: 14px;
+  border: 1px solid var(--linha-forte); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto);
+}
+.config-itens.procurando .mover { visibility: hidden; }
+.config-recolhidos { list-style: none; border-bottom: 1px solid var(--linha); }
+.config-recolhidos button {
+  width: 100%; padding: 12px 4px; border: 0; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--destaque);
+}
 .botao-secundario {
   border: 1px solid var(--linha); background: var(--superficie);
   color: var(--texto); border-radius: var(--raio-pequeno);
@@ -3185,24 +3204,43 @@ var Formulario = (function () {
   }
 
   function faltaPreencher(raiz) {
-    if (!raiz) return null;
+    return camposQueFaltam(raiz)[0] || null;
+  }
+
+  function camposQueFaltam(raiz) {
+    var faltam = [];
+    if (!raiz) return faltam;
     var exigidos = raiz.querySelectorAll('[aria-required="true"]');
     for (var i = 0; i < exigidos.length; i++) {
       var campo = exigidos[i];
       if (campo.disabled) continue;
       var bloco = campo.closest ? campo.closest('[data-campo]') : null;
       if (bloco && bloco.hidden) continue;
-      if (!String(campo.value || '').trim()) return campo;
+      if (!String(campo.value || '').trim()) faltam.push(campo);
     }
-    return null;
+    return faltam;
   }
 
-  function vigiarObrigatorios(raiz, botao) {
+  function textoDoQueFalta(raiz) {
+    var nomes = [];
+    camposQueFaltam(raiz).forEach(function (campo) {
+      var bloco = campo.closest ? campo.closest('[data-campo]') : null;
+      var rotulo = bloco ? bloco.querySelector('label') : null;
+      var nome = rotulo ? String(rotulo.textContent).replace(/\*/g, '').trim() : '';
+      if (nome && nomes.indexOf(nome) < 0) nomes.push(nome);
+    });
+    if (!nomes.length) return '';
+    return (nomes.length === 1 ? 'Falta 1 obrigatório: ' : 'Faltam ' + nomes.length + ' obrigatórios: ')
+      + nomes.slice(0, 3).join(', ') + (nomes.length > 3 ? ' e mais ' + (nomes.length - 3) : '');
+  }
+
+  function vigiarObrigatorios(raiz, botao, aviso) {
     if (!raiz || !botao) return;
 
     function conferir() {
       if (botao.getAttribute('data-gravando') === 'sim') return;
       var falta = faltaPreencher(raiz);
+      if (aviso) aviso.textContent = textoDoQueFalta(raiz);
       botao.disabled = !!falta;
       botao.title = falta
         ? 'Preencha os campos obrigatórios (marcados com *) para cadastrar.'
@@ -3273,6 +3311,7 @@ var Formulario = (function () {
     limparErros: limparErros,
     mostrarProblemas: mostrarProblemas,
     faltaPreencher: faltaPreencher,
+    textoDoQueFalta: textoDoQueFalta,
     vigiarObrigatorios: vigiarObrigatorios,
     comecouAGravar: comecouAGravar,
     acabouDeGravar: acabouDeGravar
@@ -4624,6 +4663,8 @@ var TelaCadastrarCaso = (function () {
       + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
       + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
       + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
+
+      + '<span class="falta-preencher" id="falta-no-caso" aria-live="polite"></span>'
       + '<span class="recado" id="recado-do-caso" hidden></span>'
       + '</div></form>';
   }
@@ -4639,7 +4680,7 @@ var TelaCadastrarCaso = (function () {
 
         Formulario.aplicarPadroes(corpo(), resposta);
 
-        Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'));
+        Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'), elemento('falta-no-caso'));
 
         mostrarAsAcoes(true);
         var primeiro = corpo().querySelector(
@@ -7975,11 +8016,47 @@ var TelaConfiguracoes = (function () {
       .senao(falhou);
   }
 
+  var buscaDeCampos = '';
+  var desligadosAbertos = false;
+
+  function semAcentoNemCaixa(texto) {
+    return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  function campoNaLista(campo) {
+    return campo.ativo || desligadosAbertos || !!(escolhido && escolhido.id === campo.id);
+  }
+
+  function filtrarListaDeCampos() {
+    var termo = semAcentoNemCaixa(buscaDeCampos);
+    var lista = document.querySelector('#config-lista .config-itens');
+    if (!lista) return;
+
+    lista.className = 'config-itens' + (termo ? ' procurando' : '');
+    var itens = lista.querySelectorAll('.config-item');
+    var achados = 0;
+    for (var i = 0; i < itens.length; i++) {
+
+      var some = termo !== ''
+        ? semAcentoNemCaixa(itens[i].textContent).indexOf(termo) < 0
+        : itens[i].getAttribute('data-recolhido') === 'sim';
+      itens[i].hidden = some;
+      if (!some) achados++;
+    }
+    var contagem = elemento('contagem-de-campos');
+    if (contagem) {
+      contagem.textContent = termo ? achados + ' de ' + itens.length + ' campos · ' : '';
+    }
+  }
+
   function desenharCampos() {
     if (respostaAtrasada('campos')) return;
+    var desligados = dados.campos.filter(function (campo) { return !campo.ativo; }).length;
+    var naLista = dados.campos.filter(campoNaLista);
     var linhas = dados.campos.map(function (campo, posicao) {
       return '<li class="config-item' + (escolhido && escolhido.id === campo.id
-        ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '">'
+        ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '"'
+        + (campoNaLista(campo) ? '' : ' data-recolhido="sim"') + '>'
         + '<button type="button" class="abrir" data-campo="' + escapar(campo.id) + '">'
         + '<span class="nome">' + escapar(campo.rotulo) + '</span>'
         + '<span class="detalhe">' + escapar(campo.secao) + ' · '
@@ -7991,12 +8068,18 @@ var TelaConfiguracoes = (function () {
         + '</span></button>'
         + '<span class="mover">'
         + '<button type="button" class="seta" data-subir="' + posicao + '"'
-        + (posicao === 0 ? ' disabled' : '') + ' title="Subir">↑</button>'
+        + (campo === naLista[0] ? ' disabled' : '') + ' title="Subir">↑</button>'
         + '<button type="button" class="seta" data-descer="' + posicao + '"'
-        + (posicao === dados.campos.length - 1 ? ' disabled' : '')
+        + (campo === naLista[naLista.length - 1] ? ' disabled' : '')
         + ' title="Descer">↓</button></span>'
         + '</li>';
-    }).join('');
+    }).join('')
+      + (desligados
+        ? '<li class="config-recolhidos"><button type="button" id="abrir-desligados"'
+          + ' aria-expanded="' + (desligadosAbertos ? 'true' : 'false') + '">'
+          + (desligadosAbertos ? '▾ Esconder ' : '▸ Mostrar ') + desligados
+          + (desligados === 1 ? ' campo desligado' : ' campos desligados') + ' no formulário</button></li>'
+        : '');
 
     elemento('config-lista').innerHTML =
       '<div class="config-cabeca">'
@@ -8005,11 +8088,16 @@ var TelaConfiguracoes = (function () {
         ? '<button type="button" class="botao pequeno" id="novo-campo">'
           + 'Criar campo</button>' : '')
       + '</div>'
-      + '<p class="config-explica">A ordem aqui é a ordem do formulário. '
+      + '<input type="text" class="config-busca" id="busca-de-campos"'
+      + ' placeholder="Procurar campo pelo nome…" aria-label="Procurar campo pelo nome"'
+      + ' value="' + escapar(buscaDeCampos) + '">'
+      + '<p class="config-explica"><span id="contagem-de-campos"></span>'
+      + 'A ordem aqui é a ordem do formulário. '
       + 'Mudar de lugar não mexe na planilha: a coluna fica onde está.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     ligarListaDeCampos();
+    filtrarListaDeCampos();
     if (escolhido) desenharPainelDoCampo(acharCampo(escolhido.id));
     else painelVazio('Escolha um campo para ver e mudar as propriedades dele.');
   }
@@ -8054,10 +8142,29 @@ var TelaConfiguracoes = (function () {
 
     var novo = elemento('novo-campo');
     if (novo) novo.addEventListener('click', abrirCampoNovo);
+
+    var busca = elemento('busca-de-campos');
+    if (busca) {
+      busca.addEventListener('input', function () {
+        buscaDeCampos = this.value;
+        filtrarListaDeCampos();
+      });
+    }
+    var desligados = elemento('abrir-desligados');
+    if (desligados) {
+      desligados.addEventListener('click', function () {
+        desligadosAbertos = !desligadosAbertos;
+        desenharCampos();
+      });
+    }
   }
 
   function trocarDeLugar(posicao, passo) {
+
     var destino = posicao + passo;
+    while (destino >= 0 && destino < dados.campos.length && !campoNaLista(dados.campos[destino])) {
+      destino += passo;
+    }
     if (destino < 0 || destino >= dados.campos.length) return;
 
     var lista = dados.campos.slice();

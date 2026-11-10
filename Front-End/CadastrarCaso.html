@@ -39,6 +39,8 @@ var TelaCadastrarCaso = (function () {
       + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
       + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
       + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
+      // O que ainda falta para o botão acender (Etapa 75).
+      + '<span class="falta-preencher" id="falta-no-caso" aria-live="polite"></span>'
       + '<span class="recado" id="recado-do-caso" hidden></span>'
       + '</div></form>';
   }
@@ -67,7 +69,7 @@ var TelaCadastrarCaso = (function () {
           preenchido conta como preenchido, e o botão acende sozinho quando o
           formulário não tem mais nada a pedir.
         */
-        Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'));
+        Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'), elemento('falta-no-caso'));
         // Só AGORA o formulário está inteiro — desenhado, ligado e com os
         // padrões. Se der erro na carga, os botões continuam escondidos: não
         // há o que cadastrar, e o recado do erro é o que importa ler.

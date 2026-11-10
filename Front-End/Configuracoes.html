@@ -424,11 +424,56 @@ var TelaConfiguracoes = (function () {
       .senao(falhou);
   }
 
+  /*
+    A LISTA DE CAMPOS COM BUSCA, E OS DESLIGADOS RECOLHIDOS (Etapa 75). Um canal
+    passa de cem campos: achar um pelo nome era rolar a lista inteira, e os
+    desligados — que não aparecem no formulário — ocupavam a vista de quem
+    arruma a ordem. A busca esconde as linhas sem redesenhar (o cursor fica na
+    caixa); os desligados ficam atrás de uma linha que diz quantos são.
+  */
+  var buscaDeCampos = '';
+  var desligadosAbertos = false;
+
+  function semAcentoNemCaixa(texto) {
+    return String(texto).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  /** O campo desligado só fica na lista com os desligados abertos — ou se é o escolhido. */
+  function campoNaLista(campo) {
+    return campo.ativo || desligadosAbertos || !!(escolhido && escolhido.id === campo.id);
+  }
+
+  function filtrarListaDeCampos() {
+    var termo = semAcentoNemCaixa(buscaDeCampos);
+    var lista = document.querySelector('#config-lista .config-itens');
+    if (!lista) return;
+    // Procurando, as setas saem: "subir" numa lista filtrada não diz para onde.
+    lista.className = 'config-itens' + (termo ? ' procurando' : '');
+    var itens = lista.querySelectorAll('.config-item');
+    var achados = 0;
+    for (var i = 0; i < itens.length; i++) {
+      // Procurando, vale a lista inteira — o desligado também se acha pelo nome.
+      // Sem busca, o desligado fica recolhido (menos o que está escolhido).
+      var some = termo !== ''
+        ? semAcentoNemCaixa(itens[i].textContent).indexOf(termo) < 0
+        : itens[i].getAttribute('data-recolhido') === 'sim';
+      itens[i].hidden = some;
+      if (!some) achados++;
+    }
+    var contagem = elemento('contagem-de-campos');
+    if (contagem) {
+      contagem.textContent = termo ? achados + ' de ' + itens.length + ' campos · ' : '';
+    }
+  }
+
   function desenharCampos() {
     if (respostaAtrasada('campos')) return;
+    var desligados = dados.campos.filter(function (campo) { return !campo.ativo; }).length;
+    var naLista = dados.campos.filter(campoNaLista);
     var linhas = dados.campos.map(function (campo, posicao) {
       return '<li class="config-item' + (escolhido && escolhido.id === campo.id
-        ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '">'
+        ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '"'
+        + (campoNaLista(campo) ? '' : ' data-recolhido="sim"') + '>'
         + '<button type="button" class="abrir" data-campo="' + escapar(campo.id) + '">'
         + '<span class="nome">' + escapar(campo.rotulo) + '</span>'
         + '<span class="detalhe">' + escapar(campo.secao) + ' · '
@@ -440,12 +485,18 @@ var TelaConfiguracoes = (function () {
         + '</span></button>'
         + '<span class="mover">'
         + '<button type="button" class="seta" data-subir="' + posicao + '"'
-        + (posicao === 0 ? ' disabled' : '') + ' title="Subir">↑</button>'
+        + (campo === naLista[0] ? ' disabled' : '') + ' title="Subir">↑</button>'
         + '<button type="button" class="seta" data-descer="' + posicao + '"'
-        + (posicao === dados.campos.length - 1 ? ' disabled' : '')
+        + (campo === naLista[naLista.length - 1] ? ' disabled' : '')
         + ' title="Descer">↓</button></span>'
         + '</li>';
-    }).join('');
+    }).join('')
+      + (desligados
+        ? '<li class="config-recolhidos"><button type="button" id="abrir-desligados"'
+          + ' aria-expanded="' + (desligadosAbertos ? 'true' : 'false') + '">'
+          + (desligadosAbertos ? '▾ Esconder ' : '▸ Mostrar ') + desligados
+          + (desligados === 1 ? ' campo desligado' : ' campos desligados') + ' no formulário</button></li>'
+        : '');
 
     elemento('config-lista').innerHTML =
       '<div class="config-cabeca">'
@@ -454,11 +505,16 @@ var TelaConfiguracoes = (function () {
         ? '<button type="button" class="botao pequeno" id="novo-campo">'
           + 'Criar campo</button>' : '')
       + '</div>'
-      + '<p class="config-explica">A ordem aqui é a ordem do formulário. '
+      + '<input type="text" class="config-busca" id="busca-de-campos"'
+      + ' placeholder="Procurar campo pelo nome…" aria-label="Procurar campo pelo nome"'
+      + ' value="' + escapar(buscaDeCampos) + '">'
+      + '<p class="config-explica"><span id="contagem-de-campos"></span>'
+      + 'A ordem aqui é a ordem do formulário. '
       + 'Mudar de lugar não mexe na planilha: a coluna fica onde está.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     ligarListaDeCampos();
+    filtrarListaDeCampos();
     if (escolhido) desenharPainelDoCampo(acharCampo(escolhido.id));
     else painelVazio('Escolha um campo para ver e mudar as propriedades dele.');
   }
@@ -503,10 +559,30 @@ var TelaConfiguracoes = (function () {
 
     var novo = elemento('novo-campo');
     if (novo) novo.addEventListener('click', abrirCampoNovo);
+
+    var busca = elemento('busca-de-campos');
+    if (busca) {
+      busca.addEventListener('input', function () {
+        buscaDeCampos = this.value;
+        filtrarListaDeCampos();
+      });
+    }
+    var desligados = elemento('abrir-desligados');
+    if (desligados) {
+      desligados.addEventListener('click', function () {
+        desligadosAbertos = !desligadosAbertos;
+        desenharCampos();
+      });
+    }
   }
 
   function trocarDeLugar(posicao, passo) {
+    // Troca com o vizinho QUE ESTÁ NA LISTA: com os desligados recolhidos, o
+    // vizinho de verdade pode ser um campo escondido, e a seta pareceria morta.
     var destino = posicao + passo;
+    while (destino >= 0 && destino < dados.campos.length && !campoNaLista(dados.campos[destino])) {
+      destino += passo;
+    }
     if (destino < 0 || destino >= dados.campos.length) return;
 
     var lista = dados.campos.slice();

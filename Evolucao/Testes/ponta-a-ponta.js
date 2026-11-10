@@ -1150,6 +1150,64 @@ async function rodar() {
       null, { timeout: 6000 });
   });
 
+  console.log('\nO acabamento (Etapa 75)');
+
+  await teste('o cadastro diz o que falta preencher, e as ações ficam à vista ao rolar', async () => {
+    await pagina.click('[data-tela="cadastrarCaso"]');
+    await pagina.waitForSelector('#acoes-do-caso:not([hidden])', { timeout: 10000 });
+    const falta = await pagina.textContent('#falta-no-caso');
+    verdadeiro(/^Faltam? \d+ obrigatórios?: /.test(falta), 'o que falta: "' + falta + '"');
+    verdadeiro(await pagina.$eval('#salvar-caso', (el) => el.disabled), 'e o botão segue apagado');
+    igual(await pagina.$eval('#acoes-do-caso', (el) => getComputedStyle(el).position), 'sticky');
+    // Preencher os obrigatórios apaga o recado e acende o botão.
+    await pagina.evaluate(() => {
+      document.querySelectorAll('#corpo-do-formulario [aria-required="true"]').forEach((campo) => {
+        if (campo.disabled || String(campo.value || '').trim()) return;
+        if (campo.tagName === 'SELECT') campo.selectedIndex = campo.options.length - 1;
+        else campo.value = campo.type === 'date' ? '2026-01-05' : '7';
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+        campo.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+    await pagina.waitForFunction(() => document.getElementById('falta-no-caso').textContent === ''
+      || !document.getElementById('salvar-caso').disabled, null, { timeout: 5000 });
+    const depois = await pagina.textContent('#falta-no-caso');
+    igual(await pagina.$eval('#salvar-caso', (el) => el.disabled), depois !== '',
+      'o botão acende exatamente quando o recado some');
+  });
+
+  await teste('Configurações: a busca acha o campo pelo nome, e os desligados ficam recolhidos', async () => {
+    await pagina.click('[data-tela="configuracoes"]');
+    await pagina.waitForSelector('[data-secao="campos"]', { timeout: 10000 });
+    await pagina.click('[data-secao="campos"]');
+    await pagina.waitForSelector('#busca-de-campos', { timeout: 10000 });
+    const visiveis = () => pagina.locator('#config-lista .config-item:not([hidden])').count();
+    const todos = await pagina.locator('#config-lista .config-item').count();
+    const desligados = await pagina.locator('#config-lista .config-item.desligado').count();
+    verdadeiro(desligados > 0, 'o canal tem campos desligados');
+    igual(await visiveis(), todos - desligados, 'os desligados abrem recolhidos');
+    contem(await pagina.textContent('#abrir-desligados'), desligados + ' campo');
+
+    await pagina.click('#abrir-desligados');
+    await pagina.waitForSelector('#abrir-desligados[aria-expanded="true"]', { timeout: 5000 });
+    igual(await visiveis(), todos, 'e aparecem quando se pede');
+    await pagina.click('#abrir-desligados');
+    await pagina.waitForSelector('#abrir-desligados[aria-expanded="false"]', { timeout: 5000 });
+
+    // A busca ignora acento e caixa, e alcança o desligado também.
+    await pagina.fill('#busca-de-campos', 'PREMIO');
+    const achados = await visiveis();
+    verdadeiro(achados > 0 && achados < todos, achados + ' de ' + todos);
+    contem(await pagina.textContent('#contagem-de-campos'), achados + ' de ' + todos + ' campos');
+    igual(await pagina.$eval('#config-lista .config-itens', (el) => el.className), 'config-itens procurando');
+    const nomeDeUmDesligado = await pagina.$eval('#config-lista .config-item.desligado .nome', (el) => el.textContent);
+    await pagina.fill('#busca-de-campos', nomeDeUmDesligado);
+    verdadeiro(await pagina.locator('#config-lista .config-item.desligado:not([hidden])').count() > 0,
+      'o desligado se acha pelo nome');
+    await pagina.fill('#busca-de-campos', '');
+    igual(await visiveis(), todos - desligados, 'sem busca, volta ao que era');
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();

@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.74 — a última etapa entregue é a 74. A regra do número está
+**Estado geral:** versão 1.75 — a última etapa entregue é a 75. A regra do número está
 na Etapa 68.
 
 ---
@@ -3866,6 +3866,39 @@ cronômetro (Etapa 71).
 a leitura inteira, na RET e na Mesa. 9 quebras de propósito, 9 pegas — três
 escaparam na primeira rodada (os dados do teste andavam juntos) e o teste foi
 refeito.
+
+---
+
+## Etapa 75 — Acabamento das telas, sem mexer nas cores
+
+Última das cinco etapas aprovadas (71 a 75). O PO recusou o redesenho ("não vamos
+mudar a UX por ora") e pediu "outra proposta de melhoria de UX sem mexer nas
+cores". Entrou o que as imagens aprovadas mostravam; cores, fontes e disposição
+das telas ficaram como estavam.
+
+| O que | Como ficou |
+|---|---|
+| **Cadastrar Caso: o que falta** | Ao lado do botão, "Faltam 2 obrigatórios: Nome do cliente, Canal de origem" — até três nomes, depois "e mais N". O botão apagado dizia que faltava algo, e não o quê. Sai da mesma conferência que acende o botão (`textoDoQueFalta`) |
+| **Cadastrar Caso: as ações à vista** | "Cadastrar caso" e "Limpar" grudam no pé da janela enquanto se rola o formulário, dentro do próprio cartão — não é preciso descer até o fim para ver o que falta |
+| **Configurações: busca na lista de campos** | "Procurar campo pelo nome", sem acento nem caixa, com "3 de 48 campos". Esconde as linhas sem redesenhar; procurando, as setas de ordem saem, e a busca alcança também os desligados |
+| **Configurações: desligados recolhidos** | Os campos desligados no formulário ficam atrás de "Mostrar N campos desligados no formulário". O escolhido nunca some. Com eles recolhidos, a seta troca com o vizinho que está na lista — senão pareceria morta |
+| **Versão** | 1.75 |
+
+**O que a proposta listava e não entrou:**
+
+- **Menu lateral fixo na altura toda** — conferido no navegador: já é assim. A
+  imagem da proposta parecia diferente porque foi tirada da página inteira.
+- **Rótulos "Sistema", "Contato" e "Descrição" com maiúscula** — é configuração, e
+  não código: troca-se em Configurações › Cadastrar Caso, em cada campo. Uma
+  migração mexeria em rótulos de uma instalação em uso por uma maiúscula.
+- **Os itens que estavam só na tabela, sem imagem** (título do topo em uma linha;
+  linhas mais baixas e cabeçalho fixo no Trabalho; seções que recolhem no cadastro;
+  últimas buscas e trecho destacado no Buscar Caso; painel sob demanda nas
+  Corretoras; "passo 1 de 3" na Importação; painel fixo em Configurações; índice na
+  Produtividade) — mudam o jeito das telas, e ficam esperando o PO dizer quais quer.
+
+7 testes novos em `testes-acabamento.js` e dois ponta a ponta. 7 quebras de
+propósito, 7 pegas.
 
 ---
 

@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1623 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1630 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -349,7 +349,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1623 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1630 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -714,7 +714,9 @@ espera.
 **O botão fica inativo até os campos obrigatórios estarem preenchidos** — os
 marcados com `*` —, e ao passar o mouse ele diz por quê. O Enter e o
 `Ctrl`+`Enter` passam pela mesma conferência: botão travado não é segurança se
-sobra outra porta.
+sobra outra porta. Ao lado do botão, a tela diz **o que falta** — "Faltam 2
+obrigatórios: Nome do cliente, Canal de origem" —, e as ações **ficam à vista
+enquanto se rola o formulário** (Etapa 75).
 
 Ao clicar, o botão vira **três pontinhos** e nenhum botão da tela aceita
 clique até a resposta chegar — dois cliques gravariam dois casos. **Gravou, a
@@ -1605,6 +1607,12 @@ Três colunas: os **assuntos** à esquerda, os **itens** no meio, as
 **propriedades** do que foi escolhido à direita. Nada é gravado sem apertar
 Salvar.
 
+Na lista de campos (Etapa 75), **"Procurar campo pelo nome"** acha o campo sem
+rolar a lista — sem acento nem caixa, inclusive os desligados —, e os **campos
+desligados no formulário ficam recolhidos** atrás de uma linha que diz quantos
+são. Enquanto se procura, as setas de ordem saem: a ordem se arruma na lista
+inteira.
+
 ![A tela de Configurações](imagens/tela-configuracoes.png)
 
 **Ajustes Gerais são as listas** que os campos seletores oferecem — assunto,
@@ -1717,7 +1725,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.74** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.75** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1725,7 +1733,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1623 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1630 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

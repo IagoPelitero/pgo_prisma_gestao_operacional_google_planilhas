@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-09 22:26
+   Gerado em 2026-11-10 08:06
    ========================================================================== */
 
 
@@ -8670,7 +8670,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.74',
+  numero: '1.75',
   data: '09/11/2026'
 };
 
