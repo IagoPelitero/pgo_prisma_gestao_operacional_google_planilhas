@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.76 — a última etapa entregue é a 76. A regra do número está
+**Estado geral:** versão 1.77 — a última etapa entregue é a 77. A regra do número está
 na Etapa 68.
 
 ---
@@ -3946,6 +3946,30 @@ quando a aba foi tirada, corta a maior parte dela na abertura.
 
 11 testes novos em `testes-o-que-a-aba-erros-mostrou.js`. 10 quebras de propósito,
 10 pegas.
+
+---
+
+## Etapa 77 — O valor retido acumulado, mês contra mês
+
+Pedido do PO: "na aba Produtividade RECC eu preciso de um gráfico comparativo com
+os últimos 3 meses (…) achar a data reteve e o valor (…) no dia 10 de setembro a
+equipe já tinha 200 mil reais retidos, no dia 10 de outubro tinha 220 mil e no dia
+10 de novembro tinha 230 mil". Entre colunas e linhas, ele escolheu **três linhas**.
+
+| O que | Como ficou |
+|---|---|
+| **O gráfico** | "Valor retido acumulado: os últimos 3 meses", logo depois dos prêmios. Uma linha por mês — o atual e os dois anteriores —, todas na mesma escala; o eixo de baixo é o dia do mês. Parar o mouse num dia mostra os três valores lado a lado |
+| **A conta** (`retidoAcumuladoNosTresMeses_`) | Cada ponto é a soma do "valor do prêmio retido" dos casos que retiveram do dia 1 até aquele dia, pela "Data reteve" (o carimbo do status Retido). O mês atual vai até hoje |
+| **A tabela embaixo** | Quanto cada mês tinha **até o dia de hoje**, quanto fechou no mês inteiro e quantos casos retidos |
+| **O que conta** | O caso que **está** Retido. O que reteve e depois virou outro status não entra, mesmo com a data gravada; caso sem valor também não |
+| **O período e os filtros** | Não segue o período da tela — o período é pela data de entrada do caso, e este gráfico é pela data em que ele reteve: são sempre os três meses. O alcance do nível e os filtros de lista (o analista, por exemplo) valem |
+| **A leitura** | A coluna da data inteira (uma coluna) e só as linhas dos três meses |
+| **Onde aparece** | No canal que tem o status Retido com carimbo e a coluna do valor retido — hoje, a RET |
+| **Versão** | 1.77 |
+
+`Graficos.desenharLinhas`, em `Comuns.html`, desenha várias linhas no mesmo
+desenho, com as cores de série que os temas já tinham. 9 testes novos em
+`testes-retido-acumulado.js`. 9 quebras de propósito, 9 pegas.
 
 ---
 

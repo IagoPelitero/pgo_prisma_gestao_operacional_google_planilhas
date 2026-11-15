@@ -65,6 +65,7 @@ const { rodarTestesDoRelatorioDeCasos } = require('./testes-relatorio-de-casos')
 const { rodarTestesDaLeituraLeveDoAviso } = require('./testes-leitura-leve-do-aviso');
 const { rodarTestesDoAcabamento } = require('./testes-acabamento');
 const { rodarTestesDoQueAAbaErrosMostrou } = require('./testes-o-que-a-aba-erros-mostrou');
+const { rodarTestesDoRetidoAcumulado } = require('./testes-retido-acumulado');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -120,6 +121,7 @@ rodarTestesDoRelatorioDeCasos();
 rodarTestesDaLeituraLeveDoAviso();
 rodarTestesDoAcabamento();
 rodarTestesDoQueAAbaErrosMostrou();
+rodarTestesDoRetidoAcumulado();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-10 17:49
+   Gerado em 2026-11-15 18:37
    ========================================================================== */
 
 
@@ -8677,8 +8677,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.76',
-  data: '10/11/2026'
+  numero: '1.77',
+  data: '15/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -11214,6 +11214,72 @@ function colunasDosPremios_(canal) {
   return colunas.anual && colunas.mensal && colunas.retido ? colunas : null;
 }
 
+function retidoAcumuladoNosTresMeses_(canal, quem, disponiveis, filtros) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var retido = situacoesPorChave_(canal)[normalizarParaComparar_('Retido')];
+  var iValor = posicaoDaColuna_(estrutura, 'valor do prêmio retido');
+  var iData = posicaoDaColuna_(estrutura, (retido && retido.colunaDeCarimbo) || 'Data reteve');
+  if (!retido || !canal.colunaDoStatus || iValor < 0 || iData < 0) return null;
+  var colunaDoValor = estrutura.cabecalhos[iValor];
+  var colunaDaData = estrutura.cabecalhos[iData];
+
+  var hoje = new Date();
+  var meses = [2, 1, 0].map(function (atras, ordem) {
+    var primeiro = new Date(hoje.getFullYear(), hoje.getMonth() - atras, 1);
+    var numero = primeiro.getMonth() + 1;
+    return {
+      chave: primeiro.getFullYear() + '-' + (numero < 10 ? '0' : '') + numero,
+      rotulo: RECC_NOMES_DOS_MESES[numero - 1] + ' de ' + primeiro.getFullYear(),
+      serie: ordem + 1,
+
+      ultimoDia: atras === 0 ? Number(formatarData_(hoje, 'yyyy-MM-dd').slice(8, 10))
+        : new Date(primeiro.getFullYear(), primeiro.getMonth() + 1, 0).getDate(),
+      porDia: {}, casos: 0
+    };
+  });
+  var porChave = {};
+  meses.forEach(function (mes) { porChave[mes.chave] = mes; });
+
+  var linhas = [];
+  lerColunaInteira_(canal.aba, colunaDaData).forEach(function (valor, i) {
+    var data = converterParaData_(valor);
+    if (data && porChave[formatarData_(data, 'yyyy-MM-dd').slice(0, 7)]) linhas.push(i + 2);
+  });
+  var casos = aplicarFiltros_(alcanceDaProdutividade_(
+    semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas)), canal, quem),
+    disponiveis, filtros || {});
+
+  casos.forEach(function (caso) {
+    if (normalizarParaComparar_(caso[canal.colunaDoStatus]) !== retido.chave) return;
+    var data = converterParaData_(caso[colunaDaData]);
+
+    var escrita = data ? formatarData_(data, 'yyyy-MM-dd') : '';
+    var mes = porChave[escrita.slice(0, 7)];
+    var valor = converterParaNumero_(caso[colunaDoValor]);
+    if (!mes || valor === '' || valor === null || isNaN(valor)) return;
+    var dia = Number(escrita.slice(8, 10));
+    if (dia > mes.ultimoDia) return;
+    mes.porDia[dia] = (mes.porDia[dia] || 0) + Number(valor);
+    mes.casos++;
+  });
+
+  return {
+    titulo: 'Valor retido acumulado: os últimos 3 meses',
+    colunaDaData: colunaDaData,
+    colunaDoValor: colunaDoValor,
+    meses: meses.map(function (mes) {
+      var soma = 0;
+      var pontos = [];
+      for (var dia = 1; dia <= mes.ultimoDia; dia++) {
+        soma += mes.porDia[dia] || 0;
+        pontos.push({ dia: dia, valor: Math.round(soma * 100) / 100 });
+      }
+      return { chave: mes.chave, rotulo: mes.rotulo, serie: mes.serie, pontos: pontos,
+        total: Math.round(soma * 100) / 100, casos: mes.casos };
+    })
+  };
+}
+
 function somaDaColuna_(casos, coluna) {
   return casos.reduce(function (soma, caso) {
     var numero = converterParaNumero_(caso[coluna]);
@@ -11532,6 +11598,8 @@ function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
     componentes: componentes,
 
     premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
+
+    retidoAcumulado: retidoAcumuladoNosTresMeses_(canal, quem, disponiveis, filtros),
     porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
 
     tentativas: tentativasAteOSucesso_(casos, canal),

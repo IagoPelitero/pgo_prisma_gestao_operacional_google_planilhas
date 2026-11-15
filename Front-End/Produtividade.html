@@ -105,6 +105,7 @@ var TelaProdutividade = (function () {
       + abasDaMesa()
       + desenharCartoes()
       + desenharPremios()
+      + desenharRetidoAcumulado()
       + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
@@ -148,6 +149,35 @@ var TelaProdutividade = (function () {
       + premios.pontos.map(function (ponto) {
         return '<tr><td>' + escapar(ponto.rotulo) + '</td><td class="direita">'
           + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      + '</section></div>';
+  }
+
+  /**
+   * O valor retido acumulado, mês contra mês (Etapa 77, pedido do PO): três
+   * linhas, uma por mês, e embaixo o que cada mês tinha no MESMO dia de hoje —
+   * "no dia 10 de setembro a equipe já tinha 200 mil reais retidos".
+   */
+  function desenharRetidoAcumulado() {
+    var grafico = painel.retidoAcumulado;
+    if (!grafico) return '';
+    var atual = grafico.meses[grafico.meses.length - 1];
+    var hoje = atual.pontos.length;
+    return '<div class="graficos"><section class="cartao grafico largura-2" data-retido-acumulado="sim">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(grafico.titulo) + '</h3></header>'
+      + '<p class="grafico-legenda-linha">A soma do "' + escapar(grafico.colunaDoValor)
+      + '" dos casos Retidos, do dia 1 até cada dia do mês, pela "' + escapar(grafico.colunaDaData)
+      + '". Não segue o período de cima: são sempre os três últimos meses.</p>'
+      + Graficos.desenharLinhas(grafico)
+      + '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>Mês</th><th class="direita">Até o dia ' + hoje + '</th>'
+      + '<th class="direita">No mês inteiro</th><th class="direita">Casos retidos</th></tr></thead><tbody>'
+      + grafico.meses.map(function (mes) {
+        var noDia = mes.pontos[Math.min(hoje, mes.pontos.length) - 1];
+        return '<tr><td>' + escapar(mes.rotulo) + '</td><td class="direita">'
+          + emReais(noDia ? noDia.valor : 0) + '</td><td class="direita">'
+          + (mes === atual ? '—' : emReais(mes.total)) + '</td><td class="direita">'
+          + mes.casos + '</td></tr>';
       }).join('') + '</tbody></table></div>'
       + '</section></div>';
   }

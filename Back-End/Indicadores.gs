@@ -2269,6 +2269,92 @@ function colunasDosPremios_(canal) {
   return colunas.anual && colunas.mensal && colunas.retido ? colunas : null;
 }
 
+/*
+ * O VALOR RETIDO ACUMULADO, MÊS CONTRA MÊS (Etapa 77, pedido do PO): "um gráfico
+ * comparativo com os últimos 3 meses (…) achar a data reteve e o valor (…) no
+ * dia 10 de setembro a equipe já tinha 200 mil reais retidos, no dia 10 de
+ * outubro tinha 220 mil e no dia 10 de novembro tinha 230 mil".
+ *
+ * Três linhas, uma por mês — o atual e os dois anteriores. Cada ponto é a soma
+ * do valor retido dos casos que retiveram do dia 1 até aquele dia. O mês atual
+ * vai até hoje.
+ *
+ * NÃO OBEDECE AO PERÍODO DA TELA: o período da tela é pela data de entrada do
+ * caso, e este gráfico é pela data em que ele reteve — sempre os três meses. O
+ * alcance do nível e os filtros de lista valem, como no resto da tela.
+ *
+ * Conta o caso que ESTÁ Retido hoje: o que reteve e depois virou outro status
+ * não é dinheiro retido, mesmo com a data ainda gravada.
+ *
+ * Lê a coluna da data inteira (uma coluna) e só as linhas dos três meses.
+ */
+function retidoAcumuladoNosTresMeses_(canal, quem, disponiveis, filtros) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var retido = situacoesPorChave_(canal)[normalizarParaComparar_('Retido')];
+  var iValor = posicaoDaColuna_(estrutura, 'valor do prêmio retido');
+  var iData = posicaoDaColuna_(estrutura, (retido && retido.colunaDeCarimbo) || 'Data reteve');
+  if (!retido || !canal.colunaDoStatus || iValor < 0 || iData < 0) return null;
+  var colunaDoValor = estrutura.cabecalhos[iValor];
+  var colunaDaData = estrutura.cabecalhos[iData];
+
+  var hoje = new Date();
+  var meses = [2, 1, 0].map(function (atras, ordem) {
+    var primeiro = new Date(hoje.getFullYear(), hoje.getMonth() - atras, 1);
+    var numero = primeiro.getMonth() + 1;
+    return {
+      chave: primeiro.getFullYear() + '-' + (numero < 10 ? '0' : '') + numero,
+      rotulo: RECC_NOMES_DOS_MESES[numero - 1] + ' de ' + primeiro.getFullYear(),
+      serie: ordem + 1,
+      // O mês atual para em hoje; os outros, no último dia deles.
+      ultimoDia: atras === 0 ? Number(formatarData_(hoje, 'yyyy-MM-dd').slice(8, 10))
+        : new Date(primeiro.getFullYear(), primeiro.getMonth() + 1, 0).getDate(),
+      porDia: {}, casos: 0
+    };
+  });
+  var porChave = {};
+  meses.forEach(function (mes) { porChave[mes.chave] = mes; });
+
+  var linhas = [];
+  lerColunaInteira_(canal.aba, colunaDaData).forEach(function (valor, i) {
+    var data = converterParaData_(valor);
+    if (data && porChave[formatarData_(data, 'yyyy-MM-dd').slice(0, 7)]) linhas.push(i + 2);
+  });
+  var casos = aplicarFiltros_(alcanceDaProdutividade_(
+    semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas)), canal, quem),
+    disponiveis, filtros || {});
+
+  casos.forEach(function (caso) {
+    if (normalizarParaComparar_(caso[canal.colunaDoStatus]) !== retido.chave) return;
+    var data = converterParaData_(caso[colunaDaData]);
+    // Sempre "aaaa-mm-dd", o formato que o resto do sistema já usa: o mês são
+    // os sete primeiros caracteres, e o dia, os dois últimos.
+    var escrita = data ? formatarData_(data, 'yyyy-MM-dd') : '';
+    var mes = porChave[escrita.slice(0, 7)];
+    var valor = converterParaNumero_(caso[colunaDoValor]);
+    if (!mes || valor === '' || valor === null || isNaN(valor)) return;
+    var dia = Number(escrita.slice(8, 10));
+    if (dia > mes.ultimoDia) return;   // data no futuro: não é deste gráfico
+    mes.porDia[dia] = (mes.porDia[dia] || 0) + Number(valor);
+    mes.casos++;
+  });
+
+  return {
+    titulo: 'Valor retido acumulado: os últimos 3 meses',
+    colunaDaData: colunaDaData,
+    colunaDoValor: colunaDoValor,
+    meses: meses.map(function (mes) {
+      var soma = 0;
+      var pontos = [];
+      for (var dia = 1; dia <= mes.ultimoDia; dia++) {
+        soma += mes.porDia[dia] || 0;
+        pontos.push({ dia: dia, valor: Math.round(soma * 100) / 100 });
+      }
+      return { chave: mes.chave, rotulo: mes.rotulo, serie: mes.serie, pontos: pontos,
+        total: Math.round(soma * 100) / 100, casos: mes.casos };
+    })
+  };
+}
+
 function somaDaColuna_(casos, coluna) {
   return casos.reduce(function (soma, caso) {
     var numero = converterParaNumero_(caso[coluna]);
@@ -2642,6 +2728,8 @@ function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
       canal que não tem as colunas de prêmio.
     */
     premios: colunasDosPremios ? graficoDosPremios_(casos, colunasDosPremios) : null,
+    // Etapa 77: o valor retido acumulado dia a dia, nos três últimos meses.
+    retidoAcumulado: retidoAcumuladoNosTresMeses_(canal, quem, disponiveis, filtros),
     porAnalista: colunasDosPremios ? quadroPorAnalista_(casos, canal, colunasDosPremios) : null,
     // Etapa 47: em qual contato o cliente atendeu, por analista e por CPF.
     tentativas: tentativasAteOSucesso_(casos, canal),

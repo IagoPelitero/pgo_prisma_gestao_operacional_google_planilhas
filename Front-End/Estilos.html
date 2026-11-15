@@ -2203,6 +2203,22 @@ table.fila.legado td { color: var(--suave); }
   fill: none; stroke: var(--destaque); stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round;
 }
+/* Várias linhas no mesmo desenho (Etapa 77): cada série com a cor dela. */
+.linha-do-grafico.serie-1 { stroke: var(--serie-1); }
+.linha-do-grafico.serie-2 { stroke: var(--serie-2); }
+.linha-do-grafico.serie-3 { stroke: var(--serie-3); stroke-width: 3; }
+.ponto-da-linha .marcador.serie-1 { fill: var(--serie-1); }
+.ponto-da-linha .marcador.serie-2 { fill: var(--serie-2); }
+.ponto-da-linha .marcador.serie-3 { fill: var(--serie-3); }
+.legenda-das-linhas {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none;
+  font-size: 13px; color: var(--suave);
+}
+.legenda-das-linhas li { display: inline-flex; align-items: center; gap: 7px; }
+.legenda-das-linhas i { width: 18px; height: 3px; border-radius: 2px; }
+.legenda-das-linhas i.serie-1 { background: var(--serie-1); }
+.legenda-das-linhas i.serie-2 { background: var(--serie-2); }
+.legenda-das-linhas i.serie-3 { background: var(--serie-3); }
 .ponto-da-linha { cursor: pointer; }
 .ponto-da-linha .alvo { fill: transparent; }
 .ponto-da-linha .marcador {

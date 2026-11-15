@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1641 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1650 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -349,7 +349,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1641 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1650 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -986,6 +986,20 @@ e o CPF sem perder o zero à esquerda. "Baixar arquivo" entrega o arquivo; se o
 navegador barrar o download, o texto fica logo abaixo para copiar. Cada exportação
 entra na auditoria (`relatorio.exportar`). Quem só enxerga os próprios casos na
 Produtividade exporta só os seus, e o campo oculto para o nível não sai no arquivo.
+
+### O valor retido acumulado: três meses, dia a dia
+
+Logo depois dos prêmios (Etapa 77, pedido do PO), três linhas: o mês atual e os
+dois anteriores. Cada ponto é **quanto a equipe já tinha retido do dia 1 até
+aquele dia** — a soma do "valor do prêmio retido" dos casos Retidos, pela "Data
+reteve". É a pergunta "no dia 10 do mês passado já tínhamos quanto?", respondida
+para os três meses de uma vez; a tabela embaixo dá o número de cada mês até o dia
+de hoje.
+
+Não segue o período de cima: o período é pela data de entrada do caso, e este
+gráfico é pela data em que ele reteve. Os filtros de lista valem — escolher um
+analista mostra a curva dele. Conta o caso que **está** Retido: o que reteve e
+depois mudou de status sai da soma.
 
 ### A RET: os prêmios primeiro, a equipe por último
 
@@ -1725,7 +1739,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.76** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.77** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1733,7 +1747,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1641 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1650 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

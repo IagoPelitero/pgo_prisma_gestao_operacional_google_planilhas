@@ -1767,6 +1767,22 @@ table.fila.legado td { color: var(--suave); }
   fill: none; stroke: var(--destaque); stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round;
 }
+
+.linha-do-grafico.serie-1 { stroke: var(--serie-1); }
+.linha-do-grafico.serie-2 { stroke: var(--serie-2); }
+.linha-do-grafico.serie-3 { stroke: var(--serie-3); stroke-width: 3; }
+.ponto-da-linha .marcador.serie-1 { fill: var(--serie-1); }
+.ponto-da-linha .marcador.serie-2 { fill: var(--serie-2); }
+.ponto-da-linha .marcador.serie-3 { fill: var(--serie-3); }
+.legenda-das-linhas {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none;
+  font-size: 13px; color: var(--suave);
+}
+.legenda-das-linhas li { display: inline-flex; align-items: center; gap: 7px; }
+.legenda-das-linhas i { width: 18px; height: 3px; border-radius: 2px; }
+.legenda-das-linhas i.serie-1 { background: var(--serie-1); }
+.legenda-das-linhas i.serie-2 { background: var(--serie-2); }
+.legenda-das-linhas i.serie-3 { background: var(--serie-3); }
 .ponto-da-linha { cursor: pointer; }
 .ponto-da-linha .alvo { fill: transparent; }
 .ponto-da-linha .marcador {
@@ -3915,6 +3931,60 @@ var Graficos = (function () {
       + '</div>';
   }
 
+  function desenharLinhas(grafico) {
+    var series = grafico.meses;
+    var dias = series.reduce(function (maior, serie) { return Math.max(maior, serie.pontos.length); }, 0);
+    var maior = series.reduce(function (topo, serie) { return Math.max(topo, maiorValor(serie.pontos)); }, 0);
+    var largura = 960;
+    var altura = 300;
+    var pe = 40;
+    var topo = 20;
+    var faixa = dias > 1 ? largura / dias : largura;
+
+    function xDe(i) { return i * faixa + faixa / 2; }
+    function yDe(valor) {
+      return altura - pe - (maior ? (valor / maior) * (altura - pe - topo) : 0);
+    }
+
+    var linhas = series.map(function (serie) {
+      var caminho = serie.pontos.map(function (ponto, i) {
+        return (i ? 'L' : 'M') + xDe(i).toFixed(1) + ' ' + yDe(ponto.valor).toFixed(1);
+      }).join(' ');
+      return caminho ? '<path d="' + caminho + '" class="linha-do-grafico serie-' + serie.serie + '"></path>' : '';
+    }).join('');
+
+    var rotulos = '';
+    var alvos = '';
+    for (var i = 0; i < dias; i++) {
+      if (i === 0 || (i + 1) % 5 === 0) {
+        rotulos += '<text x="' + xDe(i).toFixed(1) + '" y="' + (altura - pe + 18)
+          + '" class="rotulo-da-barra">' + (i + 1) + '</text>';
+      }
+      var doDia = series.filter(function (serie) { return serie.pontos[i]; });
+      var texto = 'Dia ' + (i + 1) + doDia.map(function (serie) {
+        return ' · ' + escapar(serie.rotulo) + ': ' + numero(serie.pontos[i].valor, 'dinheiro');
+      }).join('');
+      alvos += '<g class="ponto-da-linha" data-dia="' + (i + 1) + '" data-dica="' + texto + '"'
+        + ' tabindex="0" role="img" aria-label="' + texto + '">'
+        + '<rect class="alvo" x="' + (xDe(i) - faixa / 2).toFixed(1) + '" y="0"'
+        + ' width="' + faixa.toFixed(1) + '" height="' + (altura - pe) + '"></rect>'
+        + doDia.map(function (serie) {
+          return '<circle cx="' + xDe(i).toFixed(1) + '" cy="' + yDe(serie.pontos[i].valor).toFixed(1)
+            + '" r="5" class="marcador serie-' + serie.serie + '"></circle>';
+        }).join('') + '</g>';
+    }
+
+    return '<div class="grafico-corpo">'
+      + '<svg viewBox="0 0 ' + largura + ' ' + altura + '" class="desenho"'
+      + ' role="img" aria-label="' + escapar(grafico.titulo) + '">'
+      + '<line x1="0" y1="' + (altura - pe) + '" x2="' + largura + '" y2="'
+      + (altura - pe) + '" class="regua"></line>'
+      + linhas + alvos + rotulos + '</svg>'
+      + '<ul class="legenda-das-linhas">' + series.map(function (serie) {
+        return '<li><i class="serie-' + serie.serie + '"></i>' + escapar(serie.rotulo) + '</li>';
+      }).join('') + '</ul></div>';
+  }
+
   function larguraDoDesenho(componente) {
     return componente.largura === 2 ? 960 : 480;
   }
@@ -4025,6 +4095,7 @@ var Graficos = (function () {
 
   return {
     desenhar: desenhar,
+    desenharLinhas: desenharLinhas,
     tabela: tabela,
     numero: numero,
     ligarDica: ligarDica,
@@ -6798,6 +6869,7 @@ var TelaProdutividade = (function () {
       + abasDaMesa()
       + desenharCartoes()
       + desenharPremios()
+      + desenharRetidoAcumulado()
       + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
@@ -6834,6 +6906,30 @@ var TelaProdutividade = (function () {
       + premios.pontos.map(function (ponto) {
         return '<tr><td>' + escapar(ponto.rotulo) + '</td><td class="direita">'
           + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
+      }).join('') + '</tbody></table></div>'
+      + '</section></div>';
+  }
+
+  function desenharRetidoAcumulado() {
+    var grafico = painel.retidoAcumulado;
+    if (!grafico) return '';
+    var atual = grafico.meses[grafico.meses.length - 1];
+    var hoje = atual.pontos.length;
+    return '<div class="graficos"><section class="cartao grafico largura-2" data-retido-acumulado="sim">'
+      + '<header class="grafico-cabeca"><h3>' + escapar(grafico.titulo) + '</h3></header>'
+      + '<p class="grafico-legenda-linha">A soma do "' + escapar(grafico.colunaDoValor)
+      + '" dos casos Retidos, do dia 1 até cada dia do mês, pela "' + escapar(grafico.colunaDaData)
+      + '". Não segue o período de cima: são sempre os três últimos meses.</p>'
+      + Graficos.desenharLinhas(grafico)
+      + '<div class="rolagem-tabela"><table class="fila numeros">'
+      + '<thead><tr><th>Mês</th><th class="direita">Até o dia ' + hoje + '</th>'
+      + '<th class="direita">No mês inteiro</th><th class="direita">Casos retidos</th></tr></thead><tbody>'
+      + grafico.meses.map(function (mes) {
+        var noDia = mes.pontos[Math.min(hoje, mes.pontos.length) - 1];
+        return '<tr><td>' + escapar(mes.rotulo) + '</td><td class="direita">'
+          + emReais(noDia ? noDia.valor : 0) + '</td><td class="direita">'
+          + (mes === atual ? '—' : emReais(mes.total)) + '</td><td class="direita">'
+          + mes.casos + '</td></tr>';
       }).join('') + '</tbody></table></div>'
       + '</section></div>';
   }
