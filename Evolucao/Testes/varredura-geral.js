@@ -91,7 +91,8 @@ function funcoesPublicas() {
  */
 const DO_EDITOR = ['doGet', 'incluir', 'instalarRECC', 'atualizarPGO', 'migrarParaCanais',
   'normalizarBase', 'verificarEstruturaRECC', 'diagnosticoRECC',
-  'arquivarAuditoriaAgendada', 'atualizarAnalisesAgendadas', 'arquivarBaseAgendada'];
+  'arquivarAuditoriaAgendada', 'atualizarAnalisesAgendadas', 'arquivarBaseAgendada',
+  'mudarStatusAgendados'];
 
 /**
  * Quem pode responder a alguém SEM cadastro, e por quê. Fora desta lista,

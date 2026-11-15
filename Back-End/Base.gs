@@ -297,6 +297,13 @@ const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
 const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
+/*
+ * As duas colunas da mudança de status agendada (Etapa 78): em que dia o caso
+ * muda sozinho, e para qual status. Vazias, o caso não tem agendamento.
+ */
+const RECC_COLUNA_MUDAR_STATUS_EM = 'Mudar status em';
+const RECC_COLUNA_MUDAR_STATUS_PARA = 'Mudar status para';
+
 /**
  * QUANDO o caso foi encaminhado para a área — carimbado pelo SISTEMA no
  * instante em que a `Área responsável` é escolhida. É um dado da operação (e
@@ -460,7 +467,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       // QUANDO o caso saiu de "Não trabalhado" pela primeira vez. O sistema
       // carimba, e é daqui que os 3 dias úteis da RET contam.
-      { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // A mudança de status agendada na importação (Etapa 78).
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_EM, tipo: 'data', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_PARA, tipo: 'texto', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -505,7 +515,10 @@ const RECC_ESQUEMA = {
       // QUANDO a área foi escolhida. O sistema carimba; ninguém digita.
       { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
       // QUANDO o caso entrou em "Em andamento": é daqui que o prazo conta.
-      { cabecalho: RECC_COLUNA_DATA_EM_ANDAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_EM_ANDAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // A mudança de status agendada na importação (Etapa 78).
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_EM, tipo: 'data', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_PARA, tipo: 'texto', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -577,7 +590,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+      // A mudança de status agendada na importação (Etapa 78).
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_EM, tipo: 'data', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_PARA, tipo: 'texto', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 

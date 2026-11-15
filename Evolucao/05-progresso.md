@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.77 — a última etapa entregue é a 77. A regra do número está
+**Estado geral:** versão 1.78 — a última etapa entregue é a 78. A regra do número está
 na Etapa 68.
 
 ---
@@ -3970,6 +3970,55 @@ equipe já tinha 200 mil reais retidos, no dia 10 de outubro tinha 220 mil e no 
 `Graficos.desenharLinhas`, em `Comuns.html`, desenha várias linhas no mesmo
 desenho, com as cores de série que os temas já tinham. 9 testes novos em
 `testes-retido-acumulado.js`. 9 quebras de propósito, 9 pegas.
+
+---
+
+## Etapa 78 — A mudança de status agendada
+
+Pedido do PO: "o Prisma pode mudar status automaticamente dos casos que não estão
+com status conclusivos, inserindo uma data programada nele?". As regras vieram
+dele, pergunta a pergunta:
+
+| A pergunta | A resposta do PO |
+|---|---|
+| De onde vem a data | Da importação: "inserir quantos dias até mudar o status — SLA de 7 dias, no 8 muda sozinho" |
+| Dias úteis ou corridos | Corridos |
+| Contados de quando | Do dia da importação |
+| Para qual status | Escolhido no lote; é um status próprio, não conclusivo e diferente de Contatando |
+| Quais casos mudam | Os que ainda estiverem em Pendente, Não trabalhado ou Contatando |
+| Quais canais | Todos |
+| O Retido | Não entra: é status final |
+| Conta para o analista | Não. E não dá a largada no prazo de retorno |
+
+| O que | Como ficou |
+|---|---|
+| **Na Importação** | Depois de conferir, junto do status do lote: "Mudar o status sozinho depois de (dias corridos)" e "Para o status". Em branco, nada é agendado. A tela diz a data em que o lote muda, de quais status sai e que a mudança é do sistema. Importou no dia 1 com 7 dias: muda no dia 8 |
+| **Os destinos** (`statusParaAgendar_`) | Os status do canal que não são conclusivos nem estão entre os que o agendamento muda. Canal sem nenhum (a Mesa nasce só com "Em andamento") pede que o PO crie o status em Configurações › Ajustes Gerais |
+| **Duas colunas em cada base** | "Mudar status em" e "Mudar status para", preenchidas pelo sistema. Vazias, o caso não tem agendamento. Nascem nas três bases, e o `atualizarPGO()` as cria na base de cada canal de uma instalação em uso |
+| **Quem muda** (`mudarStatusAgendados`) | Um acionador de tempo, criado no editor. Em cada canal, lê a coluna da data inteira (uma coluna) e só as linhas em que a data chegou. O caso que ainda está num dos status de origem vai para o destino; o que já foi trabalhado só perde o agendamento. Até 300 casos por rodada; o resto fica para a próxima. Um caso ou um canal que falha não leva os outros junto |
+| **O que a mudança grava** | O status novo, o carimbo dele (se o status tiver), "Data da última mudança de status" e "Quem mudou o status" = `Sistema (agendamento)`. **Não** grava a "Data da primeira mudança de status" (a largada do prazo de retorno da RET) nem soma em "Mudanças de status" |
+| **Quais status mudam** | `Pendente, Não trabalhado, Contatando`; ajusta-se na CONFIG, em `AGENDAMENTO.STATUS_DE_ORIGEM` |
+| **Auditoria** | A importação diz a data e o destino agendados; cada rodada grava uma linha por canal (`caso.status.agendado`) com quantos mudaram, quantos tiveram o agendamento desfeito e quais casos |
+| **O diagnóstico** | Cobra o acionador só quando há caso agendado esperando: sem batimento, ou parado há mais de 2 dias, avisa e diz como criar |
+| **Versão** | 1.78 |
+
+**O que o PO precisa fazer uma vez:** rodar `atualizarPGO()` (cria as colunas) e,
+no editor do Apps Script, *Acionadores › Adicionar acionador › mudarStatusAgendados
+› Baseado no tempo › Contador de horas › A cada hora*. Sem o acionador, nada muda
+na data — e o diagnóstico avisa.
+
+**Sobre a velocidade,** que o PO perguntou: duas colunas a mais numa base de 50 são
+4% de leitura a mais, e a rotina roda em segundo plano — não é ela que a pessoa
+espera na tela.
+
+**O que ficou de fora, por não ter sido pedido:** agendar pela tela um caso que não
+veio de importação, e ver ou cancelar o agendamento de um caso pela tela (hoje ele
+se desfaz sozinho quando o caso é trabalhado; para cancelar à mão, apaga-se a
+célula "Mudar status em" na planilha).
+
+22 testes novos em `testes-mudanca-de-status-agendada.js` e um ponta a ponta. 16
+quebras de propósito: 14 pegas, e as 2 que escaparam eram linhas que não faziam
+falta — uma saiu do código, a outra é proteção repetida.
 
 ---
 

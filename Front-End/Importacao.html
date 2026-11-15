@@ -53,6 +53,9 @@ var TelaImportacao = (function () {
   // Etapa 45: a data de recepção dos casos (RET) — 'planilha' (sem data fica
   // hoje) ou 'hoje' (todos com a data de hoje).
   var dataDeRecepcao = 'planilha';
+  // A mudança de status agendada (Etapa 78): em branco, o lote não agenda nada.
+  var agendarDias = '';
+  var agendarPara = '';
   // O que importar. Na Mesa há dois destinos: os casos do canal e os
   // atendimentos do chat (pedido do PO: "ler uma planilha de chat ficou confuso"
   // — agora o chat entra por esta mesma tela). O fluxo é o mesmo; muda o
@@ -414,7 +417,68 @@ var TelaImportacao = (function () {
       + '</p>'
       + desenharAnalistas()
       + escolhaDoStatusDoLote()
+      + escolhaDoAgendamento()
       + escolhaDaDataDeRecepcao();
+  }
+
+  /*
+    A MUDANÇA DE STATUS AGENDADA (Etapa 78, pedido do PO): "inserir quantos dias
+    até mudar o status — SLA de 7 dias, no 8 muda sozinho". Dias corridos, do dia
+    da importação. Em branco, o lote não agenda nada. O destino é um status
+    próprio: não conclusivo, e diferente dos que o agendamento muda.
+  */
+  function escolhaDoAgendamento() {
+    var destinos = opcoes.statusParaAgendar || [];
+    if (!(opcoes.statusDoCanal || []).length) return '';
+    var deQuais = escapar(opcoes.statusQueOAgendamentoMuda || '');
+    if (!destinos.length) {
+      return '<p class="config-dica">Mudança de status agendada: indisponível neste canal. '
+        + 'Ela precisa de um status de destino que não seja conclusivo nem um destes: '
+        + deQuais + ' — e das colunas que o <code>atualizarPGO()</code> cria na base.</p>';
+    }
+    var dias = Number(agendarDias);
+    var valido = agendarDias !== '' && dias >= 1 && Math.floor(dias) === dias;
+    return '<div class="grade"><label class="campo">'
+      + '<span>Mudar o status sozinho depois de (dias corridos)</span>'
+      + '<input type="number" class="filtro" id="agendar-dias" min="1" max="365" step="1"'
+      + ' placeholder="em branco: não agenda" value="' + escapar(agendarDias) + '"></label>'
+      + '<label class="campo"><span>Para o status</span>'
+      + '<select class="filtro" id="agendar-para">'
+      + '<option value=""' + (agendarPara === '' ? ' selected' : '') + '>— escolha —</option>'
+      + destinos.map(function (status) {
+        return '<option value="' + escapar(status.valor) + '"'
+          + (status.valor === agendarPara ? ' selected' : '') + '>' + escapar(status.rotulo) + '</option>';
+      }).join('') + '</select></label></div>'
+      + '<p class="config-dica">' + (valido && agendarPara
+        ? 'Em <strong>' + diaDaqui(dias) + '</strong>, os casos deste lote que ainda estiverem em '
+          + deQuais + ' mudam sozinhos para <strong>' + escapar(agendarPara) + '</strong>. '
+          + 'O caso que já tiver sido trabalhado fica como está. A mudança é do sistema: não conta '
+          + 'para o analista e não inicia o prazo de retorno.'
+        : (valido ? 'Escolha para qual status os casos mudam.'
+          : 'Em branco, nada é agendado. Com 7 dias, o lote importado no dia 1 muda no dia 8.'))
+      + '</p>';
+  }
+
+  /** dd/mm/aaaa de hoje mais `dias`, como o servidor vai calcular. */
+  function diaDaqui(dias) {
+    var quando = new Date();
+    quando.setDate(quando.getDate() + dias);
+    var dois = function (n) { return (n < 10 ? '0' : '') + n; };
+    return dois(quando.getDate()) + '/' + dois(quando.getMonth() + 1) + '/' + quando.getFullYear();
+  }
+
+  /** O agendamento como o servidor recebe — ou nada, quando o lote não agenda. */
+  function agendamentoDoLote() {
+    return agendarDias === '' ? undefined : { dias: Number(agendarDias), para: agendarPara };
+  }
+
+  /** A frase do agendamento no resultado, com a data que o servidor gravou. */
+  function fraseDoAgendamento(agendamento) {
+    if (!agendamento) return '';
+    return '<p class="config-dica"><strong>Mudança de status agendada:</strong> em '
+      + escapar(agendamento.em) + ' (' + agendamento.dias + ' dia(s) corridos), os casos que ainda '
+      + 'estiverem em ' + escapar(agendamento.deQuais) + ' mudam para <strong>'
+      + escapar(agendamento.para) + '</strong>.</p>';
   }
 
   /*
@@ -610,6 +674,7 @@ var TelaImportacao = (function () {
           + escapar(resultado.ultimoId) + '.'
         : '')
       + '</p>'
+      + fraseDoAgendamento(resultado.agendamento)
       + (resultado.analistas.length
         ? '<p class="config-dica">Divididos entre: '
           + escapar(resultado.analistas.join(', ')) + '.</p>'
@@ -636,6 +701,8 @@ var TelaImportacao = (function () {
       nomeDoLote = '';
       statusDoLote = null;          // e o status padrão dele
       dataDeRecepcao = 'planilha';
+      agendarDias = '';             // o agendamento é do lote, não passa de um canal a outro
+      agendarPara = '';
       desenharSeletor();
       carregar();
     });
@@ -712,6 +779,13 @@ var TelaImportacao = (function () {
       guardarOQueEstaNaTela();
       desenhar();
     });
+    // O agendamento muda a frase de baixo: guardar o que está na tela e
+    // redesenhar, como o status do lote. A conferência continua valendo — ela
+    // é das linhas que entram, e o agendamento não muda quais entram.
+    mudancas('#agendar-dias, #agendar-para', function () {
+      guardarOQueEstaNaTela();
+      desenhar();
+    });
   }
 
   function escolherColuna(caixa) {
@@ -774,6 +848,11 @@ var TelaImportacao = (function () {
 
     var recepcao = elemento('data-de-recepcao');
     if (recepcao) dataDeRecepcao = recepcao.value;
+
+    var dias = elemento('agendar-dias');
+    if (dias) agendarDias = dias.value.trim();
+    var para = elemento('agendar-para');
+    if (para) agendarPara = para.value;
   }
 
   /** O status que vale agora: o escolhido, ou o padrão do canal. */
@@ -794,6 +873,7 @@ var TelaImportacao = (function () {
         dePara: deParaEscolhido,
         colunaQueIdentifica: colunaQueIdentifica || '',
         statusDoLote: statusQueVale(),
+        agendamento: agendamentoDoLote(),
         dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     conferencia
@@ -929,6 +1009,7 @@ var TelaImportacao = (function () {
         analistas: escolhidos,
         origem: nomeDoLote,
         statusDoLote: statusQueVale(),
+        agendamento: agendamentoDoLote(),
         dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     gravacao

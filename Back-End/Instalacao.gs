@@ -1399,6 +1399,16 @@ function atualizarPGO() {
     'o sistema carimba quando o caso sai de "Não trabalhado"', pulados));
   feito = feito.concat(ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce));
 
+  // --- 6b5b. a mudança de status agendada: duas colunas em toda base (Etapa 78) --
+  lerRegistros_('CANAIS').forEach(function (linhaDoCanal) {
+    var abaDoCanal = String(linhaDoCanal.Aba || '').trim();
+    if (!abaDoCanal) return;
+    feito = feito.concat(criarUmaColunaDoSistema_(abaDoCanal, RECC_COLUNA_MUDAR_STATUS_EM,
+      'o dia em que o caso muda de status sozinho', pulados, RECC_TIPO_DE_DADO.DATA));
+    feito = feito.concat(criarUmaColunaDoSistema_(abaDoCanal, RECC_COLUNA_MUDAR_STATUS_PARA,
+      'para qual status o caso muda', pulados, RECC_TIPO_DE_DADO.TEXTO));
+  });
+
   // --- 6b6. a coluna "prêmio mensal retido" da RET vira "prêmio mensal" -------
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
 
@@ -1885,7 +1895,7 @@ function criarOCarimboDoEncaminhamento_(pulados) {
  * Os casos que já existiam ficam com ela vazia — e sem prazo, de propósito:
  * inventar a data deles seria contar o prazo errado.
  */
-function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
+function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados, tipo) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName(nomeDaAba)) {
     pulados.push('aba ' + nomeDaAba + ' não existe');
@@ -1897,7 +1907,7 @@ function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
     return feito;
   }
 
-  adicionarColuna_(nomeDaAba, cabecalho, RECC_TIPO_DE_DADO.DATA_HORA);
+  adicionarColuna_(nomeDaAba, cabecalho, tipo || RECC_TIPO_DE_DADO.DATA_HORA);
   esquecerEstruturaLida_();
 
   var chave = normalizarParaComparar_(cabecalho);
@@ -3845,6 +3855,7 @@ function blocoDoAmbiente_() {
   itens.push(itemDosErros_());
   itens.push(itemDoAcionadorDaAuditoria_());
   itens.push(itemDoAcionadorDaBase_());
+  itens.push(itemDoAcionadorDoAgendamento_());
   itensDasListasDeAnalistas_().forEach(function (item) { itens.push(item); });
 
   return itens;
@@ -3897,6 +3908,49 @@ function itemDoAcionadorDaBase_() {
   return itemDoAcionador_('Histórico da base', RECC_CHAVE_DO_HISTORICO_DA_BASE,
     RECC_BATIMENTO_DO_ACIONADOR_DA_BASE, 'arquivarBaseAgendada',
     'sem planilha de histórico (os casos ficam todos na base)', 'a base só cresce');
+}
+
+/*
+ * O ACIONADOR DA MUDANÇA DE STATUS AGENDADA (Etapa 78). Só é cobrado quando há
+ * caso agendado esperando: sem agendamento, não há o que rodar. De hora em
+ * hora ou diário — mais de 2 dias sem batimento, com caso esperando, é
+ * acionador que não existe ou parou, e o status não muda sem avisar ninguém.
+ */
+const RECC_DIAS_SEM_O_ACIONADOR_DO_AGENDAMENTO = 2;
+
+function itemDoAcionadorDoAgendamento_() {
+  var rotulo = 'Mudança de status agendada';
+  var esperando = 0;
+  canaisVisiveis_().forEach(function (visivel) {
+    try {
+      var canal = canalPeloId_(visivel.id);
+      var colunas = colunasDoAgendamento_(canal);
+      if (!colunas) return;
+      lerColunaInteira_(canal.aba, colunas.quando).forEach(function (valor) {
+        if (converterParaData_(valor)) esperando++;
+      });
+    } catch (erro) { /* canal com defeito já aparece no item dele */ }
+  });
+  if (!esperando) return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': nenhum caso agendado');
+
+  var batimento = Number(PropertiesService.getScriptProperties()
+    .getProperty(RECC_BATIMENTO_DO_ACIONADOR_DO_AGENDAMENTO) || 0);
+  var comoCriar = 'No editor do Apps Script: Acionadores › Adicionar acionador › '
+    + 'mudarStatusAgendados › Baseado no tempo › Contador de horas › A cada hora.';
+  if (!batimento) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      rotulo + ': ' + esperando + ' caso(s) agendado(s), e o acionador ainda não rodou',
+      'mudarStatusAgendados nunca foi chamada — o acionador pode não ter sido criado. Sem ele, '
+        + 'nenhum status muda na data programada.', comoCriar);
+  }
+  var dias = Math.floor((new Date().getTime() - batimento) / (24 * 3600 * 1000));
+  if (dias > RECC_DIAS_SEM_O_ACIONADOR_DO_AGENDAMENTO) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      rotulo + ': ' + esperando + ' caso(s) agendado(s), e o acionador não roda há ' + dias + ' dias',
+      'Acionador apagado ou com erro não avisa ninguém.', 'Confira em Acionadores, no editor. ' + comoCriar);
+  }
+  return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': ' + esperando + ' caso(s) agendado(s), '
+    + 'e o acionador rodou há ' + dias + ' dia(s)');
 }
 
 function itemDoAcionador_(rotulo, chaveDaPlanilha, chaveDoBatimento, funcao, semPlanilha, semEle) {

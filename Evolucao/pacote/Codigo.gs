@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-15 18:37
+   Gerado em 2026-11-15 19:13
    ========================================================================== */
 
 
@@ -151,6 +151,9 @@ const RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS = 'Mudanças de status';
 const RECC_COLUNA_ORIGEM_DA_IMPORTACAO = 'Origem da importação';
 const RECC_COLUNA_DATA_DA_IMPORTACAO = 'Data da importação';
 
+const RECC_COLUNA_MUDAR_STATUS_EM = 'Mudar status em';
+const RECC_COLUNA_MUDAR_STATUS_PARA = 'Mudar status para';
+
 const RECC_COLUNA_DATA_DO_ENCAMINHAMENTO = 'Data do encaminhamento';
 
 const RECC_COLUNA_DATA_EM_ANDAMENTO = 'Data em andamento';
@@ -231,7 +234,10 @@ const RECC_ESQUEMA = {
 
       { cabecalho: RECC_COLUNA_DATA_DO_STATUS_PROPOSTA, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
 
-      { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_PRIMEIRA_MUDANCA_DE_STATUS, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_EM, tipo: 'data', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_PARA, tipo: 'texto', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -272,7 +278,10 @@ const RECC_ESQUEMA = {
 
       { cabecalho: RECC_COLUNA_DATA_DO_ENCAMINHAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
 
-      { cabecalho: RECC_COLUNA_DATA_EM_ANDAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_EM_ANDAMENTO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_EM, tipo: 'data', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_PARA, tipo: 'texto', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -317,7 +326,10 @@ const RECC_ESQUEMA = {
       { cabecalho: RECC_COLUNA_QUANTAS_MUDANCAS_DE_STATUS, tipo: 'numero', protegido: false, preenchidoPeloSistema: true },
 
       { cabecalho: RECC_COLUNA_ORIGEM_DA_IMPORTACAO, tipo: 'texto', protegido: false, preenchidoPeloSistema: true },
-      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true }
+      { cabecalho: RECC_COLUNA_DATA_DA_IMPORTACAO, tipo: 'dataHora', protegido: false, preenchidoPeloSistema: true },
+
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_EM, tipo: 'data', protegido: false, preenchidoPeloSistema: true },
+      { cabecalho: RECC_COLUNA_MUDAR_STATUS_PARA, tipo: 'texto', protegido: false, preenchidoPeloSistema: true }
     ]
   },
 
@@ -4928,6 +4940,8 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     analistas: analistasParaDistribuir_(canal),
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusDoLote_(canal, pedido.statusDoLote),
+
+    agendamento: agendamentoParaATela_(agendamentoDoLote_(canal, pedido.agendamento, new Date())),
     premios: premios,
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal)
   };
@@ -5240,6 +5254,162 @@ function statusDoLote_(canal, escolhido) {
   return achada.gravadoComo;
 }
 
+const RECC_STATUS_QUE_O_AGENDAMENTO_MUDA = 'Pendente, Não trabalhado, Contatando';
+const RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO = 'AGENDAMENTO.STATUS_DE_ORIGEM';
+
+const RECC_QUEM_MUDA_NO_AGENDAMENTO = 'Sistema (agendamento)';
+
+const RECC_DIAS_DO_AGENDAMENTO_NO_MAXIMO = 365;
+const RECC_CASOS_POR_RODADA_DO_AGENDAMENTO = 300;
+
+const RECC_BATIMENTO_DO_ACIONADOR_DO_AGENDAMENTO = 'AGENDAMENTO.ACIONADOR_RODOU';
+
+function statusQueOAgendamentoMuda_() {
+  var mapa = {};
+  String(valorDaConfiguracao_(RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO, '') || RECC_STATUS_QUE_O_AGENDAMENTO_MUDA)
+    .split(',').forEach(function (nome) {
+      var chave = normalizarParaComparar_(nome);
+      if (chave) mapa[chave] = true;
+    });
+  return mapa;
+}
+
+function colunasDoAgendamento_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var iQuando = posicaoDaColuna_(estrutura, RECC_COLUNA_MUDAR_STATUS_EM);
+  var iPara = posicaoDaColuna_(estrutura, RECC_COLUNA_MUDAR_STATUS_PARA);
+  if (iQuando < 0 || iPara < 0 || !canal.colunaDoStatus) return null;
+  return { quando: estrutura.cabecalhos[iQuando], para: estrutura.cabecalhos[iPara] };
+}
+
+function statusParaAgendar_(canal) {
+  if (!colunasDoAgendamento_(canal)) return [];
+  var deOrigem = statusQueOAgendamentoMuda_();
+  return situacoesDoCanal_(canal).filter(function (situacao) {
+    return !situacao.final && !deOrigem[situacao.chave];
+  }).map(function (situacao) {
+    return { valor: situacao.gravadoComo, rotulo: situacao.nome };
+  });
+}
+
+function agendamentoDoLote_(canal, pedido, agora) {
+  if (!pedido || (pedido.dias === '' && !pedido.para) || pedido.dias === undefined) return null;
+
+  var colunas = colunasDoAgendamento_(canal);
+  if (!colunas) {
+    throw new Error('A base do canal ' + canal.nome + ' ainda não tem as colunas do agendamento. '
+      + 'Rode atualizarPGO() no editor do Apps Script e tente de novo.');
+  }
+  var dias = Number(pedido.dias);
+  if (!isFinite(dias) || dias < 1 || dias > RECC_DIAS_DO_AGENDAMENTO_NO_MAXIMO || Math.floor(dias) !== dias) {
+    throw new Error('Em quantos dias o status muda? Informe um número inteiro de 1 a '
+      + RECC_DIAS_DO_AGENDAMENTO_NO_MAXIMO + '.');
+  }
+  var destino = situacaoDoCanalPeloValor_(canal, pedido.para);
+  var aceitos = statusParaAgendar_(canal);
+  if (!destino || !aceitos.some(function (um) { return um.valor === destino.gravadoComo; })) {
+    throw new Error('Escolha para qual status os casos mudam. Pode ser: '
+      + (aceitos.map(function (um) { return um.valor; }).join(', ')
+        || 'nenhum — crie um status não conclusivo em Configurações › Ajustes Gerais') + '.');
+  }
+
+  var em = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + dias);
+  return { em: em, para: destino.gravadoComo, dias: dias };
+}
+
+function agendamentoParaATela_(agendamento) {
+  if (!agendamento) return null;
+  return {
+    em: formatarData_(agendamento.em, 'dd/MM/yyyy'),
+    para: agendamento.para,
+    dias: agendamento.dias,
+    deQuais: String(valorDaConfiguracao_(RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO, '')
+      || RECC_STATUS_QUE_O_AGENDAMENTO_MUDA)
+  };
+}
+
+function mudarStatusAgendados() {
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty(RECC_BATIMENTO_DO_ACIONADOR_DO_AGENDAMENTO, String(new Date().getTime()));
+  } catch (erro) {   }
+
+  var hoje = formatarData_(new Date(), 'yyyy-MM-dd');
+  var deOrigem = statusQueOAgendamentoMuda_();
+  var resultado = { mudaram: 0, desfeitos: 0, ficaramParaDepois: 0, falharam: [] };
+  var cabem = RECC_CASOS_POR_RODADA_DO_AGENDAMENTO;
+
+  canaisVisiveis_().forEach(function (visivel) {
+    var canal = visivel;
+    try {
+      canal = canalPeloId_(visivel.id);
+      var colunas = colunasDoAgendamento_(canal);
+      if (!colunas) return;
+
+      var linhas = [];
+      lerColunaInteira_(canal.aba, colunas.quando).forEach(function (valor, i) {
+        var data = converterParaData_(valor);
+        if (data && formatarData_(data, 'yyyy-MM-dd') <= hoje) linhas.push(i + 2);
+      });
+      if (!linhas.length) return;
+      if (linhas.length > cabem) {
+        resultado.ficaramParaDepois += linhas.length - cabem;
+        linhas = linhas.slice(0, cabem);
+      }
+      cabem -= linhas.length;
+
+      var mudaram = [];
+      var desfeitos = 0;
+      semExcluidasNemVazias_(estruturaDaAba_(canal.aba), lerLinhasEspecificas_(canal.aba, linhas))
+        .forEach(function (registro) {
+          var alteracao = {};
+          alteracao[colunas.quando] = '';
+          alteracao[colunas.para] = '';
+
+          var destino = situacaoDoCanalPeloValor_(canal, registro[colunas.para]);
+          var atual = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+          var muda = !!destino && !destino.final && deOrigem[atual] === true && destino.chave !== atual;
+          if (muda) {
+            alteracao[canal.colunaDoStatus] = destino.gravadoComo;
+            carimbarOStatus_(canal, destino, registro, alteracao);
+            marcarQueFoiOAgendamento_(canal, alteracao);
+          }
+
+          try {
+            atualizarRegistro_(canal.aba, registro.__id, alteracao);
+            if (muda) mudaram.push(String(registro.__id)); else desfeitos++;
+          } catch (erro) {
+            resultado.falharam.push(canal.nome + ' · caso ' + registro.__id + ': ' + erro.message);
+          }
+        });
+
+      resultado.mudaram += mudaram.length;
+      resultado.desfeitos += desfeitos;
+      if (mudaram.length || desfeitos) {
+        registrarAuditoria_('caso.status.agendado', canal.aba, '', canal.nome + ' · '
+          + mudaram.length + ' caso(s) mudaram de status pelo agendamento'
+          + (desfeitos ? ' · ' + desfeitos + ' já tinham sido trabalhados, e o agendamento foi desfeito' : '')
+          + (mudaram.length ? ' · casos: ' + mudaram.slice(0, 40).join(', ')
+            + (mudaram.length > 40 ? ' e mais ' + (mudaram.length - 40) : '') : ''));
+      }
+    } catch (erro) {
+      resultado.falharam.push(canal.nome + ': ' + erro.message);
+      registrarErro_('servidor', 'mudarStatusAgendados', canal.nome + ': ' + erro.message, '');
+    }
+  });
+  return resultado;
+}
+
+function marcarQueFoiOAgendamento_(canal, alteracao) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_QUANDO_MUDOU_O_STATUS) >= 0) {
+    alteracao[RECC_COLUNA_QUANDO_MUDOU_O_STATUS] = new Date();
+  }
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_QUEM_MUDOU_O_STATUS) >= 0) {
+    alteracao[RECC_COLUNA_QUEM_MUDOU_O_STATUS] = RECC_QUEM_MUDA_NO_AGENDAMENTO;
+  }
+}
+
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
   var achado = '';
@@ -5296,6 +5466,8 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var agora = new Date();
   var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
+  var agendamento = agendamentoDoLote_(canal, pedido.agendamento, agora);
+  var colunasDoAgendamento = agendamento ? colunasDoAgendamento_(canal) : null;
 
   var paraGravar = [];
   var pulados = novosMotivosParaPular_(regra);
@@ -5323,6 +5495,10 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
     }
     caso[RECC_COLUNA_ORIGEM_DA_IMPORTACAO] = nomeDoLote;
     caso[RECC_COLUNA_DATA_DA_IMPORTACAO] = agora;
+    if (agendamento) {
+      caso[colunasDoAgendamento.quando] = agendamento.em;
+      caso[colunasDoAgendamento.para] = agendamento.para;
+    }
 
     paraGravar.push(caso);
   }
@@ -5345,11 +5521,14 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
 
   registrarAuditoria_('caso.importar', canal.aba, '',
     canal.nome + ' · ' + nomeDoLote + ' · ' + gravados.length + ' casos'
-    + (pulados.repetida ? ' · ' + pulados.repetida + ' repetidos pulados' : ''));
+    + (pulados.repetida ? ' · ' + pulados.repetida + ' repetidos pulados' : '')
+    + (agendamento ? ' · mudança de status agendada para '
+      + formatarData_(agendamento.em, 'dd/MM/yyyy') + ', para "' + agendamento.para + '"' : ''));
 
   return {
     canal: canal.nome,
     origem: nomeDoLote,
+    agendamento: agendamentoParaATela_(agendamento),
     entraram: gravados.length,
     pulados: pulados,
     premios: premios,
@@ -5485,6 +5664,10 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     }) : [],
 
     statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
+
+    statusParaAgendar: statusParaAgendar_(canal),
+    statusQueOAgendamentoMuda: String(valorDaConfiguracao_(RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO, '')
+      || RECC_STATUS_QUE_O_AGENDAMENTO_MUDA),
     lotes: lotesJaImportados(canal.id),
 
     aceitaChat: canal.aba === 'BASE_MESA',
@@ -8677,7 +8860,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.77',
+  numero: '1.78',
   data: '15/11/2026'
 };
 
@@ -13951,6 +14134,15 @@ function atualizarPGO() {
     'o sistema carimba quando o caso sai de "Não trabalhado"', pulados));
   feito = feito.concat(ligarOPrazoDaRetAPrimeiraMudanca_(pulados, paraVoce));
 
+  lerRegistros_('CANAIS').forEach(function (linhaDoCanal) {
+    var abaDoCanal = String(linhaDoCanal.Aba || '').trim();
+    if (!abaDoCanal) return;
+    feito = feito.concat(criarUmaColunaDoSistema_(abaDoCanal, RECC_COLUNA_MUDAR_STATUS_EM,
+      'o dia em que o caso muda de status sozinho', pulados, RECC_TIPO_DE_DADO.DATA));
+    feito = feito.concat(criarUmaColunaDoSistema_(abaDoCanal, RECC_COLUNA_MUDAR_STATUS_PARA,
+      'para qual status o caso muda', pulados, RECC_TIPO_DE_DADO.TEXTO));
+  });
+
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
 
   feito = feito.concat(ligarOValorRetidoNoRetido_(pulados, paraVoce));
@@ -14263,7 +14455,7 @@ function criarOCarimboDoEncaminhamento_(pulados) {
     'o sistema carimba quando a área é escolhida', pulados);
 }
 
-function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
+function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados, tipo) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName(nomeDaAba)) {
     pulados.push('aba ' + nomeDaAba + ' não existe');
@@ -14275,7 +14467,7 @@ function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados) {
     return feito;
   }
 
-  adicionarColuna_(nomeDaAba, cabecalho, RECC_TIPO_DE_DADO.DATA_HORA);
+  adicionarColuna_(nomeDaAba, cabecalho, tipo || RECC_TIPO_DE_DADO.DATA_HORA);
   esquecerEstruturaLida_();
 
   var chave = normalizarParaComparar_(cabecalho);
@@ -15729,6 +15921,7 @@ function blocoDoAmbiente_() {
   itens.push(itemDosErros_());
   itens.push(itemDoAcionadorDaAuditoria_());
   itens.push(itemDoAcionadorDaBase_());
+  itens.push(itemDoAcionadorDoAgendamento_());
   itensDasListasDeAnalistas_().forEach(function (item) { itens.push(item); });
 
   return itens;
@@ -15770,6 +15963,43 @@ function itemDoAcionadorDaBase_() {
   return itemDoAcionador_('Histórico da base', RECC_CHAVE_DO_HISTORICO_DA_BASE,
     RECC_BATIMENTO_DO_ACIONADOR_DA_BASE, 'arquivarBaseAgendada',
     'sem planilha de histórico (os casos ficam todos na base)', 'a base só cresce');
+}
+
+const RECC_DIAS_SEM_O_ACIONADOR_DO_AGENDAMENTO = 2;
+
+function itemDoAcionadorDoAgendamento_() {
+  var rotulo = 'Mudança de status agendada';
+  var esperando = 0;
+  canaisVisiveis_().forEach(function (visivel) {
+    try {
+      var canal = canalPeloId_(visivel.id);
+      var colunas = colunasDoAgendamento_(canal);
+      if (!colunas) return;
+      lerColunaInteira_(canal.aba, colunas.quando).forEach(function (valor) {
+        if (converterParaData_(valor)) esperando++;
+      });
+    } catch (erro) {   }
+  });
+  if (!esperando) return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': nenhum caso agendado');
+
+  var batimento = Number(PropertiesService.getScriptProperties()
+    .getProperty(RECC_BATIMENTO_DO_ACIONADOR_DO_AGENDAMENTO) || 0);
+  var comoCriar = 'No editor do Apps Script: Acionadores › Adicionar acionador › '
+    + 'mudarStatusAgendados › Baseado no tempo › Contador de horas › A cada hora.';
+  if (!batimento) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      rotulo + ': ' + esperando + ' caso(s) agendado(s), e o acionador ainda não rodou',
+      'mudarStatusAgendados nunca foi chamada — o acionador pode não ter sido criado. Sem ele, '
+        + 'nenhum status muda na data programada.', comoCriar);
+  }
+  var dias = Math.floor((new Date().getTime() - batimento) / (24 * 3600 * 1000));
+  if (dias > RECC_DIAS_SEM_O_ACIONADOR_DO_AGENDAMENTO) {
+    return item_(RECC_SITUACOES_DO_LAUDO.ATENCAO,
+      rotulo + ': ' + esperando + ' caso(s) agendado(s), e o acionador não roda há ' + dias + ' dias',
+      'Acionador apagado ou com erro não avisa ninguém.', 'Confira em Acionadores, no editor. ' + comoCriar);
+  }
+  return item_(RECC_SITUACOES_DO_LAUDO.OK, rotulo + ': ' + esperando + ' caso(s) agendado(s), '
+    + 'e o acionador rodou há ' + dias + ' dia(s)');
 }
 
 function itemDoAcionador_(rotulo, chaveDaPlanilha, chaveDoBatimento, funcao, semPlanilha, semEle) {

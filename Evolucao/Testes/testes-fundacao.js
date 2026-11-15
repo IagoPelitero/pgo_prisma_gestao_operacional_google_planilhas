@@ -32,10 +32,11 @@ function rodarTestesDaFundacao() {
     // Base de caso leva 2 de controle (_Visivel e _Origem): o carimbo da
     // exclusão saiu delas, a pedido do PO — caso é excluído de vez.
     // 47 desde a Etapa 49: grupo, agente da central e relacionamento saíram.
-    igual(base.getMaxColumns(), 49, 'colunas de BASE_RET (47 + 2 de controle)');
+    // 49 desde a Etapa 78: as duas colunas da mudança de status agendada.
+    igual(base.getMaxColumns(), 51, 'colunas de BASE_RET (49 + 2 de controle)');
     igual(base.getMaxRows(), 2001, 'linhas de BASE_RET (reserva 2000 + cabeçalho)');
     const canal = planilha.getSheetByName('BASE_MESA');
-    igual(canal.getMaxColumns(), 29, 'colunas de BASE_MESA (27 + 2 de controle)');
+    igual(canal.getMaxColumns(), 31, 'colunas de BASE_MESA (29 + 2 de controle)');
     // Os cadastros continuam com as 4: lá a linha oculta ainda existe.
     const corretoras = planilha.getSheetByName('CORRETORAS');
     const deControle = corretoras.getRange(1, 1, 1, corretoras.getMaxColumns()).getValues()[0]
@@ -45,7 +46,7 @@ function rodarTestesDaFundacao() {
 
   teste('os cabeçalhos saem na ordem e na grafia do contrato', () => {
     const canal = planilha.getSheetByName('BASE_MESA');
-    const cabecalhos = canal.getRange(1, 1, 1, 29).getValues()[0];
+    const cabecalhos = canal.getRange(1, 1, 1, 31).getValues()[0];
     igual(cabecalhos[0], 'ID');
     igual(cabecalhos[7], 'Abertura indevida');
     igual(cabecalhos[15], 'Área responsável');
@@ -59,8 +60,10 @@ function rodarTestesDaFundacao() {
       'o carimbo da Mesa: a área foi escolhida quando');
     igual(cabecalhos[26], 'Data em andamento',
       'o carimbo do status Em andamento: de onde conta o prazo da Mesa');
-    igual(cabecalhos[27], '_Visivel');
-    igual(cabecalhos[28], '_Origem');
+    igual(cabecalhos[27], 'Mudar status em', 'a mudança de status agendada (Etapa 78)');
+    igual(cabecalhos[28], 'Mudar status para');
+    igual(cabecalhos[29], '_Visivel');
+    igual(cabecalhos[30], '_Origem');
   });
 
   teste('quem instalou vira o primeiro Administrador', () => {

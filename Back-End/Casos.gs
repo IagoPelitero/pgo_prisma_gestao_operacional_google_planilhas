@@ -3094,6 +3094,8 @@ function conferirImportacaoDeCasos(idDoCanal, pedido) {
     analistas: analistasParaDistribuir_(canal),
     foraDaDivisao: quemEstaForaDaDivisao_(canal),
     statusPadrao: statusDoLote_(canal, pedido.statusDoLote),
+    // A mudança de status agendada (Etapa 78): a data já calculada, para ler antes de gravar.
+    agendamento: agendamentoParaATela_(agendamentoDoLote_(canal, pedido.agendamento, new Date())),
     premios: premios,
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal)
   };
@@ -3567,6 +3569,220 @@ function statusDoLote_(canal, escolhido) {
   return achada.gravadoComo;
 }
 
+/*
+ * ============================================================================
+ * A MUDANÇA DE STATUS AGENDADA (Etapa 78)
+ * ============================================================================
+ * Pedido do PO: "o Prisma pode mudar status automaticamente dos casos que não
+ * estão com status conclusivos, inserindo uma data programada?" — e as regras,
+ * uma a uma, nas respostas dele:
+ *
+ *   - é na IMPORTAÇÃO que se agenda, se quiser: "quantos dias até mudar o
+ *     status — SLA de 7 dias, no 8 muda sozinho". Dias CORRIDOS, contados do
+ *     dia da importação: importou no dia 1 com 7 dias, muda no dia 8;
+ *   - o status de destino é escolhido no lote, e é um status PRÓPRIO: não pode
+ *     ser conclusivo nem um dos que o agendamento muda;
+ *   - só muda o caso que ainda estiver em Pendente, Não trabalhado ou
+ *     Contatando. Se alguém já trabalhou o caso, o agendamento é desfeito;
+ *   - vale para todos os canais;
+ *   - a mudança é DO SISTEMA: não conta para o analista e não dá a largada no
+ *     prazo de retorno (a "primeira mudança de status" continua sendo a
+ *     primeira feita por uma pessoa).
+ *
+ * São duas colunas na base: quando mudar e para qual status. Quem muda é
+ * `mudarStatusAgendados`, chamada por um acionador de tempo.
+ * ============================================================================
+ */
+
+/** Os status que o agendamento muda. Ajustável na CONFIG, separados por vírgula. */
+const RECC_STATUS_QUE_O_AGENDAMENTO_MUDA = 'Pendente, Não trabalhado, Contatando';
+const RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO = 'AGENDAMENTO.STATUS_DE_ORIGEM';
+/** Quem fica escrito em "Quem mudou o status" quando foi o agendamento. */
+const RECC_QUEM_MUDA_NO_AGENDAMENTO = 'Sistema (agendamento)';
+/** Até quantos dias à frente se agenda, e quantos casos uma rodada muda. */
+const RECC_DIAS_DO_AGENDAMENTO_NO_MAXIMO = 365;
+const RECC_CASOS_POR_RODADA_DO_AGENDAMENTO = 300;
+/** Quando o acionador rodou pela última vez — o diagnóstico confere. */
+const RECC_BATIMENTO_DO_ACIONADOR_DO_AGENDAMENTO = 'AGENDAMENTO.ACIONADOR_RODOU';
+
+/** Os status que o agendamento muda, já na forma de comparar: { pendente: true, … }. */
+function statusQueOAgendamentoMuda_() {
+  var mapa = {};
+  String(valorDaConfiguracao_(RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO, '') || RECC_STATUS_QUE_O_AGENDAMENTO_MUDA)
+    .split(',').forEach(function (nome) {
+      var chave = normalizarParaComparar_(nome);
+      if (chave) mapa[chave] = true;
+    });
+  return mapa;
+}
+
+/** As duas colunas do agendamento, pela grafia da planilha — ou null, se a base não as tem. */
+function colunasDoAgendamento_(canal) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var iQuando = posicaoDaColuna_(estrutura, RECC_COLUNA_MUDAR_STATUS_EM);
+  var iPara = posicaoDaColuna_(estrutura, RECC_COLUNA_MUDAR_STATUS_PARA);
+  if (iQuando < 0 || iPara < 0 || !canal.colunaDoStatus) return null;
+  return { quando: estrutura.cabecalhos[iQuando], para: estrutura.cabecalhos[iPara] };
+}
+
+/**
+ * Os status que podem ser DESTINO de um agendamento neste canal: os que não
+ * são conclusivos e não são os que o agendamento muda. Vazio quando a base
+ * ainda não tem as colunas — a tela nem oferece.
+ */
+function statusParaAgendar_(canal) {
+  if (!colunasDoAgendamento_(canal)) return [];
+  var deOrigem = statusQueOAgendamentoMuda_();
+  return situacoesDoCanal_(canal).filter(function (situacao) {
+    return !situacao.final && !deOrigem[situacao.chave];
+  }).map(function (situacao) {
+    return { valor: situacao.gravadoComo, rotulo: situacao.nome };
+  });
+}
+
+/**
+ * O agendamento pedido para o lote — ou null, quando não foi pedido.
+ * `pedido`: { dias, para }. Devolve { em: a data, para: o status como se grava }.
+ */
+function agendamentoDoLote_(canal, pedido, agora) {
+  if (!pedido || (pedido.dias === '' && !pedido.para) || pedido.dias === undefined) return null;
+
+  var colunas = colunasDoAgendamento_(canal);
+  if (!colunas) {
+    throw new Error('A base do canal ' + canal.nome + ' ainda não tem as colunas do agendamento. '
+      + 'Rode atualizarPGO() no editor do Apps Script e tente de novo.');
+  }
+  var dias = Number(pedido.dias);
+  if (!isFinite(dias) || dias < 1 || dias > RECC_DIAS_DO_AGENDAMENTO_NO_MAXIMO || Math.floor(dias) !== dias) {
+    throw new Error('Em quantos dias o status muda? Informe um número inteiro de 1 a '
+      + RECC_DIAS_DO_AGENDAMENTO_NO_MAXIMO + '.');
+  }
+  var destino = situacaoDoCanalPeloValor_(canal, pedido.para);
+  var aceitos = statusParaAgendar_(canal);
+  if (!destino || !aceitos.some(function (um) { return um.valor === destino.gravadoComo; })) {
+    throw new Error('Escolha para qual status os casos mudam. Pode ser: '
+      + (aceitos.map(function (um) { return um.valor; }).join(', ')
+        || 'nenhum — crie um status não conclusivo em Configurações › Ajustes Gerais') + '.');
+  }
+  // Dias corridos, do dia da importação: dia 1 + 7 dias = muda no dia 8.
+  var em = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + dias);
+  return { em: em, para: destino.gravadoComo, dias: dias };
+}
+
+/** O agendamento como a tela mostra na conferência. */
+function agendamentoParaATela_(agendamento) {
+  if (!agendamento) return null;
+  return {
+    em: formatarData_(agendamento.em, 'dd/MM/yyyy'),
+    para: agendamento.para,
+    dias: agendamento.dias,
+    deQuais: String(valorDaConfiguracao_(RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO, '')
+      || RECC_STATUS_QUE_O_AGENDAMENTO_MUDA)
+  };
+}
+
+/**
+ * Para o ACIONADOR DE TEMPO — criado no editor do Apps Script (Acionadores ›
+ * Adicionar acionador › `mudarStatusAgendados` › Baseado no tempo › de hora em
+ * hora, ou diário). Como as outras rotinas agendadas, não pede senha: roda
+ * sem ninguém logado.
+ *
+ * Em cada canal: lê a coluna da data inteira (uma coluna), separa as linhas
+ * em que a data chegou, e só essas são lidas. O caso que ainda está num dos
+ * status que o agendamento muda vai para o destino; o que já saiu deles só
+ * perde o agendamento — alguém trabalhou o caso antes.
+ *
+ * Um canal que estoura não derruba os outros. Passou do teto da rodada, o
+ * resto fica para a próxima.
+ */
+function mudarStatusAgendados() {
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty(RECC_BATIMENTO_DO_ACIONADOR_DO_AGENDAMENTO, String(new Date().getTime()));
+  } catch (erro) { /* o batimento é aviso, não pode impedir a rodada */ }
+
+  var hoje = formatarData_(new Date(), 'yyyy-MM-dd');
+  var deOrigem = statusQueOAgendamentoMuda_();
+  var resultado = { mudaram: 0, desfeitos: 0, ficaramParaDepois: 0, falharam: [] };
+  var cabem = RECC_CASOS_POR_RODADA_DO_AGENDAMENTO;
+
+  canaisVisiveis_().forEach(function (visivel) {
+    var canal = visivel;
+    try {
+      canal = canalPeloId_(visivel.id);
+      var colunas = colunasDoAgendamento_(canal);
+      if (!colunas) return;
+
+      var linhas = [];
+      lerColunaInteira_(canal.aba, colunas.quando).forEach(function (valor, i) {
+        var data = converterParaData_(valor);
+        if (data && formatarData_(data, 'yyyy-MM-dd') <= hoje) linhas.push(i + 2);
+      });
+      if (!linhas.length) return;
+      if (linhas.length > cabem) {
+        resultado.ficaramParaDepois += linhas.length - cabem;
+        linhas = linhas.slice(0, cabem);
+      }
+      cabem -= linhas.length;
+
+      var mudaram = [];
+      var desfeitos = 0;
+      semExcluidasNemVazias_(estruturaDaAba_(canal.aba), lerLinhasEspecificas_(canal.aba, linhas))
+        .forEach(function (registro) {
+          var alteracao = {};
+          alteracao[colunas.quando] = '';
+          alteracao[colunas.para] = '';
+
+          var destino = situacaoDoCanalPeloValor_(canal, registro[colunas.para]);
+          var atual = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+          var muda = !!destino && !destino.final && deOrigem[atual] === true && destino.chave !== atual;
+          if (muda) {
+            alteracao[canal.colunaDoStatus] = destino.gravadoComo;
+            carimbarOStatus_(canal, destino, registro, alteracao);
+            marcarQueFoiOAgendamento_(canal, alteracao);
+          }
+          // Um caso que não grava não pode levar os outros junto: fica anotado,
+          // e continua agendado para a próxima rodada.
+          try {
+            atualizarRegistro_(canal.aba, registro.__id, alteracao);
+            if (muda) mudaram.push(String(registro.__id)); else desfeitos++;
+          } catch (erro) {
+            resultado.falharam.push(canal.nome + ' · caso ' + registro.__id + ': ' + erro.message);
+          }
+        });
+
+      resultado.mudaram += mudaram.length;
+      resultado.desfeitos += desfeitos;
+      if (mudaram.length || desfeitos) {
+        registrarAuditoria_('caso.status.agendado', canal.aba, '', canal.nome + ' · '
+          + mudaram.length + ' caso(s) mudaram de status pelo agendamento'
+          + (desfeitos ? ' · ' + desfeitos + ' já tinham sido trabalhados, e o agendamento foi desfeito' : '')
+          + (mudaram.length ? ' · casos: ' + mudaram.slice(0, 40).join(', ')
+            + (mudaram.length > 40 ? ' e mais ' + (mudaram.length - 40) : '') : ''));
+      }
+    } catch (erro) {
+      resultado.falharam.push(canal.nome + ': ' + erro.message);
+      registrarErro_('servidor', 'mudarStatusAgendados', canal.nome + ': ' + erro.message, '');
+    }
+  });
+  return resultado;
+}
+
+/**
+ * Quando e quem — e SÓ isso. Fica de fora, de propósito, o que é do analista:
+ * a primeira mudança de status (a largada do prazo de retorno) e a contagem de
+ * mudanças. Decisão do PO: a mudança agendada não conta para ninguém.
+ */
+function marcarQueFoiOAgendamento_(canal, alteracao) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_QUANDO_MUDOU_O_STATUS) >= 0) {
+    alteracao[RECC_COLUNA_QUANDO_MUDOU_O_STATUS] = new Date();
+  }
+  if (posicaoDaColuna_(estrutura, RECC_COLUNA_QUEM_MUDOU_O_STATUS) >= 0) {
+    alteracao[RECC_COLUNA_QUEM_MUDOU_O_STATUS] = RECC_QUEM_MUDA_NO_AGENDAMENTO;
+  }
+}
+
 /** O status com que o caso nasce no formulário, tirado do campo Status do canal. */
 function statusPadraoDoCanal_(canal) {
   if (!canal.colunaDoStatus) return '';
@@ -3648,6 +3864,8 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   var colunaDoAnalista = colunaDoResponsavel_(estruturaDaAba_(canal.aba));
   var agora = new Date();
   var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
+  var agendamento = agendamentoDoLote_(canal, pedido.agendamento, agora);
+  var colunasDoAgendamento = agendamento ? colunasDoAgendamento_(canal) : null;
 
   var paraGravar = [];
   var pulados = novosMotivosParaPular_(regra);
@@ -3679,6 +3897,10 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
     }
     caso[RECC_COLUNA_ORIGEM_DA_IMPORTACAO] = nomeDoLote;
     caso[RECC_COLUNA_DATA_DA_IMPORTACAO] = agora;
+    if (agendamento) {
+      caso[colunasDoAgendamento.quando] = agendamento.em;
+      caso[colunasDoAgendamento.para] = agendamento.para;
+    }
 
     paraGravar.push(caso);
   }
@@ -3705,11 +3927,14 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
 
   registrarAuditoria_('caso.importar', canal.aba, '',
     canal.nome + ' · ' + nomeDoLote + ' · ' + gravados.length + ' casos'
-    + (pulados.repetida ? ' · ' + pulados.repetida + ' repetidos pulados' : ''));
+    + (pulados.repetida ? ' · ' + pulados.repetida + ' repetidos pulados' : '')
+    + (agendamento ? ' · mudança de status agendada para '
+      + formatarData_(agendamento.em, 'dd/MM/yyyy') + ', para "' + agendamento.para + '"' : ''));
 
   return {
     canal: canal.nome,
     origem: nomeDoLote,
+    agendamento: agendamentoParaATela_(agendamento),
     entraram: gravados.length,
     pulados: pulados,
     premios: premios,
@@ -3897,6 +4122,10 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     }) : [],
     // Status padrão que a importação NÃO põe (o da Mesa): a tela explica.
     statusQueEsperaAPessoa: statusDaImportacaoDoCanal_(canal) ? '' : statusPadraoDoCanal_(canal),
+    // A mudança de status agendada (Etapa 78): para onde o lote pode ir, e de quais status sai.
+    statusParaAgendar: statusParaAgendar_(canal),
+    statusQueOAgendamentoMuda: String(valorDaConfiguracao_(RECC_CHAVE_DOS_STATUS_DO_AGENDAMENTO, '')
+      || RECC_STATUS_QUE_O_AGENDAMENTO_MUDA),
     lotes: lotesJaImportados(canal.id),
     // Na Mesa, a mesma tela traz também os atendimentos do CHAT (Etapa 39).
     aceitaChat: canal.aba === 'BASE_MESA',

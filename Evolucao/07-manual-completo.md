@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1650 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1672 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -247,11 +247,13 @@ Executar*). Pelo navegador, só um administrador consegue chamá-las.
 | `verificarEstruturaRECC` | conferir só as abas e os arquivos copiados | não |
 | `normalizarBase` | dar Id às linhas digitadas direto na planilha | só a coluna Id |
 
-E duas que são para **acionadores de tempo** (*Acionadores › Adicionar
-acionador*), e não para clicar: `arquivarAuditoriaAgendada` (mensal) e
-`atualizarAnalisesAgendadas` (no horário que a operação quiser). As duas
-obedecem às próprias regras mesmo se chamadas fora de hora: o arquivamento só
-acontece de 2 em 2 meses, e as análises só regeram o que já está ligado.
+E as que são para **acionadores de tempo** (*Acionadores › Adicionar
+acionador*), e não para clicar: `arquivarAuditoriaAgendada` (mensal),
+`atualizarAnalisesAgendadas` (no horário que a operação quiser) e
+`mudarStatusAgendados` (de hora em hora — é ela que muda o status dos casos
+agendados na importação). Todas obedecem às próprias regras mesmo se chamadas
+fora de hora: o arquivamento só acontece de 2 em 2 meses, as análises só
+regeram o que já está ligado, e o status só muda no caso cuja data chegou.
 
 ---
 
@@ -349,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1650 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1672 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1395,6 +1397,32 @@ marcada em "Não repetir o que já entrou":
 - **Dá para desmarcar** ("trazer tudo") ou trocar por uma coluna. Canal sem
   proposta em pedaços (a Mesa, o VG) não tem a opção.
 
+### A mudança de status agendada
+
+Pedido do PO (Etapa 78): o lote pode entrar já com a data em que o status muda
+sozinho. Depois de conferir, ao lado do status do lote, dois campos: **"Mudar o
+status sozinho depois de (dias corridos)"** e **"Para o status"**. Em branco, nada
+é agendado.
+
+- **A conta dos dias** é corrida e parte do dia da importação: importado no dia
+  1 com 7 dias, o lote muda no dia 8. A tela mostra a data antes de gravar.
+- **O destino** é um status próprio do agendamento: não pode ser conclusivo, nem
+  um dos que o agendamento muda. Se o canal não tiver nenhum, cria-se em
+  Configurações › Ajustes Gerais.
+- **Só muda o caso que ainda estiver em Pendente, Não trabalhado ou Contatando.**
+  O que alguém já trabalhou fica como está, e o agendamento dele é desfeito. A
+  lista se ajusta na CONFIG, em `AGENDAMENTO.STATUS_DE_ORIGEM`.
+- **A mudança é do sistema.** Em "Quem mudou o status" fica `Sistema
+  (agendamento)`; ela não conta para o analista, não soma nas mudanças de status
+  e **não inicia o prazo de retorno** — a primeira mudança de status continua
+  sendo a primeira feita por uma pessoa.
+
+Quem faz a mudança é a função `mudarStatusAgendados`, chamada por um acionador de
+tempo que se cria uma vez, no editor do Apps Script (*Acionadores › Adicionar
+acionador › mudarStatusAgendados › Baseado no tempo › A cada hora*). Ela lê só a
+coluna da data e as linhas que venceram, muda até 300 casos por rodada e registra
+na auditoria. O diagnóstico avisa quando há caso agendado e o acionador não roda.
+
 ### A data de recepção do protocolo
 
 Muitas bases chegam **sem data de recepção**. Na Importação da RET, o passo de
@@ -1739,7 +1767,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.77** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.78** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1747,7 +1775,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1650 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1672 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

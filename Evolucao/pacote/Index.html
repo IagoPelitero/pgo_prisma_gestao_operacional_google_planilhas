@@ -6017,6 +6017,9 @@ var TelaImportacao = (function () {
 
   var dataDeRecepcao = 'planilha';
 
+  var agendarDias = '';
+  var agendarPara = '';
+
   var oQueImportar = 'casos';
   var canalAceitaChat = false;
   function ehChat() { return oQueImportar === 'chat'; }
@@ -6334,7 +6337,59 @@ var TelaImportacao = (function () {
       + '</p>'
       + desenharAnalistas()
       + escolhaDoStatusDoLote()
+      + escolhaDoAgendamento()
       + escolhaDaDataDeRecepcao();
+  }
+
+  function escolhaDoAgendamento() {
+    var destinos = opcoes.statusParaAgendar || [];
+    if (!(opcoes.statusDoCanal || []).length) return '';
+    var deQuais = escapar(opcoes.statusQueOAgendamentoMuda || '');
+    if (!destinos.length) {
+      return '<p class="config-dica">Mudança de status agendada: indisponível neste canal. '
+        + 'Ela precisa de um status de destino que não seja conclusivo nem um destes: '
+        + deQuais + ' — e das colunas que o <code>atualizarPGO()</code> cria na base.</p>';
+    }
+    var dias = Number(agendarDias);
+    var valido = agendarDias !== '' && dias >= 1 && Math.floor(dias) === dias;
+    return '<div class="grade"><label class="campo">'
+      + '<span>Mudar o status sozinho depois de (dias corridos)</span>'
+      + '<input type="number" class="filtro" id="agendar-dias" min="1" max="365" step="1"'
+      + ' placeholder="em branco: não agenda" value="' + escapar(agendarDias) + '"></label>'
+      + '<label class="campo"><span>Para o status</span>'
+      + '<select class="filtro" id="agendar-para">'
+      + '<option value=""' + (agendarPara === '' ? ' selected' : '') + '>— escolha —</option>'
+      + destinos.map(function (status) {
+        return '<option value="' + escapar(status.valor) + '"'
+          + (status.valor === agendarPara ? ' selected' : '') + '>' + escapar(status.rotulo) + '</option>';
+      }).join('') + '</select></label></div>'
+      + '<p class="config-dica">' + (valido && agendarPara
+        ? 'Em <strong>' + diaDaqui(dias) + '</strong>, os casos deste lote que ainda estiverem em '
+          + deQuais + ' mudam sozinhos para <strong>' + escapar(agendarPara) + '</strong>. '
+          + 'O caso que já tiver sido trabalhado fica como está. A mudança é do sistema: não conta '
+          + 'para o analista e não inicia o prazo de retorno.'
+        : (valido ? 'Escolha para qual status os casos mudam.'
+          : 'Em branco, nada é agendado. Com 7 dias, o lote importado no dia 1 muda no dia 8.'))
+      + '</p>';
+  }
+
+  function diaDaqui(dias) {
+    var quando = new Date();
+    quando.setDate(quando.getDate() + dias);
+    var dois = function (n) { return (n < 10 ? '0' : '') + n; };
+    return dois(quando.getDate()) + '/' + dois(quando.getMonth() + 1) + '/' + quando.getFullYear();
+  }
+
+  function agendamentoDoLote() {
+    return agendarDias === '' ? undefined : { dias: Number(agendarDias), para: agendarPara };
+  }
+
+  function fraseDoAgendamento(agendamento) {
+    if (!agendamento) return '';
+    return '<p class="config-dica"><strong>Mudança de status agendada:</strong> em '
+      + escapar(agendamento.em) + ' (' + agendamento.dias + ' dia(s) corridos), os casos que ainda '
+      + 'estiverem em ' + escapar(agendamento.deQuais) + ' mudam para <strong>'
+      + escapar(agendamento.para) + '</strong>.</p>';
   }
 
   function escolhaDoStatusDoLote() {
@@ -6486,6 +6541,7 @@ var TelaImportacao = (function () {
           + escapar(resultado.ultimoId) + '.'
         : '')
       + '</p>'
+      + fraseDoAgendamento(resultado.agendamento)
       + (resultado.analistas.length
         ? '<p class="config-dica">Divididos entre: '
           + escapar(resultado.analistas.join(', ')) + '.</p>'
@@ -6510,6 +6566,8 @@ var TelaImportacao = (function () {
       nomeDoLote = '';
       statusDoLote = null;
       dataDeRecepcao = 'planilha';
+      agendarDias = '';
+      agendarPara = '';
       desenharSeletor();
       carregar();
     });
@@ -6577,6 +6635,11 @@ var TelaImportacao = (function () {
       guardarOQueEstaNaTela();
       desenhar();
     });
+
+    mudancas('#agendar-dias, #agendar-para', function () {
+      guardarOQueEstaNaTela();
+      desenhar();
+    });
   }
 
   function escolherColuna(caixa) {
@@ -6633,6 +6696,11 @@ var TelaImportacao = (function () {
 
     var recepcao = elemento('data-de-recepcao');
     if (recepcao) dataDeRecepcao = recepcao.value;
+
+    var dias = elemento('agendar-dias');
+    if (dias) agendarDias = dias.value.trim();
+    var para = elemento('agendar-para');
+    if (para) agendarPara = para.value;
   }
 
   function statusQueVale() {
@@ -6652,6 +6720,7 @@ var TelaImportacao = (function () {
         dePara: deParaEscolhido,
         colunaQueIdentifica: colunaQueIdentifica || '',
         statusDoLote: statusQueVale(),
+        agendamento: agendamentoDoLote(),
         dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     conferencia
@@ -6777,6 +6846,7 @@ var TelaImportacao = (function () {
         analistas: escolhidos,
         origem: nomeDoLote,
         statusDoLote: statusQueVale(),
+        agendamento: agendamentoDoLote(),
         dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
       });
     gravacao

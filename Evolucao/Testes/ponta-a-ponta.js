@@ -1150,6 +1150,51 @@ async function rodar() {
       null, { timeout: 6000 });
   });
 
+  console.log('\nA mudança de status agendada (Etapa 78)');
+
+  await teste('a importação agenda a mudança de status: dias, destino, e as duas colunas gravadas', async () => {
+    await pagina.click('[data-tela="importacao"]');
+    await pagina.waitForTimeout(600);
+    await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
+    // O teste do chat deixou a fonte em "outra planilha": volta para o texto colado.
+    await pagina.waitForSelector('[data-fonte="colado"]', { timeout: 10000 });
+    await pagina.click('[data-fonte="colado"]');
+    await pagina.waitForSelector('#texto-colado', { timeout: 10000 });
+    await pagina.fill('#texto-colado', 'CPF\tnome do cliente\n55500000001\tAgendado Um\n55500000002\tAgendado Dois');
+    await pagina.click('#conferir-importacao');
+    await pagina.waitForSelector('#importar-agora', { timeout: 10000 });
+    if (await pagina.locator('#dialogo-aviso').count()) await pagina.click('#confirmar-aviso');
+
+    await pagina.waitForSelector('#agendar-dias', { timeout: 10000 });
+    contem(await pagina.textContent('#importacao'), 'Em branco, nada é agendado');
+    await pagina.fill('#agendar-dias', '7');
+    await pagina.locator('#agendar-dias').dispatchEvent('change');
+    await pagina.waitForFunction(() => /Escolha para qual status/.test(document.getElementById('importacao').textContent),
+      null, { timeout: 10000 });
+    verdadeiro(await pagina.locator('#importar-agora').count() === 1, 'a conferência continua na tela');
+    const destinos = await pagina.$$eval('#agendar-para option', (os) => os.map((o) => o.value));
+    verdadeiro(destinos.indexOf('Retido') < 0 && destinos.indexOf('Pendente') < 0, destinos.join(' | '));
+    await pagina.selectOption('#agendar-para', '1º contato realizado');
+    await pagina.waitForFunction(() => /mudam sozinhos para/.test(document.getElementById('importacao').textContent),
+      null, { timeout: 10000 });
+    igual(await pagina.inputValue('#agendar-dias'), '7', 'o número digitado continua lá');
+
+    await pagina.fill('#nome-do-lote', 'Lote agendado');
+    await pagina.click('#importar-agora');
+    await pagina.waitForSelector('#dialogo-aviso', { timeout: 10000 });
+    await pagina.click('#confirmar-aviso');
+    await pagina.waitForSelector('#importar-outro-lote', { timeout: 10000 });
+    contem(await pagina.textContent('#importacao'), 'Mudança de status agendada');
+
+    const gravados = naPlanilha('BASE_RET').filter((l) => /^Agendado /.test(l['nome do cliente']));
+    igual(gravados.length, 2);
+    igual(gravados.map((l) => l['Mudar status para']).join(','), '1º contato realizado,1º contato realizado');
+    const em = new Date(gravados[0]['Mudar status em']);
+    const esperado = new Date();
+    esperado.setDate(esperado.getDate() + 7);
+    igual(em.getDate() + '/' + em.getMonth(), esperado.getDate() + '/' + esperado.getMonth(), 'daqui a 7 dias corridos');
+  });
+
   console.log('\nO acabamento (Etapa 75)');
 
   await teste('o cadastro diz o que falta preencher, e as ações ficam à vista ao rolar', async () => {
