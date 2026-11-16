@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.78 — a última etapa entregue é a 78. A regra do número está
+**Estado geral:** versão 1.79 — a última etapa entregue é a 79. A regra do número está
 na Etapa 68.
 
 ---
@@ -4019,6 +4019,44 @@ célula "Mudar status em" na planilha).
 22 testes novos em `testes-mudanca-de-status-agendada.js` e um ponta a ponta. 16
 quebras de propósito: 14 pegas, e as 2 que escaparam eram linhas que não faziam
 falta — uma saiu do código, a outra é proteção repetida.
+
+---
+
+## Etapa 79 — A Agenda da Mesa: reuniões com corretores
+
+Pedido do PO: "a Mesa faz reuniões com corretores. Não é recorrente, mas
+documentamos isso. Eu queria que a Mesa registrasse isso e fosse para a segunda
+base, onde ficam as SUSEPs" — "um formulário diferente em Cadastrar Caso, e na aba
+Trabalho tem que ter uma sub aba de reunião ao clicar em Mesa Diamante". A aba se
+chama **Agenda**, já existe na segunda base e já tem dados; os dezesseis cabeçalhos
+vieram dele.
+
+| O que | Como ficou |
+|---|---|
+| **A aba** (`abaDaAgenda_`) | O sistema não a cria nem a altera: abre a planilha de cadastros, acha a aba "Agenda" e os dezesseis cabeçalhos pelo nome — sem acento, caixa, espaço nem pontuação, em qualquer ordem. Colunas a mais ficam como estão. Sem a segunda base ligada, sem a aba ou sem uma coluna, diz o que falta — e não "nenhuma reunião" |
+| **Os campos** | Data, gerente, consultor, corretora, analista, área, segurado/estipulante, participantes, assunto, obs, ações, chamado, status e os três reports. Obrigatórios: **Data, corretora e assunto**. O analista é uma lista (os da Mesa e quem está registrando); o status também: **Pendente, Em andamento, Concluído, Acompanhar por 3 meses**, como o PO listou. Os três reports (15, 30 e 45 dias) guardam **a data em que foram feitos** |
+| **Cadastrar Caso** | Com a Mesa escolhida, duas abas: "Caso" e **"Reunião com corretor"** — o formulário da reunião, que grava na Agenda. Nos outros canais, nada muda |
+| **Trabalho** | Com a Mesa escolhida, duas abas: "Casos" e **"Reuniões"** — a lista da Agenda, as mais recentes primeiro (até 200), com a busca em qualquer coluna, "Registrar reunião" e "Abrir" para editar. Os três reports aparecem como marcas: feito, com a data, ou ainda em branco |
+| **Registrar** (`registrarReuniao`) | Uma linha nova no fim da aba; data e reports entram como data de verdade. O clique repetido não grava duas vezes (o envio único da Etapa 59) |
+| **Editar** (`salvarReuniao`) | Grava na mesma linha, só nas dezesseis colunas. A Agenda não tem Id, então a reunião é a linha: antes de gravar, o servidor confere se a linha ainda tem a data, a corretora e o assunto que a tela mostrava — se alguém ordenou a planilha, recusa em vez de escrever em outra reunião |
+| **Valores antigos** | O status ou o analista que já estava escrito na aba e não está na lista continua aparecendo, e editar a reunião não o apaga |
+| **Quem pode** | Quem enxerga a Mesa Diamante. Registrar pede a permissão *criar*; editar, *editar*. Outro canal é recusado no servidor |
+| **Auditoria** | `agenda.registrar` e `agenda.editar`, com a corretora e o assunto |
+| **Versão** | 1.79 |
+
+É **registro, e não caso**: a reunião não tem prazo, cartão nem entra na
+Produtividade. A aba com outro nome se aponta na CONFIG, em `AGENDA.ABA`.
+
+**O que o PO precisa ter:** a segunda base ligada em Configurações › Estrutura (já
+está, pelas SUSEPs) e a conta que publica o sistema com permissão de **editar**
+aquela planilha — com acesso só de leitura, a lista aparece e o registro falha.
+
+**O que não foi feito, por não ter sido pedido:** excluir reunião pela tela, avisar
+quando um report de 15, 30 ou 45 dias está para vencer, e conferir a corretora no
+cadastro (o PO escolheu digitar o nome).
+
+20 testes novos em `testes-agenda-da-mesa.js` e dois ponta a ponta. 16 quebras de
+propósito, 16 pegas.
 
 ---
 

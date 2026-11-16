@@ -1253,6 +1253,93 @@ async function rodar() {
     igual(await visiveis(), todos - desligados, 'sem busca, volta ao que era');
   });
 
+  console.log('\nA Agenda da Mesa (Etapa 79)');
+
+  await teste('Trabalho › Mesa › Reuniões: lista a Agenda da segunda base, registra e edita', async () => {
+    // A segunda base, com a aba Agenda já existente e uma reunião antiga.
+    const idDeFora = ambiente.criarPlanilhaExterna({
+      SUSEP_BLOQUEADAS: [['Id', 'SUSEP', 'NomeCorretora', 'Sucursal', 'CoordenadorComercial', 'BloqueadaEm',
+        '_Visivel', '_ExcluidoEm', '_ExcluidoPor', '_Origem']],
+      Agenda: [['Data', 'gerente', 'consultor', 'corretora', 'analista', 'área', 'segurado/estipulante',
+        'participantes', 'assunto', 'obs', 'ações', 'chamado', 'status', '1 report(15 dias)',
+        '2 report (30 dias)', '3 report (45 dias)'],
+      [new Date(2026, 8, 10), 'Gerente', 'Consultor', 'Corretora Antiga', 'Ana Martins', 'Comercial', '',
+        '', 'Renovação', '', '', '', 'Pendente', '', '', '']]
+    });
+    vm.runInContext(`(function () {
+      gravarConfiguracao_('CADASTROS.PLANILHA_ID', '${idDeFora}');
+      gravarConfiguracao_('CADASTROS.ABAS', 'SUSEP_BLOQUEADAS');
+      esquecerCacheDaConfiguracao_();
+    })()`, contexto);
+    const naAgenda = () => {
+      const aba = ambiente.planilhaExternaPeloId(idDeFora).getSheetByName('Agenda');
+      return aba.getRange(2, 1, aba.getLastRow() - 1, 16).getValues();
+    };
+
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(600);
+    await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
+    await pagina.waitForTimeout(600);
+    igual(await pagina.locator('[data-aba-do-trabalho]').count(), 0, 'na RET não há a aba Reuniões');
+    await pagina.locator('[data-canal]', { hasText: 'Mesa' }).first().click();
+    await pagina.waitForSelector('[data-aba-do-trabalho="reunioes"]', { timeout: 10000 });
+    await pagina.click('[data-aba-do-trabalho="reunioes"]');
+    await pagina.waitForSelector('.agenda-tabela', { timeout: 10000 });
+    contem(await pagina.textContent('.agenda-tabela'), 'Corretora Antiga');
+
+    // Registrar pela lista: sem o obrigatório, diz o que falta e não grava.
+    await pagina.click('#registrar-reuniao');
+    await pagina.waitForSelector('#dialogo-da-reuniao #agenda-corretora', { timeout: 10000 });
+    await pagina.click('#salvar-reuniao');
+    contem(await pagina.textContent('#falta-na-reuniao'), 'Corretora');
+    igual(naAgenda().length, 1);
+    await pagina.fill('#agenda-corretora', 'Corretora da Tela');
+    await pagina.fill('#agenda-assunto', 'Carteira de vida');
+    await pagina.selectOption('#agenda-status', 'Acompanhar por 3 meses');
+    await pagina.click('#salvar-reuniao');
+    await pagina.waitForFunction(() => /Corretora da Tela/.test((document.querySelector('.agenda-tabela') || {}).textContent || ''),
+      null, { timeout: 10000 });
+    igual(naAgenda().length, 2);
+    igual(naAgenda()[1][3] + '|' + naAgenda()[1][12], 'Corretora da Tela|Acompanhar por 3 meses');
+
+    // Editar: o report de 15 dias da reunião antiga.
+    await pagina.locator('tr', { hasText: 'Corretora Antiga' }).locator('[data-editar-reuniao]').click();
+    await pagina.waitForSelector('#dialogo-da-reuniao #agenda-report1', { timeout: 10000 });
+    igual(await pagina.inputValue('#agenda-data'), '2026-09-10', 'abre com o que está gravado');
+    await pagina.fill('#agenda-report1', '2026-09-25');
+    await pagina.click('#salvar-reuniao');
+    await pagina.waitForFunction(() => /15 d ✓/.test((document.querySelector('.agenda-tabela') || {}).textContent || ''),
+      null, { timeout: 10000 });
+    igual(naAgenda().length, 2, 'editar não cria linha');
+    igual(new Date(naAgenda()[0][13]).getDate(), 25);
+
+    // A busca.
+    await pagina.fill('#busca-na-agenda', 'renovacao');
+    await pagina.press('#busca-na-agenda', 'Enter');
+    await pagina.waitForFunction(() => document.querySelectorAll('.agenda-tabela tbody tr').length === 1,
+      null, { timeout: 10000 });
+  });
+
+  await teste('Cadastrar Caso › Mesa › "Reunião com corretor": o formulário diferente grava na Agenda', async () => {
+    await pagina.click('[data-tela="cadastrarCaso"]');
+    await pagina.waitForTimeout(600);
+    await pagina.locator('[data-canal]', { hasText: 'Mesa' }).first().click();
+    await pagina.waitForSelector('[data-o-que-cadastrar="reuniao"]', { timeout: 10000 });
+    await pagina.click('[data-o-que-cadastrar="reuniao"]');
+    await pagina.waitForSelector('#corpo-da-reuniao #agenda-corretora', { timeout: 10000 });
+    verdadeiro(!(await pagina.locator('#formulario-do-caso').count()), 'o formulário do caso sai da tela');
+    await pagina.fill('#agenda-corretora', 'Corretora do Cadastro');
+    await pagina.fill('#agenda-assunto', 'Sinistro');
+    await pagina.click('#registrar-reuniao-nova');
+    await pagina.waitForFunction(() => document.getElementById('agenda-corretora')
+      && document.getElementById('agenda-corretora').value === '', null, { timeout: 10000 });
+    const gravadas = vm.runInContext('agendaDaMesa(canaisVisiveis_().filter(function (c) { return c.aba === "BASE_MESA"; })[0].id, "")', contexto);
+    igual(gravadas.reunioes[0].valores.corretora, 'Corretora do Cadastro');
+    // E a aba "Caso" volta ao formulário de sempre.
+    await pagina.click('[data-o-que-cadastrar="caso"]');
+    await pagina.waitForSelector('#formulario-do-caso', { timeout: 10000 });
+  });
+
   /* ------------------------------------------------------------- o final -- */
 
   await navegador.close();

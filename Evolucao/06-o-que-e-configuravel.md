@@ -93,6 +93,7 @@ Funciona, e é editável — mas exige abrir a aba e digitar na célula, o que n
 |---|---|---|
 | **Janela da fila** (30 dias) | `CONFIG` → `OPERACAO.JANELA_DIAS` | Deixou de ser a abertura na Etapa 56: as telas abrem **do dia 1 do mês até hoje** (`resolverPeriodo_`, no `Indicadores.gs`). O número só vale quando um pedido chega sem período (uma página antiga, um endereço guardado) |
 | **Tema padrão da operação** | `CONFIG` → `OPERACAO.TEMA_PADRAO` | Idem |
+| **A aba da Agenda da Mesa** | `CONFIG` → `AGENDA.ABA` | O nome da aba de reuniões na planilha de cadastros (Etapa 79). Sem a linha, vale `Agenda` |
 | **Status que o agendamento muda** | `CONFIG` → `AGENDAMENTO.STATUS_DE_ORIGEM` | Os status de que o caso sai na mudança agendada (Etapa 78), separados por vírgula. Sem a linha, vale `Pendente, Não trabalhado, Contatando` |
 | **Chamada lenta** (8 s) | `CONFIG` → `OPERACAO.SEGUNDOS_DA_CHAMADA_LENTA` | A partir de quantos segundos o cronômetro (Etapa 71) registra a chamada na aba ERROS. Sem a linha, vale 8 |
 | **Busca rápida** (SIM) | `CONFIG` → `OPERACAO.BUSCA_RAPIDA` | A chave de segurança da Etapa 63: NAO volta à leitura da coluna inteira. Planilha instalada antes dela não tem a linha — vale SIM; para desligar, crie a linha (Chave `OPERACAO.BUSCA_RAPIDA`, Valor `NAO`). O diagnóstico diz quando é hora |

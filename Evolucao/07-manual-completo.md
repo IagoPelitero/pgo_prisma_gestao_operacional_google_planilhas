@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1672 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1692 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1672 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1692 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1601,6 +1601,28 @@ inventado estaria na tela da operação amanhã, medindo o que ninguém pediu.
 
 ---
 
+## A Agenda da Mesa: reuniões com corretores
+
+A Mesa Diamante registra as reuniões com corretores (Etapa 79, pedido do PO). Elas
+não são casos: moram na aba **Agenda** da planilha de cadastros — a segunda base,
+a mesma das SUSEPs bloqueadas —, que já existia e já tinha dados. O sistema não
+cria nem reorganiza essa aba: acha os cabeçalhos pelo nome e escreve só neles.
+
+- **Para registrar:** em Cadastrar Caso, com a Mesa escolhida, a aba **"Reunião
+  com corretor"**; ou, no Trabalho, a aba **"Reuniões"** e o botão "Registrar
+  reunião". Data, corretora e assunto são obrigatórios.
+- **Para acompanhar:** no Trabalho, a aba "Reuniões" lista as mais recentes, com
+  busca em qualquer coluna. "Abrir" edita a reunião — é ali que se marca a data
+  em que cada **report** (15, 30 e 45 dias) foi feito e se troca o status
+  (Pendente, Em andamento, Concluído, Acompanhar por 3 meses).
+- **Quem vê:** quem enxerga a Mesa Diamante. Registrar pede a permissão de criar;
+  editar, a de editar.
+
+A Agenda não tem Id: a reunião é a linha da planilha. Por isso, ao salvar uma
+edição, o sistema confere se a linha ainda é a mesma reunião; se alguém ordenou a
+planilha nesse meio-tempo, ele recusa e pede para recarregar a lista. A conta que
+publica o sistema precisa poder **editar** a planilha de cadastros.
+
 ## Duas bases: a operacional e a de cadastros
 
 Corretoras, SUSEPs bloqueadas e as duas listas de analista — Central e
@@ -1767,7 +1789,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.78** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.79** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1775,7 +1797,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1672 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1692 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

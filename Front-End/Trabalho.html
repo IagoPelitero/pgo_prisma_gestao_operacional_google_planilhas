@@ -36,9 +36,60 @@ var TelaTrabalho = (function () {
 
   /* --------------------------------------------------------------- montar */
 
+  /*
+    NA MESA, A SUB-ABA "REUNIÕES" (Etapa 79, pedido do PO): "na aba Trabalho tem
+    que ter uma sub aba de reunião ao clicar em Mesa Diamante". Ela lista a
+    Agenda da segunda base; os casos continuam na aba de sempre.
+  */
+  var abaDaMesa = 'casos';
+  var temAgenda = false;
+  var buscaNaAgenda = '';
+
+  function abasDaMesa() {
+    if (!temAgenda) return '';
+    return '<div class="config-abas" role="tablist" aria-label="O que ver">'
+      + [['casos', 'Casos'], ['reunioes', 'Reuniões']].map(function (aba) {
+        var atual = abaDaMesa === aba[0];
+        return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
+          + ' aria-selected="' + atual + '" data-aba-do-trabalho="' + aba[0] + '">' + aba[1] + '</button>';
+      }).join('') + '</div>';
+  }
+
+  function carregarAgenda() {
+    elemento('painel').innerHTML = '<p class="carregando-campos">Lendo a Agenda…</p>';
+    Servidor.chamar('agendaDaMesa', canalEscolhido, buscaNaAgenda)
+      .entao(function (resposta) {
+        elemento('painel').innerHTML = Agenda.lista(resposta, buscaNaAgenda);
+        var busca = elemento('busca-na-agenda');
+        busca.addEventListener('keydown', function (evento) {
+          if (evento.key !== 'Enter') return;
+          buscaNaAgenda = this.value.trim();
+          carregarAgenda();
+        });
+        var registrar = elemento('registrar-reuniao');
+        if (registrar) {
+          registrar.addEventListener('click', function () {
+            Agenda.abrirDialogo(canalEscolhido, resposta.campos, null, carregarAgenda);
+          });
+        }
+        ligarCliques('[data-editar-reuniao]', function (botao) {
+          var linha = Number(botao.getAttribute('data-editar-reuniao'));
+          var reuniao = resposta.reunioes.filter(function (uma) { return uma.linha === linha; })[0];
+          if (reuniao) Agenda.abrirDialogo(canalEscolhido, resposta.campos, reuniao, carregarAgenda);
+        });
+      })
+      .senao(function (erro) {
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+  }
+
   function montar(pacote) {
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
+    if (!temAgenda) abaDaMesa = 'casos';
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
+      + abasDaMesa()
       + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
 
@@ -652,6 +703,11 @@ var TelaTrabalho = (function () {
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });
+    ligarCliques('[data-aba-do-trabalho]', function (botao) {
+      abaDaMesa = botao.getAttribute('data-aba-do-trabalho');
+      Aplicacao.remontar();
+    });
+    if (abaDaMesa === 'reunioes') { carregarAgenda(); return; }
     // A primeira carga do canal traz o aviso dos que vencem; as seguintes
     // (filtro, gravação, período) não.
     avisarQuandoChegar = !jaAvisouNoCanal[canalEscolhido];

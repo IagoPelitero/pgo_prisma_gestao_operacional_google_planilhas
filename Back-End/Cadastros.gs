@@ -1156,3 +1156,283 @@ function camposParaAAba_(campos, receita, ehNova, faltando) {
   }
   return linha;
 }
+
+/* ############################################################################
+   A AGENDA DA MESA: AS REUNIÕES COM CORRETORES (Etapa 79)
+   ############################################################################
+   Pedido do PO: "a Mesa faz reuniões com corretores. Não é recorrente, mas
+   documentamos isso. Eu queria que a Mesa registrasse isso e fosse para a
+   segunda base, onde ficam as SUSEPs" — "um formulário diferente em Cadastrar
+   Caso, e na aba Trabalho tem que ter uma sub aba de reunião ao clicar em Mesa
+   Diamante".
+
+   A aba se chama Agenda, JÁ EXISTE na planilha de cadastros e JÁ TEM DADOS. Por
+   isso o sistema não a cria, não lhe dá Id nem colunas de controle e não mexe
+   no que encontra: lê os cabeçalhos que ela tem, acha os dezesseis pelo nome
+   (sem acento, caixa nem espaço) e escreve só neles. Uma reunião é uma linha;
+   quem a identifica é o número da linha, e a edição confere antes de gravar se
+   a linha ainda é a mesma — alguém pode ter ordenado a planilha.
+
+   É registro, e não caso: não tem prazo, cartão nem Produtividade.
+   ############################################################################ */
+
+/** Como a aba se chama na planilha de cadastros. Ajustável na CONFIG. */
+const RECC_ABA_DA_AGENDA = 'Agenda';
+const RECC_CHAVE_DA_ABA_DA_AGENDA = 'AGENDA.ABA';
+/** Quantas reuniões a lista mostra de uma vez — as mais recentes. */
+const RECC_REUNIOES_NA_LISTA = 200;
+
+/** Os status de uma reunião, como o PO listou. */
+const RECC_STATUS_DA_REUNIAO = ['Pendente', 'Em andamento', 'Concluído', 'Acompanhar por 3 meses'];
+
+/**
+ * Os dezesseis campos, na ordem do PO. `cabecalho` é como ele escreveu; o que
+ * vale para achar a coluna é o nome sem acento, caixa, espaço nem pontuação.
+ * Os três reports guardam A DATA em que o acompanhamento foi feito.
+ */
+const RECC_CAMPOS_DA_AGENDA = [
+  { chave: 'data', cabecalho: 'Data', rotulo: 'Data da reunião', tipo: 'data', obrigatorio: true },
+  { chave: 'gerente', cabecalho: 'gerente', rotulo: 'Gerente', tipo: 'texto' },
+  { chave: 'consultor', cabecalho: 'consultor', rotulo: 'Consultor', tipo: 'texto' },
+  { chave: 'corretora', cabecalho: 'corretora', rotulo: 'Corretora', tipo: 'texto', obrigatorio: true },
+  { chave: 'analista', cabecalho: 'analista', rotulo: 'Analista', tipo: 'analista' },
+  { chave: 'area', cabecalho: 'área', rotulo: 'Área', tipo: 'texto' },
+  { chave: 'segurado', cabecalho: 'segurado/estipulante', rotulo: 'Segurado / estipulante', tipo: 'texto' },
+  { chave: 'participantes', cabecalho: 'participantes', rotulo: 'Participantes', tipo: 'texto' },
+  { chave: 'assunto', cabecalho: 'assunto', rotulo: 'Assunto', tipo: 'texto', obrigatorio: true },
+  { chave: 'obs', cabecalho: 'obs', rotulo: 'Observações', tipo: 'textoLongo' },
+  { chave: 'acoes', cabecalho: 'ações', rotulo: 'Ações', tipo: 'textoLongo' },
+  { chave: 'chamado', cabecalho: 'chamado', rotulo: 'Chamado', tipo: 'texto' },
+  { chave: 'status', cabecalho: 'status', rotulo: 'Status', tipo: 'status' },
+  { chave: 'report1', cabecalho: '1 report (15 dias)', rotulo: '1º report (15 dias) — feito em', tipo: 'data' },
+  { chave: 'report2', cabecalho: '2 report (30 dias)', rotulo: '2º report (30 dias) — feito em', tipo: 'data' },
+  { chave: 'report3', cabecalho: '3 report (45 dias)', rotulo: '3º report (45 dias) — feito em', tipo: 'data' }
+];
+
+/**
+ * A aba Agenda aberta, com a posição de cada um dos dezesseis campos.
+ * Derruba com o motivo quando falta a planilha, a aba ou alguma coluna — uma
+ * lista vazia diria "nenhuma reunião registrada", que seria mentira.
+ */
+function abaDaAgenda_() {
+  if (!idDaPlanilhaDeCadastros_()) {
+    throw new Error('A Agenda mora na planilha de cadastros (a segunda base), e nenhuma está '
+      + 'ligada. Ligue-a em Configurações › Estrutura.');
+  }
+  var nome = String(valorDaConfiguracao_(RECC_CHAVE_DA_ABA_DA_AGENDA, '') || RECC_ABA_DA_AGENDA).trim();
+  var aba = planilhaDeCadastros_().getSheetByName(nome);
+  if (!aba) {
+    throw new Error('A planilha de cadastros não tem uma aba chamada "' + nome + '". Confira o nome '
+      + 'da aba lá — ou escreva o nome certo na CONFIG, em ' + RECC_CHAVE_DA_ABA_DA_AGENDA + '.');
+  }
+
+  var largura = aba.getLastColumn();
+  var cabecalhos = largura > 0 ? aba.getRange(1, 1, 1, largura).getValues()[0] : [];
+  var ondeEsta = {};
+  cabecalhos.forEach(function (cabecalho, i) {
+    var chave = normalizarParaComparar_(cabecalho);
+    if (chave && ondeEsta[chave] === undefined) ondeEsta[chave] = i;
+  });
+
+  var posicoes = {};
+  var faltam = [];
+  RECC_CAMPOS_DA_AGENDA.forEach(function (campo) {
+    var i = ondeEsta[normalizarParaComparar_(campo.cabecalho)];
+    if (i === undefined) faltam.push(campo.cabecalho); else posicoes[campo.chave] = i;
+  });
+  if (faltam.length) {
+    throw new Error('A aba "' + nome + '" não tem ' + (faltam.length === 1 ? 'a coluna' : 'as colunas')
+      + ': ' + faltam.join(', ') + '. Os cabeçalhos ficam na primeira linha; maiúscula, acento e '
+      + 'espaço não fazem diferença.');
+  }
+  return { aba: aba, nome: nome, largura: largura, posicoes: posicoes };
+}
+
+/** Só quem enxerga a Mesa Diamante chega à Agenda — a mesma porta do canal. */
+function canalDaAgenda_(idDoCanal, quem) {
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  if (canal.aba !== 'BASE_MESA') throw new Error('A Agenda de reuniões é da Mesa Diamante.');
+  return canal;
+}
+
+/** O valor da célula como a tela mostra: data em dd/mm/aaaa, o resto em texto. */
+function celulaDaAgendaParaATela_(valor, campo) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  if (campo.tipo === 'data') {
+    var data = converterParaData_(valor);
+    return data ? formatarData_(data, 'dd/MM/yyyy') : String(valor);
+  }
+  return String(valor);
+}
+
+/** O formulário da reunião: os campos, as listas e o que já vem preenchido. */
+function formularioDaAgenda_(canal, quem) {
+  // Os analistas da Mesa — e quem está registrando, mesmo que não seja dela:
+  // a coordenação também participa de reunião.
+  var meuNome = String((quem.usuario || {}).Nome || '').trim();
+  var analistas = analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
+  if (meuNome && analistas.indexOf(meuNome) < 0) analistas.push(meuNome);
+  return RECC_CAMPOS_DA_AGENDA.map(function (campo) {
+    return {
+      chave: campo.chave, rotulo: campo.rotulo, obrigatorio: campo.obrigatorio === true,
+      tipo: campo.tipo === 'analista' || campo.tipo === 'status' ? 'lista' : campo.tipo,
+      opcoes: campo.tipo === 'analista' ? analistas
+        : (campo.tipo === 'status' ? RECC_STATUS_DA_REUNIAO.slice() : []),
+      padrao: campo.chave === 'data' ? formatarData_(new Date(), 'dd/MM/yyyy')
+        : (campo.chave === 'analista' && analistas.indexOf(meuNome) >= 0 ? meuNome
+          : (campo.chave === 'status' ? RECC_STATUS_DA_REUNIAO[0] : ''))
+    };
+  });
+}
+
+/**
+ * A lista de reuniões da Mesa: as mais recentes da planilha primeiro, com a
+ * busca em qualquer coluna. Vem junto o formulário, para a mesma chamada
+ * servir a sub-aba do Trabalho e o Cadastrar Caso.
+ */
+function agendaDaMesa(idDoCanal, procurar) {
+  var quem = exigirTela_('trabalho');
+  var canal = canalDaAgenda_(idDoCanal, quem);
+  var agenda = abaDaAgenda_();
+
+  var total = Math.max(agenda.aba.getLastRow() - 1, 0);
+  var valores = total ? agenda.aba.getRange(2, 1, total, agenda.largura).getValues() : [];
+  var termo = normalizarParaComparar_(procurar);
+
+  var reunioes = [];
+  valores.forEach(function (linha, i) {
+    var celulas = {};
+    var temAlgo = false;
+    RECC_CAMPOS_DA_AGENDA.forEach(function (campo) {
+      celulas[campo.chave] = celulaDaAgendaParaATela_(linha[agenda.posicoes[campo.chave]], campo);
+      if (celulas[campo.chave] !== '') temAlgo = true;
+    });
+    if (!temAlgo) return;   // linha em branco no meio da planilha não é reunião
+    if (termo && !RECC_CAMPOS_DA_AGENDA.some(function (campo) {
+      return normalizarParaComparar_(celulas[campo.chave]).indexOf(termo) >= 0;
+    })) return;
+    reunioes.push({ linha: i + 2, valores: celulas });
+  });
+  reunioes.reverse();
+
+  return {
+    canal: { id: canal.id, nome: canal.nome },
+    campos: formularioDaAgenda_(canal, quem),
+    total: reunioes.length,
+    reunioes: reunioes.slice(0, RECC_REUNIOES_NA_LISTA),
+    podeRegistrar: podeFazer_(quem.permissoes, RECC_ACOES.CRIAR),
+    podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
+  };
+}
+
+/** Só o formulário, para o Cadastrar Caso — sem ler as reuniões. */
+function formularioDaReuniao(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  exigirTela_('cadastrarCaso');
+  var canal = canalDaAgenda_(idDoCanal, quem);
+  abaDaAgenda_();   // a aba e as colunas existem? melhor saber antes de preencher
+  return { canal: { id: canal.id, nome: canal.nome }, campos: formularioDaAgenda_(canal, quem) };
+}
+
+/**
+ * O que a tela mandou, conferido e pronto para a planilha: { chave: valor }.
+ * Data vira data de verdade; o obrigatório vazio e a data impossível recusam.
+ */
+function reuniaoConferida_(valores) {
+  valores = valores || {};
+  var pronta = {};
+  var erros = [];
+  RECC_CAMPOS_DA_AGENDA.forEach(function (campo) {
+    var texto = String(valores[campo.chave] === null || valores[campo.chave] === undefined
+      ? '' : valores[campo.chave]).trim();
+    if (!texto) {
+      if (campo.obrigatorio) erros.push(campo.rotulo + ' é obrigatório');
+      pronta[campo.chave] = '';
+      return;
+    }
+    if (campo.tipo === 'data') {
+      var data = converterParaData_(texto);
+      if (!data) { erros.push(campo.rotulo + ': "' + texto + '" não é uma data'); return; }
+      pronta[campo.chave] = data;
+      return;
+    }
+    pronta[campo.chave] = texto;
+  });
+  if (erros.length) throw new Error(erros.join('; ') + '.');
+  return pronta;
+}
+
+/** Registra uma reunião: uma linha nova no fim da Agenda. */
+function registrarReuniao(idDoCanal, valores, envio) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalDaAgenda_(idDoCanal, quem);
+  var pronta = reuniaoConferida_(valores);
+
+  return comEnvioUnico_(envio, function () {
+    var agenda = abaDaAgenda_();
+    var trava = LockService.getScriptLock();
+    if (!esperarATrava_(trava, 25000)) {
+      throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+    }
+    var linha;
+    try {
+      var nova = [];
+      for (var i = 0; i < agenda.largura; i++) nova.push('');
+      RECC_CAMPOS_DA_AGENDA.forEach(function (campo) {
+        nova[agenda.posicoes[campo.chave]] = pronta[campo.chave];
+      });
+      linha = agenda.aba.getLastRow() + 1;
+      agenda.aba.getRange(linha, 1, 1, agenda.largura).setValues([nova]);
+    } finally {
+      trava.releaseLock();
+    }
+    registrarAuditoria_('agenda.registrar', agenda.nome, String(linha),
+      canal.nome + ' · ' + pronta.corretora + ' · ' + pronta.assunto);
+    return { linha: linha };
+  });
+}
+
+/**
+ * Salva a edição de uma reunião. `original` é a data, a corretora e o assunto
+ * que a tela mostrava: se a linha já não for essa — alguém ordenou ou apagou
+ * linhas na planilha —, recusa em vez de gravar por cima de outra reunião.
+ */
+function salvarReuniao(idDoCanal, linha, valores, original) {
+  var quem = exigirPermissao_(RECC_ACOES.EDITAR);
+  var canal = canalDaAgenda_(idDoCanal, quem);
+  var pronta = reuniaoConferida_(valores);
+  var agenda = abaDaAgenda_();
+  var numero = Number(linha);
+  if (!numero || numero < 2 || Math.floor(numero) !== numero || numero > agenda.aba.getLastRow()) {
+    throw new Error('Esta reunião não está mais na Agenda. Recarregue a lista.');
+  }
+
+  var trava = LockService.getScriptLock();
+  if (!esperarATrava_(trava, 25000)) {
+    throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
+  }
+  try {
+    var faixa = agenda.aba.getRange(numero, 1, 1, agenda.largura);
+    var atual = faixa.getValues()[0];
+    original = original || {};
+    var mudou = ['data', 'corretora', 'assunto'].some(function (chave) {
+      var campo = RECC_CAMPOS_DA_AGENDA.filter(function (um) { return um.chave === chave; })[0];
+      return celulaDaAgendaParaATela_(atual[agenda.posicoes[chave]], campo)
+        !== String(original[chave] === undefined ? '' : original[chave]);
+    });
+    if (mudou) {
+      throw new Error('A Agenda mudou na planilha desde que esta lista foi aberta, e a linha '
+        + numero + ' já é outra reunião. Recarregue a lista e edite de novo.');
+    }
+    // Só as dezesseis colunas da reunião: o que mais a aba tiver fica como está.
+    RECC_CAMPOS_DA_AGENDA.forEach(function (campo) {
+      atual[agenda.posicoes[campo.chave]] = pronta[campo.chave];
+    });
+    faixa.setValues([atual]);
+  } finally {
+    trava.releaseLock();
+  }
+  registrarAuditoria_('agenda.editar', agenda.nome, String(numero),
+    canal.nome + ' · ' + pronta.corretora + ' · ' + pronta.assunto);
+  return { linha: numero };
+}

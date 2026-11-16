@@ -25,10 +25,81 @@ var TelaCadastrarCaso = (function () {
 
   /* --------------------------------------------------------------- montar */
 
+  /*
+    NA MESA, DOIS FORMULÁRIOS (Etapa 79, pedido do PO): o do caso e o da reunião
+    com corretor — "um formulário diferente em Cadastrar Caso". A reunião vai
+    para a Agenda, na segunda base, e não para a base de casos.
+  */
+  var oQueCadastrar = 'caso';
+  var temAgenda = false;
+  var envioDaReuniao = '';
+
+  function abasDaMesa() {
+    if (!temAgenda) return '';
+    return '<div class="config-abas" role="tablist" aria-label="O que cadastrar">'
+      + [['caso', 'Caso'], ['reuniao', 'Reunião com corretor']].map(function (aba) {
+        var atual = oQueCadastrar === aba[0];
+        return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
+          + ' aria-selected="' + atual + '" data-o-que-cadastrar="' + aba[0] + '">' + aba[1] + '</button>';
+      }).join('') + '</div>';
+  }
+
+  function montarReuniao() {
+    return '<div class="cartao formulario" id="formulario-da-reuniao">'
+      + '<div id="corpo-da-reuniao"><p class="carregando-campos">Montando o formulário…</p></div>'
+      + '<div class="acoes" id="acoes-da-reuniao" hidden>'
+      + '<button type="button" class="botao" id="registrar-reuniao-nova">Registrar reunião</button>'
+      + '<span class="falta-preencher" id="falta-na-reuniao-nova" aria-live="polite"></span>'
+      + '</div></div>';
+  }
+
+  function ligarReuniao() {
+    var camposDaReuniao = [];
+    Servidor.chamar('formularioDaReuniao', canalEscolhido)
+      .entao(function (resposta) {
+        camposDaReuniao = resposta.campos;
+        elemento('corpo-da-reuniao').innerHTML = Agenda.formulario(resposta.campos, null);
+        elemento('acoes-da-reuniao').hidden = false;
+      })
+      .senao(function (erro) {
+        elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga">'
+          + escapar(erro.message || String(erro)) + '</p>';
+      });
+
+    elemento('registrar-reuniao-nova').addEventListener('click', function () {
+      var botao = this;
+      var aviso = elemento('falta-na-reuniao-nova');
+      var lidos = Agenda.valores(elemento('corpo-da-reuniao'));
+      var falta = Agenda.oQueFalta(camposDaReuniao, lidos);
+      aviso.textContent = falta.length ? 'Falta preencher: ' + falta.join(', ') : '';
+      if (falta.length) return;
+
+      botao.disabled = true;
+      if (!envioDaReuniao) envioDaReuniao = Servidor.novoEnvio();
+      Servidor.chamar('registrarReuniao', canalEscolhido, lidos, envioDaReuniao)
+        .entao(function () {
+          envioDaReuniao = '';
+          botao.disabled = false;
+          Moldura.toast('Reunião registrada na Agenda.', 'bom');
+          elemento('corpo-da-reuniao').innerHTML = Agenda.formulario(camposDaReuniao, null);
+        })
+        .senao(function (erro) {
+          botao.disabled = false;
+          aviso.textContent = erro.message || String(erro);
+        });
+    });
+  }
+
   function montar(pacote) {
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
+    temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
+    if (!temAgenda) oQueCadastrar = 'caso';
 
+    if (oQueCadastrar === 'reuniao') {
+      return SeletorDeCanal.montar(pacote.canais, canalEscolhido) + abasDaMesa() + montarReuniao();
+    }
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
+      + abasDaMesa()
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
@@ -158,6 +229,14 @@ var TelaCadastrarCaso = (function () {
       canalEscolhido = idDoCanal;
       Aplicacao.remontar();
     });
+    var abas = document.querySelectorAll('[data-o-que-cadastrar]');
+    for (var i = 0; i < abas.length; i++) {
+      abas[i].addEventListener('click', function () {
+        oQueCadastrar = this.getAttribute('data-o-que-cadastrar');
+        Aplicacao.remontar();
+      });
+    }
+    if (oQueCadastrar === 'reuniao') { ligarReuniao(); return; }
 
     elemento('formulario-do-caso').addEventListener('submit', function (evento) {
       evento.preventDefault();

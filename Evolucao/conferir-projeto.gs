@@ -26,7 +26,7 @@
  */
 function oQueFaltaNoProjeto() {
   var esperado = {
-    'Cadastros.gs': ['bloquearSusep', 'desbloquearSusep', 'exportarCorretoras', 'ocultarCorretora', 'opcoesDaImportacao', 'origemDosCadastros', 'resumoDasSusepsBloqueadas', 'salvarCorretora', 'tabelaDeCorretoras'],
+    'Cadastros.gs': ['agendaDaMesa', 'bloquearSusep', 'desbloquearSusep', 'exportarCorretoras', 'formularioDaReuniao', 'ocultarCorretora', 'opcoesDaImportacao', 'origemDosCadastros', 'registrarReuniao', 'resumoDasSusepsBloqueadas', 'salvarCorretora', 'salvarReuniao', 'tabelaDeCorretoras'],
     'Casos.gs': ['alterarSituacaoDoCaso', 'buscarCasos', 'cadastrarCaso', 'camposDaSituacao', 'casoParaEditar', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
     'Config.gs': ['aplicarMudancasDaPlanilha', 'conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDoArquivoDaBase', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarErros', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'opcoesDoCarimboDoItem', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarHistoricoDaBase', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarPlanilhaDasAnalises', 'salvarSinalizador', 'usoDoItemDoCatalogo'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
@@ -47,7 +47,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 86 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 90 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

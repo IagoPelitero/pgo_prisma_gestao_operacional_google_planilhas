@@ -297,6 +297,20 @@ function pontePreparada(respostas) {
     + '        var feito = respostas.analitico.relatorios[idDoCanal];\n'
     + '        responder(pedido && pedido.soConferir ? feito.conferido : feito.arquivo);\n'
     + '      },\n'
+    // A Agenda da Mesa (Etapa 79): o formulário é o do servidor; as reuniões
+    // são de exemplo, porque a prévia não tem segunda base.
+    + '      agendaDaMesa: function () { responder(respostas.agenda); },\n'
+    + '      formularioDaReuniao: function () {\n'
+    + '        responder({ canal: respostas.agenda.canal, campos: respostas.agenda.campos });\n'
+    + '      },\n'
+    + '      registrarReuniao: function () {\n'
+    + '        return recusar("A prévia não grava — ela é uma cópia estática "\n'
+    + '          + "do sistema, sem planilha por trás.");\n'
+    + '      },\n'
+    + '      salvarReuniao: function () {\n'
+    + '        return recusar("A prévia não grava — ela é uma cópia estática "\n'
+    + '          + "do sistema, sem planilha por trás.");\n'
+    + '      },\n'
     // A busca da prévia procura nos resultados que o servidor de verdade
     // devolveu para alguns termos. Termo que não foi gravado responde vazio,
     // e a tela diz honestamente que não achou — em vez de fingir.
@@ -1108,6 +1122,24 @@ function gerar(pastaDeSaida) {
       arquivo: chamar('relatorioDeCasos')(canal.id, pedido)
     };
   });
+  // A Agenda da Mesa, com o formulário de verdade e três reuniões de exemplo.
+  const mesaDaPrevia = pacote.canais.filter((canal) => canal.aba === 'BASE_MESA')[0];
+  const reuniaoDeExemplo = (linha, data, corretora, assunto, status, r1, r2) => ({ linha, valores: {
+    data, gerente: 'Gerente Fictício', consultor: 'Consultor Fictício', corretora, analista: 'Ana Martins',
+    area: 'Comercial', segurado: 'Estipulante Fictício', participantes: 'Corretor; Mesa', assunto,
+    obs: '', acoes: 'Enviar proposta revisada', chamado: '', status, report1: r1, report2: r2, report3: '' } });
+  const agenda = mesaDaPrevia ? {
+    canal: { id: mesaDaPrevia.id, nome: mesaDaPrevia.nome },
+    campos: chamar('formularioDaAgenda_')(chamar('canalPeloId_')(mesaDaPrevia.id), chamar('usuarioAtual_()')),
+    total: 3,
+    reunioes: [
+      reuniaoDeExemplo(4, '05/11/2026', 'Corretora Fictícia Sul', 'Renovação da carteira', 'Pendente', '', ''),
+      reuniaoDeExemplo(3, '14/10/2026', 'Corretora Fictícia Norte', 'Sinistralidade', 'Acompanhar por 3 meses', '29/10/2026', ''),
+      reuniaoDeExemplo(2, '10/09/2026', 'Corretora Fictícia Centro', 'Cobrança', 'Concluído', '25/09/2026', '10/10/2026')],
+    podeRegistrar: true,
+    podeEditar: true
+  } : null;
+
   const analitico = {
     paineis: paineisAnaliticos,
     detalhes: detalhesDoPainel,
@@ -1145,7 +1177,7 @@ function gerar(pastaDeSaida) {
     '</head>',
     pontePreparada({
       pacoteDePartida: pacote, formularios, suseps, propostas, paineis, configuracoes,
-      busca, analitico, corretoras, importacao
+      busca, analitico, corretoras, importacao, agenda
     })
       + '</head>');
 

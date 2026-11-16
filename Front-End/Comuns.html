@@ -813,6 +813,182 @@ var FiltroMultiplo = (function () {
   return { desenhar: desenhar, etiquetas: etiquetas, ligar: ligar, lista: lista };
 })();
 
+/*
+  A AGENDA DA MESA: AS REUNIÕES COM CORRETORES (Etapa 79, pedido do PO). Uma peça
+  só para as duas telas: o formulário da reunião aparece no Cadastrar Caso
+  ("um formulário diferente") e, em diálogo, na sub-aba Reuniões do Trabalho —
+  para registrar e para editar. Os campos vêm do servidor; aqui só se desenha.
+*/
+var Agenda = (function () {
+
+  function escapar(texto) { return Moldura.escapar(texto); }
+
+  /** O canal que tem Agenda: a Mesa Diamante. */
+  function ehDaMesa(canais, idDoCanal) {
+    return (canais || []).some(function (canal) {
+      return String(canal.id) === String(idDoCanal) && canal.aba === 'BASE_MESA';
+    });
+  }
+
+  /** O formulário. `valores` é a reunião em edição; sem ele, valem os padrões. */
+  function formulario(campos, valores) {
+    return '<div class="grade agenda-grade">' + campos.map(function (campo) {
+      var valor = valores ? (valores[campo.chave] || '') : (campo.padrao || '');
+      var id = 'agenda-' + campo.chave;
+      var comum = ' id="' + id + '" data-agenda="' + escapar(campo.chave) + '"'
+        + (campo.obrigatorio ? ' aria-required="true"' : '');
+      var controle;
+      if (campo.tipo === 'data') {
+        controle = '<input type="date" class="filtro"' + comum + ' value="'
+          + escapar(SeletorDePeriodo.paraOCampo(valor)) + '">';
+      } else if (campo.tipo === 'lista') {
+        // O valor antigo que não está na lista continua lá: a Agenda já tinha
+        // dados, e editar uma reunião não pode apagar o que estava escrito.
+        var opcoes = campo.opcoes.slice();
+        if (valor && opcoes.indexOf(valor) < 0) opcoes.unshift(valor);
+        controle = '<select class="filtro"' + comum + '><option value=""></option>'
+          + opcoes.map(function (opcao) {
+            return '<option value="' + escapar(opcao) + '"' + (opcao === valor ? ' selected' : '')
+              + '>' + escapar(opcao) + '</option>';
+          }).join('') + '</select>';
+      } else if (campo.tipo === 'textoLongo') {
+        controle = '<textarea class="filtro" rows="3"' + comum + '>' + escapar(valor) + '</textarea>';
+      } else {
+        controle = '<input type="text" class="filtro"' + comum + ' value="' + escapar(valor) + '">';
+      }
+      return '<label class="campo' + (campo.tipo === 'textoLongo' ? ' agenda-largo' : '') + '" for="' + id + '">'
+        + '<span>' + escapar(campo.rotulo) + (campo.obrigatorio ? ' <span class="exigido">*</span>' : '')
+        + '</span>' + controle + '</label>';
+    }).join('') + '</div>';
+  }
+
+  /** O que está preenchido, como o servidor lê: a data em dd/mm/aaaa. */
+  function valores(raiz) {
+    var lidos = {};
+    var campos = raiz.querySelectorAll('[data-agenda]');
+    for (var i = 0; i < campos.length; i++) {
+      var valor = String(campos[i].value || '').trim();
+      lidos[campos[i].getAttribute('data-agenda')] = campos[i].type === 'date'
+        ? SeletorDePeriodo.paraOServidor(valor) : valor;
+    }
+    return lidos;
+  }
+
+  /** Os rótulos dos obrigatórios ainda vazios. */
+  function oQueFalta(campos, lidos) {
+    return campos.filter(function (campo) { return campo.obrigatorio && !lidos[campo.chave]; })
+      .map(function (campo) { return campo.rotulo; });
+  }
+
+  /** "15 d ✓ 20/11" para o report feito; "15 d —" para o que ainda não foi. */
+  function reports(reuniao) {
+    return [['report1', '15 d'], ['report2', '30 d'], ['report3', '45 d']].map(function (par) {
+      var feito = reuniao[par[0]];
+      return '<span class="agenda-report' + (feito ? ' feito' : '') + '" title="'
+        + (feito ? 'Report de ' + par[1].replace(' d', ' dias') + ' feito em ' + escapar(feito)
+          : 'Report de ' + par[1].replace(' d', ' dias') + ' ainda não feito') + '">'
+        + par[1] + (feito ? ' ✓' : ' —') + '</span>';
+    }).join('');
+  }
+
+  /** A lista de reuniões da sub-aba do Trabalho. */
+  function lista(resposta, termo) {
+    var linhas = resposta.reunioes.map(function (reuniao) {
+      var v = reuniao.valores;
+      return '<tr><td>' + escapar(v.data) + '</td>'
+        + '<td><strong>' + escapar(v.corretora) + '</strong>'
+        + (v.segurado ? '<small>' + escapar(v.segurado) + '</small>' : '') + '</td>'
+        + '<td>' + escapar(v.assunto) + '</td>'
+        + '<td>' + escapar(v.analista) + '</td>'
+        + '<td>' + escapar(v.status) + '</td>'
+        + '<td class="agenda-reports">' + reports(v) + '</td>'
+        + '<td>' + (resposta.podeEditar
+          ? '<button type="button" class="botao-texto" data-editar-reuniao="' + reuniao.linha + '">'
+            + 'Abrir</button>' : '') + '</td></tr>';
+    }).join('');
+
+    return '<section class="caixa-de-filtros"><div class="filtros">'
+      + '<input type="search" class="filtro" id="busca-na-agenda" value="' + escapar(termo || '') + '"'
+      + ' placeholder="Buscar reunião e apertar Enter" aria-label="Buscar reunião">'
+      + (resposta.podeRegistrar
+        ? '<button type="button" class="botao pequeno" id="registrar-reuniao">Registrar reunião</button>' : '')
+      + '<span class="contagem">' + (resposta.total > resposta.reunioes.length
+        ? 'as ' + resposta.reunioes.length + ' mais recentes de ' + resposta.total
+        : resposta.total + (resposta.total === 1 ? ' reunião' : ' reuniões')) + '</span>'
+      + '</div></section>'
+      + (resposta.reunioes.length
+        ? '<div class="cartao"><div class="rolagem-tabela"><table class="fila agenda-tabela"><thead><tr>'
+          + '<th>Data</th><th>Corretora</th><th>Assunto</th><th>Analista</th><th>Status</th>'
+          + '<th>Reports</th><th></th></tr></thead><tbody>' + linhas + '</tbody></table></div></div>'
+        : '<div class="cartao vazio"><strong>' + (termo ? 'Nenhuma reunião com esse texto.'
+          : 'Nenhuma reunião registrada.') + '</strong></div>');
+  }
+
+  /**
+   * O diálogo da reunião, no Trabalho. Sem `reuniao`, registra uma nova; com
+   * ela, edita — e manda junto o que a lista mostrava, para o servidor recusar
+   * se a planilha tiver mudado de lugar por baixo.
+   */
+  function abrirDialogo(idDoCanal, campos, reuniao, depois) {
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-da-reuniao';
+    caixa.innerHTML = '<div class="dialogo-caixa relatorio" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="titulo-da-reuniao">'
+      + '<h3 id="titulo-da-reuniao">' + (reuniao ? 'Reunião com ' + escapar(reuniao.valores.corretora)
+        : 'Registrar reunião') + '</h3>'
+      + '<div class="relatorio-miolo">' + formulario(campos, reuniao ? reuniao.valores : null) + '</div>'
+      + '<div class="config-acoes">'
+      + '<span class="falta-preencher" id="falta-na-reuniao" aria-live="polite"></span>'
+      + '<button type="button" class="botao vazado" id="cancelar-reuniao">Cancelar</button>'
+      + '<button type="button" class="botao" id="salvar-reuniao">' + (reuniao ? 'Salvar' : 'Registrar')
+      + '</button></div></div>';
+    document.body.appendChild(caixa);
+
+    var envio = '';
+    function sair() {
+      document.removeEventListener('keydown', aoTeclar);
+      if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+    }
+    function aoTeclar(evento) { if (evento.key === 'Escape') sair(); }
+    document.addEventListener('keydown', aoTeclar);
+    caixa.querySelector('#cancelar-reuniao').addEventListener('click', sair);
+
+    caixa.querySelector('#salvar-reuniao').addEventListener('click', function () {
+      var botao = this;
+      var lidos = valores(caixa);
+      var falta = oQueFalta(campos, lidos);
+      caixa.querySelector('#falta-na-reuniao').textContent = falta.length
+        ? 'Falta preencher: ' + falta.join(', ') : '';
+      if (falta.length) return;
+
+      botao.disabled = true;
+      if (!reuniao && !envio) envio = Servidor.novoEnvio();
+      function gravou() {
+        sair();
+        Moldura.toast(reuniao ? 'Reunião salva.' : 'Reunião registrada.', 'bom');
+        if (depois) depois();
+      }
+      function falhou(erro) {
+        botao.disabled = false;
+        caixa.querySelector('#falta-na-reuniao').textContent = erro.message || String(erro);
+      }
+      if (reuniao) {
+        Servidor.chamar('salvarReuniao', idDoCanal, reuniao.linha, lidos, reuniao.valores)
+          .entao(gravou).senao(falhou);
+      } else {
+        Servidor.chamar('registrarReuniao', idDoCanal, lidos, envio).entao(gravou).senao(falhou);
+      }
+    });
+
+    var primeiro = caixa.querySelector('[data-agenda]');
+    if (primeiro) primeiro.focus();
+  }
+
+  return { ehDaMesa: ehDaMesa, formulario: formulario, valores: valores, oQueFalta: oQueFalta,
+    lista: lista, abrirDialogo: abrirDialogo };
+})();
+
 var SeletorDeCanal = (function () {
 
   var DESENHOS = {

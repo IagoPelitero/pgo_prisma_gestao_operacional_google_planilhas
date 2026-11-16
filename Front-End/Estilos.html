@@ -2277,6 +2277,21 @@ table.fila.numeros .direita { text-align: right; font-variant-numeric: tabular-n
   resize: vertical;
 }
 
+/* A Agenda da Mesa (Etapa 79): o formulário da reunião e a lista. */
+.agenda-grade .campo { flex: 1 1 260px; }
+.agenda-grade .campo.agenda-largo { flex-basis: 100%; }
+.agenda-grade .campo > span { font-size: 13px; font-weight: 600; }
+.agenda-grade .campo .filtro { width: 100%; max-width: none; box-sizing: border-box; }
+.agenda-grade textarea.filtro { min-height: 76px; resize: vertical; }
+.agenda-tabela td small { display: block; color: var(--suave); font-size: 12.5px; }
+.agenda-reports { white-space: nowrap; }
+.agenda-report {
+  display: inline-block; margin-right: 5px; padding: 2px 8px; border-radius: 99px; font-size: 12px;
+  border: 1px solid var(--linha); color: var(--suave);
+}
+.agenda-report.feito { border-color: var(--bom); color: var(--bom); background: var(--bom-tenue); font-weight: 600; }
+#formulario-da-reuniao .acoes { margin-top: 18px; }
+
 /* O relatório de casos (Etapa 73): período, qual relatório e as colunas. */
 .caixa-de-filtros-cabeca #exportar-relatorio { margin-left: 4px; }
 .dialogo-caixa.relatorio {
