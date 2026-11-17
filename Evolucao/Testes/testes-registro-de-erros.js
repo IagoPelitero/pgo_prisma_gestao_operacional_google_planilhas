@@ -93,6 +93,25 @@ function rodarTestesDoRegistroDeErros() {
     igual(t.erros().map((e) => e.Onde).join(','), 'fila,outro');
   });
 
+  teste('dois erros no MESMO milissegundo saem na ordem em que aconteceram (Etapa 83)', () => {
+    // A chave da fila era o horário e um sorteio: no mesmo milissegundo, a
+    // ordem era do sorteio (o teste de cima falhava às vezes). Com o relógio
+    // parado, antes saíam fora de ordem cerca de metade das vezes.
+    for (let k = 0; k < 10; k++) {
+      const t = preparar();
+      t.chamar('(function(){ var Real = Date; var fixo = new Real(2026,10,17,10).getTime();'
+        + ' var F = function(){ return arguments.length ? new (Function.prototype.bind.apply(Real,'
+        + ' [null].concat([].slice.call(arguments))))() : new Real(fixo); };'
+        + ' F.now = function(){ return fixo; }; F.UTC = Real.UTC; F.parse = Real.parse;'
+        + ' F.prototype = Real.prototype; Date = F; return 1; })()');
+      t.ambiente.travaOcupada = true;
+      t.registrar('primeiro', 'esperou ' + k);
+      t.ambiente.travaOcupada = false;
+      t.registrar('segundo', 'descarrega ' + k);
+      igual(t.erros().map((e) => e.Onde).join(','), 'primeiro,segundo', 'rodada ' + k);
+    }
+  });
+
   teste('a aba guarda os 2.000 mais recentes: os mais antigos saem', () => {
     const t = preparar();
     const lote = Array.from({ length: 2005 }, (_, i) => ({ DataHora: new Date(2026, 0, 1, 0, i),

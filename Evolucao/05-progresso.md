@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.82 — a última etapa entregue é a 82. A regra do número está
+**Estado geral:** versão 1.83 — a última etapa entregue é a 83. A regra do número está
 na Etapa 68.
 
 ---
@@ -4138,6 +4138,43 @@ lidas; pelo nome, de 150.167 para 174; o termo que casa com milhares, de 155.114
 O termo que não existe continua lendo as colunas (150.014), de propósito.
 
 10 testes novos em `testes-busca-com-localizador.js`. 10 quebras de propósito, 10 pegas.
+
+---
+
+## Etapa 83 — O Buscar Caso procura na linha toda
+
+Pedido do PO: "toda vez que busco algum dado e não retorna nada (…) O da RET deve buscar o dado
+inserido dentro do Prisma na aba BASE_RET, a Mesa na BASE_MESA e o VG na sua base". As marcações
+já procuravam nessas abas — mas só nas **colunas da busca** do canal, quatro ou cinco: na Mesa,
+nem o protocolo nem o título do e-mail; na RET, nem o telefone nem o e-mail. O dado que estava em
+outra coluna não voltava. Escolha do PO: procurar em todas as colunas.
+
+| O que | Como ficou |
+|---|---|
+| **A linha toda** | `casosNaLinhaToda_`: o localizador procura o termo na linha toda da base do canal (o mesmo `linhasDoTermoNaPlanilha_` da busca do Trabalho, Etapa 69), e `aplicarBusca_` confere cada candidata em todas as colunas (Etapa 44). Uma regra só para as duas buscas |
+| **Cada marcação, a sua base** | RET → BASE_RET, Mesa Diamante → BASE_MESA, VG → a base do VG. A tela diz "procura em todas as colunas de BASE_RET" (`opcoesDaBusca` devolve a aba) |
+| **A reserva** | Localizador desligado (`OPERACAO.BUSCA_RAPIDA` = NAO), com falha ou sem achar nada na linha toda: vale o caminho de antes, pelas colunas da busca (`linhasPelasColunasDaBusca_`, Etapa 82). O histórico continua pelas colunas da busca |
+| **Lê em lotes, e para nos 100** | Um nome de analista aparece em milhares de linhas. As candidatas são lidas de 150 em 150, das mais recentes para trás, até juntar os 100 que a tela mostra (`RECC_LOTE_DA_BUSCA`). Parando antes do fim, o aviso diz em quantas linhas o termo aparece. No `estresse.js` (30 mil casos): o termo em milhares de linhas lê 7.664 células, e a busca com linha suja, 60.143 — lendo tudo, eram 255.014 e 1.530.575 |
+| **Não mudou** | O alcance (conferido antes e depois de ler as linhas), o caso ocultado fora, os 100 mais recentes com o aviso |
+| **Visto, e não mexido** | Na reserva, a coluna de identificador compara só os dígitos (regra antiga): "RET00J" sem achado na linha toda bate em todo CPF com "00". Fica para o PO decidir |
+| **Versão** | 1.83 |
+
+Testes: 8 novos em `testes-busca-com-localizador.js` (Mesa pelo título do e-mail, RET pelo
+telefone e e-mail, cada marcação na sua base, ocultado fora, mais de 100, a parada nos 100 e o lote
+que não basta) e a comparação termo a
+termo com a busca do Trabalho; o teste "procura SÓ nas colunas declaradas" virou "acha em
+qualquer coluna, e desligado volta às declaradas". 19 quebras de propósito: 17 pegas (uma escapou na primeira rodada e ganhou teste); as 2
+que escapam tiram uma das duas camadas do alcance, e tirar as duas é pego.
+
+**Achado de passagem:** um teste da Etapa 74 (`testes-leitura-leve-do-aviso.js`) dependia da hora em
+que roda — pedia "menos de 40 casos no amarelo", e às 16h havia 62. Agora compara com o mesmo
+momento sem a coluna que liga o prazo. Nada mudou no sistema.
+
+**Achado de passagem 2 — a ordem da aba ERROS:** a chave da fila dos erros era o horário em
+milissegundos e um sorteio. Dois erros no mesmo milissegundo saíam na ordem do sorteio: com o
+relógio parado, 21 de 40 rodadas punham o segundo antes do primeiro (e `testes-registro-de-erros.js`
+falhava às vezes). Agora a chave leva a ordem da execução (`RECC_ORDEM_DO_ERRO`) antes do sorteio:
+0 de 40, e um teste novo com o relógio parado.
 
 ---
 

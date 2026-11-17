@@ -82,12 +82,24 @@ function rodarTestesDaBuscaComLocalizador() {
 
   const t = preparar();
 
-  teste('cada termo dá o mesmo resultado com e sem o localizador', () => {
-    const ligado = TERMOS.map((termo) => retrato(t.buscar(termo)));
+  teste('cada termo acha no Buscar Caso o mesmo que a busca do Trabalho (Etapa 83)', () => {
+    // Uma regra só para as duas buscas: o localizador na linha toda e a
+    // conferência de aplicarBusca_.
+    TERMOS.forEach((termo) => {
+      const daBusca = t.buscar(termo).origens.find((o) => o.id === t.ret.id);
+      const doTrabalho = t.chamar('resumoDoCanal')(t.ret.id, { busca: termo });
+      // Sem nada achado na linha toda, o Buscar Caso volta às colunas da busca
+      // (a reserva da Etapa 82) — é ali que os dois podem diferir.
+      if (doTrabalho.total) igual(daBusca.casos.length, Math.min(doTrabalho.total, 100), termo);
+    });
+  });
+
+  teste('desligado na CONFIG, cada termo acha o que achava antes da Etapa 83', () => {
     t.chave('NAO');
     try {
-      const desligado = TERMOS.map((termo) => retrato(t.buscar(termo)));
-      TERMOS.forEach((termo, i) => igual(ligado[i], desligado[i], termo));
+      igual(t.buscar('RET-2026-0007').total, 1);
+      igual(t.buscar('jose angelo').total, 2);
+      igual(t.buscar('zzzz-nada').total, 0);
     } finally {
       t.chave('SIM');
     }
@@ -169,6 +181,90 @@ function rodarTestesDaBuscaComLocalizador() {
     } finally {
       t.chave('SIM');
     }
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Etapa 83: a marcação procura na linha toda da base do canal');
+
+  const e = preparar();
+  e.chamar('inserirVariosRegistros_')('BASE_MESA', [
+    { 'Nome do segurado': 'Segurado Mesa', 'Título do e-mail': 'Endosso urgente da Prestamista' }]);
+  e.chamar('inserirVariosRegistros_')('BASE_RET', [
+    { [COLUNA]: hoje(), status: 'Pendente', 'nome do cliente': 'Cliente Telefone',
+      'telefones de contato': '(11) 98888-7777', 'e-mail': 'cliente.unico@exemplo.com' }]);
+
+  teste('Mesa: o título do e-mail (fora das colunas da busca) é achado', () => {
+    const daMesa = e.buscar('endosso urgente').origens.find((o) => o.id === e.mesa.id);
+    igual(daMesa.casos.length, 1);
+  });
+
+  teste('RET: o telefone e o e-mail são achados', () => {
+    const contar = (termo) => e.buscar(termo).origens.find((o) => o.id === e.ret.id).casos.length;
+    igual(contar('98888-7777'), 1, 'telefone com máscara');
+    igual(contar('cliente.unico'), 1, 'e-mail');
+  });
+
+  teste('cada marcação procura só na base do próprio canal', () => {
+    const achados = e.chamar('buscarCasos')('endosso urgente', [e.ret.id], false, false);
+    igual(achados.origens.length, 1);
+    igual(achados.origens[0].id, e.ret.id);
+    igual(achados.total, 0, 'o título é da Mesa: marcando só a RET, não volta');
+  });
+
+  teste('o caso ocultado continua fora, e a tela diz a base de cada marcação', () => {
+    const caso = e.chamar('lerRegistros_')('BASE_RET').find((r) => r['nome do cliente'] === 'Cliente Telefone');
+    e.chamar('atualizarRegistro_')('BASE_RET', caso.__id, { _Visivel: 'NAO' });
+    igual(e.buscar('98888-7777').total, 0);
+    const opcoes = e.chamar('opcoesDaBusca()');
+    igual(opcoes.canais.find((c) => c.id === e.ret.id).aba, 'BASE_RET');
+    verdadeiro(require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'Front-End', 'BuscarCaso.html'), 'utf8')
+      .indexOf("'<em>procura em todas as colunas de ' + escapar(canal.aba || canal.nome)") >= 0);
+  });
+
+  teste('mais de 100 achados: vêm os 100 mais recentes, com o aviso', () => {
+    const g = preparar();
+    const lote = [];
+    for (let i = 1; i <= 120; i++) {
+      lote.push({ [COLUNA]: hoje(), status: 'Pendente', 'nome do cliente': 'Lote Grande ' + i,
+        protocolo: 'LG-' + String(i).padStart(4, '0') });
+    }
+    g.chamar('inserirVariosRegistros_')('BASE_RET', lote);
+    const daRet = g.buscar('Lote Grande').origens.find((o) => o.id === g.ret.id);
+    igual(daRet.casos.length, 100);
+    verdadeiro(daRet.aviso.indexOf('achou 120 casos e mostra os 100 mais recentes') >= 0, daRet.aviso);
+    const texto = JSON.stringify(daRet.casos);
+    verdadeiro(texto.indexOf('Lote Grande 120') >= 0 && texto.indexOf('Lote Grande 21"') >= 0, 'os mais recentes');
+    verdadeiro(texto.indexOf('Lote Grande 20"') < 0, 'os 20 mais antigos ficam de fora');
+  });
+
+  teste('termo em centenas de linhas: lê das mais recentes e para nos 100', () => {
+    const g = preparar();
+    const lote = [];
+    for (let i = 1; i <= 400; i++) {
+      lote.push({ [COLUNA]: hoje(), status: 'Pendente', 'nome do cliente': 'Muitos ' + i,
+        analista: 'Analista Repetido' });
+    }
+    g.chamar('inserirVariosRegistros_')('BASE_RET', lote);
+    const medida = g.medir(() => g.buscar('Analista Repetido'));
+    const daRet = medida.resultado.origens.find((o) => o.id === g.ret.id);
+    igual(daRet.casos.length, 100);
+    verdadeiro(JSON.stringify(daRet.casos).indexOf('Muitos 400') >= 0, 'o mais recente veio');
+    verdadeiro(daRet.aviso.indexOf('O termo aparece em 400 linhas') >= 0, daRet.aviso);
+    const largura = g.chamar('estruturaDaAba_')('BASE_RET').cabecalhos.length;
+    verdadeiro(medida.celulas < 300 * largura, 'leu ' + medida.celulas + ' células, menos que as 400 linhas');
+  });
+
+  teste('o lote que não basta (ocultos entre os recentes) puxa o lote anterior', () => {
+    const g = preparar();
+    const lote = [];
+    for (let i = 1; i <= 200; i++) {
+      // Os 120 mais recentes estão ocultos: o primeiro lote (150) só traz 30.
+      lote.push({ [COLUNA]: hoje(), status: 'Pendente', 'nome do cliente': 'Escondido ' + i,
+        _Visivel: i > 80 ? 'NAO' : 'SIM' });
+    }
+    g.chamar('inserirVariosRegistros_')('BASE_RET', lote);
+    const daRet = g.buscar('Escondido').origens.find((o) => o.id === g.ret.id);
+    igual(daRet.casos.length, 80, 'os 80 visíveis, de dois lotes');
   });
 
   /* ----------------------------------------------------------------------- */

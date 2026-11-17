@@ -131,25 +131,34 @@ function rodarTestesDeBusca() {
     });
   });
 
-  secao('Só as colunas declaradas');
+  secao('Todas as colunas do caso (Etapa 83)');
 
-  teste('a busca procura SÓ nas colunas que o canal declarou', () => {
-    // O "sistema" da RET é SIVIDA em todos os casos. Ele não está entre as
-    // colunas de busca, então procurar por ele não acha nada — e é assim que
-    // a tela não lê a base inteira.
+  teste('a busca acha o dado em QUALQUER coluna da base do canal', () => {
+    // Pedido do PO (Etapa 83): "toda vez que busco algum dado e não retorna
+    // nada". O "sistema" da RET não está entre as colunas de busca, e antes
+    // não era achado. Agora o localizador procura na linha toda.
     chamar('atualizarRegistro_')('BASE_RET',
       chamar('lerRegistros_')('BASE_RET')[0].__id, { sistema: 'SIVIDA' });
+    igual(chamar('buscarCasos')('SIVIDA', [ret.id], false).total, 1,
+      'coluna fora da lista de busca também é achada');
 
-    igual(chamar('buscarCasos')('SIVIDA', [ret.id], false).total, 0,
-      'coluna fora da lista de busca não é lida');
-
-    // E declarando a coluna, passa a achar. Sem programador no meio.
-    chamar('salvarCanal')({
-      id: ret.id, nome: ret.nome,
-      colunaDaData: 'data de recepção do protocolo', colunaDoStatus: 'status',
-      colunasDaBusca: 'protocolo, sistema'
-    });
-    igual(chamar('buscarCasos')('SIVIDA', [ret.id], false).total, 1);
+    // Com o localizador desligado na CONFIG, volta ao caminho de antes: só as
+    // colunas declaradas — e declarar a coluna continua fazendo achar.
+    chamar('gravarConfiguracao_')('OPERACAO.BUSCA_RAPIDA', 'NAO');
+    chamar('esquecerCacheDaConfiguracao_()');
+    try {
+      igual(chamar('buscarCasos')('SIVIDA', [ret.id], false).total, 0,
+        'desligado, só as colunas da busca');
+      chamar('salvarCanal')({
+        id: ret.id, nome: ret.nome,
+        colunaDaData: 'data de recepção do protocolo', colunaDoStatus: 'status',
+        colunasDaBusca: 'protocolo, sistema'
+      });
+      igual(chamar('buscarCasos')('SIVIDA', [ret.id], false).total, 1);
+    } finally {
+      chamar('gravarConfiguracao_')('OPERACAO.BUSCA_RAPIDA', 'SIM');
+      chamar('esquecerCacheDaConfiguracao_()');
+    }
   });
 
   teste('canal sem coluna de busca declarada avisa, em vez de ler tudo', () => {

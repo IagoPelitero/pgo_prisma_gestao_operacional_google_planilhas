@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-17 17:10
+   Gerado em 2026-11-17 19:43
    ========================================================================== */
 
 
@@ -4648,6 +4648,8 @@ function opcoesDaBusca() {
         id: canal.id,
         nome: canal.nome,
         icone: canal.icone,
+
+        aba: canal.aba,
         procuraEm: colunasDaBusca_(canal).map(function (coluna) {
           return coluna.cabecalho;
         })
@@ -4730,23 +4732,85 @@ function colunasDaBusca_(canal) {
 
 function procurarNoCanal_(canal, termo, quem) {
   comAGrafiaDaAba_(canal);
-  var colunas = colunasDaBusca_(canal);
-  var aviso = '';
+  var origem = {
+    tipo: 'canal',
+    id: canal.id,
+    nome: canal.nome,
+    icone: canal.icone,
+    colunas: colunasDaFila_(canal),
+    casos: [],
+    aviso: ''
+  };
 
-  if (!colunas.length) {
-    return {
-      tipo: 'canal',
-      id: canal.id,
-      nome: canal.nome,
-      icone: canal.icone,
-      colunas: [],
-      casos: [],
-      aviso: 'Este canal não declarou em quais colunas procurar. ' +
-        'Isso se ajusta em Configurações › Canais de trabalho.'
-    };
+  var conferidos = casosNaLinhaToda_(canal, termo, quem);
+  var paradaAntes = null;
+  if (conferidos) {
+    if (!conferidos.exato) paradaAntes = conferidos.linhas;
+    conferidos = conferidos.registros;
+  } else {
+    var colunas = colunasDaBusca_(canal);
+    if (!colunas.length) {
+      origem.aviso = 'Este canal não declarou em quais colunas procurar. ' +
+        'Isso se ajusta em Configurações › Canais de trabalho.';
+      return origem;
+    }
+
+    var linhas = linhasNoMeuAlcance_(canal.aba, linhasPelasColunasDaBusca_(canal, colunas, termo), quem);
+    if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
+      origem.aviso = avisoDoMaximoDaBusca_(linhas.length);
+
+      linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
+    }
+    linhas.sort(function (uma, outra) { return uma - outra; });
+    conferidos = filtrarPeloAlcance_(lerLinhasEspecificas_(canal.aba, linhas)
+      .filter(function (registro) {
+
+        return normalizarParaComparar_(registro._Visivel) !== 'nao';
+      }), canal.aba, quem);
   }
 
-  var linhasQueCasam = {};
+  if (paradaAntes !== null) {
+
+    origem.aviso = 'O termo aparece em ' + paradaAntes + ' linhas da base, e a busca mostra os ' +
+      RECC_MAXIMO_DA_BUSCA + ' casos mais recentes. Um termo mais específico chega mais perto.';
+    conferidos = conferidos.slice(-RECC_MAXIMO_DA_BUSCA);
+  } else if (conferidos.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = avisoDoMaximoDaBusca_(conferidos.length);
+    conferidos = conferidos.slice(-RECC_MAXIMO_DA_BUSCA);
+  }
+  origem.casos = montarFila_(conferidos, canal);
+  return origem;
+}
+
+function avisoDoMaximoDaBusca_(quantos) {
+  return 'A busca achou ' + quantos + ' casos e mostra os ' + RECC_MAXIMO_DA_BUSCA +
+    ' mais recentes. Um termo mais específico chega mais perto.';
+}
+
+const RECC_LOTE_DA_BUSCA = 150;
+
+function casosNaLinhaToda_(canal, termo, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return null;
+  var linhas = linhasDoTermoNaPlanilha_(estrutura, termo, total);
+  if (!linhas || !linhas.length) return null;
+
+  linhas = linhasNoMeuAlcance_(canal.aba, linhas, quem);
+  var conferidos = [];
+  var fim = linhas.length;
+  while (fim > 0 && conferidos.length <= RECC_MAXIMO_DA_BUSCA) {
+    var lote = linhas.slice(Math.max(0, fim - RECC_LOTE_DA_BUSCA), fim);
+    fim -= lote.length;
+    var lidos = semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, lote));
+    conferidos = filtrarPeloAlcance_(aplicarBusca_(lidos, canal, termo), canal.aba, quem)
+      .concat(conferidos);
+  }
+  return { registros: conferidos, exato: fim === 0, linhas: linhas.length };
+}
+
+function linhasPelasColunasDaBusca_(canal, colunas, termo) {
+  var jaAchada = {};
   var ordemDasLinhas = [];
   var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo);
 
@@ -4765,44 +4829,13 @@ function procurarNoCanal_(canal, termo, quem) {
     }
     for (var i = 0; i < valores.length; i++) {
       var numeroDaLinha = numeros[i];
-      if (linhasQueCasam[numeroDaLinha]) continue;
+      if (jaAchada[numeroDaLinha]) continue;
       if (!casaComOTermo_(valores[i], termo, coluna.tipo)) continue;
-
-      linhasQueCasam[numeroDaLinha] = coluna.cabecalho;
+      jaAchada[numeroDaLinha] = true;
       ordemDasLinhas.push(numeroDaLinha);
     }
   });
-
-  ordemDasLinhas = linhasNoMeuAlcance_(canal.aba, ordemDasLinhas, quem);
-
-  if (ordemDasLinhas.length > RECC_MAXIMO_DA_BUSCA) {
-    aviso = 'A busca achou ' + ordemDasLinhas.length + ' casos e mostra os ' +
-      RECC_MAXIMO_DA_BUSCA + ' mais recentes. Um termo mais específico ' +
-      'chega mais perto.';
-
-    ordemDasLinhas = ordemDasLinhas.slice(-RECC_MAXIMO_DA_BUSCA);
-  }
-
-  ordemDasLinhas.sort(function (uma, outra) { return outra - uma; });
-  var registros = lerLinhasEspecificas_(canal.aba, ordemDasLinhas)
-    .filter(function (registro) {
-
-      return normalizarParaComparar_(registro._Visivel) !== 'nao';
-    });
-
-  var meus = filtrarPeloAlcance_(registros, canal.aba, quem);
-
-  return {
-    tipo: 'canal',
-    id: canal.id,
-    nome: canal.nome,
-    icone: canal.icone,
-    colunas: colunasDaFila_(canal),
-    casos: montarFila_(meus.slice().reverse(), canal),
-    ondeAchou: linhasQueCasam,
-    procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
-    aviso: aviso
-  };
+  return ordemDasLinhas;
 }
 
 const RECC_TIPOS_DA_BUSCA_RAPIDA = [RECC_TIPO_DE_DADO.IDENTIFICADOR, RECC_TIPO_DE_DADO.TEXTO,
@@ -9155,7 +9188,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.82',
+  numero: '1.83',
   data: '17/11/2026'
 };
 
@@ -9949,6 +9982,8 @@ function formatarData_(data, formato) {
   return texto;
 }
 
+var RECC_ORDEM_DO_ERRO = 0;
+
 function registrarErro_(origem, onde, mensagem, detalhe) {
   var cortar = function (texto) {
     return String(texto === null || texto === undefined ? '' : texto)
@@ -9971,7 +10006,8 @@ function registrarErro_(origem, onde, mensagem, detalhe) {
     try { usuarioId = (usuarioAtual_().usuario || {}).Id || ''; } catch (semUsuario) { usuarioId = ''; }
     var agora = new Date();
     props.setProperty(RECC_PREFIXO_DA_FILA_DOS_ERROS
-      + ('0000000000000' + agora.getTime()).slice(-13) + '.' + Math.random().toString(36).slice(2, 10),
+      + ('0000000000000' + agora.getTime()).slice(-13) + '.' + ('000' + (RECC_ORDEM_DO_ERRO++ % 10000)).slice(-4)
+      + Math.random().toString(36).slice(2, 10),
       JSON.stringify({ d: agora.getTime(), u: usuarioId, o: cortar(origem), w: cortar(onde),
         m: cortar(mensagem), t: cortar(detalhe) }));
     descarregarAFilaDosErros_(0);

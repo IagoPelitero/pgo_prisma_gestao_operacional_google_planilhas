@@ -81,12 +81,17 @@ function rodarTestesDaLeituraLeveDoAviso() {
 
   teste('o prazo que só vale com uma coluna preenchida: a linha sem ela nem é lida', () => {
     const t = preparar();
+    // Quantos estão no amarelo depende da hora em que o teste roda (o prazo é
+    // em horas úteis): compara com o mesmo momento sem a coluna, e não com um
+    // número fixo — às 16h havia 62, e o teste pedia menos de 40.
+    const semAColuna = t.quantos(t.chamar('lerRegistros_')('BASE_RET'));
     const linha = t.chamar('lerRegistros_')('SINALIZADORES').find((l) => String(l.CanalId) === String(t.ret.id));
     t.chamar('atualizarRegistro_')('SINALIZADORES', linha.__id, { ColunaQueLiga: 'protocolo' });
     t.chamar('esquecerCacheDaConfiguracao_()');
     const todos = t.chamar('lerRegistros_')('BASE_RET');
     const esperados = t.amarelos(todos);
-    verdadeiro(esperados.length > 0 && t.quantos(todos) < 40, 'menos casos avisam: ' + t.quantos(todos));
+    verdadeiro(esperados.length > 0 && t.quantos(todos) < semAColuna,
+      'menos casos avisam: ' + t.quantos(todos) + ' de ' + semAColuna);
     igual(t.ids(t.chamar('casosAbertosDaPlanilha_')(t.canal(), true)), esperados);
   });
 

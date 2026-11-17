@@ -2337,6 +2337,9 @@ function opcoesDaBusca() {
         id: canal.id,
         nome: canal.nome,
         icone: canal.icone,
+        // A base em que a marcação procura (Etapa 83: "procura em todas as
+        // colunas de BASE_RET"). As colunas da busca ficam para a reserva.
+        aba: canal.aba,
         procuraEm: colunasDaBusca_(canal).map(function (coluna) {
           return coluna.cabecalho;
         })
@@ -2440,29 +2443,120 @@ function colunasDaBusca_(canal) {
 }
 
 /**
- * Procura num canal, lendo coluna por coluna e só depois as linhas que casam.
+ * Procura num canal: na LINHA TODA do caso (Etapa 83), como a busca do
+ * Trabalho.
+ *
+ * Pedido do PO: "toda vez que busco algum dado e não retorna nada" — cada
+ * canal procurava só nas COLUNAS DA BUSCA (4 ou 5: na Mesa, nem o protocolo
+ * nem o título do e-mail), e o que estava em outra coluna não voltava. Agora
+ * o localizador do Sheets procura na linha toda da base do canal (BASE_RET,
+ * BASE_MESA, BASE_VG) e `aplicarBusca_` — a conferência da busca do Trabalho
+ * (Etapas 44 e 69) — confere cada candidata em todas as colunas. Uma regra só
+ * para as duas buscas: digitar o mesmo termo acha os mesmos casos.
+ *
+ * Sem o localizador (desligado, com falha ou sem achar nada), vale o caminho
+ * de antes: as colunas da busca, lidas como na Etapa 82. "Nada encontrado"
+ * nunca depende só dele.
  */
 function procurarNoCanal_(canal, termo, quem) {
   comAGrafiaDaAba_(canal);
-  var colunas = colunasDaBusca_(canal);
-  var aviso = '';
+  var origem = {
+    tipo: 'canal',
+    id: canal.id,
+    nome: canal.nome,
+    icone: canal.icone,
+    colunas: colunasDaFila_(canal),
+    casos: [],
+    aviso: ''
+  };
 
-  if (!colunas.length) {
-    return {
-      tipo: 'canal',
-      id: canal.id,
-      nome: canal.nome,
-      icone: canal.icone,
-      colunas: [],
-      casos: [],
-      aviso: 'Este canal não declarou em quais colunas procurar. ' +
-        'Isso se ajusta em Configurações › Canais de trabalho.'
-    };
+  var conferidos = casosNaLinhaToda_(canal, termo, quem);
+  var paradaAntes = null;
+  if (conferidos) {
+    if (!conferidos.exato) paradaAntes = conferidos.linhas;
+    conferidos = conferidos.registros;
+  } else {
+    var colunas = colunasDaBusca_(canal);
+    if (!colunas.length) {
+      origem.aviso = 'Este canal não declarou em quais colunas procurar. ' +
+        'Isso se ajusta em Configurações › Canais de trabalho.';
+      return origem;
+    }
+    // O alcance vem ANTES do corte: os 100 lugares são dos casos que eu posso ver.
+    var linhas = linhasNoMeuAlcance_(canal.aba, linhasPelasColunasDaBusca_(canal, colunas, termo), quem);
+    if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
+      origem.aviso = avisoDoMaximoDaBusca_(linhas.length);
+      // Os mais recentes são os do fim da base, que só acrescenta no fim.
+      linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
+    }
+    linhas.sort(function (uma, outra) { return uma - outra; });
+    conferidos = filtrarPeloAlcance_(lerLinhasEspecificas_(canal.aba, linhas)
+      .filter(function (registro) {
+        // Caso ocultado não volta na busca. A linha continua na planilha, e
+        // um administrador ainda a enxerga por lá.
+        return normalizarParaComparar_(registro._Visivel) !== 'nao';
+      }), canal.aba, quem);
   }
 
-  // Passo 1: anotar em QUAIS linhas o termo aparece, coluna de busca por
-  // coluna de busca. É aqui que a tela não estoura numa base grande.
-  var linhasQueCasam = {};
+  if (paradaAntes !== null) {
+    // Parou de ler ao juntar os 100: a conta exata dos casos não é sabida,
+    // mas em quantas linhas o termo aparece, sim.
+    origem.aviso = 'O termo aparece em ' + paradaAntes + ' linhas da base, e a busca mostra os ' +
+      RECC_MAXIMO_DA_BUSCA + ' casos mais recentes. Um termo mais específico chega mais perto.';
+    conferidos = conferidos.slice(-RECC_MAXIMO_DA_BUSCA);
+  } else if (conferidos.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = avisoDoMaximoDaBusca_(conferidos.length);
+    conferidos = conferidos.slice(-RECC_MAXIMO_DA_BUSCA);
+  }
+  origem.casos = montarFila_(conferidos, canal);
+  return origem;
+}
+
+function avisoDoMaximoDaBusca_(quantos) {
+  return 'A busca achou ' + quantos + ' casos e mostra os ' + RECC_MAXIMO_DA_BUSCA +
+    ' mais recentes. Um termo mais específico chega mais perto.';
+}
+
+/** Quantas candidatas a busca na linha toda lê de cada vez, das mais recentes para trás. */
+const RECC_LOTE_DA_BUSCA = 150;
+
+/**
+ * Os casos do canal em que o termo aparece em QUALQUER coluna (Etapa 83), em
+ * ordem da planilha, já conferidos e no alcance de quem procura — ou null,
+ * quando o localizador está desligado, falhou ou não achou nada.
+ *
+ * Lê as candidatas EM LOTES, das mais recentes para trás, e para quando já tem
+ * os 100 que a tela mostra. Um nome de analista aparece em milhares de linhas:
+ * ler todas, inteiras, para mostrar 100 era 1,5 milhão de células no teste de
+ * volume. `exato` diz se todas as candidatas foram conferidas (aí `total` é a
+ * conta dos casos); senão, `linhas` é em quantas linhas o termo aparece.
+ */
+function casosNaLinhaToda_(canal, termo, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return null;
+  var linhas = linhasDoTermoNaPlanilha_(estrutura, termo, total);
+  if (!linhas || !linhas.length) return null;
+
+  linhas = linhasNoMeuAlcance_(canal.aba, linhas, quem);
+  var conferidos = [];
+  var fim = linhas.length;
+  while (fim > 0 && conferidos.length <= RECC_MAXIMO_DA_BUSCA) {
+    var lote = linhas.slice(Math.max(0, fim - RECC_LOTE_DA_BUSCA), fim);
+    fim -= lote.length;
+    var lidos = semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, lote));
+    conferidos = filtrarPeloAlcance_(aplicarBusca_(lidos, canal, termo), canal.aba, quem)
+      .concat(conferidos);
+  }
+  return { registros: conferidos, exato: fim === 0, linhas: linhas.length };
+}
+
+/**
+ * O caminho de antes (Etapas 82 e anteriores): só as COLUNAS DA BUSCA do
+ * canal, em ordem — as linhas em que o termo aparece numa delas.
+ */
+function linhasPelasColunasDaBusca_(canal, colunas, termo) {
+  var jaAchada = {};
   var ordemDasLinhas = [];
   var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo);
 
@@ -2481,47 +2575,13 @@ function procurarNoCanal_(canal, termo, quem) {
     }
     for (var i = 0; i < valores.length; i++) {
       var numeroDaLinha = numeros[i];
-      if (linhasQueCasam[numeroDaLinha]) continue;
+      if (jaAchada[numeroDaLinha]) continue;
       if (!casaComOTermo_(valores[i], termo, coluna.tipo)) continue;
-
-      linhasQueCasam[numeroDaLinha] = coluna.cabecalho;
+      jaAchada[numeroDaLinha] = true;
       ordemDasLinhas.push(numeroDaLinha);
     }
   });
-
-  // O alcance vem ANTES do corte: os 100 lugares são dos casos que eu posso ver.
-  ordemDasLinhas = linhasNoMeuAlcance_(canal.aba, ordemDasLinhas, quem);
-
-  if (ordemDasLinhas.length > RECC_MAXIMO_DA_BUSCA) {
-    aviso = 'A busca achou ' + ordemDasLinhas.length + ' casos e mostra os ' +
-      RECC_MAXIMO_DA_BUSCA + ' mais recentes. Um termo mais específico ' +
-      'chega mais perto.';
-    // Os mais recentes são os do fim da base, que só acrescenta no fim.
-    ordemDasLinhas = ordemDasLinhas.slice(-RECC_MAXIMO_DA_BUSCA);
-  }
-
-  // Passo 2: agora sim, ler as linhas inteiras — só essas.
-  ordemDasLinhas.sort(function (uma, outra) { return outra - uma; });
-  var registros = lerLinhasEspecificas_(canal.aba, ordemDasLinhas)
-    .filter(function (registro) {
-      // Caso ocultado não volta na busca. A linha continua na planilha, e
-      // um administrador ainda a enxerga por lá.
-      return normalizarParaComparar_(registro._Visivel) !== 'nao';
-    });
-
-  var meus = filtrarPeloAlcance_(registros, canal.aba, quem);
-
-  return {
-    tipo: 'canal',
-    id: canal.id,
-    nome: canal.nome,
-    icone: canal.icone,
-    colunas: colunasDaFila_(canal),
-    casos: montarFila_(meus.slice().reverse(), canal),
-    ondeAchou: linhasQueCasam,
-    procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
-    aviso: aviso
-  };
+  return ordemDasLinhas;
 }
 
 /** Os tipos de coluna em que o texto que a célula mostra é o próprio valor. */

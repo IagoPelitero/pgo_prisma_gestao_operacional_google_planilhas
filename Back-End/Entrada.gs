@@ -235,7 +235,7 @@ function montarPacoteDePartida_(quem) {
  * o que mudou em Evolucao/05-progresso.md.
  */
 const RECC_VERSAO = {
-  numero: '1.82',
+  numero: '1.83',
   data: '17/11/2026'
 };
 
@@ -1455,6 +1455,13 @@ function formatarData_(data, formato) {
   return texto;
 }
 
+/**
+ * A ordem dos erros DESTA execução na fila (Etapa 83). A chave era o horário
+ * em milissegundos e um sorteio: dois erros no mesmo milissegundo saíam na
+ * ordem do sorteio, e a aba ERROS podia mostrar o segundo antes do primeiro.
+ */
+var RECC_ORDEM_DO_ERRO = 0;
+
 /** Registra um erro. `origem`: 'servidor' ou 'tela'; `onde`: a função ou a tela. */
 function registrarErro_(origem, onde, mensagem, detalhe) {
   var cortar = function (texto) {
@@ -1478,7 +1485,8 @@ function registrarErro_(origem, onde, mensagem, detalhe) {
     try { usuarioId = (usuarioAtual_().usuario || {}).Id || ''; } catch (semUsuario) { usuarioId = ''; }
     var agora = new Date();
     props.setProperty(RECC_PREFIXO_DA_FILA_DOS_ERROS
-      + ('0000000000000' + agora.getTime()).slice(-13) + '.' + Math.random().toString(36).slice(2, 10),
+      + ('0000000000000' + agora.getTime()).slice(-13) + '.' + ('000' + (RECC_ORDEM_DO_ERRO++ % 10000)).slice(-4)
+      + Math.random().toString(36).slice(2, 10),
       JSON.stringify({ d: agora.getTime(), u: usuarioId, o: cortar(origem), w: cortar(onde),
         m: cortar(mensagem), t: cortar(detalhe) }));
     descarregarAFilaDosErros_(0);

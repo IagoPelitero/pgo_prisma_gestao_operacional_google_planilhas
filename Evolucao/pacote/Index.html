@@ -5274,7 +5274,8 @@ var TelaBuscarCaso = (function () {
         + '<input type="checkbox" data-canal-da-busca="' + escapar(canal.id) + '"'
         + (canaisEscolhidas[canal.id] ? ' checked' : '') + '>'
         + '<span>' + escapar(canal.nome)
-        + '<em>procura em: ' + escapar(canal.procuraEm.join(', ') || 'nada declarado')
+
+        + '<em>procura em todas as colunas de ' + escapar(canal.aba || canal.nome)
         + '</em></span></label>';
     });
 
