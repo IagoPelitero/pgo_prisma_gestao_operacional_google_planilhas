@@ -142,6 +142,7 @@ no [manual](Evolucao/07-manual-completo.md#instalação).
 | | |
 |---|---|
 | [Manual completo](Evolucao/07-manual-completo.md) | Instalação, cada tela, cada regra e o porquê |
+| [Manual de uso (apresentação)](Evolucao/manual-de-uso/README.md) | Passo a passo com as telas, para quem usa o sistema — abre no Google Apresentações |
 | [Arquitetura](Evolucao/01-arquitetura.md) | O modelo de dados e as decisões de projeto |
 | [Padrão de código](Evolucao/02-padrao-de-codigo.md) | Como os nomes são escolhidos |
 | [Manutenção](Evolucao/03-manutencao.md) | Como evoluir sem quebrar |
