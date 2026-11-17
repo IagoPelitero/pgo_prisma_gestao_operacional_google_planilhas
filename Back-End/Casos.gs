@@ -919,11 +919,40 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
   preencherColunasCalculadas_(canal.aba, paraGravar, atual);
+  manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar);
 
   atualizarRegistro_(canal.aba, alvo, paraGravar);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
+}
+
+/*
+ * A DATA QUE NÃO MUDOU DE DIA NÃO PERDE A HORA (Etapa 80).
+ *
+ * Relato do PO: "um analista respondeu o caso e fechou dentro da SLA de 6 horas,
+ * mas o Prisma duplicou o tempo que ele levou". O caminho: o diálogo de status
+ * grava a "Data da finalização" com a hora do Concluído; o formulário do
+ * "Trabalhar no caso" mostra só o dia, e ao salvar regravava o dia à meia-noite.
+ * Sem a hora, o prazo de 48 horas da Mesa contava até o fim do expediente
+ * (18:30) — um caso concluído às 15:15, que entrou às 12:00, passava de 3h15
+ * para 6h30.
+ *
+ * Aqui: data de dia inteiro (meia-noite) que é o MESMO dia do que já estava
+ * gravado com hora fica com o valor gravado. Trocou o dia, vale o novo.
+ */
+function manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  Object.keys(paraGravar).forEach(function (coluna) {
+    var posicao = posicaoDaColuna_(estrutura, coluna);
+    if (posicao < 0 || estrutura.tipos[posicao] !== RECC_TIPO_DE_DADO.DATA) return;
+    var nova = converterParaData_(paraGravar[coluna]);
+    var antiga = converterParaDataEHora_(atual[estrutura.cabecalhos[posicao]]);
+    if (!nova || !antiga) return;
+    var semHora = formatarData_(nova, 'HH:mm') === '00:00';
+    var mesmoDia = formatarData_(nova, 'yyyy-MM-dd') === formatarData_(antiga, 'yyyy-MM-dd');
+    if (semHora && mesmoDia && formatarData_(antiga, 'HH:mm') !== '00:00') paraGravar[coluna] = antiga;
+  });
 }
 
 /**

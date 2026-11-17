@@ -273,7 +273,7 @@ var TelaTabelaCorretoras = (function () {
       exportar.addEventListener('click', function () {
         Servidor.chamar('exportarCorretoras', procurar, segmento)
           .entao(abrirCaixaDeExportar)
-          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+          .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
       });
     }
 
@@ -554,7 +554,7 @@ var TelaTabelaCorretoras = (function () {
 
     Servidor.chamar('desbloquearSusep', id)
       .entao(function () { avisar('SUSEP liberada.', 'bom'); carregar(); })
-      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
   }
 
   /* ----------------------------------------------------------- importação */

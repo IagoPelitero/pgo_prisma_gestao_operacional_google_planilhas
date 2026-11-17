@@ -970,7 +970,8 @@ const RECC_TIPO_LISTA = 'LISTA';
  * inteira, não: sem ela, o cadastro de usuários, o de corretoras ou os
  * cartões do Trabalho perderiam o chão.
  */
-const RECC_LISTAS_DO_SISTEMA = ['STATUS', 'CARGO', 'DISPONIBILIDADE', 'SEGMENTO'];
+const RECC_LISTAS_DO_SISTEMA = ['STATUS', 'CARGO', 'DISPONIBILIDADE', 'SEGMENTO',
+  RECC_LISTA_DO_STATUS_DA_REUNIAO];
 
 /** Tipos da aba CATALOGO que não são listas de formulário. */
 const RECC_TIPOS_FORA_DAS_LISTAS = ['NIVEL_ACESSO', RECC_TIPO_LISTA];
@@ -1026,9 +1027,15 @@ function listasDeAjustes_() {
       + (canal ? ' (' + canal + ')' : ''));
   });
 
+  // O status da Agenda da Mesa não é campo de formulário de caso: diz onde aparece.
+  if (porChave[RECC_LISTA_DO_STATUS_DA_REUNIAO]) {
+    porChave[RECC_LISTA_DO_STATUS_DA_REUNIAO].usadaEm.push('Status da reunião (Agenda da Mesa Diamante)');
+  }
+
   return Object.keys(porChave).map(function (chave) {
     var uma = porChave[chave];
-    if (!uma.nome) uma.nome = nomeLegivelDaLista_(chave);
+    if (!uma.nome) uma.nome = chave === RECC_LISTA_DO_STATUS_DA_REUNIAO
+      ? 'Status da reunião' : nomeLegivelDaLista_(chave);
     return uma;
   }).sort(function (uma, outra) { return uma.nome.localeCompare(outra.nome, 'pt-BR'); });
 }

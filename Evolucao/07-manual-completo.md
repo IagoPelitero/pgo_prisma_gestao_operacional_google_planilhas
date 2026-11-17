@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1692 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1702 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1692 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1702 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -586,6 +586,13 @@ o prazo cheio. Na atualização, os casos que **já tinham saído** de "Não
 trabalhado" ganham a data mais antiga que a própria linha guardava (a última
 mudança de status ou o carimbo de qualquer status); quem não guardava data
 nenhuma fica sem selo, e o laudo diz quantos são.
+
+**A hora da finalização não se perde** (Etapa 80). O "Trabalhar no caso" mostra a
+"Data da finalização" só com o dia; salvar o caso não apaga mais a hora que o
+Concluído gravou. E o caso que já tinha perdido a hora — finalização à meia-noite,
+sem "horário da finalização" — conta até a hora da última mudança de status do
+mesmo dia, e não até o fim do expediente. Era isso que fazia o prazo de 48 horas
+da Mesa mostrar o dobro do tempo.
 
 **O Retido e o Status proposta.** Na RET, "Retido" é um desfecho, mas o caso só
 termina quando a proposta chega ao fim do caminho. Enquanto o Status proposta
@@ -1613,8 +1620,11 @@ cria nem reorganiza essa aba: acha os cabeçalhos pelo nome e escreve só neles.
   reunião". Data, corretora e assunto são obrigatórios.
 - **Para acompanhar:** no Trabalho, a aba "Reuniões" lista as mais recentes, com
   busca em qualquer coluna. "Abrir" edita a reunião — é ali que se marca a data
-  em que cada **report** (15, 30 e 45 dias) foi feito e se troca o status
-  (Pendente, Em andamento, Concluído, Acompanhar por 3 meses).
+  em que cada **report** (15, 30 e 45 dias) foi feito e se troca o status.
+- **O analista** é digitado (vem com o nome de quem registra). **O status** é
+  escolhido numa lista que se ajusta em Configurações › Ajustes Gerais ›
+  "Status da reunião" — de fábrica: Pendente, Em andamento, Concluído,
+  Acompanhar por 3 meses.
 - **Quem vê:** quem enxerga a Mesa Diamante. Registrar pede a permissão de criar;
   editar, a de editar.
 
@@ -1789,7 +1799,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.79** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.80** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1797,7 +1807,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1692 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1702 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

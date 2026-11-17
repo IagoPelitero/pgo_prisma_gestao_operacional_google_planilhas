@@ -670,7 +670,7 @@ var TelaTrabalho = (function () {
       Formulario.confirmarExclusao(idDoCaso, function () {
         Servidor.chamar('excluirCaso', canalEscolhido, idDoCaso)
           .entao(carregar)
-          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+          .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
       });
     });
   }

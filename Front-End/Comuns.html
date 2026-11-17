@@ -2670,7 +2670,7 @@ var CasoEmModal = (function () {
       })
       .senao(function (erro) {
         abrindoOStatus = false;
-        window.alert(erro.message || String(erro));
+        Moldura.toast(erro.message || String(erro), 'ruim');
       });
   }
 
@@ -2977,9 +2977,8 @@ var Graficos = (function () {
       + '<path d="' + caminho + '" class="linha-do-grafico"></path>'
       + marcas + rotulos + '</svg>'
       + (comBarras
-        ? '<p class="grafico-legenda-linha">As barras são o dia; a linha é a '
-          + '<strong>média dos 7 dias anteriores</strong>, na mesma escala — '
-          + 'ela mostra a tendência por cima do sobe e desce do dia a dia.</p>'
+        ? '<p class="grafico-legenda-linha">Barras: o dia. Linha: a <strong>média dos 7 dias '
+          + 'anteriores</strong>.</p>'
         : '')
       + '</div>';
   }

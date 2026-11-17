@@ -1182,8 +1182,26 @@ const RECC_CHAVE_DA_ABA_DA_AGENDA = 'AGENDA.ABA';
 /** Quantas reuniões a lista mostra de uma vez — as mais recentes. */
 const RECC_REUNIOES_NA_LISTA = 200;
 
-/** Os status de uma reunião, como o PO listou. */
+/** Os status de uma reunião, como o PO listou — os de fábrica. */
 const RECC_STATUS_DA_REUNIAO = ['Pendente', 'Em andamento', 'Concluído', 'Acompanhar por 3 meses'];
+
+/*
+ * O STATUS É UMA LISTA DE AJUSTES GERAIS (Etapa 80, pedido do PO): "criar na aba
+ * de Configurações a possibilidade de ajustar lá pelo Prisma". Os itens moram no
+ * CATALOGO, como as outras listas; a instalação traz os quatro acima.
+ */
+const RECC_LISTA_DO_STATUS_DA_REUNIAO = 'STATUS_DA_REUNIAO';
+
+/** Os status ligados, na ordem da lista — ou os de fábrica, se a lista ainda não existe. */
+function statusDaReuniao_() {
+  var itens = lerRegistros_('CATALOGO').filter(function (item) {
+    return String(item.Tipo || '').trim().toUpperCase() === RECC_LISTA_DO_STATUS_DA_REUNIAO
+      && normalizarParaComparar_(item.Ativo) === 'sim';
+  }).sort(function (um, outro) { return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0); })
+    .map(function (item) { return String(item.Nome || '').trim(); })
+    .filter(function (nome) { return nome; });
+  return itens.length ? itens : RECC_STATUS_DA_REUNIAO.slice();
+}
 
 /**
  * Os dezesseis campos, na ordem do PO. `cabecalho` é como ele escreveu; o que
@@ -1195,7 +1213,7 @@ const RECC_CAMPOS_DA_AGENDA = [
   { chave: 'gerente', cabecalho: 'gerente', rotulo: 'Gerente', tipo: 'texto' },
   { chave: 'consultor', cabecalho: 'consultor', rotulo: 'Consultor', tipo: 'texto' },
   { chave: 'corretora', cabecalho: 'corretora', rotulo: 'Corretora', tipo: 'texto', obrigatorio: true },
-  { chave: 'analista', cabecalho: 'analista', rotulo: 'Analista', tipo: 'analista' },
+  { chave: 'analista', cabecalho: 'analista', rotulo: 'Analista', tipo: 'texto' },
   { chave: 'area', cabecalho: 'área', rotulo: 'Área', tipo: 'texto' },
   { chave: 'segurado', cabecalho: 'segurado/estipulante', rotulo: 'Segurado / estipulante', tipo: 'texto' },
   { chave: 'participantes', cabecalho: 'participantes', rotulo: 'Participantes', tipo: 'texto' },
@@ -1267,20 +1285,17 @@ function celulaDaAgendaParaATela_(valor, campo) {
 
 /** O formulário da reunião: os campos, as listas e o que já vem preenchido. */
 function formularioDaAgenda_(canal, quem) {
-  // Os analistas da Mesa — e quem está registrando, mesmo que não seja dela:
-  // a coordenação também participa de reunião.
+  // O analista é digitado (Etapa 80, pedido do PO: "não deve ter campo seletor
+  // no analista, apenas em status"); já vem com o nome de quem registra.
   var meuNome = String((quem.usuario || {}).Nome || '').trim();
-  var analistas = analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
-  if (meuNome && analistas.indexOf(meuNome) < 0) analistas.push(meuNome);
+  var status = statusDaReuniao_();
   return RECC_CAMPOS_DA_AGENDA.map(function (campo) {
     return {
       chave: campo.chave, rotulo: campo.rotulo, obrigatorio: campo.obrigatorio === true,
-      tipo: campo.tipo === 'analista' || campo.tipo === 'status' ? 'lista' : campo.tipo,
-      opcoes: campo.tipo === 'analista' ? analistas
-        : (campo.tipo === 'status' ? RECC_STATUS_DA_REUNIAO.slice() : []),
+      tipo: campo.tipo === 'status' ? 'lista' : campo.tipo,
+      opcoes: campo.tipo === 'status' ? status : [],
       padrao: campo.chave === 'data' ? formatarData_(new Date(), 'dd/MM/yyyy')
-        : (campo.chave === 'analista' && analistas.indexOf(meuNome) >= 0 ? meuNome
-          : (campo.chave === 'status' ? RECC_STATUS_DA_REUNIAO[0] : ''))
+        : (campo.chave === 'analista' ? meuNome : (campo.chave === 'status' ? status[0] : ''))
     };
   });
 }

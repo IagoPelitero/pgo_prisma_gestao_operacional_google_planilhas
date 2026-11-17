@@ -1580,7 +1580,18 @@ function pontoDaFinalizacao_(registro, canal, fecha) {
   var data = converterParaDataEHora_(registro[canal.colunaDaFinalizacao]);
   if (!data) return null;
   var colunaDaHora = grafiaDaColuna_(canal.aba, RECC_COLUNA_HORA_DA_FINALIZACAO);
-  return pontoDoFim_(data, registro[colunaDaHora], fecha);
+  var hora = registro[colunaDaHora];
+  // SÓ O DIA, SEM A HORA (Etapa 80): a finalização que o formulário regravou à
+  // meia-noite, antes do conserto, contava até o fim do expediente. Vale a hora
+  // da última mudança de status quando ela é do mesmo dia — a regra da Etapa 58:
+  // "na ausência, o status concluído e o carimbo da data em que foi salvo".
+  if (minutoDaHora_(hora) === null && relogioDeParede_(data).minuto === 0) {
+    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+    if (mudou && formatarData_(mudou, 'yyyy-MM-dd') === formatarData_(data, 'yyyy-MM-dd')) {
+      return relogioDeParede_(mudou);
+    }
+  }
+  return pontoDoFim_(data, hora, fecha);
 }
 
 /**

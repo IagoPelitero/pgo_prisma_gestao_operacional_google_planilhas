@@ -68,6 +68,7 @@ const { rodarTestesDoQueAAbaErrosMostrou } = require('./testes-o-que-a-aba-erros
 const { rodarTestesDoRetidoAcumulado } = require('./testes-retido-acumulado');
 const { rodarTestesDaMudancaDeStatusAgendada } = require('./testes-mudanca-de-status-agendada');
 const { rodarTestesDaAgendaDaMesa } = require('./testes-agenda-da-mesa');
+const { rodarTestesDaHoraDaFinalizacao } = require('./testes-hora-da-finalizacao');
 
 rodarTestesDaFundacao();
 rodarTestesDeAcesso();
@@ -126,6 +127,7 @@ rodarTestesDoQueAAbaErrosMostrou();
 rodarTestesDoRetidoAcumulado();
 rodarTestesDaMudancaDeStatusAgendada();
 rodarTestesDaAgendaDaMesa();
+rodarTestesDaHoraDaFinalizacao();
 
 const { passaram, falhas } = resumo();
 console.log('\n' + '-'.repeat(60));

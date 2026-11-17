@@ -554,7 +554,11 @@ function semearDadosIniciais_(emailDoInstalador) {
     PERIODICIDADE: ['Mensal', 'Trimestral', 'Semestral', 'Anual'],
     // De onde veio a oportunidade. "Banguela" é o termo da operação para o
     // caso que vem sem origem definida — mantido como ele escreveu.
-    LEAD: ['Banguela', 'Reativação', 'Inadimplência', 'Renovação', 'Cobrança']
+    LEAD: ['Banguela', 'Reativação', 'Inadimplência', 'Renovação', 'Cobrança'],
+
+    // O status das reuniões da Agenda da Mesa (Etapa 79), como o PO listou.
+    // Ajustável em Configurações › Ajustes Gerais (Etapa 80).
+    STATUS_DA_REUNIAO: RECC_STATUS_DA_REUNIAO.slice()
   };
   Object.keys(listasGlobais).forEach(function (tipo) {
     listasGlobais[tipo].forEach(function (nome, i) {
@@ -1412,6 +1416,9 @@ function atualizarPGO() {
   // --- 6b6. a coluna "prêmio mensal retido" da RET vira "prêmio mensal" -------
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
 
+  // --- 6b7. o status da Agenda da Mesa vira lista de Ajustes Gerais (Etapa 80) --
+  feito = feito.concat(criarAListaDoStatusDaReuniao_(pulados));
+
   // --- 6b7. o valor retido é obrigatório no Retido ---------------------------
   feito = feito.concat(ligarOValorRetidoNoRetido_(pulados, paraVoce));
 
@@ -1895,6 +1902,24 @@ function criarOCarimboDoEncaminhamento_(pulados) {
  * Os casos que já existiam ficam com ela vazia — e sem prazo, de propósito:
  * inventar a data deles seria contar o prazo errado.
  */
+/**
+ * Os itens do status da reunião numa instalação em uso — só se a lista ainda
+ * não tem nenhum: quem já ajustou fica com o que ajustou.
+ */
+function criarAListaDoStatusDaReuniao_(pulados) {
+  var temItem = lerRegistros_('CATALOGO', { incluirOcultos: true }).some(function (item) {
+    return String(item.Tipo || '').trim().toUpperCase() === RECC_LISTA_DO_STATUS_DA_REUNIAO;
+  });
+  if (temItem) {
+    pulados.push('a lista do status da reunião já existe');
+    return [];
+  }
+  inserirVariosRegistros_('CATALOGO', RECC_STATUS_DA_REUNIAO.map(function (nome, i) {
+    return novoItemDeCatalogo_(RECC_LISTA_DO_STATUS_DA_REUNIAO, '', nome, i + 1);
+  }));
+  return ['lista do status da reunião criada em Ajustes Gerais (' + RECC_STATUS_DA_REUNIAO.join(', ') + ')'];
+}
+
 function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados, tipo) {
   var feito = [];
   if (!planilhaAtiva_().getSheetByName(nomeDaAba)) {

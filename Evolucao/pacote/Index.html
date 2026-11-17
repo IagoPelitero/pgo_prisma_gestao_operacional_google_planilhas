@@ -3852,7 +3852,7 @@ var CasoEmModal = (function () {
       })
       .senao(function (erro) {
         abrindoOStatus = false;
-        window.alert(erro.message || String(erro));
+        Moldura.toast(erro.message || String(erro), 'ruim');
       });
   }
 
@@ -4096,9 +4096,8 @@ var Graficos = (function () {
       + '<path d="' + caminho + '" class="linha-do-grafico"></path>'
       + marcas + rotulos + '</svg>'
       + (comBarras
-        ? '<p class="grafico-legenda-linha">As barras são o dia; a linha é a '
-          + '<strong>média dos 7 dias anteriores</strong>, na mesma escala — '
-          + 'ela mostra a tendência por cima do sobe e desce do dia a dia.</p>'
+        ? '<p class="grafico-legenda-linha">Barras: o dia. Linha: a <strong>média dos 7 dias '
+          + 'anteriores</strong>.</p>'
         : '')
       + '</div>';
   }
@@ -4887,7 +4886,7 @@ var TelaTrabalho = (function () {
       Formulario.confirmarExclusao(idDoCaso, function () {
         Servidor.chamar('excluirCaso', canalEscolhido, idDoCaso)
           .entao(carregar)
-          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+          .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
       });
     });
   }
@@ -5396,7 +5395,7 @@ var TelaBuscarCaso = (function () {
       Formulario.confirmarExclusao(caso, function () {
         Servidor.chamar('excluirCaso', canal, caso)
           .entao(procurarDeNovo)
-          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+          .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
       });
     }, 'data-excluir-achado');
   }
@@ -5665,7 +5664,7 @@ var TelaTabelaCorretoras = (function () {
       exportar.addEventListener('click', function () {
         Servidor.chamar('exportarCorretoras', procurar, segmento)
           .entao(abrirCaixaDeExportar)
-          .senao(function (erro) { window.alert(erro.message || String(erro)); });
+          .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
       });
     }
 
@@ -5926,7 +5925,7 @@ var TelaTabelaCorretoras = (function () {
 
     Servidor.chamar('desbloquearSusep', id)
       .entao(function () { avisar('SUSEP liberada.', 'bom'); carregar(); })
-      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
   }
 
   function receitaEscolhida() {
@@ -7680,8 +7679,7 @@ var TelaProdutividade = (function () {
   }
 
   function soOsMaiores(componente) {
-    return 'Só os ' + componente.pontos.length + ' maiores aparecem; a soma e as '
-      + 'porcentagens são entre eles.';
+    return 'Os ' + componente.pontos.length + ' maiores (soma e % entre eles).';
   }
 
   function ligarPainel() {
@@ -7862,7 +7860,7 @@ var TelaProdutividade = (function () {
     Servidor.chamar('exportarComponente', canalEscolhido, idDoComponente,
       filtros, periodo)
       .entao(function (arquivo) { abrirCaixaDeExportar(arquivo); })
-      .senao(function (erro) { window.alert(erro.message || String(erro)); });
+      .senao(function (erro) { Moldura.toast(erro.message || String(erro), 'ruim'); });
   }
 
   function abrirCaixaDeExportar(arquivo) {
@@ -11079,8 +11077,7 @@ var TelaConfiguracoes = (function () {
       + '<form class="config-form" id="form-cadastros">'
       + campoDeTexto('cadastrosId', 'Id da planilha de cadastros',
         cadastros.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
-        + 'precisa ter acesso a ela.')
+        'No endereço da planilha, entre /d/ e /edit.')
       + '<div class="config-campo"><span>Quais listas moram nela</span>'
       + '<div class="config-marcadores">'
       + cadastros.abas.map(function (uma) {
@@ -11179,8 +11176,7 @@ var TelaConfiguracoes = (function () {
         : 'Nenhum arquivamento feito ainda.') + '</p>'
       + '<form class="config-form" id="form-arquivo-da-auditoria">'
       + campoDeTexto('arquivoId', 'Id da planilha de arquivo', arquivo.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha, '
-        + 'e a conta que roda o sistema precisa ter acesso a ela.')
+        'No endereço da planilha, entre /d/ e /edit. Outra planilha, e não esta.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (arquivo.planilhaId
@@ -11255,7 +11251,7 @@ var TelaConfiguracoes = (function () {
         + base.ultimoQuantos + ' caso(s).' : 'Nenhum arquivamento feito ainda.') + '</p>'
       + '<form class="config-form" id="form-historico-da-base">'
       + campoDeTexto('historicoId', 'Id da planilha de histórico', base.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha.')
+        'No endereço da planilha, entre /d/ e /edit. Outra planilha, e não esta.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (base.planilhaId ? '<button type="button" class="botao vazado" id="arquivar-base-agora">'
@@ -11272,7 +11268,7 @@ var TelaConfiguracoes = (function () {
       + 'elas ficam aqui.</p>'
       + '<form class="config-form" id="form-planilha-das-analises">'
       + campoDeTexto('analisesId', 'Id da planilha das análises', base.planilhaDasAnalises,
-        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha.')
+        'No endereço da planilha, entre /d/ e /edit. Outra planilha, e não esta.')
       + '<div class="config-acoes"><button type="submit" class="botao">Salvar</button></div>'
       + '</form></div>';
   }
@@ -11374,8 +11370,7 @@ var TelaConfiguracoes = (function () {
       + 'origem a mais — em leitura, sem editar nada. Vazio desliga.</p>'
       + '<form class="config-form" id="form-legado">'
       + campoDeTexto('legadoId', 'Id da planilha', legado.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
-        + 'precisa ter acesso a ela.')
+        'No endereço da planilha, entre /d/ e /edit.')
       + campoDeTexto('legadoAba', 'Aba', legado.aba,
         'Vazio usa a primeira aba. A primeira linha é lida como cabeçalho.')
       + campoDeTexto('legadoRotulo', 'Como aparece na busca', legado.rotulo, '')
@@ -11506,7 +11501,7 @@ var TelaConfiguracoes = (function () {
 
   function mostrarErroNoPainel(erro) {
     var painel = elemento('config-painel');
-    if (!painel) return window.alert(erro.message || String(erro));
+    if (!painel) return Moldura.toast(erro.message || String(erro), 'ruim');
 
     var antigo = painel.querySelector('.config-erro');
     if (antigo) antigo.parentNode.removeChild(antigo);

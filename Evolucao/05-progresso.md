@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.79 — a última etapa entregue é a 79. A regra do número está
+**Estado geral:** versão 1.80 — a última etapa entregue é a 80. A regra do número está
 na Etapa 68.
 
 ---
@@ -4034,7 +4034,7 @@ vieram dele.
 | O que | Como ficou |
 |---|---|
 | **A aba** (`abaDaAgenda_`) | O sistema não a cria nem a altera: abre a planilha de cadastros, acha a aba "Agenda" e os dezesseis cabeçalhos pelo nome — sem acento, caixa, espaço nem pontuação, em qualquer ordem. Colunas a mais ficam como estão. Sem a segunda base ligada, sem a aba ou sem uma coluna, diz o que falta — e não "nenhuma reunião" |
-| **Os campos** | Data, gerente, consultor, corretora, analista, área, segurado/estipulante, participantes, assunto, obs, ações, chamado, status e os três reports. Obrigatórios: **Data, corretora e assunto**. O analista é uma lista (os da Mesa e quem está registrando); o status também: **Pendente, Em andamento, Concluído, Acompanhar por 3 meses**, como o PO listou. Os três reports (15, 30 e 45 dias) guardam **a data em que foram feitos** |
+| **Os campos** | Data, gerente, consultor, corretora, analista, área, segurado/estipulante, participantes, assunto, obs, ações, chamado, status e os três reports. Obrigatórios: **Data, corretora e assunto**. O analista era uma lista (na Etapa 80 virou texto); o status também: **Pendente, Em andamento, Concluído, Acompanhar por 3 meses**, como o PO listou (na Etapa 80, lista de Ajustes Gerais). Os três reports (15, 30 e 45 dias) guardam **a data em que foram feitos** |
 | **Cadastrar Caso** | Com a Mesa escolhida, duas abas: "Caso" e **"Reunião com corretor"** — o formulário da reunião, que grava na Agenda. Nos outros canais, nada muda |
 | **Trabalho** | Com a Mesa escolhida, duas abas: "Casos" e **"Reuniões"** — a lista da Agenda, as mais recentes primeiro (até 200), com a busca em qualquer coluna, "Registrar reunião" e "Abrir" para editar. Os três reports aparecem como marcas: feito, com a data, ou ainda em branco |
 | **Registrar** (`registrarReuniao`) | Uma linha nova no fim da aba; data e reports entram como data de verdade. O clique repetido não grava duas vezes (o envio único da Etapa 59) |
@@ -4057,6 +4057,39 @@ cadastro (o PO escolheu digitar o nome).
 
 20 testes novos em `testes-agenda-da-mesa.js` e dois ponta a ponta. 16 quebras de
 propósito, 16 pegas.
+
+---
+
+## Etapa 80 — O prazo da Mesa que dobrava, a Agenda ajustada e a caça a bugs
+
+Três pedidos do PO numa rodada: "a agenda da Mesa não deve ter campo seletor no
+analista, apenas em status (…) criar na aba de Configurações a possibilidade de
+ajustar lá pelo Prisma"; "vamos fazer um caça bugs, erros e functions que deixaram
+de ser usadas"; e "o sinalizador de 48 horas da Mesa está contando errado. Um
+analista respondeu o caso e fechou dentro da SLA de 6 horas, mas o Prisma duplicou
+o tempo".
+
+**O prazo da Mesa — a causa.** O diálogo de status grava a "Data da finalização"
+com a hora do Concluído. O "Trabalhar no caso" mostra esse campo só com o dia e,
+ao salvar qualquer coisa no caso, regravava o dia à **meia-noite**. Sem hora — e
+com o "horário da finalização" em branco —, o fim do prazo virava o **fim do
+expediente (18:30)**. Reproduzido: caso que entrou às 12:00 e foi concluído às
+15:15 marcava 3h15; depois de salvo pelo formulário, **6h30** — o dobro. O SLA de 6
+horas não era afetado: ele para na "Data resposta".
+
+| O que | Como ficou |
+|---|---|
+| **A data que não mudou de dia não perde a hora** (`manterAHoraDasDatasQueNaoMudaram_`) | Na edição pelo formulário, a coluna de data que volta à meia-noite do MESMO dia que já estava gravado com hora fica com o valor gravado. Trocou o dia, vale o novo |
+| **Os casos que já tinham perdido a hora** (`pontoDaFinalizacao_`) | Finalização à meia-noite e sem horário: vale a hora da última mudança de status, quando ela é do mesmo dia — a regra da Etapa 58 ("na ausência, o status concluído e o carimbo"). O horário digitado continua mandando; sem mudança no mesmo dia, segue o fim do expediente |
+| **Agenda: o analista** | Campo de texto, já preenchido com o nome de quem registra. Antes era uma lista |
+| **Agenda: o status** | Virou a lista **"Status da reunião"** em Configurações › Ajustes Gerais: incluir, renomear, desligar e reordenar pela tela. A lista em si não se exclui (é do sistema); a tela diz onde ela é usada. Os quatro de fábrica são os do PO; uma instalação em uso os ganha no `atualizarPGO()` |
+| **Erros na caixinha do navegador** | Seis telas (Trabalho, Buscar Caso, Tabela de Corretoras, Produtividade, o status pelo diálogo e Configurações) ainda mostravam o erro no `alert` cinza do navegador. Agora é o aviso do sistema, como no resto |
+| **Textos repetidos** | Na Produtividade, a legenda das barras com linha e o rodapé do "só os 5 maiores" — que se repetem em cada gráfico — ficaram com uma linha curta. Em Configurações › Estrutura, a explicação do Id da planilha aparecia cinco vezes na mesma página com três redações: ficou uma frase só, igual nas cinco |
+| **Funções sem uso** | Varridas de novo, no servidor e nas telas: nenhuma sobrou desde a limpeza da Etapa 62 |
+| **Versão** | 1.80 |
+
+7 testes novos em `testes-hora-da-finalizacao.js` e 3 em `testes-agenda-da-mesa.js`.
+11 quebras de propósito, 11 pegas — duas escaparam na primeira rodada e ganharam teste.
 
 ---
 

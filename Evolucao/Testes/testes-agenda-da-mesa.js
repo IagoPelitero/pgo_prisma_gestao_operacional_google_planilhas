@@ -133,20 +133,52 @@ function rodarTestesDaAgendaDaMesa() {
     verdadeiro(ehData(nova[13]) && nova[13].getDate() === 27, 'o report também é data');
   });
 
-  teste('o formulário já vem com a data de hoje, o status Pendente e os analistas da Mesa', () => {
+  teste('o formulário já vem com a data de hoje, o status Pendente e o nome de quem registra', () => {
     const t = preparar();
-    const operacao = t.chamar('lerRegistros_')('CATALOGO')
-      .find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação').Id;
-    t.chamar('salvarUsuario')({ nome: 'Bianca Souza', email: 'bianca@exemplo.com',
-      nivelAcessoId: operacao, canalId: t.mesa.id, ativo: true });
     const campo = (chave) => t.chamar('formularioDaReuniao')(t.mesa.id).campos.find((c) => c.chave === chave);
     const hoje = new Date();
     igual(campo('data').padrao.slice(0, 2), (hoje.getDate() < 10 ? '0' : '') + hoje.getDate());
     igual(campo('status').padrao, 'Pendente');
     igual(campo('status').opcoes.join(','), 'Pendente,Em andamento,Concluído,Acompanhar por 3 meses');
-    verdadeiro(campo('analista').opcoes.indexOf('Bianca Souza') >= 0, campo('analista').opcoes.join(','));
     igual(['data', 'corretora', 'assunto'].every((c) => campo(c).obrigatorio), true);
     igual(campo('gerente').obrigatorio, false);
+  });
+
+  teste('o analista é digitado, e não escolhido numa lista (Etapa 80)', () => {
+    const t = preparar();
+    const analista = t.chamar('formularioDaReuniao')(t.mesa.id).campos.find((c) => c.chave === 'analista');
+    igual(analista.tipo + '|' + analista.opcoes.length, 'texto|0');
+    igual(analista.padrao, String(t.chamar('usuarioAtual_()').usuario.Nome), 'já vem com quem registra');
+    t.registrar({ analista: 'Alguém de Fora da Mesa' });
+    igual(t.naPlanilha()[2][4], 'Alguém de Fora da Mesa');
+  });
+
+  teste('o status é uma lista de Ajustes Gerais: o que se muda lá aparece na Agenda (Etapa 80)', () => {
+    const t = preparar();
+    const lista = t.chamar('listasDeAjustes_()').find((l) => l.chave === 'STATUS_DA_REUNIAO');
+    igual(lista.nome, 'Status da reunião');
+    igual(lista.doSistema, true, 'a lista não se exclui; os itens, sim');
+    contem(lista.usadaEm.join(','), 'Agenda da Mesa Diamante');
+    t.chamar('salvarItemDoCatalogo')({ tipo: 'STATUS_DA_REUNIAO', nome: 'Remarcada', ordem: 5, ativo: true });
+    const pendente = t.chamar('lerRegistros_')('CATALOGO')
+      .find((i) => i.Tipo === 'STATUS_DA_REUNIAO' && i.Nome === 'Pendente');
+    t.chamar('atualizarRegistro_')('CATALOGO', pendente.__id, { Ativo: false });
+    t.chamar('esquecerCacheDaConfiguracao_()');
+    const status = t.chamar('formularioDaReuniao')(t.mesa.id).campos.find((c) => c.chave === 'status');
+    igual(status.opcoes.join(','), 'Em andamento,Concluído,Acompanhar por 3 meses,Remarcada');
+    igual(status.padrao, 'Em andamento', 'o primeiro da lista vira o padrão');
+  });
+
+  teste('instalação em uso: o atualizarPGO cria a lista só se ela ainda não existe', () => {
+    const t = preparar();
+    const itens = () => t.chamar('lerRegistros_')('CATALOGO').filter((i) => i.Tipo === 'STATUS_DA_REUNIAO');
+    const pulados = [];
+    igual(t.chamar('criarAListaDoStatusDaReuniao_')(pulados).length, 0, 'já tem: não mexe');
+    contem(pulados.join(','), 'já existe');
+    // Como uma planilha de antes da Etapa 80: sem os itens.
+    itens().forEach((i) => t.chamar('atualizarRegistro_')('CATALOGO', i.__id, { Tipo: 'OUTRA_LISTA' }));
+    contem(t.chamar('criarAListaDoStatusDaReuniao_')([]).join(','), 'lista do status da reunião criada');
+    igual(itens().map((i) => i.Nome).join(','), 'Pendente,Em andamento,Concluído,Acompanhar por 3 meses');
   });
 
   teste('recusa sem data, sem corretora ou sem assunto, e a data que não existe', () => {
@@ -269,7 +301,7 @@ function rodarTestesDaAgendaDaMesa() {
     const edicao = peca().formulario(resposta.campos, resposta.reunioes[0].valores);
     contem(edicao, 'id="agenda-data" data-agenda="data" aria-required="true" value="2026-09-10"');
     contem(edicao, '<option value="Status de antes" selected>Status de antes</option>');
-    contem(edicao, '<option value="Quem Saiu" selected>Quem Saiu</option>', 'o analista que não é mais usuário');
+    contem(edicao, 'id="agenda-analista" data-agenda="analista" value="Quem Saiu"', 'o analista, como texto');
   });
 
   teste('a lista mostra os três reports: o feito com a data, o que falta com um traço', () => {

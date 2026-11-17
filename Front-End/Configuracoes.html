@@ -3342,8 +3342,7 @@ var TelaConfiguracoes = (function () {
       + '<form class="config-form" id="form-cadastros">'
       + campoDeTexto('cadastrosId', 'Id da planilha de cadastros',
         cadastros.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
-        + 'precisa ter acesso a ela.')
+        'No endereço da planilha, entre /d/ e /edit.')
       + '<div class="config-campo"><span>Quais listas moram nela</span>'
       + '<div class="config-marcadores">'
       + cadastros.abas.map(function (uma) {
@@ -3452,8 +3451,7 @@ var TelaConfiguracoes = (function () {
         : 'Nenhum arquivamento feito ainda.') + '</p>'
       + '<form class="config-form" id="form-arquivo-da-auditoria">'
       + campoDeTexto('arquivoId', 'Id da planilha de arquivo', arquivo.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha, '
-        + 'e a conta que roda o sistema precisa ter acesso a ela.')
+        'No endereço da planilha, entre /d/ e /edit. Outra planilha, e não esta.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (arquivo.planilhaId
@@ -3534,7 +3532,7 @@ var TelaConfiguracoes = (function () {
         + base.ultimoQuantos + ' caso(s).' : 'Nenhum arquivamento feito ainda.') + '</p>'
       + '<form class="config-form" id="form-historico-da-base">'
       + campoDeTexto('historicoId', 'Id da planilha de histórico', base.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha.')
+        'No endereço da planilha, entre /d/ e /edit. Outra planilha, e não esta.')
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (base.planilhaId ? '<button type="button" class="botao vazado" id="arquivar-base-agora">'
@@ -3551,7 +3549,7 @@ var TelaConfiguracoes = (function () {
       + 'elas ficam aqui.</p>'
       + '<form class="config-form" id="form-planilha-das-analises">'
       + campoDeTexto('analisesId', 'Id da planilha das análises', base.planilhaDasAnalises,
-        'É o pedaço do endereço entre /d/ e /edit. Precisa ser OUTRA planilha.')
+        'No endereço da planilha, entre /d/ e /edit. Outra planilha, e não esta.')
       + '<div class="config-acoes"><button type="submit" class="botao">Salvar</button></div>'
       + '</form></div>';
   }
@@ -3665,8 +3663,7 @@ var TelaConfiguracoes = (function () {
       + 'origem a mais — em leitura, sem editar nada. Vazio desliga.</p>'
       + '<form class="config-form" id="form-legado">'
       + campoDeTexto('legadoId', 'Id da planilha', legado.planilhaId,
-        'É o pedaço do endereço entre /d/ e /edit. A conta que roda o sistema '
-        + 'precisa ter acesso a ela.')
+        'No endereço da planilha, entre /d/ e /edit.')
       + campoDeTexto('legadoAba', 'Aba', legado.aba,
         'Vazio usa a primeira aba. A primeira linha é lida como cabeçalho.')
       + campoDeTexto('legadoRotulo', 'Como aparece na busca', legado.rotulo, '')
@@ -3816,7 +3813,7 @@ var TelaConfiguracoes = (function () {
 
   function mostrarErroNoPainel(erro) {
     var painel = elemento('config-painel');
-    if (!painel) return window.alert(erro.message || String(erro));
+    if (!painel) return Moldura.toast(erro.message || String(erro), 'ruim');
 
     var antigo = painel.querySelector('.config-erro');
     if (antigo) antigo.parentNode.removeChild(antigo);

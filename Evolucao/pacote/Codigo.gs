@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-16 19:51
+   Gerado em 2026-11-17 12:14
    ========================================================================== */
 
 
@@ -3032,12 +3032,24 @@ const RECC_REUNIOES_NA_LISTA = 200;
 
 const RECC_STATUS_DA_REUNIAO = ['Pendente', 'Em andamento', 'Concluído', 'Acompanhar por 3 meses'];
 
+const RECC_LISTA_DO_STATUS_DA_REUNIAO = 'STATUS_DA_REUNIAO';
+
+function statusDaReuniao_() {
+  var itens = lerRegistros_('CATALOGO').filter(function (item) {
+    return String(item.Tipo || '').trim().toUpperCase() === RECC_LISTA_DO_STATUS_DA_REUNIAO
+      && normalizarParaComparar_(item.Ativo) === 'sim';
+  }).sort(function (um, outro) { return (Number(um.Ordem) || 0) - (Number(outro.Ordem) || 0); })
+    .map(function (item) { return String(item.Nome || '').trim(); })
+    .filter(function (nome) { return nome; });
+  return itens.length ? itens : RECC_STATUS_DA_REUNIAO.slice();
+}
+
 const RECC_CAMPOS_DA_AGENDA = [
   { chave: 'data', cabecalho: 'Data', rotulo: 'Data da reunião', tipo: 'data', obrigatorio: true },
   { chave: 'gerente', cabecalho: 'gerente', rotulo: 'Gerente', tipo: 'texto' },
   { chave: 'consultor', cabecalho: 'consultor', rotulo: 'Consultor', tipo: 'texto' },
   { chave: 'corretora', cabecalho: 'corretora', rotulo: 'Corretora', tipo: 'texto', obrigatorio: true },
-  { chave: 'analista', cabecalho: 'analista', rotulo: 'Analista', tipo: 'analista' },
+  { chave: 'analista', cabecalho: 'analista', rotulo: 'Analista', tipo: 'texto' },
   { chave: 'area', cabecalho: 'área', rotulo: 'Área', tipo: 'texto' },
   { chave: 'segurado', cabecalho: 'segurado/estipulante', rotulo: 'Segurado / estipulante', tipo: 'texto' },
   { chave: 'participantes', cabecalho: 'participantes', rotulo: 'Participantes', tipo: 'texto' },
@@ -3103,17 +3115,14 @@ function celulaDaAgendaParaATela_(valor, campo) {
 function formularioDaAgenda_(canal, quem) {
 
   var meuNome = String((quem.usuario || {}).Nome || '').trim();
-  var analistas = analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
-  if (meuNome && analistas.indexOf(meuNome) < 0) analistas.push(meuNome);
+  var status = statusDaReuniao_();
   return RECC_CAMPOS_DA_AGENDA.map(function (campo) {
     return {
       chave: campo.chave, rotulo: campo.rotulo, obrigatorio: campo.obrigatorio === true,
-      tipo: campo.tipo === 'analista' || campo.tipo === 'status' ? 'lista' : campo.tipo,
-      opcoes: campo.tipo === 'analista' ? analistas
-        : (campo.tipo === 'status' ? RECC_STATUS_DA_REUNIAO.slice() : []),
+      tipo: campo.tipo === 'status' ? 'lista' : campo.tipo,
+      opcoes: campo.tipo === 'status' ? status : [],
       padrao: campo.chave === 'data' ? formatarData_(new Date(), 'dd/MM/yyyy')
-        : (campo.chave === 'analista' && analistas.indexOf(meuNome) >= 0 ? meuNome
-          : (campo.chave === 'status' ? RECC_STATUS_DA_REUNIAO[0] : ''))
+        : (campo.chave === 'analista' ? meuNome : (campo.chave === 'status' ? status[0] : ''))
     };
   });
 }
@@ -3824,11 +3833,26 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   carimbarOsItensDeLista_(canal, atual, paraGravar);
 
   preencherColunasCalculadas_(canal.aba, paraGravar, atual);
+  manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar);
 
   atualizarRegistro_(canal.aba, alvo, paraGravar);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
+}
+
+function manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  Object.keys(paraGravar).forEach(function (coluna) {
+    var posicao = posicaoDaColuna_(estrutura, coluna);
+    if (posicao < 0 || estrutura.tipos[posicao] !== RECC_TIPO_DE_DADO.DATA) return;
+    var nova = converterParaData_(paraGravar[coluna]);
+    var antiga = converterParaDataEHora_(atual[estrutura.cabecalhos[posicao]]);
+    if (!nova || !antiga) return;
+    var semHora = formatarData_(nova, 'HH:mm') === '00:00';
+    var mesmoDia = formatarData_(nova, 'yyyy-MM-dd') === formatarData_(antiga, 'yyyy-MM-dd');
+    if (semHora && mesmoDia && formatarData_(antiga, 'HH:mm') !== '00:00') paraGravar[coluna] = antiga;
+  });
 }
 
 function acrescentarColunasSuas_(canal, colunasSuas, paraGravar) {
@@ -6586,7 +6610,8 @@ function quantosCasosUsam_(item) {
 
 const RECC_TIPO_LISTA = 'LISTA';
 
-const RECC_LISTAS_DO_SISTEMA = ['STATUS', 'CARGO', 'DISPONIBILIDADE', 'SEGMENTO'];
+const RECC_LISTAS_DO_SISTEMA = ['STATUS', 'CARGO', 'DISPONIBILIDADE', 'SEGMENTO',
+  RECC_LISTA_DO_STATUS_DA_REUNIAO];
 
 const RECC_TIPOS_FORA_DAS_LISTAS = ['NIVEL_ACESSO', RECC_TIPO_LISTA];
 
@@ -6635,9 +6660,14 @@ function listasDeAjustes_() {
       + (canal ? ' (' + canal + ')' : ''));
   });
 
+  if (porChave[RECC_LISTA_DO_STATUS_DA_REUNIAO]) {
+    porChave[RECC_LISTA_DO_STATUS_DA_REUNIAO].usadaEm.push('Status da reunião (Agenda da Mesa Diamante)');
+  }
+
   return Object.keys(porChave).map(function (chave) {
     var uma = porChave[chave];
-    if (!uma.nome) uma.nome = nomeLegivelDaLista_(chave);
+    if (!uma.nome) uma.nome = chave === RECC_LISTA_DO_STATUS_DA_REUNIAO
+      ? 'Status da reunião' : nomeLegivelDaLista_(chave);
     return uma;
   }).sort(function (uma, outra) { return uma.nome.localeCompare(outra.nome, 'pt-BR'); });
 }
@@ -9089,8 +9119,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.79',
-  data: '16/11/2026'
+  numero: '1.80',
+  data: '17/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -11122,7 +11152,15 @@ function pontoDaFinalizacao_(registro, canal, fecha) {
   var data = converterParaDataEHora_(registro[canal.colunaDaFinalizacao]);
   if (!data) return null;
   var colunaDaHora = grafiaDaColuna_(canal.aba, RECC_COLUNA_HORA_DA_FINALIZACAO);
-  return pontoDoFim_(data, registro[colunaDaHora], fecha);
+  var hora = registro[colunaDaHora];
+
+  if (minutoDaHora_(hora) === null && relogioDeParede_(data).minuto === 0) {
+    var mudou = converterParaDataEHora_(registro[RECC_COLUNA_QUANDO_MUDOU_O_STATUS]);
+    if (mudou && formatarData_(mudou, 'yyyy-MM-dd') === formatarData_(data, 'yyyy-MM-dd')) {
+      return relogioDeParede_(mudou);
+    }
+  }
+  return pontoDoFim_(data, hora, fecha);
 }
 
 function fechaPelaFinalizacao_(canal, situacoes) {
@@ -13794,7 +13832,9 @@ function semearDadosIniciais_(emailDoInstalador) {
 
     PERIODICIDADE: ['Mensal', 'Trimestral', 'Semestral', 'Anual'],
 
-    LEAD: ['Banguela', 'Reativação', 'Inadimplência', 'Renovação', 'Cobrança']
+    LEAD: ['Banguela', 'Reativação', 'Inadimplência', 'Renovação', 'Cobrança'],
+
+    STATUS_DA_REUNIAO: RECC_STATUS_DA_REUNIAO.slice()
   };
   Object.keys(listasGlobais).forEach(function (tipo) {
     listasGlobais[tipo].forEach(function (nome, i) {
@@ -14374,6 +14414,8 @@ function atualizarPGO() {
 
   feito = feito.concat(renomearOPremioMensalDaRet_(pulados, paraVoce));
 
+  feito = feito.concat(criarAListaDoStatusDaReuniao_(pulados));
+
   feito = feito.concat(ligarOValorRetidoNoRetido_(pulados, paraVoce));
 
   feito = feito.concat(criarAAbaDoChat_(pulados, paraVoce));
@@ -14682,6 +14724,20 @@ function criarOsSinalizadores_(pulados) {
 function criarOCarimboDoEncaminhamento_(pulados) {
   return criarUmaColunaDoSistema_('BASE_MESA', RECC_COLUNA_DATA_DO_ENCAMINHAMENTO,
     'o sistema carimba quando a área é escolhida', pulados);
+}
+
+function criarAListaDoStatusDaReuniao_(pulados) {
+  var temItem = lerRegistros_('CATALOGO', { incluirOcultos: true }).some(function (item) {
+    return String(item.Tipo || '').trim().toUpperCase() === RECC_LISTA_DO_STATUS_DA_REUNIAO;
+  });
+  if (temItem) {
+    pulados.push('a lista do status da reunião já existe');
+    return [];
+  }
+  inserirVariosRegistros_('CATALOGO', RECC_STATUS_DA_REUNIAO.map(function (nome, i) {
+    return novoItemDeCatalogo_(RECC_LISTA_DO_STATUS_DA_REUNIAO, '', nome, i + 1);
+  }));
+  return ['lista do status da reunião criada em Ajustes Gerais (' + RECC_STATUS_DA_REUNIAO.join(', ') + ')'];
 }
 
 function criarUmaColunaDoSistema_(nomeDaAba, cabecalho, oQueFaz, pulados, tipo) {
