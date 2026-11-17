@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-17 12:58
+   Gerado em 2026-11-17 17:10
    ========================================================================== */
 
 
@@ -4748,11 +4748,23 @@ function procurarNoCanal_(canal, termo, quem) {
 
   var linhasQueCasam = {};
   var ordemDasLinhas = [];
+  var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo);
 
-  colunas.forEach(function (coluna) {
-    var valores = lerColunaInteira_(canal.aba, coluna.cabecalho);
+  colunas.forEach(function (coluna, k) {
+    var numeros;
+    var valores;
+    if (candidatas[k]) {
+
+      numeros = candidatas[k];
+      var estrutura = estruturaDaAba_(canal.aba);
+      var porLinha = valoresNasLinhas_(estrutura, posicaoDaColuna_(estrutura, coluna.cabecalho), numeros);
+      valores = numeros.map(function (linha) { return porLinha[linha]; });
+    } else {
+      valores = lerColunaInteira_(canal.aba, coluna.cabecalho);
+      numeros = valores.map(function (valor, i) { return i + 2; });
+    }
     for (var i = 0; i < valores.length; i++) {
-      var numeroDaLinha = i + 2;
+      var numeroDaLinha = numeros[i];
       if (linhasQueCasam[numeroDaLinha]) continue;
       if (!casaComOTermo_(valores[i], termo, coluna.tipo)) continue;
 
@@ -4791,6 +4803,24 @@ function procurarNoCanal_(canal, termo, quem) {
     procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
     aviso: aviso
   };
+}
+
+const RECC_TIPOS_DA_BUSCA_RAPIDA = [RECC_TIPO_DE_DADO.IDENTIFICADOR, RECC_TIPO_DE_DADO.TEXTO,
+  RECC_TIPO_DE_DADO.TEXTO_LONGO];
+
+function candidatasDaBuscaNoCanal_(canal, colunas, termo) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var candidatas = colunas.map(function (coluna) {
+    if (RECC_TIPOS_DA_BUSCA_RAPIDA.indexOf(coluna.tipo) < 0) return null;
+    var ehIdentificador = coluna.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR;
+    var alvo = ehIdentificador ? apenasDigitos_(termo) : normalizarParaComparar_(termo);
+
+    if (ehIdentificador && !alvo) return [];
+    return linhasDaBuscaRapida_(estrutura, posicaoDaColuna_(estrutura, coluna.cabecalho),
+      alvo, ehIdentificador, false);
+  });
+  var achou = candidatas.some(function (linhas) { return linhas && linhas.length; });
+  return achou ? candidatas : candidatas.map(function () { return null; });
 }
 
 function procurarNoHistorico_(canal, termo, quem) {
@@ -4841,8 +4871,14 @@ function procurarNoHistoricoSemRelogio_(canal, termo, quem) {
     linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
   }
   var iId = onde[normalizarParaComparar_('Id')];
+
+  var porLinha = {};
+  blocosDeLinhas_(linhas).forEach(function (bloco) {
+    aba.getRange(bloco.inicio, 1, bloco.fim - bloco.inicio + 1, largura).getValues()
+      .forEach(function (valoresDaLinha, k) { porLinha[bloco.inicio + k] = valoresDaLinha; });
+  });
   var registros = linhas.map(function (linha) {
-    var valores = aba.getRange(linha, 1, 1, largura).getValues()[0];
+    var valores = porLinha[linha];
     var registro = { __linha: linha };
     cabecalhos.forEach(function (cabecalho, i) { if (cabecalho) registro[cabecalho] = valores[i]; });
     registro.__id = iId === undefined ? '' : converterParaIdentificador_(valores[iId]);
@@ -9119,7 +9155,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.81',
+  numero: '1.82',
   data: '17/11/2026'
 };
 

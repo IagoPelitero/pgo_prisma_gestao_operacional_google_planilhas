@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.81 — a última etapa entregue é a 81. A regra do número está
+**Estado geral:** versão 1.82 — a última etapa entregue é a 82. A regra do número está
 na Etapa 68.
 
 ---
@@ -4114,6 +4114,30 @@ desenho.
 17 testes novos em `testes-importacao-em-passos.js`; três testes antigos que
 fixavam textos e a classe do de-para foram atualizados para o texto novo.
 18 quebras de propósito, 18 pegas — uma escapou na primeira rodada e ganhou teste.
+
+---
+
+## Etapa 82 — O Buscar Caso sem ler a coluna inteira
+
+O PO mandou a aba ERROS de 11 a 17/11: 834 linhas, **nenhum erro de código** — todas de
+lentidão, e 19 vezes o servidor sem responder a tempo. Metade era o Buscar Caso: 245 buscas
+lentas (mediana 11 s), e o cronômetro da Etapa 76 apontou as duas causas. Aprovado: "Pode
+fazer A e B".
+
+| O que | Como ficou |
+|---|---|
+| **A. O histórico em blocos** | As linhas achadas no histórico (Etapa 66) eram lidas **uma por vez**, na planilha de fora: até 100 idas. Era o "20 a 45 s procurando". Agora vão em blocos (`blocosDeLinhas_`), como a base própria já fazia |
+| **B. O localizador na base própria** | Toda busca lia as colunas de busca inteiras nos canais — ~7,6 s "lendo a planilha" em cada uma. Agora o localizador do Sheets aponta as linhas candidatas por coluna (`candidatasDaBuscaNoCanal_`), e `casaComOTermo_`, a regra de sempre, confere só essas |
+| **O que continua lendo a coluna** | A coluna de data, hora, número ou dinheiro (o texto mostrado não é o valor comparado); o localizador desligado (`OPERACAO.BUSCA_RAPIDA` = NAO) ou com falha; e o canal em que ele **não acha nada** — "nada encontrado" nunca depende só dele |
+| **Não mudou** | O que a busca acha: os mesmos casos, na mesma ordem, com o mesmo aviso dos 100 — provado termo a termo com e sem o localizador |
+| **Fora do alcance** | O pico de 1.226 s (11/11, 14:58) foi "1.214,9 s no resto": o servidor do Google parado no meio. O Trabalho e o salvar (~9 s) são leitura de planilha que cresce com a base: sem ganho grande e seguro agora. 10 linhas da aba vieram em branco |
+| **Versão** | 1.82 |
+
+Medida no `estresse.js` (30 mil casos): achar pelo protocolo passou de 150.128 para 129 células
+lidas; pelo nome, de 150.167 para 174; o termo que casa com milhares, de 155.114 para 35.114.
+O termo que não existe continua lendo as colunas (150.014), de propósito.
+
+10 testes novos em `testes-busca-com-localizador.js`. 10 quebras de propósito, 10 pegas.
 
 ---
 

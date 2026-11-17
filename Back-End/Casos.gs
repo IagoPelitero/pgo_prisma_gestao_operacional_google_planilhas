@@ -2460,15 +2460,27 @@ function procurarNoCanal_(canal, termo, quem) {
     };
   }
 
-  // Passo 1: ler só as colunas de busca, e anotar em QUAIS linhas o termo
-  // aparece. É aqui que a tela não estoura numa base grande.
+  // Passo 1: anotar em QUAIS linhas o termo aparece, coluna de busca por
+  // coluna de busca. É aqui que a tela não estoura numa base grande.
   var linhasQueCasam = {};
   var ordemDasLinhas = [];
+  var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo);
 
-  colunas.forEach(function (coluna) {
-    var valores = lerColunaInteira_(canal.aba, coluna.cabecalho);
+  colunas.forEach(function (coluna, k) {
+    var numeros;
+    var valores;
+    if (candidatas[k]) {
+      // O localizador apontou as linhas; a regra de sempre confere o valor.
+      numeros = candidatas[k];
+      var estrutura = estruturaDaAba_(canal.aba);
+      var porLinha = valoresNasLinhas_(estrutura, posicaoDaColuna_(estrutura, coluna.cabecalho), numeros);
+      valores = numeros.map(function (linha) { return porLinha[linha]; });
+    } else {
+      valores = lerColunaInteira_(canal.aba, coluna.cabecalho);
+      numeros = valores.map(function (valor, i) { return i + 2; });   // a linha 1 é o cabeçalho
+    }
     for (var i = 0; i < valores.length; i++) {
-      var numeroDaLinha = i + 2;   // a linha 1 é o cabeçalho
+      var numeroDaLinha = numeros[i];
       if (linhasQueCasam[numeroDaLinha]) continue;
       if (!casaComOTermo_(valores[i], termo, coluna.tipo)) continue;
 
@@ -2510,6 +2522,43 @@ function procurarNoCanal_(canal, termo, quem) {
     procurouEm: colunas.map(function (coluna) { return coluna.cabecalho; }),
     aviso: aviso
   };
+}
+
+/** Os tipos de coluna em que o texto que a célula mostra é o próprio valor. */
+const RECC_TIPOS_DA_BUSCA_RAPIDA = [RECC_TIPO_DE_DADO.IDENTIFICADOR, RECC_TIPO_DE_DADO.TEXTO,
+  RECC_TIPO_DE_DADO.TEXTO_LONGO];
+
+/**
+ * As linhas candidatas de cada coluna de busca, pelo localizador do Sheets
+ * (Etapa 82) — ou null na coluna que deve ser lida inteira, como antes.
+ *
+ * Na aba ERROS do PO, toda busca gastava ~7,6 s só lendo as colunas de busca
+ * inteiras, nos canais todos. O localizador (o mesmo da Etapa 63 e da busca
+ * da fila) procura do lado do Google e devolve só as linhas que batem; quem
+ * chamou ainda confere cada uma com casaComOTermo_, a regra de sempre.
+ *
+ * Lê a coluna inteira, como antes:
+ *   - a coluna de data, hora, número ou dinheiro: o texto que a célula mostra
+ *     não é o valor que a regra compara;
+ *   - quando o localizador está desligado (OPERACAO.BUSCA_RAPIDA = NAO), falha
+ *     ou o termo não cabe na expressão;
+ *   - quando ele não acha NADA em nenhuma coluna do canal. "Nada encontrado"
+ *     nunca depende só dele: uma célula que mostra o número de outro jeito
+ *     ainda é achada pela leitura.
+ */
+function candidatasDaBuscaNoCanal_(canal, colunas, termo) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var candidatas = colunas.map(function (coluna) {
+    if (RECC_TIPOS_DA_BUSCA_RAPIDA.indexOf(coluna.tipo) < 0) return null;
+    var ehIdentificador = coluna.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR;
+    var alvo = ehIdentificador ? apenasDigitos_(termo) : normalizarParaComparar_(termo);
+    // Identificador sem dígito nenhum no termo nunca casa (casaComOTermo_).
+    if (ehIdentificador && !alvo) return [];
+    return linhasDaBuscaRapida_(estrutura, posicaoDaColuna_(estrutura, coluna.cabecalho),
+      alvo, ehIdentificador, false);
+  });
+  var achou = candidatas.some(function (linhas) { return linhas && linhas.length; });
+  return achou ? candidatas : candidatas.map(function () { return null; });
 }
 
 /**
@@ -2566,8 +2615,16 @@ function procurarNoHistoricoSemRelogio_(canal, termo, quem) {
     linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
   }
   var iId = onde[normalizarParaComparar_('Id')];
+  // As linhas achadas, lidas em BLOCOS (Etapa 82), como na base própria
+  // (lerLinhasEspecificas_). Uma ida por linha, numa planilha de fora, eram
+  // até 100 idas: na aba ERROS do PO, buscas de 20 a 45 s "procurando".
+  var porLinha = {};
+  blocosDeLinhas_(linhas).forEach(function (bloco) {
+    aba.getRange(bloco.inicio, 1, bloco.fim - bloco.inicio + 1, largura).getValues()
+      .forEach(function (valoresDaLinha, k) { porLinha[bloco.inicio + k] = valoresDaLinha; });
+  });
   var registros = linhas.map(function (linha) {
-    var valores = aba.getRange(linha, 1, 1, largura).getValues()[0];
+    var valores = porLinha[linha];
     var registro = { __linha: linha };
     cabecalhos.forEach(function (cabecalho, i) { if (cabecalho) registro[cabecalho] = valores[i]; });
     registro.__id = iId === undefined ? '' : converterParaIdentificador_(valores[iId]);
