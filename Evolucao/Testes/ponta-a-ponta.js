@@ -1166,7 +1166,8 @@ async function rodar() {
     if (await pagina.locator('#dialogo-aviso').count()) await pagina.click('#confirmar-aviso');
 
     await pagina.waitForSelector('#agendar-dias', { timeout: 10000 });
-    contem(await pagina.textContent('#importacao'), 'Em branco, nada é agendado');
+    contem(await pagina.textContent('#importacao'), 'Com 7 dias, o lote importado no dia 1 muda no dia 8.');
+    contem(await pagina.getAttribute('#agendar-dias', 'placeholder'), 'em branco: não agenda');
     await pagina.fill('#agendar-dias', '7');
     await pagina.locator('#agendar-dias').dispatchEvent('change');
     await pagina.waitForFunction(() => /Escolha para qual status/.test(document.getElementById('importacao').textContent),
@@ -1175,7 +1176,7 @@ async function rodar() {
     const destinos = await pagina.$$eval('#agendar-para option', (os) => os.map((o) => o.value));
     verdadeiro(destinos.indexOf('Retido') < 0 && destinos.indexOf('Pendente') < 0, destinos.join(' | '));
     await pagina.selectOption('#agendar-para', '1º contato realizado');
-    await pagina.waitForFunction(() => /mudam sozinhos para/.test(document.getElementById('importacao').textContent),
+    await pagina.waitForFunction(() => /muda sozinho para/.test(document.getElementById('importacao').textContent),
       null, { timeout: 10000 });
     igual(await pagina.inputValue('#agendar-dias'), '7', 'o número digitado continua lá');
 

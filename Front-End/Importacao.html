@@ -115,11 +115,37 @@ var TelaImportacao = (function () {
 
   /* -------------------------------------------------------------- desenho */
 
+  /*
+    A TELA EM PASSOS (Etapa 81, proposta aprovada pelo PO: "hoje os textos ficam
+    juntos e bagunçados (…) precisa ser mais didático"). No alto, os quatro
+    passos e onde a pessoa está. Cada passo num cartão; as opções do lote em
+    quadros, cada um com uma linha de explicação; e no pé, uma faixa que diz o
+    que vai acontecer, ao lado do botão de importar. Nada muda no que a
+    importação faz.
+  */
   function desenhar() {
-    elemento('importacao').innerHTML = resultado
-      ? desenharResultado()
-      : (desenharFonte() + (laudo ? desenharLaudo() : ''));
+    elemento('importacao').innerHTML = desenharPassos()
+      + (resultado
+        ? desenharResultado()
+        : (laudo ? desenharFonteConferida() + desenharLaudo() : desenharFonte()));
     ligar();
+  }
+
+  function desenharPassos() {
+    var onde = resultado ? 5 : (laudo ? 2 : 1);
+    return '<ol class="imp-passos" aria-label="Passos da importação">'
+      + ['De onde vêm', 'Conferir as colunas', 'Opções do lote', 'Importar'].map(function (nome, i) {
+        var numero = i + 1;
+        var estado = numero < onde ? 'feito' : (numero === onde ? 'atual' : '');
+        return '<li class="imp-passo ' + estado + '"' + (estado === 'atual' ? ' aria-current="step"' : '')
+          + '><b>' + (estado === 'feito' ? '✓' : numero) + '</b>' + nome + '</li>';
+      }).join('') + '</ol>';
+  }
+
+  /** O título de um cartão, com o número do passo. */
+  function tituloDoPasso(numero, texto, aDireita) {
+    return '<header class="imp-cabeca"><h3><i>' + numero + '</i>' + texto + '</h3>'
+      + (aDireita || '') + '</header>';
   }
 
   /** Passo 1: de onde vem o dado. */
@@ -127,17 +153,15 @@ var TelaImportacao = (function () {
     var colado = fonte.tipo === 'colado';
 
     return escolhaDoQueImportar()
-      + '<section class="cartaa importação-passo">'
-      + '<header class="grafico-cabeca"><h3>1. De onde vêm os ' + oQue(true) + '</h3></header>'
+      + '<section class="imp-cartao">'
+      + tituloDoPasso(1, 'De onde vêm os ' + oQue(true))
       + (ehChat() && opcoes.abaExiste === false
         ? '<p class="aviso-janela">A aba ATENDIMENTOS_CHAT ainda não existe nesta planilha. '
           + 'Rode atualizarPGO() no editor do Apps Script antes de importar.</p>' : '')
       + (ehChat()
-        ? '<p class="config-dica">Uma linha por atendimento. São obrigatórias a <strong>data'
-          + '</strong> e o <strong>analista</strong>; SUSEP, corretora, assunto, consultor, '
-          + 'vida individual ou em grupo, sucursal, tabulação, sub assunto e TMO (em segundos, '
-          + 'como 1.152) são opcionais — o que a origem não trouxer fica em branco. A linha igual a uma que já entrou é '
-          + 'pulada — importar a mesma planilha de novo não conta em dobro.</p>' : '')
+        ? '<p class="imp-sub">Uma linha por atendimento. Obrigatórias: <strong>data</strong> e '
+          + '<strong>analista</strong>. As outras colunas são opcionais, e a linha que já entrou é pulada.</p>'
+        : '')
       + '<div class="config-abas">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
       + ' data-fonte="colado">Colar da planilha</button>'
@@ -145,12 +169,23 @@ var TelaImportacao = (function () {
       + ' data-fonte="planilha">Ler outra planilha pelo link</button>'
       + '</div>'
       + (colado ? desenharColar() : desenharLink())
-      + '<p class="config-dica">A primeira linha tem de ser a dos NOMES das '
-      + 'colunas. É por ela que o sistema descobre para onde cada coluna vai. '
-      + 'Até ' + opcoes.limite + ' linhas por vez.</p>'
+      + '<ul class="imp-dicas"><li>A primeira linha é a dos <strong>nomes das colunas</strong></li>'
+      + '<li>Até ' + opcoes.limite + ' linhas por vez</li><li>Nada é gravado antes de você conferir</li></ul>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="conferir-importacao">'
       + 'Conferir antes de importar</button></div>'
+      + '</section>';
+  }
+
+  /** Passo 1 já feito: uma linha só, com "trocar" para voltar. */
+  function desenharFonteConferida() {
+    var deOnde = fonte.tipo === 'colado' ? 'Colado da planilha'
+      : 'Outra planilha' + (fonte.aba ? ', aba ' + escapar(fonte.aba) : '');
+    return '<section class="imp-cartao imp-feito">'
+      + tituloDoPasso(1, 'De onde vêm os ' + oQue(true), '<span class="imp-etiqueta ok">'
+        + laudo.linhasNaFonte + ' linha(s) · ' + laudo.dePara.length + ' coluna(s)</span>')
+      + '<p class="imp-sub">' + deOnde + ' · '
+      + '<button type="button" class="botao-texto" id="recomecar-do-laudo">trocar</button></p>'
       + '</section>';
   }
 
@@ -180,48 +215,73 @@ var TelaImportacao = (function () {
       + '<input type="text" id="planilha-aba" value="' + escapar(fonte.aba) + '"'
       + ' placeholder="em branco = a primeira aba"></label>'
       + '</div>'
-      + '<p class="config-dica">A conta que abre o PGO precisa ter acesso a essa '
-      + 'planilha. Se não tiver, o sistema diz isso em vez de importar pela metade.</p>';
+      + '<p class="imp-sub">A conta que abre o PGO precisa ter acesso a essa planilha.</p>';
   }
 
-  /** Passo 2: o laudo, que é a razão de a tela existir. */
+  /** Passos 2 e 3, e a faixa do pé. */
   function desenharLaudo() {
-    return '<section class="cartaa importação-passo">'
-      + '<header class="grafico-cabeca"><h3>2. Confira antes de gravar</h3></header>'
+    return '<section class="imp-cartao">'
+      + tituloDoPasso(2, 'Confira antes de gravar')
+      + '<p class="imp-sub">O sistema leu a primeira linha e ligou cada coluna da sua planilha a '
+      + 'uma coluna do canal. Ajuste o que estiver errado.</p>'
       + desenharContagem()
       + desenharDePara()
       + desenharAmostra()
+      + '</section>'
+      + '<section class="imp-cartao">'
+      + tituloDoPasso(3, ehChat() ? 'O lote' : 'Opções do lote')
+      + '<p class="imp-sub">Tudo aqui vale para todos os ' + oQue(true) + ' deste arquivo.</p>'
       + desenharDestino()
-      + '<div class="config-acoes">'
+      + '</section>'
+      + desenharBarra();
+  }
+
+  /** A faixa do pé: o que vai acontecer, e o botão. */
+  function desenharBarra() {
+    return '<div class="imp-barra">'
+      + '<div class="imp-barra-texto"><strong>' + laudo.vaoEntrar + ' ' + oQue(laudo.vaoEntrar !== 1)
+      + ' ' + (laudo.vaoEntrar === 1 ? 'vai' : 'vão') + ' entrar' + (opcoes.canal
+        ? ' em ' + escapar(opcoes.canal.nome) : '') + '</strong>'
+      + '<small id="imp-resumo-do-lote">' + escapar(resumoDoLote()) + '</small></div>'
+      + '<div class="imp-barra-botoes">'
+      + '<button type="button" class="botao vazado" id="recomecar-da-barra">Recomeçar</button>'
       + '<button type="button" class="botao" id="importar-agora"'
       + (laudo.vaoEntrar ? '' : ' disabled') + '>'
-      + 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)</button>'
-      + '<button type="button" class="botao vazado" id="recomecar-do-laudo">'
-      + 'Recomeçar</button></div>'
-      + '</section>';
+      + 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)</button></div></div>';
+  }
+
+  /** "Divididos entre Ana e Diego · status Não trabalhado · muda sozinho em 24/11/2026". */
+  function resumoDoLote() {
+    if (ehChat()) return nomeDoLote ? 'Lote "' + nomeDoLote + '"' : 'Dê um nome ao lote antes de importar.';
+    var marcados = Object.keys(analistasMarcados).filter(function (nome) { return analistasMarcados[nome]; });
+    var partes = [marcados.length ? 'Divididos entre ' + marcados.join(', ')
+      : 'Sem divisão: fica o analista que vier na planilha'];
+    if ((opcoes.statusDoCanal || []).length) {
+      partes.push(statusQueVale() ? 'status ' + statusQueVale() : 'sem status');
+    }
+    var dias = Number(agendarDias);
+    if (agendarDias !== '' && dias >= 1 && agendarPara) partes.push('muda sozinho em ' + diaDaqui(dias));
+    return partes.join(' · ');
+  }
+
+  function atualizarResumoDoLote() {
+    var caixa = elemento('imp-resumo-do-lote');
+    if (caixa) caixa.textContent = resumoDoLote();
   }
 
   function desenharContagem() {
-    var pulados = laudo.vaoSerPuladas
-      ? '<div class="indicador tom-atencao" title="'
-        + laudo.motivosParaPular.vazia + ' em branco, '
-        + laudo.motivosParaPular.repetida + ' repetidas">'
-        + '<span class="rotulo">Vão ser puladas'
-        + '</span><strong class="numero">' + laudo.vaoSerPuladas + '</strong>'
-        + '</div>'
-      : '';
-
-    return '<div class="cartoes">'
-      + '<div class="indicador tom-neutro"><span class="rotulo">Linhas na origem'
-      + '</span><strong class="numero">' + laudo.linhasNaFonte + '</strong></div>'
-      + '<div class="indicador tom-bom"><span class="rotulo">Vão entrar</span>'
-      + '<strong class="numero">' + laudo.vaoEntrar + '</strong></div>'
-      + pulados
+    return '<div class="imp-numeros">'
+      + '<div class="imp-numero"><span>Linhas na origem</span><strong>' + laudo.linhasNaFonte + '</strong></div>'
+      + '<div class="imp-numero bom"><span>Vão entrar</span><strong>' + laudo.vaoEntrar + '</strong></div>'
+      + (laudo.vaoSerPuladas
+        ? '<div class="imp-numero atencao" title="' + laudo.motivosParaPular.vazia + ' em branco, '
+          + laudo.motivosParaPular.repetida + ' repetidas"><span>Ficam de fora</span><strong>'
+          + laudo.vaoSerPuladas + '</strong></div>' : '')
       + (laudo.premios || []).map(function (premio) {
-        return '<div class="indicador tom-neutro" title="Soma da coluna &quot;'
-          + escapar(premio.coluna) + '&quot; dos ' + premio.casos + ' caso(s) que vão entrar e '
-          + 'trazem o valor"><span class="rotulo">' + escapar(premio.rotulo) + ' importado'
-          + '</span><strong class="numero">' + emReais(premio.total) + '</strong></div>';
+        return '<div class="imp-numero" title="Soma da coluna &quot;' + escapar(premio.coluna)
+          + '&quot; dos ' + premio.casos + ' caso(s) que vão entrar e trazem o valor"><span>'
+          + escapar(premio.rotulo) + ' importado' + '</span><strong>' + emReais(premio.total)
+          + '</strong></div>';
       }).join('')
       + '</div>'
       + porQueRepetem(laudo.motivosParaPular, 'vão ficar de fora')
@@ -230,6 +290,13 @@ var TelaImportacao = (function () {
           + 'limite é ' + laudo.limite + '. Divida em levas: se o mapeamento '
           + 'estiver errado, o estrago é menor.</p>'
         : '');
+  }
+
+  /** A etiqueta ao lado de cada coluna: se ela entra, e para onde. */
+  function etiquetaDaColuna(par) {
+    return par.paraAColuna
+      ? '<span class="imp-etiqueta ok">' + (par.lembrado ? 'como na última importação' : 'ligada') + '</span>'
+      : '<span class="imp-etiqueta fora">não entra</span>';
   }
 
   /**
@@ -243,27 +310,25 @@ var TelaImportacao = (function () {
   function desenharDePara() {
     var atual = deParaEscolhido || laudo.dePara;
 
-    return '<h4 class="importacao-titulo">Para onde vai cada coluna</h4>'
-      + '<table class="fila importacao-depara"><thead><tr>'
-      + '<th>Na planilha de origem</th><th>Vai para esta coluna do canal</th>'
+    return '<table class="fila importacao-depara"><thead><tr>'
+      + '<th>Na sua planilha</th><th aria-hidden="true"></th><th>Vai para</th><th></th>'
       + '</tr></thead><tbody>'
       + atual.map(function (par, i) {
-        return '<tr><td><code>' + escapar(par.daFonte || '(sem nome)') + '</code></td>'
-          + '<td><input type="search" class="filtro procurar-coluna" data-procurar-coluna="' + i + '"'
-          + ' placeholder="Digite para procurar a coluna" aria-label="Procurar a coluna para '
-          + escapar(par.daFonte || '(sem nome)') + '">'
-          + '<select class="filtro" data-depara="' + i + '">'
+        return '<tr><td>' + escapar(par.daFonte || '(sem nome)') + '</td>'
+          + '<td class="imp-seta" aria-hidden="true">→</td>'
+          + '<td><div class="imp-escolha"><select class="filtro" data-depara="' + i + '"'
+          + ' aria-label="Para onde vai ' + escapar(par.daFonte || '(sem nome)') + '">'
           + opcoesDeColuna(par.paraAColuna, '') + '</select>'
-          + (par.lembrado ? '<span class="config-dica">como na última importação</span>' : '')
-          + '</td></tr>';
+          + '<input type="search" class="filtro procurar-coluna" data-procurar-coluna="' + i + '"'
+          + ' placeholder="procurar…" aria-label="Procurar a coluna para '
+          + escapar(par.daFonte || '(sem nome)') + '"></div></td>'
+          + '<td data-etiqueta-da-coluna="' + i + '">' + etiquetaDaColuna(par) + '</td></tr>';
       }).join('')
       + '</tbody></table>'
       + (algumCarimboEscolhido(atual)
-        ? '<p class="config-dica aviso-de-carimbo">Você apontou a origem para '
-          + 'uma coluna de <strong>controle de produtividade</strong>. É o certo '
-          + 'quando a base antiga guarda a data de verdade do contato — e é '
-          + 'assim que esses casos passam a contar em "Já contatados". Confira '
-          + 'nas três linhas traduzidas abaixo se a data chegou certa.</p>'
+        ? '<p class="config-dica aviso-de-carimbo">Uma coluna foi ligada a um <strong>controle de '
+          + 'produtividade</strong> (carimbo de status). É o certo quando a base antiga guarda a '
+          + 'data de verdade do contato. Confira nas primeiras linhas, logo abaixo.</p>'
         : '');
   }
 
@@ -307,7 +372,7 @@ var TelaImportacao = (function () {
   }
 
   /**
-   * As primeiras linhas JÁ TRADUZIDAS.
+   * As primeiras linhas JÁ TRADUZIDAS — recolhidas, para abrir quando quiser.
    *
    * É o único lugar da tela em que um mapeamento trocado aparece. O cabeçalho
    * "CPF" apontando para a coluna "telefones de contato" parece certo na tabela
@@ -315,8 +380,8 @@ var TelaImportacao = (function () {
    */
   function desenharAmostra() {
     if (!laudo.amostra.length) {
-      return '<p class="config-dica">Nenhuma linha entraria, então não há o que '
-        + 'mostrar. Confira o de-para acima.</p>';
+      return '<p class="imp-sub">Nenhuma linha entraria, então não há o que '
+        + 'mostrar. Confira as colunas acima.</p>';
     }
 
     var colunas = [];
@@ -326,7 +391,9 @@ var TelaImportacao = (function () {
       });
     });
 
-    return '<h4 class="importacao-titulo">As primeiras linhas, como vão ficar</h4>'
+    return '<details class="imp-amostra"' + (algumCarimboEscolhido(deParaEscolhido || laudo.dePara)
+      ? ' open' : '') + '><summary>Ver as ' + laudo.amostra.length
+      + ' primeiras linhas como vão ficar</summary>'
       + '<div class="rolagem-tabela"><table class="fila"><thead><tr>'
       + colunas.map(function (c) { return '<th>' + escapar(c) + '</th>'; }).join('')
       + '</tr></thead><tbody>'
@@ -336,89 +403,82 @@ var TelaImportacao = (function () {
             + '</td>';
         }).join('') + '</tr>';
       }).join('')
-      + '</tbody></table></div>';
+      + '</tbody></table></div></details>';
+  }
+
+  /** Um quadro das opções do lote: o nome, o controle e uma linha de explicação. */
+  function quadro(titulo, controle, explicacao, largo) {
+    return '<div class="imp-quadro' + (largo ? ' largo' : '') + '"><strong>' + titulo + '</strong>'
+      + controle + (explicacao ? '<small>' + explicacao + '</small>' : '') + '</div>';
   }
 
   /**
-   * No chat, o destino é só o nome do lote — não há analista a dividir, nem
-   * status. E o laudo diz o que impediria a soma de juntar certo: a coluna
-   * obrigatória que faltou ligar e o analista que o cadastro não conhece.
+   * No chat, o lote é só o nome — não há analista a dividir, nem status. E o
+   * laudo diz o que impediria a soma de juntar certo: a coluna obrigatória que
+   * faltou ligar e o analista que o cadastro não conhece.
    */
   function desenharDestinoDoChat() {
     return (laudo.faltando && laudo.faltando.length
-      ? '<p class="aviso-janela">Ligue no de-para acima a coluna de: <strong>'
+      ? '<p class="aviso-janela">Ligue nas colunas acima a de: <strong>'
         + escapar(laudo.faltando.join(' e ')) + '</strong>. Sem a data não há como recortar '
         + 'o período, e sem o analista não há de quem somar.</p>' : '')
       + (laudo.analistasDesconhecidos && laudo.analistasDesconhecidos.length
-        ? '<p class="config-dica aviso-de-carimbo">Estes nomes não estão no cadastro de usuários: '
+        ? '<p class="config-dica aviso-de-carimbo">Fora do cadastro de usuários: '
           + '<strong>' + escapar(laudo.analistasDesconhecidos.slice(0, 10).join(', ')) + '</strong>'
           + (laudo.analistasDesconhecidos.length > 10
             ? ' e mais ' + (laudo.analistasDesconhecidos.length - 10) : '')
-          + '. Eles entram, mas no gráfico "Atendidos por analista" aparecem separados de quem '
-          + 'tem o nome cadastrado. Se for a mesma pessoa escrita de outro jeito, acerte o nome '
-          + 'na planilha de origem antes de importar.</p>' : '')
+          + '. Entram, mas aparecem separados de quem tem o nome cadastrado. Se for a mesma '
+          + 'pessoa escrita de outro jeito, acerte o nome na planilha antes.</p>' : '')
       + (laudo.semDataOuAnalista
-        ? '<p class="config-dica">' + laudo.semDataOuAnalista + ' linha(s) sem data ou sem '
+        ? '<p class="imp-sub">' + laudo.semDataOuAnalista + ' linha(s) sem data ou sem '
           + 'analista ficam de fora.</p>' : '')
       + (laudo.tmoQueNaoENumero
         ? '<p class="config-dica aviso-de-carimbo">' + laudo.tmoQueNaoENumero + ' linha(s) '
-          + 'com um TMO que não é número (em segundos, como 1.152). Elas entram, com o TMO em '
-          + 'branco para você preencher.</p>' : '')
-      + '<h4 class="importacao-titulo">Como se chama o lote</h4>'
-      + '<div class="grade">' + caixaDoNomeDoLote('Chat de outubro') + '</div>';
+          + 'com um TMO que não é número (em segundos, como 1.152). Entram com o TMO em branco.</p>' : '')
+      + '<div class="imp-quadros">' + quadro('Nome do lote', caixaDoNomeDoLote('Chat de outubro'),
+        'Separa este lote dos outros na Produtividade.', true) + '</div>';
   }
 
   /** A caixa do nome do lote, com os lotes já usados — a mesma nos dois destinos. */
   function caixaDoNomeDoLote(exemplo) {
-    return '<label class="campo largura-2"><span>Nome do lote</span>'
-      + '<input type="text" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
-      + ' placeholder="' + escapar(exemplo) + '"'
+    return '<input type="text" class="filtro" id="nome-do-lote" value="' + escapar(nomeDoLote) + '"'
+      + ' placeholder="' + escapar(exemplo) + '" aria-label="Nome do lote"'
       + (opcoes.lotes.length ? ' list="lotes-ja-usados"' : '') + '>'
       + (opcoes.lotes.length
         ? '<datalist id="lotes-ja-usados">' + opcoes.lotes.map(function (lote) {
           return '<option value="' + escapar(lote.origem) + '"></option>';
         }).join('') + '</datalist>'
-        : '')
-      + '</label>';
+        : '');
   }
 
-  /** Nome do lote, para quem vai, e o que não repetir. */
+  /** As opções do lote, cada uma no seu quadro. */
   function desenharDestino() {
     if (ehChat()) return desenharDestinoDoChat();
-    return '<h4 class="importacao-titulo">De quem são, e como se chama o lote</h4>'
-      + '<div class="grade">'
-      + caixaDoNomeDoLote('Base de inadimplentes Vida Presente')
-      + '<label class="campo"><span>Não repetir o que já entrou, comparando por</span>'
-      + '<select class="filtro" id="coluna-que-identifica">'
-      + ['<option value="">— trazer tudo, mesmo repetido —</option>']
-        // Pedido do PO para a RET: a mesma proposta no mesmo mês não entra na
-        // divisão. Vem marcada; trocar ou desmarcar continua na mão de quem
-        // importa.
-        .concat(opcoes.repeticaoPelaProposta
-          ? ['<option value="@PROPOSTA_NO_MES"'
-            + (colunaQueIdentifica === '@PROPOSTA_NO_MES' ? ' selected' : '')
-            + '>Proposta no mesmo mês</option>']
-          : [])
-        .concat(opcoes.colunasDoCanal.map(function (coluna) {
-          return '<option value="' + escapar(coluna) + '"'
-            + (colunaQueIdentifica === coluna ? ' selected' : '') + '>'
-            + escapar(coluna) + '</option>';
-        })).join('')
-      + '</select></label>'
-      + '</div>'
-      + '<p class="config-dica">A base é atualizada toda semana e boa parte dela '
-      + 'repete. Escolhendo uma coluna que identifica o caso — o CPF, o número da '
-      + 'proposta — o que já está dentro é pulado, e o laudo diz quantos.'
-      + (opcoes.repeticaoPelaProposta
-        ? ' Aqui já vem marcada a <strong>proposta no mesmo mês</strong>: a mesma '
-          + 'proposta (código e número), já cadastrada no mês do caso ou repetida '
-          + 'no arquivo, não entra na divisão.'
-        : '')
-      + '</p>'
+    return '<div class="imp-quadros">'
+      + quadro('Nome do lote', caixaDoNomeDoLote('Ex.: Base de inadimplentes novembro'),
+        'Aparece em "Origem da importação" e nos filtros.')
+      + quadro('Não repetir o que já entrou', '<select class="filtro" id="coluna-que-identifica"'
+        + ' aria-label="Não repetir o que já entrou, comparando por">'
+        + ['<option value="">— trazer tudo, mesmo repetido —</option>']
+          // Pedido do PO para a RET: a mesma proposta no mesmo mês não entra na
+          // divisão. Vem marcada; trocar ou desmarcar continua na mão de quem
+          // importa.
+          .concat(opcoes.repeticaoPelaProposta
+            ? ['<option value="@PROPOSTA_NO_MES"'
+              + (colunaQueIdentifica === '@PROPOSTA_NO_MES' ? ' selected' : '')
+              + '>Proposta no mesmo mês</option>']
+            : [])
+          .concat(opcoes.colunasDoCanal.map(function (coluna) {
+            return '<option value="' + escapar(coluna) + '"'
+              + (colunaQueIdentifica === coluna ? ' selected' : '') + '>'
+              + escapar(coluna) + '</option>';
+          })).join('')
+        + '</select>', 'O que já está no Prisma é pulado, e o resumo acima diz quantos.')
       + desenharAnalistas()
       + escolhaDoStatusDoLote()
+      + escolhaDaDataDeRecepcao()
       + escolhaDoAgendamento()
-      + escolhaDaDataDeRecepcao();
+      + '</div>';
   }
 
   /*
@@ -431,32 +491,29 @@ var TelaImportacao = (function () {
     var destinos = opcoes.statusParaAgendar || [];
     if (!(opcoes.statusDoCanal || []).length) return '';
     var deQuais = escapar(opcoes.statusQueOAgendamentoMuda || '');
+    var titulo = 'Mudar o status sozinho <span class="imp-opcional">— opcional</span>';
     if (!destinos.length) {
-      return '<p class="config-dica">Mudança de status agendada: indisponível neste canal. '
-        + 'Ela precisa de um status de destino que não seja conclusivo nem um destes: '
-        + deQuais + ' — e das colunas que o <code>atualizarPGO()</code> cria na base.</p>';
+      return quadro(titulo, '', 'Indisponível neste canal: falta um status de destino que não seja '
+        + 'conclusivo nem um destes: ' + deQuais + '.', true);
     }
     var dias = Number(agendarDias);
     var valido = agendarDias !== '' && dias >= 1 && Math.floor(dias) === dias;
-    return '<div class="grade"><label class="campo">'
-      + '<span>Mudar o status sozinho depois de (dias corridos)</span>'
+    return quadro(titulo, '<div class="imp-lado-a-lado">'
       + '<input type="number" class="filtro" id="agendar-dias" min="1" max="365" step="1"'
-      + ' placeholder="em branco: não agenda" value="' + escapar(agendarDias) + '"></label>'
-      + '<label class="campo"><span>Para o status</span>'
-      + '<select class="filtro" id="agendar-para">'
-      + '<option value=""' + (agendarPara === '' ? ' selected' : '') + '>— escolha —</option>'
+      + ' placeholder="dias corridos (em branco: não agenda)" aria-label="Depois de quantos dias corridos"'
+      + ' value="' + escapar(agendarDias) + '">'
+      + '<select class="filtro" id="agendar-para" aria-label="Para o status">'
+      + '<option value=""' + (agendarPara === '' ? ' selected' : '') + '>para o status…</option>'
       + destinos.map(function (status) {
         return '<option value="' + escapar(status.valor) + '"'
           + (status.valor === agendarPara ? ' selected' : '') + '>' + escapar(status.rotulo) + '</option>';
-      }).join('') + '</select></label></div>'
-      + '<p class="config-dica">' + (valido && agendarPara
-        ? 'Em <strong>' + diaDaqui(dias) + '</strong>, os casos deste lote que ainda estiverem em '
-          + deQuais + ' mudam sozinhos para <strong>' + escapar(agendarPara) + '</strong>. '
-          + 'O caso que já tiver sido trabalhado fica como está. A mudança é do sistema: não conta '
-          + 'para o analista e não inicia o prazo de retorno.'
+      }).join('') + '</select></div>',
+      valido && agendarPara
+        ? 'Em <strong>' + diaDaqui(dias) + '</strong>, quem ainda estiver em ' + deQuais
+          + ' muda sozinho para <strong>' + escapar(agendarPara) + '</strong>. Não conta para o '
+          + 'analista nem inicia o prazo de retorno.'
         : (valido ? 'Escolha para qual status os casos mudam.'
-          : 'Em branco, nada é agendado. Com 7 dias, o lote importado no dia 1 muda no dia 8.'))
-      + '</p>';
+          : 'Com 7 dias, o lote importado no dia 1 muda no dia 8.'), true);
   }
 
   /** dd/mm/aaaa de hoje mais `dias`, como o servidor vai calcular. */
@@ -475,7 +532,7 @@ var TelaImportacao = (function () {
   /** A frase do agendamento no resultado, com a data que o servidor gravou. */
   function fraseDoAgendamento(agendamento) {
     if (!agendamento) return '';
-    return '<p class="config-dica"><strong>Mudança de status agendada:</strong> em '
+    return '<p class="imp-sub"><strong>Mudança de status agendada:</strong> em '
       + escapar(agendamento.em) + ' (' + agendamento.dias + ' dia(s) corridos), os casos que ainda '
       + 'estiverem em ' + escapar(agendamento.deQuais) + ' mudam para <strong>'
       + escapar(agendamento.para) + '</strong>.</p>';
@@ -484,31 +541,23 @@ var TelaImportacao = (function () {
   /*
     O STATUS DE TODOS OS CASOS DO LOTE. Pedido do PO: escolher, e não mais só o
     "Não trabalhado". Vale para o caso que a fonte trouxe sem status; o que veio
-    com status na coluna ligada no de-para fica com o dele. Não carimba data —
-    o caso é antigo.
+    com status na coluna ligada fica com o dele. Não carimba data — o caso é antigo.
   */
   function escolhaDoStatusDoLote() {
     var lista = opcoes.statusDoCanal || [];
     if (!lista.length) return '';
     var vale = statusQueVale();
-    return '<div class="grade"><label class="campo">'
-      + '<span>Status dos casos importados</span>'
-      + '<select class="filtro" id="status-do-lote">'
+    return quadro('Status dos casos', '<select class="filtro" id="status-do-lote"'
+      + ' aria-label="Status dos casos importados">'
       + '<option value=""' + (vale === '' ? ' selected' : '') + '>— sem status —</option>'
       + lista.map(function (status) {
         return '<option value="' + escapar(status.valor) + '"'
           + (status.valor === vale ? ' selected' : '') + '>' + escapar(status.rotulo) + '</option>';
-      }).join('') + '</select></label></div>'
-      + '<p class="config-dica">' + (vale
-        ? 'Os casos sem status na planilha vão nascer em <strong>' + escapar(vale)
-          + '</strong>; os que trazem o status numa coluna ligada acima ficam com o deles. '
-          + 'A importação não carimba data: o caso é antigo, e a data de hoje diria que o '
-          + 'contato foi hoje. O analista ajusta depois, caso a caso.'
-        : 'Os casos sem status na planilha vão nascer <strong>sem status</strong>.'
-          + (opcoes.statusQueEsperaAPessoa ? ' O prazo só começa quando alguém puser o caso '
-            + 'em <strong>' + escapar(opcoes.statusQueEsperaAPessoa) + '</strong> — é aí que '
-            + 'o sistema anota a data.' : ''))
-      + '</p>';
+      }).join('') + '</select>',
+      vale ? 'Só para quem vier sem status na planilha. Não carimba data.'
+        : 'Os casos sem status na planilha nascem sem status.'
+          + (opcoes.statusQueEsperaAPessoa ? ' O prazo começa quando alguém os puser em <strong>'
+            + escapar(opcoes.statusQueEsperaAPessoa) + '</strong>.' : ''));
   }
 
   /**
@@ -519,28 +568,17 @@ var TelaImportacao = (function () {
   function escolhaDaDataDeRecepcao() {
     var coluna = opcoes.dataDeRecepcao;
     if (!coluna) return '';
-    return '<div class="grade"><label class="campo">'
-      + '<span>' + escapar(coluna.charAt(0).toUpperCase() + coluna.slice(1)) + '</span>'
-      + '<select class="filtro" id="data-de-recepcao">'
+    return quadro(escapar(coluna.charAt(0).toUpperCase() + coluna.slice(1)),
+      '<select class="filtro" id="data-de-recepcao" aria-label="' + escapar(coluna) + '">'
       + '<option value="planilha"' + (dataDeRecepcao === 'planilha' ? ' selected' : '')
-      + '>A da planilha (sem data, fica a de hoje)</option>'
+      + '>A da planilha</option>'
       + '<option value="hoje"' + (dataDeRecepcao === 'hoje' ? ' selected' : '')
       + '>A data de hoje, para todos os casos</option>'
-      + '</select></label></div>'
-      + '<p class="config-dica">' + (dataDeRecepcao === 'hoje'
-        ? 'Todos os casos vão entrar com a data de hoje, mesmo os que trazem data na planilha.'
-        : 'Vale a data que a planilha trouxer; o caso que vier sem data entra com a de hoje.')
-      + '</p>';
+      + '</select>',
+      dataDeRecepcao === 'hoje' ? 'Todos entram com a data de hoje, mesmo os que trazem data.'
+        : 'Caso sem data entra com a de hoje.');
   }
 
-  /**
-   * Quem recebe os casos.
-   *
-   * Vários marcados = rodízio, em partes iguais. É o pedido da operação:
-   * "uma base com 100 casos ou 300 casos podemos incluir no individual para
-   * cada analista". Nenhum marcado deixa a coluna de responsável como a origem
-   * mandou — que é o certo quando a própria base já traz o analista.
-   */
   /** Quem é deste canal e está de férias ou afastado. Pode vir vazio. */
   function quemEstaFora() {
     return (opcoes && opcoes.foraDaDivisao) || [];
@@ -551,71 +589,53 @@ var TelaImportacao = (function () {
 
     Sem isto, a coordenação procura um nome que ela sabe que trabalha no canal,
     não acha, e a única conclusão possível é "o sistema está errado" — quando
-    o certo é "ela está de férias, e por isso não recebe". O silêncio aqui
-    custa um chamado e uma desconfiança.
+    o certo é "ela está de férias, e por isso não recebe".
   */
   function desenharQuemEstaFora() {
     var fora = quemEstaFora();
     if (!fora.length) return '';
 
-    return '<p class="config-dica">Fora da divisão hoje: '
+    return ' Fora da divisão hoje: '
       + fora.map(function (pessoa) {
-        return '<strong>' + escapar(pessoa.nome) + '</strong> — '
-          + escapar(pessoa.porque);
+        return '<strong>' + escapar(pessoa.nome) + '</strong> — ' + escapar(pessoa.porque);
       }).join('; ')
-      + '. Continuam com acesso ao sistema; só não recebem lote. '
-      + 'Isso se ajusta em Configurações › Usuários.</p>';
+      + '. Continuam com acesso ao sistema; só não recebem lote.';
   }
 
+  /**
+   * Quem recebe os casos. Vários marcados = rodízio, em partes iguais. Nenhum
+   * marcado deixa o responsável como a origem mandou — o certo quando a própria
+   * base já traz o analista.
+   */
   function desenharAnalistas() {
     if (!opcoes.analistas.length) {
       /*
-        Lista vazia é RESPOSTA, e a tela tem de dizer qual. São duas causas
-        diferentes, e a saída de cada uma é outra: ou ninguém deste canal foi
-        cadastrado, ou todo mundo está de férias. Um recado só para as duas
-        mandaria metade das pessoas para o lugar errado.
+        Lista vazia é RESPOSTA, e a tela tem de dizer qual: ou ninguém deste
+        canal foi cadastrado, ou todo mundo está de férias.
       */
-      return '<p class="config-dica">' + (quemEstaFora().length
+      return quadro('Dividir entre', '', quemEstaFora().length
         ? 'Todo mundo deste canal está fora da divisão hoje ('
           + escapar(quemEstaFora().map(function (p) {
             return p.nome + ' — ' + p.porque;
-          }).join('; ')) + '). Os casos entram sem responsável. Ajuste a '
-          + 'disponibilidade em Configurações › Usuários.'
-        : 'Ninguém deste canal está cadastrado e disponível, então os casos '
-          + 'entram sem responsável. Em Configurações › Usuários, escolha o '
-          + 'CANAL de cada analista — a divisão é só entre quem é do canal '
-          + 'que você escolheu aqui em cima.') + '</p>';
+          }).join('; ')) + '). Os casos entram sem responsável.'
+        : 'Ninguém deste canal está cadastrado e disponível: os casos entram sem responsável. '
+          + 'Em Configurações › Usuários, escolha o CANAL de cada analista.', true);
     }
-
-    var quantos = Object.keys(analistasMarcados).filter(function (nome) {
-      return analistasMarcados[nome];
-    }).length;
 
     // A lista já vem SÓ com quem é deste canal e está disponível — o servidor
     // filtra, a pedido do PO: "distribua apenas para o canal que escolhi".
-    // A tela não precisa mais marcar "de outro canal", porque de outro canal
-    // não chega aqui.
-    return '<h4 class="importacao-titulo">Dividir entre</h4>'
-      + '<div class="config-marcadores">'
+    return quadro('Dividir entre', '<div class="imp-pessoas">'
       + opcoes.analistas.map(function (pessoa) {
-        return '<label class="config-chave">'
-          + '<input type="checkbox"'
-          + ' data-analista="' + escapar(pessoa.nome) + '"'
-          + (analistasMarcados[pessoa.nome] ? ' checked' : '') + '>'
+        var marcado = !!analistasMarcados[pessoa.nome];
+        return '<label class="imp-pessoa' + (marcado ? ' marcada' : '') + '">'
+          + '<input type="checkbox" data-analista="' + escapar(pessoa.nome) + '"'
+          + (marcado ? ' checked' : '') + '>'
           + '<span>' + escapar(pessoa.nome) + '</span></label>';
-      }).join('')
-      + '</div>'
-      + desenharQuemEstaFora()
-      + '<p class="config-dica">'
-      + (quantos
-        ? 'Os casos vão ser divididos em partes iguais entre os ' + quantos
-          + ' marcado(s), em rodízio.'
-        : 'Ninguém marcado: o responsável vai ser o que vier na planilha de '
-          + 'origem, se ela trouxer um.')
-      + '</p>';
+      }).join('') + '</div>',
+      'Em rodízio, em partes iguais. Ninguém marcado: fica o analista que vier na planilha.'
+        + desenharQuemEstaFora(), true);
   }
 
-  /** Passo 3: o que entrou. */
   /** R$ 1.234,56 — o prêmio, como a operação lê. */
   function emReais(valor) {
     var numero = Number(valor) || 0;
@@ -645,8 +665,8 @@ var TelaImportacao = (function () {
   }
 
   function desenharResultado() {
-    return '<section class="cartaa importação-passo">'
-      + '<header class="grafico-cabeca"><h3>Importado</h3></header>'
+    return '<section class="imp-cartao">'
+      + tituloDoPasso('✓', 'Importado')
       + '<div class="cartoes">'
       + '<div class="indicador tom-bom"><span class="rotulo">'
       + (ehChat() ? 'Atendimentos que entraram' : 'Casos que entraram')
@@ -667,7 +687,7 @@ var TelaImportacao = (function () {
         : '')
       + '</div>'
       + porQueRepetem(resultado.pulados, 'ficaram de fora')
-      + '<p>Lote <strong>' + escapar(resultado.origem) + '</strong>, em '
+      + '<p class="imp-sub">Lote <strong>' + escapar(resultado.origem) + '</strong>, em '
       + escapar(resultado.canal) + '.'
       + (resultado.primeiroId
         ? ' Do caso ' + escapar(resultado.primeiroId) + ' ao '
@@ -676,14 +696,12 @@ var TelaImportacao = (function () {
       + '</p>'
       + fraseDoAgendamento(resultado.agendamento)
       + (resultado.analistas.length
-        ? '<p class="config-dica">Divididos entre: '
+        ? '<p class="imp-sub">Divididos entre: '
           + escapar(resultado.analistas.join(', ')) + '.</p>'
         : '')
       + (ehChat()
-        ? '<p class="config-dica">A Produtividade da Mesa já soma estes atendimentos aos casos '
-          + 'do sistema, na aba "Atendidos".</p>'
-        : '<p class="config-dica">A Produtividade RECC já mostra este lote no '
-          + 'gráfico de casos importados por dia.</p>')
+        ? '<p class="imp-sub">A Produtividade da Mesa já soma estes atendimentos, na aba "Atendidos".</p>'
+        : '<p class="imp-sub">A Produtividade RECC já mostra este lote no gráfico de importados por dia.</p>')
       + '<div class="config-acoes">'
       + '<button type="button" class="botao" id="importar-outro-lote">'
       + 'Importar outro lote</button></div>'
@@ -725,11 +743,11 @@ var TelaImportacao = (function () {
 
     cliques('#conferir-importacao', conferir);
     cliques('#importar-agora', importar);
-    // Dois ids, e não um: os dois botões dizem coisas diferentes ("Recomeçar"
-    // depois de conferir, "Importar outro lote" depois de gravar) e nunca estão
-    // na tela juntos. Compartilhar id é o achado 21 esperando a terceira tela
-    // que os coloque lado a lado.
-    cliques('#recomecar-do-laudo, #importar-outro-lote', function () {
+    // Um id por botão, e não um só: "trocar" (no passo 1 já feito), "Recomeçar"
+    // (na faixa do pé) e "Importar outro lote" (depois de gravar) dizem coisas
+    // diferentes, e os dois primeiros estão na tela juntos. Compartilhar id é
+    // o achado 21.
+    cliques('#recomecar-do-laudo, #recomecar-da-barra, #importar-outro-lote', function () {
       laudo = null;
       resultado = null;
       deParaEscolhido = null;
@@ -760,10 +778,14 @@ var TelaImportacao = (function () {
 
     mudancas('[data-analista]', function (caixa) {
       analistasMarcados[caixa.getAttribute('data-analista')] = caixa.checked;
-      // Só o texto de baixo muda; redesenhar a tela inteira aqui apagaria o
-      // que a pessoa já escreveu no nome do lote e nas caixas do de-para.
+      // Só a marca e o resumo do pé mudam; redesenhar a tela inteira aqui
+      // apagaria o que a pessoa já escreveu nas buscas do de-para.
+      caixa.parentNode.className = 'imp-pessoa' + (caixa.checked ? ' marcada' : '');
       guardarOQueEstaNaTela();
+      atualizarResumoDoLote();
     });
+    var nome = elemento('nome-do-lote');
+    if (nome) nome.addEventListener('input', function () { nomeDoLote = this.value; atualizarResumoDoLote(); });
 
     mudancas('#coluna-que-identifica', function (caixa) {
       colunaQueIdentifica = caixa.value;
@@ -794,9 +816,12 @@ var TelaImportacao = (function () {
         return { daFonte: par.daFonte, paraAColuna: par.paraAColuna, lembrado: par.lembrado === true };
       });
     }
-    var par = deParaEscolhido[Number(caixa.getAttribute('data-depara'))];
+    var indice = Number(caixa.getAttribute('data-depara'));
+    var par = deParaEscolhido[indice];
     par.paraAColuna = caixa.value;
     par.lembrado = false;   // agora é escolha desta importação
+    var etiqueta = document.querySelector('#importacao [data-etiqueta-da-coluna="' + indice + '"]');
+    if (etiqueta) etiqueta.innerHTML = etiquetaDaColuna(par);
   }
 
   function desenharSeletor() {

@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.80 — a última etapa entregue é a 80. A regra do número está
+**Estado geral:** versão 1.81 — a última etapa entregue é a 81. A regra do número está
 na Etapa 68.
 
 ---
@@ -4090,6 +4090,30 @@ horas não era afetado: ele para na "Data resposta".
 
 7 testes novos em `testes-hora-da-finalizacao.js` e 3 em `testes-agenda-da-mesa.js`.
 11 quebras de propósito, 11 pegas — duas escaparam na primeira rodada e ganharam teste.
+
+---
+
+## Etapa 81 — A Importação em passos
+
+Pedido do PO, com a proposta mostrada antes e aprovada: "melhore o visual da aba
+importação (…) hoje os textos ficam juntos e bagunçados". **Nada muda no que a
+importação grava** — as mesmas chamadas ao servidor, os mesmos ids na tela; só o
+desenho.
+
+| O que | Como ficou |
+|---|---|
+| **Os passos no alto** | De onde vêm · Conferir as colunas · Opções do lote · Importar. O atual em destaque, os feitos com ✓ |
+| **Um cartão por passo** | Com o número e o título. O passo 1, depois de conferido, encolhe para uma linha com "N linha(s) · M coluna(s)" e um **trocar** |
+| **Os números da conferência** | Linhas na origem · Vão entrar · Ficam de fora (só quando alguma fica) · o prêmio importado |
+| **O de-para** | Origem → seletor com a busca ao lado → etiqueta: **ligada**, **como na última importação** ou **não entra**. Trocar a coluna troca a etiqueta na hora. As primeiras linhas ficam recolhidas em "Ver as 3 primeiras linhas como vão ficar" (abertas sozinhas quando um carimbo é escolhido) |
+| **As opções do lote** | Cada uma num quadro, com uma linha de explicação embaixo. Os textos que se repetiam foram encurtados. Os analistas viraram botões marcáveis |
+| **A faixa do pé** | Presa ao pé enquanto se rola: "12 casos vão entrar em RET", o resumo do lote (divisão, status, mudança agendada) e os botões **Recomeçar** e **Importar**. Marcar um analista ou digitar o nome do lote atualiza o resumo sem redesenhar a tela |
+| **Achado** | Os cartões dos passos tinham a classe `cartaa importação-passo` — erro de digitação antigo: nunca pegaram o estilo de cartão. Por isso os textos pareciam "juntos e bagunçados" |
+| **Versão** | 1.81 |
+
+17 testes novos em `testes-importacao-em-passos.js`; três testes antigos que
+fixavam textos e a classe do de-para foram atualizados para o texto novo.
+18 quebras de propósito, 18 pegas — uma escapou na primeira rodada e ganhou teste.
 
 ---
 

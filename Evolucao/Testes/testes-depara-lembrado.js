@@ -143,7 +143,7 @@ function rodarTestesDoDeParaLembrado() {
     contem(tela, 'como na última importação');
     contem(tela, 'function opcoesDeColuna(escolhida, termo)');
     contem(tela, '.localeCompare(');
-    contem(lerTela('Estilos.html'), '.importacao-depara .procurar-coluna');
+    contem(lerTela('Estilos.html'), '.imp-escolha .procurar-coluna');
   });
 }
 

@@ -698,27 +698,114 @@ button { font: inherit; color: inherit; }
 }
 
 /*
-  A IMPORTAÇÃO, em passos.
+  A IMPORTAÇÃO, em passos (Etapa 81, proposta aprovada pelo PO).
 
-  Cada passo é um cartão, empilhado. Poderia ser tudo numa tela só, mas o passo
-  do meio — conferir — é a razão de a tela existir: separá-lo visualmente é o
-  que impede alguém de rolar direto até o botão de gravar.
+  No alto, os quatro passos e onde a pessoa está. Cada passo num cartão branco;
+  as opções do lote em quadros, uma linha de explicação cada; e no pé uma faixa
+  que gruda na janela, dizendo o que vai acontecer ao lado do botão.
 */
-.importacao-titulo {
-  margin: 20px 0 8px; font-size: 14px; font-weight: 700;
-  color: var(--suave); letter-spacing: .01em;
+.imp-passos {
+  display: flex; margin: 0 0 16px; padding: 0; list-style: none;
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  overflow: hidden;
 }
-.importacao-titulo:first-child { margin-top: 0; }
-/* O de-para é de LER, não de comparar números: a coluna da esquerda fica
-   estreita e monoespaçada, para o nome vindo de fora se distinguir do nosso. */
-.importacao-depara td:first-child { width: 42%; }
-.importacao-depara code {
-  font-family: var(--fonte-dado); font-size: 12.5px; color: var(--suave);
+.imp-passo {
+  flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  font-size: 14px; color: var(--suave);
 }
-.importacao-depara select { max-width: 100%; }
-/* A busca de cada linha do de-para (Etapa 48) fica em cima do seletor. */
-.importacao-depara .procurar-coluna { display: block; width: 100%; max-width: 100%; margin-bottom: 4px; }
-.importacao-depara .config-dica { display: block; margin-top: 2px; }
+.imp-passo + .imp-passo { border-left: 1px solid var(--linha); }
+.imp-passo b {
+  width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--superficie-2); color: var(--suave); font-size: 13px;
+}
+.imp-passo.feito { color: var(--texto); }
+.imp-passo.feito b { background: var(--bom); color: var(--destaque-sobre); }
+.imp-passo.atual { color: var(--texto); font-weight: 600; box-shadow: inset 0 -3px 0 var(--destaque); }
+.imp-passo.atual b { background: var(--destaque); color: var(--destaque-sobre); }
+
+.imp-cartao {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 20px 22px; margin-bottom: 16px;
+}
+.imp-cabeca { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.imp-cabeca h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+.imp-cabeca h3 i {
+  font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--destaque); color: var(--destaque-sobre); font-size: 12.5px;
+}
+.imp-cabeca .imp-etiqueta { margin-left: auto; }
+.imp-feito .imp-cabeca h3 i { background: var(--bom); }
+.imp-sub { margin: 4px 0 14px; color: var(--suave); font-size: 13.5px; line-height: 1.5; }
+.imp-feito .imp-sub { margin-bottom: 0; }
+.imp-dicas {
+  display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 10px 0 0; padding: 0; list-style: none;
+  color: var(--suave); font-size: 13px;
+}
+.imp-dicas li::before { content: '✓ '; color: var(--bom); font-weight: 700; }
+
+.imp-numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.imp-numero { border: 1px solid var(--linha); border-radius: var(--raio-pequeno); padding: 12px 14px; }
+.imp-numero span { display: block; font-size: 12.5px; color: var(--suave); }
+.imp-numero strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.imp-numero.bom strong { color: var(--bom); }
+.imp-numero.atencao strong { color: var(--atencao); }
+
+.imp-etiqueta {
+  display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap;
+}
+.imp-etiqueta.ok { background: var(--bom-tenue); color: var(--bom); }
+.imp-etiqueta.fora { background: var(--superficie-2); color: var(--suave); }
+
+/* O de-para: uma linha por coluna — de onde, a seta, para onde e se entra. */
+.importacao-depara td { vertical-align: middle; }
+.importacao-depara td:first-child { width: 34%; }
+.importacao-depara .imp-seta { width: 28px; text-align: center; color: var(--tenue); }
+.imp-escolha { display: flex; gap: 8px; align-items: center; }
+.imp-escolha select { flex: 1 1 240px; max-width: 340px; }
+.imp-escolha .procurar-coluna { flex: 0 1 150px; max-width: 150px; }
+.imp-amostra { margin-top: 12px; }
+.imp-amostra summary { cursor: pointer; color: var(--destaque); font-size: 13.5px; font-weight: 600; }
+.imp-amostra .rolagem-tabela { margin-top: 10px; }
+
+/* As opções do lote: quadros de duas colunas; o largo ocupa a linha. */
+.imp-quadros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.imp-quadro { border: 1px solid var(--linha); border-radius: var(--raio-pequeno); padding: 14px 16px; min-width: 0; }
+.imp-quadro.largo { grid-column: 1 / -1; }
+.imp-quadro > strong { display: block; font-size: 14px; margin-bottom: 8px; }
+.imp-quadro .filtro { width: 100%; max-width: none; box-sizing: border-box; }
+.imp-quadro > small { display: block; margin-top: 7px; color: var(--suave); font-size: 12.5px; line-height: 1.45; }
+.imp-opcional { font-weight: 400; color: var(--suave); }
+.imp-lado-a-lado { display: flex; gap: 10px; }
+.imp-lado-a-lado > * { flex: 1; min-width: 0; }
+.imp-pessoas { display: flex; flex-wrap: wrap; gap: 8px; }
+.imp-pessoa {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; cursor: pointer;
+  border: 1px solid var(--linha-forte); border-radius: 99px; font-size: 13.5px;
+}
+.imp-pessoa.marcada { border-color: var(--destaque); background: var(--destaque-tenue); font-weight: 600; }
+.imp-pessoa input { accent-color: var(--destaque); margin: 0; }
+
+.imp-barra {
+  position: sticky; bottom: 0; z-index: 4;
+  display: flex; align-items: center; gap: 14px; padding: 14px 20px;
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: 0 -10px 24px -18px rgba(12, 27, 51, .45);
+}
+.imp-barra-texto { font-size: 14px; min-width: 0; }
+.imp-barra-texto small { display: block; color: var(--suave); font-size: 12.5px; }
+.imp-barra-botoes { margin-left: auto; display: flex; gap: 10px; flex: none; }
+
+@media (max-width: 760px) {
+  .imp-passos { flex-wrap: wrap; }
+  .imp-passo { flex: 1 1 50%; padding: 10px 12px; }
+  .imp-passo + .imp-passo { border-left: 0; }
+  .imp-quadros { grid-template-columns: minmax(0, 1fr); }
+  .imp-escolha, .imp-lado-a-lado { flex-wrap: wrap; }
+  .imp-escolha select, .imp-escolha .procurar-coluna { max-width: none; flex-basis: 100%; }
+  .imp-barra { flex-wrap: wrap; }
+  .imp-barra-botoes { margin-left: 0; width: 100%; }
+  .imp-barra-botoes .botao { flex: 1; }
+}
 
 /*
   O recado de que a origem vai escrever numa coluna de produtividade.

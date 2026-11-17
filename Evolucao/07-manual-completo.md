@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1702 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1719 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1702 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1719 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1356,16 +1356,28 @@ dentro do PGO **numa gravação só**, já dividida entre os analistas.
 
 ![A Importação](imagens/tela-importacao.png)
 
-São três passos, e **o do meio é a razão de a tela existir**:
+São quatro passos, mostrados no alto da tela — o atual em destaque, os feitos
+com ✓ (Etapa 81). Cada passo é um cartão, e **o da conferência é a razão de a
+tela existir**:
 
-1. **De onde vem.** Colar o conteúdo da outra planilha, ou dar o link dela.
+1. **De onde vêm.** Colar o conteúdo da outra planilha, ou dar o link dela.
    Colar funciona sempre; o link é melhor para quem repete toda semana, e exige
-   que a conta que roda o PGO tenha acesso àquela planilha.
-2. **Conferir.** O servidor devolve para onde cada coluna vai, quantas linhas
-   entram, quantas repetem — e **as três primeiras já traduzidas**. Se houver
-   algum ponto de atenção (repetidas, nomes fora do cadastro, linhas em branco,
-   limite), um **pop-up** lista todos de uma vez (Etapa 57); o detalhe fica no laudo.
-3. **Importar**, depois de confirmar no pop-up do sistema, que diz quantos vão entrar.
+   que a conta que roda o PGO tenha acesso àquela planilha. Depois de conferido,
+   o cartão encolhe para uma linha ("12 linha(s) · 7 coluna(s)") com um **trocar**
+   que volta ao começo.
+2. **Conferir as colunas.** O servidor devolve os números (linhas na origem, quantas
+   **vão entrar**, quantas **ficam de fora**) e o de-para: cada coluna da sua
+   planilha → a coluna do canal, com uma etiqueta ao lado — **ligada**, **como na
+   última importação** ou **não entra**. As três primeiras linhas, já traduzidas,
+   ficam em "Ver as 3 primeiras linhas como vão ficar". Se houver algum ponto de atenção
+   (repetidas, nomes fora do cadastro, linhas em branco, limite), um **pop-up**
+   lista todos de uma vez (Etapa 57).
+3. **Opções do lote.** Cada opção num quadro, com uma linha de explicação embaixo:
+   status, data de recepção, mudança agendada e quem recebe o lote (os analistas
+   são botões que se marcam).
+4. **Importar.** Uma faixa presa ao pé da tela resume o que vai acontecer — "12
+   casos vão entrar em RET · Divididos entre Ana, Diego · status Não trabalhado" —
+   ao lado do botão, que confirma no pop-up do sistema.
 
 O passo 2 não é burocracia. Um mapeamento trocado é invisível olhando o
 cabeçalho e óbvio olhando o dado: ver `11999998888` na coluna "CPF" custa cinco
@@ -1799,7 +1811,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.80** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.81** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1807,7 +1819,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1702 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1719 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

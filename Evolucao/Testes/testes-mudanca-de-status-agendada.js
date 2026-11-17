@@ -291,8 +291,8 @@ function rodarTestesDaMudancaDeStatusAgendada() {
 
   teste('a tela diz a data, de quais status sai e que a mudança é do sistema', () => {
     const importacao = tela('Importacao');
-    contem(importacao, "'Em <strong>' + diaDaqui(dias) + '</strong>, os casos deste lote que ainda estiverem em '");
-    contem(importacao, 'não conta \'\n          + \'para o analista e não inicia o prazo de retorno.');
+    contem(importacao, "'Em <strong>' + diaDaqui(dias) + '</strong>, quem ainda estiver em ' + deQuais");
+    contem(importacao, 'Não conta para o \'\n          + \'analista nem inicia o prazo de retorno.');
     contem(importacao, '+ fraseDoAgendamento(resultado.agendamento)');
   });
 

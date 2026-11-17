@@ -46,6 +46,7 @@ const { rodarTestesDasColunasForaDaRet } = require('./testes-colunas-fora-da-ret
 const { rodarTestesDasSusepsNaSegundaBase } = require('./testes-suseps-na-segunda-base');
 const { rodarTestesDoLimparFiltros } = require('./testes-limpar-filtros');
 const { rodarTestesDosPopupsDaImportacao } = require('./testes-popups-da-importacao');
+const { rodarTestesDaImportacaoEmPassos } = require('./testes-importacao-em-passos');
 const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
@@ -105,6 +106,7 @@ rodarTestesDasColunasForaDaRet();
 rodarTestesDasSusepsNaSegundaBase();
 rodarTestesDoLimparFiltros();
 rodarTestesDosPopupsDaImportacao();
+rodarTestesDaImportacaoEmPassos();
 rodarTestesDaDataDaFinalizacao();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();
