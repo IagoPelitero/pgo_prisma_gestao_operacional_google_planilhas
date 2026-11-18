@@ -33,6 +33,9 @@ var TelaCadastrarCaso = (function () {
   var oQueCadastrar = 'caso';
   var temAgenda = false;
   var envioDaReuniao = '';
+  // O pacote de partida: as permissões dizem que botões o cadastro concluído
+  // oferece (Etapa 86).
+  var pacoteDaTela = null;
 
   function abasDaMesa() {
     if (!temAgenda) return '';
@@ -91,6 +94,7 @@ var TelaCadastrarCaso = (function () {
   }
 
   function montar(pacote) {
+    pacoteDaTela = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
     if (!temAgenda) oQueCadastrar = 'caso';
@@ -198,22 +202,12 @@ var TelaCadastrarCaso = (function () {
 
     if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()), envio)
-      .entao(function () {
+      .entao(function (resposta) {
         salvando = false;
         envio = '';
-        /*
-          GRAVOU: VAI PARA O TRABALHO.
-
-          Pedido do PO: "após gravar vá para a tela trabalho". O caso recém
-          cadastrado está lá, na fila, que é onde ele passa a ser trabalhado —
-          e quem cadastra em sequência volta aqui pelo menu.
-
-          Não destravamos os botões antes de sair: a tela inteira é trocada
-          pelo `irPara`, e os botões vão com ela. `irPara` também confere a
-          permissão de ver o Trabalho, e cai na primeira tela do menu de quem
-          não a tiver — não é esta tela que decide isso.
-        */
-        Aplicacao.irPara('trabalho');
+        Formulario.acabouDeGravar(elemento('salvar-caso'),
+          elemento('formulario-do-caso'));
+        mostrarCadastroConcluido(resposta);
       })
       .senao(function (erro) {
         salvando = false;
@@ -222,6 +216,58 @@ var TelaCadastrarCaso = (function () {
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
       });
+  }
+
+  /*
+    CADASTRO CONCLUÍDO: A PESSOA ESCOLHE O PRÓXIMO PASSO (Etapa 86, F7 + F12).
+
+    Antes, gravar levava direto ao Trabalho (pedido do PO, "após gravar vá para
+    a tela trabalho"). Mas lá, na aba 1, o caso novo entra no fim da ordem e a
+    fila mostra 5: ele não aparecia, e quem cadastra vários em sequência voltava
+    pelo menu e escolhia o canal de novo. Agora, no lugar do formulário:
+      · TRABALHAR NO CASO abre o caso recém-cadastrado — só para quem pode
+        editar; o servidor confere de novo (alcance incluído) ao abrir;
+      · CADASTRAR OUTRO CASO traz o formulário limpo, no MESMO canal;
+      · IR PARA O TRABALHO continua lá, para quem quer a fila.
+    Nada abre sozinho: o caso só abre com o clique.
+  */
+  function mostrarCadastroConcluido(resposta) {
+    var permissoes = (pacoteDaTela && pacoteDaTela.permissoes) || {};
+    var acoes = permissoes.acoes || [];
+    var telas = permissoes.telas || [];
+    var podeTrabalhar = acoes.indexOf('editar') >= 0;
+    var podeIrAoTrabalho = telas.indexOf('trabalho') >= 0;
+    var id = String((resposta && resposta.id) || '');
+
+    recado('', '');
+    mostrarAsAcoes(false);
+    corpo().innerHTML = '<div class="cadastro-concluido" id="cadastro-concluido" role="status" tabindex="-1">'
+      + '<span class="cadastro-concluido-icone" aria-hidden="true">✓</span>'
+      + '<div class="cadastro-concluido-texto">'
+      + '<h3>Caso <strong>' + escapar(id) + '</strong> cadastrado'
+      + (resposta && resposta.canal ? ' · ' + escapar(resposta.canal) : '') + '</h3>'
+      + '<p>O que você quer fazer agora?</p>'
+      + '<div class="cadastro-concluido-acoes">'
+      + (podeTrabalhar && id
+        ? '<button type="button" class="botao" id="trabalhar-no-cadastrado">Trabalhar no caso</button>' : '')
+      + '<button type="button" class="botao-secundario" id="cadastrar-outro">Cadastrar outro caso</button>'
+      + (podeIrAoTrabalho
+        ? '<button type="button" class="botao-secundario" id="ir-para-o-trabalho">Ir para o Trabalho</button>' : '')
+      + '</div></div></div>';
+
+    var trabalhar = elemento('trabalhar-no-cadastrado');
+    if (trabalhar) trabalhar.addEventListener('click', function () {
+      CasoEmModal.abrir(canalEscolhido, id, null);
+    });
+    elemento('cadastrar-outro').addEventListener('click', function () {
+      envio = '';   // formulário limpo é caso novo
+      carregarFormulario();
+    });
+    var irAoTrabalho = elemento('ir-para-o-trabalho');
+    if (irAoTrabalho) irAoTrabalho.addEventListener('click', function () {
+      Aplicacao.irPara('trabalho');
+    });
+    (trabalhar || elemento('cadastrar-outro')).focus();
   }
 
   function ligar() {

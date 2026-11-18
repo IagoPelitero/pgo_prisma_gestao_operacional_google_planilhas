@@ -1225,12 +1225,13 @@ function rodarTestesDeCadastro() {
     contem(botao.innerHTML, 'tres-pontinhos', 'e continua com os pontinhos');
   });
 
-  teste('a tela de cadastro vai para o Trabalho depois de gravar', () => {
-    // Pedido do PO: "após gravar vá para a tela trabalho". Fica como
-    // conferência de código porque a navegação é da moldura, não do
-    // formulário — o caminho inteiro é percorrido no navegador, na varredura.
+  teste('a tela de cadastro oferece o próximo passo depois de gravar (Etapa 86)', () => {
+    // Era "após gravar vá para a tela trabalho"; na Etapa 86 o PO pediu as
+    // duas opções — Trabalhar no caso e Cadastrar outro —, com a volta ao
+    // Trabalho preservada. O caminho inteiro é percorrido no ponta a ponta.
     const tela = lerPeca('CadastrarCaso');
-    contem(tela, "Aplicacao.irPara('trabalho')");
+    contem(tela, 'mostrarCadastroConcluido(resposta)');
+    contem(tela, "Aplicacao.irPara('trabalho')", 'a volta ao Trabalho continua');
     contem(tela, 'Formulario.comecouAGravar',
       'os três pontinhos ao gravar o cadastro');
     contem(tela, 'Formulario.vigiarObrigatorios',

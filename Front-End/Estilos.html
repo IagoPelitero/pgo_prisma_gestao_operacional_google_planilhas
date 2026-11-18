@@ -958,6 +958,13 @@ table.fila.prazos-lista td.direita, table.fila.prazos-lista th.direita { text-al
 .mostrar-quantos[aria-pressed="true"] {
   background: var(--destaque); border-color: var(--destaque); color: var(--destaque-sobre);
 }
+/* O cadastro concluído (Etapa 86): o próximo passo, no lugar do formulário. */
+.cadastro-concluido { display: flex; align-items: flex-start; gap: 16px; padding: 22px 8px; outline: none; }
+.cadastro-concluido-icone { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 22px; font-weight: 700; color: var(--bom); background: var(--bom-tenue); }
+.cadastro-concluido-texto h3 { margin: 0 0 4px; font-size: 18px; }
+.cadastro-concluido-texto p { margin: 0 0 14px; color: var(--suave); }
+.cadastro-concluido-acoes { display: flex; flex-wrap: wrap; gap: 10px; }
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
 .cartao.vazio p { margin: 0 auto; max-width: 46ch; color: var(--suave); }
