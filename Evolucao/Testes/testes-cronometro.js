@@ -114,7 +114,8 @@ function rodarTestesDoCronometro() {
   teste('as chamadas do dia a dia passam pelo cronômetro', () => {
     const t = preparar();
     ['resumoDoCanal', 'produtividadeDaEquipe', 'detalharComponente', 'casoParaEditar', 'editarCaso',
-      'alterarSituacaoDoCaso', 'cadastrarCaso', 'buscarCasos', 'formularioDoCanal', 'pacoteDePartida']
+      'alterarSituacaoDoCaso', 'cadastrarCaso', 'buscarCasos', 'formularioDoCanal', 'pacoteDePartida',
+      'resumoDasConfiguracoes', 'salvarItemDoCatalogo', 'excluirItemDoCatalogo']
       .forEach((nome) => contem(String(t.chamar(nome)), "cronometrado_('" + nome + "'", nome));
   });
 

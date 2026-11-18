@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1774 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1787 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1774 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1787 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1761,6 +1761,20 @@ inteira.
 
 ![A tela de Configurações](imagens/tela-configuracoes.png)
 
+**Medir a velocidade** (Etapa 85), em Configurações › Estrutura, ao lado de "Rodar
+diagnóstico". Cronometra **na planilha de verdade**, só lendo: para cada aba, os
+dados (linhas × colunas), a grade (as linhas e colunas que existem, vazias ou
+não), **uma ida pequena** (ler só o cabeçalho — o pedágio que toda chamada paga,
+por ida), **ler a aba inteira**, as fórmulas e as regras de formatação
+condicional; e quanto leva para abrir as planilhas de fora (cadastros, legado,
+histórico, arquivo da auditoria). As abas vêm da mais lenta para a mais rápida,
+com avisos: ida pequena acima de 500 ms, aba inteira acima de 3 s, mais de 5.000
+linhas vazias na grade, fórmulas que recalculam muito (HOJE, AGORA, IMPORTRANGE,
+ARRAYFORMULA, QUERY, PROCV, INDIRETO…) e 10 regras de formatação ou mais. Em cima,
+**"Cada ida à planilha"**: a mediana da ida pequena. Por que existe: a planilha do
+PO é pequena (umas 376 mil células), mas a aba ERROS mostrou 3 idas levando 10 s.
+A régua do `estresse.js` não vê fórmula, formatação nem grade — este raio-x vê.
+
 **Ajustes Gerais são as listas** que os campos seletores oferecem — assunto,
 produto, motivo, canal de origem e as que a operação criar. Cada lista aparece
 com o nome legível e **em quais campos é usada** ("Usada em: Assunto (Mesa
@@ -1769,10 +1783,13 @@ campo seletor já pode escolhê-la), **renomear** (muda só o nome na tela; os
 itens, campos e casos continuam ligados) e **excluir** a lista que nenhum
 campo usa — a que um campo usa é recusada, dizendo qual. Status, cargo,
 disponibilidade e segmento são usados por dentro do sistema: os itens se
-mexem, a lista não. **Item se cria, edita e exclui**; excluir um item já
-gravado em casos passa por um aviso de atenção que diz em quantos, e os casos
-**mantêm o texto** — decisão do PO. Para um campo seletor novo: crie a lista
-em Ajustes Gerais e escolha-a no campo, em "Lista de opções".
+mexem, a lista não. **Item se cria, edita e exclui**. **Trocar o nome ou excluir
+um item mexe só na lista** (Etapa 85, decisão do PO: "ignorando que há dados na
+planilha"): o formulário passa a oferecer o nome novo, e os casos já gravados
+**mantêm o texto** de antes — sem efeito cascata. Os cartões de Painéis que
+contavam o item vão junto. Antes, conferir os casos lia a base coluna por coluna
+e passava dos 40 segundos. Para um campo seletor novo: crie a lista em Ajustes
+Gerais e escolha-a no campo, em "Lista de opções".
 
 Cada ação carrega a guarda que o estrago dela pede:
 
@@ -1784,9 +1801,9 @@ Cada ação carrega a guarda que o estrago dela pede:
 
 E as três coisas que o sistema **recusa fazer**, por mais permissão que se
 tenha: trocar o cabeçalho de um campo (é o nome da coluna, e o Power BI aponta
-para ele), renomear um item de lista que já está gravado em casos, e tirar
-Configurações do último nível que ainda a tem — ninguém se tranca do lado de
-fora.
+para ele) e tirar Configurações do último nível que ainda a tem — ninguém se
+tranca do lado de fora. (Renomear um item gravado em casos era recusado até a
+Etapa 85; agora renomeia só a lista.)
 
 Os **cartões são configuráveis um a um** — nome, o que cada um conta, cor,
 ordem e mostrar ou ocultar —, e são **duas listas**: a do Trabalho, que mostra o
@@ -1871,7 +1888,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.84** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.85** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1879,7 +1896,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1774 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1787 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

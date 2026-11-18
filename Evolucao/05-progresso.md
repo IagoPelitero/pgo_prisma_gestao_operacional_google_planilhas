@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.84 — a última etapa entregue é a 84. A regra do número está
+**Estado geral:** versão 1.85 — a última etapa entregue é a 85. A regra do número está
 na Etapa 68.
 
 ---
@@ -4227,6 +4227,37 @@ cartões continuam na aba onde fazem sentido", e eles tinham ficado de fora das 
 leitura leve lê as colunas deles), com 1 teste e 2 quebras de propósito, pegas. Três testes de
 navegador foram ajustados ao Trabalho novo: o caso é aberto pelo Id (a aba 1 vem na ordem da
 prioridade), a fila grande é olhada na aba 1, e o "Limpar filtros" não tem mais período a voltar.
+
+---
+
+## Etapa 85 — Ajustes Gerais sem os 40 segundos, e o raio-x da velocidade
+
+Relato do PO: "as configurações estão apontando erro de 40 s na parte de ajustes gerais",
+"ao tentar mudar o nome (…) ele só dá o erro de 40 segundos. Ele não atualiza", e 123
+notificações de lentidão num dia (Buscar Caso, Configurações, Produtividade). A foto da aba
+ERROS e o tamanho real da planilha (18 abas, umas 376 mil células; a RET com 56 colunas e
+3,5 mil linhas) mudaram o diagnóstico: a planilha é pequena, mas **cada ida custa uns 3 s**
+(a Produtividade faz 3 idas e levou 10 s). A 1.84 não deixou Buscar, Configurações nem
+Produtividade mais pesados — medido, 1.83 × 1.84, função por função, iguais.
+
+| O que | Como ficou |
+|---|---|
+| **A causa dos 40 s** | Renomear um item conferia se ele estava gravado em algum caso. Com a lista que nenhum campo do canal usa (Área, Canal, Tipo, Assunto, Ramo, Origem, Cargo…), a conferência lia a base **coluna por coluna**: 49 idas na RET. A 3 s por ida, a tela desistia nos 40 s — e a recusa ("está gravado em N casos, troque o rótulo"), que chegava depois, ninguém via |
+| **Renomear e excluir** | Decisão do PO: "vamos seguir ignorando que há dados na planilha. Ele não fará efeito cascata (…) vai na aba catálogo e altera o nome". Mexem **só na lista**: o formulário oferece o nome novo, o caso gravado guarda o texto. Os cartões de Painéis que contavam o item vão junto (é configuração). A auditoria registra "X virou Y". O aviso de excluir sai sem ida ao servidor |
+| **Cronômetro** | `resumoDasConfiguracoes`, `salvarItemDoCatalogo` e `excluirItemDoCatalogo` entram no cronômetro: passando de 8 s, a aba ERROS diz onde foi o tempo |
+| **Raio-x da velocidade** | Configurações › Estrutura › "Medir a velocidade" (`raioXDaVelocidade`): por aba, dados, grade, uma ida pequena, ler tudo, fórmulas (e as que recalculam muito), formatação condicional; e o tempo para abrir as planilhas de fora. Só lê. Da mais lenta para a mais rápida, com avisos |
+| **Versão** | 1.85 |
+
+**O que vem depois** (aprovado pelo PO, "perfeito mas preciso resolver o problema que trouxe"):
+com o print do raio-x, atacar a causa do custo por ida — o que pesa na planilha e as idas do
+Buscar Caso, do Trabalho e da Produtividade —, com a proposta mostrada antes.
+
+Testes: 13 novos em `testes-raio-x-da-velocidade.js`; o de `testes-configuracoes.js` que exigia
+"renomear item em uso é recusado" virou a regra nova (só a lista muda, o caso guarda o texto, a
+base não é lida); o do cronômetro conta as três funções novas. O simulador ganhou `getFormulas` e
+`getConditionalFormatRules`. 7 quebras de propósito, todas pegas — duas só na segunda rodada: a da
+ordem (a aba lenta do teste já era a primeira; agora é a última) e a da grade (o `sed` da quebra
+não tinha casado).
 
 ---
 

@@ -67,6 +67,11 @@
  * tempo — seis idas ao servidor fariam a tela montar aos pedaços.
  */
 function resumoDasConfiguracoes() {
+  // No cronômetro (Etapa 85): passando de 8 s, a aba ERROS diz onde foi o tempo.
+  return cronometrado_('resumoDasConfiguracoes', resumoDasConfiguracoesSemRelogio_, arguments);
+}
+
+function resumoDasConfiguracoesSemRelogio_() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var catalogo = lerRegistros_('CATALOGO');
   var laudo = conferirEstrutura_();
@@ -676,6 +681,11 @@ function listarCatalogo(tipo, idDoCanal) {
  * e por isso o sistema avisa em vez de deixar acontecer calado.
  */
 function salvarItemDoCatalogo(dados) {
+  // No cronômetro (Etapa 85): passando de 8 s, a aba ERROS diz onde foi o tempo.
+  return cronometrado_('salvarItemDoCatalogo', salvarItemDoCatalogoSemRelogio_, arguments);
+}
+
+function salvarItemDoCatalogoSemRelogio_(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
 
@@ -729,20 +739,18 @@ function salvarItemDoCatalogo(dados) {
   }
 
   if (id) {
-    if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
-      var emUso = quantosCasosUsam_(atual);
-      if (emUso > 0) {
-        throw new Error('"' + atual.Nome + '" está gravado em ' + emUso +
-          ' caso(s). Trocar o nome aqui NÃO renomeia o que já foi gravado — ' +
-          'eles ficariam apontando para um item que não existe mais. ' +
-          'Para mudar só o que aparece na tela, troque o rótulo.');
-      }
-    }
+    // RENOMEAR MEXE SÓ NA LISTA (Etapa 85, decisão do PO: "ignorando que há
+    // dados na planilha (…) ele vai na aba catálogo e altera o nome"). O nome
+    // novo vale no formulário dali em diante; os casos já gravados ficam com o
+    // texto de antes — sem efeito cascata. Antes, conferir se o item estava
+    // gravado em algum caso lia a base coluna por coluna (49 idas na RET) e a
+    // tela desistia nos 40 segundos sem dizer nada. Os cartões de Painéis que
+    // contavam o item vão junto (é configuração, não caso).
+    var renomeou = normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome);
     atualizarRegistro_('CATALOGO', id, campos);
-    if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
-      renomearNosCartoes_(atual.Nome, nome, tipo, campos.CanalId);
-    }
-    registrarAuditoria_('catalogo.editar', 'CATALOGO', id, tipo);
+    if (renomeou) renomearNosCartoes_(atual.Nome, nome, tipo, campos.CanalId);
+    registrarAuditoria_('catalogo.editar', 'CATALOGO', id, tipo
+      + (renomeou ? ' — "' + atual.Nome + '" virou "' + nome + '"' : ''));
     return id;
   }
 
@@ -1138,6 +1146,11 @@ function usoDoItemDoCatalogo(id) {
  * gravado nos casos fica como está. A tela avisa antes, dizendo em quantos.
  */
 function excluirItemDoCatalogo(id) {
+  // No cronômetro (Etapa 85): passando de 8 s, a aba ERROS diz onde foi o tempo.
+  return cronometrado_('excluirItemDoCatalogo', excluirItemDoCatalogoSemRelogio_, arguments);
+}
+
+function excluirItemDoCatalogoSemRelogio_(id) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var alvo = converterParaIdentificador_(id);
   var item = buscarRegistros_('CATALOGO', 'Id', alvo, 1)[0];
@@ -1146,11 +1159,12 @@ function excluirItemDoCatalogo(id) {
   if (RECC_TIPOS_FORA_DAS_LISTAS.indexOf(tipo) >= 0) {
     throw new Error('Este registro não é um item de lista.');
   }
-  var casos = quantosCasosUsam_(item);
+  // Excluir também mexe só na lista (Etapa 85, decisão do PO): não conta os
+  // casos — era a mesma leitura coluna por coluna do renomear.
   apagarRegistroDeVez_('CATALOGO', alvo);
   registrarAuditoria_('catalogo.excluir', 'CATALOGO', alvo, tipo + ' — ' + item.Nome
-    + (casos ? ' (gravado em ' + casos + ' caso(s), que mantêm o texto)' : ''));
-  return { nome: String(item.Rotulo || item.Nome), casos: casos };
+    + ' (os casos que já o têm mantêm o texto)');
+  return { nome: String(item.Rotulo || item.Nome) };
 }
 
 // ============================================================================

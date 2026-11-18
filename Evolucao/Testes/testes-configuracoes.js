@@ -200,19 +200,31 @@ function rodarTestesDeConfiguracoes() {
 
   secao('As listas');
 
-  teste('renomear um item em uso é recusado, com o número de casos', () => {
-    // Trocar o Nome não renomeia o que já foi gravado: os casos ficariam
-    // apontando para um item que não existe mais.
-    chamar('inserirRegistro_')('BASE_MESA', {
+  teste('renomear um item em uso muda só a lista: o caso guarda o texto (Etapa 85)', () => {
+    // Decisão do PO: "ignorando que há dados na planilha (…) ele vai na aba
+    // catálogo e altera o nome". Sem efeito cascata, e sem ler a base.
+    const caso = chamar('inserirRegistro_')('BASE_MESA', {
       Analista: 'Ana Martins', Status: 'Em andamento', 'Nome do segurado': 'Alguém'
     });
     const pendente = chamar('listarCatalogo')('STATUS', canal.id)
       .find((i) => i.nome === 'Em andamento');
-
-    const erro = lanca(() => chamar('salvarItemDoCatalogo')({
-      id: pendente.id, tipo: 'STATUS', canalId: canal.id, nome: 'Em aberto'
-    }), 'está gravado em');
-    contem(erro.message, 'troque o rótulo', 'a saída precisa ser oferecida');
+    const { medidor } = require('./simulador');
+    medidor.zerar();
+    chamar('salvarItemDoCatalogo')({
+      id: pendente.id, tipo: 'STATUS', canalId: canal.id, nome: 'Em aberto', rotulo: 'Em aberto'
+    });
+    const custo = medidor.retrato();
+    verdadeiro(custo.celulasLidas < 2000, 'não leu a base: ' + custo.celulasLidas + ' células');
+    igual(chamar('listarCatalogo')('STATUS', canal.id).filter((i) => i.nome === 'Em aberto').length, 1,
+      'a lista tem o nome novo');
+    igual(String(chamar('buscarRegistros_')('BASE_MESA', 'Id', String(caso.__id), 1)[0].Status),
+      'Em andamento', 'o caso continua com o texto de antes');
+    verdadeiro(chamar('lerRegistros_')('AUDITORIA').some((a) => String(a.Acao) === 'catalogo.editar'
+      && String(a.Detalhe).indexOf('"Em andamento" virou "Em aberto"') >= 0), 'a troca fica na trilha');
+    // Volta, para os testes seguintes.
+    chamar('salvarItemDoCatalogo')({
+      id: pendente.id, tipo: 'STATUS', canalId: canal.id, nome: 'Em andamento', rotulo: 'Em andamento'
+    });
   });
 
   teste('trocar só o rótulo é livre — é o que aparece na tela', () => {
@@ -736,7 +748,7 @@ function rodarTestesDeConfiguracoes() {
   secao('Auditoria');
 
   teste('a trilha mostra o que foi feito, e por quem', () => {
-    const trilha = chamar('listarAuditoria')(20);
+    const trilha = chamar('listarAuditoria')(30);
     verdadeiro(trilha.length > 0);
     igual(trilha[0].quem, 'primeiro.adm', 'a mais recente vem primeiro');
     verdadeiro(trilha.some((l) => l.acao === 'campo.criar'));
@@ -1487,8 +1499,11 @@ function rodarTestesDeConfiguracoes() {
       nomedosegurado: 'Caso com sinistro', assunto: 'Sinistro' });
     const sinistro = lis.chamar('listarCatalogo')('ASSUNTO', '').find((i) => i.nome === 'Sinistro');
     igual(lis.chamar('usoDoItemDoCatalogo')(sinistro.id).casos, 1, 'o aviso diz em quantos casos');
+    const { medidor } = require('./simulador');
+    medidor.zerar();
     const saiu = lis.chamar('excluirItemDoCatalogo')(sinistro.id);
-    igual(saiu.casos, 1);
+    igual(saiu.nome, 'Sinistro');
+    verdadeiro(medidor.retrato().celulasLidas < 2000, 'excluir não conta os casos (Etapa 85)');
     verdadeiro(!lis.chamar('listarCatalogo')('ASSUNTO', '').some((i) => i.nome === 'Sinistro'),
       'o item saiu da lista');
     igual(String(lis.chamar('buscarRegistros_')('BASE_MESA', 'Id', String(caso.id), 1)[0].Assunto),

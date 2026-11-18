@@ -393,6 +393,9 @@ function pontePreparada(respostas) {
     + '      diagnosticoDoSistema: function () {\n'
     + '        responder(respostas.configuracoes.diagnostico);\n'
     + '      },\n'
+    + '      raioXDaVelocidade: function () {\n'
+    + '        responder(respostas.configuracoes.raioX);\n'
+    + '      },\n'
     + '      listarAuditoria: function () {\n'
     + '        responder(respostas.configuracoes.trilha);\n'
     + '      },\n'
@@ -1078,7 +1081,8 @@ function gerar(pastaDeSaida) {
     analises: chamar('listarAnalises()'),
     opcoesDeSinalizador: chamar('opcoesDeSinalizador()'),
     sinalizadores: chamar('listarSinalizadores()'),
-    diagnostico: chamar('diagnosticoDoSistema()')
+    diagnostico: chamar('diagnosticoDoSistema()'),
+    raioX: chamar('raioXDaVelocidade()')
   };
 
   // A busca, com alguns termos já procurados de verdade. A prévia é estática:

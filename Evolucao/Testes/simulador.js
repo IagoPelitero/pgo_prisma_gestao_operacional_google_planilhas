@@ -187,6 +187,19 @@ class Faixa {
     return saida;
   }
   getValue() { return this.getValues()[0][0]; }
+  /** As fórmulas da faixa: '' onde não há (o simulador guarda as que o teste pôs em `aba.formulas`). */
+  getFormulas() {
+    medidor.idasParaLer++;
+    medidor.celulasLidas += this.nLinhas * this.nColunas;
+    const formulas = this.aba.formulas || {};
+    const saida = [];
+    for (let i = 0; i < this.nLinhas; i++) {
+      const linha = [];
+      for (let j = 0; j < this.nColunas; j++) linha.push(formulas[(this.linha + i) + ',' + (this.coluna + j)] || '');
+      saida.push(linha);
+    }
+    return saida;
+  }
   /**
    * O valor como a pessoa VÊ na tela — sempre texto.
    *
@@ -293,6 +306,7 @@ class Aba {
      na planilha de produção. */
   setName(novo) { this.nome = novo; return this; }
   getMaxRows() { return this.valores.length; }
+  getConditionalFormatRules() { return (this.regrasDeFormatacao || []).slice(); }
   getMaxColumns() { return this.valores[0] ? this.valores[0].length : 0; }
   getRange(l, c, nl = 1, nc = 1) {
     medidor.faixasPedidas++;

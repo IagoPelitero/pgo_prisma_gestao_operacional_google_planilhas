@@ -787,6 +787,15 @@ table.fila.prazos-lista td.direita, table.fila.prazos-lista th.direita { text-al
 }
 
 .rolagem-tabela { overflow-x: auto; }
+
+.raio-x-da-velocidade { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+.raio-x-da-velocidade th, .raio-x-da-velocidade td {
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--linha); vertical-align: top;
+}
+.raio-x-da-velocidade thead th { font-size: 11.5px; color: var(--suave); white-space: nowrap; }
+.raio-x-da-velocidade td { font-family: var(--fonte-dado); white-space: nowrap; }
+.raio-x-da-velocidade td:last-child { white-space: normal; font-family: inherit; min-width: 220px; }
+.raio-x-da-velocidade tr.com-alerta th, .raio-x-da-velocidade tr.com-alerta td:last-child { color: var(--ruim); }
 table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
 
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
@@ -9522,9 +9531,9 @@ var TelaConfiguracoes = (function () {
       + (lista ? sobreALista(lista) : '<p class="config-explica">Nenhuma lista '
         + 'ainda. Crie a primeira em "Nova lista".</p>')
       + '<p class="config-explica">O <strong>nome</strong> é o que fica gravado '
-      + 'no caso; o <strong>rótulo</strong> é o que aparece na tela. Por isso '
-      + 'trocar o rótulo é sempre seguro, e trocar o nome de um item já usado '
-      + 'é recusado.</p>'
+      + 'no caso; o <strong>rótulo</strong> é o que aparece na tela. Trocar o '
+      + 'nome ou excluir mexe só na lista: o formulário passa a usar o novo, e '
+      + 'os casos já gravados continuam com o texto de antes.</p>'
       + '<ul class="config-itens">' + linhas + '</ul>';
 
     var trocaDeLista = elemento('tipo-da-lista');
@@ -9645,27 +9654,20 @@ var TelaConfiguracoes = (function () {
   }
 
   function excluirOItem(item) {
-    Servidor.chamar('usoDoItemDoCatalogo', item.id)
-      .entao(function (uso) {
-        Formulario.confirmarAtencao('Atenção: excluir o item "' + escapar(uso.nome) + '"',
-          '<p><strong>O item sai da lista e do formulário.</strong> Não dá para '
-          + 'desfazer.</p>'
-          + (uso.casos
-            ? '<p>Ele está gravado em <strong>' + escapar(String(uso.casos))
-              + ' caso(s)</strong>. Esses casos continuam com o texto "'
-              + escapar(item.nome) + '".</p>'
-            : '<p>Nenhum caso usa este item.</p>'),
-          'Excluir item', function () {
-            Servidor.chamar('excluirItemDoCatalogo', item.id)
-              .entao(function () {
-                escolhido = null;
-                avisarSalvo('Item excluído.');
-                carregarListas();
-              })
-              .senao(mostrarErroNoPainel);
-          });
-      })
-      .senao(mostrarErroNoPainel);
+    Formulario.confirmarAtencao('Atenção: excluir o item "' + escapar(item.rotulo || item.nome) + '"',
+      '<p><strong>O item sai da lista e do formulário.</strong> Não dá para '
+      + 'desfazer.</p>'
+      + '<p>Os casos que já têm este item continuam com o texto "'
+      + escapar(item.nome) + '".</p>',
+      'Excluir item', function () {
+        Servidor.chamar('excluirItemDoCatalogo', item.id)
+          .entao(function () {
+            escolhido = null;
+            avisarSalvo('Item excluído.');
+            carregarListas();
+          })
+          .senao(mostrarErroNoPainel);
+      });
   }
 
   function desenharPainelDoItem(item) {
@@ -11349,8 +11351,51 @@ var TelaConfiguracoes = (function () {
       + 'servidor. <strong>Só lê</strong> — não muda nada.</p>'
       + '<div class="config-acoes">'
       + '<button type="button" class="botao vazado" id="rodar-diagnostico">'
-      + 'Rodar diagnóstico</button></div>'
+      + 'Rodar diagnóstico</button>'
+      + '<button type="button" class="botao vazado" id="medir-velocidade">'
+      + 'Medir a velocidade</button></div>'
+      + '<p class="config-explica"><strong>Medir a velocidade</strong> (Etapa 85) '
+      + 'cronometra cada aba na planilha de verdade: uma ida pequena, ler a aba '
+      + 'inteira, as fórmulas, a formatação condicional e as planilhas de fora. '
+      + 'Também <strong>só lê</strong>. Rode no horário de uso normal.</p>'
       + '<div id="resultado-do-diagnostico"></div></div>';
+  }
+
+  function raioXDesenhado(raio) {
+    var mil = function (n) { return Number(n || 0).toLocaleString('pt-BR'); };
+    var tempo = function (ms) {
+      if (ms === undefined || ms === null) return '—';
+      return ms >= 1000 ? (ms / 1000).toFixed(1).replace('.', ',') + ' s' : ms + ' ms';
+    };
+    var linhas = raio.abas.map(function (aba) {
+      return '<tr' + (aba.alertas.length ? ' class="com-alerta"' : '') + '>'
+        + '<th scope="row">' + escapar(aba.nome) + '</th>'
+        + '<td>' + mil(aba.linhas) + ' × ' + mil(aba.colunas) + '</td>'
+        + '<td>' + mil(aba.gradeLinhas) + ' × ' + mil(aba.gradeColunas) + '</td>'
+        + '<td>' + tempo(aba.msIdaPequena) + '</td>'
+        + '<td>' + tempo(aba.msAbaInteira) + '</td>'
+        + '<td>' + mil(aba.formulas) + '</td>'
+        + '<td>' + mil(aba.regrasDeFormatacao) + '</td>'
+        + '<td>' + (aba.alertas.length ? escapar(aba.alertas.join(' ')) : 'ok') + '</td></tr>';
+    }).join('');
+    var deFora = raio.deFora.length
+      ? '<p class="config-explica"><strong>Planilhas de fora:</strong> ' + raio.deFora.map(function (item) {
+        return escapar(item.rotulo) + ' — ' + (item.erro ? 'não abriu: ' + escapar(item.erro)
+          : 'abriu em ' + tempo(item.msParaAbrir));
+      }).join(' · ') + '</p>'
+      : '';
+    return '<div class="laudo-resumo ' + (raio.resumo.msPorIda >= 500 ? 'falha' : 'ok') + '">'
+      + '<strong>Cada ida à planilha: ' + tempo(raio.resumo.msPorIda) + '</strong>'
+      + '<span>' + raio.resumo.abas + ' abas · ' + mil(raio.resumo.celulasUsadas) + ' células com dado · '
+      + mil(raio.resumo.celulasDaGrade) + ' na grade · ' + mil(raio.resumo.formulas) + ' fórmula(s) · '
+      + 'medido em ' + tempo(raio.resumo.msNoTotal) + ' · ' + escapar(raio.quando) + '</span></div>'
+      + deFora
+      + '<div class="rolagem-tabela"><table class="raio-x-da-velocidade">'
+      + '<thead><tr><th scope="col">Aba</th><th scope="col">Dados (linhas × colunas)</th>'
+      + '<th scope="col">Grade</th><th scope="col">Uma ida pequena</th>'
+      + '<th scope="col">Ler a aba inteira</th><th scope="col">Fórmulas</th>'
+      + '<th scope="col">Formatação condicional</th><th scope="col">Atenção</th></tr></thead>'
+      + '<tbody>' + linhas + '</tbody></table></div>';
   }
 
   function ligarDiagnostico() {
@@ -11359,6 +11404,16 @@ var TelaConfiguracoes = (function () {
       onde.innerHTML = '<p class="carregando-campos">Conferindo o sistema…</p>';
       Servidor.chamarSemPressa('diagnosticoDoSistema')
         .entao(function (laudo) { onde.innerHTML = laudoDesenhado(laudo); })
+        .senao(function (erro) {
+          onde.innerHTML = '<p class="carregando-campos erro-carga">'
+            + escapar(erro.message || String(erro)) + '</p>';
+        });
+    });
+    elemento('medir-velocidade').addEventListener('click', function () {
+      var onde = elemento('resultado-do-diagnostico');
+      onde.innerHTML = '<p class="carregando-campos">Cronometrando cada aba…</p>';
+      Servidor.chamarSemPressa('raioXDaVelocidade')
+        .entao(function (raio) { onde.innerHTML = raioXDesenhado(raio); })
         .senao(function (erro) {
           onde.innerHTML = '<p class="carregando-campos erro-carga">'
             + escapar(erro.message || String(erro)) + '</p>';

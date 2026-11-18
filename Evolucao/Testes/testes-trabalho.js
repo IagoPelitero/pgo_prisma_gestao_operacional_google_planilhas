@@ -1425,7 +1425,10 @@ function rodarTestesDoTrabalho() {
     // célula ficaria para trás no dia em que alguém arrastasse uma linha.
     const daInstalacao = fs.readFileSync(
       path.join(__dirname, '..', '..', 'Back-End', 'Instalacao.gs'), 'utf8');
-    verdadeiro(daInstalacao.indexOf('ConditionalFormat') < 0,
+    // O raio-x da velocidade (Etapa 85) só CONTA as regras que já existem
+    // (getConditionalFormatRules): o que fica proibido é criar e gravar.
+    verdadeiro(daInstalacao.indexOf('newConditionalFormatRule') < 0
+      && daInstalacao.indexOf('setConditionalFormatRules') < 0,
       'nada de formatação condicional na planilha');
     verdadeiro(daInstalacao.indexOf('setBackground') < 0,
       'nem célula pintada na gravação');

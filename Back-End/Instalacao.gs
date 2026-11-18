@@ -3739,6 +3739,148 @@ function diagnosticoDoSistema() {
 }
 
 // ============================================================================
+// O RAIO-X DA VELOCIDADE (Etapa 85)
+// ============================================================================
+//
+// Pedido do PO: "assim posso medir quanto tempo cada aba está levando". A
+// planilha é pequena (umas 376 mil células nas 18 abas), mas a aba ERROS
+// mostrou 3 idas levando 10 s — uns 3 s por ida, quando o normal é uma fração
+// de segundo. A régua do estresse.js não vê isso: ela não tem as fórmulas, a
+// formatação nem a grade de verdade. Este raio-x mede NA PLANILHA DE VERDADE,
+// com o relógio, e diz o que costuma pesar. SÓ LÊ — não muda nada.
+
+/** Funções que fazem a planilha recalcular muito (nomes em inglês e em português). */
+var RECC_FUNCOES_QUE_PESAM = ['IMPORTRANGE', 'ARRAYFORMULA', 'QUERY', 'INDIRECT', 'INDIRETO',
+  'NOW', 'AGORA', 'TODAY', 'HOJE', 'RAND', 'RANDBETWEEN', 'ALEATORIO', 'ALEATÓRIO', 'VLOOKUP', 'PROCV',
+  'XLOOKUP', 'PROCX', 'FILTER', 'FILTRO', 'IMPORTXML', 'IMPORTDATA', 'GOOGLEFINANCE'];
+/** Uma ida pequena acima disto já é sinal (ms). */
+var RECC_IDA_PEQUENA_LENTA = 500;
+/** Ler a aba inteira acima disto já é sinal (ms). */
+var RECC_ABA_INTEIRA_LENTA = 3000;
+/** Linhas vazias na grade, abaixo da última com dado, a partir das quais vale avisar. */
+var RECC_LINHAS_VAZIAS_DEMAIS = 5000;
+/** Regras de formatação condicional numa aba, a partir das quais vale avisar. */
+var RECC_REGRAS_DEMAIS = 10;
+
+function raioXDaVelocidade() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var comecou = agoraEmMs_();
+  var abas = planilhaAtiva_().getSheets().map(raioXDaAba_);
+  var deFora = [
+    { rotulo: 'Planilha de cadastros', id: idDaPlanilhaDeCadastros_() },
+    { rotulo: 'Planilha legada', id: valorDaConfiguracao_('LEGADO.PLANILHA_ID', '') },
+    { rotulo: 'Histórico da base', id: valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '') },
+    { rotulo: 'Arquivo da auditoria', id: valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '') }
+  ].filter(function (item) { return String(item.id || '').trim(); }).map(function (item) {
+    var inicio = agoraEmMs_();
+    try {
+      var abasDela = SpreadsheetApp.openById(String(item.id).trim()).getSheets().length;
+      return { rotulo: item.rotulo, msParaAbrir: agoraEmMs_() - inicio, abas: abasDela };
+    } catch (erro) {
+      return { rotulo: item.rotulo, msParaAbrir: agoraEmMs_() - inicio, erro: erro.message };
+    }
+  });
+
+  var idas = abas.filter(function (aba) { return aba.msIdaPequena !== undefined; })
+    .map(function (aba) { return aba.msIdaPequena; }).sort(function (a, b) { return a - b; });
+  var resumo = {
+    abas: abas.length,
+    celulasUsadas: abas.reduce(function (soma, aba) { return soma + (aba.celulas || 0); }, 0),
+    celulasDaGrade: abas.reduce(function (soma, aba) { return soma + (aba.grade || 0); }, 0),
+    formulas: abas.reduce(function (soma, aba) { return soma + (aba.formulas || 0); }, 0),
+    // A mediana da ida pequena: o pedágio que TODA chamada paga, por ida.
+    msPorIda: idas.length ? idas[Math.floor(idas.length / 2)] : 0,
+    msNoTotal: agoraEmMs_() - comecou
+  };
+  registrarAuditoria_('diagnostico.velocidade', '', '', resumo.abas + ' aba(s), '
+    + resumo.msPorIda + ' ms por ida, ' + resumo.msNoTotal + ' ms no total');
+  return {
+    quando: formatarData_(new Date(), 'dd/MM/yyyy HH:mm'),
+    resumo: resumo,
+    // As mais lentas primeiro: é por elas que se começa.
+    abas: abas.sort(function (uma, outra) { return (outra.msAbaInteira || 0) - (uma.msAbaInteira || 0); }),
+    deFora: deFora
+  };
+}
+
+/** Uma aba: tamanho, grade, o tempo de uma ida pequena e o de ler tudo, fórmulas e formatação. */
+function raioXDaAba_(aba) {
+  var item = { nome: aba.getName(), alertas: [] };
+  try {
+    var ultimaLinha = aba.getLastRow();
+    var ultimaColuna = aba.getLastColumn();
+    item.linhas = Math.max(ultimaLinha - 1, 0);
+    item.colunas = ultimaColuna;
+    item.gradeLinhas = aba.getMaxRows();
+    item.gradeColunas = aba.getMaxColumns();
+    item.celulas = ultimaLinha * ultimaColuna;
+    item.grade = item.gradeLinhas * item.gradeColunas;
+    if (ultimaLinha >= 1 && ultimaColuna >= 1) {
+      var inicio = agoraEmMs_();
+      aba.getRange(1, 1, 1, ultimaColuna).getValues();
+      item.msIdaPequena = agoraEmMs_() - inicio;
+      var faixa = aba.getRange(1, 1, ultimaLinha, ultimaColuna);
+      inicio = agoraEmMs_();
+      faixa.getValues();
+      item.msAbaInteira = agoraEmMs_() - inicio;
+      contarFormulas_(faixa.getFormulas(), item);
+    }
+    try {
+      item.regrasDeFormatacao = aba.getConditionalFormatRules().length;
+    } catch (semRegras) {
+      item.regrasDeFormatacao = 0;
+    }
+  } catch (erro) {
+    item.erro = erro.message;
+  }
+  alertasDaAba_(item);
+  return item;
+}
+
+function contarFormulas_(formulas, item) {
+  var quantas = 0;
+  var pesadas = {};
+  formulas.forEach(function (linha) {
+    linha.forEach(function (formula) {
+      if (!formula) return;
+      quantas++;
+      var maiusculas = String(formula).toUpperCase();
+      RECC_FUNCOES_QUE_PESAM.forEach(function (nome) {
+        if (maiusculas.indexOf(nome + '(') >= 0) pesadas[nome] = (pesadas[nome] || 0) + 1;
+      });
+    });
+  });
+  item.formulas = quantas;
+  item.funcoesQuePesam = Object.keys(pesadas).map(function (nome) {
+    return { nome: nome, vezes: pesadas[nome] };
+  });
+}
+
+function alertasDaAba_(item) {
+  if (item.erro) { item.alertas.push('Não consegui medir: ' + item.erro); return; }
+  if (item.msIdaPequena >= RECC_IDA_PEQUENA_LENTA) {
+    item.alertas.push('Ler só o cabeçalho levou ' + item.msIdaPequena + ' ms: cada ida a esta aba está cara.');
+  }
+  if (item.msAbaInteira >= RECC_ABA_INTEIRA_LENTA) {
+    item.alertas.push('Ler a aba inteira levou ' + (item.msAbaInteira / 1000).toFixed(1) + ' s.');
+  }
+  var vazias = item.gradeLinhas - item.linhas - 1;
+  if (vazias >= RECC_LINHAS_VAZIAS_DEMAIS) {
+    item.alertas.push(vazias.toLocaleString('pt-BR') + ' linhas vazias na grade, abaixo dos dados.');
+  }
+  if ((item.funcoesQuePesam || []).length) {
+    item.alertas.push('Fórmulas que recalculam muito: ' + item.funcoesQuePesam.map(function (f) {
+      return f.nome + ' (' + f.vezes + ')';
+    }).join(', ') + '.');
+  } else if (item.formulas > 0) {
+    item.alertas.push(item.formulas.toLocaleString('pt-BR') + ' fórmula(s) nesta aba.');
+  }
+  if (item.regrasDeFormatacao >= RECC_REGRAS_DEMAIS) {
+    item.alertas.push(item.regrasDeFormatacao + ' regras de formatação condicional.');
+  }
+}
+
+// ============================================================================
 // O LAUDO
 // ============================================================================
 

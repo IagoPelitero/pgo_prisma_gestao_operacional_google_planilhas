@@ -49,6 +49,7 @@ const { rodarTestesDosPopupsDaImportacao } = require('./testes-popups-da-importa
 const { rodarTestesDaImportacaoEmPassos } = require('./testes-importacao-em-passos');
 const { rodarTestesDaBuscaComLocalizador } = require('./testes-busca-com-localizador');
 const { rodarTestesDasSubAbasDoTrabalho } = require('./testes-sub-abas-do-trabalho');
+const { rodarTestesDoRaioXDaVelocidade } = require('./testes-raio-x-da-velocidade');
 const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
@@ -111,6 +112,7 @@ rodarTestesDosPopupsDaImportacao();
 rodarTestesDaImportacaoEmPassos();
 rodarTestesDaBuscaComLocalizador();
 rodarTestesDasSubAbasDoTrabalho();
+rodarTestesDoRaioXDaVelocidade();
 rodarTestesDaDataDaFinalizacao();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();

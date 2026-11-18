@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-18 13:14
+   Gerado em 2026-11-18 20:18
    ========================================================================== */
 
 
@@ -6009,6 +6009,11 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
 /* ==== Config.gs =========================================================== */
 
 function resumoDasConfiguracoes() {
+
+  return cronometrado_('resumoDasConfiguracoes', resumoDasConfiguracoesSemRelogio_, arguments);
+}
+
+function resumoDasConfiguracoesSemRelogio_() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var catalogo = lerRegistros_('CATALOGO');
   var laudo = conferirEstrutura_();
@@ -6464,6 +6469,11 @@ function listarCatalogo(tipo, idDoCanal) {
 }
 
 function salvarItemDoCatalogo(dados) {
+
+  return cronometrado_('salvarItemDoCatalogo', salvarItemDoCatalogoSemRelogio_, arguments);
+}
+
+function salvarItemDoCatalogoSemRelogio_(dados) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   dados = dadosDaTela_(dados);
 
@@ -6507,20 +6517,12 @@ function salvarItemDoCatalogo(dados) {
   }
 
   if (id) {
-    if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
-      var emUso = quantosCasosUsam_(atual);
-      if (emUso > 0) {
-        throw new Error('"' + atual.Nome + '" está gravado em ' + emUso +
-          ' caso(s). Trocar o nome aqui NÃO renomeia o que já foi gravado — ' +
-          'eles ficariam apontando para um item que não existe mais. ' +
-          'Para mudar só o que aparece na tela, troque o rótulo.');
-      }
-    }
+
+    var renomeou = normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome);
     atualizarRegistro_('CATALOGO', id, campos);
-    if (normalizarParaComparar_(atual.Nome) !== normalizarParaComparar_(nome)) {
-      renomearNosCartoes_(atual.Nome, nome, tipo, campos.CanalId);
-    }
-    registrarAuditoria_('catalogo.editar', 'CATALOGO', id, tipo);
+    if (renomeou) renomearNosCartoes_(atual.Nome, nome, tipo, campos.CanalId);
+    registrarAuditoria_('catalogo.editar', 'CATALOGO', id, tipo
+      + (renomeou ? ' — "' + atual.Nome + '" virou "' + nome + '"' : ''));
     return id;
   }
 
@@ -6828,6 +6830,11 @@ function usoDoItemDoCatalogo(id) {
 }
 
 function excluirItemDoCatalogo(id) {
+
+  return cronometrado_('excluirItemDoCatalogo', excluirItemDoCatalogoSemRelogio_, arguments);
+}
+
+function excluirItemDoCatalogoSemRelogio_(id) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var alvo = converterParaIdentificador_(id);
   var item = buscarRegistros_('CATALOGO', 'Id', alvo, 1)[0];
@@ -6836,11 +6843,11 @@ function excluirItemDoCatalogo(id) {
   if (RECC_TIPOS_FORA_DAS_LISTAS.indexOf(tipo) >= 0) {
     throw new Error('Este registro não é um item de lista.');
   }
-  var casos = quantosCasosUsam_(item);
+
   apagarRegistroDeVez_('CATALOGO', alvo);
   registrarAuditoria_('catalogo.excluir', 'CATALOGO', alvo, tipo + ' — ' + item.Nome
-    + (casos ? ' (gravado em ' + casos + ' caso(s), que mantêm o texto)' : ''));
-  return { nome: String(item.Rotulo || item.Nome), casos: casos };
+    + ' (os casos que já o têm mantêm o texto)');
+  return { nome: String(item.Rotulo || item.Nome) };
 }
 
 function listarNiveisDeAcesso() {
@@ -9289,8 +9296,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.84',
-  data: '17/11/2026'
+  numero: '1.85',
+  data: '18/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -16614,6 +16621,135 @@ function diagnosticoDoSistema() {
   registrarAuditoria_('diagnostico.rodar', '', '',
     laudo.resumo.falhas + ' falha(s), ' + laudo.resumo.atencoes + ' atenção(ões)');
   return laudo;
+}
+
+var RECC_FUNCOES_QUE_PESAM = ['IMPORTRANGE', 'ARRAYFORMULA', 'QUERY', 'INDIRECT', 'INDIRETO',
+  'NOW', 'AGORA', 'TODAY', 'HOJE', 'RAND', 'RANDBETWEEN', 'ALEATORIO', 'ALEATÓRIO', 'VLOOKUP', 'PROCV',
+  'XLOOKUP', 'PROCX', 'FILTER', 'FILTRO', 'IMPORTXML', 'IMPORTDATA', 'GOOGLEFINANCE'];
+
+var RECC_IDA_PEQUENA_LENTA = 500;
+
+var RECC_ABA_INTEIRA_LENTA = 3000;
+
+var RECC_LINHAS_VAZIAS_DEMAIS = 5000;
+
+var RECC_REGRAS_DEMAIS = 10;
+
+function raioXDaVelocidade() {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var comecou = agoraEmMs_();
+  var abas = planilhaAtiva_().getSheets().map(raioXDaAba_);
+  var deFora = [
+    { rotulo: 'Planilha de cadastros', id: idDaPlanilhaDeCadastros_() },
+    { rotulo: 'Planilha legada', id: valorDaConfiguracao_('LEGADO.PLANILHA_ID', '') },
+    { rotulo: 'Histórico da base', id: valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '') },
+    { rotulo: 'Arquivo da auditoria', id: valorDaConfiguracao_(RECC_CHAVE_DO_ARQUIVO_DA_AUDITORIA, '') }
+  ].filter(function (item) { return String(item.id || '').trim(); }).map(function (item) {
+    var inicio = agoraEmMs_();
+    try {
+      var abasDela = SpreadsheetApp.openById(String(item.id).trim()).getSheets().length;
+      return { rotulo: item.rotulo, msParaAbrir: agoraEmMs_() - inicio, abas: abasDela };
+    } catch (erro) {
+      return { rotulo: item.rotulo, msParaAbrir: agoraEmMs_() - inicio, erro: erro.message };
+    }
+  });
+
+  var idas = abas.filter(function (aba) { return aba.msIdaPequena !== undefined; })
+    .map(function (aba) { return aba.msIdaPequena; }).sort(function (a, b) { return a - b; });
+  var resumo = {
+    abas: abas.length,
+    celulasUsadas: abas.reduce(function (soma, aba) { return soma + (aba.celulas || 0); }, 0),
+    celulasDaGrade: abas.reduce(function (soma, aba) { return soma + (aba.grade || 0); }, 0),
+    formulas: abas.reduce(function (soma, aba) { return soma + (aba.formulas || 0); }, 0),
+
+    msPorIda: idas.length ? idas[Math.floor(idas.length / 2)] : 0,
+    msNoTotal: agoraEmMs_() - comecou
+  };
+  registrarAuditoria_('diagnostico.velocidade', '', '', resumo.abas + ' aba(s), '
+    + resumo.msPorIda + ' ms por ida, ' + resumo.msNoTotal + ' ms no total');
+  return {
+    quando: formatarData_(new Date(), 'dd/MM/yyyy HH:mm'),
+    resumo: resumo,
+
+    abas: abas.sort(function (uma, outra) { return (outra.msAbaInteira || 0) - (uma.msAbaInteira || 0); }),
+    deFora: deFora
+  };
+}
+
+function raioXDaAba_(aba) {
+  var item = { nome: aba.getName(), alertas: [] };
+  try {
+    var ultimaLinha = aba.getLastRow();
+    var ultimaColuna = aba.getLastColumn();
+    item.linhas = Math.max(ultimaLinha - 1, 0);
+    item.colunas = ultimaColuna;
+    item.gradeLinhas = aba.getMaxRows();
+    item.gradeColunas = aba.getMaxColumns();
+    item.celulas = ultimaLinha * ultimaColuna;
+    item.grade = item.gradeLinhas * item.gradeColunas;
+    if (ultimaLinha >= 1 && ultimaColuna >= 1) {
+      var inicio = agoraEmMs_();
+      aba.getRange(1, 1, 1, ultimaColuna).getValues();
+      item.msIdaPequena = agoraEmMs_() - inicio;
+      var faixa = aba.getRange(1, 1, ultimaLinha, ultimaColuna);
+      inicio = agoraEmMs_();
+      faixa.getValues();
+      item.msAbaInteira = agoraEmMs_() - inicio;
+      contarFormulas_(faixa.getFormulas(), item);
+    }
+    try {
+      item.regrasDeFormatacao = aba.getConditionalFormatRules().length;
+    } catch (semRegras) {
+      item.regrasDeFormatacao = 0;
+    }
+  } catch (erro) {
+    item.erro = erro.message;
+  }
+  alertasDaAba_(item);
+  return item;
+}
+
+function contarFormulas_(formulas, item) {
+  var quantas = 0;
+  var pesadas = {};
+  formulas.forEach(function (linha) {
+    linha.forEach(function (formula) {
+      if (!formula) return;
+      quantas++;
+      var maiusculas = String(formula).toUpperCase();
+      RECC_FUNCOES_QUE_PESAM.forEach(function (nome) {
+        if (maiusculas.indexOf(nome + '(') >= 0) pesadas[nome] = (pesadas[nome] || 0) + 1;
+      });
+    });
+  });
+  item.formulas = quantas;
+  item.funcoesQuePesam = Object.keys(pesadas).map(function (nome) {
+    return { nome: nome, vezes: pesadas[nome] };
+  });
+}
+
+function alertasDaAba_(item) {
+  if (item.erro) { item.alertas.push('Não consegui medir: ' + item.erro); return; }
+  if (item.msIdaPequena >= RECC_IDA_PEQUENA_LENTA) {
+    item.alertas.push('Ler só o cabeçalho levou ' + item.msIdaPequena + ' ms: cada ida a esta aba está cara.');
+  }
+  if (item.msAbaInteira >= RECC_ABA_INTEIRA_LENTA) {
+    item.alertas.push('Ler a aba inteira levou ' + (item.msAbaInteira / 1000).toFixed(1) + ' s.');
+  }
+  var vazias = item.gradeLinhas - item.linhas - 1;
+  if (vazias >= RECC_LINHAS_VAZIAS_DEMAIS) {
+    item.alertas.push(vazias.toLocaleString('pt-BR') + ' linhas vazias na grade, abaixo dos dados.');
+  }
+  if ((item.funcoesQuePesam || []).length) {
+    item.alertas.push('Fórmulas que recalculam muito: ' + item.funcoesQuePesam.map(function (f) {
+      return f.nome + ' (' + f.vezes + ')';
+    }).join(', ') + '.');
+  } else if (item.formulas > 0) {
+    item.alertas.push(item.formulas.toLocaleString('pt-BR') + ' fórmula(s) nesta aba.');
+  }
+  if (item.regrasDeFormatacao >= RECC_REGRAS_DEMAIS) {
+    item.alertas.push(item.regrasDeFormatacao + ' regras de formatação condicional.');
+  }
 }
 
 function rodarDiagnostico_() {
