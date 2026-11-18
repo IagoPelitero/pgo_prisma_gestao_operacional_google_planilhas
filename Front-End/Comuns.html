@@ -1697,10 +1697,31 @@ var Formulario = (function () {
     var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-susep');
     if (!selo) return;
 
-    if (!String(valor || '').trim()) {
+    /*
+      UMA CONSULTA POR SUSEP, E SÓ A RESPOSTA DA ATUAL (Etapa 86, F11).
+
+      O campo chama aqui no `change` E no `blur`: digitar e sair do campo
+      disparava DUAS consultas iguais — de 8 a 11 segundos cada na planilha do
+      PO. A mesma SUSEP já consultada (ou a caminho) não vai de novo. E a
+      resposta que chega depois de a pessoa trocar a SUSEP é descartada, como
+      a do selo da proposta: a da primeira não pode pintar o selo da segunda.
+      As regras (cadastrada antes de bloqueada, o bloqueio por canal, o
+      segmento) são do servidor e não mudam.
+    */
+    var texto = String(valor || '').trim();
+    var pedido = (Number(selo.getAttribute('data-pedido')) || 0) + 1;
+    if (!texto) {
+      selo.setAttribute('data-pedido', String(pedido));
+      selo.removeAttribute('data-consultada');
       selo.hidden = true;
       return;
     }
+    if (selo.getAttribute('data-consultada') === texto) return;
+    selo.setAttribute('data-pedido', String(pedido));
+    selo.setAttribute('data-consultada', texto);
+    var aindaEAMesma = function () {
+      return selo.getAttribute('data-pedido') === String(pedido);
+    };
 
     selo.hidden = false;
     selo.className = 'selo-susep conferindo';
@@ -1711,6 +1732,7 @@ var Formulario = (function () {
     // disso é a coluna do canal — não esta tela.
     Servidor.chamar('consultarSusep', valor, idDoCanal)
       .entao(function (resposta) {
+        if (!aindaEAMesma()) return;
         var aparencia = {
           OK: 'liberada', BLOQUEADA: 'bloqueada',
           NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
@@ -1727,6 +1749,9 @@ var Formulario = (function () {
         preencherCorretoraDaSusep(raiz, resposta);
       })
       .senao(function () {
+        if (!aindaEAMesma()) return;
+        // Falhou: a mesma SUSEP pode ser conferida de novo ao sair do campo.
+        selo.removeAttribute('data-consultada');
         selo.className = 'selo-susep conferindo';
         selo.textContent = 'Não consegui conferir a SUSEP agora.';
       });
