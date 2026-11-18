@@ -37,6 +37,66 @@ var TelaCadastrarCaso = (function () {
   // oferece (Etapa 86).
   var pacoteDaTela = null;
 
+  /*
+    NÃO PERDER O QUE FOI DIGITADO (Etapa 87, F2).
+
+    Trocar de canal, trocar entre Caso e Reunião, ir para outra tela do
+    Prisma ou recarregar e fechar a página jogavam fora o formulário sem
+    perguntar. O retrato abaixo é o formulário como ele acabou de montar
+    (com os padrões); havendo diferença, pergunta antes — a mesma pergunta do
+    "Trabalhar no caso". Fica SÓ na memória da página: nada de rascunho no
+    navegador, nem CPF, nem nome (decisão do PO). null: não há formulário
+    (carregando, ou o cadastro concluído no lugar dele).
+  */
+  var retratoDoCadastro = null;
+
+  function retratoDoCadastroAgora() {
+    if (oQueCadastrar === 'reuniao') {
+      var daReuniao = elemento('corpo-da-reuniao');
+      var acoesDaReuniao = elemento('acoes-da-reuniao');
+      if (!daReuniao || !acoesDaReuniao || acoesDaReuniao.hidden) return null;
+      return JSON.stringify(Agenda.valores(daReuniao));
+    }
+    var acoes = elemento('acoes-do-caso');
+    if (!corpo() || !acoes || acoes.hidden) return null;
+    return JSON.stringify(Formulario.valores(corpo()));
+  }
+
+  function guardarRetratoDoCadastro() { retratoDoCadastro = retratoDoCadastroAgora(); }
+
+  function temAlteracaoNoCadastro() {
+    if (retratoDoCadastro === null) return false;
+    var agora = retratoDoCadastroAgora();
+    return agora !== null && agora !== retratoDoCadastro;
+  }
+
+  /** Segue já, ou depois de a pessoa escolher descartar. */
+  function depoisDePerguntar(seguir) {
+    if (!temAlteracaoNoCadastro()) { seguir(); return; }
+    Formulario.confirmarDescarte(function () {
+      retratoDoCadastro = null;
+      seguir();
+    });
+  }
+
+  /**
+   * A moldura pergunta antes de trocar de tela (Aplicacao.irPara): true, pode
+   * sair; false, a pergunta está na tela e `seguir` é chamado se descartar.
+   */
+  function podeSair(seguir) {
+    if (!temAlteracaoNoCadastro()) return true;
+    depoisDePerguntar(seguir);
+    return false;
+  }
+
+  /** Recarregar ou fechar a página: o aviso do próprio navegador. */
+  function aoSairDaPagina(evento) {
+    if (!temAlteracaoNoCadastro()) return undefined;
+    evento.preventDefault();
+    evento.returnValue = '';
+    return '';
+  }
+
   function abasDaMesa() {
     if (!temAgenda) return '';
     return '<div class="config-abas" role="tablist" aria-label="O que cadastrar">'
@@ -63,6 +123,7 @@ var TelaCadastrarCaso = (function () {
         camposDaReuniao = resposta.campos;
         elemento('corpo-da-reuniao').innerHTML = Agenda.formulario(resposta.campos, null);
         elemento('acoes-da-reuniao').hidden = false;
+        guardarRetratoDoCadastro();
       })
       .senao(function (erro) {
         elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga">'
@@ -85,6 +146,7 @@ var TelaCadastrarCaso = (function () {
           botao.disabled = false;
           Moldura.toast('Reunião registrada na Agenda.', 'bom');
           elemento('corpo-da-reuniao').innerHTML = Agenda.formulario(camposDaReuniao, null);
+          guardarRetratoDoCadastro();
         })
         .senao(function (erro) {
           botao.disabled = false;
@@ -149,6 +211,7 @@ var TelaCadastrarCaso = (function () {
         // padrões. Se der erro na carga, os botões continuam escondidos: não
         // há o que cadastrar, e o recado do erro é o que importa ler.
         mostrarAsAcoes(true);
+        guardarRetratoDoCadastro();
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -272,16 +335,23 @@ var TelaCadastrarCaso = (function () {
 
   function ligar() {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhido = idDoCanal;
-      Aplicacao.remontar();
+      depoisDePerguntar(function () {
+        canalEscolhido = idDoCanal;
+        Aplicacao.remontar(true);   // já perguntou: a moldura não pergunta de novo
+      });
     });
     var abas = document.querySelectorAll('[data-o-que-cadastrar]');
     for (var i = 0; i < abas.length; i++) {
       abas[i].addEventListener('click', function () {
-        oQueCadastrar = this.getAttribute('data-o-que-cadastrar');
-        Aplicacao.remontar();
+        var qual = this.getAttribute('data-o-que-cadastrar');
+        depoisDePerguntar(function () {
+          oQueCadastrar = qual;
+          Aplicacao.remontar(true);
+        });
       });
     }
+    retratoDoCadastro = null;
+    window.addEventListener('beforeunload', aoSairDaPagina);
     if (oQueCadastrar === 'reuniao') { ligarReuniao(); return; }
 
     elemento('formulario-do-caso').addEventListener('submit', function (evento) {
@@ -312,8 +382,10 @@ var TelaCadastrarCaso = (function () {
   /** Chamado ao sair da tela, para o atalho não continuar valendo nas outras. */
   function desligar() {
     document.removeEventListener('keydown', atalhoDeSalvar);
+    window.removeEventListener('beforeunload', aoSairDaPagina);
+    retratoDoCadastro = null;
   }
 
-  return { montar: montar, ligar: ligar, desligar: desligar };
+  return { montar: montar, ligar: ligar, desligar: desligar, podeSair: podeSair };
 })();
 </script>

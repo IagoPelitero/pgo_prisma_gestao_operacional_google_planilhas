@@ -431,6 +431,99 @@ async function rodar() {
     if (cadastrada.criada) vm.runInContext("apagarRegistroDeVez_('CORRETORAS', '" + cadastrada.criada + "')", contexto);
   });
 
+  await teste('o Cadastrar Caso pergunta antes de perder o que foi digitado (Etapa 87, F2)', async () => {
+    const irAoCadastro = async () => {
+      await pagina.click('[data-tela="cadastrarCaso"]');
+      await pagina.waitForFunction(() => {
+        const acoes = document.getElementById('acoes-do-caso') || document.getElementById('acoes-da-reuniao');
+        return acoes && !acoes.hidden;
+      }, null, { timeout: 10000 });
+    };
+    const livre = (raiz) => pagina.$$eval(raiz + ' input[type="text"], ' + raiz + ' textarea', (es) => {
+      const um = es.find((e) => !e.disabled && e.offsetParent !== null); return um ? '#' + um.id : '';
+    });
+    const perguntou = () => pagina.locator('#dialogo-descarte').count();
+    const aoSairDaPagina = () => pagina.evaluate(() => {
+      const evento = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    });
+    const retCanal = pagina.locator('.canal', { hasText: 'RET' }).first();
+    const mesaCanal = pagina.locator('.canal', { hasText: 'Mesa' }).first();
+
+    // Sem digitar nada: sai sem pergunta, e o navegador não é chamado a avisar.
+    await irAoCadastro();
+    await retCanal.click(); await pagina.waitForTimeout(600);
+    verdadeiro(!(await aoSairDaPagina()), 'formulário intacto: fechar a página não avisa');
+    await pagina.click('[data-tela="buscarCaso"]');
+    await pagina.waitForTimeout(400);
+    igual(await perguntou(), 0, 'sem alteração, troca de tela sem perguntar');
+    igual(await pagina.evaluate(() => location.hash), '#buscarCaso');
+
+    // Com algo digitado.
+    await irAoCadastro();
+    const campo = await livre('#formulario-do-caso');
+    verdadeiro(!!campo, 'um campo para digitar');
+    await pagina.fill(campo, 'Digitado no teste');
+    verdadeiro(await aoSairDaPagina(), 'recarregar ou fechar a página pede o aviso do navegador');
+
+    // 1. Outra tela, pelo menu: pergunta; continuar fica, com o que foi digitado.
+    await pagina.click('[data-tela="buscarCaso"]');
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    contem(await pagina.textContent('#dialogo-descarte'), 'Você possui alterações não salvas. Deseja descartá-las?');
+    await pagina.click('#continuar-editando'); await pagina.waitForTimeout(200);
+    igual(await pagina.evaluate(() => location.hash), '#cadastrarCaso', 'continuou no Cadastrar');
+    igual(await pagina.inputValue(campo), 'Digitado no teste', 'com o que foi digitado');
+
+    // 2. O voltar do navegador (o endereço muda): pergunta, e o endereço volta.
+    await pagina.evaluate(() => { location.hash = 'trabalho'; });
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#continuar-editando'); await pagina.waitForTimeout(300);
+    igual(await pagina.evaluate(() => location.hash), '#cadastrarCaso', 'o endereço voltou a ser o do Cadastrar');
+    igual(await pagina.inputValue(campo), 'Digitado no teste');
+
+    // 3. O recarregar da tela, no alto: pergunta.
+    await pagina.click('#recarregar');
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#continuar-editando'); await pagina.waitForTimeout(200);
+    igual(await pagina.inputValue(campo), 'Digitado no teste', 'recarregar a tela não apagou');
+
+    // 4. Trocar de canal: pergunta; descartar troca.
+    await mesaCanal.click();
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#continuar-editando'); await pagina.waitForTimeout(200);
+    igual(await pagina.inputValue(campo), 'Digitado no teste', 'continuar: o canal não trocou');
+    await mesaCanal.click();
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#descartar-alteracoes');
+    await pagina.waitForFunction(() => {
+      const acoes = document.getElementById('acoes-do-caso');
+      return acoes && !acoes.hidden;
+    }, null, { timeout: 10000 });
+    igual(await perguntou(), 0);
+
+    // 5. Na Mesa, do Caso para a Reunião: pergunta. (A volta, da Reunião para o
+    //    Caso, é conferida depois que a Agenda da Mesa existe — ver Etapa 79.)
+    const abaReuniao = pagina.locator('[data-o-que-cadastrar="reuniao"]');
+    verdadeiro(await abaReuniao.count() > 0, 'a Mesa tem a aba Reunião');
+    const daMesa = await livre('#formulario-do-caso');
+    await pagina.fill(daMesa, 'Caso da Mesa no teste');
+    await abaReuniao.click();
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#continuar-editando'); await pagina.waitForTimeout(200);
+    igual(await pagina.inputValue(daMesa), 'Caso da Mesa no teste', 'continuar: ficou no Caso');
+
+    // Volta à RET descartando o da Mesa; o formulário novo não tem o que perder.
+    await retCanal.click();
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#descartar-alteracoes');
+    await pagina.waitForFunction(() => {
+      const acoes = document.getElementById('acoes-do-caso');
+      return acoes && !acoes.hidden;
+    }, null, { timeout: 10000 });
+    verdadeiro(!(await aoSairDaPagina()), 'formulário novo: nada a avisar');
+  });
+
   await teste('cadastrar um caso grava na base', async () => {
     const antes = naPlanilha('BASE_RET').length;
 
@@ -513,9 +606,11 @@ async function rodar() {
     igual(canalDepois, canalAntes, 'o mesmo canal');
     igual(naPlanilha('BASE_RET').length, antes + 1, '"Cadastrar outro" não grava nada sozinho');
 
-    // E a volta normal ao Trabalho, pelo menu.
+    // E a volta normal ao Trabalho, pelo menu — sem pergunta: nada foi digitado (F2).
     await pagina.click('[data-tela="trabalho"]');
     await pagina.waitForTimeout(900);
+    igual(await pagina.locator('#dialogo-descarte').count(), 0, 'depois de cadastrar, navegar não pergunta');
+    igual(await pagina.evaluate(() => location.hash), '#trabalho');
   });
 
   await teste('no Trabalho, a resposta de um pedido antigo não pinta por cima do novo (Etapa 86, F6)', async () => {
@@ -1423,6 +1518,9 @@ async function rodar() {
     const depois = await pagina.textContent('#falta-no-caso');
     igual(await pagina.$eval('#salvar-caso', (el) => el.disabled), depois !== '',
       'o botão acende exatamente quando o recado some');
+    // Sai sem cadastrar: limpa antes, senão a troca de tela pergunta (Etapa 87, F2).
+    await pagina.click('#limpar-caso');
+    await pagina.waitForSelector('#acoes-do-caso:not([hidden])', { timeout: 10000 });
   });
 
   await teste('Configurações: a busca acha o campo pelo nome, e os desligados ficam recolhidos', async () => {
@@ -1542,6 +1640,22 @@ async function rodar() {
     // E a aba "Caso" volta ao formulário de sempre.
     await pagina.click('[data-o-que-cadastrar="caso"]');
     await pagina.waitForSelector('#formulario-do-caso', { timeout: 10000 });
+  });
+
+  await teste('Cadastrar Caso › Mesa: da Reunião para o Caso, com algo digitado, pergunta antes (Etapa 87, F2)', async () => {
+    await pagina.click('[data-o-que-cadastrar="reuniao"]');
+    await pagina.waitForSelector('#corpo-da-reuniao #agenda-corretora', { timeout: 10000 });
+    await pagina.fill('#agenda-corretora', 'Digitada e não registrada');
+    await pagina.click('[data-o-que-cadastrar="caso"]');
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#continuar-editando'); await pagina.waitForTimeout(200);
+    igual(await pagina.inputValue('#agenda-corretora'), 'Digitada e não registrada', 'continuar: a reunião fica');
+    await pagina.click('[data-o-que-cadastrar="caso"]');
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#descartar-alteracoes');
+    await pagina.waitForSelector('#formulario-do-caso', { timeout: 10000 });
+    const gravadas = vm.runInContext('agendaDaMesa(canaisVisiveis_().filter(function (c) { return c.aba === "BASE_MESA"; })[0].id, "")', contexto);
+    verdadeiro(!gravadas.reunioes.some((r) => r.valores.corretora === 'Digitada e não registrada'), 'descartar não grava a reunião');
   });
 
   /* ------------------------------------------------------------- o final -- */

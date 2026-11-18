@@ -286,7 +286,9 @@ var Rotas = (function () {
       subtitulo: 'Registro de um caso novo, com o formulário montado pelo canal.',
       montar: function (pacote) { return TelaCadastrarCaso.montar(pacote); },
       ligar: function (pacote) { TelaCadastrarCaso.ligar(pacote); },
-      desligar: function () { TelaCadastrarCaso.desligar(); }
+      desligar: function () { TelaCadastrarCaso.desligar(); },
+      // Antes de sair com o formulário preenchido, pergunta (Etapa 87, F2).
+      podeSair: function (seguir) { return TelaCadastrarCaso.podeSair(seguir); }
     },
     buscarCaso: {
       titulo: 'Buscar Caso',
@@ -389,7 +391,22 @@ var Aplicacao = (function () {
    * ninguém de digitar o endereço da tela. E o servidor confere de novo em
    * cada função — esconder botão nunca foi segurança.
    */
-  function irPara(tela, semHistorico) {
+  function irPara(tela, semHistorico, semPerguntar) {
+    /*
+      A TELA QUE SAI PODE PEDIR PARA PERGUNTAR ANTES (Etapa 87, F2): o
+      Cadastrar Caso com o formulário preenchido. Vale para todo caminho que
+      passa por aqui — o menu, a busca do alto, o voltar do navegador (o
+      endereço volta a ser o desta tela) e o botão de recarregar a tela.
+      Vem antes de tudo: trocar de tela descartaria as respostas a caminho.
+    */
+    if (!semPerguntar && telaAtual && Rotas.existe(telaAtual)) {
+      var saindo = Rotas.pegar(telaAtual);
+      if (saindo.podeSair && !saindo.podeSair(function () { irPara(tela, false, true); })) {
+        if (location.hash !== '#' + telaAtual) location.hash = telaAtual;
+        return;
+      }
+    }
+
     // Antes de qualquer coisa: o que estava a caminho era para a tela antiga.
     Servidor.trocouDeTela(tela);
 
@@ -596,9 +613,13 @@ var Aplicacao = (function () {
     ligarTeclado();
   }
 
-  /** Redesenha a tela atual — usada quando ela mesma muda de estado. */
-  function remontar() {
-    if (telaAtual) irPara(telaAtual, true);
+  /**
+   * Redesenha a tela atual — usada quando ela mesma muda de estado.
+   * `semPerguntar`: a tela já perguntou antes de pedir (o Cadastrar, ao trocar
+   * de canal). O botão de recarregar do alto chama sem, e pergunta.
+   */
+  function remontar(semPerguntar) {
+    if (telaAtual) irPara(telaAtual, true, semPerguntar === true);
   }
 
   return {
