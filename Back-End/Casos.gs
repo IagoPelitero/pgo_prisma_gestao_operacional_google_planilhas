@@ -2031,6 +2031,12 @@ function preencherResponsavelAutomatico_(canal, paraGravar, quem) {
  *                    precisa saber disso antes de seguir
  */
 function consultarSusep(susep, idDoCanal) {
+  // No cronômetro (Etapa 86, medição M2): passando de 8 s, a aba ERROS diz
+  // onde foi o tempo — antes só a tela registrava quanto esperou.
+  return cronometrado_('consultarSusep', consultarSusepSemRelogio_, arguments);
+}
+
+function consultarSusepSemRelogio_(susep, idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
 
   var procurada = susepComoSeEscreve_(susep);
@@ -2183,6 +2189,12 @@ function deveConferirOBloqueio_(idDoCanal, quem) {
  * ser nenhuma ou uma.
  */
 function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
+  // No cronômetro (Etapa 86, medição M2): passando de 8 s, a aba ERROS diz
+  // onde foi o tempo — antes só a tela registrava quanto esperou.
+  return cronometrado_('conferirPropostaRepetida', conferirPropostaRepetidaSemRelogio_, arguments);
+}
+
+function conferirPropostaRepetidaSemRelogio_(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 

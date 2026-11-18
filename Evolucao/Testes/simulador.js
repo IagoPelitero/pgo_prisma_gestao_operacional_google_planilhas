@@ -318,6 +318,7 @@ class Aba {
     return new Faixa(this, l, c, nl, nc);
   }
   getLastRow() {
+    medidor.ultimasLinhas++;
     for (let l = this.valores.length - 1; l >= 0; l--) {
       if (this.valores[l].some((v) => v !== '' && v !== null && v !== undefined)) {
         return l + 1;
@@ -326,6 +327,7 @@ class Aba {
     return 0;
   }
   getLastColumn() {
+    medidor.ultimasColunas++;
     let ultima = 0;
     for (let l = 0; l < this.valores.length; l++) {
       for (let c = this.valores[l].length - 1; c >= ultima; c--) {
@@ -393,6 +395,12 @@ const medidor = {
   propriedadesLidas: 0,
   propriedadesGravadas: 0,
   travasPedidas: 0,
+  // Medição M3 (Etapa 86): chamadas que também atravessam a fronteira do
+  // Apps Script e que a conta de idas não via. Ficam à parte, para as contas
+  // de antes continuarem comparáveis.
+  abasPedidas: 0,       // getSheetByName
+  ultimasLinhas: 0,     // getLastRow
+  ultimasColunas: 0,    // getLastColumn
   // O CacheService também é ida ao serviço — barata (uns 10 ms), mas é. Fica
   // contado à parte, para a conta das idas à PLANILHA continuar comparável.
   cacheLidos: 0,
@@ -403,6 +411,7 @@ const medidor = {
     this.buscasRapidas = 0;
     this.propriedadesLidas = 0; this.propriedadesGravadas = 0;
     this.travasPedidas = 0;
+    this.abasPedidas = 0; this.ultimasLinhas = 0; this.ultimasColunas = 0;
     this.cacheLidos = 0; this.cacheGravados = 0;
     return this;
   },
@@ -417,6 +426,13 @@ const medidor = {
       travasPedidas: this.travasPedidas,
       cacheLidos: this.cacheLidos,
       cacheGravados: this.cacheGravados,
+      abasPedidas: this.abasPedidas, ultimasLinhas: this.ultimasLinhas,
+      ultimasColunas: this.ultimasColunas,
+      // Todas as chamadas à planilha (M3): as idas de sempre, as buscas do
+      // localizador e as de estrutura (aba, última linha, última coluna).
+      chamadasNoTotal: this.idasParaLer + this.idasParaGravar + this.propriedadesLidas
+        + this.propriedadesGravadas + this.buscasRapidas + this.abasPedidas
+        + this.ultimasLinhas + this.ultimasColunas,
       // O que o Apps Script realmente cobra: cada ida ao serviço.
       idasNoTotal: this.idasParaLer + this.idasParaGravar
         + this.propriedadesLidas + this.propriedadesGravadas
@@ -446,7 +462,7 @@ class Planilha {
     this.abas.push(a);
     return a;
   }
-  getSheetByName(nome) { return this.abas.find((a) => a.nome === nome) || null; }
+  getSheetByName(nome) { medidor.abasPedidas++; return this.abas.find((a) => a.nome === nome) || null; }
   /*
     Apagar aba de verdade, e não marcar como apagada.
 

@@ -1,0 +1,236 @@
+{
+ "quando": "2026-11-18T21:46:11.254Z",
+ "medidas": [
+  {
+   "tela": "Abrir",
+   "nome": "pacoteDePartida",
+   "chamadas": 20,
+   "idas": 7,
+   "localizador": 0,
+   "estrutura": 13,
+   "celulas": 684,
+   "msNaRegua": 501,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "RET aba 1 (entrar, com aviso)",
+   "chamadas": 18,
+   "idas": 5,
+   "localizador": 0,
+   "estrutura": 13,
+   "celulas": 32591,
+   "msNaRegua": 479,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "RET aba 2",
+   "chamadas": 12,
+   "idas": 3,
+   "localizador": 0,
+   "estrutura": 9,
+   "celulas": 173044,
+   "msNaRegua": 456,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "RET busca de texto",
+   "chamadas": 11,
+   "idas": 3,
+   "localizador": 1,
+   "estrutura": 7,
+   "celulas": 102,
+   "msNaRegua": 275,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "Mesa aba 1",
+   "chamadas": 18,
+   "idas": 5,
+   "localizador": 0,
+   "estrutura": 13,
+   "celulas": 3937,
+   "msNaRegua": 454,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "VG",
+   "chamadas": 12,
+   "idas": 2,
+   "localizador": 0,
+   "estrutura": 10,
+   "celulas": 3840,
+   "msNaRegua": 303,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "casoParaEditar",
+   "chamadas": 10,
+   "idas": 3,
+   "localizador": 1,
+   "estrutura": 6,
+   "celulas": 102,
+   "msNaRegua": 250,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "editarCaso",
+   "chamadas": 35,
+   "idas": 18,
+   "localizador": 3,
+   "estrutura": 14,
+   "celulas": 263,
+   "msNaRegua": 875,
+   "erro": ""
+  },
+  {
+   "tela": "Trabalho",
+   "nome": "alterarSituacaoDoCaso",
+   "chamadas": 20,
+   "idas": 9,
+   "localizador": 2,
+   "estrutura": 9,
+   "celulas": 205,
+   "msNaRegua": 500,
+   "erro": ""
+  },
+  {
+   "tela": "Cadastrar",
+   "nome": "formularioDoCanal",
+   "chamadas": 5,
+   "idas": 1,
+   "localizador": 0,
+   "estrutura": 4,
+   "celulas": 51,
+   "msNaRegua": 125,
+   "erro": ""
+  },
+  {
+   "tela": "Cadastrar",
+   "nome": "consultarSusep (cadastrada)",
+   "chamadas": 8,
+   "idas": 3,
+   "localizador": 1,
+   "estrutura": 4,
+   "celulas": 20,
+   "msNaRegua": 200,
+   "erro": ""
+  },
+  {
+   "tela": "Cadastrar",
+   "nome": "consultarSusep (não existe)",
+   "chamadas": 11,
+   "idas": 3,
+   "localizador": 1,
+   "estrutura": 7,
+   "celulas": 21,
+   "msNaRegua": 275,
+   "erro": ""
+  },
+  {
+   "tela": "Cadastrar",
+   "nome": "conferirPropostaRepetida",
+   "chamadas": 8,
+   "idas": 2,
+   "localizador": 1,
+   "estrutura": 5,
+   "celulas": 51,
+   "msNaRegua": 200,
+   "erro": ""
+  },
+  {
+   "tela": "Cadastrar",
+   "nome": "cadastrarCaso",
+   "chamadas": 25,
+   "idas": 13,
+   "localizador": 0,
+   "estrutura": 12,
+   "celulas": 109,
+   "msNaRegua": 625,
+   "erro": ""
+  },
+  {
+   "tela": "Buscar",
+   "nome": "buscarCasos protocolo",
+   "chamadas": 76,
+   "idas": 30,
+   "localizador": 11,
+   "estrutura": 35,
+   "celulas": 2756,
+   "msNaRegua": 1902,
+   "erro": ""
+  },
+  {
+   "tela": "Buscar",
+   "nome": "buscarCasos nome",
+   "chamadas": 76,
+   "idas": 30,
+   "localizador": 11,
+   "estrutura": 35,
+   "celulas": 2756,
+   "msNaRegua": 1902,
+   "erro": ""
+  },
+  {
+   "tela": "Buscar",
+   "nome": "buscarCasos não existe",
+   "chamadas": 85,
+   "idas": 34,
+   "localizador": 11,
+   "estrutura": 40,
+   "celulas": 20570,
+   "msNaRegua": 2144,
+   "erro": ""
+  },
+  {
+   "tela": "Config",
+   "nome": "resumoDasConfiguracoes",
+   "chamadas": 96,
+   "idas": 20,
+   "localizador": 0,
+   "estrutura": 76,
+   "celulas": 344,
+   "msNaRegua": 2400,
+   "erro": ""
+  },
+  {
+   "tela": "Config",
+   "nome": "listarCamposDoCanal",
+   "chamadas": 12,
+   "idas": 4,
+   "localizador": 1,
+   "estrutura": 7,
+   "celulas": 99,
+   "msNaRegua": 300,
+   "erro": ""
+  },
+  {
+   "tela": "Config",
+   "nome": "listarCanaisConfiguraveis",
+   "chamadas": 10,
+   "idas": 3,
+   "localizador": 0,
+   "estrutura": 7,
+   "celulas": 114,
+   "msNaRegua": 250,
+   "erro": ""
+  },
+  {
+   "tela": "Produtividade",
+   "nome": "produtividadeDaEquipe RET",
+   "chamadas": 11,
+   "idas": 4,
+   "localizador": 0,
+   "estrutura": 7,
+   "celulas": 45192,
+   "msNaRegua": 316,
+   "erro": ""
+  }
+ ]
+}

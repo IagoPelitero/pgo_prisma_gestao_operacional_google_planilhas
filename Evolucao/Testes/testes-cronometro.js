@@ -115,7 +115,8 @@ function rodarTestesDoCronometro() {
     const t = preparar();
     ['resumoDoCanal', 'produtividadeDaEquipe', 'detalharComponente', 'casoParaEditar', 'editarCaso',
       'alterarSituacaoDoCaso', 'cadastrarCaso', 'buscarCasos', 'formularioDoCanal', 'pacoteDePartida',
-      'resumoDasConfiguracoes', 'salvarItemDoCatalogo', 'excluirItemDoCatalogo']
+      'resumoDasConfiguracoes', 'salvarItemDoCatalogo', 'excluirItemDoCatalogo',
+      'consultarSusep', 'conferirPropostaRepetida', 'listarCamposDoCanal']
       .forEach((nome) => contem(String(t.chamar(nome)), "cronometrado_('" + nome + "'", nome));
   });
 

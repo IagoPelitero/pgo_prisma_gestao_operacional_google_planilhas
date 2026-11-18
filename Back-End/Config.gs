@@ -184,6 +184,12 @@ function resumoDasConfiguracoesSemRelogio_() {
 
 /** Todos os campos de um canal, inclusive os desligados — aqui se administra. */
 function listarCamposDoCanal(idDoCanal) {
+  // No cronômetro (Etapa 86, medição M2): passando de 8 s, a aba ERROS diz
+  // onde foi o tempo — antes só a tela registrava quanto esperou.
+  return cronometrado_('listarCamposDoCanal', listarCamposDoCanalSemRelogio_, arguments);
+}
+
+function listarCamposDoCanalSemRelogio_(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
