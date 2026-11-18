@@ -122,10 +122,24 @@ var TelaTrabalho = (function () {
     });
   }
 
+  /*
+    SÓ VALE A RESPOSTA DO ÚLTIMO PEDIDO (Etapa 86, F6).
+
+    Dois cliques seguidos (um cartão, um filtro, a troca de sub-aba) são dois
+    pedidos ao servidor, e as respostas voltam em qualquer ordem — a primeira
+    chegando por último desenhava a fila de um filtro que já não está marcado.
+    Cada carga do painel ganha um número; a resposta que chega com número
+    velho é descartada. A Agenda da Mesa divide o mesmo painel, e por isso o
+    mesmo contador. Os números e a fila continuam vindo do servidor, iguais.
+  */
+  var pedidoDoPainel = 0;
+
   function carregarAgenda() {
+    var meuPedido = ++pedidoDoPainel;
     elemento('painel').innerHTML = '<p class="carregando-campos">Lendo a Agenda…</p>';
     Servidor.chamar('agendaDaMesa', canalEscolhido, buscaNaAgenda)
       .entao(function (resposta) {
+        if (meuPedido !== pedidoDoPainel) return;
         elemento('painel').innerHTML = Agenda.lista(resposta, buscaNaAgenda);
         var busca = elemento('busca-na-agenda');
         busca.addEventListener('keydown', function (evento) {
@@ -146,6 +160,7 @@ var TelaTrabalho = (function () {
         });
       })
       .senao(function (erro) {
+        if (meuPedido !== pedidoDoPainel) return;
         elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
@@ -647,6 +662,7 @@ var TelaTrabalho = (function () {
   // `carregar` também é passado como "depois de salvar" ao modal do caso, que
   // o chama com outra coisa.
   function carregar(recado) {
+    var meuPedido = ++pedidoDoPainel;
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">'
       + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
@@ -656,6 +672,7 @@ var TelaTrabalho = (function () {
     Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, null,
       quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))
       .entao(function (resposta) {
+        if (meuPedido !== pedidoDoPainel) return;   // um pedido mais novo já saiu (F6)
         resumo = resposta;
         if (resposta.filaCompacta) {
           resumo.fila = expandirFila(resposta.fila, resposta.colunas);
@@ -669,6 +686,7 @@ var TelaTrabalho = (function () {
         }
       })
       .senao(function (erro) {
+        if (meuPedido !== pedidoDoPainel) return;
         elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
