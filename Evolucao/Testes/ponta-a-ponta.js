@@ -557,6 +557,75 @@ async function rodar() {
       'o caso de hoje não pode nascer fora do prazo');
   });
 
+  await teste('fechar o "Trabalhar no caso" com alteração não salva pergunta antes; sem alteração, fecha (Etapa 87, F1)', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-trabalhar]', { timeout: 10000 });
+    if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
+    const abrir = async () => {
+      await pagina.click('[data-trabalhar]');
+      await pagina.waitForFunction(() => {
+        const salvar = document.getElementById('modal-salvar');
+        return salvar && !salvar.disabled;
+      }, { timeout: 10000 });
+    };
+    const aberto = () => pagina.locator('#modal-do-caso').count();
+    const perguntou = () => pagina.locator('#dialogo-descarte').count();
+    const jeitos = {
+      'o X': () => pagina.click('#modal-x'),
+      'o Esc': () => pagina.keyboard.press('Escape'),
+      'clicar fora': () => pagina.mouse.click(5, 5),
+      'o Fechar': () => pagina.click('#modal-fechar')
+    };
+
+    // Sem alteração: os quatro jeitos fecham na hora, sem pergunta.
+    for (const [nome, fazer] of Object.entries(jeitos)) {
+      await abrir();
+      await fazer();
+      await pagina.waitForTimeout(250);
+      igual(await perguntou(), 0, nome + ' sem alteração não pergunta');
+      igual(await aberto(), 0, nome + ' sem alteração fecha');
+    }
+
+    // Com alteração: os quatro jeitos perguntam, e "Continuar editando" mantém tudo.
+    await abrir();
+    const campo = await pagina.$$eval('#modal-do-caso [data-chave]', (es) => {
+      const livre = es.find((e) => (e.tagName === 'TEXTAREA' || (e.tagName === 'INPUT' && e.type === 'text'))
+        && !e.disabled && e.getAttribute('aria-required') !== 'true');
+      return livre ? livre.id : '';
+    });
+    verdadeiro(!!campo, 'há um campo livre para mexer');
+    const original = await pagina.inputValue('#' + campo);
+    await pagina.fill('#' + campo, original + ' (rascunho do teste)');
+    for (const [nome, fazer] of Object.entries(jeitos)) {
+      await fazer();
+      await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+      contem(await pagina.textContent('#dialogo-descarte'), 'Você possui alterações não salvas. Deseja descartá-las?', nome);
+      await pagina.click('#continuar-editando');
+      await pagina.waitForTimeout(200);
+      igual(await aberto(), 1, nome + ': continuar editando mantém o caso aberto');
+      igual(await pagina.inputValue('#' + campo), original + ' (rascunho do teste)', nome + ': e o que foi digitado');
+    }
+    // O Esc na pergunta é "continuar", e não fecha o caso por baixo.
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForTimeout(200);
+    igual(await perguntou(), 0); igual(await aberto(), 1, 'o Esc da pergunta não fecha o caso');
+
+    // Descartar: fecha, e nada foi gravado.
+    const gravacoes = chamadasDoNavegador.editarCaso || 0;
+    await pagina.click('#modal-x');
+    await pagina.waitForSelector('#dialogo-descarte', { timeout: 5000 });
+    await pagina.click('#descartar-alteracoes');
+    await pagina.waitForTimeout(250);
+    igual(await aberto(), 0, 'descartou e fechou');
+    igual(chamadasDoNavegador.editarCaso || 0, gravacoes, 'descartar não grava');
+    await abrir();
+    igual(await pagina.inputValue('#' + campo), original, 'ao abrir de novo, o valor é o de antes');
+    await pagina.click('#modal-fechar');
+    await pagina.waitForTimeout(250);
+  });
+
   await teste('apagar um campo no "Trabalhar no caso" apaga na planilha', async () => {
     // Pela tela de verdade: abre o caso, escreve, salva; abre de novo, apaga,
     // salva. A versão do caso vai e volta pela ponte nas duas gravações.
