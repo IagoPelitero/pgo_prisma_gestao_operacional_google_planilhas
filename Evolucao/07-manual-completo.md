@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1794 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1809 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1794 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1809 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -688,7 +688,7 @@ Mesa Diamante e VG —, a pedido do PO:
 
 | Ação | O que faz |
 |---|---|
-| **Trabalhar no caso** | Abre o caso por cima da fila, **já no formulário**, preenchido com o que está na planilha, **no centro da área de trabalho** — à direita do menu, aberto ou encolhido; no celular, no centro da tela. Fechar devolve a fila exatamente como estava |
+| **Trabalhar no caso** | Abre o caso por cima da fila, **já no formulário**, preenchido com o que está na planilha, **no centro da área de trabalho** — à direita do menu, aberto ou encolhido; no celular, no centro da tela. Fechar devolve a fila exatamente como estava. **Com alguma coisa mudada e não salva** (Etapa 87), fechar pelo X, pelo Esc, clicando fora ou pelo Fechar pergunta: "Você possui alterações não salvas. Deseja descartá-las?" — **Continuar editando** ou **Descartar alterações**. Sem mudança, fecha na hora |
 | **Alterar status** (ícone ao lado) | Um diálogo só com o status — o gesto mais frequente da operação. Não passa pelo formulário inteiro, e por isso funciona mesmo num caso que veio da base antiga com a proposta ou a apólice pela metade |
 | **Excluir** (por último) | Apaga o caso **definitivamente da planilha**. Antes, um **aviso de atenção** em vermelho: o foco nasce em *Cancelar*, Enter e Esc cancelam, e só o botão "Excluir definitivamente" apaga. O que havia no caso fica na auditoria |
 
@@ -774,7 +774,14 @@ clique até a resposta chegar — dois cliques gravariam dois casos. **Gravou, a
 tela mostra o próximo passo** (Etapa 86), no lugar do formulário: "Caso N
 cadastrado", com **Trabalhar no caso** (abre o caso recém-cadastrado — só para
 quem pode editar), **Cadastrar outro caso** (o formulário limpo, no mesmo canal)
-e **Ir para o Trabalho** (para quem vê o Trabalho). Nada abre sozinho. Até a 1.85,
+e **Ir para o Trabalho** (para quem vê o Trabalho). Nada abre sozinho.
+
+**Com o formulário preenchido e não cadastrado** (Etapa 87), trocar de canal,
+trocar entre Caso e Reunião (na Mesa) ou ir para outra tela — pelo menu, pela busca
+do alto, pelo voltar do navegador ou pelo botão de recarregar a tela — faz a mesma
+pergunta do "Trabalhar no caso". **Recarregar ou fechar a página** mostra o aviso do
+próprio navegador (o texto é dele, e cada navegador escreve o seu). Nada fica guardado
+no navegador: nem CPF, nem nome — decisão do PO. Até a 1.85,
 gravar levava direto ao Trabalho, onde o caso novo nem sempre aparecia: na aba 1
 ele entra no fim da ordem.
 
@@ -1904,7 +1911,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.86** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.87** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1912,7 +1919,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1794 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1809 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

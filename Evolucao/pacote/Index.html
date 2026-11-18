@@ -3139,6 +3139,47 @@ var Formulario = (function () {
     document.getElementById('cancelar-exclusao').focus();
   }
 
+  function confirmarDescarte(aoDescartar) {
+    if (document.getElementById('dialogo-descarte')) return;
+    var antes = document.activeElement;
+    var caixa = document.createElement('div');
+    caixa.className = 'dialogo';
+    caixa.id = 'dialogo-descarte';
+    caixa.innerHTML = '<div class="dialogo-caixa atencao" role="alertdialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-descarte" aria-describedby="texto-descarte">'
+      + '<h3 id="titulo-descarte">Alterações não salvas</h3>'
+      + '<p id="texto-descarte">Você possui alterações não salvas. Deseja descartá-las?</p>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao" id="continuar-editando">Continuar editando</button>'
+      + '<button type="button" class="botao vazado perigo" id="descartar-alteracoes">'
+      + 'Descartar alterações</button>'
+      + '</div></div>';
+    document.body.appendChild(caixa);
+
+    function sair() {
+      if (caixa.parentNode) caixa.parentNode.removeChild(caixa);
+      document.removeEventListener('keydown', aoTeclar, true);
+    }
+    function continuar() {
+      sair();
+      if (antes && antes.focus && document.body.contains(antes)) antes.focus();
+    }
+    function aoTeclar(evento) {
+
+      if (evento.key === 'Escape') { evento.preventDefault(); evento.stopPropagation(); continuar(); }
+    }
+    document.addEventListener('keydown', aoTeclar, true);
+    caixa.addEventListener('mousedown', function (evento) {
+      if (evento.target === caixa) continuar();
+    });
+    document.getElementById('continuar-editando').addEventListener('click', continuar);
+    document.getElementById('descartar-alteracoes').addEventListener('click', function () {
+      sair();
+      if (aoDescartar) aoDescartar();
+    });
+    document.getElementById('continuar-editando').focus();
+  }
+
   function avisar(opcoes) {
     if (document.getElementById('dialogo-aviso')) return;
     var pergunta = typeof opcoes.aoConfirmar === 'function';
@@ -3623,6 +3664,7 @@ var Formulario = (function () {
     aplicarPadroes: aplicarPadroes,
     confirmarExclusao: confirmarExclusao,
     confirmarAtencao: confirmarAtencao,
+    confirmarDescarte: confirmarDescarte,
     avisar: avisar,
     valores: valores,
     preencher: preencher,
@@ -3651,6 +3693,8 @@ var CasoEmModal = (function () {
   var envio = '';
   var aoFechar = null;
   var mudouAlgo = false;
+
+  var retratoAoAbrir = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -3711,7 +3755,7 @@ var CasoEmModal = (function () {
   function aoTeclar(evento) {
     if (!elemento('modal-do-caso')) return;
 
-    if (elemento('dialogo-situacao') || elemento('dialogo-exclusao')) return;
+    if (elemento('dialogo-situacao') || elemento('dialogo-exclusao') || elemento('dialogo-descarte')) return;
 
     if (salvando) return;
     if (evento.key === 'Escape') { evento.preventDefault(); fechar(); return; }
@@ -3721,7 +3765,28 @@ var CasoEmModal = (function () {
     }
   }
 
+  function retratoDaEdicao() {
+    var corpo = corpoDaEdicao();
+    if (!corpo || !corpo.querySelector('[data-chave]')) return null;
+    return JSON.stringify([Formulario.valores(corpo), colunasSuasNaTela()]);
+  }
+
+  function temAlteracaoNaoSalva() {
+    if (retratoAoAbrir === null) return false;
+    var agora = retratoDaEdicao();
+    return agora !== null && agora !== retratoAoAbrir;
+  }
+
   function fechar(semAvisar) {
+    if (!semAvisar && temAlteracaoNaoSalva()) {
+      Formulario.confirmarDescarte(function () { fecharDeVez(); });
+      return;
+    }
+    fecharDeVez(semAvisar);
+  }
+
+  function fecharDeVez(semAvisar) {
+    retratoAoAbrir = null;
     var caixa = elemento('modal-do-caso');
     if (caixa) caixa.parentNode.removeChild(caixa);
     document.removeEventListener('keydown', aoTeclar);
@@ -3751,6 +3816,7 @@ var CasoEmModal = (function () {
       elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
         + desenharDoSistema(osValores.doSistema);
       elemento('modal-salvar').disabled = false;
+      retratoAoAbrir = retratoDaEdicao();
     }
 
     function falhou(erro) {
@@ -3859,6 +3925,7 @@ var CasoEmModal = (function () {
       .entao(function () {
         salvando = false;
         mudouAlgo = true;
+        retratoAoAbrir = null;
 
         destravarOsBotoes();
         fechar();
@@ -5157,6 +5224,49 @@ var TelaCadastrarCaso = (function () {
 
   var pacoteDaTela = null;
 
+  var retratoDoCadastro = null;
+
+  function retratoDoCadastroAgora() {
+    if (oQueCadastrar === 'reuniao') {
+      var daReuniao = elemento('corpo-da-reuniao');
+      var acoesDaReuniao = elemento('acoes-da-reuniao');
+      if (!daReuniao || !acoesDaReuniao || acoesDaReuniao.hidden) return null;
+      return JSON.stringify(Agenda.valores(daReuniao));
+    }
+    var acoes = elemento('acoes-do-caso');
+    if (!corpo() || !acoes || acoes.hidden) return null;
+    return JSON.stringify(Formulario.valores(corpo()));
+  }
+
+  function guardarRetratoDoCadastro() { retratoDoCadastro = retratoDoCadastroAgora(); }
+
+  function temAlteracaoNoCadastro() {
+    if (retratoDoCadastro === null) return false;
+    var agora = retratoDoCadastroAgora();
+    return agora !== null && agora !== retratoDoCadastro;
+  }
+
+  function depoisDePerguntar(seguir) {
+    if (!temAlteracaoNoCadastro()) { seguir(); return; }
+    Formulario.confirmarDescarte(function () {
+      retratoDoCadastro = null;
+      seguir();
+    });
+  }
+
+  function podeSair(seguir) {
+    if (!temAlteracaoNoCadastro()) return true;
+    depoisDePerguntar(seguir);
+    return false;
+  }
+
+  function aoSairDaPagina(evento) {
+    if (!temAlteracaoNoCadastro()) return undefined;
+    evento.preventDefault();
+    evento.returnValue = '';
+    return '';
+  }
+
   function abasDaMesa() {
     if (!temAgenda) return '';
     return '<div class="config-abas" role="tablist" aria-label="O que cadastrar">'
@@ -5183,6 +5293,7 @@ var TelaCadastrarCaso = (function () {
         camposDaReuniao = resposta.campos;
         elemento('corpo-da-reuniao').innerHTML = Agenda.formulario(resposta.campos, null);
         elemento('acoes-da-reuniao').hidden = false;
+        guardarRetratoDoCadastro();
       })
       .senao(function (erro) {
         elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga">'
@@ -5205,6 +5316,7 @@ var TelaCadastrarCaso = (function () {
           botao.disabled = false;
           Moldura.toast('Reunião registrada na Agenda.', 'bom');
           elemento('corpo-da-reuniao').innerHTML = Agenda.formulario(camposDaReuniao, null);
+          guardarRetratoDoCadastro();
         })
         .senao(function (erro) {
           botao.disabled = false;
@@ -5252,6 +5364,7 @@ var TelaCadastrarCaso = (function () {
         Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'), elemento('falta-no-caso'));
 
         mostrarAsAcoes(true);
+        guardarRetratoDoCadastro();
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -5352,16 +5465,23 @@ var TelaCadastrarCaso = (function () {
 
   function ligar() {
     SeletorDeCanal.ligar(function (idDoCanal) {
-      canalEscolhido = idDoCanal;
-      Aplicacao.remontar();
+      depoisDePerguntar(function () {
+        canalEscolhido = idDoCanal;
+        Aplicacao.remontar(true);
+      });
     });
     var abas = document.querySelectorAll('[data-o-que-cadastrar]');
     for (var i = 0; i < abas.length; i++) {
       abas[i].addEventListener('click', function () {
-        oQueCadastrar = this.getAttribute('data-o-que-cadastrar');
-        Aplicacao.remontar();
+        var qual = this.getAttribute('data-o-que-cadastrar');
+        depoisDePerguntar(function () {
+          oQueCadastrar = qual;
+          Aplicacao.remontar(true);
+        });
       });
     }
+    retratoDoCadastro = null;
+    window.addEventListener('beforeunload', aoSairDaPagina);
     if (oQueCadastrar === 'reuniao') { ligarReuniao(); return; }
 
     elemento('formulario-do-caso').addEventListener('submit', function (evento) {
@@ -5391,9 +5511,11 @@ var TelaCadastrarCaso = (function () {
 
   function desligar() {
     document.removeEventListener('keydown', atalhoDeSalvar);
+    window.removeEventListener('beforeunload', aoSairDaPagina);
+    retratoDoCadastro = null;
   }
 
-  return { montar: montar, ligar: ligar, desligar: desligar };
+  return { montar: montar, ligar: ligar, desligar: desligar, podeSair: podeSair };
 })();
 </script>
 
@@ -12197,7 +12319,9 @@ var Rotas = (function () {
       subtitulo: 'Registro de um caso novo, com o formulário montado pelo canal.',
       montar: function (pacote) { return TelaCadastrarCaso.montar(pacote); },
       ligar: function (pacote) { TelaCadastrarCaso.ligar(pacote); },
-      desligar: function () { TelaCadastrarCaso.desligar(); }
+      desligar: function () { TelaCadastrarCaso.desligar(); },
+
+      podeSair: function (seguir) { return TelaCadastrarCaso.podeSair(seguir); }
     },
     buscarCaso: {
       titulo: 'Buscar Caso',
@@ -12278,7 +12402,15 @@ var Aplicacao = (function () {
     return false;
   }
 
-  function irPara(tela, semHistorico) {
+  function irPara(tela, semHistorico, semPerguntar) {
+
+    if (!semPerguntar && telaAtual && Rotas.existe(telaAtual)) {
+      var saindo = Rotas.pegar(telaAtual);
+      if (saindo.podeSair && !saindo.podeSair(function () { irPara(tela, false, true); })) {
+        if (location.hash !== '#' + telaAtual) location.hash = telaAtual;
+        return;
+      }
+    }
 
     Servidor.trocouDeTela(tela);
 
@@ -12459,8 +12591,8 @@ var Aplicacao = (function () {
     ligarTeclado();
   }
 
-  function remontar() {
-    if (telaAtual) irPara(telaAtual, true);
+  function remontar(semPerguntar) {
+    if (telaAtual) irPara(telaAtual, true, semPerguntar === true);
   }
 
   return {

@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.86 — a última etapa entregue é a 86. A regra do número está
+**Estado geral:** versão 1.87 — a última etapa entregue é a 87. A regra do número está
 na Etapa 68.
 
 ---
@@ -4287,6 +4287,35 @@ chegar depois da outra; o ponta a ponta do cadastro passou a percorrer o cadastr
 de antes do F11 (2 consultas: pego), só a guarda da resposta velha do F11 (pego), o código de
 antes do F6 (a resposta velha pintava a aba 1 com a aba 2 marcada: pego), o botão sem a
 permissão (pego) e o contador do `getLastRow` (pego).
+
+---
+
+## Etapa 87 — Segurança e estabilidade: B1, F1 e F2
+
+Pedido do PO: "ETAPA 2 — SEGURANÇA E ESTABILIDADE (…) implementar as melhorias B1, F1 e F2,
+preservando integralmente as funcionalidades existentes." O Excel vem só na última etapa.
+
+| O que | Como ficou |
+|---|---|
+| **B1 · gravações simultâneas** | `atualizarRegistro_` ganhou uma conferência opcional feita com a linha lida **dentro da trava** — a mesma leitura da mescla, sem ida a mais; o erro sai pelo `finally`, que solta a trava. **Edição**: a versão de quando o caso abriu é conferida de novo na trava (antes, só fora dela: a janela em que a outra gravação entrava). **Troca de status**: era montada sobre o caso lido e não conferia nada; agora, se o caso mudou até a trava, é recusada — a contagem de mudanças de status não se perde nem dobra. Quem chega por último recebe "alterado/atualizado por outra pessoa (…) nada foi gravado", e a auditoria só registra o que valeu |
+| **F1 · Trabalhar no caso** | Retrato dos campos ao terminar de abrir (só na memória). X, Esc, clicar fora e Fechar comparam: igual, fecha; diferente, pergunta "Você possui alterações não salvas. Deseja descartá-las?" — Continuar editando (padrão; Esc e clicar fora ficam nele) ou Descartar alterações. Gravou: fecha sem perguntar |
+| **F2 · Cadastrar Caso** | O mesmo retrato e a mesma pergunta ao trocar de canal, entre Caso e Reunião e de tela (menu, busca do alto, voltar do navegador — o endereço volta —, recarregar a tela). `Aplicacao.irPara` pergunta à tela que sai (`podeSair`). Recarregar ou fechar a página: `beforeunload`, o aviso do navegador. Nenhum rascunho no navegador. O cadastro concluído (F7 + F12) e o formulário recém-limpo não perguntam |
+| **Versão** | 1.87 |
+
+**Medida** (`medir-telas.js --comparar linha-de-base-1.85.json`): as 21 funções, **idênticas** —
+`editarCaso` 35 chamadas e `alterarSituacaoDoCaso` 20, como antes. Dentro da trava, a conferência
+é uma conta em memória sobre a linha que já estava lida.
+
+Testes: `testes-gravacao-simultanea.js` (9) — a outra pessoa grava exatamente entre a leitura e a
+trava (o teste troca `esperarATrava_`); edição × edição, edição × status nas duas ordens, status ×
+status com a contagem, a auditoria, a trava solta (o simulador passou a contar as travas
+seguradas), sem disputa e sem versão como antes, e as mesmas chamadas com e sem a conferência.
+**Com o código anterior, 5 dos 9 falham: a gravação sobrescrevia sem aviso.**
+`testes-alteracoes-nao-salvas.js` (6). Ponta a ponta: F1 (os 4 jeitos de fechar, com e sem
+alteração, descartar não grava), F2 (canal, menu, voltar do navegador, recarregar a tela, a página,
+Caso → Reunião) e Reunião → Caso depois que a Agenda existe; sem a F1 ou a F2, os testes falham. Um
+teste antigo que saía do Cadastrar com o formulário preenchido passou a limpar antes de sair — é a
+pergunta nova funcionando.
 
 ---
 

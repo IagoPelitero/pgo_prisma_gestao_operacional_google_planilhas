@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-18 22:03
+   Gerado em 2026-11-18 22:52
    ========================================================================== */
 
 
@@ -1949,7 +1949,7 @@ function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
   return linhaDoRegistro_(estrutura, id);
 }
 
-function atualizarRegistro_(nomeDaAba, id, alteracoes) {
+function atualizarRegistro_(nomeDaAba, id, alteracoes, conferirNaTrava) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
@@ -1965,6 +1965,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
         nomeDaAba + '".');
     }
     var atuais = estrutura.aba.getRange(linha, 1, 1, estrutura.cabecalhos.length).getValues()[0];
+    if (conferirNaTrava) conferirNaTrava(montarRegistro_(estrutura, atuais, linha));
     var nova = montarLinhaParaGravar_(estrutura, alteracoes, atuais);
     formatarEGravar_(estrutura, linha, [nova]);
     return montarRegistro_(estrutura, nova, linha);
@@ -3798,6 +3799,13 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
   return { id: gravado.__id, canal: canal.nome, aba: canal.aba };
 }
 
+var RECC_CASO_ALTERADO_POR_OUTRA_PESSOA = 'Este caso foi alterado por outra pessoa depois '
+  + 'que você o abriu. Para não apagar a mudança dela, nada foi gravado: feche, abra o '
+  + 'caso de novo e refaça a sua alteração.';
+var RECC_STATUS_ALTERADO_POR_OUTRA_PESSOA = 'Este caso foi atualizado por outra pessoa '
+  + 'enquanto você trocava o status. Para não apagar a mudança dela, nada foi gravado: '
+  + 'abra o caso de novo, confira e troque o status outra vez.';
+
 function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
   return cronometrado_('editarCaso', editarCasoSemRelogio_, arguments);
 }
@@ -3822,9 +3830,7 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   exigirAlcanceSobre_(atual, canal, quem);
 
   if (versaoQueAbriu && versaoQueAbriu !== versaoDoCaso_(atual, canal.aba)) {
-    throw new Error('Este caso foi alterado por outra pessoa depois que você o '
-      + 'abriu. Para não apagar a mudança dela, nada foi gravado: feche, abra o '
-      + 'caso de novo e refaça a sua alteração.');
+    throw new Error(RECC_CASO_ALTERADO_POR_OUTRA_PESSOA);
   }
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false, atual);
@@ -3838,7 +3844,11 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   preencherColunasCalculadas_(canal.aba, paraGravar, atual);
   manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar);
 
-  atualizarRegistro_(canal.aba, alvo, paraGravar);
+  atualizarRegistro_(canal.aba, alvo, paraGravar, versaoQueAbriu ? function (naTrava) {
+    if (versaoDoCaso_(naTrava, canal.aba) !== versaoQueAbriu) {
+      throw new Error(RECC_CASO_ALTERADO_POR_OUTRA_PESSOA);
+    }
+  } : null);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
@@ -3931,7 +3941,12 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   carimbarOStatus_(canal, achada, atual, alteracao);
   registrarAMudancaDeStatus_(canal, atual, alteracao, quem);
 
-  atualizarRegistro_(canal.aba, alvo, alteracao);
+  var versaoLida = versaoDoCaso_(atual, canal.aba);
+  atualizarRegistro_(canal.aba, alvo, alteracao, function (naTrava) {
+    if (versaoDoCaso_(naTrava, canal.aba) !== versaoLida) {
+      throw new Error(RECC_STATUS_ALTERADO_POR_OUTRA_PESSOA);
+    }
+  });
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
 }
@@ -9311,7 +9326,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.86',
+  numero: '1.87',
   data: '18/11/2026'
 };
 
