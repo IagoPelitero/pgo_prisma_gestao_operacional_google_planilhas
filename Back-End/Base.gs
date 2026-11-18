@@ -1547,6 +1547,7 @@ var lendoTiposDeclarados = false;
 
 function esquecerEstruturaLida_(nomeDaAba) {
   esquecerCacheDaConfiguracao_(nomeDaAba);
+  esquecerMemoriaDaCarga_(nomeDaAba);
   if (nomeDaAba) {
     delete estruturasJaLidas[nomeDaAba];
     esquecerRegistrosLidos_(nomeDaAba);
@@ -2630,6 +2631,40 @@ function lerRegistrosSemRelogio_(nomeDaAba, opcoes) {
  * 200 mil linhas por 39 colunas, ler tudo são 7,8 milhões de células; ler
  * uma coluna são 200 mil.
  */
+/*
+ * A MEMÓRIA DA CARGA (Etapa 88, B3).
+ *
+ * Abrir o Trabalho com o aviso de prazo lia DUAS vezes a coluna do status e
+ * as mesmas linhas abertas: uma para a fila, outra para o aviso. Enquanto uma
+ * carga que só LÊ está em curso (o resumoDoCanal), a coluna e as linhas já
+ * trazidas nesta execução são servidas de novo daqui, sem outra ida. Regras:
+ *   · só existe dentro de `comMemoriaDaCarga_` — fora dela, tudo como antes;
+ *   · qualquer gravação na aba a esquece (esquecerEstruturaLida_, que todo
+ *     caminho de gravação já chama);
+ *   · some no fim da carga, até com erro (finally).
+ * Devolve sempre CÓPIAS: quem recebe pode mexer sem estragar a memória.
+ */
+var RECC_MEMORIA_DA_CARGA = null;
+
+function comMemoriaDaCarga_(fazer, argumentos) {
+  if (RECC_MEMORIA_DA_CARGA) return fazer.apply(null, argumentos);
+  RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} };
+  try {
+    return fazer.apply(null, argumentos);
+  } finally {
+    RECC_MEMORIA_DA_CARGA = null;
+  }
+}
+
+function esquecerMemoriaDaCarga_(nomeDaAba) {
+  if (!RECC_MEMORIA_DA_CARGA) return;
+  if (!nomeDaAba) { RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} }; return; }
+  delete RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba];
+  Object.keys(RECC_MEMORIA_DA_CARGA.colunas).forEach(function (chave) {
+    if (chave.indexOf(nomeDaAba + '|') === 0) delete RECC_MEMORIA_DA_CARGA.colunas[chave];
+  });
+}
+
 function lerColunaInteira_(nomeDaAba, cabecalho) {
   return lendoAPlanilha_(lerColunaInteiraSemRelogio_, arguments);
 }
@@ -2639,9 +2674,15 @@ function lerColunaInteiraSemRelogio_(nomeDaAba, cabecalho) {
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
   var totalDados = quantidadeDeRegistros_(estrutura);
   if (totalDados <= 0) return [];
-  return estrutura.aba.getRange(2, i + 1, totalDados, 1).getValues().map(function (l) {
+  var chave = nomeDaAba + '|' + i + '|' + totalDados;
+  if (RECC_MEMORIA_DA_CARGA && RECC_MEMORIA_DA_CARGA.colunas[chave]) {
+    return RECC_MEMORIA_DA_CARGA.colunas[chave].slice();
+  }
+  var valores = estrutura.aba.getRange(2, i + 1, totalDados, 1).getValues().map(function (l) {
     return l[0];
   });
+  if (RECC_MEMORIA_DA_CARGA) RECC_MEMORIA_DA_CARGA.colunas[chave] = valores.slice();
+  return valores;
 }
 
 /** Lê só as linhas indicadas (números de linha da planilha). */
@@ -2703,12 +2744,21 @@ function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha) {
   var largura = estrutura.cabecalhos.length;
   var porLinha = {};
 
-  blocosDeLinhas_(numerosDeLinha).forEach(function (bloco) {
+  // As linhas já trazidas nesta carga não vão de novo (a memória da carga).
+  var memoria = RECC_MEMORIA_DA_CARGA ? (RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba]
+    || (RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba] = {})) : null;
+  var faltam = memoria ? numerosDeLinha.filter(function (n) {
+    if (memoria[n] && memoria[n].length === largura) { porLinha[n] = memoria[n].slice(); return false; }
+    return true;
+  }) : numerosDeLinha;
+
+  blocosDeLinhas_(faltam).forEach(function (bloco) {
     var quantas = bloco.fim - bloco.inicio + 1;
     var valores = estrutura.aba
       .getRange(bloco.inicio, 1, quantas, largura).getValues();
     for (var i = 0; i < valores.length; i++) {
       porLinha[bloco.inicio + i] = valores[i];
+      if (memoria) memoria[bloco.inicio + i] = valores[i].slice();
     }
   });
 

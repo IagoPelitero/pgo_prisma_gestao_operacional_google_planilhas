@@ -17,6 +17,15 @@
  * régua do estresse.js (25 ms por chamada, 0,9 s por milhão de células); a
  * planilha do PO é mais lenta que a régua, e a M1 ("Medir a velocidade", na
  * planilha de verdade) é quem diz quanto. Aqui vale a COMPARAÇÃO.
+ *
+ * A SEGUNDA RÉGUA (Etapa 88), "RÉGUA PO": uma ESTIMATIVA tirada da aba ERROS
+ * do PO (18/11/2026), não uma medição — o Buscar Caso fez 13 leituras pequenas
+ * em 0,3 s "lendo" (≈ 25 ms por chamada) e a Produtividade leu suas faixas
+ * grandes em 10,1 s (≈ 53 µs por célula, contando as 189 mil células da
+ * planilha toda). Na planilha do PO a célula pesa ~60 vezes mais que na régua
+ * de cima, e a chamada pesa o mesmo. A busca do localizador: o Buscar Caso
+ * passou de 6 a 31 s "procurando" com umas 11 buscas — 0,5 a 2,8 s cada; a régua
+ * usa 1 s. Quem confirma é a M1.
  * ============================================================================
  */
 
@@ -97,23 +106,27 @@ function medirTudo() {
     const m = medidor.retrato();
     return { tela, nome, chamadas: m.chamadasNoTotal, idas: m.idasNoTotal, localizador: m.buscasRapidas,
       estrutura: m.abasPedidas + m.ultimasLinhas + m.ultimasColunas, celulas: m.celulasLidas,
-      msNaRegua: Math.round(m.chamadasNoTotal * 25 + m.celulasLidas / 1e6 * 900), erro };
+      msNaRegua: Math.round(m.chamadasNoTotal * 25 + m.celulasLidas / 1e6 * 900),
+      msNaReguaDoPO: Math.round(m.chamadasNoTotal * 25 + m.celulasLidas * 0.053 + m.buscasRapidas * 1000), erro };
   });
 }
 
 function imprimir(agora, antes) {
   const porNome = {};
   (antes || []).forEach((l) => { porNome[l.tela + '|' + l.nome] = l; });
-  const dif = (a, b) => (b === undefined ? '' : (a === b ? ' =' : (a < b ? ' ↓' : ' ↑') + Math.abs(a - b)));
+  const dif = (a, b) => (b === undefined ? '' : (a === b ? ' =' : (a < b ? ' ↓' : ' ↑')
+    + (Number.isInteger(a) && Number.isInteger(b) ? Math.abs(a - b) : Math.abs(a - b).toFixed(1))));
   console.log('TELA'.padEnd(14) + 'FUNÇÃO'.padEnd(34) + 'CHAMADAS'.padStart(13) + 'LOCALIZ.'.padStart(11)
-    + 'CÉLULAS'.padStart(18) + 'RÉGUA'.padStart(10));
+    + 'CÉLULAS'.padStart(18) + 'RÉGUA'.padStart(10) + 'RÉGUA PO'.padStart(16));
   agora.forEach((l) => {
     const b = porNome[l.tela + '|' + l.nome];
     console.log(l.tela.padEnd(14) + l.nome.padEnd(34)
       + (l.chamadas + dif(l.chamadas, b && b.chamadas)).padStart(13)
       + (l.localizador + dif(l.localizador, b && b.localizador)).padStart(11)
       + (l.celulas.toLocaleString('pt-BR') + dif(l.celulas, b && b.celulas)).padStart(18)
-      + ((l.msNaRegua / 1000).toFixed(1) + ' s').padStart(10) + (l.erro ? '  ERRO: ' + l.erro : ''));
+      + ((l.msNaRegua / 1000).toFixed(1) + ' s').padStart(10)
+      + (((l.msNaReguaDoPO || 0) / 1000).toFixed(1) + ' s' + (b && b.msNaReguaDoPO !== undefined ? dif(Math.round(l.msNaReguaDoPO / 100) / 10, Math.round(b.msNaReguaDoPO / 100) / 10) : '')).padStart(16)
+      + (l.erro ? '  ERRO: ' + l.erro : ''));
   });
 }
 
@@ -129,4 +142,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { medirTudo };
+module.exports = { medirTudo, montar };

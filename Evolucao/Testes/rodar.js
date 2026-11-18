@@ -53,6 +53,7 @@ const { rodarTestesDoRaioXDaVelocidade } = require('./testes-raio-x-da-velocidad
 const { rodarTestesDaMedicaoEPrimeiraEntrega } = require('./testes-medicao-e-primeira-entrega');
 const { rodarTestesDaGravacaoSimultanea } = require('./testes-gravacao-simultanea');
 const { rodarTestesDasAlteracoesNaoSalvas } = require('./testes-alteracoes-nao-salvas');
+const { rodarTestesDeDesempenhoDoTrabalhoEDaBusca } = require('./testes-desempenho-do-trabalho-e-da-busca');
 const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
@@ -119,6 +120,7 @@ rodarTestesDoRaioXDaVelocidade();
 rodarTestesDaMedicaoEPrimeiraEntrega();
 rodarTestesDaGravacaoSimultanea();
 rodarTestesDasAlteracoesNaoSalvas();
+rodarTestesDeDesempenhoDoTrabalhoEDaBusca();
 rodarTestesDaDataDaFinalizacao();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();

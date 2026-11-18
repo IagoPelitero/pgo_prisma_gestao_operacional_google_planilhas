@@ -129,7 +129,12 @@ function tomValido_(cor) {
  * inventa filtro, ela oferece o que o canal tem.
  */
 function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
-  return cronometrado_('resumoDoCanal', resumoDoCanalSemRelogio_, arguments);
+  return cronometrado_('resumoDoCanal', resumoDoCanalComMemoria_, arguments);
+}
+
+/** A carga do Trabalho só lê: o que ela já trouxe não vai de novo (Etapa 88, B3). */
+function resumoDoCanalComMemoria_() {
+  return comMemoriaDaCarga_(resumoDoCanalSemRelogio_, arguments);
 }
 
 function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
@@ -1031,11 +1036,18 @@ function linhasDasSubAbas_(canal, sub, quem) {
 }
 
 /**
- * Quantas células custam o mesmo que uma ida à planilha. Pela régua do teste
- * de volume (estresse.js: 25 ms por ida, 900 ms por milhão de células), uma ida
- * vale umas 25 mil células trazidas.
+ * Quantas células custam o mesmo que uma ida à planilha.
+ *
+ * Era 25 mil, pela régua do teste de volume (estresse.js: 25 ms por ida, 900 ms
+ * por milhão de células). A planilha do PO desmentiu a régua (Etapa 88, B3): na
+ * aba ERROS de 18/11/2026, o Buscar Caso fez 13 leituras pequenas em 0,3 s
+ * "lendo" — a ida custa os mesmos ~25 ms —, mas a Produtividade levou 10 s para
+ * ler as suas faixas grandes — a célula custa umas 60 vezes mais (~53 µs). Uma
+ * ida vale ~500 células, e não 25 mil. Com 25 mil, a aba dos concluídos lia a
+ * RET inteira (173 mil células) em vez das colunas leves. 1.000 fica do lado
+ * seguro (menos idas que o ponto de equilíbrio) e vale para as duas sub-abas.
  */
-var RECC_CELULAS_QUE_VALEM_UMA_IDA = 25000;
+var RECC_CELULAS_QUE_VALEM_UMA_IDA = 1000;
 
 /** Qual leitura a aba usa: '' escolhe pelo custo; 'leve' ou 'linhas' fixam (os testes provam as duas). */
 var RECC_LEITURA_DA_SUB_ABA = '';

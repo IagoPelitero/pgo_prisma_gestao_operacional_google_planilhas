@@ -382,8 +382,17 @@ function rodarTestesDasSubAbasDoTrabalho() {
     } finally {
       v.chamar("RECC_LEITURA_DA_SUB_ABA = ''");
     }
-    igual(v.chamar('resumoDoCanal')(v.ret.id, {}, null, '', false, 1).fila.length, 100,
-      'sem a leitura leve, os 100 de sempre');
+    v.chamar("RECC_LEITURA_DA_SUB_ABA = 'linhas'");
+    try {
+      igual(v.chamar('resumoDoCanal')(v.ret.id, {}, null, '', false, 1).fila.length, 100,
+        'sem a leitura leve, os 100 de sempre');
+    } finally {
+      v.chamar("RECC_LEITURA_DA_SUB_ABA = ''");
+    }
+    // Sem forçar, quem escolhe é a régua da planilha do PO (Etapa 88): 300 casos
+    // espalhados já valem a leitura leve.
+    igual(v.chamar('resumoDoCanal')(v.ret.id, {}, null, '', false, 1).fila.length, 20,
+      'sem forçar, a régua escolhe a leve');
   });
 
   /* ----------------------------------------------------------------------- */
