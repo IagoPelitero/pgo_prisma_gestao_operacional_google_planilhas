@@ -523,7 +523,7 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   // O fuso do PROJETO do Apps Script (Etapa 60): o certo, até o teste trocar.
   const ambienteDoFuso = { fusoDoProjeto: 'America/Sao_Paulo' };
   // A trava do script (Etapa 61): livre, até o teste ocupar.
-  const ambienteDaTrava = { ocupada: false, esperas: [] };
+  const ambienteDaTrava = { ocupada: false, esperas: [], seguradas: 0 };
   let adiantadoEmMs = 0;
   const cache = {
     agora: () => Date.now() + adiantadoEmMs,
@@ -573,6 +573,9 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     get travaOcupada() { return ambienteDaTrava.ocupada; },
     set travaOcupada(sim) { ambienteDaTrava.ocupada = !!sim; },
     get esperasDaTrava() { return ambienteDaTrava.esperas; },
+    // Etapa 86 (B1): quantas travas foram pegas e ainda não soltas — tem de
+    // voltar a zero até quando a gravação é recusada no meio.
+    get travasSeguradas() { return ambienteDaTrava.seguradas; },
     /**
      * Cria uma planilha "de fora" e devolve o Id.
      *
@@ -712,10 +715,12 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
           tryLock: (ms) => {
             medidor.travasPedidas++;
             ambienteDaTrava.esperas.push(Number(ms) || 0);
-            return !ambienteDaTrava.ocupada;
+            if (ambienteDaTrava.ocupada) return false;
+            ambienteDaTrava.seguradas++;
+            return true;
           },
-          waitLock: () => true,
-          releaseLock: () => {}
+          waitLock: () => { ambienteDaTrava.seguradas++; return true; },
+          releaseLock: () => { if (ambienteDaTrava.seguradas > 0) ambienteDaTrava.seguradas--; }
         })
       },
       // Quem EXECUTA é o dono — quem criou o ambiente, como no editor. O

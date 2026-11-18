@@ -870,6 +870,17 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
  * `envio`: ver cadastrarCaso. Sem ele, o segundo clique depois dos 40
  * segundos esbarrava na versão já gravada e dizia "outra pessoa alterou".
  */
+/*
+ * O CONFLITO (Etapa 86, B1): duas pessoas no mesmo caso. Quem grava por último
+ * é recusado, e nada do que ela mandou é gravado — a mudança da outra fica.
+ */
+var RECC_CASO_ALTERADO_POR_OUTRA_PESSOA = 'Este caso foi alterado por outra pessoa depois '
+  + 'que você o abriu. Para não apagar a mudança dela, nada foi gravado: feche, abra o '
+  + 'caso de novo e refaça a sua alteração.';
+var RECC_STATUS_ALTERADO_POR_OUTRA_PESSOA = 'Este caso foi atualizado por outra pessoa '
+  + 'enquanto você trocava o status. Para não apagar a mudança dela, nada foi gravado: '
+  + 'abra o caso de novo, confira e troque o status outra vez.';
+
 function editarCaso(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunasSuas, envio) {
   return cronometrado_('editarCaso', editarCasoSemRelogio_, arguments);
 }
@@ -900,10 +911,11 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
    * momento em que o caso abriu; se a linha mudou desde então, recusa e diz
    * por quê. Sem versão (chamada direta, sem a tela), segue como antes.
    */
+  // Conferir aqui, antes de montar a gravação, poupa o trabalho quando a
+  // mudança é antiga. A conferência que GARANTE é a de dentro da trava, logo
+  // antes de gravar (Etapa 86, B1) — ver `atualizarRegistro_`.
   if (versaoQueAbriu && versaoQueAbriu !== versaoDoCaso_(atual, canal.aba)) {
-    throw new Error('Este caso foi alterado por outra pessoa depois que você o '
-      + 'abriu. Para não apagar a mudança dela, nada foi gravado: feche, abra o '
-      + 'caso de novo e refaça a sua alteração.');
+    throw new Error(RECC_CASO_ALTERADO_POR_OUTRA_PESSOA);
   }
 
   var paraGravar = validarValores_(canal.id, valores || {}, quem, false, atual);
@@ -921,7 +933,11 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   preencherColunasCalculadas_(canal.aba, paraGravar, atual);
   manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar);
 
-  atualizarRegistro_(canal.aba, alvo, paraGravar);
+  atualizarRegistro_(canal.aba, alvo, paraGravar, versaoQueAbriu ? function (naTrava) {
+    if (versaoDoCaso_(naTrava, canal.aba) !== versaoQueAbriu) {
+      throw new Error(RECC_CASO_ALTERADO_POR_OUTRA_PESSOA);
+    }
+  } : null);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
@@ -1062,7 +1078,16 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   carimbarOStatus_(canal, achada, atual, alteracao);
   registrarAMudancaDeStatus_(canal, atual, alteracao, quem);
 
-  atualizarRegistro_(canal.aba, alvo, alteracao);
+  // A troca foi montada sobre o caso como estava ao ler (a contagem de
+  // mudanças, os carimbos). Se outra pessoa gravou nele desde então, gravar
+  // apagaria a mudança dela e contaria errado: dentro da trava, a linha tem de
+  // ser a mesma que foi lida (Etapa 86, B1).
+  var versaoLida = versaoDoCaso_(atual, canal.aba);
+  atualizarRegistro_(canal.aba, alvo, alteracao, function (naTrava) {
+    if (versaoDoCaso_(naTrava, canal.aba) !== versaoLida) {
+      throw new Error(RECC_STATUS_ALTERADO_POR_OUTRA_PESSOA);
+    }
+  });
 
   // NÃO registra na auditoria, e isso é decisão da operação.
   //

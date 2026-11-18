@@ -3105,8 +3105,16 @@ function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
  * Atualiza um registro pelo Id.
  * Lê a linha, mescla as alterações e regrava a linha inteira já formatada —
  * assim uma coluna nunca fica com o formato de outro tipo.
+ *
+ * `conferirNaTrava` (Etapa 86, B1), opcional: recebe o registro como ele está
+ * AGORA, lido DENTRO da trava, e lança um erro para recusar a gravação — é
+ * onde a edição e a troca de status conferem a versão do caso. Conferir antes
+ * da trava deixava uma janela: outra pessoa gravava entre a conferência e a
+ * gravação, e a mudança dela era apagada sem aviso. A linha já é lida aqui
+ * para a mescla; conferir não custa ida nenhuma a mais. O erro sai pelo
+ * `finally`, que solta a trava.
  */
-function atualizarRegistro_(nomeDaAba, id, alteracoes) {
+function atualizarRegistro_(nomeDaAba, id, alteracoes, conferirNaTrava) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
   var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
@@ -3122,6 +3130,7 @@ function atualizarRegistro_(nomeDaAba, id, alteracoes) {
         nomeDaAba + '".');
     }
     var atuais = estrutura.aba.getRange(linha, 1, 1, estrutura.cabecalhos.length).getValues()[0];
+    if (conferirNaTrava) conferirNaTrava(montarRegistro_(estrutura, atuais, linha));
     var nova = montarLinhaParaGravar_(estrutura, alteracoes, atuais);
     formatarEGravar_(estrutura, linha, [nova]);
     return montarRegistro_(estrutura, nova, linha);
