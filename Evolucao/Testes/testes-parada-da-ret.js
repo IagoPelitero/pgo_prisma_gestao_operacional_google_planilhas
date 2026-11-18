@@ -254,7 +254,9 @@ function rodarTestesDaParadaDaRet() {
       'nome do cliente': 'Transmitido', status: 'Retido', 'Status proposta': 'Transmitido',
       'Data do status proposta': dias(29), 'data de recepção do protocolo': dias(30),
       'Data da primeira mudança de status': dias(30) });
-    const fila = comAFilaDaTela(x.chamar('resumoDoCanal')(x.ret.id, {}, 90)).fila;
+    // As duas sub-abas do Trabalho (Etapa 84): o caso está em uma delas.
+    const fila = comAFilaDaTela(x.chamar('resumoDoCanal')(x.ret.id, {}, null, 'todos', false, 1)).fila
+      .concat(comAFilaDaTela(x.chamar('resumoDoCanal')(x.ret.id, {}, null, 'todos', false, 2)).fila);
     const sinais = (r) => fila.find((c) => String(c.id) === String(r.__id)).sinais[0];
     igual(sinais(aguardando).encerrado, false);
     igual(sinais(aguardando).tom, 'ruim', 'há 30 dias esperando a transmissão');

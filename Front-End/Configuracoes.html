@@ -1880,6 +1880,7 @@ var TelaConfiguracoes = (function () {
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
         + 'a busca não estourar numa base grande.')
+      + editorDoTrabalho(canal)
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -1926,6 +1927,7 @@ var TelaConfiguracoes = (function () {
 
     EditorDaFila.montar(elemento('editor-da-fila'), elemento('cfg-colunasDaFila'),
       canal.colunasDaFila, canal.colunasDaBase, escapar);
+    ligarEditorDoTrabalho(canal);
 
     elemento('form-canal').addEventListener('submit', function (evento) {
       evento.preventDefault();
@@ -1947,12 +1949,190 @@ var TelaConfiguracoes = (function () {
         colunaDaHoraDaPrimeiraResposta: valorDe('colunaDaHoraDaPrimeiraResposta'),
         colunaDoValor: valorDe('colunaDoValor'),
         situacoesDestacadas: valorDe('situacoesDestacadas'),
+        subAbasDoTrabalho: subAbasDaTela(),
+        filtrosDoTrabalho: filtrosDaTela(canal),
         icone: valorDe('icone'),
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarCanais(); })
         .senao(mostrarErroNoPainel);
     });
+  }
+
+  /* ------------------------------------- o Trabalho do canal (Etapa 84) */
+
+  /*
+    AS SUB-ABAS E OS FILTROS DO TRABALHO — pedido do PO: "esse ajuste também
+    deve ser disponível na aba de configurações permitindo que eu escolha a
+    ordem dos casos e quais status devem ir para qual aba". A aba 1 tem uma
+    lista de status EM ORDEM (é a prioridade da fila); cada um pode ter uma
+    condição — "fica na aba 1 até a coluna X ter um destes valores", como o
+    Retido da RET até o Status proposta ser Transmitido. O resto vai para a
+    aba 2. Os filtros são até 6 campos de lista, em ordem; em branco, os de
+    sempre.
+  */
+  var statusDaAba1 = [];
+  var FILTROS_NO_TRABALHO = 6;
+  var ORDENS_DA_ABA = [['antigos', 'Do mais antigo para o mais recente'],
+    ['recentes', 'Do mais recente para o mais antigo']];
+
+  function subAbasGravadas(canal) {
+    try { return canal.subAbasDoTrabalho ? JSON.parse(canal.subAbasDoTrabalho) : null; }
+    catch (erro) { return null; }
+  }
+
+  function caixaDaOrdem(nome, rotulo, escolhida) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<select id="cfg-' + nome + '">' + ORDENS_DA_ABA.map(function (ordem) {
+        return '<option value="' + ordem[0] + '"' + (ordem[0] === escolhida ? ' selected' : '') + '>'
+          + escapar(ordem[1]) + '</option>';
+      }).join('') + '</select></label>';
+  }
+
+  function editorDoTrabalho(canal) {
+    var gravadas = subAbasGravadas(canal);
+    statusDaAba1 = gravadas && gravadas.status ? gravadas.status.map(function (regra) {
+      return { status: regra.status || '', rotulo: regra.rotulo || '', coluna: regra.coluna || '',
+        saiCom: (regra.saiCom || []).join(', ') };
+    }) : [];
+    var abas = (gravadas && gravadas.abas) || ['Casos em aberto', 'Casos concluídos'];
+    var ordem = (gravadas && gravadas.ordem) || ['antigos', 'recentes'];
+    var filtros = String(canal.filtrosDoTrabalho || '').split(',').map(function (chave) {
+      return chave.trim();
+    });
+    var opcoesDeFiltro = [{ chave: '', rotulo: '— nenhum —' }].concat(canal.camposDeLista || []);
+
+    return '<p class="config-explica"><strong>Trabalho: sub-abas</strong></p>'
+      + caixaDeMarcar('subAbasLigadas', 'Dividir o Trabalho deste canal em duas sub-abas', !!gravadas,
+        'A aba 1 traz os status escolhidos abaixo, da planilha toda; a aba 2, os demais (os mais recentes, até o teto do painel).')
+      + '<div id="cfg-sub-abas"' + (gravadas ? '' : ' hidden') + '>'
+      + campoDeTexto('nomeDaAba1', 'Nome da aba 1', abas[0], '')
+      + campoDeTexto('nomeDaAba2', 'Nome da aba 2', abas[1], '')
+      + '<div class="config-campo"><span>Status da aba 1, na ordem de prioridade</span>'
+      + '<div id="lista-da-aba-1"></div>'
+      + '<button type="button" class="botao-texto" id="mais-um-status">+ acrescentar status</button>'
+      + '<em>A fila da aba 1 segue esta ordem. Os outros status vão para a aba 2. Caso sem status '
+      + 'vai para a aba 1, no fim. "Fica até…": o status só fica na aba 1 enquanto a coluna '
+      + 'escolhida NÃO tiver um destes valores — na RET, o Retido até o Status proposta ser '
+      + 'Transmitido ou Sem alteração. O nome no cartão é opcional.</em></div>'
+      + caixaDaOrdem('ordemDaAba1', 'Ordem da aba 1, dentro de cada status', ordem[0])
+      + caixaDaOrdem('ordemDaAba2', 'Ordem da aba 2', ordem[1])
+      + '</div>'
+      + '<p class="config-explica"><strong>Trabalho: filtros</strong></p>'
+      + '<div class="config-campo"><span>Filtros do Trabalho, em ordem (até ' + FILTROS_NO_TRABALHO + ')</span>'
+      + '<div class="filtros-do-trabalho">'
+      + Array.apply(null, Array(FILTROS_NO_TRABALHO)).map(function (nada, i) {
+        return '<select id="cfg-filtroDoTrabalho' + i + '" aria-label="' + (i + 1) + 'º filtro">'
+          + opcoesDeFiltro.map(function (campo) {
+            return '<option value="' + escapar(campo.chave) + '"'
+              + ((filtros[i] || '') === campo.chave ? ' selected' : '') + '>'
+              + escapar(campo.rotulo) + '</option>';
+          }).join('') + '</select>';
+      }).join('') + '</div>'
+      + '<em>A busca de texto vem sempre primeiro. Todos em branco: os filtros de sempre (o Status '
+      + 'e os primeiros campos de lista do formulário).</em></div>';
+  }
+
+  /** Lê da tela o que a pessoa já mexeu nas linhas, antes de redesenhar. */
+  function lerStatusDaTela() {
+    statusDaAba1 = statusDaAba1.map(function (regra, i) {
+      return {
+        status: valorDe('status-aba1-' + i), rotulo: valorDe('rotulo-aba1-' + i),
+        coluna: valorDe('coluna-aba1-' + i), saiCom: valorDe('saiCom-aba1-' + i)
+      };
+    });
+  }
+
+  function desenharStatusDaAba1(canal) {
+    var lugar = elemento('lista-da-aba-1');
+    if (!lugar) return;
+    var colunas = [''].concat(canal.colunasDaBase);
+    lugar.innerHTML = statusDaAba1.length ? statusDaAba1.map(function (regra, i) {
+      var situacoes = canal.situacoes.indexOf(regra.status) >= 0 || !regra.status
+        ? canal.situacoes : [regra.status].concat(canal.situacoes);
+      return '<div class="linha-da-aba-1">'
+        + '<span class="ordem-da-aba-1">' + (i + 1) + 'º</span>'
+        + '<select id="cfg-status-aba1-' + i + '" aria-label="Status ' + (i + 1) + '">'
+        + '<option value="">— status —</option>'
+        + situacoes.map(function (nome) {
+          return '<option value="' + escapar(nome) + '"' + (nome === regra.status ? ' selected' : '') + '>'
+            + escapar(nome) + '</option>';
+        }).join('') + '</select>'
+        + '<input type="text" id="cfg-rotulo-aba1-' + i + '" value="' + escapar(regra.rotulo) + '"'
+        + ' placeholder="nome no cartão (opcional)" aria-label="Nome no cartão">'
+        + '<select id="cfg-coluna-aba1-' + i + '" aria-label="Fica até a coluna">'
+        + colunas.map(function (coluna) {
+          return '<option value="' + escapar(coluna) + '"' + (coluna === regra.coluna ? ' selected' : '') + '>'
+            + (coluna ? 'Fica até ' + escapar(coluna) + ' ser…' : 'Sem condição') + '</option>';
+        }).join('') + '</select>'
+        + '<input type="text" id="cfg-saiCom-aba1-' + i + '" value="' + escapar(regra.saiCom) + '"'
+        + ' placeholder="valores, separados por vírgula" aria-label="Valores que tiram da aba 1"'
+        + (regra.coluna ? '' : ' hidden') + '>'
+        + '<button type="button" class="seta" data-subir-aba1="' + i + '" aria-label="Subir"'
+        + (i ? '' : ' disabled') + '>↑</button>'
+        + '<button type="button" class="seta" data-descer-aba1="' + i + '" aria-label="Descer"'
+        + (i < statusDaAba1.length - 1 ? '' : ' disabled') + '>↓</button>'
+        + '<button type="button" class="seta perigo" data-tirar-aba1="' + i + '"'
+        + ' aria-label="Tirar da aba 1">×</button></div>';
+    }).join('') : '<p class="config-dica">Nenhum status ainda.</p>';
+
+    function mexer(atributo, fazer) {
+      ligarCliques('[' + atributo + ']', function (botao) {
+        lerStatusDaTela();
+        fazer(Number(botao.getAttribute(atributo)));
+        desenharStatusDaAba1(canal);
+      });
+    }
+    mexer('data-subir-aba1', function (i) {
+      statusDaAba1.splice(i - 1, 0, statusDaAba1.splice(i, 1)[0]);
+    });
+    mexer('data-descer-aba1', function (i) {
+      statusDaAba1.splice(i + 1, 0, statusDaAba1.splice(i, 1)[0]);
+    });
+    mexer('data-tirar-aba1', function (i) { statusDaAba1.splice(i, 1); });
+    statusDaAba1.forEach(function (regra, i) {
+      elemento('cfg-coluna-aba1-' + i).addEventListener('change', function () {
+        elemento('cfg-saiCom-aba1-' + i).hidden = !this.value;
+      });
+    });
+  }
+
+  function ligarEditorDoTrabalho(canal) {
+    desenharStatusDaAba1(canal);
+    elemento('cfg-subAbasLigadas').addEventListener('change', function () {
+      elemento('cfg-sub-abas').hidden = !this.checked;
+    });
+    elemento('mais-um-status').addEventListener('click', function () {
+      lerStatusDaTela();
+      statusDaAba1.push({ status: '', rotulo: '', coluna: '', saiCom: '' });
+      desenharStatusDaAba1(canal);
+    });
+  }
+
+  /** O que vai para o servidor: null desliga as sub-abas. */
+  function subAbasDaTela() {
+    if (!elemento('cfg-subAbasLigadas')) return undefined;
+    if (!marcado('subAbasLigadas')) return null;
+    lerStatusDaTela();
+    return {
+      abas: [valorDe('nomeDaAba1'), valorDe('nomeDaAba2')],
+      status: statusDaAba1.filter(function (regra) { return regra.status; }).map(function (regra) {
+        return { status: regra.status, rotulo: regra.rotulo, coluna: regra.coluna,
+          saiCom: regra.coluna ? regra.saiCom.split(',').map(function (valor) { return valor.trim(); })
+            .filter(function (valor) { return valor; }) : [] };
+      }),
+      ordem: [valorDe('ordemDaAba1'), valorDe('ordemDaAba2')]
+    };
+  }
+
+  function filtrosDaTela() {
+    if (!elemento('cfg-filtroDoTrabalho0')) return undefined;
+    var lista = [];
+    for (var i = 0; i < FILTROS_NO_TRABALHO; i++) {
+      var chave = valorDe('filtroDoTrabalho' + i);
+      if (chave && lista.indexOf(chave) < 0) lista.push(chave);
+    }
+    return lista;
   }
 
   /* -------------------------------------------------------------- painéis */

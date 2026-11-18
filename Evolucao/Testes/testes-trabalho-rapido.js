@@ -21,7 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const { carregar, secao, teste, igual, verdadeiro, contem, comAFilaDaTela,
-  pecaRodando } = require('./ferramentas');
+  pecaRodando, semSubAbas } = require('./ferramentas');
 
 const lerTela = (nome) => fs.readFileSync(
   path.join(__dirname, '..', '..', 'Front-End', nome), 'utf8');
@@ -36,6 +36,7 @@ function diasAtras(n) {
 function retCom(quantos, extra) {
   const t = carregar('primeiro.adm@exemplo.com');
   t.chamar('instalarRECC()');
+  semSubAbas(t.chamar);   // a fila de 100 é a do canal sem sub-abas (Etapa 84)
   t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
   const lote = [];
   for (let i = 0; i < quantos; i++) {
@@ -171,11 +172,11 @@ function rodarTestesDoTrabalhoRapido() {
   /* ----------------------------------------------------------------------- */
   secao('A tela');
 
-  teste('"Todos" com mais casos do que vieram vai ao servidor; até 100, não', () => {
+  teste('pedir mais casos do que vieram vai ao servidor; o que já veio, não', () => {
     const tela = lerTela('Trabalho.html');
-    contem(tela, "if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {");
-    contem(tela, "carregar('Trazendo os ' + totalDaFila() + ' casos…');");
-    contem(tela, "quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)");
+    contem(tela, "var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;");
+    contem(tela, "if (querMais && resumo.fila.length < totalDaFila()) {");
+    contem(tela, "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))");
   });
 
   teste('a barra do "Mostrar" fala da fila inteira, e não só do que veio', () => {

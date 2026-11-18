@@ -12,13 +12,16 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario,
-  ehData, lerPeca, scriptDaPeca, pecaRodando, comAFilaDaTela } = require('./ferramentas');
+  ehData, lerPeca, scriptDaPeca, pecaRodando, comAFilaDaTela, semSubAbas } = require('./ferramentas');
 
 function rodarTestesDoTrabalho() {
   console.log('\nEtapa 5 — Trabalho');
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
+  // A mecânica geral do Trabalho — cartões de Painéis, filtros, alcance — é a
+  // do canal SEM sub-abas (Etapa 84): é ela que estes testes provam.
+  semSubAbas(chamar);
 
   const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
   const hoje = new Date();
@@ -188,18 +191,28 @@ function rodarTestesDoTrabalho() {
 
   secao('O período e a fila');
 
-  teste('a fila mostra só a janela recente, e o mais novo primeiro', () => {
+  /** Apaga os casos de teste pelo nome, para os testes seguintes contarem igual. */
+  function apagarPeloNome(nome) {
+    chamar('lerRegistros_')('BASE_MESA').filter((r) => r['Nome do segurado'] === nome)
+      .forEach((r) => chamar('excluirCaso')(canal.id, r.__id));
+  }
+
+  teste('sem período, o caso antigo aparece — e o mais novo vem primeiro (Etapa 84)', () => {
+    // Pedido do PO: "retire o filtro que permite selecionar por data ou por
+    // mês". Antes, o caso de 90 dias atrás ficava fora da janela de 30 dias.
     chamar('inserirRegistro_')('BASE_MESA', {
       Analista: 'Ana Martins', Status: 'Em andamento',
       'Data de entrada': diasAtras(90), 'Nome do segurado': 'Caso antigo'
     });
 
     const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
-    igual(resumo.periodo.dias, 30);
-    verdadeiro(!JSON.stringify(resumo.fila).includes('Caso antigo'),
-      'fora da janela não aparece na fila');
-    igual(valorNaFila(resumo, 0, 'Nome do segurado'), 'Encaminhado',
-      'o registro mais recente encabeça a fila');
+    igual(resumo.periodo, undefined, 'o Trabalho não tem mais período');
+    verdadeiro(JSON.stringify(resumo.fila).includes('Caso antigo'), 'o caso antigo está na fila');
+    igual(valorNaFila(resumo, 0, 'Nome do segurado'), 'Caso antigo',
+      'o registro mais recente da planilha encabeça a fila');
+    apagarPeloNome('Caso antigo');
+    igual(valorNaFila(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})), 0, 'Nome do segurado'),
+      'Encaminhado');
   });
 
   teste('a fila vem em grupos, com várias colunas debaixo de um título', () => {
@@ -249,21 +262,18 @@ function rodarTestesDoTrabalho() {
     verdadeiro(/^\d{2}\/\d{2}\/\d{4}$/.test(primeira), 'veio ' + primeira);
   });
 
-  teste('a variação compara com o período anterior, e cala quando não dá', () => {
-    // Mostrar "+100%" porque saiu de zero é ruído que a operação aprende a
-    // ignorar — e junto com ele ignora a variação que importa.
-    const total = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes[0];
-    igual(total.anterior, 0, 'não havia nada no período anterior');
-    igual(total.variacao, null, 'sem base de comparação, não há variação');
-
-    // Agora com base: um caso no período anterior, quatro no atual.
+  teste('sem período, os cartões não têm a seta do período anterior (Etapa 84)', () => {
+    // Sem período não há "anterior" para comparar: a seta fica vazia, e o caso
+    // de 40 dias atrás conta junto com os outros.
     chamar('inserirRegistro_')('BASE_MESA', {
       Analista: 'Ana Martins', Status: 'Em andamento',
       'Data de entrada': diasAtras(40), 'Nome do segurado': 'Do mês passado'
     });
-    const comBase = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes[0];
-    igual(comBase.anterior, 1);
-    igual(comBase.variacao, 300, 'de 1 para 4 são +300%');
+    const total = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).cartoes[0];
+    igual(total.valor, 5, 'os quatro de sempre e o do mês passado');
+    igual(total.anterior, 0);
+    igual(total.variacao, null, 'sem período, não há variação');
+    apagarPeloNome('Do mês passado');
   });
 
   secao('A tela');
@@ -979,74 +989,42 @@ function rodarTestesDoTrabalho() {
     return escrever(quando);
   };
 
-  teste('sem pedido nenhum, o Trabalho abre no atalho da CONFIG', () => {
-    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
-    igual(resumo.periodo.tipo, 'dias');
-    igual(resumo.periodo.dias, 30);
-    contem(resumo.periodo.rotulo, 'últimos 30 dias');
-  });
+  // Etapa 84, pedido do PO: "retire o filtro que permite selecionar por data
+  // ou por mês e retire o complemento que pede a data ou o mês". O Trabalho
+  // não tem mais período: o que a tela pedir de período é ignorado.
 
-  teste('o Trabalho aceita um mês fechado, e a fila muda com ele', () => {
-    // O caso nasce em DOIS meses atrás: fora do atalho de 30 dias, dentro do
-    // seu próprio mês. Se o período não chegasse ao filtro, ele nunca
-    // apareceria — e é justamente o caso que o filtro por data existe para achar.
+  teste('o Trabalho não tem período: o pedido de mês ou de/até é ignorado (Etapa 84)', () => {
     chamar('inserirRegistro_')('BASE_MESA', {
       Analista: 'Ana Martins', Status: 'Em andamento',
       'Data de entrada': diaNoMes(2), 'Nome do segurado': 'Caso de dois meses atras'
     });
-
-    const noMesDele = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(2) }));
-    igual(noMesDele.periodo.tipo, 'mes');
-    igual(noMesDele.periodo.mes, mesDe(2));
-    verdadeiro(JSON.stringify(noMesDele.fila).includes('Caso de dois meses atras'),
-      'escolhido o mês dele, o caso aparece');
-
-    const noMesPassado = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(1) }));
-    verdadeiro(!JSON.stringify(noMesPassado.fila).includes('Caso de dois meses atras'),
-      'escolhido outro mês, ele sai');
-  });
-
-  teste('o Trabalho aceita de/até, com as duas pontas dentro', () => {
-    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {},
+    const semPedido = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
+    const comMes = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(1) }));
+    const comIntervalo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {},
       { tipo: 'intervalo', de: diasAtras(2), ate: diasAtras(1) }));
-    igual(resumo.periodo.tipo, 'intervalo');
-    igual(resumo.periodo.de, diasAtras(2));
-    igual(resumo.periodo.ate, diasAtras(1));
-    contem(resumo.periodo.rotulo, 'de ' + diasAtras(2));
+    verdadeiro(JSON.stringify(semPedido.fila).includes('Caso de dois meses atras'), 'o caso antigo aparece');
+    igual(comMes.total, semPedido.total, 'o mês pedido não muda nada');
+    igual(comIntervalo.total, semPedido.total, 'o de/até pedido não muda nada');
+    igual(semPedido.periodo, undefined);
+    igual(semPedido.mesesDisponiveis, undefined, 'e não há lista de meses');
+    apagarPeloNome('Caso de dois meses atras');
   });
 
-  teste('o mês fechado NÃO guarda o caso sem data; o atalho guarda', () => {
-    // Num "últimos 30 dias", a linha sem data é um caso mal preenchido que
-    // precisa aparecer para alguém arrumar. Num "setembro", ela é um caso
-    // sobre o qual não se pode afirmar que é de setembro.
+  teste('o caso sem data aparece no Trabalho, para ser arrumado', () => {
     chamar('inserirRegistro_')('BASE_MESA', {
       Analista: 'Ana Martins', Status: 'Em andamento',
       'Nome do segurado': 'Caso sem data nenhuma'
     });
-
-    const atalho = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
-    verdadeiro(JSON.stringify(atalho.fila).includes('Caso sem data nenhuma'),
-      'no atalho ele aparece, para ser arrumado');
-
-    const mes = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}, { tipo: 'mes', mes: mesDe(0) }));
-    verdadeiro(!JSON.stringify(mes.fila).includes('Caso sem data nenhuma'),
-      'num mês fechado ele sai');
+    verdadeiro(JSON.stringify(comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {})).fila)
+      .includes('Caso sem data nenhuma'));
+    apagarPeloNome('Caso sem data nenhuma');
   });
 
-  teste('o Trabalho entrega os meses para a tela montar a lista', () => {
-    const resumo = comAFilaDaTela(chamar('resumoDoCanal')(canal.id, {}));
-    verdadeiro(resumo.mesesDisponiveis.length > 0, 'sem lista, não há o que escolher');
-    igual(resumo.mesesDisponiveis[0].valor, mesDe(0), 'o corrente vem primeiro');
-  });
-
-  teste('a fila vazia diz o período que olhou, não "os N dias"', () => {
-    // Com "setembro de 2026" escolhido, "nada nos 30 dias mais recentes" era
-    // mentira — e mandava a pessoa procurar defeito onde não havia.
+  teste('a fila vazia diz onde olhou, sem falar de período', () => {
     const tela = lerPeca('Trabalho');
-    contem(tela, 'Nada foi registrado no período escolhido');
-    contem(tela, 'escapar(resumo.periodo.rotulo)');
-    verdadeiro(tela.indexOf("resumo.periodo.dias + ' dias mais recentes") < 0,
-      'o recado antigo não pode ter sobrado');
+    contem(tela, "'Nenhum caso ' + ondeOlhou + '.'");
+    verdadeiro(tela.indexOf('resumo.periodo') < 0, 'a tela não lê mais período nenhum');
+    verdadeiro(tela.indexOf('SeletorDePeriodo') < 0, 'nem desenha o seletor de período');
   });
 
   secao('A caixa de filtros, nas duas telas');
@@ -1068,8 +1046,9 @@ function rodarTestesDoTrabalho() {
     contem(lerPeca('Estilos'), '.caixa-de-filtros', 'com o fundo branco declarado');
   });
 
-  teste('as duas telas usam o MESMO seletor de período', () => {
-    asDuasTelas.forEach((nome) => {
+  teste('o seletor de período é peça compartilhada — hoje só a Produtividade usa', () => {
+    // O Trabalho saiu do período na Etapa 84; a peça continua sendo uma só.
+    ['Produtividade'].forEach((nome) => {
       const tela = lerPeca(nome);
       contem(tela, 'SeletorDePeriodo.desenhar(', nome + ' desenha pelo seletor');
       contem(tela, 'SeletorDePeriodo.mudou(', nome + ' reage pelo seletor');
@@ -1097,7 +1076,7 @@ function rodarTestesDoTrabalho() {
     // E as telas que têm filtro comum PRECISAM separar `false` de `null`: sem
     // isso, mexer no período cairia no `filtrosEscolhidos` e a tela procuraria
     // um filtro chamado "de" — que não existe, e zeraria a fila.
-    ['Trabalho', 'Produtividade'].forEach((nome) => {
+    ['Produtividade'].forEach((nome) => {
       contem(lerPeca(nome), 'novoPeriodo !== null',
         nome + ' tem de separar "não é meu" de "ainda incompleto"');
     });
@@ -1714,6 +1693,7 @@ function rodarTestesDoTrabalho() {
    */
   const curta = carregar('primeiro.adm@exemplo.com');
   curta.chamar('instalarRECC()');
+  semSubAbas(curta.chamar);   // a fila de um canal sem sub-abas (Etapa 84)
   const mesaCurta = curta.chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
   for (let i = 1; i <= 7; i++) {
     curta.chamar('cadastrarCaso')(mesaCurta.id, {
@@ -1782,8 +1762,8 @@ function rodarTestesDoTrabalho() {
     const corpo = clique.substring(0, clique.indexOf('\n    });'));
     contem(corpo, 'desenharPainel();');
     verdadeiro(corpo.indexOf('carregar()') < 0, 'a quantidade, sozinha, não chama o servidor');
-    contem(corpo, "if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {",
-      'só o "Todos" com casos faltando vai ao servidor');
+    contem(corpo, "if (querMais && resumo.fila.length < totalDaFila()) {",
+      'só quem pede casos que faltam vai ao servidor');
   });
 
   teste('limpar filtros e trocar de canal não mexem no "Mostrar"', () => {

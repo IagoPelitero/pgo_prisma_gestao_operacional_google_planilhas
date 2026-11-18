@@ -22,7 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { secao, teste, igual, verdadeiro, contem, lanca, comAFilaDaTela } = require('./ferramentas');
+const { secao, teste, igual, verdadeiro, contem, lanca, comAFilaDaTela , semSubAbas } = require('./ferramentas');
 const { retComStatusProposta } = require('./testes-condicional');
 
 const lerTela = (nome) => fs.readFileSync(
@@ -31,6 +31,9 @@ const lerTela = (nome) => fs.readFileSync(
 /** A RET do PO: Status proposta, "Contatando" no lugar do "1º contato realizado", e casos. */
 function retDoPO() {
   const t = retComStatusProposta();
+  // A mecânica dos cards e dos filtros de sempre (Etapa 44) é a do canal sem
+  // sub-abas e sem filtros escolhidos (Etapa 84).
+  semSubAbas(t.chamar, null, true);
   const item = t.chamar('lerRegistros_')('CATALOGO').find((i) => i.Tipo === 'STATUS'
     && i.Nome === '1º contato realizado' && String(i.CanalId) === String(t.ret.id));
   t.renomearStatus = (de, para) => {
@@ -282,7 +285,7 @@ function rodarTestesDosCardsFiltrosEBusca() {
   /* ----------------------------------------------------------------------- */
   secao('A abertura em "Por data" volta a mostrar os casos sem data');
 
-  teste('o caso sem data de recepção aparece na abertura, e não num período escolhido', () => {
+  teste('o caso sem data de recepção aparece no Trabalho, com ou sem período pedido', () => {
     const t = retDoPO();
     t.chamar('inserirRegistro_')('BASE_RET', { analista: 'Ana', status: 'Pendente',
       'nome do cliente': 'Sem data' });
@@ -291,8 +294,9 @@ function rodarTestesDosCardsFiltrosEBusca() {
     const hoje = new Date();
     const dd = (n) => (n < 10 ? '0' : '') + n;
     const data = dd(hoje.getDate()) + '/' + dd(hoje.getMonth() + 1) + '/' + hoje.getFullYear();
+    // Sem período (Etapa 84), o de/até pedido é ignorado: o caso sem data fica.
     const escolhido = t.resumo({}, { tipo: 'intervalo', de: data, ate: data });
-    verdadeiro(JSON.stringify(escolhido.fila).indexOf('Sem data') < 0, 'num de/até escolhido, não');
+    verdadeiro(JSON.stringify(escolhido.fila).indexOf('Sem data') >= 0, 'o de/até não vale mais no Trabalho');
   });
 
   /* ----------------------------------------------------------------------- */

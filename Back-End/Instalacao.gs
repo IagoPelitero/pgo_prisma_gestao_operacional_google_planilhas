@@ -72,6 +72,11 @@ function instalarRECC() {
   esquecerEstruturaLida_();
 
   var semente = semearDadosIniciais_(email);
+  // As sub-abas do Trabalho e os filtros da RET (Etapa 84), com o que a
+  // semente acabou de criar.
+  montarAsSubAbasDoTrabalho_([], []);
+  // A montagem leu a configuração: a instalação termina com o cache frio, como antes.
+  esquecerCacheDaConfiguracao_();
   var orcamento = orcamentoDeCelulas_(planilha);
 
   var laudo = [
@@ -1331,7 +1336,10 @@ function atualizarPGO() {
    ['CANAIS', 'InicioDoExpediente', 'texto'],
    ['CANAIS', 'FimDoExpediente', 'texto'],
    ['CANAIS', 'ColunaDaPrimeiraResposta', 'texto'],
-   ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto']].forEach(function (trio) {
+   ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto'],
+   // As sub-abas e os filtros do Trabalho (Etapa 84).
+   ['CANAIS', 'SubAbasDoTrabalho', 'textoLongo'],
+   ['CANAIS', 'FiltrosDoTrabalho', 'texto']].forEach(function (trio) {
     var aba = planilhaAtiva_().getSheetByName(trio[0]);
     if (!aba) { pulados.push('aba ' + trio[0] + ' não existe'); return; }
     if (posicaoDaColuna_(estruturaDaAba_(trio[0]), trio[1]) >= 0) {
@@ -1473,6 +1481,9 @@ function atualizarPGO() {
 
   // --- Etapa 44: os 4 cards do Trabalho da RET, na ordem do PO -------------
   feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
+
+  // --- Etapa 84: as sub-abas do Trabalho (RET e Mesa) e os filtros da RET ---
+  feito = feito.concat(montarAsSubAbasDoTrabalho_(pulados, paraVoce));
 
   // --- Etapa 49: grupo, agente da central e relacionamento saem do formulário
   feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
@@ -5169,6 +5180,124 @@ function laudoEmTexto_(laudo) {
   });
 
   return linhas.join('\n');
+}
+
+/** A marca de que as sub-abas do Trabalho já foram montadas (Etapa 84). */
+const RECC_CHAVE_DAS_SUB_ABAS = 'MIGRACAO.SUB_ABAS_DO_TRABALHO';
+
+/**
+ * Monta as sub-abas do Trabalho como o PO pediu (Etapa 84), e os filtros da RET.
+ *
+ *   RET   "Casos em aberto": 1º Retido ainda não transmitido (Status proposta
+ *         diferente de Transmitido e de Sem alteração — a regra do prazo),
+ *         2º Pendente, 3º Contatando, 4º Não trabalhado, 5º Acompanhamento; do
+ *         mais antigo para o mais recente. "Casos concluídos": os demais.
+ *         Filtros: Status, Tentativas de contato, Status proposta, Analista,
+ *         Canal de origem e Cód. do produto e produto.
+ *   Mesa  "Casos em andamento": Em andamento, do mais antigo para o mais
+ *         recente. "Casos concluídos": os demais.
+ *   VG    sem sub-abas (pedido do PO).
+ *
+ * Roda UMA VEZ: depois, quem manda é Configurações › Canais de trabalho. Canal
+ * que já tem sub-abas não é tocado. Status que a planilha não tem fica de fora,
+ * e o laudo diz qual — o "Acompanhamento", criado pelo PO, pode não existir.
+ */
+function montarAsSubAbasDoTrabalho_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CANAIS')
+    || posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'SubAbasDoTrabalho') < 0) {
+    pulados.push('as sub-abas do Trabalho: a coluna CANAIS.SubAbasDoTrabalho ainda não existe');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DAS_SUB_ABAS, '') || '').trim()) {
+    pulados.push('as sub-abas do Trabalho já foram montadas (agora quem manda é Configurações)');
+    return feito;
+  }
+  var canais = canaisVisiveis_();
+  function montar(aba, abas, pedidos) {
+    var canal = canais.filter(function (um) { return um.aba === aba; })[0];
+    if (!canal) { pulados.push('as sub-abas: o canal ' + aba + ' não está ligado'); return; }
+    if (String(canal.subAbasDoTrabalho || '').trim()) {
+      pulados.push(canal.nome + ': já tem sub-abas');
+      return;
+    }
+    var situacoes = situacoesDoCanal_(canal);
+    var faltando = [];
+    var status = [];
+    pedidos.forEach(function (pedido) {
+      var achado = situacoes.filter(function (um) {
+        return normalizarParaComparar_(um.gravadoComo) === normalizarParaComparar_(pedido.status)
+          || normalizarParaComparar_(um.nome) === normalizarParaComparar_(pedido.status);
+      })[0];
+      if (!achado) { faltando.push('"' + pedido.status + '"'); return; }
+      var regra = { status: achado.gravadoComo };
+      if (pedido.rotulo) regra.rotulo = pedido.rotulo;
+      if (pedido.condicao) {
+        var coluna = grafiaDaColuna_(canal.aba, pedido.condicao.coluna);
+        if (posicaoDaColuna_(estruturaDaAba_(canal.aba), coluna) < 0) {
+          faltando.push('"' + pedido.status + '" (a base não tem a coluna "' + pedido.condicao.coluna + '")');
+          return;
+        }
+        regra.coluna = coluna;
+        regra.saiCom = pedido.condicao.saiCom;
+      }
+      status.push(regra);
+    });
+    if (!status.length) {
+      paraVoce.push(canal.nome + ': as sub-abas do Trabalho NÃO foram montadas — nenhum destes '
+        + 'status existe: ' + faltando.join(', ') + '. Monte em Configurações › Canais de trabalho.');
+      return;
+    }
+    atualizarRegistro_('CANAIS', canal.id, { SubAbasDoTrabalho: JSON.stringify({
+      abas: abas, status: status, ordem: ['antigos', 'recentes'] }) });
+    feito.push(canal.nome + ': sub-abas "' + abas[0] + '" (' + status.map(function (regra) {
+      return regra.rotulo || regra.status;
+    }).join(', ') + ') e "' + abas[1] + '"');
+    if (faltando.length) {
+      paraVoce.push(canal.nome + ': ficaram de fora da aba "' + abas[0] + '" os status que a '
+        + 'planilha não tem: ' + faltando.join(', ') + '. Crie em Configurações › Ajustes Gerais '
+        + 'e acrescente em Configurações › Canais de trabalho.');
+    }
+  }
+
+  montar('BASE_RET', ['Casos em aberto', 'Casos concluídos'], [
+    { status: 'Retido', rotulo: 'Aguardando transmissão',
+      condicao: { coluna: 'Status proposta', saiCom: ['Transmitido', 'Sem alteração'] } },
+    { status: 'Pendente' }, { status: 'Contatando' }, { status: 'Não trabalhado' },
+    { status: 'Acompanhamento' }]);
+  montar('BASE_MESA', ['Casos em andamento', 'Casos concluídos'], [{ status: 'Em andamento' }]);
+  feito = feito.concat(montarOsFiltrosDaRet_(canais, paraVoce));
+
+  gravarConfiguracao_(RECC_CHAVE_DAS_SUB_ABAS, 'Etapa 84 — '
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
+  esquecerEstruturaLida_('CANAIS');
+  return feito;
+}
+
+/** Os filtros do Trabalho da RET, na ordem do PO (Etapa 84). */
+function montarOsFiltrosDaRet_(canais, paraVoce) {
+  var ret = canais.filter(function (um) { return um.aba === 'BASE_RET'; })[0];
+  if (!ret || String(ret.filtrosDoTrabalho || '').trim()) return [];
+  var ativos = camposAtivosDoCanal_(ret.id);
+  var faltando = [];
+  var chaves = ['Status', 'Tentativas de contato', 'Status proposta', 'Analista',
+    'Canal de origem', 'Cód. do produto e produto'].map(function (nome) {
+    var procurado = normalizarParaComparar_(nome);
+    var campo = ativos.filter(function (um) {
+      return normalizarParaComparar_(um.Rotulo) === procurado
+        || normalizarParaComparar_(um.Cabecalho) === procurado;
+    })[0];
+    if (!campo) faltando.push('"' + nome + '"');
+    return campo ? String(campo.ChaveTecnica) : '';
+  }).filter(function (chave) { return chave; });
+  if (!chaves.length) return [];
+  atualizarRegistro_('CANAIS', ret.id, { FiltrosDoTrabalho: chaves.join(', ') });
+  if (faltando.length) {
+    paraVoce.push('RET: os filtros do Trabalho ficaram sem ' + faltando.join(', ')
+      + ' — o campo não existe ou está desligado. Ajuste em Configurações › Canais de trabalho.');
+  }
+  return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
+    + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
 }
 
 /** A marca de que os cards da RET já foram montados — para não desfazer o que o PO mudar depois. */

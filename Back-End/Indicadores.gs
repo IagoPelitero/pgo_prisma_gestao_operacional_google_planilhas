@@ -92,6 +92,15 @@ const RECC_OPCOES_DE_CASOS_NA_FILA = [5, 10, 20, 50, 100];
  */
 const RECC_FILA_NA_ABERTURA = RECC_OPCOES_DE_CASOS_NA_FILA[RECC_OPCOES_DE_CASOS_NA_FILA.length - 1];
 
+/**
+ * Na LEITURA LEVE das sub-abas (Etapa 84), as linhas da fila vêm inteiras uma a
+ * uma, e as primeiras da aba 1 — os casos mais antigos — se espalham pela base:
+ * cem linhas soltas eram dezenas de idas. Aí abre com 20 (o 5, o 10 e o 20 na
+ * hora); 50, 100 e "Todos" vão ao servidor, como o "Todos" já ia. Sem a leitura
+ * leve, continua tudo como o PO escolheu: os 100 de uma vez.
+ */
+const RECC_FILA_NA_LEITURA_LEVE = 20;
+
 function linhasQueOPainelOlha_() {
   var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
   if (isFinite(declarado) && declarado > 0) return Math.floor(declarado);
@@ -119,55 +128,56 @@ function tomValido_(cor) {
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
   return cronometrado_('resumoDoCanal', resumoDoCanalSemRelogio_, arguments);
 }
 
-function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
+function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  // O PERÍODO é escolhido na tela — por data ou por mês, abrindo do dia 1 do
-  // mês até hoje. Antes era a janela fixa da CONFIG, igual para todo mundo: quem
-  // precisasse fechar uma semana ou um mês tinha de exportar e contar fora.
-  var periodo = resolverPeriodo_(periodoPedido);
-  var antes = periodoAnterior_(periodo);
+  // SEM PERÍODO (Etapa 84, pedido do PO: "retire o filtro que permite
+  // selecionar por data ou por mês"). `periodoPedido` fica na assinatura só
+  // para a página aberta antes da atualização não quebrar — é ignorado.
+  // Com SUB-ABAS (RET e Mesa), a aba 1 traz os casos de trabalho da planilha
+  // toda e a aba 2 os concluídos mais recentes; sem (o VG), os casos mais
+  // recentes, até o teto do painel. Ver "AS SUB-ABAS DO TRABALHO".
+  var sub = subAbasDoCanal_(canal);
+  var qualAba = sub ? (Number(subAba) === 2 ? 2 : 1) : 0;
+  var contagemDasAbas = null;
 
-  // Linha sem data FICA no atalho e SAI dos períodos fechados — a mesma regra
-  // da Produtividade RECC, pelo mesmo motivo: na abertura da tela ela é um
-  // caso mal preenchido que precisa aparecer; num "setembro", é um caso sobre
-  // o qual não dá para afirmar que é de setembro.
-  var guardarSemData = guardaOsSemData_(periodo);
-
-  // A BUSCA DIGITADA procura na PLANILHA TODA, sem o período (Etapa 69, pedido
-  // do PO: "os filtros de texto ficam condicionados à data, prejudicando a
-  // busca"). Os outros filtros continuam valendo, e os cartões contam o que a
-  // busca achou — o mesmo que a fila. Sem período, não há o anterior para
-  // comparar: a seta dos cartões fica vazia.
+  // A BUSCA DIGITADA procura na PLANILHA TODA (Etapa 69, pedido do PO: "os
+  // filtros de texto ficam condicionados à data, prejudicando a busca"). Os
+  // outros filtros continuam valendo, e os cartões contam o que a busca achou —
+  // o mesmo que a fila. Com sub-abas, cada aba mostra o que a busca achou nela,
+  // e o número das duas diz se vale trocar de aba.
   var termo = String((filtros || {}).busca || '').trim();
   var meus;
-  var anterior;
   var truncada;
   if (termo) {
     var achado = registrosDaBuscaNaPlanilha_(canal, termo);
     meus = filtrarPeloAlcance_(achado.registros, canal.aba, quem);
-    anterior = [];
     truncada = achado.truncada;
+    if (sub) {
+      var partes = separarNasSubAbas_(aplicarBusca_(meus, canal, termo), canal, sub);
+      contagemDasAbas = [partes[0].length, partes[1].length];
+      meus = partes[qualAba - 1];
+    }
+  } else if (sub) {
+    var daAba = registrosDaSubAba_(canal, sub, qualAba, quem, filtrosDoCanal_(canal, quem));
+    meus = daAba.registros;
+    truncada = daAba.truncada;
+    contagemDasAbas = daAba.contagem;
   } else {
-    // Só as linhas do período e do anterior, achadas pela coluna da data
-    // (Etapa 65) — qualquer mês completo. Ver registrosDosPeriodos_.
-    var lido = registrosDosPeriodos_(canal, [
-      { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
-      { de: antes.de, ate: antes.ate }]);
-    truncada = lido.truncada;
-    meus = filtrarPeloAlcance_(entreDuasDatas_(lido.registros, canal, periodo.de, periodo.ate,
-      guardarSemData), canal.aba, quem);
-    // O período ANTERIOR, do mesmo tamanho, só para dizer se subiu ou desceu.
-    anterior = filtrarPeloAlcance_(
-      entreDuasDatas_(lido.registros, canal, antes.de, antes.ate, false), canal.aba, quem);
+    var teto = linhasQueOPainelOlha_();
+    meus = filtrarPeloAlcance_(lerRegistros_(canal.aba, { ultimas: teto }), canal.aba, quem);
+    truncada = quantidadeDeRegistros_(estruturaDaAba_(canal.aba)) > teto;
   }
+  // Sem período, não há o anterior para comparar: a seta dos cartões some.
+  var anterior = [];
 
   var disponiveis = filtrosDoCanal_(canal, quem);
+  if (sub) disponiveis = filtrosDaSubAba_(disponiveis, canal, sub, qualAba);
   // A busca entra junto com os filtros, e vale para os cartões E para a fila:
   // o número do cartão continua sendo o dos casos que a busca achou.
   var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
@@ -186,28 +196,35 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
   // O CARTÃO CLICADO filtra a FILA pelo que ele conta (Etapa 44) — o status, o
   // valor de uma coluna (o Status proposta), a coluna preenchida. Os cartões
   // continuam contando sem ele: clicar em "Pendente" não pode zerar os outros.
-  var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
+  var naFila = sub ? filtrarPeloCartaoDaSubAba_(filtrados, canal, sub, (filtros || {}).cartao)
+    : filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
+  // A ORDEM DA ABA (Etapa 84): a fila sai de cima para baixo como a aba manda,
+  // e vai invertida porque montarFila_ desenha o fim primeiro (o mais recente
+  // em cima, a regra de sempre). Sem sub-abas, segue a ordem da planilha.
+  if (sub) naFila = ordenarNaSubAba_(naFila, canal, sub, qualAba).reverse();
 
   return {
     canal: canal,
-    periodo: {
-      tipo: periodo.tipo,
-      dias: periodo.dias,
-      mes: periodo.mes || '',
-      de: comoSeEscreve_(periodo.de),
-      ate: comoSeEscreve_(periodo.ate),
-      rotulo: periodo.rotulo
-    },
-    mesesDisponiveis: mesesParaEscolher_(),
-    cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
+    // As sub-abas (Etapa 84): os nomes, qual está aberta e quantos casos cada
+    // uma tem. Sem sub-abas, null.
+    subAbas: sub ? { nomes: sub.abas, atual: qualAba, contagem: contagemDasAbas,
+      ordem: sub.ordem[qualAba - 1], comPrioridade: qualAba === 1 } : null,
+    // O teto do painel: a aba dos concluídos (e o VG) mostra até tantos casos
+    // — e o aviso de janela (o mesmo da Produtividade) diz quantas leu.
+    teto: linhasQueOPainelOlha_(),
+    linhasLidas: linhasQueOPainelOlha_(),
+    cartoes: sub ? cartoesDaSubAba_(filtrados, canal, sub, qualAba)
+      .concat(outrosCartoesDaSubAba_(filtrados, canal))
+      : contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, meus),
     colunas: colunasDaFila_(canal),
     // A fila, o mais recente em cima: os 100 mais recentes, ou todos quando a
     // tela pede "Todos". Ver RECC_FILA_NA_ABERTURA. Vai COMPACTA — só os
     // valores; o nome de cada coluna já está em `colunas`, e a tela remonta.
     // `total` continua sendo a fila inteira.
-    fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
-      ? naFila : naFila.slice(-RECC_FILA_NA_ABERTURA), canal)),
+    // Da leitura leve (Etapa 84), só as linhas que vão para a tela vêm inteiras.
+    fila: compactarFila_(montarFila_(completarRegistros_(canal, quantosNaFila === 'todos'
+      ? naFila : naFila.slice(-quantosNaFilaQueVao_(naFila, quantosNaFila)), quem), canal)),
     filaCompacta: true,
     // O aviso de prazo olha todos os casos ABERTOS da planilha (Etapa 70), e não
     // só a fila — um caso perto de vencer que não está entre os 100 mais
@@ -239,6 +256,12 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
  * Registro sem data FICA no período atual. Some-lo por omissão esconderia
  * justamente as linhas mal preenchidas, que são as que precisam de atenção.
  */
+/** Quantos casos da fila vão para a tela: os da abertura, ou os que a tela pediu. */
+function quantosNaFilaQueVao_(naFila, quantosNaFila) {
+  var leve = naFila.length > 0 && naFila[0].__leve === true;
+  return Math.max(Number(quantosNaFila) || 0, leve ? RECC_FILA_NA_LEITURA_LEVE : RECC_FILA_NA_ABERTURA);
+}
+
 function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
   if (!canal.colunaDaData) return recuo ? [] : registros;
 
@@ -704,6 +727,21 @@ function filtrosDoCanal_(canal, quem) {
     return um.prioridade - outro.prioridade || um.ordem - outro.ordem;
   }).map(function (item) { return item.campo; });
 
+  // OS FILTROS ESCOLHIDOS (Etapa 84, pedido do PO): em Configurações › Canais
+  // de trabalho, o canal pode dizer quais campos viram filtro, e em que ordem
+  // (CANAIS.FiltrosDoTrabalho, as chaves técnicas separadas por vírgula). Na
+  // RET, a Tentativa de contato no lugar da Forma de pagamento. Em branco, vale
+  // a regra de sempre, acima.
+  var escolhidos = String(canal.filtrosDoTrabalho || '').split(',').map(function (chave) {
+    return normalizarParaComparar_(chave);
+  }).filter(function (chave) { return chave; });
+  if (escolhidos.length) {
+    var porChave = {};
+    ativos.forEach(function (campo) { porChave[normalizarParaComparar_(campo.ChaveTecnica)] = campo; });
+    campos = escolhidos.map(function (chave) { return porChave[chave]; })
+      .filter(function (campo) { return !!campo; });
+  }
+
   campos.forEach(function (campo) {
     if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;   // mais vira parede de caixas
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
@@ -848,6 +886,447 @@ function aplicarBusca_(registros, canal, termo) {
       return casaComOTermo_(valor, termo, coluna.tipo);
     });
   });
+}
+
+// ============================================================================
+// AS SUB-ABAS DO TRABALHO (Etapa 84)
+// ============================================================================
+/*
+ * Pedido do PO: tirar o período do Trabalho e dividir a RET e a Mesa em duas
+ * sub-abas — "Casos em aberto" (RET) / "Casos em andamento" (Mesa), com os
+ * status de trabalho na ordem de prioridade e do mais antigo para o mais
+ * recente, e "Casos concluídos" com os demais. O VG fica sem sub-abas.
+ *
+ * MORA EM CANAIS.SubAbasDoTrabalho, e não no código: o PO escolhe em
+ * Configurações › Canais de trabalho quais status vão para a aba 1, em que
+ * ordem, e a ordem das datas. Em branco, o canal não tem sub-abas. O texto é
+ * JSON:
+ *
+ *   { "abas": ["Casos em aberto", "Casos concluídos"],
+ *     "status": [ { "status": "Retido", "rotulo": "Aguardando transmissão",
+ *                   "coluna": "Status proposta",
+ *                   "saiCom": ["Transmitido", "Sem alteração"] },
+ *                 { "status": "Pendente" }, … ],
+ *     "ordem": ["antigos", "recentes"] }
+ *
+ * Um status pode ter CONDIÇÃO: na RET, o Retido fica na aba 1 enquanto o Status
+ * proposta não for Transmitido nem Sem alteração (decisão do PO: a mesma regra
+ * do prazo de 3 dias). O caso SEM STATUS vai para a aba 1, no fim da fila
+ * (decisão do PO: o importado da Mesa não pode sumir do "em andamento").
+ *
+ * VELOCIDADE: a aba 1 sai como o aviso de prazo (Etapa 70) — lê a coluna do
+ * status inteira (e a da condição), e só as linhas da aba. A aba 2 lê os
+ * concluídos mais recentes, até o teto do painel (OPERACAO.LINHAS_DO_PAINEL,
+ * 5.000 — decisão do PO). O número de cada aba sai das mesmas colunas, sem
+ * ler linha nenhuma a mais.
+ */
+
+/** As duas ordens que a aba aceita, pela coluna de data do canal. */
+const RECC_ORDENS_DA_SUB_ABA = ['antigos', 'recentes'];
+
+/**
+ * As sub-abas do canal, prontas para usar — ou null, quando o canal não tem.
+ * Texto que não é JSON, ou sem nenhum status, também vale "sem sub-abas": a
+ * tela continua funcionando, e Configurações mostra o que está gravado.
+ */
+function subAbasDoCanal_(canal) {
+  var texto = String((canal && canal.subAbasDoTrabalho) || '').trim();
+  if (!texto) return null;
+  var lido;
+  try { lido = JSON.parse(texto); } catch (erro) { return null; }
+  var regras = (lido.status || []).map(function (regra) {
+    var status = String(regra.status || '').trim();
+    return {
+      status: status,
+      chave: normalizarParaComparar_(status),
+      rotulo: String(regra.rotulo || '').trim() || status,
+      coluna: String(regra.coluna || '').trim(),
+      saiCom: (regra.saiCom || []).map(normalizarParaComparar_).filter(function (v) { return v; })
+    };
+  }).filter(function (regra) { return regra.chave; });
+  if (!regras.length) return null;
+  var abas = lido.abas || [];
+  var ordem = lido.ordem || [];
+  return {
+    abas: [String(abas[0] || '').trim() || 'Casos em aberto',
+      String(abas[1] || '').trim() || 'Casos concluídos'],
+    regras: regras,
+    ordem: [RECC_ORDENS_DA_SUB_ABA.indexOf(ordem[0]) >= 0 ? ordem[0] : 'antigos',
+      RECC_ORDENS_DA_SUB_ABA.indexOf(ordem[1]) >= 0 ? ordem[1] : 'recentes']
+  };
+}
+
+/**
+ * Em que lugar da aba 1 o caso fica: o número da regra (0, 1, 2…), o número
+ * de regras para o caso SEM status (o fim da fila), ou -1 para a aba 2.
+ * `valorDaCondicao(coluna)` devolve o valor da coluna da condição no caso.
+ */
+function lugarNaSubAba_(sub, valorDoStatus, valorDaCondicao) {
+  var chave = normalizarParaComparar_(valorDoStatus);
+  if (!chave) return sub.regras.length;
+  for (var i = 0; i < sub.regras.length; i++) {
+    var regra = sub.regras[i];
+    if (regra.chave !== chave) continue;
+    if (regra.coluna && regra.saiCom.length
+      && regra.saiCom.indexOf(normalizarParaComparar_(valorDaCondicao(regra.coluna))) >= 0) continue;
+    return i;
+  }
+  return -1;
+}
+
+/** O lugar de um registro já lido. */
+function lugarDoRegistro_(registro, canal, sub) {
+  return lugarNaSubAba_(sub, registro[canal.colunaDoStatus], function (coluna) {
+    return registro[grafiaDaColuna_(canal.aba, coluna)];
+  });
+}
+
+/**
+ * As linhas de cada aba, pela coluna do status (e a da condição), no alcance
+ * de quem olha: { aba1: [{ linha, lugar }], aba2: [linha] }. Não lê linha
+ * nenhuma inteira.
+ */
+function linhasDasSubAbas_(canal, sub, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0 || !canal.colunaDoStatus || posicaoDaColuna_(estrutura, canal.colunaDoStatus) < 0) {
+    return { aba1: [], aba2: [], lidas: {} };
+  }
+  var status = lerColunaInteira_(canal.aba, canal.colunaDoStatus);
+  // A coluna da condição, inteira: os Retidos se espalham pela base, e uma
+  // coluna só sai mais barata que um pedaço por Retido.
+  var condicoes = {};
+  sub.regras.forEach(function (regra) {
+    if (!regra.coluna || condicoes[regra.coluna] || posicaoDaColuna_(estrutura, regra.coluna) < 0) return;
+    condicoes[regra.coluna] = lerColunaInteira_(canal.aba, grafiaDaColuna_(canal.aba, regra.coluna));
+  });
+  // Status vazio pode ser caso sem status OU linha em branco: só o Id separa.
+  var semStatus = [];
+  status.forEach(function (valor, i) { if (!normalizarParaComparar_(valor)) semStatus.push(i + 2); });
+  var iId = posicaoDaColuna_(estrutura, 'Id');
+  var ids = iId >= 0 && semStatus.length ? valoresNasLinhas_(estrutura, iId, semStatus) : {};
+
+  var lugares = {};
+  var todas = [];
+  status.forEach(function (valor, i) {
+    var linha = i + 2;
+    if (!normalizarParaComparar_(valor) && iId >= 0
+      && !String(ids[linha] === undefined || ids[linha] === null ? '' : ids[linha]).trim()) return;
+    lugares[linha] = lugarNaSubAba_(sub, valor, function (coluna) {
+      return condicoes[coluna] ? condicoes[coluna][i] : '';
+    });
+    todas.push(linha);
+  });
+  var aba1 = [];
+  var aba2 = [];
+  linhasNoMeuAlcance_(canal.aba, todas, quem).forEach(function (linha) {
+    if (lugares[linha] >= 0) aba1.push({ linha: linha, lugar: lugares[linha] });
+    else aba2.push(linha);
+  });
+  // As colunas já lidas vão junto: a leitura leve não as lê de novo.
+  var lidas = {};
+  lidas[normalizarParaComparar_(canal.colunaDoStatus)] = status;
+  Object.keys(condicoes).forEach(function (coluna) { lidas[normalizarParaComparar_(coluna)] = condicoes[coluna]; });
+  return { aba1: aba1, aba2: aba2, lidas: lidas };
+}
+
+/**
+ * Quantas células custam o mesmo que uma ida à planilha. Pela régua do teste
+ * de volume (estresse.js: 25 ms por ida, 900 ms por milhão de células), uma ida
+ * vale umas 25 mil células trazidas.
+ */
+var RECC_CELULAS_QUE_VALEM_UMA_IDA = 25000;
+
+/** Qual leitura a aba usa: '' escolhe pelo custo; 'leve' ou 'linhas' fixam (os testes provam as duas). */
+var RECC_LEITURA_DA_SUB_ABA = '';
+
+/**
+ * As linhas que a leitura vai trazer para ter as pedidas, gastando o mínimo.
+ * Os casos abertos se espalham pela base: uma ida por grupo de linhas pode ser
+ * muitas idas, e juntar tudo numa ida só traria a base inteira. Junta dois
+ * pedaços só quando as linhas do meio (lidas e descartadas) custam MENOS que a
+ * ida que se economiza.
+ */
+function planoDeLeitura_(estrutura, linhas) {
+  var tolerado = Math.max(1, Math.floor(RECC_CELULAS_QUE_VALEM_UMA_IDA
+    / Math.max(1, estrutura.cabecalhos.length)));
+  var ordenadas = linhas.slice().sort(function (uma, outra) { return uma - outra; });
+  var paraLer = [];
+  ordenadas.forEach(function (linha, k) {
+    var buraco = k > 0 ? linha - ordenadas[k - 1] : 0;
+    if (buraco > 1 && buraco <= tolerado) {
+      for (var meio = ordenadas[k - 1] + 1; meio < linha; meio++) paraLer.push(meio);
+    }
+    paraLer.push(linha);
+  });
+  return paraLer;
+}
+
+/** Lê as linhas pedidas, inteiras, pelo plano mais barato. */
+function lerLinhasEmPoucasIdas_(canal, linhas) {
+  if (!linhas.length) return [];
+  var estrutura = estruturaDaAba_(canal.aba);
+  var pedidas = {};
+  linhas.forEach(function (linha) { pedidas[linha] = true; });
+  return semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, planoDeLeitura_(estrutura, linhas))
+    .filter(function (registro) { return pedidas[registro.__linha]; }));
+}
+
+/** O que custa ler estas linhas inteiras, na régua de células (as idas viram células). */
+function custoDeLerAsLinhas_(estrutura, linhas) {
+  var blocos = blocosDeLinhas_(planoDeLeitura_(estrutura, linhas));
+  var celulas = 0;
+  blocos.forEach(function (bloco) { celulas += (bloco.fim - bloco.inicio + 1) * estrutura.cabecalhos.length; });
+  return celulas + blocos.length * RECC_CELULAS_QUE_VALEM_UMA_IDA;
+}
+
+/*
+ * A LEITURA LEVE da aba (Etapa 84). Para os cartões, os filtros, o número e a
+ * ordem da aba bastam POUCAS colunas — o status, a da condição, a data e a
+ * hora, as dos filtros e a _Visivel —, e a fila mostra no máximo 100 casos.
+ * Quando muitos casos da aba se espalham pela base (milhares de abertos), ler
+ * essas colunas e, inteiras, só as linhas que vão aparecer sai muito mais
+ * barato que ler a aba inteira, linha por linha. Com poucos casos, o contrário:
+ * a aba escolhe, pela régua de células, o que custa menos.
+ */
+
+/** Os nomes das colunas que a leitura leve traz: as que o Trabalho usa sem mostrar. */
+function colunasDaLeituraLeve_(canal, sub, estrutura, disponiveis) {
+  var nomes = [];
+  function querer(nome) {
+    if (!nome || posicaoDaColuna_(estrutura, nome) < 0) return;
+    if (nomes.some(function (outro) { return normalizarParaComparar_(outro) === normalizarParaComparar_(nome); })) return;
+    nomes.push(nome);
+  }
+  querer(canal.colunaDoStatus);
+  sub.regras.forEach(function (regra) { querer(regra.coluna); });
+  querer(canal.colunaDaData);
+  querer(canal.colunaDaHora);
+  (disponiveis || []).forEach(function (filtro) { querer(filtro.cabecalho); });
+  // As colunas dos outros cartões de Painéis (ver outrosCartoesDaSubAba_).
+  cartoesDoCanal_(canal, 'trabalho').forEach(function (cartao) {
+    if (cartao.dimensao === 'valor') querer(cartao.coluna);
+    if (cartao.dimensao === 'preenchido') querer(cartao.filtro);
+    if (cartao.dimensao === 'naCelula') {
+      querer(canal.colunaDaFinalizacao);
+      querer(canal.colunaDaAreaResponsavel);
+    }
+  });
+  querer('_Visivel');
+  return nomes;
+}
+
+/** Registros só com as colunas leves, nas linhas pedidas (sem as ocultas). `jaLidas`: as que não se lê de novo. */
+function registrosLeves_(canal, estrutura, nomes, linhas, jaLidas) {
+  var colunas = nomes.map(function (nome) {
+    var daPlanilha = estrutura.cabecalhos[posicaoDaColuna_(estrutura, nome)];
+    var lida = (jaLidas || {})[normalizarParaComparar_(nome)];
+    return { pedida: nome, daPlanilha: daPlanilha, valores: lida || lerColunaInteira_(canal.aba, daPlanilha) };
+  });
+  var visivel = colunas.filter(function (coluna) { return normalizarParaComparar_(coluna.pedida) === 'visivel'; })[0];
+  return linhas.filter(function (linha) {
+    return !visivel || normalizarParaComparar_(visivel.valores[linha - 2]) !== 'nao';
+  }).map(function (linha) {
+    var registro = { __linha: linha, __leve: true };
+    colunas.forEach(function (coluna) {
+      registro[coluna.daPlanilha] = coluna.valores[linha - 2];
+      registro[coluna.pedida] = coluna.valores[linha - 2];
+    });
+    return registro;
+  });
+}
+
+/** Troca os registros leves pelas linhas inteiras, na mesma ordem — só os que vão para a tela. */
+function completarRegistros_(canal, registros, quem) {
+  var leves = registros.filter(function (registro) { return registro.__leve; });
+  if (!leves.length) return registros;
+  var inteiros = {};
+  filtrarPeloAlcance_(semExcluidasNemVazias_(estruturaDaAba_(canal.aba),
+    lerLinhasEspecificas_(canal.aba, leves.map(function (registro) { return registro.__linha; }))),
+  canal.aba, quem).forEach(function (registro) { inteiros[registro.__linha] = registro; });
+  return registros.map(function (registro) {
+    return registro.__leve ? inteiros[registro.__linha] : registro;
+  }).filter(function (registro) { return !!registro; });
+}
+
+/**
+ * Os casos da aba pedida (1 ou 2), já no alcance, e quantos há em cada aba:
+ * { registros, contagem: [n1, n2], truncada }.
+ */
+function registrosDaSubAba_(canal, sub, qualAba, quem, disponiveis) {
+  var linhas = linhasDasSubAbas_(canal, sub, quem);
+  var teto = linhasQueOPainelOlha_();
+  var contagem = [linhas.aba1.length, linhas.aba2.length];
+  var todasDaAba = qualAba === 2 ? linhas.aba2 : linhas.aba1.map(function (um) { return um.linha; });
+  var daAba = todasDaAba.slice(-teto);
+  var truncada = todasDaAba.length > teto;
+
+  // O caminho mais barato: as linhas inteiras, ou as colunas leves e só as
+  // linhas que vão para a tela. Ver "A LEITURA LEVE".
+  var estrutura = estruturaDaAba_(canal.aba);
+  var nomes = colunasDaLeituraLeve_(canal, sub, estrutura, disponiveis);
+  var aLer = nomes.filter(function (nome) { return !linhas.lidas[normalizarParaComparar_(nome)]; }).length;
+  var custoLeve = aLer * (quantidadeDeRegistros_(estrutura) + RECC_CELULAS_QUE_VALEM_UMA_IDA)
+    + custoDeLerAsLinhas_(estrutura, daAba.slice(-RECC_FILA_NA_ABERTURA));
+  var leve = RECC_LEITURA_DA_SUB_ABA ? RECC_LEITURA_DA_SUB_ABA === 'leve'
+    : daAba.length > RECC_FILA_NA_ABERTURA && custoLeve < custoDeLerAsLinhas_(estrutura, daAba);
+  // O alcance já cortou as linhas (linhasDasSubAbas_); a linha inteira passa de
+  // novo por ele quando é completada para a tela.
+  var registros = leve ? registrosLeves_(canal, estrutura, nomes, daAba, linhas.lidas)
+    : filtrarPeloAlcance_(lerLinhasEmPoucasIdas_(canal, daAba), canal.aba, quem);
+  // Lidas as linhas (ou a _Visivel), o número da aba aberta é o que a fila
+  // mostra — sem a linha excluída que só a coluna do status não sabia dizer.
+  if (!truncada) contagem[qualAba - 1] = registros.length;
+  return { registros: registros, contagem: contagem, truncada: truncada };
+}
+
+/** A busca digitada, dividida nas abas: [aba1, aba2]. */
+function separarNasSubAbas_(registros, canal, sub) {
+  var partes = [[], []];
+  registros.forEach(function (registro) {
+    partes[lugarDoRegistro_(registro, canal, sub) >= 0 ? 0 : 1].push(registro);
+  });
+  return partes;
+}
+
+/** O momento do caso, pela data (e a hora) do canal — ou null. */
+function momentoDoCaso_(registro, canal) {
+  if (!canal.colunaDaData) return null;
+  var momento = juntarDataEHora_(registro[canal.colunaDaData],
+    canal.colunaDaHora ? registro[canal.colunaDaHora] : '');
+  return momento ? momento.getTime() : null;
+}
+
+/**
+ * A ordem da aba, de cima para baixo. Aba 1: o lugar do status (a prioridade
+ * do PO) e, dentro dele, a data na ordem escolhida. Aba 2: só a data. Caso sem
+ * data vai para o fim do seu grupo; empate fica na ordem da planilha.
+ */
+function ordenarNaSubAba_(registros, canal, sub, qualAba) {
+  var antigosPrimeiro = sub.ordem[qualAba === 2 ? 1 : 0] === 'antigos';
+  var comChave = registros.map(function (registro) {
+    return {
+      registro: registro,
+      lugar: qualAba === 2 ? 0 : Math.max(0, lugarDoRegistro_(registro, canal, sub)),
+      momento: momentoDoCaso_(registro, canal)
+    };
+  });
+  comChave.sort(function (um, outro) {
+    if (um.lugar !== outro.lugar) return um.lugar - outro.lugar;
+    if (um.momento === null || outro.momento === null) {
+      if (um.momento !== outro.momento) return um.momento === null ? 1 : -1;
+    } else if (um.momento !== outro.momento) {
+      return antigosPrimeiro ? um.momento - outro.momento : outro.momento - um.momento;
+    }
+    return antigosPrimeiro ? um.registro.__linha - outro.registro.__linha
+      : outro.registro.__linha - um.registro.__linha;
+  });
+  return comChave.map(function (item) { return item.registro; });
+}
+
+/**
+ * Os cartões da aba (aprovado pelo PO): o total da aba e um cartão por status.
+ * Aba 1: um por status da lista, na ordem da prioridade, e o "Sem status"
+ * quando houver. Aba 2: um por status que tem caso, na ordem do catálogo.
+ * Clicar filtra a fila pelo cartão, como antes.
+ */
+function cartoesDaSubAba_(registros, canal, sub, qualAba) {
+  var tons = {};
+  var nomes = {};
+  var ordemDoCatalogo = [];
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    tons[situacao.chave] = situacao.tom;
+    nomes[situacao.chave] = situacao.nome;
+    ordemDoCatalogo.push(situacao.chave);
+  });
+  function cartao(id, rotulo, valor, tom, dimensao) {
+    var feito = montarCartao_(id, rotulo, valor, 0, tom || 'neutro', '');
+    feito.id = id;
+    feito.dimensao = dimensao || 'situacao';
+    feito.filtravel = true;
+    return feito;
+  }
+  var lista = [cartao('aba:total', 'Total ' + (qualAba === 2 ? 'concluídos'
+    : sub.abas[0].replace(/^casos\s+/i, '')), registros.length, 'destaque', 'total')];
+  if (qualAba === 2) {
+    var porChave = {};
+    registros.forEach(function (registro) {
+      var chave = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+      porChave[chave] = (porChave[chave] || 0) + 1;
+      // Status fora do catálogo aparece como está escrito na planilha.
+      if (!nomes[chave]) nomes[chave] = String(registro[canal.colunaDoStatus] || '').trim() || 'Sem status';
+    });
+    ordemDoCatalogo.concat(Object.keys(porChave).filter(function (chave) {
+      return ordemDoCatalogo.indexOf(chave) < 0;
+    })).forEach(function (chave) {
+      if (!porChave[chave]) return;
+      lista.push(cartao('aba:s:' + chave, nomes[chave] || chave, porChave[chave], tons[chave]));
+    });
+    return lista;
+  }
+  var porLugar = {};
+  registros.forEach(function (registro) {
+    var lugar = lugarDoRegistro_(registro, canal, sub);
+    porLugar[lugar] = (porLugar[lugar] || 0) + 1;
+  });
+  sub.regras.forEach(function (regra, i) {
+    lista.push(cartao('aba:r' + i, regra.rotulo === regra.status ? (nomes[regra.chave] || regra.status)
+      : regra.rotulo, porLugar[i] || 0, tons[regra.chave]));
+  });
+  if (porLugar[sub.regras.length]) {
+    lista.push(cartao('aba:sem', 'Sem status', porLugar[sub.regras.length], 'neutro'));
+  }
+  return lista;
+}
+
+/**
+ * Os OUTROS cartões de Painéis na sub-aba (aprovado pelo PO: "os outros cartões
+ * continuam na aba onde fazem sentido"): os que não são de status nem o total —
+ * valor de um campo, coluna preenchida, finalizados na célula —, contados nos
+ * casos da aba, e só na aba onde contam algum caso.
+ */
+function outrosCartoesDaSubAba_(registros, canal) {
+  return contarCartoes_(registros, [], canal).filter(function (cartao) {
+    return cartao.dimensao !== 'situacao' && cartao.dimensao !== 'total' && cartao.valor > 0;
+  });
+}
+
+/** A fila pelo cartão da aba clicado (os cartões de `cartoesDaSubAba_`, e os outros de Painéis). */
+function filtrarPeloCartaoDaSubAba_(registros, canal, sub, idDoCartao) {
+  var id = String(idDoCartao || '');
+  if (!id || id === 'aba:total') return registros;
+  if (id.indexOf('aba:') !== 0) return filtrarPeloCartao_(registros, canal, id);
+  if (id.indexOf('aba:s:') === 0) {
+    var chave = id.substring(6);
+    return registros.filter(function (registro) {
+      return normalizarParaComparar_(registro[canal.colunaDoStatus]) === chave;
+    });
+  }
+  var lugar = id === 'aba:sem' ? sub.regras.length : Number(id.substring(5));
+  if (!(lugar >= 0)) return registros;
+  return registros.filter(function (registro) { return lugarDoRegistro_(registro, canal, sub) === lugar; });
+}
+
+/**
+ * O filtro Status só com os status DA ABA (aprovado pelo PO). Com um status só
+ * — a Mesa, na aba 1 —, o filtro sai; volta sozinho se outro status entrar.
+ */
+function filtrosDaSubAba_(disponiveis, canal, sub, qualAba) {
+  var daAba = {};
+  sub.regras.forEach(function (regra) { daAba[regra.chave] = true; });
+  var colunaDoStatus = normalizarParaComparar_(canal.colunaDoStatus);
+  return disponiveis.map(function (filtro) {
+    if (normalizarParaComparar_(filtro.cabecalho) !== colunaDoStatus) return filtro;
+    var opcoes = filtro.opcoes.filter(function (opcao) {
+      var dela = !!daAba[normalizarParaComparar_(opcao.valor)];
+      // O status com condição (o Retido) aparece nas duas abas.
+      var nasDuas = sub.regras.some(function (regra) {
+        return regra.coluna && regra.chave === normalizarParaComparar_(opcao.valor);
+      });
+      return qualAba === 2 ? (!dela || nasDuas) : dela;
+    });
+    return opcoes.length > 1 ? Object.assign({}, filtro, { opcoes: opcoes }) : null;
+  }).filter(function (filtro) { return filtro !== null; });
 }
 
 // ============================================================================

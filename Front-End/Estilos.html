@@ -2072,6 +2072,21 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 }
 .config-aba:hover { color: var(--texto); }
 .config-aba.atual { color: var(--destaque); border-bottom-color: var(--destaque); }
+/* Configurações › Canais de trabalho: os status da aba 1 e os filtros (Etapa 84). */
+.linha-da-aba-1 {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px;
+}
+.linha-da-aba-1 select, .linha-da-aba-1 input[type="text"] { flex: 1 1 140px; min-width: 0; }
+.ordem-da-aba-1 { min-width: 2.2em; font-weight: 700; color: var(--suave); }
+.filtros-do-trabalho { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+
+/* A barra das sub-abas do Trabalho (Etapa 84): as abas e, na Mesa, as Reuniões. */
+.abas-do-trabalho { margin-bottom: 4px; }
+/* O número de casos de cada sub-aba do Trabalho (Etapa 84). */
+.config-aba .numero-da-aba {
+  margin-left: 6px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--suave);
+}
+.config-aba.atual .numero-da-aba { color: var(--destaque); }
 
 .card-editavel {
   border: 1px solid var(--linha); border-radius: var(--raio);

@@ -322,7 +322,9 @@ function rodarTestesDaAgendaDaMesa() {
     contem(cadastrar, "Servidor.chamar('registrarReuniao', canalEscolhido, lidos, envioDaReuniao)");
     const trabalho = tela('Trabalho');
     contem(trabalho, "temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);\n    if (!temAgenda) abaDaMesa = 'casos';");
-    contem(trabalho, "[['casos', 'Casos'], ['reunioes', 'Reuniões']]");
+    // Etapa 84: as Reuniões entram na mesma linha das sub-abas da Mesa.
+    contem(trabalho, "abas.push({ atributo: 'data-aba-do-trabalho=\"reunioes\"', rotulo: 'Reuniões', atual: abaDaMesa === 'reunioes' });");
+    contem(trabalho, "if (temAgenda) {");
     contem(trabalho, "if (abaDaMesa === 'reunioes') { carregarAgenda(); return; }");
   });
 

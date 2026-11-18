@@ -73,15 +73,14 @@ function rodarTestesDoLimparFiltros() {
     igual(t.chamar('diasEntre_')(antes.de, antes.ate), periodo.dias, 'do mesmo tamanho');
   });
 
-  teste('o Trabalho e a Produtividade abrem com essas datas', () => {
-    const trabalho = t.chamar('resumoDoCanal')(ret.id, {}, abertura);
-    igual(trabalho.periodo.de + '|' + trabalho.periodo.ate, comoSeEscreve(dia1) + '|' + comoSeEscreve(hoje));
+  teste('a Produtividade abre com essas datas (o Trabalho não tem mais período, Etapa 84)', () => {
+    igual(t.chamar('resumoDoCanal')(ret.id, {}, abertura).periodo, undefined);
     const produtividade = t.chamar('produtividadeDaEquipe')(ret.id, {}, abertura);
     igual(produtividade.periodo.de + '|' + produtividade.periodo.ate,
       comoSeEscreve(dia1) + '|' + comoSeEscreve(hoje));
   });
 
-  teste('na abertura: o caso de hoje entra, o do mês passado não, e o sem data continua', () => {
+  teste('no Trabalho, sem período: o de hoje, o do mês passado e o sem data, todos (Etapa 84)', () => {
     const mesPassado = new Date(dia1.getFullYear(), dia1.getMonth() - 1, 15);
     t.chamar('inserirVariosRegistros_')('BASE_RET', [
       { 'data de recepção do protocolo': hoje, status: 'Pendente', 'nome do cliente': 'Caso de hoje' },
@@ -91,7 +90,7 @@ function rodarTestesDoLimparFiltros() {
     const fila = JSON.stringify(t.chamar('resumoDoCanal')(ret.id, {}, abertura, 'todos'));
     contem(fila, 'Caso de hoje');
     contem(fila, 'Caso sem data');
-    verdadeiro(fila.indexOf('Caso do mês passado') < 0, 'o do mês passado fica fora');
+    contem(fila, 'Caso do mês passado', 'sem período, o do mês passado também aparece');
   });
 
   teste('de "Por mês" para "Por data", a tela volta para a abertura', () => {
@@ -130,10 +129,11 @@ function rodarTestesDoLimparFiltros() {
     verdadeiro(trabalho.indexOf('algumAtivo') < 0, 'o Trabalho não esconde mais o botão');
   });
 
-  teste('Trabalho: limpa busca, cartão e listas, e volta o período da abertura', () => {
+  teste('Trabalho: limpa busca, cartão e listas — o período saiu, e a sub-aba fica', () => {
     const bloco = blocoDoClique(lerPeca('Trabalho'), 'limpar-filtros');
     contem(bloco, 'filtrosEscolhidos = {};');
-    contem(bloco, 'periodo = SeletorDePeriodo.padrao();');
+    verdadeiro(bloco.indexOf('periodo') < 0, 'não há período para voltar (Etapa 84)');
+    verdadeiro(bloco.indexOf('subAba') < 0, 'a sub-aba não é filtro e fica');
     contem(bloco, 'carregar();');
     verdadeiro(bloco.indexOf('quantosNaFila') < 0, 'o "Mostrar" não é filtro e fica');
   });

@@ -1661,6 +1661,20 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 .config-aba:hover { color: var(--texto); }
 .config-aba.atual { color: var(--destaque); border-bottom-color: var(--destaque); }
 
+.linha-da-aba-1 {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px;
+}
+.linha-da-aba-1 select, .linha-da-aba-1 input[type="text"] { flex: 1 1 140px; min-width: 0; }
+.ordem-da-aba-1 { min-width: 2.2em; font-weight: 700; color: var(--suave); }
+.filtros-do-trabalho { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+
+.abas-do-trabalho { margin-bottom: 4px; }
+
+.config-aba .numero-da-aba {
+  margin-left: 6px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--suave);
+}
+.config-aba.atual .numero-da-aba { color: var(--destaque); }
+
 .card-editavel {
   border: 1px solid var(--linha); border-radius: var(--raio);
   padding: 14px 16px; margin-bottom: 10px; background: var(--superficie);
@@ -4469,7 +4483,24 @@ var TelaTrabalho = (function () {
   var canalEscolhido = '';
   var filtrosEscolhidos = {};
 
-  var periodo = SeletorDePeriodo.padrao();
+  var subAbaPorCanal = {};
+  var subAbasConhecidas = {};
+  var CHAVE_DA_SUB_ABA = 'pgo.trabalho.subAba.';
+
+  function subAbaDoCanal(idDoCanal) {
+    if (subAbaPorCanal[idDoCanal]) return subAbaPorCanal[idDoCanal];
+    var lembrada = 1;
+    try { lembrada = Number(window.localStorage.getItem(CHAVE_DA_SUB_ABA + idDoCanal)) === 2 ? 2 : 1; }
+    catch (semArmazenamento) { lembrada = 1; }
+    subAbaPorCanal[idDoCanal] = lembrada;
+    return lembrada;
+  }
+
+  function lembrarSubAba(idDoCanal, qual) {
+    subAbaPorCanal[idDoCanal] = qual;
+    try { window.localStorage.setItem(CHAVE_DA_SUB_ABA + idDoCanal, String(qual)); }
+    catch (semArmazenamento) {   }
+  }
 
   var quantosNaFila = 0;
   var focarNoMostrar = '';
@@ -4485,14 +4516,55 @@ var TelaTrabalho = (function () {
   var temAgenda = false;
   var buscaNaAgenda = '';
 
-  function abasDaMesa() {
-    if (!temAgenda) return '';
-    return '<div class="config-abas" role="tablist" aria-label="O que ver">'
-      + [['casos', 'Casos'], ['reunioes', 'Reuniões']].map(function (aba) {
-        var atual = abaDaMesa === aba[0];
-        return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
-          + ' aria-selected="' + atual + '" data-aba-do-trabalho="' + aba[0] + '">' + aba[1] + '</button>';
+  function abasDoTrabalho() {
+    var conhecidas = subAbasConhecidas[canalEscolhido];
+    var abas = [];
+    if (conhecidas) {
+      conhecidas.nomes.forEach(function (nome, i) {
+        var numero = conhecidas.contagem ? conhecidas.contagem[i] : null;
+        abas.push({ atributo: 'data-sub-aba="' + (i + 1) + '"', rotulo: escapar(nome)
+          + (numero === null || numero === undefined ? ''
+            : ' <b class="numero-da-aba">' + Number(numero).toLocaleString('pt-BR') + '</b>'),
+          atual: abaDaMesa !== 'reunioes' && subAbaDoCanal(canalEscolhido) === i + 1 });
+      });
+    } else if (temAgenda) {
+      abas.push({ atributo: 'data-aba-do-trabalho="casos"', rotulo: 'Casos', atual: abaDaMesa === 'casos' });
+    }
+    if (temAgenda) {
+      abas.push({ atributo: 'data-aba-do-trabalho="reunioes"', rotulo: 'Reuniões', atual: abaDaMesa === 'reunioes' });
+    }
+    if (!abas.length) return '';
+    return '<div class="config-abas abas-do-trabalho" role="tablist" aria-label="O que ver">'
+      + abas.map(function (aba) {
+        return '<button type="button" role="tab" class="config-aba' + (aba.atual ? ' atual' : '') + '"'
+          + ' aria-selected="' + aba.atual + '" ' + aba.atributo + '>' + aba.rotulo + '</button>';
       }).join('') + '</div>';
+  }
+
+  function desenharAbas() {
+    var lugar = elemento('abas-do-trabalho');
+    if (!lugar) return;
+    lugar.innerHTML = abasDoTrabalho();
+    ligarCliques('[data-aba-do-trabalho]', function (botao) {
+      abaDaMesa = botao.getAttribute('data-aba-do-trabalho');
+      Aplicacao.remontar();
+    });
+    ligarCliques('[data-sub-aba]', function (botao) {
+      var qual = Number(botao.getAttribute('data-sub-aba'));
+      var vindoDasReunioes = abaDaMesa === 'reunioes';
+      abaDaMesa = 'casos';
+      if (qual === subAbaDoCanal(canalEscolhido) && !vindoDasReunioes) return;
+      lembrarSubAba(canalEscolhido, qual);
+
+      filtrosEscolhidos.cartao = '';
+      (resumo && resumo.filtrosDisponiveis || []).forEach(function (filtro) {
+        if (resumo.canal && String(filtro.cabecalho).toLowerCase()
+          === String(resumo.canal.colunaDoStatus || '').toLowerCase()) delete filtrosEscolhidos[filtro.chave];
+      });
+      if (vindoDasReunioes) { Aplicacao.remontar(); return; }
+      desenharAbas();
+      carregar();
+    });
   }
 
   function carregarAgenda() {
@@ -4529,7 +4601,7 @@ var TelaTrabalho = (function () {
     temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
     if (!temAgenda) abaDaMesa = 'casos';
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + abasDaMesa()
+      + '<div id="abas-do-trabalho">' + abasDoTrabalho() + '</div>'
       + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
 
@@ -4580,7 +4652,6 @@ var TelaTrabalho = (function () {
 
     return Moldura.caixaDeFiltros(
       busca
-        + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
         + Moldura.botaoLimparFiltros('limpar-filtros')
         + FiltroMultiplo.etiquetas(resumo.filtrosDisponiveis, filtrosEscolhidos),
@@ -4588,7 +4659,21 @@ var TelaTrabalho = (function () {
         + ' casos · ' + (resumo.buscaNaPlanilhaToda
 
           ? 'busca na planilha toda, de qualquer data'
-          : escapar(resumo.periodo.rotulo)));
+          : oQueAAbaOlha()));
+  }
+
+  function oQueAAbaOlha() {
+    if (resumo.subAbas && resumo.subAbas.atual === 1) return 'planilha toda';
+    return resumo.truncada
+      ? 'os ' + Number(resumo.teto).toLocaleString('pt-BR') + ' mais recentes'
+      : 'planilha toda';
+  }
+
+  function ordemDaFila() {
+    if (!resumo.subAbas) return 'mais recentes';
+    var datas = resumo.subAbas.ordem === 'antigos'
+      ? 'do mais antigo para o mais recente' : 'do mais recente para o mais antigo';
+    return resumo.subAbas.comPrioridade ? 'por prioridade do status, ' + datas : datas;
   }
 
   function expandirFila(compacta, colunas) {
@@ -4646,7 +4731,8 @@ var TelaTrabalho = (function () {
 
     return '<div class="fila-mostrar">'
       + '<span class="fila-mostrando">' + (visiveis < total
-        ? 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total
+        ? (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
+          : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)
         : 'Mostrando todos os ' + total + ' casos') + '</span>'
       + '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
       + '<span>Mostrar</span>' + botoes + '</div></div>';
@@ -4663,16 +4749,15 @@ var TelaTrabalho = (function () {
             + 'qualquer data.') + '</p></div>';
     }
     if (!resumo.fila.length) {
+      var ondeOlhou = resumo.subAbas
+        ? 'em "' + escapar(resumo.subAbas.nomes[resumo.subAbas.atual - 1]) + '"' : 'neste canal';
       return '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
-          ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
+          ? 'Há ' + resumo.totalNoPeriodo + ' casos ' + ondeOlhou + ', mas nenhum passa '
             + (filtrosEscolhidos.busca ? 'pela busca e pelos filtros escolhidos.'
               : 'pelos filtros escolhidos.')
-
-          : 'Nada foi registrado no período escolhido — '
-            + escapar(resumo.periodo.rotulo) + '. '
-            + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
+          : 'Nenhum caso ' + ondeOlhou + '.') + '</p></div>';
     }
 
     var cabecalho = resumo.colunas.map(function (grupo) {
@@ -4863,6 +4948,11 @@ var TelaTrabalho = (function () {
     elemento('painel').innerHTML =
       (resumo.buscaNaPlanilhaToda ? avisoDaBusca() : Moldura.avisoDeJanela(resumo, 'Estes números e esta fila'))
       + desenharCartoes() + desenharFiltros() + desenharFila();
+
+    if (resumo.subAbas) {
+      subAbasConhecidas[canalEscolhido] = resumo.subAbas;
+      desenharAbas();
+    }
     ligarPainel();
     var busca = elemento('busca-na-fila');
     if (focarABusca && busca) {
@@ -4882,8 +4972,8 @@ var TelaTrabalho = (function () {
     if (painel) painel.innerHTML = '<p class="carregando-campos">'
       + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
 
-    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo,
-      quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)
+    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, null,
+      quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))
       .entao(function (resposta) {
         resumo = resposta;
         if (resposta.filaCompacta) {
@@ -4912,12 +5002,6 @@ var TelaTrabalho = (function () {
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
-        var novoPeriodo = SeletorDePeriodo.mudou(this, resumo, 'painel');
-        if (novoPeriodo !== null) {
-
-          if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
-          return;
-        }
         if (this.getAttribute('data-filtro') === 'busca') { buscar(this); return; }
         filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value.trim();
         carregar();
@@ -4933,7 +5017,6 @@ var TelaTrabalho = (function () {
     if (limpar) {
       limpar.addEventListener('click', function () {
         filtrosEscolhidos = {};
-        periodo = SeletorDePeriodo.padrao();
         carregar();
       });
     }
@@ -4953,8 +5036,11 @@ var TelaTrabalho = (function () {
       var escolha = botao.getAttribute('data-mostrar');
       quantosNaFila = escolha === 'todos' ? 'todos' : Number(escolha);
       focarNoMostrar = escolha;
-      if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {
-        carregar('Trazendo os ' + totalDaFila() + ' casos…');
+
+      var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;
+      if (querMais && resumo.fila.length < totalDaFila()) {
+        carregar('Trazendo os ' + (escolha === 'todos' ? totalDaFila()
+          : Math.min(Number(escolha), totalDaFila())) + ' casos…');
         return;
       }
       desenharPainel();
@@ -4999,10 +5085,7 @@ var TelaTrabalho = (function () {
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });
-    ligarCliques('[data-aba-do-trabalho]', function (botao) {
-      abaDaMesa = botao.getAttribute('data-aba-do-trabalho');
-      Aplicacao.remontar();
-    });
+    desenharAbas();
     if (abaDaMesa === 'reunioes') { carregarAgenda(); return; }
 
     avisarQuandoChegar = !jaAvisouNoCanal[canalEscolhido];
@@ -9859,6 +9942,7 @@ var TelaConfiguracoes = (function () {
         canal.colunasDaBusca,
         'Separadas por vírgula. Só estas são lidas ao procurar — é o que faz '
         + 'a busca não estourar numa base grande.')
+      + editorDoTrabalho(canal)
       + caixaDeOpcoes('colunaDaFinalizacao', 'Coluna da finalização', colunas,
         canal.colunaDaFinalizacao, '')
       + caixaDeOpcoes('colunaDaAreaResponsavel', 'Coluna da área responsável',
@@ -9905,6 +9989,7 @@ var TelaConfiguracoes = (function () {
 
     EditorDaFila.montar(elemento('editor-da-fila'), elemento('cfg-colunasDaFila'),
       canal.colunasDaFila, canal.colunasDaBase, escapar);
+    ligarEditorDoTrabalho(canal);
 
     elemento('form-canal').addEventListener('submit', function (evento) {
       evento.preventDefault();
@@ -9926,12 +10011,176 @@ var TelaConfiguracoes = (function () {
         colunaDaHoraDaPrimeiraResposta: valorDe('colunaDaHoraDaPrimeiraResposta'),
         colunaDoValor: valorDe('colunaDoValor'),
         situacoesDestacadas: valorDe('situacoesDestacadas'),
+        subAbasDoTrabalho: subAbasDaTela(),
+        filtrosDoTrabalho: filtrosDaTela(canal),
         icone: valorDe('icone'),
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarCanais(); })
         .senao(mostrarErroNoPainel);
     });
+  }
+
+  var statusDaAba1 = [];
+  var FILTROS_NO_TRABALHO = 6;
+  var ORDENS_DA_ABA = [['antigos', 'Do mais antigo para o mais recente'],
+    ['recentes', 'Do mais recente para o mais antigo']];
+
+  function subAbasGravadas(canal) {
+    try { return canal.subAbasDoTrabalho ? JSON.parse(canal.subAbasDoTrabalho) : null; }
+    catch (erro) { return null; }
+  }
+
+  function caixaDaOrdem(nome, rotulo, escolhida) {
+    return '<label class="config-campo"><span>' + escapar(rotulo) + '</span>'
+      + '<select id="cfg-' + nome + '">' + ORDENS_DA_ABA.map(function (ordem) {
+        return '<option value="' + ordem[0] + '"' + (ordem[0] === escolhida ? ' selected' : '') + '>'
+          + escapar(ordem[1]) + '</option>';
+      }).join('') + '</select></label>';
+  }
+
+  function editorDoTrabalho(canal) {
+    var gravadas = subAbasGravadas(canal);
+    statusDaAba1 = gravadas && gravadas.status ? gravadas.status.map(function (regra) {
+      return { status: regra.status || '', rotulo: regra.rotulo || '', coluna: regra.coluna || '',
+        saiCom: (regra.saiCom || []).join(', ') };
+    }) : [];
+    var abas = (gravadas && gravadas.abas) || ['Casos em aberto', 'Casos concluídos'];
+    var ordem = (gravadas && gravadas.ordem) || ['antigos', 'recentes'];
+    var filtros = String(canal.filtrosDoTrabalho || '').split(',').map(function (chave) {
+      return chave.trim();
+    });
+    var opcoesDeFiltro = [{ chave: '', rotulo: '— nenhum —' }].concat(canal.camposDeLista || []);
+
+    return '<p class="config-explica"><strong>Trabalho: sub-abas</strong></p>'
+      + caixaDeMarcar('subAbasLigadas', 'Dividir o Trabalho deste canal em duas sub-abas', !!gravadas,
+        'A aba 1 traz os status escolhidos abaixo, da planilha toda; a aba 2, os demais (os mais recentes, até o teto do painel).')
+      + '<div id="cfg-sub-abas"' + (gravadas ? '' : ' hidden') + '>'
+      + campoDeTexto('nomeDaAba1', 'Nome da aba 1', abas[0], '')
+      + campoDeTexto('nomeDaAba2', 'Nome da aba 2', abas[1], '')
+      + '<div class="config-campo"><span>Status da aba 1, na ordem de prioridade</span>'
+      + '<div id="lista-da-aba-1"></div>'
+      + '<button type="button" class="botao-texto" id="mais-um-status">+ acrescentar status</button>'
+      + '<em>A fila da aba 1 segue esta ordem. Os outros status vão para a aba 2. Caso sem status '
+      + 'vai para a aba 1, no fim. "Fica até…": o status só fica na aba 1 enquanto a coluna '
+      + 'escolhida NÃO tiver um destes valores — na RET, o Retido até o Status proposta ser '
+      + 'Transmitido ou Sem alteração. O nome no cartão é opcional.</em></div>'
+      + caixaDaOrdem('ordemDaAba1', 'Ordem da aba 1, dentro de cada status', ordem[0])
+      + caixaDaOrdem('ordemDaAba2', 'Ordem da aba 2', ordem[1])
+      + '</div>'
+      + '<p class="config-explica"><strong>Trabalho: filtros</strong></p>'
+      + '<div class="config-campo"><span>Filtros do Trabalho, em ordem (até ' + FILTROS_NO_TRABALHO + ')</span>'
+      + '<div class="filtros-do-trabalho">'
+      + Array.apply(null, Array(FILTROS_NO_TRABALHO)).map(function (nada, i) {
+        return '<select id="cfg-filtroDoTrabalho' + i + '" aria-label="' + (i + 1) + 'º filtro">'
+          + opcoesDeFiltro.map(function (campo) {
+            return '<option value="' + escapar(campo.chave) + '"'
+              + ((filtros[i] || '') === campo.chave ? ' selected' : '') + '>'
+              + escapar(campo.rotulo) + '</option>';
+          }).join('') + '</select>';
+      }).join('') + '</div>'
+      + '<em>A busca de texto vem sempre primeiro. Todos em branco: os filtros de sempre (o Status '
+      + 'e os primeiros campos de lista do formulário).</em></div>';
+  }
+
+  function lerStatusDaTela() {
+    statusDaAba1 = statusDaAba1.map(function (regra, i) {
+      return {
+        status: valorDe('status-aba1-' + i), rotulo: valorDe('rotulo-aba1-' + i),
+        coluna: valorDe('coluna-aba1-' + i), saiCom: valorDe('saiCom-aba1-' + i)
+      };
+    });
+  }
+
+  function desenharStatusDaAba1(canal) {
+    var lugar = elemento('lista-da-aba-1');
+    if (!lugar) return;
+    var colunas = [''].concat(canal.colunasDaBase);
+    lugar.innerHTML = statusDaAba1.length ? statusDaAba1.map(function (regra, i) {
+      var situacoes = canal.situacoes.indexOf(regra.status) >= 0 || !regra.status
+        ? canal.situacoes : [regra.status].concat(canal.situacoes);
+      return '<div class="linha-da-aba-1">'
+        + '<span class="ordem-da-aba-1">' + (i + 1) + 'º</span>'
+        + '<select id="cfg-status-aba1-' + i + '" aria-label="Status ' + (i + 1) + '">'
+        + '<option value="">— status —</option>'
+        + situacoes.map(function (nome) {
+          return '<option value="' + escapar(nome) + '"' + (nome === regra.status ? ' selected' : '') + '>'
+            + escapar(nome) + '</option>';
+        }).join('') + '</select>'
+        + '<input type="text" id="cfg-rotulo-aba1-' + i + '" value="' + escapar(regra.rotulo) + '"'
+        + ' placeholder="nome no cartão (opcional)" aria-label="Nome no cartão">'
+        + '<select id="cfg-coluna-aba1-' + i + '" aria-label="Fica até a coluna">'
+        + colunas.map(function (coluna) {
+          return '<option value="' + escapar(coluna) + '"' + (coluna === regra.coluna ? ' selected' : '') + '>'
+            + (coluna ? 'Fica até ' + escapar(coluna) + ' ser…' : 'Sem condição') + '</option>';
+        }).join('') + '</select>'
+        + '<input type="text" id="cfg-saiCom-aba1-' + i + '" value="' + escapar(regra.saiCom) + '"'
+        + ' placeholder="valores, separados por vírgula" aria-label="Valores que tiram da aba 1"'
+        + (regra.coluna ? '' : ' hidden') + '>'
+        + '<button type="button" class="seta" data-subir-aba1="' + i + '" aria-label="Subir"'
+        + (i ? '' : ' disabled') + '>↑</button>'
+        + '<button type="button" class="seta" data-descer-aba1="' + i + '" aria-label="Descer"'
+        + (i < statusDaAba1.length - 1 ? '' : ' disabled') + '>↓</button>'
+        + '<button type="button" class="seta perigo" data-tirar-aba1="' + i + '"'
+        + ' aria-label="Tirar da aba 1">×</button></div>';
+    }).join('') : '<p class="config-dica">Nenhum status ainda.</p>';
+
+    function mexer(atributo, fazer) {
+      ligarCliques('[' + atributo + ']', function (botao) {
+        lerStatusDaTela();
+        fazer(Number(botao.getAttribute(atributo)));
+        desenharStatusDaAba1(canal);
+      });
+    }
+    mexer('data-subir-aba1', function (i) {
+      statusDaAba1.splice(i - 1, 0, statusDaAba1.splice(i, 1)[0]);
+    });
+    mexer('data-descer-aba1', function (i) {
+      statusDaAba1.splice(i + 1, 0, statusDaAba1.splice(i, 1)[0]);
+    });
+    mexer('data-tirar-aba1', function (i) { statusDaAba1.splice(i, 1); });
+    statusDaAba1.forEach(function (regra, i) {
+      elemento('cfg-coluna-aba1-' + i).addEventListener('change', function () {
+        elemento('cfg-saiCom-aba1-' + i).hidden = !this.value;
+      });
+    });
+  }
+
+  function ligarEditorDoTrabalho(canal) {
+    desenharStatusDaAba1(canal);
+    elemento('cfg-subAbasLigadas').addEventListener('change', function () {
+      elemento('cfg-sub-abas').hidden = !this.checked;
+    });
+    elemento('mais-um-status').addEventListener('click', function () {
+      lerStatusDaTela();
+      statusDaAba1.push({ status: '', rotulo: '', coluna: '', saiCom: '' });
+      desenharStatusDaAba1(canal);
+    });
+  }
+
+  function subAbasDaTela() {
+    if (!elemento('cfg-subAbasLigadas')) return undefined;
+    if (!marcado('subAbasLigadas')) return null;
+    lerStatusDaTela();
+    return {
+      abas: [valorDe('nomeDaAba1'), valorDe('nomeDaAba2')],
+      status: statusDaAba1.filter(function (regra) { return regra.status; }).map(function (regra) {
+        return { status: regra.status, rotulo: regra.rotulo, coluna: regra.coluna,
+          saiCom: regra.coluna ? regra.saiCom.split(',').map(function (valor) { return valor.trim(); })
+            .filter(function (valor) { return valor; }) : [] };
+      }),
+      ordem: [valorDe('ordemDaAba1'), valorDe('ordemDaAba2')]
+    };
+  }
+
+  function filtrosDaTela() {
+    if (!elemento('cfg-filtroDoTrabalho0')) return undefined;
+    var lista = [];
+    for (var i = 0; i < FILTROS_NO_TRABALHO; i++) {
+      var chave = valorDe('filtroDoTrabalho' + i);
+      if (chave && lista.indexOf(chave) < 0) lista.push(chave);
+    }
+    return lista;
   }
 
   var canalDosCards = '';

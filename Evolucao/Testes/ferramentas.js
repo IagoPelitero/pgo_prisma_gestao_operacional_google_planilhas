@@ -86,6 +86,24 @@ function carregar(email) {
   };
 }
 
+/**
+ * Desliga as sub-abas do Trabalho (Etapa 84) nos canais dados (ou em todos):
+ * o Trabalho volta a ser uma fila só, a dos casos mais recentes — o caminho do
+ * VG. É o que os testes da mecânica geral do Trabalho (cartões de Painéis,
+ * filtros, alcance, fila) usam: ela continua valendo para todo canal sem
+ * sub-abas. Recebe o `chamar` de quem testa.
+ */
+function semSubAbas(chamar, abas, tambemOsFiltros) {
+  chamar('lerRegistros_')('CANAIS').forEach((canal) => {
+    if (abas && abas.indexOf(String(canal.Aba)) < 0) return;
+    // `tambemOsFiltros`: os filtros voltam a ser os de sempre (os 6 primeiros
+    // campos de lista), que é a regra que os testes da Etapa 44 provam.
+    chamar('atualizarRegistro_')('CANAIS', canal.Id, tambemOsFiltros
+      ? { SubAbasDoTrabalho: '', FiltrosDoTrabalho: '' } : { SubAbasDoTrabalho: '' });
+  });
+  chamar('esquecerCacheDaConfiguracao_()');
+}
+
 let passaram = 0;
 const falhas = [];
 
@@ -338,5 +356,5 @@ module.exports = {
   telasDoSistema,
   carregar, secao, teste, igual, verdadeiro, contem, lanca, ehData,
   celula, formatoDaCelula, comoUsuario, resumo, lerPeca, scriptDaPeca,
-  elementoFalso, pecaRodando
+  elementoFalso, pecaRodando, semSubAbas
 };

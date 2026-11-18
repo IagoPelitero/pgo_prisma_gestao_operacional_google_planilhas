@@ -86,6 +86,26 @@ function rodarTestesDaAuditoriaForaDaTrava() {
     igual(acoes.join(','), 'teste.primeiro,teste.segundo,teste.terceiro');
   });
 
+  teste('dois registros no MESMO milissegundo saem na ordem em que aconteceram (Etapa 84)', () => {
+    // A chave da fila era o horário e um sorteio: no mesmo milissegundo, a
+    // ordem era do sorteio, e o teste de cima falhava às vezes.
+    for (let k = 0; k < 10; k++) {
+      const t = preparar();
+      t.chamar('(function(){ var Real = Date; var fixo = new Real(2026,10,18,10).getTime();'
+        + ' var F = function(){ return arguments.length ? new (Function.prototype.bind.apply(Real,'
+        + ' [null].concat([].slice.call(arguments))))() : new Real(fixo); };'
+        + ' F.now = function(){ return fixo; }; F.UTC = Real.UTC; F.parse = Real.parse;'
+        + ' F.prototype = Real.prototype; Date = F; return 1; })()');
+      t.ambiente.travaOcupada = true;
+      t.registrar('teste.primeiro');
+      t.registrar('teste.segundo');
+      t.ambiente.travaOcupada = false;
+      t.registrar('teste.terceiro');
+      const acoes = t.auditoria().map((l) => l.Acao).filter((a) => /^teste\./.test(a));
+      igual(acoes.join(','), 'teste.primeiro,teste.segundo,teste.terceiro', 'rodada ' + k);
+    }
+  });
+
   teste('cadastrar espera a trava UMA vez (o caso), e não duas (o caso e a auditoria)', () => {
     const t = preparar();
     t.ambiente.esperasDaTrava.length = 0;

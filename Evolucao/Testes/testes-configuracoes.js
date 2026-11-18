@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { carregar, secao, teste, igual, verdadeiro, contem, lanca, comoUsuario, scriptDaPeca,
-  pecaRodando, comAFilaDaTela } = require('./ferramentas');
+  pecaRodando, comAFilaDaTela , semSubAbas } = require('./ferramentas');
 
 const PASTA_DAS_TELAS = path.join(__dirname, '..', '..', 'Front-End');
 
@@ -40,6 +40,7 @@ function rodarTestesDeConfiguracoes() {
 
   const { ambiente, chamar } = carregar('primeiro.adm@exemplo.com');
   chamar('instalarRECC()');
+  semSubAbas(chamar);   // os cartões de Painéis valem no canal sem sub-abas (Etapa 84)
   const canal = chamar('canaisVisiveis_()').find((m) => m.aba === 'BASE_MESA');
 
   secao('O panorama');

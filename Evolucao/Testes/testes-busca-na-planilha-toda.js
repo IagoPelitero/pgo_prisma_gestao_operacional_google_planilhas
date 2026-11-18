@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, comoUsuario } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, comoUsuario , semSubAbas } = require('./ferramentas');
 
 const DA_RET = 'data de recepção do protocolo';
 const tela = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End', nome + '.html'), 'utf8');
@@ -29,6 +29,7 @@ function diasAtras(n) {
 function preparar() {
   const t = carregar('primeiro.adm@exemplo.com');
   t.chamar('instalarRECC()');
+  semSubAbas(t.chamar);   // a busca do canal sem sub-abas (Etapa 84)
   t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
   t.casos = (linhas) => t.chamar('inserirVariosRegistros_')('BASE_RET', linhas);
   t.casos([
@@ -49,9 +50,10 @@ function rodarTestesDaBuscaNaPlanilhaToda() {
   /* ----------------------------------------------------------------------- */
   secao('O texto procura em todas as datas');
 
-  teste('o caso de 200 dias atrás aparece com a busca — sem ela, não', () => {
+  teste('o caso de 200 dias atrás aparece com a busca — e, sem período, também sem ela', () => {
     const t = preparar();
-    igual(t.trabalho().total, 1, 'sem busca, só o caso do período');
+    // Sem período (Etapa 84), os três casos da planilha aparecem sem busca.
+    igual(t.trabalho().total, 3, 'sem busca, a planilha toda');
     const achado = t.trabalho({ busca: 'barba branca' });
     igual(achado.total, 1);
     igual(achado.buscaNaPlanilhaToda, true);
@@ -170,9 +172,9 @@ function rodarTestesDaBuscaNaPlanilhaToda() {
     }
   });
 
-  teste('a busca vazia volta ao período', () => {
+  teste('a busca vazia é como não buscar', () => {
     const t = preparar();
-    igual(t.trabalho({ busca: '   ' }).total, 1);
+    igual(t.trabalho({ busca: '   ' }).total, 3, 'a planilha toda, como sem busca (Etapa 84)');
     igual(t.trabalho({ busca: '   ' }).buscaNaPlanilhaToda, false);
   });
 

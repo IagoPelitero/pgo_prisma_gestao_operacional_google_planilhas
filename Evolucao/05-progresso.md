@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.83 — a última etapa entregue é a 83. A regra do número está
+**Estado geral:** versão 1.84 — a última etapa entregue é a 84. A regra do número está
 na Etapa 68.
 
 ---
@@ -4175,6 +4175,58 @@ milissegundos e um sorteio. Dois erros no mesmo milissegundo saíam na ordem do 
 relógio parado, 21 de 40 rodadas punham o segundo antes do primeiro (e `testes-registro-de-erros.js`
 falhava às vezes). Agora a chave leva a ordem da execução (`RECC_ORDEM_DO_ERRO`) antes do sorteio:
 0 de 40, e um teste novo com o relógio parado.
+
+---
+
+## Etapa 84 — O Trabalho sem período, em sub-abas
+
+Pedido do PO, com a proposta mostrada antes (prévia em cima da tela real) e as dúvidas
+respondidas: tirar o período do Trabalho em todos os canais; na RET e na Mesa, duas sub-abas;
+o VG só perde o período. "As sub abas devem conversar entre si (…) Esse ajuste também deve ser
+disponível na aba de configurações (…) cuidado para que a velocidade da página e sua
+performance não sejam prejudicadas."
+
+| O que | Como ficou |
+|---|---|
+| **RET** | "Casos em aberto": 1º Aguardando transmissão (Retido com o Status proposta diferente de Transmitido e de Sem alteração — decisão do PO: a regra do prazo), 2º Pendente, 3º Contatando, 4º Não trabalhado, 5º Acompanhamento; do mais antigo para o mais recente. "Casos concluídos": os demais, do mais recente para o mais antigo |
+| **Mesa** | "Casos em andamento": Em andamento. "Casos concluídos": os demais. As Reuniões (Etapa 79) na mesma linha das abas |
+| **Sem status** | Aba 1, no fim (decisão do PO: o importado da Mesa não some) |
+| **Aba 2** | Os 5.000 concluídos mais recentes (o teto do painel; decisão do PO), com o aviso de janela de sempre. O número da aba é o real |
+| **UX aprovada** | Número de casos em cada aba (com busca: quantos ela achou em cada uma); cartões da aba (total + um por status, e os outros cartões de Painéis — valor de um campo, coluna preenchida, finalizados na célula — na aba onde contam caso); filtro Status só com os status da aba — some com um status só e volta sozinho; a última aba lembrada por canal, no navegador |
+| **Configurações** | Canais de trabalho › "Trabalho: sub-abas": ligar, nomes, status da aba 1 em ordem (subir, descer, tirar, acrescentar), nome no cartão, condição ("fica até a coluna X ser…") e a ordem das datas de cada aba. "Trabalho: filtros": até 6 campos de lista, em ordem; em branco, os de sempre. Grava em `CANAIS.SubAbasDoTrabalho` (JSON) e `CANAIS.FiltrosDoTrabalho`, conferidos (`trabalhoDoFormulario_`) |
+| **Filtros da RET** | Status, Tentativas de contato, Status proposta, Analista, Canal de origem, Cód. do produto e produto — escolha do PO: em Configurações, e não fixo |
+| **Montagem** | `montarAsSubAbasDoTrabalho_`, na instalação e no `atualizarPGO()`, uma vez (`MIGRACAO.SUB_ABAS_DO_TRABALHO`). Status que a planilha não tem fica de fora, e o laudo diz qual |
+| **Velocidade** | A aba 1 lê a coluna do status (e a da condição) e só as linhas da aba. Com muitos casos espalhados, a LEITURA LEVE: só as colunas que cartões, filtros e ordem usam, e inteiras só as linhas que vão para a tela — a fila abre com 20 (5, 10 e 20 na hora; 50, 100 e "Todos" no servidor). A escolha é pela régua do `estresse.js` (`RECC_CELULAS_QUE_VALEM_UMA_IDA`); juntar pedaços só quando o meio custa menos que a ida |
+| **Achado** | A fila da AUDITORIA tinha o mesmo defeito da dos erros (Etapa 83): dois registros no mesmo milissegundo saíam na ordem do sorteio. Agora a chave leva a ordem da execução (`RECC_ORDEM_DA_AUDITORIA`) |
+| **Versão** | 1.84 |
+
+**A medida, honesta** (régua do `estresse.js`, 30 mil casos na RET). Abrir o Trabalho:
+
+| Cenário | Antes (período do mês) | Agora (aba 1) | Aba 2 |
+|---|---|---|---|
+| 900 abertos (os recentes e alguns antigos esquecidos) | 2 idas · 168 mil células · ~0,2 s | 27 idas · 211 mil · ~0,9 s | 2 idas · 286 mil · ~0,3 s |
+| 3.000 abertos | 2 idas · 168 mil · ~0,2 s | 8 idas · 212 mil · ~0,4 s | 2 idas · 288 mil · ~0,3 s |
+| Teste de estresse (1 em 4 casos aberto, espalhados) | 8 idas · 376 mil · ~0,5 s | 32 idas · 301 mil · ~1,1 s | — |
+
+A aba 1 olha a planilha toda (antes, só o mês) e mostra primeiro os mais ANTIGOS — que se
+espalham pela base: buscar cada um é uma ida. As idas que sobram vêm daí. O cronômetro da Etapa
+76 registra na aba ERROS o tempo real de cada abertura acima de 8 s.
+
+Testes: 38 novos em `testes-sub-abas-do-trabalho.js` (montagem, ordem, abas que conversam,
+cartões — os da aba e os outros de Painéis —, filtros, busca, alcance, ocultos, teto, velocidade, leitura leve igual à inteira,
+Configurações, tela) e 1 em `testes-auditoria-fora-da-trava.js`. Os testes da mecânica geral do
+Trabalho (cartões de Painéis, filtros de sempre, fila de 100) passaram a rodar num canal sem
+sub-abas (`semSubAbas`, em ferramentas.js); os do período no Trabalho viraram "o Trabalho não tem
+período". 36 quebras de propósito: 31 pegas na primeira rodada; das 5 que escaparam, 4 ganharam
+teste, e a quinta — tirar a coluna da condição da leitura leve — é redundância esperada (a aba já
+foi separada pela coluna inteira, e a coluna é reaproveitada, sem leitura a mais).
+
+O ponta a ponta pegou o que os testes de servidor não pegaram: na proposta aprovada, "os outros
+cartões continuam na aba onde fazem sentido", e eles tinham ficado de fora das sub-abas (o card
+"1ª tentativa", criado pela tela, sumia do Trabalho). Corrigido (`outrosCartoesDaSubAba_`; a
+leitura leve lê as colunas deles), com 1 teste e 2 quebras de propósito, pegas. Três testes de
+navegador foram ajustados ao Trabalho novo: o caso é aberto pelo Id (a aba 1 vem na ordem da
+prioridade), a fila grande é olhada na aba 1, e o "Limpar filtros" não tem mais período a voltar.
 
 ---
 

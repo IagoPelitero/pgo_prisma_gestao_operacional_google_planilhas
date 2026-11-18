@@ -10,7 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem , semSubAbas } = require('./ferramentas');
 
 const DA_RET = 'data de recepção do protocolo';
 const tela = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End', nome + '.html'), 'utf8');
@@ -18,6 +18,7 @@ const tela = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'Front-E
 function preparar() {
   const t = carregar('primeiro.adm@exemplo.com');
   t.chamar('instalarRECC()');
+  semSubAbas(t.chamar, null, true);   // os filtros de sempre, sem sub-abas (Etapa 84)
   t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
   const hoje = new Date();
   t.chamar('inserirVariosRegistros_')('BASE_RET', [

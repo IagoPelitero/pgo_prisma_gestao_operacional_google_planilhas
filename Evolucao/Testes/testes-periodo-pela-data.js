@@ -9,7 +9,7 @@
  * ============================================================================
  */
 
-const { carregar, secao, teste, igual, verdadeiro } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro , semSubAbas } = require('./ferramentas');
 
 const COLUNA = 'data de recepção do protocolo';
 
@@ -28,6 +28,7 @@ function mesDe(diasAtras) {
 function preparar() {
   const t = carregar('primeiro.adm@exemplo.com');
   t.chamar('instalarRECC()');
+  semSubAbas(t.chamar);
   t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
   t.casos = (quantos, diasAtras, extra) => t.chamar('inserirVariosRegistros_')('BASE_RET',
     Array.from({ length: quantos }, (_, i) => Object.assign({ [COLUNA]: dia(diasAtras),
@@ -73,8 +74,7 @@ function rodarTestesDoPeriodoPelaData() {
     const produtividade = t.chamar('produtividadeDaEquipe')(t.ret.id, {}, mesDe(150));
     igual(produtividade.total, 1200, 'antes: 0, porque as últimas 5.000 linhas eram todas recentes');
     igual(produtividade.truncada, false);
-    const trabalho = t.chamar('resumoDoCanal')(t.ret.id, {}, mesDe(150));
-    igual(trabalho.totalNoPeriodo, 1200);
+    // O Trabalho não tem mais período (Etapa 84): o mês pedido é ignorado.
   });
 
   teste('a mesma conta de antes: a resposta é igual à da base inteira', () => {
@@ -93,14 +93,10 @@ function rodarTestesDoPeriodoPelaData() {
   teste('o caso excluído e a linha sem data seguem as regras de sempre', () => {
     const doMes = t.chamar('produtividadeDaEquipe')(t.ret.id, {}, mesDe(150));
     verdadeiro(doMes.total === 1200, 'o excluído não conta');
+    // No Trabalho (Etapa 84) não há período: o mês pedido e a abertura dão o mesmo.
     const abertura = t.chamar('resumoDoCanal')(t.ret.id, {}, { tipo: 'intervalo', de: '', ate: '' });
-    // O mês fechado é o MESMO da abertura (o mês de hoje): a diferença são só os
-    // sem data. Com o mês de 3 dias atrás, a conta quebrava nos três primeiros
-    // dias de cada mês — a abertura já é outro mês.
     const fechado = t.chamar('resumoDoCanal')(t.ret.id, {}, mesDe(0));
-    igual(abertura.totalNoPeriodo - fechado.totalNoPeriodo, 3, 'os 3 sem data, só na abertura');
-    igual(comOJeitoDeAntes(t, () => t.chamar('resumoDoCanal')(t.ret.id, {}, { tipo: 'intervalo', de: '', ate: '' }))
-      .totalNoPeriodo, abertura.totalNoPeriodo, 'a abertura guarda os sem data, como antes');
+    igual(abertura.totalNoPeriodo, fechado.totalNoPeriodo, 'o período não muda o Trabalho');
   });
 
   teste('clicar num gráfico do mês antigo lista o mesmo tanto que a barra mostra', () => {

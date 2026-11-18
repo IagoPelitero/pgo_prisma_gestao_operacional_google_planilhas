@@ -707,7 +707,7 @@ async function rodar() {
   console.log('\nA coluna sua, corrigida no "Trabalhar no caso"');
 
   await teste('a coluna escrita direto na planilha vem editável no modal, e o carimbo não', async () => {
-    vm.runInContext(`(function () {
+    const idDoUltimo = vm.runInContext(`(function () {
       var aba = planilhaAtiva_().getSheetByName('BASE_RET');
       aba.insertColumnsBefore(3, 1);
       aba.getRange(1, 3).setNumberFormat('@');
@@ -715,6 +715,7 @@ async function rodar() {
       esquecerEstruturaLida_();
       var ultimo = lerRegistros_('BASE_RET').pop();
       atualizarRegistro_('BASE_RET', ultimo.__id, { 'Observação minha': 'fora  do formato' });
+      return String(ultimo.__id);
     })()`, contexto);
 
     await pagina.click('[data-tela="trabalho"]');
@@ -723,7 +724,16 @@ async function rodar() {
     await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
     await pagina.waitForTimeout(900);
     if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
-    await pagina.click('[data-trabalhar]');
+    // O caso pelo Id, na busca (Etapa 84: a aba 1 vem na ordem da prioridade, e
+    // o último caso da planilha pode estar na aba 2).
+    await pagina.fill('#busca-na-fila', idDoUltimo);
+    await pagina.press('#busca-na-fila', 'Enter');
+    await pagina.waitForTimeout(1200);
+    if (!(await pagina.locator('[data-trabalhar="' + idDoUltimo + '"]').count())) {
+      await pagina.click('[data-sub-aba="2"]');
+      await pagina.waitForSelector('[data-trabalhar="' + idDoUltimo + '"]', { timeout: 10000 });
+    }
+    await pagina.click('[data-trabalhar="' + idDoUltimo + '"]');
     await pagina.waitForFunction(() => {
       const salvar = document.getElementById('modal-salvar');
       return salvar && !salvar.disabled;
@@ -972,10 +982,22 @@ async function rodar() {
     const naRet = pagina.locator('[data-canal]', { hasText: 'RET' }).first();
     if (await naRet.count()) await naRet.click();
     await pagina.waitForTimeout(900);
-    const cards = await pagina.$$eval('.cartoes .indicador', (es) => es.map((e) =>
+    const lerCards = () => pagina.$$eval('.cartoes .indicador', (es) => es.map((e) =>
       e.querySelector('.rotulo').textContent + '=' + e.querySelector('.numero').textContent
       + (e.tagName === 'BUTTON' ? ' (filtra)' : '')));
-    verdadeiro(cards.indexOf('1ª tentativa=1 (filtra)') >= 0, 'o card conta o caso: ' + cards.join(', '));
+    // Com sub-abas (Etapa 84), o card de Painéis fica na aba onde conta caso.
+    let cards = await lerCards();
+    const primeiros = cards;
+    if (cards.indexOf('1ª tentativa=1 (filtra)') < 0) {
+      const outra = (await pagina.$eval('[data-sub-aba][aria-selected="true"]',
+        (e) => e.getAttribute('data-sub-aba')).catch(() => '2')) === '1' ? '2' : '1';
+      await pagina.click('[data-sub-aba="' + outra + '"]');
+      await pagina.waitForTimeout(900);
+      cards = await lerCards();
+    }
+    verdadeiro(cards.indexOf('1ª tentativa=1 (filtra)') >= 0, 'o card conta o caso: ' + cards.join(', ')
+      + ' | antes de trocar: ' + primeiros.join(', '));
+    const totalDaAba = cards.find((c) => /^Total/.test(c)).replace(' (filtra)', '');
 
     // Etapa 44: clicar no card de valor filtra a fila pelo que ele conta.
     await pagina.locator('.cartoes .indicador.clicavel', { hasText: '1ª tentativa' }).first().click();
@@ -986,7 +1008,7 @@ async function rodar() {
       'e o card fica marcado');
     const outros = await pagina.$$eval('.cartoes .indicador', (es) => es.map((e) =>
       e.querySelector('.rotulo').textContent + '=' + e.querySelector('.numero').textContent));
-    verdadeiro(outros.indexOf('Total de casos=4') >= 0, 'os outros cards não zeram: ' + outros.join(', '));
+    verdadeiro(outros.indexOf(totalDaAba) >= 0, 'os outros cards não zeram: ' + outros.join(', '));
     await pagina.locator('.cartoes .indicador.clicavel', { hasText: '1ª tentativa' }).first().click();
     await pagina.waitForTimeout(900);
   });
@@ -995,7 +1017,7 @@ async function rodar() {
 
   console.log('\nO Trabalho com fila grande');
 
-  await teste('abre com os 100 mais recentes; até 100 não volta ao servidor; "Todos" vai buscar', async () => {
+  await teste('a aba 1 abre com parte da fila; "100" e "Todos" mostram mais (Etapa 84)', async () => {
     vm.runInContext(`(function () {
       var lote = [];
       for (var i = 0; i < 150; i++) {
@@ -1004,32 +1026,38 @@ async function rodar() {
       }
       inserirVariosRegistros_('BASE_RET', lote);
     })()`, contexto);
-    const totalNaBase = naPlanilha('BASE_RET').length;
-
     await pagina.click('[data-tela="trabalho"]');
     await pagina.waitForTimeout(900);
     const naRet = pagina.locator('[data-canal]', { hasText: 'RET' }).first();
     if (await naRet.count()) await naRet.click();
+    await pagina.waitForTimeout(900);
+    // Os 150 Pendente estão na aba 1, "Casos em aberto" (Etapa 84).
+    await pagina.click('[data-sub-aba="1"]');
     await pagina.waitForSelector('.fila-mostrando', { timeout: 10000 });
-    contem(await pagina.textContent('.fila-mostrando'), 'de ' + totalNaBase,
-      'a barra fala da fila inteira');
-    contem(await pagina.textContent('table.fila.agrupada tbody'), 'Fila grande 149',
-      'o mais recente em cima');
+    const totalDaAba = Number((await pagina.textContent('[data-sub-aba="1"] .numero-da-aba')).replace(/\D/g, ''));
+    verdadeiro(totalDaAba >= 150, 'a aba diz quantos casos tem: ' + totalDaAba);
+    contem(await pagina.textContent('.fila-mostrando'), 'de ' + totalDaAba,
+      'a barra fala da aba inteira');
+    contem(await pagina.textContent('table.fila.agrupada tbody'), 'Fila grande', 'os casos novos estão na aba');
+    const linhas = () => pagina.$$eval('table.fila.agrupada tbody tr', (es) => es.length);
+    const naAbertura = await linhas();
+    igual(naAbertura, 5, 'a tela abre mostrando os 5 de sempre');
 
     const antes = chamadasDoNavegador.resumoDoCanal;
     await pagina.click('[data-mostrar="100"]');
-    await pagina.waitForTimeout(400);
-    igual(await pagina.$$eval('table.fila.agrupada tbody tr', (es) => es.length), 100);
-    igual(chamadasDoNavegador.resumoDoCanal, antes, '100 é na hora, sem ir ao servidor');
+    await pagina.waitForFunction(() =>
+      document.querySelectorAll('table.fila.agrupada tbody tr').length === 100, null, { timeout: 10000 });
+    // O servidor manda 100 na abertura, ou 20 na leitura leve (Etapa 84): aí o
+    // "100" vai buscar o resto, uma vez. Os 20/100 são provados em
+    // testes-sub-abas-do-trabalho.
+    verdadeiro(chamadasDoNavegador.resumoDoCanal - antes <= 1, 'no máximo uma ida ao servidor');
 
     await pagina.click('[data-mostrar="todos"]');
     await pagina.waitForFunction((n) =>
       document.querySelectorAll('table.fila.agrupada tbody tr').length === n,
-      totalNaBase, { timeout: 10000 });
-    igual(chamadasDoNavegador.resumoDoCanal, antes + 1, '"Todos" foi buscar o resto');
-    contem(await pagina.textContent('table.fila.agrupada tbody'), 'Fila grande 0',
-      'até o mais antigo');
-    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando todos os ' + totalNaBase);
+      totalDaAba, { timeout: 10000 });
+    contem(await pagina.textContent('table.fila.agrupada tbody'), 'Fila grande 0', 'todos os da aba');
+    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando todos os ' + totalDaAba);
   });
 
   await teste('na Produtividade, a fatia do gráfico abre com 100 e "Mostrar todos" traz o resto', async () => {
@@ -1097,7 +1125,7 @@ async function rodar() {
       const campo = document.getElementById('busca-na-fila');
       return campo && campo.value === '';
     }, null, { timeout: 10000 });
-    igual(await valor('#painel [data-periodo="de"]'), noCalendario(1), 'e o período volta ao dia 1');
+    igual(await pagina.locator('#painel [data-periodo]').count(), 0, 'o Trabalho não tem período (Etapa 84)');
   });
 
   await teste('exportar relatório: escolhe, confere e só então exporta (Etapa 73)', async () => {

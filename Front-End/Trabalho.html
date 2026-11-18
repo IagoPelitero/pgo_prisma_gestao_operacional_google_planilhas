@@ -13,10 +13,28 @@ var TelaTrabalho = (function () {
 
   var canalEscolhido = '';
   var filtrosEscolhidos = {};
-  // COMO o período foi escolhido. Quem calcula as datas é o servidor — se a
-  // tela calculasse, o dia daqui sairia do relógio do navegador e o dia da
-  // conta sairia do relógio da planilha.
-  var periodo = SeletorDePeriodo.padrao();
+  // O PERÍODO SAIU do Trabalho (Etapa 84, pedido do PO). No lugar, as
+  // SUB-ABAS da RET e da Mesa: 1 = os casos de trabalho, 2 = os concluídos.
+  // A última aberta em cada canal fica lembrada neste navegador (aprovado
+  // pelo PO); sem lembrança, abre na 1.
+  var subAbaPorCanal = {};
+  var subAbasConhecidas = {};
+  var CHAVE_DA_SUB_ABA = 'pgo.trabalho.subAba.';
+
+  function subAbaDoCanal(idDoCanal) {
+    if (subAbaPorCanal[idDoCanal]) return subAbaPorCanal[idDoCanal];
+    var lembrada = 1;
+    try { lembrada = Number(window.localStorage.getItem(CHAVE_DA_SUB_ABA + idDoCanal)) === 2 ? 2 : 1; }
+    catch (semArmazenamento) { lembrada = 1; }
+    subAbaPorCanal[idDoCanal] = lembrada;
+    return lembrada;
+  }
+
+  function lembrarSubAba(idDoCanal, qual) {
+    subAbaPorCanal[idDoCanal] = qual;
+    try { window.localStorage.setItem(CHAVE_DA_SUB_ABA + idDoCanal, String(qual)); }
+    catch (semArmazenamento) { /* sem lembrança, abre na 1 da próxima vez */ }
+  }
   // Quantos casos a fila mostra — o "Mostrar", em cima da tabela. Zero é
   // "ainda não escolheu": vale o padrão do servidor (5). Os 100 mais recentes
   // já vieram, e até 100 trocar não volta ao servidor; "Todos" vai buscar o
@@ -45,14 +63,63 @@ var TelaTrabalho = (function () {
   var temAgenda = false;
   var buscaNaAgenda = '';
 
-  function abasDaMesa() {
-    if (!temAgenda) return '';
-    return '<div class="config-abas" role="tablist" aria-label="O que ver">'
-      + [['casos', 'Casos'], ['reunioes', 'Reuniões']].map(function (aba) {
-        var atual = abaDaMesa === aba[0];
-        return '<button type="button" role="tab" class="config-aba' + (atual ? ' atual' : '') + '"'
-          + ' aria-selected="' + atual + '" data-aba-do-trabalho="' + aba[0] + '">' + aba[1] + '</button>';
+  /*
+    A BARRA DE ABAS (Etapa 84). As sub-abas do canal — "Casos em aberto" e
+    "Casos concluídos" na RET; "Casos em andamento" e "Casos concluídos" na
+    Mesa —, cada uma com quantos casos tem (aprovado pelo PO). Na Mesa, a
+    "Reuniões" (Etapa 79) entra na mesma linha: duas linhas de abas uma em cima
+    da outra confundiriam qual manda em qual. Os nomes e os números vêm do
+    servidor; antes da primeira resposta, a barra mostra só o que já se sabe.
+  */
+  function abasDoTrabalho() {
+    var conhecidas = subAbasConhecidas[canalEscolhido];
+    var abas = [];
+    if (conhecidas) {
+      conhecidas.nomes.forEach(function (nome, i) {
+        var numero = conhecidas.contagem ? conhecidas.contagem[i] : null;
+        abas.push({ atributo: 'data-sub-aba="' + (i + 1) + '"', rotulo: escapar(nome)
+          + (numero === null || numero === undefined ? ''
+            : ' <b class="numero-da-aba">' + Number(numero).toLocaleString('pt-BR') + '</b>'),
+          atual: abaDaMesa !== 'reunioes' && subAbaDoCanal(canalEscolhido) === i + 1 });
+      });
+    } else if (temAgenda) {
+      abas.push({ atributo: 'data-aba-do-trabalho="casos"', rotulo: 'Casos', atual: abaDaMesa === 'casos' });
+    }
+    if (temAgenda) {
+      abas.push({ atributo: 'data-aba-do-trabalho="reunioes"', rotulo: 'Reuniões', atual: abaDaMesa === 'reunioes' });
+    }
+    if (!abas.length) return '';
+    return '<div class="config-abas abas-do-trabalho" role="tablist" aria-label="O que ver">'
+      + abas.map(function (aba) {
+        return '<button type="button" role="tab" class="config-aba' + (aba.atual ? ' atual' : '') + '"'
+          + ' aria-selected="' + aba.atual + '" ' + aba.atributo + '>' + aba.rotulo + '</button>';
       }).join('') + '</div>';
+  }
+
+  function desenharAbas() {
+    var lugar = elemento('abas-do-trabalho');
+    if (!lugar) return;
+    lugar.innerHTML = abasDoTrabalho();
+    ligarCliques('[data-aba-do-trabalho]', function (botao) {
+      abaDaMesa = botao.getAttribute('data-aba-do-trabalho');
+      Aplicacao.remontar();
+    });
+    ligarCliques('[data-sub-aba]', function (botao) {
+      var qual = Number(botao.getAttribute('data-sub-aba'));
+      var vindoDasReunioes = abaDaMesa === 'reunioes';
+      abaDaMesa = 'casos';
+      if (qual === subAbaDoCanal(canalEscolhido) && !vindoDasReunioes) return;
+      lembrarSubAba(canalEscolhido, qual);
+      // O cartão e o Status escolhidos eram da outra aba: não valem nesta.
+      filtrosEscolhidos.cartao = '';
+      (resumo && resumo.filtrosDisponiveis || []).forEach(function (filtro) {
+        if (resumo.canal && String(filtro.cabecalho).toLowerCase()
+          === String(resumo.canal.colunaDoStatus || '').toLowerCase()) delete filtrosEscolhidos[filtro.chave];
+      });
+      if (vindoDasReunioes) { Aplicacao.remontar(); return; }
+      desenharAbas();
+      carregar();
+    });
   }
 
   function carregarAgenda() {
@@ -89,7 +156,7 @@ var TelaTrabalho = (function () {
     temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
     if (!temAgenda) abaDaMesa = 'casos';
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + abasDaMesa()
+      + '<div id="abas-do-trabalho">' + abasDoTrabalho() + '</div>'
       + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
 
@@ -157,11 +224,8 @@ var TelaTrabalho = (function () {
     // (ou ao sair do campo), e não a cada letra: cada busca é uma ida ao
     // servidor, e uma por letra seria uma fila de idas que a pessoa não pediu.
     //
-    // Depois vem o PERÍODO, o mesmo seletor das outras duas telas — a peça é
-    // compartilhada de propósito: três cópias divergiriam no primeiro ajuste,
-    // e aí "setembro" significaria uma coisa aqui e outra na Produtividade.
-    // A caixa existe mesmo sem filtro de lista nenhum: o período sozinho já é
-    // um recorte, e ele precisa estar em algum lugar.
+    // O PERÍODO SAIU (Etapa 84, pedido do PO): a busca e os filtros de lista
+    // ficam. O que a tela olha é dito ao lado do título da caixa.
     var busca = '<input type="search" class="filtro busca-na-fila" data-filtro="busca"'
       + ' id="busca-na-fila" autocomplete="off"'
       + ' placeholder="Buscar neste canal e apertar Enter"'
@@ -170,15 +234,30 @@ var TelaTrabalho = (function () {
 
     return Moldura.caixaDeFiltros(
       busca
-        + SeletorDePeriodo.desenhar(resumo)
         + caixas.join('')
         + Moldura.botaoLimparFiltros('limpar-filtros')
         + FiltroMultiplo.etiquetas(resumo.filtrosDisponiveis, filtrosEscolhidos),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + (resumo.buscaNaPlanilhaToda
-          // A busca não olha o período (Etapa 69): a caixa diz onde ela procurou.
+          // A busca procura na planilha toda (Etapa 69): a caixa diz onde.
           ? 'busca na planilha toda, de qualquer data'
-          : escapar(resumo.periodo.rotulo)));
+          : oQueAAbaOlha()));
+  }
+
+  /** O que a fila desta aba olha — o recado ao lado do título dos filtros. */
+  function oQueAAbaOlha() {
+    if (resumo.subAbas && resumo.subAbas.atual === 1) return 'planilha toda';
+    return resumo.truncada
+      ? 'os ' + Number(resumo.teto).toLocaleString('pt-BR') + ' mais recentes'
+      : 'planilha toda';
+  }
+
+  /** Como a fila está ordenada — o recado em cima da tabela. */
+  function ordemDaFila() {
+    if (!resumo.subAbas) return 'mais recentes';
+    var datas = resumo.subAbas.ordem === 'antigos'
+      ? 'do mais antigo para o mais recente' : 'do mais recente para o mais antigo';
+    return resumo.subAbas.comPrioridade ? 'por prioridade do status, ' + datas : datas;
   }
 
   /**
@@ -253,7 +332,8 @@ var TelaTrabalho = (function () {
 
     return '<div class="fila-mostrar">'
       + '<span class="fila-mostrando">' + (visiveis < total
-        ? 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total
+        ? (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
+          : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)
         : 'Mostrando todos os ' + total + ' casos') + '</span>'
       + '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
       + '<span>Mostrar</span>' + botoes + '</div></div>';
@@ -270,18 +350,15 @@ var TelaTrabalho = (function () {
             + 'qualquer data.') + '</p></div>';
     }
     if (!resumo.fila.length) {
+      var ondeOlhou = resumo.subAbas
+        ? 'em "' + escapar(resumo.subAbas.nomes[resumo.subAbas.atual - 1]) + '"' : 'neste canal';
       return '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
-          ? 'Há ' + resumo.totalNoPeriodo + ' casos no período, mas nenhum passa '
+          ? 'Há ' + resumo.totalNoPeriodo + ' casos ' + ondeOlhou + ', mas nenhum passa '
             + (filtrosEscolhidos.busca ? 'pela busca e pelos filtros escolhidos.'
               : 'pelos filtros escolhidos.')
-          // O recado diz o período que a tela OLHOU, com as palavras do
-          // próprio filtro. Antes falava sempre "nos N dias mais recentes":
-          // com "setembro de 2026" escolhido, era mentira.
-          : 'Nada foi registrado no período escolhido — '
-            + escapar(resumo.periodo.rotulo) + '. '
-            + 'Para casos antigos, use Buscar Caso.') + '</p></div>';
+          : 'Nenhum caso ' + ondeOlhou + '.') + '</p></div>';
     }
 
     var cabecalho = resumo.colunas.map(function (grupo) {
@@ -545,6 +622,11 @@ var TelaTrabalho = (function () {
     elemento('painel').innerHTML =
       (resumo.buscaNaPlanilhaToda ? avisoDaBusca() : Moldura.avisoDeJanela(resumo, 'Estes números e esta fila'))
       + desenharCartoes() + desenharFiltros() + desenharFila();
+    // Os números das abas vêm na mesma resposta (Etapa 84).
+    if (resumo.subAbas) {
+      subAbasConhecidas[canalEscolhido] = resumo.subAbas;
+      desenharAbas();
+    }
     ligarPainel();
     var busca = elemento('busca-na-fila');
     if (focarABusca && busca) {
@@ -571,8 +653,8 @@ var TelaTrabalho = (function () {
 
     // O aviso de prazo lê os casos abertos da planilha toda (Etapa 70): só se
     // pede quando ele vai abrir, na primeira carga do canal.
-    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, periodo,
-      quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)
+    Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, null,
+      quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))
       .entao(function (resposta) {
         resumo = resposta;
         if (resposta.filaCompacta) {
@@ -601,13 +683,6 @@ var TelaTrabalho = (function () {
     var caixas = document.querySelectorAll('.filtro');
     for (var i = 0; i < caixas.length; i++) {
       caixas[i].addEventListener('change', function () {
-        var novoPeriodo = SeletorDePeriodo.mudou(this, resumo, 'painel');
-        if (novoPeriodo !== null) {
-          // `false` quer dizer "é do período, mas ainda incompleto" — o de/até
-          // com uma data só. Não recarrega, e também não vira filtro comum.
-          if (novoPeriodo) { periodo = novoPeriodo; carregar(); }
-          return;
-        }
         if (this.getAttribute('data-filtro') === 'busca') { buscar(this); return; }
         filtrosEscolhidos[this.getAttribute('data-filtro')] = this.value.trim();
         carregar();
@@ -622,14 +697,12 @@ var TelaTrabalho = (function () {
       campoDaBusca.addEventListener('search', function () { buscar(this); });
     }
 
-    // O estado inicial (Etapa 56): sem busca, sem cartão, sem filtro de lista
-    // e o período da abertura — do dia 1 do mês até hoje. O "Mostrar" fica:
-    // não é filtro.
+    // O estado inicial (Etapa 56): sem busca, sem cartão, sem filtro de lista.
+    // O "Mostrar" e a sub-aba ficam: não são filtro.
     var limpar = elemento('limpar-filtros');
     if (limpar) {
       limpar.addEventListener('click', function () {
         filtrosEscolhidos = {};
-        periodo = SeletorDePeriodo.padrao();
         carregar();
       });
     }
@@ -651,8 +724,12 @@ var TelaTrabalho = (function () {
       var escolha = botao.getAttribute('data-mostrar');
       quantosNaFila = escolha === 'todos' ? 'todos' : Number(escolha);
       focarNoMostrar = escolha;
-      if (escolha === 'todos' && resumo.fila.length < totalDaFila()) {
-        carregar('Trazendo os ' + totalDaFila() + ' casos…');
+      // Faltam casos na tela (o "Todos", ou — numa aba grande, Etapa 84 — o 50 e
+      // o 100): o servidor traz o resto.
+      var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;
+      if (querMais && resumo.fila.length < totalDaFila()) {
+        carregar('Trazendo os ' + (escolha === 'todos' ? totalDaFila()
+          : Math.min(Number(escolha), totalDaFila())) + ' casos…');
         return;
       }
       desenharPainel();
@@ -703,10 +780,7 @@ var TelaTrabalho = (function () {
       filtrosEscolhidos = {};
       Aplicacao.remontar();
     });
-    ligarCliques('[data-aba-do-trabalho]', function (botao) {
-      abaDaMesa = botao.getAttribute('data-aba-do-trabalho');
-      Aplicacao.remontar();
-    });
+    desenharAbas();
     if (abaDaMesa === 'reunioes') { carregarAgenda(); return; }
     // A primeira carga do canal traz o aviso dos que vencem; as seguintes
     // (filtro, gravação, período) não.

@@ -1494,6 +1494,15 @@ function listarCanaisConfiguraveis() {
         colunaDaAreaResponsavel: String(canal.ColunaDaAreaResponsavel || ''),
         colunaDoValor: String(canal.ColunaDoValor || ''),
         situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
+        // As sub-abas e os filtros do Trabalho (Etapa 84), e os campos de
+        // lista do canal — os que podem virar filtro.
+        subAbasDoTrabalho: String(canal.SubAbasDoTrabalho || ''),
+        filtrosDoTrabalho: String(canal.FiltrosDoTrabalho || ''),
+        camposDeLista: camposAtivosDoCanal_(canal.Id).filter(function (campo) {
+          return normalizarParaComparar_(campo.TipoCampo) === 'seletor';
+        }).map(function (campo) {
+          return { chave: String(campo.ChaveTecnica), rotulo: String(campo.Rotulo || campo.Cabecalho) };
+        }),
         // Vazio vale SIM, igual ao resto do sistema: a tela mostra marcado.
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
@@ -1572,8 +1581,9 @@ function salvarCanal(dados) {
   }
 
   var sla = slaDoFormulario_(dados, atual);
+  var doTrabalho = trabalhoDoFormulario_(dados, atual, estrutura);
 
-  atualizarRegistro_('CANAIS', id, Object.assign(sla, {
+  atualizarRegistro_('CANAIS', id, Object.assign(sla, doTrabalho, {
     Nome: nome,
     Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
     ColunaDaData: String(dados.colunaDaData || ''),
@@ -1600,6 +1610,105 @@ function salvarCanal(dados) {
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+/**
+ * As sub-abas e os filtros do Trabalho vindos de Configurações (Etapa 84),
+ * conferidos — ou nada, numa planilha que ainda não rodou a atualização. Campo
+ * que a tela não mandou fica como está.
+ *
+ * `subAbasDoTrabalho`: null ou '' desliga; um objeto { abas, status, ordem }
+ * liga. Cada status precisa existir no canal; a coluna da condição, na base.
+ * `filtrosDoTrabalho`: as chaves dos campos, em ordem, até 6; vazio = os de
+ * sempre.
+ */
+function trabalhoDoFormulario_(dados, atual, estrutura) {
+  var colunasDeCanais = estruturaDaAba_('CANAIS');
+  if (posicaoDaColuna_(colunasDeCanais, 'SubAbasDoTrabalho') < 0) return {};
+  var saida = {};
+
+  if (dados.subAbasDoTrabalho !== undefined) {
+    var pedido = dados.subAbasDoTrabalho;
+    if (typeof pedido === 'string') {
+      try { pedido = pedido.trim() ? JSON.parse(pedido) : null; } catch (erro) {
+        throw new Error('As sub-abas do Trabalho não vieram num formato que eu entenda.');
+      }
+    }
+    if (!pedido) {
+      saida.SubAbasDoTrabalho = '';
+    } else {
+      var existentes = {};
+      listarCatalogo('STATUS', atual.Id).forEach(function (item) {
+        existentes[normalizarParaComparar_(item.nome)] = item.nome;
+      });
+      var vistos = {};
+      var status = (pedido.status || []).map(function (regra) {
+        var nome = String(regra.status || '').trim();
+        if (!nome) return null;
+        var chave = normalizarParaComparar_(nome);
+        if (!existentes[chave]) {
+          throw new Error('O status "' + nome + '" não existe neste canal. Crie em Ajustes Gerais.');
+        }
+        var coluna = String(regra.coluna || '').trim();
+        var saiCom = (Array.isArray(regra.saiCom) ? regra.saiCom : String(regra.saiCom || '').split(','))
+          .map(function (valor) { return String(valor).trim(); })
+          .filter(function (valor) { return valor; });
+        if (vistos[chave] && !coluna) {
+          throw new Error('O status "' + nome + '" está duas vezes na aba 1.');
+        }
+        vistos[chave] = true;
+        var feita = { status: existentes[chave] };
+        var rotulo = String(regra.rotulo || '').trim();
+        if (rotulo && normalizarParaComparar_(rotulo) !== chave) feita.rotulo = rotulo;
+        if (coluna) {
+          conferirQueAColunaExiste_(estrutura, coluna, atual.Aba);
+          if (!saiCom.length) {
+            throw new Error('O status "' + nome + '" tem a coluna "' + coluna + '", mas nenhum '
+              + 'valor que tira o caso da aba 1. Escreva os valores, ou tire a coluna.');
+          }
+          feita.coluna = coluna;
+          feita.saiCom = saiCom;
+        }
+        return feita;
+      }).filter(function (regra) { return regra; });
+      if (!status.length) {
+        throw new Error('Escolha ao menos um status para a aba 1, ou desligue as sub-abas.');
+      }
+      var abas = (pedido.abas || []).map(function (nome) { return String(nome || '').trim(); });
+      var ordem = (pedido.ordem || []).map(function (um) {
+        return RECC_ORDENS_DA_SUB_ABA.indexOf(um) >= 0 ? um : 'antigos';
+      });
+      saida.SubAbasDoTrabalho = JSON.stringify({
+        abas: [abas[0] || 'Casos em aberto', abas[1] || 'Casos concluídos'],
+        status: status,
+        ordem: [ordem[0] || 'antigos', ordem[1] || 'recentes']
+      });
+    }
+  }
+
+  if (dados.filtrosDoTrabalho !== undefined) {
+    var lista = (Array.isArray(dados.filtrosDoTrabalho) ? dados.filtrosDoTrabalho
+      : String(dados.filtrosDoTrabalho || '').split(','))
+      .map(function (chave) { return String(chave || '').trim(); })
+      .filter(function (chave) { return chave; });
+    var deLista = {};
+    camposAtivosDoCanal_(atual.Id).forEach(function (campo) {
+      if (normalizarParaComparar_(campo.TipoCampo) === 'seletor') {
+        deLista[normalizarParaComparar_(campo.ChaveTecnica)] = String(campo.ChaveTecnica);
+      }
+    });
+    var unicas = [];
+    lista.forEach(function (chave) {
+      var achada = deLista[normalizarParaComparar_(chave)];
+      if (!achada) throw new Error('O filtro "' + chave + '" não é um campo de lista ligado neste canal.');
+      if (unicas.indexOf(achada) < 0) unicas.push(achada);
+    });
+    if (unicas.length > RECC_FILTROS_NO_TRABALHO) {
+      throw new Error('O Trabalho mostra até ' + RECC_FILTROS_NO_TRABALHO + ' filtros.');
+    }
+    saida.FiltrosDoTrabalho = unicas.join(', ');
+  }
+  return saida;
 }
 
 /**

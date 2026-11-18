@@ -156,8 +156,9 @@ function pontePreparada(respostas) {
     + '        responder(respostas.propostas[String(proposta) + "|" + (idDoCaso || "")]\n'
     + '          || respostas.propostas.avulsa || { situacao: "VAZIA", mensagem: "" });\n'
     + '      },\n'
-    + '      resumoDoCanal: function (idDoCanal, filtros) {\n'
-    + '        var painel = respostas.paineis[idDoCanal];\n'
+    // As sub-abas do Trabalho (Etapa 84): um painel gravado por aba.
+    + '      resumoDoCanal: function (idDoCanal, filtros, periodo, quantos, aviso, subAba) {\n'
+    + '        var painel = respostas.paineis[idDoCanal].abas[Number(subAba) === 2 ? 2 : 1];\n'
     + '        var chave = "";\n'
     + '        Object.keys(filtros || {}).forEach(function (campo) {\n'
     + '          if (filtros[campo] && campo !== "busca") chave = campo + "=" + filtros[campo];\n'
@@ -969,19 +970,25 @@ function gerar(pastaDeSaida) {
     // O painel sem filtro, e uma variação por opção de cada filtro. Guardar
     // só o que muda (cartões, fila e totais) evita repetir as listas de
     // opções em dezenas de cópias.
-    // O período da abertura, como a tela pede: do dia 1 do mês até hoje (Etapa 56).
-    const base = chamar('resumoDoCanal')(canal.id, {}, ABERTURA);
-    const variantes = {};
-    base.filtrosDisponiveis.forEach((filtro) => {
-      filtro.opcoes.forEach((opcao) => {
-        const escolha = {};
-        escolha[filtro.chave] = opcao.valor;
-        const resumo = chamar('resumoDoCanal')(canal.id, escolha, ABERTURA);
-        variantes[filtro.chave + '=' + opcao.valor] = {
-          cartoes: resumo.cartoes, fila: resumo.fila, total: resumo.total
-        };
+    // Sem período (Etapa 84): um painel por sub-aba — o canal sem sub-abas
+    // responde igual nas duas.
+    function painelDaAba(subAba) {
+      const base = chamar('resumoDoCanal')(canal.id, {}, null, '', true, subAba);
+      const variantes = {};
+      base.filtrosDisponiveis.forEach((filtro) => {
+        filtro.opcoes.forEach((opcao) => {
+          const escolha = {};
+          escolha[filtro.chave] = opcao.valor;
+          const resumo = chamar('resumoDoCanal')(canal.id, escolha, null, '', false, subAba);
+          variantes[filtro.chave + '=' + opcao.valor] = {
+            cartoes: resumo.cartoes, fila: resumo.fila, total: resumo.total
+          };
+        });
       });
-    });
+      return { base, variantes };
+    }
+    const abas = { 1: painelDaAba(1), 2: painelDaAba(2) };
+    const base = { fila: abas[1].base.fila.concat(abas[2].base.fila) };
 
     // "Trabalhar no caso" abre direto a edição: a leitura saiu do sistema, e
     // a prévia não guarda mais a resposta dela.
@@ -992,7 +999,7 @@ function gerar(pastaDeSaida) {
       situacoes[caso.id] = chamar('situacoesParaTrocar')(canal.id, caso.id);
     });
 
-    paineis[canal.id] = { base, variantes, paraEditar, situacoes };
+    paineis[canal.id] = { abas, paraEditar, situacoes };
   });
   const suseps = {
     '1234567': chamar('consultarSusep')('1234567'),

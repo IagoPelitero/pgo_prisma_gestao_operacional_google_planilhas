@@ -847,6 +847,16 @@ const RECC_ESQUEMA = {
       { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaPrimeiraResposta', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHoraDaPrimeiraResposta', tipo: 'texto', protegido: false },
+      /*
+       * AS SUB-ABAS E OS FILTROS DO TRABALHO (Etapa 84) — pedido do PO: "esse
+       * ajuste também deve ser disponível na aba de configurações permitindo
+       * que eu escolha a ordem dos casos e quais status devem ir para qual
+       * aba". SubAbasDoTrabalho é JSON (ver subAbasDoCanal_); FiltrosDoTrabalho,
+       * as chaves técnicas dos campos que viram filtro, em ordem. Em branco:
+       * sem sub-abas, e os filtros de sempre.
+       */
+      { cabecalho: 'SubAbasDoTrabalho', tipo: 'textoLongo', protegido: false },
+      { cabecalho: 'FiltrosDoTrabalho', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }

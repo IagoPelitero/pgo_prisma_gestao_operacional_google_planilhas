@@ -235,7 +235,7 @@ function montarPacoteDePartida_(quem) {
  * o que mudou em Evolucao/05-progresso.md.
  */
 const RECC_VERSAO = {
-  numero: '1.83',
+  numero: '1.84',
   data: '17/11/2026'
 };
 
@@ -368,6 +368,10 @@ function canaisVisiveis_() {
         colunaDaAreaResponsavel: canal.ColunaDaAreaResponsavel,
         colunaDoValor: String(canal.ColunaDoValor || ''),
         situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
+        // As sub-abas e os filtros do Trabalho (Etapa 84). Em branco: o canal
+        // não tem sub-abas, e os filtros são os de sempre (os 6 primeiros).
+        subAbasDoTrabalho: String(canal.SubAbasDoTrabalho || ''),
+        filtrosDoTrabalho: String(canal.FiltrosDoTrabalho || ''),
         // VAZIO VALE SIM, de propósito: um canal cadastrado antes desta coluna
         // existir continua conferindo o bloqueio, que é o que ele já fazia.
         // Só quem disser "Não" em letras deixa de conferir.
@@ -1238,6 +1242,9 @@ const RECC_PREFIXO_DA_FILA_DA_AUDITORIA = 'AUDITORIA.FILA.';
 const RECC_MAIOR_REGISTRO_NA_FILA = 8000;      // caracteres; o teto é 9 KB
 const RECC_DESCARGA_DA_AUDITORIA = 500;        // registros por descarga
 
+/** A ordem dos registros DESTA execução na fila da auditoria (Etapa 84). */
+var RECC_ORDEM_DA_AUDITORIA = 0;
+
 /** Põe o registro na fila. Devolve false quando ele não cabe (vai direto). */
 function entrarNaFilaDaAuditoria_(registro) {
   var texto = JSON.stringify({
@@ -1245,8 +1252,11 @@ function entrarNaFilaDaAuditoria_(registro) {
     e: registro.Entidade, r: registro.RegistroId, t: registro.Detalhe
   });
   if (texto.length > RECC_MAIOR_REGISTRO_NA_FILA) return false;
+  // A ordem da execução antes do sorteio (Etapa 84): dois registros no mesmo
+  // milissegundo saíam na ordem do sorteio — o mesmo defeito da fila dos erros.
   var chave = RECC_PREFIXO_DA_FILA_DA_AUDITORIA + ('0000000000000' + registro.DataHora.getTime()).slice(-13)
-    + '.' + Math.random().toString(36).slice(2, 10);
+    + '.' + ('000' + (RECC_ORDEM_DA_AUDITORIA++ % 10000)).slice(-4)
+    + Math.random().toString(36).slice(2, 10);
   try {
     PropertiesService.getScriptProperties().setProperty(chave, texto);
     return true;

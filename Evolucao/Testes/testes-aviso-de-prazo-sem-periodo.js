@@ -11,7 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, comoUsuario } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, comoUsuario , semSubAbas } = require('./ferramentas');
 
 const DA_RET = 'data de recepção do protocolo';
 const tela = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End', nome + '.html'), 'utf8');
@@ -31,6 +31,7 @@ function diasAtras(n) {
 function preparar() {
   const t = carregar('primeiro.adm@exemplo.com');
   t.chamar('instalarRECC()');
+  semSubAbas(t.chamar);   // o aviso não depende das sub-abas (Etapa 84)
   t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
   t.vg = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_VG');
   t.casos = (linhas) => t.chamar('inserirVariosRegistros_')('BASE_RET', linhas);
@@ -53,7 +54,8 @@ function rodarTestesDoAvisoDePrazoSemPeriodo() {
   teste('o caso aberto de 40 dias atrás, no amarelo, entra no aviso', () => {
     const t = preparar();
     const resumo = t.trabalho();
-    igual(resumo.totalNoPeriodo, 0, 'nenhum deles está no período da tela');
+    // Sem período (Etapa 84), eles estão na fila também — e o aviso, como antes.
+    verdadeiro(resumo.totalNoPeriodo > 0, 'sem período, os casos antigos estão na fila');
     const esperados = t.amarelosDe(t.chamar('lerRegistros_')('BASE_RET'));
     verdadeiro(esperados.length > 0, 'algum caso no amarelo');
     igual(resumo.pertoDeVencer.map((c) => String(c.id)).sort().join(','), esperados);
@@ -130,7 +132,7 @@ function rodarTestesDoAvisoDePrazoSemPeriodo() {
     const t = preparar();
     igual(t.trabalho({}, false).pertoDeVencer.length, 0);
     igual(t.trabalho({}, false).quantosPertoDeVencer, 0);
-    contem(tela('Trabalho'), "quantosNaFila === 'todos' ? 'todos' : '', avisarQuandoChegar)",
+    contem(tela('Trabalho'), "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))",
       'a tela só pede o aviso na primeira carga do canal');
   });
 

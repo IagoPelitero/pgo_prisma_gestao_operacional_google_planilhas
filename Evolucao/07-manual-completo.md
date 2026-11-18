@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1738 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1774 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1738 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1774 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -381,6 +381,52 @@ primeiro**; logo depois, os campos que dependem do status — na RET, o **Status
 proposta**, que a operação criou fora do contrato (Etapa 44, pedido do PO).
 
 ![O Trabalho](imagens/tela-trabalho.png)
+
+### Sem período, em duas sub-abas (Etapa 84)
+
+Pedido do PO: tirar o filtro de período do Trabalho e dividir a RET e a Mesa em
+duas **sub-abas**. O VG fica sem sub-abas — só perdeu o período.
+
+| Canal | Aba 1 | Aba 2 |
+|---|---|---|
+| **RET** | **Casos em aberto**: 1º **Aguardando transmissão** (o Retido cujo Status proposta ainda não é Transmitido nem Sem alteração — a regra do prazo), 2º **Pendente**, 3º **Contatando**, 4º **Não trabalhado**, 5º **Acompanhamento** | **Casos concluídos**: os demais |
+| **Mesa Diamante** | **Casos em andamento**: Em andamento | **Casos concluídos**: os demais |
+
+- **A ordem da aba 1** é a do PO: o status (a prioridade) e, dentro dele, **do mais
+  antigo para o mais recente**. Caso **sem status** (o importado da Mesa, por
+  exemplo) vai para a aba 1, **no fim**. A aba 2 vem do mais recente para o mais
+  antigo.
+- **A aba 1 olha a planilha toda**; a **aba 2**, os **5.000 concluídos mais recentes**
+  (o teto do painel, `OPERACAO.LINHAS_DO_PAINEL`), com o aviso quando há mais. Para
+  um caso mais antigo, a busca de texto procura na planilha toda.
+- **Cada aba diz quantos casos tem**, ao lado do nome — com texto na busca, quantos
+  a busca achou em cada uma, para saber se vale trocar de aba.
+- **Os cartões são os da aba**: o total e um cartão por status (na aba 1, os da
+  lista, na ordem; na aba 2, os que têm caso). Os **outros cartões de Painéis** —
+  valor de um campo, coluna preenchida, finalizados na célula — continuam, contados
+  nos casos da aba, e aparecem na aba onde contam algum caso. Clicar filtra a fila,
+  como antes.
+- **O filtro Status mostra só os status da aba.** Com um status só (a Mesa, na aba
+  1), ele some — e volta sozinho se outro status entrar na aba.
+- **As abas conversam**: o caso que muda de status muda de aba na próxima carga
+  (trocar o status recarrega a fila).
+- **A última aba aberta fica lembrada**, por canal, no navegador de cada pessoa.
+- Na Mesa, a aba **Reuniões** (Etapa 79) fica na mesma linha das sub-abas.
+
+**Tudo se ajusta em Configurações › Canais de trabalho**, em "Trabalho: sub-abas":
+ligar ou desligar, o nome das abas, os **status da aba 1 em ordem** (subir, descer,
+tirar, acrescentar) — cada um com um nome no cartão e, se quiser, uma condição
+("fica até a coluna X ser…") — e a ordem das datas de cada aba. Em "Trabalho:
+filtros", **quais campos viram filtro e em que ordem** (até 6); em branco, os de
+sempre. Na RET: Status, Tentativas de contato, Status proposta, Analista, Canal de
+origem e Cód. do produto e produto.
+
+**Velocidade.** A aba 1 lê a coluna do status (e a da condição) da planilha toda e
+só as linhas da aba. Quando há muitos casos espalhados pela base, ela usa a
+**leitura leve**: lê só as colunas de que os cartões, os filtros e a ordem precisam,
+e inteiras só as linhas que vão para a tela — aí a fila abre com **20** casos (5, 10
+e 20 na hora; 50, 100 e "Todos" vão ao servidor). Sem a leitura leve, os 100 de
+sempre. Quem escolhe o caminho é a régua de custo do próprio teste de volume.
 
 Tudo o que filtra mora numa **caixa branca, com o título "Filtros"** e, do lado
 direito, **quantos casos estão sendo mostrados e de qual período**. É a mesma
@@ -414,21 +460,19 @@ os outros filtros. É uma ida ao servidor por Enter, e não uma por letra.
 
 **A busca procura na planilha toda, de qualquer data** (Etapa 69, pedido do PO:
 "os filtros de texto ficam condicionados à data, prejudicando a busca"). Com
-texto digitado, o período não vale: a fila e os cartões mostram o que a busca
+texto digitado, a fila e os cartões mostram o que a busca
 achou em toda a base do canal, e a caixa dos filtros diz "busca na planilha
 toda, de qualquer data". Os **outros filtros continuam valendo** — o analista,
 o status, o cartão clicado — e quem só vê os próprios casos continua vendo só os
-seus. Sem período, a seta "vs. período anterior" dos cartões fica vazia. Quem
+seus. Com sub-abas, cada aba mostra o que a busca achou nela. Quem
 procura é o localizador do Sheets (o mesmo da busca rápida, Etapa 63), que lê só
 as linhas em que o texto aparece; com mais casos achados do que o painel lê de
 uma vez (`OPERACAO.LINHAS_DO_PAINEL`), vêm os mais recentes e a tela avisa. Com
 a busca rápida desligada, ela procura nas linhas mais recentes até esse teto.
-Apagar o texto volta ao período.
+Apagar o texto volta à aba como ela é.
 
-Depois vem o **período**, nas mesmas maneiras da Produtividade RECC (ver
-adiante): **por data** (a abertura) e **por mês**. Antes o Trabalho olhava só a janela
-fixa da `CONFIG` — os mesmos 30 dias para todo mundo —, e quem precisasse
-fechar uma semana ou um mês tinha de exportar e contar fora.
+O **período saiu do Trabalho** na Etapa 84 (ver acima). Ele continua na
+Produtividade RECC.
 
 **A fila mostra 5 casos de cara**, os mais recentes, em todos os canais. Logo
 em cima da tabela, uma barra diz quantos aparecem e oferece o resto:
@@ -447,10 +491,8 @@ caixa de filtros, não muda os cartões, e a escolha continua valendo ao trocar
 de canal ou limpar os filtros. As opções e o padrão moram em `Indicadores.gs`
 (`RECC_OPCOES_DE_CASOS_NA_FILA` e `RECC_CASOS_NA_FILA`).
 
-Quando a fila sai vazia, o recado diz **o período que ela olhou**, com as
-palavras do próprio filtro: "nada foi registrado no período escolhido —
-setembro de 2026". Dizer "nos 30 dias mais recentes" com setembro escolhido
-mandaria a pessoa procurar defeito onde não há.
+Quando a fila sai vazia, o recado diz **onde ela olhou** — "Nenhum caso em
+'Casos em aberto'" —, ou que há casos mas nenhum passa pelos filtros.
 
 A fila vem em **grupos**: várias colunas debaixo de um título só, com a
 primeira em destaque. Um caso da RET tem trinta e cinco colunas — seis lado a
@@ -1188,9 +1230,8 @@ O que vale saber, e a tela diz:
 
 ### O período, de três maneiras
 
-Vale para as **duas telas que filtram** — Trabalho e Produtividade RECC. É a
-mesma peça (`SeletorDePeriodo`) nas duas: duas cópias divergiriam no primeiro
-ajuste, e a operação veria duas telas diferentes fazendo a mesma pergunta.
+Vale para a **Produtividade RECC** — o Trabalho saiu do período na Etapa 84. A
+peça (`SeletorDePeriodo`) continua sendo uma só, em Comuns.html.
 
 | Maneira | Para quê |
 |---|---|
@@ -1830,7 +1871,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.83** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.84** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1838,7 +1879,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1738 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1774 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

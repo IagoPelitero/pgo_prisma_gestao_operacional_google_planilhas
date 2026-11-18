@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-17 19:43
+   Gerado em 2026-11-18 13:14
    ========================================================================== */
 
 
@@ -449,6 +449,9 @@ const RECC_ESQUEMA = {
       { cabecalho: 'FimDoExpediente', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaPrimeiraResposta', tipo: 'texto', protegido: false },
       { cabecalho: 'ColunaDaHoraDaPrimeiraResposta', tipo: 'texto', protegido: false },
+
+      { cabecalho: 'SubAbasDoTrabalho', tipo: 'textoLongo', protegido: false },
+      { cabecalho: 'FiltrosDoTrabalho', tipo: 'texto', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }
@@ -7101,6 +7104,14 @@ function listarCanaisConfiguraveis() {
         colunaDoValor: String(canal.ColunaDoValor || ''),
         situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
 
+        subAbasDoTrabalho: String(canal.SubAbasDoTrabalho || ''),
+        filtrosDoTrabalho: String(canal.FiltrosDoTrabalho || ''),
+        camposDeLista: camposAtivosDoCanal_(canal.Id).filter(function (campo) {
+          return normalizarParaComparar_(campo.TipoCampo) === 'seletor';
+        }).map(function (campo) {
+          return { chave: String(campo.ChaveTecnica), rotulo: String(campo.Rotulo || campo.Cabecalho) };
+        }),
+
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
         slaHorasUteis: Number(canal.SlaHorasUteis) || 0,
@@ -7166,8 +7177,9 @@ function salvarCanal(dados) {
   }
 
   var sla = slaDoFormulario_(dados, atual);
+  var doTrabalho = trabalhoDoFormulario_(dados, atual, estrutura);
 
-  atualizarRegistro_('CANAIS', id, Object.assign(sla, {
+  atualizarRegistro_('CANAIS', id, Object.assign(sla, doTrabalho, {
     Nome: nome,
     Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
     ColunaDaData: String(dados.colunaDaData || ''),
@@ -7191,6 +7203,95 @@ function salvarCanal(dados) {
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+function trabalhoDoFormulario_(dados, atual, estrutura) {
+  var colunasDeCanais = estruturaDaAba_('CANAIS');
+  if (posicaoDaColuna_(colunasDeCanais, 'SubAbasDoTrabalho') < 0) return {};
+  var saida = {};
+
+  if (dados.subAbasDoTrabalho !== undefined) {
+    var pedido = dados.subAbasDoTrabalho;
+    if (typeof pedido === 'string') {
+      try { pedido = pedido.trim() ? JSON.parse(pedido) : null; } catch (erro) {
+        throw new Error('As sub-abas do Trabalho não vieram num formato que eu entenda.');
+      }
+    }
+    if (!pedido) {
+      saida.SubAbasDoTrabalho = '';
+    } else {
+      var existentes = {};
+      listarCatalogo('STATUS', atual.Id).forEach(function (item) {
+        existentes[normalizarParaComparar_(item.nome)] = item.nome;
+      });
+      var vistos = {};
+      var status = (pedido.status || []).map(function (regra) {
+        var nome = String(regra.status || '').trim();
+        if (!nome) return null;
+        var chave = normalizarParaComparar_(nome);
+        if (!existentes[chave]) {
+          throw new Error('O status "' + nome + '" não existe neste canal. Crie em Ajustes Gerais.');
+        }
+        var coluna = String(regra.coluna || '').trim();
+        var saiCom = (Array.isArray(regra.saiCom) ? regra.saiCom : String(regra.saiCom || '').split(','))
+          .map(function (valor) { return String(valor).trim(); })
+          .filter(function (valor) { return valor; });
+        if (vistos[chave] && !coluna) {
+          throw new Error('O status "' + nome + '" está duas vezes na aba 1.');
+        }
+        vistos[chave] = true;
+        var feita = { status: existentes[chave] };
+        var rotulo = String(regra.rotulo || '').trim();
+        if (rotulo && normalizarParaComparar_(rotulo) !== chave) feita.rotulo = rotulo;
+        if (coluna) {
+          conferirQueAColunaExiste_(estrutura, coluna, atual.Aba);
+          if (!saiCom.length) {
+            throw new Error('O status "' + nome + '" tem a coluna "' + coluna + '", mas nenhum '
+              + 'valor que tira o caso da aba 1. Escreva os valores, ou tire a coluna.');
+          }
+          feita.coluna = coluna;
+          feita.saiCom = saiCom;
+        }
+        return feita;
+      }).filter(function (regra) { return regra; });
+      if (!status.length) {
+        throw new Error('Escolha ao menos um status para a aba 1, ou desligue as sub-abas.');
+      }
+      var abas = (pedido.abas || []).map(function (nome) { return String(nome || '').trim(); });
+      var ordem = (pedido.ordem || []).map(function (um) {
+        return RECC_ORDENS_DA_SUB_ABA.indexOf(um) >= 0 ? um : 'antigos';
+      });
+      saida.SubAbasDoTrabalho = JSON.stringify({
+        abas: [abas[0] || 'Casos em aberto', abas[1] || 'Casos concluídos'],
+        status: status,
+        ordem: [ordem[0] || 'antigos', ordem[1] || 'recentes']
+      });
+    }
+  }
+
+  if (dados.filtrosDoTrabalho !== undefined) {
+    var lista = (Array.isArray(dados.filtrosDoTrabalho) ? dados.filtrosDoTrabalho
+      : String(dados.filtrosDoTrabalho || '').split(','))
+      .map(function (chave) { return String(chave || '').trim(); })
+      .filter(function (chave) { return chave; });
+    var deLista = {};
+    camposAtivosDoCanal_(atual.Id).forEach(function (campo) {
+      if (normalizarParaComparar_(campo.TipoCampo) === 'seletor') {
+        deLista[normalizarParaComparar_(campo.ChaveTecnica)] = String(campo.ChaveTecnica);
+      }
+    });
+    var unicas = [];
+    lista.forEach(function (chave) {
+      var achada = deLista[normalizarParaComparar_(chave)];
+      if (!achada) throw new Error('O filtro "' + chave + '" não é um campo de lista ligado neste canal.');
+      if (unicas.indexOf(achada) < 0) unicas.push(achada);
+    });
+    if (unicas.length > RECC_FILTROS_NO_TRABALHO) {
+      throw new Error('O Trabalho mostra até ' + RECC_FILTROS_NO_TRABALHO + ' filtros.');
+    }
+    saida.FiltrosDoTrabalho = unicas.join(', ');
+  }
+  return saida;
 }
 
 function slaDoFormulario_(dados, atual) {
@@ -9188,7 +9289,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.83',
+  numero: '1.84',
   data: '17/11/2026'
 };
 
@@ -9281,6 +9382,9 @@ function canaisVisiveis_() {
         colunaDaAreaResponsavel: canal.ColunaDaAreaResponsavel,
         colunaDoValor: String(canal.ColunaDoValor || ''),
         situacoesDestacadas: String(canal.SituacoesDestacadas || ''),
+
+        subAbasDoTrabalho: String(canal.SubAbasDoTrabalho || ''),
+        filtrosDoTrabalho: String(canal.FiltrosDoTrabalho || ''),
 
         confereSusepBloqueada:
           normalizarParaComparar_(canal.ConfereSusepBloqueada) !== 'nao',
@@ -9835,14 +9939,18 @@ const RECC_PREFIXO_DA_FILA_DA_AUDITORIA = 'AUDITORIA.FILA.';
 const RECC_MAIOR_REGISTRO_NA_FILA = 8000;
 const RECC_DESCARGA_DA_AUDITORIA = 500;
 
+var RECC_ORDEM_DA_AUDITORIA = 0;
+
 function entrarNaFilaDaAuditoria_(registro) {
   var texto = JSON.stringify({
     d: registro.DataHora.getTime(), u: registro.UsuarioId, a: registro.Acao,
     e: registro.Entidade, r: registro.RegistroId, t: registro.Detalhe
   });
   if (texto.length > RECC_MAIOR_REGISTRO_NA_FILA) return false;
+
   var chave = RECC_PREFIXO_DA_FILA_DA_AUDITORIA + ('0000000000000' + registro.DataHora.getTime()).slice(-13)
-    + '.' + Math.random().toString(36).slice(2, 10);
+    + '.' + ('000' + (RECC_ORDEM_DA_AUDITORIA++ % 10000)).slice(-4)
+    + Math.random().toString(36).slice(2, 10);
   try {
     PropertiesService.getScriptProperties().setProperty(chave, texto);
     return true;
@@ -10234,6 +10342,8 @@ const RECC_OPCOES_DE_CASOS_NA_FILA = [5, 10, 20, 50, 100];
 
 const RECC_FILA_NA_ABERTURA = RECC_OPCOES_DE_CASOS_NA_FILA[RECC_OPCOES_DE_CASOS_NA_FILA.length - 1];
 
+const RECC_FILA_NA_LEITURA_LEVE = 20;
+
 function linhasQueOPainelOlha_() {
   var declarado = Number(valorDaConfiguracao_('OPERACAO.LINHAS_DO_PAINEL', ''));
   if (isFinite(declarado) && declarado > 0) return Math.floor(declarado);
@@ -10247,42 +10357,45 @@ function tomValido_(cor) {
   return RECC_TONS.indexOf(tom) >= 0 ? tom : 'neutro';
 }
 
-function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
   return cronometrado_('resumoDoCanal', resumoDoCanalSemRelogio_, arguments);
 }
 
-function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso) {
+function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
-  var periodo = resolverPeriodo_(periodoPedido);
-  var antes = periodoAnterior_(periodo);
-
-  var guardarSemData = guardaOsSemData_(periodo);
+  var sub = subAbasDoCanal_(canal);
+  var qualAba = sub ? (Number(subAba) === 2 ? 2 : 1) : 0;
+  var contagemDasAbas = null;
 
   var termo = String((filtros || {}).busca || '').trim();
   var meus;
-  var anterior;
   var truncada;
   if (termo) {
     var achado = registrosDaBuscaNaPlanilha_(canal, termo);
     meus = filtrarPeloAlcance_(achado.registros, canal.aba, quem);
-    anterior = [];
     truncada = achado.truncada;
+    if (sub) {
+      var partes = separarNasSubAbas_(aplicarBusca_(meus, canal, termo), canal, sub);
+      contagemDasAbas = [partes[0].length, partes[1].length];
+      meus = partes[qualAba - 1];
+    }
+  } else if (sub) {
+    var daAba = registrosDaSubAba_(canal, sub, qualAba, quem, filtrosDoCanal_(canal, quem));
+    meus = daAba.registros;
+    truncada = daAba.truncada;
+    contagemDasAbas = daAba.contagem;
   } else {
-
-    var lido = registrosDosPeriodos_(canal, [
-      { de: periodo.de, ate: periodo.ate, guardarSemData: guardarSemData },
-      { de: antes.de, ate: antes.ate }]);
-    truncada = lido.truncada;
-    meus = filtrarPeloAlcance_(entreDuasDatas_(lido.registros, canal, periodo.de, periodo.ate,
-      guardarSemData), canal.aba, quem);
-
-    anterior = filtrarPeloAlcance_(
-      entreDuasDatas_(lido.registros, canal, antes.de, antes.ate, false), canal.aba, quem);
+    var teto = linhasQueOPainelOlha_();
+    meus = filtrarPeloAlcance_(lerRegistros_(canal.aba, { ultimas: teto }), canal.aba, quem);
+    truncada = quantidadeDeRegistros_(estruturaDaAba_(canal.aba)) > teto;
   }
 
+  var anterior = [];
+
   var disponiveis = filtrosDoCanal_(canal, quem);
+  if (sub) disponiveis = filtrosDaSubAba_(disponiveis, canal, sub, qualAba);
 
   var filtrados = aplicarBusca_(aplicarFiltros_(meus, disponiveis, filtros || {}),
     canal, termo);
@@ -10293,25 +10406,27 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     aplicarBusca_(aplicarFiltros_(filtrarPeloAlcance_(casosAbertosDaPlanilha_(canal, true), canal.aba, quem),
       disponiveis, filtros || {}), canal, termo), canal);
 
-  var naFila = filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
+  var naFila = sub ? filtrarPeloCartaoDaSubAba_(filtrados, canal, sub, (filtros || {}).cartao)
+    : filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
+
+  if (sub) naFila = ordenarNaSubAba_(naFila, canal, sub, qualAba).reverse();
 
   return {
     canal: canal,
-    periodo: {
-      tipo: periodo.tipo,
-      dias: periodo.dias,
-      mes: periodo.mes || '',
-      de: comoSeEscreve_(periodo.de),
-      ate: comoSeEscreve_(periodo.ate),
-      rotulo: periodo.rotulo
-    },
-    mesesDisponiveis: mesesParaEscolher_(),
-    cartoes: contarCartoes_(filtrados, anterioresFiltrados, canal),
+
+    subAbas: sub ? { nomes: sub.abas, atual: qualAba, contagem: contagemDasAbas,
+      ordem: sub.ordem[qualAba - 1], comPrioridade: qualAba === 1 } : null,
+
+    teto: linhasQueOPainelOlha_(),
+    linhasLidas: linhasQueOPainelOlha_(),
+    cartoes: sub ? cartoesDaSubAba_(filtrados, canal, sub, qualAba)
+      .concat(outrosCartoesDaSubAba_(filtrados, canal))
+      : contarCartoes_(filtrados, anterioresFiltrados, canal),
     filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, meus),
     colunas: colunasDaFila_(canal),
 
-    fila: compactarFila_(montarFila_(quantosNaFila === 'todos'
-      ? naFila : naFila.slice(-RECC_FILA_NA_ABERTURA), canal)),
+    fila: compactarFila_(montarFila_(completarRegistros_(canal, quantosNaFila === 'todos'
+      ? naFila : naFila.slice(-quantosNaFilaQueVao_(naFila, quantosNaFila)), quem), canal)),
     filaCompacta: true,
 
     pertoDeVencer: compactarFila_(montarFila_(
@@ -10327,6 +10442,11 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     escopo: quem.permissoes.escopo,
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
   };
+}
+
+function quantosNaFilaQueVao_(naFila, quantosNaFila) {
+  var leve = naFila.length > 0 && naFila[0].__leve === true;
+  return Math.max(Number(quantosNaFila) || 0, leve ? RECC_FILA_NA_LEITURA_LEVE : RECC_FILA_NA_ABERTURA);
 }
 
 function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
@@ -10630,6 +10750,16 @@ function filtrosDoCanal_(canal, quem) {
     return um.prioridade - outro.prioridade || um.ordem - outro.ordem;
   }).map(function (item) { return item.campo; });
 
+  var escolhidos = String(canal.filtrosDoTrabalho || '').split(',').map(function (chave) {
+    return normalizarParaComparar_(chave);
+  }).filter(function (chave) { return chave; });
+  if (escolhidos.length) {
+    var porChave = {};
+    ativos.forEach(function (campo) { porChave[normalizarParaComparar_(campo.ChaveTecnica)] = campo; });
+    campos = escolhidos.map(function (chave) { return porChave[chave]; })
+      .filter(function (campo) { return !!campo; });
+  }
+
   campos.forEach(function (campo) {
     if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
@@ -10737,6 +10867,336 @@ function aplicarBusca_(registros, canal, termo) {
       return casaComOTermo_(valor, termo, coluna.tipo);
     });
   });
+}
+
+const RECC_ORDENS_DA_SUB_ABA = ['antigos', 'recentes'];
+
+function subAbasDoCanal_(canal) {
+  var texto = String((canal && canal.subAbasDoTrabalho) || '').trim();
+  if (!texto) return null;
+  var lido;
+  try { lido = JSON.parse(texto); } catch (erro) { return null; }
+  var regras = (lido.status || []).map(function (regra) {
+    var status = String(regra.status || '').trim();
+    return {
+      status: status,
+      chave: normalizarParaComparar_(status),
+      rotulo: String(regra.rotulo || '').trim() || status,
+      coluna: String(regra.coluna || '').trim(),
+      saiCom: (regra.saiCom || []).map(normalizarParaComparar_).filter(function (v) { return v; })
+    };
+  }).filter(function (regra) { return regra.chave; });
+  if (!regras.length) return null;
+  var abas = lido.abas || [];
+  var ordem = lido.ordem || [];
+  return {
+    abas: [String(abas[0] || '').trim() || 'Casos em aberto',
+      String(abas[1] || '').trim() || 'Casos concluídos'],
+    regras: regras,
+    ordem: [RECC_ORDENS_DA_SUB_ABA.indexOf(ordem[0]) >= 0 ? ordem[0] : 'antigos',
+      RECC_ORDENS_DA_SUB_ABA.indexOf(ordem[1]) >= 0 ? ordem[1] : 'recentes']
+  };
+}
+
+function lugarNaSubAba_(sub, valorDoStatus, valorDaCondicao) {
+  var chave = normalizarParaComparar_(valorDoStatus);
+  if (!chave) return sub.regras.length;
+  for (var i = 0; i < sub.regras.length; i++) {
+    var regra = sub.regras[i];
+    if (regra.chave !== chave) continue;
+    if (regra.coluna && regra.saiCom.length
+      && regra.saiCom.indexOf(normalizarParaComparar_(valorDaCondicao(regra.coluna))) >= 0) continue;
+    return i;
+  }
+  return -1;
+}
+
+function lugarDoRegistro_(registro, canal, sub) {
+  return lugarNaSubAba_(sub, registro[canal.colunaDoStatus], function (coluna) {
+    return registro[grafiaDaColuna_(canal.aba, coluna)];
+  });
+}
+
+function linhasDasSubAbas_(canal, sub, quem) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0 || !canal.colunaDoStatus || posicaoDaColuna_(estrutura, canal.colunaDoStatus) < 0) {
+    return { aba1: [], aba2: [], lidas: {} };
+  }
+  var status = lerColunaInteira_(canal.aba, canal.colunaDoStatus);
+
+  var condicoes = {};
+  sub.regras.forEach(function (regra) {
+    if (!regra.coluna || condicoes[regra.coluna] || posicaoDaColuna_(estrutura, regra.coluna) < 0) return;
+    condicoes[regra.coluna] = lerColunaInteira_(canal.aba, grafiaDaColuna_(canal.aba, regra.coluna));
+  });
+
+  var semStatus = [];
+  status.forEach(function (valor, i) { if (!normalizarParaComparar_(valor)) semStatus.push(i + 2); });
+  var iId = posicaoDaColuna_(estrutura, 'Id');
+  var ids = iId >= 0 && semStatus.length ? valoresNasLinhas_(estrutura, iId, semStatus) : {};
+
+  var lugares = {};
+  var todas = [];
+  status.forEach(function (valor, i) {
+    var linha = i + 2;
+    if (!normalizarParaComparar_(valor) && iId >= 0
+      && !String(ids[linha] === undefined || ids[linha] === null ? '' : ids[linha]).trim()) return;
+    lugares[linha] = lugarNaSubAba_(sub, valor, function (coluna) {
+      return condicoes[coluna] ? condicoes[coluna][i] : '';
+    });
+    todas.push(linha);
+  });
+  var aba1 = [];
+  var aba2 = [];
+  linhasNoMeuAlcance_(canal.aba, todas, quem).forEach(function (linha) {
+    if (lugares[linha] >= 0) aba1.push({ linha: linha, lugar: lugares[linha] });
+    else aba2.push(linha);
+  });
+
+  var lidas = {};
+  lidas[normalizarParaComparar_(canal.colunaDoStatus)] = status;
+  Object.keys(condicoes).forEach(function (coluna) { lidas[normalizarParaComparar_(coluna)] = condicoes[coluna]; });
+  return { aba1: aba1, aba2: aba2, lidas: lidas };
+}
+
+var RECC_CELULAS_QUE_VALEM_UMA_IDA = 25000;
+
+var RECC_LEITURA_DA_SUB_ABA = '';
+
+function planoDeLeitura_(estrutura, linhas) {
+  var tolerado = Math.max(1, Math.floor(RECC_CELULAS_QUE_VALEM_UMA_IDA
+    / Math.max(1, estrutura.cabecalhos.length)));
+  var ordenadas = linhas.slice().sort(function (uma, outra) { return uma - outra; });
+  var paraLer = [];
+  ordenadas.forEach(function (linha, k) {
+    var buraco = k > 0 ? linha - ordenadas[k - 1] : 0;
+    if (buraco > 1 && buraco <= tolerado) {
+      for (var meio = ordenadas[k - 1] + 1; meio < linha; meio++) paraLer.push(meio);
+    }
+    paraLer.push(linha);
+  });
+  return paraLer;
+}
+
+function lerLinhasEmPoucasIdas_(canal, linhas) {
+  if (!linhas.length) return [];
+  var estrutura = estruturaDaAba_(canal.aba);
+  var pedidas = {};
+  linhas.forEach(function (linha) { pedidas[linha] = true; });
+  return semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, planoDeLeitura_(estrutura, linhas))
+    .filter(function (registro) { return pedidas[registro.__linha]; }));
+}
+
+function custoDeLerAsLinhas_(estrutura, linhas) {
+  var blocos = blocosDeLinhas_(planoDeLeitura_(estrutura, linhas));
+  var celulas = 0;
+  blocos.forEach(function (bloco) { celulas += (bloco.fim - bloco.inicio + 1) * estrutura.cabecalhos.length; });
+  return celulas + blocos.length * RECC_CELULAS_QUE_VALEM_UMA_IDA;
+}
+
+function colunasDaLeituraLeve_(canal, sub, estrutura, disponiveis) {
+  var nomes = [];
+  function querer(nome) {
+    if (!nome || posicaoDaColuna_(estrutura, nome) < 0) return;
+    if (nomes.some(function (outro) { return normalizarParaComparar_(outro) === normalizarParaComparar_(nome); })) return;
+    nomes.push(nome);
+  }
+  querer(canal.colunaDoStatus);
+  sub.regras.forEach(function (regra) { querer(regra.coluna); });
+  querer(canal.colunaDaData);
+  querer(canal.colunaDaHora);
+  (disponiveis || []).forEach(function (filtro) { querer(filtro.cabecalho); });
+
+  cartoesDoCanal_(canal, 'trabalho').forEach(function (cartao) {
+    if (cartao.dimensao === 'valor') querer(cartao.coluna);
+    if (cartao.dimensao === 'preenchido') querer(cartao.filtro);
+    if (cartao.dimensao === 'naCelula') {
+      querer(canal.colunaDaFinalizacao);
+      querer(canal.colunaDaAreaResponsavel);
+    }
+  });
+  querer('_Visivel');
+  return nomes;
+}
+
+function registrosLeves_(canal, estrutura, nomes, linhas, jaLidas) {
+  var colunas = nomes.map(function (nome) {
+    var daPlanilha = estrutura.cabecalhos[posicaoDaColuna_(estrutura, nome)];
+    var lida = (jaLidas || {})[normalizarParaComparar_(nome)];
+    return { pedida: nome, daPlanilha: daPlanilha, valores: lida || lerColunaInteira_(canal.aba, daPlanilha) };
+  });
+  var visivel = colunas.filter(function (coluna) { return normalizarParaComparar_(coluna.pedida) === 'visivel'; })[0];
+  return linhas.filter(function (linha) {
+    return !visivel || normalizarParaComparar_(visivel.valores[linha - 2]) !== 'nao';
+  }).map(function (linha) {
+    var registro = { __linha: linha, __leve: true };
+    colunas.forEach(function (coluna) {
+      registro[coluna.daPlanilha] = coluna.valores[linha - 2];
+      registro[coluna.pedida] = coluna.valores[linha - 2];
+    });
+    return registro;
+  });
+}
+
+function completarRegistros_(canal, registros, quem) {
+  var leves = registros.filter(function (registro) { return registro.__leve; });
+  if (!leves.length) return registros;
+  var inteiros = {};
+  filtrarPeloAlcance_(semExcluidasNemVazias_(estruturaDaAba_(canal.aba),
+    lerLinhasEspecificas_(canal.aba, leves.map(function (registro) { return registro.__linha; }))),
+  canal.aba, quem).forEach(function (registro) { inteiros[registro.__linha] = registro; });
+  return registros.map(function (registro) {
+    return registro.__leve ? inteiros[registro.__linha] : registro;
+  }).filter(function (registro) { return !!registro; });
+}
+
+function registrosDaSubAba_(canal, sub, qualAba, quem, disponiveis) {
+  var linhas = linhasDasSubAbas_(canal, sub, quem);
+  var teto = linhasQueOPainelOlha_();
+  var contagem = [linhas.aba1.length, linhas.aba2.length];
+  var todasDaAba = qualAba === 2 ? linhas.aba2 : linhas.aba1.map(function (um) { return um.linha; });
+  var daAba = todasDaAba.slice(-teto);
+  var truncada = todasDaAba.length > teto;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  var nomes = colunasDaLeituraLeve_(canal, sub, estrutura, disponiveis);
+  var aLer = nomes.filter(function (nome) { return !linhas.lidas[normalizarParaComparar_(nome)]; }).length;
+  var custoLeve = aLer * (quantidadeDeRegistros_(estrutura) + RECC_CELULAS_QUE_VALEM_UMA_IDA)
+    + custoDeLerAsLinhas_(estrutura, daAba.slice(-RECC_FILA_NA_ABERTURA));
+  var leve = RECC_LEITURA_DA_SUB_ABA ? RECC_LEITURA_DA_SUB_ABA === 'leve'
+    : daAba.length > RECC_FILA_NA_ABERTURA && custoLeve < custoDeLerAsLinhas_(estrutura, daAba);
+
+  var registros = leve ? registrosLeves_(canal, estrutura, nomes, daAba, linhas.lidas)
+    : filtrarPeloAlcance_(lerLinhasEmPoucasIdas_(canal, daAba), canal.aba, quem);
+
+  if (!truncada) contagem[qualAba - 1] = registros.length;
+  return { registros: registros, contagem: contagem, truncada: truncada };
+}
+
+function separarNasSubAbas_(registros, canal, sub) {
+  var partes = [[], []];
+  registros.forEach(function (registro) {
+    partes[lugarDoRegistro_(registro, canal, sub) >= 0 ? 0 : 1].push(registro);
+  });
+  return partes;
+}
+
+function momentoDoCaso_(registro, canal) {
+  if (!canal.colunaDaData) return null;
+  var momento = juntarDataEHora_(registro[canal.colunaDaData],
+    canal.colunaDaHora ? registro[canal.colunaDaHora] : '');
+  return momento ? momento.getTime() : null;
+}
+
+function ordenarNaSubAba_(registros, canal, sub, qualAba) {
+  var antigosPrimeiro = sub.ordem[qualAba === 2 ? 1 : 0] === 'antigos';
+  var comChave = registros.map(function (registro) {
+    return {
+      registro: registro,
+      lugar: qualAba === 2 ? 0 : Math.max(0, lugarDoRegistro_(registro, canal, sub)),
+      momento: momentoDoCaso_(registro, canal)
+    };
+  });
+  comChave.sort(function (um, outro) {
+    if (um.lugar !== outro.lugar) return um.lugar - outro.lugar;
+    if (um.momento === null || outro.momento === null) {
+      if (um.momento !== outro.momento) return um.momento === null ? 1 : -1;
+    } else if (um.momento !== outro.momento) {
+      return antigosPrimeiro ? um.momento - outro.momento : outro.momento - um.momento;
+    }
+    return antigosPrimeiro ? um.registro.__linha - outro.registro.__linha
+      : outro.registro.__linha - um.registro.__linha;
+  });
+  return comChave.map(function (item) { return item.registro; });
+}
+
+function cartoesDaSubAba_(registros, canal, sub, qualAba) {
+  var tons = {};
+  var nomes = {};
+  var ordemDoCatalogo = [];
+  situacoesDoCanal_(canal).forEach(function (situacao) {
+    tons[situacao.chave] = situacao.tom;
+    nomes[situacao.chave] = situacao.nome;
+    ordemDoCatalogo.push(situacao.chave);
+  });
+  function cartao(id, rotulo, valor, tom, dimensao) {
+    var feito = montarCartao_(id, rotulo, valor, 0, tom || 'neutro', '');
+    feito.id = id;
+    feito.dimensao = dimensao || 'situacao';
+    feito.filtravel = true;
+    return feito;
+  }
+  var lista = [cartao('aba:total', 'Total ' + (qualAba === 2 ? 'concluídos'
+    : sub.abas[0].replace(/^casos\s+/i, '')), registros.length, 'destaque', 'total')];
+  if (qualAba === 2) {
+    var porChave = {};
+    registros.forEach(function (registro) {
+      var chave = normalizarParaComparar_(registro[canal.colunaDoStatus]);
+      porChave[chave] = (porChave[chave] || 0) + 1;
+
+      if (!nomes[chave]) nomes[chave] = String(registro[canal.colunaDoStatus] || '').trim() || 'Sem status';
+    });
+    ordemDoCatalogo.concat(Object.keys(porChave).filter(function (chave) {
+      return ordemDoCatalogo.indexOf(chave) < 0;
+    })).forEach(function (chave) {
+      if (!porChave[chave]) return;
+      lista.push(cartao('aba:s:' + chave, nomes[chave] || chave, porChave[chave], tons[chave]));
+    });
+    return lista;
+  }
+  var porLugar = {};
+  registros.forEach(function (registro) {
+    var lugar = lugarDoRegistro_(registro, canal, sub);
+    porLugar[lugar] = (porLugar[lugar] || 0) + 1;
+  });
+  sub.regras.forEach(function (regra, i) {
+    lista.push(cartao('aba:r' + i, regra.rotulo === regra.status ? (nomes[regra.chave] || regra.status)
+      : regra.rotulo, porLugar[i] || 0, tons[regra.chave]));
+  });
+  if (porLugar[sub.regras.length]) {
+    lista.push(cartao('aba:sem', 'Sem status', porLugar[sub.regras.length], 'neutro'));
+  }
+  return lista;
+}
+
+function outrosCartoesDaSubAba_(registros, canal) {
+  return contarCartoes_(registros, [], canal).filter(function (cartao) {
+    return cartao.dimensao !== 'situacao' && cartao.dimensao !== 'total' && cartao.valor > 0;
+  });
+}
+
+function filtrarPeloCartaoDaSubAba_(registros, canal, sub, idDoCartao) {
+  var id = String(idDoCartao || '');
+  if (!id || id === 'aba:total') return registros;
+  if (id.indexOf('aba:') !== 0) return filtrarPeloCartao_(registros, canal, id);
+  if (id.indexOf('aba:s:') === 0) {
+    var chave = id.substring(6);
+    return registros.filter(function (registro) {
+      return normalizarParaComparar_(registro[canal.colunaDoStatus]) === chave;
+    });
+  }
+  var lugar = id === 'aba:sem' ? sub.regras.length : Number(id.substring(5));
+  if (!(lugar >= 0)) return registros;
+  return registros.filter(function (registro) { return lugarDoRegistro_(registro, canal, sub) === lugar; });
+}
+
+function filtrosDaSubAba_(disponiveis, canal, sub, qualAba) {
+  var daAba = {};
+  sub.regras.forEach(function (regra) { daAba[regra.chave] = true; });
+  var colunaDoStatus = normalizarParaComparar_(canal.colunaDoStatus);
+  return disponiveis.map(function (filtro) {
+    if (normalizarParaComparar_(filtro.cabecalho) !== colunaDoStatus) return filtro;
+    var opcoes = filtro.opcoes.filter(function (opcao) {
+      var dela = !!daAba[normalizarParaComparar_(opcao.valor)];
+
+      var nasDuas = sub.regras.some(function (regra) {
+        return regra.coluna && regra.chave === normalizarParaComparar_(opcao.valor);
+      });
+      return qualAba === 2 ? (!dela || nasDuas) : dela;
+    });
+    return opcoes.length > 1 ? Object.assign({}, filtro, { opcoes: opcoes }) : null;
+  }).filter(function (filtro) { return filtro !== null; });
 }
 
 function dimensaoDoCartao_(valor) {
@@ -13591,6 +14051,10 @@ function instalarRECC() {
   esquecerEstruturaLida_();
 
   var semente = semearDadosIniciais_(email);
+
+  montarAsSubAbasDoTrabalho_([], []);
+
+  esquecerCacheDaConfiguracao_();
   var orcamento = orcamentoDeCelulas_(planilha);
 
   var laudo = [
@@ -14422,7 +14886,10 @@ function atualizarPGO() {
    ['CANAIS', 'InicioDoExpediente', 'texto'],
    ['CANAIS', 'FimDoExpediente', 'texto'],
    ['CANAIS', 'ColunaDaPrimeiraResposta', 'texto'],
-   ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto']].forEach(function (trio) {
+   ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto'],
+
+   ['CANAIS', 'SubAbasDoTrabalho', 'textoLongo'],
+   ['CANAIS', 'FiltrosDoTrabalho', 'texto']].forEach(function (trio) {
     var aba = planilhaAtiva_().getSheetByName(trio[0]);
     if (!aba) { pulados.push('aba ' + trio[0] + ' não existe'); return; }
     if (posicaoDaColuna_(estruturaDaAba_(trio[0]), trio[1]) >= 0) {
@@ -14528,6 +14995,8 @@ function atualizarPGO() {
   });
 
   feito = feito.concat(montarOsCardsDaRet_(pulados, paraVoce));
+
+  feito = feito.concat(montarAsSubAbasDoTrabalho_(pulados, paraVoce));
 
   feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
 
@@ -17400,6 +17869,105 @@ function laudoEmTexto_(laudo) {
   });
 
   return linhas.join('\n');
+}
+
+const RECC_CHAVE_DAS_SUB_ABAS = 'MIGRACAO.SUB_ABAS_DO_TRABALHO';
+
+function montarAsSubAbasDoTrabalho_(pulados, paraVoce) {
+  var feito = [];
+  if (!planilhaAtiva_().getSheetByName('CANAIS')
+    || posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'SubAbasDoTrabalho') < 0) {
+    pulados.push('as sub-abas do Trabalho: a coluna CANAIS.SubAbasDoTrabalho ainda não existe');
+    return feito;
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DAS_SUB_ABAS, '') || '').trim()) {
+    pulados.push('as sub-abas do Trabalho já foram montadas (agora quem manda é Configurações)');
+    return feito;
+  }
+  var canais = canaisVisiveis_();
+  function montar(aba, abas, pedidos) {
+    var canal = canais.filter(function (um) { return um.aba === aba; })[0];
+    if (!canal) { pulados.push('as sub-abas: o canal ' + aba + ' não está ligado'); return; }
+    if (String(canal.subAbasDoTrabalho || '').trim()) {
+      pulados.push(canal.nome + ': já tem sub-abas');
+      return;
+    }
+    var situacoes = situacoesDoCanal_(canal);
+    var faltando = [];
+    var status = [];
+    pedidos.forEach(function (pedido) {
+      var achado = situacoes.filter(function (um) {
+        return normalizarParaComparar_(um.gravadoComo) === normalizarParaComparar_(pedido.status)
+          || normalizarParaComparar_(um.nome) === normalizarParaComparar_(pedido.status);
+      })[0];
+      if (!achado) { faltando.push('"' + pedido.status + '"'); return; }
+      var regra = { status: achado.gravadoComo };
+      if (pedido.rotulo) regra.rotulo = pedido.rotulo;
+      if (pedido.condicao) {
+        var coluna = grafiaDaColuna_(canal.aba, pedido.condicao.coluna);
+        if (posicaoDaColuna_(estruturaDaAba_(canal.aba), coluna) < 0) {
+          faltando.push('"' + pedido.status + '" (a base não tem a coluna "' + pedido.condicao.coluna + '")');
+          return;
+        }
+        regra.coluna = coluna;
+        regra.saiCom = pedido.condicao.saiCom;
+      }
+      status.push(regra);
+    });
+    if (!status.length) {
+      paraVoce.push(canal.nome + ': as sub-abas do Trabalho NÃO foram montadas — nenhum destes '
+        + 'status existe: ' + faltando.join(', ') + '. Monte em Configurações › Canais de trabalho.');
+      return;
+    }
+    atualizarRegistro_('CANAIS', canal.id, { SubAbasDoTrabalho: JSON.stringify({
+      abas: abas, status: status, ordem: ['antigos', 'recentes'] }) });
+    feito.push(canal.nome + ': sub-abas "' + abas[0] + '" (' + status.map(function (regra) {
+      return regra.rotulo || regra.status;
+    }).join(', ') + ') e "' + abas[1] + '"');
+    if (faltando.length) {
+      paraVoce.push(canal.nome + ': ficaram de fora da aba "' + abas[0] + '" os status que a '
+        + 'planilha não tem: ' + faltando.join(', ') + '. Crie em Configurações › Ajustes Gerais '
+        + 'e acrescente em Configurações › Canais de trabalho.');
+    }
+  }
+
+  montar('BASE_RET', ['Casos em aberto', 'Casos concluídos'], [
+    { status: 'Retido', rotulo: 'Aguardando transmissão',
+      condicao: { coluna: 'Status proposta', saiCom: ['Transmitido', 'Sem alteração'] } },
+    { status: 'Pendente' }, { status: 'Contatando' }, { status: 'Não trabalhado' },
+    { status: 'Acompanhamento' }]);
+  montar('BASE_MESA', ['Casos em andamento', 'Casos concluídos'], [{ status: 'Em andamento' }]);
+  feito = feito.concat(montarOsFiltrosDaRet_(canais, paraVoce));
+
+  gravarConfiguracao_(RECC_CHAVE_DAS_SUB_ABAS, 'Etapa 84 — '
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
+  esquecerEstruturaLida_('CANAIS');
+  return feito;
+}
+
+function montarOsFiltrosDaRet_(canais, paraVoce) {
+  var ret = canais.filter(function (um) { return um.aba === 'BASE_RET'; })[0];
+  if (!ret || String(ret.filtrosDoTrabalho || '').trim()) return [];
+  var ativos = camposAtivosDoCanal_(ret.id);
+  var faltando = [];
+  var chaves = ['Status', 'Tentativas de contato', 'Status proposta', 'Analista',
+    'Canal de origem', 'Cód. do produto e produto'].map(function (nome) {
+    var procurado = normalizarParaComparar_(nome);
+    var campo = ativos.filter(function (um) {
+      return normalizarParaComparar_(um.Rotulo) === procurado
+        || normalizarParaComparar_(um.Cabecalho) === procurado;
+    })[0];
+    if (!campo) faltando.push('"' + nome + '"');
+    return campo ? String(campo.ChaveTecnica) : '';
+  }).filter(function (chave) { return chave; });
+  if (!chaves.length) return [];
+  atualizarRegistro_('CANAIS', ret.id, { FiltrosDoTrabalho: chaves.join(', ') });
+  if (faltando.length) {
+    paraVoce.push('RET: os filtros do Trabalho ficaram sem ' + faltando.join(', ')
+      + ' — o campo não existe ou está desligado. Ajuste em Configurações › Canais de trabalho.');
+  }
+  return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
+    + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
 }
 
 const RECC_CHAVE_DOS_CARDS_DA_RET = 'MIGRACAO.CARDS_DA_RET';
