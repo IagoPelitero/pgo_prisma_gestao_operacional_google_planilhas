@@ -212,8 +212,15 @@ async function rodar() {
         corrida[nome] = function () {
           var argumentos = Array.prototype.slice.call(arguments);
           window.__servidorDoPGO(nome, argumentos).then(function (r) {
-            if (r && r.erro) { if (ruim) ruim(new Error(r.erro)); }
-            else if (ok) ok(r ? r.valor : null);
+            // Atraso sob encomenda (Etapa 86): window.__atrasos = { nome: [ms, ...] }
+            // faz a resposta da vez chegar depois — é como se prova que a
+            // resposta velha não pinta por cima da nova.
+            var fila = window.__atrasos && window.__atrasos[nome];
+            var espera = fila && fila.length ? fila.shift() : 0;
+            setTimeout(function () {
+              if (r && r.erro) { if (ruim) ruim(new Error(r.erro)); }
+              else if (ok) ok(r ? r.valor : null);
+            }, espera);
           });
         };
       });
@@ -385,6 +392,45 @@ async function rodar() {
 
   console.log('\nO cadastro de casos');
 
+  await teste('a SUSEP é consultada uma vez só, e só a resposta da atual vale (Etapa 86, F11)', async () => {
+    const cadastrada = vm.runInContext(`(function () {
+      var uma = lerRegistros_('CORRETORAS')[0];
+      if (uma) return { susep: String(uma.SUSEP), criada: '' };
+      var nova = inserirRegistro_('CORRETORAS', { SUSEP: 'TST01A', Corretora: 'Corretora do teste',
+        Sucursal: '1', Segmento: 'Diamante', Consultor: 'Alguém' });
+      return { susep: 'TST01A', criada: String(nova.__id) };
+    })()`, contexto);
+    await pagina.click('[data-tela="cadastrarCaso"]');
+    await pagina.waitForSelector('#campo-susep', { timeout: 10000 });
+
+    // Digitar e sair do campo: o change e o blur juntos eram 2 consultas.
+    const antes = chamadasDoNavegador.consultarSusep || 0;
+    await pagina.fill('#campo-susep', 'ZZ9999');
+    await pagina.press('#campo-susep', 'Tab');
+    await pagina.waitForFunction(() => !/Conferindo/.test(document.getElementById('selo-susep').textContent), null, { timeout: 10000 });
+    igual((chamadasDoNavegador.consultarSusep || 0) - antes, 1, 'uma consulta por SUSEP digitada');
+    await pagina.focus('#campo-susep');
+    await pagina.press('#campo-susep', 'Tab');
+    await pagina.waitForTimeout(300);
+    igual((chamadasDoNavegador.consultarSusep || 0) - antes, 1, 'sair de novo do campo, sem mudar, não consulta de novo');
+
+    // A primeira (a cadastrada) volta DEPOIS da segunda: o selo é da segunda.
+    await pagina.evaluate(() => { window.__atrasos = { consultarSusep: [1500, 0] }; });
+    await pagina.fill('#campo-susep', cadastrada.susep);
+    await pagina.press('#campo-susep', 'Tab');
+    await pagina.fill('#campo-susep', 'ZZ8888');
+    await pagina.press('#campo-susep', 'Tab');
+    await pagina.waitForTimeout(2200);
+    const selo = await pagina.textContent('#selo-susep');
+    contem(selo, 'não encontrada', 'o selo é da SUSEP que está no campo: ' + selo);
+    verdadeiro(selo.indexOf('liberada') < 0, 'a resposta velha (liberada) não pintou por cima');
+    await pagina.evaluate(() => { window.__atrasos = {}; });
+
+    await pagina.click('#limpar-caso');
+    await pagina.waitForTimeout(900);
+    if (cadastrada.criada) vm.runInContext("apagarRegistroDeVez_('CORRETORAS', '" + cadastrada.criada + "')", contexto);
+  });
+
   await teste('cadastrar um caso grava na base', async () => {
     const antes = naPlanilha('BASE_RET').length;
 
@@ -430,11 +476,71 @@ async function rodar() {
 
     igual(naPlanilha('BASE_RET').length, antes + 1, 'linha nova na BASE_RET');
 
-    // E a tela foi para o Trabalho — pedido do PO: "após gravar vá para a
-    // tela trabalho". O recado de sucesso não é mais conferido aqui porque
-    // ele não chega a existir: a tela inteira é trocada na mesma hora.
-    const endereco = await pagina.evaluate(() => location.hash);
-    igual(endereco, '#trabalho', 'gravou e levou para o Trabalho');
+    // Etapa 86 (F7 + F12): gravou, e a pessoa escolhe o próximo passo — nada
+    // abre sozinho, e a tela fica no Cadastrar.
+    await pagina.waitForSelector('#cadastro-concluido', { timeout: 10000 });
+    const novo = String(naPlanilha('BASE_RET').slice(-1)[0].__id);
+    contem(await pagina.textContent('#cadastro-concluido'), novo, 'o aviso diz qual caso foi cadastrado');
+    igual(await pagina.locator('#modal-do-caso').count(), 0, 'o caso não abre sozinho');
+    verdadeiro(await pagina.locator('#ir-para-o-trabalho').count() === 1, 'a volta ao Trabalho continua');
+    verdadeiro(await pagina.evaluate(() => document.getElementById('acoes-do-caso').hidden),
+      'sem formulário, sem "Cadastrar caso": o Ctrl+Enter não grava de novo');
+
+    // 1. Trabalhar no caso: abre o recém-cadastrado.
+    await pagina.click('#trabalhar-no-cadastrado');
+    await pagina.waitForFunction(() => {
+      const salvar = document.getElementById('modal-salvar');
+      return salvar && !salvar.disabled;
+    }, { timeout: 10000 });
+    contem(await pagina.textContent('#titulo-do-caso'), novo, 'abriu o caso recém-cadastrado');
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForTimeout(300);
+    igual(await pagina.locator('#cadastro-concluido').count(), 1, 'fechou e o aviso continua lá');
+
+    // 2. Cadastrar outro: o formulário limpo, no mesmo canal.
+    const canalAntes = await pagina.$eval('[data-canal][aria-pressed="true"], [data-canal].atual, [data-canal][aria-checked="true"]',
+      (e) => e.getAttribute('data-canal')).catch(() => '');
+    await pagina.click('#cadastrar-outro');
+    await pagina.waitForFunction(() => {
+      const acoes = document.getElementById('acoes-do-caso');
+      return acoes && !acoes.hidden;
+    }, { timeout: 10000 });
+    const preenchidos = await pagina.$$eval('#formulario-do-caso textarea[id^="campo-"], #formulario-do-caso input[type="text"][id^="campo-"]',
+      (es) => es.filter((e) => e.value && !e.disabled).map((e) => e.id + '=' + e.value));
+    igual(preenchidos.length, 0, 'formulário limpo: ' + preenchidos.join(', '));
+    const canalDepois = await pagina.$eval('[data-canal][aria-pressed="true"], [data-canal].atual, [data-canal][aria-checked="true"]',
+      (e) => e.getAttribute('data-canal')).catch(() => '');
+    igual(canalDepois, canalAntes, 'o mesmo canal');
+    igual(naPlanilha('BASE_RET').length, antes + 1, '"Cadastrar outro" não grava nada sozinho');
+
+    // E a volta normal ao Trabalho, pelo menu.
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(900);
+  });
+
+  await teste('no Trabalho, a resposta de um pedido antigo não pinta por cima do novo (Etapa 86, F6)', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    const rotulos = await pagina.$$eval('.cartoes .indicador.clicavel .rotulo', (es) => es.map((e) => e.textContent));
+    verdadeiro(rotulos.length >= 2, 'há cartões para clicar: ' + rotulos.join(', '));
+    // O clique no cartão demora a voltar; a troca de sub-aba, feita enquanto
+    // ele carrega (as abas ficam na tela), volta na hora.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [1500, 0] }; });
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: rotulos[1] }).first().click();
+    await pagina.waitForTimeout(150);
+    await pagina.click('[data-sub-aba="2"]');
+    await pagina.waitForTimeout(2400);
+    await pagina.evaluate(() => { window.__atrasos = {}; });
+    const cartoes = await pagina.$$eval('.cartoes .indicador .rotulo', (es) => es.map((e) => e.textContent));
+    verdadeiro(cartoes.some((r) => /concluídos/i.test(r)), 'ficou o painel da aba 2, o pedido mais novo: ' + cartoes.join(', '));
+    igual(await pagina.locator('.cartoes .indicador.ligado').count(), 0, 'nenhum cartão do pedido velho voltou marcado');
+    igual(await pagina.getAttribute('[data-sub-aba="2"]', 'aria-selected'), 'true', 'e a aba marcada é a 2');
+    // Volta ao estado de antes.
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForTimeout(900);
   });
 
   /* --------------------------------------------------- os sinalizadores -- */

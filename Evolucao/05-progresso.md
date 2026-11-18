@@ -3,7 +3,7 @@
 O estado de cada etapa, o que ela entregou e o que falta. Atualizado a cada
 entrega.
 
-**Estado geral:** versão 1.85 — a última etapa entregue é a 85. A regra do número está
+**Estado geral:** versão 1.86 — a última etapa entregue é a 86. A regra do número está
 na Etapa 68.
 
 ---
@@ -4258,6 +4258,35 @@ base não é lida); o do cronômetro conta as três funções novas. O simulador
 `getConditionalFormatRules`. 7 quebras de propósito, todas pegas — duas só na segunda rodada: a da
 ordem (a aba lenta do teste já era a primeira; agora é a última) e a da grade (o `sed` da quebra
 não tinha casado).
+
+---
+
+## Etapa 86 — Medição (M2, M3) e a primeira entrega (F11, F6, F7 + F12)
+
+Pedido do PO: "Vamos iniciar a implementação das melhorias, seguindo um processo controlado (…)
+ETAPA 0 — MEDIÇÃO (…) ETAPA 1 — PRIMEIRA ENTREGA". Nada além disso nesta etapa.
+
+| O que | Como ficou |
+|---|---|
+| **M2 · cronômetro** | `consultarSusep`, `conferirPropostaRepetida` e `listarCamposDoCanal` passam pelo cronômetro: passando de 8 s, a aba ERROS diz quanto foi trava, leitura, procura e resto. Antes só a tela registrava quanto esperou |
+| **M3 · contadores** | O simulador conta `getSheetByName`, `getLastRow` e `getLastColumn` (à parte das idas, para as contas antigas continuarem comparáveis) e soma tudo em `chamadasNoTotal`. `medir-telas.js` mede 21 funções numa planilha do tamanho da do PO; a linha de base de antes das mudanças está em `Evolucao/medicoes/linha-de-base-1.85.json` |
+| **M1** | "Medir a velocidade" (Etapa 85), na planilha de verdade — a rodar pelo PO |
+| **F11 · SUSEP** | O campo consultava no `change` e no `blur`: digitar e sair eram 2 consultas (8 a 11 s cada na aba ERROS). Agora a mesma SUSEP não vai de novo, e a resposta que chega depois de a SUSEP ter sido trocada é descartada (no sucesso e na falha). Falhou ou esvaziou: pode consultar de novo. As regras (cadastrada antes de bloqueada, bloqueio por canal, Diamante) são do servidor e não mudaram |
+| **F6 · Trabalho** | Cada carga do painel ganha um número (`pedidoDoPainel`); a resposta de número velho é descartada. Vale para a fila e para a Agenda da Mesa, que dividem o painel. O que o servidor responde não mudou |
+| **F7 + F12 · cadastro concluído** | Gravou: no lugar do formulário, "Caso N cadastrado" com **Trabalhar no caso** (só com a permissão de editar; o servidor confere de novo ao abrir), **Cadastrar outro caso** (formulário limpo, mesmo canal) e **Ir para o Trabalho** (só para quem vê o Trabalho). Nada abre sozinho. Substitui o "após gravar vá para a tela trabalho", pedido anterior do PO |
+| **Versão** | 1.86 |
+
+**Medida.** No servidor, as 21 funções medidas ficaram **idênticas** à linha de base (o que
+mudou é da tela). No navegador, contado pelo ponta a ponta: a consulta da SUSEP ao digitar e sair
+do campo passou de **2 para 1** chamada; sair do campo de novo, sem mudar, de 1 para 0.
+
+Testes: 7 novos em `testes-medicao-e-primeira-entrega.js` e 2 ponta a ponta novos (F11 e F6) —
+a ponte do ponta a ponta ganhou atraso sob encomenda (`window.__atrasos`), que faz uma resposta
+chegar depois da outra; o ponta a ponta do cadastro passou a percorrer o cadastro concluído
+(Trabalhar no caso, fechar, Cadastrar outro, a volta pelo menu). Quebras de propósito: o código
+de antes do F11 (2 consultas: pego), só a guarda da resposta velha do F11 (pego), o código de
+antes do F6 (a resposta velha pintava a aba 1 com a aba 2 marcada: pego), o botão sem a
+permissão (pego) e o contador do `getLastRow` (pego).
 
 ---
 

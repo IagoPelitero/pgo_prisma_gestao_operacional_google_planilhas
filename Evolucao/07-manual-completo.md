@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1787 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1794 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -351,7 +351,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1787 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1794 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -771,9 +771,16 @@ enquanto se rola o formulário** (Etapa 75).
 
 Ao clicar, o botão vira **três pontinhos** e nenhum botão da tela aceita
 clique até a resposta chegar — dois cliques gravariam dois casos. **Gravou, a
-tela vai para o Trabalho**, que é onde o caso passa a ser trabalhado.
+tela mostra o próximo passo** (Etapa 86), no lugar do formulário: "Caso N
+cadastrado", com **Trabalhar no caso** (abre o caso recém-cadastrado — só para
+quem pode editar), **Cadastrar outro caso** (o formulário limpo, no mesmo canal)
+e **Ir para o Trabalho** (para quem vê o Trabalho). Nada abre sozinho. Até a 1.85,
+gravar levava direto ao Trabalho, onde o caso novo nem sempre aparecia: na aba 1
+ele entra no fim da ordem.
 
-O selo da SUSEP responde três coisas, e as três são informação: **liberada**
+O selo da SUSEP é **consultado uma vez por SUSEP digitada** (Etapa 86): sair do
+campo de novo, sem mudar, não consulta outra vez, e a resposta que chega depois de
+a SUSEP ter sido trocada é descartada. Ele responde três coisas, e as três são informação: **liberada**
 com o segmento, **bloqueada** com o motivo, ou **não encontrada** — que não é
 erro, é uma corretora que o cadastro ainda não conhece.
 
@@ -1775,6 +1782,15 @@ ARRAYFORMULA, QUERY, PROCV, INDIRETO…) e 10 regras de formatação ou mais. Em
 PO é pequena (umas 376 mil células), mas a aba ERROS mostrou 3 idas levando 10 s.
 A régua do `estresse.js` não vê fórmula, formatação nem grade — este raio-x vê.
 
+**Antes e depois, no simulador** (Etapa 86, medição M3): `node
+Evolucao/Testes/medir-telas.js --comparar Evolucao/medicoes/linha-de-base-1.85.json`
+mede 21 funções das telas prioritárias numa planilha do tamanho da do PO e mostra,
+para cada uma, as chamadas (idas, buscas do localizador e as de estrutura —
+getSheetByName, getLastRow, getLastColumn, que antes não se contavam), as células
+e a diferença para a linha de base. A M2 pôs no cronômetro `consultarSusep`,
+`conferirPropostaRepetida` e `listarCamposDoCanal`: passando de 8 s, a aba ERROS
+diz onde foi o tempo.
+
 **Ajustes Gerais são as listas** que os campos seletores oferecem — assunto,
 produto, motivo, canal de origem e as que a operação criar. Cada lista aparece
 com o nome legível e **em quais campos é usada** ("Usada em: Assunto (Mesa
@@ -1888,7 +1904,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.85** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.86** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1896,7 +1912,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1787 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1794 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

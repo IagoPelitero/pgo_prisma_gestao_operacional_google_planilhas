@@ -763,6 +763,13 @@ table.fila.prazos-lista td.direita, table.fila.prazos-lista th.direita { text-al
 .mostrar-quantos[aria-pressed="true"] {
   background: var(--destaque); border-color: var(--destaque); color: var(--destaque-sobre);
 }
+
+.cadastro-concluido { display: flex; align-items: flex-start; gap: 16px; padding: 22px 8px; outline: none; }
+.cadastro-concluido-icone { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 22px; font-weight: 700; color: var(--bom); background: var(--bom-tenue); }
+.cadastro-concluido-texto h3 { margin: 0 0 4px; font-size: 18px; }
+.cadastro-concluido-texto p { margin: 0 0 14px; color: var(--suave); }
+.cadastro-concluido-acoes { display: flex; flex-wrap: wrap; gap: 10px; }
 .cartao.vazio { text-align: center; padding: 40px 24px; }
 .cartao.vazio strong { display: block; font-size: 16px; margin-bottom: 5px; }
 .cartao.vazio p { margin: 0 auto; max-width: 46ch; color: var(--suave); }
@@ -3315,10 +3322,20 @@ var Formulario = (function () {
     var selo = raiz.querySelector('#' + (prefixo || '') + 'selo-susep');
     if (!selo) return;
 
-    if (!String(valor || '').trim()) {
+    var texto = String(valor || '').trim();
+    var pedido = (Number(selo.getAttribute('data-pedido')) || 0) + 1;
+    if (!texto) {
+      selo.setAttribute('data-pedido', String(pedido));
+      selo.removeAttribute('data-consultada');
       selo.hidden = true;
       return;
     }
+    if (selo.getAttribute('data-consultada') === texto) return;
+    selo.setAttribute('data-pedido', String(pedido));
+    selo.setAttribute('data-consultada', texto);
+    var aindaEAMesma = function () {
+      return selo.getAttribute('data-pedido') === String(pedido);
+    };
 
     selo.hidden = false;
     selo.className = 'selo-susep conferindo';
@@ -3326,6 +3343,7 @@ var Formulario = (function () {
 
     Servidor.chamar('consultarSusep', valor, idDoCanal)
       .entao(function (resposta) {
+        if (!aindaEAMesma()) return;
         var aparencia = {
           OK: 'liberada', BLOQUEADA: 'bloqueada',
           NAO_ENCONTRADA: 'desconhecida', VAZIA: 'conferindo'
@@ -3341,6 +3359,9 @@ var Formulario = (function () {
         preencherCorretoraDaSusep(raiz, resposta);
       })
       .senao(function () {
+        if (!aindaEAMesma()) return;
+
+        selo.removeAttribute('data-consultada');
         selo.className = 'selo-susep conferindo';
         selo.textContent = 'Não consegui conferir a SUSEP agora.';
       });
@@ -4576,10 +4597,14 @@ var TelaTrabalho = (function () {
     });
   }
 
+  var pedidoDoPainel = 0;
+
   function carregarAgenda() {
+    var meuPedido = ++pedidoDoPainel;
     elemento('painel').innerHTML = '<p class="carregando-campos">Lendo a Agenda…</p>';
     Servidor.chamar('agendaDaMesa', canalEscolhido, buscaNaAgenda)
       .entao(function (resposta) {
+        if (meuPedido !== pedidoDoPainel) return;
         elemento('painel').innerHTML = Agenda.lista(resposta, buscaNaAgenda);
         var busca = elemento('busca-na-agenda');
         busca.addEventListener('keydown', function (evento) {
@@ -4600,6 +4625,7 @@ var TelaTrabalho = (function () {
         });
       })
       .senao(function (erro) {
+        if (meuPedido !== pedidoDoPainel) return;
         elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
@@ -4977,6 +5003,7 @@ var TelaTrabalho = (function () {
   }
 
   function carregar(recado) {
+    var meuPedido = ++pedidoDoPainel;
     var painel = elemento('painel');
     if (painel) painel.innerHTML = '<p class="carregando-campos">'
       + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
@@ -4984,6 +5011,7 @@ var TelaTrabalho = (function () {
     Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, null,
       quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))
       .entao(function (resposta) {
+        if (meuPedido !== pedidoDoPainel) return;
         resumo = resposta;
         if (resposta.filaCompacta) {
           resumo.fila = expandirFila(resposta.fila, resposta.colunas);
@@ -4997,6 +5025,7 @@ var TelaTrabalho = (function () {
         }
       })
       .senao(function (erro) {
+        if (meuPedido !== pedidoDoPainel) return;
         elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
@@ -5126,6 +5155,8 @@ var TelaCadastrarCaso = (function () {
   var temAgenda = false;
   var envioDaReuniao = '';
 
+  var pacoteDaTela = null;
+
   function abasDaMesa() {
     if (!temAgenda) return '';
     return '<div class="config-abas" role="tablist" aria-label="O que cadastrar">'
@@ -5183,6 +5214,7 @@ var TelaCadastrarCaso = (function () {
   }
 
   function montar(pacote) {
+    pacoteDaTela = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
     if (!temAgenda) oQueCadastrar = 'caso';
@@ -5263,11 +5295,12 @@ var TelaCadastrarCaso = (function () {
 
     if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('cadastrarCaso', canalEscolhido, Formulario.valores(corpo()), envio)
-      .entao(function () {
+      .entao(function (resposta) {
         salvando = false;
         envio = '';
-
-        Aplicacao.irPara('trabalho');
+        Formulario.acabouDeGravar(elemento('salvar-caso'),
+          elemento('formulario-do-caso'));
+        mostrarCadastroConcluido(resposta);
       })
       .senao(function (erro) {
         salvando = false;
@@ -5276,6 +5309,45 @@ var TelaCadastrarCaso = (function () {
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
       });
+  }
+
+  function mostrarCadastroConcluido(resposta) {
+    var permissoes = (pacoteDaTela && pacoteDaTela.permissoes) || {};
+    var acoes = permissoes.acoes || [];
+    var telas = permissoes.telas || [];
+    var podeTrabalhar = acoes.indexOf('editar') >= 0;
+    var podeIrAoTrabalho = telas.indexOf('trabalho') >= 0;
+    var id = String((resposta && resposta.id) || '');
+
+    recado('', '');
+    mostrarAsAcoes(false);
+    corpo().innerHTML = '<div class="cadastro-concluido" id="cadastro-concluido" role="status" tabindex="-1">'
+      + '<span class="cadastro-concluido-icone" aria-hidden="true">✓</span>'
+      + '<div class="cadastro-concluido-texto">'
+      + '<h3>Caso <strong>' + escapar(id) + '</strong> cadastrado'
+      + (resposta && resposta.canal ? ' · ' + escapar(resposta.canal) : '') + '</h3>'
+      + '<p>O que você quer fazer agora?</p>'
+      + '<div class="cadastro-concluido-acoes">'
+      + (podeTrabalhar && id
+        ? '<button type="button" class="botao" id="trabalhar-no-cadastrado">Trabalhar no caso</button>' : '')
+      + '<button type="button" class="botao-secundario" id="cadastrar-outro">Cadastrar outro caso</button>'
+      + (podeIrAoTrabalho
+        ? '<button type="button" class="botao-secundario" id="ir-para-o-trabalho">Ir para o Trabalho</button>' : '')
+      + '</div></div></div>';
+
+    var trabalhar = elemento('trabalhar-no-cadastrado');
+    if (trabalhar) trabalhar.addEventListener('click', function () {
+      CasoEmModal.abrir(canalEscolhido, id, null);
+    });
+    elemento('cadastrar-outro').addEventListener('click', function () {
+      envio = '';
+      carregarFormulario();
+    });
+    var irAoTrabalho = elemento('ir-para-o-trabalho');
+    if (irAoTrabalho) irAoTrabalho.addEventListener('click', function () {
+      Aplicacao.irPara('trabalho');
+    });
+    (trabalhar || elemento('cadastrar-outro')).focus();
   }
 
   function ligar() {

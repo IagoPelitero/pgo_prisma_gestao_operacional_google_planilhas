@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-18 20:18
+   Gerado em 2026-11-18 22:03
    ========================================================================== */
 
 
@@ -4482,6 +4482,11 @@ function preencherResponsavelAutomatico_(canal, paraGravar, quem) {
 }
 
 function consultarSusep(susep, idDoCanal) {
+
+  return cronometrado_('consultarSusep', consultarSusepSemRelogio_, arguments);
+}
+
+function consultarSusepSemRelogio_(susep, idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
 
   var procurada = susepComoSeEscreve_(susep);
@@ -4550,6 +4555,11 @@ function deveConferirOBloqueio_(idDoCanal, quem) {
 }
 
 function conferirPropostaRepetida(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
+
+  return cronometrado_('conferirPropostaRepetida', conferirPropostaRepetidaSemRelogio_, arguments);
+}
+
+function conferirPropostaRepetidaSemRelogio_(proposta, idDoCanal, dataDoCaso, idDoCasoAberto) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -6098,6 +6108,11 @@ function resumoDasConfiguracoesSemRelogio_() {
 }
 
 function listarCamposDoCanal(idDoCanal) {
+
+  return cronometrado_('listarCamposDoCanal', listarCamposDoCanalSemRelogio_, arguments);
+}
+
+function listarCamposDoCanalSemRelogio_(idDoCanal) {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   var estrutura = estruturaDaAba_(canal.aba);
@@ -9296,7 +9311,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.85',
+  numero: '1.86',
   data: '18/11/2026'
 };
 
