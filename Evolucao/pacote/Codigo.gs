@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-18 22:52
+   Gerado em 2026-11-19 09:16
    ========================================================================== */
 
 
@@ -898,6 +898,9 @@ var lendoTiposDeclarados = false;
 
 function esquecerEstruturaLida_(nomeDaAba) {
   esquecerCacheDaConfiguracao_(nomeDaAba);
+
+  if (!nomeDaAba || nomeDaAba === 'CAMPOS' || nomeDaAba === 'CANAIS') esquecerResumoDaEstrutura_();
+  esquecerMemoriaDaCarga_(nomeDaAba);
   if (nomeDaAba) {
     delete estruturasJaLidas[nomeDaAba];
     esquecerRegistrosLidos_(nomeDaAba);
@@ -1607,6 +1610,27 @@ function lerRegistrosSemRelogio_(nomeDaAba, opcoes) {
   return guardar ? copiarRegistros_(saida) : saida;
 }
 
+var RECC_MEMORIA_DA_CARGA = null;
+
+function comMemoriaDaCarga_(fazer, argumentos) {
+  if (RECC_MEMORIA_DA_CARGA) return fazer.apply(null, argumentos);
+  RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} };
+  try {
+    return fazer.apply(null, argumentos);
+  } finally {
+    RECC_MEMORIA_DA_CARGA = null;
+  }
+}
+
+function esquecerMemoriaDaCarga_(nomeDaAba) {
+  if (!RECC_MEMORIA_DA_CARGA) return;
+  if (!nomeDaAba) { RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} }; return; }
+  delete RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba];
+  Object.keys(RECC_MEMORIA_DA_CARGA.colunas).forEach(function (chave) {
+    if (chave.indexOf(nomeDaAba + '|') === 0) delete RECC_MEMORIA_DA_CARGA.colunas[chave];
+  });
+}
+
 function lerColunaInteira_(nomeDaAba, cabecalho) {
   return lendoAPlanilha_(lerColunaInteiraSemRelogio_, arguments);
 }
@@ -1616,21 +1640,29 @@ function lerColunaInteiraSemRelogio_(nomeDaAba, cabecalho) {
   var i = exigirPosicaoDaColuna_(estrutura, cabecalho);
   var totalDados = quantidadeDeRegistros_(estrutura);
   if (totalDados <= 0) return [];
-  return estrutura.aba.getRange(2, i + 1, totalDados, 1).getValues().map(function (l) {
+  var chave = nomeDaAba + '|' + i + '|' + totalDados;
+  if (RECC_MEMORIA_DA_CARGA && RECC_MEMORIA_DA_CARGA.colunas[chave]) {
+    return RECC_MEMORIA_DA_CARGA.colunas[chave].slice();
+  }
+  var valores = estrutura.aba.getRange(2, i + 1, totalDados, 1).getValues().map(function (l) {
     return l[0];
   });
+  if (RECC_MEMORIA_DA_CARGA) RECC_MEMORIA_DA_CARGA.colunas[chave] = valores.slice();
+  return valores;
 }
 
 var RECC_BURACO_QUE_VALE_PULAR = 50;
 
-function blocosDeLinhas_(numerosDeLinha) {
+function blocosDeLinhas_(numerosDeLinha, buracoQueValePular) {
+
+  var buraco = buracoQueValePular === undefined ? RECC_BURACO_QUE_VALE_PULAR : buracoQueValePular;
   var ordenados = numerosDeLinha.slice().sort(function (um, outro) {
     return um - outro;
   });
   var blocos = [];
   for (var i = 0; i < ordenados.length; i++) {
     var ultimo = blocos.length ? blocos[blocos.length - 1] : null;
-    if (ultimo && ordenados[i] - ultimo.fim <= RECC_BURACO_QUE_VALE_PULAR) {
+    if (ultimo && ordenados[i] - ultimo.fim <= buraco) {
       ultimo.fim = ordenados[i];
     } else {
       blocos.push({ inicio: ordenados[i], fim: ordenados[i] });
@@ -1643,19 +1675,27 @@ function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
   return lendoAPlanilha_(lerLinhasEspecificasSemRelogio_, arguments);
 }
 
-function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha) {
+function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha, buracoQueValePular) {
   if (!numerosDeLinha || !numerosDeLinha.length) return [];
 
   var estrutura = estruturaDaAba_(nomeDaAba);
   var largura = estrutura.cabecalhos.length;
   var porLinha = {};
 
-  blocosDeLinhas_(numerosDeLinha).forEach(function (bloco) {
+  var memoria = RECC_MEMORIA_DA_CARGA ? (RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba]
+    || (RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba] = {})) : null;
+  var faltam = memoria ? numerosDeLinha.filter(function (n) {
+    if (memoria[n] && memoria[n].length === largura) { porLinha[n] = memoria[n].slice(); return false; }
+    return true;
+  }) : numerosDeLinha;
+
+  blocosDeLinhas_(faltam, buracoQueValePular).forEach(function (bloco) {
     var quantas = bloco.fim - bloco.inicio + 1;
     var valores = estrutura.aba
       .getRange(bloco.inicio, 1, quantas, largura).getValues();
     for (var i = 0; i < valores.length; i++) {
       porLinha[bloco.inicio + i] = valores[i];
+      if (memoria) memoria[bloco.inicio + i] = valores[i].slice();
     }
   });
 
@@ -2260,7 +2300,54 @@ function conferirEstrutura_() {
     laudo.abas.push(item);
   });
 
+  guardarResumoDaEstrutura_(resumoDoLaudo_(laudo));
   return laudo;
+}
+
+var RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA = 'pgo-estrutura-1|resumo';
+
+function resumoDoLaudo_(laudo) {
+  return {
+    emOrdem: laudo.ok,
+    abasComProblema: laudo.abas.filter(function (aba) {
+      return !aba.existe || aba.faltando.length;
+    }),
+    colunasForaDoContrato: laudo.abas.reduce(function (soma, aba) {
+      return soma + aba.aMais.length;
+    }, 0)
+  };
+}
+
+function guardarResumoDaEstrutura_(resumo) {
+  var cache = cacheDoScript_();
+  if (!cache) return;
+  try {
+    cache.put(RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA, JSON.stringify(resumo), RECC_SEGUNDOS_DO_CACHE);
+  } catch (erro) {
+
+  }
+}
+
+function esquecerResumoDaEstrutura_() {
+  var cache = cacheDoScript_();
+  if (!cache) return;
+  try { cache.remove(RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA); } catch (erro) {   }
+}
+
+function resumoDaEstruturaReaproveitado_() {
+  var cache = cacheDoScript_();
+  if (cache) {
+    try {
+      var guardado = cache.get(RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA);
+      if (guardado) {
+        var resumo = JSON.parse(guardado);
+        if (resumo && typeof resumo.emOrdem === 'boolean' && Array.isArray(resumo.abasComProblema)) return resumo;
+      }
+    } catch (erro) {
+
+    }
+  }
+  return resumoDoLaudo_(conferirEstrutura_());
 }
 
 
@@ -4772,6 +4859,9 @@ function procurarNoCanal_(canal, termo, quem) {
 
   var conferidos = casosNaLinhaToda_(canal, termo, quem);
   var paradaAntes = null;
+
+  var nadaNaLinhaToda = !!(conferidos && conferidos.nadaNaLinhaToda);
+  if (nadaNaLinhaToda) conferidos = null;
   if (conferidos) {
     if (!conferidos.exato) paradaAntes = conferidos.linhas;
     conferidos = conferidos.registros;
@@ -4783,7 +4873,8 @@ function procurarNoCanal_(canal, termo, quem) {
       return origem;
     }
 
-    var linhas = linhasNoMeuAlcance_(canal.aba, linhasPelasColunasDaBusca_(canal, colunas, termo), quem);
+    var linhas = linhasNoMeuAlcance_(canal.aba,
+      linhasPelasColunasDaBusca_(canal, colunas, termo, nadaNaLinhaToda), quem);
     if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
       origem.aviso = avisoDoMaximoDaBusca_(linhas.length);
 
@@ -4822,7 +4913,8 @@ function casosNaLinhaToda_(canal, termo, quem) {
   var total = quantidadeDeRegistros_(estrutura);
   if (total <= 0) return null;
   var linhas = linhasDoTermoNaPlanilha_(estrutura, termo, total);
-  if (!linhas || !linhas.length) return null;
+  if (!linhas) return null;
+  if (!linhas.length) return { nadaNaLinhaToda: true };
 
   linhas = linhasNoMeuAlcance_(canal.aba, linhas, quem);
   var conferidos = [];
@@ -4837,10 +4929,10 @@ function casosNaLinhaToda_(canal, termo, quem) {
   return { registros: conferidos, exato: fim === 0, linhas: linhas.length };
 }
 
-function linhasPelasColunasDaBusca_(canal, colunas, termo) {
+function linhasPelasColunasDaBusca_(canal, colunas, termo, nadaNaLinhaToda) {
   var jaAchada = {};
   var ordemDasLinhas = [];
-  var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo);
+  var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo, nadaNaLinhaToda);
 
   colunas.forEach(function (coluna, k) {
     var numeros;
@@ -4869,7 +4961,7 @@ function linhasPelasColunasDaBusca_(canal, colunas, termo) {
 const RECC_TIPOS_DA_BUSCA_RAPIDA = [RECC_TIPO_DE_DADO.IDENTIFICADOR, RECC_TIPO_DE_DADO.TEXTO,
   RECC_TIPO_DE_DADO.TEXTO_LONGO];
 
-function candidatasDaBuscaNoCanal_(canal, colunas, termo) {
+function candidatasDaBuscaNoCanal_(canal, colunas, termo, nadaNaLinhaToda) {
   var estrutura = estruturaDaAba_(canal.aba);
   var candidatas = colunas.map(function (coluna) {
     if (RECC_TIPOS_DA_BUSCA_RAPIDA.indexOf(coluna.tipo) < 0) return null;
@@ -4877,6 +4969,7 @@ function candidatasDaBuscaNoCanal_(canal, colunas, termo) {
     var alvo = ehIdentificador ? apenasDigitos_(termo) : normalizarParaComparar_(termo);
 
     if (ehIdentificador && !alvo) return [];
+    if (nadaNaLinhaToda && !ehIdentificador) return [];
     return linhasDaBuscaRapida_(estrutura, posicaoDaColuna_(estrutura, coluna.cabecalho),
       alvo, ehIdentificador, false);
   });
@@ -6041,7 +6134,8 @@ function resumoDasConfiguracoes() {
 function resumoDasConfiguracoesSemRelogio_() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var catalogo = lerRegistros_('CATALOGO');
-  var laudo = conferirEstrutura_();
+
+  var estrutura = resumoDaEstruturaReaproveitado_();
 
   function quantosDoTipo(tipo) {
     return catalogo.filter(function (item) {
@@ -6110,15 +6204,7 @@ function resumoDasConfiguracoesSemRelogio_() {
         descricao: 'O laudo da planilha, a auditoria e a base antiga',
         quantidade: 0 }
     ],
-    estrutura: {
-      emOrdem: laudo.ok,
-      abasComProblema: laudo.abas.filter(function (aba) {
-        return !aba.existe || aba.faltando.length;
-      }),
-      colunasForaDoContrato: laudo.abas.reduce(function (soma, aba) {
-        return soma + aba.aMais.length;
-      }, 0)
-    }
+    estrutura: estrutura
   };
 }
 
@@ -9326,8 +9412,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.87',
-  data: '18/11/2026'
+  numero: '1.88',
+  data: '19/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -10395,7 +10481,11 @@ function tomValido_(cor) {
 }
 
 function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
-  return cronometrado_('resumoDoCanal', resumoDoCanalSemRelogio_, arguments);
+  return cronometrado_('resumoDoCanal', resumoDoCanalComMemoria_, arguments);
+}
+
+function resumoDoCanalComMemoria_() {
+  return comMemoriaDaCarga_(resumoDoCanalSemRelogio_, arguments);
 }
 
 function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
@@ -10997,13 +11087,12 @@ function linhasDasSubAbas_(canal, sub, quem) {
   return { aba1: aba1, aba2: aba2, lidas: lidas };
 }
 
-var RECC_CELULAS_QUE_VALEM_UMA_IDA = 25000;
+var RECC_CELULAS_QUE_VALEM_UMA_IDA = 1000;
 
 var RECC_LEITURA_DA_SUB_ABA = '';
 
 function planoDeLeitura_(estrutura, linhas) {
-  var tolerado = Math.max(1, Math.floor(RECC_CELULAS_QUE_VALEM_UMA_IDA
-    / Math.max(1, estrutura.cabecalhos.length)));
+  var tolerado = buracoDaRegua_(estrutura);
   var ordenadas = linhas.slice().sort(function (uma, outra) { return uma - outra; });
   var paraLer = [];
   ordenadas.forEach(function (linha, k) {
@@ -11014,6 +11103,10 @@ function planoDeLeitura_(estrutura, linhas) {
     paraLer.push(linha);
   });
   return paraLer;
+}
+
+function buracoDaRegua_(estrutura) {
+  return Math.max(1, Math.floor(RECC_CELULAS_QUE_VALEM_UMA_IDA / Math.max(1, estrutura.cabecalhos.length)));
 }
 
 function lerLinhasEmPoucasIdas_(canal, linhas) {
@@ -11080,8 +11173,11 @@ function completarRegistros_(canal, registros, quem) {
   var leves = registros.filter(function (registro) { return registro.__leve; });
   if (!leves.length) return registros;
   var inteiros = {};
-  filtrarPeloAlcance_(semExcluidasNemVazias_(estruturaDaAba_(canal.aba),
-    lerLinhasEspecificas_(canal.aba, leves.map(function (registro) { return registro.__linha; }))),
+  var estrutura = estruturaDaAba_(canal.aba);
+
+  filtrarPeloAlcance_(semExcluidasNemVazias_(estrutura,
+    lerLinhasEspecificas_(canal.aba, leves.map(function (registro) { return registro.__linha; }),
+      buracoDaRegua_(estrutura))),
   canal.aba, quem).forEach(function (registro) { inteiros[registro.__linha] = registro; });
   return registros.map(function (registro) {
     return registro.__leve ? inteiros[registro.__linha] : registro;
@@ -11099,8 +11195,9 @@ function registrosDaSubAba_(canal, sub, qualAba, quem, disponiveis) {
   var estrutura = estruturaDaAba_(canal.aba);
   var nomes = colunasDaLeituraLeve_(canal, sub, estrutura, disponiveis);
   var aLer = nomes.filter(function (nome) { return !linhas.lidas[normalizarParaComparar_(nome)]; }).length;
+
   var custoLeve = aLer * (quantidadeDeRegistros_(estrutura) + RECC_CELULAS_QUE_VALEM_UMA_IDA)
-    + custoDeLerAsLinhas_(estrutura, daAba.slice(-RECC_FILA_NA_ABERTURA));
+    + Math.min(daAba.length, RECC_FILA_NA_LEITURA_LEVE) * (estrutura.cabecalhos.length + RECC_CELULAS_QUE_VALEM_UMA_IDA);
   var leve = RECC_LEITURA_DA_SUB_ABA ? RECC_LEITURA_DA_SUB_ABA === 'leve'
     : daAba.length > RECC_FILA_NA_ABERTURA && custoLeve < custoDeLerAsLinhas_(estrutura, daAba);
 
@@ -14181,6 +14278,7 @@ function criarAbaDoContrato_(planilha, esquema) {
     aba.getRange(2, i + 1, esquema.reserva, 1).setNumberFormat(formato);
   }
 
+  esquecerResumoDaEstrutura_();
   return esquema.aba;
 }
 

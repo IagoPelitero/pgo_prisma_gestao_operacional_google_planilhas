@@ -4319,6 +4319,56 @@ pergunta nova funcionando.
 
 ---
 
+## Etapa 88 — Desempenho e fluidez: B3, B2, B4, F5 e F14
+
+Pedido do PO: "ETAPA 3 (…) B3 — Trabalho; B2 — Buscar Caso; B4 — Configurações; F5 —
+Carregamento inteligente no Trabalho; F14 — Avisos de operações demoradas", preservando a 1.87
+inteira. O Excel vem só na última etapa; nada foi publicado em produção.
+
+| O que | Como ficou |
+|---|---|
+| **B3 · Trabalho** | A régua de custo (`RECC_CELULAS_QUE_VALEM_UMA_IDA`) passou de 25 mil para 1.000 células por ida, pela aba ERROS do PO (a ida custa ~25 ms; a célula, ~53 µs — umas 60 vezes a régua antiga). A aba dos concluídos deixou de ler a RET inteira. A **memória da carga** (só durante um `resumoDoCanal`): o aviso de prazo não relê a coluna do status nem as linhas que a fila acabou de ler; gravar na aba no meio esquece a memória. **Ajuste** (pego pelo teste da Etapa 74): a leitura leve completava as 20 linhas da fila com o buraco antigo de 50 linhas — 20 linhas espalhadas viravam um bloco de 571; agora usa o buraco da régua (`buracoDaRegua_`), e a estimativa supõe as 20 espalhadas. O modo "linhas" (o da 1.87) não mudou |
+| **B2 · Buscar Caso** | Quando o localizador procura o termo na linha toda do canal e não acha nada, as colunas de texto não repetem a **mesma expressão** (a coluna é um pedaço da faixa que deu zero). O identificador (CPF, CNPJ: só dígitos) continua procurando, e o caminho de reserva ("nada em coluna nenhuma → lê as colunas inteiras") não mudou. Critérios, normalização, alcance e permissões: os mesmos |
+| **B4 · Configurações** | O panorama reaproveita o **resumo da estrutura** por até 5 minutos no CacheService, com as regras da configuração (Etapa 42). Esquecem na hora: `esquecerEstruturaLida_()` sem aba (criar e apagar coluna, instalar, `atualizarPGO`, o botão "Aplicar mudanças da planilha agora"), gravar em CAMPOS ou CANAIS e `criarAbaDoContrato_`. A seção Estrutura e o diagnóstico leem sempre na hora e renovam o resumo. Permissão antes do cache. "Medir a velocidade" não passa por aqui |
+| **F5 · Trabalho** | No mesmo canal e sub-aba (cartão, filtro, busca, "Mostrar"), o painel fica, esmaecido (menos os filtros), com `aria-busy` e "Atualizando informações…" numa faixa de altura zero presa no alto; a resposta troca tudo de uma vez e devolve a rolagem da página e a da tabela. Troca de canal ou de sub-aba e o erro limpam a tela. A F6 continua decidindo qual resposta vale |
+| **F14 · Avisos** | `Servidor.chamar` liga um relógio de 8 s; vencido, o texto do PO aparece na pilha dos avisos do canto (tom de atenção, `role=status`) até a última chamada demorada terminar. No erro, sai antes de a tela mostrar o erro. Trocar de tela tira o aviso. Nenhuma chamada nova ao servidor; botões e envio único iguais; as chamadas sem pressa ficam de fora |
+| **Versão** | 1.88 |
+
+**Medida — SIMULADA** (`medir-telas.js --comparar linha-de-base-1.87.json`, planilha do tamanho da do
+PO; a RÉGUA PO é estimativa tirada da aba ERROS, não medição):
+
+| Tela | Chamadas | Localizador | Células | Régua PO |
+|---|---|---|---|---|
+| Trabalho · RET aba 1 (com aviso) | 18 → 16 | — | 32.591 → 16.321 | 2,2 → 1,3 s |
+| Trabalho · RET aba 2 (concluídos) | 12 → 24 | — | 173.044 → 26.068 | 9,5 → 2,0 s |
+| Trabalho · Mesa aba 1 | 18 → 16 | — | 3.937 → 1.984 | 0,7 → 0,5 s |
+| Buscar · protocolo / nome | 76 → 58 | 11 → 5 | igual | 13,0 → 6,6 s |
+| Buscar · termo que não existe | 85 → 61 | 11 → 3 | igual | 14,2 → 5,6 s |
+| Configurações · panorama (resumo guardado) | 96 → 8 | — | 344 → 48 | 2,4 → 0,2 s |
+| Produtividade RET | igual | — | 45.192 → 44.580 | 2,7 → 2,6 s |
+
+As outras 13 das 21 funções medidas ficaram **idênticas**. A RET aba 2 faz mais chamadas e lê 85% menos
+células: na régua antiga isso parecia pior; na do PO, é o maior ganho. A primeira abertura de
+Configurações depois de 5 minutos custa o mesmo de antes. **Nenhum ganho real foi medido ainda**: quem
+confirma é a M1 ("Medir a velocidade") e a aba ERROS, na planilha do PO, depois de publicar.
+
+**Resultados iguais à 1.87.** Buscar Caso: `comparar-busca.js` rodou 82 buscas (administrador e
+nível Operação — protocolo, CPF e CNPJ com e sem pontuação e com letras no meio, proposta com hífen,
+SUSEP, acentos, e-mail, data, caso oculto, termo curto, termo que não existe) na 1.87 e agora: 0
+diferentes, 0 mais caras, localizador 760 → 368. Trabalho: a resposta com e sem a memória da carga é
+a mesma, e em 8 cenários a escolha da leitura custa no máximo o caminho da 1.87. Produtividade: 18
+consultas (3 canais × com e sem filtro × 3 períodos) idênticas às da 1.87.
+
+Testes: `testes-desempenho-do-trabalho-e-da-busca.js` (B3: 15; B2: 4; B4: 11), dois ponta a ponta
+novos (F5 e F14, com respostas atrasadas de verdade no Chromium) e `comparar-busca.js`. Quebras de
+propósito, todas pegas: a memória das linhas desligada; o buraco antigo ao completar a fila (3
+falhas); não cair no caminho de reserva da busca (66 resultados diferentes); pular também o
+identificador (12 buscas mais caras); sem invalidar o resumo (3), sem o aviso em
+`criarAbaDoContrato_` (2), o cache antes da permissão (1); a F5 apagando a tela, o erro sem limpar;
+o aviso da F14 que não sai, e o que aparece antes dos 8 s.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

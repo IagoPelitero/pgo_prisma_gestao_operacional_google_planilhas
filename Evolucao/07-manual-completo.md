@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1809 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1839 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -324,6 +324,15 @@ para todas as pessoas. A planilha continua sendo a dona do dado:
 | Pelas telas (Configurações, Usuários, `atualizarPGO`) | **Na hora**: salvar limpa o cache daquela aba |
 | **Direto na planilha** (CONFIG, CANAIS, CAMPOS, CATALOGO, USUARIOS, SINALIZADORES ou PAINEIS) | Em **até 5 minutos** — ou na hora, em **Configurações › Estrutura › Aplicar mudanças da planilha agora** |
 
+**A faixa "A planilha saiu do contrato — ver o laudo"** no alto de Configurações
+segue a mesma regra (Etapa 88): o resumo da estrutura fica guardado por 5
+minutos, e abrir Configurações deixou de conferir aba por aba a cada vez (~96
+chamadas → 8, no simulador). Criar ou apagar coluna, mexer nos campos ou nos
+canais, o `atualizarPGO` e o botão **Aplicar mudanças da planilha agora** fazem
+valer na hora. A seção **Estrutura** e o diagnóstico leem sempre na hora — e o
+que leem renova a faixa. Cabeçalho mudado à mão aparece na faixa em até 5
+minutos (ou na hora, pelo botão ou abrindo a seção Estrutura).
+
 As bases de casos, as corretoras e as SUSEPs bloqueadas **não** entram no cache:
 mudam a cada clique. Se o cache do Google falhar, o sistema lê a planilha como
 sempre leu — ele deixa a tela mais rápida, nunca a derruba.
@@ -351,7 +360,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1809 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1839 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -533,6 +542,21 @@ período inteiro: eles dizem o tamanho de cada pedaço, e a fila mostra o pedaç
 escolhido. O único que não filtra é "finalizados na célula", que é conta e não
 coluna — passar o cursor num cartão que filtra mostra "Filtrar a fila por…". Quem resolve é o servidor, pelo
 **Id** do cartão: antes a tela mandava o título, e só o cartão de status filtrava.
+
+**Filtrar não apaga a tela** (Etapa 88). Ao clicar num cartão, escolher um
+filtro, buscar ou mudar o "Mostrar", os cartões e a fila **ficam na tela,
+esmaecidos**, com o aviso **"Atualizando informações…"** no alto — e são
+trocados de uma vez quando a resposta chega, no mesmo ponto da rolagem.
+Esmaecidos porque ainda são os números do pedido anterior; os filtros não
+esmaecem. Trocar de canal ou de sub-aba limpa a tela, como antes (os números de
+uma não aparecem sob o nome da outra), e um erro também. Clicou duas vezes
+seguidas: vale a última (Etapa 86).
+
+**A consulta que passa de 8 segundos avisa** (Etapa 88), em qualquer tela, no
+canto: *"A consulta está demorando mais que o normal. O Prisma continua
+aguardando a resposta. Não é necessário clicar novamente."* O aviso sai quando
+a resposta chega; se ela vier com erro, o erro toma o lugar dele. Importar,
+diagnóstico e "Medir a velocidade" não mostram esse aviso: demoram de propósito.
 
 **O cartão que perdeu o status não trava mais nada** (Etapa 44, achado 100). Se
 um status muda de nome em Ajustes Gerais, os cartões que contavam esse status
@@ -1798,6 +1822,16 @@ e a diferença para a linha de base. A M2 pôs no cronômetro `consultarSusep`,
 `conferirPropostaRepetida` e `listarCamposDoCanal`: passando de 8 s, a aba ERROS
 diz onde foi o tempo.
 
+A coluna **RÉGUA PO** (Etapa 88) é uma **estimativa** tirada da aba ERROS do PO
+(18/11/2026), e não uma medição: ~25 ms por chamada, ~53 µs por célula e 1 s por
+busca do localizador. Ela mostra que, na planilha do PO, a célula pesa muito mais
+do que a régua antiga supunha — por isso o Trabalho passou a ler só as colunas de
+que precisa. Quem confirma é a **M1** ("Medir a velocidade") e a aba ERROS, na
+planilha de verdade. A linha de base de hoje é `linha-de-base-1.88.json`. O Buscar
+Caso tem uma prova à parte, `comparar-busca.js`: 82 buscas rodadas na 1.87 e
+guardadas em `medicoes/busca-1.87.json` — a versão de agora tem de dar o mesmo
+resultado em todas, sem ficar mais cara em nenhuma.
+
 **Ajustes Gerais são as listas** que os campos seletores oferecem — assunto,
 produto, motivo, canal de origem e as que a operação criar. Cada lista aparece
 com o nome legível e **em quais campos é usada** ("Usada em: Assunto (Mesa
@@ -1911,7 +1945,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.87** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.88** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1919,7 +1953,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1809 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1839 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.
