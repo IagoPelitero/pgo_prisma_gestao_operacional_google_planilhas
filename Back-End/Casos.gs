@@ -898,7 +898,12 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   var alvo = converterParaIdentificador_(idDoCaso);
   if (!alvo) throw new Error('Informe qual caso deve ser alterado.');
 
-  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
+  // Até DOIS com o mesmo Id (Etapa 89): um só, a linha dele vai para a
+  // gravação, sem procurar de novo; dois, a gravação procura e recusa com o
+  // recado do Id repetido, como sempre. Custa o mesmo: o localizador já
+  // devolve todas as ocorrências.
+  var comEsteId = buscarRegistros_(canal.aba, 'Id', alvo, 2);
+  var atual = comEsteId[0];
   if (!atual) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
@@ -937,7 +942,7 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
     if (versaoDoCaso_(naTrava, canal.aba) !== versaoQueAbriu) {
       throw new Error(RECC_CASO_ALTERADO_POR_OUTRA_PESSOA);
     }
-  } : null);
+  } : null, comEsteId.length === 1 ? atual.__linha : 0);   // a linha já achada (Etapa 89)
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
@@ -1029,7 +1034,9 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
       'a situação, então não há o que trocar. Isso se ajusta em Configurações.');
   }
 
-  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
+  // Até dois com o mesmo Id: ver editarCasoUmaVez_ (Etapa 89).
+  var comEsteId = buscarRegistros_(canal.aba, 'Id', alvo, 2);
+  var atual = comEsteId[0];
   if (!atual) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
@@ -1087,7 +1094,7 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
     if (versaoDoCaso_(naTrava, canal.aba) !== versaoLida) {
       throw new Error(RECC_STATUS_ALTERADO_POR_OUTRA_PESSOA);
     }
-  });
+  }, comEsteId.length === 1 ? atual.__linha : 0);   // a linha já achada (Etapa 89)
 
   // NÃO registra na auditoria, e isso é decisão da operação.
   //

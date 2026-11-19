@@ -3170,9 +3170,15 @@ function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
  * para a mescla; conferir não custa ida nenhuma a mais. O erro sai pelo
  * `finally`, que solta a trava.
  */
-function atualizarRegistro_(nomeDaAba, id, alteracoes, conferirNaTrava) {
+function atualizarRegistro_(nomeDaAba, id, alteracoes, conferirNaTrava, linhaJaAchada) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
-  var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
+  // `linhaJaAchada` (Etapa 89), opcional: a linha que quem chama acabou de
+  // achar pelo mesmo Id — o caso lido para editar ou trocar o status. Procurar
+  // de novo era uma segunda busca do localizador pelo MESMO Id, antes da
+  // trava. Dentro da trava nada muda: linhaConferidaNaTrava_ confere o Id
+  // NAQUELA linha e, se não bate (um caso excluído acima subiu as linhas),
+  // procura de novo, com a planilha fresca.
+  var linhaAchada = linhaJaAchada > 1 ? linhaJaAchada : linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
   if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');

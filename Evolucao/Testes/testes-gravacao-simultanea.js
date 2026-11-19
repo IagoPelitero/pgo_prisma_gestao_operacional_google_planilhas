@@ -174,6 +174,88 @@ function rodarTestesDaGravacaoSimultanea() {
     const comConferencia = medir(t.versao(), 'Medido de novo');
     igual(comConferencia, semConferencia, 'as mesmas chamadas, com e sem a conferência');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Etapa 89: a linha já achada não é procurada de novo — e a trava ainda confere');
+
+  /** Uma RET com vizinhos acima e abaixo do caso da disputa. */
+  function comVizinhos() {
+    const t = doisAnalistas();
+    t.vizinhos = ['Vizinho de cima 1', 'Vizinho de cima 2'].map((nome) =>
+      String(t.chamar('inserirRegistro_')('BASE_RET', { [DA_RET]: new Date(), status: 'Pendente', 'nome do cliente': nome,
+        analista: 'Ana Martins' }).__id));
+    // O caso da disputa vai para o FIM (depois dos vizinhos): excluir um vizinho sobe a linha dele.
+    const caso = t.chamar('inserirRegistro_')('BASE_RET', { [DA_RET]: new Date(), status: 'Pendente',
+      'nome do cliente': 'Caso que desce', analista: 'Ana Martins' });
+    t.id = String(caso.__id);
+    t.porId = (id) => t.chamar('buscarRegistros_')('BASE_RET', 'Id', id, 1)[0];
+    t.versao = () => t.chamar('casoParaEditar')(t.ret.id, t.id).versao;   // a do caso NOVO
+    return t;
+  }
+
+  teste('salvar o caso procura o Id uma vez só (eram duas)', () => {
+    const t = comVizinhos();
+    const { medidor } = require('./simulador');
+    t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Aquecendo', status: 'Pendente' }, '');
+    medidor.zerar();
+    t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Medido', status: 'Pendente' }, t.versao());
+    const comVersao = medidor.retrato().buscasRapidas;
+    medidor.zerar();
+    t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Medido de novo', status: 'Pendente' }, '');
+    igual(medidor.retrato().buscasRapidas, 1, 'editar: o localizador uma vez');
+    verdadeiro(comVersao >= 1);
+    medidor.zerar();
+    t.chamar('alterarSituacaoDoCaso')(t.ret.id, t.id, 'Não trabalhado', {});
+    igual(medidor.retrato().buscasRapidas, 1, 'trocar o status: o localizador uma vez');
+  });
+
+  teste('um caso acima é excluído entre a leitura e a trava: a edição grava no caso certo', () => {
+    const t = comVizinhos();
+    const linhaAntes = t.porId(t.id).__linha;
+    const versao = t.versao();
+    const desfazer = t.noMeio(() => t.chamar('apagarRegistroDeVez_')('BASE_RET', t.vizinhos[0]));
+    try {
+      t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Nome certo', status: 'Pendente' }, versao);
+    } finally { desfazer(); }
+    igual(t.porId(t.id).__linha, linhaAntes - 1, 'a linha do caso subiu');
+    igual(String(t.porId(t.id)['nome do cliente']), 'Nome certo', 'e a gravação foi nele');
+    igual(String(t.porId(t.vizinhos[1])['nome do cliente']), 'Vizinho de cima 2', 'o vizinho que ocupou a linha antiga ficou intacto');
+  });
+
+  teste('um caso acima é excluído entre a leitura e a trava: a troca de status cai no caso certo', () => {
+    const t = comVizinhos();
+    const desfazer = t.noMeio(() => t.chamar('apagarRegistroDeVez_')('BASE_RET', t.vizinhos[0]));
+    try {
+      t.chamar('alterarSituacaoDoCaso')(t.ret.id, t.id, 'Não trabalhado', {});
+    } finally { desfazer(); }
+    igual(String(t.porId(t.id).status), 'Não trabalhado');
+    igual(String(t.porId(t.vizinhos[1]).status), 'Pendente', 'o vizinho não teve o status trocado');
+  });
+
+  teste('Id repetido (planilha mexida à mão): editar e trocar o status continuam recusando, com o recado', () => {
+    const t = comVizinhos();
+    const estrutura = t.chamar('estruturaDaAba_')('BASE_RET');
+    const coluna = estrutura.cabecalhos.findIndex((c) => c.toLowerCase() === 'id') + 1;
+    estrutura.aba.getRange(t.porId(t.vizinhos[1]).__linha, coluna).setValue(t.id);   // o vizinho ganha o mesmo Id
+    t.chamar('esquecerEstruturaLida_()');
+    contem(lanca(() => t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Qual dos dois?', status: 'Pendente' }, '')).message,
+      'normalizarBase()');
+    contem(lanca(() => t.chamar('alterarSituacaoDoCaso')(t.ret.id, t.id, 'Não trabalhado', {})).message, 'normalizarBase()');
+  });
+
+  teste('com a linha já achada, a disputa continua recusada dentro da trava (B1)', () => {
+    const t = comVizinhos();
+    const daAna = t.versao();
+    const doBruno = t.comoBruno(() => t.versao());
+    const desfazer = t.noMeio(() => t.comoBruno(() =>
+      t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Nome do Bruno', status: 'Pendente' }, doBruno)));
+    try {
+      lanca(() => t.chamar('editarCaso')(t.ret.id, t.id, { nomedocliente: 'Nome da Ana', status: 'Pendente' }, daAna),
+        'alterado por outra pessoa');
+    } finally { desfazer(); }
+    igual(String(t.porId(t.id)['nome do cliente']), 'Nome do Bruno');
+    igual(t.ambiente.travasSeguradas, 0);
+  });
 }
 
 module.exports = { rodarTestesDaGravacaoSimultanea };
