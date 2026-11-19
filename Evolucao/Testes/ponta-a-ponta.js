@@ -2145,6 +2145,76 @@ async function rodar() {
     await pagina.waitForTimeout(400);
   });
 
+  await teste('F10: "Salvar e abrir o próximo" grava e abre o seguinte da fila; no último, avisa; conflito fica', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.fila-do-trabalho [data-trabalhar]', { timeout: 10000 });
+    await pagina.waitForTimeout(400);
+    const ids = await pagina.$$eval('.fila-do-trabalho [data-trabalhar]', (bs) =>
+      bs.map((b) => b.getAttribute('data-trabalhar')).filter((v, i, a) => a.indexOf(v) === i));
+    verdadeiro(ids.length >= 2, 'a fila tem ao menos dois casos: ' + ids.length);
+    const abrirO = async (id) => {
+      await pagina.click('.fila-do-trabalho [data-trabalhar="' + id + '"]');
+      await pagina.waitForSelector('#modal-salvar-e-proximo:not([disabled])', { timeout: 10000 });
+      // O caso de teste tem uma analista que não está na lista: uma opção válida.
+      await pagina.evaluate(() => {
+        const sel = document.getElementById('editar-campo-analista');
+        // (a lista guarda o valor antigo como opção, mas o servidor só aceita os usuários)
+        const opcao = sel && sel.options ? Array.from(sel.options).find((o) => o.value) : null;
+        if (opcao) { sel.value = opcao.value; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+      });
+    };
+
+    // 1. Grava e abre o seguinte, na ordem da fila.
+    await abrirO(ids[0]);
+    await pagina.click('#modal-salvar-e-proximo');
+    await pagina.waitForFunction((id) => {
+      const t = document.getElementById('titulo-do-caso'); return t && t.textContent === 'Caso ' + id;
+    }, ids[1], { timeout: 10000 }).catch(async () => {
+      throw new Error('não abriu o próximo. Título: ' + await pagina.evaluate(() => (document.getElementById('titulo-do-caso') || {}).textContent)
+        + ' · recado: ' + await pagina.evaluate(() => (document.getElementById('recado-do-modal') || {}).textContent)
+        + ' · ids: ' + ids.join(','));
+    });
+    await pagina.waitForSelector('.aviso-flutuante:has-text("Caso ' + ids[0] + ' atualizado")', { timeout: 10000 });
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !document.getElementById('modal-do-caso'), null, { timeout: 5000 });
+
+    // 2. Quebra de propósito: outra pessoa grava no caso aberto — nada é gravado, e o próximo NÃO abre.
+    await pagina.waitForTimeout(600);
+    await abrirO(ids[0]);
+    vm.runInContext("atualizarRegistro_('BASE_RET', " + JSON.stringify(ids[0]) + ", { 'nome do cliente': 'Mudado por outra pessoa' })", contexto);
+    await pagina.click('#modal-salvar-e-proximo');
+    await pagina.waitForSelector('#recado-do-modal:not([hidden])', { timeout: 10000 });
+    await pagina.waitForFunction(() => !/Gravando/.test(document.getElementById('recado-do-modal').textContent), null, { timeout: 10000 });
+    contem(await pagina.textContent('#recado-do-modal'), 'alterado por outra pessoa');
+    igual(await pagina.textContent('#titulo-do-caso'), 'Caso ' + ids[0], 'continua no mesmo caso');
+    await pagina.click('#modal-fechar');
+    if (await pagina.waitForSelector('#dialogo-descarte', { timeout: 1500 }).catch(() => null)) await pagina.click('#descartar-alteracoes');
+    await pagina.waitForFunction(() => !document.getElementById('modal-do-caso'), null, { timeout: 5000 });
+
+    // 3. O último da fila: grava e avisa que não há próximo.
+    await pagina.waitForTimeout(800);
+    const agora = await pagina.$$eval('.fila-do-trabalho [data-trabalhar]', (bs) =>
+      bs.map((b) => b.getAttribute('data-trabalhar')).filter((v, i, a) => a.indexOf(v) === i));
+    await abrirO(agora[agora.length - 1]);
+    await pagina.click('#modal-salvar-e-proximo');
+    await pagina.waitForSelector('.aviso-flutuante:has-text("último caso da fila")', { timeout: 10000 });
+    igual(await pagina.locator('#modal-do-caso').count(), 0, 'sem próximo, o modal fecha');
+
+    // 4. Aberto pela Busca, o modal não tem o botão (a Busca não é uma fila).
+    await pagina.click('[data-tela="buscarCaso"]');
+    await pagina.waitForSelector('#termo-da-busca', { timeout: 10000 });
+    await pagina.fill('#termo-da-busca', ids[1]);
+    await pagina.click('#botao-buscar');
+    await pagina.waitForSelector('[data-achado]', { timeout: 10000 });
+    await pagina.locator('[data-achado]').first().click();
+    await pagina.waitForSelector('#modal-salvar:not([disabled])', { timeout: 10000 });
+    igual(await pagina.locator('#modal-salvar-e-proximo').count(), 0, 'na Busca, só o Salvar de sempre');
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !document.getElementById('modal-do-caso'), null, { timeout: 5000 });
+  });
+
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
   if (process.env.PGO_GRAVAR_CHAMADAS) {

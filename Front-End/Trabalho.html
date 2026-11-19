@@ -821,6 +821,22 @@ var TelaTrabalho = (function () {
    * O destino vem do servidor, pela mesma regra que monta a fila; canal sem
    * sub-abas diz só "Caso 123 atualizado.". E a fila recarrega, como antes.
    */
+  /**
+   * F10 (Etapa 90): o caso seguinte ao `idAtual` na fila QUE ESTÁ NA TELA, de
+   * cima para baixo — a ordem já é a do canal, da sub-aba, dos filtros, da
+   * ordenação e do que a pessoa pode ver. Fora da fila, ou o último: ''.
+   */
+  function proximoDaFila(idAtual) {
+    var ids = [];
+    var botoes = document.querySelectorAll('.fila-do-trabalho [data-trabalhar]');
+    for (var i = 0; i < botoes.length; i++) {
+      var id = botoes[i].getAttribute('data-trabalhar');
+      if (ids.indexOf(id) < 0) ids.push(id);
+    }
+    var aqui = ids.indexOf(String(idAtual));
+    return aqui >= 0 && aqui + 1 < ids.length ? ids[aqui + 1] : '';
+  }
+
   function depoisDeGravar() {
     var gravado = CasoEmModal.oQueGravou();
     if (gravado) {
@@ -944,7 +960,8 @@ var TelaTrabalho = (function () {
     });
 
     ligarCliques('[data-trabalhar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), depoisDeGravar);
+      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), depoisDeGravar,
+        proximoDaFila);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
       CasoEmModal.trocarSituacao(canalEscolhido,

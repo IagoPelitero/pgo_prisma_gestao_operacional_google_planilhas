@@ -1246,7 +1246,7 @@ function rodarTestesDeCadastro() {
     // Pedido do PO: "depois de salvar o ajuste precisa fechar o modal senão
     // fica ruim seguir trabalhando".
     const modal = lerPeca('CasoEmModal');
-    const salvar = modal.substring(modal.indexOf('function salvar()'));
+    const salvar = modal.substring(modal.indexOf('function salvar(eAbrirOProximo)'));
     const corpoDoSalvar = salvar.substring(0, salvar.indexOf('\n  }'));
 
     contem(corpoDoSalvar, 'fechar();', 'o modal sai de cena quando gravou');

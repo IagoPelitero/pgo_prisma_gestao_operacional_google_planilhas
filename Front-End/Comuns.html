@@ -2505,12 +2505,21 @@ var CasoEmModal = (function () {
    * foi gravado — assim a fila recarrega quando precisa, e fica quieta quando
    * a pessoa abriu e fechou.
    */
-  function abrir(idDoCanal, idDoCaso, quandoMudar) {
+  /*
+    F10 (Etapa 90): "Salvar e abrir o próximo". `qualOProximo(idAtual)` é da
+    TELA que abriu — só ela sabe a ordem da fila que a pessoa está vendo
+    (canal, sub-aba, filtros, ordenação, o que ela pode ver). Sem ele, o botão
+    não aparece: o modal aberto da Busca ou da Produtividade fica como antes.
+  */
+  var qualOProximo = null;
+
+  function abrir(idDoCanal, idDoCaso, quandoMudar, comOProximo) {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
     versaoAoAbrir = '';
     envio = '';
     aoFechar = quandoMudar || null;
+    qualOProximo = typeof comOProximo === 'function' ? comOProximo : null;
     mudouAlgo = false;
     salvando = false;
 
@@ -2543,6 +2552,8 @@ var CasoEmModal = (function () {
       + '<footer class="modal-pe" id="modal-pe">'
       + '<span class="recado" id="recado-do-modal" hidden></span>'
       + '<button type="button" class="botao vazado" id="modal-fechar">Fechar</button>'
+      + (qualOProximo ? '<button type="button" class="botao vazado" id="modal-salvar-e-proximo" disabled>'
+        + 'Salvar e abrir o próximo</button>' : '')
       + '<button type="button" class="botao" id="modal-salvar" disabled>'
       + 'Salvar alterações</button></footer>'
       + '</div>';
@@ -2550,7 +2561,12 @@ var CasoEmModal = (function () {
 
     elemento('modal-x').addEventListener('click', function () { fechar(); });
     elemento('modal-fechar').addEventListener('click', function () { fechar(); });
-    elemento('modal-salvar').addEventListener('click', salvar);
+    // `salvar(false)`, e não `salvar` direto: o clique passaria o evento como
+    // o "e o próximo", e o Salvar de sempre viraria o do F10.
+    elemento('modal-salvar').addEventListener('click', function () { salvar(false); });
+    if (elemento('modal-salvar-e-proximo')) {
+      elemento('modal-salvar-e-proximo').addEventListener('click', function () { salvar(true); });
+    }
     caixa.addEventListener('mousedown', function (evento) {
       // Só o véu fecha. Um arrasto que começa dentro e termina fora não é
       // "clicar fora" — e fechar ali perderia o que a pessoa digitou.
@@ -2665,6 +2681,7 @@ var CasoEmModal = (function () {
       elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
         + desenharDoSistema(osValores.doSistema);
       elemento('modal-salvar').disabled = false;
+      if (elemento('modal-salvar-e-proximo')) elemento('modal-salvar-e-proximo').disabled = false;
       retratoAoAbrir = retratoDaEdicao();
     }
 
@@ -2768,6 +2785,8 @@ var CasoEmModal = (function () {
     if (subtitulo) subtitulo.textContent = 'Não deu para abrir';
     var salvarBotao = elemento('modal-salvar');
     if (salvarBotao) salvarBotao.disabled = true;
+    var eOProximo = elemento('modal-salvar-e-proximo');
+    if (eOProximo) eOProximo.disabled = true;
   }
 
   function recado(texto, tipo) {
@@ -2778,19 +2797,23 @@ var CasoEmModal = (function () {
     caixa.hidden = !texto;
   }
 
-  function salvar() {
+  function salvar(eAbrirOProximo) {
     if (salvando) return;
     var corpo = corpoDaEdicao();
     // Formulário ainda não chegou: o botão está travado, e o Ctrl+Enter não
     // pode ser a porta dos fundos que grava um caso vazio.
     if (!corpo || elemento('modal-salvar').disabled) return;
 
+    // F10: o próximo é decidido AGORA, na ordem da fila que está na tela — e
+    // só é aberto depois de gravar. Conflito ou erro: fica neste caso.
+    var proximo = eAbrirOProximo && qualOProximo ? (qualOProximo(idAtual) || '') : null;
     salvando = true;
     Formulario.limparErros(corpo);
     recado('Gravando…', '');
     // Os três pontinhos no botão, e nenhum botão do modal clicável enquanto a
     // gravação está a caminho — nem o X, nem o "Fechar".
-    Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
+    Formulario.comecouAGravar(elemento(eAbrirOProximo ? 'modal-salvar-e-proximo' : 'modal-salvar'),
+      elemento('modal-do-caso'));
 
     if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
@@ -2809,7 +2832,17 @@ var CasoEmModal = (function () {
           ser gravado.
         */
         destravarOsBotoes();
+        // F10: guarda o que reabrir antes de fechar (fechar esquece o retorno).
+        var retorno = aoFechar;
+        var proximoDe = qualOProximo;
+        var canal = canalAtual;
         fechar();
+        if (proximo === null) return;
+        if (proximo) {
+          abrir(canal, proximo, retorno, proximoDe);
+        } else {
+          Moldura.toast('Este era o último caso da fila desta tela — não há próximo para abrir.', 'atencao');
+        }
       })
       .senao(function (erro) {
         salvando = false;
@@ -2828,6 +2861,9 @@ var CasoEmModal = (function () {
    */
   function destravarOsBotoes() {
     Formulario.acabouDeGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
+    if (elemento('modal-salvar-e-proximo')) {
+      Formulario.acabouDeGravar(elemento('modal-salvar-e-proximo'), elemento('modal-do-caso'));
+    }
   }
 
   /* ================================================== alterar o status */

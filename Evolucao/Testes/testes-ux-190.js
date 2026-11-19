@@ -126,6 +126,28 @@ function rodarTestesDeUX190() {
       verdadeiro(comNome >= dialogos, nome + ': ' + comNome + ' de ' + dialogos + ' diálogos com nome');
     });
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('F10 — Salvar e abrir o próximo');
+
+  teste('o próximo é decidido no clique, pela fila da tela, e só abre depois de gravar', () => {
+    const comuns = ler('Comuns.html');
+    const salvar = comuns.slice(comuns.indexOf('function salvar(eAbrirOProximo)'), comuns.indexOf('function destravarOsBotoes'));
+    verdadeiro(salvar.indexOf('qualOProximo(idAtual)') < salvar.indexOf("Servidor.chamar('editarCaso'"), 'decidido antes de gravar');
+    const entao = salvar.slice(salvar.indexOf('.entao('), salvar.indexOf('.senao('));
+    contem(entao, 'abrir(canal, proximo, retorno, proximoDe);', 'abre no sucesso');
+    contem(entao, 'Este era o último caso da fila desta tela', 'sem próximo, avisa');
+    verdadeiro(salvar.slice(salvar.indexOf('.senao(')).indexOf('abrir(') < 0, 'no erro (e no conflito), não abre nada');
+    contem(comuns, "elemento('modal-salvar').addEventListener('click', function () { salvar(false); });",
+      'o Salvar de sempre continua o de sempre');
+  });
+
+  teste('só o Trabalho oferece o botão: a ordem é a da fila que está na tela', () => {
+    const trabalho = ler('Trabalho.html');
+    contem(trabalho, "document.querySelectorAll('.fila-do-trabalho [data-trabalhar]')");
+    contem(trabalho, "CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), depoisDeGravar,\n        proximoDaFila);");
+    contem(ler('BuscarCaso.html'), 'CasoEmModal.abrir(canal, caso, procurarDeNovo);', 'a Busca sem o botão');
+  });
 }
 
 module.exports = { rodarTestesDeUX190 };
