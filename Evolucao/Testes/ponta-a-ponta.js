@@ -1908,6 +1908,51 @@ async function rodar() {
     await pagina.setViewportSize({ width: 1440, height: 1000 });
   });
 
+  await teste('Cadastrar: o índice das seções, o erro no campo (V4) e o "pedido pelo status" (V6) — Etapa 90', async () => {
+    try {
+    await pagina.click('[data-tela="cadastrarCaso"]');
+    await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
+    await pagina.waitForSelector('#indice-do-cadastro:not([hidden]) .indice-item', { timeout: 10000 });
+    const secoes = await pagina.locator('#corpo-do-formulario fieldset.secao').count();
+    igual(await pagina.locator('#indice-do-cadastro .indice-item').count(), secoes, 'um item por seção de Configurações');
+    // V4: sair do obrigatório vazio marca o campo, a seção e o índice.
+    const nome = pagina.locator('#formulario-do-caso [aria-required="true"]').first();
+    await nome.focus(); await pagina.keyboard.press('Tab'); await pagina.waitForTimeout(150);
+    igual(await nome.getAttribute('aria-invalid'), 'true', 'o campo vazio ficou marcado');
+    contem(await pagina.textContent('#formulario-do-caso .campo.com-erro .erro'), 'é obrigatório');
+    verdadeiro(await pagina.locator('#corpo-do-formulario fieldset.secao.com-erro').count() >= 1, 'a seção ficou vermelha');
+    contem(await pagina.textContent('#indice-do-cadastro'), 'obrigatório');
+    // Quebra de propósito: do obrigatório vazio direto para o índice — o erro
+    // aparece (e o índice muda) no meio do clique, e o clique não se perde.
+    await nome.focus();
+    await pagina.locator('#indice-do-cadastro li:last-child .indice-item').click(); await pagina.waitForTimeout(200);
+    verdadeiro(await pagina.evaluate(() => document.getElementById(document.querySelector('#indice-do-cadastro li:last-child .indice-item')
+      .getAttribute('data-ir-para-secao')).contains(document.activeElement)), 'o clique levou à seção mesmo com o índice mudando');
+    // Preencher tira o aviso.
+    await nome.fill('Cliente do teste visual'); await pagina.waitForTimeout(150);
+    igual(await nome.getAttribute('aria-invalid'), null, 'preencheu, saiu o aviso');
+    // Clicar no índice leva à seção e põe o cursor nela.
+    const ultimo = pagina.locator('#indice-do-cadastro .indice-item').last();
+    await ultimo.click(); await pagina.waitForTimeout(200);
+    const foco = await pagina.evaluate(() => {
+      const alvo = document.getElementById(document.querySelector('#indice-do-cadastro li:last-child .indice-item').getAttribute('data-ir-para-secao'));
+      const a = document.activeElement;
+      return { dentro: alvo.contains(a), ativo: a.tagName + '#' + a.id, campos: Array.from(alvo.querySelectorAll('input,select,textarea'))
+        .map((c) => c.id + ':' + c.disabled + ':' + ((c.closest('[data-campo]') || {}).hidden)) };
+    });
+    verdadeiro(foco.dentro, 'o cursor foi para a seção escolhida: ' + JSON.stringify(foco));
+    // V6: um campo pedido por outro diz por quem — e o nome dele no "Falta…" continua limpo.
+    const etiquetas = await pagina.$$eval('#formulario-do-caso [data-pedido-pelo]:not([hidden])', (es) => es.map((e) => e.textContent));
+    etiquetas.forEach((texto) => contem(texto, 'pedido pelo '));
+    verdadeiro((await pagina.textContent('#falta-no-caso')).indexOf('pedido pelo') < 0, 'o "Falta…" traz só o nome do campo');
+    } finally {
+      // Sai sem guardar nada (o F2 pergunta; descarta) — mesmo se algo acima falhou.
+      await pagina.click('[data-tela="trabalho"]');
+      if (await pagina.waitForSelector('#dialogo-descarte', { timeout: 3000 }).catch(() => null)) await pagina.click('#descartar-alteracoes');
+      await pagina.waitForTimeout(400);
+    }
+  });
+
   console.log('\nA busca inteligente (Etapa 89)');
 
   await teste('Buscar Caso: "Pesquisar por" abre na avançada, procura só no campo escolhido e lembra a escolha (Etapa 89)', async () => {

@@ -1772,7 +1772,8 @@ function rodarTestesDeCadastro() {
     // Pedido do PO: "centraliza a aba cadastro". O formulário tinha 1080 px e
     // ficava encostado à esquerda, com um vazio à direita em monitor largo.
     const estilos = lerPeca('Estilos');
-    contem(estilos, '.miolo[data-tela="cadastrarCaso"] > * { max-width: 1080px; margin-inline: auto; }');
+    // Etapa 90: com o índice das seções ao lado (aprovado), 1480 px — ainda no meio.
+    contem(estilos, '.miolo[data-tela="cadastrarCaso"] > * { max-width: 1480px; margin-inline: auto; }');
     // Sem `:has()`, que navegador anterior a 2022 ignora calado (achado 69):
     // a marca é o data-tela que o roteador põe no miolo.
     contem(lerPeca('Aplicacao'), "elemento('miolo').setAttribute('data-tela', tela);");
@@ -1780,9 +1781,12 @@ function rodarTestesDeCadastro() {
       'nenhuma regra de CSS usa :has()');
     const tela = lerPeca('CadastrarCaso');
     const montar = tela.substring(tela.indexOf('function montar('), tela.indexOf('function carregarFormulario'));
-    // Entre os canais e o formulário, só as abas da Mesa (Etapa 79) — vazias nos outros canais.
-    contem(montar, "return SeletorDeCanal.montar(pacote.canais, canalEscolhido)\n      + abasDaMesa()\n      + '<form class=\"cartao formulario\" id=\"formulario-do-caso\"",
-      'o formulário sai logo depois dos canais, direto no miolo');
+    // Entre os canais e o formulário, só as abas da Mesa (Etapa 79) — vazias nos
+    // outros canais — e, desde a Etapa 90 (aprovado), o índice das seções ao lado.
+    contem(montar, "return SeletorDeCanal.montar(pacote.canais, canalEscolhido)\n      + abasDaMesa()\n      // As seções em blocos, com o índice ao lado (Etapa 90, proposta aprovada).\n      + '<div class=\"cadastro-em-blocos\">'\n"
+      + "      + '<nav class=\"indice-do-cadastro\" id=\"indice-do-cadastro\" aria-label=\"Seções do formulário\" hidden></nav>'\n"
+      + "      + '<form class=\"cartao formulario\" id=\"formulario-do-caso\"",
+      'o formulário sai logo depois dos canais, só com o índice ao lado');
   });
 }
 

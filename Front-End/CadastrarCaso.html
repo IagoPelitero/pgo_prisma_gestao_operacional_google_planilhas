@@ -166,6 +166,9 @@ var TelaCadastrarCaso = (function () {
     }
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + abasDaMesa()
+      // As seções em blocos, com o índice ao lado (Etapa 90, proposta aprovada).
+      + '<div class="cadastro-em-blocos">'
+      + '<nav class="indice-do-cadastro" id="indice-do-cadastro" aria-label="Seções do formulário" hidden></nav>'
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos">'
       + 'Montando o formulário…</p></div>'
@@ -179,7 +182,125 @@ var TelaCadastrarCaso = (function () {
       // O que ainda falta para o botão acender (Etapa 75).
       + '<span class="falta-preencher" id="falta-no-caso" aria-live="polite"></span>'
       + '<span class="recado" id="recado-do-caso" hidden></span>'
-      + '</div></form>';
+      + '</div></form></div>';
+  }
+
+  /*
+    O ÍNDICE DAS SEÇÕES (Etapa 90, proposta aprovada pelo PO). As seções vêm
+    de Configurações (o campo "Seção do formulário"); o índice só as mostra,
+    com ✓ quando nada obrigatório falta nela e "N obrigatório(s)" quando
+    falta. Quem diz o que falta é a mesma regra do botão (camposQueFaltam).
+  */
+  // A seção onde está o cursor: o índice a mostra em destaque (aprovado).
+  var secaoAtual = '';
+  function desenharIndice() {
+    var indice = elemento('indice-do-cadastro');
+    var secoes = corpo() ? corpo().querySelectorAll('fieldset.secao') : [];
+    if (!indice || secoes.length < 2) { if (indice) indice.hidden = true; return; }
+    var faltam = Formulario.camposQueFaltam(corpo());
+    var itens = Array.prototype.map.call(secoes, function (secao, i) {
+      secao.id = secao.id || 'secao-do-cadastro-' + (i + 1);
+      var quantos = faltam.filter(function (campo) { return secao.contains(campo); }).length;
+      var preenchido = Array.prototype.some.call(secao.querySelectorAll('[data-chave]'),
+        function (campo) { return !campo.disabled && String(campo.value || '').trim() !== ''; });
+      var comErro = !!secao.querySelector('.campo.com-erro');
+      secao.classList.toggle('com-erro', comErro);
+      var nome = secao.querySelector('legend') ? secao.querySelector('legend').textContent : 'Seção ' + (i + 1);
+      var atual = secao.id === secaoAtual;
+      return '<li><button type="button" class="indice-item' + (comErro ? ' com-erro' : '') + (atual ? ' atual' : '')
+        + '"' + (atual ? ' aria-current="true"' : '') + ' data-ir-para-secao="' + secao.id + '">'
+        + '<span class="indice-numero">' + (i + 1) + '</span>'
+        + '<span class="indice-nome">' + escapar(nome) + '</span>'
+        + (quantos ? '<span class="indice-falta">' + quantos + (quantos === 1 ? ' obrigatório' : ' obrigatórios') + '</span>'
+          : (preenchido ? '<span class="indice-ok" aria-label="completa">' + Moldura.icone('confirmado') + '</span>' : ''))
+        + '</button></li>';
+    });
+    var html = '<ol>' + itens.join('') + '</ol>'
+      + '<p class="indice-nota">As seções e os campos vêm de Configurações › Cadastrar Caso.</p>';
+    indice.hidden = false;
+    // Só redesenha quando mudou: o "change" de quem sai de um campo para
+    // clicar no índice chega no meio do clique, e trocar o botão debaixo do
+    // mouse perderia o clique.
+    if (indice.getAttribute('data-desenhado') !== html) {
+      indice.innerHTML = html;
+      indice.setAttribute('data-desenhado', html);
+    }
+    if (indice.getAttribute('data-clique-ligado') === 'sim') return;
+    indice.setAttribute('data-clique-ligado', 'sim');
+    // Um ouvinte só, no índice: vale para os botões de qualquer redesenho.
+    // Com o mouse, age no "mousedown" — antes de o campo que se deixa perder
+    // o foco (o que pode marcar o erro e redesenhar o índice debaixo do
+    // clique). Pelo teclado (Enter, Espaço), o "click" de sempre.
+    function botaoDo(evento) {
+      return evento.target && evento.target.closest ? evento.target.closest('[data-ir-para-secao]') : null;
+    }
+    indice.addEventListener('mousedown', function (evento) {
+      var botao = botaoDo(evento);
+      if (!botao || evento.button !== 0) return;
+      evento.preventDefault();
+      irParaASecao(botao);
+    });
+    indice.addEventListener('click', function (evento) {
+      var botao = botaoDo(evento);
+      if (botao && evento.detail === 0) irParaASecao(botao);
+    });
+  }
+
+  function irParaASecao(botao) {
+    var secao = document.getElementById(botao.getAttribute('data-ir-para-secao'));
+    if (!secao) return;
+    secao.scrollIntoView({ block: 'start' });
+    // O primeiro campo À VISTA: o condicional escondido não recebe o cursor.
+    var campos = secao.querySelectorAll('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
+    for (var c = 0; c < campos.length; c++) {
+      var bloco = campos[c].closest('[data-campo]');
+      if (bloco && bloco.hidden) continue;
+      if (campos[c].type === 'hidden') continue;
+      campos[c].focus({ preventScroll: true });
+      break;
+    }
+  }
+
+  /*
+    V4 (Etapa 90, aprovado): o erro no próprio campo. O botão fica apagado até
+    os obrigatórios estarem preenchidos (pedido do PO), então o aviso não
+    espera a tentativa de cadastrar: ao sair de um obrigatório vazio, o campo
+    fica vermelho com "é obrigatório", a seção e o índice também; preencheu,
+    sai. Os problemas que o servidor devolve continuam marcados como antes.
+  */
+  var AVISO_DE_OBRIGATORIO = 'é obrigatório';
+  function vigiarOCampoVazio() {
+    var raiz = corpo();
+    if (!raiz || raiz.getAttribute('data-campo-vazio-vigiado') === 'sim') return;
+    raiz.setAttribute('data-campo-vazio-vigiado', 'sim');
+    raiz.addEventListener('focusout', function (evento) {
+      var campo = evento.target;
+      if (!campo || campo.getAttribute('aria-required') !== 'true' || campo.disabled) return;
+      var bloco = campo.closest ? campo.closest('[data-campo]') : null;
+      if (!bloco || bloco.hidden || String(campo.value || '').trim()) return;
+      var aviso = bloco.querySelector('.erro');
+      bloco.classList.add('com-erro');
+      campo.setAttribute('aria-invalid', 'true');
+      if (aviso) { aviso.textContent = AVISO_DE_OBRIGATORIO; aviso.hidden = false; }
+      desenharIndice();
+    });
+    function conferir(evento) {
+      var campo = evento.target;
+      var bloco = campo && campo.closest ? campo.closest('[data-campo]') : null;
+      var aviso = bloco ? bloco.querySelector('.erro') : null;
+      if (bloco && aviso && aviso.textContent === AVISO_DE_OBRIGATORIO && String(campo.value || '').trim()) {
+        bloco.classList.remove('com-erro');
+        campo.removeAttribute('aria-invalid');
+        aviso.textContent = ''; aviso.hidden = true;
+      }
+      desenharIndice();
+    }
+    raiz.addEventListener('input', conferir);
+    raiz.addEventListener('change', conferir);
+    raiz.addEventListener('focusin', function (evento) {
+      var secao = evento.target && evento.target.closest ? evento.target.closest('fieldset.secao') : null;
+      if (secao && secao.id && secao.id !== secaoAtual) { secaoAtual = secao.id; desenharIndice(); }
+    });
   }
 
   /* ----------------------------------------------------------- comportamento */
@@ -207,6 +328,8 @@ var TelaCadastrarCaso = (function () {
           formulário não tem mais nada a pedir.
         */
         Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'), elemento('falta-no-caso'));
+        vigiarOCampoVazio();
+        desenharIndice();
         // Só AGORA o formulário está inteiro — desenhado, ligado e com os
         // padrões. Se der erro na carga, os botões continuam escondidos: não
         // há o que cadastrar, e o recado do erro é o que importa ler.
@@ -278,6 +401,7 @@ var TelaCadastrarCaso = (function () {
           elemento('formulario-do-caso'));
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
+        desenharIndice();   // a seção e o índice acompanham o campo com erro (V4)
       });
   }
 
@@ -295,6 +419,9 @@ var TelaCadastrarCaso = (function () {
     Nada abre sozinho: o caso só abre com o clique.
   */
   function mostrarCadastroConcluido(resposta) {
+    // O índice é do formulário; com o cadastro concluído no lugar, ele sai.
+    var indiceDoCadastro = elemento('indice-do-cadastro');
+    if (indiceDoCadastro) indiceDoCadastro.hidden = true;
     var permissoes = (pacoteDaTela && pacoteDaTela.permissoes) || {};
     var acoes = permissoes.acoes || [];
     var telas = permissoes.telas || [];

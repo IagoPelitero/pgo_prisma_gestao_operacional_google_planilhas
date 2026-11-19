@@ -1212,7 +1212,8 @@ var Formulario = (function () {
     // O asterisco existe também no campo "obrigatório quando…": ele nasce
     // escondido e `aplicarCondicoes` o acende quando a condição vale.
     var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>'
-      : (campo.obrigatorioSe ? ' <span class="exigido" data-exigido-condicional hidden>*</span>' : '');
+      : (campo.obrigatorioSe ? ' <span class="pedido-pelo" data-pedido-pelo hidden></span>'
+        + ' <span class="exigido" data-exigido-condicional hidden>*</span>' : '');
     /*
       O asterisco é VISUAL. Quem usa leitor de tela não o ouve como "campo
       obrigatório" — ouve "asterisco", ou nada. `aria-required` é o que diz
@@ -1596,6 +1597,17 @@ var Formulario = (function () {
       }
       var asterisco = cobrado.querySelector('[data-exigido-condicional]');
       if (asterisco) asterisco.hidden = !vale;
+      // V6 (Etapa 90, aprovado): a etiqueta diz POR QUE o campo virou
+      // obrigatório — "pedido pelo status Retido". A regra é a mesma; a
+      // etiqueta só a explica.
+      var etiqueta = cobrado.querySelector('[data-pedido-pelo]');
+      if (etiqueta) {
+        var rotuloDeQuemManda = manda && manda.closest ? manda.closest('[data-campo]') : null;
+        var nomeDeQuemManda = rotuloDeQuemManda && rotuloDeQuemManda.querySelector('label')
+          ? textoDoRotulo(rotuloDeQuemManda.querySelector('label')).toLowerCase() : '';
+        etiqueta.textContent = vale ? 'pedido pelo ' + (nomeDeQuemManda ? nomeDeQuemManda + ' ' : '') + valorQueManda : '';
+        etiqueta.hidden = !vale;
+      }
     }
 
     var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
@@ -1853,8 +1865,10 @@ var Formulario = (function () {
       .entao(function (resposta) {
         if (String(campo.value || '').trim() !== perguntada) return;
         if (resposta.situacao === 'REPETIDA' || resposta.situacao === 'UNICA') {
+          // V5 (Etapa 90, aprovado): a proposta repetida em destaque, no âmbar
+          // de atenção — é aviso para conferir, e não bloqueio.
           selo.className = 'selo-susep '
-            + (resposta.situacao === 'REPETIDA' ? 'bloqueada' : 'liberada');
+            + (resposta.situacao === 'REPETIDA' ? 'repetida' : 'liberada');
           selo.textContent = resposta.mensagem;
         } else {
           // Proposta pela metade, ou canal sem proposta: nada a dizer. O
@@ -2113,6 +2127,21 @@ var Formulario = (function () {
     return camposQueFaltam(raiz)[0] || null;
   }
 
+  /**
+   * O nome do campo, como está no rótulo — sem o asterisco e sem a etiqueta
+   * "pedido pelo…" (V6), que explica o rótulo mas não faz parte do nome.
+   */
+  function textoDoRotulo(rotulo) {
+    if (!rotulo) return '';
+    var texto = String(rotulo.textContent || '');
+    var extras = rotulo.querySelectorAll ? rotulo.querySelectorAll('.pedido-pelo') : [];
+    for (var i = 0; i < extras.length; i++) {
+      var dele = String(extras[i].textContent || '');
+      if (dele) texto = texto.replace(dele, '');
+    }
+    return texto.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+  }
+
   /** Todos os obrigatórios ainda vazios, na ordem do formulário. */
   function camposQueFaltam(raiz) {
     var faltam = [];
@@ -2138,7 +2167,7 @@ var Formulario = (function () {
     camposQueFaltam(raiz).forEach(function (campo) {
       var bloco = campo.closest ? campo.closest('[data-campo]') : null;
       var rotulo = bloco ? bloco.querySelector('label') : null;
-      var nome = rotulo ? String(rotulo.textContent).replace(/\*/g, '').trim() : '';
+      var nome = textoDoRotulo(rotulo);
       if (nome && nomes.indexOf(nome) < 0) nomes.push(nome);
     });
     if (!nomes.length) return '';
@@ -2264,6 +2293,7 @@ var Formulario = (function () {
     limparErros: limparErros,
     mostrarProblemas: mostrarProblemas,
     faltaPreencher: faltaPreencher,
+    camposQueFaltam: camposQueFaltam,
     textoDoQueFalta: textoDoQueFalta,
     vigiarObrigatorios: vigiarObrigatorios,
     comecouAGravar: comecouAGravar,

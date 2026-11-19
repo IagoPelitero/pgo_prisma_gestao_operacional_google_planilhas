@@ -1258,7 +1258,10 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
   `:has()` não existe em navegador anterior a 2022, que ignora a regra calado
   (achado 69 e a armadilha 9 do 03-manutencao.md).
 */
-.miolo[data-tela="cadastrarCaso"] > * { max-width: 1080px; margin-inline: auto; }
+/* Etapa 90 (proposta aprovada): com o índice das seções ao lado, a coluna
+   centralizada passou de 1080 px para 1480 px — continua no meio em monitor
+   largo, e o formulário ganha a largura que o índice ocupa. */
+.miolo[data-tela="cadastrarCaso"] > * { max-width: 1480px; margin-inline: auto; }
 
 .secao { border: 0; padding: 0; margin: 0 0 26px; }
 .secao:last-of-type { margin-bottom: 8px; }
@@ -2380,6 +2383,83 @@ table.fila.legado td { color: var(--suave); }
     position: sticky; top: var(--altura-da-barra-superior, 76px); z-index: 3;
     background: var(--superficie-2);
   }
+}
+
+/* =====================================================================
+   ETAPA 90 · CADASTRAR CASO — as seções em blocos, com o índice (aprovado),
+   V4 (o erro no próprio campo), V5 (a proposta repetida) e V6 ("pedido
+   pelo status…"). As seções e os campos continuam vindo de Configurações.
+   ===================================================================== */
+.cadastro-em-blocos { display: flex; align-items: flex-start; gap: 18px; }
+.cadastro-em-blocos > .formulario { flex: 1 1 auto; min-width: 0; }
+.indice-do-cadastro {
+  flex: 0 0 240px; position: sticky; top: calc(var(--altura-da-barra-superior, 76px) + 16px);
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 10px;
+}
+.indice-do-cadastro ol { list-style: none; margin: 0; padding: 0; }
+.indice-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 9px 10px; border: 0; border-radius: var(--raio-pequeno);
+  background: transparent; color: var(--texto); font: inherit; font-size: 14.5px; cursor: pointer;
+}
+.indice-item:hover { background: var(--superficie-2); }
+.indice-numero {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.indice-nome { flex: 1 1 auto; min-width: 0; }
+.indice-falta { font-size: 12px; font-weight: 700; color: var(--ruim); white-space: nowrap; }
+.indice-ok { display: inline-flex; color: var(--bom); }
+.indice-ok svg { width: 16px; height: 16px; }
+.indice-item.atual { background: var(--destaque-tenue); color: var(--destaque-escuro); font-weight: 600; }
+.indice-nota { margin: 8px 6px 4px; padding-top: 10px; border-top: 1px solid var(--linha); font-size: 12.5px; color: var(--suave); }
+
+.cadastro-em-blocos .formulario { background: none; border: 0; box-shadow: none; padding: 0; max-width: none; }
+.cadastro-em-blocos #corpo-do-formulario { counter-reset: secao-do-cadastro; }
+.cadastro-em-blocos fieldset.secao {
+  counter-increment: secao-do-cadastro;
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 16px 20px 20px; margin: 0 0 14px;
+  scroll-margin-top: calc(var(--altura-da-barra-superior, 76px) + 16px);
+}
+.cadastro-em-blocos fieldset.secao legend {
+  float: left; width: 100%; display: flex; align-items: center; gap: 9px;
+  margin-bottom: 14px; color: var(--suave);
+}
+.cadastro-em-blocos fieldset.secao legend::before {
+  content: counter(secao-do-cadastro); display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%; letter-spacing: 0;
+  font-size: 12px; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.cadastro-em-blocos fieldset.secao .grade { clear: both; }
+.cadastro-em-blocos fieldset.secao.com-erro { border-color: var(--ruim); box-shadow: 0 0 0 1px var(--ruim), var(--sombra); }
+.cadastro-em-blocos .acoes {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 12px 16px; margin-top: 4px;
+}
+@media (max-width: 1000px) {
+  .indice-do-cadastro { display: none; }
+}
+/* O que falta, à direita da barra, numa etiqueta de atenção (aprovado). */
+.cadastro-em-blocos .falta-preencher {
+  margin-left: auto; padding: 5px 12px; border-radius: 999px; background: var(--atencao-tenue);
+}
+.cadastro-em-blocos .falta-preencher::before { content: "\26A0\FE0E  "; }
+
+/* V4: o erro no próprio campo, com o sinal antes. */
+.campo.com-erro .erro::before { content: "\26A0\FE0E  "; }
+/* V5: a proposta repetida, em destaque de atenção. */
+.selo-susep.repetida {
+  color: var(--atencao); background: var(--atencao-tenue); border-radius: var(--raio-pequeno);
+  border: 1px solid color-mix(in srgb, var(--atencao) 30%, transparent); padding: 8px 12px; line-height: 1.4;
+}
+.selo-susep.repetida::before { content: "\26A0\FE0E  "; }
+/* V6: por que o campo virou obrigatório. */
+.pedido-pelo {
+  display: inline-block; white-space: nowrap;
+  margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; background: var(--destaque-tenue); color: var(--destaque-escuro);
 }
 
 /* ==================================================== Produtividade RECC === */

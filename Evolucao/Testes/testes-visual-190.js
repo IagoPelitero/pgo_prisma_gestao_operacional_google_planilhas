@@ -118,6 +118,33 @@ function rodarTestesDoVisual190() {
   teste('a situação vem em cima só no desenho: as colunas da fila continuam as de Configurações', () => {
     contem(trabalho, 'grupo.filter(function (celula) { return celula.ehStatus; })');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Cadastrar Caso: seções em blocos com índice, V4, V5 e V6');
+
+  const cadastrar = ler('CadastrarCaso.html');
+  const comuns = ler('Comuns.html');
+  teste('o índice mostra as seções que vêm de Configurações, com o que falta pela mesma regra do botão', () => {
+    contem(cadastrar, 'id="indice-do-cadastro" aria-label="Seções do formulário"');
+    contem(cadastrar, 'Formulario.camposQueFaltam(corpo())');
+    contem(cadastrar, 'As seções e os campos vêm de Configurações › Cadastrar Caso.');
+    contem(estilos, '.cadastro-em-blocos fieldset.secao {');
+    contem(estilos, 'counter-increment: secao-do-cadastro;');
+  });
+
+  teste('V4: sair de um obrigatório vazio marca o campo, a seção e o índice — e preencher tira', () => {
+    contem(cadastrar, "var AVISO_DE_OBRIGATORIO = 'é obrigatório';");
+    contem(cadastrar, "campo.setAttribute('aria-invalid', 'true');");
+    contem(cadastrar, "campo.removeAttribute('aria-invalid');");
+  });
+
+  teste('V5 e V6: a proposta repetida em âmbar, e o "pedido pelo…" fora do nome do campo', () => {
+    contem(comuns, "(resposta.situacao === 'REPETIDA' ? 'repetida' : 'liberada')");
+    contem(estilos, '.selo-susep.repetida {');
+    contem(comuns, 'data-pedido-pelo hidden');
+    contem(comuns, "'pedido pelo ' +");
+    contem(comuns, 'var nome = textoDoRotulo(rotulo);');
+  });
 }
 
 module.exports = { rodarTestesDoVisual190 };
