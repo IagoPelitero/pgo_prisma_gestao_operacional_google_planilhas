@@ -184,6 +184,9 @@ function criarAbaDoContrato_(planilha, esquema) {
     aba.getRange(2, i + 1, esquema.reserva, 1).setNumberFormat(formato);
   }
 
+  // Etapa 88 (B4): aba do contrato criada ou acertada — o resumo da estrutura
+  // guardado não vale mais.
+  esquecerResumoDaEstrutura_();
   return esquema.aba;
 }
 

@@ -74,7 +74,8 @@ function resumoDasConfiguracoes() {
 function resumoDasConfiguracoesSemRelogio_() {
   var quem = exigirPermissao_(RECC_ACOES.CONFIGURAR);
   var catalogo = lerRegistros_('CATALOGO');
-  var laudo = conferirEstrutura_();
+  // Etapa 88 (B4): o resumo da estrutura dos últimos 5 minutos, quando há.
+  var estrutura = resumoDaEstruturaReaproveitado_();
 
   function quantosDoTipo(tipo) {
     return catalogo.filter(function (item) {
@@ -166,15 +167,7 @@ function resumoDasConfiguracoesSemRelogio_() {
         descricao: 'O laudo da planilha, a auditoria e a base antiga',
         quantidade: 0 }
     ],
-    estrutura: {
-      emOrdem: laudo.ok,
-      abasComProblema: laudo.abas.filter(function (aba) {
-        return !aba.existe || aba.faltando.length;
-      }),
-      colunasForaDoContrato: laudo.abas.reduce(function (soma, aba) {
-        return soma + aba.aMais.length;
-      }, 0)
-    }
+    estrutura: estrutura
   };
 }
 

@@ -1547,6 +1547,9 @@ var lendoTiposDeclarados = false;
 
 function esquecerEstruturaLida_(nomeDaAba) {
   esquecerCacheDaConfiguracao_(nomeDaAba);
+  // Etapa 88 (B4): sem nome é "a estrutura mudou"; CAMPOS e CANAIS decidem
+  // quais colunas são do formulário. Gravar um caso não esquece o resumo.
+  if (!nomeDaAba || nomeDaAba === 'CAMPOS' || nomeDaAba === 'CANAIS') esquecerResumoDaEstrutura_();
   esquecerMemoriaDaCarga_(nomeDaAba);
   if (nomeDaAba) {
     delete estruturasJaLidas[nomeDaAba];
@@ -3609,5 +3612,74 @@ function conferirEstrutura_() {
     laudo.abas.push(item);
   });
 
+  // Todo laudo lido na hora renova o resumo guardado (Etapa 88, B4).
+  guardarResumoDaEstrutura_(resumoDoLaudo_(laudo));
   return laudo;
+}
+
+/* ============================================================================
+   O RESUMO DA ESTRUTURA, REAPROVEITADO POR 5 MINUTOS (Etapa 88, B4)
+   ============================================================================
+   O panorama de Configurações conferia a estrutura a cada abertura: ~96
+   chamadas à planilha (uma aba do contrato depois da outra), para mostrar uma
+   faixa — "A planilha saiu do contrato — ver o laudo". O resumo do laudo agora
+   fica no CacheService pelos mesmos 5 minutos da configuração, com as mesmas
+   regras dela:
+     - o que o Prisma muda na estrutura ESQUECE o resumo na hora: criar ou
+       apagar coluna, criar aba, instalar, o atualizarPGO, mexer nos campos
+       do formulário ou nos canais (tudo passa por esquecerEstruturaLida_);
+     - "Aplicar mudanças da planilha agora" (Configurações › Estrutura)
+       também esquece — é a atualização imediata;
+     - a seção Estrutura e o diagnóstico leem SEMPRE na hora, e o laudo que
+       leram renova o resumo;
+     - quem mexe DIRETO na planilha vê a faixa mudar em até 5 minutos.
+   O cache nunca é necessário: sem ele, ou com o valor estragado, lê como antes.
+   "Medir a velocidade" não passa por aqui.
+   ============================================================================ */
+var RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA = 'pgo-estrutura-1|resumo';
+
+/** O que o panorama usa do laudo. */
+function resumoDoLaudo_(laudo) {
+  return {
+    emOrdem: laudo.ok,
+    abasComProblema: laudo.abas.filter(function (aba) {
+      return !aba.existe || aba.faltando.length;
+    }),
+    colunasForaDoContrato: laudo.abas.reduce(function (soma, aba) {
+      return soma + aba.aMais.length;
+    }, 0)
+  };
+}
+
+function guardarResumoDaEstrutura_(resumo) {
+  var cache = cacheDoScript_();
+  if (!cache) return;
+  try {
+    cache.put(RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA, JSON.stringify(resumo), RECC_SEGUNDOS_DO_CACHE);
+  } catch (erro) {
+    // Sem cache, a próxima abertura confere a estrutura como antes.
+  }
+}
+
+function esquecerResumoDaEstrutura_() {
+  var cache = cacheDoScript_();
+  if (!cache) return;
+  try { cache.remove(RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA); } catch (erro) { /* expira em 5 minutos */ }
+}
+
+/** O resumo guardado, se ainda vale; senão, confere a estrutura agora (e guarda). */
+function resumoDaEstruturaReaproveitado_() {
+  var cache = cacheDoScript_();
+  if (cache) {
+    try {
+      var guardado = cache.get(RECC_CHAVE_DO_RESUMO_DA_ESTRUTURA);
+      if (guardado) {
+        var resumo = JSON.parse(guardado);
+        if (resumo && typeof resumo.emOrdem === 'boolean' && Array.isArray(resumo.abasComProblema)) return resumo;
+      }
+    } catch (erro) {
+      // Valor estragado: confere de novo.
+    }
+  }
+  return resumoDoLaudo_(conferirEstrutura_());
 }
