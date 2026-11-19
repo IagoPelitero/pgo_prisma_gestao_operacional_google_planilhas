@@ -1207,7 +1207,8 @@ function rodarTestesDeDiagnostico() {
         withSuccessHandler: function () { return this; },
         withFailureHandler: function () { return this; },
         // Esta nunca responde. É exatamente o caso relatado.
-        umaQueSomeNoAr: function () {}
+        umaQueSomeNoAr: function () {},
+        salvarQueSomeNoAr: function () {}
       } } }
     });
     const fonte = fs.readFileSync(
@@ -1227,11 +1228,24 @@ function rodarTestesDeDiagnostico() {
 
     desistencia.funcao();
     const recado = vm.runInContext('globalThis.__d || ""', contexto);
-    contem(recado, 'umaQueSomeNoAr', 'diz qual função não respondeu');
-    contem(recado, 'Quase sempre é demora', 'a causa mais provável (Etapa 59)');
-    contem(recado, 'não grava duas vezes', 'quem gravava pode repetir sem duplicar');
-    contem(recado, 'não foi copiado', 'e a outra causa');
-    contem(recado, 'diagnosticoRECC', 'e onde ver a lista do que falta');
+    // F15 (Etapa 90): claro para quem usa — sem o nome técnico da função.
+    contem(recado, 'O sistema demorou para responder', 'a leitura: tente de novo');
+    contem(recado, 'planilha ocupada', 'a causa mais provável (Etapa 59)');
+    verdadeiro(recado.indexOf('umaQueSomeNoAr') < 0 && recado.indexOf('diagnosticoRECC') < 0,
+      'quem não configura não vê o detalhe técnico');
+
+    // A gravação: pode ter sido concluída — conferir antes de salvar de novo.
+    const antes = marcados.length;
+    vm.runInContext("Servidor.comDetalheTecnico(true); Servidor.chamar('salvarQueSomeNoAr')"
+      + ".entao(function () {}).senao(function (e) { globalThis.__g = e.message; globalThis.__t = e.tempoEsgotado; });", contexto);
+    marcados.slice(antes).find(function (m) { return m.atraso === 40000; }).funcao();
+    const daGravacao = vm.runInContext('globalThis.__g || ""', contexto);
+    contem(daGravacao, 'pode ter sido concluída', 'não manda repetir às cegas');
+    contem(daGravacao, 'confira se a alteração já aparece');
+    // Para o administrador, o detalhe técnico — o nome e onde diagnosticar.
+    contem(daGravacao, 'Para o administrador: "salvarQueSomeNoAr" não respondeu em 40 segundos');
+    contem(daGravacao, 'diagnosticoRECC', 'e onde ver a lista do que falta');
+    igual(vm.runInContext('globalThis.__t', contexto), true, 'o erro diz que foi tempo esgotado');
   });
 
   secao('O arquivo que ficou para trás na cópia');

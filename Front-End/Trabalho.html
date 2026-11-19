@@ -199,7 +199,7 @@ var TelaTrabalho = (function () {
     var meuPedido = ++pedidoDoPainel;
     painelDesenhadoPara = '';
     desmarcarAtualizando(elemento('painel'));
-    elemento('painel').innerHTML = '<p class="carregando-campos">Lendo a Agenda…</p>';
+    elemento('painel').innerHTML = '<p class="carregando-campos" role="status">Lendo a Agenda…</p>';
     Servidor.chamar('agendaDaMesa', canalEscolhido, buscaNaAgenda)
       .entao(function (resposta) {
         if (meuPedido !== pedidoDoPainel) return;
@@ -224,7 +224,7 @@ var TelaTrabalho = (function () {
       })
       .senao(function (erro) {
         if (meuPedido !== pedidoDoPainel) return;
-        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -752,7 +752,7 @@ var TelaTrabalho = (function () {
       botoes[i].addEventListener('click', function () {
         var idDoCaso = this.getAttribute('data-trabalhar-do-aviso');
         sair();
-        CasoEmModal.abrir(canalEscolhido, idDoCaso, carregar);
+        CasoEmModal.abrir(canalEscolhido, idDoCaso, depoisDeGravar);
       });
     }
     document.getElementById('fechar-aviso-de-prazo').focus();
@@ -815,6 +815,21 @@ var TelaTrabalho = (function () {
   // `recado` é o texto da espera ("Trazendo os 5000 casos…"). Só vale texto:
   // `carregar` também é passado como "depois de salvar" ao modal do caso, que
   // o chama com outra coisa.
+  /**
+   * F8 (Etapa 90): depois de gravar no modal ou no "Alterar status", diz onde
+   * o caso foi parar — "Caso 123 atualizado. Agora está em Casos concluídos."
+   * O destino vem do servidor, pela mesma regra que monta a fila; canal sem
+   * sub-abas diz só "Caso 123 atualizado.". E a fila recarrega, como antes.
+   */
+  function depoisDeGravar() {
+    var gravado = CasoEmModal.oQueGravou();
+    if (gravado) {
+      Moldura.toast('Caso ' + gravado.id + ' atualizado.'
+        + (gravado.destino ? ' Agora está em ' + gravado.destino + '.' : ''), 'bom');
+    }
+    carregar();
+  }
+
   function carregar(recado) {
     var meuPedido = ++pedidoDoPainel;
     var painel = elemento('painel');
@@ -824,7 +839,7 @@ var TelaTrabalho = (function () {
     } else if (painel) {
       painelDesenhadoPara = '';
       desmarcarAtualizando(painel);
-      painel.innerHTML = '<p class="carregando-campos">'
+      painel.innerHTML = '<p class="carregando-campos" role="status">'
         + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
     }
 
@@ -851,7 +866,7 @@ var TelaTrabalho = (function () {
         // O erro limpa a tela: o que estava esmaecido não vira resultado (F5).
         painelDesenhadoPara = '';
         desmarcarAtualizando(elemento('painel'));
-        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -929,11 +944,11 @@ var TelaTrabalho = (function () {
     });
 
     ligarCliques('[data-trabalhar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), carregar);
+      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), depoisDeGravar);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
       CasoEmModal.trocarSituacao(canalEscolhido,
-        botao.getAttribute('data-status-do-caso'), carregar);
+        botao.getAttribute('data-status-do-caso'), depoisDeGravar);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');

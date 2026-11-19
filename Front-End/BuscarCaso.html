@@ -165,7 +165,7 @@ var TelaBuscarCaso = (function () {
     procurando = true;
     elemento('botao-buscar').disabled = true;
     elemento('resultado-da-busca').innerHTML =
-      '<p class="carregando-campos">Procurando…</p>';
+      '<p class="carregando-campos" role="status">Procurando…</p>';
 
     Servidor.chamar('buscarCasos', termo, onde, incluirLegado,
       incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado), pesquisarPor)

@@ -506,6 +506,90 @@ var Moldura = (function () {
     usa esta, e os avisos se empilham em vez de cobrir um ao outro. O erro
     fica mais tempo na tela: é o que mais precisa ser lido.
   */
+  /*
+    F17 (Etapa 90): O FOCO NOS DIÁLOGOS, num lugar só, para todos eles.
+
+    1. Tab e Shift+Tab dão a volta DENTRO do diálogo de cima (o último
+       [aria-modal] aberto) — sem isso, o Tab saía do modal e andava pela fila
+       escondida atrás dele. Só a tecla Tab: Esc, Ctrl+Enter e os atalhos
+       seguem com quem já cuidava deles, e a confirmação do F1/F2 aberta por
+       cima do modal passa a ser o "diálogo de cima" naturalmente.
+    2. Ao fechar, o foco volta para onde estava antes de o diálogo abrir —
+       o botão "Trabalhar no caso", o "Alterar status" —, se ele ainda está
+       na tela e o foco não foi para outro lugar de propósito.
+  */
+  var FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]),'
+    + ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function dialogoDeCima() {
+    var abertos = document.querySelectorAll('.dialogo [aria-modal="true"]');
+    return abertos.length ? abertos[abertos.length - 1] : null;
+  }
+  function focaveisDe(caixa) {
+    return Array.prototype.filter.call(caixa.querySelectorAll(FOCAVEIS), function (el) {
+      return el.getClientRects().length > 0 && !el.closest('[inert]');
+    });
+  }
+  function prenderOFoco(evento) {
+    if (evento.key !== 'Tab') return;
+    var caixa = dialogoDeCima();
+    if (!caixa) return;
+    var lista = focaveisDe(caixa);
+    if (!lista.length) { evento.preventDefault(); return; }
+    var primeiro = lista[0];
+    var ultimo = lista[lista.length - 1];
+    var agora = document.activeElement;
+    if (!caixa.contains(agora)) {
+      evento.preventDefault();
+      (evento.shiftKey ? ultimo : primeiro).focus();
+    } else if (evento.shiftKey && agora === primeiro) {
+      evento.preventDefault(); ultimo.focus();
+    } else if (!evento.shiftKey && agora === ultimo) {
+      evento.preventDefault(); primeiro.focus();
+    }
+  }
+  var ultimosFocos = [];
+  var voltarPara = [];   // { dialogo, elemento }
+  function lembrarOFoco(evento) {
+    ultimosFocos.push(evento.target);
+    if (ultimosFocos.length > 12) ultimosFocos.shift();
+  }
+  function quandoODomMudar(mudancas) {
+    mudancas.forEach(function (mudanca) {
+      Array.prototype.forEach.call(mudanca.addedNodes, function (no) {
+        if (!no.classList || !no.classList.contains('dialogo')) return;
+        // Quem tinha o foco ANTES: o último focado que não é deste diálogo.
+        for (var i = ultimosFocos.length - 1; i >= 0; i--) {
+          var antes = ultimosFocos[i];
+          if (antes && antes !== document.body && !no.contains(antes)) {
+            voltarPara.push({ dialogo: no, elemento: antes });
+            return;
+          }
+        }
+      });
+      Array.prototype.forEach.call(mudanca.removedNodes, function (no) {
+        for (var i = voltarPara.length - 1; i >= 0; i--) {
+          if (voltarPara[i].dialogo !== no) continue;
+          var alvo = voltarPara[i].elemento;
+          voltarPara.splice(i, 1);
+          var semFoco = !document.activeElement || document.activeElement === document.body
+            || !document.activeElement.isConnected;
+          if (semFoco && alvo && alvo.isConnected && !alvo.disabled && alvo.getClientRects().length) {
+            alvo.focus({ preventScroll: true });
+          }
+        }
+      });
+    });
+  }
+  if (typeof document !== 'undefined' && document.addEventListener && typeof MutationObserver !== 'undefined') {
+    document.addEventListener('keydown', prenderOFoco, true);
+    document.addEventListener('focusin', lembrarOFoco, true);
+    var vigiaDosDialogos = function () {
+      new MutationObserver(quandoODomMudar).observe(document.body, { childList: true });
+    };
+    if (document.body) vigiaDosDialogos();
+    else document.addEventListener('DOMContentLoaded', vigiaDosDialogos);
+  }
+
   function toast(mensagem, tom) {
     var pilha = document.getElementById('avisos-flutuantes');
     if (!pilha) {
@@ -517,12 +601,31 @@ var Moldura = (function () {
     }
     var aviso = document.createElement('div');
     aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
-    aviso.setAttribute('role', 'status');
-    aviso.textContent = mensagem;
+    /*
+      F16 (Etapa 90): o ERRO fica até a pessoa fechar — sumir sozinho em 6 s
+      perdia o recado de quem estava olhando para outro lugar. Ele é anunciado
+      como alerta (role="alert") e tem o ✕. O de sucesso e os outros somem
+      sozinhos, como antes.
+    */
+    var persistente = tom === 'ruim';
+    aviso.setAttribute('role', persistente ? 'alert' : 'status');
+    var texto = document.createElement('span');
+    texto.className = 'aviso-flutuante-texto';
+    texto.textContent = mensagem;
+    aviso.appendChild(texto);
+    function tirar() { if (aviso.parentNode) aviso.parentNode.removeChild(aviso); }
+    if (persistente) {
+      aviso.classList.add('persistente');
+      var fechar = document.createElement('button');
+      fechar.type = 'button';
+      fechar.className = 'aviso-flutuante-fechar';
+      fechar.setAttribute('aria-label', 'Fechar aviso');
+      fechar.innerHTML = icone('fechar');
+      fechar.addEventListener('click', tirar);
+      aviso.appendChild(fechar);
+    }
     pilha.appendChild(aviso);
-    window.setTimeout(function () {
-      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
-    }, tom === 'ruim' ? 6000 : 3200);
+    if (!persistente) window.setTimeout(tirar, 4500);
     return aviso;
   }
 
@@ -534,7 +637,7 @@ var Moldura = (function () {
     var blocos = [];
     for (var i = 0; i < (cartoes || 4); i++) blocos.push('<span class="esqueleto-cartao"></span>');
     return '<div class="esqueleto" aria-busy="true">'
-      + '<p class="carregando-campos">' + escapar(texto || 'Carregando…') + '</p>'
+      + '<p class="carregando-campos" role="status">' + escapar(texto || 'Carregando…') + '</p>'
       + '<div class="esqueleto-cartoes">' + blocos.join('') + '</div>'
       + '<span class="esqueleto-linha"></span><span class="esqueleto-linha"></span>'
       + '<span class="esqueleto-linha curta"></span></div>';
@@ -1320,6 +1423,9 @@ var Formulario = (function () {
         + ' autocomplete="off"' + exigido + travado + '>';
     }
 
+    // F18 (Etapa 90): o erro do campo é a DESCRIÇÃO do controle — quem usa
+    // leitor de tela ouve "é obrigatório" ao chegar nele, e não só quem vê.
+    controle = controle.replace(' data-chave="', ' aria-describedby="' + id + '-erro" data-chave="');
     var ajuda = campo.descricao
       ? '<small class="ajuda">' + escapar(campo.descricao) + '</small>' : '';
     var selo = campo.chave === 'susep'
@@ -1355,7 +1461,7 @@ var Formulario = (function () {
       + escapar(campo.chave) + '"' + condicao + '>'
       + '<label for="' + id + '">' + escapar(campo.rotulo) + obrigatorio + '</label>'
       + controle + ajuda + porQueTravado + selo
-      + '<small class="erro" hidden></small>'
+      + '<small class="erro" id="' + id + '-erro" hidden></small>'
       + '</div>';
   }
 
@@ -2087,6 +2193,8 @@ var Formulario = (function () {
       marcados[i].classList.remove('com-erro');
       var aviso = marcados[i].querySelector('.erro');
       if (aviso) { aviso.hidden = true; aviso.textContent = ''; }
+      var invalido = marcados[i].querySelector('[aria-invalid]');
+      if (invalido) invalido.removeAttribute('aria-invalid');
     }
   }
 
@@ -2106,6 +2214,8 @@ var Formulario = (function () {
       var aviso = caixa.querySelector('.erro');
       aviso.textContent = problema.erro;
       aviso.hidden = false;
+      var controle = caixa.querySelector('[data-chave]');
+      if (controle) controle.setAttribute('aria-invalid', 'true');   // F18
     });
     var primeiro = raiz.querySelector('.campo.com-erro input, .campo.com-erro select');
     if (primeiro) primeiro.focus();
@@ -2369,6 +2479,11 @@ var CasoEmModal = (function () {
   var envio = '';             // o código de envio da edição (Etapa 59)
   var aoFechar = null;        // o que a tela quer fazer quando algo mudou
   var mudouAlgo = false;
+  // F8 (Etapa 90): o que acabou de ser gravado — o Id e a sub-aba em que o
+  // caso ficou. A tela que quiser dizer "Agora está em…" pergunta com
+  // `oQueGravou()`; as outras seguem chamando o retorno sem argumento.
+  var oQueFoiGravado = null;
+  function oQueGravou() { var foi = oQueFoiGravado; oQueFoiGravado = null; return foi; }
   /*
     O RETRATO DOS CAMPOS QUANDO O CASO ACABOU DE ABRIR (Etapa 87, F1).
 
@@ -2419,7 +2534,7 @@ var CasoEmModal = (function () {
       + '</header>'
       + '<div class="modal-corpo" id="modal-corpo">'
       + '<form class="formulario no-modal" id="form-do-caso" novalidate>'
-      + '<div id="corpo-da-edicao"><p class="carregando-campos">'
+      + '<div id="corpo-da-edicao"><p class="carregando-campos" role="status">'
       + 'Abrindo o caso…</p></div></form>'
       + '<div id="modal-do-sistema"></div></div>'
       // "Salvar" nasce TRAVADO e só destrava com o formulário preenchido. É a
@@ -2647,7 +2762,7 @@ var CasoEmModal = (function () {
   function mostrarRecadoDeErro(erro) {
     var corpo = corpoDaEdicao();
     if (!corpo) return;
-    corpo.innerHTML = '<p class="carregando-campos erro-carga">'
+    corpo.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
       + escapar(erro.message || String(erro)) + '</p>';
     var subtitulo = elemento('modal-subtitulo');
     if (subtitulo) subtitulo.textContent = 'Não deu para abrir';
@@ -2680,9 +2795,10 @@ var CasoEmModal = (function () {
     if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
       versaoAoAbrir, colunasSuasNaTela(), envio)
-      .entao(function () {
+      .entao(function (resposta) {
         salvando = false;
         mudouAlgo = true;
+        oQueFoiGravado = { id: idAtual, destino: (resposta && resposta.destino) || '' };
         retratoAoAbrir = null;   // gravou: não há o que perder ao fechar
         /*
           O MODAL FECHA depois de gravar.
@@ -2825,8 +2941,9 @@ var CasoEmModal = (function () {
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
             elemento('situacao-nova').value,
             Formulario.valores(elemento('campos-da-situacao')), envio)
-            .entao(function () {
+            .entao(function (resposta) {
               gravando = false;
+              oQueFoiGravado = { id: idDoCaso, destino: (resposta && resposta.destino) || '' };
               sair();
               if (quandoMudar) quandoMudar();
             })
@@ -2845,7 +2962,7 @@ var CasoEmModal = (function () {
       });
   }
 
-  return { abrir: abrir, trocarSituacao: trocarSituacao };
+  return { abrir: abrir, trocarSituacao: trocarSituacao, oQueGravou: oQueGravou };
 })();
 </script>
 

@@ -236,15 +236,15 @@ var Servidor = (function () {
       encerrarADemora();
       if (!aTelaAindaEAMesma()) return;
       // A causa mais comum é DEMORA — a planilha ocupada com outras gravações
-      // ou lenta —, e não arquivo faltando (análise de 29/10, Etapa 59). Quem
-      // estava gravando pode repetir: o envio único não grava duas vezes.
-      var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
-        + segundosAteDesistir + ' segundos. Quase sempre é demora: a planilha '
-        + 'ocupada com outras gravações, ou lenta.\n\n'
-        + 'Se você estava gravando, pode clicar de novo: o PGO reconhece o mesmo '
-        + 'envio e não grava duas vezes. Se acontece em toda tela, mesmo com '
-        + 'pouca gente usando, pode ser um arquivo .gs que não foi copiado — '
-        + 'execute diagnosticoRECC() no editor, que lista o que falta.');
+      // ou lenta —, e não arquivo faltando (análise de 29/10, Etapa 59).
+      //
+      // F15 (Etapa 90): a mensagem fala a língua de quem usa. Numa GRAVAÇÃO,
+      // o servidor pode ter terminado depois dos 40 s: em vez de mandar
+      // clicar de novo às cegas, pede para conferir se já gravou. O detalhe
+      // técnico (o nome da função, o diagnóstico) vai para a aba ERROS e só
+      // aparece na tela para quem pode configurar.
+      var erro = new Error(mensagemDoTempoEsgotado(nomeDaFuncao, segundosAteDesistir));
+      erro.tempoEsgotado = true;
       avisarErro('tempo', 'O servidor não respondeu "' + nomeDaFuncao + '" em '
         + segundosAteDesistir + ' segundos', '');
       if (aoDarErrado) aoDarErrado(erro);
@@ -309,6 +309,27 @@ var Servidor = (function () {
     return acompanhamento;
   }
 
+  /** O que grava: o nome diz (salvar, editar, alterar, cadastrar…). */
+  var GRAVACAO = /^(salvar|editar|alterar|cadastrar|criar|excluir|ocultar|importar|gravar|definir|reordenar|liberar|bloquear|arquivar|renomear|remover|apagar|marcar|registrar|trocar|mover|desfazer|enviar|aplicar|guardar|limpar)/i;
+  var mostrarDetalheTecnico = false;
+  /** A tela diz se quem usa pode configurar (só então o detalhe técnico aparece). */
+  function comDetalheTecnico(pode) { mostrarDetalheTecnico = !!pode; }
+
+  /** F15: o recado do tempo esgotado, claro para quem usa. */
+  function mensagemDoTempoEsgotado(nomeDaFuncao, segundos) {
+    var texto = GRAVACAO.test(String(nomeDaFuncao || ''))
+      ? 'A gravação está demorando mais que o normal e pode ter sido concluída. '
+        + 'Antes de salvar de novo, atualize a tela e confira se a alteração já aparece.'
+      : 'O sistema demorou para responder. Isso costuma ser a planilha ocupada; '
+        + 'tente de novo em alguns instantes.';
+    if (mostrarDetalheTecnico) {
+      texto += '\n\nPara o administrador: "' + nomeDaFuncao + '" não respondeu em ' + segundos
+        + ' segundos. Se acontece em toda tela, mesmo com pouca gente usando, rode '
+        + 'diagnosticoRECC() no editor (Configurações › Estrutura › Rodar diagnóstico).';
+    }
+    return texto;
+  }
+
   /**
    * Um CÓDIGO DE ENVIO novo (Etapa 59). O formulário guarda o mesmo código
    * até a gravação dar certo: o servidor não grava duas vezes o mesmo código,
@@ -320,7 +341,7 @@ var Servidor = (function () {
 
   return {
     chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela,
-    novoEnvio: novoEnvio, avisarErro: avisarErro
+    novoEnvio: novoEnvio, avisarErro: avisarErro, comDetalheTecnico: comDetalheTecnico
   };
 })();
 
@@ -690,6 +711,8 @@ var Aplicacao = (function () {
       return;
     }
     pacote = resposta;
+    // F15: o detalhe técnico do erro só para quem pode configurar.
+    Servidor.comDetalheTecnico(podeVer('configuracoes'));
     if (pacote.identidade && pacote.identidade.corPrimaria) {
       // Em --cor-da-operacao, e não em --destaque: escrever direto no
       // destaque pintaria os quatro temas com a cor da operação, e o

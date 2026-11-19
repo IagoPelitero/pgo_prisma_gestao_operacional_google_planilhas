@@ -479,7 +479,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     contem(codigo, 'avisarQuandoChegar = !jaAvisouNoCanal[canalEscolhido]');
     contem(codigo, 'jaAvisouNoCanal[canalEscolhido] = true');
     contem(codigo, 'data-trabalhar-do-aviso');
-    contem(codigo, 'CasoEmModal.abrir(canalEscolhido, idDoCaso, carregar)');
+    contem(codigo, 'CasoEmModal.abrir(canalEscolhido, idDoCaso, depoisDeGravar)');
   });
 
   teste('o caso no amarelo chega na fila com o que o aviso precisa', () => {

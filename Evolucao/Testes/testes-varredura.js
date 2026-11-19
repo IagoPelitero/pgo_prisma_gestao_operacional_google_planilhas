@@ -311,8 +311,11 @@ function rodarTestesDaVarredura() {
   });
 
   teste('desistir de esperar avisa que a ação pode ter sido feita', () => {
-    // Etapa 59: e que repetir não duplica — o envio único reconhece o mesmo código.
-    contem(ler('Front-End/Aplicacao.html'), 'o PGO reconhece o mesmo');
+    // Etapa 59: repetir não duplica — o envio único reconhece o mesmo código, no
+    // servidor. Etapa 90 (F15): ainda assim a tela pede para CONFERIR antes de
+    // salvar de novo, em vez de mandar clicar outra vez às cegas.
+    contem(ler('Front-End/Aplicacao.html'), 'pode ter sido concluída');
+    contem(ler('Front-End/Aplicacao.html'), 'function novoEnvio()', 'o envio único continua');
   });
 
   /* ----------------------------------------------------------------------- */

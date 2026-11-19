@@ -76,14 +76,14 @@ var TelaImportacao = (function () {
     pacoteDoSistema = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="importacao"><p class="carregando-campos">'
+      + '<div id="importacao"><p class="carregando-campos" role="status">'
       + 'Lendo as colunas do canal…</p></div>';
   }
 
   function carregar() {
     var caixa = elemento('importacao');
     if (caixa) {
-      caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
+      caixa.innerHTML = '<p class="carregando-campos" role="status">Lendo as colunas do canal…</p>';
     }
     Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhido)
       .entao(function (resposta) {
@@ -103,12 +103,12 @@ var TelaImportacao = (function () {
         Servidor.chamar('opcoesDaImportacaoDoChat')
           .entao(function (doChat) { opcoes = doChat; desenhar(); })
           .senao(function (erro) {
-            elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
+            elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
               + escapar(erro.message || String(erro)) + '</p>';
           });
       })
       .senao(function (erro) {
-        elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }

@@ -64,14 +64,14 @@ var TelaTabelaCorretoras = (function () {
       }).join('') + '</div>'
       + '<div class="config" id="corretoras">'
       + '<div class="config-lista" id="corretoras-lista">'
-      + '<p class="carregando-campos">Lendo o cadastro…</p></div>'
+      + '<p class="carregando-campos" role="status">Lendo o cadastro…</p></div>'
       + '<aside class="config-painel" id="corretoras-painel"></aside>'
       + '</div>';
   }
 
   function carregar() {
     var lista = elemento('corretoras-lista');
-    if (lista) lista.innerHTML = '<p class="carregando-campos">Lendo o cadastro…</p>';
+    if (lista) lista.innerHTML = '<p class="carregando-campos" role="status">Lendo o cadastro…</p>';
 
     if (abaAtual === 'corretoras') {
       return Servidor.chamar('tabelaDeCorretoras', procurar, segmento)
@@ -96,7 +96,7 @@ var TelaTabelaCorretoras = (function () {
 
   function falhou(erro) {
     elemento('corretoras-lista').innerHTML =
-      '<p class="carregando-campos erro-carga">'
+      '<p class="carregando-campos erro-carga" role="alert">'
       + escapar(erro.message || String(erro)) + '</p>';
   }
 
@@ -711,7 +711,7 @@ var TelaTabelaCorretoras = (function () {
       return;
     }
     var onde = elemento('resultado-da-importacao');
-    onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
+    onde.innerHTML = '<p class="carregando-campos" role="status">Conferindo…</p>';
 
     Servidor.chamarSemPressa('conferirImportacao', tipoDaImportacao, fonte)
       .entao(function (resposta) {
@@ -720,7 +720,7 @@ var TelaTabelaCorretoras = (function () {
       })
       .senao(function (erro) {
         conferido = null;
-        onde.innerHTML = '<p class="carregando-campos erro-carga">'
+        onde.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -807,7 +807,7 @@ var TelaTabelaCorretoras = (function () {
     var fonte = guardarFonteDaImportacao();
     SenhaDeAdministrador.pedir(function () {
       elemento('resultado-da-importacao').innerHTML =
-        '<p class="carregando-campos">Gravando…</p>';
+        '<p class="carregando-campos" role="status">Gravando…</p>';
       Servidor.chamarSemPressa('aplicarImportacao', tipoDaImportacao, fonte)
         .entao(function (feito) {
           avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
@@ -874,8 +874,9 @@ var TelaTabelaCorretoras = (function () {
   function abrirCaixaDeExportar(arquivo) {
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
-    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true">'
-      + '<h3>Exportar</h3>'
+    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="titulo-exportar-corretoras">'
+      + '<h3 id="titulo-exportar-corretoras">Exportar</h3>'
       + '<p>Separado por ponto e vírgula, que é como o Excel em português abre '
       + 'sem perguntar nada.</p>'
       + '<textarea rows="8" readonly>' + escapar(arquivo.conteudo) + '</textarea>'

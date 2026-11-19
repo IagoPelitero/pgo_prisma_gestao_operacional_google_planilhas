@@ -303,7 +303,7 @@ var TelaConfiguracoes = (function () {
     pacoteDoSistema = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return '<div class="config" id="config">'
-      + '<p class="carregando-campos">Abrindo as configurações…</p>'
+      + '<p class="carregando-campos" role="status">Abrindo as configurações…</p>'
       + '</div>';
   }
 
@@ -385,12 +385,12 @@ var TelaConfiguracoes = (function () {
 
   function aguarde(mensagem) {
     elemento('config-lista').innerHTML =
-      '<p class="carregando-campos">' + escapar(mensagem) + '</p>';
+      '<p class="carregando-campos" role="status">' + escapar(mensagem) + '</p>';
     elemento('config-painel').innerHTML = '';
   }
 
   function falhou(erro) {
-    elemento('config-lista').innerHTML = '<p class="carregando-campos erro-carga">'
+    elemento('config-lista').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
       + escapar(erro.message || String(erro)) + '</p>';
   }
 
@@ -3521,21 +3521,21 @@ var TelaConfiguracoes = (function () {
   function ligarDiagnostico() {
     elemento('rodar-diagnostico').addEventListener('click', function () {
       var onde = elemento('resultado-do-diagnostico');
-      onde.innerHTML = '<p class="carregando-campos">Conferindo o sistema…</p>';
+      onde.innerHTML = '<p class="carregando-campos" role="status">Conferindo o sistema…</p>';
       Servidor.chamarSemPressa('diagnosticoDoSistema')
         .entao(function (laudo) { onde.innerHTML = laudoDesenhado(laudo); })
         .senao(function (erro) {
-          onde.innerHTML = '<p class="carregando-campos erro-carga">'
+          onde.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
             + escapar(erro.message || String(erro)) + '</p>';
         });
     });
     elemento('medir-velocidade').addEventListener('click', function () {
       var onde = elemento('resultado-do-diagnostico');
-      onde.innerHTML = '<p class="carregando-campos">Cronometrando cada aba…</p>';
+      onde.innerHTML = '<p class="carregando-campos" role="status">Cronometrando cada aba…</p>';
       Servidor.chamarSemPressa('raioXDaVelocidade')
         .entao(function (raio) { onde.innerHTML = raioXDesenhado(raio); })
         .senao(function (erro) {
-          onde.innerHTML = '<p class="carregando-campos erro-carga">'
+          onde.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
             + escapar(erro.message || String(erro)) + '</p>';
         });
     });
@@ -3672,7 +3672,7 @@ var TelaConfiguracoes = (function () {
   function ligarCadastros() {
     elemento('conferir-cadastros').addEventListener('click', function () {
       var caixa = elemento('laudo-dos-cadastros');
-      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
+      caixa.innerHTML = '<p class="carregando-campos" role="status">Abrindo a planilha…</p>';
 
       Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'), abasDeFora())
         .entao(function (laudo) {
@@ -4132,7 +4132,7 @@ var TelaConfiguracoes = (function () {
         desenharTudo();
       })
       .senao(function (erro) {
-        elemento('config').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('config').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }

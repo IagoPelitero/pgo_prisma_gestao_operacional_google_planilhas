@@ -63,7 +63,7 @@ var TelaProdutividade = (function () {
 
   function carregar() {
     var caixa = elemento('analitico');
-    if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
+    if (caixa) caixa.innerHTML = '<p class="carregando-campos" role="status">Somando os números…</p>';
 
     Servidor.chamar('produtividadeDaEquipe', canalEscolhido, filtros, periodo)
       .entao(function (resposta) {
@@ -71,7 +71,7 @@ var TelaProdutividade = (function () {
         desenhar();
       })
       .senao(function (erro) {
-        elemento('analitico').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('analitico').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -768,7 +768,7 @@ var TelaProdutividade = (function () {
   // `todos`: a lista vem com os 100 mais recentes; "Mostrar todos" pede o resto.
   function detalhar(idDoComponente, chaveDoPonto, todos) {
     var caixa = elemento('detalhe-do-painel');
-    caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
+    caixa.innerHTML = '<p class="carregando-campos" role="status">Separando os casos…</p>';
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     Servidor.chamar('detalharComponente', canalEscolhido, idDoComponente,
@@ -783,7 +783,7 @@ var TelaProdutividade = (function () {
         desenharDetalhe(resposta, idDoComponente, chaveDoPonto);
       })
       .senao(function (erro) {
-        caixa.innerHTML = '<p class="carregando-campos erro-carga">'
+        caixa.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }

@@ -945,7 +945,37 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   } : null, comEsteId.length === 1 ? atual.__linha : 0);   // a linha já achada (Etapa 89)
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
-  return { id: alvo, canal: canal.nome };
+  return { id: alvo, canal: canal.nome, destino: destinoDepoisDeGravar_(canal, atual, paraGravar) };
+}
+
+/**
+ * F8 (Etapa 90): o nome da sub-aba do Trabalho em que o caso ficou depois de
+ * gravar — "Agora está em Casos concluídos". É a MESMA regra da fila
+ * (`lugarDoRegistro_`), aplicada ao caso como foi lido com o que acabou de
+ * ser gravado por cima: nenhuma leitura a mais. Canal sem sub-abas: ''.
+ *
+ * Roda DEPOIS de gravar: qualquer problema aqui devolve '' e o aviso só não
+ * diz o destino. Nunca transforma em erro uma gravação que deu certo.
+ */
+function destinoDepoisDeGravar_(canal, atual, gravado) {
+  try {
+    var sub = subAbasDoCanal_(canal);
+    if (!sub) return '';
+    var depois = {};
+    var porNome = {};
+    Object.keys(atual || {}).forEach(function (chave) {
+      depois[chave] = atual[chave];
+      porNome[normalizarParaComparar_(chave)] = chave;
+    });
+    Object.keys(gravado || {}).forEach(function (chave) {
+      depois[porNome[normalizarParaComparar_(chave)] || chave] = gravado[chave];
+    });
+    var doStatus = porNome[normalizarParaComparar_(canal.colunaDoStatus)];
+    if (doStatus && doStatus !== canal.colunaDoStatus) depois[canal.colunaDoStatus] = depois[doStatus];
+    return lugarDoRegistro_(depois, canal, sub) >= 0 ? sub.abas[0] : sub.abas[1];
+  } catch (semDestino) {
+    return '';
+  }
 }
 
 /*
@@ -1110,7 +1140,8 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   // A auditoria continua guardando o que é raro e sem volta: criar, editar,
   // ocultar, mexer em configuração.
 
-  return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
+  return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom,
+    destino: destinoDepoisDeGravar_(canal, atual, alteracao) };   // F8 (Etapa 90)
 }
 
 /**

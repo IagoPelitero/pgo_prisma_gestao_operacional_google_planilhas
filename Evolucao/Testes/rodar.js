@@ -56,6 +56,7 @@ const { rodarTestesDasAlteracoesNaoSalvas } = require('./testes-alteracoes-nao-s
 const { rodarTestesDeDesempenhoDoTrabalhoEDaBusca } = require('./testes-desempenho-do-trabalho-e-da-busca');
 const { rodarTestesDePesquisarPor } = require('./testes-pesquisar-por');
 const { rodarTestesDoVisual190 } = require('./testes-visual-190');
+const { rodarTestesDeUX190 } = require('./testes-ux-190');
 const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao');
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
@@ -125,6 +126,7 @@ rodarTestesDasAlteracoesNaoSalvas();
 rodarTestesDeDesempenhoDoTrabalhoEDaBusca();
 rodarTestesDePesquisarPor();
 rodarTestesDoVisual190();
+rodarTestesDeUX190();
 rodarTestesDaDataDaFinalizacao();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();

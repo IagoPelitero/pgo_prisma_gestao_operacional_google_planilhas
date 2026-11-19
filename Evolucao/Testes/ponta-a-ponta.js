@@ -2074,6 +2074,77 @@ async function rodar() {
     await pagina.waitForTimeout(900);
   });
 
+  console.log('\nAs melhorias de uso (Etapa 90)');
+
+  await teste('F17: o Tab não sai do "Trabalhar no caso", e ao fechar o foco volta ao botão', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-trabalhar]', { timeout: 10000 });
+    const botao = pagina.locator('[data-trabalhar]').first();
+    const id = await botao.getAttribute('data-trabalhar');
+    await botao.focus();
+    await botao.click();
+    await pagina.waitForSelector('#modal-do-caso #corpo-da-edicao [data-chave]', { timeout: 10000 });
+    for (let i = 0; i < 40; i++) {
+      await pagina.keyboard.press(i % 7 === 6 ? 'Shift+Tab' : 'Tab');
+      const dentro = await pagina.evaluate(() => document.getElementById('modal-do-caso').contains(document.activeElement));
+      verdadeiro(dentro, 'o foco ficou no modal depois de ' + (i + 1) + ' Tab(s)');
+    }
+    await pagina.keyboard.press('Escape');   // nada digitado: o F1 não pergunta
+    await pagina.waitForFunction(() => !document.getElementById('modal-do-caso'), null, { timeout: 5000 });
+    igual(await pagina.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-trabalhar')), id,
+      'o foco voltou ao "Trabalhar no caso"');
+  });
+
+  await teste('F16: o erro fica até fechar no ✕; o sucesso some sozinho', async () => {
+    await pagina.evaluate(() => { Moldura.toast('Erro de teste', 'ruim'); Moldura.toast('Salvo de teste', 'bom'); });
+    await pagina.waitForTimeout(5000);
+    igual(await pagina.locator('.aviso-flutuante', { hasText: 'Salvo de teste' }).count(), 0, 'o sucesso sumiu');
+    const erro = pagina.locator('.aviso-flutuante', { hasText: 'Erro de teste' });
+    igual(await erro.count(), 1, 'o erro continua depois de 5 s');
+    igual(await erro.getAttribute('role'), 'alert');
+    await erro.locator('.aviso-flutuante-fechar').click();
+    igual(await pagina.locator('.aviso-flutuante', { hasText: 'Erro de teste' }).count(), 0, 'fechou no ✕');
+  });
+
+  await teste('F8: trocar o status diz onde o caso foi parar — a aba que a fila mostra', async () => {
+    const idDoCaso = vm.runInContext(`(function () {
+      var ret = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+      return cadastrarCaso(ret.id, { nomedocliente: 'Vai para concluídos', status: 'Pendente' }).id;
+    })()`, contexto);
+    await pagina.reload();
+    await pagina.waitForSelector('.lateral-item', { timeout: 10000 });
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('[data-status-do-caso="' + idDoCaso + '"]', { timeout: 10000 });
+    await pagina.click('[data-status-do-caso="' + idDoCaso + '"]');
+    await pagina.waitForSelector('#situacao-nova', { timeout: 10000 });
+    await pagina.selectOption('#situacao-nova', 'Pago');
+    await pagina.waitForTimeout(300);
+    await pagina.click('#salvar-situacao');
+    await pagina.waitForSelector('.aviso-flutuante:has-text("atualizado")', { timeout: 10000 });
+    const aviso = await pagina.textContent('.aviso-flutuante:has-text("atualizado")');
+    const aba2 = (await pagina.textContent('[data-sub-aba="2"]')).replace(/[\d.\s]+$/, '').trim();
+    igual(aviso.trim(), 'Caso ' + idDoCaso + ' atualizado. Agora está em ' + aba2 + '.');
+  });
+
+  await teste('F18: carregamentos anunciados, e o erro do campo ligado ao campo', async () => {
+    await pagina.click('[data-tela="cadastrarCaso"]');
+    await pagina.waitForSelector('#formulario-do-caso [aria-required="true"]', { timeout: 10000 });
+    const ligado = await pagina.evaluate(() => {
+      const campo = document.querySelector('#formulario-do-caso [aria-required="true"]');
+      const id = campo.getAttribute('aria-describedby');
+      return !!id && !!document.getElementById(id) && document.getElementById(id).classList.contains('erro');
+    });
+    verdadeiro(ligado, 'o obrigatório aponta para a caixa do erro dele');
+    const semRole = await pagina.evaluate(() => Array.from(document.querySelectorAll('.carregando-campos'))
+      .filter((p) => !p.getAttribute('role')).length);
+    igual(semRole, 0, 'todo "carregando" tem role');
+    await pagina.click('[data-tela="trabalho"]');
+    if (await pagina.waitForSelector('#dialogo-descarte', { timeout: 1500 }).catch(() => null)) await pagina.click('#descartar-alteracoes');
+    await pagina.waitForTimeout(400);
+  });
+
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
   if (process.env.PGO_GRAVAR_CHAMADAS) {

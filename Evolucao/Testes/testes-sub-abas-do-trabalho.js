@@ -493,4 +493,4 @@ function rodarTestesDasSubAbasDoTrabalho() {
   });
 }
 
-module.exports = { rodarTestesDasSubAbasDoTrabalho };
+module.exports = { rodarTestesDasSubAbasDoTrabalho, retDoPO, comCasos };

@@ -2052,6 +2052,16 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   box-shadow: var(--sombra);
 }
 
+/* F16 (Etapa 90): o erro fica, com o ✕ para fechar. */
+.aviso-flutuante.persistente { display: flex; align-items: flex-start; gap: 10px; padding-right: 8px; }
+.aviso-flutuante-fechar {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-top: -1px;
+  border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer;
+}
+.aviso-flutuante-fechar:hover { background: color-mix(in srgb, var(--tom) 14%, transparent); }
+.aviso-flutuante-fechar:focus-visible { outline: 2px solid var(--tom); outline-offset: 1px; }
+.aviso-flutuante-fechar svg { width: 15px; height: 15px; }
+
 @keyframes aviso-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* O esqueleto de carregamento (Etapa 67): o desenho do que vem. */

@@ -109,7 +109,7 @@ var TelaCadastrarCaso = (function () {
 
   function montarReuniao() {
     return '<div class="cartao formulario" id="formulario-da-reuniao">'
-      + '<div id="corpo-da-reuniao"><p class="carregando-campos">Montando o formulário…</p></div>'
+      + '<div id="corpo-da-reuniao"><p class="carregando-campos" role="status">Montando o formulário…</p></div>'
       + '<div class="acoes" id="acoes-da-reuniao" hidden>'
       + '<button type="button" class="botao" id="registrar-reuniao-nova">Registrar reunião</button>'
       + '<span class="falta-preencher" id="falta-na-reuniao-nova" aria-live="polite"></span>'
@@ -126,7 +126,7 @@ var TelaCadastrarCaso = (function () {
         guardarRetratoDoCadastro();
       })
       .senao(function (erro) {
-        elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
 
@@ -170,7 +170,7 @@ var TelaCadastrarCaso = (function () {
       + '<div class="cadastro-em-blocos">'
       + '<nav class="indice-do-cadastro" id="indice-do-cadastro" aria-label="Seções do formulário" hidden></nav>'
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
-      + '<div id="corpo-do-formulario"><p class="carregando-campos">'
+      + '<div id="corpo-do-formulario"><p class="carregando-campos" role="status">'
       + 'Montando o formulário…</p></div>'
       // As ações nascem ESCONDIDAS e só aparecem com o formulário montado.
       // Pedido do PO: nos testes, a equipe via "Cadastrar caso" e "Limpar"
@@ -306,7 +306,7 @@ var TelaCadastrarCaso = (function () {
   /* ----------------------------------------------------------- comportamento */
 
   function carregarFormulario() {
-    corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
+    corpo().innerHTML = '<p class="carregando-campos" role="status">Montando o formulário…</p>';
     mostrarAsAcoes(false);
 
     Servidor.chamar('formularioDoCanal', canalEscolhido)
@@ -340,7 +340,7 @@ var TelaCadastrarCaso = (function () {
         if (primeiro) primeiro.focus();
       })
       .senao(function (erro) {
-        corpo().innerHTML = '<p class="carregando-campos erro-carga">'
+        corpo().innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
