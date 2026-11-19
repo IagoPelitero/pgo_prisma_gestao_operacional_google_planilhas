@@ -638,6 +638,106 @@ async function rodar() {
     await pagina.waitForTimeout(900);
   });
 
+  await teste('no Trabalho, filtrar não apaga a tela: esmaece, avisa e troca de uma vez (Etapa 88, F5)', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    await pagina.waitForTimeout(300);
+    const rotulos = await pagina.$$eval('.cartoes .indicador.clicavel .rotulo', (es) => es.map((e) => e.textContent));
+    // Rola um pouco, como quem está olhando a fila.
+    await pagina.setViewportSize({ width: 1280, height: 420 });
+    await pagina.evaluate(() => window.scrollTo(0, 120));
+    const rolagemAntes = await pagina.evaluate(() => window.pageYOffset);
+    verdadeiro(rolagemAntes > 50, 'a página rolou de verdade: ' + rolagemAntes);
+
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [1500] }; });
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: rotulos[1] }).first().click();
+    await pagina.waitForTimeout(250);
+    const durante = await pagina.evaluate(() => ({
+      cartoes: document.querySelectorAll('#painel .cartoes .indicador').length,
+      atualizando: document.getElementById('painel').classList.contains('atualizando'),
+      ocupado: document.getElementById('painel').getAttribute('aria-busy'),
+      aviso: (document.querySelector('#painel .aviso-atualizando') || {}).textContent,
+      somando: document.querySelectorAll('#painel .carregando-campos').length,
+      esmaecido: getComputedStyle(document.querySelector('#painel .cartoes')).opacity,
+      filtros: getComputedStyle(document.querySelector('#painel .caixa-de-filtros')).opacity,
+      rolagem: window.pageYOffset
+    }));
+    verdadeiro(durante.cartoes > 0, 'os cartões ficam na tela durante a espera');
+    igual(durante.atualizando, true);
+    igual(durante.ocupado, 'true', 'o leitor de tela sabe que o painel está ocupado');
+    igual(durante.aviso, 'Atualizando informações…');
+    igual(durante.somando, 0, 'nada de "Somando os casos…" no lugar do painel');
+    igual(durante.esmaecido, '0.5', 'os números do pedido anterior ficam esmaecidos');
+    igual(durante.filtros, '1', 'os filtros, não');
+    verdadeiro(Math.abs(durante.rolagem - rolagemAntes) <= 1, 'a página não pulou: ' + rolagemAntes + ' → ' + durante.rolagem);
+
+    await pagina.waitForTimeout(1700);
+    const depois = await pagina.evaluate(() => ({
+      atualizando: document.getElementById('painel').classList.contains('atualizando'),
+      ocupado: document.getElementById('painel').getAttribute('aria-busy'),
+      aviso: document.querySelectorAll('#painel .aviso-atualizando').length,
+      ligado: document.querySelectorAll('.cartoes .indicador.ligado').length,
+      rolagem: window.pageYOffset
+    }));
+    igual(depois.atualizando, false, 'trocado de uma vez quando chegou');
+    igual(depois.ocupado, null);
+    igual(depois.aviso, 0, 'o aviso sai junto');
+    igual(depois.ligado, 1, 'e o que está na tela é o resultado do cartão clicado');
+    verdadeiro(Math.abs(depois.rolagem - rolagemAntes) <= 1, 'a rolagem ficou: ' + rolagemAntes + ' → ' + depois.rolagem);
+
+    // Dois cliques seguidos: vale o último (F6), e a tela não fica presa esmaecida.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [1500, 300] }; });
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: rotulos[0] }).first().click();
+    await pagina.waitForTimeout(120);
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: rotulos[1] }).first().click();
+    await pagina.waitForTimeout(700);
+    igual(await pagina.evaluate(() => document.getElementById('painel').classList.contains('atualizando')), false,
+      'a resposta do último clique já chegou');
+    await pagina.waitForTimeout(1200);
+    const ligado = await pagina.$$eval('.cartoes .indicador.ligado .rotulo', (es) => es.map((e) => e.textContent));
+    igual(ligado.join(), rotulos[1], 'a resposta velha não pintou por cima (F6)');
+
+    // Trocar de sub-aba NÃO mantém os números da outra aba na tela.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [800] }; });
+    await pagina.click('[data-sub-aba="2"]');
+    await pagina.waitForTimeout(150);
+    igual(await pagina.locator('#painel .cartoes').count(), 0, 'outra aba: a tela limpa, como antes');
+    await pagina.waitForTimeout(1000);
+
+    // O erro durante a atualização substitui a tela — nada velho com cara de válido.
+    const original = await pagina.evaluate(() => {
+      window.__servidorOriginal = window.__servidorOriginal || window.__servidorDoPGO;
+      window.__servidorDoPGO = function (nome, argumentos) {
+        if (nome === 'resumoDoCanal' && window.__falharUmaVez) {
+          window.__falharUmaVez = false;
+          return Promise.resolve({ erro: 'Falha simulada na atualização' });
+        }
+        return window.__servidorOriginal(nome, argumentos);
+      };
+      window.__falharUmaVez = true;
+      window.__atrasos = { resumoDoCanal: [300] };
+      return true;
+    });
+    verdadeiro(original);
+    await pagina.locator('.cartoes .indicador.clicavel').first().click();
+    await pagina.waitForTimeout(700);
+    const comErro = await pagina.evaluate(() => ({
+      erro: (document.querySelector('#painel .erro-carga') || {}).textContent || '',
+      cartoes: document.querySelectorAll('#painel .cartoes').length,
+      atualizando: document.getElementById('painel').classList.contains('atualizando')
+    }));
+    contem(comErro.erro, 'Falha simulada');
+    igual(comErro.cartoes, 0, 'os números velhos saíram');
+    igual(comErro.atualizando, false);
+    await pagina.evaluate(() => { window.__servidorDoPGO = window.__servidorOriginal; window.__atrasos = {}; });
+    await pagina.setViewportSize({ width: 1440, height: 1000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForTimeout(900);
+  });
+
   /* --------------------------------------------------- os sinalizadores -- */
 
   console.log('\nOs sinalizadores de prazo');

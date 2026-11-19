@@ -988,6 +988,32 @@ table.fila.prazos-lista td.direita, table.fila.prazos-lista th.direita { text-al
   border-radius: 3px; padding: 1px 5px;
 }
 
+/*
+  Atualizando sem apagar a tela (Etapa 88, F5). O que está no painel fica,
+  esmaecido — os números ainda são do pedido anterior —, e o aviso vem numa
+  faixa de altura zero, presa no alto enquanto se rola: não empurra nada e
+  não faz a tela pular. Os filtros não esmaecem: é neles que a pessoa está
+  mexendo. Sem animação além do esmaecer.
+*/
+#painel.atualizando { position: relative; }
+#painel.atualizando > :not(.faixa-atualizando):not(.caixa-de-filtros) {
+  opacity: .5; transition: opacity var(--transicao);
+}
+.faixa-atualizando {
+  position: sticky; top: 8px; z-index: 5; height: 0;
+  display: flex; justify-content: center; pointer-events: none;
+}
+.aviso-atualizando {
+  margin: 0; padding: 6px 14px;
+  border-radius: 999px; border: 1px solid var(--linha-forte);
+  background: var(--superficie); color: var(--suave);
+  box-shadow: var(--sombra); font-size: 13px;
+}
+#painel:not(.atualizando) .faixa-atualizando { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  #painel.atualizando > :not(.faixa-atualizando):not(.caixa-de-filtros) { transition: none; }
+}
+
 .aviso-fila {
   margin: 0; padding: 11px 16px; font-size: 13px; color: var(--atencao);
   background: var(--atencao-tenue); border-bottom: 1px solid var(--linha);

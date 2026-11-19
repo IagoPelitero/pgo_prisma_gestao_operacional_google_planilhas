@@ -134,8 +134,49 @@ var TelaTrabalho = (function () {
   */
   var pedidoDoPainel = 0;
 
+  /*
+    ATUALIZAR SEM APAGAR A TELA (Etapa 88, F5).
+
+    Aplicar um filtro trocava o painel inteiro por "Somando os casos…": os
+    cartões e a fila sumiam, a página encolhia e a rolagem se perdia. Agora,
+    no MESMO canal e na MESMA sub-aba, o que está na tela fica — esmaecido,
+    com o aviso "Atualizando informações…" — e só é trocado, de uma vez,
+    quando a resposta nova chega. Esmaecido porque aqueles números são do
+    pedido anterior: não podem parecer o resultado do filtro que acabou de
+    ser marcado. Trocar de canal ou de sub-aba continua limpando a tela (os
+    números de uma não podem aparecer sob o nome da outra), e o erro também
+    (número velho não fica com cara de válido). Quem decide qual resposta
+    vale continua sendo o pedidoDoPainel (F6).
+  */
+  var painelDesenhadoPara = '';
+
+  function chaveDoPainel() {
+    return String(canalEscolhido) + '|' + subAbaDoCanal(canalEscolhido);
+  }
+
+  function marcarComoAtualizando(painel, recado) {
+    painel.classList.add('atualizando');
+    painel.setAttribute('aria-busy', 'true');
+    var faixa = elemento('faixa-atualizando');
+    if (!faixa) {
+      faixa = document.createElement('div');
+      faixa.id = 'faixa-atualizando';
+      faixa.className = 'faixa-atualizando';
+      faixa.innerHTML = '<p class="aviso-atualizando" role="status"></p>';
+      painel.insertBefore(faixa, painel.firstChild);
+    }
+    faixa.firstChild.textContent = typeof recado === 'string' ? recado : 'Atualizando informações…';
+  }
+
+  function desmarcarAtualizando(painel) {
+    painel.classList.remove('atualizando');
+    painel.removeAttribute('aria-busy');
+  }
+
   function carregarAgenda() {
     var meuPedido = ++pedidoDoPainel;
+    painelDesenhadoPara = '';
+    desmarcarAtualizando(elemento('painel'));
     elemento('painel').innerHTML = '<p class="carregando-campos">Lendo a Agenda…</p>';
     Servidor.chamar('agendaDaMesa', canalEscolhido, buscaNaAgenda)
       .entao(function (resposta) {
@@ -631,12 +672,26 @@ var TelaTrabalho = (function () {
   }
 
   function desenharPainel() {
+    var painel = elemento('painel');
+    // A rolagem de quem estava vendo este mesmo painel (F5): a da página e a
+    // de lado da tabela da fila.
+    var mesmoPainel = painelDesenhadoPara === chaveDoPainel();
+    var rolagem = window.pageYOffset || document.documentElement.scrollTop || 0;
+    var tabela = painel.querySelector('.rolagem-tabela');
+    var deLado = tabela ? tabela.scrollLeft : 0;
     // O aviso mora no ALTO, e não junto da fila, porque não é só a fila que
     // está parcial: os cartões contam o mesmo recorte. O texto antigo, colado
     // na fila, dava a entender que os números em cima estavam completos.
-    elemento('painel').innerHTML =
+    painel.innerHTML =
       (resumo.buscaNaPlanilhaToda ? avisoDaBusca() : Moldura.avisoDeJanela(resumo, 'Estes números e esta fila'))
       + desenharCartoes() + desenharFiltros() + desenharFila();
+    desmarcarAtualizando(painel);
+    painelDesenhadoPara = chaveDoPainel();
+    if (mesmoPainel) {
+      var novaTabela = painel.querySelector('.rolagem-tabela');
+      if (novaTabela && deLado) novaTabela.scrollLeft = deLado;
+      if (Math.abs((window.pageYOffset || 0) - rolagem) > 1) window.scrollTo(window.pageXOffset || 0, rolagem);
+    }
     // Os números das abas vêm na mesma resposta (Etapa 84).
     if (resumo.subAbas) {
       subAbasConhecidas[canalEscolhido] = resumo.subAbas;
@@ -664,8 +719,15 @@ var TelaTrabalho = (function () {
   function carregar(recado) {
     var meuPedido = ++pedidoDoPainel;
     var painel = elemento('painel');
-    if (painel) painel.innerHTML = '<p class="carregando-campos">'
-      + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
+    // F5: o mesmo painel fica na tela, esmaecido, até a resposta nova chegar.
+    if (painel && painelDesenhadoPara === chaveDoPainel() && painel.querySelector('.cartoes')) {
+      marcarComoAtualizando(painel, recado);
+    } else if (painel) {
+      painelDesenhadoPara = '';
+      desmarcarAtualizando(painel);
+      painel.innerHTML = '<p class="carregando-campos">'
+        + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
+    }
 
     // O aviso de prazo lê os casos abertos da planilha toda (Etapa 70): só se
     // pede quando ele vai abrir, na primeira carga do canal.
@@ -687,6 +749,9 @@ var TelaTrabalho = (function () {
       })
       .senao(function (erro) {
         if (meuPedido !== pedidoDoPainel) return;
+        // O erro limpa a tela: o que estava esmaecido não vira resultado (F5).
+        painelDesenhadoPara = '';
+        desmarcarAtualizando(elemento('painel'));
         elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
