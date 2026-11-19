@@ -162,11 +162,11 @@ var TelaImportacao = (function () {
         ? '<p class="imp-sub">Uma linha por atendimento. Obrigatórias: <strong>data</strong> e '
           + '<strong>analista</strong>. As outras colunas são opcionais, e a linha que já entrou é pulada.</p>'
         : '')
-      + '<div class="config-abas">'
+      + '<div class="config-abas imp-fontes">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
-      + ' data-fonte="colado">Colar da planilha</button>'
+      + ' data-fonte="colado">' + Moldura.icone('estrutura') + 'Colar da planilha</button>'
       + '<button type="button" class="config-aba' + (colado ? '' : ' atual') + '"'
-      + ' data-fonte="planilha">Ler outra planilha pelo link</button>'
+      + ' data-fonte="planilha">' + Moldura.icone('elo') + 'Ler outra planilha pelo link</button>'
       + '</div>'
       + (colado ? desenharColar() : desenharLink())
       + '<ul class="imp-dicas"><li>A primeira linha é a dos <strong>nomes das colunas</strong></li>'

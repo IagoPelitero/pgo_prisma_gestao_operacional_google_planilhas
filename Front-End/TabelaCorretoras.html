@@ -112,23 +112,25 @@ var TelaTabelaCorretoras = (function () {
     var filtroDoSegmento = filtrosDasCorretoras()[0];
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
+      // A lupa dentro do campo (Etapa 90, aprovado) — só desenho.
+      + '<span class="busca-campo">' + Moldura.icone('buscarCaso')
       + '<input type="search" id="procurar-corretora" class="busca-do-cadastro"'
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
       + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
-      + ' aria-label="Procurar corretora">'
+      + ' aria-label="Procurar corretora"></span>'
       + FiltroMultiplo.desenhar(filtroDoSegmento, { segmento: segmento })
       + Moldura.botaoLimparFiltros('limpar-filtros-corretoras')
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
-        ? '<button type="button" class="botao pequeno" id="nova-corretora">'
-          + 'Cadastrar corretora</button>' : '')
+        ? '<button type="button" class="botao pequeno com-icone" id="nova-corretora">'
+          + Moldura.icone('cadastrarCaso') + 'Cadastrar corretora</button>' : '')
       + (dados.podeExportar
-        ? '<button type="button" class="botao-texto" id="exportar-corretoras">'
-          + 'Exportar</button>' : '')
+        ? '<button type="button" class="botao-secundario pequeno com-icone" id="exportar-corretoras">'
+          + Moldura.icone('importacao') + 'Exportar</button>' : '')
       + '</div>'
       + avisoDeOrigem('CORRETORAS')
       + avisoDasNaoCadastradas()
-      + '<p class="config-explica">' + dados.quantasFiltradas + ' de '
-      + dados.quantasNoTotal + ' corretoras · a lista vem de quem mais traz '
+      + '<p class="config-explica contagem-da-tabela"><strong>' + dados.quantasFiltradas + ' de '
+      + dados.quantasNoTotal + ' corretoras</strong> · a lista vem de quem mais traz '
       + 'caso, e não em ordem alfabética.</p>'
       + tabelaDasCorretoras()
       + (dados.truncada
@@ -152,7 +154,8 @@ var TelaTabelaCorretoras = (function () {
     if (!dados.foraDoCadastro.length) return '';
 
     var primeiras = dados.foraDoCadastro.slice(0, 6);
-    return '<div class="aviso-cadastro">'
+    return '<div class="aviso-cadastro compacto" role="status">'
+      + Moldura.icone('alerta')
       + '<strong>' + dados.foraDoCadastro.length + ' SUSEP(s) aparecem nos '
       + 'casos e não estão no cadastro.</strong>'
       + '<p>Enquanto elas ficarem de fora, o selo do formulário vai dizer '

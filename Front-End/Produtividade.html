@@ -104,8 +104,8 @@ var TelaProdutividade = (function () {
     elemento('analitico').innerHTML = desenharFiltros()
       + abasDaMesa()
       + desenharCartoes()
-      + desenharPremios()
-      + desenharRetidoAcumulado()
+      // Etapa 90 (aprovado): os prêmios e o retido acumulado lado a lado.
+      + '<div class="dupla-de-graficos">' + desenharPremios() + desenharRetidoAcumulado() + '</div>'
       + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
@@ -142,7 +142,7 @@ var TelaProdutividade = (function () {
     if (!premios) return '';
     return '<div class="graficos"><section class="cartao grafico largura-2" data-premios="sim">'
       + '<header class="grafico-cabeca"><h3>' + escapar(premios.titulo) + '</h3></header>'
-      + Graficos.desenhar(premios)
+      + barrasDosPremios(premios)
       + '<div class="rolagem-tabela"><table class="fila numeros">'
       + '<thead><tr><th>Prêmio</th><th class="direita">Valor</th>'
       + '<th class="direita">Casos com valor</th></tr></thead><tbody>'
@@ -151,6 +151,25 @@ var TelaProdutividade = (function () {
           + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
       }).join('') + '</tbody></table></div>'
       + '</section></div>';
+  }
+
+  /**
+   * As barras deitadas dos prêmios (Etapa 90, proposta aprovada): o nome e o
+   * valor em cima, a barra embaixo, proporcional ao maior. Os números são os
+   * mesmos da tabela logo abaixo — as barras só os desenham. Não detalham ao
+   * clicar (nunca detalharam: os prêmios não são um gráfico de PAINEIS).
+   */
+  function barrasDosPremios(premios) {
+    var maior = premios.pontos.reduce(function (m, p) { return Math.max(m, Number(p.valor) || 0); }, 0);
+    return '<ul class="barras-de-premio" aria-hidden="true">'
+      + premios.pontos.map(function (ponto) {
+        var parte = maior ? Math.max((Number(ponto.valor) || 0) / maior * 100, 1.5) : 1.5;
+        return '<li class="barra-de-premio premio-' + escapar(ponto.chave) + '">'
+          + '<span class="barra-de-premio-nome">' + escapar(ponto.rotulo) + '</span>'
+          + '<strong class="barra-de-premio-valor">' + emReais(ponto.valor) + '</strong>'
+          + '<span class="barra-de-premio-trilho"><span style="width:' + parte.toFixed(1) + '%"></span></span>'
+          + '</li>';
+      }).join('') + '</ul>';
   }
 
   /**

@@ -49,9 +49,11 @@ var TelaBuscarCaso = (function () {
     return '<div class="cartao busca-caixa">'
       + '<form id="form-da-busca" novalidate>'
       + '<div class="busca-linha">'
+      // A lupa dentro do campo (Etapa 90, aprovado) — só desenho.
+      + '<span class="busca-campo">' + Moldura.icone('buscarCaso')
       + '<input type="search" id="termo-da-busca" autocomplete="off"'
       + ' placeholder="Protocolo, apólice, proposta, CPF ou nome"'
-      + ' aria-label="O que procurar">'
+      + ' aria-label="O que procurar"></span>'
       + '<button type="submit" class="botao" id="botao-buscar">'
       + Moldura.icone('buscarCaso') + ' Buscar</button>'
       + Moldura.botaoLimparFiltros('limpar-filtros-da-busca')
@@ -90,7 +92,8 @@ var TelaBuscarCaso = (function () {
     var bases = (opcoes.basesDaPesquisaDirigida || []).join(', ');
     dica.textContent = pesquisarPor === 'avancada'
       ? 'Em todas as colunas de todas as bases marcadas.'
-      : 'Vale na ' + bases + '. As outras bases, o histórico e a base legada procuram em todas as colunas, como sempre.';
+      // Etapa 90: a orientação discreta, nas palavras pedidas pelo PO.
+      : 'A pesquisa direcionada é aplicada à ' + bases + '. As demais bases mantêm a busca completa.';
   }
 
   function desenharOnde() {

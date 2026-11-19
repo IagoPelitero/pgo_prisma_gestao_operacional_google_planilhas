@@ -169,6 +169,38 @@ function rodarTestesDoVisual190() {
     contem(config, 'id="previa-do-campo" inert');
     contem(comuns, 'desenharCampo: desenharCampo,');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Buscar, Produtividade, Importação e Corretoras no novo formato');
+
+  teste('Buscar: a orientação discreta da pesquisa direcionada, nas palavras do PO', () => {
+    const buscar = ler('BuscarCaso.html');
+    contem(buscar, "'A pesquisa direcionada é aplicada à ' + bases + '. As demais bases mantêm a busca completa.'");
+    contem(buscar, "'Em todas as colunas de todas as bases marcadas.'", 'a avançada continua com a dela');
+    contem(buscar, '<span class="busca-campo">');
+  });
+
+  teste('Produtividade: os prêmios em barras deitadas, com os mesmos números da tabela, ao lado do retido', () => {
+    const prod = ler('Produtividade.html');
+    contem(prod, 'function barrasDosPremios(premios)');
+    contem(prod, '+ barrasDosPremios(premios)');
+    contem(prod, '<div class="dupla-de-graficos">');
+    contem(estilos, '.barra-de-premio.premio-retido .barra-de-premio-trilho > span { background: var(--bom); }');
+  });
+
+  teste('Importação: a colagem tracejada e os selos verdes; o passo a passo é o mesmo', () => {
+    contem(ler('Importacao.html'), "Moldura.icone('elo') + 'Ler outra planilha pelo link</button>'");
+    contem(estilos, '#texto-colado {');
+    contem(estilos, 'border: 1px dashed var(--linha-forte);');
+  });
+
+  teste('Corretoras: o aviso compacto com o MESMO texto e os mesmos botões de cadastrar', () => {
+    const cor = ler('TabelaCorretoras.html');
+    contem(cor, '<div class="aviso-cadastro compacto" role="status">');
+    contem(cor, '"não encontrada" toda vez que alguém as digitar.');
+    contem(cor, 'data-cadastrar-susep="');
+    contem(cor, 'class="config-explica contagem-da-tabela"');
+  });
 }
 
 module.exports = { rodarTestesDoVisual190 };

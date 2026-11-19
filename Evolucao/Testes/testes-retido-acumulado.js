@@ -153,7 +153,8 @@ function rodarTestesDoRetidoAcumulado() {
 
   teste('fica logo depois dos prêmios, com o que cada mês tinha no mesmo dia de hoje', () => {
     const produtividade = tela('Produtividade');
-    contem(produtividade, "+ desenharPremios()\n      + desenharRetidoAcumulado()");
+    // Etapa 90 (aprovado): os dois lado a lado, o retido logo depois dos prêmios.
+    contem(produtividade, "'<div class=\"dupla-de-graficos\">' + desenharPremios() + desenharRetidoAcumulado() + '</div>'");
     contem(produtividade, "'<thead><tr><th>Mês</th><th class=\"direita\">Até o dia ' + hoje + '</th>'");
     contem(produtividade, 'if (!grafico) return \'\';');
   });

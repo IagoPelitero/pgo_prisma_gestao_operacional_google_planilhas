@@ -2222,6 +2222,24 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   padding: 12px 14px; font: inherit; font-size: 15px;
 }
 .busca-linha input[type="search"]:focus { border-color: var(--destaque); }
+/* Etapa 90 (aprovado): a lupa dentro do campo, e as bases em caixas. */
+.busca-campo { flex: 1; min-width: 0; position: relative; display: flex; }
+.busca-campo > svg {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; color: var(--suave); pointer-events: none;
+}
+.busca-campo input[type="search"] { padding-left: 42px; }
+.busca-onde { align-items: center; }
+.busca-onde .config-chave {
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); padding: 9px 14px 9px 12px; gap: 10px;
+}
+.busca-onde .config-chave span { font-weight: 600; }
+.busca-onde .config-chave em { font-weight: 400; }
+.busca-onde .config-chave:hover { border-color: var(--destaque); }
+.busca-onde .config-chave input { width: 16px; height: 16px; }
+.busca-onde > .busca-dica { flex-basis: 100%; text-align: right; }
+@media (max-width: 1499px) { .busca-onde > .busca-rotulo { flex-basis: 100%; } }
 .busca-linha .botao {
   display: inline-flex; align-items: center; gap: 8px; flex: none;
 }
@@ -2255,6 +2273,11 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 }
 .origem.vazia .origem-cabeca { border-bottom: 0; padding-bottom: 4px; }
 .origem.vazia p { margin: 0 0 4px; font-size: 13.5px; color: var(--tenue); }
+/* Etapa 90 (aprovado): a base sem achado é uma linha só — o nome, o zero e o
+   recado à direita —, para os achados das outras bases subirem na tela. */
+.cartao.origem.vazia { display: flex; flex-wrap: wrap; align-items: center; padding: 0 18px 0 0; }
+.cartao.origem.vazia .origem-cabeca { padding-bottom: 14px; }
+.cartao.origem.vazia p { margin: 0 0 0 auto; padding: 6px 0 6px 16px; }
 .origem-cabeca svg { width: 22px; height: 22px; color: var(--destaque); flex: none; }
 .origem-cabeca h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
 .origem-cabeca .quantos {
@@ -2537,6 +2560,47 @@ table.fila.legado td { color: var(--suave); }
   padding: 12px 14px; background: var(--superficie-2); box-shadow: none;
 }
 .config-previa-caixa .campo { margin: 0; }
+
+/* =====================================================================
+   ETAPA 90 · PRODUTIVIDADE (aprovado): os prêmios em barras deitadas, e os
+   prêmios e o retido acumulado lado a lado. Os números não mudam.
+   ===================================================================== */
+.dupla-de-graficos {
+  display: grid; gap: 14px; margin-top: 16px; align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr));
+}
+.dupla-de-graficos:empty { display: none; }
+.dupla-de-graficos > .graficos { margin-top: 0; display: block; }
+.barras-de-premio { list-style: none; margin: 4px 0 16px; padding: 0; display: grid; gap: 14px; }
+.barra-de-premio { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: baseline; }
+.barra-de-premio-nome { font-weight: 600; font-size: 14px; }
+.barra-de-premio-valor { font-family: var(--fonte-dado); font-size: 13.5px; }
+.barra-de-premio-trilho {
+  grid-column: 1 / -1; height: 14px; border-radius: 999px; background: var(--superficie-2); overflow: hidden;
+}
+.barra-de-premio-trilho > span { display: block; height: 100%; border-radius: 999px; background: var(--destaque); }
+.barra-de-premio.premio-mensal .barra-de-premio-trilho > span { background: color-mix(in srgb, var(--destaque) 55%, var(--superficie)); }
+.barra-de-premio.premio-retido .barra-de-premio-trilho > span { background: var(--bom); }
+
+/* =====================================================================
+   ETAPA 90 · IMPORTAÇÃO (aprovado): a colagem tracejada, em letra de dado,
+   os três selos verdes e os ícones nas abas. O passo a passo não muda.
+   ===================================================================== */
+.imp-fontes .config-aba { display: inline-flex; align-items: center; gap: 7px; }
+.imp-fontes .config-aba svg { width: 16px; height: 16px; }
+.imp-cartao .campo > span { font-weight: 600; }
+#texto-colado {
+  font-family: var(--fonte-dado); font-size: 13.5px; line-height: 1.75;
+  background: var(--superficie-2); border: 1px dashed var(--linha-forte);
+  border-radius: var(--raio-pequeno); padding: 14px 16px; min-height: 220px;
+}
+#texto-colado:focus { border-style: solid; border-color: var(--destaque); background: var(--superficie); }
+.imp-dicas { gap: 8px 12px; }
+.imp-dicas li {
+  padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: var(--bom-tenue); color: var(--bom);
+}
+.imp-dicas li::before { content: '✓  '; }
 
 /* ==================================================== Produtividade RECC === */
 /*
@@ -2855,6 +2919,33 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
 .aviso-cadastro li .quantos {
   margin-left: auto; color: var(--tenue); font-size: 12px; white-space: nowrap;
 }
+
+/* Etapa 90 (aprovado): o aviso compacto — o ícone, o título e a frase numa
+   linha, as SUSEPs lado a lado embaixo. O texto e os botões são os mesmos. */
+.aviso-cadastro.compacto { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 10px 14px; }
+.aviso-cadastro.compacto > svg { flex: none; width: 17px; height: 17px; color: var(--atencao); align-self: center; }
+.aviso-cadastro.compacto strong { display: inline; }
+.aviso-cadastro.compacto > p { margin: 0; max-width: none; font-size: 13px; color: var(--atencao); }
+.aviso-cadastro.compacto ul { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 18px; padding-left: 25px; }
+.aviso-cadastro.compacto li .quantos { margin-left: 0; }
+.aviso-cadastro.compacto li .quantos::before { content: "("; }
+.aviso-cadastro.compacto li .quantos::after { content: ")"; }
+/* A barra das corretoras: a lupa, o "Cadastrar" com +, o "Exportar" contornado. */
+#corretoras .config-cabeca .busca-campo { flex: 1 1 260px; }
+#corretoras .config-cabeca .busca-campo input { width: 100%; }
+.botao.com-icone, .botao-secundario.com-icone { display: inline-flex; align-items: center; gap: 6px; }
+.botao.com-icone svg, .botao-secundario.com-icone svg { width: 15px; height: 15px; }
+#corretoras .config-cabeca .botao.pequeno { margin-left: 0; }
+/* A contagem como barra no alto da tabela, a SUSEP em letra de dado e a
+   faixa do destaque na linha aberta. */
+.contagem-da-tabela {
+  margin: 12px 0 0; padding: 9px 12px; background: var(--superficie-2);
+  border: 1px solid var(--linha); border-bottom: 0; border-radius: var(--raio-pequeno) var(--raio-pequeno) 0 0;
+}
+.contagem-da-tabela strong { color: var(--texto); }
+.contagem-da-tabela + .rolagem-tabela { margin-top: 0; }
+table.fila.cadastro .apoio { font-family: var(--fonte-dado); }
+table.fila.cadastro tr.aberta td:first-child { box-shadow: inset 3px 0 0 var(--destaque); }
 
 /* A tela de corretoras usa a moldura de Configurações, mas sem o submenu:
    a lista ocupa as duas primeiras colunas e o painel fica na terceira. */

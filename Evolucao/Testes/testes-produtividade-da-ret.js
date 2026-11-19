@@ -135,8 +135,12 @@ function rodarTestesDaProdutividadeDaRet() {
 
   teste('os prêmios vêm logo depois dos cartões; o quadro por analista, por último', () => {
     const tela = lerTela('Produtividade.html');
-    const montagem = tela.substring(tela.indexOf("+ desenharCartoes()\n      + desenharPremios()"));
-    verdadeiro(montagem.length > 0, 'prêmios logo depois dos cartões');
+    // O indexOf de antes dava -1 quando o trecho sumia, e o substring(-1)
+    // devolvia a tela inteira: o teste passava sempre. Agora confere.
+    const depoisDosCartoes = tela.indexOf('+ desenharCartoes()');
+    verdadeiro(depoisDosCartoes > 0, 'os cartões estão na montagem');
+    verdadeiro(/^\+ desenharCartoes\(\)\s*\/\/[^\n]*\n\s*\+ '<div class="dupla-de-graficos">' \+ desenharPremios\(\)/.test(tela.slice(depoisDosCartoes)),
+      'prêmios logo depois dos cartões');
     contem(tela, "+ desenharPorAnalista()\n      + LUGAR_DO_DETALHE;", 'o quadro por último');
     contem(tela, 'soma-do-cartao');
     contem(lerTela('Estilos.html'), '.indicador .soma-do-cartao');
