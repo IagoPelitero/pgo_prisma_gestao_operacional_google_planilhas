@@ -1060,8 +1060,7 @@ var RECC_LEITURA_DA_SUB_ABA = '';
  * ida que se economiza.
  */
 function planoDeLeitura_(estrutura, linhas) {
-  var tolerado = Math.max(1, Math.floor(RECC_CELULAS_QUE_VALEM_UMA_IDA
-    / Math.max(1, estrutura.cabecalhos.length)));
+  var tolerado = buracoDaRegua_(estrutura);
   var ordenadas = linhas.slice().sort(function (uma, outra) { return uma - outra; });
   var paraLer = [];
   ordenadas.forEach(function (linha, k) {
@@ -1072,6 +1071,16 @@ function planoDeLeitura_(estrutura, linhas) {
     paraLer.push(linha);
   });
   return paraLer;
+}
+
+/**
+ * Quantas linhas sem interesse, inteiras, custam menos que uma ida: as células
+ * que valem uma ida divididas pela largura da aba (Etapa 88, B3). Na RET do PO,
+ * com 52 colunas, são 19 — e não as 50 de RECC_BURACO_QUE_VALE_PULAR, que vêm
+ * da régua antiga ("39 células custam menos de 0,1 ms").
+ */
+function buracoDaRegua_(estrutura) {
+  return Math.max(1, Math.floor(RECC_CELULAS_QUE_VALEM_UMA_IDA / Math.max(1, estrutura.cabecalhos.length)));
 }
 
 /** Lê as linhas pedidas, inteiras, pelo plano mais barato. */
@@ -1153,8 +1162,13 @@ function completarRegistros_(canal, registros, quem) {
   var leves = registros.filter(function (registro) { return registro.__leve; });
   if (!leves.length) return registros;
   var inteiros = {};
-  filtrarPeloAlcance_(semExcluidasNemVazias_(estruturaDaAba_(canal.aba),
-    lerLinhasEspecificas_(canal.aba, leves.map(function (registro) { return registro.__linha; }))),
+  var estrutura = estruturaDaAba_(canal.aba);
+  // Etapa 88 (B3): as linhas da fila se espalham pela base (a ordem é a do
+  // status e da data). Com o buraco de sempre (50), 20 linhas viravam um bloco
+  // de 571 linhas inteiras; com o da régua, só se lê o meio que sai mais barato.
+  filtrarPeloAlcance_(semExcluidasNemVazias_(estrutura,
+    lerLinhasEspecificas_(canal.aba, leves.map(function (registro) { return registro.__linha; }),
+      buracoDaRegua_(estrutura))),
   canal.aba, quem).forEach(function (registro) { inteiros[registro.__linha] = registro; });
   return registros.map(function (registro) {
     return registro.__leve ? inteiros[registro.__linha] : registro;
@@ -1178,8 +1192,12 @@ function registrosDaSubAba_(canal, sub, qualAba, quem, disponiveis) {
   var estrutura = estruturaDaAba_(canal.aba);
   var nomes = colunasDaLeituraLeve_(canal, sub, estrutura, disponiveis);
   var aLer = nomes.filter(function (nome) { return !linhas.lidas[normalizarParaComparar_(nome)]; }).length;
+  // As linhas que a fila completa são as primeiras NA ORDEM da aba (status e
+  // data), que ainda não se sabe aqui: a conta supõe o pior, cada uma numa ida
+  // (Etapa 88, B3). Supor as 20 últimas, juntas, escolhia a leitura leve onde
+  // ela saía mais cara que a de antes.
   var custoLeve = aLer * (quantidadeDeRegistros_(estrutura) + RECC_CELULAS_QUE_VALEM_UMA_IDA)
-    + custoDeLerAsLinhas_(estrutura, daAba.slice(-RECC_FILA_NA_ABERTURA));
+    + Math.min(daAba.length, RECC_FILA_NA_LEITURA_LEVE) * (estrutura.cabecalhos.length + RECC_CELULAS_QUE_VALEM_UMA_IDA);
   var leve = RECC_LEITURA_DA_SUB_ABA ? RECC_LEITURA_DA_SUB_ABA === 'leve'
     : daAba.length > RECC_FILA_NA_ABERTURA && custoLeve < custoDeLerAsLinhas_(estrutura, daAba);
   // O alcance já cortou as linhas (linhasDasSubAbas_); a linha inteira passa de

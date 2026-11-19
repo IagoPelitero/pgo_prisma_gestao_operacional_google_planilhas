@@ -139,6 +139,68 @@ function rodarTestesDeDesempenhoDoTrabalhoEDaBusca() {
     t.chamar('lerColunaInteira_')('BASE_RET', 'status');
     igual(medidor.retrato().idasParaLer, 2, 'duas leituras, duas idas — como antes');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('B3 — a escolha da leitura nunca sai mais cara que o caminho da 1.87');
+
+  /** Na régua do PO: 25 ms por chamada, 53 µs por célula. */
+  const custoNoPO = (m) => m.chamadasNoTotal * 25 + m.celulasLidas * 0.053;
+
+  /** RET larga (52 colunas), com os abertos ESPALHADOS pela base. */
+  function retEspalhada(quantos, deCadaQuantosUmAberto, estreita) {
+    const t = carregar('primeiro.adm@exemplo.com');
+    t.chamar('instalarRECC()');
+    t.ret = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+    if (!estreita) for (let i = 0; i < 12; i++) t.chamar('adicionarColuna_')('BASE_RET', 'Da operação ' + i, 'texto');
+    const lote = [];
+    for (let i = 0; i < quantos; i++) {
+      // As datas se repetem a cada 30 linhas: os mais antigos — os primeiros da
+      // fila — ficam a 30 linhas um do outro, pela base toda (como no aviso).
+      const d = new Date(2026, 10, 18); d.setDate(d.getDate() - (i % 30));
+      lote.push({ [DA_RET]: d, status: i % deCadaQuantosUmAberto ? 'Retido' : ['Pendente', 'Não trabalhado'][i % 2],
+        'nome do cliente': 'Cliente ' + i, analista: 'Ana Martins' });
+    }
+    t.chamar('inserirVariosRegistros_')('BASE_RET', lote);
+    return t;
+  }
+
+  function lerOsDoisCaminhos(t, aba) {
+    const medir = (modo) => {
+      t.chamar('(function(m){ RECC_LEITURA_DA_SUB_ABA = m; })')(modo);
+      try {
+        t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, aba);   // a configuração já lida
+        medidor.zerar();
+        t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, aba);
+        return custoNoPO(medidor.retrato());
+      } finally { t.chamar("RECC_LEITURA_DA_SUB_ABA = ''"); }
+    };
+    return { escolhida: medir(''), linhas: medir('linhas') };
+  }
+
+  [[600, 2, 1], [600, 2, 2], [300, 1, 1], [2000, 9, 1], [2000, 9, 2], [120, 3, 1], [300, 1, 1, true], [600, 2, 1, true]]
+    .forEach(([quantos, cada, aba, estreita]) => {
+    teste(quantos + ' casos, 1 aberto a cada ' + cada + ', aba ' + aba + (estreita ? ', base estreita' : '')
+      + ': a escolhida custa no máximo o caminho da 1.87', () => {
+      const t = retEspalhada(quantos, cada, estreita);
+      const r = lerOsDoisCaminhos(t, aba);
+      verdadeiro(r.escolhida <= r.linhas + 1, Math.round(r.escolhida) + ' ms escolhida, ' + Math.round(r.linhas) + ' ms pelas linhas');
+    });
+  });
+
+  teste('completar as 20 da fila não lê o meio da base: o buraco é o da régua', () => {
+    const t = retEspalhada(600, 2);
+    const estrutura = t.chamar('estruturaDaAba_')('BASE_RET');
+    igual(t.chamar('buracoDaRegua_')(estrutura), Math.floor(1000 / estrutura.cabecalhos.length));
+    t.chamar("RECC_LEITURA_DA_SUB_ABA = 'leve'");
+    try {
+      t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 1);
+      medidor.zerar();
+      const r = t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 1);
+      igual(r.fila.length, 20);
+      verdadeiro(medidor.retrato().celulasLidas < 600 * estrutura.cabecalhos.length / 3,
+        medidor.retrato().celulasLidas + ' células — antes, um bloco de quase a base inteira');
+    } finally { t.chamar("RECC_LEITURA_DA_SUB_ABA = ''"); }
+  });
 }
 
 module.exports = { rodarTestesDeDesempenhoDoTrabalhoEDaBusca };

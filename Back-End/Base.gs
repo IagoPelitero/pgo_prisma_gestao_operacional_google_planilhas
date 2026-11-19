@@ -2703,14 +2703,17 @@ var RECC_BURACO_QUE_VALE_PULAR = 50;
  * [12, 30, 40] vira um só: 12–40, porque ler as 27 linhas do meio é mais
  * barato que duas idas a mais.
  */
-function blocosDeLinhas_(numerosDeLinha) {
+function blocosDeLinhas_(numerosDeLinha, buracoQueValePular) {
+  // Etapa 88 (B3): quem sabe a largura da aba passa o seu buraco (ver
+  // buracoDaRegua_); sem ele, vale o de sempre.
+  var buraco = buracoQueValePular === undefined ? RECC_BURACO_QUE_VALE_PULAR : buracoQueValePular;
   var ordenados = numerosDeLinha.slice().sort(function (um, outro) {
     return um - outro;
   });
   var blocos = [];
   for (var i = 0; i < ordenados.length; i++) {
     var ultimo = blocos.length ? blocos[blocos.length - 1] : null;
-    if (ultimo && ordenados[i] - ultimo.fim <= RECC_BURACO_QUE_VALE_PULAR) {
+    if (ultimo && ordenados[i] - ultimo.fim <= buraco) {
       ultimo.fim = ordenados[i];
     } else {
       blocos.push({ inicio: ordenados[i], fim: ordenados[i] });
@@ -2737,7 +2740,7 @@ function lerLinhasEspecificas_(nomeDaAba, numerosDeLinha) {
   return lendoAPlanilha_(lerLinhasEspecificasSemRelogio_, arguments);
 }
 
-function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha) {
+function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha, buracoQueValePular) {
   if (!numerosDeLinha || !numerosDeLinha.length) return [];
 
   var estrutura = estruturaDaAba_(nomeDaAba);
@@ -2752,7 +2755,7 @@ function lerLinhasEspecificasSemRelogio_(nomeDaAba, numerosDeLinha) {
     return true;
   }) : numerosDeLinha;
 
-  blocosDeLinhas_(faltam).forEach(function (bloco) {
+  blocosDeLinhas_(faltam, buracoQueValePular).forEach(function (bloco) {
     var quantas = bloco.fim - bloco.inicio + 1;
     var valores = estrutura.aba
       .getRange(bloco.inicio, 1, quantas, largura).getValues();
