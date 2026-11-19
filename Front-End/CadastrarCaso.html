@@ -170,6 +170,8 @@ var TelaCadastrarCaso = (function () {
       + '<div class="cadastro-em-blocos">'
       + '<nav class="indice-do-cadastro" id="indice-do-cadastro" aria-label="Seções do formulário" hidden></nav>'
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
+      // F3: o rascunho guardado aparece aqui, com Recuperar e Descartar.
+      + '<div class="rascunho-encontrado" id="rascunho-encontrado" role="status" hidden></div>'
       + '<div id="corpo-do-formulario"><p class="carregando-campos" role="status">'
       + 'Montando o formulário…</p></div>'
       // As ações nascem ESCONDIDAS e só aparecem com o formulário montado.
@@ -179,6 +181,10 @@ var TelaCadastrarCaso = (function () {
       + '<button type="submit" class="botao" id="salvar-caso">Cadastrar caso</button>'
       + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
       + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
+      // F3 (Etapa 90): o rascunho só com o consentimento, cadastro a cadastro.
+      + '<label class="guardar-rascunho" title="Fica guardado por 2 horas, só para você. Desmarque para apagar.">'
+      + '<input type="checkbox" id="guardar-rascunho"> Guardar rascunho deste cadastro'
+      + '<span class="estado-do-rascunho" id="estado-do-rascunho" aria-live="polite"></span></label>'
       // O que ainda falta para o botão acender (Etapa 75).
       + '<span class="falta-preencher" id="falta-no-caso" aria-live="polite"></span>'
       + '<span class="recado" id="recado-do-caso" hidden></span>'
@@ -303,13 +309,120 @@ var TelaCadastrarCaso = (function () {
     });
   }
 
+  /* ------------------------------------------------------------ F3: rascunho */
+
+  /*
+    O RASCUNHO SEGURO (Etapa 90, F3; decisão do PO: no servidor, por e-mail).
+
+    · Só com "Guardar rascunho deste cadastro" marcado — a caixa nasce
+      desmarcada em cada formulário novo.
+    · Uma chamada a cada 30 s de digitação, no máximo: a primeira mudança
+      agenda; as outras, dentro dos 30 s, vão juntas.
+    · Desmarcar, cadastrar ou limpar apaga o rascunho no servidor.
+    · NADA NO NAVEGADOR — nem o rascunho, nem marca de que há um. Ele vem
+      do servidor junto com o formulário (formularioDoCanal com o pedido do
+      rascunho), na MESMA viagem: abrir o Cadastrar não custa chamada a mais.
+  */
+  var SEGUNDOS_ENTRE_RASCUNHOS = 30;
+  var relogioDoRascunho = null;
+  var haRascunhoNoServidor = false;   // só na memória da página
+  function caixaDoRascunho() { return elemento('guardar-rascunho'); }
+  function estadoDoRascunho(texto) {
+    var onde = elemento('estado-do-rascunho');
+    if (onde) onde.textContent = texto ? ' · ' + texto : '';
+  }
+  function horaDeAgora(quando) {
+    var d = quando ? new Date(quando) : new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  function guardarRascunhoAgora() {
+    var caixa = caixaDoRascunho();
+    if (!caixa || !caixa.checked || !corpo()) return;
+    Servidor.chamar('guardarRascunho', canalEscolhido, Formulario.valores(corpo()))
+      .entao(function () {
+        haRascunhoNoServidor = true;
+        estadoDoRascunho('guardado às ' + horaDeAgora());
+      })
+      .senao(function () { estadoDoRascunho('não deu para guardar agora'); });
+  }
+
+  function agendarRascunho() {
+    var caixa = caixaDoRascunho();
+    if (!caixa || !caixa.checked || relogioDoRascunho) return;
+    relogioDoRascunho = setTimeout(function () {
+      relogioDoRascunho = null;
+      guardarRascunhoAgora();
+    }, SEGUNDOS_ENTRE_RASCUNHOS * 1000);
+  }
+
+  function esquecerORelogioDoRascunho() {
+    if (relogioDoRascunho) { clearTimeout(relogioDoRascunho); relogioDoRascunho = null; }
+  }
+
+  /** Apaga no servidor — só se há o que apagar (guardado, oferecido, ou a caixa marcada). */
+  function apagarORascunho() {
+    esquecerORelogioDoRascunho();
+    var caixa = caixaDoRascunho();
+    var haviaRascunho = haRascunhoNoServidor || (caixa && caixa.checked);
+    haRascunhoNoServidor = false;
+    estadoDoRascunho('');
+    if (haviaRascunho) Servidor.chamar('apagarRascunho', canalEscolhido).senao(function () {});
+  }
+
+  /** Formulário novo: a caixa desmarcada, e o rascunho oferecido se veio um. */
+  function prepararORascunho(rascunho) {
+    esquecerORelogioDoRascunho();
+    var caixa = caixaDoRascunho();
+    if (caixa) caixa.checked = false;
+    estadoDoRascunho('');
+    var faixa = elemento('rascunho-encontrado');
+    if (faixa) { faixa.hidden = true; faixa.innerHTML = ''; }
+    var raiz = corpo();
+    if (raiz && raiz.getAttribute('data-rascunho-vigiado') !== 'sim') {
+      raiz.setAttribute('data-rascunho-vigiado', 'sim');
+      raiz.addEventListener('input', agendarRascunho);
+      raiz.addEventListener('change', agendarRascunho);
+    }
+    if (caixa && caixa.getAttribute('data-ligada') !== 'sim') {
+      caixa.setAttribute('data-ligada', 'sim');
+      caixa.addEventListener('change', function () {
+        if (this.checked) guardarRascunhoAgora();   // o consentimento já guarda o que está na tela
+        else apagarORascunho();
+      });
+    }
+    haRascunhoNoServidor = !!rascunho;
+    if (!rascunho || !faixa) return;
+    faixa.innerHTML = Moldura.icone('relogio')
+      + '<span>Há um rascunho deste cadastro, guardado às <strong>' + horaDeAgora(rascunho.quando)
+      + '</strong>.</span>'
+      + '<button type="button" class="botao pequeno" id="recuperar-rascunho">Recuperar</button>'
+      + '<button type="button" class="botao-secundario pequeno" id="descartar-rascunho">Descartar</button>';
+    faixa.hidden = false;
+    elemento('recuperar-rascunho').addEventListener('click', function () {
+      Formulario.preencher(corpo(), rascunho.valores);
+      if (caixa) caixa.checked = true;
+      estadoDoRascunho('recuperado');
+      faixa.hidden = true;
+      // O botão, o "Falta…", as condições e o índice acompanham os valores.
+      corpo().dispatchEvent(new Event('input', { bubbles: true }));
+      corpo().dispatchEvent(new Event('change', { bubbles: true }));
+      desenharIndice();
+    });
+    elemento('descartar-rascunho').addEventListener('click', function () {
+      apagarORascunho();
+      faixa.hidden = true;
+    });
+  }
+
   /* ----------------------------------------------------------- comportamento */
 
   function carregarFormulario() {
     corpo().innerHTML = '<p class="carregando-campos" role="status">Montando o formulário…</p>';
     mostrarAsAcoes(false);
 
-    Servidor.chamar('formularioDoCanal', canalEscolhido)
+    // `true`: com o rascunho de quem está usando, se houver (F3).
+    Servidor.chamar('formularioDoCanal', canalEscolhido, true)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
         Formulario.ligar(corpo(), '', canalEscolhido);
@@ -335,6 +448,7 @@ var TelaCadastrarCaso = (function () {
         // há o que cadastrar, e o recado do erro é o que importa ler.
         mostrarAsAcoes(true);
         guardarRetratoDoCadastro();
+        prepararORascunho(resposta.rascunho);   // F3
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
@@ -393,6 +507,7 @@ var TelaCadastrarCaso = (function () {
         envio = '';
         Formulario.acabouDeGravar(elemento('salvar-caso'),
           elemento('formulario-do-caso'));
+        apagarORascunho();   // F3: cadastrou, o rascunho não serve mais
         mostrarCadastroConcluido(resposta);
       })
       .senao(function (erro) {
@@ -488,6 +603,7 @@ var TelaCadastrarCaso = (function () {
     elemento('limpar-caso').addEventListener('click', function () {
       recado('', '');
       envio = '';   // formulário limpo é caso novo
+      apagarORascunho();   // F3: limpar é desistir do que estava ali
       carregarFormulario();
     });
     document.addEventListener('keydown', atalhoDeSalvar);
@@ -508,6 +624,7 @@ var TelaCadastrarCaso = (function () {
 
   /** Chamado ao sair da tela, para o atalho não continuar valendo nas outras. */
   function desligar() {
+    esquecerORelogioDoRascunho();   // F3: fica o último rascunho guardado
     document.removeEventListener('keydown', atalhoDeSalvar);
     window.removeEventListener('beforeunload', aoSairDaPagina);
     retratoDoCadastro = null;

@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { secao, teste, igual, verdadeiro, contem } = require('./ferramentas');
+const { secao, teste, igual, verdadeiro, contem, lanca, carregar, comoUsuario } = require('./ferramentas');
 const { retDoPO, comCasos } = require('./testes-sub-abas-do-trabalho');
 
 const ler = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End', nome), 'utf8');
@@ -147,6 +147,89 @@ function rodarTestesDeUX190() {
     contem(trabalho, "document.querySelectorAll('.fila-do-trabalho [data-trabalhar]')");
     contem(trabalho, "CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), depoisDeGravar,\n        proximoDaFila);");
     contem(ler('BuscarCaso.html'), 'CasoEmModal.abrir(canal, caso, procurarDeNovo);', 'a Busca sem o botão');
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('F3 — o rascunho seguro: no servidor, por e-mail, com consentimento');
+
+  const r = carregar('primeiro.adm@exemplo.com');
+  r.chamar('instalarRECC()');
+  const operacao = r.chamar('lerRegistros_')('CATALOGO').find((i) => i.Tipo === 'NIVEL_ACESSO' && i.Nome === 'Operação');
+  r.chamar('salvarUsuario')({ nome: 'Diego Castilho', email: 'diego@exemplo.com', nivelAcessoId: operacao.Id, canalId: '', ativo: true });
+  const ret = r.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_RET');
+  // Espia o cache: o que é gravado, com qual chave e por quanto tempo.
+  const gravados = [];
+  const original = r.chamar('CacheService.getScriptCache');
+  r.chamar('CacheService').getScriptCache = function () {
+    const cache = original();
+    return Object.assign({}, cache, { put: (chave, valor, segundos) => { gravados.push({ chave, valor, segundos }); return cache.put(chave, valor, segundos); } });
+  };
+  const doDiego = (fazer) => comoUsuario(r.ambiente, 'diego@exemplo.com', fazer);
+
+  teste('guarda por 2 horas, com chave que não tem o e-mail escrito', () => {
+    r.chamar('guardarRascunho')(ret.id, { nomedocliente: 'Cliente do rascunho', cpf: '123.456.789-01' });
+    const ultimo = gravados[gravados.length - 1];
+    igual(ultimo.segundos, 7200, '2 horas');
+    verdadeiro(/^PGO_RASCUNHO_[0-9a-f]{64}$/.test(ultimo.chave), 'a chave é o resumo SHA-256: ' + ultimo.chave);
+    verdadeiro(ultimo.chave.indexOf('primeiro') < 0 && ultimo.chave.indexOf('@') < 0, 'sem o e-mail na chave');
+  });
+
+  teste('volta junto com o formulário do Cadastrar — só para quem guardou', () => {
+    const meu = r.chamar('formularioDoCanal')(ret.id, true).rascunho;
+    igual(meu.valores.nomedocliente, 'Cliente do rascunho');
+    verdadeiro(meu.quando > 0, 'com a hora');
+    igual(doDiego(() => r.chamar('formularioDoCanal')(ret.id, true).rascunho), null, 'o Diego, no mesmo canal, não vê');
+  });
+
+  teste('o modal do "Trabalhar no caso" (sem o pedido) não recebe rascunho nenhum', () => {
+    verdadeiro(!('rascunho' in r.chamar('formularioDoCanal')(ret.id)), 'sem a chave rascunho');
+  });
+
+  teste('cada pessoa tem o seu: o do Diego não troca o do administrador', () => {
+    doDiego(() => r.chamar('guardarRascunho')(ret.id, { nomedocliente: 'Do Diego' }));
+    igual(r.chamar('formularioDoCanal')(ret.id, true).rascunho.valores.nomedocliente, 'Cliente do rascunho');
+    igual(doDiego(() => r.chamar('formularioDoCanal')(ret.id, true).rascunho.valores.nomedocliente), 'Do Diego');
+  });
+
+  teste('apagar tira só o de quem apagou', () => {
+    r.chamar('apagarRascunho')(ret.id);
+    igual(r.chamar('formularioDoCanal')(ret.id, true).rascunho, null);
+    igual(doDiego(() => r.chamar('formularioDoCanal')(ret.id, true).rascunho.valores.nomedocliente), 'Do Diego');
+  });
+
+  teste('quebra de propósito: rascunho enorme é recusado, sem guardar pela metade', () => {
+    const antes = gravados.length;
+    lanca(() => r.chamar('guardarRascunho')(ret.id, { descricao: 'x'.repeat(60 * 1024) }), 'grande demais');
+    igual(gravados.length, antes, 'nada gravado');
+  });
+
+  teste('quebra de propósito: sem e-mail na sessão, não há rascunho (recusa antes)', () => {
+    lanca(() => comoUsuario(r.ambiente, '', () => r.chamar('guardarRascunho')(ret.id, { nomedocliente: 'x' })), 'Acesso negado');
+  });
+
+  teste('nada em log: sem auditoria, sem Logger, sem cronômetro nas funções do rascunho', () => {
+    const casos = fs.readFileSync(path.join(__dirname, '..', '..', 'Back-End', 'Casos.gs'), 'utf8');
+    const f3 = casos.slice(casos.indexOf('var RECC_RASCUNHO_SEGUNDOS'));
+    ['registrarAuditoria_', 'Logger.', 'console.', 'cronometrado_', 'registrarErro'].forEach((proibido) => {
+      igual(f3.indexOf(proibido), -1, proibido + ' não aparece');
+    });
+    ['function guardarRascunho(', 'function apagarRascunho('].forEach((nome) => {
+      const corpo = f3.slice(f3.indexOf(nome), f3.indexOf('\n}', f3.indexOf(nome)));
+      contem(corpo, 'exigirPermissao_(RECC_ACOES.CRIAR)', nome + ' exige poder cadastrar');
+    });
+  });
+
+  teste('a tela: a caixa nasce desmarcada, 30 s entre envios, apaga ao cadastrar/limpar/desmarcar', () => {
+    const tela = ler('CadastrarCaso.html');
+    contem(tela, '<input type="checkbox" id="guardar-rascunho"> Guardar rascunho deste cadastro');
+    contem(tela, 'if (caixa) caixa.checked = false;', 'desmarcada a cada formulário');
+    contem(tela, 'var SEGUNDOS_ENTRE_RASCUNHOS = 30;');
+    contem(tela, 'if (!caixa || !caixa.checked || relogioDoRascunho) return;', 'uma chamada por janela de 30 s');
+    contem(tela, 'apagarORascunho();   // F3: cadastrou');
+    contem(tela, 'apagarORascunho();   // F3: limpar');
+    contem(tela, 'else apagarORascunho();', 'desmarcar apaga');
+    contem(tela, "Servidor.chamar('formularioDoCanal', canalEscolhido, true)", 'na mesma viagem do formulário');
+    igual((tela.match(/localStorage|sessionStorage|indexedDB/g) || []).length, 0, 'nada no navegador');
   });
 }
 

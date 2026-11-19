@@ -2215,6 +2215,54 @@ async function rodar() {
     await pagina.waitForFunction(() => !document.getElementById('modal-do-caso'), null, { timeout: 5000 });
   });
 
+  await teste('F3: o rascunho só com a caixa marcada; recarregar oferece recuperar; limpar apaga; nada no navegador', async () => {
+    const irAoCadastro = async () => {
+      await pagina.click('[data-tela="cadastrarCaso"]');
+      await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
+      await pagina.waitForSelector('#acoes-do-caso:not([hidden]) #guardar-rascunho', { timeout: 10000 });
+    };
+    const sair = async () => {
+      await pagina.click('[data-tela="trabalho"]');
+      if (await pagina.waitForSelector('#dialogo-descarte', { timeout: 1500 }).catch(() => null)) await pagina.click('#descartar-alteracoes');
+      await pagina.waitForTimeout(300);
+    };
+    await irAoCadastro();
+    igual(await pagina.isChecked('#guardar-rascunho'), false, 'nasce desmarcada');
+    const nome = pagina.locator('#formulario-do-caso [data-chave="nomedocliente"]');
+    await nome.fill('Rascunho do teste');
+    await pagina.waitForTimeout(200);
+    igual(await pagina.textContent('#estado-do-rascunho'), '', 'sem a caixa, nada vai ao servidor');
+
+    await pagina.check('#guardar-rascunho');
+    await pagina.waitForFunction(() => /guardado às/.test(document.getElementById('estado-do-rascunho').textContent), null, { timeout: 10000 });
+
+    // Recarregar (o "fechou sem querer"): o Cadastrar oferece recuperar.
+    await pagina.evaluate(() => { window.onbeforeunload = null; });
+    await pagina.reload();   // o "sair da página?" do navegador já é aceito pelo tratador geral
+    await pagina.waitForSelector('.lateral-item', { timeout: 10000 });
+    await irAoCadastro();
+    await pagina.waitForSelector('#rascunho-encontrado:not([hidden])', { timeout: 10000 });
+    contem(await pagina.textContent('#rascunho-encontrado'), 'Há um rascunho deste cadastro');
+    await pagina.click('#recuperar-rascunho');
+    igual(await nome.inputValue(), 'Rascunho do teste', 'o que foi digitado voltou');
+    igual(await pagina.isChecked('#guardar-rascunho'), true, 'e continua guardando');
+
+    // Limpar apaga — voltar ao Cadastrar não oferece mais nada.
+    await pagina.click('#limpar-caso');
+    await pagina.waitForSelector('#acoes-do-caso:not([hidden])', { timeout: 10000 });
+    await pagina.waitForTimeout(500);
+    await sair();
+    await irAoCadastro();
+    await pagina.waitForTimeout(500);
+    igual(await pagina.locator('#rascunho-encontrado:not([hidden])').count(), 0, 'limpou, não há rascunho');
+
+    // Nada do rascunho no navegador.
+    const noNavegador = await pagina.evaluate(() => JSON.stringify(Object.assign({}, localStorage, sessionStorage)));
+    verdadeiro(noNavegador.indexOf('Rascunho do teste') < 0 && noNavegador.indexOf('rascunho') < 0,
+      'nada no localStorage nem no sessionStorage: ' + noNavegador);
+    await sair();
+  });
+
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
   if (process.env.PGO_GRAVAR_CHAMADAS) {

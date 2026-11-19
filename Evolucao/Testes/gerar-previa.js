@@ -137,6 +137,9 @@ function pontePreparada(respostas) {
     + '      withFailureHandler: function (f) { return novaChamada(aoDarCerto, f); },\n'
     + '      pacoteDePartida: function () { responder(respostas.pacoteDePartida); },\n'
     + '      salvarTemaDoUsuario: function (tema) { responder(tema); },\n'
+    // F3 (Etapa 90): na prévia o rascunho não vai a lugar nenhum — só responde.
+    + '      guardarRascunho: function () { responder({ guardado: true }); },\n'
+    + '      apagarRascunho: function () { responder(true); },\n'
     + '      formularioDoCanal: function (idDoCanal) {\n'
     + '        responder(respostas.formularios[idDoCanal]);\n'
     + '      },\n'

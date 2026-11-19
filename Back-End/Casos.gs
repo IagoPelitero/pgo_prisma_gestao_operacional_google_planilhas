@@ -54,7 +54,7 @@ function formularioDoCanal(idDoCanal) {
   return cronometrado_('formularioDoCanal', formularioDoCanalSemRelogio_, arguments);
 }
 
-function formularioDoCanalSemRelogio_(idDoCanal) {
+function formularioDoCanalSemRelogio_(idDoCanal, comORascunho) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -73,12 +73,17 @@ function formularioDoCanalSemRelogio_(idDoCanal) {
     porSecao[secao].push(campoParaATela_(campo, canal.id, visibilidade, quem));
   });
 
-  return {
+  var formulario = {
     canal: canal,
     secoes: ordemDasSecoes.map(function (nome) {
       return { nome: nome, campos: porSecao[nome] };
     })
   };
+  // F3 (Etapa 90): o Cadastrar pede o rascunho na MESMA viagem que pede o
+  // formulário — sem chamada a mais, e sem marca nenhuma no navegador. O
+  // modal do "Trabalhar no caso" não pede, e fica como estava.
+  if (comORascunho === true) formulario.rascunho = rascunhoDe_(quem, canal);
+  return formulario;
 }
 
 /** Os campos ativos de um canal, na ordem escolhida pelo administrador. */
@@ -4753,4 +4758,79 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
+}
+
+/* ===========================================================================
+   F3 (Etapa 90) — O RASCUNHO SEGURO DO CADASTRO
+   ===========================================================================
+   Decisão do PO: "No servidor, por e-mail". Quem marca "Guardar rascunho
+   deste cadastro" tem o que digitou guardado por 2 horas, só para si:
+
+   · NO CACHE DO SCRIPT, e não no do usuário: o app roda como o dono, e o
+     getUserCache seria o MESMO para todo mundo. A separação é a chave.
+   · A CHAVE vem do e-mail que o SERVIDOR lê da sessão (usuarioAtual_ via
+     exigirPermissao_) — nunca de algo que a tela manda. E é o resumo SHA-256
+     de e-mail + canal: nem o e-mail fica escrito na chave.
+   · SÓ COM O CONSENTIMENTO: a tela só chama com a caixa marcada; desmarcar,
+     cadastrar ou limpar apaga.
+   · 2 HORAS, e some sozinho. Até 50 KB (um formulário tem uns poucos KB).
+   · NADA EM LOG: sem auditoria, sem Logger, sem cronômetro — o rascunho tem
+     CPF e nome, e nada dele vai para planilha nenhuma.
+   · Sem e-mail na sessão não há rascunho: exigirPermissao_ recusa antes.
+   =========================================================================== */
+var RECC_RASCUNHO_SEGUNDOS = 2 * 60 * 60;
+var RECC_RASCUNHO_MAXIMO = 50 * 1024;
+
+function chaveDoRascunho_(quem, canal) {
+  var email = String((quem && quem.email) || '').trim().toLowerCase();
+  if (!email) throw new Error('Sem o e-mail de quem está usando não dá para guardar rascunho.');
+  return 'PGO_RASCUNHO_' + impressaoDigitalDaSenha_('rascunho', email + '|' + canal.id);
+}
+
+function cacheDoRascunho_() {
+  if (typeof CacheService === 'undefined') throw new Error('O rascunho não está disponível agora.');
+  return CacheService.getScriptCache();
+}
+
+/** Guarda (ou troca) o rascunho do cadastro de quem está usando, neste canal. */
+function guardarRascunho(idDoCanal, valores) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var limpos = {};
+  Object.keys(valores && typeof valores === 'object' ? valores : {}).forEach(function (chave) {
+    var valor = valores[chave];
+    if (valor === null || valor === undefined) return;
+    limpos[String(chave).slice(0, 80)] = Array.isArray(valor)
+      ? valor.map(function (v) { return String(v); }) : String(valor);
+  });
+  var texto = JSON.stringify({ valores: limpos, quando: new Date().getTime() });
+  if (texto.length > RECC_RASCUNHO_MAXIMO) {
+    throw new Error('O rascunho ficou grande demais para guardar. O que está na tela continua aí.');
+  }
+  cacheDoRascunho_().put(chaveDoRascunho_(quem, canal), texto, RECC_RASCUNHO_SEGUNDOS);
+  return { guardado: true };
+}
+
+/**
+ * O rascunho de quem está usando, neste canal — ou null. Vai junto com o
+ * formulário (formularioDoCanal com `comORascunho`). Qualquer problema no
+ * cache é "sem rascunho": o formulário nunca deixa de abrir por causa dele.
+ */
+function rascunhoDe_(quem, canal) {
+  try {
+    var texto = cacheDoRascunho_().get(chaveDoRascunho_(quem, canal));
+    if (!texto) return null;
+    var lido = JSON.parse(texto);
+    return { valores: lido.valores || {}, quando: lido.quando || 0 };
+  } catch (semRascunho) {
+    return null;
+  }
+}
+
+/** Apaga o rascunho de quem está usando, neste canal. */
+function apagarRascunho(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  cacheDoRascunho_().remove(chaveDoRascunho_(quem, canal));
+  return true;
 }

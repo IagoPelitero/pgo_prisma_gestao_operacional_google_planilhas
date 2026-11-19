@@ -2480,6 +2480,18 @@ table.fila.legado td { color: var(--suave); }
 }
 .cadastro-em-blocos .falta-preencher::before { content: "\26A0\FE0E  "; }
 
+/* F3 (Etapa 90): a caixa do rascunho e a faixa de recuperar. */
+.guardar-rascunho { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--suave); cursor: pointer; }
+.guardar-rascunho input { accent-color: var(--destaque); width: 15px; height: 15px; margin: 0; }
+.estado-do-rascunho { color: var(--tenue); }
+.rascunho-encontrado {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--destaque) 30%, transparent);
+  border-radius: var(--raio-pequeno); background: var(--destaque-tenue); color: var(--texto); font-size: 13.5px;
+}
+.rascunho-encontrado > svg { width: 17px; height: 17px; color: var(--destaque-escuro); flex: none; }
+.rascunho-encontrado > span { flex: 1 1 260px; }
+
 /* V4: o erro no próprio campo, com o sinal antes. */
 .campo.com-erro .erro::before { content: "\26A0\FE0E  "; }
 /* V5: a proposta repetida, em destaque de atenção. */
