@@ -74,8 +74,7 @@ function gabarito(t, termo, modo, soDoDiego) {
   const norm = t.contexto.normalizarParaComparar_;
   const dig = t.contexto.apenasDigitos_;
   const termoEhNumero = /^[\d\s.\-/]+$/.test(String(termo).trim());
-  // As colunas que a fila e a busca do canal declaram comparam sempre; as outras de identificador, só com termo-número.
-  const sempre = ['Código origem da proposta', 'número da proposta', 'nome do cliente', 'Num_apolice', 'CPF'];
+  // Os dígitos do identificador: sempre no campo sozinho; na busca rápida, só com termo-número.
   const campos = modo === 'rapida' ? Object.keys(CAMPOS) : [modo];
   const contem = (valor, ident) => {
     if (valor === '' || valor === null || valor === undefined) return false;
@@ -88,7 +87,7 @@ function gabarito(t, termo, modo, soDoDiego) {
       const colunas = CAMPOS[campo];
       const pedaco = colunas.some((c) => {
         const ident = c !== 'nome do cliente';
-        if (ident && sempre.indexOf(c) < 0 && !termoEhNumero) return false;
+        if (ident && campos.length > 1 && !termoEhNumero) return false;
         return contem(r[c], ident);
       });
       if (pedaco || colunas.length < 2) return pedaco;
@@ -206,6 +205,18 @@ function rodarTestesDePesquisarPor() {
       Object.getPrototypeOf(folha.getRange(1, 1)).createTextFinder = original;
     }
     verdadeiro(faixas.length > 0 && faixas.every((n) => n === 1), 'faixas de 1 coluna: ' + faixas.join(','));
+    // A busca rápida: uma procura por expressão, da primeira à última coluna dos quatro campos — nunca a linha toda.
+    faixas.length = 0;
+    Object.getPrototypeOf(folha.getRange(1, 1)).createTextFinder = function (e) {
+      if (this.aba === folha) faixas.push(this.nColunas);
+      return original.call(this, e);
+    };
+    try { t.buscar('joão', 'rapida'); t.buscar('123.456.789-01', 'rapida'); } finally {
+      Object.getPrototypeOf(folha.getRange(1, 1)).createTextFinder = original;
+    }
+    const largura = t.chamar('estruturaDaAba_')('BASE_RET').cabecalhos.length;
+    igual(faixas.length, 2, 'uma procura em cada busca rápida');
+    verdadeiro(faixas.every((n) => n < largura), 'faixas de ' + faixas.join(',') + ' colunas, de ' + largura);
   });
 
   /* ----------------------------------------------------------------------- */
