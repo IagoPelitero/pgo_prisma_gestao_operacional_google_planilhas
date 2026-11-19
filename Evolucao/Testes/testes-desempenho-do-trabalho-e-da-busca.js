@@ -6,6 +6,11 @@
  * células, e não 25 mil) e a memória da carga (o aviso de prazo não relê a
  * coluna do status nem as linhas que a fila acabou de ler). Os resultados têm
  * de ser OS MESMOS; só o caminho até eles muda.
+ *
+ * B2: o Buscar Caso não repete nas colunas de texto a expressão que a linha
+ * toda acabou de procurar sem achar. A prova é comparativa: comparar-busca.js
+ * rodou a bateria (82 buscas) na 1.87 e guardou em medicoes/busca-1.87.json;
+ * aqui a mesma bateria roda na versão de agora e tem de dar o mesmo.
  * ============================================================================
  */
 
@@ -200,6 +205,43 @@ function rodarTestesDeDesempenhoDoTrabalhoEDaBusca() {
       verdadeiro(medidor.retrato().celulasLidas < 600 * estrutura.cabecalhos.length / 3,
         medidor.retrato().celulasLidas + ' células — antes, um bloco de quase a base inteira');
     } finally { t.chamar("RECC_LEITURA_DA_SUB_ABA = ''"); }
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('B2 — o Buscar Caso dá os mesmos resultados da 1.87, com menos localizador');
+
+  const path = require('path');
+  const { procurarTudo } = require('./comparar-busca');
+  const da187 = require('../medicoes/busca-1.87.json');
+  let agora = null;
+  const comparar = () => { if (!agora) agora = procurarTudo(path.join(__dirname, '..', '..')); return agora; };
+
+  teste('as 82 buscas (adm e Operação) voltam idênticas às da 1.87: origens, casos, avisos e erros', () => {
+    const r = comparar();
+    const diferentes = Object.keys(da187).filter((k) => JSON.stringify([da187[k].erro, da187[k].resultado, da187[k].total])
+      !== JSON.stringify([r[k].erro, r[k].resultado, r[k].total]));
+    igual(Object.keys(r).length, Object.keys(da187).length, 'a mesma bateria');
+    igual(diferentes.join(' | '), '', 'nenhuma busca com resultado diferente');
+  });
+
+  teste('nenhuma busca ficou mais cara: nem mais localizador, nem mais células', () => {
+    const r = comparar();
+    const piores = Object.keys(da187).filter((k) => r[k].localizador > da187[k].localizador || r[k].celulas > da187[k].celulas);
+    igual(piores.join(' | '), '', 'o identificador continua procurando (sem ele, a busca leria a coluna inteira)');
+  });
+
+  teste('o termo que não existe: só a linha toda de cada canal (11 → 3 localizadores)', () => {
+    const r = comparar();
+    igual(da187['adm · zzzznaoexiste'].localizador, 11);
+    igual(r['adm · zzzznaoexiste'].localizador, 3);
+  });
+
+  teste('a busca que a linha toda acha não muda de caminho', () => {
+    const r = comparar();
+    igual(r['adm · RET-0007'].total, 1);
+    igual(r['adm · cpf 123.456.789-01'].total, 1, 'o identificador acha com letras no meio, como antes');
+    verdadeiro(r['adm · RET-0007'].localizador < da187['adm · RET-0007'].localizador,
+      'Mesa e VG não repetem nas colunas de texto o que a linha toda não achou');
   });
 }
 

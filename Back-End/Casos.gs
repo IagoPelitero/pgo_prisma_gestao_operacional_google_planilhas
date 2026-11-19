@@ -2509,6 +2509,9 @@ function procurarNoCanal_(canal, termo, quem) {
 
   var conferidos = casosNaLinhaToda_(canal, termo, quem);
   var paradaAntes = null;
+  // Etapa 88 (B2): o localizador rodou na linha toda e não achou nada.
+  var nadaNaLinhaToda = !!(conferidos && conferidos.nadaNaLinhaToda);
+  if (nadaNaLinhaToda) conferidos = null;
   if (conferidos) {
     if (!conferidos.exato) paradaAntes = conferidos.linhas;
     conferidos = conferidos.registros;
@@ -2520,7 +2523,8 @@ function procurarNoCanal_(canal, termo, quem) {
       return origem;
     }
     // O alcance vem ANTES do corte: os 100 lugares são dos casos que eu posso ver.
-    var linhas = linhasNoMeuAlcance_(canal.aba, linhasPelasColunasDaBusca_(canal, colunas, termo), quem);
+    var linhas = linhasNoMeuAlcance_(canal.aba,
+      linhasPelasColunasDaBusca_(canal, colunas, termo, nadaNaLinhaToda), quem);
     if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
       origem.aviso = avisoDoMaximoDaBusca_(linhas.length);
       // Os mais recentes são os do fim da base, que só acrescenta no fim.
@@ -2567,13 +2571,19 @@ const RECC_LOTE_DA_BUSCA = 150;
  * ler todas, inteiras, para mostrar 100 era 1,5 milhão de células no teste de
  * volume. `exato` diz se todas as candidatas foram conferidas (aí `total` é a
  * conta dos casos); senão, `linhas` é em quantas linhas o termo aparece.
+ *
+ * Etapa 88 (B2): quando o localizador RODOU na linha toda e não achou nada,
+ * volta `{ nadaNaLinhaToda: true }` em vez de null. Quem chamou segue pelo
+ * caminho de antes (as colunas da busca), mas sem repetir nas colunas de texto
+ * a MESMA expressão que acabou de dar zero numa faixa que as contém.
  */
 function casosNaLinhaToda_(canal, termo, quem) {
   var estrutura = estruturaDaAba_(canal.aba);
   var total = quantidadeDeRegistros_(estrutura);
   if (total <= 0) return null;
   var linhas = linhasDoTermoNaPlanilha_(estrutura, termo, total);
-  if (!linhas || !linhas.length) return null;
+  if (!linhas) return null;
+  if (!linhas.length) return { nadaNaLinhaToda: true };
 
   linhas = linhasNoMeuAlcance_(canal.aba, linhas, quem);
   var conferidos = [];
@@ -2592,10 +2602,10 @@ function casosNaLinhaToda_(canal, termo, quem) {
  * O caminho de antes (Etapas 82 e anteriores): só as COLUNAS DA BUSCA do
  * canal, em ordem — as linhas em que o termo aparece numa delas.
  */
-function linhasPelasColunasDaBusca_(canal, colunas, termo) {
+function linhasPelasColunasDaBusca_(canal, colunas, termo, nadaNaLinhaToda) {
   var jaAchada = {};
   var ordemDasLinhas = [];
-  var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo);
+  var candidatas = candidatasDaBuscaNoCanal_(canal, colunas, termo, nadaNaLinhaToda);
 
   colunas.forEach(function (coluna, k) {
     var numeros;
@@ -2642,8 +2652,18 @@ const RECC_TIPOS_DA_BUSCA_RAPIDA = [RECC_TIPO_DE_DADO.IDENTIFICADOR, RECC_TIPO_D
  *   - quando ele não acha NADA em nenhuma coluna do canal. "Nada encontrado"
  *     nunca depende só dele: uma célula que mostra o número de outro jeito
  *     ainda é achada pela leitura.
+ *
+ * Etapa 88 (B2) — `nadaNaLinhaToda`: o localizador acabou de procurar o termo
+ * na LINHA TODA (todas as colunas, as mesmas linhas) com a MESMA expressão que
+ * a coluna de texto usaria — expressaoDaBuscaRapida_(normalizado, false,
+ * false) — e não achou nada. Repeti-la numa coluna, que é um pedaço daquela
+ * faixa, só pode dar zero de novo: na aba ERROS do PO eram ~11 localizadores
+ * por busca, de 0,5 a 2,8 s cada. A coluna de texto já sai vazia, sem ida. O
+ * identificador continua procurando — a expressão dele é outra, só os dígitos
+ * ("123.456" acha "123456"), e pode achar o que a linha toda não achou. E a
+ * regra de cima não muda: sem candidato em coluna nenhuma, lê inteiras.
  */
-function candidatasDaBuscaNoCanal_(canal, colunas, termo) {
+function candidatasDaBuscaNoCanal_(canal, colunas, termo, nadaNaLinhaToda) {
   var estrutura = estruturaDaAba_(canal.aba);
   var candidatas = colunas.map(function (coluna) {
     if (RECC_TIPOS_DA_BUSCA_RAPIDA.indexOf(coluna.tipo) < 0) return null;
@@ -2651,6 +2671,7 @@ function candidatasDaBuscaNoCanal_(canal, colunas, termo) {
     var alvo = ehIdentificador ? apenasDigitos_(termo) : normalizarParaComparar_(termo);
     // Identificador sem dígito nenhum no termo nunca casa (casaComOTermo_).
     if (ehIdentificador && !alvo) return [];
+    if (nadaNaLinhaToda && !ehIdentificador) return [];
     return linhasDaBuscaRapida_(estrutura, posicaoDaColuna_(estrutura, coluna.cabecalho),
       alvo, ehIdentificador, false);
   });
