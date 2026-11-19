@@ -2267,6 +2267,55 @@ sem esperar; a linha do caso procurada antes da trava e conferida dentro com uma
 (Etapa 61). A suíte ocupa a trava e confere que a busca não espera, que nada se perde e que a
 mudança de status lê menos de 500 células com a trava na mão.
 
+### 111 · Clicar no índice do Cadastrar logo depois de digitar não levava a lugar nenhum
+
+**Sintoma.** Pego pelo teste de navegador da Etapa 90, antes do commit: quem digitava num campo e
+clicava em seguida numa seção do índice ficava parado, com o foco na página.
+
+**Causa.** Sair do campo dispara o "change", e o "change" redesenhava o índice — no meio do
+clique. O botão debaixo do mouse era trocado por outro igual, e o clique terminava num elemento
+que já não existia.
+
+**Defesa.** O índice só é redesenhado quando o conteúdo muda, um ouvinte só no índice vale para
+qualquer redesenho, e com o mouse ele age no "mousedown" (antes de o campo perder o foco); pelo
+teclado, o "click" de sempre. O ponta a ponta sai de um obrigatório vazio direto para o índice —
+o erro aparece e o índice muda no meio do clique — e confere que o cursor chegou à seção.
+
+### 112 · O "Falta…" do Cadastrar dizia "Valor do prêmio retido pedido pelo status Retido"
+
+**Sintoma.** Visto na foto da Etapa 90, comparada à proposta aprovada.
+
+**Causa.** O nome do campo no "Falta…" e na etiqueta V6 vinha do texto INTEIRO do rótulo — e a
+etiqueta nova ("pedido pelo status Retido") mora dentro do rótulo.
+
+**Defesa.** `textoDoRotulo` tira do texto a etiqueta (e o asterisco); os dois lugares que liam o
+rótulo passam por ele. A suíte confere que o "Falta…" usa `textoDoRotulo`, e o ponta a ponta,
+que ele não diz "pedido pelo".
+
+### 113 · Um teste de ordem passava sempre, mesmo com o trecho sumido
+
+**Sintoma.** Achado ao mudar a Produtividade na Etapa 90: o teste "os prêmios vêm logo depois
+dos cartões" continuou passando quando o trecho que ele procurava deixou de existir.
+
+**Causa.** `tela.substring(tela.indexOf(trecho))` com o trecho ausente é `substring(-1)` — a tela
+inteira —, e `length > 0` é sempre verdade.
+
+**Defesa.** O teste confere a posição (o trecho existe) e a ordem com uma expressão. O mesmo
+padrão foi procurado no resto da suíte: o outro caso (`function salvar()`) também foi corrigido.
+
+### 114 · A fila da auditoria podia gravar o mesmo lote duas vezes
+
+**Sintoma.** Achado da revisão do B6 (Etapa 90), sem relato da operação: uma execução que caísse
+exatamente entre gravar o lote na aba e tirá-lo da fila deixava o próximo gravar tudo de novo.
+
+**Causa.** A fila grava ANTES de tirar — o que garante não perder —, e nada dizia ao próximo que
+aquele lote já tinha chegado à aba.
+
+**Defesa.** Uma marca durável (as chaves e a impressão de cada registro) antes de gravar,
+resolvida pela próxima descarga, dentro da trava: lote nas últimas linhas da aba, só sai da
+fila; lote que não chegou, é gravado uma vez. Vale para AUDITORIA e ERROS. A suíte derruba a
+execução nos dois pontos e confere: nada repetido, nada perdido.
+
 ---
 
 ## O que esta lista ensina
@@ -2515,3 +2564,9 @@ Daí as duas práticas que o projeto não abre mão:
 61. **Tudo o que entra numa trava compartilhada é pago por todo mundo.** No item 110 o rastro
     de quem só olhava esperava junto com quem gravava. Dentro da trava, só o que precisa
     estar lá — e o rastro não precisa.
+62. **Redesenhar debaixo do mouse perde o clique.** No item 111 o redesenho chegava no meio do
+    gesto. O que reage a "change" não pode trocar o elemento que a pessoa está clicando.
+63. **Um teste que não pode falhar não testa nada.** No item 113 o `indexOf` de -1 virava a tela
+    inteira. Toda conferência de "está aqui" precisa conferir, antes, que achou.
+64. **"Grava antes de tirar" resolve perder; não resolve repetir.** No item 114 a fila era
+    segura de um lado só. Quem reprocessa precisa saber o que já foi processado.

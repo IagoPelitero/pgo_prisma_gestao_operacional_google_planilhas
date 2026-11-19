@@ -31,7 +31,15 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const RAIZ = path.join(__dirname, '..', '..');
 const PREVIA = path.join(RAIZ, 'Evolucao', 'previa');
 const DESTINO = path.join(RAIZ, 'Evolucao', 'imagens');
-const NAVEGADOR = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// O Chromium instalado, qualquer que seja a versão (Etapa 90: o caminho era fixo
+// numa versão que o ambiente trocou). A mesma procura do ponta-a-ponta.js.
+const NAVEGADOR = (function () {
+  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
+  if (!fs.existsSync(base)) return undefined;
+  const pasta = fs.readdirSync(base).sort().reverse().find((nome) => nome.indexOf('chromium-') === 0);
+  const caminho = pasta ? path.join(base, pasta, 'chrome-linux', 'chrome') : '';
+  return caminho && fs.existsSync(caminho) ? caminho : undefined;
+})();
 
 /** Monitor de trabalho: é onde a operação abre o sistema. */
 const TELA_CHEIA = { width: 1440, height: 900 };
@@ -102,7 +110,7 @@ async function gerar() {
   }
   fs.mkdirSync(DESTINO, { recursive: true });
 
-  const navegador = await chromium.launch({ executablePath: NAVEGADOR });
+  const navegador = await chromium.launch(NAVEGADOR ? { executablePath: NAVEGADOR } : {});
   const endereco = 'file://' + path.join(PREVIA, 'sistema.html');
   const feitas = [];
 

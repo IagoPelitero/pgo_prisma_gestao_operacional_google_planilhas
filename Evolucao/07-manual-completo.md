@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1865 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1910 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -360,7 +360,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1865 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1910 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1947,6 +1947,98 @@ ainda falta e por quê, está em
 
 ---
 
+## A versão 1.90 no dia a dia
+
+A 1.90 traz o visual aprovado pelo PO (Corporate Modern, azul Porto, nos quatro temas) e um
+conjunto de melhorias de uso. **Nenhuma regra de negócio, permissão, indicador, cálculo de
+produtividade, regra Diamante/SUSEP ou estrutura de planilha mudou.**
+
+**Trabalho**
+
+- **Faixa do prazo.** No alto da tela, uma faixa avisa quantos casos estão perto de vencer, e
+  "Ver os casos" abre a lista. A janela não abre mais sozinha (decisão do PO).
+- **Cartões e fila.** Os cartões ficaram compactos. A cor de cada linha da fila acompanha o
+  prazo do caso (V1).
+- **"Filtrando por" (V2).** Mostra o cartão e a busca em uso, cada um com o ✕ para tirar.
+  "Limpar tudo" tira todos.
+- **Cabeçalho fixo (V3).** Em telas a partir de 1360 px, o cabeçalho da fila fica preso
+  embaixo da barra ao rolar.
+- **"Mostrar" lembrado (F9).** A quantidade da fila fica lembrada neste navegador. Só o número
+  é guardado: o "Todos" nunca é lembrado.
+- **Para onde o caso foi (F8).** Depois de salvar, aparece "Caso 123 atualizado. Agora está em
+  Casos concluídos." O destino é calculado pela mesma regra que monta a fila.
+- **Salvar e abrir o próximo (F10).** No "Trabalhar no caso" aberto pela fila, esse botão grava
+  e abre o caso seguinte da fila que está na tela, na mesma ordem e com os mesmos filtros.
+  - Só abre depois de gravar com sucesso.
+  - Se outra pessoa alterou o caso, nada é gravado e o caso continua aberto.
+  - No último caso da fila, o sistema avisa que não há próximo.
+  - O "Salvar alterações" e o Ctrl+Enter continuam iguais.
+
+**Cadastrar Caso**
+
+- **Seções e índice.** As seções viram blocos numerados, com um índice ao lado. O índice mostra
+  "N obrigatório(s)" quando falta algo, ou ✓ quando a seção está completa. Clicar numa seção
+  leva até ela.
+- **Erro no campo (V4).** Ao sair de um obrigatório vazio, o campo fica vermelho e diz "é
+  obrigatório". A seção e o índice acompanham.
+- **Proposta repetida (V5).** Aparece em âmbar. É um aviso, não um bloqueio.
+- **Por que é obrigatório (V6).** Um campo obrigatório por causa de outro mostra o motivo:
+  "pedido pelo status Retido".
+- **Rascunho (F3).** Para guardar o que está sendo digitado, marque **"Guardar rascunho deste
+  cadastro"** na barra de baixo.
+  - **Onde:** fica no servidor, por 2 horas, e só para quem guardou.
+  - **Ao voltar:** se a tela foi fechada sem querer, ao abrir o Cadastrar de novo aparece
+    "Há um rascunho… Recuperar / Descartar".
+  - **Quando some:** desmarcar a caixa, cadastrar ou limpar apaga o rascunho.
+  - **No navegador:** nada fica guardado.
+
+**Buscar Caso**
+
+- **Bases em caixas.** As bases de "Onde procurar" aparecem em caixas, e a lupa fica dentro do
+  campo de busca.
+- **Pesquisa direcionada.** Ao escolher uma opção que não é a "Busca avançada", a tela orienta:
+  "A pesquisa direcionada é aplicada à BASE_RET. As demais bases mantêm a busca completa."
+  As seis opções continuam, com a avançada como padrão.
+
+**Configurações**
+
+- **Três colunas.** O menu, a lista e o painel ficam lado a lado.
+- **Campos por seção (V7).** A lista de campos ganha um título a cada seção, como "CASO · 5
+  campos", e um ícone por tipo de campo. A ordem e as setas continuam as mesmas.
+- **Alerta no alto (V8).** O alerta do menu, como "Sem senha de administrador definida", fica no
+  alto.
+- **Prévia (V9).** O painel mostra a prévia do campo no formulário, ao vivo, antes de salvar.
+
+**Produtividade, Importação e Corretoras**
+
+- **Produtividade:** os prêmios aparecem em barras deitadas, lado a lado com o retido
+  acumulado. Os números são os mesmos de antes.
+- **Importação:** a área de colar ficou tracejada, e os três avisos aparecem como selos verdes.
+- **Corretoras:** o aviso das SUSEPs fora do cadastro ficou compacto, com o mesmo texto e os
+  mesmos botões.
+
+**Mensagens e acessibilidade**
+
+- **Tempo esgotado ao salvar (F15).** A tela diz que a gravação "pode ter sido concluída" e pede
+  para conferir antes de salvar de novo. O detalhe técnico aparece só para quem pode configurar,
+  e sempre vai para a aba ERROS.
+- **Avisos (F16).** Um aviso de erro fica na tela até ser fechado no ✕. O de sucesso some
+  sozinho.
+- **Foco (F17).** O Tab não sai de uma janela aberta, e ao fechá-la o foco volta para onde
+  estava.
+- **Leitor de tela (F18).** Os carregamentos são anunciados, e o erro de cada campo é lido junto
+  com o campo.
+- **Contraste (F19).** Todo texto tem contraste de 4,5:1 ou mais nos quatro temas, pelo critério
+  WCAG AA.
+
+**Por dentro (B5 e B6).** As decisões e os números estão em
+[`medicoes/B5-B6-decisoes-1.90.md`](medicoes/B5-B6-decisoes-1.90.md).
+
+- **B5:** a consulta da SUSEP foi medida em três estratégias e continua com o localizador.
+- **B6:** a fila da auditoria e da aba ERROS deixou de poder gravar o mesmo lote duas vezes.
+
+Todos os números são do simulador. A confirmação na planilha de verdade é a M1.
+
 ## As regras que sustentam o produto
 
 Não são preferências de estilo. Cada uma existe porque a alternativa já causou
@@ -1980,7 +2072,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.89** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.90** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1988,7 +2080,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1865 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1910 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

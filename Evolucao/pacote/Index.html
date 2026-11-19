@@ -38,16 +38,17 @@
   --linha: #DCE4EE;
   --linha-forte: #BCC8D8;
   --texto: #14213A;
-  --suave: #56667F;
-  --tenue: #8494A9;
+  --suave: #4F5F78;
+  --tenue: #5B6B82;
 
-  --lateral-fundo: #17A2E8;
+  --lateral-fundo: #0B4F94;
   --lateral-texto: #FFFFFF;
+  --lateral-subtexto: #C9DCF2;
   --lateral-titulo: #FFFFFF;
-  --lateral-marca-realce: #0A2A3D;
-  --lateral-linha: #47BAF0;
+  --lateral-marca-realce: #C9DCF2;
+  --lateral-linha: #2E6BAA;
   --lateral-ativo: #FFFFFF;
-  --lateral-ativo-texto: #0A2A3D;
+  --lateral-ativo-texto: #0B4F94;
 
   --violeta: #6B4FD8;     --violeta-tenue: #EDE9FB;
 
@@ -71,16 +72,17 @@
   --linha: #EED6E1;
   --linha-forte: #DCB4C7;
   --texto: #2B1420;
-  --suave: #6E5260;
-  --tenue: #9C8290;
+  --suave: #63485A;
+  --tenue: #6E5260;
 
-  --lateral-fundo: #E8489B;
+  --lateral-fundo: #A8125A;
   --lateral-texto: #FFFFFF;
+  --lateral-subtexto: #F6CFE2;
   --lateral-titulo: #FFFFFF;
-  --lateral-marca-realce: #3A0A22;
-  --lateral-linha: #F084BE;
+  --lateral-marca-realce: #F6CFE2;
+  --lateral-linha: #BC3B76;
   --lateral-ativo: #FFFFFF;
-  --lateral-ativo-texto: #3A0A22;
+  --lateral-ativo-texto: #A8125A;
 
   --violeta: #6D28D9;     --violeta-tenue: #EDE7FB;
 
@@ -104,8 +106,8 @@
   --linha: #26344C;
   --linha-forte: #3A4B69;
   --texto: #E7EDF7;
-  --suave: #9AAAC2;
-  --tenue: #75879F;
+  --suave: #AEBBD0;
+  --tenue: #9AAAC2;
 
   --serie-1: #3987E5;
   --serie-2: #D95926;
@@ -115,12 +117,13 @@
   --serie-6: #008300;
 
   --lateral-fundo: #0E1725;
-  --lateral-texto: #9EB0C9;
+  --lateral-texto: #C9D6E8;
+  --lateral-subtexto: #8FA3BF;
   --lateral-titulo: #FFFFFF;
   --lateral-marca-realce: #5C9DFF;
   --lateral-linha: #202D42;
-  --lateral-ativo: #1E3358;
-  --lateral-ativo-texto: #FFFFFF;
+  --lateral-ativo: #1B2C47;
+  --lateral-ativo-texto: #E7EDF7;
 
   --violeta: #A794F5;     --violeta-tenue: #241E45;
 
@@ -141,15 +144,16 @@
   --linha: #D3E5D8;
   --linha-forte: #AECDB7;
   --texto: #10251A;
-  --suave: #4E6656;
-  --tenue: #7C9585;
+  --suave: #45604E;
+  --tenue: #4E6656;
 
-  --lateral-fundo: #12A150;
+  --lateral-fundo: #0B6B35;
   --lateral-texto: #FFFFFF;
+  --lateral-subtexto: #CDEBD7;
   --lateral-titulo: #FFFFFF;
-  --lateral-marca-realce: #06301A;
-  --lateral-linha: #4DC181;
-  --lateral-ativo: #FFFFFF;
+  --lateral-marca-realce: #FFDF00;
+  --lateral-linha: #2C8150;
+  --lateral-ativo: #FFDF00;
   --lateral-ativo-texto: #06301A;
 
   --violeta: #5B41C4;     --violeta-tenue: #EAE6FA;
@@ -290,8 +294,8 @@ button { font: inherit; color: inherit; }
   margin-left: auto; flex: 0 0 auto;
   display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 8px;
-  border: 0; background: var(--lateral-marca-realce);
-  color: var(--lateral-fundo); cursor: pointer;
+  border: 0; background: var(--lateral-linha);
+  color: var(--lateral-titulo); cursor: pointer;
 }
 .lateral-encolher:hover { opacity: .85; }
 .lateral-encolher svg { width: 18px; height: 18px; }
@@ -437,7 +441,12 @@ button { font: inherit; color: inherit; }
 
 .miolo { padding: 22px; flex: 1 1 auto; }
 
-.cabecalho-da-tela { margin-bottom: 18px; }
+.cabecalho-da-tela {
+  margin-bottom: 18px;
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  gap: 14px 24px;
+}
+.cabecalho-da-tela .titulo-da-tela { flex: 1 1 320px; min-width: 0; }
 .cabecalho-da-tela h2 {
   margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -.024em;
   line-height: 1.2;
@@ -945,16 +954,35 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
 .canal:hover { border-color: var(--linha-forte); }
 
 .canal.atual {
-  background: color-mix(in srgb, var(--lateral-fundo) 68%, black);
-  border-color: color-mix(in srgb, var(--lateral-fundo) 68%, black);
-  color: var(--lateral-titulo);
+  background: var(--destaque);
+  border-color: var(--destaque);
+  color: var(--destaque-sobre);
 }
-.canal.atual svg { color: var(--lateral-titulo); }
-.canal.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
+.canal.atual svg { color: var(--destaque-sobre); }
+.canal.atual .dizeres span { color: var(--destaque-sobre); }
+
+.cabecalho-da-tela .canais {
+  flex: 0 1 auto; margin: 0; gap: 4px; padding: 4px;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: var(--raio); box-shadow: var(--sombra);
+}
+.cabecalho-da-tela .canal {
+  flex: 0 1 auto; gap: 10px; padding: 7px 14px 7px 8px;
+  border: 0; box-shadow: none; background: transparent; border-radius: var(--raio-pequeno);
+}
+.cabecalho-da-tela .canal:hover { background: var(--superficie-2); }
+.cabecalho-da-tela .canal.atual { background: var(--destaque); }
+.cabecalho-da-tela .canal svg {
+  flex: 0 0 32px; width: 32px; height: 32px; padding: 6px;
+  border-radius: var(--raio-pequeno); background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.cabecalho-da-tela .canal.atual svg { background: color-mix(in srgb, var(--destaque-sobre) 18%, transparent); color: var(--destaque-sobre); }
+.cabecalho-da-tela .canal strong { font-size: 14.5px; line-height: 1.25; }
+.cabecalho-da-tela .canal .dizeres span { font-size: 12.5px; line-height: 1.3; display: block; }
 
 .formulario { max-width: 1080px; }
 
-.miolo[data-tela="cadastrarCaso"] > * { max-width: 1080px; margin-inline: auto; }
+.miolo[data-tela="cadastrarCaso"] > * { max-width: 1480px; margin-inline: auto; }
 
 .secao { border: 0; padding: 0; margin: 0 0 26px; }
 .secao:last-of-type { margin-bottom: 8px; }
@@ -1600,6 +1628,15 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   box-shadow: var(--sombra);
 }
 
+.aviso-flutuante.persistente { display: flex; align-items: flex-start; gap: 10px; padding-right: 8px; }
+.aviso-flutuante-fechar {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-top: -1px;
+  border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer;
+}
+.aviso-flutuante-fechar:hover { background: color-mix(in srgb, var(--tom) 14%, transparent); }
+.aviso-flutuante-fechar:focus-visible { outline: 2px solid var(--tom); outline-offset: 1px; }
+.aviso-flutuante-fechar svg { width: 15px; height: 15px; }
+
 @keyframes aviso-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .esqueleto { display: grid; gap: 12px; }
@@ -1760,6 +1797,24 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   padding: 12px 14px; font: inherit; font-size: 15px;
 }
 .busca-linha input[type="search"]:focus { border-color: var(--destaque); }
+
+.busca-campo { flex: 1; min-width: 0; position: relative; display: flex; }
+.busca-campo > svg {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; color: var(--suave); pointer-events: none;
+}
+.busca-campo input[type="search"] { padding-left: 42px; }
+.busca-onde { align-items: center; }
+.busca-onde .config-chave {
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); padding: 9px 14px 9px 12px; gap: 10px;
+}
+.busca-onde .config-chave span { font-weight: 600; }
+.busca-onde .config-chave em { font-weight: 400; }
+.busca-onde .config-chave:hover { border-color: var(--destaque); }
+.busca-onde .config-chave input { width: 16px; height: 16px; }
+.busca-onde > .busca-dica { flex-basis: 100%; text-align: right; }
+@media (max-width: 1499px) { .busca-onde > .busca-rotulo { flex-basis: 100%; } }
 .busca-linha .botao {
   display: inline-flex; align-items: center; gap: 8px; flex: none;
 }
@@ -1793,6 +1848,10 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 }
 .origem.vazia .origem-cabeca { border-bottom: 0; padding-bottom: 4px; }
 .origem.vazia p { margin: 0 0 4px; font-size: 13.5px; color: var(--tenue); }
+
+.cartao.origem.vazia { display: flex; flex-wrap: wrap; align-items: center; padding: 0 18px 0 0; }
+.cartao.origem.vazia .origem-cabeca { padding-bottom: 14px; }
+.cartao.origem.vazia p { margin: 0 0 0 auto; padding: 6px 0 6px 16px; }
 .origem-cabeca svg { width: 22px; height: 22px; color: var(--destaque); flex: none; }
 .origem-cabeca h3 { margin: 0; font-size: 15px; letter-spacing: -.01em; }
 .origem-cabeca .quantos {
@@ -1812,6 +1871,276 @@ table.fila.legado td { color: var(--suave); }
   .busca-linha { flex-wrap: wrap; }
   .busca-linha .botao { width: 100%; justify-content: center; }
 }
+
+.faixa-do-prazo {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
+  padding: 11px 16px; border-radius: var(--raio);
+  background: var(--atencao-tenue); color: var(--texto);
+  border: 1px solid color-mix(in srgb, var(--atencao) 32%, transparent);
+}
+.faixa-do-prazo > svg { flex: none; width: 20px; height: 20px; color: var(--atencao); }
+.faixa-do-prazo p { margin: 0; flex: 1 1 auto; font-size: 14px; line-height: 1.45; }
+.faixa-do-prazo strong { color: var(--atencao); }
+.faixa-do-prazo .botao-secundario { flex: none; }
+
+.abas-do-trabalho { align-items: center; }
+.config-aba .numero-da-aba {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  background: var(--superficie-2); color: var(--suave);
+}
+.config-aba.atual .numero-da-aba { background: var(--destaque); color: var(--destaque-sobre); }
+.ordem-da-aba {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--suave); padding: 6px 2px;
+}
+.ordem-da-aba svg { width: 15px; height: 15px; }
+
+.cartoes .indicador {
+  border-top: 1px solid var(--linha); border-left: 3px solid var(--tom, var(--linha-forte));
+  padding: 12px 16px 12px 14px; gap: 4px;
+}
+.cartoes .indicador .rotulo {
+  min-height: 0; display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--suave);
+}
+.cartoes .indicador .rotulo::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tom, var(--tenue));
+}
+.cartoes .indicador .numero { font-size: 32px; }
+.cartoes .indicador .variacao.vazia { display: none; }
+.cartoes .indicador.ligado {
+  background: var(--superficie);
+  box-shadow: 0 0 0 2px var(--destaque), var(--sombra);
+}
+
+.caixa-de-filtros { display: flex; flex-direction: column; padding: 14px 16px 10px; }
+.caixa-de-filtros .filtros { order: 1; margin-bottom: 6px; }
+.caixa-de-filtros-cabeca { order: 2; margin: 0; flex-wrap: wrap; }
+.caixa-de-filtros-cabeca h3 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.fila-mostrar { gap: 8px 18px; }
+.fila-mostrando { font-weight: 600; }
+.legenda-do-prazo { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--suave); }
+.legenda-do-prazo i { display: inline-block; width: 3px; height: 14px; border-radius: 2px; margin-left: 6px; }
+.legenda-do-prazo .marca-ruim { background: var(--ruim); }
+.legenda-do-prazo .marca-atencao { background: var(--atencao); }
+.fila-mostrar .legenda-do-prazo { margin-right: auto; }
+.mostrar-grupo { gap: 0; }
+.mostrar-grupo > span { margin-right: 10px; }
+.mostrar-grupo .mostrar-quantos { border-radius: 0; margin-left: -1px; }
+.mostrar-grupo .mostrar-quantos:first-of-type { border-radius: var(--raio-pequeno) 0 0 var(--raio-pequeno); margin-left: 0; }
+.mostrar-grupo .mostrar-quantos:last-of-type { border-radius: 0 var(--raio-pequeno) var(--raio-pequeno) 0; }
+.mostrar-quantos[aria-pressed="true"] { position: relative; z-index: 1; }
+.mostrar-salvo { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--suave); }
+.mostrar-salvo svg { width: 14px; height: 14px; }
+
+.filtrando-por {
+  margin: 0; padding: 9px 16px; border-bottom: 1px solid var(--linha);
+  background: var(--superficie); flex-basis: auto;
+}
+.filtrando-por .limpar-filtros { margin-left: 4px; }
+.filtrando-por + .cartao.vazio, .filtro-etiquetas.filtrando-por:not(.fila-do-trabalho *) {
+  border-radius: var(--raio); border: 1px solid var(--linha); margin-bottom: 12px;
+}
+
+.fila-do-trabalho tr.linha-prazo-ruim > td:first-child { box-shadow: inset 3px 0 0 var(--ruim); }
+.fila-do-trabalho tr.linha-prazo-atencao > td:first-child { box-shadow: inset 3px 0 0 var(--atencao); }
+
+.fila-do-trabalho td:first-child .situacao { margin-bottom: 4px; }
+.fila-do-trabalho td:first-child .selo-prazo { margin-top: 6px; }
+
+@media (min-width: 1360px) {
+  .cartao.sem-forro.fila-do-trabalho, .fila-do-trabalho .rolagem-tabela { overflow: visible; }
+  .fila-do-trabalho .fila-mostrar { border-radius: var(--raio) var(--raio) 0 0; }
+  .fila-do-trabalho table.fila thead th {
+    position: sticky; top: var(--altura-da-barra-superior, 76px); z-index: 3;
+    background: var(--superficie-2);
+  }
+}
+
+.cadastro-em-blocos { display: flex; align-items: flex-start; gap: 18px; }
+.cadastro-em-blocos > .formulario { flex: 1 1 auto; min-width: 0; }
+.indice-do-cadastro {
+  flex: 0 0 240px; position: sticky; top: calc(var(--altura-da-barra-superior, 76px) + 16px);
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 10px;
+}
+.indice-do-cadastro ol { list-style: none; margin: 0; padding: 0; }
+.indice-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 9px 10px; border: 0; border-radius: var(--raio-pequeno);
+  background: transparent; color: var(--texto); font: inherit; font-size: 14.5px; cursor: pointer;
+}
+.indice-item:hover { background: var(--superficie-2); }
+.indice-numero {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.indice-nome { flex: 1 1 auto; min-width: 0; }
+.indice-falta { font-size: 12px; font-weight: 700; color: var(--ruim); white-space: nowrap; }
+.indice-ok { display: inline-flex; color: var(--bom); }
+.indice-ok svg { width: 16px; height: 16px; }
+.indice-item.atual { background: var(--destaque-tenue); color: var(--destaque-escuro); font-weight: 600; }
+.indice-nota { margin: 8px 6px 4px; padding-top: 10px; border-top: 1px solid var(--linha); font-size: 12.5px; color: var(--suave); }
+
+.cadastro-em-blocos .formulario { background: none; border: 0; box-shadow: none; padding: 0; max-width: none; }
+.cadastro-em-blocos #corpo-do-formulario { counter-reset: secao-do-cadastro; }
+.cadastro-em-blocos fieldset.secao {
+  counter-increment: secao-do-cadastro;
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 16px 20px 20px; margin: 0 0 14px;
+  scroll-margin-top: calc(var(--altura-da-barra-superior, 76px) + 16px);
+}
+.cadastro-em-blocos fieldset.secao legend {
+  float: left; width: 100%; display: flex; align-items: center; gap: 9px;
+  margin-bottom: 14px; color: var(--suave);
+}
+.cadastro-em-blocos fieldset.secao legend::before {
+  content: counter(secao-do-cadastro); display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%; letter-spacing: 0;
+  font-size: 12px; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.cadastro-em-blocos fieldset.secao .grade { clear: both; }
+.cadastro-em-blocos fieldset.secao.com-erro { border-color: var(--ruim); box-shadow: 0 0 0 1px var(--ruim), var(--sombra); }
+.cadastro-em-blocos .acoes {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: var(--sombra); padding: 12px 16px; margin-top: 4px;
+}
+@media (max-width: 1000px) {
+  .indice-do-cadastro { display: none; }
+}
+
+.cadastro-em-blocos .falta-preencher {
+  margin-left: auto; padding: 5px 12px; border-radius: 999px; background: var(--atencao-tenue);
+}
+.cadastro-em-blocos .falta-preencher::before { content: "\26A0\FE0E  "; }
+
+.guardar-rascunho { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--suave); cursor: pointer; }
+.guardar-rascunho input { accent-color: var(--destaque); width: 15px; height: 15px; margin: 0; }
+.estado-do-rascunho { color: var(--tenue); }
+.rascunho-encontrado {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--destaque) 30%, transparent);
+  border-radius: var(--raio-pequeno); background: var(--destaque-tenue); color: var(--texto); font-size: 13.5px;
+}
+.rascunho-encontrado > svg { width: 17px; height: 17px; color: var(--destaque-escuro); flex: none; }
+.rascunho-encontrado > span { flex: 1 1 260px; }
+
+.campo.com-erro .erro::before { content: "\26A0\FE0E  "; }
+
+.selo-susep.repetida {
+  color: var(--atencao); background: var(--atencao-tenue); border-radius: var(--raio-pequeno);
+  border: 1px solid color-mix(in srgb, var(--atencao) 30%, transparent); padding: 8px 12px; line-height: 1.4;
+}
+.selo-susep.repetida::before { content: "\26A0\FE0E  "; }
+
+.pedido-pelo {
+  display: inline-block; white-space: nowrap;
+  margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+
+.config-secoes > .config-alerta {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; width: 100%;
+}
+.config-alerta svg { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+
+.config-cabeca.numa-linha { flex-wrap: nowrap; margin-bottom: 0; padding-bottom: 12px; }
+.config-cabeca.numa-linha .config-canais { flex: none; }
+.config-cabeca.numa-linha .config-busca { flex: 1 1 200px; width: auto; min-width: 0; margin: 0; }
+.config-cabeca.numa-linha .botao.pequeno { margin-left: 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.config-cabeca.numa-linha .botao.pequeno svg { width: 15px; height: 15px; }
+
+@media (max-width: 1499px) {
+  .config-cabeca.numa-linha { flex-wrap: wrap; }
+  .config-cabeca.numa-linha .config-busca { order: 3; flex-basis: 100%; }
+  .config-cabeca.numa-linha .botao.pequeno { margin-left: auto; }
+}
+
+.config-grupo {
+  list-style: none; display: flex; align-items: baseline; gap: 2px;
+  margin: 0 -18px; padding: 7px 18px; background: var(--superficie-2);
+  border-top: 1px solid var(--linha); border-bottom: 1px solid var(--linha);
+  font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--suave);
+}
+.config-grupo .nome-do-grupo { color: var(--suave); }
+.config-grupo .quantos-no-grupo { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.config-grupo + .config-item { border-top: 0; }
+.config-item .abrir.com-icone { display: flex; align-items: center; gap: 12px; }
+.config-item .abrir.com-icone .textos { display: grid; gap: 1px; min-width: 0; }
+.icone-do-tipo {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: var(--raio-pequeno); background: var(--superficie-2); color: var(--suave);
+}
+.icone-do-tipo svg { width: 16px; height: 16px; }
+.etiqueta-obrigatorio {
+  padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+  background: var(--ruim-tenue); color: var(--ruim);
+}
+.config-item.atual { box-shadow: inset 3px 0 0 var(--destaque); border-radius: 0; }
+
+@media (min-width: 1500px) { .config { grid-template-columns: 260px minmax(0, 1fr) 440px; } }
+.config-painel { top: calc(var(--altura-da-barra-superior, 76px) + 16px); max-height: calc(100vh - var(--altura-da-barra-superior, 76px) - 32px); }
+
+.config-painel .config-chave { align-items: center; font-weight: 600; }
+.config-painel .config-chave input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; margin: 0; flex: none; cursor: pointer;
+  width: 38px; height: 22px; border-radius: 999px; position: relative;
+  background: var(--linha-forte); transition: background .15s;
+}
+.config-painel .config-chave input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--destaque-sobre); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s;
+}
+.config-painel .config-chave input[type="checkbox"]:checked { background: var(--destaque); }
+.config-painel .config-chave input[type="checkbox"]:checked::after { transform: translateX(16px); }
+.config-painel .config-chave input[type="checkbox"]:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+.config-painel .config-chave input[type="checkbox"]:disabled { opacity: .5; cursor: default; }
+
+.config-previa { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--linha); }
+.config-previa-titulo { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); }
+.config-previa-caixa {
+  border: 1px dashed var(--linha-forte); border-radius: var(--raio-pequeno);
+  padding: 12px 14px; background: var(--superficie-2); box-shadow: none;
+}
+.config-previa-caixa .campo { margin: 0; }
+
+.dupla-de-graficos {
+  display: grid; gap: 14px; margin-top: 16px; align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr));
+}
+.dupla-de-graficos:empty { display: none; }
+.dupla-de-graficos > .graficos { margin-top: 0; display: block; }
+.barras-de-premio { list-style: none; margin: 4px 0 16px; padding: 0; display: grid; gap: 14px; }
+.barra-de-premio { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: baseline; }
+.barra-de-premio-nome { font-weight: 600; font-size: 14px; }
+.barra-de-premio-valor { font-family: var(--fonte-dado); font-size: 13.5px; }
+.barra-de-premio-trilho {
+  grid-column: 1 / -1; height: 14px; border-radius: 999px; background: var(--superficie-2); overflow: hidden;
+}
+.barra-de-premio-trilho > span { display: block; height: 100%; border-radius: 999px; background: var(--destaque); }
+.barra-de-premio.premio-mensal .barra-de-premio-trilho > span { background: color-mix(in srgb, var(--destaque) 55%, var(--superficie)); }
+.barra-de-premio.premio-retido .barra-de-premio-trilho > span { background: var(--bom); }
+
+.imp-fontes .config-aba { display: inline-flex; align-items: center; gap: 7px; }
+.imp-fontes .config-aba svg { width: 16px; height: 16px; }
+.imp-cartao .campo > span { font-weight: 600; }
+#texto-colado {
+  font-family: var(--fonte-dado); font-size: 13.5px; line-height: 1.75;
+  background: var(--superficie-2); border: 1px dashed var(--linha-forte);
+  border-radius: var(--raio-pequeno); padding: 14px 16px; min-height: 220px;
+}
+#texto-colado:focus { border-style: solid; border-color: var(--destaque); background: var(--superficie); }
+.imp-dicas { gap: 8px 12px; }
+.imp-dicas li {
+  padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: var(--bom-tenue); color: var(--bom);
+}
+.imp-dicas li::before { content: '✓  '; }
 
 .graficos {
   display: grid; gap: 14px; margin-top: 16px;
@@ -2088,6 +2417,30 @@ table.fila.cadastro tr.aberta { background: var(--destaque-tenue); }
   margin-left: auto; color: var(--tenue); font-size: 12px; white-space: nowrap;
 }
 
+.aviso-cadastro.compacto { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 10px 14px; }
+.aviso-cadastro.compacto > svg { flex: none; width: 17px; height: 17px; color: var(--atencao); align-self: center; }
+.aviso-cadastro.compacto strong { display: inline; }
+.aviso-cadastro.compacto > p { margin: 0; max-width: none; font-size: 13px; color: var(--atencao); }
+.aviso-cadastro.compacto ul { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 18px; padding-left: 25px; }
+.aviso-cadastro.compacto li .quantos { margin-left: 0; }
+.aviso-cadastro.compacto li .quantos::before { content: "("; }
+.aviso-cadastro.compacto li .quantos::after { content: ")"; }
+
+#corretoras .config-cabeca .busca-campo { flex: 1 1 260px; }
+#corretoras .config-cabeca .busca-campo input { width: 100%; }
+.botao.com-icone, .botao-secundario.com-icone { display: inline-flex; align-items: center; gap: 6px; }
+.botao.com-icone svg, .botao-secundario.com-icone svg { width: 15px; height: 15px; }
+#corretoras .config-cabeca .botao.pequeno { margin-left: 0; }
+
+.contagem-da-tabela {
+  margin: 12px 0 0; padding: 9px 12px; background: var(--superficie-2);
+  border: 1px solid var(--linha); border-bottom: 0; border-radius: var(--raio-pequeno) var(--raio-pequeno) 0 0;
+}
+.contagem-da-tabela strong { color: var(--texto); }
+.contagem-da-tabela + .rolagem-tabela { margin-top: 0; }
+table.fila.cadastro .apoio { font-family: var(--fonte-dado); }
+table.fila.cadastro tr.aberta td:first-child { box-shadow: inset 3px 0 0 var(--destaque); }
+
 #corretoras { grid-template-columns: minmax(0, 1fr) 340px; }
 @media (max-width: 900px) {
   #corretoras { grid-template-columns: minmax(0, 1fr); }
@@ -2242,6 +2595,16 @@ var Moldura = (function () {
       '<path d="M12 3.2 19.4 6v6.1c0 4.3-3 7.5-7.4 8.7-4.4-1.2-7.4-4.4-7.4-8.7V6z"></path>'
       + '<path d="m8.9 11.9 2.3 2.3L15.4 10"></path>',
 
+    calendario:
+      '<rect x="3.8" y="5.2" width="16.4" height="15" rx="2"></rect>'
+      + '<path d="M3.8 9.8h16.4M8.2 3.2v4M15.8 3.2v4"></path>',
+
+    elo:
+      '<path d="M10.2 13.8a3.6 3.6 0 0 0 5.1 0l3-3a3.6 3.6 0 0 0-5.1-5.1l-1.1 1.1"></path>'
+      + '<path d="M13.8 10.2a3.6 3.6 0 0 0-5.1 0l-3 3a3.6 3.6 0 0 0 5.1 5.1l1.1-1.1"></path>',
+    folha:
+      '<path d="M6.2 3.4h7.6l4 4v13.2H6.2z"></path>'
+      + '<path d="M13.6 3.6v4h4M9 12.4h6M9 16h6"></path>',
     catalogo:
       '<circle cx="4.7" cy="6.6" r="1.1"></circle>'
       + '<circle cx="4.7" cy="12" r="1.1"></circle>'
@@ -2298,7 +2661,19 @@ var Moldura = (function () {
       '<path d="M4.4 6.8h15.2"></path>'
       + '<path d="M9.2 6.8V5.2a1.4 1.4 0 0 1 1.4-1.4h2.8a1.4 1.4 0 0 1 1.4 1.4v1.6"></path>'
       + '<path d="M6.4 6.8v12.4a1.4 1.4 0 0 0 1.4 1.4h8.4a1.4 1.4 0 0 0 1.4-1.4V6.8"></path>'
-      + '<path d="M10.2 10.6v6M13.8 10.6v6"></path>'
+      + '<path d="M10.2 10.6v6M13.8 10.6v6"></path>',
+
+    alerta:
+      '<path d="M10.3 4.2 2.9 17.4a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"></path>'
+      + '<path d="M12 9.4v4.2M12 17h.01"></path>',
+    info:
+      '<circle cx="12" cy="12" r="8.6"></circle><path d="M12 11v5.2M12 7.8h.01"></path>',
+    relogio:
+      '<circle cx="12" cy="12" r="8.6"></circle><path d="M12 7.4V12l3 1.8"></path>',
+    confirmado:
+      '<path d="m5 12.6 4.4 4.4L19 7.4"></path>',
+    fechar:
+      '<path d="M6.6 6.6l10.8 10.8M17.4 6.6 6.6 17.4"></path>'
   };
 
   var TEMAS = [
@@ -2489,6 +2864,78 @@ var Moldura = (function () {
       + 'Limpar filtros</button>';
   }
 
+  var FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]),'
+    + ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function dialogoDeCima() {
+    var abertos = document.querySelectorAll('.dialogo [aria-modal="true"]');
+    return abertos.length ? abertos[abertos.length - 1] : null;
+  }
+  function focaveisDe(caixa) {
+    return Array.prototype.filter.call(caixa.querySelectorAll(FOCAVEIS), function (el) {
+      return el.getClientRects().length > 0 && !el.closest('[inert]');
+    });
+  }
+  function prenderOFoco(evento) {
+    if (evento.key !== 'Tab') return;
+    var caixa = dialogoDeCima();
+    if (!caixa) return;
+    var lista = focaveisDe(caixa);
+    if (!lista.length) { evento.preventDefault(); return; }
+    var primeiro = lista[0];
+    var ultimo = lista[lista.length - 1];
+    var agora = document.activeElement;
+    if (!caixa.contains(agora)) {
+      evento.preventDefault();
+      (evento.shiftKey ? ultimo : primeiro).focus();
+    } else if (evento.shiftKey && agora === primeiro) {
+      evento.preventDefault(); ultimo.focus();
+    } else if (!evento.shiftKey && agora === ultimo) {
+      evento.preventDefault(); primeiro.focus();
+    }
+  }
+  var ultimosFocos = [];
+  var voltarPara = [];
+  function lembrarOFoco(evento) {
+    ultimosFocos.push(evento.target);
+    if (ultimosFocos.length > 12) ultimosFocos.shift();
+  }
+  function quandoODomMudar(mudancas) {
+    mudancas.forEach(function (mudanca) {
+      Array.prototype.forEach.call(mudanca.addedNodes, function (no) {
+        if (!no.classList || !no.classList.contains('dialogo')) return;
+
+        for (var i = ultimosFocos.length - 1; i >= 0; i--) {
+          var antes = ultimosFocos[i];
+          if (antes && antes !== document.body && !no.contains(antes)) {
+            voltarPara.push({ dialogo: no, elemento: antes });
+            return;
+          }
+        }
+      });
+      Array.prototype.forEach.call(mudanca.removedNodes, function (no) {
+        for (var i = voltarPara.length - 1; i >= 0; i--) {
+          if (voltarPara[i].dialogo !== no) continue;
+          var alvo = voltarPara[i].elemento;
+          voltarPara.splice(i, 1);
+          var semFoco = !document.activeElement || document.activeElement === document.body
+            || !document.activeElement.isConnected;
+          if (semFoco && alvo && alvo.isConnected && !alvo.disabled && alvo.getClientRects().length) {
+            alvo.focus({ preventScroll: true });
+          }
+        }
+      });
+    });
+  }
+  if (typeof document !== 'undefined' && document.addEventListener && typeof MutationObserver !== 'undefined') {
+    document.addEventListener('keydown', prenderOFoco, true);
+    document.addEventListener('focusin', lembrarOFoco, true);
+    var vigiaDosDialogos = function () {
+      new MutationObserver(quandoODomMudar).observe(document.body, { childList: true });
+    };
+    if (document.body) vigiaDosDialogos();
+    else document.addEventListener('DOMContentLoaded', vigiaDosDialogos);
+  }
+
   function toast(mensagem, tom) {
     var pilha = document.getElementById('avisos-flutuantes');
     if (!pilha) {
@@ -2500,12 +2947,26 @@ var Moldura = (function () {
     }
     var aviso = document.createElement('div');
     aviso.className = 'aviso-flutuante tom-' + (tom || 'bom');
-    aviso.setAttribute('role', 'status');
-    aviso.textContent = mensagem;
+
+    var persistente = tom === 'ruim';
+    aviso.setAttribute('role', persistente ? 'alert' : 'status');
+    var texto = document.createElement('span');
+    texto.className = 'aviso-flutuante-texto';
+    texto.textContent = mensagem;
+    aviso.appendChild(texto);
+    function tirar() { if (aviso.parentNode) aviso.parentNode.removeChild(aviso); }
+    if (persistente) {
+      aviso.classList.add('persistente');
+      var fechar = document.createElement('button');
+      fechar.type = 'button';
+      fechar.className = 'aviso-flutuante-fechar';
+      fechar.setAttribute('aria-label', 'Fechar aviso');
+      fechar.innerHTML = icone('fechar');
+      fechar.addEventListener('click', tirar);
+      aviso.appendChild(fechar);
+    }
     pilha.appendChild(aviso);
-    window.setTimeout(function () {
-      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
-    }, tom === 'ruim' ? 6000 : 3200);
+    if (!persistente) window.setTimeout(tirar, 4500);
     return aviso;
   }
 
@@ -2513,7 +2974,7 @@ var Moldura = (function () {
     var blocos = [];
     for (var i = 0; i < (cartoes || 4); i++) blocos.push('<span class="esqueleto-cartao"></span>');
     return '<div class="esqueleto" aria-busy="true">'
-      + '<p class="carregando-campos">' + escapar(texto || 'Carregando…') + '</p>'
+      + '<p class="carregando-campos" role="status">' + escapar(texto || 'Carregando…') + '</p>'
       + '<div class="esqueleto-cartoes">' + blocos.join('') + '</div>'
       + '<span class="esqueleto-linha"></span><span class="esqueleto-linha"></span>'
       + '<span class="esqueleto-linha curta"></span></div>';
@@ -2634,7 +3095,12 @@ var FiltroMultiplo = (function () {
   }
 
   function etiquetas(filtros, escolhidos) {
-    var feitas = filtros.map(function (filtro) {
+    var feitas = etiquetasSoltas(filtros, escolhidos);
+    return feitas ? '<div class="filtro-etiquetas"><span>Filtrando por</span>' + feitas + '</div>' : '';
+  }
+
+  function etiquetasSoltas(filtros, escolhidos) {
+    return filtros.map(function (filtro) {
       var marcadas = lista(escolhidos[filtro.chave]);
       if (!marcadas.length) return '';
       var rotulos = marcadas.map(function (valor) {
@@ -2645,7 +3111,6 @@ var FiltroMultiplo = (function () {
         + '<button type="button" data-tirar-filtro="' + escapar(filtro.chave) + '"'
         + ' aria-label="Tirar o filtro ' + escapar(filtro.rotulo) + '">×</button></span>';
     }).join('');
-    return feitas ? '<div class="filtro-etiquetas"><span>Filtrando por</span>' + feitas + '</div>' : '';
   }
 
   function painel(filtro, marcadas) {
@@ -2733,7 +3198,7 @@ var FiltroMultiplo = (function () {
     }
   }
 
-  return { desenhar: desenhar, etiquetas: etiquetas, ligar: ligar, lista: lista };
+  return { desenhar: desenhar, etiquetas: etiquetas, etiquetasSoltas: etiquetasSoltas, ligar: ligar, lista: lista };
 })();
 
 var Agenda = (function () {
@@ -3020,7 +3485,8 @@ var Formulario = (function () {
     var id = prefixo + 'campo-' + campo.chave;
 
     var obrigatorio = campo.obrigatorio ? ' <span class="exigido">*</span>'
-      : (campo.obrigatorioSe ? ' <span class="exigido" data-exigido-condicional hidden>*</span>' : '');
+      : (campo.obrigatorioSe ? ' <span class="pedido-pelo" data-pedido-pelo hidden></span>'
+        + ' <span class="exigido" data-exigido-condicional hidden>*</span>' : '');
 
     var exigido = campo.obrigatorio ? ' aria-required="true"' : '';
     var travado = campo.somenteLeitura ? ' disabled' : '';
@@ -3086,6 +3552,7 @@ var Formulario = (function () {
         + ' autocomplete="off"' + exigido + travado + '>';
     }
 
+    controle = controle.replace(' data-chave="', ' aria-describedby="' + id + '-erro" data-chave="');
     var ajuda = campo.descricao
       ? '<small class="ajuda">' + escapar(campo.descricao) + '</small>' : '';
     var selo = campo.chave === 'susep'
@@ -3113,7 +3580,7 @@ var Formulario = (function () {
       + escapar(campo.chave) + '"' + condicao + '>'
       + '<label for="' + id + '">' + escapar(campo.rotulo) + obrigatorio + '</label>'
       + controle + ajuda + porQueTravado + selo
-      + '<small class="erro" hidden></small>'
+      + '<small class="erro" id="' + id + '-erro" hidden></small>'
       + '</div>';
   }
 
@@ -3285,6 +3752,15 @@ var Formulario = (function () {
       }
       var asterisco = cobrado.querySelector('[data-exigido-condicional]');
       if (asterisco) asterisco.hidden = !vale;
+
+      var etiqueta = cobrado.querySelector('[data-pedido-pelo]');
+      if (etiqueta) {
+        var rotuloDeQuemManda = manda && manda.closest ? manda.closest('[data-campo]') : null;
+        var nomeDeQuemManda = rotuloDeQuemManda && rotuloDeQuemManda.querySelector('label')
+          ? textoDoRotulo(rotuloDeQuemManda.querySelector('label')).toLowerCase() : '';
+        etiqueta.textContent = vale ? 'pedido pelo ' + (nomeDeQuemManda ? nomeDeQuemManda + ' ' : '') + valorQueManda : '';
+        etiqueta.hidden = !vale;
+      }
     }
 
     var condicionais = raiz.querySelectorAll('[data-mostrar-se-campo]');
@@ -3454,8 +3930,9 @@ var Formulario = (function () {
       .entao(function (resposta) {
         if (String(campo.value || '').trim() !== perguntada) return;
         if (resposta.situacao === 'REPETIDA' || resposta.situacao === 'UNICA') {
+
           selo.className = 'selo-susep '
-            + (resposta.situacao === 'REPETIDA' ? 'bloqueada' : 'liberada');
+            + (resposta.situacao === 'REPETIDA' ? 'repetida' : 'liberada');
           selo.textContent = resposta.mensagem;
         } else {
 
@@ -3570,6 +4047,8 @@ var Formulario = (function () {
       marcados[i].classList.remove('com-erro');
       var aviso = marcados[i].querySelector('.erro');
       if (aviso) { aviso.hidden = true; aviso.textContent = ''; }
+      var invalido = marcados[i].querySelector('[aria-invalid]');
+      if (invalido) invalido.removeAttribute('aria-invalid');
     }
   }
 
@@ -3582,6 +4061,8 @@ var Formulario = (function () {
       var aviso = caixa.querySelector('.erro');
       aviso.textContent = problema.erro;
       aviso.hidden = false;
+      var controle = caixa.querySelector('[data-chave]');
+      if (controle) controle.setAttribute('aria-invalid', 'true');
     });
     var primeiro = raiz.querySelector('.campo.com-erro input, .campo.com-erro select');
     if (primeiro) primeiro.focus();
@@ -3589,6 +4070,17 @@ var Formulario = (function () {
 
   function faltaPreencher(raiz) {
     return camposQueFaltam(raiz)[0] || null;
+  }
+
+  function textoDoRotulo(rotulo) {
+    if (!rotulo) return '';
+    var texto = String(rotulo.textContent || '');
+    var extras = rotulo.querySelectorAll ? rotulo.querySelectorAll('.pedido-pelo') : [];
+    for (var i = 0; i < extras.length; i++) {
+      var dele = String(extras[i].textContent || '');
+      if (dele) texto = texto.replace(dele, '');
+    }
+    return texto.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
   }
 
   function camposQueFaltam(raiz) {
@@ -3610,7 +4102,7 @@ var Formulario = (function () {
     camposQueFaltam(raiz).forEach(function (campo) {
       var bloco = campo.closest ? campo.closest('[data-campo]') : null;
       var rotulo = bloco ? bloco.querySelector('label') : null;
-      var nome = rotulo ? String(rotulo.textContent).replace(/\*/g, '').trim() : '';
+      var nome = textoDoRotulo(rotulo);
       if (nome && nomes.indexOf(nome) < 0) nomes.push(nome);
     });
     if (!nomes.length) return '';
@@ -3685,6 +4177,8 @@ var Formulario = (function () {
     aplicarMascara: aplicarMascara,
     aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
     desenhar: desenhar,
+
+    desenharCampo: desenharCampo,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
     confirmarExclusao: confirmarExclusao,
@@ -3696,6 +4190,7 @@ var Formulario = (function () {
     limparErros: limparErros,
     mostrarProblemas: mostrarProblemas,
     faltaPreencher: faltaPreencher,
+    camposQueFaltam: camposQueFaltam,
     textoDoQueFalta: textoDoQueFalta,
     vigiarObrigatorios: vigiarObrigatorios,
     comecouAGravar: comecouAGravar,
@@ -3719,18 +4214,24 @@ var CasoEmModal = (function () {
   var aoFechar = null;
   var mudouAlgo = false;
 
+  var oQueFoiGravado = null;
+  function oQueGravou() { var foi = oQueFoiGravado; oQueFoiGravado = null; return foi; }
+
   var retratoAoAbrir = null;
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
   function corpoDaEdicao() { return elemento('corpo-da-edicao'); }
 
-  function abrir(idDoCanal, idDoCaso, quandoMudar) {
+  var qualOProximo = null;
+
+  function abrir(idDoCanal, idDoCaso, quandoMudar, comOProximo) {
     canalAtual = idDoCanal;
     idAtual = idDoCaso;
     versaoAoAbrir = '';
     envio = '';
     aoFechar = quandoMudar || null;
+    qualOProximo = typeof comOProximo === 'function' ? comOProximo : null;
     mudouAlgo = false;
     salvando = false;
 
@@ -3754,13 +4255,15 @@ var CasoEmModal = (function () {
       + '</header>'
       + '<div class="modal-corpo" id="modal-corpo">'
       + '<form class="formulario no-modal" id="form-do-caso" novalidate>'
-      + '<div id="corpo-da-edicao"><p class="carregando-campos">'
+      + '<div id="corpo-da-edicao"><p class="carregando-campos" role="status">'
       + 'Abrindo o caso…</p></div></form>'
       + '<div id="modal-do-sistema"></div></div>'
 
       + '<footer class="modal-pe" id="modal-pe">'
       + '<span class="recado" id="recado-do-modal" hidden></span>'
       + '<button type="button" class="botao vazado" id="modal-fechar">Fechar</button>'
+      + (qualOProximo ? '<button type="button" class="botao vazado" id="modal-salvar-e-proximo" disabled>'
+        + 'Salvar e abrir o próximo</button>' : '')
       + '<button type="button" class="botao" id="modal-salvar" disabled>'
       + 'Salvar alterações</button></footer>'
       + '</div>';
@@ -3768,7 +4271,11 @@ var CasoEmModal = (function () {
 
     elemento('modal-x').addEventListener('click', function () { fechar(); });
     elemento('modal-fechar').addEventListener('click', function () { fechar(); });
-    elemento('modal-salvar').addEventListener('click', salvar);
+
+    elemento('modal-salvar').addEventListener('click', function () { salvar(false); });
+    if (elemento('modal-salvar-e-proximo')) {
+      elemento('modal-salvar-e-proximo').addEventListener('click', function () { salvar(true); });
+    }
     caixa.addEventListener('mousedown', function (evento) {
 
       if (salvando) return;
@@ -3841,6 +4348,7 @@ var CasoEmModal = (function () {
       elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
         + desenharDoSistema(osValores.doSistema);
       elemento('modal-salvar').disabled = false;
+      if (elemento('modal-salvar-e-proximo')) elemento('modal-salvar-e-proximo').disabled = false;
       retratoAoAbrir = retratoDaEdicao();
     }
 
@@ -3916,12 +4424,14 @@ var CasoEmModal = (function () {
   function mostrarRecadoDeErro(erro) {
     var corpo = corpoDaEdicao();
     if (!corpo) return;
-    corpo.innerHTML = '<p class="carregando-campos erro-carga">'
+    corpo.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
       + escapar(erro.message || String(erro)) + '</p>';
     var subtitulo = elemento('modal-subtitulo');
     if (subtitulo) subtitulo.textContent = 'Não deu para abrir';
     var salvarBotao = elemento('modal-salvar');
     if (salvarBotao) salvarBotao.disabled = true;
+    var eOProximo = elemento('modal-salvar-e-proximo');
+    if (eOProximo) eOProximo.disabled = true;
   }
 
   function recado(texto, tipo) {
@@ -3932,28 +4442,41 @@ var CasoEmModal = (function () {
     caixa.hidden = !texto;
   }
 
-  function salvar() {
+  function salvar(eAbrirOProximo) {
     if (salvando) return;
     var corpo = corpoDaEdicao();
 
     if (!corpo || elemento('modal-salvar').disabled) return;
 
+    var proximo = eAbrirOProximo && qualOProximo ? (qualOProximo(idAtual) || '') : null;
     salvando = true;
     Formulario.limparErros(corpo);
     recado('Gravando…', '');
 
-    Formulario.comecouAGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
+    Formulario.comecouAGravar(elemento(eAbrirOProximo ? 'modal-salvar-e-proximo' : 'modal-salvar'),
+      elemento('modal-do-caso'));
 
     if (!envio) envio = Servidor.novoEnvio();
     Servidor.chamar('editarCaso', canalAtual, idAtual, Formulario.valores(corpo),
       versaoAoAbrir, colunasSuasNaTela(), envio)
-      .entao(function () {
+      .entao(function (resposta) {
         salvando = false;
         mudouAlgo = true;
+        oQueFoiGravado = { id: idAtual, destino: (resposta && resposta.destino) || '' };
         retratoAoAbrir = null;
 
         destravarOsBotoes();
+
+        var retorno = aoFechar;
+        var proximoDe = qualOProximo;
+        var canal = canalAtual;
         fechar();
+        if (proximo === null) return;
+        if (proximo) {
+          abrir(canal, proximo, retorno, proximoDe);
+        } else {
+          Moldura.toast('Este era o último caso da fila desta tela — não há próximo para abrir.', 'atencao');
+        }
       })
       .senao(function (erro) {
         salvando = false;
@@ -3965,6 +4488,9 @@ var CasoEmModal = (function () {
 
   function destravarOsBotoes() {
     Formulario.acabouDeGravar(elemento('modal-salvar'), elemento('modal-do-caso'));
+    if (elemento('modal-salvar-e-proximo')) {
+      Formulario.acabouDeGravar(elemento('modal-salvar-e-proximo'), elemento('modal-do-caso'));
+    }
   }
 
   var abrindoOStatus = false;
@@ -4058,8 +4584,9 @@ var CasoEmModal = (function () {
           Servidor.chamar('alterarSituacaoDoCaso', idDoCanal, idDoCaso,
             elemento('situacao-nova').value,
             Formulario.valores(elemento('campos-da-situacao')), envio)
-            .entao(function () {
+            .entao(function (resposta) {
               gravando = false;
+              oQueFoiGravado = { id: idDoCaso, destino: (resposta && resposta.destino) || '' };
               sair();
               if (quandoMudar) quandoMudar();
             })
@@ -4078,7 +4605,7 @@ var CasoEmModal = (function () {
       });
   }
 
-  return { abrir: abrir, trocarSituacao: trocarSituacao };
+  return { abrir: abrir, trocarSituacao: trocarSituacao, oQueGravou: oQueGravou };
 })();
 </script>
 
@@ -4625,11 +5152,20 @@ var TelaTrabalho = (function () {
   }
 
   var quantosNaFila = 0;
+
+  var CHAVE_DO_MOSTRAR = 'pgo.trabalho.mostrar';
+  var podeLembrarOMostrar = true;
+  try {
+    var mostrarLembrado = Number(window.localStorage.getItem(CHAVE_DO_MOSTRAR));
+    if (mostrarLembrado > 0) quantosNaFila = mostrarLembrado;
+  } catch (semArmazenamento) { podeLembrarOMostrar = false; }
   var focarNoMostrar = '';
   var resumo = null;
 
   var jaAvisouNoCanal = {};
   var avisarQuandoChegar = false;
+
+  var prazoPorCanal = {};
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -4656,11 +5192,14 @@ var TelaTrabalho = (function () {
       abas.push({ atributo: 'data-aba-do-trabalho="reunioes"', rotulo: 'Reuniões', atual: abaDaMesa === 'reunioes' });
     }
     if (!abas.length) return '';
+
+    var ordem = resumo && resumo.subAbas && abaDaMesa !== 'reunioes'
+      ? '<span class="ordem-da-aba">' + Moldura.icone('info') + 'Ordem: ' + escapar(ordemDaFila()) + '</span>' : '';
     return '<div class="config-abas abas-do-trabalho" role="tablist" aria-label="O que ver">'
       + abas.map(function (aba) {
         return '<button type="button" role="tab" class="config-aba' + (aba.atual ? ' atual' : '') + '"'
           + ' aria-selected="' + aba.atual + '" ' + aba.atributo + '>' + aba.rotulo + '</button>';
-      }).join('') + '</div>';
+      }).join('') + ordem + '</div>';
   }
 
   function desenharAbas() {
@@ -4720,7 +5259,7 @@ var TelaTrabalho = (function () {
     var meuPedido = ++pedidoDoPainel;
     painelDesenhadoPara = '';
     desmarcarAtualizando(elemento('painel'));
-    elemento('painel').innerHTML = '<p class="carregando-campos">Lendo a Agenda…</p>';
+    elemento('painel').innerHTML = '<p class="carregando-campos" role="status">Lendo a Agenda…</p>';
     Servidor.chamar('agendaDaMesa', canalEscolhido, buscaNaAgenda)
       .entao(function (resposta) {
         if (meuPedido !== pedidoDoPainel) return;
@@ -4745,7 +5284,7 @@ var TelaTrabalho = (function () {
       })
       .senao(function (erro) {
         if (meuPedido !== pedidoDoPainel) return;
-        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -4755,6 +5294,7 @@ var TelaTrabalho = (function () {
     temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
     if (!temAgenda) abaDaMesa = 'casos';
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
+      + '<div id="faixa-do-prazo"></div>'
       + '<div id="abas-do-trabalho">' + abasDoTrabalho() + '</div>'
       + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
@@ -4807,8 +5347,7 @@ var TelaTrabalho = (function () {
     return Moldura.caixaDeFiltros(
       busca
         + caixas.join('')
-        + Moldura.botaoLimparFiltros('limpar-filtros')
-        + FiltroMultiplo.etiquetas(resumo.filtrosDisponiveis, filtrosEscolhidos),
+        + Moldura.botaoLimparFiltros('limpar-filtros'),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + (resumo.buscaNaPlanilhaToda
 
@@ -4874,7 +5413,6 @@ var TelaTrabalho = (function () {
   function barraDeMostrar(visiveis) {
     var total = totalDaFila();
     var opcoes = opcoesDeMostrar(total, resumo.mostrarNaFila.opcoes);
-    if (!opcoes.length) return '';
 
     var botoes = opcoes.map(function (quantos) {
       var ligado = quantos === 'todos' ? visiveis === total : quantos === visiveis;
@@ -4888,13 +5426,46 @@ var TelaTrabalho = (function () {
         ? (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
           : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)
         : 'Mostrando todos os ' + total + ' casos') + '</span>'
-      + '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
-      + '<span>Mostrar</span>' + botoes + '</div></div>';
+      + legendaDoPrazo()
+      + (opcoes.length ? '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
+        + '<span>Mostrar</span>' + botoes + '</div>'
+        + (podeLembrarOMostrar ? '<span class="mostrar-salvo">' + Moldura.icone('confirmado') + 'Sua escolha fica salva</span>' : '')
+        : '')
+      + '</div>';
+  }
+
+  function tomDoPrazoDaLinha(caso) {
+    var correndo = (caso.sinais || []).filter(function (sinal) { return !sinal.encerrado; });
+    if (correndo.some(function (sinal) { return sinal.tom === 'ruim'; })) return 'ruim';
+    if (correndo.some(function (sinal) { return sinal.tom === 'atencao'; })) return 'atencao';
+    return '';
+  }
+
+  function legendaDoPrazo() {
+    var temSinal = resumo.fila.some(function (caso) { return (caso.sinais || []).length; });
+    return temSinal ? '<span class="legenda-do-prazo" aria-hidden="true">'
+      + '<i class="marca-ruim"></i>prazo vencido <i class="marca-atencao"></i>perto de vencer</span>' : '';
+  }
+
+  function filtrandoPor() {
+    var etiquetas = '';
+    if (filtrosEscolhidos.cartao) {
+      var cartao = (resumo.cartoes || []).filter(function (um) { return String(um.id) === String(filtrosEscolhidos.cartao); })[0];
+      etiquetas += '<span class="filtro-etiqueta">Cartão: ' + escapar(cartao ? cartao.rotulo : filtrosEscolhidos.cartao)
+        + '<button type="button" data-tirar-cartao aria-label="Tirar o filtro do cartão">×</button></span>';
+    }
+    if (filtrosEscolhidos.busca) {
+      etiquetas += '<span class="filtro-etiqueta">Busca: ' + escapar(filtrosEscolhidos.busca)
+        + '<button type="button" data-tirar-busca aria-label="Tirar a busca">×</button></span>';
+    }
+    etiquetas += FiltroMultiplo.etiquetasSoltas(resumo.filtrosDisponiveis, filtrosEscolhidos);
+    return etiquetas ? '<div class="filtro-etiquetas filtrando-por"><span>Filtrando por</span>' + etiquetas
+      + '<button type="button" class="limpar-filtros" id="limpar-tudo-da-fila">Limpar tudo</button></div>' : '';
   }
 
   function desenharFila() {
     if (!resumo.fila.length && resumo.buscaNaPlanilhaToda) {
-      return '<div class="cartao vazio">'
+      return filtrandoPor() + '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
           ? 'A busca achou ' + resumo.totalNoPeriodo + ' casos na planilha toda, mas '
@@ -4905,7 +5476,7 @@ var TelaTrabalho = (function () {
     if (!resumo.fila.length) {
       var ondeOlhou = resumo.subAbas
         ? 'em "' + escapar(resumo.subAbas.nomes[resumo.subAbas.atual - 1]) + '"' : 'neste canal';
-      return '<div class="cartao vazio">'
+      return filtrandoPor() + '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
           ? 'Há ' + resumo.totalNoPeriodo + ' casos ' + ondeOlhou + ', mas nenhum passa '
@@ -4926,18 +5497,25 @@ var TelaTrabalho = (function () {
           + (i === 0 ? seloDoSla(caso.sla) + selosDePrazo(caso.sinais) : '') + '</td>';
       }).join('');
 
-      return '<tr>' + celulas + '<td class="acoes-coluna">'
+      var tom = tomDoPrazoDaLinha(caso);
+      return '<tr' + (tom ? ' class="linha-prazo-' + tom + '"' : '') + '>' + celulas + '<td class="acoes-coluna">'
         + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
-    return '<div class="cartao sem-forro">'
+    return '<div class="cartao sem-forro fila-do-trabalho">'
       + barraDeMostrar(visiveis)
+      + filtrandoPor()
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
       + '<tbody>' + linhas + '</tbody></table></div></div>';
   }
 
   function desenharGrupo(grupo, caso, ehOPrimeiro) {
+
+    if (ehOPrimeiro) {
+      grupo = grupo.filter(function (celula) { return celula.ehStatus; })
+        .concat(grupo.filter(function (celula) { return !celula.ehStatus; }));
+    }
     return grupo.map(function (celula, i) {
       if (celula.ehStatus) {
         return '<span class="situacao tom-' + escapar(caso.tom || 'neutro') + '">'
@@ -5029,17 +5607,40 @@ var TelaTrabalho = (function () {
     return valor || String(caso.id);
   }
 
-  function avisarDosQueVencem() {
+  function guardarOPrazo() {
 
     var achados = casosPertoDeVencer(resumo && (resumo.pertoDeVencer || resumo.fila));
+    prazoPorCanal[canalEscolhido] = {
+      achados: achados,
+      quantos: Math.max(Number(resumo.quantosPertoDeVencer) || 0, achados.length),
+      nomeDoCanal: resumo.canal && resumo.canal.nome ? resumo.canal.nome : ''
+    };
+  }
+
+  function desenharFaixaDoPrazo() {
+    var lugar = elemento('faixa-do-prazo');
+    if (!lugar) return;
+    var prazo = prazoPorCanal[canalEscolhido];
+    if (!prazo || !prazo.quantos) { lugar.innerHTML = ''; return; }
+    lugar.innerHTML = '<div class="faixa-do-prazo" role="status">' + Moldura.icone('alerta')
+      + '<p><strong>' + prazo.quantos + (prazo.quantos === 1 ? ' caso perto de vencer' : ' casos perto de vencer')
+      + (prazo.nomeDoCanal ? ' na ' + escapar(prazo.nomeDoCanal) : '') + '.</strong> '
+      + 'Estão no amarelo do prazo — trabalhe antes que fiquem vermelhos.</p>'
+      + '<button type="button" class="botao-secundario pequeno" id="ver-casos-do-prazo">Ver os casos</button></div>';
+    elemento('ver-casos-do-prazo').addEventListener('click', avisarDosQueVencem);
+  }
+
+  function avisarDosQueVencem() {
+    var prazo = prazoPorCanal[canalEscolhido];
+    var achados = prazo ? prazo.achados : [];
     if (!achados.length || document.getElementById('dialogo-prazo')) return;
 
-    var nomeDoCanal = resumo.canal && resumo.canal.nome ? resumo.canal.nome : '';
+    var nomeDoCanal = prazo.nomeDoCanal;
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
     caixa.id = 'dialogo-prazo';
 
-    var quantos = Math.max(Number(resumo.quantosPertoDeVencer) || 0, achados.length);
+    var quantos = prazo.quantos;
     var sobram = quantos - achados.length;
     caixa.innerHTML = '<div class="dialogo-caixa aviso-de-prazo" role="alertdialog"'
       + ' aria-modal="true" aria-labelledby="titulo-prazo" aria-describedby="texto-prazo">'
@@ -5084,7 +5685,7 @@ var TelaTrabalho = (function () {
       botoes[i].addEventListener('click', function () {
         var idDoCaso = this.getAttribute('data-trabalhar-do-aviso');
         sair();
-        CasoEmModal.abrir(canalEscolhido, idDoCaso, carregar);
+        CasoEmModal.abrir(canalEscolhido, idDoCaso, depoisDeGravar);
       });
     }
     document.getElementById('fechar-aviso-de-prazo').focus();
@@ -5121,6 +5722,7 @@ var TelaTrabalho = (function () {
       desenharAbas();
     }
     ligarPainel();
+    desenharFaixaDoPrazo();
     var busca = elemento('busca-na-fila');
     if (focarABusca && busca) {
       busca.focus();
@@ -5134,6 +5736,26 @@ var TelaTrabalho = (function () {
     focarNoMostrar = '';
   }
 
+  function proximoDaFila(idAtual) {
+    var ids = [];
+    var botoes = document.querySelectorAll('.fila-do-trabalho [data-trabalhar]');
+    for (var i = 0; i < botoes.length; i++) {
+      var id = botoes[i].getAttribute('data-trabalhar');
+      if (ids.indexOf(id) < 0) ids.push(id);
+    }
+    var aqui = ids.indexOf(String(idAtual));
+    return aqui >= 0 && aqui + 1 < ids.length ? ids[aqui + 1] : '';
+  }
+
+  function depoisDeGravar() {
+    var gravado = CasoEmModal.oQueGravou();
+    if (gravado) {
+      Moldura.toast('Caso ' + gravado.id + ' atualizado.'
+        + (gravado.destino ? ' Agora está em ' + gravado.destino + '.' : ''), 'bom');
+    }
+    carregar();
+  }
+
   function carregar(recado) {
     var meuPedido = ++pedidoDoPainel;
     var painel = elemento('painel');
@@ -5143,7 +5765,7 @@ var TelaTrabalho = (function () {
     } else if (painel) {
       painelDesenhadoPara = '';
       desmarcarAtualizando(painel);
-      painel.innerHTML = '<p class="carregando-campos">'
+      painel.innerHTML = '<p class="carregando-campos" role="status">'
         + escapar(typeof recado === 'string' ? recado : 'Somando os casos…') + '</p>';
     }
 
@@ -5156,19 +5778,19 @@ var TelaTrabalho = (function () {
           resumo.fila = expandirFila(resposta.fila, resposta.colunas);
           resumo.pertoDeVencer = expandirFila(resposta.pertoDeVencer, resposta.colunas);
         }
-        desenharPainel();
         if (avisarQuandoChegar) {
           avisarQuandoChegar = false;
           jaAvisouNoCanal[canalEscolhido] = true;
-          avisarDosQueVencem();
+          guardarOPrazo();
         }
+        desenharPainel();
       })
       .senao(function (erro) {
         if (meuPedido !== pedidoDoPainel) return;
 
         painelDesenhadoPara = '';
         desmarcarAtualizando(elemento('painel'));
-        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('painel').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -5215,6 +5837,9 @@ var TelaTrabalho = (function () {
     ligarCliques('[data-mostrar]', function (botao) {
       var escolha = botao.getAttribute('data-mostrar');
       quantosNaFila = escolha === 'todos' ? 'todos' : Number(escolha);
+      if (escolha !== 'todos') {
+        try { window.localStorage.setItem(CHAVE_DO_MOSTRAR, String(quantosNaFila)); } catch (semArmazenamento) {   }
+      }
       focarNoMostrar = escolha;
 
       var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;
@@ -5226,12 +5851,20 @@ var TelaTrabalho = (function () {
       desenharPainel();
     });
 
+    ligarCliques('[data-tirar-cartao]', function () { filtrosEscolhidos.cartao = ''; carregar(); });
+    ligarCliques('[data-tirar-busca]', function () { filtrosEscolhidos.busca = ''; carregar(); });
+    ligarCliques('#limpar-tudo-da-fila', function () {
+      var limpar = elemento('limpar-filtros');
+      if (limpar) limpar.click();
+    });
+
     ligarCliques('[data-trabalhar]', function (botao) {
-      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), carregar);
+      CasoEmModal.abrir(canalEscolhido, botao.getAttribute('data-trabalhar'), depoisDeGravar,
+        proximoDaFila);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
       CasoEmModal.trocarSituacao(canalEscolhido,
-        botao.getAttribute('data-status-do-caso'), carregar);
+        botao.getAttribute('data-status-do-caso'), depoisDeGravar);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');
@@ -5266,6 +5899,7 @@ var TelaTrabalho = (function () {
       Aplicacao.remontar();
     });
     desenharAbas();
+    desenharFaixaDoPrazo();
     if (abaDaMesa === 'reunioes') { carregarAgenda(); return; }
 
     avisarQuandoChegar = !jaAvisouNoCanal[canalEscolhido];
@@ -5354,7 +5988,7 @@ var TelaCadastrarCaso = (function () {
 
   function montarReuniao() {
     return '<div class="cartao formulario" id="formulario-da-reuniao">'
-      + '<div id="corpo-da-reuniao"><p class="carregando-campos">Montando o formulário…</p></div>'
+      + '<div id="corpo-da-reuniao"><p class="carregando-campos" role="status">Montando o formulário…</p></div>'
       + '<div class="acoes" id="acoes-da-reuniao" hidden>'
       + '<button type="button" class="botao" id="registrar-reuniao-nova">Registrar reunião</button>'
       + '<span class="falta-preencher" id="falta-na-reuniao-nova" aria-live="polite"></span>'
@@ -5371,7 +6005,7 @@ var TelaCadastrarCaso = (function () {
         guardarRetratoDoCadastro();
       })
       .senao(function (erro) {
-        elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('corpo-da-reuniao').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
 
@@ -5411,8 +6045,13 @@ var TelaCadastrarCaso = (function () {
     }
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
       + abasDaMesa()
+
+      + '<div class="cadastro-em-blocos">'
+      + '<nav class="indice-do-cadastro" id="indice-do-cadastro" aria-label="Seções do formulário" hidden></nav>'
       + '<form class="cartao formulario" id="formulario-do-caso" novalidate>'
-      + '<div id="corpo-do-formulario"><p class="carregando-campos">'
+
+      + '<div class="rascunho-encontrado" id="rascunho-encontrado" role="status" hidden></div>'
+      + '<div id="corpo-do-formulario"><p class="carregando-campos" role="status">'
       + 'Montando o formulário…</p></div>'
 
       + '<div class="acoes" id="acoes-do-caso" hidden>'
@@ -5420,16 +6059,209 @@ var TelaCadastrarCaso = (function () {
       + '<button type="button" class="botao-secundario" id="limpar-caso">Limpar</button>'
       + '<span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>'
 
+      + '<label class="guardar-rascunho" title="Fica guardado por 2 horas, só para você. Desmarque para apagar.">'
+      + '<input type="checkbox" id="guardar-rascunho"> Guardar rascunho deste cadastro'
+      + '<span class="estado-do-rascunho" id="estado-do-rascunho" aria-live="polite"></span></label>'
+
       + '<span class="falta-preencher" id="falta-no-caso" aria-live="polite"></span>'
       + '<span class="recado" id="recado-do-caso" hidden></span>'
-      + '</div></form>';
+      + '</div></form></div>';
+  }
+
+  var secaoAtual = '';
+  function desenharIndice() {
+    var indice = elemento('indice-do-cadastro');
+    var secoes = corpo() ? corpo().querySelectorAll('fieldset.secao') : [];
+    if (!indice || secoes.length < 2) { if (indice) indice.hidden = true; return; }
+    var faltam = Formulario.camposQueFaltam(corpo());
+    var itens = Array.prototype.map.call(secoes, function (secao, i) {
+      secao.id = secao.id || 'secao-do-cadastro-' + (i + 1);
+      var quantos = faltam.filter(function (campo) { return secao.contains(campo); }).length;
+      var preenchido = Array.prototype.some.call(secao.querySelectorAll('[data-chave]'),
+        function (campo) { return !campo.disabled && String(campo.value || '').trim() !== ''; });
+      var comErro = !!secao.querySelector('.campo.com-erro');
+      secao.classList.toggle('com-erro', comErro);
+      var nome = secao.querySelector('legend') ? secao.querySelector('legend').textContent : 'Seção ' + (i + 1);
+      var atual = secao.id === secaoAtual;
+      return '<li><button type="button" class="indice-item' + (comErro ? ' com-erro' : '') + (atual ? ' atual' : '')
+        + '"' + (atual ? ' aria-current="true"' : '') + ' data-ir-para-secao="' + secao.id + '">'
+        + '<span class="indice-numero">' + (i + 1) + '</span>'
+        + '<span class="indice-nome">' + escapar(nome) + '</span>'
+        + (quantos ? '<span class="indice-falta">' + quantos + (quantos === 1 ? ' obrigatório' : ' obrigatórios') + '</span>'
+          : (preenchido ? '<span class="indice-ok" aria-label="completa">' + Moldura.icone('confirmado') + '</span>' : ''))
+        + '</button></li>';
+    });
+    var html = '<ol>' + itens.join('') + '</ol>'
+      + '<p class="indice-nota">As seções e os campos vêm de Configurações › Cadastrar Caso.</p>';
+    indice.hidden = false;
+
+    if (indice.getAttribute('data-desenhado') !== html) {
+      indice.innerHTML = html;
+      indice.setAttribute('data-desenhado', html);
+    }
+    if (indice.getAttribute('data-clique-ligado') === 'sim') return;
+    indice.setAttribute('data-clique-ligado', 'sim');
+
+    function botaoDo(evento) {
+      return evento.target && evento.target.closest ? evento.target.closest('[data-ir-para-secao]') : null;
+    }
+    indice.addEventListener('mousedown', function (evento) {
+      var botao = botaoDo(evento);
+      if (!botao || evento.button !== 0) return;
+      evento.preventDefault();
+      irParaASecao(botao);
+    });
+    indice.addEventListener('click', function (evento) {
+      var botao = botaoDo(evento);
+      if (botao && evento.detail === 0) irParaASecao(botao);
+    });
+  }
+
+  function irParaASecao(botao) {
+    var secao = document.getElementById(botao.getAttribute('data-ir-para-secao'));
+    if (!secao) return;
+    secao.scrollIntoView({ block: 'start' });
+
+    var campos = secao.querySelectorAll('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
+    for (var c = 0; c < campos.length; c++) {
+      var bloco = campos[c].closest('[data-campo]');
+      if (bloco && bloco.hidden) continue;
+      if (campos[c].type === 'hidden') continue;
+      campos[c].focus({ preventScroll: true });
+      break;
+    }
+  }
+
+  var AVISO_DE_OBRIGATORIO = 'é obrigatório';
+  function vigiarOCampoVazio() {
+    var raiz = corpo();
+    if (!raiz || raiz.getAttribute('data-campo-vazio-vigiado') === 'sim') return;
+    raiz.setAttribute('data-campo-vazio-vigiado', 'sim');
+    raiz.addEventListener('focusout', function (evento) {
+      var campo = evento.target;
+      if (!campo || campo.getAttribute('aria-required') !== 'true' || campo.disabled) return;
+      var bloco = campo.closest ? campo.closest('[data-campo]') : null;
+      if (!bloco || bloco.hidden || String(campo.value || '').trim()) return;
+      var aviso = bloco.querySelector('.erro');
+      bloco.classList.add('com-erro');
+      campo.setAttribute('aria-invalid', 'true');
+      if (aviso) { aviso.textContent = AVISO_DE_OBRIGATORIO; aviso.hidden = false; }
+      desenharIndice();
+    });
+    function conferir(evento) {
+      var campo = evento.target;
+      var bloco = campo && campo.closest ? campo.closest('[data-campo]') : null;
+      var aviso = bloco ? bloco.querySelector('.erro') : null;
+      if (bloco && aviso && aviso.textContent === AVISO_DE_OBRIGATORIO && String(campo.value || '').trim()) {
+        bloco.classList.remove('com-erro');
+        campo.removeAttribute('aria-invalid');
+        aviso.textContent = ''; aviso.hidden = true;
+      }
+      desenharIndice();
+    }
+    raiz.addEventListener('input', conferir);
+    raiz.addEventListener('change', conferir);
+    raiz.addEventListener('focusin', function (evento) {
+      var secao = evento.target && evento.target.closest ? evento.target.closest('fieldset.secao') : null;
+      if (secao && secao.id && secao.id !== secaoAtual) { secaoAtual = secao.id; desenharIndice(); }
+    });
+  }
+
+  var SEGUNDOS_ENTRE_RASCUNHOS = 30;
+  var relogioDoRascunho = null;
+  var haRascunhoNoServidor = false;
+  function caixaDoRascunho() { return elemento('guardar-rascunho'); }
+  function estadoDoRascunho(texto) {
+    var onde = elemento('estado-do-rascunho');
+    if (onde) onde.textContent = texto ? ' · ' + texto : '';
+  }
+  function horaDeAgora(quando) {
+    var d = quando ? new Date(quando) : new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  function guardarRascunhoAgora() {
+    var caixa = caixaDoRascunho();
+    if (!caixa || !caixa.checked || !corpo()) return;
+    Servidor.chamar('guardarRascunho', canalEscolhido, Formulario.valores(corpo()))
+      .entao(function () {
+        haRascunhoNoServidor = true;
+        estadoDoRascunho('guardado às ' + horaDeAgora());
+      })
+      .senao(function () { estadoDoRascunho('não deu para guardar agora'); });
+  }
+
+  function agendarRascunho() {
+    var caixa = caixaDoRascunho();
+    if (!caixa || !caixa.checked || relogioDoRascunho) return;
+    relogioDoRascunho = setTimeout(function () {
+      relogioDoRascunho = null;
+      guardarRascunhoAgora();
+    }, SEGUNDOS_ENTRE_RASCUNHOS * 1000);
+  }
+
+  function esquecerORelogioDoRascunho() {
+    if (relogioDoRascunho) { clearTimeout(relogioDoRascunho); relogioDoRascunho = null; }
+  }
+
+  function apagarORascunho() {
+    esquecerORelogioDoRascunho();
+    var caixa = caixaDoRascunho();
+    var haviaRascunho = haRascunhoNoServidor || (caixa && caixa.checked);
+    haRascunhoNoServidor = false;
+    estadoDoRascunho('');
+    if (haviaRascunho) Servidor.chamar('apagarRascunho', canalEscolhido).senao(function () {});
+  }
+
+  function prepararORascunho(rascunho) {
+    esquecerORelogioDoRascunho();
+    var caixa = caixaDoRascunho();
+    if (caixa) caixa.checked = false;
+    estadoDoRascunho('');
+    var faixa = elemento('rascunho-encontrado');
+    if (faixa) { faixa.hidden = true; faixa.innerHTML = ''; }
+    var raiz = corpo();
+    if (raiz && raiz.getAttribute('data-rascunho-vigiado') !== 'sim') {
+      raiz.setAttribute('data-rascunho-vigiado', 'sim');
+      raiz.addEventListener('input', agendarRascunho);
+      raiz.addEventListener('change', agendarRascunho);
+    }
+    if (caixa && caixa.getAttribute('data-ligada') !== 'sim') {
+      caixa.setAttribute('data-ligada', 'sim');
+      caixa.addEventListener('change', function () {
+        if (this.checked) guardarRascunhoAgora();
+        else apagarORascunho();
+      });
+    }
+    haRascunhoNoServidor = !!rascunho;
+    if (!rascunho || !faixa) return;
+    faixa.innerHTML = Moldura.icone('relogio')
+      + '<span>Há um rascunho deste cadastro, guardado às <strong>' + horaDeAgora(rascunho.quando)
+      + '</strong>.</span>'
+      + '<button type="button" class="botao pequeno" id="recuperar-rascunho">Recuperar</button>'
+      + '<button type="button" class="botao-secundario pequeno" id="descartar-rascunho">Descartar</button>';
+    faixa.hidden = false;
+    elemento('recuperar-rascunho').addEventListener('click', function () {
+      Formulario.preencher(corpo(), rascunho.valores);
+      if (caixa) caixa.checked = true;
+      estadoDoRascunho('recuperado');
+      faixa.hidden = true;
+
+      corpo().dispatchEvent(new Event('input', { bubbles: true }));
+      corpo().dispatchEvent(new Event('change', { bubbles: true }));
+      desenharIndice();
+    });
+    elemento('descartar-rascunho').addEventListener('click', function () {
+      apagarORascunho();
+      faixa.hidden = true;
+    });
   }
 
   function carregarFormulario() {
-    corpo().innerHTML = '<p class="carregando-campos">Montando o formulário…</p>';
+    corpo().innerHTML = '<p class="carregando-campos" role="status">Montando o formulário…</p>';
     mostrarAsAcoes(false);
 
-    Servidor.chamar('formularioDoCanal', canalEscolhido)
+    Servidor.chamar('formularioDoCanal', canalEscolhido, true)
       .entao(function (resposta) {
         corpo().innerHTML = Formulario.desenhar(resposta, '');
         Formulario.ligar(corpo(), '', canalEscolhido);
@@ -5437,15 +6269,18 @@ var TelaCadastrarCaso = (function () {
         Formulario.aplicarPadroes(corpo(), resposta);
 
         Formulario.vigiarObrigatorios(corpo(), elemento('salvar-caso'), elemento('falta-no-caso'));
+        vigiarOCampoVazio();
+        desenharIndice();
 
         mostrarAsAcoes(true);
         guardarRetratoDoCadastro();
+        prepararORascunho(resposta.rascunho);
         var primeiro = corpo().querySelector(
           'input:not([disabled]), select:not([disabled])');
         if (primeiro) primeiro.focus();
       })
       .senao(function (erro) {
-        corpo().innerHTML = '<p class="carregando-campos erro-carga">'
+        corpo().innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -5488,6 +6323,7 @@ var TelaCadastrarCaso = (function () {
         envio = '';
         Formulario.acabouDeGravar(elemento('salvar-caso'),
           elemento('formulario-do-caso'));
+        apagarORascunho();
         mostrarCadastroConcluido(resposta);
       })
       .senao(function (erro) {
@@ -5496,10 +6332,14 @@ var TelaCadastrarCaso = (function () {
           elemento('formulario-do-caso'));
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo(), erro.problemas);
+        desenharIndice();
       });
   }
 
   function mostrarCadastroConcluido(resposta) {
+
+    var indiceDoCadastro = elemento('indice-do-cadastro');
+    if (indiceDoCadastro) indiceDoCadastro.hidden = true;
     var permissoes = (pacoteDaTela && pacoteDaTela.permissoes) || {};
     var acoes = permissoes.acoes || [];
     var telas = permissoes.telas || [];
@@ -5566,6 +6406,7 @@ var TelaCadastrarCaso = (function () {
     elemento('limpar-caso').addEventListener('click', function () {
       recado('', '');
       envio = '';
+      apagarORascunho();
       carregarFormulario();
     });
     document.addEventListener('keydown', atalhoDeSalvar);
@@ -5585,6 +6426,7 @@ var TelaCadastrarCaso = (function () {
   }
 
   function desligar() {
+    esquecerORelogioDoRascunho();
     document.removeEventListener('keydown', atalhoDeSalvar);
     window.removeEventListener('beforeunload', aoSairDaPagina);
     retratoDoCadastro = null;
@@ -5623,9 +6465,11 @@ var TelaBuscarCaso = (function () {
     return '<div class="cartao busca-caixa">'
       + '<form id="form-da-busca" novalidate>'
       + '<div class="busca-linha">'
+
+      + '<span class="busca-campo">' + Moldura.icone('buscarCaso')
       + '<input type="search" id="termo-da-busca" autocomplete="off"'
       + ' placeholder="Protocolo, apólice, proposta, CPF ou nome"'
-      + ' aria-label="O que procurar">'
+      + ' aria-label="O que procurar"></span>'
       + '<button type="submit" class="botao" id="botao-buscar">'
       + Moldura.icone('buscarCaso') + ' Buscar</button>'
       + Moldura.botaoLimparFiltros('limpar-filtros-da-busca')
@@ -5663,7 +6507,8 @@ var TelaBuscarCaso = (function () {
     var bases = (opcoes.basesDaPesquisaDirigida || []).join(', ');
     dica.textContent = pesquisarPor === 'avancada'
       ? 'Em todas as colunas de todas as bases marcadas.'
-      : 'Vale na ' + bases + '. As outras bases, o histórico e a base legada procuram em todas as colunas, como sempre.';
+
+      : 'A pesquisa direcionada é aplicada à ' + bases + '. As demais bases mantêm a busca completa.';
   }
 
   function desenharOnde() {
@@ -5731,7 +6576,7 @@ var TelaBuscarCaso = (function () {
     procurando = true;
     elemento('botao-buscar').disabled = true;
     elemento('resultado-da-busca').innerHTML =
-      '<p class="carregando-campos">Procurando…</p>';
+      '<p class="carregando-campos" role="status">Procurando…</p>';
 
     Servidor.chamar('buscarCasos', termo, onde, incluirLegado,
       incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado), pesquisarPor)
@@ -5973,14 +6818,14 @@ var TelaTabelaCorretoras = (function () {
       }).join('') + '</div>'
       + '<div class="config" id="corretoras">'
       + '<div class="config-lista" id="corretoras-lista">'
-      + '<p class="carregando-campos">Lendo o cadastro…</p></div>'
+      + '<p class="carregando-campos" role="status">Lendo o cadastro…</p></div>'
       + '<aside class="config-painel" id="corretoras-painel"></aside>'
       + '</div>';
   }
 
   function carregar() {
     var lista = elemento('corretoras-lista');
-    if (lista) lista.innerHTML = '<p class="carregando-campos">Lendo o cadastro…</p>';
+    if (lista) lista.innerHTML = '<p class="carregando-campos" role="status">Lendo o cadastro…</p>';
 
     if (abaAtual === 'corretoras') {
       return Servidor.chamar('tabelaDeCorretoras', procurar, segmento)
@@ -6004,7 +6849,7 @@ var TelaTabelaCorretoras = (function () {
 
   function falhou(erro) {
     elemento('corretoras-lista').innerHTML =
-      '<p class="carregando-campos erro-carga">'
+      '<p class="carregando-campos erro-carga" role="alert">'
       + escapar(erro.message || String(erro)) + '</p>';
   }
 
@@ -6018,23 +6863,25 @@ var TelaTabelaCorretoras = (function () {
     var filtroDoSegmento = filtrosDasCorretoras()[0];
 
     elemento('corretoras-lista').innerHTML = '<div class="config-cabeca">'
+
+      + '<span class="busca-campo">' + Moldura.icone('buscarCaso')
       + '<input type="search" id="procurar-corretora" class="busca-do-cadastro"'
       + ' value="' + escapar(procurar) + '" autocomplete="off"'
       + ' placeholder="Corretora, sucursal, consultor ou SUSEP"'
-      + ' aria-label="Procurar corretora">'
+      + ' aria-label="Procurar corretora"></span>'
       + FiltroMultiplo.desenhar(filtroDoSegmento, { segmento: segmento })
       + Moldura.botaoLimparFiltros('limpar-filtros-corretoras')
       + (dados.podeMexer && podeMexerNesta('CORRETORAS')
-        ? '<button type="button" class="botao pequeno" id="nova-corretora">'
-          + 'Cadastrar corretora</button>' : '')
+        ? '<button type="button" class="botao pequeno com-icone" id="nova-corretora">'
+          + Moldura.icone('cadastrarCaso') + 'Cadastrar corretora</button>' : '')
       + (dados.podeExportar
-        ? '<button type="button" class="botao-texto" id="exportar-corretoras">'
-          + 'Exportar</button>' : '')
+        ? '<button type="button" class="botao-secundario pequeno com-icone" id="exportar-corretoras">'
+          + Moldura.icone('importacao') + 'Exportar</button>' : '')
       + '</div>'
       + avisoDeOrigem('CORRETORAS')
       + avisoDasNaoCadastradas()
-      + '<p class="config-explica">' + dados.quantasFiltradas + ' de '
-      + dados.quantasNoTotal + ' corretoras · a lista vem de quem mais traz '
+      + '<p class="config-explica contagem-da-tabela"><strong>' + dados.quantasFiltradas + ' de '
+      + dados.quantasNoTotal + ' corretoras</strong> · a lista vem de quem mais traz '
       + 'caso, e não em ordem alfabética.</p>'
       + tabelaDasCorretoras()
       + (dados.truncada
@@ -6051,7 +6898,8 @@ var TelaTabelaCorretoras = (function () {
     if (!dados.foraDoCadastro.length) return '';
 
     var primeiras = dados.foraDoCadastro.slice(0, 6);
-    return '<div class="aviso-cadastro">'
+    return '<div class="aviso-cadastro compacto" role="status">'
+      + Moldura.icone('alerta')
       + '<strong>' + dados.foraDoCadastro.length + ' SUSEP(s) aparecem nos '
       + 'casos e não estão no cadastro.</strong>'
       + '<p>Enquanto elas ficarem de fora, o selo do formulário vai dizer '
@@ -6546,7 +7394,7 @@ var TelaTabelaCorretoras = (function () {
       return;
     }
     var onde = elemento('resultado-da-importacao');
-    onde.innerHTML = '<p class="carregando-campos">Conferindo…</p>';
+    onde.innerHTML = '<p class="carregando-campos" role="status">Conferindo…</p>';
 
     Servidor.chamarSemPressa('conferirImportacao', tipoDaImportacao, fonte)
       .entao(function (resposta) {
@@ -6555,7 +7403,7 @@ var TelaTabelaCorretoras = (function () {
       })
       .senao(function (erro) {
         conferido = null;
-        onde.innerHTML = '<p class="carregando-campos erro-carga">'
+        onde.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -6636,7 +7484,7 @@ var TelaTabelaCorretoras = (function () {
     var fonte = guardarFonteDaImportacao();
     SenhaDeAdministrador.pedir(function () {
       elemento('resultado-da-importacao').innerHTML =
-        '<p class="carregando-campos">Gravando…</p>';
+        '<p class="carregando-campos" role="status">Gravando…</p>';
       Servidor.chamarSemPressa('aplicarImportacao', tipoDaImportacao, fonte)
         .entao(function (feito) {
           avisar(feito.criadas + ' cadastrada(s) e ' + feito.atualizadas
@@ -6701,8 +7549,9 @@ var TelaTabelaCorretoras = (function () {
   function abrirCaixaDeExportar(arquivo) {
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
-    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true">'
-      + '<h3>Exportar</h3>'
+    caixa.innerHTML = '<div class="dialogo-caixa" role="dialog" aria-modal="true"'
+      + ' aria-labelledby="titulo-exportar-corretoras">'
+      + '<h3 id="titulo-exportar-corretoras">Exportar</h3>'
       + '<p>Separado por ponto e vírgula, que é como o Excel em português abre '
       + 'sem perguntar nada.</p>'
       + '<textarea rows="8" readonly>' + escapar(arquivo.conteudo) + '</textarea>'
@@ -6817,14 +7666,14 @@ var TelaImportacao = (function () {
     pacoteDoSistema = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
-      + '<div id="importacao"><p class="carregando-campos">'
+      + '<div id="importacao"><p class="carregando-campos" role="status">'
       + 'Lendo as colunas do canal…</p></div>';
   }
 
   function carregar() {
     var caixa = elemento('importacao');
     if (caixa) {
-      caixa.innerHTML = '<p class="carregando-campos">Lendo as colunas do canal…</p>';
+      caixa.innerHTML = '<p class="carregando-campos" role="status">Lendo as colunas do canal…</p>';
     }
     Servidor.chamar('opcoesDaImportacaoDeCasos', canalEscolhido)
       .entao(function (resposta) {
@@ -6844,12 +7693,12 @@ var TelaImportacao = (function () {
         Servidor.chamar('opcoesDaImportacaoDoChat')
           .entao(function (doChat) { opcoes = doChat; desenhar(); })
           .senao(function (erro) {
-            elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
+            elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
               + escapar(erro.message || String(erro)) + '</p>';
           });
       })
       .senao(function (erro) {
-        elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('importacao').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -6891,11 +7740,11 @@ var TelaImportacao = (function () {
         ? '<p class="imp-sub">Uma linha por atendimento. Obrigatórias: <strong>data</strong> e '
           + '<strong>analista</strong>. As outras colunas são opcionais, e a linha que já entrou é pulada.</p>'
         : '')
-      + '<div class="config-abas">'
+      + '<div class="config-abas imp-fontes">'
       + '<button type="button" class="config-aba' + (colado ? ' atual' : '') + '"'
-      + ' data-fonte="colado">Colar da planilha</button>'
+      + ' data-fonte="colado">' + Moldura.icone('estrutura') + 'Colar da planilha</button>'
       + '<button type="button" class="config-aba' + (colado ? '' : ' atual') + '"'
-      + ' data-fonte="planilha">Ler outra planilha pelo link</button>'
+      + ' data-fonte="planilha">' + Moldura.icone('elo') + 'Ler outra planilha pelo link</button>'
       + '</div>'
       + (colado ? desenharColar() : desenharLink())
       + '<ul class="imp-dicas"><li>A primeira linha é a dos <strong>nomes das colunas</strong></li>'
@@ -7706,7 +8555,7 @@ var TelaProdutividade = (function () {
 
   function carregar() {
     var caixa = elemento('analitico');
-    if (caixa) caixa.innerHTML = '<p class="carregando-campos">Somando os números…</p>';
+    if (caixa) caixa.innerHTML = '<p class="carregando-campos" role="status">Somando os números…</p>';
 
     Servidor.chamar('produtividadeDaEquipe', canalEscolhido, filtros, periodo)
       .entao(function (resposta) {
@@ -7714,7 +8563,7 @@ var TelaProdutividade = (function () {
         desenhar();
       })
       .senao(function (erro) {
-        elemento('analitico').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('analitico').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -7742,8 +8591,8 @@ var TelaProdutividade = (function () {
     elemento('analitico').innerHTML = desenharFiltros()
       + abasDaMesa()
       + desenharCartoes()
-      + desenharPremios()
-      + desenharRetidoAcumulado()
+
+      + '<div class="dupla-de-graficos">' + desenharPremios() + desenharRetidoAcumulado() + '</div>'
       + desenharPrazos()
       + Moldura.avisoDeJanela(painel, 'Estes gráficos')
       + (painel.componentes.length
@@ -7773,7 +8622,7 @@ var TelaProdutividade = (function () {
     if (!premios) return '';
     return '<div class="graficos"><section class="cartao grafico largura-2" data-premios="sim">'
       + '<header class="grafico-cabeca"><h3>' + escapar(premios.titulo) + '</h3></header>'
-      + Graficos.desenhar(premios)
+      + barrasDosPremios(premios)
       + '<div class="rolagem-tabela"><table class="fila numeros">'
       + '<thead><tr><th>Prêmio</th><th class="direita">Valor</th>'
       + '<th class="direita">Casos com valor</th></tr></thead><tbody>'
@@ -7782,6 +8631,19 @@ var TelaProdutividade = (function () {
           + emReais(ponto.valor) + '</td><td class="direita">' + ponto.casos + '</td></tr>';
       }).join('') + '</tbody></table></div>'
       + '</section></div>';
+  }
+
+  function barrasDosPremios(premios) {
+    var maior = premios.pontos.reduce(function (m, p) { return Math.max(m, Number(p.valor) || 0); }, 0);
+    return '<ul class="barras-de-premio" aria-hidden="true">'
+      + premios.pontos.map(function (ponto) {
+        var parte = maior ? Math.max((Number(ponto.valor) || 0) / maior * 100, 1.5) : 1.5;
+        return '<li class="barra-de-premio premio-' + escapar(ponto.chave) + '">'
+          + '<span class="barra-de-premio-nome">' + escapar(ponto.rotulo) + '</span>'
+          + '<strong class="barra-de-premio-valor">' + emReais(ponto.valor) + '</strong>'
+          + '<span class="barra-de-premio-trilho"><span style="width:' + parte.toFixed(1) + '%"></span></span>'
+          + '</li>';
+      }).join('') + '</ul>';
   }
 
   function desenharRetidoAcumulado() {
@@ -8282,7 +9144,7 @@ var TelaProdutividade = (function () {
 
   function detalhar(idDoComponente, chaveDoPonto, todos) {
     var caixa = elemento('detalhe-do-painel');
-    caixa.innerHTML = '<p class="carregando-campos">Separando os casos…</p>';
+    caixa.innerHTML = '<p class="carregando-campos" role="status">Separando os casos…</p>';
     caixa.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     Servidor.chamar('detalharComponente', canalEscolhido, idDoComponente,
@@ -8295,7 +9157,7 @@ var TelaProdutividade = (function () {
         desenharDetalhe(resposta, idDoComponente, chaveDoPonto);
       })
       .senao(function (erro) {
-        caixa.innerHTML = '<p class="carregando-campos erro-carga">'
+        caixa.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -8882,7 +9744,7 @@ var TelaConfiguracoes = (function () {
     pacoteDoSistema = pacote;
     if (!canalEscolhido && pacote.canais.length) canalEscolhido = pacote.canais[0].id;
     return '<div class="config" id="config">'
-      + '<p class="carregando-campos">Abrindo as configurações…</p>'
+      + '<p class="carregando-campos" role="status">Abrindo as configurações…</p>'
       + '</div>';
   }
 
@@ -8899,15 +9761,22 @@ var TelaConfiguracoes = (function () {
   }
 
   function desenharSecoes() {
+    return desenharOAlertaDoMenu() + desenharAsSecoes();
+  }
+
+  function desenharOAlertaDoMenu() {
     var aviso = '';
     if (!resumo.estrutura.emOrdem) {
       aviso = '<button type="button" class="config-alerta" data-secao="estrutura">'
-        + 'A planilha saiu do contrato — ver o laudo</button>';
+        + Moldura.icone('alerta') + '<span>A planilha saiu do contrato — ver o laudo</span></button>';
     } else if (!resumo.senhaDefinida) {
       aviso = '<button type="button" class="config-alerta suave" data-secao="identidade">'
-        + 'Sem senha de administrador definida</button>';
+        + Moldura.icone('alerta') + '<span>Sem senha de administrador definida</span></button>';
     }
+    return aviso;
+  }
 
+  function desenharAsSecoes() {
     return resumo.secoes.map(function (secao) {
       return '<button type="button" class="config-secao'
         + (secao.chave === secaoAtual ? ' atual' : '') + '"'
@@ -8918,7 +9787,7 @@ var TelaConfiguracoes = (function () {
           ? '<span class="quantos">' + secao.quantidade + '</span>'
           : '<span></span>')
         + '</button>';
-    }).join('') + aviso;
+    }).join('');
   }
 
   function atualizarDescricao() {
@@ -8945,12 +9814,12 @@ var TelaConfiguracoes = (function () {
 
   function aguarde(mensagem) {
     elemento('config-lista').innerHTML =
-      '<p class="carregando-campos">' + escapar(mensagem) + '</p>';
+      '<p class="carregando-campos" role="status">' + escapar(mensagem) + '</p>';
     elemento('config-painel').innerHTML = '';
   }
 
   function falhou(erro) {
-    elemento('config-lista').innerHTML = '<p class="carregando-campos erro-carga">'
+    elemento('config-lista').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
       + escapar(erro.message || String(erro)) + '</p>';
   }
 
@@ -9016,6 +9885,26 @@ var TelaConfiguracoes = (function () {
     if (contagem) {
       contagem.textContent = termo ? achados + ' de ' + itens.length + ' campos · ' : '';
     }
+
+    var grupos = lista.querySelectorAll('.config-grupo');
+    for (var g = 0; g < grupos.length; g++) {
+      var vistos = 0;
+      for (var irmao = grupos[g].nextElementSibling; irmao && !irmao.classList.contains('config-grupo');
+        irmao = irmao.nextElementSibling) {
+        if (irmao.classList.contains('config-item') && !irmao.hidden) vistos++;
+      }
+      grupos[g].hidden = vistos === 0;
+      var quantos = grupos[g].querySelector('.quantos-no-grupo');
+      if (quantos) quantos.textContent = ' · ' + vistos + (vistos === 1 ? ' campo' : ' campos');
+    }
+  }
+
+  function iconeDoTipo(tipo) {
+    if (tipo === 'data' || tipo === 'dataHora') return 'calendario';
+    if (tipo === 'hora') return 'relogio';
+    if (tipo === 'seletor' || tipo === 'seletorMultiplo' || tipo === 'simOuNao') return 'catalogo';
+    if (tipo === 'documento' || tipo === 'identificador') return 'usuarios';
+    return 'folha';
   }
 
   function desenharCampos() {
@@ -9023,18 +9912,27 @@ var TelaConfiguracoes = (function () {
     var desligados = dados.campos.filter(function (campo) { return !campo.ativo; }).length;
     var naLista = dados.campos.filter(campoNaLista);
     var linhas = dados.campos.map(function (campo, posicao) {
-      return '<li class="config-item' + (escolhido && escolhido.id === campo.id
+
+      var anterior = dados.campos[posicao - 1];
+      var titulo = !anterior || texto(anterior.secao) !== texto(campo.secao)
+        ? '<li class="config-grupo" data-grupo="' + escapar(campo.secao) + '">'
+          + '<span class="nome-do-grupo">' + escapar(campo.secao || 'Sem seção') + '</span>'
+          + '<span class="quantos-no-grupo"></span></li>'
+        : '';
+      return titulo + '<li class="config-item' + (escolhido && escolhido.id === campo.id
         ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '"'
         + (campoNaLista(campo) ? '' : ' data-recolhido="sim"') + '>'
-        + '<button type="button" class="abrir" data-campo="' + escapar(campo.id) + '">'
-        + '<span class="nome">' + escapar(campo.rotulo) + '</span>'
-        + '<span class="detalhe">' + escapar(campo.secao) + ' · '
+        + '<button type="button" class="abrir com-icone" data-campo="' + escapar(campo.id) + '">'
+        + '<span class="icone-do-tipo" aria-hidden="true">' + Moldura.icone(iconeDoTipo(campo.tipo)) + '</span>'
+        + '<span class="textos">'
+        + '<span class="nome">' + escapar(campo.rotulo)
+        + (campo.obrigatorio ? ' <span class="etiqueta-obrigatorio">obrigatório</span>' : '') + '</span>'
+        + '<span class="detalhe">'
         + escapar(campo.tipo)
-        + (campo.obrigatorio ? ' · obrigatório' : '')
         + (campo.ativo ? '' : ' · desligado no formulário')
         + (campo.colunaExiste ? ''
           : ' · <strong class="alerta">coluna ausente na planilha</strong>')
-        + '</span></button>'
+        + '</span></span></button>'
         + '<span class="mover">'
         + '<button type="button" class="seta" data-subir="' + posicao + '"'
         + (campo === naLista[0] ? ' disabled' : '') + ' title="Subir">↑</button>'
@@ -9051,15 +9949,16 @@ var TelaConfiguracoes = (function () {
         : '');
 
     elemento('config-lista').innerHTML =
-      '<div class="config-cabeca">'
+
+      '<div class="config-cabeca numa-linha">'
       + '<div class="config-canais">' + caixaDeCanais() + '</div>'
-      + (resumo.podeMexerNaEstrutura
-        ? '<button type="button" class="botao pequeno" id="novo-campo">'
-          + 'Criar campo</button>' : '')
-      + '</div>'
       + '<input type="text" class="config-busca" id="busca-de-campos"'
       + ' placeholder="Procurar campo pelo nome…" aria-label="Procurar campo pelo nome"'
       + ' value="' + escapar(buscaDeCampos) + '">'
+      + (resumo.podeMexerNaEstrutura
+        ? '<button type="button" class="botao pequeno" id="novo-campo">'
+          + Moldura.icone('cadastrarCaso') + 'Criar campo</button>' : '')
+      + '</div>'
       + '<p class="config-explica"><span id="contagem-de-campos"></span>'
       + 'A ordem aqui é a ordem do formulário. '
       + 'Mudar de lugar não mexe na planilha: a coluna fica onde está.</p>'
@@ -9186,6 +10085,9 @@ var TelaConfiguracoes = (function () {
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
       + blocoDaCondicao(campo)
       + blocoDaCondicao(campo, 'obrigatorioSe')
+
+      + '<div class="config-previa"><span class="config-previa-titulo">Prévia no formulário</span>'
+      + '<div class="config-previa-caixa formulario" id="previa-do-campo" inert></div></div>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (podeExcluirEsteCampo(campo)
@@ -9201,12 +10103,28 @@ var TelaConfiguracoes = (function () {
     });
     ligarACondicao(campo);
     ligarACondicao(campo, 'obrigatorioSe');
+    desenharAPrevia(campo);
+    elemento('form-campo').addEventListener('input', function () { desenharAPrevia(campo); });
+    elemento('form-campo').addEventListener('change', function () { desenharAPrevia(campo); });
     var excluir = elemento('excluir-campo');
     if (excluir) {
       excluir.addEventListener('click', function () {
         abrirExclusaoDoCampo(campo);
       });
     }
+  }
+
+  function desenharAPrevia(campo) {
+    var caixa = elemento('previa-do-campo');
+    if (!caixa) return;
+    var tipo = valorDe('tipo') || campo.tipo;
+    var exemplo = {
+      chave: 'previa', cabecalho: '', largura: 3, rotulo: valorDe('rotulo') || campo.rotulo,
+      descricao: valorDe('descricao'), tipo: tipo, mascara: valorDe('mascara'),
+      obrigatorio: marcado('obrigatorio'),
+      opcoes: [{ valor: 'exemplo', rotulo: 'As opções da lista escolhida' }]
+    };
+    caixa.innerHTML = Formulario.desenharCampo(exemplo, 'previa-', '');
   }
 
   var CONDICOES = {
@@ -11709,21 +12627,21 @@ var TelaConfiguracoes = (function () {
   function ligarDiagnostico() {
     elemento('rodar-diagnostico').addEventListener('click', function () {
       var onde = elemento('resultado-do-diagnostico');
-      onde.innerHTML = '<p class="carregando-campos">Conferindo o sistema…</p>';
+      onde.innerHTML = '<p class="carregando-campos" role="status">Conferindo o sistema…</p>';
       Servidor.chamarSemPressa('diagnosticoDoSistema')
         .entao(function (laudo) { onde.innerHTML = laudoDesenhado(laudo); })
         .senao(function (erro) {
-          onde.innerHTML = '<p class="carregando-campos erro-carga">'
+          onde.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
             + escapar(erro.message || String(erro)) + '</p>';
         });
     });
     elemento('medir-velocidade').addEventListener('click', function () {
       var onde = elemento('resultado-do-diagnostico');
-      onde.innerHTML = '<p class="carregando-campos">Cronometrando cada aba…</p>';
+      onde.innerHTML = '<p class="carregando-campos" role="status">Cronometrando cada aba…</p>';
       Servidor.chamarSemPressa('raioXDaVelocidade')
         .entao(function (raio) { onde.innerHTML = raioXDesenhado(raio); })
         .senao(function (erro) {
-          onde.innerHTML = '<p class="carregando-campos erro-carga">'
+          onde.innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
             + escapar(erro.message || String(erro)) + '</p>';
         });
     });
@@ -11829,7 +12747,7 @@ var TelaConfiguracoes = (function () {
   function ligarCadastros() {
     elemento('conferir-cadastros').addEventListener('click', function () {
       var caixa = elemento('laudo-dos-cadastros');
-      caixa.innerHTML = '<p class="carregando-campos">Abrindo a planilha…</p>';
+      caixa.innerHTML = '<p class="carregando-campos" role="status">Abrindo a planilha…</p>';
 
       Servidor.chamar('conferirPlanilhaDeCadastros', valorDe('cadastrosId'), abasDeFora())
         .entao(function (laudo) {
@@ -12241,7 +13159,7 @@ var TelaConfiguracoes = (function () {
         desenharTudo();
       })
       .senao(function (erro) {
-        elemento('config').innerHTML = '<p class="carregando-campos erro-carga">'
+        elemento('config').innerHTML = '<p class="carregando-campos erro-carga" role="alert">'
           + escapar(erro.message || String(erro)) + '</p>';
       });
   }
@@ -12398,13 +13316,8 @@ var Servidor = (function () {
       encerrarADemora();
       if (!aTelaAindaEAMesma()) return;
 
-      var erro = new Error('O servidor não respondeu "' + nomeDaFuncao + '" em '
-        + segundosAteDesistir + ' segundos. Quase sempre é demora: a planilha '
-        + 'ocupada com outras gravações, ou lenta.\n\n'
-        + 'Se você estava gravando, pode clicar de novo: o PGO reconhece o mesmo '
-        + 'envio e não grava duas vezes. Se acontece em toda tela, mesmo com '
-        + 'pouca gente usando, pode ser um arquivo .gs que não foi copiado — '
-        + 'execute diagnosticoRECC() no editor, que lista o que falta.');
+      var erro = new Error(mensagemDoTempoEsgotado(nomeDaFuncao, segundosAteDesistir));
+      erro.tempoEsgotado = true;
       avisarErro('tempo', 'O servidor não respondeu "' + nomeDaFuncao + '" em '
         + segundosAteDesistir + ' segundos', '');
       if (aoDarErrado) aoDarErrado(erro);
@@ -12449,13 +13362,32 @@ var Servidor = (function () {
     return acompanhamento;
   }
 
+  var GRAVACAO = /^(salvar|editar|alterar|cadastrar|criar|excluir|ocultar|importar|gravar|definir|reordenar|liberar|bloquear|arquivar|renomear|remover|apagar|marcar|registrar|trocar|mover|desfazer|enviar|aplicar|guardar|limpar)/i;
+  var mostrarDetalheTecnico = false;
+
+  function comDetalheTecnico(pode) { mostrarDetalheTecnico = !!pode; }
+
+  function mensagemDoTempoEsgotado(nomeDaFuncao, segundos) {
+    var texto = GRAVACAO.test(String(nomeDaFuncao || ''))
+      ? 'A gravação está demorando mais que o normal e pode ter sido concluída. '
+        + 'Antes de salvar de novo, atualize a tela e confira se a alteração já aparece.'
+      : 'O sistema demorou para responder. Isso costuma ser a planilha ocupada; '
+        + 'tente de novo em alguns instantes.';
+    if (mostrarDetalheTecnico) {
+      texto += '\n\nPara o administrador: "' + nomeDaFuncao + '" não respondeu em ' + segundos
+        + ' segundos. Se acontece em toda tela, mesmo com pouca gente usando, rode '
+        + 'diagnosticoRECC() no editor (Configurações › Estrutura › Rodar diagnóstico).';
+    }
+    return texto;
+  }
+
   function novoEnvio() {
     return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
   }
 
   return {
     chamar: chamar, chamarSemPressa: chamarSemPressa, trocouDeTela: trocouDeTela,
-    novoEnvio: novoEnvio, avisarErro: avisarErro
+    novoEnvio: novoEnvio, avisarErro: avisarErro, comDetalheTecnico: comDetalheTecnico
   };
 })();
 
@@ -12602,11 +13534,16 @@ var Aplicacao = (function () {
     elemento('miolo').setAttribute('data-tela', tela);
     document.body.classList.add('com-casca');
     elemento('miolo').innerHTML = '<div class="cabecalho-da-tela">'
+      + '<div class="titulo-da-tela">'
       + '<h2>' + Moldura.escapar(comoSeChama) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
-      + '</div>'
+      + '</div></div>'
       + definicao.montar(pacote);
+
+    var seletor = elemento('miolo').querySelector(':scope > .canais');
+    if (seletor) elemento('miolo').querySelector('.cabecalho-da-tela').appendChild(seletor);
     document.title = pacote.identidade.nome + ' — ' + comoSeChama;
+    medirABarraSuperior();
 
     ligarMoldura();
     if (definicao.ligar) definicao.ligar(pacote);
@@ -12615,6 +13552,16 @@ var Aplicacao = (function () {
 
     if (!semHistorico && location.hash !== '#' + tela) {
       location.hash = tela;
+    }
+  }
+
+  var jaMedeAoRedimensionar = false;
+  function medirABarraSuperior() {
+    var barra = elemento('superior');
+    if (barra) document.documentElement.style.setProperty('--altura-da-barra-superior', barra.offsetHeight + 'px');
+    if (!jaMedeAoRedimensionar) {
+      jaMedeAoRedimensionar = true;
+      window.addEventListener('resize', medirABarraSuperior);
     }
   }
 
@@ -12747,6 +13694,8 @@ var Aplicacao = (function () {
       return;
     }
     pacote = resposta;
+
+    Servidor.comDetalheTecnico(podeVer('configuracoes'));
     if (pacote.identidade && pacote.identidade.corPrimaria) {
 
       document.documentElement.style.setProperty(

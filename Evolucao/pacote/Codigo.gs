@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-19 11:59
+   Gerado em 2026-11-19 18:06
    ========================================================================== */
 
 
@@ -3362,7 +3362,7 @@ function formularioDoCanal(idDoCanal) {
   return cronometrado_('formularioDoCanal', formularioDoCanalSemRelogio_, arguments);
 }
 
-function formularioDoCanalSemRelogio_(idDoCanal) {
+function formularioDoCanalSemRelogio_(idDoCanal, comORascunho) {
   var quem = exigirPermissao_(RECC_ACOES.CRIAR);
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
 
@@ -3381,12 +3381,15 @@ function formularioDoCanalSemRelogio_(idDoCanal) {
     porSecao[secao].push(campoParaATela_(campo, canal.id, visibilidade, quem));
   });
 
-  return {
+  var formulario = {
     canal: canal,
     secoes: ordemDasSecoes.map(function (nome) {
       return { nome: nome, campos: porSecao[nome] };
     })
   };
+
+  if (comORascunho === true) formulario.rascunho = rascunhoDe_(quem, canal);
+  return formulario;
 }
 
 function camposAtivosDoCanal_(idDoCanal) {
@@ -3940,7 +3943,28 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   } : null, comEsteId.length === 1 ? atual.__linha : 0);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
-  return { id: alvo, canal: canal.nome };
+  return { id: alvo, canal: canal.nome, destino: destinoDepoisDeGravar_(canal, atual, paraGravar) };
+}
+
+function destinoDepoisDeGravar_(canal, atual, gravado) {
+  try {
+    var sub = subAbasDoCanal_(canal);
+    if (!sub) return '';
+    var depois = {};
+    var porNome = {};
+    Object.keys(atual || {}).forEach(function (chave) {
+      depois[chave] = atual[chave];
+      porNome[normalizarParaComparar_(chave)] = chave;
+    });
+    Object.keys(gravado || {}).forEach(function (chave) {
+      depois[porNome[normalizarParaComparar_(chave)] || chave] = gravado[chave];
+    });
+    var doStatus = porNome[normalizarParaComparar_(canal.colunaDoStatus)];
+    if (doStatus && doStatus !== canal.colunaDoStatus) depois[canal.colunaDoStatus] = depois[doStatus];
+    return lugarDoRegistro_(depois, canal, sub) >= 0 ? sub.abas[0] : sub.abas[1];
+  } catch (semDestino) {
+    return '';
+  }
 }
 
 function manterAHoraDasDatasQueNaoMudaram_(canal, atual, paraGravar) {
@@ -4038,7 +4062,8 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
     }
   }, comEsteId.length === 1 ? atual.__linha : 0);
 
-  return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
+  return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom,
+    destino: destinoDepoisDeGravar_(canal, atual, alteracao) };
 }
 
 function camposPedidosPelaSituacao_(canal, quem, situacao) {
@@ -6396,6 +6421,56 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
+}
+
+var RECC_RASCUNHO_SEGUNDOS = 2 * 60 * 60;
+var RECC_RASCUNHO_MAXIMO = 50 * 1024;
+
+function chaveDoRascunho_(quem, canal) {
+  var email = String((quem && quem.email) || '').trim().toLowerCase();
+  if (!email) throw new Error('Sem o e-mail de quem está usando não dá para guardar rascunho.');
+  return 'PGO_RASCUNHO_' + impressaoDigitalDaSenha_('rascunho', email + '|' + canal.id);
+}
+
+function cacheDoRascunho_() {
+  if (typeof CacheService === 'undefined') throw new Error('O rascunho não está disponível agora.');
+  return CacheService.getScriptCache();
+}
+
+function guardarRascunho(idDoCanal, valores) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var limpos = {};
+  Object.keys(valores && typeof valores === 'object' ? valores : {}).forEach(function (chave) {
+    var valor = valores[chave];
+    if (valor === null || valor === undefined) return;
+    limpos[String(chave).slice(0, 80)] = Array.isArray(valor)
+      ? valor.map(function (v) { return String(v); }) : String(valor);
+  });
+  var texto = JSON.stringify({ valores: limpos, quando: new Date().getTime() });
+  if (texto.length > RECC_RASCUNHO_MAXIMO) {
+    throw new Error('O rascunho ficou grande demais para guardar. O que está na tela continua aí.');
+  }
+  cacheDoRascunho_().put(chaveDoRascunho_(quem, canal), texto, RECC_RASCUNHO_SEGUNDOS);
+  return { guardado: true };
+}
+
+function rascunhoDe_(quem, canal) {
+  try {
+    var texto = cacheDoRascunho_().get(chaveDoRascunho_(quem, canal));
+    if (!texto) return null;
+    var lido = JSON.parse(texto);
+    return { valores: lido.valores || {}, quando: lido.quando || 0 };
+  } catch (semRascunho) {
+    return null;
+  }
+}
+
+function apagarRascunho(idDoCanal) {
+  var quem = exigirPermissao_(RECC_ACOES.CRIAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  cacheDoRascunho_().remove(chaveDoRascunho_(quem, canal));
+  return true;
 }
 
 
@@ -9687,7 +9762,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.89',
+  numero: '1.90',
   data: '19/11/2026'
 };
 
@@ -10362,6 +10437,7 @@ function descarregarAFilaDaAuditoria_(esperarMs) {
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(esperarMs || 0)) return 0;
   try {
+    resolverOLoteInterrompido_(props, 'AUDITORIA');
     var todas = props.getProperties();
     var chaves = Object.keys(todas)
       .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
@@ -10378,12 +10454,59 @@ function descarregarAFilaDaAuditoria_(esperarMs) {
         Entidade: lido.e || '', RegistroId: lido.r || '', Detalhe: lido.t || ''
       });
     });
-    if (registros.length) inserirComATravaNaMao_('AUDITORIA', registros);
-    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+    gravarOLoteDaFila_(props, 'AUDITORIA', chaves, registros);
     return registros.length;
   } finally {
     trava.releaseLock();
   }
+}
+
+function chaveDoLote_(nomeDaAba) { return nomeDaAba + '.LOTE'; }
+
+function impressaoDoRegistro_(registro) {
+  var data = registro.DataHora instanceof Date ? registro.DataHora : new Date(registro.DataHora);
+
+  return Math.floor(data.getTime() / 1000) + '|' + converterParaIdentificador_(registro.UsuarioId || '') + '|'
+    + String(registro.Acao !== undefined ? registro.Acao : registro.Onde || '');
+}
+
+function gravarOLoteDaFila_(props, nomeDaAba, chaves, registros) {
+  if (registros.length) {
+    props.setProperty(chaveDoLote_(nomeDaAba), JSON.stringify({
+      chaves: chaves, impressoes: registros.map(impressaoDoRegistro_) }));
+    inserirComATravaNaMao_(nomeDaAba, registros);
+  }
+  chaves.forEach(function (chave) { props.deleteProperty(chave); });
+  props.deleteProperty(chaveDoLote_(nomeDaAba));
+}
+
+function resolverOLoteInterrompido_(props, nomeDaAba) {
+  var texto = props.getProperty(chaveDoLote_(nomeDaAba));
+  if (!texto) return;
+  var lote = null;
+  try { lote = JSON.parse(texto); } catch (lixo) { lote = null; }
+  if (lote && lote.impressoes && lote.impressoes.length && jaEstaNaAba_(nomeDaAba, lote.impressoes)) {
+    (lote.chaves || []).forEach(function (chave) { props.deleteProperty(chave); });
+  }
+  props.deleteProperty(chaveDoLote_(nomeDaAba));
+}
+
+function jaEstaNaAba_(nomeDaAba, impressoes) {
+  esquecerEstruturaLida_(nomeDaAba);
+  var estrutura = estruturaDaAba_(nomeDaAba, true);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total < impressoes.length) return false;
+
+  var quantas = Math.min(total, impressoes.length + 200);
+  var inicio = total - quantas + 2;
+  var linhas = estrutura.aba.getRange(inicio, 1, quantas, estrutura.cabecalhos.length).getValues()
+    .map(function (valores, k) { return impressaoDoRegistro_(montarRegistro_(estrutura, valores, inicio + k)); });
+  for (var i = 0; i + impressoes.length <= linhas.length; i++) {
+    var todas = true;
+    for (var j = 0; j < impressoes.length && todas; j++) todas = linhas[i + j] === impressoes[j];
+    if (todas) return true;
+  }
+  return false;
 }
 
 function tamanhoDaFilaDaAuditoria_() {
@@ -10527,6 +10650,7 @@ function descarregarAFilaDosErros_(esperarMs) {
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(esperarMs || 0)) return 0;
   try {
+    resolverOLoteInterrompido_(props, 'ERROS');
     var todas = props.getProperties();
     var chaves = Object.keys(todas)
       .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DOS_ERROS) === 0; })
@@ -10542,8 +10666,7 @@ function descarregarAFilaDosErros_(esperarMs) {
         Onde: lido.w || '', Mensagem: lido.m || '', Detalhe: lido.t || ''
       });
     });
-    if (registros.length) inserirComATravaNaMao_('ERROS', registros);
-    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+    gravarOLoteDaFila_(props, 'ERROS', chaves, registros);
 
     esquecerEstruturaLida_('ERROS');
     var estrutura = estruturaDaAba_('ERROS', true);

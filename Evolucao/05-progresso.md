@@ -4419,6 +4419,85 @@ trava sem conferir o Id (2 — e a B1 também recusou), editar sem a linha (1), 
 
 ---
 
+## Etapa 90 — O visual aprovado e o uso do dia a dia (versão 1.90)
+
+Pedido do PO: "Com esse último fechamos". A proposta visual aprovada (Corporate Modern, azul Porto,
+nos quatro temas) em todas as telas, as melhorias de uso F3, F8, F9, F10 e F15 a F19, e as avaliações
+B5 e B6. Nada foi publicado em produção. O Excel completo é entregue só nesta etapa.
+
+**Decisões do PO nesta etapa:**
+
+- **Aviso de prazo:** "Só a faixa". A janela não abre sozinha.
+- **F3:** "No servidor, por e-mail".
+
+**Regras preservadas:**
+
+- regras de negócio, permissões, indicadores, produtividade, regras Diamante/SUSEP e estrutura das
+  planilhas;
+- B1 (gravações simultâneas);
+- F1, F2, F5, F6, F7 + F12, F11, F14, B2, B3, B4 e a busca inteligente da 1.89.
+
+| Bloco | Commit | O que ficou |
+|---|---|---|
+| **Base visual + F19** | fd11698 | Menu azul escuro, tokens novos nos 4 temas (todo texto com 4,5:1 ou mais, WCAG AA), canal na linha do título, botões, etiquetas e tabelas |
+| **Trabalho** | 1f02b36 | Proposta A; faixa do prazo ("Ver os casos" abre a mesma janela); V1 (cor da linha pelo prazo); V2 ("Filtrando por" com ✕); V3 (cabeçalho fixo a partir de 1360 px); F9 (o "Mostrar" lembrado; só o número, nunca o "Todos") |
+| **Cadastrar** | 23a3cdf | Seções em blocos numerados, com índice (o que falta pela mesma regra do botão); V4 (erro no campo); V5 (proposta repetida em âmbar); V6 ("pedido pelo status Retido") |
+| **Configurações** | 88eb2c9 | V7 (campos por seção, com ícone por tipo; a ordem e as setas iguais); V8 (o alerta no alto do menu); V9 (prévia ao vivo, com o mesmo desenho do formulário); interruptores |
+| **Demais telas** | 2bf2e46 | Buscar (lupa, caixas e a orientação "A pesquisa direcionada é aplicada à BASE_RET. As demais bases mantêm a busca completa."); Produtividade (prêmios em barras deitadas, lado a lado com o retido acumulado); Importação (colagem tracejada, selos verdes); Corretoras (aviso compacto, contagem em barra, linha aberta em destaque) |
+| **UX** | 672f838 | F8 ("Caso 123 atualizado. Agora está em Casos concluídos.", pela regra da fila, calculado depois de gravar e sem derrubar a gravação); F15 (tempo esgotado: "pode ter sido concluída", conferir antes de repetir, detalhe técnico só para quem configura e na aba ERROS); F16 (o erro fica até fechar no ✕); F17 (foco preso no diálogo e devolvido ao fechar); F18 (36 carregamentos com role, erro ligado ao campo, diálogos com nome) |
+| **F10** | 4d2ceed | "Salvar e abrir o próximo" no modal aberto pela fila. O próximo é decidido no clique, pela fila da tela; só abre depois de gravar; conflito e erro não abrem nada; no último, avisa. O Salvar de sempre continua |
+| **F3** | 22846b0 | Rascunho no cache do script, com a chave SHA-256 de e-mail + canal (o e-mail vem da sessão). Opt-in por cadastro; 1 envio a cada 30 s; dura 2 h; apagado ao cadastrar, limpar ou desmarcar. Volta na mesma viagem do formulário; nada no navegador; nada em log |
+| **B5 e B6** | 0cef0a3 | B5: a SUSEP medida em três estratégias (fica o localizador, sem cache compartilhado). B6: o lote da auditoria e dos ERROS não se repete se a execução cair. Ver [`medicoes/B5-B6-decisoes-1.90.md`](medicoes/B5-B6-decisoes-1.90.md) |
+| **Versão** | (fechamento) | 1.90 |
+
+**Medida — SIMULADA.** Feita com `medir-telas.js --comparar linha-de-base-1.89.json`. A RÉGUA PO é uma
+estimativa, não uma medição.
+
+- **Telas:** as 29 funções medidas ficaram **idênticas** às da 1.89, em chamadas, localizador e
+  células. O F8 não lê nada a mais, o F3 é uma consulta ao cache dentro da mesma viagem, e o B6 faz 2
+  idas ao PropertiesService por descarga, sem nenhuma à planilha.
+- **SUSEP (B5):** medida em 1.000 a 50.000 linhas por aba.
+  - **Localizador:** constante, 0,2 a 0,35 s na régua técnica e 1,2 a 2,35 s na régua PO.
+  - **Coluna:** igual na régua técnica, e de 0,23 a 5,6 s na régua PO.
+  - **Parcial:** sempre pior.
+- **Trava (B6):**
+
+  | Operação | Chamadas dentro da trava | Células dentro da trava |
+  |---|---|---|
+  | `editarCaso` | 18 | 110 |
+  | `alterarSituacaoDoCaso` | 7 | 103 |
+  | `cadastrarCaso` | 19 | 58 |
+
+**Nenhum ganho real foi medido.** A M1 é quem confirma na planilha de verdade.
+
+**Testes**
+
+- **`testes-visual-190.js` (20):** contraste de 20 pares de cor nos 4 temas e as peças de cada tela.
+- **`testes-ux-190.js` (25), no simulador:**
+  - F8 de verdade: aba 2 e volta para a 1, pelo status e pelo formulário inteiro;
+  - F15, F16, F17 e F18;
+  - F10;
+  - F3, em 9 testes: 2 h, chave sem e-mail, cada pessoa só com o seu, o modal sem rascunho, rascunho
+    enorme recusado, sem e-mail recusado, nada em log, a tela;
+  - B6: cai depois de gravar, cai antes de gravar, ERROS, sem marca sobrando.
+- **Ponta a ponta (+12, total 52):**
+  - faixa, V2, F9 e V3;
+  - índice, V4 e V6, com o clique no índice no meio do erro;
+  - V7, V8 e V9, com um campo que muda de seção e volta;
+  - F17 (40 Tabs);
+  - F16;
+  - F8 (a frase exata);
+  - F18;
+  - F10 (próximo, conflito, último, Busca sem o botão);
+  - F3 (marcar, recarregar, recuperar, limpar, nada no navegador).
+- **Testes antigos:** 8 atualizados para o desenho novo, preservando a intenção. Dois deles nunca
+  falhavam (o `indexOf` de -1) e agora conferem de verdade.
+- **Achados:** itens 111 a 114 em [`04-bugs-capturados.md`](04-bugs-capturados.md).
+- **Imagens:** as das telas foram comparadas com as propostas aprovadas, nos 4 temas e em 1366 e
+  1920 px.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
