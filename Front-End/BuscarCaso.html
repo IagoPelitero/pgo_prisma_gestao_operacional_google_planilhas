@@ -28,6 +28,18 @@ var TelaBuscarCaso = (function () {
   // procurando. Vale uma vez: é usado e esquecido.
   var termoPedido = '';
 
+  /*
+    PESQUISAR POR (Etapa 89). Proposta, Nome do segurado, Apólice, CPF, a
+    busca rápida (os quatro) ou a avançada (todas as colunas, a busca de
+    antes). Abre na avançada; a escolha de cada analista fica lembrada neste
+    navegador — só a opção, nenhum dado de caso (a regra da F2).
+  */
+  var CHAVE_DA_PESQUISA = 'pgo-pesquisar-por';
+  var pesquisarPor = 'avancada';
+  try {
+    pesquisarPor = window.localStorage.getItem(CHAVE_DA_PESQUISA) || 'avancada';
+  } catch (semArmazenamento) { pesquisarPor = 'avancada'; }
+
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
 
@@ -44,9 +56,41 @@ var TelaBuscarCaso = (function () {
       + Moldura.icone('buscarCaso') + ' Buscar</button>'
       + Moldura.botaoLimparFiltros('limpar-filtros-da-busca')
       + '</div>'
+      + '<div id="pesquisar-por-linha" class="busca-por"></div>'
       + '<div id="onde-procurar" class="busca-onde"></div>'
       + '</form></div>'
       + '<div id="resultado-da-busca"></div>';
+  }
+
+  function desenharPesquisarPor() {
+    var lista = opcoes.pesquisarPor || [];
+    if (!lista.length) return;
+    var conhecida = lista.some(function (opcao) { return opcao.chave === pesquisarPor; });
+    if (!conhecida) pesquisarPor = 'avancada';
+    elemento('pesquisar-por-linha').innerHTML =
+      '<label class="busca-rotulo" for="pesquisar-por">Pesquisar por</label>'
+      + '<select class="filtro" id="pesquisar-por">'
+      + lista.map(function (opcao) {
+        return '<option value="' + escapar(opcao.chave) + '"'
+          + (opcao.chave === pesquisarPor ? ' selected' : '') + '>' + escapar(opcao.rotulo) + '</option>';
+      }).join('') + '</select>'
+      + '<span class="busca-dica" id="dica-da-pesquisa"></span>';
+    explicarPesquisa();
+    elemento('pesquisar-por').addEventListener('change', function () {
+      pesquisarPor = this.value;
+      try { window.localStorage.setItem(CHAVE_DA_PESQUISA, pesquisarPor); } catch (semArmazenamento) { /* fica só nesta visita */ }
+      explicarPesquisa();
+    });
+  }
+
+  /** O que a opção escolhida quer dizer — e onde ela não vale. */
+  function explicarPesquisa() {
+    var dica = elemento('dica-da-pesquisa');
+    if (!dica) return;
+    var bases = (opcoes.basesDaPesquisaDirigida || []).join(', ');
+    dica.textContent = pesquisarPor === 'avancada'
+      ? 'Em todas as colunas de todas as bases marcadas.'
+      : 'Vale na ' + bases + '. As outras bases, o histórico e a base legada procuram em todas as colunas, como sempre.';
   }
 
   function desenharOnde() {
@@ -121,7 +165,7 @@ var TelaBuscarCaso = (function () {
       '<p class="carregando-campos">Procurando…</p>';
 
     Servidor.chamar('buscarCasos', termo, onde, incluirLegado,
-      incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado))
+      incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado), pesquisarPor)
       .entao(function (resposta) {
         procurando = false;
         elemento('botao-buscar').disabled = false;
@@ -170,6 +214,7 @@ var TelaBuscarCaso = (function () {
     var cabeca = '<header class="origem-cabeca">'
       + (origem.icone ? SeletorDeCanal.icone(origem.icone) : '')
       + '<h3>' + escapar(origem.nome) + '</h3>'
+      + (origem.pesquisouEm ? '<span class="busca-dica">' + escapar(origem.pesquisouEm) + '</span>' : '')
       + '<span class="quantos">' + origem.casos.length + '</span>'
       + (origem.somenteLeitura
         ? '<span class="etiqueta-leitura">só leitura</span>' : '')
@@ -320,6 +365,7 @@ var TelaBuscarCaso = (function () {
         // Todas os canais marcadas por padrão: quem procura um protocolo
         // raramente sabe de antemão em qual canal ele está.
         opcoes.canais.forEach(function (canal) { canaisEscolhidas[canal.id] = true; });
+        desenharPesquisarPor();
         desenharOnde();
         elemento('termo-da-busca').focus();
         if (termoPedido) {

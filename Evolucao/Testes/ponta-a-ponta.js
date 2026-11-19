@@ -1833,6 +1833,81 @@ async function rodar() {
 
   /* ------------------------------------------------------------- o final -- */
 
+  console.log('\nA busca inteligente (Etapa 89)');
+
+  await teste('Buscar Caso: "Pesquisar por" abre na avançada, procura só no campo escolhido e lembra a escolha (Etapa 89)', async () => {
+    // Encerrado e antigo: não entra na frente da fila que os testes seguintes usam.
+    vm.runInContext("inserirRegistro_('BASE_RET', { 'data de recepção do protocolo': new Date(2025, 0, 2), status: 'Pago',"
+      + " analista: 'Ana Martins', 'nome do cliente': 'Teste Pesquisar Por', CPF: '321.654.987-00',"
+      + " 'Código origem da proposta': '7', 'número da proposta': '0099887', 'e-mail': 'pesquisarpor@exemplo.invalid' })", contexto);
+    await pagina.evaluate(() => {
+      try { localStorage.removeItem('pgo-pesquisar-por'); } catch (e) { /* sem armazenamento */ }
+      window.__servidorOriginal = window.__servidorOriginal || window.__servidorDoPGO;
+      window.__pedidosDeBusca = [];
+      window.__servidorDoPGO = function (nome, argumentos) {
+        if (nome === 'buscarCasos') window.__pedidosDeBusca.push(argumentos[4]);
+        return window.__servidorOriginal(nome, argumentos);
+      };
+    });
+    const daRet = async () => pagina.evaluate(() => {
+      const secao = Array.from(document.querySelectorAll('#resultado-da-busca .origem'))
+        .find((s) => (s.querySelector('h3') || {}).textContent === 'RET');
+      if (!secao) return null;
+      return { etiqueta: (secao.querySelector('.origem-cabeca .busca-dica') || {}).textContent || '',
+        quantos: Number((secao.querySelector('.quantos') || {}).textContent || 0) };
+    });
+    const procurar = async (termo) => {
+      await pagina.fill('#termo-da-busca', termo);
+      await pagina.click('#botao-buscar');
+      await pagina.waitForFunction(() => !document.querySelector('#resultado-da-busca .carregando-campos'), null, { timeout: 15000 });
+      await pagina.waitForTimeout(200);
+    };
+
+    await pagina.click('[data-tela="buscarCaso"]');
+    await pagina.waitForSelector('#pesquisar-por', { timeout: 10000 });
+    igual(await pagina.inputValue('#pesquisar-por'), 'avancada', 'abre na busca avançada (decisão do PO)');
+    const rotulos = await pagina.$$eval('#pesquisar-por option', (es) => es.map((e) => e.textContent));
+    igual(rotulos.join(' | '), 'Proposta | Nome do segurado | Apólice | CPF | Busca rápida — os quatro campos | Busca avançada — todas as colunas');
+    contem(await pagina.textContent('#dica-da-pesquisa'), 'todas as colunas');
+
+    await pagina.selectOption('#pesquisar-por', 'cpf');
+    contem(await pagina.textContent('#dica-da-pesquisa'), 'BASE_RET');
+    await procurar('32165498700');
+    const porCpf = await daRet();
+    verdadeiro(porCpf && porCpf.quantos === 1, 'o CPF sem pontuação acha o caso: ' + JSON.stringify(porCpf));
+    igual(porCpf.etiqueta, 'CPF', 'a RET diz onde procurou');
+
+    await procurar('pesquisarpor@exemplo.invalid');
+    const peloEmail = await daRet();
+    verdadeiro(!peloEmail || peloEmail.quantos === 0, 'por CPF, o e-mail não acha');
+    await pagina.selectOption('#pesquisar-por', 'avancada');
+    await procurar('pesquisarpor@exemplo.invalid');
+    igual((await daRet()).quantos, 1, 'a busca avançada acha em qualquer coluna');
+
+    await pagina.selectOption('#pesquisar-por', 'proposta');
+    await procurar('7-0099887');
+    igual((await daRet()).quantos, 1, 'a proposta com hífen, juntando as duas colunas');
+    igual(JSON.stringify(await pagina.evaluate(() => window.__pedidosDeBusca)), JSON.stringify(['cpf', 'cpf', 'avancada', 'proposta']),
+      'cada busca levou a opção escolhida ao servidor, uma vez');
+
+    // A escolha fica lembrada neste navegador.
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(600);
+    await pagina.click('[data-tela="buscarCaso"]');
+    await pagina.waitForSelector('#pesquisar-por', { timeout: 10000 });
+    igual(await pagina.inputValue('#pesquisar-por'), 'proposta', 'voltou na última escolha');
+    const guardado = await pagina.evaluate(() => JSON.stringify(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
+    verdadeiro(guardado.indexOf('0099887') < 0 && guardado.indexOf('Teste Pesquisar Por') < 0, 'nenhum dado do caso no navegador');
+
+    await pagina.selectOption('#pesquisar-por', 'avancada');
+    await pagina.evaluate(() => { window.__servidorDoPGO = window.__servidorOriginal; });
+    // Volta ao Trabalho, onde os testes seguintes começam.
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForTimeout(900);
+  });
+
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
   if (process.env.PGO_GRAVAR_CHAMADAS) {

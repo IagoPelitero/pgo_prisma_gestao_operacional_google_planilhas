@@ -169,7 +169,8 @@ function rodarTestesDoQueAAbaErrosMostrou() {
   secao('Os erros da tela que a aba trouxe');
 
   teste('Buscar Caso: procurar antes de as opções chegarem não quebra mais', () => {
-    contem(tela('BuscarCaso'), 'incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado))');
+    // A guarda continua; desde a Etapa 89 a opção "Pesquisar por" vai depois dela.
+    contem(tela('BuscarCaso'), 'incluirHistorico && !!(opcoes && opcoes.historico && opcoes.historico.ligado)');
   });
 
   teste('o aviso "ResizeObserver loop" do navegador não vai para a aba ERROS', () => {

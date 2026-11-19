@@ -2387,7 +2387,12 @@ function opcoesDaBusca() {
     historico: { ligado: String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim() !== '' },
     minimo: RECC_MINIMO_DO_TERMO,
     maximo: RECC_MAXIMO_DA_BUSCA,
-    escopo: quem.permissoes.escopo
+    escopo: quem.permissoes.escopo,
+    // "Pesquisar por" (Etapa 89): as opções, e em quais bases elas valem.
+    pesquisarPor: RECC_PESQUISAR_POR.map(function (opcao) {
+      return { chave: opcao.chave, rotulo: opcao.rotulo };
+    }),
+    basesDaPesquisaDirigida: Object.keys(RECC_CAMPOS_DA_PESQUISA_DIRIGIDA)
   };
 }
 
@@ -2397,12 +2402,17 @@ function opcoesDaBusca() {
  * `ondeProcurar` é a lista de ids de canal; vazio procura em todas as que a
  * pessoa enxerga. `incluirLegado` diz se a planilha antiga entra.
  */
-function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico) {
-  return cronometrado_('buscarCasos', buscarCasosSemRelogio_, arguments);
+function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico, pesquisarPor) {
+  // A pesquisa dirigida vai com o nome dela para a aba ERROS: é por ela que se
+  // compara, na planilha de verdade, o tempo de cada jeito de procurar.
+  var opcao = opcaoDaPesquisa_(pesquisarPor);
+  return cronometrado_('buscarCasos' + (opcao.chave === 'avancada' ? '' : ' · ' + opcao.rotulo),
+    buscarCasosSemRelogio_, arguments);
 }
 
-function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHistorico) {
+function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHistorico, pesquisarPor) {
   var quem = exigirTela_('buscarCaso');
+  var opcao = opcaoDaPesquisa_(pesquisarPor);
 
   var procurado = String(termo || '').trim();
   if (procurado.length < RECC_MINIMO_DO_TERMO) {
@@ -2420,7 +2430,12 @@ function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHisto
     if (escolhidas.length && escolhidas.indexOf(converterParaIdentificador_(canal.id)) < 0) {
       return;
     }
-    resultados.push(procurarNoCanal_(canal, procurado, quem));
+    // A pesquisa dirigida (Etapa 89) vale só na base que a declara (a RET);
+    // nas outras, e na busca avançada, é a busca de sempre (1.88).
+    var campos = opcao.chave === 'avancada' ? null : RECC_CAMPOS_DA_PESQUISA_DIRIGIDA[canal.aba];
+    resultados.push(campos
+      ? procurarPorCamposNoCanal_(canal, procurado, quem, opcao, campos)
+      : procurarNoCanal_(canal, procurado, quem));
     // O que foi arquivado deste canal (Etapa 66) — só leitura.
     if (incluirHistorico) {
       var doHistorico = procurarNoHistorico_(canal, procurado, quem);
@@ -2443,6 +2458,7 @@ function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHisto
   return {
     termo: procurado,
     total: total,
+    pesquisarPor: opcao.chave,
     origens: resultados,
     // A mesma resposta da fila do Trabalho: "Trabalhar no caso" e "Alterar
     // status" aparecem só para quem pode editar — o servidor recusaria.
@@ -2550,6 +2566,330 @@ function procurarNoCanal_(canal, termo, quem) {
     conferidos = conferidos.slice(-RECC_MAXIMO_DA_BUSCA);
   }
   origem.casos = montarFila_(conferidos, canal);
+  return origem;
+}
+
+/* ============================================================================
+   PESQUISAR POR (Etapa 89) — a pesquisa dirigida da BASE_RET
+   ============================================================================
+   Pedido do PO: "a BASE_RET possui 55 colunas. Entretanto, as pesquisas
+   operacionais mais frequentes utilizam apenas quatro informações: Proposta,
+   Nome do segurado, Apólice, CPF". O analista escolhe onde procurar:
+
+     · um campo — só as colunas dele;
+     · a busca rápida — só as colunas dos quatro;
+     · a busca avançada — a busca de antes (1.88), inteira, em todas as colunas.
+
+   AS COLUNAS SÃO ACHADAS PELO CABEÇALHO, e todas são do contrato da RET. A
+   proposta e a apólice moram em MAIS DE UMA coluna (o formulário as parte:
+   "7-0000000" e "12-1391-0000000"), e a regra de juntar fica: cada pedaço
+   sozinho, como a busca avançada compara, e os pedaços juntos com "-", como a
+   fila mostra a proposta. A apólice completa juntada é decisão do PO (Etapa
+   89): na busca avançada ela continua não sendo juntada. "Nome do segurado"
+   é a coluna "nome do cliente" da RET (decisão do PO). A "Nova proposta" não
+   entra (decisão do PO); a busca avançada a acha.
+
+   A COMPARAÇÃO É A MESMA DA BUSCA AVANÇADA (aplicarBusca_), só que nas colunas
+   do campo: identificador pelos dígitos, o resto pelo texto sem acento, caixa
+   e pontuação; a coluna de identificador que não está na fila nem nas colunas
+   da busca do canal só compara quando o termo parece número.
+
+   COMO PROCURA — pelo que custa menos, na régua do PO (Etapa 88: ~53 µs por
+   célula; o localizador, de 0,5 a 2,8 s por procura):
+     · base do tamanho da RET de hoje: lê só as colunas do campo, inteiras, até
+       a última linha — e a _Visivel —, e compara aqui. Exato: nada depende do
+       que o localizador acha;
+     · base grande: o localizador procura só nas colunas do campo (nunca na
+       linha toda), as candidatas são lidas em lotes, das mais recentes para
+       trás, e a regra de sempre confere cada uma. Sem candidata nenhuma, as
+       colunas são lidas antes de dizer "nada encontrado" — a mesma garantia
+       da busca de antes (Etapa 82).
+   Nos dois, o alcance de quem procura vem ANTES do corte dos 100 mais
+   recentes, e só os casos que vão para a tela são lidos inteiros.
+
+   Mesa, VG, histórico e base legada não têm pesquisa dirigida: procuram como
+   sempre (o PO: "não aplicar automaticamente as quatro colunas da BASE_RET às
+   demais bases").
+   ============================================================================ */
+var RECC_PESQUISAR_POR = [
+  { chave: 'proposta', rotulo: 'Proposta', campos: ['proposta'] },
+  { chave: 'nome', rotulo: 'Nome do segurado', campos: ['nome'] },
+  { chave: 'apolice', rotulo: 'Apólice', campos: ['apolice'] },
+  { chave: 'cpf', rotulo: 'CPF', campos: ['cpf'] },
+  { chave: 'rapida', rotulo: 'Busca rápida — os quatro campos', campos: ['proposta', 'nome', 'apolice', 'cpf'] },
+  { chave: 'avancada', rotulo: 'Busca avançada — todas as colunas', campos: [] }
+];
+
+var RECC_CAMPOS_DA_PESQUISA_DIRIGIDA = {
+  BASE_RET: {
+    proposta: { rotulo: 'Proposta', colunas: ['Código origem da proposta', 'número da proposta'] },
+    nome: { rotulo: 'Nome do segurado', colunas: ['nome do cliente'] },
+    apolice: { rotulo: 'Apólice', colunas: ['cod_sucursal', 'cod_ramo', 'Num_apolice'] },
+    cpf: { rotulo: 'CPF', colunas: ['CPF'] }
+  }
+};
+
+/**
+ * Quantas células lidas custam o mesmo que uma procura do localizador, na
+ * régua do PO (1 s ÷ 53 µs ≈ 19 mil). É estimativa (aba ERROS de 18/11/2026):
+ * a M1 e a aba ERROS — onde a pesquisa dirigida aparece com o nome dela —
+ * dizem se precisa mudar.
+ */
+var RECC_CELULAS_QUE_VALEM_UM_LOCALIZADOR = 19000;
+
+/** Qual caminho a pesquisa dirigida usa: '' escolhe pelo custo; 'colunas' ou 'localizador' fixam (os testes provam os dois). */
+var RECC_CAMINHO_DA_PESQUISA_DIRIGIDA = '';
+
+/** A opção pedida pela tela; sem nenhuma, a busca avançada (a de antes). */
+function opcaoDaPesquisa_(pesquisarPor) {
+  var chave = normalizarParaComparar_(pesquisarPor || 'avancada');
+  var opcao = RECC_PESQUISAR_POR.filter(function (uma) { return uma.chave === chave; })[0];
+  if (!opcao) throw new Error('Não conheço a opção de pesquisa "' + pesquisarPor + '". Escolha uma da lista.');
+  return opcao;
+}
+
+/**
+ * Os campos da opção nesta base, com a posição de cada pedaço — ou null, se
+ * alguma coluna não está na planilha (aí a busca avançada responde, com aviso).
+ */
+function camposDaPesquisaNaBase_(canal, estrutura, opcao, declarados) {
+  var naFila = {};
+  colunasDaFila_(canal).forEach(function (grupo) {
+    grupo.colunas.forEach(function (coluna) {
+      (coluna.juntar || [coluna]).forEach(function (pedaco) { naFila[normalizarParaComparar_(pedaco.cabecalho)] = true; });
+    });
+  });
+  colunasDaBusca_(canal).forEach(function (coluna) { naFila[normalizarParaComparar_(coluna.cabecalho)] = true; });
+
+  var faltando = [];
+  var campos = opcao.campos.map(function (chave) {
+    var campo = declarados[chave];
+    return {
+      rotulo: campo.rotulo,
+      pedacos: campo.colunas.map(function (nome) {
+        var posicao = posicaoDaColuna_(estrutura, nome);
+        if (posicao < 0) { faltando.push(nome); return null; }
+        return { posicao: posicao, cabecalho: estrutura.cabecalhos[posicao], tipo: estrutura.tipos[posicao],
+          sempre: naFila[normalizarParaComparar_(nome)] === true };
+      })
+    };
+  });
+  return faltando.length ? { faltando: faltando } : { campos: campos };
+}
+
+/** O campo casa com o termo? A regra de aplicarBusca_, nas colunas dele. */
+function campoCasaComOTermo_(campo, valoresDaLinha, termo, termoEhNumero) {
+  var algumPedaco = campo.pedacos.some(function (pedaco) {
+    if (pedaco.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR && !pedaco.sempre && !termoEhNumero) return false;
+    var cru = valoresDaLinha[pedaco.posicao];
+    var valor = pedaco.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR ? cru : paraTexto_(cru, pedaco.tipo);
+    return casaComOTermo_(valor, termo, pedaco.tipo);
+  });
+  if (algumPedaco || campo.pedacos.length < 2) return algumPedaco;
+  var inteira = campo.pedacos.map(function (pedaco) {
+    var cru = valoresDaLinha[pedaco.posicao];
+    return String(cru === undefined || cru === null ? '' : cru);
+  }).filter(function (texto) { return texto !== ''; }).join('-');
+  return casaComOTermo_(inteira, termo, '');
+}
+
+/** Lê só estas colunas, inteiras, em faixas contínuas: { posição: [valores] }. */
+function lerColunasDaBase_(estrutura, posicoes, total) {
+  return lendoAPlanilha_(lerColunasDaBaseSemRelogio_, arguments);
+}
+
+function lerColunasDaBaseSemRelogio_(estrutura, posicoes, total) {
+  var porPosicao = {};
+  faixasContinuas_(posicoes).forEach(function (faixa) {
+    var valores = estrutura.aba.getRange(2, faixa.inicio + 1, total, faixa.fim - faixa.inicio + 1).getValues();
+    for (var posicao = faixa.inicio; posicao <= faixa.fim; posicao++) {
+      porPosicao[posicao] = valores.map(function (linha) { return linha[posicao - faixa.inicio]; });
+    }
+  });
+  return porPosicao;
+}
+
+/** As colunas lidas, em faixas contínuas: [{ inicio, fim }] (posições). */
+function faixasContinuas_(posicoes) {
+  var ordenadas = posicoes.slice().sort(function (uma, outra) { return uma - outra; })
+    .filter(function (posicao, i, todas) { return i === 0 || posicao !== todas[i - 1]; });
+  var faixas = [];
+  ordenadas.forEach(function (posicao) {
+    var ultima = faixas[faixas.length - 1];
+    if (ultima && posicao === ultima.fim + 1) ultima.fim = posicao;
+    else faixas.push({ inicio: posicao, fim: posicao });
+  });
+  return faixas;
+}
+
+/**
+ * As linhas candidatas pelo localizador, só nas colunas dos campos — ou null,
+ * quando ele está desligado, falhou ou o termo não cabe na expressão. As
+ * expressões são as da busca de sempre: o texto normalizado nas colunas de
+ * texto, os dígitos nas de identificador e, no campo de várias colunas, o
+ * maior pedaço de número do termo ("7-0000123" → "0000123"), porque nenhuma
+ * célula tem os pedaços juntos. Candidata é só candidata: a regra confere.
+ */
+function linhasDosCamposPeloLocalizador_(estrutura, campos, termo, total, termoEhNumero) {
+  return procurandoNaPlanilha_(linhasDosCamposPeloLocalizadorSemRelogio_, arguments);
+}
+
+function linhasDosCamposPeloLocalizadorSemRelogio_(estrutura, campos, termo, total, termoEhNumero) {
+  if (!buscaRapidaLigada_()) return null;
+  var normalizado = normalizarParaComparar_(termo);
+  var digitos = apenasDigitos_(termo);
+  var pedacos = String(termo).split(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/).filter(function (p) { return p; });
+  var maior = pedacos.length > 1 && pedacos.every(function (p) { return /^[0-9]+$/.test(p); })
+    ? pedacos.reduce(function (um, outro) { return outro.length > um.length ? outro : um; }) : '';
+  if (maior.length < RECC_PEDACO_MINIMO_DA_BUSCA) maior = '';
+
+  // Por faixa contínua de colunas, as expressões que ela precisa.
+  var pedidos = [];
+  campos.forEach(function (campo) {
+    var composto = campo.pedacos.length > 1;
+    campo.pedacos.forEach(function (pedaco) {
+      var ehIdentificador = pedaco.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR;
+      if (ehIdentificador && !pedaco.sempre && !termoEhNumero && !composto) return;
+      if (ehIdentificador) { if (digitos) pedidos.push({ posicao: pedaco.posicao, alvo: digitos, identificador: true }); }
+      else pedidos.push({ posicao: pedaco.posicao, alvo: normalizado, identificador: false });
+      if (composto) {
+        // O pedaço juntado é comparado como texto: o termo inteiro e o maior pedaço.
+        pedidos.push({ posicao: pedaco.posicao, alvo: normalizado, identificador: false });
+        if (maior) pedidos.push({ posicao: pedaco.posicao, alvo: maior, identificador: true });
+      }
+    });
+  });
+  if (pedidos.some(function (pedido) { return !/^[a-z0-9]+$/.test(pedido.alvo); })) return null;
+
+  var porExpressao = {};
+  pedidos.forEach(function (pedido) {
+    var chave = (pedido.identificador ? 'i|' : 't|') + pedido.alvo;
+    (porExpressao[chave] = porExpressao[chave] || { pedido: pedido, posicoes: [] }).posicoes.push(pedido.posicao);
+  });
+  var achadas = {};
+  try {
+    Object.keys(porExpressao).forEach(function (chave) {
+      var item = porExpressao[chave];
+      var expressao = expressaoDaBuscaRapida_(item.pedido.alvo, item.pedido.identificador, false);
+      faixasContinuas_(item.posicoes).forEach(function (faixa) {
+        estrutura.aba.getRange(2, faixa.inicio + 1, total, faixa.fim - faixa.inicio + 1)
+          .createTextFinder(expressao)
+          .useRegularExpression(true)
+          .matchFormulaText(false)
+          .findAll()
+          .forEach(function (celula) { achadas[celula.getRow()] = true; });
+      });
+    });
+  } catch (erro) {
+    return null;   // o localizador falhou: as colunas são lidas
+  }
+  return Object.keys(achadas).map(Number).sort(function (uma, outra) { return uma - outra; });
+}
+
+/** A pesquisa dirigida num canal que a declara (a RET). */
+function procurarPorCamposNoCanal_(canal, termo, quem, opcao, declarados) {
+  comAGrafiaDaAba_(canal);
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achados = camposDaPesquisaNaBase_(canal, estrutura, opcao, declarados);
+  if (achados.faltando) {
+    // Coluna renomeada ou apagada na planilha: a busca avançada não perde o caso.
+    var deReserva = procurarNoCanal_(canal, termo, quem);
+    deReserva.aviso = 'A pesquisa por ' + opcao.rotulo + ' precisa da coluna "' + achados.faltando.join('", "')
+      + '", que não está na ' + canal.aba + ': a busca foi feita em todas as colunas.'
+      + (deReserva.aviso ? ' ' + deReserva.aviso : '');
+    return deReserva;
+  }
+  var origem = {
+    tipo: 'canal',
+    id: canal.id,
+    nome: canal.nome,
+    icone: canal.icone,
+    colunas: colunasDaFila_(canal),
+    casos: [],
+    aviso: '',
+    pesquisouEm: opcao.rotulo
+  };
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return origem;
+
+  var posicoes = [];
+  achados.campos.forEach(function (campo) {
+    campo.pedacos.forEach(function (pedaco) { posicoes.push(pedaco.posicao); });
+  });
+  var iVisivel = posicaoDaColuna_(estrutura, '_Visivel');
+  if (iVisivel >= 0) posicoes.push(iVisivel);
+  var termoEhNumero = /^[\d\s.\-\/]+$/.test(String(termo).trim());
+
+  // O caminho mais barato (ver "COMO PROCURA").
+  var celulasDasColunas = total * faixasContinuas_(posicoes).reduce(function (soma, faixa) {
+    return soma + faixa.fim - faixa.inicio + 1;
+  }, 0);
+  var faixasDoLocalizador = faixasContinuas_(posicoes.filter(function (posicao) { return posicao !== iVisivel; })).length;
+  var peloLocalizador = RECC_CAMINHO_DA_PESQUISA_DIRIGIDA
+    ? RECC_CAMINHO_DA_PESQUISA_DIRIGIDA === 'localizador'
+    : celulasDasColunas > faixasDoLocalizador * RECC_CELULAS_QUE_VALEM_UM_LOCALIZADOR;
+  if (peloLocalizador) {
+    var candidatas = linhasDosCamposPeloLocalizador_(estrutura, achados.campos, termo, total, termoEhNumero);
+    if (candidatas && candidatas.length) {
+      return comAsCandidatasDoLocalizador_(origem, canal, estrutura, achados.campos, candidatas, termo, quem, termoEhNumero);
+    }
+    // Sem candidata (ou sem localizador): as colunas respondem — "nada
+    // encontrado" nunca depende só dele.
+  }
+
+  var colunas = lerColunasDaBase_(estrutura, posicoes, total);
+  var linhas = [];
+  for (var i = 0; i < total; i++) {
+    // Caso ocultado não volta na busca (como na busca avançada).
+    if (iVisivel >= 0 && normalizarParaComparar_(colunas[iVisivel][i]) === 'nao') continue;
+    var daLinha = {};
+    posicoes.forEach(function (posicao) { daLinha[posicao] = colunas[posicao][i]; });
+    if (achados.campos.some(function (campo) { return campoCasaComOTermo_(campo, daLinha, termo, termoEhNumero); })) {
+      linhas.push(i + 2);   // a linha 1 é o cabeçalho
+    }
+  }
+
+  // O alcance vem ANTES do corte: os 100 lugares são dos casos que eu posso ver.
+  linhas = linhasNoMeuAlcance_(canal.aba, linhas, quem);
+  if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = avisoDoMaximoDaBusca_(linhas.length);
+    linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);   // os mais recentes: a base só acrescenta no fim
+  }
+  var conferidos = filtrarPeloAlcance_(semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas)),
+    canal.aba, quem);
+  origem.casos = montarFila_(conferidos, canal);
+  return origem;
+}
+
+/**
+ * O caminho do localizador: as candidatas no meu alcance, lidas em lotes das
+ * mais recentes para trás até juntar os 100 que a tela mostra (como a busca
+ * na linha toda, Etapa 83), e conferidas pela regra do campo.
+ */
+function comAsCandidatasDoLocalizador_(origem, canal, estrutura, campos, candidatas, termo, quem, termoEhNumero) {
+  var linhas = linhasNoMeuAlcance_(canal.aba, candidatas, quem);
+  var conferidos = [];
+  var fim = linhas.length;
+  function casa(registro) {
+    var daLinha = {};
+    campos.forEach(function (campo) {
+      campo.pedacos.forEach(function (pedaco) { daLinha[pedaco.posicao] = registro[pedaco.cabecalho]; });
+    });
+    return campos.some(function (campo) { return campoCasaComOTermo_(campo, daLinha, termo, termoEhNumero); });
+  }
+  while (fim > 0 && conferidos.length <= RECC_MAXIMO_DA_BUSCA) {
+    var lote = linhas.slice(Math.max(0, fim - RECC_LOTE_DA_BUSCA), fim);
+    fim -= lote.length;
+    var lidos = semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, lote));
+    conferidos = filtrarPeloAlcance_(lidos.filter(casa), canal.aba, quem).concat(conferidos);
+  }
+  if (fim > 0) {
+    origem.aviso = 'O termo aparece em ' + linhas.length + ' linhas da base, e a busca mostra os '
+      + RECC_MAXIMO_DA_BUSCA + ' casos mais recentes. Um termo mais específico chega mais perto.';
+  } else if (conferidos.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = avisoDoMaximoDaBusca_(conferidos.length);
+  }
+  origem.casos = montarFila_(conferidos.slice(-RECC_MAXIMO_DA_BUSCA), canal);
   return origem;
 }
 
