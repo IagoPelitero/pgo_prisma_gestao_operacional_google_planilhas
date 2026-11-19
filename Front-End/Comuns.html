@@ -126,6 +126,13 @@ var Moldura = (function () {
       + '<path d="m8.9 11.9 2.3 2.3L15.4 10"></path>',
 
     // listas: os marcadores e as linhas
+    // Etapa 90 (V7): os ícones por tipo de campo em Configurações.
+    calendario:
+      '<rect x="3.8" y="5.2" width="16.4" height="15" rx="2"></rect>'
+      + '<path d="M3.8 9.8h16.4M8.2 3.2v4M15.8 3.2v4"></path>',
+    folha:
+      '<path d="M6.2 3.4h7.6l4 4v13.2H6.2z"></path>'
+      + '<path d="M13.6 3.6v4h4M9 12.4h6M9 16h6"></path>',
     catalogo:
       '<circle cx="4.7" cy="6.6" r="1.1"></circle>'
       + '<circle cx="4.7" cy="12" r="1.1"></circle>'
@@ -2282,6 +2289,9 @@ var Formulario = (function () {
     aplicarMascara: aplicarMascara,
     aplicarMascaraDeDinheiro: aplicarMascaraDeDinheiro,
     desenhar: desenhar,
+    // Exportado na Etapa 90 para a prévia de Configurações (V9): o campo da
+    // prévia sai do MESMO desenho que o formulário usa.
+    desenharCampo: desenharCampo,
     ligar: ligar,
     aplicarPadroes: aplicarPadroes,
     confirmarExclusao: confirmarExclusao,

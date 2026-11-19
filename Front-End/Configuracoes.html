@@ -319,16 +319,25 @@ var TelaConfiguracoes = (function () {
     carregarSecao();
   }
 
+  // V8 (Etapa 90, aprovado): o alerta no ALTO do menu, antes das seções —
+  // no pé, ele ficava abaixo da dobra em notebook. O alerta é o mesmo.
   function desenharSecoes() {
+    return desenharOAlertaDoMenu() + desenharAsSecoes();
+  }
+
+  function desenharOAlertaDoMenu() {
     var aviso = '';
     if (!resumo.estrutura.emOrdem) {
       aviso = '<button type="button" class="config-alerta" data-secao="estrutura">'
-        + 'A planilha saiu do contrato — ver o laudo</button>';
+        + Moldura.icone('alerta') + '<span>A planilha saiu do contrato — ver o laudo</span></button>';
     } else if (!resumo.senhaDefinida) {
       aviso = '<button type="button" class="config-alerta suave" data-secao="identidade">'
-        + 'Sem senha de administrador definida</button>';
+        + Moldura.icone('alerta') + '<span>Sem senha de administrador definida</span></button>';
     }
+    return aviso;
+  }
 
+  function desenharAsSecoes() {
     return resumo.secoes.map(function (secao) {
       return '<button type="button" class="config-secao'
         + (secao.chave === secaoAtual ? ' atual' : '') + '"'
@@ -339,7 +348,7 @@ var TelaConfiguracoes = (function () {
           ? '<span class="quantos">' + secao.quantidade + '</span>'
           : '<span></span>')
         + '</button>';
-    }).join('') + aviso;
+    }).join('');
   }
 
   /**
@@ -464,6 +473,28 @@ var TelaConfiguracoes = (function () {
     if (contagem) {
       contagem.textContent = termo ? achados + ' de ' + itens.length + ' campos · ' : '';
     }
+    // O título da seção conta o que está à vista nela, e some quando nada dela
+    // está (procurando, ou com os desligados recolhidos).
+    var grupos = lista.querySelectorAll('.config-grupo');
+    for (var g = 0; g < grupos.length; g++) {
+      var vistos = 0;
+      for (var irmao = grupos[g].nextElementSibling; irmao && !irmao.classList.contains('config-grupo');
+        irmao = irmao.nextElementSibling) {
+        if (irmao.classList.contains('config-item') && !irmao.hidden) vistos++;
+      }
+      grupos[g].hidden = vistos === 0;
+      var quantos = grupos[g].querySelector('.quantos-no-grupo');
+      if (quantos) quantos.textContent = ' · ' + vistos + (vistos === 1 ? ' campo' : ' campos');
+    }
+  }
+
+  /** O ícone de cada tipo de campo na lista (V7). Só o desenho: o tipo continua escrito ao lado. */
+  function iconeDoTipo(tipo) {
+    if (tipo === 'data' || tipo === 'dataHora') return 'calendario';
+    if (tipo === 'hora') return 'relogio';
+    if (tipo === 'seletor' || tipo === 'seletorMultiplo' || tipo === 'simOuNao') return 'catalogo';
+    if (tipo === 'documento' || tipo === 'identificador') return 'usuarios';
+    return 'folha';
   }
 
   function desenharCampos() {
@@ -471,18 +502,29 @@ var TelaConfiguracoes = (function () {
     var desligados = dados.campos.filter(function (campo) { return !campo.ativo; }).length;
     var naLista = dados.campos.filter(campoNaLista);
     var linhas = dados.campos.map(function (campo, posicao) {
-      return '<li class="config-item' + (escolhido && escolhido.id === campo.id
+      // V7 (Etapa 90, aprovado): um título a cada seção que começa. A ordem
+      // é a mesma do formulário — o título só marca onde a seção muda, e as
+      // setas continuam trocando o campo com o vizinho, como antes.
+      var anterior = dados.campos[posicao - 1];
+      var titulo = !anterior || texto(anterior.secao) !== texto(campo.secao)
+        ? '<li class="config-grupo" data-grupo="' + escapar(campo.secao) + '">'
+          + '<span class="nome-do-grupo">' + escapar(campo.secao || 'Sem seção') + '</span>'
+          + '<span class="quantos-no-grupo"></span></li>'
+        : '';
+      return titulo + '<li class="config-item' + (escolhido && escolhido.id === campo.id
         ? ' atual' : '') + (campo.ativo ? '' : ' desligado') + '"'
         + (campoNaLista(campo) ? '' : ' data-recolhido="sim"') + '>'
-        + '<button type="button" class="abrir" data-campo="' + escapar(campo.id) + '">'
-        + '<span class="nome">' + escapar(campo.rotulo) + '</span>'
-        + '<span class="detalhe">' + escapar(campo.secao) + ' · '
+        + '<button type="button" class="abrir com-icone" data-campo="' + escapar(campo.id) + '">'
+        + '<span class="icone-do-tipo" aria-hidden="true">' + Moldura.icone(iconeDoTipo(campo.tipo)) + '</span>'
+        + '<span class="textos">'
+        + '<span class="nome">' + escapar(campo.rotulo)
+        + (campo.obrigatorio ? ' <span class="etiqueta-obrigatorio">obrigatório</span>' : '') + '</span>'
+        + '<span class="detalhe">'
         + escapar(campo.tipo)
-        + (campo.obrigatorio ? ' · obrigatório' : '')
         + (campo.ativo ? '' : ' · desligado no formulário')
         + (campo.colunaExiste ? ''
           : ' · <strong class="alerta">coluna ausente na planilha</strong>')
-        + '</span></button>'
+        + '</span></span></button>'
         + '<span class="mover">'
         + '<button type="button" class="seta" data-subir="' + posicao + '"'
         + (campo === naLista[0] ? ' disabled' : '') + ' title="Subir">↑</button>'
@@ -499,15 +541,16 @@ var TelaConfiguracoes = (function () {
         : '');
 
     elemento('config-lista').innerHTML =
-      '<div class="config-cabeca">'
+      // O canal, a busca e o "Criar campo" numa linha só (Etapa 90, aprovado).
+      '<div class="config-cabeca numa-linha">'
       + '<div class="config-canais">' + caixaDeCanais() + '</div>'
-      + (resumo.podeMexerNaEstrutura
-        ? '<button type="button" class="botao pequeno" id="novo-campo">'
-          + 'Criar campo</button>' : '')
-      + '</div>'
       + '<input type="text" class="config-busca" id="busca-de-campos"'
       + ' placeholder="Procurar campo pelo nome…" aria-label="Procurar campo pelo nome"'
       + ' value="' + escapar(buscaDeCampos) + '">'
+      + (resumo.podeMexerNaEstrutura
+        ? '<button type="button" class="botao pequeno" id="novo-campo">'
+          + Moldura.icone('cadastrarCaso') + 'Criar campo</button>' : '')
+      + '</div>'
       + '<p class="config-explica"><span id="contagem-de-campos"></span>'
       + 'A ordem aqui é a ordem do formulário. '
       + 'Mudar de lugar não mexe na planilha: a coluna fica onde está.</p>'
@@ -639,6 +682,10 @@ var TelaConfiguracoes = (function () {
       + caixaDeSimNao('ativo', 'Aparece no formulário', campo.ativo)
       + blocoDaCondicao(campo)
       + blocoDaCondicao(campo, 'obrigatorioSe')
+      // V9 (Etapa 90, aprovado): como o campo fica no formulário, com o que
+      // está escrito AGORA no painel — antes de salvar. Só olhar (inert).
+      + '<div class="config-previa"><span class="config-previa-titulo">Prévia no formulário</span>'
+      + '<div class="config-previa-caixa formulario" id="previa-do-campo" inert></div></div>'
       + '<div class="config-acoes">'
       + '<button type="submit" class="botao">Salvar</button>'
       + (podeExcluirEsteCampo(campo)
@@ -654,12 +701,34 @@ var TelaConfiguracoes = (function () {
     });
     ligarACondicao(campo);
     ligarACondicao(campo, 'obrigatorioSe');
+    desenharAPrevia(campo);
+    elemento('form-campo').addEventListener('input', function () { desenharAPrevia(campo); });
+    elemento('form-campo').addEventListener('change', function () { desenharAPrevia(campo); });
     var excluir = elemento('excluir-campo');
     if (excluir) {
       excluir.addEventListener('click', function () {
         abrirExclusaoDoCampo(campo);
       });
     }
+  }
+
+  /**
+   * A prévia (V9): o campo desenhado pelo MESMO Formulario.desenharCampo do
+   * cadastro, com o rótulo, o tipo, a máscara, a dica e o "obrigatório" que
+   * estão no painel agora. O seletor mostra uma opção de exemplo — as opções
+   * de verdade vêm da lista escolhida, em Ajustes Gerais.
+   */
+  function desenharAPrevia(campo) {
+    var caixa = elemento('previa-do-campo');
+    if (!caixa) return;
+    var tipo = valorDe('tipo') || campo.tipo;
+    var exemplo = {
+      chave: 'previa', cabecalho: '', largura: 3, rotulo: valorDe('rotulo') || campo.rotulo,
+      descricao: valorDe('descricao'), tipo: tipo, mascara: valorDe('mascara'),
+      obrigatorio: marcado('obrigatorio'),
+      opcoes: [{ valor: 'exemplo', rotulo: 'As opções da lista escolhida' }]
+    };
+    caixa.innerHTML = Formulario.desenharCampo(exemplo, 'previa-', '');
   }
 
   /* ------------------------------------------------ mostrar só quando… */

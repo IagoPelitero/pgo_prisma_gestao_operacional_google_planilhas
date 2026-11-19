@@ -145,6 +145,30 @@ function rodarTestesDoVisual190() {
     contem(comuns, "'pedido pelo ' +");
     contem(comuns, 'var nome = textoDoRotulo(rotulo);');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Configurações: três colunas, V7, V8 e V9');
+
+  const config = ler('Configuracoes.html');
+  teste('V7: a lista de campos ganha o título da seção onde ela muda — sem mudar a ordem nem as setas', () => {
+    contem(config, "texto(anterior.secao) !== texto(campo.secao)");
+    contem(config, "'<li class=\"config-grupo\" data-grupo=\"'");
+    contem(config, 'data-subir="\' + posicao');
+    contem(config, 'function iconeDoTipo(tipo)');
+    contem(config, '<span class="etiqueta-obrigatorio">obrigatório</span>');
+  });
+
+  teste('V8: o alerta do menu vem ANTES das seções, e é o mesmo alerta de antes', () => {
+    contem(config, 'return desenharOAlertaDoMenu() + desenharAsSecoes();');
+    contem(config, 'Sem senha de administrador definida');
+    contem(config, 'A planilha saiu do contrato — ver o laudo');
+  });
+
+  teste('V9: a prévia sai do mesmo desenho do formulário e só se olha (inert)', () => {
+    contem(config, "Formulario.desenharCampo(exemplo, 'previa-', '')");
+    contem(config, 'id="previa-do-campo" inert');
+    contem(comuns, 'desenharCampo: desenharCampo,');
+  });
 }
 
 module.exports = { rodarTestesDoVisual190 };

@@ -1953,6 +1953,52 @@ async function rodar() {
     }
   });
 
+  await teste('Configurações: os campos por seção (V7), o alerta no alto (V8) e a prévia (V9) — Etapa 90', async () => {
+    await pagina.click('[data-tela="configuracoes"]');
+    await pagina.waitForSelector('#config-lista .config-grupo', { timeout: 15000 });
+    // V8: se há alerta, ele é o primeiro do menu.
+    const alerta = await pagina.evaluate(() => {
+      const menu = document.getElementById('config-secoes');
+      const a = menu.querySelector('.config-alerta');
+      return a ? menu.firstElementChild === a : null;
+    });
+    if (alerta !== null) igual(alerta, true, 'o alerta vem antes das seções');
+    // V7: um título por seção, contando os campos à vista.
+    const grupos = await pagina.$$eval('#config-lista .config-grupo:not([hidden])', (es) => es.map((e) => e.textContent));
+    verdadeiro(grupos.length >= 2, 'mais de uma seção: ' + grupos.join(' | '));
+    grupos.forEach((g) => verdadeiro(/ · \d+ campos?$/.test(g), 'o título conta os campos: ' + g));
+    // Procurando, só fica o título da seção que tem o achado.
+    const primeiro = (await pagina.textContent('#config-lista .config-item:not([hidden]) .nome')).trim();
+    await pagina.fill('#busca-de-campos', primeiro);
+    await pagina.waitForTimeout(150);
+    const comBusca = await pagina.$$eval('#config-lista .config-grupo:not([hidden])', (es) => es.length);
+    verdadeiro(comBusca >= 1 && comBusca < grupos.length, 'só as seções com achado: ' + comBusca);
+    await pagina.fill('#busca-de-campos', '');
+    await pagina.waitForTimeout(150);
+    // Quebra de propósito: o primeiro campo da 2ª seção sobe para a 1ª, e volta.
+    const contar = () => pagina.$$eval('#config-lista .config-grupo:not([hidden]) .quantos-no-grupo', (es) => es.map((e) => e.textContent).join('|'));
+    const antes = await contar();
+    const segundoGrupo = pagina.locator('#config-lista .config-grupo:not([hidden])').nth(1);
+    const indice = await segundoGrupo.evaluate((g) => g.nextElementSibling.querySelector('[data-subir]').getAttribute('data-subir'));
+    await pagina.click('[data-subir="' + indice + '"]');
+    await pagina.waitForTimeout(400);
+    verdadeiro((await contar()) !== antes, 'o campo mudou de seção na lista: ' + (await contar()));
+    await pagina.click('[data-descer="' + (Number(indice) - 1) + '"]');
+    await pagina.waitForTimeout(400);
+    igual(await contar(), antes, 'e voltou');
+    // V9: a prévia acompanha o que se escreve, antes de salvar.
+    await pagina.click('#config-lista .config-item .abrir');
+    await pagina.waitForSelector('#previa-do-campo label', { timeout: 5000 });
+    await pagina.fill('#cfg-rotulo', 'Rótulo só na prévia');
+    await pagina.waitForTimeout(100);
+    contem(await pagina.textContent('#previa-do-campo label'), 'Rótulo só na prévia');
+    igual(await pagina.getAttribute('#previa-do-campo', 'inert'), '', 'a prévia só se olha');
+    // Sai sem salvar.
+    await pagina.click('[data-tela="trabalho"]');
+    if (await pagina.waitForSelector('#dialogo-descarte', { timeout: 2000 }).catch(() => null)) await pagina.click('#descartar-alteracoes');
+    await pagina.waitForTimeout(400);
+  });
+
   console.log('\nA busca inteligente (Etapa 89)');
 
   await teste('Buscar Caso: "Pesquisar por" abre na avançada, procura só no campo escolhido e lembra a escolha (Etapa 89)', async () => {
