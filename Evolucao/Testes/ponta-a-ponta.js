@@ -1833,6 +1833,81 @@ async function rodar() {
 
   /* ------------------------------------------------------------- o final -- */
 
+  console.log('\nO visual aprovado (Etapa 90)');
+
+  await teste('Trabalho: a faixa do prazo no lugar da janela, e "Ver os casos" abre a mesma janela (Etapa 90)', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForTimeout(600);
+    // A RET, na aba de casos (o teste anterior termina na Agenda da Mesa).
+    await pagina.locator('[data-canal]', { hasText: 'RET' }).first().click();
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.cartoes .indicador', { timeout: 10000 });
+    await pagina.waitForTimeout(500);
+    igual(await pagina.locator('#dialogo-prazo').count(), 0, 'a janela não abre sozinha (decisão do PO)');
+    if (await pagina.locator('#ver-casos-do-prazo').count()) {
+      contem(await pagina.textContent('.faixa-do-prazo'), 'perto de vencer');
+      await pagina.click('#ver-casos-do-prazo');
+      await pagina.waitForSelector('#dialogo-prazo', { timeout: 5000 });
+      contem(await pagina.textContent('#dialogo-prazo'), 'perto de vencer');
+      await pagina.click('#fechar-aviso-de-prazo');
+      await pagina.waitForTimeout(200);
+      igual(await pagina.locator('#dialogo-prazo').count(), 0);
+    }
+  });
+
+  await teste('Trabalho: "Filtrando por" mostra o cartão escolhido, e o × tira o filtro (Etapa 90, V2)', async () => {
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    await pagina.waitForTimeout(400);
+    const rotulos = await pagina.$$eval('.cartoes .indicador.clicavel .rotulo', (es) => es.map((e) => e.textContent));
+    await pagina.locator('.cartoes .indicador.clicavel', { hasText: rotulos[1] }).first().click();
+    await pagina.waitForSelector('.filtrando-por [data-tirar-cartao]', { timeout: 10000 });
+    contem(await pagina.textContent('.filtrando-por'), 'Cartão: ' + rotulos[1]);
+    await pagina.click('.filtrando-por [data-tirar-cartao]');
+    await pagina.waitForFunction(() => !document.querySelector('.filtrando-por [data-tirar-cartao]')
+      && !document.getElementById('painel').classList.contains('atualizando'), null, { timeout: 10000 });
+    igual(await pagina.locator('.cartoes .indicador.ligado').count(), 0, 'o cartão desligou');
+  });
+
+  await teste('Trabalho: o "Mostrar" fica lembrado neste navegador — só o número (Etapa 90, F9)', async () => {
+    const botao = pagina.locator('[data-mostrar]').first();
+    if (!await botao.count()) return;
+    const escolha = await botao.getAttribute('data-mostrar');
+    await botao.click();
+    await pagina.waitForTimeout(500);
+    contem(await pagina.textContent('.fila-mostrar'), 'Sua escolha fica salva');
+    igual(await pagina.evaluate(() => localStorage.getItem('pgo.trabalho.mostrar')), escolha === 'todos' ? null : escolha);
+    await pagina.reload();
+    await pagina.waitForSelector('.cartoes .indicador', { timeout: 10000 });
+    await pagina.waitForTimeout(800);
+    igual(await pagina.getAttribute('[data-mostrar="' + escolha + '"]', 'aria-pressed'), 'true', 'depois de recarregar, a mesma escolha');
+    await pagina.evaluate(() => localStorage.removeItem('pgo.trabalho.mostrar'));
+  });
+
+  await teste('Trabalho: o cabeçalho da fila gruda embaixo da barra ao rolar (Etapa 90, V3)', async () => {
+    await pagina.setViewportSize({ width: 1440, height: 520 });
+    if (await pagina.locator('[data-mostrar="todos"]').count()) {
+      await pagina.click('[data-mostrar="todos"]');
+      await pagina.waitForTimeout(800);
+    }
+    // Rola até o cabeçalho natural da fila passar por baixo da barra.
+    await pagina.evaluate(() => {
+      const th = document.querySelector('.fila-do-trabalho thead th');
+      window.scrollTo(0, th.getBoundingClientRect().top + window.scrollY - 20);
+    });
+    await pagina.waitForTimeout(300);
+    const posicoes = await pagina.evaluate(() => ({
+      th: Math.round(document.querySelector('.fila-do-trabalho thead th').getBoundingClientRect().top),
+      barra: Math.round(document.getElementById('superior').getBoundingClientRect().bottom),
+      deLado: document.documentElement.scrollWidth > window.innerWidth
+    }));
+    verdadeiro(Math.abs(posicoes.th - posicoes.barra) <= 1, 'o cabeçalho logo abaixo da barra: ' + JSON.stringify(posicoes));
+    igual(posicoes.deLado, false, 'e a página não rola de lado');
+    await pagina.evaluate(() => { window.scrollTo(0, 0); localStorage.removeItem('pgo.trabalho.mostrar'); });
+    await pagina.setViewportSize({ width: 1440, height: 1000 });
+  });
+
   console.log('\nA busca inteligente (Etapa 89)');
 
   await teste('Buscar Caso: "Pesquisar por" abre na avançada, procura só no campo escolhido e lembra a escolha (Etapa 89)', async () => {

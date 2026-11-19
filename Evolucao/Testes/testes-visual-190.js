@@ -89,6 +89,35 @@ function rodarTestesDoVisual190() {
     contem(aplicacao, "querySelector(':scope > .canais')");
     contem(estilos, '.cabecalho-da-tela .canais {');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Trabalho: Proposta A, V1, V2, V3, a faixa do prazo e o F9');
+
+  const trabalho = ler('Trabalho.html');
+  teste('a janela do prazo não abre sozinha: a faixa no alto, e "Ver os casos" abre a mesma janela', () => {
+    const carregar = trabalho.slice(trabalho.indexOf('function carregar(recado)'), trabalho.indexOf('function ligarPainel'));
+    verdadeiro(carregar.indexOf('avisarDosQueVencem()') < 0, 'a carga não abre a janela');
+    contem(carregar, 'guardarOPrazo();');
+    contem(trabalho, "elemento('ver-casos-do-prazo').addEventListener('click', avisarDosQueVencem);");
+  });
+
+  teste('F9: o Mostrar lembra só o número, e nunca o "Todos"', () => {
+    contem(trabalho, "if (escolha !== 'todos') {");
+    contem(trabalho, "window.localStorage.setItem(CHAVE_DO_MOSTRAR, String(quantosNaFila))");
+    contem(trabalho, 'Sua escolha fica salva');
+  });
+
+  teste('V1, V2 e V3 estão na fila', () => {
+    contem(trabalho, "' class=\"linha-prazo-' + tom + '\"'");
+    contem(trabalho, 'Filtrando por');
+    contem(trabalho, 'data-tirar-cartao');
+    contem(estilos, '.fila-do-trabalho table.fila thead th {');
+    contem(ler('Aplicacao.html'), "'--altura-da-barra-superior'");
+  });
+
+  teste('a situação vem em cima só no desenho: as colunas da fila continuam as de Configurações', () => {
+    contem(trabalho, 'grupo.filter(function (celula) { return celula.ehStatus; })');
+  });
 }
 
 module.exports = { rodarTestesDoVisual190 };

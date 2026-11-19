@@ -2272,6 +2272,116 @@ table.fila.legado td { color: var(--suave); }
   .busca-linha .botao { width: 100%; justify-content: center; }
 }
 
+/* =====================================================================
+   ETAPA 90 · A PROPOSTA VISUAL APROVADA — TRABALHO E PEÇAS COMUNS
+   =====================================================================
+   Proposta A do Trabalho, com V1 (a faixa colorida do prazo na linha), V2
+   ("Filtrando por" com ×) e V3 (o cabeçalho da fila fixo ao rolar). Só
+   aparência: as regras, as colunas e as ações continuam as de antes. */
+
+/* A faixa do prazo (decisão do PO: só a faixa; "Ver os casos" abre a janela). */
+.faixa-do-prazo {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
+  padding: 11px 16px; border-radius: var(--raio);
+  background: var(--atencao-tenue); color: var(--texto);
+  border: 1px solid color-mix(in srgb, var(--atencao) 32%, transparent);
+}
+.faixa-do-prazo > svg { flex: none; width: 20px; height: 20px; color: var(--atencao); }
+.faixa-do-prazo p { margin: 0; flex: 1 1 auto; font-size: 14px; line-height: 1.45; }
+.faixa-do-prazo strong { color: var(--atencao); }
+.faixa-do-prazo .botao-secundario { flex: none; }
+
+/* As sub-abas: o número numa pastilha, e a ordem à direita. */
+.abas-do-trabalho { align-items: center; }
+.config-aba .numero-da-aba {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  background: var(--superficie-2); color: var(--suave);
+}
+.config-aba.atual .numero-da-aba { background: var(--destaque); color: var(--destaque-sobre); }
+.ordem-da-aba {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--suave); padding: 6px 2px;
+}
+.ordem-da-aba svg { width: 15px; height: 15px; }
+
+/* Os cartões: compactos, numa linha, a cor do status na barra e no número;
+   o cartão clicado fica contornado. */
+.cartoes .indicador {
+  border-top: 1px solid var(--linha); border-left: 3px solid var(--tom, var(--linha-forte));
+  padding: 12px 16px 12px 14px; gap: 4px;
+}
+.cartoes .indicador .rotulo {
+  min-height: 0; display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--suave);
+}
+.cartoes .indicador .rotulo::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tom, var(--tenue));
+}
+.cartoes .indicador .numero { font-size: 32px; }
+.cartoes .indicador .variacao.vazia { display: none; }
+.cartoes .indicador.ligado {
+  background: var(--superficie);
+  box-shadow: 0 0 0 2px var(--destaque), var(--sombra);
+}
+
+/* A caixa de filtros: os controles numa linha, a contagem embaixo, à direita.
+   O título "Filtros" continua lá para o leitor de tela. */
+.caixa-de-filtros { display: flex; flex-direction: column; padding: 14px 16px 10px; }
+.caixa-de-filtros .filtros { order: 1; margin-bottom: 6px; }
+.caixa-de-filtros-cabeca { order: 2; margin: 0; flex-wrap: wrap; }
+.caixa-de-filtros-cabeca h3 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* A barra da fila: quantos, a legenda do prazo, o Mostrar em grupo (F9). */
+.fila-mostrar { gap: 8px 18px; }
+.fila-mostrando { font-weight: 600; }
+.legenda-do-prazo { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--suave); }
+.legenda-do-prazo i { display: inline-block; width: 3px; height: 14px; border-radius: 2px; margin-left: 6px; }
+.legenda-do-prazo .marca-ruim { background: var(--ruim); }
+.legenda-do-prazo .marca-atencao { background: var(--atencao); }
+.fila-mostrar .legenda-do-prazo { margin-right: auto; }
+.mostrar-grupo { gap: 0; }
+.mostrar-grupo > span { margin-right: 10px; }
+.mostrar-grupo .mostrar-quantos { border-radius: 0; margin-left: -1px; }
+.mostrar-grupo .mostrar-quantos:first-of-type { border-radius: var(--raio-pequeno) 0 0 var(--raio-pequeno); margin-left: 0; }
+.mostrar-grupo .mostrar-quantos:last-of-type { border-radius: 0 var(--raio-pequeno) var(--raio-pequeno) 0; }
+.mostrar-quantos[aria-pressed="true"] { position: relative; z-index: 1; }
+.mostrar-salvo { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--suave); }
+.mostrar-salvo svg { width: 14px; height: 14px; }
+
+/* V2: "Filtrando por", em cima da fila. */
+.filtrando-por {
+  margin: 0; padding: 9px 16px; border-bottom: 1px solid var(--linha);
+  background: var(--superficie); flex-basis: auto;
+}
+.filtrando-por .limpar-filtros { margin-left: 4px; }
+.filtrando-por + .cartao.vazio, .filtro-etiquetas.filtrando-por:not(.fila-do-trabalho *) {
+  border-radius: var(--raio); border: 1px solid var(--linha); margin-bottom: 12px;
+}
+
+/* V1: a faixa colorida do prazo, à esquerda da linha. */
+.fila-do-trabalho tr.linha-prazo-ruim > td:first-child { box-shadow: inset 3px 0 0 var(--ruim); }
+.fila-do-trabalho tr.linha-prazo-atencao > td:first-child { box-shadow: inset 3px 0 0 var(--atencao); }
+
+/* A situação em cima, a data embaixo, e o selo do prazo com mais respiro. */
+.fila-do-trabalho td:first-child .situacao { margin-bottom: 4px; }
+.fila-do-trabalho td:first-child .selo-prazo { margin-top: 6px; }
+
+/* V3: o cabeçalho da fila fixo ao rolar — em tela larga, onde a tabela cabe
+   inteira e o cartão não precisa rolar de lado. Abaixo disso, fica a rolagem
+   lateral de sempre. */
+@media (min-width: 1360px) {
+  .cartao.sem-forro.fila-do-trabalho, .fila-do-trabalho .rolagem-tabela { overflow: visible; }
+  .fila-do-trabalho .fila-mostrar { border-radius: var(--raio) var(--raio) 0 0; }
+  .fila-do-trabalho table.fila thead th {
+    position: sticky; top: var(--altura-da-barra-superior, 76px); z-index: 3;
+    background: var(--superficie-2);
+  }
+}
+
 /* ==================================================== Produtividade RECC === */
 /*
   A grade dos gráficos. `auto-fit` com um mínimo generoso: numa tela larga

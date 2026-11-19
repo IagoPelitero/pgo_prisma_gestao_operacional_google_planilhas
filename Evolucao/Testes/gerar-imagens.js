@@ -71,8 +71,8 @@ const FOTOS = [
   { arquivo: 'tela-produtividade-mesa', tela: 'produtividade', canal: 'Mesa', inteira: true,
     clique: '[data-aba-da-mesa="atendidos"]' },
 
-  // O aviso dos casos perto de vencer, que o Trabalho abre ao entrar no canal.
-  // Nas outras fotos ele é fechado antes de clicar e de fotografar.
+  // O aviso dos casos perto de vencer, aberto pelo "Ver os casos" da faixa.
+  // Nas outras fotos ele fica fechado.
   { arquivo: 'tela-aviso-de-prazo', tela: 'trabalho', comOAviso: true }
 ];
 
@@ -110,6 +110,11 @@ async function gerar() {
     const pagina = await navegador.newPage({ viewport: foto.janela || TELA_CHEIA });
     await pagina.goto(endereco + '#' + foto.tela);
     await esperarATelaMontar(pagina);
+    // O aviso de prazo mora na faixa (Etapa 90): a foto dele clica no "Ver os casos".
+    if (foto.comOAviso && await pagina.locator('#ver-casos-do-prazo').count()) {
+      await pagina.click('#ver-casos-do-prazo');
+      await pagina.waitForTimeout(400);
+    }
     if (foto.comOAviso && !await pagina.locator('#dialogo-prazo').count()) {
       throw new Error('a foto "' + foto.arquivo + '" é do aviso de prazo, e ele não abriu');
     }

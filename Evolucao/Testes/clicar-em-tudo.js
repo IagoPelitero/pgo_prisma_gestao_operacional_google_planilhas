@@ -164,6 +164,13 @@ async function varrer() {
    */
   let avisosDePrazo = 0;
   async function fecharOAvisoDePrazo() {
+    // Etapa 90 (decisão do PO): o aviso mora numa faixa, e a janela abre pelo
+    // "Ver os casos" — é ele que a varredura clica, uma vez por faixa.
+    const faixa = pagina.locator('#ver-casos-do-prazo');
+    if (!await pagina.locator('#dialogo-prazo').count() && await faixa.count()) {
+      await faixa.click();
+      await pagina.waitForTimeout(200);
+    }
     if (await pagina.locator('#dialogo-prazo').count()) {
       avisosDePrazo++;
       await pagina.click('#fechar-aviso-de-prazo');

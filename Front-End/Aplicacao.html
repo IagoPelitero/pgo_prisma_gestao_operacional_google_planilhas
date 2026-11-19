@@ -515,6 +515,7 @@ var Aplicacao = (function () {
     var seletor = elemento('miolo').querySelector(':scope > .canais');
     if (seletor) elemento('miolo').querySelector('.cabecalho-da-tela').appendChild(seletor);
     document.title = pacote.identidade.nome + ' — ' + comoSeChama;
+    medirABarraSuperior();
 
     ligarMoldura();
     if (definicao.ligar) definicao.ligar(pacote);
@@ -523,6 +524,21 @@ var Aplicacao = (function () {
 
     if (!semHistorico && location.hash !== '#' + tela) {
       location.hash = tela;
+    }
+  }
+
+  /*
+    A ALTURA DA BARRA DE CIMA (Etapa 90): o cabeçalho fixo da fila (V3) gruda
+    logo abaixo dela, e ela muda de altura quando o título quebra em duas
+    linhas. Medida a cada tela e a cada mudança do tamanho da janela.
+  */
+  var jaMedeAoRedimensionar = false;
+  function medirABarraSuperior() {
+    var barra = elemento('superior');
+    if (barra) document.documentElement.style.setProperty('--altura-da-barra-superior', barra.offsetHeight + 'px');
+    if (!jaMedeAoRedimensionar) {
+      jaMedeAoRedimensionar = true;
+      window.addEventListener('resize', medirABarraSuperior);
     }
   }
 

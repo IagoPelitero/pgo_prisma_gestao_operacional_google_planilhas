@@ -1747,7 +1747,8 @@ function rodarTestesDoTrabalho() {
     const filtros = tela.substring(tela.indexOf('function desenharFiltros'), tela.indexOf('function limiteDaFila'));
     verdadeiro(filtros.indexOf('Mostrar') < 0 && filtros.indexOf('barraDeMostrar') < 0,
       'não é filtro: não entra na caixa de filtros');
-    contem(tela, "+ barraDeMostrar(visiveis)\n      + '<div class=\"rolagem-tabela\">",
+    // Etapa 90 (V2): o "Filtrando por" entrou entre a barra e a tabela.
+    contem(tela, "+ barraDeMostrar(visiveis)\n      + filtrandoPor()\n      + '<div class=\"rolagem-tabela\">",
       'a barra vem antes da tabela');
     contem(tela, "'Mostrando os ' + visiveis + ' casos mais recentes de ' + total");
     contem(tela, "'Todos (' + total + ')'", 'o "todos" diz quantos são');

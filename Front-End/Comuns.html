@@ -195,7 +195,19 @@ var Moldura = (function () {
       '<path d="M4.4 6.8h15.2"></path>'
       + '<path d="M9.2 6.8V5.2a1.4 1.4 0 0 1 1.4-1.4h2.8a1.4 1.4 0 0 1 1.4 1.4v1.6"></path>'
       + '<path d="M6.4 6.8v12.4a1.4 1.4 0 0 0 1.4 1.4h8.4a1.4 1.4 0 0 0 1.4-1.4V6.8"></path>'
-      + '<path d="M10.2 10.6v6M13.8 10.6v6"></path>'
+      + '<path d="M10.2 10.6v6M13.8 10.6v6"></path>',
+    // Etapa 90 (proposta visual aprovada): os ícones dos avisos e das etiquetas.
+    alerta:
+      '<path d="M10.3 4.2 2.9 17.4a2 2 0 0 0 1.7 3h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"></path>'
+      + '<path d="M12 9.4v4.2M12 17h.01"></path>',
+    info:
+      '<circle cx="12" cy="12" r="8.6"></circle><path d="M12 11v5.2M12 7.8h.01"></path>',
+    relogio:
+      '<circle cx="12" cy="12" r="8.6"></circle><path d="M12 7.4V12l3 1.8"></path>',
+    confirmado:
+      '<path d="m5 12.6 4.4 4.4L19 7.4"></path>',
+    fechar:
+      '<path d="M6.6 6.6l10.8 10.8M17.4 6.6 6.6 17.4"></path>'
   };
 
   var TEMAS = [
@@ -706,7 +718,13 @@ var FiltroMultiplo = (function () {
 
   /** As etiquetas do que está escolhido, cada uma com o "×" que a tira. */
   function etiquetas(filtros, escolhidos) {
-    var feitas = filtros.map(function (filtro) {
+    var feitas = etiquetasSoltas(filtros, escolhidos);
+    return feitas ? '<div class="filtro-etiquetas"><span>Filtrando por</span>' + feitas + '</div>' : '';
+  }
+
+  /** Só as etiquetas, sem a moldura — o Trabalho as junta às do cartão e da busca (Etapa 90, V2). */
+  function etiquetasSoltas(filtros, escolhidos) {
+    return filtros.map(function (filtro) {
       var marcadas = lista(escolhidos[filtro.chave]);
       if (!marcadas.length) return '';
       var rotulos = marcadas.map(function (valor) {
@@ -717,7 +735,6 @@ var FiltroMultiplo = (function () {
         + '<button type="button" data-tirar-filtro="' + escapar(filtro.chave) + '"'
         + ' aria-label="Tirar o filtro ' + escapar(filtro.rotulo) + '">×</button></span>';
     }).join('');
-    return feitas ? '<div class="filtro-etiquetas"><span>Filtrando por</span>' + feitas + '</div>' : '';
   }
 
   function painel(filtro, marcadas) {
@@ -810,7 +827,7 @@ var FiltroMultiplo = (function () {
     }
   }
 
-  return { desenhar: desenhar, etiquetas: etiquetas, ligar: ligar, lista: lista };
+  return { desenhar: desenhar, etiquetas: etiquetas, etiquetasSoltas: etiquetasSoltas, ligar: ligar, lista: lista };
 })();
 
 /*

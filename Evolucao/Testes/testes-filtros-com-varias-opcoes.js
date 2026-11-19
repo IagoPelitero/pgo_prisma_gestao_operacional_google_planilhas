@@ -122,7 +122,9 @@ function rodarTestesDosFiltrosComVariasOpcoes() {
       contem(tela(nome), 'FiltroMultiplo.desenhar(', nome);
       contem(tela(nome), 'FiltroMultiplo.ligar(', nome);
     });
-    ['Trabalho', 'Produtividade'].forEach((nome) => contem(tela(nome), 'FiltroMultiplo.etiquetas(', nome));
+    contem(tela('Produtividade'), 'FiltroMultiplo.etiquetas(', 'Produtividade');
+    // O Trabalho junta as mesmas etiquetas às do cartão e da busca (Etapa 90, V2).
+    contem(tela('Trabalho'), 'FiltroMultiplo.etiquetasSoltas(', 'Trabalho');
   });
 
   teste('a lista só vai ao servidor quando fecha com escolha diferente', () => {

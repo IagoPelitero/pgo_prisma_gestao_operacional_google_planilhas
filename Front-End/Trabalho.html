@@ -41,6 +41,18 @@ var TelaTrabalho = (function () {
   // resto (ver RECC_FILA_NA_ABERTURA, no servidor). Não é filtro — não muda
   // os cartões, o "Limpar filtros" não mexe nele, e trocar de canal mantém.
   var quantosNaFila = 0;
+  /*
+    F9 (Etapa 90): o "Mostrar" fica lembrado neste navegador — só o número
+    (5, 10, 20, 50, 100), nenhum dado de caso. O "Todos" não é lembrado: numa
+    aba de concluídos são milhares de casos, e abrir a tela com eles todos
+    seria uma espera que a pessoa não pediu hoje.
+  */
+  var CHAVE_DO_MOSTRAR = 'pgo.trabalho.mostrar';
+  var podeLembrarOMostrar = true;
+  try {
+    var mostrarLembrado = Number(window.localStorage.getItem(CHAVE_DO_MOSTRAR));
+    if (mostrarLembrado > 0) quantosNaFila = mostrarLembrado;
+  } catch (semArmazenamento) { podeLembrarOMostrar = false; }
   var focarNoMostrar = '';
   var resumo = null;
   // O aviso dos casos perto de vencer sai UMA VEZ por canal, quando a pessoa
@@ -48,6 +60,13 @@ var TelaTrabalho = (function () {
   // `avisarDosQueVencem`.
   var jaAvisouNoCanal = {};
   var avisarQuandoChegar = false;
+  /*
+    A FAIXA DO PRAZO (Etapa 90, proposta aprovada; decisão do PO: só a faixa).
+    A resposta da entrada no canal traz os casos perto de vencer; em vez de
+    abrir a janela sozinha, eles ficam guardados aqui e a faixa fica no alto.
+    "Ver os casos" abre a mesma janela de antes, com o mesmo retrato.
+  */
+  var prazoPorCanal = {};
 
   function escapar(texto) { return Moldura.escapar(texto); }
   function elemento(id) { return document.getElementById(id); }
@@ -89,11 +108,14 @@ var TelaTrabalho = (function () {
       abas.push({ atributo: 'data-aba-do-trabalho="reunioes"', rotulo: 'Reuniões', atual: abaDaMesa === 'reunioes' });
     }
     if (!abas.length) return '';
+    // A ordem da aba, à direita (Etapa 90, proposta aprovada): o mesmo recado da fila.
+    var ordem = resumo && resumo.subAbas && abaDaMesa !== 'reunioes'
+      ? '<span class="ordem-da-aba">' + Moldura.icone('info') + 'Ordem: ' + escapar(ordemDaFila()) + '</span>' : '';
     return '<div class="config-abas abas-do-trabalho" role="tablist" aria-label="O que ver">'
       + abas.map(function (aba) {
         return '<button type="button" role="tab" class="config-aba' + (aba.atual ? ' atual' : '') + '"'
           + ' aria-selected="' + aba.atual + '" ' + aba.atributo + '>' + aba.rotulo + '</button>';
-      }).join('') + '</div>';
+      }).join('') + ordem + '</div>';
   }
 
   function desenharAbas() {
@@ -212,6 +234,7 @@ var TelaTrabalho = (function () {
     temAgenda = Agenda.ehDaMesa(pacote.canais, canalEscolhido);
     if (!temAgenda) abaDaMesa = 'casos';
     return SeletorDeCanal.montar(pacote.canais, canalEscolhido)
+      + '<div id="faixa-do-prazo"></div>'
       + '<div id="abas-do-trabalho">' + abasDoTrabalho() + '</div>'
       + '<div id="painel">' + Moldura.esqueleto('Somando os casos…') + '</div>';
   }
@@ -291,8 +314,7 @@ var TelaTrabalho = (function () {
     return Moldura.caixaDeFiltros(
       busca
         + caixas.join('')
-        + Moldura.botaoLimparFiltros('limpar-filtros')
-        + FiltroMultiplo.etiquetas(resumo.filtrosDisponiveis, filtrosEscolhidos),
+        + Moldura.botaoLimparFiltros('limpar-filtros'),
       resumo.total + ' de ' + resumo.totalNoPeriodo
         + ' casos · ' + (resumo.buscaNaPlanilhaToda
           // A busca procura na planilha toda (Etapa 69): a caixa diz onde.
@@ -377,7 +399,6 @@ var TelaTrabalho = (function () {
   function barraDeMostrar(visiveis) {
     var total = totalDaFila();
     var opcoes = opcoesDeMostrar(total, resumo.mostrarNaFila.opcoes);
-    if (!opcoes.length) return '';
 
     var botoes = opcoes.map(function (quantos) {
       var ligado = quantos === 'todos' ? visiveis === total : quantos === visiveis;
@@ -391,13 +412,56 @@ var TelaTrabalho = (function () {
         ? (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
           : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)
         : 'Mostrando todos os ' + total + ' casos') + '</span>'
-      + '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
-      + '<span>Mostrar</span>' + botoes + '</div></div>';
+      + legendaDoPrazo()
+      + (opcoes.length ? '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
+        + '<span>Mostrar</span>' + botoes + '</div>'
+        + (podeLembrarOMostrar ? '<span class="mostrar-salvo">' + Moldura.icone('confirmado') + 'Sua escolha fica salva</span>' : '')
+        : '')
+      + '</div>';
+  }
+
+  /*
+    V1 (Etapa 90, aprovado): a faixa colorida à esquerda da linha — vermelha
+    com o prazo vencido, âmbar perto de vencer —, a partir do selo de prazo que
+    a linha já tem. A legenda só aparece quando o canal tem sinalizador.
+  */
+  function tomDoPrazoDaLinha(caso) {
+    var correndo = (caso.sinais || []).filter(function (sinal) { return !sinal.encerrado; });
+    if (correndo.some(function (sinal) { return sinal.tom === 'ruim'; })) return 'ruim';
+    if (correndo.some(function (sinal) { return sinal.tom === 'atencao'; })) return 'atencao';
+    return '';
+  }
+
+  function legendaDoPrazo() {
+    var temSinal = resumo.fila.some(function (caso) { return (caso.sinais || []).length; });
+    return temSinal ? '<span class="legenda-do-prazo" aria-hidden="true">'
+      + '<i class="marca-ruim"></i>prazo vencido <i class="marca-atencao"></i>perto de vencer</span>' : '';
+  }
+
+  /*
+    V2 (Etapa 90, aprovado): "Filtrando por", em cima da fila — o cartão, a
+    busca e os filtros de lista escolhidos, cada um com o seu ×, e "Limpar
+    tudo". Explica por que a fila mostra só alguns casos.
+  */
+  function filtrandoPor() {
+    var etiquetas = '';
+    if (filtrosEscolhidos.cartao) {
+      var cartao = (resumo.cartoes || []).filter(function (um) { return String(um.id) === String(filtrosEscolhidos.cartao); })[0];
+      etiquetas += '<span class="filtro-etiqueta">Cartão: ' + escapar(cartao ? cartao.rotulo : filtrosEscolhidos.cartao)
+        + '<button type="button" data-tirar-cartao aria-label="Tirar o filtro do cartão">×</button></span>';
+    }
+    if (filtrosEscolhidos.busca) {
+      etiquetas += '<span class="filtro-etiqueta">Busca: ' + escapar(filtrosEscolhidos.busca)
+        + '<button type="button" data-tirar-busca aria-label="Tirar a busca">×</button></span>';
+    }
+    etiquetas += FiltroMultiplo.etiquetasSoltas(resumo.filtrosDisponiveis, filtrosEscolhidos);
+    return etiquetas ? '<div class="filtro-etiquetas filtrando-por"><span>Filtrando por</span>' + etiquetas
+      + '<button type="button" class="limpar-filtros" id="limpar-tudo-da-fila">Limpar tudo</button></div>' : '';
   }
 
   function desenharFila() {
     if (!resumo.fila.length && resumo.buscaNaPlanilhaToda) {
-      return '<div class="cartao vazio">'
+      return filtrandoPor() + '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
           ? 'A busca achou ' + resumo.totalNoPeriodo + ' casos na planilha toda, mas '
@@ -408,7 +472,7 @@ var TelaTrabalho = (function () {
     if (!resumo.fila.length) {
       var ondeOlhou = resumo.subAbas
         ? 'em "' + escapar(resumo.subAbas.nomes[resumo.subAbas.atual - 1]) + '"' : 'neste canal';
-      return '<div class="cartao vazio">'
+      return filtrandoPor() + '<div class="cartao vazio">'
         + '<strong>Nenhum caso para mostrar aqui.</strong>'
         + '<p>' + (resumo.totalNoPeriodo
           ? 'Há ' + resumo.totalNoPeriodo + ' casos ' + ondeOlhou + ', mas nenhum passa '
@@ -431,15 +495,17 @@ var TelaTrabalho = (function () {
           + (i === 0 ? seloDoSla(caso.sla) + selosDePrazo(caso.sinais) : '') + '</td>';
       }).join('');
 
-      return '<tr>' + celulas + '<td class="acoes-coluna">'
+      var tom = tomDoPrazoDaLinha(caso);
+      return '<tr' + (tom ? ' class="linha-prazo-' + tom + '"' : '') + '>' + celulas + '<td class="acoes-coluna">'
         + acoesDaLinha(caso) + '</td></tr>';
     }).join('');
 
     // A barra vem EM CIMA da tabela: é o primeiro lugar que o olho vê, e com
     // cinco linhas e um cartão dizendo 37, ela explica a diferença antes que
     // pareça defeito.
-    return '<div class="cartao sem-forro">'
+    return '<div class="cartao sem-forro fila-do-trabalho">'
       + barraDeMostrar(visiveis)
+      + filtrandoPor()
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
       + '<tbody>' + linhas + '</tbody></table></div></div>';
@@ -453,6 +519,13 @@ var TelaTrabalho = (function () {
    * porque são o que ela confere depois de já ter achado a linha.
    */
   function desenharGrupo(grupo, caso, ehOPrimeiro) {
+    // A situação primeiro, no grupo da situação (Etapa 90, proposta aprovada):
+    // o status salta, a data vem embaixo. Muda só a ordem de desenho — as
+    // colunas e a ordem delas continuam as de Configurações.
+    if (ehOPrimeiro) {
+      grupo = grupo.filter(function (celula) { return celula.ehStatus; })
+        .concat(grupo.filter(function (celula) { return !celula.ehStatus; }));
+    }
     return grupo.map(function (celula, i) {
       if (celula.ehStatus) {
         return '<span class="situacao tom-' + escapar(caso.tom || 'neutro') + '">'
@@ -598,18 +671,43 @@ var TelaTrabalho = (function () {
     return valor || String(caso.id);
   }
 
-  function avisarDosQueVencem() {
+  /** Guarda o retrato do prazo da entrada no canal (ver prazoPorCanal). */
+  function guardarOPrazo() {
     // Os perto de vencer vêm à parte, da fila INTEIRA: a fila que veio para a
     // tela são só os 100 mais recentes.
     var achados = casosPertoDeVencer(resumo && (resumo.pertoDeVencer || resumo.fila));
+    prazoPorCanal[canalEscolhido] = {
+      achados: achados,
+      quantos: Math.max(Number(resumo.quantosPertoDeVencer) || 0, achados.length),
+      nomeDoCanal: resumo.canal && resumo.canal.nome ? resumo.canal.nome : ''
+    };
+  }
+
+  /** A faixa no alto da tela, enquanto há caso perto de vencer neste canal. */
+  function desenharFaixaDoPrazo() {
+    var lugar = elemento('faixa-do-prazo');
+    if (!lugar) return;
+    var prazo = prazoPorCanal[canalEscolhido];
+    if (!prazo || !prazo.quantos) { lugar.innerHTML = ''; return; }
+    lugar.innerHTML = '<div class="faixa-do-prazo" role="status">' + Moldura.icone('alerta')
+      + '<p><strong>' + prazo.quantos + (prazo.quantos === 1 ? ' caso perto de vencer' : ' casos perto de vencer')
+      + (prazo.nomeDoCanal ? ' na ' + escapar(prazo.nomeDoCanal) : '') + '.</strong> '
+      + 'Estão no amarelo do prazo — trabalhe antes que fiquem vermelhos.</p>'
+      + '<button type="button" class="botao-secundario pequeno" id="ver-casos-do-prazo">Ver os casos</button></div>';
+    elemento('ver-casos-do-prazo').addEventListener('click', avisarDosQueVencem);
+  }
+
+  function avisarDosQueVencem() {
+    var prazo = prazoPorCanal[canalEscolhido];
+    var achados = prazo ? prazo.achados : [];
     if (!achados.length || document.getElementById('dialogo-prazo')) return;
 
-    var nomeDoCanal = resumo.canal && resumo.canal.nome ? resumo.canal.nome : '';
+    var nomeDoCanal = prazo.nomeDoCanal;
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
     caixa.id = 'dialogo-prazo';
     // O número é o da fila inteira; a lista vem com até 100 (ver o servidor).
-    var quantos = Math.max(Number(resumo.quantosPertoDeVencer) || 0, achados.length);
+    var quantos = prazo.quantos;
     var sobram = quantos - achados.length;
     caixa.innerHTML = '<div class="dialogo-caixa aviso-de-prazo" role="alertdialog"'
       + ' aria-modal="true" aria-labelledby="titulo-prazo" aria-describedby="texto-prazo">'
@@ -698,6 +796,7 @@ var TelaTrabalho = (function () {
       desenharAbas();
     }
     ligarPainel();
+    desenharFaixaDoPrazo();
     var busca = elemento('busca-na-fila');
     if (focarABusca && busca) {
       busca.focus();
@@ -740,12 +839,12 @@ var TelaTrabalho = (function () {
           resumo.fila = expandirFila(resposta.fila, resposta.colunas);
           resumo.pertoDeVencer = expandirFila(resposta.pertoDeVencer, resposta.colunas);
         }
-        desenharPainel();
         if (avisarQuandoChegar) {
           avisarQuandoChegar = false;
           jaAvisouNoCanal[canalEscolhido] = true;
-          avisarDosQueVencem();
+          guardarOPrazo();
         }
+        desenharPainel();
       })
       .senao(function (erro) {
         if (meuPedido !== pedidoDoPainel) return;
@@ -806,6 +905,9 @@ var TelaTrabalho = (function () {
     ligarCliques('[data-mostrar]', function (botao) {
       var escolha = botao.getAttribute('data-mostrar');
       quantosNaFila = escolha === 'todos' ? 'todos' : Number(escolha);
+      if (escolha !== 'todos') {
+        try { window.localStorage.setItem(CHAVE_DO_MOSTRAR, String(quantosNaFila)); } catch (semArmazenamento) { /* vale só agora */ }
+      }
       focarNoMostrar = escolha;
       // Faltam casos na tela (o "Todos", ou — numa aba grande, Etapa 84 — o 50 e
       // o 100): o servidor traz o resto.
@@ -816,6 +918,14 @@ var TelaTrabalho = (function () {
         return;
       }
       desenharPainel();
+    });
+
+    // V2: o × do cartão e da busca, e o "Limpar tudo" (o mesmo do "Limpar filtros").
+    ligarCliques('[data-tirar-cartao]', function () { filtrosEscolhidos.cartao = ''; carregar(); });
+    ligarCliques('[data-tirar-busca]', function () { filtrosEscolhidos.busca = ''; carregar(); });
+    ligarCliques('#limpar-tudo-da-fila', function () {
+      var limpar = elemento('limpar-filtros');
+      if (limpar) limpar.click();
     });
 
     ligarCliques('[data-trabalhar]', function (botao) {
@@ -864,6 +974,7 @@ var TelaTrabalho = (function () {
       Aplicacao.remontar();
     });
     desenharAbas();
+    desenharFaixaDoPrazo();
     if (abaDaMesa === 'reunioes') { carregarAgenda(); return; }
     // A primeira carga do canal traz o aviso dos que vencem; as seguintes
     // (filtro, gravação, período) não.
