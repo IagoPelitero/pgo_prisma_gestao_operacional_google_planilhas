@@ -4369,6 +4369,56 @@ o aviso da F14 que não sai, e o que aparece antes dos 8 s.
 
 ---
 
+## Etapa 89 — Busca inteligente e refinamento de desempenho
+
+Pedido do PO: "ETAPA 4 — BUSCA INTELIGENTE E REFINAMENTO DE DESEMPENHO (…) permitindo que o
+analista escolha onde pesquisar, sem perder acesso a qualquer registro antigo". Nada publicado em
+produção; o Excel vem só na última etapa.
+
+| O que | Como ficou |
+|---|---|
+| **Pesquisar por** | Seletor no Buscar Caso: Proposta, Nome do segurado, Apólice, CPF, Busca rápida (os quatro) e Busca avançada (a busca da 1.88, inteira). Só na BASE_RET; Mesa, VG, histórico e base legada procuram como antes, em qualquer opção |
+| **As colunas** | Pelo cabeçalho, todas do contrato. A proposta e a apólice moram em mais de uma coluna, e a regra de juntar foi preservada: Proposta = Código origem + número (com ou sem hífen); Apólice = cod_sucursal + cod_ramo + Num_apolice. Decisões do PO: a apólice completa também acha (na avançada, não — como na 1.88); a Nova proposta não entra; "Nome do segurado" é a coluna "nome do cliente"; a tela abre na avançada e lembra a escolha de cada analista |
+| **A comparação** | A da busca avançada (`aplicarBusca_`), nas colunas do campo: dígitos no identificador, texto sem acento/caixa/pontuação. Na busca rápida, os dígitos comparam quando o termo parece número — como a avançada faz na prática |
+| **Por dentro** | Pelo custo, na régua do PO: lê só as colunas do campo, até a última linha (RET de hoje), ou o localizador só nelas — uma procura por expressão, nunca na linha toda (base grande); sem candidata, lê as colunas antes de dizer "nada encontrado". Alcance antes do corte dos 100; ocultos fora (a `_Visivel` só é lida quando passa de 100); só os casos da tela são lidos inteiros. A aba ERROS registra a opção (`buscarCasos · CPF`) |
+| **Salvar o caso** | `editarCaso` e `alterarSituacaoDoCaso` procuravam o mesmo Id duas vezes antes da trava. Agora a linha do caso lido vai para `atualizarRegistro_`; dentro da trava, o Id é conferido naquela linha (se um caso acima foi excluído, procura de novo) e a versão da B1 também. Id repetido continua recusado com o recado de sempre |
+| **Trabalho** | Sem mudança: B3 e F5 preservadas, nenhuma leitura nova |
+| **Versão** | 1.89 |
+
+**Medida — SIMULADA** (`medir-telas.js --comparar linha-de-base-1.88.json`, planilha do tamanho da do
+PO; a RÉGUA PO é estimativa da aba ERROS, não medição):
+
+| Função | Chamadas | Localizador | Células | Régua PO |
+|---|---|---|---|---|
+| editarCaso | 35 → 32 | 3 → 2 | igual | 3,9 → 2,8 s |
+| alterarSituacaoDoCaso | 20 → 17 | 2 → 1 | igual | 2,5 → 1,4 s |
+| Buscar só na RET · CPF que existe | avançada 20 · por CPF 19 | 1 · 0 | 109 · 3.682 | 1,5 · **0,7 s** |
+| Buscar só na RET · CPF que não existe | avançada 29 · por CPF 18 | 1 · 0 | 17.923 · 3.631 | 2,7 · **0,6 s** |
+| Buscar só na RET · Proposta / Apólice | 18 | 0 | 7.204 / 10.777 | 0,8 / 1,0 s |
+| Buscar só na RET · busca rápida | 20 | 1 | 109 | 1,5 s (igual à avançada) |
+
+As outras 19 das 21 funções que a 1.88 mediu ficaram **idênticas** (Trabalho, Cadastrar, a busca em todos os
+canais, Configurações, Produtividade). Em escala (RET de 10 mil e 50 mil linhas, simulado): por CPF
+1,0 e 1,5 s, contra 1,5 s da avançada; a busca rápida empata com a avançada quando acha (1,5 s) e custa
+mais quando não acha (5,2 × 4,4 s; 20,1 × 15,0 s), porque relê as 7 colunas dos quatro campos antes de
+dizer "nada encontrado" — a avançada relê as 5 colunas da busca do canal. **Nenhum ganho real foi
+medido**: o 07-manual diz como medir na planilha (a aba ERROS com o limite baixo por um dia e a M1).
+
+Testes: `testes-pesquisar-por.js` (21) — um gabarito que olha linha por linha a regra de cada campo: 22
+termos × 5 opções, pelos dois caminhos, como administrador e como nível Operação, idênticos; proposta
+com e sem hífen; apólice completa; ocultos; mais de 100; o localizador só nas colunas; Mesa e VG sem as
+colunas da RET; coluna ausente; e os casos das linhas 10, 1.000, 10.000, 20.000 e 50.000 achados na RET
+(3 caminhos, com alcance), na Mesa, no VG, no histórico e na base legada (50 mil linhas, outras colunas).
+`testes-gravacao-simultanea.js` (+5): uma procura só; um caso excluído acima entre a leitura e a trava (a
+edição e a troca de status caem no caso certo); Id repetido; a disputa da B1. Ponta a ponta: o seletor, a
+etiqueta, a opção enviada, a lembrança sem dado de caso. Quebras de propósito, todas pegas: sem juntar
+(9), sem ocultos (2), alcance depois do corte (1), localizador na linha toda (1), só as 20 mil primeiras
+linhas (4), sem a leitura de reserva (2), a `_Visivel` nunca filtrada (2), dígitos sempre na rápida (2), a
+trava sem conferir o Id (2 — e a B1 também recusou), editar sem a linha (1), reaproveitar com Id repetido
+(1). Um teste antigo da varredura pegou a perda da recusa do Id repetido antes do commit.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

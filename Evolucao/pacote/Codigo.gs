@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-19 09:16
+   Gerado em 2026-11-19 11:59
    ========================================================================== */
 
 
@@ -1989,9 +1989,10 @@ function linhaConferidaNaTrava_(estrutura, id, linhaAchada) {
   return linhaDoRegistro_(estrutura, id);
 }
 
-function atualizarRegistro_(nomeDaAba, id, alteracoes, conferirNaTrava) {
+function atualizarRegistro_(nomeDaAba, id, alteracoes, conferirNaTrava, linhaJaAchada) {
   exigirQuePossaEscreverNaAbaDeFora_(nomeDaAba);
-  var linhaAchada = linhaProcuradaAntesDaTrava_(nomeDaAba, id);
+
+  var linhaAchada = linhaJaAchada > 1 ? linhaJaAchada : linhaProcuradaAntesDaTrava_(nomeDaAba, id);
   var trava = LockService.getScriptLock();
   if (!esperarATrava_(trava, 25000)) {
     throw new Error('A planilha está ocupada com outra gravação. Tente de novo.');
@@ -3910,7 +3911,8 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   var alvo = converterParaIdentificador_(idDoCaso);
   if (!alvo) throw new Error('Informe qual caso deve ser alterado.');
 
-  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
+  var comEsteId = buscarRegistros_(canal.aba, 'Id', alvo, 2);
+  var atual = comEsteId[0];
   if (!atual) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
@@ -3935,7 +3937,7 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
     if (versaoDoCaso_(naTrava, canal.aba) !== versaoQueAbriu) {
       throw new Error(RECC_CASO_ALTERADO_POR_OUTRA_PESSOA);
     }
-  } : null);
+  } : null, comEsteId.length === 1 ? atual.__linha : 0);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
   return { id: alvo, canal: canal.nome };
@@ -3992,7 +3994,8 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
       'a situação, então não há o que trocar. Isso se ajusta em Configurações.');
   }
 
-  var atual = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
+  var comEsteId = buscarRegistros_(canal.aba, 'Id', alvo, 2);
+  var atual = comEsteId[0];
   if (!atual) {
     throw new Error('O caso ' + alvo + ' não existe no canal ' + canal.nome + '.');
   }
@@ -4033,7 +4036,7 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
     if (versaoDoCaso_(naTrava, canal.aba) !== versaoLida) {
       throw new Error(RECC_STATUS_ALTERADO_POR_OUTRA_PESSOA);
     }
-  });
+  }, comEsteId.length === 1 ? atual.__linha : 0);
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom };
 }
@@ -4775,16 +4778,25 @@ function opcoesDaBusca() {
     historico: { ligado: String(valorDaConfiguracao_(RECC_CHAVE_DO_HISTORICO_DA_BASE, '')).trim() !== '' },
     minimo: RECC_MINIMO_DO_TERMO,
     maximo: RECC_MAXIMO_DA_BUSCA,
-    escopo: quem.permissoes.escopo
+    escopo: quem.permissoes.escopo,
+
+    pesquisarPor: RECC_PESQUISAR_POR.map(function (opcao) {
+      return { chave: opcao.chave, rotulo: opcao.rotulo };
+    }),
+    basesDaPesquisaDirigida: Object.keys(RECC_CAMPOS_DA_PESQUISA_DIRIGIDA)
   };
 }
 
-function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico) {
-  return cronometrado_('buscarCasos', buscarCasosSemRelogio_, arguments);
+function buscarCasos(termo, ondeProcurar, incluirLegado, incluirHistorico, pesquisarPor) {
+
+  var opcao = opcaoDaPesquisa_(pesquisarPor);
+  return cronometrado_('buscarCasos' + (opcao.chave === 'avancada' ? '' : ' · ' + opcao.rotulo),
+    buscarCasosSemRelogio_, arguments);
 }
 
-function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHistorico) {
+function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHistorico, pesquisarPor) {
   var quem = exigirTela_('buscarCaso');
+  var opcao = opcaoDaPesquisa_(pesquisarPor);
 
   var procurado = String(termo || '').trim();
   if (procurado.length < RECC_MINIMO_DO_TERMO) {
@@ -4800,7 +4812,11 @@ function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHisto
     if (escolhidas.length && escolhidas.indexOf(converterParaIdentificador_(canal.id)) < 0) {
       return;
     }
-    resultados.push(procurarNoCanal_(canal, procurado, quem));
+
+    var campos = opcao.chave === 'avancada' ? null : RECC_CAMPOS_DA_PESQUISA_DIRIGIDA[canal.aba];
+    resultados.push(campos
+      ? procurarPorCamposNoCanal_(canal, procurado, quem, opcao, campos)
+      : procurarNoCanal_(canal, procurado, quem));
 
     if (incluirHistorico) {
       var doHistorico = procurarNoHistorico_(canal, procurado, quem);
@@ -4821,6 +4837,7 @@ function buscarCasosSemRelogio_(termo, ondeProcurar, incluirLegado, incluirHisto
   return {
     termo: procurado,
     total: total,
+    pesquisarPor: opcao.chave,
     origens: resultados,
 
     podeEditar: podeFazer_(quem.permissoes, RECC_ACOES.EDITAR)
@@ -4898,6 +4915,264 @@ function procurarNoCanal_(canal, termo, quem) {
     conferidos = conferidos.slice(-RECC_MAXIMO_DA_BUSCA);
   }
   origem.casos = montarFila_(conferidos, canal);
+  return origem;
+}
+
+var RECC_PESQUISAR_POR = [
+  { chave: 'proposta', rotulo: 'Proposta', campos: ['proposta'] },
+  { chave: 'nome', rotulo: 'Nome do segurado', campos: ['nome'] },
+  { chave: 'apolice', rotulo: 'Apólice', campos: ['apolice'] },
+  { chave: 'cpf', rotulo: 'CPF', campos: ['cpf'] },
+  { chave: 'rapida', rotulo: 'Busca rápida — os quatro campos', campos: ['proposta', 'nome', 'apolice', 'cpf'] },
+  { chave: 'avancada', rotulo: 'Busca avançada — todas as colunas', campos: [] }
+];
+
+var RECC_CAMPOS_DA_PESQUISA_DIRIGIDA = {
+  BASE_RET: {
+    proposta: { rotulo: 'Proposta', colunas: ['Código origem da proposta', 'número da proposta'] },
+    nome: { rotulo: 'Nome do segurado', colunas: ['nome do cliente'] },
+    apolice: { rotulo: 'Apólice', colunas: ['cod_sucursal', 'cod_ramo', 'Num_apolice'] },
+    cpf: { rotulo: 'CPF', colunas: ['CPF'] }
+  }
+};
+
+var RECC_CELULAS_QUE_VALEM_UM_LOCALIZADOR = 19000;
+
+var RECC_CAMINHO_DA_PESQUISA_DIRIGIDA = '';
+
+function opcaoDaPesquisa_(pesquisarPor) {
+  var chave = normalizarParaComparar_(pesquisarPor || 'avancada');
+  var opcao = RECC_PESQUISAR_POR.filter(function (uma) { return uma.chave === chave; })[0];
+  if (!opcao) throw new Error('Não conheço a opção de pesquisa "' + pesquisarPor + '". Escolha uma da lista.');
+  return opcao;
+}
+
+function camposDaPesquisaNaBase_(canal, estrutura, opcao, declarados) {
+  var faltando = [];
+  var sozinho = opcao.campos.length === 1;
+  var campos = opcao.campos.map(function (chave) {
+    var campo = declarados[chave];
+    return {
+      rotulo: campo.rotulo,
+      sozinho: sozinho,
+      pedacos: campo.colunas.map(function (nome) {
+        var posicao = posicaoDaColuna_(estrutura, nome);
+        if (posicao < 0) { faltando.push(nome); return null; }
+        return { posicao: posicao, cabecalho: estrutura.cabecalhos[posicao], tipo: estrutura.tipos[posicao] };
+      })
+    };
+  });
+  return faltando.length ? { faltando: faltando } : { campos: campos };
+}
+
+function campoCasaComOTermo_(campo, valoresDaLinha, termo, termoEhNumero) {
+  var algumPedaco = campo.pedacos.some(function (pedaco) {
+    if (pedaco.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR && !campo.sozinho && !termoEhNumero) return false;
+    var cru = valoresDaLinha[pedaco.posicao];
+    var valor = pedaco.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR ? cru : paraTexto_(cru, pedaco.tipo);
+    return casaComOTermo_(valor, termo, pedaco.tipo);
+  });
+  if (algumPedaco || campo.pedacos.length < 2) return algumPedaco;
+  var inteira = campo.pedacos.map(function (pedaco) {
+    var cru = valoresDaLinha[pedaco.posicao];
+    return String(cru === undefined || cru === null ? '' : cru);
+  }).filter(function (texto) { return texto !== ''; }).join('-');
+  return casaComOTermo_(inteira, termo, '');
+}
+
+function lerColunasDaBase_(estrutura, posicoes, total) {
+  return lendoAPlanilha_(lerColunasDaBaseSemRelogio_, arguments);
+}
+
+function lerColunasDaBaseSemRelogio_(estrutura, posicoes, total) {
+  var porPosicao = {};
+  faixasContinuas_(posicoes).forEach(function (faixa) {
+    var valores = estrutura.aba.getRange(2, faixa.inicio + 1, total, faixa.fim - faixa.inicio + 1).getValues();
+    for (var posicao = faixa.inicio; posicao <= faixa.fim; posicao++) {
+      porPosicao[posicao] = valores.map(function (linha) { return linha[posicao - faixa.inicio]; });
+    }
+  });
+  return porPosicao;
+}
+
+function faixasContinuas_(posicoes) {
+  var ordenadas = posicoes.slice().sort(function (uma, outra) { return uma - outra; })
+    .filter(function (posicao, i, todas) { return i === 0 || posicao !== todas[i - 1]; });
+  var faixas = [];
+  ordenadas.forEach(function (posicao) {
+    var ultima = faixas[faixas.length - 1];
+    if (ultima && posicao === ultima.fim + 1) ultima.fim = posicao;
+    else faixas.push({ inicio: posicao, fim: posicao });
+  });
+  return faixas;
+}
+
+function planoDoLocalizador_(campos, termo, termoEhNumero) {
+  var normalizado = normalizarParaComparar_(termo);
+  var digitos = apenasDigitos_(termo);
+  var pedacos = String(termo).split(/[^0-9A-Za-zÀ-ÖØ-öø-ÿ]+/).filter(function (p) { return p; });
+  var maior = pedacos.length > 1 && pedacos.every(function (p) { return /^[0-9]+$/.test(p); })
+    ? pedacos.reduce(function (um, outro) { return outro.length > um.length ? outro : um; }) : '';
+  if (maior.length < RECC_PEDACO_MINIMO_DA_BUSCA) maior = '';
+
+  var pedidos = [];
+  campos.forEach(function (campo) {
+    var composto = campo.pedacos.length > 1;
+    campo.pedacos.forEach(function (pedaco) {
+      var ehIdentificador = pedaco.tipo === RECC_TIPO_DE_DADO.IDENTIFICADOR;
+      if (termoEhNumero) {
+        if (digitos) pedidos.push({ posicao: pedaco.posicao, alvo: digitos, identificador: true });
+        if (composto && maior) pedidos.push({ posicao: pedaco.posicao, alvo: maior, identificador: true });
+        return;
+      }
+      if (!ehIdentificador || composto) pedidos.push({ posicao: pedaco.posicao, alvo: normalizado, identificador: false });
+      if (ehIdentificador && campo.sozinho && digitos) {
+        pedidos.push({ posicao: pedaco.posicao, alvo: digitos, identificador: true });
+      }
+    });
+  });
+  if (pedidos.some(function (pedido) { return !/^[a-z0-9]+$/.test(pedido.alvo); })) return null;
+
+  var porExpressao = {};
+  pedidos.forEach(function (pedido) {
+    var chave = (pedido.identificador ? 'i|' : 't|') + pedido.alvo;
+    (porExpressao[chave] = porExpressao[chave] || { alvo: pedido.alvo, identificador: pedido.identificador, posicoes: [] })
+      .posicoes.push(pedido.posicao);
+  });
+
+  return Object.keys(porExpressao).map(function (chave) {
+    var item = porExpressao[chave];
+    return { expressao: expressaoDaBuscaRapida_(item.alvo, item.identificador, false),
+      faixas: [{ inicio: Math.min.apply(null, item.posicoes), fim: Math.max.apply(null, item.posicoes) }] };
+  });
+}
+
+function procurasDoPlano_(plano) {
+  return plano.reduce(function (soma, item) { return soma + item.faixas.length; }, 0);
+}
+
+function linhasDosCamposPeloLocalizador_(estrutura, plano, total) {
+  return procurandoNaPlanilha_(linhasDosCamposPeloLocalizadorSemRelogio_, arguments);
+}
+
+function linhasDosCamposPeloLocalizadorSemRelogio_(estrutura, plano, total) {
+  if (!buscaRapidaLigada_()) return null;
+  var achadas = {};
+  try {
+    plano.forEach(function (item) {
+      var expressao = item.expressao;
+      item.faixas.forEach(function (faixa) {
+        estrutura.aba.getRange(2, faixa.inicio + 1, total, faixa.fim - faixa.inicio + 1)
+          .createTextFinder(expressao)
+          .useRegularExpression(true)
+          .matchFormulaText(false)
+          .findAll()
+          .forEach(function (celula) { achadas[celula.getRow()] = true; });
+      });
+    });
+  } catch (erro) {
+    return null;
+  }
+  return Object.keys(achadas).map(Number).sort(function (uma, outra) { return uma - outra; });
+}
+
+function procurarPorCamposNoCanal_(canal, termo, quem, opcao, declarados) {
+  comAGrafiaDaAba_(canal);
+  var estrutura = estruturaDaAba_(canal.aba);
+  var achados = camposDaPesquisaNaBase_(canal, estrutura, opcao, declarados);
+  if (achados.faltando) {
+
+    var deReserva = procurarNoCanal_(canal, termo, quem);
+    deReserva.aviso = 'A pesquisa por ' + opcao.rotulo + ' precisa da coluna "' + achados.faltando.join('", "')
+      + '", que não está na ' + canal.aba + ': a busca foi feita em todas as colunas.'
+      + (deReserva.aviso ? ' ' + deReserva.aviso : '');
+    return deReserva;
+  }
+  var origem = {
+    tipo: 'canal',
+    id: canal.id,
+    nome: canal.nome,
+    icone: canal.icone,
+    colunas: colunasDaFila_(canal),
+    casos: [],
+    aviso: '',
+    pesquisouEm: opcao.rotulo
+  };
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return origem;
+
+  var posicoes = [];
+  achados.campos.forEach(function (campo) {
+    campo.pedacos.forEach(function (pedaco) { posicoes.push(pedaco.posicao); });
+  });
+  var iVisivel = posicaoDaColuna_(estrutura, '_Visivel');
+  var termoEhNumero = /^[\d\s.\-\/]+$/.test(String(termo).trim());
+
+  var celulasDasColunas = total * faixasContinuas_(posicoes).reduce(function (soma, faixa) {
+    return soma + faixa.fim - faixa.inicio + 1;
+  }, 0);
+  var plano = planoDoLocalizador_(achados.campos, termo, termoEhNumero);
+  var peloLocalizador = plano !== null && (RECC_CAMINHO_DA_PESQUISA_DIRIGIDA
+    ? RECC_CAMINHO_DA_PESQUISA_DIRIGIDA === 'localizador'
+    : celulasDasColunas > procurasDoPlano_(plano) * RECC_CELULAS_QUE_VALEM_UM_LOCALIZADOR);
+  if (peloLocalizador) {
+    var candidatas = linhasDosCamposPeloLocalizador_(estrutura, plano, total);
+    if (candidatas && candidatas.length) {
+      return comAsCandidatasDoLocalizador_(origem, canal, estrutura, achados.campos, candidatas, termo, quem, termoEhNumero);
+    }
+
+  }
+
+  var colunas = lerColunasDaBase_(estrutura, posicoes, total);
+  var linhas = [];
+  for (var i = 0; i < total; i++) {
+    var daLinha = {};
+    posicoes.forEach(function (posicao) { daLinha[posicao] = colunas[posicao][i]; });
+    if (achados.campos.some(function (campo) { return campoCasaComOTermo_(campo, daLinha, termo, termoEhNumero); })) {
+      linhas.push(i + 2);
+    }
+  }
+
+  if (linhas.length > RECC_MAXIMO_DA_BUSCA && iVisivel >= 0) {
+    var visivel = lerColunasDaBase_(estrutura, [iVisivel], total)[iVisivel];
+    linhas = linhas.filter(function (linha) { return normalizarParaComparar_(visivel[linha - 2]) !== 'nao'; });
+  }
+
+  linhas = linhasNoMeuAlcance_(canal.aba, linhas, quem);
+  if (linhas.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = avisoDoMaximoDaBusca_(linhas.length);
+    linhas = linhas.slice(-RECC_MAXIMO_DA_BUSCA);
+  }
+  var conferidos = filtrarPeloAlcance_(semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas)),
+    canal.aba, quem);
+  origem.casos = montarFila_(conferidos, canal);
+  return origem;
+}
+
+function comAsCandidatasDoLocalizador_(origem, canal, estrutura, campos, candidatas, termo, quem, termoEhNumero) {
+  var linhas = linhasNoMeuAlcance_(canal.aba, candidatas, quem);
+  var conferidos = [];
+  var fim = linhas.length;
+  function casa(registro) {
+    var daLinha = {};
+    campos.forEach(function (campo) {
+      campo.pedacos.forEach(function (pedaco) { daLinha[pedaco.posicao] = registro[pedaco.cabecalho]; });
+    });
+    return campos.some(function (campo) { return campoCasaComOTermo_(campo, daLinha, termo, termoEhNumero); });
+  }
+  while (fim > 0 && conferidos.length <= RECC_MAXIMO_DA_BUSCA) {
+    var lote = linhas.slice(Math.max(0, fim - RECC_LOTE_DA_BUSCA), fim);
+    fim -= lote.length;
+    var lidos = semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, lote));
+    conferidos = filtrarPeloAlcance_(lidos.filter(casa), canal.aba, quem).concat(conferidos);
+  }
+  if (fim > 0) {
+    origem.aviso = 'O termo aparece em ' + linhas.length + ' linhas da base, e a busca mostra os '
+      + RECC_MAXIMO_DA_BUSCA + ' casos mais recentes. Um termo mais específico chega mais perto.';
+  } else if (conferidos.length > RECC_MAXIMO_DA_BUSCA) {
+    origem.aviso = avisoDoMaximoDaBusca_(conferidos.length);
+  }
+  origem.casos = montarFila_(conferidos.slice(-RECC_MAXIMO_DA_BUSCA), canal);
   return origem;
 }
 
@@ -9412,7 +9687,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.88',
+  numero: '1.89',
   data: '19/11/2026'
 };
 

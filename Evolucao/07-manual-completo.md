@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1839 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1865 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -360,7 +360,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1839 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1865 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1018,6 +1018,41 @@ lidas como antes — "nada encontrado" nunca depende só dele. `OPERACAO.BUSCA_R
 em blocos, e não mais uma ida à planilha de fora por linha. E quando há uma **planilha legada** apontada, ela
 entra como uma origem a mais — lida como está, em leitura, sem prometer
 edição do que não é caso do sistema.
+
+### Pesquisar por (Etapa 89)
+
+Pedido do PO: "as pesquisas operacionais mais frequentes utilizam apenas quatro
+informações". Abaixo da caixa, o seletor **Pesquisar por**:
+
+| Opção | Onde procura na BASE_RET |
+|---|---|
+| **Proposta** | `Código origem da proposta` + `número da proposta` — com ou sem hífen: `7-0000123`, `70000123` e `0000123` acham |
+| **Nome do segurado** | `nome do cliente` (é o nome da coluna na RET) — sem acento, sem maiúscula |
+| **Apólice** | `cod_sucursal` + `cod_ramo` + `Num_apolice` — o número sozinho **e** a apólice completa `12-1391-0000000` |
+| **CPF** | `CPF` — com ou sem pontuação |
+| **Busca rápida — os quatro campos** | os quatro acima. CPF, proposta e apólice comparam pelos dígitos quando o termo parece número |
+| **Busca avançada — todas as colunas** | a busca de sempre (1.88), em todas as colunas — protocolo, e-mail, SUSEP, telefone… |
+
+- **Vale só na BASE_RET.** Mesa, VG, o histórico e a base legada procuram como sempre,
+  em qualquer opção, e as marcações de "Onde procurar" continuam valendo.
+- **Nenhum registro antigo se perde:** procura até a última linha, e os testes acham os
+  casos das linhas 10, 1.000, 10.000, 20.000 e 50.000 na RET, na Mesa, no VG, no
+  histórico e na base legada. Mais de 100: mostra os 100 mais recentes e diz quantos achou.
+- **A tela abre na busca avançada**, e o navegador lembra a última escolha de cada
+  analista (só a opção, nenhum dado de caso). Na RET, o resultado diz onde procurou.
+- **Por dentro:** lê só as colunas do campo (ou, numa base grande, usa o localizador só
+  nelas), compara com a mesma regra da busca avançada e só lê inteiros os casos que vão
+  para a tela. As permissões vêm antes do corte dos 100. Se uma coluna do campo sumir da
+  planilha, a busca avançada responde, com aviso.
+
+**Medir na planilha de verdade.** A aba ERROS registra cada busca com o nome da opção
+(`buscarCasos · CPF`, `buscarCasos · Busca rápida — os quatro campos`; a avançada continua
+`buscarCasos`), com o tempo lendo e procurando. Ela só registra o que passa do limite
+(8 s). Para comparar num dia normal: em `CONFIG`, ponha `OPERACAO.SEGUNDOS_DA_CHAMADA_LENTA`
+= `1`, faça as mesmas buscas em cada opção, leia a aba ERROS e volte o valor a `8` (ou
+apague a linha). Rode também **Configurações › Estrutura › Medir a velocidade**: a ida
+pequena e a aba inteira da BASE_RET dizem se a régua de custo (1 procura do localizador ≈
+19 mil células) vale na sua planilha.
 
 ---
 
@@ -1945,7 +1980,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.88** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.89** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -1953,7 +1988,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1839 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1865 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.
