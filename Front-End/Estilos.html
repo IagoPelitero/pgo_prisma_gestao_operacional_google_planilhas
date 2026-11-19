@@ -48,19 +48,23 @@
   --linha: #DCE4EE;
   --linha-forte: #BCC8D8;
   --texto: #14213A;
-  --suave: #56667F;
-  --tenue: #8494A9;
+  --suave: #4F5F78;
+  --tenue: #5B6B82;
 
-  /* O menu lateral do padrão é o azul vivo da marca, com o texto em branco e
-     o item atual numa pastilha branca de texto escuro. Branco sobre o azul é
-     o contraste mais alto que esse fundo aceita — e o que a operação aprovou. */
-  --lateral-fundo: #17A2E8;
+  /* Etapa 90 (proposta visual aprovada, F19): o menu é o azul Porto ESCURO
+     (#0B4F94) — o branco sobre ele foi de 2,85:1 (o azul vivo #17A2E8) para
+     8,4:1 —, e o texto suave e o tênue passaram de 2,9:1 para mais de 5:1.
+     Rosa e Brasil ganharam o equivalente (#A8125A, #0B6B35, o item atual do
+     Brasil no amarelo); o Dark só clareou o texto. O item atual é a pastilha
+     clara com o azul no texto. */
+  --lateral-fundo: #0B4F94;
   --lateral-texto: #FFFFFF;
+  --lateral-subtexto: #C9DCF2;
   --lateral-titulo: #FFFFFF;
-  --lateral-marca-realce: #0A2A3D;
-  --lateral-linha: #47BAF0;
+  --lateral-marca-realce: #C9DCF2;
+  --lateral-linha: #2E6BAA;
   --lateral-ativo: #FFFFFF;
-  --lateral-ativo-texto: #0A2A3D;
+  --lateral-ativo-texto: #0B4F94;
 
   --violeta: #6B4FD8;     --violeta-tenue: #EDE9FB;
 
@@ -94,16 +98,17 @@
   --linha: #EED6E1;
   --linha-forte: #DCB4C7;
   --texto: #2B1420;
-  --suave: #6E5260;
-  --tenue: #9C8290;
+  --suave: #63485A;
+  --tenue: #6E5260;
 
-  --lateral-fundo: #E8489B;
+  --lateral-fundo: #A8125A;
   --lateral-texto: #FFFFFF;
+  --lateral-subtexto: #F6CFE2;
   --lateral-titulo: #FFFFFF;
-  --lateral-marca-realce: #3A0A22;
-  --lateral-linha: #F084BE;
+  --lateral-marca-realce: #F6CFE2;
+  --lateral-linha: #BC3B76;
   --lateral-ativo: #FFFFFF;
-  --lateral-ativo-texto: #3A0A22;
+  --lateral-ativo-texto: #A8125A;
 
   --violeta: #6D28D9;     --violeta-tenue: #EDE7FB;
 
@@ -137,8 +142,8 @@
   --linha: #26344C;
   --linha-forte: #3A4B69;
   --texto: #E7EDF7;
-  --suave: #9AAAC2;
-  --tenue: #75879F;
+  --suave: #AEBBD0;
+  --tenue: #9AAAC2;
 
 
   /* Os mesmos seis tons, repassados para o fundo escuro — e não a paleta
@@ -151,12 +156,13 @@
   --serie-6: #008300;
 
   --lateral-fundo: #0E1725;
-  --lateral-texto: #9EB0C9;
+  --lateral-texto: #C9D6E8;
+  --lateral-subtexto: #8FA3BF;
   --lateral-titulo: #FFFFFF;
   --lateral-marca-realce: #5C9DFF;
   --lateral-linha: #202D42;
-  --lateral-ativo: #1E3358;
-  --lateral-ativo-texto: #FFFFFF;
+  --lateral-ativo: #1B2C47;
+  --lateral-ativo-texto: #E7EDF7;
 
   --violeta: #A794F5;     --violeta-tenue: #241E45;
 
@@ -178,15 +184,16 @@
   --linha: #D3E5D8;
   --linha-forte: #AECDB7;
   --texto: #10251A;
-  --suave: #4E6656;
-  --tenue: #7C9585;
+  --suave: #45604E;
+  --tenue: #4E6656;
 
-  --lateral-fundo: #12A150;
+  --lateral-fundo: #0B6B35;
   --lateral-texto: #FFFFFF;
+  --lateral-subtexto: #CDEBD7;
   --lateral-titulo: #FFFFFF;
-  --lateral-marca-realce: #06301A;
-  --lateral-linha: #4DC181;
-  --lateral-ativo: #FFFFFF;
+  --lateral-marca-realce: #FFDF00;
+  --lateral-linha: #2C8150;
+  --lateral-ativo: #FFDF00;
   --lateral-ativo-texto: #06301A;
 
   --violeta: #5B41C4;     --violeta-tenue: #EAE6FA;
@@ -380,8 +387,8 @@ button { font: inherit; color: inherit; }
   margin-left: auto; flex: 0 0 auto;
   display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 8px;
-  border: 0; background: var(--lateral-marca-realce);
-  color: var(--lateral-fundo); cursor: pointer;
+  border: 0; background: var(--lateral-linha);
+  color: var(--lateral-titulo); cursor: pointer;
 }
 .lateral-encolher:hover { opacity: .85; }
 .lateral-encolher svg { width: 18px; height: 18px; }
@@ -566,7 +573,15 @@ button { font: inherit; color: inherit; }
 /* -------------------------------------------------------------- miolo --- */
 .miolo { padding: 22px; flex: 1 1 auto; }
 
-.cabecalho-da-tela { margin-bottom: 18px; }
+/* O cabeçalho da tela (Etapa 90, proposta aprovada): o título à esquerda e,
+   quando a tela tem canal, o seletor compacto à direita, na mesma linha. Sem
+   espaço (notebook, celular), o seletor desce para a linha de baixo sozinho. */
+.cabecalho-da-tela {
+  margin-bottom: 18px;
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  gap: 14px 24px;
+}
+.cabecalho-da-tela .titulo-da-tela { flex: 1 1 320px; min-width: 0; }
 .cabecalho-da-tela h2 {
   margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -.024em;
   line-height: 1.2;
@@ -1200,15 +1215,36 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
 .canal .dizeres span { font-size: 13px; color: var(--suave); }
 .canal:hover { border-color: var(--linha-forte); }
 
-/* O canal escolhido usa o azul do menu, escurecido — é o mesmo azul da casa,
-   e escuro o bastante para a letra branca ficar legível em cima dele. */
+/* O canal escolhido usa o destaque do tema (Etapa 90, proposta aprovada), com
+   o texto "sobre o destaque" de cada tema — branco a 4,6:1 ou mais. */
 .canal.atual {
-  background: color-mix(in srgb, var(--lateral-fundo) 68%, black);
-  border-color: color-mix(in srgb, var(--lateral-fundo) 68%, black);
-  color: var(--lateral-titulo);
+  background: var(--destaque);
+  border-color: var(--destaque);
+  color: var(--destaque-sobre);
 }
-.canal.atual svg { color: var(--lateral-titulo); }
-.canal.atual .dizeres span { color: var(--lateral-titulo); opacity: .82; }
+.canal.atual svg { color: var(--destaque-sobre); }
+.canal.atual .dizeres span { color: var(--destaque-sobre); }
+
+/* O SELETOR COMPACTO, no cabeçalho da tela (Etapa 90): os canais numa
+   pastilha só, na linha do título — libera ~110 px de altura para a fila. */
+.cabecalho-da-tela .canais {
+  flex: 0 1 auto; margin: 0; gap: 4px; padding: 4px;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: var(--raio); box-shadow: var(--sombra);
+}
+.cabecalho-da-tela .canal {
+  flex: 0 1 auto; gap: 10px; padding: 7px 14px 7px 8px;
+  border: 0; box-shadow: none; background: transparent; border-radius: var(--raio-pequeno);
+}
+.cabecalho-da-tela .canal:hover { background: var(--superficie-2); }
+.cabecalho-da-tela .canal.atual { background: var(--destaque); }
+.cabecalho-da-tela .canal svg {
+  flex: 0 0 32px; width: 32px; height: 32px; padding: 6px;
+  border-radius: var(--raio-pequeno); background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.cabecalho-da-tela .canal.atual svg { background: color-mix(in srgb, var(--destaque-sobre) 18%, transparent); color: var(--destaque-sobre); }
+.cabecalho-da-tela .canal strong { font-size: 14.5px; line-height: 1.25; }
+.cabecalho-da-tela .canal .dizeres span { font-size: 12.5px; line-height: 1.3; display: block; }
 
 .formulario { max-width: 1080px; }
 /*

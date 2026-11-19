@@ -505,10 +505,15 @@ var Aplicacao = (function () {
     elemento('miolo').setAttribute('data-tela', tela);
     document.body.classList.add('com-casca');
     elemento('miolo').innerHTML = '<div class="cabecalho-da-tela">'
+      + '<div class="titulo-da-tela">'
       + '<h2>' + Moldura.escapar(comoSeChama) + '</h2>'
       + '<p>' + Moldura.escapar(definicao.subtitulo) + '</p>'
-      + '</div>'
+      + '</div></div>'
       + definicao.montar(pacote);
+    // O seletor de canal sobe para a linha do título (Etapa 90, proposta
+    // aprovada). Ele continua sendo o mesmo: as telas o procuram pela classe.
+    var seletor = elemento('miolo').querySelector(':scope > .canais');
+    if (seletor) elemento('miolo').querySelector('.cabecalho-da-tela').appendChild(seletor);
     document.title = pacote.identidade.nome + ' — ' + comoSeChama;
 
     ligarMoldura();
