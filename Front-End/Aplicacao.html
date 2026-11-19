@@ -69,6 +69,57 @@ var Servidor = (function () {
   function trocouDeTela(tela) {
     geracaoDaTela++;
     if (tela) telaDaVez = tela;
+    // A tela que esperava saiu: a resposta dela será descartada, e o aviso de
+    // demora dela sai junto (F14).
+    chamadasDemoradas = {};
+    atualizarAvisoDeDemora();
+  }
+
+  /*
+    O AVISO DE DEMORA (Etapa 88, F14).
+
+    Passando de 8 segundos (o mesmo SEGUNDOS_DA_CHAMADA_LENTA que já vai para a
+    aba ERROS), a pessoa via só a tela parada, e clicava de novo. Agora aparece,
+    na pilha dos avisos do canto, o texto pedido pelo PO. Ele fica enquanto
+    houver chamada demorada esperando e sai quando a última termina; se ela
+    termina em erro, sai ANTES de a tela mostrar o erro, que toma o lugar dele.
+
+    É só um relógio no navegador: nenhuma chamada nova ao servidor. Os botões
+    e o envio único seguem como estavam. As chamadas sem pressa (importar,
+    diagnóstico, medir a velocidade) ficam de fora: demoram de propósito, e a
+    tela delas já diz isso.
+  */
+  var TEXTO_DA_DEMORA = 'A consulta está demorando mais que o normal. O Prisma continua '
+    + 'aguardando a resposta. Não é necessário clicar novamente.';
+  var chamadasDemoradas = {};
+  var ultimaChamada = 0;
+
+  function atualizarAvisoDeDemora() {
+    try {
+      var aviso = document.getElementById('aviso-de-demora');
+      var esperando = Object.keys(chamadasDemoradas).length > 0;
+      if (!esperando) {
+        if (aviso && aviso.parentNode) aviso.parentNode.removeChild(aviso);
+        return;
+      }
+      if (aviso) return;
+      var pilha = document.getElementById('avisos-flutuantes');
+      if (!pilha) {
+        pilha = document.createElement('div');
+        pilha.id = 'avisos-flutuantes';
+        pilha.className = 'avisos-flutuantes';
+        pilha.setAttribute('aria-live', 'polite');
+        document.body.appendChild(pilha);
+      }
+      aviso = document.createElement('div');
+      aviso.id = 'aviso-de-demora';
+      aviso.className = 'aviso-flutuante tom-atencao aviso-de-demora';
+      aviso.setAttribute('role', 'status');
+      aviso.textContent = TEXTO_DA_DEMORA;
+      pilha.appendChild(aviso);
+    } catch (erro) {
+      // o aviso de demora não pode virar outro erro
+    }
   }
 
   /*
@@ -162,9 +213,27 @@ var Servidor = (function () {
     // O relógio de desistência. Quem responder primeiro — servidor ou relógio
     // — vence; o segundo é ignorado, para a tela não receber duas respostas.
     var jaRespondeu = false;
+
+    // O relógio do aviso de demora (F14): só nas chamadas do dia a dia.
+    var minhaChamada = ++ultimaChamada;
+    var relogioDaDemora = segundosAteDesistir === SEGUNDOS_ATE_DESISTIR
+      ? setTimeout(function () {
+        if (jaRespondeu || geracaoDaTela !== minhaGeracao) return;
+        chamadasDemoradas[minhaChamada] = true;
+        atualizarAvisoDeDemora();
+      }, SEGUNDOS_DA_CHAMADA_LENTA * 1000)
+      : null;
+    function encerrarADemora() {
+      if (relogioDaDemora) clearTimeout(relogioDaDemora);
+      if (!chamadasDemoradas[minhaChamada]) return;
+      delete chamadasDemoradas[minhaChamada];
+      atualizarAvisoDeDemora();
+    }
+
     var relogio = setTimeout(function () {
       if (jaRespondeu) return;
       jaRespondeu = true;
+      encerrarADemora();
       if (!aTelaAindaEAMesma()) return;
       // A causa mais comum é DEMORA — a planilha ocupada com outras gravações
       // ou lenta —, e não arquivo faltando (análise de 29/10, Etapa 59). Quem
@@ -189,6 +258,7 @@ var Servidor = (function () {
       if (jaRespondeu) return;
       jaRespondeu = true;
       clearTimeout(relogio);
+      encerrarADemora();   // antes de a tela desenhar a resposta ou o erro
       // As chamadas sem pressa (importar, diagnóstico) demoram de propósito.
       if (segundosAteDesistir === SEGUNDOS_ATE_DESISTIR) avisarSeDemorou(nomeDaFuncao, Date.now() - saiuAs);
       if (!aTelaAindaEAMesma()) return;
@@ -221,6 +291,7 @@ var Servidor = (function () {
     try {
       if (typeof corrida[nomeDaFuncao] !== 'function') {
         clearTimeout(relogio);
+        encerrarADemora();
         throw new Error('A função "' + nomeDaFuncao + '" não existe no '
           + 'servidor. Ou o arquivo .gs dela não foi copiado para o projeto '
           + 'do Apps Script, ou ela foi renomeada lá e a tela continua '

@@ -738,6 +738,79 @@ async function rodar() {
     await pagina.waitForTimeout(900);
   });
 
+  await teste('a consulta que passa de 8 s avisa, sem chamar o servidor de novo, e o aviso sai no fim (Etapa 88, F14)', async () => {
+    const TEXTO = 'A consulta está demorando mais que o normal. O Prisma continua aguardando a resposta. '
+      + 'Não é necessário clicar novamente.';
+    const aviso = () => pagina.evaluate(() => {
+      const e = document.getElementById('aviso-de-demora');
+      return e ? { texto: e.textContent, papel: e.getAttribute('role') } : null;
+    });
+    const contarChamadas = () => pagina.evaluate(() => window.__chamadasDeResumo || 0);
+    await pagina.evaluate(() => {
+      window.__servidorOriginal = window.__servidorOriginal || window.__servidorDoPGO;
+      window.__chamadasDeResumo = 0;
+      window.__servidorDoPGO = function (nome, argumentos) {
+        if (nome === 'resumoDoCanal') window.__chamadasDeResumo++;
+        if (nome === 'resumoDoCanal' && window.__falharUmaVez) {
+          window.__falharUmaVez = false;
+          return Promise.resolve({ erro: 'Falha simulada depois da demora' });
+        }
+        return window.__servidorOriginal(nome, argumentos);
+      };
+    });
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    if (await pagina.locator('#dialogo-prazo').count()) await pagina.click('#fechar-aviso-de-prazo');
+    await pagina.waitForTimeout(300);
+
+    // 1. Uma consulta rápida não avisa nada.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [1000] }; window.__chamadasDeResumo = 0; });
+    await pagina.locator('.cartoes .indicador.clicavel').first().click();
+    await pagina.waitForTimeout(1500);
+    igual(await aviso(), null, 'consulta rápida: nenhum aviso');
+
+    // 2. A demorada: nada antes dos 8 s; o texto pedido depois; some no fim.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [9500] }; window.__chamadasDeResumo = 0; });
+    await pagina.locator('.cartoes .indicador.clicavel').first().click();
+    await pagina.waitForTimeout(7300);
+    igual(await aviso(), null, 'antes dos 8 s, nada');
+    await pagina.waitForTimeout(1300);
+    const durante = await aviso();
+    verdadeiro(durante !== null, 'passados 8 s, o aviso aparece');
+    igual(durante.texto, TEXTO, 'o texto pedido, exato');
+    igual(durante.papel, 'status', 'e o leitor de tela anuncia');
+    igual(await contarChamadas(), 1, 'nenhuma chamada nova ao servidor por causa do aviso');
+    await pagina.waitForTimeout(1500);
+    igual(await aviso(), null, 'a resposta chegou: o aviso saiu');
+    verdadeiro(await pagina.locator('#painel .cartoes').count() > 0, 'e a tela mostra a resposta');
+
+    // 3. Demorou e deu erro: o aviso sai, e o erro toma o lugar dele.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [9000] }; window.__falharUmaVez = true; });
+    await pagina.locator('.cartoes .indicador.clicavel').first().click();
+    await pagina.waitForTimeout(8600);
+    verdadeiro((await aviso()) !== null, 'esperando o erro, o aviso aparece');
+    await pagina.waitForTimeout(1000);
+    igual(await aviso(), null, 'o erro chegou: o aviso saiu');
+    contem(await pagina.$eval('#painel .erro-carga', (e) => e.textContent), 'Falha simulada depois da demora');
+
+    // 4. Saiu da tela enquanto esperava: o aviso sai junto.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [10000] }; });
+    await pagina.click('[data-sub-aba="2"]');
+    await pagina.waitForTimeout(8600);
+    verdadeiro((await aviso()) !== null);
+    await pagina.click('[data-tela="buscarCaso"]');
+    await pagina.waitForTimeout(300);
+    igual(await aviso(), null, 'outra tela: o aviso da anterior saiu');
+    await pagina.waitForTimeout(1500);
+    igual(await aviso(), null, 'e não volta quando a resposta descartada chega');
+
+    await pagina.evaluate(() => { window.__servidorDoPGO = window.__servidorOriginal; window.__atrasos = {}; });
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForTimeout(900);
+  });
+
   /* --------------------------------------------------- os sinalizadores -- */
 
   console.log('\nOs sinalizadores de prazo');
