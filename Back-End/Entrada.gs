@@ -1283,6 +1283,7 @@ function descarregarAFilaDaAuditoria_(esperarMs) {
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(esperarMs || 0)) return 0;
   try {
+    resolverOLoteInterrompido_(props, 'AUDITORIA');   // B6
     var todas = props.getProperties();
     var chaves = Object.keys(todas)
       .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DA_AUDITORIA) === 0; })
@@ -1299,12 +1300,74 @@ function descarregarAFilaDaAuditoria_(esperarMs) {
         Entidade: lido.e || '', RegistroId: lido.r || '', Detalhe: lido.t || ''
       });
     });
-    if (registros.length) inserirComATravaNaMao_('AUDITORIA', registros);
-    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+    gravarOLoteDaFila_(props, 'AUDITORIA', chaves, registros);
     return registros.length;
   } finally {
     trava.releaseLock();
   }
+}
+
+/*
+ * B6 (Etapa 90): O LOTE SEM REPETIR.
+ *
+ * A fila grava ANTES de tirar (nada se perde). O pior caso era a execução cair
+ * exatamente entre gravar o lote e tirá-lo da fila: o próximo a descarregar
+ * gravaria tudo DE NOVO. Agora, antes de gravar, fica uma MARCA durável no
+ * PropertiesService — as chaves do lote e a impressão de cada registro (o
+ * segundo, o usuário, a ação ou o lugar do erro). Quem descarrega depois
+ * resolve a marca que sobrou: se o lote está nas últimas linhas da aba, ele
+ * foi gravado e só sai da fila; se não está, continua na fila e é gravado
+ * agora. Sempre dentro da trava. Custa duas idas ao PropertiesService por
+ * descarga, e nenhuma à planilha — a planilha só é lida na recuperação.
+ */
+function chaveDoLote_(nomeDaAba) { return nomeDaAba + '.LOTE'; }
+
+function impressaoDoRegistro_(registro) {
+  var data = registro.DataHora instanceof Date ? registro.DataHora : new Date(registro.DataHora);
+  // O Id do usuário na forma que a coluna de identificador guarda ("U1" vira "1").
+  return Math.floor(data.getTime() / 1000) + '|' + converterParaIdentificador_(registro.UsuarioId || '') + '|'
+    + String(registro.Acao !== undefined ? registro.Acao : registro.Onde || '');
+}
+
+function gravarOLoteDaFila_(props, nomeDaAba, chaves, registros) {
+  if (registros.length) {
+    props.setProperty(chaveDoLote_(nomeDaAba), JSON.stringify({
+      chaves: chaves, impressoes: registros.map(impressaoDoRegistro_) }));
+    inserirComATravaNaMao_(nomeDaAba, registros);
+  }
+  chaves.forEach(function (chave) { props.deleteProperty(chave); });
+  props.deleteProperty(chaveDoLote_(nomeDaAba));
+}
+
+/** A marca que sobrou de uma descarga interrompida. Chamada com a trava na mão. */
+function resolverOLoteInterrompido_(props, nomeDaAba) {
+  var texto = props.getProperty(chaveDoLote_(nomeDaAba));
+  if (!texto) return;
+  var lote = null;
+  try { lote = JSON.parse(texto); } catch (lixo) { lote = null; }
+  if (lote && lote.impressoes && lote.impressoes.length && jaEstaNaAba_(nomeDaAba, lote.impressoes)) {
+    (lote.chaves || []).forEach(function (chave) { props.deleteProperty(chave); });
+  }
+  props.deleteProperty(chaveDoLote_(nomeDaAba));
+}
+
+/** O lote (as impressões, em sequência) está nas últimas linhas da aba? */
+function jaEstaNaAba_(nomeDaAba, impressoes) {
+  esquecerEstruturaLida_(nomeDaAba);
+  var estrutura = estruturaDaAba_(nomeDaAba, true);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total < impressoes.length) return false;
+  // As últimas linhas: o lote e o que tenha entrado direto depois dele.
+  var quantas = Math.min(total, impressoes.length + 200);
+  var inicio = total - quantas + 2;
+  var linhas = estrutura.aba.getRange(inicio, 1, quantas, estrutura.cabecalhos.length).getValues()
+    .map(function (valores, k) { return impressaoDoRegistro_(montarRegistro_(estrutura, valores, inicio + k)); });
+  for (var i = 0; i + impressoes.length <= linhas.length; i++) {
+    var todas = true;
+    for (var j = 0; j < impressoes.length && todas; j++) todas = linhas[i + j] === impressoes[j];
+    if (todas) return true;
+  }
+  return false;
 }
 
 /** Quantos registros esperam na fila — para o diagnóstico. */
@@ -1516,6 +1579,7 @@ function descarregarAFilaDosErros_(esperarMs) {
   var trava = LockService.getScriptLock();
   if (!trava.tryLock(esperarMs || 0)) return 0;
   try {
+    resolverOLoteInterrompido_(props, 'ERROS');   // B6
     var todas = props.getProperties();
     var chaves = Object.keys(todas)
       .filter(function (chave) { return chave.indexOf(RECC_PREFIXO_DA_FILA_DOS_ERROS) === 0; })
@@ -1531,8 +1595,7 @@ function descarregarAFilaDosErros_(esperarMs) {
         Onde: lido.w || '', Mensagem: lido.m || '', Detalhe: lido.t || ''
       });
     });
-    if (registros.length) inserirComATravaNaMao_('ERROS', registros);
-    chaves.forEach(function (chave) { props.deleteProperty(chave); });
+    gravarOLoteDaFila_(props, 'ERROS', chaves, registros);   // B6: sem repetir
 
     esquecerEstruturaLida_('ERROS');
     var estrutura = estruturaDaAba_('ERROS', true);

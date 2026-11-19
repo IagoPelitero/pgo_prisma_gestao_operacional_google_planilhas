@@ -231,6 +231,80 @@ function rodarTestesDeUX190() {
     contem(tela, "Servidor.chamar('formularioDoCanal', canalEscolhido, true)", 'na mesma viagem do formulário');
     igual((tela.match(/localStorage|sessionStorage|indexedDB/g) || []).length, 0, 'nada no navegador');
   });
+
+  /* ----------------------------------------------------------------------- */
+  secao('B6 — auditoria e ERROS: sem perder e sem repetir');
+
+  const a = carregar('primeiro.adm@exemplo.com');
+  a.chamar('instalarRECC()');
+  const PS = a.chamar('PropertiesService');
+  const propriedadesDeVerdade = PS.getScriptProperties;
+  let cair = null;   // 'ao tirar' | 'ao gravar' | null
+  PS.getScriptProperties = () => {
+    const p = propriedadesDeVerdade();
+    return Object.assign({}, p, { deleteProperty: (chave) => {
+      if (cair === 'ao tirar' && /\.FILA\./.test(chave)) { cair = null; throw new Error('a execução caiu'); }
+      return p.deleteProperty(chave);
+    } });
+  };
+  const linhas = (aba) => a.chamar('lerRegistros_')(aba).length;
+  const naFila = (prefixo) => Object.keys(propriedadesDeVerdade().getProperties()).filter((k) => k.indexOf(prefixo) === 0).length;
+  const enfileirar = (acao) => a.chamar('entrarNaFilaDaAuditoria_')({ DataHora: new Date(), UsuarioId: 'U1', Acao: acao,
+    Entidade: 'BASE_RET', RegistroId: '1', Detalhe: '' });
+
+  teste('quebra de propósito: cai DEPOIS de gravar e antes de tirar da fila — a próxima descarga não repete', () => {
+    a.chamar('descarregarAFilaDaAuditoria_')(0);
+    const antes = linhas('AUDITORIA');
+    ['teste.a', 'teste.b', 'teste.c'].forEach(enfileirar);
+    cair = 'ao tirar';
+    lanca(() => a.chamar('descarregarAFilaDaAuditoria_')(0), 'caiu');
+    igual(linhas('AUDITORIA'), antes + 3, 'o lote foi gravado antes de cair');
+    verdadeiro(naFila('AUDITORIA.FILA.') >= 2, 'e ficou (quase todo) na fila');
+    verdadeiro(!!propriedadesDeVerdade().getProperty('AUDITORIA.LOTE'), 'com a marca do lote');
+    a.chamar('descarregarAFilaDaAuditoria_')(0);
+    igual(linhas('AUDITORIA'), antes + 3, 'NADA repetido');
+    igual(naFila('AUDITORIA.FILA.'), 0, 'a fila esvaziou');
+    igual(propriedadesDeVerdade().getProperty('AUDITORIA.LOTE'), null, 'e a marca saiu');
+  });
+
+  teste('quebra de propósito: cai ANTES de gravar — a próxima descarga grava, uma vez só', () => {
+    const antes = linhas('AUDITORIA');
+    ['teste.d', 'teste.e'].forEach(enfileirar);
+    const inserir = a.chamar('inserirComATravaNaMao_');
+    a.chamar('(function (f) { inserirComATravaNaMao_ = f; })')(() => { throw new Error('a planilha não respondeu'); });
+    lanca(() => a.chamar('descarregarAFilaDaAuditoria_')(0), 'não respondeu');
+    a.chamar('(function (f) { inserirComATravaNaMao_ = f; })')(inserir);
+    igual(linhas('AUDITORIA'), antes, 'nada gravado');
+    igual(naFila('AUDITORIA.FILA.'), 2, 'nada perdido: a fila está inteira');
+    a.chamar('descarregarAFilaDaAuditoria_')(0);
+    igual(linhas('AUDITORIA'), antes + 2, 'gravado uma vez');
+    igual(naFila('AUDITORIA.FILA.'), 0);
+  });
+
+  teste('a aba ERROS tem a mesma proteção', () => {
+    a.chamar('descarregarAFilaDosErros_')(0);
+    const antes = linhas('ERROS');
+    a.chamar('registrarErro_')('servidor', 'teste-b6', 'erro de teste ' + Date.now(), '');   // já tenta descarregar
+    const depoisDoPrimeiro = linhas('ERROS');
+    a.chamar('registrarErro_')('servidor', 'teste-b6', 'outro erro de teste ' + Date.now(), '');
+    verdadeiro(linhas('ERROS') >= depoisDoPrimeiro, 'os erros chegam à aba');
+    // Cai ao tirar da fila:
+    propriedadesDeVerdade().setProperty('ERROS.FILA.9999999999999.0001teste', JSON.stringify({ d: Date.now(), u: '', o: 'servidor', w: 'teste-b6', m: 'na fila', t: '' }));
+    const meio = linhas('ERROS');
+    cair = 'ao tirar';
+    lanca(() => a.chamar('descarregarAFilaDosErros_')(0), 'caiu');
+    a.chamar('descarregarAFilaDosErros_')(0);
+    igual(linhas('ERROS'), meio + 1, 'gravado uma vez, sem repetir');
+    verdadeiro(antes <= linhas('ERROS'));
+  });
+
+  teste('a descarga normal não deixa marca sobrando', () => {
+    enfileirar('teste.f');
+    a.chamar('descarregarAFilaDaAuditoria_')(0);
+    igual(propriedadesDeVerdade().getProperty('AUDITORIA.LOTE'), null);
+    igual(propriedadesDeVerdade().getProperty('ERROS.LOTE'), null);
+  });
+  PS.getScriptProperties = propriedadesDeVerdade;
 }
 
 module.exports = { rodarTestesDeUX190 };
