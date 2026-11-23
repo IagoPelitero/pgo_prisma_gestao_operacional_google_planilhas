@@ -235,7 +235,7 @@ function montarPacoteDePartida_(quem) {
  * o que mudou em Evolucao/05-progresso.md.
  */
 const RECC_VERSAO = {
-  numero: '1.91',
+  numero: '1.92',
   data: '23/11/2026'
 };
 

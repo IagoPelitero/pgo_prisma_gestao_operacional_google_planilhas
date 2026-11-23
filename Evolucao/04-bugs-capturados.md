@@ -2327,6 +2327,22 @@ falhou — e falhava igual no código de antes da etapa (conferido numa cópia d
 **Defesa.** As datas do teste são relativas a hoje (recepção há 10 dias, 1º contato há 5). O resto
 da suíte passou em 23/11/2026.
 
+### 116 · O "Atualizando informações…" do Trabalho sumia ao rolar e aparecia espremido no topo
+
+**Sintoma.** Relato do PO, depois da 1.91: ao aplicar um filtro no Trabalho, o aviso de carregamento
+não aparecia, e quando aparecia estava "desconfigurado".
+
+**Causa.** Duas, no CSS do F5 (Etapa 88):
+
+- A faixa de altura zero usava o alinhamento padrão (`stretch`), que levava o aviso a zero de altura.
+- A faixa grudava a 8 px do topo da janela, atrás da barra superior que a Etapa 90 deixou fixa.
+
+O teste da Etapa 88 conferia a classe e o texto, nunca o tamanho nem a posição.
+
+**Defesa.** A faixa gruda abaixo da barra, pela altura medida dela, e o aviso mantém a própria
+altura. O ponta a ponta atrasa o servidor e mede o aviso, no topo e rolado. Com o CSS antigo ele
+falha.
+
 ---
 
 ## O que esta lista ensina
@@ -2584,3 +2600,6 @@ Daí as duas práticas que o projeto não abre mão:
 65. **Data fixa contra janela que anda é um teste com prazo de validade.** No item 115 o teste
     passou por semanas e quebrou sozinho. Quando a regra olha "os últimos N dias", o teste
     precisa montar as datas a partir de hoje.
+66. **Mudar um elemento de lugar muda o mundo dos que grudam nele.** No item 116 a barra fixa da
+    Etapa 90 escondeu um aviso de outra etapa. Quem gruda ("sticky") precisa ser medido na tela,
+    e não só conferido pelo texto.

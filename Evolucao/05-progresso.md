@@ -4541,6 +4541,43 @@ não precisa e o vg também não".
 
 ---
 
+## Etapa 92 — O "Atualizando informações…" do Trabalho de volta (versão 1.92)
+
+**Relato do PO:** "a tela de carregamento quando gero os filtros do trabalho não aparece e está
+desconfigurado".
+
+**Causa, reproduzida na prévia** com o servidor atrasado de propósito. O aviso do F5 (Etapa 88) fica
+numa faixa de altura zero, presa no alto, e tinha dois defeitos:
+
+1. **Desconfigurado.** A faixa usava `display: flex` com o alinhamento padrão (`stretch`). Isso
+   espremia o aviso a **zero de altura**: sobravam as bordas, e o texto vazava por cima do cartão do
+   meio.
+2. **Não aparecia ao rolar.** A faixa grudava a `top: 8px`, mas desde a Etapa 90 a barra superior é
+   fixa (cerca de 94 px). Com a tela rolada, o aviso ficava escondido atrás dela.
+
+**Correção, só no CSS (`Estilos.html`):**
+
+- a faixa gruda **abaixo** da barra superior, pela altura medida dela, a mesma variável do cabeçalho
+  fixo da fila;
+- o aviso mantém a própria altura (`align-items: flex-start`) e fica centrado na borda de cima do
+  painel, sem cobrir o título dos cartões;
+- ganha um pequeno indicador girando, parado para quem pede menos movimento.
+
+O esmaecer do painel e os filtros fora dele continuam como na Etapa 88.
+
+**Teste.** O teste do F5 da Etapa 88 conferia só a classe e o texto do aviso; por isso a quebra
+passou. O teste novo do ponta a ponta atrasa o servidor e mede o aviso de verdade:
+
+- no topo: altura de pelo menos 24 px;
+- com a tela rolada: altura de verdade, e abaixo da barra superior.
+
+Quebra de propósito: com o CSS antigo, ele falha ("altura": 14); com o novo, passa. Ponta a ponta
+53/53.
+
+**Versão:** 1.92.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
