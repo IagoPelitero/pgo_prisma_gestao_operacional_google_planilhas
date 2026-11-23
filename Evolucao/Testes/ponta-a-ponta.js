@@ -2269,6 +2269,44 @@ async function rodar() {
     await sair();
   });
 
+  await teste('Trabalho: o "Atualizando informações…" aparece inteiro, no topo e com a tela rolada (Etapa 91)', async () => {
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.cartoes .indicador.clicavel', { timeout: 10000 });
+    await pagina.waitForTimeout(500);
+    const medir = () => pagina.evaluate(() => {
+      const aviso = document.querySelector('#painel .aviso-atualizando');
+      const r = aviso ? aviso.getBoundingClientRect() : { top: 0, height: 0, width: 0 };
+      return { atualizando: document.getElementById('painel').classList.contains('atualizando'),
+        topo: Math.round(r.top), altura: Math.round(r.height), largura: Math.round(r.width),
+        barra: Math.round(document.getElementById('superior').getBoundingClientRect().bottom),
+        texto: aviso ? aviso.textContent : '' };
+    });
+    // 1. No topo: um filtro (o cartão) com o servidor lento.
+    await pagina.evaluate(() => { window.__atrasos = { resumoDoCanal: [2500, 2500] }; });
+    await pagina.locator('.cartoes .indicador.clicavel').nth(1).click();
+    await pagina.waitForTimeout(400);
+    const noTopo = await medir();
+    igual(noTopo.atualizando, true);
+    contem(noTopo.texto, 'Atualizando informações');
+    verdadeiro(noTopo.altura >= 24 && noTopo.largura >= 150, 'o aviso tem tamanho de verdade: ' + JSON.stringify(noTopo));
+    await pagina.waitForFunction(() => !document.getElementById('painel').classList.contains('atualizando'), null, { timeout: 10000 });
+    // 2. Rolada até a fila: o aviso fica abaixo da barra superior, e não atrás dela.
+    await pagina.evaluate(() => { const th = document.querySelector('.fila-do-trabalho'); window.scrollTo(0, th.getBoundingClientRect().top + window.scrollY - 40); });
+    await pagina.waitForTimeout(200);
+    await pagina.locator('.filtrando-por [data-tirar-cartao], #limpar-tudo-da-fila').first().click().catch(async () => {
+      await pagina.locator('[data-mostrar]').first().click();
+    });
+    await pagina.waitForTimeout(400);
+    const rolado = await medir();
+    igual(rolado.atualizando, true, 'carregando de novo');
+    verdadeiro(rolado.altura >= 24, 'inteiro: ' + JSON.stringify(rolado));
+    verdadeiro(rolado.topo >= rolado.barra, 'abaixo da barra superior: ' + JSON.stringify(rolado));
+    await pagina.waitForFunction(() => !document.getElementById('painel').classList.contains('atualizando'), null, { timeout: 10000 });
+    await pagina.evaluate(() => { window.__atrasos = {}; window.scrollTo(0, 0); });
+  });
+
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
   if (process.env.PGO_GRAVAR_CHAMADAS) {
