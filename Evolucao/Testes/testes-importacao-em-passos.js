@@ -30,7 +30,7 @@ function pedaco(nomes, estado) {
   const tela = lerPeca('Importacao');
   const base = {
     laudo: null, resultado: null, opcoes: { analistas: [], statusDoCanal: [] },
-    analistasMarcados: {}, nomeDoLote: '', agendarDias: '', agendarPara: '',
+    analistasMarcados: {}, nomeDoLote: '', agendarDias: '', agendarPara: '', canalDeOrigem: '',
     oQueImportar: 'casos', statusQueVale: () => '', diaDaqui: (d) => 'D+' + d,
   };
   const tudo = Object.assign(base, estado || {});
@@ -105,16 +105,28 @@ function rodarTestesDaImportacaoEmPassos() {
 
   teste('o botão diz quantos entram e fica desligado quando nenhum entra', () => {
     const laudo = { vaoEntrar: 0 };
-    const html = pedaco(['desenharBarra', 'resumoDoLote'], { laudo, opcoes: { canal: { nome: 'RET' }, analistas: [] } })
+    const html = pedaco(['desenharBarra', 'resumoDoLote', 'faltaOCanalDeOrigem'], { laudo, opcoes: { canal: { nome: 'RET' }, analistas: [] } })
       .desenharBarra();
     contem(html, '<strong>0 casos vão entrar em RET</strong>');
     contem(html, 'id="importar-agora" disabled>Importar 0 caso(s)</button>');
     contem(html, 'id="imp-resumo-do-lote"');
     contem(html, 'id="recomecar-da-barra"');
-    const um = pedaco(['desenharBarra', 'resumoDoLote'], { laudo: { vaoEntrar: 1 }, opcoes: { analistas: [] } })
+    const um = pedaco(['desenharBarra', 'resumoDoLote', 'faltaOCanalDeOrigem'], { laudo: { vaoEntrar: 1 }, opcoes: { analistas: [] } })
       .desenharBarra();
     contem(um, '<strong>1 caso vai entrar</strong>');
     verdadeiro(um.indexOf('disabled') < 0, 'com um caso, o botão vale');
+  });
+
+  teste('RET: sem o Canal de origem escolhido, o botão fica travado — e o resumo pede a escolha (Etapa 91)', () => {
+    const naRet = { analistas: [], canalDeOrigem: { coluna: 'canal', rotulo: 'Canal de origem', opcoes: [{ valor: 'URA', rotulo: 'URA' }] } };
+    const sem = pedaco(['desenharBarra', 'resumoDoLote', 'faltaOCanalDeOrigem'], { laudo: { vaoEntrar: 3 }, opcoes: naRet })
+      .desenharBarra();
+    contem(sem, 'id="importar-agora" disabled>');
+    contem(sem, 'escolha o canal de origem');
+    const com = pedaco(['desenharBarra', 'resumoDoLote', 'faltaOCanalDeOrigem'],
+      { laudo: { vaoEntrar: 3 }, opcoes: naRet, canalDeOrigem: 'URA' }).desenharBarra();
+    verdadeiro(com.indexOf('disabled') < 0, 'escolhido, o botão vale');
+    contem(com, 'canal de origem URA');
   });
 
   /* ----------------------------------------------------------------------- */

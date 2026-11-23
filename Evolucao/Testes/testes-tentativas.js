@@ -168,15 +168,20 @@ function rodarTestesDasTentativas() {
 
   teste('importar a "Data do 1º contato" da base antiga grava o dia certo — e a conta o vê', () => {
     const t = retComTentativas();
+    // Datas RELATIVAS a hoje (Etapa 91): eram fixas (20/10 e 25/10/2026) e saíram da
+    // janela de 30 dias do painel quando o calendário andou — o teste quebrava sozinho.
+    const diaAntes = (dias) => { const d = new Date(); d.setDate(d.getDate() - dias); return d; };
+    const dma = (d) => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+    const contato = diaAntes(5);
     const texto = [['nome do cliente', 'CPF', 'status', 'Data do 1º contato', 'data de recepção do protocolo'],
-      ['Importado', '55555555555', 'Retido', '25/10/2026 09:15', '20/10/2026']]
+      ['Importado', '55555555555', 'Retido', dma(contato) + ' 09:15', dma(diaAntes(10))]]
       .map((l) => l.join('\t')).join('\n');
-    t.chamar('importarCasos')(t.ret.id, { fonte: { tipo: 'colado', texto }, colunaQueIdentifica: '',
+    t.chamar('importarCasos')(t.ret.id, { canalDeOrigem: 'URA', fonte: { tipo: 'colado', texto }, colunaQueIdentifica: '',
       analistas: [], origem: 'Base antiga', dePara: ['nome do cliente', 'CPF', 'status',
         'Data do 1º contato', 'data de recepção do protocolo'].map((c) => ({ daFonte: c, paraAColuna: c })) });
     const caso = t.chamar('lerRegistros_')('BASE_RET').find((c) => c['nome do cliente'] === 'Importado');
     const d = caso['Data do 1º contato'];
-    igual(d.getDate() + '/' + (d.getMonth() + 1), '25/10');
+    igual(d.getDate() + '/' + (d.getMonth() + 1), contato.getDate() + '/' + (contato.getMonth() + 1));
     t.caso('Ana Martins', 'Pendente', 0, '55555555555', 'Importado');   // a tabela é de quem tem 2 casos
     const linha = t.painel().tentativas.porCpf.linhas.find((l) => l.cpf === '55555555555');
     igual(linha.desfecho, 'Retido no 2º contato, Pendente');

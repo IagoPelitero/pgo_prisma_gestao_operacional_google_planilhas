@@ -111,7 +111,7 @@ function rodarTestesDoEnvioUnico() {
     const t = preparar();
     const texto = [['nome do cliente', 'status'], ['Lote único A', 'Pendente'], ['Lote único B', 'Pendente']]
       .map((l) => l.join('\t')).join('\n');
-    const pedido = { envio: 'envio-teste-0009', fonte: { tipo: 'colado', texto }, colunaQueIdentifica: '',
+    const pedido = { envio: 'envio-teste-0009', canalDeOrigem: 'URA', fonte: { tipo: 'colado', texto }, colunaQueIdentifica: '',
       analistas: [], origem: 'Lote', dePara: ['nome do cliente', 'status'].map((c) => ({ daFonte: c, paraAColuna: c })) };
     t.chamar('importarCasos')(t.ret.id, pedido);
     t.chamar('importarCasos')(t.ret.id, pedido);

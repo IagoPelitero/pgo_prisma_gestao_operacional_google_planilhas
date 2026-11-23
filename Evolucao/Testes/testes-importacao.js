@@ -223,7 +223,7 @@ function rodarTestesDeImportacao() {
 
   teste('a base entra, dividida entre os analistas em rodízio', () => {
     const antes = casosDaRet().length;
-    const resultado = chamar('importarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([
         ['CPF', 'nome do cliente'],
         ['10000000001', 'Cliente Um'],
@@ -342,7 +342,7 @@ function rodarTestesDeImportacao() {
       { fonte: fonte, colunaQueIdentifica: 'CPF' });
 
     const antes = casosDaRet().length;
-    const resultado = chamar('importarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: fonte, colunaQueIdentifica: 'CPF', origem: 'Leva conferida'
     });
 
@@ -354,7 +354,7 @@ function rodarTestesDeImportacao() {
   teste('sem coluna que identifica, tudo entra — inclusive o repetido', () => {
     // É uma escolha, e às vezes a certa: a mesma pessoa pode ter dois casos.
     const antes = casosDaRet().length;
-    chamar('importarCasos')(ret.id, {
+    chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['CPF', 'nome do cliente'], ['10000000001', 'Cliente Um']]),
       origem: 'Leva sem conferir repetido'
     });
@@ -405,7 +405,7 @@ function rodarTestesDeImportacao() {
 
   teste('o repetido NÃO chega a analista nenhum — a divisão é só dos novos', () => {
     const antes = casosDaRet().length;
-    const resultado = chamar('importarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([
         cabecalhoDaProposta,
         ['7', '4200001', dia(2), 'Proposta A'],
@@ -486,7 +486,7 @@ function rodarTestesDeImportacao() {
     // que ele entra. E o da base que entrou sem data vale pela data da
     // importação — senão a segunda leva do mês passaria.
     const semData = ['Código origem da proposta', 'número da proposta', 'nome do cliente'];
-    chamar('importarCasos')(ret.id, {
+    chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([semData, ['7', '4300001', 'Sem data, primeira leva']]),
       colunaQueIdentifica: '@PROPOSTA_NO_MES',
       origem: 'Leva sem data 1'
@@ -509,7 +509,7 @@ function rodarTestesDeImportacao() {
     ]);
     const laudo = chamar('conferirImportacaoDeCasos')(ret.id,
       { fonte: fonte, colunaQueIdentifica: '@PROPOSTA_NO_MES' });
-    const resultado = chamar('importarCasos')(ret.id, {
+    const resultado = chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: fonte, colunaQueIdentifica: '@PROPOSTA_NO_MES',
       origem: 'Leva conferida pela proposta'
     });
@@ -544,7 +544,7 @@ function rodarTestesDeImportacao() {
   secao('As recusas');
 
   teste('lote sem nome é recusado — o gráfico não teria o que dizer', () => {
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['CPF'], ['40000000001']])
     }), 'Dê um nome ao lote');
   });
@@ -552,14 +552,14 @@ function rodarTestesDeImportacao() {
   teste('de-para que não leva a coluna nenhuma é recusado', () => {
     // Sem isto, seriam trezentas linhas em branco na base operacional, que
     // alguém teria de achar e apagar uma a uma.
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['Coluna A', 'Coluna B'], ['x', 'y']]),
       origem: 'Lote perdido'
     }), 'criaria linhas em branco');
   });
 
   teste('de-para apontando para coluna inexistente é recusado, dizendo quais', () => {
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['Coluna A'], ['x']]),
       dePara: [{ daFonte: 'Coluna A', paraAColuna: 'Coluna que nunca existiu' }],
       origem: 'Lote torto'
@@ -570,7 +570,7 @@ function rodarTestesDeImportacao() {
     // Caso no nome de quem não existe some da fila de todo mundo: o escopo
     // "próprios" não acha um responsável que não está no cadastro. O caso
     // estaria na planilha e invisível no sistema.
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['CPF'], ['50000000001']]),
       analistas: ['Fulano Que Não Existe'],
       origem: 'Lote sem dono'
@@ -578,7 +578,7 @@ function rodarTestesDeImportacao() {
   });
 
   teste('base em que nada entraria recusa em vez de gravar zero', () => {
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['CPF', 'nome do cliente'], ['10000000001', 'Cliente Um']]),
       colunaQueIdentifica: 'CPF',
       origem: 'Leva toda repetida'
@@ -590,7 +590,7 @@ function rodarTestesDeImportacao() {
     for (let i = 0; i < 2001; i++) {
       muitas.push(['9' + String(i).padStart(9, '0'), 'Cliente ' + i]);
     }
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado(muitas), origem: 'Leva gigante'
     }), 'no máximo 2000 linhas');
   });
@@ -630,7 +630,7 @@ function rodarTestesDeImportacao() {
     });
 
     comoUsuario(ambiente, 'comum@exemplo.com', () => {
-      lanca(() => chamar('importarCasos')(ret.id, {
+      lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
         fonte: colado([['CPF'], ['70000000001']]), origem: 'Lote proibido'
       }), 'não permite');
     });
@@ -699,7 +699,7 @@ function rodarTestesDeImportacao() {
     // E o recado diz o motivo certo. Antes dizia sempre "não estão
     // cadastrados e ativos" — e Sandra está cadastrada E ativa. Quem lesse
     // iria cadastrar de novo alguém que já existe.
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['CPF', 'nome do cliente'], ['80000000001', 'De outro canal']]),
       analistas: ['Sandra da Mesa'],
       origem: 'Lote cruzado'
@@ -746,7 +746,7 @@ function rodarTestesDeImportacao() {
   });
 
   teste('marcar quem está de férias é recusado, dizendo o motivo', () => {
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['CPF'], ['80000000003']]),
       analistas: ['Patrícia Nunes'],
       origem: 'Lote para quem está fora'
@@ -966,7 +966,7 @@ function rodarTestesDeImportacao() {
      * escolhível: a linha entre "pode escolher" e "nunca" tem de ser a mesma
      * na tela e no servidor.
      */
-    lanca(() => chamar('importarCasos')(ret.id, {
+    lanca(() => chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['de onde veio', 'CPF'], ['Lote inventado', '77788899900']]),
       dePara: [
         { daFonte: 'de onde veio', paraAColuna: 'Origem da importação' },
@@ -976,7 +976,7 @@ function rodarTestesDeImportacao() {
     }), 'rastro do lote', 'a origem da importação não pode vir da fonte');
 
     // E o carimbo, que É permitido, continua passando pela mesma trava.
-    chamar('importarCasos')(ret.id, {
+    chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([['quando falamos', 'CPF'], ['11/07/2026', '77788899901']]),
       dePara: [
         { daFonte: 'quando falamos', paraAColuna: 'Data do 1º contato' },
@@ -1001,7 +1001,7 @@ function rodarTestesDeImportacao() {
     const antes = chamar('produtividadeDaEquipe')(ret.id, {}, 3650)
       .cartoes.find((c) => c.chave === 'datado1contato');
 
-    chamar('importarCasos')(ret.id, {
+    chamar('importarCasos')(ret.id, { canalDeOrigem: 'URA',
       fonte: colado([
         ['quando falamos', 'CPF', 'nome do cliente'],
         ['10/07/2026', '99911122233', 'Contatado na base antiga']

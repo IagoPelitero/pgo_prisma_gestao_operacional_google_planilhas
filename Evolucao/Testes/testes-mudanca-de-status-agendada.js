@@ -45,7 +45,7 @@ function preparar() {
       ['10000000003', 'Ja retido', 'Retido']];
     return Object.assign({
       fonte: { tipo: 'colado', texto: grade.map((l) => l.join('\t')).join('\n') },
-      analistas: ['Marcos Vieira'], origem: 'Lote agendado' }, extra);
+      analistas: ['Marcos Vieira'], origem: 'Lote agendado', canalDeOrigem: 'URA' }, extra);   // Etapa 91
   };
   t.importar = (extra, linhas) => t.chamar('importarCasos')(t.ret.id, t.lote(extra, linhas));
   t.agendado = { agendamento: { dias: 7, para: DESTINO } };

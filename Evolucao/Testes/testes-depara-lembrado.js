@@ -32,7 +32,7 @@ function ret() {
   t.conferir = (cabecalho, extra, canal) => t.chamar('conferirImportacaoDeCasos')((canal || t.ret).id,
     Object.assign({ fonte: colado([cabecalho || CABECALHO, ['Fulano', '123', '11111111111', 'x']]),
       colunaQueIdentifica: '' }, extra || {}));
-  t.importar = (dePara, cabecalho) => t.chamar('importarCasos')(t.ret.id, {
+  t.importar = (dePara, cabecalho) => t.chamar('importarCasos')(t.ret.id, { canalDeOrigem: 'URA',
     fonte: colado([cabecalho || CABECALHO, ['Fulano ' + Math.random(), '123', '11111111111', 'x']]),
     colunaQueIdentifica: '', analistas: ['Marcos Vieira'], origem: 'Lote', dePara });
   t.para = (laudo, daFonte) => laudo.dePara.find((p) => p.daFonte === daFonte);

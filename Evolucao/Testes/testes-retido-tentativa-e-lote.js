@@ -305,7 +305,7 @@ function rodarTestesDoRetidoTentativaELote() {
       ['10000000001', 'Sem status', ''], ['10000000002', 'Já pago', 'Pago']];
     return Object.assign({
       fonte: { tipo: 'colado', texto: grade.map((l) => l.join('\t')).join('\n') },
-      analistas: ['Marcos Vieira'], origem: 'Lote de teste' }, extra);
+      analistas: ['Marcos Vieira'], origem: 'Lote de teste', canalDeOrigem: 'URA' }, extra);   // Etapa 91
   }
   const doLote = (t, nome) => t.chamar('lerRegistros_')('BASE_RET')
     .find((l) => l['nome do cliente'] === nome);

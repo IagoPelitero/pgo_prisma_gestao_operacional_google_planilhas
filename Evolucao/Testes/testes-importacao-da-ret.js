@@ -19,7 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { carregar, secao, teste, igual, verdadeiro, contem, ehData } = require('./ferramentas');
+const { carregar, secao, teste, igual, verdadeiro, contem, ehData, lanca } = require('./ferramentas');
 
 const lerTela = (nome) => fs.readFileSync(
   path.join(__dirname, '..', '..', 'Front-End', nome), 'utf8');
@@ -38,7 +38,8 @@ function ret() {
   t.chamar('salvarUsuario')({ nome: 'Marcos Vieira', email: 'marcos@exemplo.com',
     nivelAcessoId: operacao, canalId: t.ret.id, ativo: true });
   t.pedido = (linhas, extra) => Object.assign({ fonte: colado([CABECALHO].concat(linhas)),
-    colunaQueIdentifica: '@PROPOSTA_NO_MES', analistas: ['Marcos Vieira'], origem: 'Lote' }, extra || {});
+    colunaQueIdentifica: '@PROPOSTA_NO_MES', analistas: ['Marcos Vieira'], origem: 'Lote',
+    canalDeOrigem: 'URA' }, extra || {});   // Etapa 91: obrigatório na RET
   t.conferir = (linhas, extra) => t.chamar('conferirImportacaoDeCasos')(t.ret.id, t.pedido(linhas, extra));
   t.importar = (linhas, extra) => t.chamar('importarCasos')(t.ret.id, t.pedido(linhas, extra));
   t.caso = (nome) => t.chamar('lerRegistros_')('BASE_RET').find((c) => c['nome do cliente'] === nome);
@@ -180,6 +181,75 @@ function rodarTestesDaImportacaoDaRet() {
     contem(tela, 'function porQueRepetem(motivos, verbo)');
     contem(tela, 'já estão no PGO');
     contem(tela, 'se repetem na própria planilha');
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Etapa 91: o Canal de origem do lote — só na RET, obrigatório, só nos que vierem sem');
+
+  teste('a RET oferece a lista do campo "Canal de origem"; a Mesa e o VG não oferecem nada', () => {
+    const t = ret();
+    const naRet = t.chamar('opcoesDaImportacaoDeCasos')(t.ret.id).canalDeOrigem;
+    igual(naRet.rotulo, 'Canal de origem');
+    igual(naRet.coluna, 'canal');
+    verdadeiro(naRet.opcoes.some((o) => o.valor === 'URA') && naRet.opcoes.some((o) => o.valor === 'Central'),
+      'as opções da lista de Ajustes Gerais');
+    igual(t.chamar('opcoesDaImportacaoDeCasos')(t.mesa.id).canalDeOrigem, null, 'Mesa não precisa');
+    const vg = t.chamar('canaisVisiveis_()').find((c) => c.aba === 'BASE_VG');
+    if (vg) igual(t.chamar('opcoesDaImportacaoDeCasos')(vg.id).canalDeOrigem, null, 'VG também não');
+  });
+
+  teste('quebra de propósito: sem escolher, a RET recusa — e nada é gravado', () => {
+    const t = ret();
+    const antes = t.chamar('lerRegistros_')('BASE_RET').length;
+    contem(lanca(() => t.importar([['7', '0091001', dataDeHoje, 'Sem canal', '100', '']], { canalDeOrigem: '' })).message,
+      'Escolha o Canal de origem do lote');
+    igual(t.chamar('lerRegistros_')('BASE_RET').length, antes, 'nenhuma linha');
+  });
+
+  teste('quebra de propósito: um canal que não está na lista é recusado — e nada é gravado', () => {
+    const t = ret();
+    const antes = t.chamar('lerRegistros_')('BASE_RET').length;
+    contem(lanca(() => t.importar([['7', '0091002', dataDeHoje, 'Canal inventado', '100', '']],
+      { canalDeOrigem: 'Pombo-correio' })).message, 'não está na lista de Canal de origem');
+    igual(t.chamar('lerRegistros_')('BASE_RET').length, antes, 'nenhuma linha');
+  });
+
+  teste('vale só para os casos que vierem SEM canal de origem: o da planilha fica', () => {
+    const t = ret();
+    t.chamar('importarCasos')(t.ret.id, Object.assign(t.pedido([]), {
+      canalDeOrigem: 'Central',
+      fonte: colado([CABECALHO.concat(['canal']),
+        ['7', '0091003', dataDeHoje, 'Veio sem canal', '100', '', ''],
+        ['7', '0091004', dataDeHoje, 'Veio da URA', '100', '', 'URA']])
+    }));
+    igual(t.caso('Veio sem canal').canal, 'Central', 'o vazio ganha o escolhido');
+    igual(t.caso('Veio da URA').canal, 'URA', 'o da planilha fica');
+  });
+
+  teste('aceita a escolha escrita de outro jeito (maiúsculas, sem acento) e grava como está na lista', () => {
+    const t = ret();
+    t.importar([['7', '0091005', dataDeHoje, 'Caixa diferente', '100', '']], { canalDeOrigem: 'central' });
+    igual(t.caso('Caixa diferente').canal, 'Central');
+  });
+
+  teste('na Mesa, o pedido é ignorado: importa sem a escolha, e o canal dela não é tocado', () => {
+    const t = ret();
+    t.chamar('salvarUsuario')({ nome: 'Diego', email: 'diego@exemplo.com',
+      nivelAcessoId: t.chamar('lerRegistros_')('CATALOGO').find((i) => i.Tipo === 'NIVEL_ACESSO'
+        && i.Nome === 'Operação').Id, canalId: t.mesa.id, ativo: true });
+    t.chamar('importarCasos')(t.mesa.id, { fonte: colado([['Nome do segurado'], ['Mesa sem canal']]),
+      analistas: ['Diego'], origem: 'Mesa', canalDeOrigem: 'URA' });
+    const caso = t.chamar('lerRegistros_')('BASE_MESA').find((c) => c['Nome do segurado'] === 'Mesa sem canal');
+    verdadeiro(!!caso, 'entrou');
+    igual(String(caso.canal || ''), '', 'o canal da Mesa ficou como veio');
+  });
+
+  teste('a tela: o quadro com *, o botão travado sem a escolha, e o valor vai para o servidor', () => {
+    const tela = lerTela('Importacao.html');
+    contem(tela, 'function escolhaDoCanalDeOrigem()');
+    contem(tela, "'<select class=\"filtro\" id=\"canal-de-origem-do-lote\" aria-required=\"true\"");
+    contem(tela, "(laudo.vaoEntrar && !faltaOCanalDeOrigem() ? '' : ' disabled')");
+    contem(tela, "canalDeOrigem: opcoes.canalDeOrigem ? canalDeOrigem : ''");
   });
 }
 

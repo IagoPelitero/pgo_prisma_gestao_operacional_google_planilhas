@@ -3911,6 +3911,57 @@ function aplicarDataDeRecepcao_(caso, canal, escolha, agora) {
   }
 }
 
+/*
+ * O CANAL DE ORIGEM DO LOTE (Etapa 91, pedido do PO): "inclua a opção de
+ * escolher o Canal de origem na importação dos casos da RET; Mesa não precisa
+ * e o VG também não". Decisões do PO:
+ *   · é OBRIGATÓRIO escolher, na RET — sem a escolha, nada é gravado;
+ *   · vale só para os casos que vierem SEM canal de origem: o que a planilha
+ *     trouxer fica.
+ * Só no canal com proposta (a RET), o mesmo critério da data de recepção; e
+ * só se o campo "Canal de origem" (chave `canal`) estiver ativo no formulário.
+ * As opções são as do próprio campo (a lista de Ajustes Gerais).
+ */
+function canalDeOrigemNaImportacao_(canal) {
+  if (!partirDaPropostaDoCanal_(canal)) return null;
+  var campo = camposAtivosDoCanal_(canal.id).filter(function (umCampo) {
+    return normalizarParaComparar_(umCampo.ChaveTecnica) === 'canal';
+  })[0];
+  if (!campo) return null;
+  if (posicaoDaColuna_(estruturaDaAba_(canal.aba), String(campo.Cabecalho)) < 0) return null;
+  return {
+    coluna: grafiaDaColuna_(canal.aba, String(campo.Cabecalho)),
+    rotulo: String(campo.Rotulo || 'Canal de origem'),
+    opcoes: opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), canal.id).map(function (opcao) {
+      return { valor: opcao.valor, rotulo: opcao.rotulo };
+    })
+  };
+}
+
+/**
+ * O canal de origem escolhido para o lote, conferido: { coluna, valor } — ou
+ * null no canal que não pede. Recusa ANTES de gravar qualquer linha quando
+ * falta a escolha ou ela não está na lista.
+ */
+function canalDeOrigemDoLote_(canal, escolhido) {
+  var definicao = canalDeOrigemNaImportacao_(canal);
+  if (!definicao) return null;
+  var texto = String(escolhido === null || escolhido === undefined ? '' : escolhido).trim();
+  if (!texto) {
+    throw new Error('Escolha o ' + definicao.rotulo + ' do lote antes de importar. Ele vale para os '
+      + 'casos que vierem sem ' + definicao.rotulo.toLowerCase() + ' na planilha.');
+  }
+  var achada = definicao.opcoes.filter(function (opcao) {
+    return normalizarParaComparar_(opcao.valor) === normalizarParaComparar_(texto);
+  })[0];
+  if (!achada) {
+    throw new Error('"' + texto + '" não está na lista de ' + definicao.rotulo + '. As opções são: '
+      + (definicao.opcoes.map(function (opcao) { return opcao.valor; }).join(', ') || 'nenhuma')
+      + '. A lista se ajusta em Configurações › Ajustes Gerais.');
+  }
+  return { coluna: definicao.coluna, valor: achada.valor };
+}
+
 /** A coluna da data de recepção que a importação deixa escolher — só no canal com proposta (a RET). */
 function dataDeRecepcaoNaImportacao_(canal) {
   if (!canal.colunaDaData || !partirDaPropostaDoCanal_(canal)) return '';
@@ -4486,6 +4537,8 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   var statusPadrao = statusDoLote_(canal, pedido.statusDoLote);
   var agendamento = agendamentoDoLote_(canal, pedido.agendamento, agora);
   var colunasDoAgendamento = agendamento ? colunasDoAgendamento_(canal) : null;
+  // Etapa 91: conferido antes do laço — sem a escolha (na RET), nada é gravado.
+  var canalDeOrigem = canalDeOrigemDoLote_(canal, pedido.canalDeOrigem);
 
   var paraGravar = [];
   var pulados = novosMotivosParaPular_(regra);
@@ -4514,6 +4567,11 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
     }
     if (canal.colunaDoStatus && !caso[canal.colunaDoStatus] && statusPadrao) {
       caso[canal.colunaDoStatus] = statusPadrao;
+    }
+    // Só o caso que veio SEM canal de origem (decisão do PO): o da planilha fica.
+    if (canalDeOrigem && String(caso[canalDeOrigem.coluna] === undefined || caso[canalDeOrigem.coluna] === null
+      ? '' : caso[canalDeOrigem.coluna]).trim() === '') {
+      caso[canalDeOrigem.coluna] = canalDeOrigem.valor;
     }
     caso[RECC_COLUNA_ORIGEM_DA_IMPORTACAO] = nomeDoLote;
     caso[RECC_COLUNA_DATA_DA_IMPORTACAO] = agora;
@@ -4756,6 +4814,8 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     // Etapa 45: a escolha da data de recepção (hoje / da planilha) — só no
     // canal com proposta, a RET. Vazio: a tela não mostra a escolha.
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
+    // Etapa 91: o Canal de origem do lote — só na RET, e obrigatório lá.
+    canalDeOrigem: canalDeOrigemNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
 }

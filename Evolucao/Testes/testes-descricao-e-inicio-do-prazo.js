@@ -314,7 +314,7 @@ function rodarTestesDaDescricaoEDoInicioDoPrazo() {
     t.chamar('salvarUsuario')({ nome: 'Marcos Vieira', email: 'marcos@exemplo.com',
       nivelAcessoId: operacao, canalId: t.ret.id, ativo: true });
     const linhas = [['CPF', 'nome do cliente'], ['10000000001', 'Importado']];
-    t.chamar('importarCasos')(t.ret.id, {
+    t.chamar('importarCasos')(t.ret.id, { canalDeOrigem: 'URA',
       fonte: { tipo: 'colado', texto: linhas.map((l) => l.join('\t')).join('\n') },
       analistas: ['Marcos Vieira'], origem: 'Lote de teste'
     });

@@ -1637,6 +1637,10 @@ async function rodar() {
     if (await pagina.locator('#dialogo-aviso').count()) await pagina.click('#confirmar-aviso');
 
     await pagina.waitForSelector('#agendar-dias', { timeout: 10000 });
+    // Etapa 91: na RET, o Canal de origem é obrigatório — o botão nasce travado.
+    igual(await pagina.isDisabled('#importar-agora'), true, 'sem o Canal de origem, não importa');
+    await pagina.selectOption('#canal-de-origem-do-lote', 'Central');
+    igual(await pagina.isDisabled('#importar-agora'), false, 'escolhido, o botão destrava');
     contem(await pagina.textContent('#importacao'), 'Com 7 dias, o lote importado no dia 1 muda no dia 8.');
     contem(await pagina.getAttribute('#agendar-dias', 'placeholder'), 'em branco: não agenda');
     await pagina.fill('#agendar-dias', '7');
@@ -1650,10 +1654,12 @@ async function rodar() {
     await pagina.waitForFunction(() => /muda sozinho para/.test(document.getElementById('importacao').textContent),
       null, { timeout: 10000 });
     igual(await pagina.inputValue('#agendar-dias'), '7', 'o número digitado continua lá');
+    igual(await pagina.inputValue('#canal-de-origem-do-lote'), 'Central', 'o Canal de origem também (a tela redesenhou)');
 
     await pagina.fill('#nome-do-lote', 'Lote agendado');
     await pagina.click('#importar-agora');
     await pagina.waitForSelector('#dialogo-aviso', { timeout: 10000 });
+    contem(await pagina.textContent('#dialogo-aviso'), 'Canal de origem: Central, nos casos que vierem sem');
     await pagina.click('#confirmar-aviso');
     await pagina.waitForSelector('#importar-outro-lote', { timeout: 10000 });
     contem(await pagina.textContent('#importacao'), 'Mudança de status agendada');
