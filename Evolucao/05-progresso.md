@@ -4498,6 +4498,49 @@ estimativa, não uma medição.
 
 ---
 
+## Etapa 91 — O Canal de origem na Importação da RET (versão 1.91)
+
+**Pedido do PO:** "inclua a opção de escolher o Canal de origem na importação dos casos da Ret, mesa
+não precisa e o vg também não".
+
+**Decisões do PO:**
+
+- a escolha é **obrigatória** na RET;
+- ela vale **só para os casos que vierem sem** Canal de origem: o que a planilha trouxer fica.
+
+| O que | Como ficou |
+|---|---|
+| **Onde** | Passo 3, "Opções do lote", da Importação, só no canal com proposta (a RET), pelo mesmo critério da data de recepção. Aparece só se o campo "Canal de origem" (chave `canal`) estiver ativo no formulário. A Mesa e o VG não têm a pergunta |
+| **As opções** | As do próprio campo: a lista CANAL_ORIGEM de Ajustes Gerais. Com a lista vazia, o quadro diz que um administrador precisa cadastrar as opções |
+| **Obrigatório** | O botão Importar fica travado até a escolha. O servidor também recusa: sem a escolha, ou com um valor fora da lista, a recusa vem **antes** de gravar qualquer linha |
+| **A regra** | Preenche só o caso que veio com o Canal de origem vazio. A escolha escrita de outro jeito (maiúsculas, sem acento) é gravada como está na lista |
+| **Na tela** | Quadro "Canal de origem \*". O resumo do pé ("canal de origem Central") e o pop-up de confirmação dizem o canal escolhido, e a escolha sobrevive aos redesenhos da tela |
+| **Versão** | 1.91 |
+
+**Testes**
+
+- **Suíte, 7 em `testes-importacao-da-ret.js`:**
+  - a RET oferece a lista; a Mesa e o VG não;
+  - quebra de propósito: sem escolher, recusa e nada é gravado;
+  - quebra de propósito: valor fora da lista, recusa e nada é gravado;
+  - só os casos vazios são preenchidos, e o da planilha fica;
+  - maiúsculas e acento;
+  - na Mesa, o pedido é ignorado;
+  - a tela.
+- **Suíte, 1 em `testes-importacao-em-passos.js`:** o botão travado e o resumo.
+- **Ponta a ponta:** o teste da importação da RET agora confere:
+  - o botão travado;
+  - a escolha que destrava;
+  - a escolha que continua depois do redesenho;
+  - o canal no pop-up.
+- **Testes antigos:** as 34 importações da RET nos testes passaram a informar o canal (`URA`), porque
+  agora ele é obrigatório. As da Mesa ficaram como estavam.
+- **Achado 115:** um teste do 1º contato tinha datas fixas que saíram da janela de 30 dias quando o
+  calendário andou. Ele falhava igual no código de antes desta etapa. As datas agora são relativas a
+  hoje.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

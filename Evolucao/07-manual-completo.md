@@ -83,7 +83,7 @@ Dentro de `Evolucao/`:
 | [`04-bugs-capturados.md`](04-bugs-capturados.md) | Todo defeito encontrado, com sintoma, causa e defesa |
 | [`05-progresso.md`](05-progresso.md) | O estado de cada uma das 14 etapas |
 | [`06-o-que-e-configuravel.md`](06-o-que-e-configuravel.md) | O que se ajusta pela tela, o que só na planilha e o que ainda não se ajusta |
-| `Testes/` | A suíte: 1910 testes, que rodam no computador com `node` |
+| `Testes/` | A suíte: 1918 testes, que rodam no computador com `node` |
 | `imagens/` | As telas |
 
 ---
@@ -360,7 +360,7 @@ sua planilha, compare em **Apps Script › Execuções** a duração de `resumoD
 node Evolucao/Testes/rodar.js
 ```
 
-1910 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
+1918 testes. O critério de aceite é **cinco execuções seguidas sem falha** —
 rodar uma vez não detecta teste instável.
 
 A suíte roda contra um Google Planilhas falso que **converte valores igual ao
@@ -1506,8 +1506,8 @@ tela existir**:
    (repetidas, nomes fora do cadastro, linhas em branco, limite), um **pop-up**
    lista todos de uma vez (Etapa 57).
 3. **Opções do lote.** Cada opção num quadro, com uma linha de explicação embaixo:
-   status, data de recepção, mudança agendada e quem recebe o lote (os analistas
-   são botões que se marcam).
+   status, data de recepção, canal de origem (na RET, obrigatório), mudança agendada
+   e quem recebe o lote (os analistas são botões que se marcam).
 4. **Importar.** Uma faixa presa ao pé da tela resume o que vai acontecer — "12
    casos vão entrar em RET · Divididos entre Ana, Diego · status Não trabalhado" —
    ao lado do botão, que confirma no pop-up do sistema.
@@ -1587,6 +1587,26 @@ conferir pergunta **"Data de recepção do protocolo"** (Etapa 45):
 
 Só a RET tem a pergunta — é o canal com a proposta no mês. A Mesa e o VG seguem
 como estavam.
+
+### O Canal de origem do lote
+
+Na Importação da RET, as opções do lote pedem o **Canal de origem \*** (Etapa 91),
+com as mesmas opções do campo "Canal de origem" do formulário. Elas vêm da lista
+de Configurações › Ajustes Gerais.
+
+- **Obrigatório.** O botão **Importar** fica travado até a escolha, e o servidor
+  recusa o lote sem ela, ou com um valor que não está na lista. Nos dois casos,
+  **nada** é gravado.
+- **Vale só para os casos que vierem sem Canal de origem.** Se a planilha traz a
+  coluna preenchida, o valor dela fica.
+- **Onde aparece:** o resumo do pé da tela e o pop-up de confirmação dizem qual
+  canal foi escolhido.
+- **Lista vazia:** o quadro avisa que um administrador precisa cadastrar as opções.
+  Até lá, não dá para importar na RET.
+- **Campo desligado:** se o campo "Canal de origem" estiver desligado no
+  formulário da RET, a pergunta não aparece.
+
+A Mesa e o VG não têm a pergunta, a pedido do PO.
 
 ### O prêmio que está sendo importado
 
@@ -2072,7 +2092,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.90** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.91** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
@@ -2080,7 +2100,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 | ✅ | Fundação · Acesso · Casca · Cadastrar Caso · Trabalho · Configurações · Buscar Caso · Produtividade RECC · Tabela de Corretoras · Abas de análise · Diagnóstico · Importação · A segunda base |
 |---|---|
 
-1910 testes, mais as varreduras de navegador: responsividade em todas as telas e
+1918 testes, mais as varreduras de navegador: responsividade em todas as telas e
 larguras, o roteiro que clica em tudo, os testes
 de ponta a ponta — e as imagens deste README, que saem de um gerador e por isso
 mostram a tela de hoje.

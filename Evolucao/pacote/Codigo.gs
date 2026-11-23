@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-19 18:06
+   Gerado em 2026-11-23 14:22
    ========================================================================== */
 
 
@@ -5816,6 +5816,41 @@ function aplicarDataDeRecepcao_(caso, canal, escolha, agora) {
   }
 }
 
+function canalDeOrigemNaImportacao_(canal) {
+  if (!partirDaPropostaDoCanal_(canal)) return null;
+  var campo = camposAtivosDoCanal_(canal.id).filter(function (umCampo) {
+    return normalizarParaComparar_(umCampo.ChaveTecnica) === 'canal';
+  })[0];
+  if (!campo) return null;
+  if (posicaoDaColuna_(estruturaDaAba_(canal.aba), String(campo.Cabecalho)) < 0) return null;
+  return {
+    coluna: grafiaDaColuna_(canal.aba, String(campo.Cabecalho)),
+    rotulo: String(campo.Rotulo || 'Canal de origem'),
+    opcoes: opcoesDoCampo_(lerConfiguracaoDoCampo_(campo), canal.id).map(function (opcao) {
+      return { valor: opcao.valor, rotulo: opcao.rotulo };
+    })
+  };
+}
+
+function canalDeOrigemDoLote_(canal, escolhido) {
+  var definicao = canalDeOrigemNaImportacao_(canal);
+  if (!definicao) return null;
+  var texto = String(escolhido === null || escolhido === undefined ? '' : escolhido).trim();
+  if (!texto) {
+    throw new Error('Escolha o ' + definicao.rotulo + ' do lote antes de importar. Ele vale para os '
+      + 'casos que vierem sem ' + definicao.rotulo.toLowerCase() + ' na planilha.');
+  }
+  var achada = definicao.opcoes.filter(function (opcao) {
+    return normalizarParaComparar_(opcao.valor) === normalizarParaComparar_(texto);
+  })[0];
+  if (!achada) {
+    throw new Error('"' + texto + '" não está na lista de ' + definicao.rotulo + '. As opções são: '
+      + (definicao.opcoes.map(function (opcao) { return opcao.valor; }).join(', ') || 'nenhuma')
+      + '. A lista se ajusta em Configurações › Ajustes Gerais.');
+  }
+  return { coluna: definicao.coluna, valor: achada.valor };
+}
+
 function dataDeRecepcaoNaImportacao_(canal) {
   if (!canal.colunaDaData || !partirDaPropostaDoCanal_(canal)) return '';
   var estrutura = estruturaDaAba_(canal.aba);
@@ -6212,6 +6247,8 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
   var agendamento = agendamentoDoLote_(canal, pedido.agendamento, agora);
   var colunasDoAgendamento = agendamento ? colunasDoAgendamento_(canal) : null;
 
+  var canalDeOrigem = canalDeOrigemDoLote_(canal, pedido.canalDeOrigem);
+
   var paraGravar = [];
   var pulados = novosMotivosParaPular_(regra);
   var premios = premiosDoDePara_(dePara, canal);
@@ -6235,6 +6272,11 @@ function importarCasosUmaVez_(idDoCanal, pedido) {
     }
     if (canal.colunaDoStatus && !caso[canal.colunaDoStatus] && statusPadrao) {
       caso[canal.colunaDoStatus] = statusPadrao;
+    }
+
+    if (canalDeOrigem && String(caso[canalDeOrigem.coluna] === undefined || caso[canalDeOrigem.coluna] === null
+      ? '' : caso[canalDeOrigem.coluna]).trim() === '') {
+      caso[canalDeOrigem.coluna] = canalDeOrigem.valor;
     }
     caso[RECC_COLUNA_ORIGEM_DA_IMPORTACAO] = nomeDoLote;
     caso[RECC_COLUNA_DATA_DA_IMPORTACAO] = agora;
@@ -6419,6 +6461,8 @@ function opcoesDaImportacaoDeCasos(idDoCanal) {
     repeticaoPelaProposta: repeticaoPelaProposta,
 
     dataDeRecepcao: dataDeRecepcaoNaImportacao_(canal),
+
+    canalDeOrigem: canalDeOrigemNaImportacao_(canal),
     repeticaoPadrao: repeticaoPelaProposta ? RECC_REPETIR_PELA_PROPOSTA_NO_MES : ''
   };
 }
@@ -9762,8 +9806,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.90',
-  data: '19/11/2026'
+  numero: '1.91',
+  data: '23/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];

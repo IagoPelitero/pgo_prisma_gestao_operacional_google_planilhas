@@ -2126,6 +2126,7 @@ table.fila.legado td { color: var(--suave); }
 .barra-de-premio.premio-mensal .barra-de-premio-trilho > span { background: color-mix(in srgb, var(--destaque) 55%, var(--superficie)); }
 .barra-de-premio.premio-retido .barra-de-premio-trilho > span { background: var(--bom); }
 
+.imp-quadro .exigido { color: var(--ruim); }
 .imp-fontes .config-aba { display: inline-flex; align-items: center; gap: 7px; }
 .imp-fontes .config-aba svg { width: 16px; height: 16px; }
 .imp-cartao .campo > span { font-weight: 600; }
@@ -7649,6 +7650,8 @@ var TelaImportacao = (function () {
 
   var dataDeRecepcao = 'planilha';
 
+  var canalDeOrigem = '';
+
   var agendarDias = '';
   var agendarPara = '';
 
@@ -7820,7 +7823,7 @@ var TelaImportacao = (function () {
       + '<div class="imp-barra-botoes">'
       + '<button type="button" class="botao vazado" id="recomecar-da-barra">Recomeçar</button>'
       + '<button type="button" class="botao" id="importar-agora"'
-      + (laudo.vaoEntrar ? '' : ' disabled') + '>'
+      + (laudo.vaoEntrar && !faltaOCanalDeOrigem() ? '' : ' disabled') + '>'
       + 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)</button></div></div>';
   }
 
@@ -7834,6 +7837,10 @@ var TelaImportacao = (function () {
     }
     var dias = Number(agendarDias);
     if (agendarDias !== '' && dias >= 1 && agendarPara) partes.push('muda sozinho em ' + diaDaqui(dias));
+    if (opcoes.canalDeOrigem) {
+      partes.push(canalDeOrigem ? opcoes.canalDeOrigem.rotulo.toLowerCase() + ' ' + canalDeOrigem
+        : 'escolha o ' + opcoes.canalDeOrigem.rotulo.toLowerCase());
+    }
     return partes.join(' · ');
   }
 
@@ -8015,6 +8022,7 @@ var TelaImportacao = (function () {
       + desenharAnalistas()
       + escolhaDoStatusDoLote()
       + escolhaDaDataDeRecepcao()
+      + escolhaDoCanalDeOrigem()
       + escolhaDoAgendamento()
       + '</div>';
   }
@@ -8096,6 +8104,35 @@ var TelaImportacao = (function () {
       + '</select>',
       dataDeRecepcao === 'hoje' ? 'Todos entram com a data de hoje, mesmo os que trazem data.'
         : 'Caso sem data entra com a de hoje.');
+  }
+
+  function escolhaDoCanalDeOrigem() {
+    var definicao = opcoes.canalDeOrigem;
+    if (!definicao) return '';
+    if (!definicao.opcoes.length) {
+      return quadro(escapar(definicao.rotulo) + ' <span class="exigido">*</span>', '',
+        'A lista de ' + escapar(definicao.rotulo) + ' está vazia, e escolher um é obrigatório para '
+          + 'importar na RET. Um administrador cadastra as opções em Configurações › Ajustes Gerais.', true);
+    }
+    return quadro(escapar(definicao.rotulo) + ' <span class="exigido">*</span>',
+      '<select class="filtro" id="canal-de-origem-do-lote" aria-required="true" aria-label="'
+      + escapar(definicao.rotulo) + ' do lote">'
+      + '<option value="">Escolha o ' + escapar(definicao.rotulo.toLowerCase()) + '</option>'
+      + definicao.opcoes.map(function (opcao) {
+        return '<option value="' + escapar(opcao.valor) + '"' + (canalDeOrigem === opcao.valor ? ' selected' : '')
+          + '>' + escapar(opcao.rotulo) + '</option>';
+      }).join('') + '</select>',
+      'Obrigatório. Vale para os casos que vierem sem ' + escapar(definicao.rotulo.toLowerCase())
+        + ' na planilha; o que ela trouxer fica.');
+  }
+
+  function faltaOCanalDeOrigem() {
+    return !ehChat() && !!(opcoes && opcoes.canalDeOrigem) && !canalDeOrigem;
+  }
+
+  function atualizarBotaoDeImportar() {
+    var botao = elemento('importar-agora');
+    if (botao && laudo) botao.disabled = !laudo.vaoEntrar || faltaOCanalDeOrigem();
   }
 
   function quemEstaFora() {
@@ -8212,6 +8249,7 @@ var TelaImportacao = (function () {
       nomeDoLote = '';
       statusDoLote = null;
       dataDeRecepcao = 'planilha';
+      canalDeOrigem = '';
       agendarDias = '';
       agendarPara = '';
       desenharSeletor();
@@ -8275,6 +8313,11 @@ var TelaImportacao = (function () {
 
     mudancas('#coluna-que-identifica', function (caixa) {
       colunaQueIdentifica = caixa.value;
+    });
+    mudancas('#canal-de-origem-do-lote', function (caixa) {
+      canalDeOrigem = caixa.value;
+      atualizarResumoDoLote();
+      atualizarBotaoDeImportar();
     });
 
     mudancas('#status-do-lote', function () {
@@ -8349,6 +8392,9 @@ var TelaImportacao = (function () {
 
     var recepcao = elemento('data-de-recepcao');
     if (recepcao) dataDeRecepcao = recepcao.value;
+
+    var origem = elemento('canal-de-origem-do-lote');
+    if (origem) canalDeOrigem = origem.value;
 
     var dias = elemento('agendar-dias');
     if (dias) agendarDias = dias.value.trim();
@@ -8466,6 +8512,12 @@ var TelaImportacao = (function () {
 
   function importar() {
     guardarOQueEstaNaTela();
+    if (faltaOCanalDeOrigem()) {
+      Formulario.avisar({ tom: 'atencao', titulo: 'Falta o ' + opcoes.canalDeOrigem.rotulo,
+        html: '<p>Na RET, escolha o ' + escapar(opcoes.canalDeOrigem.rotulo.toLowerCase())
+          + ' do lote nas opções do lote antes de importar.</p>', botao: 'Entendi' });
+      return;
+    }
 
     var escolhidos = Object.keys(analistasMarcados).filter(function (nome) {
       return analistasMarcados[nome];
@@ -8474,7 +8526,10 @@ var TelaImportacao = (function () {
     Formulario.avisar({
       tom: 'destaque',
       titulo: 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s) em ' + laudo.canal.nome + '?',
-      html: '<p>Desfazer isso é apagar as linhas uma a uma.</p>',
+      html: (opcoes.canalDeOrigem && canalDeOrigem
+        ? '<p>' + escapar(opcoes.canalDeOrigem.rotulo) + ': <strong>' + escapar(canalDeOrigem)
+          + '</strong>, nos casos que vierem sem.</p>' : '')
+        + '<p>Desfazer isso é apagar as linhas uma a uma.</p>',
       botao: 'Importar ' + laudo.vaoEntrar + ' ' + oQue(false) + '(s)',
       aoConfirmar: function () { gravar(escolhidos); }
     });
@@ -8500,7 +8555,8 @@ var TelaImportacao = (function () {
         origem: nomeDoLote,
         statusDoLote: statusQueVale(),
         agendamento: agendamentoDoLote(),
-        dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : ''
+        dataDeRecepcao: opcoes.dataDeRecepcao ? dataDeRecepcao : '',
+        canalDeOrigem: opcoes.canalDeOrigem ? canalDeOrigem : ''
       });
     gravacao
       .entao(function (resposta) {

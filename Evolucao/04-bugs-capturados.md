@@ -2316,6 +2316,17 @@ resolvida pela próxima descarga, dentro da trava: lote nas últimas linhas da a
 fila; lote que não chegou, é gravado uma vez. Vale para AUDITORIA e ERROS. A suíte derruba a
 execução nos dois pontos e confere: nada repetido, nada perdido.
 
+### 115 · Um teste de Produtividade quebrou sozinho com a virada do calendário
+
+**Sintoma.** Na Etapa 91, o teste "importar a Data do 1º contato da base antiga grava o dia certo"
+falhou — e falhava igual no código de antes da etapa (conferido numa cópia do repositório).
+
+**Causa.** O caso importado tinha datas fixas (recepção em 20/10/2026), e o painel olha os últimos
+30 dias. Quando o calendário passou de 19/11, a data saiu da janela e o CPF sumiu da tabela.
+
+**Defesa.** As datas do teste são relativas a hoje (recepção há 10 dias, 1º contato há 5). O resto
+da suíte passou em 23/11/2026.
+
 ---
 
 ## O que esta lista ensina
@@ -2570,3 +2581,6 @@ Daí as duas práticas que o projeto não abre mão:
     inteira. Toda conferência de "está aqui" precisa conferir, antes, que achou.
 64. **"Grava antes de tirar" resolve perder; não resolve repetir.** No item 114 a fila era
     segura de um lado só. Quem reprocessa precisa saber o que já foi processado.
+65. **Data fixa contra janela que anda é um teste com prazo de validade.** No item 115 o teste
+    passou por semanas e quebrou sozinho. Quando a regra olha "os últimos N dias", o teste
+    precisa montar as datas a partir de hoje.
