@@ -4660,6 +4660,42 @@ carregamento e pode gerar conflitos". Tudo na mesma 1.93.
 
 ---
 
+## Etapa 94 — A descrição dos canais (versão 1.94)
+
+**Pedido do PO:** o texto embaixo do nome de cada canal, no seletor do Trabalho (e nas outras telas
+que mostram o canal):
+
+| Canal | Era | Agora |
+|---|---|---|
+| RET | Relacionamento estratégico de clientes | **Retenção de clientes do VI** |
+| Mesa Diamante | Atendimento a casos prioritários | **Atendimento aos corretores de elite** |
+| VG | Vida em Grupo | **Piloto de retenção Vida Empresarial** |
+
+**Como:**
+
+- A descrição mora em `CANAIS.Descricao` (dado da planilha, editável em Configurações › Canais de
+  trabalho). As três ficam numa constante, `RECC_DESCRICOES_DOS_CANAIS`, com a antiga e a nova.
+- **Instalação nova:** já nasce com as novas.
+- **Planilha em uso:** o `atualizarPGO()` ganhou `trocarAsDescricoesDosCanais_`.
+  - Troca só a descrição que ainda é a **antiga** ou está **vazia**.
+  - A que alguém mudou em Configurações fica como está, com um aviso no "para você".
+  - Rodar de novo não faz nada, porque a nova já não é a antiga. Por isso não precisa de marca.
+- Nenhuma regra, coluna ou estrutura mudou: é só o texto.
+
+**Na tela:** com os textos mais longos, o seletor de canal passa para a linha de baixo do título na
+tela de 1366 px (a quebra de linha que já existia). Nada fica cortado. No celular, igual a antes.
+
+**Testes:** `testes-194.js` (novo), 6 testes. Quebra de propósito: com a atualização desligada, 3
+falham.
+
+**A análise da aba ERROS:** os caminhos propostos (A: arquivar os concluídos no Histórico; B: ler
+só as colunas necessárias; C: reduzir os 5.000 concluídos) ficam **de lado**, por decisão do PO,
+que vai estudar outras formas. Nada foi implementado.
+
+**Versão:** 1.94. O Excel marca com ◆ tudo o que mudou desde a 1.92.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

@@ -35,8 +35,12 @@ sem tocar em código:
 
 | Canal | Base | O que é |
 |---|---|---|
-| **RET** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
-| **Mesa Diamante** | `BASE_MESA` | Atendimento a casos prioritários |
+| **RET** | `BASE_RET` | Retenção de clientes do VI |
+| **Mesa Diamante** | `BASE_MESA` | Atendimento aos corretores de elite |
+| **VG** | `BASE_VG` | Piloto de retenção Vida Empresarial |
+
+O texto da última coluna é a **descrição** que aparece embaixo do nome no seletor de canal
+(Etapa 94). Ela se edita em Configurações › Canais de trabalho.
 
 ### Telas (menu lateral, presente em todas as abas)
 

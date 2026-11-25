@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-25 12:18
+   Gerado em 2026-11-25 12:31
    ========================================================================== */
 
 
@@ -9842,7 +9842,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.93',
+  numero: '1.94',
   data: '25/11/2026'
 };
 
@@ -14815,7 +14815,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   var canais = inserirVariosRegistros_('CANAIS', [
     {
       Nome: 'RET',
-      Descricao: 'Relacionamento estratégico de clientes',
+      Descricao: RECC_DESCRICOES_DOS_CANAIS.BASE_RET.nova,
       Aba: 'BASE_RET',
       ColunaDaData: 'data de recepção do protocolo',
       ColunaDaHora: '',
@@ -14848,7 +14848,7 @@ function semearDadosIniciais_(emailDoInstalador) {
     },
     {
       Nome: 'Mesa Diamante',
-      Descricao: 'Atendimento a casos prioritários',
+      Descricao: RECC_DESCRICOES_DOS_CANAIS.BASE_MESA.nova,
       Aba: 'BASE_MESA',
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
@@ -14880,7 +14880,7 @@ function semearDadosIniciais_(emailDoInstalador) {
 
     {
       Nome: 'VG',
-      Descricao: 'Vida em Grupo',
+      Descricao: RECC_DESCRICOES_DOS_CANAIS.BASE_VG.nova,
       Aba: 'BASE_VG',
       ColunaDaData: 'Data do protocolo da solicitação',
       ColunaDaHora: '',
@@ -15622,6 +15622,8 @@ function atualizarPGO() {
   feito = feito.concat(tirarAMinhaPerformanceDosNiveis_(pulados));
 
   feito = feito.concat(tirarATelaInicialDosNiveis_(pulados));
+
+  feito = feito.concat(trocarAsDescricoesDosCanais_(pulados, paraVoce));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -18716,6 +18718,35 @@ function montarOsFiltrosDaRet_(canais, paraVoce) {
   }
   return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
     + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
+}
+
+const RECC_DESCRICOES_DOS_CANAIS = {
+  BASE_RET: { antiga: 'Relacionamento estratégico de clientes', nova: 'Retenção de clientes do VI' },
+  BASE_MESA: { antiga: 'Atendimento a casos prioritários', nova: 'Atendimento aos corretores de elite' },
+  BASE_VG: { antiga: 'Vida em Grupo', nova: 'Piloto de retenção Vida Empresarial' }
+};
+
+function trocarAsDescricoesDosCanais_(pulados, paraVoce) {
+  if (!planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('as descrições dos canais: a aba CANAIS ainda não existe');
+    return [];
+  }
+  var feito = [];
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    var regra = RECC_DESCRICOES_DOS_CANAIS[String(canal.Aba || '')];
+    if (!regra) return;
+    var atual = String(canal.Descricao || '').trim();
+    if (atual === regra.nova) return;
+    if (atual && normalizarParaComparar_(atual) !== normalizarParaComparar_(regra.antiga)) {
+      paraVoce.push(canal.Nome + ': a descrição NÃO foi trocada para "' + regra.nova + '" — ela foi '
+        + 'mudada para "' + atual + '". Se quiser a nova, troque em Configurações › Canais de trabalho.');
+      return;
+    }
+    atualizarRegistro_('CANAIS', canal.Id, { Descricao: regra.nova });
+    feito.push(canal.Nome + ': a descrição agora é "' + regra.nova + '"');
+  });
+  if (feito.length) esquecerEstruturaLida_('CANAIS');
+  return feito;
 }
 
 const RECC_CHAVE_DO_FILTRO_DE_EMISSAO = 'MIGRACAO.FILTRO_TIPO_DE_EMISSAO';

@@ -30,8 +30,12 @@ código:
 
 | Canal | Base | O que é |
 |---|---|---|
-| **RET** | `BASE_RET` | Retenção — relacionamento estratégico de clientes |
-| **Mesa Diamante** | `BASE_MESA` | Atendimento a casos prioritários |
+| **RET** | `BASE_RET` | Retenção de clientes do VI |
+| **Mesa Diamante** | `BASE_MESA` | Atendimento aos corretores de elite |
+| **VG** | `BASE_VG` | Piloto de retenção Vida Empresarial |
+
+O texto da última coluna é a **descrição** que aparece embaixo do nome no seletor de canal
+(Etapa 94). Ela se edita em Configurações › Canais de trabalho.
 
 ### As telas
 
@@ -2119,7 +2123,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.93** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.94** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
