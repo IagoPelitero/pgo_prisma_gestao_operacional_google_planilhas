@@ -276,7 +276,7 @@ function semearDadosIniciais_(emailDoInstalador) {
   var canais = inserirVariosRegistros_('CANAIS', [
     {
       Nome: 'RET',
-      Descricao: 'Relacionamento estratégico de clientes',
+      Descricao: RECC_DESCRICOES_DOS_CANAIS.BASE_RET.nova,
       Aba: 'BASE_RET',
       ColunaDaData: 'data de recepção do protocolo',
       ColunaDaHora: '',
@@ -326,7 +326,7 @@ function semearDadosIniciais_(emailDoInstalador) {
     },
     {
       Nome: 'Mesa Diamante',
-      Descricao: 'Atendimento a casos prioritários',
+      Descricao: RECC_DESCRICOES_DOS_CANAIS.BASE_MESA.nova,
       Aba: 'BASE_MESA',
       ColunaDaData: 'Data de entrada',
       ColunaDaHora: 'Horário',
@@ -383,7 +383,7 @@ function semearDadosIniciais_(emailDoInstalador) {
      */
     {
       Nome: 'VG',
-      Descricao: 'Vida em Grupo',
+      Descricao: RECC_DESCRICOES_DOS_CANAIS.BASE_VG.nova,
       Aba: 'BASE_VG',
       ColunaDaData: 'Data do protocolo da solicitação',
       ColunaDaHora: '',
@@ -1499,6 +1499,9 @@ function atualizarPGO() {
 
   // --- Etapa 68: a tela inicial saiu do sistema — e dos níveis de acesso ----
   feito = feito.concat(tirarATelaInicialDosNiveis_(pulados));
+
+  // --- Etapa 94: a descrição de cada canal, embaixo do nome ----------------
+  feito = feito.concat(trocarAsDescricoesDosCanais_(pulados, paraVoce));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -5446,6 +5449,47 @@ function montarOsFiltrosDaRet_(canais, paraVoce) {
   }
   return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
     + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
+}
+
+/**
+ * A descrição de cada canal, o texto embaixo do nome no seletor de canal
+ * (Etapa 94, pedido do PO). `antiga` é a que o instalador gravava até a 1.93.
+ */
+const RECC_DESCRICOES_DOS_CANAIS = {
+  BASE_RET: { antiga: 'Relacionamento estratégico de clientes', nova: 'Retenção de clientes do VI' },
+  BASE_MESA: { antiga: 'Atendimento a casos prioritários', nova: 'Atendimento aos corretores de elite' },
+  BASE_VG: { antiga: 'Vida em Grupo', nova: 'Piloto de retenção Vida Empresarial' }
+};
+
+/**
+ * Troca a descrição dos canais na planilha que já está em uso (Etapa 94).
+ *
+ * Só troca a que ainda é a ANTIGA (ou está vazia): a descrição se edita em
+ * Configurações › Canais de trabalho, e a que alguém escreveu lá não some por
+ * causa de uma atualização. Essa fica como está, com um aviso. Rodar de novo
+ * não faz nada — a nova já não é a antiga.
+ */
+function trocarAsDescricoesDosCanais_(pulados, paraVoce) {
+  if (!planilhaAtiva_().getSheetByName('CANAIS')) {
+    pulados.push('as descrições dos canais: a aba CANAIS ainda não existe');
+    return [];
+  }
+  var feito = [];
+  lerRegistros_('CANAIS').forEach(function (canal) {
+    var regra = RECC_DESCRICOES_DOS_CANAIS[String(canal.Aba || '')];
+    if (!regra) return;
+    var atual = String(canal.Descricao || '').trim();
+    if (atual === regra.nova) return;
+    if (atual && normalizarParaComparar_(atual) !== normalizarParaComparar_(regra.antiga)) {
+      paraVoce.push(canal.Nome + ': a descrição NÃO foi trocada para "' + regra.nova + '" — ela foi '
+        + 'mudada para "' + atual + '". Se quiser a nova, troque em Configurações › Canais de trabalho.');
+      return;
+    }
+    atualizarRegistro_('CANAIS', canal.Id, { Descricao: regra.nova });
+    feito.push(canal.Nome + ': a descrição agora é "' + regra.nova + '"');
+  });
+  if (feito.length) esquecerEstruturaLida_('CANAIS');
+  return feito;
 }
 
 /** A marca de que o Tipo de emissão já entrou nos filtros da RET (Etapa 93). */
