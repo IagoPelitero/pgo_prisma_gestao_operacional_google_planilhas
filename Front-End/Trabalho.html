@@ -564,26 +564,34 @@ var TelaTrabalho = (function () {
    *
    * As duas primeiras aparecem só para quem pode editar: o servidor recusaria,
    * e botão que a chamada recusa ensina a pessoa a desconfiar da tela.
+   *
+   * O DESENHO (Etapa 93, proposta C aprovada pelo PO): "Trabalhar no caso" em
+   * cima, cheio, e embaixo "Status" e "Excluir" menores, lado a lado, COM
+   * TEXTO. Antes os dois eram só o desenho, e a pessoa precisava passar o
+   * mouse para saber o que faziam; três botões escritos do mesmo tamanho,
+   * lado a lado, cortavam o Excluir na tela de 1366 px.
    */
   function acoesDaLinha(caso) {
+    var secundarias = '';
     var botoes = '';
 
     if (resumo.podeEditar) {
       botoes += '<button type="button" class="acao" data-trabalhar="'
         + escapar(caso.id) + '">' + Moldura.icone('editar')
-        + ' Trabalhar no caso</button>'
-        + '<button type="button" class="acao-icone" data-status-do-caso="'
+        + ' Trabalhar no caso</button>';
+      secundarias += '<button type="button" class="acao-secundaria" data-status-do-caso="'
         + escapar(caso.id) + '" title="Alterar status" aria-label="Alterar status">'
-        + Moldura.icone('trocarSituacao') + '</button>';
+        + Moldura.icone('trocarSituacao') + '<span>Status</span></button>';
     }
 
     // Sem condição de permissão: qualquer pessoa cadastrada exclui, em
     // qualquer canal. É o que o PO pediu, e o servidor combina com isto.
-    botoes += '<button type="button" class="acao-icone perigo" data-excluir="'
+    secundarias += '<button type="button" class="acao-secundaria perigo" data-excluir="'
       + escapar(caso.id) + '" title="Excluir caso" aria-label="Excluir caso">'
-      + Moldura.icone('ocultar') + '</button>';
+      + Moldura.icone('ocultar') + '<span>Excluir</span></button>';
 
-    return botoes;
+    return '<div class="acoes-do-caso">' + botoes
+      + '<div class="acoes-secundarias">' + secundarias + '</div></div>';
   }
 
   var focarABusca = false;
@@ -964,8 +972,9 @@ var TelaTrabalho = (function () {
         proximoDaFila);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
+      // O botão vai junto para girar enquanto o servidor busca os status (Etapa 93).
       CasoEmModal.trocarSituacao(canalEscolhido,
-        botao.getAttribute('data-status-do-caso'), depoisDeGravar);
+        botao.getAttribute('data-status-do-caso'), depoisDeGravar, botao);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');

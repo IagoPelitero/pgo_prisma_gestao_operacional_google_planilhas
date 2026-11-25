@@ -695,6 +695,13 @@ function mesesParaEscolher_() {
 /** Quantas caixas de filtro o Trabalho mostra. Era 4; o PO pediu o Status proposta (Etapa 44). */
 const RECC_FILTROS_NO_TRABALHO = 6;
 
+/**
+ * Quantos filtros cabem quando o canal ESCOLHE a lista em Configurações (Etapa
+ * 93, pedido do PO: o Tipo de emissão como 7º filtro da RET). A regra de
+ * sempre (lista em branco) continua com 6, para não mudar a Mesa nem o VG.
+ */
+const RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO = 7;
+
 function filtrosDoCanal_(canal, quem) {
   var disponiveis = [];
 
@@ -740,7 +747,9 @@ function filtrosDoCanal_(canal, quem) {
   var escolhidos = String(canal.filtrosDoTrabalho || '').split(',').map(function (chave) {
     return normalizarParaComparar_(chave);
   }).filter(function (chave) { return chave; });
+  var teto = RECC_FILTROS_NO_TRABALHO;
   if (escolhidos.length) {
+    teto = RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO;
     var porChave = {};
     ativos.forEach(function (campo) { porChave[normalizarParaComparar_(campo.ChaveTecnica)] = campo; });
     campos = escolhidos.map(function (chave) { return porChave[chave]; })
@@ -748,7 +757,7 @@ function filtrosDoCanal_(canal, quem) {
   }
 
   campos.forEach(function (campo) {
-    if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;   // mais vira parede de caixas
+    if (disponiveis.length >= teto) return;   // mais vira parede de caixas
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 

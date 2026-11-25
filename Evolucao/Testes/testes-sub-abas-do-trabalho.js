@@ -432,8 +432,9 @@ function rodarTestesDasSubAbasDoTrabalho() {
       saiCom: [] }] } }), 'nenhum valor');
     lanca(() => salvar({ subAbasDoTrabalho: { status: [] } }), 'ao menos um status');
     lanca(() => salvar({ filtrosDoTrabalho: ['naoexiste'] }), 'não é um campo de lista');
+    // Etapa 93: a lista escolhida vai até 7 (o Tipo de emissão da RET); a 8ª é recusada.
     lanca(() => salvar({ filtrosDoTrabalho: ['status', 'analista', 'canal', 'codproduto',
-      'tentativasdecontato', 'formadepagamento', 'motivodocancelamento'] }), 'até 6');
+      'tentativasdecontato', 'formadepagamento', 'motivodocancelamento', 'statusproposta'] }), 'até 7');
   });
 
   teste('os filtros escolhidos mandam na ordem; em branco, voltam os de sempre', () => {
@@ -449,6 +450,85 @@ function rodarTestesDasSubAbasDoTrabalho() {
     const canal = c.chamar('canaisVisiveis_()').find((k) => k.aba === 'BASE_RET');
     igual(JSON.parse(canal.subAbasDoTrabalho).status[0].status, 'Pendente');
     igual(canal.filtrosDoTrabalho, 'analista');
+  });
+
+  /* ----------------------------------------------------------------------- */
+  secao('Etapa 93 · o Tipo de emissão como 7º filtro da RET');
+
+  // A RET do PO com o campo de lista que ele criou na planilha.
+  const comEmissao = () => {
+    const e = retDoPO();
+    const lista = e.chamar('criarLista')('Tipo de emissão');
+    ['PPW', 'Emissão manual', 'Salesforce', 'Kivida'].forEach((nome, i) => {
+      e.chamar('salvarItemDoCatalogo')({ tipo: lista, canalId: '', nome, ordem: i + 1, ativo: true });
+    });
+    e.chamar('criarCampo')(e.ret.id, { rotulo: 'Tipo de emissão', tipo: 'seletor', secao: 'Seguro' });
+    const campo = e.chamar('listarCamposDoCanal')(e.ret.id).find((k) => k.rotulo === 'Tipo de emissão');
+    e.chamar('salvarCampo')({ id: campo.id, rotulo: 'Tipo de emissão', secao: 'Seguro', tipo: 'seletor',
+      catalogo: lista, obrigatorio: false, ativo: true });
+    e.chamar('esquecerCacheDaConfiguracao_()');
+    e.migrar = () => {
+      const pulados = []; const paraVoce = [];
+      const feito = e.chamar('acrescentarOTipoDeEmissaoNosFiltrosDaRet_')(pulados, paraVoce);
+      e.chamar('esquecerCacheDaConfiguracao_()');
+      return { feito: feito.join(' | '), pulados: pulados.join(' | '), paraVoce: paraVoce.join(' | ') };
+    };
+    return e;
+  };
+
+  teste('o atualizarPGO põe o Tipo de emissão no FIM dos filtros da RET (7º), com as 4 opções', () => {
+    const e = comEmissao();
+    contem(e.migrar().feito, 'em 7º lugar');
+    const filtros = e.resumo(1).filtrosDisponiveis;
+    igual(filtros.length, 7);
+    igual(filtros[6].rotulo, 'Tipo de emissão');
+    igual(filtros[6].opcoes.map((o) => o.valor).join(', '), 'PPW, Emissão manual, Salesforce, Kivida');
+    igual(filtros.slice(0, 6).map((f) => f.rotulo).join(' | '), 'Status | Tentativas de contato | '
+      + 'Status proposta | Analista | Canal de origem | Cód. do produto e produto', 'os 6 de antes, na mesma ordem');
+  });
+
+  teste('o filtro funciona: só os casos daquele tipo de emissão', () => {
+    const e = comEmissao(); e.migrar(); comCasos(e);
+    const chave = e.resumo(1).filtrosDisponiveis[6].chave;
+    const linha = e.chamar('lerRegistros_')('BASE_RET').find((l) => l.status === 'Pendente');
+    e.chamar('atualizarRegistro_')('BASE_RET', linha.__id, { 'Tipo de emissão': 'Kivida' });
+    e.chamar('esquecerCacheDaConfiguracao_()');
+    const fila = e.resumo(1, { [chave]: ['Kivida'] }).fila;
+    igual(fila.length, 1);
+    igual(e.resumo(1, { [chave]: ['PPW'] }).fila.length, 0);
+  });
+
+  teste('roda uma vez: depois, quem manda é Configurações', () => {
+    const e = comEmissao(); e.migrar();
+    const segunda = e.migrar();
+    igual(segunda.feito, '');
+    contem(segunda.pulados, 'já foi acrescentado');
+  });
+
+  teste('sem o campo na RET: não mexe, não marca e avisa (tenta de novo na próxima)', () => {
+    const e = retDoPO();
+    const antes = e.canal().filtrosDoTrabalho;
+    const pulados = []; const paraVoce = [];
+    igual(e.chamar('acrescentarOTipoDeEmissaoNosFiltrosDaRet_')(pulados, paraVoce).length, 0);
+    contem(paraVoce.join(' | '), 'NÃO foi acrescentado');
+    igual(e.canal().filtrosDoTrabalho, antes);
+    igual(String(e.chamar('valorDaConfiguracao_')('MIGRACAO.FILTRO_TIPO_DE_EMISSAO', '') || ''), '');
+  });
+
+  teste('com 7 filtros já escolhidos: não troca nenhum, avisa', () => {
+    const e = comEmissao();
+    const chaves = e.canal().filtrosDoTrabalho + ', formadepagamento';
+    e.chamar('atualizarRegistro_')('CANAIS', e.ret.id, { FiltrosDoTrabalho: chaves });
+    e.chamar('esquecerCacheDaConfiguracao_()');
+    contem(e.migrar().paraVoce, 'já há 7 filtros');
+    igual(e.canal().filtrosDoTrabalho, chaves);
+  });
+
+  teste('a regra de sempre (lista em branco) continua com 6: a Mesa e o VG não mudam', () => {
+    const e = comEmissao();
+    e.chamar('atualizarRegistro_')('CANAIS', e.ret.id, { FiltrosDoTrabalho: '' });
+    e.chamar('esquecerCacheDaConfiguracao_()');
+    igual(e.chamar('resumoDoCanal')(e.ret.id, {}, null, '', false, 1).filtrosDisponiveis.length, 6);
   });
 
   /* ----------------------------------------------------------------------- */

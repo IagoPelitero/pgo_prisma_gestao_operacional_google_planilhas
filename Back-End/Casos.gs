@@ -1710,7 +1710,52 @@ function casoParaEditarSemRelogio_(idDoCanal, idDoCaso) {
 
   return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema,
     versao: versaoDoCaso_(registro, canal.aba),
-    linhaDoTempo: linhaDoTempoDoCaso_(registro, estrutura, canal) };
+    linhaDoTempo: linhaDoTempoDoCaso_(registro, estrutura, canal),
+    resumo: resumoDoCasoAberto_(registro, canal) };
+}
+
+/*
+ * O CABEÇALHO DO CASO ABERTO (Etapa 93, Estilo B aprovado pelo PO): o status
+ * com a cor dele e os prazos (o selo do sinalizador, o SLA da Mesa) — as duas
+ * coisas que a tela não sabe calcular sozinha. São as MESMAS contas da fila
+ * (montarFila_), sobre a linha que já foi lida: nenhuma ida a mais à base.
+ *
+ * Só enfeita: se algo aqui falhar, o caso abre sem os cartões, como antes —
+ * o cabeçalho não pode ser o motivo de o caso não abrir.
+ */
+function resumoDoCasoAberto_(registro, canal) {
+  try {
+    var nome = canal.colunaDoStatus ? String(registro[canal.colunaDoStatus] || '') : '';
+    var tons = {};
+    var rotulos = {};
+    var finais = {};
+    situacoesDoCanal_(canal).forEach(function (situacao) {
+      tons[situacao.chave] = situacao.tom;
+      rotulos[situacao.chave] = situacao.nome;
+      if (situacao.final) finais[situacao.chave] = true;
+    });
+    var sinalizadores = sinalizadoresDoCanal_(canal);
+    var comSla = Number(canal.slaHorasUteis) > 0;
+    var agora = (comSla || sinalizadores.length) ? relogioDeParede_(new Date()) : null;
+    var situacoes = sinalizadores.length ? situacoesPorChave_(canal) : null;
+    var prazos = [];
+    var sla = comSla ? slaDoCaso_(registro, canal, finais, agora) : null;
+    if (sla) prazos.push({ nome: 'SLA', texto: String(sla.texto || ''), tom: sla.tom });
+    sinalizadores.forEach(function (sinalizador) {
+      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      if (!sinal) return;
+      // "Prazo de retorno · vence em 7h24": o nome vira o rótulo do cartão.
+      var texto = String(sinal.texto || '');
+      var prefixo = String(sinal.nome || '') + ' · ';
+      prazos.push({ nome: String(sinal.nome || 'Prazo'), tom: sinal.tom,
+        texto: texto.indexOf(prefixo) === 0 ? texto.substring(prefixo.length) : texto });
+    });
+    var chave = normalizarParaComparar_(nome);
+    return { status: nome ? { nome: rotulos[chave] || nome, tom: tons[chave] || 'neutro' } : null,
+      prazos: prazos };
+  } catch (erro) {
+    return null;
+  }
 }
 
 /*

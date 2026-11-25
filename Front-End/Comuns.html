@@ -2533,23 +2533,40 @@ var CasoEmModal = (function () {
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
     caixa.id = 'modal-do-caso';
-    caixa.innerHTML = '<div class="dialogo-caixa larga" role="dialog"'
-      + ' aria-modal="true" aria-labelledby="titulo-do-caso">'
+    /*
+      O DESENHO DO MODAL (Etapa 93, Estilo B aprovado pelo PO): em cima, o
+      nome do cliente e os cartões do que mais se consulta (status, prazo,
+      analista, proposta); embaixo, abas — "Dados do caso", "Linha do tempo",
+      "Da planilha" — no lugar da rolagem comprida em que a linha do tempo e
+      as colunas da planilha ficavam escondidas no fim. As seções do
+      formulário ganham número e o selo "completa" / "N obrigatório", e
+      recolhem com um clique. No pé, o que falta e se há alteração não salva.
+      O que o modal grava e confere não mudou.
+    */
+    caixa.innerHTML = '<div class="dialogo-caixa larga caso-em-abas" role="dialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-do-caso nome-do-caso">'
       + '<header class="modal-cabeca">'
-      + '<div><h3 id="titulo-do-caso">Caso ' + escapar(idAtual) + '</h3>'
-      + '<p id="modal-subtitulo">Abrindo…</p></div>'
+      + '<div class="modal-titulos"><p class="modal-sobretitulo">'
+      + '<span id="titulo-do-caso">Caso ' + escapar(idAtual) + '</span>'
+      + '<span id="modal-subtitulo">Abrindo…</span></p>'
+      + '<h3 id="nome-do-caso"></h3></div>'
       + '<button type="button" class="modal-fechar" id="modal-x"'
       + ' aria-label="Fechar">✕</button>'
       + '</header>'
+      + '<div class="modal-resumo" id="modal-resumo" hidden></div>'
+      + '<div class="modal-abas" id="modal-abas" role="tablist" aria-label="Partes do caso" hidden></div>'
       + '<div class="modal-corpo" id="modal-corpo">'
+      + '<div id="aba-dados-do-caso" role="tabpanel">'
       + '<form class="formulario no-modal" id="form-do-caso" novalidate>'
       + '<div id="corpo-da-edicao"><p class="carregando-campos" role="status">'
-      + 'Abrindo o caso…</p></div></form>'
+      + 'Abrindo o caso…</p></div></form></div>'
       + '<div id="modal-do-sistema"></div></div>'
       // "Salvar" nasce TRAVADO e só destrava com o formulário preenchido. É a
       // regra que o PO pediu para o cadastro: botão que aparece antes do
       // formulário é botão que alguém clica — e aqui gravaria um caso vazio.
       + '<footer class="modal-pe" id="modal-pe">'
+      + '<span class="modal-sinais"><span class="sinal-falta" id="modal-falta" hidden></span>'
+      + '<span class="sinal-nao-salvo" id="modal-nao-salvo" hidden>Alterações não salvas</span></span>'
       + '<span class="recado" id="recado-do-modal" hidden></span>'
       + '<button type="button" class="botao vazado" id="modal-fechar">Fechar</button>'
       + (qualOProximo ? '<button type="button" class="botao vazado" id="modal-salvar-e-proximo" disabled>'
@@ -2669,8 +2686,7 @@ var CasoEmModal = (function () {
       if (deuErro || !oFormulario || !osValores) return;
       var corpo = corpoDaEdicao();
       if (!corpo) return;   // a pessoa fechou antes de chegar
-      elemento('modal-subtitulo').textContent = 'Trabalhar no caso · '
-        + (osValores.canal || oFormulario.canal.nome || '');
+      elemento('modal-subtitulo').textContent = (osValores.canal || oFormulario.canal.nome || '');
       corpo.innerHTML = Formulario.desenhar(oFormulario, 'editar-');
       // Só o canal que confere a SUSEP ganha o selo na EDIÇÃO. Ver `ligar`.
       // O Id do caso vai junto para o selo da proposta: na edição, o próprio
@@ -2678,11 +2694,28 @@ var CasoEmModal = (function () {
       Formulario.ligar(corpo, 'editar-', canalAtual,
         oFormulario.canal.confereSusepBloqueada !== false, idAtual);
       Formulario.preencher(corpo, osValores.valores);
-      elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
-        + desenharDoSistema(osValores.doSistema);
+      // A linha do tempo e as colunas da planilha, cada uma na sua aba.
+      var tempo = desenharLinhaDoTempo(osValores.linhaDoTempo);
+      var planilha = desenharDoSistema(osValores.doSistema);
+      elemento('modal-do-sistema').innerHTML
+        = '<div id="aba-linha-do-tempo" role="tabpanel" hidden>' + tempo + '</div>'
+        + '<div id="aba-da-planilha" role="tabpanel" hidden>' + planilha + '</div>';
+      desenharResumo(oFormulario, osValores);
+      desenharAbas([
+        { id: 'aba-dados-do-caso', nome: 'Dados do caso', quantos: null },
+        { id: 'aba-linha-do-tempo', nome: 'Linha do tempo',
+          quantos: tempo ? (osValores.linhaDoTempo || []).length : 0 },
+        { id: 'aba-da-planilha', nome: 'Da planilha',
+          quantos: planilha ? (osValores.doSistema || []).length : 0 }]);
+      prepararAsSecoes(corpo);
       elemento('modal-salvar').disabled = false;
       if (elemento('modal-salvar-e-proximo')) elemento('modal-salvar-e-proximo').disabled = false;
       retratoAoAbrir = retratoDaEdicao();
+      // Os avisos do pé e os selos das seções acompanham o que a pessoa digita.
+      var miolo = elemento('modal-corpo');
+      miolo.addEventListener('input', atualizarOsAvisos);
+      miolo.addEventListener('change', atualizarOsAvisos);
+      atualizarOsAvisos();
     }
 
     function falhou(erro) {
@@ -2769,6 +2802,173 @@ var CasoEmModal = (function () {
     return colunas;
   }
 
+  /* ----------------------------------------- o Estilo B (Etapa 93) */
+
+  /** Para achar o campo pelo rótulo, sem acento nem espaço. */
+  function chaveDoTexto(texto) {
+    return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  /**
+   * O valor de um campo do formulário que a pessoa VÊ, achado pelo rótulo —
+   * o primeiro da lista que existir. Vem do formulário dela, e não da linha:
+   * um campo oculto para o nível não aparece no cabeçalho pela porta dos
+   * fundos. Na lista, o rótulo da opção; vazio, nada.
+   */
+  function campoPeloRotulo(formulario, valores, rotulos) {
+    var campos = [];
+    (formulario.secoes || []).forEach(function (secao) { campos = campos.concat(secao.campos || []); });
+    for (var i = 0; i < rotulos.length; i++) {
+      for (var j = 0; j < campos.length; j++) {
+        if (chaveDoTexto(campos[j].rotulo) !== rotulos[i]) continue;
+        var valor = valores[campos[j].chave];
+        if (valor === undefined || valor === null || !String(valor).trim()) return null;
+        var opcao = (campos[j].opcoes || []).filter(function (uma) { return uma.valor === valor; })[0];
+        return { rotulo: campos[j].rotulo, valor: String(opcao ? (opcao.rotulo || opcao.valor) : valor) };
+      }
+    }
+    return null;
+  }
+
+  /*
+    O CABEÇALHO: o nome do cliente em destaque e os cartões. Só entra o que o
+    caso tem — o canal sem prazo não ganha cartão de prazo vazio. É como o
+    caso ESTAVA ao abrir: mudar o status no formulário só vale depois de salvar.
+  */
+  function desenharResumo(formulario, caso) {
+    var valores = caso.valores || {};
+    var cliente = campoPeloRotulo(formulario, valores,
+      ['nomedocliente', 'cliente', 'nomedosegurado', 'segurado']);
+    elemento('nome-do-caso').textContent = cliente ? cliente.valor : 'Caso ' + idAtual;
+    if (!cliente) elemento('nome-do-caso').classList.add('sem-nome');
+
+    var resumo = caso.resumo || {};
+    var cartoes = [];
+    if (resumo.status) {
+      cartoes.push('<div class="cartao-do-caso"><span>Status</span><strong class="com-ponto tom-'
+        + escapar(resumo.status.tom) + '">' + escapar(resumo.status.nome) + '</strong></div>');
+    }
+    (resumo.prazos || []).forEach(function (prazo) {
+      cartoes.push('<div class="cartao-do-caso"><span>' + escapar(prazo.nome) + '</span>'
+        + '<strong class="tom-' + escapar(prazo.tom) + '">' + Moldura.icone('relogio')
+        + escapar(prazo.texto) + '</strong></div>');
+    });
+    var analista = campoPeloRotulo(formulario, valores, ['analista', 'responsavel']);
+    if (analista) {
+      cartoes.push('<div class="cartao-do-caso"><span>' + escapar(analista.rotulo) + '</span><strong>'
+        + escapar(analista.valor) + '</strong></div>');
+    }
+    var proposta = campoPeloRotulo(formulario, valores, ['numerodaproposta', 'proposta']);
+    if (proposta) {
+      cartoes.push('<div class="cartao-do-caso"><span>Proposta</span><strong>'
+        + escapar(proposta.valor) + '</strong></div>');
+    }
+    var lugar = elemento('modal-resumo');
+    lugar.innerHTML = cartoes.join('');
+    lugar.hidden = !cartoes.length;
+  }
+
+  /**
+   * As abas. A de uma parte vazia não aparece; sobrando só "Dados do caso",
+   * a barra inteira some — aba única é enfeite.
+   */
+  function desenharAbas(abas) {
+    var barra = elemento('modal-abas');
+    var comConteudo = abas.filter(function (aba) { return aba.quantos === null || aba.quantos > 0; });
+    if (comConteudo.length < 2) { barra.hidden = true; return; }
+    barra.innerHTML = comConteudo.map(function (aba, i) {
+      return '<button type="button" role="tab" class="modal-aba" id="botao-' + aba.id + '"'
+        + ' aria-controls="' + aba.id + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '"'
+        + ' data-aba-do-caso="' + aba.id + '">' + escapar(aba.nome)
+        + (aba.quantos ? ' <b>' + aba.quantos + '</b>' : '') + '</button>';
+    }).join('');
+    barra.hidden = false;
+    barra.addEventListener('click', function (evento) {
+      var botao = evento.target.closest ? evento.target.closest('[data-aba-do-caso]') : null;
+      if (botao) mostrarAba(botao.getAttribute('data-aba-do-caso'));
+    });
+  }
+
+  function mostrarAba(id) {
+    ['aba-dados-do-caso', 'aba-linha-do-tempo', 'aba-da-planilha'].forEach(function (uma) {
+      if (elemento(uma)) elemento(uma).hidden = uma !== id;
+      var botao = elemento('botao-' + uma);
+      if (botao) botao.setAttribute('aria-selected', uma === id ? 'true' : 'false');
+    });
+    if (elemento('modal-corpo')) elemento('modal-corpo').scrollTop = 0;
+  }
+
+  /*
+    AS SEÇÕES NUMERADAS, QUE RECOLHEM. Todas nascem ABERTAS: recolher é
+    escolha de quem trabalha, e nada fica escondido sem que a pessoa peça. O
+    selo diz se falta obrigatório — a mesma regra do pé (camposQueFaltam).
+  */
+  function prepararAsSecoes(corpo) {
+    var secoes = corpo.querySelectorAll('fieldset.secao');
+    Array.prototype.forEach.call(secoes, function (secao, i) {
+      var legenda = secao.querySelector('legend');
+      if (!legenda) return;
+      var nome = legenda.textContent;
+      secao.classList.add('secao-do-caso');
+      legenda.innerHTML = '<button type="button" class="secao-alternar" aria-expanded="true">'
+        + '<span class="secao-seta" aria-hidden="true">›</span>'
+        + '<span class="secao-numero">' + (i + 1) + '</span>'
+        + '<span class="secao-nome">' + escapar(nome) + '</span>'
+        + '<span class="secao-selo"></span></button>';
+      legenda.querySelector('button').addEventListener('click', function () {
+        var aberta = secao.classList.toggle('recolhida') === false;
+        this.setAttribute('aria-expanded', aberta ? 'true' : 'false');
+      });
+    });
+  }
+
+  /**
+   * O que deu erro ao salvar aparece: a aba dos dados, e a seção aberta. Vale
+   * o campo marcado com erro e o obrigatório vazio — a lista de problemas do
+   * servidor nem sempre atravessa até a tela, e a seção recolhida esconderia
+   * justamente o campo que a mensagem do erro cita.
+   */
+  function mostrarAsSecoesComErro() {
+    var corpo = corpoDaEdicao();
+    if (!corpo) return;
+    var comErro = Array.prototype.slice.call(corpo.querySelectorAll('.campo.com-erro'))
+      .concat(Formulario.camposQueFaltam(corpo));
+    if (comErro.length) mostrarAba('aba-dados-do-caso');
+    comErro.forEach(function (campo) {
+      var secao = campo.closest('fieldset.secao');
+      if (!secao || !secao.classList.contains('recolhida')) return;
+      secao.classList.remove('recolhida');
+      var botao = secao.querySelector('.secao-alternar');
+      if (botao) botao.setAttribute('aria-expanded', 'true');
+    });
+    atualizarOsAvisos();
+  }
+
+  /** Os selos das seções e os dois avisos do pé. */
+  function atualizarOsAvisos() {
+    var corpo = corpoDaEdicao();
+    if (!corpo) return;
+    var faltam = Formulario.camposQueFaltam(corpo);
+    Array.prototype.forEach.call(corpo.querySelectorAll('fieldset.secao-do-caso'), function (secao) {
+      var selo = secao.querySelector('.secao-selo');
+      if (!selo) return;
+      var quantos = faltam.filter(function (campo) { return secao.contains(campo); }).length;
+      var comErro = !!secao.querySelector('.campo.com-erro');
+      secao.classList.toggle('com-falta', quantos > 0 || comErro);
+      selo.className = 'secao-selo' + (quantos ? ' falta' : ' ok');
+      selo.textContent = quantos ? quantos + (quantos === 1 ? ' obrigatório' : ' obrigatórios')
+        : '✓ completa';
+    });
+    var falta = elemento('modal-falta');
+    if (falta) {
+      falta.textContent = Formulario.textoDoQueFalta(corpo);
+      falta.hidden = !falta.textContent;
+    }
+    var naoSalvo = elemento('modal-nao-salvo');
+    if (naoSalvo) naoSalvo.hidden = !temAlteracaoNaoSalva();
+  }
+
   /**
    * O caso não abriu: o motivo no lugar do formulário, e só o Fechar.
    *
@@ -2783,6 +2983,8 @@ var CasoEmModal = (function () {
       + escapar(erro.message || String(erro)) + '</p>';
     var subtitulo = elemento('modal-subtitulo');
     if (subtitulo) subtitulo.textContent = 'Não deu para abrir';
+    var nome = elemento('nome-do-caso');
+    if (nome) nome.textContent = 'Caso ' + idAtual;
     var salvarBotao = elemento('modal-salvar');
     if (salvarBotao) salvarBotao.disabled = true;
     var eOProximo = elemento('modal-salvar-e-proximo');
@@ -2849,6 +3051,7 @@ var CasoEmModal = (function () {
         destravarOsBotoes();
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo, erro.problemas);
+        mostrarAsSecoesComErro();
       });
   }
 
@@ -2878,16 +3081,23 @@ var CasoEmModal = (function () {
    * O formulário confere todos os campos ao salvar; este diálogo mexe só no
    * status, e por isso funciona mesmo num caso que veio da base antiga com a
    * proposta ou a apólice pela metade.
+   *
+   * `botaoQueAbriu` (Etapa 93, pedido do PO: "ele não mostra carregamento e
+   * pode gerar conflitos"): o botão da fila gira e fica travado enquanto o
+   * servidor busca os status — antes, nada mudava na tela, e a pessoa
+   * clicava de novo ou ia para outro caso achando que não tinha pegado.
    */
-  function trocarSituacao(idDoCanal, idDoCaso, quandoMudar) {
+  function trocarSituacao(idDoCanal, idDoCaso, quandoMudar, botaoQueAbriu) {
     // Um clique enquanto o primeiro ainda busca as opções não abre dois
     // diálogos um em cima do outro.
     if (abrindoOStatus || elemento('dialogo-situacao')) return;
     abrindoOStatus = true;
+    botaoCarregando(botaoQueAbriu, true);
 
     Servidor.chamar('situacoesParaTrocar', idDoCanal, idDoCaso)
       .entao(function (resposta) {
         abrindoOStatus = false;
+        botaoCarregando(botaoQueAbriu, false);
         var caixa = document.createElement('div');
         caixa.className = 'dialogo';
         caixa.id = 'dialogo-situacao';
@@ -2939,15 +3149,32 @@ var CasoEmModal = (function () {
         // A cada status escolhido, o servidor diz o que ele pede; o formulário
         // desenha com as mesmas máscaras e listas do cadastro. A resposta de um
         // status que já não está escolhido é descartada.
+        //
+        // ENQUANTO OS CAMPOS NÃO CHEGAM, O SALVAR FICA TRAVADO (Etapa 93): antes
+        // ele ficava livre, e salvar nesse meio-tempo mandava o status SEM o
+        // que ele pede (o valor retido, o Status proposta). Agora a pessoa vê
+        // "Carregando o que este status pede…" e só salva com os campos na tela.
         var pedidoAtual = 0;
+        var camposCarregando = false;
+        function travarOSalvar(travar) {
+          camposCarregando = travar;
+          var salvar = elemento('salvar-situacao');
+          if (!salvar || salvar.getAttribute('data-gravando') === 'sim') return;
+          salvar.disabled = travar;
+          salvar.title = travar ? 'Espere carregar o que este status pede' : '';
+        }
         function mostrarOsCamposDaSituacao() {
           var situacao = elemento('situacao-nova').value;
           var lugar = elemento('campos-da-situacao');
           var esta = ++pedidoAtual;
-          lugar.innerHTML = '';
+          elemento('erro-situacao').hidden = true;
+          lugar.innerHTML = '<p class="carregando-status" role="status">'
+            + 'Carregando o que este status pede…</p>';
+          travarOSalvar(true);
           Servidor.chamar('camposDaSituacao', idDoCanal, idDoCaso, situacao)
             .entao(function (campos) {
               if (esta !== pedidoAtual || !elemento('campos-da-situacao')) return;
+              travarOSalvar(false);
               if (!campos || !campos.length) { lugar.innerHTML = ''; return; }
               lugar.innerHTML = '<p class="config-explica">O status "' + escapar(situacao)
                 + '" pede:</p>'
@@ -2958,15 +3185,27 @@ var CasoEmModal = (function () {
               campos.forEach(function (campo) { valoresDoCaso[campo.chave] = campo.valor; });
               Formulario.preencher(lugar, valoresDoCaso);
             })
-            .senao(function () { lugar.innerHTML = ''; });
+            .senao(function () {
+              if (esta !== pedidoAtual || !elemento('campos-da-situacao')) return;
+              // O Salvar continua travado: sem saber o que o status pede, salvar
+              // poderia gravar o status sem os campos dele.
+              lugar.innerHTML = '<p class="carregando-status falhou" role="alert">'
+                + 'Não consegui carregar o que este status pede. '
+                + '<button type="button" class="tentar-de-novo" id="tentar-campos-de-novo">'
+                + 'Tentar de novo</button></p>';
+              elemento('tentar-campos-de-novo').addEventListener('click', mostrarOsCamposDaSituacao);
+            });
         }
         elemento('situacao-nova').addEventListener('change', mostrarOsCamposDaSituacao);
         mostrarOsCamposDaSituacao();
 
         elemento('form-situacao').addEventListener('submit', function (evento) {
           evento.preventDefault();
-          if (gravando) return;
+          if (gravando || camposCarregando) return;
           gravando = true;
+          // O status fica parado enquanto grava: trocá-lo no meio mudaria os
+          // campos na tela sem mudar o que já foi mandado.
+          elemento('situacao-nova').disabled = true;
           // Os três pontinhos, e nada clicável até a resposta: dois cliques
           // gravariam duas mudanças, e o contador de mudanças contaria duas.
           Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
@@ -2985,6 +3224,7 @@ var CasoEmModal = (function () {
             })
             .senao(function (erro) {
               gravando = false;
+              elemento('situacao-nova').disabled = false;
               Formulario.acabouDeGravar(elemento('salvar-situacao'), caixa);
               var aviso = elemento('erro-situacao');
               aviso.textContent = erro.message || String(erro);
@@ -2994,8 +3234,18 @@ var CasoEmModal = (function () {
       })
       .senao(function (erro) {
         abrindoOStatus = false;
+        botaoCarregando(botaoQueAbriu, false);
         Moldura.toast(erro.message || String(erro), 'ruim');
       });
+  }
+
+  /** O botão que abriu o status gira e fica travado até o diálogo abrir (Etapa 93). */
+  function botaoCarregando(botao, carregando) {
+    if (!botao || !botao.classList) return;
+    botao.classList.toggle('carregando', carregando);
+    botao.disabled = carregando;
+    if (carregando) botao.setAttribute('aria-busy', 'true');
+    else botao.removeAttribute('aria-busy');
   }
 
   return { abrir: abrir, trocarSituacao: trocarSituacao, oQueGravou: oQueGravou };

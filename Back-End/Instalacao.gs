@@ -1488,6 +1488,9 @@ function atualizarPGO() {
   // --- Etapa 84: as sub-abas do Trabalho (RET e Mesa) e os filtros da RET ---
   feito = feito.concat(montarAsSubAbasDoTrabalho_(pulados, paraVoce));
 
+  // --- Etapa 93: o Tipo de emissão como 7º filtro do Trabalho da RET --------
+  feito = feito.concat(acrescentarOTipoDeEmissaoNosFiltrosDaRet_(pulados, paraVoce));
+
   // --- Etapa 49: grupo, agente da central e relacionamento saem do formulário
   feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
 
@@ -5443,6 +5446,71 @@ function montarOsFiltrosDaRet_(canais, paraVoce) {
   }
   return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
     + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
+}
+
+/** A marca de que o Tipo de emissão já entrou nos filtros da RET (Etapa 93). */
+const RECC_CHAVE_DO_FILTRO_DE_EMISSAO = 'MIGRACAO.FILTRO_TIPO_DE_EMISSAO';
+
+/**
+ * Pedido do PO (Etapa 93): "na aba trabalho adicione apenas mais um filtro para
+ * a RET que será o do tipo de emissão" — um campo de lista que ele criou na
+ * planilha (PPW, Emissão manual, Salesforce e Kivida), no FIM da lista (7º).
+ *
+ * Roda UMA VEZ, como os cards e as sub-abas: depois, quem manda nos filtros é
+ * Configurações › Canais de trabalho. Acha o campo pelo rótulo ou pelo
+ * cabeçalho "Tipo de emissão"; não acha (ou não é lista ligada), não mexe em
+ * nada, não marca e avisa — na próxima atualização tenta de novo.
+ */
+function acrescentarOTipoDeEmissaoNosFiltrosDaRet_(pulados, paraVoce) {
+  if (!planilhaAtiva_().getSheetByName('CANAIS')
+      || posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'FiltrosDoTrabalho') < 0) {
+    pulados.push('o filtro Tipo de emissão da RET: a coluna CANAIS.FiltrosDoTrabalho ainda não existe');
+    return [];
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DO_FILTRO_DE_EMISSAO, '') || '').trim()) {
+    pulados.push('o filtro Tipo de emissão da RET já foi acrescentado (agora quem manda é Configurações)');
+    return [];
+  }
+  var ret = canaisVisiveis_().filter(function (canal) { return canal.aba === 'BASE_RET'; })[0];
+  if (!ret) { pulados.push('o filtro Tipo de emissão: o canal BASE_RET não está ligado'); return []; }
+
+  var campo = camposAtivosDoCanal_(ret.id).filter(function (um) {
+    return normalizarParaComparar_(um.Rotulo) === 'tipodeemissao'
+      || normalizarParaComparar_(um.Cabecalho) === 'tipodeemissao';
+  })[0];
+  if (!campo || normalizarParaComparar_(campo.TipoCampo) !== 'seletor') {
+    paraVoce.push('RET: o filtro "Tipo de emissão" NÃO foi acrescentado ao Trabalho — '
+      + (campo ? 'o campo existe, mas não é de lista' : 'não achei um campo ligado com esse nome')
+      + '. Ajuste e rode atualizarPGO() de novo, ou acrescente em Configurações › Canais de trabalho.');
+    return [];
+  }
+
+  var chave = String(campo.ChaveTecnica);
+  var lista = String(ret.filtrosDoTrabalho || '').split(',').map(function (um) {
+    return String(um || '').trim();
+  }).filter(function (um) { return um; });
+  if (!lista.length) {
+    paraVoce.push('RET: o filtro "Tipo de emissão" NÃO foi acrescentado — a RET usa os filtros de '
+      + 'sempre (nenhum escolhido). Escolha em Configurações › Canais de trabalho.');
+    return [];
+  }
+  var jaTem = lista.some(function (um) {
+    return normalizarParaComparar_(um) === normalizarParaComparar_(chave);
+  });
+  if (!jaTem && lista.length >= RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO) {
+    paraVoce.push('RET: o filtro "Tipo de emissão" NÃO foi acrescentado — já há '
+      + lista.length + ' filtros. Troque um deles em Configurações › Canais de trabalho.');
+    return [];
+  }
+  if (!jaTem) {
+    lista.push(chave);
+    atualizarRegistro_('CANAIS', ret.id, { FiltrosDoTrabalho: lista.join(', ') });
+    esquecerEstruturaLida_('CANAIS');
+  }
+  gravarConfiguracao_(RECC_CHAVE_DO_FILTRO_DE_EMISSAO, 'Etapa 93 — '
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
+  return [jaTem ? 'RET: o filtro Tipo de emissão já estava no Trabalho'
+    : 'RET: o filtro Tipo de emissão entrou no Trabalho, em ' + lista.length + 'º lugar'];
 }
 
 /** A marca de que os cards da RET já foram montados — para não desfazer o que o PO mudar depois. */

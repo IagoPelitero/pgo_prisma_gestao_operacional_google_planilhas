@@ -1070,14 +1070,14 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 */
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
 table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
-  /* O número é MEDIDO no navegador, não estimado: "Trabalhar no caso" ocupa
-     181, mais dois ícones de 34 com 6 de folga cada, mais os 24 de respiro
-     da célula — 285, e uma folga para a fonte de cada computador. Já
-     aconteceu de a largura ficar curta — com os 190px de quando eram duas
-     ações, o terceiro botão ficava cortado pela borda da tabela. Aparecia
-     inteiro no HTML e pela metade na tela, que é o pior dos dois mundos: o
-     teste passava. */
-  width: 292px;
+  /* O número é MEDIDO no navegador, não estimado. Desde a Etapa 93 as ações
+     ficam em duas linhas (proposta C): "Trabalhar no caso" ocupa uns 181, e
+     embaixo "Status" e "Excluir" dividem a mesma largura — a coluna é os 188
+     do bloco mais os 24 de respiro da célula, e uma folga para a fonte de
+     cada computador. Já aconteceu de a largura ficar curta e o último botão
+     ficar cortado pela borda da tabela: inteiro no HTML e pela metade na
+     tela, que é o pior dos dois mundos — o teste passava. */
+  width: 222px;
 }
 /* Na agrupada o texto PODE quebrar: cada célula já tem várias linhas, então
    quebrar mais uma não desalinha nada — e é o que faz as cinco colunas
@@ -1202,6 +1202,62 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
 .acao-icone:hover { border-color: var(--destaque); color: var(--destaque); }
 .acao-icone.perigo:hover {
   border-color: var(--ruim); color: var(--ruim); background: var(--ruim-tenue);
+}
+
+/* As ações da linha do Trabalho (Etapa 93, proposta C): a principal em cima,
+   cheia; "Status" e "Excluir" embaixo, menores e com texto — à vista, a um
+   clique, sem disputar o olho com a principal. */
+.acoes-do-caso {
+  display: inline-grid; gap: 6px; width: 188px; vertical-align: middle;
+  white-space: nowrap; text-align: left;
+}
+.acoes-do-caso .acao { justify-content: center; }
+.acoes-secundarias { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+/* Só o Excluir (quem não pode editar): ele ocupa a linha inteira. */
+.acoes-secundarias > :only-child { grid-column: 1 / -1; }
+.acao-secundaria {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 28px; padding: 0 8px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto);
+  font-size: 12px; font-weight: 600;
+}
+.acao-secundaria svg { width: 14px; height: 14px; flex: none; }
+.acao-secundaria:hover { border-color: var(--destaque); color: var(--destaque); }
+.acao-secundaria.perigo { color: var(--ruim); }
+.acao-secundaria.perigo:hover {
+  border-color: var(--ruim); color: var(--ruim); background: var(--ruim-tenue);
+}
+/* Enquanto o servidor busca os status, o desenho dá lugar a um círculo que
+   gira, e o botão não aceita outro clique (Etapa 93). */
+.acao-secundaria.carregando { cursor: progress; opacity: .8; }
+.acao-secundaria.carregando svg { display: none; }
+.acao-secundaria.carregando::before {
+  content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--destaque-tenue); border-top-color: var(--destaque);
+  animation: atualizando-gira 0.8s linear infinite;
+}
+
+/* O "Carregando o que este status pede…" do Alterar status (Etapa 93). */
+.carregando-status {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 12px 0 0; padding: 10px 12px; border-radius: var(--raio-pequeno);
+  background: var(--destaque-tenue); color: var(--destaque-escuro);
+  font-size: 13px; font-weight: 600;
+}
+.carregando-status::before {
+  content: ""; flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--superficie); border-top-color: var(--destaque);
+  animation: atualizando-gira 0.8s linear infinite;
+}
+.carregando-status.falhou { background: var(--ruim-tenue); color: var(--ruim); }
+.carregando-status.falhou::before { display: none; }
+.carregando-status .tentar-de-novo {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; text-decoration: underline;
+}
+@media (prefers-reduced-motion: reduce) {
+  .acao-secundaria.carregando::before, .carregando-status::before { animation: none; }
 }
 
 @media (max-width: 560px) {
@@ -1962,6 +2018,120 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 .modal-pe .recado { margin-right: auto; margin-left: 0; }
 .modal-pe .botao { display: inline-flex; align-items: center; gap: 7px; }
 .modal-pe .botao svg { width: 16px; height: 16px; }
+
+/* ====================== o modal do caso no Estilo B (Etapa 93, aprovado) ===
+   Cabeçalho com o nome do cliente e os cartões; abas; seções numeradas que
+   recolhem; no pé, o que falta e se há alteração não salva. */
+.dialogo-caixa.larga.caso-em-abas { max-width: 1080px; max-height: min(92vh, 980px); min-width: 0; }
+/* `min-width: 0` acima: o .dialogo é uma grade, e sem ele a barra de abas (que
+   não quebra linha) alargava o modal além da tela no celular. Assim ela rola. */
+/* Altura FIXA na tela larga: trocar de aba não faz o modal encolher e pular. */
+@media (min-height: 640px) { .dialogo-caixa.larga.caso-em-abas { height: min(92vh, 980px); } }
+/* Só o miolo encolhe e rola: cabeça, cartões, abas e pé ficam inteiros. */
+.caso-em-abas > .modal-cabeca, .caso-em-abas > .modal-resumo,
+.caso-em-abas > .modal-abas, .caso-em-abas > .modal-pe { flex: none; }
+.caso-em-abas .modal-cabeca {
+  border-bottom: 0; padding-bottom: 10px;
+  background: linear-gradient(180deg, var(--destaque-tenue), var(--superficie));
+}
+.caso-em-abas .modal-titulos { min-width: 0; }
+.modal-sobretitulo {
+  margin: 0 0 4px !important; font-size: 12px !important; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--destaque-escuro) !important;
+}
+#modal-subtitulo:not(:empty)::before { content: " · "; }
+.caso-em-abas .modal-cabeca h3 {
+  font-size: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.caso-em-abas .modal-cabeca h3:empty { display: none; }
+.modal-resumo {
+  display: grid; gap: 10px; padding: 0 24px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+  background: var(--superficie);
+}
+.cartao-do-caso {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  padding: 10px 12px; border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie);
+}
+.cartao-do-caso > span { font-size: 12px; color: var(--tenue); }
+.cartao-do-caso > strong {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cartao-do-caso > strong svg { width: 15px; height: 15px; flex: none; }
+.cartao-do-caso .com-ponto::before {
+  content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: currentColor;
+}
+.cartao-do-caso .tom-bom { color: var(--bom); }
+.cartao-do-caso .tom-atencao { color: var(--atencao); }
+.cartao-do-caso .tom-ruim { color: var(--ruim); }
+.cartao-do-caso .tom-neutro { color: var(--texto); }
+.modal-abas {
+  display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--linha);
+  background: var(--superficie); overflow-x: auto;
+}
+.modal-aba {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 10px 14px; margin-bottom: -1px; cursor: pointer;
+  border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--suave); font: inherit; font-size: 14px; font-weight: 600;
+}
+.modal-aba b {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px; font-size: 11.5px;
+  background: var(--superficie-2); color: var(--suave);
+}
+.modal-aba:hover { color: var(--destaque); }
+.modal-aba[aria-selected="true"] { color: var(--destaque); border-bottom-color: var(--destaque); }
+.caso-em-abas .modal-corpo { background: var(--fundo); }
+.caso-em-abas #modal-do-sistema .modal-pares { margin-top: 0; }
+.caso-em-abas #modal-do-sistema .pares-do-sistema { margin-top: 0; padding-top: 0; border-top: 0; }
+.caso-em-abas .linha-do-tempo { margin: 0; }
+
+/* As seções: blocos numerados, com o selo à direita, que recolhem. */
+.caso-em-abas fieldset.secao-do-caso {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 0 18px; margin: 0 0 12px;
+}
+.caso-em-abas fieldset.secao-do-caso.com-falta { border-color: var(--ruim); }
+.caso-em-abas fieldset.secao-do-caso legend {
+  float: left; width: 100%; padding: 0; margin: 0; letter-spacing: 0; text-transform: none;
+}
+.secao-alternar {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 0;
+  border: 0; background: none; cursor: pointer; text-align: left;
+  color: var(--texto); font: inherit; font-size: 15px; font-weight: 600;
+}
+.secao-seta { display: inline-block; width: 12px; color: var(--suave); transform: rotate(90deg); transition: transform var(--transicao); }
+.recolhida .secao-seta { transform: none; }
+.secao-numero {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.secao-nome { flex: 1 1 auto; min-width: 0; }
+.secao-selo { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.secao-selo.ok { color: var(--bom); }
+.secao-selo.falta { color: var(--ruim); }
+.caso-em-abas fieldset.secao-do-caso .grade { clear: both; padding-bottom: 16px; }
+.caso-em-abas fieldset.secao-do-caso.recolhida .grade { display: none; }
+
+/* O pé: o que falta e a alteração não salva, à esquerda dos botões. */
+.modal-sinais { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-right: auto; }
+.sinal-falta, .sinal-nao-salvo {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
+  border-radius: 999px; font-size: 12.5px; font-weight: 600;
+}
+.sinal-falta { background: var(--atencao-tenue); color: var(--atencao); }
+.sinal-falta::before { content: "\26A0\FE0E"; }
+.sinal-nao-salvo { background: var(--destaque-tenue); color: var(--destaque-escuro); }
+.sinal-nao-salvo::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+}
+.caso-em-abas .modal-pe .recado { margin-right: 0; }
+@media (max-width: 720px) {
+  .modal-resumo { padding-inline: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal-abas { padding-inline: 18px; }
+}
 
 /* Dentro do modal o formulário não tem cartão próprio — o modal já é um. */
 .formulario.no-modal { background: none; border: 0; padding: 0; box-shadow: none; }

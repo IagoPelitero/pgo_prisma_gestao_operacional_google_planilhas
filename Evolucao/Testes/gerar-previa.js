@@ -669,6 +669,17 @@ function gerar(pastaDeSaida) {
     descricao: 'Aparece só quando o status é Retido.', tipo: 'seletor',
     catalogo: listaDaProposta, obrigatorio: false, ativo: true,
     mostrarSe: { campo: 'status', valores: ['Retido'] } });
+  // Etapa 93: o Tipo de emissão do PO, como 7º filtro do Trabalho da RET.
+  const listaDaEmissao = chamar('criarLista')('Tipo de emissão');
+  ['PPW', 'Emissão manual', 'Salesforce', 'Kivida'].forEach((nome, i) => {
+    chamar('salvarItemDoCatalogo')({ tipo: listaDaEmissao, canalId: '', nome, ordem: i + 1, ativo: true });
+  });
+  chamar('criarCampo')(retDaPrevia.id, { rotulo: 'Tipo de emissão', tipo: 'seletor', secao: 'Seguro' });
+  const campoDaEmissao = chamar('listarCamposDoCanal')(retDaPrevia.id).find((c) => c.rotulo === 'Tipo de emissão');
+  chamar('salvarCampo')({ id: campoDaEmissao.id, rotulo: 'Tipo de emissão', secao: 'Seguro', tipo: 'seletor',
+    catalogo: listaDaEmissao, obrigatorio: false, ativo: true });
+  chamar('esquecerCacheDaConfiguracao_()');
+  chamar('acrescentarOTipoDeEmissaoNosFiltrosDaRet_')([], []);
   const sinalizadorDaRet = chamar('listarSinalizadores')()
     .find((k) => String(k.canalId) === String(retDaPrevia.id));
   chamar('salvarSinalizador')({ id: sinalizadorDaRet.id, nome: sinalizadorDaRet.nome,

@@ -1632,8 +1632,8 @@ function salvarCanal(dados) {
  *
  * `subAbasDoTrabalho`: null ou '' desliga; um objeto { abas, status, ordem }
  * liga. Cada status precisa existir no canal; a coluna da condição, na base.
- * `filtrosDoTrabalho`: as chaves dos campos, em ordem, até 6; vazio = os de
- * sempre.
+ * `filtrosDoTrabalho`: as chaves dos campos, em ordem, até 7 (Etapa 93); vazio =
+ * os de sempre (até 6).
  */
 function trabalhoDoFormulario_(dados, atual, estrutura) {
   var colunasDeCanais = estruturaDaAba_('CANAIS');
@@ -1716,8 +1716,8 @@ function trabalhoDoFormulario_(dados, atual, estrutura) {
       if (!achada) throw new Error('O filtro "' + chave + '" não é um campo de lista ligado neste canal.');
       if (unicas.indexOf(achada) < 0) unicas.push(achada);
     });
-    if (unicas.length > RECC_FILTROS_NO_TRABALHO) {
-      throw new Error('O Trabalho mostra até ' + RECC_FILTROS_NO_TRABALHO + ' filtros.');
+    if (unicas.length > RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO) {
+      throw new Error('O Trabalho mostra até ' + RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO + ' filtros.');
     }
     saida.FiltrosDoTrabalho = unicas.join(', ');
   }

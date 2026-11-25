@@ -1182,6 +1182,8 @@ async function rodar() {
       return salvar && !salvar.disabled;
     }, { timeout: 10000 });
 
+    // Etapa 93: as colunas da planilha moram na aba "Da planilha" do modal.
+    await pagina.click('[data-aba-do-caso="aba-da-planilha"]');
     const caixa = pagina.locator('#modal-do-sistema [data-coluna-sua="Observação minha"]');
     igual(await caixa.count(), 1, 'a coluna sua virou caixa de texto');
     igual(await caixa.inputValue(), 'fora  do formato');
@@ -1606,6 +1608,9 @@ async function rodar() {
     await pagina.click('[data-tela="trabalho"]');
     await pagina.waitForSelector('[data-trabalhar]', { timeout: 10000 });
     await pagina.click('[data-trabalhar]');
+    // Etapa 93: a linha do tempo mora na aba dela.
+    await pagina.waitForSelector('[data-aba-do-caso="aba-linha-do-tempo"]', { timeout: 10000 });
+    await pagina.click('[data-aba-do-caso="aba-linha-do-tempo"]');
     await pagina.waitForSelector('#modal-do-sistema .linha-do-tempo li', { timeout: 10000 });
     const eventos = await pagina.$$eval('#modal-do-sistema .linha-do-tempo .oque', (es) => es.map((e) => e.textContent));
     verdadeiro(eventos.indexOf('Entrada do caso') >= 0, 'a entrada na linha do tempo: ' + eventos.join(' | '));
@@ -2305,6 +2310,176 @@ async function rodar() {
     verdadeiro(rolado.topo >= rolado.barra, 'abaixo da barra superior: ' + JSON.stringify(rolado));
     await pagina.waitForFunction(() => !document.getElementById('painel').classList.contains('atualizando'), null, { timeout: 10000 });
     await pagina.evaluate(() => { window.__atrasos = {}; window.scrollTo(0, 0); });
+  });
+
+  /* ------------------------------------------------- a versão 1.93 -- */
+
+  console.log('\nA versão 1.93 (Etapa 93)');
+
+  const abrirAFila = async () => {
+    // Um diálogo que um teste anterior deixou aberto não arrasta os seguintes.
+    for (const id of ['cancelar-situacao', 'descartar-alteracoes', 'modal-x']) {
+      if (await pagina.locator('#' + id).count()) await pagina.click('#' + id).catch(() => {});
+    }
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.fila-do-trabalho [data-trabalhar]', { timeout: 10000 });
+    await pagina.waitForTimeout(300);
+  };
+
+  await teste('fila: "Trabalhar no caso" em cima; "Status" e "Excluir" com texto embaixo, nada cortado', async () => {
+    await abrirAFila();
+    const linhas = await pagina.$$eval('.fila-do-trabalho td.acoes-coluna', (tds) => tds.slice(0, 3).map((td) => {
+      const t = td.querySelector('[data-trabalhar]').getBoundingClientRect();
+      const s = td.querySelector('[data-status-do-caso]').getBoundingClientRect();
+      const x = td.querySelector('[data-excluir]').getBoundingClientRect();
+      const celula = td.getBoundingClientRect();
+      return { textos: [td.querySelector('[data-status-do-caso]').textContent.trim(), td.querySelector('[data-excluir]').textContent.trim()],
+        embaixo: s.top >= t.bottom && x.top >= t.bottom, ladoALado: Math.abs(s.top - x.top) < 2,
+        mesmaLargura: Math.abs(s.width - x.width) < 2, dentro: x.right <= celula.right + 1 && t.right <= celula.right + 1 };
+    }));
+    verdadeiro(linhas.length > 0, 'há linhas na fila');
+    linhas.forEach((l) => {
+      igual(l.textos.join('|'), 'Status|Excluir');
+      verdadeiro(l.embaixo && l.ladoALado && l.mesmaLargura && l.dentro, JSON.stringify(l));
+    });
+  });
+
+  await teste('Alterar status: o botão gira e não abre dois; o Salvar espera os campos chegarem', async () => {
+    await abrirAFila();
+    await pagina.evaluate(() => { window.__atrasos = { situacoesParaTrocar: [1200], camposDaSituacao: [1500] }; });
+    const botao = pagina.locator('.fila-do-trabalho [data-status-do-caso]').first();
+    await botao.click();
+    await pagina.waitForTimeout(250);
+    const girando = await botao.evaluate((b) => ({ classe: b.classList.contains('carregando'), travado: b.disabled,
+      ocupado: b.getAttribute('aria-busy') }));
+    igual(JSON.stringify(girando), JSON.stringify({ classe: true, travado: true, ocupado: 'true' }), 'girando e travado');
+    await botao.click({ force: true }).catch(() => {});
+    await pagina.waitForSelector('#situacao-nova', { timeout: 10000 });
+    igual(await pagina.locator('.dialogo#dialogo-situacao').count(), 1, 'um diálogo só');
+    igual(await botao.evaluate((b) => b.classList.contains('carregando') || b.disabled), false, 'o botão volta ao normal');
+    // Os campos do status ainda a caminho: o aviso aparece e o Salvar fica travado.
+    contem(await pagina.textContent('#campos-da-situacao'), 'Carregando o que este status pede');
+    igual(await pagina.isDisabled('#salvar-situacao'), true, 'Salvar travado enquanto carrega');
+    await pagina.waitForFunction(() => !document.querySelector('#campos-da-situacao .carregando-status'), null, { timeout: 10000 });
+    igual(await pagina.isDisabled('#salvar-situacao'), false, 'Salvar livre quando os campos chegam');
+    await pagina.evaluate(() => { window.__atrasos = {}; });
+    await pagina.click('#cancelar-situacao');
+    await pagina.waitForTimeout(200);
+  });
+
+  await teste('Alterar status: se os campos não chegam, o Salvar continua travado e dá para tentar de novo', async () => {
+    await abrirAFila();
+    await pagina.click('.fila-do-trabalho [data-status-do-caso]');
+    await pagina.waitForSelector('#situacao-nova', { timeout: 10000 });
+    await pagina.waitForFunction(() => !document.querySelector('#campos-da-situacao .carregando-status'), null, { timeout: 10000 });
+    // O servidor falha UMA vez no próximo pedido dos campos.
+    await pagina.evaluate(() => {
+      const original = window.__servidorDoPGO;
+      window.__servidorDoPGO = function (nome, argumentos) {
+        if (nome === 'camposDaSituacao') { window.__servidorDoPGO = original; return Promise.resolve({ erro: 'Sem conexão' }); }
+        return original(nome, argumentos);
+      };
+    });
+    const outro = await pagina.$$eval('#situacao-nova option', (os) => os.map((o) => o.value)
+      .find((v) => v !== document.getElementById('situacao-nova').value));
+    await pagina.selectOption('#situacao-nova', outro);
+    await pagina.waitForSelector('#tentar-campos-de-novo', { timeout: 10000 });
+    igual(await pagina.isDisabled('#salvar-situacao'), true, 'sem os campos, não salva');
+    await pagina.click('#tentar-campos-de-novo');
+    await pagina.waitForFunction(() => !document.querySelector('#campos-da-situacao .carregando-status'), null, { timeout: 10000 });
+    igual(await pagina.isDisabled('#salvar-situacao'), false, 'tentou de novo, chegou, libera');
+    await pagina.click('#cancelar-situacao');
+    await pagina.waitForTimeout(200);
+  });
+
+  await teste('modal no Estilo B: nome, cartões, abas, seções que recolhem e os avisos do pé', async () => {
+    await abrirAFila();
+    await pagina.click('.fila-do-trabalho [data-trabalhar]');
+    await pagina.waitForFunction(() => { const s = document.getElementById('modal-salvar'); return s && !s.disabled; }, null, { timeout: 10000 });
+    contem(await pagina.textContent('#titulo-do-caso'), 'Caso ');
+    verdadeiro((await pagina.textContent('#nome-do-caso')).trim().length > 0, 'o nome em destaque');
+    const cartoes = await pagina.$$eval('#modal-resumo .cartao-do-caso > span', (es) => es.map((e) => e.textContent));
+    contem(cartoes.join('|'), 'Status');
+    // As abas: a dos dados aberta; as outras escondidas até o clique.
+    igual(await pagina.getAttribute('[data-aba-do-caso="aba-dados-do-caso"]', 'aria-selected'), 'true');
+    if (await pagina.locator('[data-aba-do-caso="aba-linha-do-tempo"]').count()) {
+      igual(await pagina.isVisible('#aba-linha-do-tempo'), false);
+      await pagina.click('[data-aba-do-caso="aba-linha-do-tempo"]');
+      igual(await pagina.isVisible('#aba-linha-do-tempo'), true);
+      igual(await pagina.isVisible('#aba-dados-do-caso'), false);
+      await pagina.click('[data-aba-do-caso="aba-dados-do-caso"]');
+    }
+    // As seções: numeradas, com selo, e recolhem.
+    const primeira = pagina.locator('fieldset.secao-do-caso').first();
+    igual(await primeira.locator('.secao-numero').textContent(), '1');
+    verdadeiro(/completa|obrigat/.test(await primeira.locator('.secao-selo').textContent()), 'o selo da seção');
+    await primeira.locator('.secao-alternar').click();
+    igual(await primeira.locator('.grade').isVisible(), false, 'recolheu');
+    igual(await primeira.locator('.secao-alternar').getAttribute('aria-expanded'), 'false');
+    await primeira.locator('.secao-alternar').click();
+    igual(await primeira.locator('.grade').isVisible(), true, 'abriu de novo');
+    // O pé: nada a avisar ao abrir; mexeu, "Alterações não salvas"; o obrigatório vazio, "Falta…".
+    igual(await pagina.isVisible('#modal-nao-salvo'), false);
+    const nome = pagina.locator('#editar-campo-nomedocliente');
+    const antes = await nome.inputValue();
+    await nome.fill('');
+    await pagina.waitForTimeout(100);
+    igual(await pagina.isVisible('#modal-nao-salvo'), true, 'avisa a alteração não salva');
+    contem(await pagina.textContent('#modal-falta'), 'Nome do cliente');
+    contem(await pagina.textContent('fieldset.secao-do-caso.com-falta .secao-selo'), '1 obrigatório');
+    await nome.fill(antes);
+    await pagina.waitForTimeout(100);
+    igual(await pagina.isVisible('#modal-nao-salvo'), false, 'voltou ao que era: some');
+    igual(await pagina.isVisible('#modal-falta'), false);
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForTimeout(300);
+    igual(await pagina.locator('#modal-do-caso').count(), 0, 'fechou sem perguntar: nada mudou');
+  });
+
+  await teste('modal: o erro do servidor abre a seção recolhida e volta para a aba dos dados', async () => {
+    await abrirAFila();
+    await pagina.click('.fila-do-trabalho [data-trabalhar]');
+    await pagina.waitForFunction(() => { const s = document.getElementById('modal-salvar'); return s && !s.disabled; }, null, { timeout: 10000 });
+    const secao = pagina.locator('fieldset.secao-do-caso', { has: pagina.locator('#editar-campo-nomedocliente') });
+    await pagina.fill('#editar-campo-nomedocliente', '');
+    await secao.locator('.secao-alternar').click();
+    if (await pagina.locator('[data-aba-do-caso="aba-linha-do-tempo"]').count()) {
+      await pagina.click('[data-aba-do-caso="aba-linha-do-tempo"]');
+    }
+    await pagina.click('#modal-salvar');
+    await pagina.waitForSelector('#recado-do-modal:not([hidden])', { timeout: 10000 });
+    await pagina.waitForTimeout(200);
+    igual(await pagina.isVisible('#editar-campo-nomedocliente'), true, 'o campo com erro está à vista');
+    igual(await secao.locator('.secao-alternar').getAttribute('aria-expanded'), 'true');
+    await pagina.click('#modal-fechar');
+    await pagina.waitForSelector('#descartar-alteracoes', { timeout: 5000 });
+    await pagina.click('#descartar-alteracoes');
+    await pagina.waitForTimeout(300);
+    igual(await pagina.locator('#modal-do-caso').count(), 0);
+  });
+
+  await teste('modal no celular (320 px): cabe na tela; as abas rolam para o lado', async () => {
+    // A fila já está na tela (o teste anterior); no celular o menu fica recolhido.
+    await abrirAFila();
+    const antes = pagina.viewportSize();
+    await pagina.setViewportSize({ width: 320, height: 800 });
+    try {
+      await pagina.waitForTimeout(300);
+      await pagina.locator('.fila-do-trabalho [data-trabalhar]').first().click();
+      await pagina.waitForFunction(() => { const s = document.getElementById('modal-salvar'); return s && !s.disabled; }, null, { timeout: 10000 });
+      const medida = await pagina.evaluate(() => ({
+        abas: document.querySelectorAll('#modal-abas [role="tab"]').length,
+        caixa: Math.round(document.querySelector('#modal-do-caso .dialogo-caixa').getBoundingClientRect().right),
+        pagina: document.documentElement.scrollWidth }));
+      verdadeiro(medida.abas >= 2, 'o caso tem a barra de abas: ' + JSON.stringify(medida));
+      verdadeiro(medida.caixa <= 320 && medida.pagina <= 320, 'nada passa da tela: ' + JSON.stringify(medida));
+      await pagina.keyboard.press('Escape');
+      await pagina.waitForTimeout(300);
+    } finally {
+      await pagina.setViewportSize(antes);
+    }
   });
 
   await navegador.close();
