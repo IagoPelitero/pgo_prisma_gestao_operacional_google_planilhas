@@ -4578,6 +4578,88 @@ Quebra de propósito: com o CSS antigo, ele falha ("altura": 14); com o novo, pa
 
 ---
 
+## Etapa 93 — Tipo de emissão, modal no Estilo B, botões da fila e o Alterar status (versão 1.93)
+
+**Pedido do PO**, antes de colar a 1.92: "Na aba trabalho adicione apenas mais um filtro para a RET
+que será o do tipo de emissão"; "melhorias visuais do modal trabalhar no caso (…) mais eficiente e
+visualmente mais didático"; "os botões de mudar status e excluir caso vamos mudar para ter o mesmo
+tamanho e ter nome igual ao trabalhar no caso"; "melhore também o mudar status pois ele não mostra
+carregamento e pode gerar conflitos". Tudo na mesma 1.93.
+
+**Decisões do PO** (perguntadas antes de implementar):
+
+| Pergunta | Resposta |
+|---|---|
+| Estilo do modal (A "Resumo ao lado" × B "Cabeçalho-resumo + abas") | **B** |
+| Botões da fila: lado a lado (cortava o Excluir em 1366 px) × empilhados | Nenhum: "veja outras 2 propostas que tornem a tela menos poluída" → C × D (menu "⋯") → **C** |
+| O Tipo de emissão | Seletor com **PPW, Emissão manual, Salesforce e Kivida**, no **fim (7º)** |
+| As 3 melhorias do Alterar status | **Sim, as 3** |
+
+### 1. O filtro Tipo de emissão (RET)
+
+- "Tipo de emissão" não existe no código: é um campo de lista que o PO criou na planilha.
+- **O teto:** a lista **escolhida** em Configurações passa a caber **7** filtros
+  (`RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO`). A regra de sempre (lista em branco) continua com **6**
+  (`RECC_FILTROS_NO_TRABALHO`): subir o número único mudaria a Mesa e o VG, que usam essa regra.
+- **`atualizarPGO()`** ganhou `acrescentarOTipoDeEmissaoNosFiltrosDaRet_`, que roda **uma vez**
+  (marca `MIGRACAO.FILTRO_TIPO_DE_EMISSAO`):
+  - acha na RET o campo **de lista ligado** com rótulo ou cabeçalho "Tipo de emissão" e o põe
+    **no fim** da lista de filtros;
+  - sem o campo (ou não é lista), com a RET sem filtros escolhidos, ou já com 7: **não mexe,
+    não marca e avisa** no "para você";
+  - depois de rodar, quem manda é Configurações › Canais de trabalho, como os cards e as sub-abas.
+- A tela de Configurações mostra 7 caixas de filtro.
+
+### 2. O modal "Trabalhar no caso" no Estilo B
+
+- **Cabeçalho:** "CASO <id> · <canal>", o **nome do cliente** em destaque e os cartões **Status**
+  (com a cor do catálogo), **Prazo** (o mesmo selo da fila), **Analista** e **Proposta**. Só entra
+  o que o caso tem.
+  - O status e o prazo vêm do servidor: `casoParaEditar` devolve `resumo`, calculado por
+    `resumoDoCasoAberto_` com as **mesmas contas da fila** sobre a linha já lida — nenhuma ida a
+    mais à base. Se essa conta falhar, o caso abre sem os cartões.
+  - O nome, o analista e a proposta saem do **formulário que a pessoa vê**: campo oculto para o
+    nível não vaza para o cabeçalho.
+- **Abas:** Dados do caso · Linha do tempo (N) · Da planilha (N). Aba vazia não aparece. A altura
+  do modal é fixa na tela larga, para não pular ao trocar de aba.
+- **Seções** numeradas, com o selo "✓ completa" ou "N obrigatório(s)", que **recolhem** com um
+  clique. Todas nascem **abertas**.
+- **Pé:** "Falta 1 obrigatório: …" e "Alterações não salvas" (a mesma comparação do F1).
+- **Erro ao salvar:** a seção com o campo (com erro ou obrigatório vazio) reabre e a aba volta
+  para os dados (achado 118).
+- **Não mudou:** o que o modal grava e confere, a B1, o F1, o F10 e o Ctrl+Enter.
+
+### 3. Os botões da fila (proposta C)
+
+- "Trabalhar no caso" em cima, cheio; embaixo, **"Status"** e **"Excluir"**, menores, lado a
+  lado, com texto e o mesmo tamanho. A coluna de ações ficou mais estreita (292 → 222 px), e as
+  outras colunas ganharam espaço.
+- Só o Trabalho mudou. A Busca segue com os botões de antes.
+
+### 4. O Alterar status (achado 117)
+
+- O botão da fila **gira e fica travado** enquanto o servidor busca os status.
+- Trocar o status mostra **"Carregando o que este status pede…"** e trava o **Salvar** até os
+  campos chegarem. Se falhar, "Tentar de novo", com o Salvar ainda travado.
+- O seletor de status fica parado enquanto grava.
+
+### Testes
+
+- `testes-sub-abas-do-trabalho.js`: 6 testes do 7º filtro, incluindo "a Mesa e o VG continuam
+  com 6". O de "até 6" virou "até 7" (a 8ª é recusada).
+- `testes-193.js` (novo): 8 testes do cabeçalho no servidor e do que o código da tela promete.
+- `ponta-a-ponta.js`: 6 testes novos ("A versão 1.93"), o último com o modal no celular (320 px);
+  2 antigos clicam na aba antes de ler a linha do tempo e a coluna sua. Ponta a ponta 59/59.
+- Responsividade (96 combinações) e a varredura de cliques com a base suja: sem problema.
+- **Quebras de propósito:** teto de volta a 6 → 4 testes do servidor falham; sem o carregamento do
+  botão e sem a trava do Salvar → os testes do status falham, cada um na sua asserção; sem o
+  `min-width: 0` do modal → o teste do celular falha (376 px numa tela de 320, achado 119).
+- A prévia ganhou o campo Tipo de emissão na RET (7 filtros na tela).
+
+**Versão:** 1.93.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

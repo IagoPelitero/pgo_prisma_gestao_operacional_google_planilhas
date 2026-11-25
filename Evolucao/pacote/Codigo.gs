@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-23 18:11
+   Gerado em 2026-11-25 12:18
    ========================================================================== */
 
 
@@ -4383,7 +4383,43 @@ function casoParaEditarSemRelogio_(idDoCanal, idDoCaso) {
 
   return { id: registro.__id, canal: canal.nome, valores: valores, doSistema: doSistema,
     versao: versaoDoCaso_(registro, canal.aba),
-    linhaDoTempo: linhaDoTempoDoCaso_(registro, estrutura, canal) };
+    linhaDoTempo: linhaDoTempoDoCaso_(registro, estrutura, canal),
+    resumo: resumoDoCasoAberto_(registro, canal) };
+}
+
+function resumoDoCasoAberto_(registro, canal) {
+  try {
+    var nome = canal.colunaDoStatus ? String(registro[canal.colunaDoStatus] || '') : '';
+    var tons = {};
+    var rotulos = {};
+    var finais = {};
+    situacoesDoCanal_(canal).forEach(function (situacao) {
+      tons[situacao.chave] = situacao.tom;
+      rotulos[situacao.chave] = situacao.nome;
+      if (situacao.final) finais[situacao.chave] = true;
+    });
+    var sinalizadores = sinalizadoresDoCanal_(canal);
+    var comSla = Number(canal.slaHorasUteis) > 0;
+    var agora = (comSla || sinalizadores.length) ? relogioDeParede_(new Date()) : null;
+    var situacoes = sinalizadores.length ? situacoesPorChave_(canal) : null;
+    var prazos = [];
+    var sla = comSla ? slaDoCaso_(registro, canal, finais, agora) : null;
+    if (sla) prazos.push({ nome: 'SLA', texto: String(sla.texto || ''), tom: sla.tom });
+    sinalizadores.forEach(function (sinalizador) {
+      var sinal = sinalDoCaso_(registro, canal, sinalizador, situacoes, agora);
+      if (!sinal) return;
+
+      var texto = String(sinal.texto || '');
+      var prefixo = String(sinal.nome || '') + ' · ';
+      prazos.push({ nome: String(sinal.nome || 'Prazo'), tom: sinal.tom,
+        texto: texto.indexOf(prefixo) === 0 ? texto.substring(prefixo.length) : texto });
+    });
+    var chave = normalizarParaComparar_(nome);
+    return { status: nome ? { nome: rotulos[chave] || nome, tom: tons[chave] || 'neutro' } : null,
+      prazos: prazos };
+  } catch (erro) {
+    return null;
+  }
 }
 
 function linhaDoTempoDoCaso_(registro, estrutura, canal) {
@@ -7803,8 +7839,8 @@ function trabalhoDoFormulario_(dados, atual, estrutura) {
       if (!achada) throw new Error('O filtro "' + chave + '" não é um campo de lista ligado neste canal.');
       if (unicas.indexOf(achada) < 0) unicas.push(achada);
     });
-    if (unicas.length > RECC_FILTROS_NO_TRABALHO) {
-      throw new Error('O Trabalho mostra até ' + RECC_FILTROS_NO_TRABALHO + ' filtros.');
+    if (unicas.length > RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO) {
+      throw new Error('O Trabalho mostra até ' + RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO + ' filtros.');
     }
     saida.FiltrosDoTrabalho = unicas.join(', ');
   }
@@ -9806,8 +9842,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.92',
-  data: '23/11/2026'
+  numero: '1.93',
+  data: '25/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -11296,6 +11332,8 @@ function mesesParaEscolher_() {
 
 const RECC_FILTROS_NO_TRABALHO = 6;
 
+const RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO = 7;
+
 function filtrosDoCanal_(canal, quem) {
   var disponiveis = [];
 
@@ -11322,7 +11360,9 @@ function filtrosDoCanal_(canal, quem) {
   var escolhidos = String(canal.filtrosDoTrabalho || '').split(',').map(function (chave) {
     return normalizarParaComparar_(chave);
   }).filter(function (chave) { return chave; });
+  var teto = RECC_FILTROS_NO_TRABALHO;
   if (escolhidos.length) {
+    teto = RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO;
     var porChave = {};
     ativos.forEach(function (campo) { porChave[normalizarParaComparar_(campo.ChaveTecnica)] = campo; });
     campos = escolhidos.map(function (chave) { return porChave[chave]; })
@@ -11330,7 +11370,7 @@ function filtrosDoCanal_(canal, quem) {
   }
 
   campos.forEach(function (campo) {
-    if (disponiveis.length >= RECC_FILTROS_NO_TRABALHO) return;
+    if (disponiveis.length >= teto) return;
     var visibilidade = visibilidadeDoCampo_(quem.permissoes, campo.ChaveTecnica);
     if (visibilidade === RECC_VISIBILIDADE.OCULTO) return;
 
@@ -15575,6 +15615,8 @@ function atualizarPGO() {
 
   feito = feito.concat(montarAsSubAbasDoTrabalho_(pulados, paraVoce));
 
+  feito = feito.concat(acrescentarOTipoDeEmissaoNosFiltrosDaRet_(pulados, paraVoce));
+
   feito = feito.concat(tirarDoFormularioOQueSaiuDaRet_(pulados));
 
   feito = feito.concat(tirarAMinhaPerformanceDosNiveis_(pulados));
@@ -18674,6 +18716,60 @@ function montarOsFiltrosDaRet_(canais, paraVoce) {
   }
   return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
     + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
+}
+
+const RECC_CHAVE_DO_FILTRO_DE_EMISSAO = 'MIGRACAO.FILTRO_TIPO_DE_EMISSAO';
+
+function acrescentarOTipoDeEmissaoNosFiltrosDaRet_(pulados, paraVoce) {
+  if (!planilhaAtiva_().getSheetByName('CANAIS')
+      || posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'FiltrosDoTrabalho') < 0) {
+    pulados.push('o filtro Tipo de emissão da RET: a coluna CANAIS.FiltrosDoTrabalho ainda não existe');
+    return [];
+  }
+  if (String(valorDaConfiguracao_(RECC_CHAVE_DO_FILTRO_DE_EMISSAO, '') || '').trim()) {
+    pulados.push('o filtro Tipo de emissão da RET já foi acrescentado (agora quem manda é Configurações)');
+    return [];
+  }
+  var ret = canaisVisiveis_().filter(function (canal) { return canal.aba === 'BASE_RET'; })[0];
+  if (!ret) { pulados.push('o filtro Tipo de emissão: o canal BASE_RET não está ligado'); return []; }
+
+  var campo = camposAtivosDoCanal_(ret.id).filter(function (um) {
+    return normalizarParaComparar_(um.Rotulo) === 'tipodeemissao'
+      || normalizarParaComparar_(um.Cabecalho) === 'tipodeemissao';
+  })[0];
+  if (!campo || normalizarParaComparar_(campo.TipoCampo) !== 'seletor') {
+    paraVoce.push('RET: o filtro "Tipo de emissão" NÃO foi acrescentado ao Trabalho — '
+      + (campo ? 'o campo existe, mas não é de lista' : 'não achei um campo ligado com esse nome')
+      + '. Ajuste e rode atualizarPGO() de novo, ou acrescente em Configurações › Canais de trabalho.');
+    return [];
+  }
+
+  var chave = String(campo.ChaveTecnica);
+  var lista = String(ret.filtrosDoTrabalho || '').split(',').map(function (um) {
+    return String(um || '').trim();
+  }).filter(function (um) { return um; });
+  if (!lista.length) {
+    paraVoce.push('RET: o filtro "Tipo de emissão" NÃO foi acrescentado — a RET usa os filtros de '
+      + 'sempre (nenhum escolhido). Escolha em Configurações › Canais de trabalho.');
+    return [];
+  }
+  var jaTem = lista.some(function (um) {
+    return normalizarParaComparar_(um) === normalizarParaComparar_(chave);
+  });
+  if (!jaTem && lista.length >= RECC_FILTROS_ESCOLHIDOS_NO_TRABALHO) {
+    paraVoce.push('RET: o filtro "Tipo de emissão" NÃO foi acrescentado — já há '
+      + lista.length + ' filtros. Troque um deles em Configurações › Canais de trabalho.');
+    return [];
+  }
+  if (!jaTem) {
+    lista.push(chave);
+    atualizarRegistro_('CANAIS', ret.id, { FiltrosDoTrabalho: lista.join(', ') });
+    esquecerEstruturaLida_('CANAIS');
+  }
+  gravarConfiguracao_(RECC_CHAVE_DO_FILTRO_DE_EMISSAO, 'Etapa 93 — '
+    + formatarData_(new Date(), 'dd/MM/yyyy HH:mm'));
+  return [jaTem ? 'RET: o filtro Tipo de emissão já estava no Trabalho'
+    : 'RET: o filtro Tipo de emissão entrou no Trabalho, em ' + lista.length + 'º lugar'];
 }
 
 const RECC_CHAVE_DOS_CARDS_DA_RET = 'MIGRACAO.CARDS_DA_RET';

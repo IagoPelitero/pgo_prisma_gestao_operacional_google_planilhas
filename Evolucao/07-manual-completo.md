@@ -387,7 +387,9 @@ Cartões e fila saem da **mesma lista**, já filtrada pelo alcance do nível —
 isso o número do cartão sempre bate com o que a fila mostra. Os filtros são os
 campos que já são lista: nada escrito em código. São **até 6**, e o **Status vem
 primeiro**; logo depois, os campos que dependem do status — na RET, o **Status
-proposta**, que a operação criou fora do contrato (Etapa 44, pedido do PO).
+proposta**, que a operação criou fora do contrato (Etapa 44, pedido do PO). Quando
+o canal **escolhe** os filtros em Configurações, cabem **até 7** (Etapa 93): na RET,
+o 7º é o **Tipo de emissão** (PPW, Emissão manual, Salesforce, Kivida).
 
 ![O Trabalho](imagens/tela-trabalho.png)
 
@@ -426,9 +428,11 @@ duas **sub-abas**. O VG fica sem sub-abas — só perdeu o período.
 ligar ou desligar, o nome das abas, os **status da aba 1 em ordem** (subir, descer,
 tirar, acrescentar) — cada um com um nome no cartão e, se quiser, uma condição
 ("fica até a coluna X ser…") — e a ordem das datas de cada aba. Em "Trabalho:
-filtros", **quais campos viram filtro e em que ordem** (até 6); em branco, os de
-sempre. Na RET: Status, Tentativas de contato, Status proposta, Analista, Canal de
-origem e Cód. do produto e produto.
+filtros", **quais campos viram filtro e em que ordem** (até 7); em branco, os de
+sempre (até 6). Na RET: Status, Tentativas de contato, Status proposta, Analista, Canal de
+origem, Cód. do produto e produto e, desde a Etapa 93, **Tipo de emissão** — o
+`atualizarPGO()` o põe no fim **uma vez só**, se achar na RET um campo de lista ligado
+com esse nome; sem o campo, não mexe em nada e avisa.
 
 **Velocidade.** A aba 1 lê a coluna do status (e a da condição) da planilha toda e
 só as linhas da aba. Quando há muitos casos espalhados pela base, ela usa a
@@ -708,13 +712,16 @@ três sinalizadores rodando `atualizarPGO()` uma vez.
 ### As três ações de cada caso
 
 Cada linha da fila tem três ações, nesta ordem, **em todos os canais** — RET,
-Mesa Diamante e VG —, a pedido do PO:
+Mesa Diamante e VG —, a pedido do PO. Desde a Etapa 93 (proposta C aprovada pelo
+PO), **"Trabalhar no caso"** fica em cima, cheio, e embaixo **"Status"** e
+**"Excluir"**, menores, lado a lado e **com texto** — antes eram só o desenho, e a
+pessoa precisava passar o mouse para saber o que faziam:
 
 | Ação | O que faz |
 |---|---|
 | **Trabalhar no caso** | Abre o caso por cima da fila, **já no formulário**, preenchido com o que está na planilha, **no centro da área de trabalho** — à direita do menu, aberto ou encolhido; no celular, no centro da tela. Fechar devolve a fila exatamente como estava. **Com alguma coisa mudada e não salva** (Etapa 87), fechar pelo X, pelo Esc, clicando fora ou pelo Fechar pergunta: "Você possui alterações não salvas. Deseja descartá-las?" — **Continuar editando** ou **Descartar alterações**. Sem mudança, fecha na hora |
-| **Alterar status** (ícone ao lado) | Um diálogo só com o status — o gesto mais frequente da operação. Não passa pelo formulário inteiro, e por isso funciona mesmo num caso que veio da base antiga com a proposta ou a apólice pela metade |
-| **Excluir** (por último) | Apaga o caso **definitivamente da planilha**. Antes, um **aviso de atenção** em vermelho: o foco nasce em *Cancelar*, Enter e Esc cancelam, e só o botão "Excluir definitivamente" apaga. O que havia no caso fica na auditoria |
+| **Status** (embaixo, à esquerda) | O **Alterar status**: um diálogo só com o status — o gesto mais frequente da operação. Não passa pelo formulário inteiro, e por isso funciona mesmo num caso que veio da base antiga com a proposta ou a apólice pela metade. Desde a Etapa 93, o botão **gira e fica travado** enquanto o servidor busca os status (não abre dois); no diálogo, trocar o status mostra **"Carregando o que este status pede…"** e o **Salvar fica travado** até os campos do status chegarem — e o status não muda enquanto grava. Se os campos não chegam, aparece "Tentar de novo" e o Salvar continua travado |
+| **Excluir** (embaixo, à direita) | Apaga o caso **definitivamente da planilha**. Antes, um **aviso de atenção** em vermelho: o foco nasce em *Cancelar*, Enter e Esc cancelam, e só o botão "Excluir definitivamente" apaga. O que havia no caso fica na auditoria |
 
 ![O caso aberto para trabalhar](imagens/tela-caso-em-modal.png)
 
@@ -949,11 +956,31 @@ Alterar status (achado 98). A coluna estava declarada como número; agora é tex
 E se um dia outra coluna tiver o mesmo engano, a gravação é **recusada com o nome
 da coluna** — em vez de gravar vazio sem avisar.
 
+### O desenho do caso aberto (Etapa 93, Estilo B)
+
+O PO escolheu, entre dois estilos, o **"Cabeçalho-resumo + abas"**:
+
+- **Em cima:** "CASO 0000000012 · RET" e, em destaque, o **nome do cliente**. Embaixo,
+  os **cartões** do que mais se consulta: **Status** (com a cor do status),
+  **Prazo** (o mesmo selo da fila, como "vence em 7h24"), **Analista** e **Proposta**.
+  Só entra o que o caso tem. Os cartões mostram o caso **como estava ao abrir**:
+  mudar o status no formulário só vale depois de salvar.
+- **Abas:** **Dados do caso** (o formulário), **Linha do tempo** e **Da planilha**
+  (as colunas que o formulário não pergunta), com o número de itens de cada uma.
+  Aba vazia não aparece.
+- **Seções numeradas** (1 Caso, 2 Cliente…) com o selo **"✓ completa"** ou
+  **"1 obrigatório"**. Todas nascem **abertas**; um clique no título **recolhe**. Se
+  salvar der erro, a seção com o problema reabre e a aba volta a ser a dos dados.
+- **No pé:** "Falta 1 obrigatório: …" e **"Alterações não salvas"** quando algo mudou.
+
+O nome e os cartões saem do **formulário que a pessoa vê**: campo oculto para o
+nível não aparece no cabeçalho. O que o modal grava e confere **não mudou**.
+
 ### Trabalhar no caso traz tudo o que está preenchido
 
 Um caso importado chega com valor em colunas que o formulário não pergunta: a
 origem da importação, a data dela, os carimbos de contato. Elas aparecem
-**embaixo do formulário**, atrás de um aviso: são as colunas que o formulário não
+**na aba "Da planilha"** (até a 1.92, embaixo do formulário), atrás de um aviso: são as colunas que o formulário não
 pergunta — as do sistema e as **suas**, escritas direto na planilha.
 
 - **As suas se corrigem ali mesmo.** Pedido do PO: *"preciso ter a opção de editar
@@ -2092,7 +2119,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.92** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.93** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).

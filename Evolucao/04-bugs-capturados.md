@@ -2343,6 +2343,54 @@ O teste da Etapa 88 conferia a classe e o texto, nunca o tamanho nem a posição
 altura. O ponta a ponta atrasa o servidor e mede o aviso, no topo e rolado. Com o CSS antigo ele
 falha.
 
+### 117 · O Alterar status deixava salvar antes de os campos do status chegarem
+
+**Sintoma.** Relato do PO, antes da 1.93: o "mudar status" "não mostra carregamento e pode gerar
+conflitos".
+
+**Causa.** Duas esperas sem nada na tela:
+
+- o botão da fila não mudava enquanto o servidor buscava os status; a pessoa clicava de novo ou
+  ia para outro caso (o segundo clique já era ignorado, mas sem dizer nada);
+- ao trocar o status, os campos que ele pede (o valor retido, o Status proposta) vinham do
+  servidor, e nesse meio-tempo o **Salvar ficava livre**. Salvar ali mandava o status sem os
+  campos dele, e o servidor recusava — ou, num status sem campo obrigatório, gravava sem a
+  tentativa de contato que a pessoa ainda ia escolher.
+
+**Defesa.** O botão gira e fica travado até o diálogo abrir. Trocar o status mostra
+"Carregando o que este status pede…" e trava o Salvar até os campos chegarem; se não chegam,
+"Tentar de novo", com o Salvar ainda travado. O status fica parado enquanto grava. O ponta a
+ponta atrasa o servidor e confere cada trava; sem elas, ele falha.
+
+### 118 · O erro ao salvar o caso podia apontar para um campo escondido
+
+**Sintoma.** Achado ao construir o Estilo B (Etapa 93), antes de chegar ao PO. Com as seções que
+recolhem, o erro "Confira 1 campo(s): Nome do cliente…" aparecia no pé, mas o campo estava numa
+seção recolhida ou noutra aba.
+
+**Causa.** A tela marcava o campo com erro pela lista de problemas do servidor (`erro.problemas`).
+No simulador do ponta a ponta, essa lista **não chega** à tela: só a mensagem atravessa a ponte.
+Pelo que se sabe do `google.script.run`, na planilha de verdade é igual: o erro chega com a
+mensagem, sem as propriedades extras. Isso já era assim antes da 1.93 — o campo só não ficava
+marcado de vermelho, mas estava à vista.
+
+**Defesa.** Ao dar erro, a tela abre a seção e volta à aba dos dados pelo que ela mesma sabe: o
+campo marcado com erro **ou** o obrigatório vazio. O ponta a ponta recolhe a seção, troca de aba,
+salva com o nome vazio e confere que o campo está à vista.
+
+### 119 · O modal novo passava da largura da tela no celular
+
+**Sintoma.** Achado na conferência do Estilo B, antes de chegar ao PO: em 390 px o modal ficava
+com 463 px e cortava à direita.
+
+**Causa.** O fundo do diálogo (`.dialogo`) é uma grade. Na grade, o item cresce até caber o
+conteúdo que não quebra — e a barra de abas não quebra linha. O primeiro teste do celular, em
+390 px, abria um caso com duas abas e passava mesmo sem a correção.
+
+**Defesa.** `min-width: 0` no modal: a grade passa a respeitar a tela, e a barra de abas rola para
+o lado. O teste mede em 320 px e exige a barra de abas na tela. Sem a correção, ele falha
+(376 px).
+
 ---
 
 ## O que esta lista ensina
@@ -2603,3 +2651,12 @@ Daí as duas práticas que o projeto não abre mão:
 66. **Mudar um elemento de lugar muda o mundo dos que grudam nele.** No item 116 a barra fixa da
     Etapa 90 escondeu um aviso de outra etapa. Quem gruda ("sticky") precisa ser medido na tela,
     e não só conferido pelo texto.
+67. **Toda espera do servidor precisa aparecer, e travar o que depende dela.** No item 117 o
+    botão livre durante a espera era a porta para salvar pela metade. Carregando, o que depende
+    da resposta fica travado e diz por quê.
+68. **Esconder é uma decisão de quem lê, e o erro tem de desfazê-la.** No item 118 recolher e
+    trocar de aba eram ótimos para trabalhar e péssimos para corrigir. Quem esconde precisa de
+    um caminho de volta quando o problema está lá dentro.
+69. **A quebra de propósito testa o teste.** No item 119 o teste do celular passou sem a correção,
+    e só a quebra mostrou isso. Teste que não falha quando devia é pior que nenhum: dá
+    confiança falsa.

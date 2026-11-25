@@ -845,7 +845,7 @@ table.fila { border-collapse: collapse; width: 100%; min-width: 640px; font-size
 table.fila.agrupada { min-width: 1060px; table-layout: fixed; }
 table.fila.agrupada th.acoes-coluna, table.fila.agrupada td.acoes-coluna {
 
-  width: 292px;
+  width: 222px;
 }
 
 table.fila.agrupada th, table.fila.agrupada td { white-space: normal; }
@@ -941,6 +941,57 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
 .acao-icone:hover { border-color: var(--destaque); color: var(--destaque); }
 .acao-icone.perigo:hover {
   border-color: var(--ruim); color: var(--ruim); background: var(--ruim-tenue);
+}
+
+.acoes-do-caso {
+  display: inline-grid; gap: 6px; width: 188px; vertical-align: middle;
+  white-space: nowrap; text-align: left;
+}
+.acoes-do-caso .acao { justify-content: center; }
+.acoes-secundarias { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.acoes-secundarias > :only-child { grid-column: 1 / -1; }
+.acao-secundaria {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 28px; padding: 0 8px; cursor: pointer;
+  border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie); color: var(--texto);
+  font-size: 12px; font-weight: 600;
+}
+.acao-secundaria svg { width: 14px; height: 14px; flex: none; }
+.acao-secundaria:hover { border-color: var(--destaque); color: var(--destaque); }
+.acao-secundaria.perigo { color: var(--ruim); }
+.acao-secundaria.perigo:hover {
+  border-color: var(--ruim); color: var(--ruim); background: var(--ruim-tenue);
+}
+
+.acao-secundaria.carregando { cursor: progress; opacity: .8; }
+.acao-secundaria.carregando svg { display: none; }
+.acao-secundaria.carregando::before {
+  content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--destaque-tenue); border-top-color: var(--destaque);
+  animation: atualizando-gira 0.8s linear infinite;
+}
+
+.carregando-status {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 12px 0 0; padding: 10px 12px; border-radius: var(--raio-pequeno);
+  background: var(--destaque-tenue); color: var(--destaque-escuro);
+  font-size: 13px; font-weight: 600;
+}
+.carregando-status::before {
+  content: ""; flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--superficie); border-top-color: var(--destaque);
+  animation: atualizando-gira 0.8s linear infinite;
+}
+.carregando-status.falhou { background: var(--ruim-tenue); color: var(--ruim); }
+.carregando-status.falhou::before { display: none; }
+.carregando-status .tentar-de-novo {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: inherit; font: inherit; text-decoration: underline;
+}
+@media (prefers-reduced-motion: reduce) {
+  .acao-secundaria.carregando::before, .carregando-status::before { animation: none; }
 }
 
 @media (max-width: 560px) {
@@ -1560,6 +1611,113 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 .modal-pe .recado { margin-right: auto; margin-left: 0; }
 .modal-pe .botao { display: inline-flex; align-items: center; gap: 7px; }
 .modal-pe .botao svg { width: 16px; height: 16px; }
+
+.dialogo-caixa.larga.caso-em-abas { max-width: 1080px; max-height: min(92vh, 980px); min-width: 0; }
+
+@media (min-height: 640px) { .dialogo-caixa.larga.caso-em-abas { height: min(92vh, 980px); } }
+
+.caso-em-abas > .modal-cabeca, .caso-em-abas > .modal-resumo,
+.caso-em-abas > .modal-abas, .caso-em-abas > .modal-pe { flex: none; }
+.caso-em-abas .modal-cabeca {
+  border-bottom: 0; padding-bottom: 10px;
+  background: linear-gradient(180deg, var(--destaque-tenue), var(--superficie));
+}
+.caso-em-abas .modal-titulos { min-width: 0; }
+.modal-sobretitulo {
+  margin: 0 0 4px !important; font-size: 12px !important; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--destaque-escuro) !important;
+}
+#modal-subtitulo:not(:empty)::before { content: " · "; }
+.caso-em-abas .modal-cabeca h3 {
+  font-size: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.caso-em-abas .modal-cabeca h3:empty { display: none; }
+.modal-resumo {
+  display: grid; gap: 10px; padding: 0 24px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+  background: var(--superficie);
+}
+.cartao-do-caso {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  padding: 10px 12px; border: 1px solid var(--linha); border-radius: var(--raio-pequeno);
+  background: var(--superficie);
+}
+.cartao-do-caso > span { font-size: 12px; color: var(--tenue); }
+.cartao-do-caso > strong {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cartao-do-caso > strong svg { width: 15px; height: 15px; flex: none; }
+.cartao-do-caso .com-ponto::before {
+  content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: currentColor;
+}
+.cartao-do-caso .tom-bom { color: var(--bom); }
+.cartao-do-caso .tom-atencao { color: var(--atencao); }
+.cartao-do-caso .tom-ruim { color: var(--ruim); }
+.cartao-do-caso .tom-neutro { color: var(--texto); }
+.modal-abas {
+  display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--linha);
+  background: var(--superficie); overflow-x: auto;
+}
+.modal-aba {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 10px 14px; margin-bottom: -1px; cursor: pointer;
+  border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--suave); font: inherit; font-size: 14px; font-weight: 600;
+}
+.modal-aba b {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px; font-size: 11.5px;
+  background: var(--superficie-2); color: var(--suave);
+}
+.modal-aba:hover { color: var(--destaque); }
+.modal-aba[aria-selected="true"] { color: var(--destaque); border-bottom-color: var(--destaque); }
+.caso-em-abas .modal-corpo { background: var(--fundo); }
+.caso-em-abas #modal-do-sistema .modal-pares { margin-top: 0; }
+.caso-em-abas #modal-do-sistema .pares-do-sistema { margin-top: 0; padding-top: 0; border-top: 0; }
+.caso-em-abas .linha-do-tempo { margin: 0; }
+
+.caso-em-abas fieldset.secao-do-caso {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 0 18px; margin: 0 0 12px;
+}
+.caso-em-abas fieldset.secao-do-caso.com-falta { border-color: var(--ruim); }
+.caso-em-abas fieldset.secao-do-caso legend {
+  float: left; width: 100%; padding: 0; margin: 0; letter-spacing: 0; text-transform: none;
+}
+.secao-alternar {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 0;
+  border: 0; background: none; cursor: pointer; text-align: left;
+  color: var(--texto); font: inherit; font-size: 15px; font-weight: 600;
+}
+.secao-seta { display: inline-block; width: 12px; color: var(--suave); transform: rotate(90deg); transition: transform var(--transicao); }
+.recolhida .secao-seta { transform: none; }
+.secao-numero {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; background: var(--destaque-tenue); color: var(--destaque-escuro);
+}
+.secao-nome { flex: 1 1 auto; min-width: 0; }
+.secao-selo { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.secao-selo.ok { color: var(--bom); }
+.secao-selo.falta { color: var(--ruim); }
+.caso-em-abas fieldset.secao-do-caso .grade { clear: both; padding-bottom: 16px; }
+.caso-em-abas fieldset.secao-do-caso.recolhida .grade { display: none; }
+
+.modal-sinais { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-right: auto; }
+.sinal-falta, .sinal-nao-salvo {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
+  border-radius: 999px; font-size: 12.5px; font-weight: 600;
+}
+.sinal-falta { background: var(--atencao-tenue); color: var(--atencao); }
+.sinal-falta::before { content: "\26A0\FE0E"; }
+.sinal-nao-salvo { background: var(--destaque-tenue); color: var(--destaque-escuro); }
+.sinal-nao-salvo::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+}
+.caso-em-abas .modal-pe .recado { margin-right: 0; }
+@media (max-width: 720px) {
+  .modal-resumo { padding-inline: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal-abas { padding-inline: 18px; }
+}
 
 .formulario.no-modal { background: none; border: 0; padding: 0; box-shadow: none; }
 
@@ -4255,21 +4413,29 @@ var CasoEmModal = (function () {
     var caixa = document.createElement('div');
     caixa.className = 'dialogo';
     caixa.id = 'modal-do-caso';
-    caixa.innerHTML = '<div class="dialogo-caixa larga" role="dialog"'
-      + ' aria-modal="true" aria-labelledby="titulo-do-caso">'
+
+    caixa.innerHTML = '<div class="dialogo-caixa larga caso-em-abas" role="dialog"'
+      + ' aria-modal="true" aria-labelledby="titulo-do-caso nome-do-caso">'
       + '<header class="modal-cabeca">'
-      + '<div><h3 id="titulo-do-caso">Caso ' + escapar(idAtual) + '</h3>'
-      + '<p id="modal-subtitulo">Abrindo…</p></div>'
+      + '<div class="modal-titulos"><p class="modal-sobretitulo">'
+      + '<span id="titulo-do-caso">Caso ' + escapar(idAtual) + '</span>'
+      + '<span id="modal-subtitulo">Abrindo…</span></p>'
+      + '<h3 id="nome-do-caso"></h3></div>'
       + '<button type="button" class="modal-fechar" id="modal-x"'
       + ' aria-label="Fechar">✕</button>'
       + '</header>'
+      + '<div class="modal-resumo" id="modal-resumo" hidden></div>'
+      + '<div class="modal-abas" id="modal-abas" role="tablist" aria-label="Partes do caso" hidden></div>'
       + '<div class="modal-corpo" id="modal-corpo">'
+      + '<div id="aba-dados-do-caso" role="tabpanel">'
       + '<form class="formulario no-modal" id="form-do-caso" novalidate>'
       + '<div id="corpo-da-edicao"><p class="carregando-campos" role="status">'
-      + 'Abrindo o caso…</p></div></form>'
+      + 'Abrindo o caso…</p></div></form></div>'
       + '<div id="modal-do-sistema"></div></div>'
 
       + '<footer class="modal-pe" id="modal-pe">'
+      + '<span class="modal-sinais"><span class="sinal-falta" id="modal-falta" hidden></span>'
+      + '<span class="sinal-nao-salvo" id="modal-nao-salvo" hidden>Alterações não salvas</span></span>'
       + '<span class="recado" id="recado-do-modal" hidden></span>'
       + '<button type="button" class="botao vazado" id="modal-fechar">Fechar</button>'
       + (qualOProximo ? '<button type="button" class="botao vazado" id="modal-salvar-e-proximo" disabled>'
@@ -4348,18 +4514,34 @@ var CasoEmModal = (function () {
       if (deuErro || !oFormulario || !osValores) return;
       var corpo = corpoDaEdicao();
       if (!corpo) return;
-      elemento('modal-subtitulo').textContent = 'Trabalhar no caso · '
-        + (osValores.canal || oFormulario.canal.nome || '');
+      elemento('modal-subtitulo').textContent = (osValores.canal || oFormulario.canal.nome || '');
       corpo.innerHTML = Formulario.desenhar(oFormulario, 'editar-');
 
       Formulario.ligar(corpo, 'editar-', canalAtual,
         oFormulario.canal.confereSusepBloqueada !== false, idAtual);
       Formulario.preencher(corpo, osValores.valores);
-      elemento('modal-do-sistema').innerHTML = desenharLinhaDoTempo(osValores.linhaDoTempo)
-        + desenharDoSistema(osValores.doSistema);
+
+      var tempo = desenharLinhaDoTempo(osValores.linhaDoTempo);
+      var planilha = desenharDoSistema(osValores.doSistema);
+      elemento('modal-do-sistema').innerHTML
+        = '<div id="aba-linha-do-tempo" role="tabpanel" hidden>' + tempo + '</div>'
+        + '<div id="aba-da-planilha" role="tabpanel" hidden>' + planilha + '</div>';
+      desenharResumo(oFormulario, osValores);
+      desenharAbas([
+        { id: 'aba-dados-do-caso', nome: 'Dados do caso', quantos: null },
+        { id: 'aba-linha-do-tempo', nome: 'Linha do tempo',
+          quantos: tempo ? (osValores.linhaDoTempo || []).length : 0 },
+        { id: 'aba-da-planilha', nome: 'Da planilha',
+          quantos: planilha ? (osValores.doSistema || []).length : 0 }]);
+      prepararAsSecoes(corpo);
       elemento('modal-salvar').disabled = false;
       if (elemento('modal-salvar-e-proximo')) elemento('modal-salvar-e-proximo').disabled = false;
       retratoAoAbrir = retratoDaEdicao();
+
+      var miolo = elemento('modal-corpo');
+      miolo.addEventListener('input', atualizarOsAvisos);
+      miolo.addEventListener('change', atualizarOsAvisos);
+      atualizarOsAvisos();
     }
 
     function falhou(erro) {
@@ -4431,6 +4613,143 @@ var CasoEmModal = (function () {
     return colunas;
   }
 
+  function chaveDoTexto(texto) {
+    return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function campoPeloRotulo(formulario, valores, rotulos) {
+    var campos = [];
+    (formulario.secoes || []).forEach(function (secao) { campos = campos.concat(secao.campos || []); });
+    for (var i = 0; i < rotulos.length; i++) {
+      for (var j = 0; j < campos.length; j++) {
+        if (chaveDoTexto(campos[j].rotulo) !== rotulos[i]) continue;
+        var valor = valores[campos[j].chave];
+        if (valor === undefined || valor === null || !String(valor).trim()) return null;
+        var opcao = (campos[j].opcoes || []).filter(function (uma) { return uma.valor === valor; })[0];
+        return { rotulo: campos[j].rotulo, valor: String(opcao ? (opcao.rotulo || opcao.valor) : valor) };
+      }
+    }
+    return null;
+  }
+
+  function desenharResumo(formulario, caso) {
+    var valores = caso.valores || {};
+    var cliente = campoPeloRotulo(formulario, valores,
+      ['nomedocliente', 'cliente', 'nomedosegurado', 'segurado']);
+    elemento('nome-do-caso').textContent = cliente ? cliente.valor : 'Caso ' + idAtual;
+    if (!cliente) elemento('nome-do-caso').classList.add('sem-nome');
+
+    var resumo = caso.resumo || {};
+    var cartoes = [];
+    if (resumo.status) {
+      cartoes.push('<div class="cartao-do-caso"><span>Status</span><strong class="com-ponto tom-'
+        + escapar(resumo.status.tom) + '">' + escapar(resumo.status.nome) + '</strong></div>');
+    }
+    (resumo.prazos || []).forEach(function (prazo) {
+      cartoes.push('<div class="cartao-do-caso"><span>' + escapar(prazo.nome) + '</span>'
+        + '<strong class="tom-' + escapar(prazo.tom) + '">' + Moldura.icone('relogio')
+        + escapar(prazo.texto) + '</strong></div>');
+    });
+    var analista = campoPeloRotulo(formulario, valores, ['analista', 'responsavel']);
+    if (analista) {
+      cartoes.push('<div class="cartao-do-caso"><span>' + escapar(analista.rotulo) + '</span><strong>'
+        + escapar(analista.valor) + '</strong></div>');
+    }
+    var proposta = campoPeloRotulo(formulario, valores, ['numerodaproposta', 'proposta']);
+    if (proposta) {
+      cartoes.push('<div class="cartao-do-caso"><span>Proposta</span><strong>'
+        + escapar(proposta.valor) + '</strong></div>');
+    }
+    var lugar = elemento('modal-resumo');
+    lugar.innerHTML = cartoes.join('');
+    lugar.hidden = !cartoes.length;
+  }
+
+  function desenharAbas(abas) {
+    var barra = elemento('modal-abas');
+    var comConteudo = abas.filter(function (aba) { return aba.quantos === null || aba.quantos > 0; });
+    if (comConteudo.length < 2) { barra.hidden = true; return; }
+    barra.innerHTML = comConteudo.map(function (aba, i) {
+      return '<button type="button" role="tab" class="modal-aba" id="botao-' + aba.id + '"'
+        + ' aria-controls="' + aba.id + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '"'
+        + ' data-aba-do-caso="' + aba.id + '">' + escapar(aba.nome)
+        + (aba.quantos ? ' <b>' + aba.quantos + '</b>' : '') + '</button>';
+    }).join('');
+    barra.hidden = false;
+    barra.addEventListener('click', function (evento) {
+      var botao = evento.target.closest ? evento.target.closest('[data-aba-do-caso]') : null;
+      if (botao) mostrarAba(botao.getAttribute('data-aba-do-caso'));
+    });
+  }
+
+  function mostrarAba(id) {
+    ['aba-dados-do-caso', 'aba-linha-do-tempo', 'aba-da-planilha'].forEach(function (uma) {
+      if (elemento(uma)) elemento(uma).hidden = uma !== id;
+      var botao = elemento('botao-' + uma);
+      if (botao) botao.setAttribute('aria-selected', uma === id ? 'true' : 'false');
+    });
+    if (elemento('modal-corpo')) elemento('modal-corpo').scrollTop = 0;
+  }
+
+  function prepararAsSecoes(corpo) {
+    var secoes = corpo.querySelectorAll('fieldset.secao');
+    Array.prototype.forEach.call(secoes, function (secao, i) {
+      var legenda = secao.querySelector('legend');
+      if (!legenda) return;
+      var nome = legenda.textContent;
+      secao.classList.add('secao-do-caso');
+      legenda.innerHTML = '<button type="button" class="secao-alternar" aria-expanded="true">'
+        + '<span class="secao-seta" aria-hidden="true">›</span>'
+        + '<span class="secao-numero">' + (i + 1) + '</span>'
+        + '<span class="secao-nome">' + escapar(nome) + '</span>'
+        + '<span class="secao-selo"></span></button>';
+      legenda.querySelector('button').addEventListener('click', function () {
+        var aberta = secao.classList.toggle('recolhida') === false;
+        this.setAttribute('aria-expanded', aberta ? 'true' : 'false');
+      });
+    });
+  }
+
+  function mostrarAsSecoesComErro() {
+    var corpo = corpoDaEdicao();
+    if (!corpo) return;
+    var comErro = Array.prototype.slice.call(corpo.querySelectorAll('.campo.com-erro'))
+      .concat(Formulario.camposQueFaltam(corpo));
+    if (comErro.length) mostrarAba('aba-dados-do-caso');
+    comErro.forEach(function (campo) {
+      var secao = campo.closest('fieldset.secao');
+      if (!secao || !secao.classList.contains('recolhida')) return;
+      secao.classList.remove('recolhida');
+      var botao = secao.querySelector('.secao-alternar');
+      if (botao) botao.setAttribute('aria-expanded', 'true');
+    });
+    atualizarOsAvisos();
+  }
+
+  function atualizarOsAvisos() {
+    var corpo = corpoDaEdicao();
+    if (!corpo) return;
+    var faltam = Formulario.camposQueFaltam(corpo);
+    Array.prototype.forEach.call(corpo.querySelectorAll('fieldset.secao-do-caso'), function (secao) {
+      var selo = secao.querySelector('.secao-selo');
+      if (!selo) return;
+      var quantos = faltam.filter(function (campo) { return secao.contains(campo); }).length;
+      var comErro = !!secao.querySelector('.campo.com-erro');
+      secao.classList.toggle('com-falta', quantos > 0 || comErro);
+      selo.className = 'secao-selo' + (quantos ? ' falta' : ' ok');
+      selo.textContent = quantos ? quantos + (quantos === 1 ? ' obrigatório' : ' obrigatórios')
+        : '✓ completa';
+    });
+    var falta = elemento('modal-falta');
+    if (falta) {
+      falta.textContent = Formulario.textoDoQueFalta(corpo);
+      falta.hidden = !falta.textContent;
+    }
+    var naoSalvo = elemento('modal-nao-salvo');
+    if (naoSalvo) naoSalvo.hidden = !temAlteracaoNaoSalva();
+  }
+
   function mostrarRecadoDeErro(erro) {
     var corpo = corpoDaEdicao();
     if (!corpo) return;
@@ -4438,6 +4757,8 @@ var CasoEmModal = (function () {
       + escapar(erro.message || String(erro)) + '</p>';
     var subtitulo = elemento('modal-subtitulo');
     if (subtitulo) subtitulo.textContent = 'Não deu para abrir';
+    var nome = elemento('nome-do-caso');
+    if (nome) nome.textContent = 'Caso ' + idAtual;
     var salvarBotao = elemento('modal-salvar');
     if (salvarBotao) salvarBotao.disabled = true;
     var eOProximo = elemento('modal-salvar-e-proximo');
@@ -4493,6 +4814,7 @@ var CasoEmModal = (function () {
         destravarOsBotoes();
         recado(erro.message || String(erro), 'ruim');
         if (erro.problemas) Formulario.mostrarProblemas(corpo, erro.problemas);
+        mostrarAsSecoesComErro();
       });
   }
 
@@ -4505,14 +4827,16 @@ var CasoEmModal = (function () {
 
   var abrindoOStatus = false;
 
-  function trocarSituacao(idDoCanal, idDoCaso, quandoMudar) {
+  function trocarSituacao(idDoCanal, idDoCaso, quandoMudar, botaoQueAbriu) {
 
     if (abrindoOStatus || elemento('dialogo-situacao')) return;
     abrindoOStatus = true;
+    botaoCarregando(botaoQueAbriu, true);
 
     Servidor.chamar('situacoesParaTrocar', idDoCanal, idDoCaso)
       .entao(function (resposta) {
         abrindoOStatus = false;
+        botaoCarregando(botaoQueAbriu, false);
         var caixa = document.createElement('div');
         caixa.className = 'dialogo';
         caixa.id = 'dialogo-situacao';
@@ -4558,14 +4882,26 @@ var CasoEmModal = (function () {
         elemento('situacao-nova').focus();
 
         var pedidoAtual = 0;
+        var camposCarregando = false;
+        function travarOSalvar(travar) {
+          camposCarregando = travar;
+          var salvar = elemento('salvar-situacao');
+          if (!salvar || salvar.getAttribute('data-gravando') === 'sim') return;
+          salvar.disabled = travar;
+          salvar.title = travar ? 'Espere carregar o que este status pede' : '';
+        }
         function mostrarOsCamposDaSituacao() {
           var situacao = elemento('situacao-nova').value;
           var lugar = elemento('campos-da-situacao');
           var esta = ++pedidoAtual;
-          lugar.innerHTML = '';
+          elemento('erro-situacao').hidden = true;
+          lugar.innerHTML = '<p class="carregando-status" role="status">'
+            + 'Carregando o que este status pede…</p>';
+          travarOSalvar(true);
           Servidor.chamar('camposDaSituacao', idDoCanal, idDoCaso, situacao)
             .entao(function (campos) {
               if (esta !== pedidoAtual || !elemento('campos-da-situacao')) return;
+              travarOSalvar(false);
               if (!campos || !campos.length) { lugar.innerHTML = ''; return; }
               lugar.innerHTML = '<p class="config-explica">O status "' + escapar(situacao)
                 + '" pede:</p>'
@@ -4576,15 +4912,25 @@ var CasoEmModal = (function () {
               campos.forEach(function (campo) { valoresDoCaso[campo.chave] = campo.valor; });
               Formulario.preencher(lugar, valoresDoCaso);
             })
-            .senao(function () { lugar.innerHTML = ''; });
+            .senao(function () {
+              if (esta !== pedidoAtual || !elemento('campos-da-situacao')) return;
+
+              lugar.innerHTML = '<p class="carregando-status falhou" role="alert">'
+                + 'Não consegui carregar o que este status pede. '
+                + '<button type="button" class="tentar-de-novo" id="tentar-campos-de-novo">'
+                + 'Tentar de novo</button></p>';
+              elemento('tentar-campos-de-novo').addEventListener('click', mostrarOsCamposDaSituacao);
+            });
         }
         elemento('situacao-nova').addEventListener('change', mostrarOsCamposDaSituacao);
         mostrarOsCamposDaSituacao();
 
         elemento('form-situacao').addEventListener('submit', function (evento) {
           evento.preventDefault();
-          if (gravando) return;
+          if (gravando || camposCarregando) return;
           gravando = true;
+
+          elemento('situacao-nova').disabled = true;
 
           Formulario.comecouAGravar(elemento('salvar-situacao'), caixa);
           if (!envio || statusDoEnvio !== elemento('situacao-nova').value) {
@@ -4602,6 +4948,7 @@ var CasoEmModal = (function () {
             })
             .senao(function (erro) {
               gravando = false;
+              elemento('situacao-nova').disabled = false;
               Formulario.acabouDeGravar(elemento('salvar-situacao'), caixa);
               var aviso = elemento('erro-situacao');
               aviso.textContent = erro.message || String(erro);
@@ -4611,8 +4958,17 @@ var CasoEmModal = (function () {
       })
       .senao(function (erro) {
         abrindoOStatus = false;
+        botaoCarregando(botaoQueAbriu, false);
         Moldura.toast(erro.message || String(erro), 'ruim');
       });
+  }
+
+  function botaoCarregando(botao, carregando) {
+    if (!botao || !botao.classList) return;
+    botao.classList.toggle('carregando', carregando);
+    botao.disabled = carregando;
+    if (carregando) botao.setAttribute('aria-busy', 'true');
+    else botao.removeAttribute('aria-busy');
   }
 
   return { abrir: abrir, trocarSituacao: trocarSituacao, oQueGravou: oQueGravou };
@@ -5545,22 +5901,24 @@ var TelaTrabalho = (function () {
   }
 
   function acoesDaLinha(caso) {
+    var secundarias = '';
     var botoes = '';
 
     if (resumo.podeEditar) {
       botoes += '<button type="button" class="acao" data-trabalhar="'
         + escapar(caso.id) + '">' + Moldura.icone('editar')
-        + ' Trabalhar no caso</button>'
-        + '<button type="button" class="acao-icone" data-status-do-caso="'
+        + ' Trabalhar no caso</button>';
+      secundarias += '<button type="button" class="acao-secundaria" data-status-do-caso="'
         + escapar(caso.id) + '" title="Alterar status" aria-label="Alterar status">'
-        + Moldura.icone('trocarSituacao') + '</button>';
+        + Moldura.icone('trocarSituacao') + '<span>Status</span></button>';
     }
 
-    botoes += '<button type="button" class="acao-icone perigo" data-excluir="'
+    secundarias += '<button type="button" class="acao-secundaria perigo" data-excluir="'
       + escapar(caso.id) + '" title="Excluir caso" aria-label="Excluir caso">'
-      + Moldura.icone('ocultar') + '</button>';
+      + Moldura.icone('ocultar') + '<span>Excluir</span></button>';
 
-    return botoes;
+    return '<div class="acoes-do-caso">' + botoes
+      + '<div class="acoes-secundarias">' + secundarias + '</div></div>';
   }
 
   var focarABusca = false;
@@ -5873,8 +6231,9 @@ var TelaTrabalho = (function () {
         proximoDaFila);
     });
     ligarCliques('[data-status-do-caso]', function (botao) {
+
       CasoEmModal.trocarSituacao(canalEscolhido,
-        botao.getAttribute('data-status-do-caso'), depoisDeGravar);
+        botao.getAttribute('data-status-do-caso'), depoisDeGravar, botao);
     });
     ligarCliques('[data-excluir]', function (botao) {
       var idDoCaso = botao.getAttribute('data-excluir');
@@ -11315,7 +11674,7 @@ var TelaConfiguracoes = (function () {
   }
 
   var statusDaAba1 = [];
-  var FILTROS_NO_TRABALHO = 6;
+  var FILTROS_NO_TRABALHO = 7;
   var ORDENS_DA_ABA = [['antigos', 'Do mais antigo para o mais recente'],
     ['recentes', 'Do mais recente para o mais antigo']];
 
