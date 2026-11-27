@@ -53,6 +53,7 @@ abaixo com o motivo.
 | **Estrutura** | Conferir o laudo da planilha e ler a trilha de auditoria | Estrutura |
 | **Arquivo da auditoria** | O Id da planilha que recebe a auditoria com **mais de 2 meses** (conferido na hora, e não pode ser esta mesma), e o botão **Arquivar agora**. Copia, confere e só então apaga daqui. Para ser automático, a cada 2 meses: um acionador **mensal** no editor do Apps Script para `arquivarAuditoriaAgendada` | Estrutura · **pede senha** |
 | **Quais colunas a importação pode preencher** | Ajustes Gerais → Situações, na coluna do carimbo de cada status | O carimbo nunca é sugerido sozinho, mas pode ser escolhido no de-para. Criar um status novo apontando para uma coluna já a torna escolhível |
+| **Aviso de retenção no Google Chat** | Ligar ou desligar, a meta de valor retido do mês (R$, da equipe), a meta de retenções por analista no dia, o endereço do Chat (webhook, guardado em segredo) e uma mensagem de teste (Etapa 95) | Canais de trabalho › bloco do Chat · **o endereço pede senha** |
 | **Abas de análise** | Montar uma aba `ANALISE_*` na planilha: canal, quais colunas, filtros e janela de dias. Gerar quando quiser, ou apontar um acionador de tempo | Análises · **regerar pede senha** |
 | **Diagnóstico** | Conferir o sistema inteiro — fuso, estrutura, sequências, Ids repetidos, canais, campos, painéis, análises, quem consegue configurar e a ligação entre cada botão e a função que ele chama | Estrutura · só lê |
 

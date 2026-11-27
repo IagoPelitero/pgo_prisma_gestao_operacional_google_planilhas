@@ -27,7 +27,7 @@
 function oQueFaltaNoProjeto() {
   var esperado = {
     'Cadastros.gs': ['agendaDaMesa', 'bloquearSusep', 'desbloquearSusep', 'exportarCorretoras', 'formularioDaReuniao', 'ocultarCorretora', 'opcoesDaImportacao', 'origemDosCadastros', 'registrarReuniao', 'resumoDasSusepsBloqueadas', 'salvarCorretora', 'salvarReuniao', 'tabelaDeCorretoras'],
-    'Casos.gs': ['alterarSituacaoDoCaso', 'apagarRascunho', 'buscarCasos', 'cadastrarCaso', 'camposDaSituacao', 'casoParaEditar', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'guardarRascunho', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'situacoesParaTrocar'],
+    'Casos.gs': ['alterarSituacaoDoCaso', 'apagarRascunho', 'avisarRetencaoNoChat', 'buscarCasos', 'cadastrarCaso', 'camposDaSituacao', 'casoParaEditar', 'conferirPropostaRepetida', 'configuracaoDoLegado', 'consultarSusep', 'editarCaso', 'excluirCaso', 'formularioDoCanal', 'guardarRascunho', 'opcoesDaBusca', 'opcoesDaImportacaoDeCasos', 'salvarConfiguracaoDoLegado', 'salvarWebhookDoChat', 'situacoesParaTrocar', 'testarAvisoNoChat'],
     'Config.gs': ['aplicarMudancasDaPlanilha', 'conferirEstruturaDaPlanilha', 'conferirPlanilhaDeCadastros', 'configuracaoDoArquivoDaAuditoria', 'configuracaoDoArquivoDaBase', 'configuracaoDosCadastros', 'criarCampo', 'criarCanal', 'criarLista', 'definirSenhaDeAdministrador', 'excluirCampo', 'excluirItemDoCatalogo', 'excluirLista', 'liberarComSenha', 'listarAnalises', 'listarAuditoria', 'listarCamposDoCanal', 'listarCanaisConfiguraveis', 'listarCardsDoPainel', 'listarCatalogo', 'listarErros', 'listarNiveisDeAcesso', 'listarSinalizadores', 'ocultarAnalise', 'ocultarSinalizador', 'opcoesDeAnalise', 'opcoesDeConfiguracaoDeCampo', 'opcoesDeNivelDeAcesso', 'opcoesDeSinalizador', 'opcoesDoCarimboDoItem', 'renomearLista', 'reordenarCampos', 'resumoDasConfiguracoes', 'salvarAnalise', 'salvarArquivoDaAuditoria', 'salvarCampo', 'salvarCanal', 'salvarCardsDoPainel', 'salvarConfiguracaoDosCadastros', 'salvarHistoricoDaBase', 'salvarIdentidade', 'salvarItemDoCatalogo', 'salvarNivelDeAcesso', 'salvarPlanilhaDasAnalises', 'salvarSinalizador'],
     'Entrada.gs': ['definirLogo', 'desativarUsuario', 'listarUsuarios', 'pacoteDePartida', 'salvarTemaDoUsuario', 'salvarUsuario'],
     'Indicadores.gs': ['detalharComponente', 'exportarComponente', 'listarComponentesDoPainel', 'opcoesDaImportacaoDoChat', 'opcoesDoRelatorio', 'opcoesDosGraficos', 'produtividadeDaEquipe', 'relatorioDeCasos', 'resumoDoCanal', 'salvarComponentesDoPainel']
@@ -47,7 +47,7 @@ function oQueFaltaNoProjeto() {
 
   var recado;
   if (!faltando.length) {
-    recado = 'TUDO AQUI. As 91 funcoes que as telas chamam existem no projeto.';
+    recado = 'TUDO AQUI. As 94 funcoes que as telas chamam existem no projeto.';
   } else {
     recado = 'FALTAM ' + faltando.length + ' funcao(oes), em '
       + arquivosIncompletos.length + ' arquivo(s):\n\n'

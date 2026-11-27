@@ -4696,6 +4696,61 @@ que vai estudar outras formas. Nada foi implementado.
 
 ---
 
+## Etapa 95 — O aviso de retenção no Google Chat (versão 1.95)
+
+**Pedido do PO:** "Quando o caso for retido e o analista clicar em salvar ele deve mandar numa
+conversa do chat: o quanto o valor está acumulado, quanto falta (vou editar no prisma na aba de
+configurações) e a quantidade já retida no dia zerando a do dia anterior: atualmente a meta é 6 por
+analista." Hoje a equipe tira print de uma calculadora e posta no Chat.
+
+**Decisões do PO:**
+
+| Pergunta | Resposta |
+|---|---|
+| Acumulado e "falta": de quem, de quando? | **Da equipe RET, no mês** |
+| Quais metas se editam em Configurações? | **As duas:** valor do mês (R$) e retenções por analista no dia (6) |
+| A quantidade do dia mostra o quê? | **Só quem reteve agora** ("4 de 6") |
+| Versão | 1.95; a 1.94 já está colada |
+
+**Como foi feito:**
+
+- **Dois tempos.** As três gravações (`editarCaso`, `alterarSituacaoDoCaso`, `cadastrarCaso`) só
+  devolvem `avisoNoChat` quando o caso **acabou de passar** a Retido, com o aviso ligado e o endereço
+  guardado (`retencaoParaAvisar_`, que nunca estoura). Nenhuma ida à internet dentro da gravação.
+  Depois, a tela chama `avisarRetencaoNoChat` (`AvisoDeRetencao`, em `Comuns.html`), que **confere
+  tudo de novo**: o caso está Retido, a "Data reteve" é de hoje, ainda não foi avisado hoje.
+- **As contas** (`numerosDaRetencao_`) são as da Produtividade: lê a coluna da "Data reteve" e só as
+  linhas do mês; soma o valor retido dos que estão Retido; conta os de hoje do analista do caso
+  (`colunaDoResponsavel_`). O texto (`textoDoAvisoDeRetencao_`) leva só o nome de quem reteve, o
+  valor e o canal de origem — nada do cliente.
+- **Uma vez por caso no dia:** a lista do dia fica nas propriedades (`RECC.CHAT.AVISADOS.<data>`), e
+  as dos dias anteriores são apagadas. A reserva é feita antes de postar; se o Chat falhar, sai da
+  lista e o erro vai para a aba ERROS.
+- **O endereço (webhook)** fica nas propriedades do script (`RECC.CHAT.WEBHOOK.<canal>`), nunca na
+  planilha nem na tela. `salvarWebhookDoChat` pede a senha de administrador e só aceita endereço
+  `https://chat.googleapis.com/v1/spaces/…`. `testarAvisoNoChat` posta uma mensagem de teste.
+- **As metas** moram em três colunas novas da CANAIS: `AvisoDeRetencaoNoChat`, `MetaDeRetencaoDoMes`
+  e `MetaDeRetencoesPorDia`. O `atualizarPGO()` cria as colunas e, na RET, liga o aviso e põe a meta
+  do dia 6 — só se estiverem vazias (`prepararOAvisoNoChatDaRet_`). A instalação nova já nasce assim.
+- **Configurações › Canais de trabalho:** o bloco "Aviso de retenção no Google Chat" (só no canal que
+  tem o status Retido), com as metas, o endereço (campo de senha), Guardar, Testar e Apagar.
+- **Simulador:** ganhou um `UrlFetchApp` falso, que guarda os envios e simula recusa e rede fora.
+
+**Uma permissão nova:** o projeto passa a usar o `UrlFetchApp`. Depois de colar, ao rodar
+`atualizarPGO()`, o Google pede a autorização de "conectar a um serviço externo". O aplicativo roda
+"como você": só o dono autoriza.
+
+**Testes:** `testes-195.js` (novo), 18 testes: a configuração, quando avisa (as três portas, já
+Retido, sem endereço, desligado), o cartão (as contas, metas batidas, sem meta, nada do cliente),
+uma vez por dia, Data reteve antiga, o Chat recusando e a rede fora. No navegador, o Alterar status
+para Retido grava e posta uma vez (ponta a ponta 60/60). **Quebras de propósito:** sem a conferência
+do "já era Retido", sem a do "já avisado hoje" e aceitando qualquer endereço — cada uma derruba um
+teste.
+
+**Versão:** 1.95. O Excel marca com ◆ o que mudou desde a 1.94.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
@@ -4704,5 +4759,5 @@ que vai estudar outras formas. Nada foi implementado.
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha (a janela deixou de ser a abertura na Etapa 56 — hoje só vale para pedido sem período). São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
 | **Apagar canal** | Criar um canal novo já passa por Configurações › Canais de trabalho (cria a aba; pede senha). Apagar não existe de propósito: o canal se desliga, e a aba com os casos fica |
-| **Retenção no Google Chat** | Ideia de 27/11/2026: o Prisma posta no espaço do Chat um cartão com a retenção (analista, canal de origem, acumulado do mês e quanto falta), no lugar do print da calculadora. Via webhook do Chat. **Aguardando o PO:** a TI liberar webhooks; quando enviar (a cada retenção, por botão ou em horário fixo); e se a meta do mês volta para o Prisma (saiu na Etapa 52). Nada implementado |
+| **Retenção no Google Chat** | **Feito na Etapa 95.** Falta só, na planilha do PO: a TI liberar os webhooks do Chat (se a opção não aparecer no espaço), guardar o endereço e informar a meta do mês em Configurações › Canais de trabalho |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

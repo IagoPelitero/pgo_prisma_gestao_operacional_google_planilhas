@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-25 12:31
+   Gerado em 2026-11-27 13:23
    ========================================================================== */
 
 
@@ -452,6 +452,10 @@ const RECC_ESQUEMA = {
 
       { cabecalho: 'SubAbasDoTrabalho', tipo: 'textoLongo', protegido: false },
       { cabecalho: 'FiltrosDoTrabalho', tipo: 'texto', protegido: false },
+
+      { cabecalho: 'AvisoDeRetencaoNoChat', tipo: 'simOuNao', protegido: false },
+      { cabecalho: 'MetaDeRetencaoDoMes', tipo: 'numero', protegido: false },
+      { cabecalho: 'MetaDeRetencoesPorDia', tipo: 'numero', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }
@@ -3887,7 +3891,8 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
   registrarAuditoria_('caso.criar', canal.aba, gravado.__id, canal.nome);
 
-  return { id: gravado.__id, canal: canal.nome, aba: canal.aba };
+  return { id: gravado.__id, canal: canal.nome, aba: canal.aba,
+    avisoNoChat: retencaoParaAvisar_(canal, null, paraGravar, gravado.__id) };
 }
 
 var RECC_CASO_ALTERADO_POR_OUTRA_PESSOA = 'Este caso foi alterado por outra pessoa depois '
@@ -3943,7 +3948,8 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   } : null, comEsteId.length === 1 ? atual.__linha : 0);
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
-  return { id: alvo, canal: canal.nome, destino: destinoDepoisDeGravar_(canal, atual, paraGravar) };
+  return { id: alvo, canal: canal.nome, destino: destinoDepoisDeGravar_(canal, atual, paraGravar),
+    avisoNoChat: retencaoParaAvisar_(canal, atual, paraGravar, alvo) };
 }
 
 function destinoDepoisDeGravar_(canal, atual, gravado) {
@@ -4063,7 +4069,8 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   }, comEsteId.length === 1 ? atual.__linha : 0);
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom,
-    destino: destinoDepoisDeGravar_(canal, atual, alteracao) };
+    destino: destinoDepoisDeGravar_(canal, atual, alteracao),
+    avisoNoChat: retencaoParaAvisar_(canal, atual, alteracao, alvo) };
 }
 
 function camposPedidosPelaSituacao_(canal, quem, situacao) {
@@ -6553,6 +6560,245 @@ function apagarRascunho(idDoCanal) {
   return true;
 }
 
+var RECC_PREFIXO_DO_WEBHOOK = 'RECC.CHAT.WEBHOOK.';
+var RECC_PREFIXO_DOS_AVISADOS = 'RECC.CHAT.AVISADOS.';
+var RECC_FORMATO_DO_WEBHOOK = /^https:\/\/chat\.googleapis\.com\/v1\/spaces\/[A-Za-z0-9_-]+\/messages\?\S+$/;
+
+function statusQueAvisaNoChat_(canal) {
+  try {
+    return situacoesPorChave_(canal)[normalizarParaComparar_('Retido')] || null;
+  } catch (semCatalogo) {
+    return null;
+  }
+}
+
+function webhookDoCanal_(idDoCanal) {
+  return String(PropertiesService.getScriptProperties()
+    .getProperty(RECC_PREFIXO_DO_WEBHOOK + converterParaIdentificador_(idDoCanal)) || '');
+}
+
+function configuracaoDoChat_(canal) {
+  var linha = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(canal.id), 1)[0] || {};
+  var metaDoMes = converterParaNumero_(linha.MetaDeRetencaoDoMes);
+  var metaDoDia = converterParaNumero_(linha.MetaDeRetencoesPorDia);
+  return {
+    ligado: normalizarParaComparar_(linha.AvisoDeRetencaoNoChat) === 'sim',
+    metaDoMes: metaDoMes === '' ? 0 : metaDoMes,
+    metaDoDia: metaDoDia === '' ? 0 : Math.round(metaDoDia),
+    temWebhook: webhookDoCanal_(canal.id) !== ''
+  };
+}
+
+function retencaoParaAvisar_(canal, atual, gravado, id) {
+  try {
+    var retido = statusQueAvisaNoChat_(canal);
+    if (!retido || !canal.colunaDoStatus || !gravado) return null;
+    var alvo = normalizarParaComparar_(canal.colunaDoStatus);
+    var novo = null;
+    Object.keys(gravado).forEach(function (chave) {
+      if (normalizarParaComparar_(chave) === alvo) novo = gravado[chave];
+    });
+    if (novo === null || normalizarParaComparar_(novo) !== retido.chave) return null;
+    var antes = '';
+    Object.keys(atual || {}).forEach(function (chave) {
+      if (normalizarParaComparar_(chave) === alvo) antes = atual[chave];
+    });
+    if (normalizarParaComparar_(antes) === retido.chave) return null;
+    var config = configuracaoDoChat_(canal);
+    if (!config.ligado || !config.temWebhook) return null;
+    return { canal: canal.id, id: String(id) };
+  } catch (semAviso) {
+    return null;
+  }
+}
+
+function reaisNoChat_(valor) {
+  var numero = Math.round((Number(valor) || 0) * 100) / 100;
+  var negativo = numero < 0;
+  var partes = Math.abs(numero).toFixed(2).split('.');
+  return (negativo ? '-' : '') + 'R$ ' + partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + partes[1];
+}
+
+function numerosDaRetencao_(canal, caso, retido, quemSalvou) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var iValor = posicaoDaColuna_(estrutura, 'valor do prêmio retido');
+  var iData = posicaoDaColuna_(estrutura, retido.colunaDeCarimbo || 'Data reteve');
+  if (iData < 0) throw new Error('A coluna "' + (retido.colunaDeCarimbo || 'Data reteve') + '" não existe em ' + canal.aba + '.');
+  var colunaDoValor = iValor >= 0 ? estrutura.cabecalhos[iValor] : '';
+  var colunaDaData = estrutura.cabecalhos[iData];
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+
+  var hoje = formatarData_(new Date(), 'yyyy-MM-dd');
+  var mes = hoje.slice(0, 7);
+  var linhas = [];
+  lerColunaInteira_(canal.aba, colunaDaData).forEach(function (valor, i) {
+    var data = converterParaData_(valor);
+    if (data && formatarData_(data, 'yyyy-MM-dd').slice(0, 7) === mes) linhas.push(i + 2);
+  });
+  var doMes = semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas))
+    .filter(function (registro) { return normalizarParaComparar_(registro[canal.colunaDoStatus]) === retido.chave; });
+
+  var analista = String((colunaDoAnalista && caso[colunaDoAnalista]) || quemSalvou || '').trim();
+  var acumulado = 0;
+  var hojeDoAnalista = 0;
+  doMes.forEach(function (registro) {
+    var valor = colunaDoValor ? converterParaNumero_(registro[colunaDoValor]) : '';
+    acumulado += valor === '' ? 0 : valor;
+    var data = converterParaData_(registro[colunaDaData]);
+    if (!data || formatarData_(data, 'yyyy-MM-dd') !== hoje) return;
+    var dele = colunaDoAnalista ? String(registro[colunaDoAnalista] || '').trim() : '';
+    if (normalizarParaComparar_(dele) === normalizarParaComparar_(analista)) hojeDoAnalista++;
+  });
+  var doCaso = colunaDoValor ? converterParaNumero_(caso[colunaDoValor]) : '';
+
+  var origem = '';
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
+    if (normalizarParaComparar_(campo.ChaveTecnica) !== 'canal') return;
+    var posicao = posicaoDaColuna_(estrutura, String(campo.Cabecalho || ''));
+    if (posicao >= 0) origem = String(caso[estrutura.cabecalhos[posicao]] || '').trim();
+  });
+
+  return { analista: analista, valorDoCaso: doCaso === '' ? 0 : doCaso, origem: origem,
+    hojeDoAnalista: hojeDoAnalista, acumulado: acumulado,
+    nomeDoMes: RECC_NOMES_DOS_MESES[Number(mes.slice(5, 7)) - 1] };
+}
+
+function textoDoAvisoDeRetencao_(canal, numeros, config) {
+  var linhas = ['✅ *Nova retenção — ' + canal.nome + '*',
+    '*' + (numeros.analista || 'Alguém da equipe') + '* reteve agora: ' + reaisNoChat_(numeros.valorDoCaso)
+      + (numeros.origem ? ' · Canal de origem: ' + numeros.origem : ''), ''];
+  var doDia = '*' + (numeros.analista || 'Hoje') + ' hoje:* ';
+  if (config.metaDoDia > 0) {
+    var faltamNoDia = config.metaDoDia - numeros.hojeDoAnalista;
+    doDia += numeros.hojeDoAnalista + ' de ' + config.metaDoDia + ' retenções'
+      + (faltamNoDia > 0 ? ' (faltam ' + faltamNoDia + ')' : ' — meta do dia batida 🎯');
+  } else {
+    doDia += numeros.hojeDoAnalista + (numeros.hojeDoAnalista === 1 ? ' retenção' : ' retenções');
+  }
+  linhas.push(doDia);
+  linhas.push('*Acumulado de ' + String(numeros.nomeDoMes || '').toLowerCase() + ':* ' + reaisNoChat_(numeros.acumulado));
+  if (config.metaDoMes > 0) {
+    var falta = config.metaDoMes - numeros.acumulado;
+    linhas.push('*Meta do mês:* ' + reaisNoChat_(config.metaDoMes) + ' · '
+      + (falta > 0 ? '*Falta:* ' + reaisNoChat_(falta) : '*Meta batida!* (+' + reaisNoChat_(-falta) + ')'));
+  }
+  return linhas.join('\n');
+}
+
+function postarNoChat_(webhook, texto) {
+  var resposta = UrlFetchApp.fetch(webhook, {
+    method: 'post',
+    contentType: 'application/json; charset=UTF-8',
+    payload: JSON.stringify({ text: texto }),
+    muteHttpExceptions: true
+  });
+  return resposta.getResponseCode();
+}
+
+function avisadosDeHoje_(props, hoje) {
+  Object.keys(props.getProperties()).forEach(function (chave) {
+    if (chave.indexOf(RECC_PREFIXO_DOS_AVISADOS) === 0 && chave !== RECC_PREFIXO_DOS_AVISADOS + hoje) {
+      props.deleteProperty(chave);
+    }
+  });
+  try {
+    return JSON.parse(props.getProperty(RECC_PREFIXO_DOS_AVISADOS + hoje) || '[]');
+  } catch (estragada) {
+    return [];
+  }
+}
+
+function avisarRetencaoNoChat(idDoCanal, idDoCaso) {
+  var quem = exigirPermissao_(RECC_ACOES.EDITAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var alvo = converterParaIdentificador_(idDoCaso);
+  try {
+    var retido = statusQueAvisaNoChat_(canal);
+    var config = configuracaoDoChat_(canal);
+    if (!retido || !config.ligado || !config.temWebhook) return { enviado: false, motivo: 'desligado' };
+
+    var caso = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
+    if (!caso || normalizarParaComparar_(caso[canal.colunaDoStatus]) !== retido.chave) {
+      return { enviado: false, motivo: 'não está Retido' };
+    }
+    var estrutura = estruturaDaAba_(canal.aba);
+    var iData = posicaoDaColuna_(estrutura, retido.colunaDeCarimbo || 'Data reteve');
+    var data = iData >= 0 ? converterParaData_(caso[estrutura.cabecalhos[iData]]) : '';
+    var hoje = formatarData_(new Date(), 'yyyy-MM-dd');
+    if (!data || formatarData_(data, 'yyyy-MM-dd') !== hoje) return { enviado: false, motivo: 'não reteve hoje' };
+
+    var props = PropertiesService.getScriptProperties();
+    var marca = converterParaIdentificador_(canal.id) + ':' + alvo;
+    var avisados = avisadosDeHoje_(props, hoje);
+    if (avisados.indexOf(marca) >= 0) return { enviado: false, motivo: 'já avisado hoje' };
+    avisados.push(marca);
+    props.setProperty(RECC_PREFIXO_DOS_AVISADOS + hoje, JSON.stringify(avisados));
+
+    var codigo = 0;
+    try {
+      var texto = textoDoAvisoDeRetencao_(canal, numerosDaRetencao_(canal, caso, retido, quem.nome), config);
+      codigo = postarNoChat_(webhookDoCanal_(canal.id), texto);
+    } finally {
+      if (codigo !== 200) {
+        var deNovo = avisadosDeHoje_(props, hoje).filter(function (uma) { return uma !== marca; });
+        props.setProperty(RECC_PREFIXO_DOS_AVISADOS + hoje, JSON.stringify(deNovo));
+      }
+    }
+    if (codigo !== 200) {
+      registrarErro_('servidor', 'avisarRetencaoNoChat', 'O Google Chat respondeu ' + codigo
+        + ' ao aviso de retenção (canal ' + canal.nome + ').', 'caso ' + alvo);
+      return { enviado: false, falhou: true, motivo: 'o Chat respondeu ' + codigo };
+    }
+    return { enviado: true };
+  } catch (erro) {
+    registrarErro_('servidor', 'avisarRetencaoNoChat', 'O aviso de retenção no Chat falhou: ' + erro.message,
+      'canal ' + canal.nome + ' · caso ' + alvo);
+    return { enviado: false, falhou: true, motivo: erro.message };
+  }
+}
+
+function salvarWebhookDoChat(idDoCanal, endereco) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var canal = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(idDoCanal), 1)[0];
+  if (!canal) throw new Error('Canal ' + idDoCanal + ' não encontrado.');
+  var props = PropertiesService.getScriptProperties();
+  var chave = RECC_PREFIXO_DO_WEBHOOK + converterParaIdentificador_(idDoCanal);
+  var texto = String(endereco || '').trim();
+  if (!texto) {
+    props.deleteProperty(chave);
+    registrarAuditoria_('chat.webhook.apagar', 'CANAIS', canal.Id, String(canal.Nome));
+    return { configurado: false };
+  }
+  if (!RECC_FORMATO_DO_WEBHOOK.test(texto)) {
+    throw new Error('Esse não é um endereço de webhook do Google Chat. Ele começa com '
+      + '"https://chat.googleapis.com/v1/spaces/" — copie de novo em Apps e integrações › Webhooks, no espaço do Chat.');
+  }
+  props.setProperty(chave, texto);
+  registrarAuditoria_('chat.webhook.salvar', 'CANAIS', canal.Id, String(canal.Nome));
+  return { configurado: true };
+}
+
+function testarAvisoNoChat(idDoCanal) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var canal = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(idDoCanal), 1)[0];
+  if (!canal) throw new Error('Canal ' + idDoCanal + ' não encontrado.');
+  var webhook = webhookDoCanal_(canal.Id);
+  if (!webhook) throw new Error('Guarde o endereço do Chat (webhook) antes de testar.');
+  var codigo;
+  try {
+    codigo = postarNoChat_(webhook, '🔔 Teste do Prisma: os avisos de retenção do canal '
+      + String(canal.Nome) + ' vão chegar neste espaço.');
+  } catch (erro) {
+    throw new Error('Não deu para falar com o Google Chat: ' + erro.message);
+  }
+  if (codigo !== 200) {
+    throw new Error('O Google Chat recusou (código ' + codigo + '). Confira se o endereço está '
+      + 'completo e se o webhook ainda existe no espaço.');
+  }
+  return { ok: true };
+}
+
 
 /* ==== Config.gs =========================================================== */
 
@@ -7676,7 +7922,9 @@ function listarCanaisConfiguraveis() {
         ordem: Number(canal.Ordem) || 0,
         ativo: normalizarParaComparar_(canal.Ativo) === 'sim',
         colunasDaBase: colunas,
-        situacoes: situacoes
+        situacoes: situacoes,
+
+        avisoNoChat: avisoNoChatParaATela_(canal)
       };
     });
 }
@@ -7731,8 +7979,9 @@ function salvarCanal(dados) {
 
   var sla = slaDoFormulario_(dados, atual);
   var doTrabalho = trabalhoDoFormulario_(dados, atual, estrutura);
+  var doChat = avisoNoChatDoFormulario_(dados);
 
-  atualizarRegistro_('CANAIS', id, Object.assign(sla, doTrabalho, {
+  atualizarRegistro_('CANAIS', id, Object.assign(sla, doTrabalho, doChat, {
     Nome: nome,
     Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
     ColunaDaData: String(dados.colunaDaData || ''),
@@ -7756,6 +8005,43 @@ function salvarCanal(dados) {
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+function avisoNoChatParaATela_(linha) {
+  try {
+    if (posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'MetaDeRetencoesPorDia') < 0) return null;
+    var canal = { id: linha.Id, aba: String(linha.Aba) };
+    if (!statusQueAvisaNoChat_(canal)) return null;
+    var metaDoMes = converterParaNumero_(linha.MetaDeRetencaoDoMes);
+    var metaDoDia = converterParaNumero_(linha.MetaDeRetencoesPorDia);
+    return {
+      ligado: normalizarParaComparar_(linha.AvisoDeRetencaoNoChat) === 'sim',
+      metaDoMes: metaDoMes === '' ? '' : metaDoMes,
+      metaDoDia: metaDoDia === '' ? '' : metaDoDia,
+      temWebhook: webhookDoCanal_(linha.Id) !== ''
+    };
+  } catch (semAviso) {
+    return null;
+  }
+}
+
+function avisoNoChatDoFormulario_(dados) {
+  var pedido = dados.avisoNoChat;
+  if (!pedido || typeof pedido !== 'object') return {};
+  if (posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'MetaDeRetencoesPorDia') < 0) return {};
+  function numero(valor, nome, inteiro) {
+    if (valor === '' || valor === null || valor === undefined) return '';
+    var n = converterParaNumero_(valor);
+    if (n === '' || n < 0 || (inteiro && Math.round(n) !== n)) {
+      throw new Error('A ' + nome + ' precisa ser um número' + (inteiro ? ' inteiro' : '') + ', zero ou maior.');
+    }
+    return n;
+  }
+  return {
+    AvisoDeRetencaoNoChat: pedido.ligado === true ? 'SIM' : 'NAO',
+    MetaDeRetencaoDoMes: numero(pedido.metaDoMes, 'meta do mês', false),
+    MetaDeRetencoesPorDia: numero(pedido.metaDoDia, 'meta do dia', true)
+  };
 }
 
 function trabalhoDoFormulario_(dados, atual, estrutura) {
@@ -9842,8 +10128,8 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.94',
-  data: '25/11/2026'
+  numero: '1.95',
+  data: '27/11/2026'
 };
 
 const RECC_TEMAS = ['padrao', 'rosa', 'dark', 'brasil'];
@@ -14842,6 +15128,9 @@ function semearDadosIniciais_(emailDoInstalador) {
       FimDoExpediente: '',
       ColunaDaPrimeiraResposta: '',
       ColunaDaHoraDaPrimeiraResposta: '',
+
+      AvisoDeRetencaoNoChat: true,
+      MetaDeRetencoesPorDia: 6,
       Icone: 'escudo',
       Ordem: 1,
       Ativo: true
@@ -15506,7 +15795,11 @@ function atualizarPGO() {
    ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto'],
 
    ['CANAIS', 'SubAbasDoTrabalho', 'textoLongo'],
-   ['CANAIS', 'FiltrosDoTrabalho', 'texto']].forEach(function (trio) {
+   ['CANAIS', 'FiltrosDoTrabalho', 'texto'],
+
+   ['CANAIS', 'AvisoDeRetencaoNoChat', 'simOuNao'],
+   ['CANAIS', 'MetaDeRetencaoDoMes', 'numero'],
+   ['CANAIS', 'MetaDeRetencoesPorDia', 'numero']].forEach(function (trio) {
     var aba = planilhaAtiva_().getSheetByName(trio[0]);
     if (!aba) { pulados.push('aba ' + trio[0] + ' não existe'); return; }
     if (posicaoDaColuna_(estruturaDaAba_(trio[0]), trio[1]) >= 0) {
@@ -15624,6 +15917,8 @@ function atualizarPGO() {
   feito = feito.concat(tirarATelaInicialDosNiveis_(pulados));
 
   feito = feito.concat(trocarAsDescricoesDosCanais_(pulados, paraVoce));
+
+  feito = feito.concat(prepararOAvisoNoChatDaRet_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -18718,6 +19013,28 @@ function montarOsFiltrosDaRet_(canais, paraVoce) {
   }
   return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
     + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
+}
+
+function prepararOAvisoNoChatDaRet_(pulados) {
+  if (!planilhaAtiva_().getSheetByName('CANAIS')
+      || posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'MetaDeRetencoesPorDia') < 0) {
+    pulados.push('o aviso no Chat: as colunas novas da CANAIS ainda não existem');
+    return [];
+  }
+  var ret = lerRegistros_('CANAIS').filter(function (canal) { return canal.Aba === 'BASE_RET'; })[0];
+  if (!ret) return [];
+  var mudar = {};
+  if (String(ret.AvisoDeRetencaoNoChat === undefined ? '' : ret.AvisoDeRetencaoNoChat).trim() === '') {
+    mudar.AvisoDeRetencaoNoChat = 'SIM';
+  }
+  if (String(ret.MetaDeRetencoesPorDia === undefined ? '' : ret.MetaDeRetencoesPorDia).trim() === '') {
+    mudar.MetaDeRetencoesPorDia = 6;
+  }
+  if (!Object.keys(mudar).length) return [];
+  atualizarRegistro_('CANAIS', ret.Id, mudar);
+  esquecerEstruturaLida_('CANAIS');
+  return ['RET: o aviso de retenção no Chat ficou ligado, com a meta do dia de 6 retenções por '
+    + 'analista. Falta o endereço do Chat e a meta do mês, em Configurações › Canais de trabalho'];
 }
 
 const RECC_DESCRICOES_DOS_CANAIS = {

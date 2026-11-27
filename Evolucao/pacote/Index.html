@@ -1719,6 +1719,13 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
   .modal-abas { padding-inline: 18px; }
 }
 
+.config-bloco-chat {
+  border: 1px solid var(--linha); border-radius: var(--raio); background: var(--superficie-2);
+  padding: 10px 14px 14px; margin: 16px 0; min-width: 0;
+}
+.config-bloco-chat legend { padding: 0 6px; font-weight: 700; font-size: 14px; color: var(--texto); }
+.config-bloco-chat .config-acoes { flex-wrap: wrap; }
+
 .formulario.no-modal { background: none; border: 0; padding: 0; box-shadow: none; }
 
 .dialogo-caixa {
@@ -4369,6 +4376,24 @@ var Formulario = (function () {
 
 <script>
 
+var AvisoDeRetencao = (function () {
+  function depoisDeSalvar(resposta) {
+    var aviso = resposta && resposta.avisoNoChat;
+    if (!aviso || !aviso.canal || !aviso.id) return;
+    Servidor.chamar('avisarRetencaoNoChat', aviso.canal, aviso.id)
+      .entao(function (r) {
+        if (r && r.enviado) Moldura.toast('Retenção avisada no Chat.', 'bom');
+        else if (r && r.falhou) {
+          Moldura.toast('O caso está salvo, mas o aviso no Chat não foi enviado.', 'atencao');
+        }
+      })
+      .senao(function () {
+        Moldura.toast('O caso está salvo, mas o aviso no Chat não foi enviado.', 'atencao');
+      });
+  }
+  return { depoisDeSalvar: depoisDeSalvar };
+})();
+
 var CasoEmModal = (function () {
 
   var canalAtual = '';
@@ -4794,6 +4819,7 @@ var CasoEmModal = (function () {
         salvando = false;
         mudouAlgo = true;
         oQueFoiGravado = { id: idAtual, destino: (resposta && resposta.destino) || '' };
+        AvisoDeRetencao.depoisDeSalvar(resposta);
         retratoAoAbrir = null;
 
         destravarOsBotoes();
@@ -4943,6 +4969,7 @@ var CasoEmModal = (function () {
             .entao(function (resposta) {
               gravando = false;
               oQueFoiGravado = { id: idDoCaso, destino: (resposta && resposta.destino) || '' };
+              AvisoDeRetencao.depoisDeSalvar(resposta);
               sair();
               if (quandoMudar) quandoMudar();
             })
@@ -6693,6 +6720,7 @@ var TelaCadastrarCaso = (function () {
         Formulario.acabouDeGravar(elemento('salvar-caso'),
           elemento('formulario-do-caso'));
         apagarORascunho();
+        AvisoDeRetencao.depoisDeSalvar(resposta);
         mostrarCadastroConcluido(resposta);
       })
       .senao(function (erro) {
@@ -11632,6 +11660,7 @@ var TelaConfiguracoes = (function () {
         + 'no losango.')
       + campoDeTexto('ordem', 'Ordem no seletor', canal.ordem, '')
       + caixaDeSimNao('ativo', 'Canal em uso', canal.ativo)
+      + editorDoChat(canal)
       + (canal.situacoes.length
         ? '<p class="config-explica">Situações cadastradas neste canal: '
           + escapar(canal.situacoes.join(', ')) + '.</p>'
@@ -11642,6 +11671,7 @@ var TelaConfiguracoes = (function () {
     EditorDaFila.montar(elemento('editor-da-fila'), elemento('cfg-colunasDaFila'),
       canal.colunasDaFila, canal.colunasDaBase, escapar);
     ligarEditorDoTrabalho(canal);
+    ligarEditorDoChat(canal);
 
     elemento('form-canal').addEventListener('submit', function (evento) {
       evento.preventDefault();
@@ -11665,12 +11695,83 @@ var TelaConfiguracoes = (function () {
         situacoesDestacadas: valorDe('situacoesDestacadas'),
         subAbasDoTrabalho: subAbasDaTela(),
         filtrosDoTrabalho: filtrosDaTela(canal),
+        avisoNoChat: avisoNoChatDaTela(canal),
         icone: valorDe('icone'),
         ordem: valorDe('ordem'),
         ativo: marcado('ativo')
       }).entao(function () { avisarSalvo(); carregarCanais(); })
         .senao(mostrarErroNoPainel);
     });
+  }
+
+  function editorDoChat(canal) {
+    var chat = canal.avisoNoChat;
+    if (!chat) return '';
+    return '<fieldset class="config-bloco-chat"><legend>Aviso de retenção no Google Chat</legend>'
+      + '<p class="config-explica">Quando um caso passa a <strong>Retido</strong> e é salvo (Trabalhar no '
+      + 'caso, Alterar status ou Cadastrar), o Prisma posta no espaço do Chat: quem reteve e o valor, '
+      + 'quantas retenções a pessoa tem hoje, o acumulado da equipe no mês e quanto falta. Nada do '
+      + 'cliente vai para o Chat.</p>'
+      + caixaDeSimNao('chatLigado', 'Avisar no Chat', chat.ligado)
+      + campoDeTexto('chatMetaDoMes', 'Meta de valor retido do mês (R$, da equipe)', chat.metaDoMes,
+        'É dela que sai o "Falta". Em branco, o cartão mostra só o acumulado. Grava no Salvar, embaixo.')
+      + campoDeTexto('chatMetaDoDia', 'Meta de retenções por analista no dia', chat.metaDoDia,
+        'Zera todo dia. Em branco, o cartão mostra só quantas a pessoa tem hoje. Grava no Salvar, embaixo.')
+      + '<div class="config-campo"><span>Endereço do Chat (webhook)</span>'
+      + '<p class="config-explica" id="chat-estado">' + (chat.temWebhook
+        ? '✓ Guardado. Por segurança, o endereço não aparece aqui.'
+        : 'Ainda não guardado: sem ele, nenhum aviso é enviado.') + '</p>'
+      + '<input type="password" id="cfg-chatWebhook" autocomplete="off" '
+      + 'placeholder="https://chat.googleapis.com/v1/spaces/…">'
+      + '<em>Como pegar: no Google Chat, abra o espaço › clique no nome dele › Apps e integrações › '
+      + 'Webhooks › Adicionar webhook › dê um nome (ex.: Prisma) › copie o endereço e cole aqui.</em>'
+      + '<div class="config-acoes">'
+      + '<button type="button" class="botao vazado" id="chat-guardar">Guardar endereço</button>'
+      + '<button type="button" class="botao vazado" id="chat-testar">Enviar mensagem de teste</button>'
+      + '<button type="button" class="botao vazado perigo" id="chat-apagar">Apagar endereço</button>'
+      + '</div></div></fieldset>';
+  }
+
+  function ligarEditorDoChat(canal) {
+    if (!canal.avisoNoChat || !elemento('chat-guardar')) return;
+    function guardar(endereco, recado) {
+      comSenhaDeAdministrador(function () {
+        Servidor.chamar('salvarWebhookDoChat', canal.id, endereco)
+          .entao(function (resposta) {
+            canal.avisoNoChat.temWebhook = !!resposta.configurado;
+            elemento('cfg-chatWebhook').value = '';
+            elemento('chat-estado').textContent = resposta.configurado
+              ? '✓ Guardado. Por segurança, o endereço não aparece aqui.'
+              : 'Ainda não guardado: sem ele, nenhum aviso é enviado.';
+            avisarSalvo(recado);
+          })
+          .senao(mostrarErroNoPainel);
+      });
+    }
+    elemento('chat-guardar').addEventListener('click', function () {
+      var endereco = String(elemento('cfg-chatWebhook').value || '').trim();
+      if (!endereco) { avisar('Cole o endereço do webhook antes de guardar.', 'atencao'); return; }
+      guardar(endereco, 'Endereço do Chat guardado. Use "Enviar mensagem de teste" para conferir.');
+    });
+    elemento('chat-apagar').addEventListener('click', function () {
+      guardar('', 'Endereço do Chat apagado: os avisos param.');
+    });
+    elemento('chat-testar').addEventListener('click', function () {
+      var botao = elemento('chat-testar');
+      Formulario.comecouAGravar(botao, null);
+      Servidor.chamar('testarAvisoNoChat', canal.id)
+        .entao(function () {
+          Formulario.acabouDeGravar(botao, null);
+          avisarSalvo('Mensagem de teste enviada: confira no espaço do Chat.');
+        })
+        .senao(function (erro) { Formulario.acabouDeGravar(botao, null); mostrarErroNoPainel(erro); });
+    });
+  }
+
+  function avisoNoChatDaTela(canal) {
+    if (!canal.avisoNoChat || !elemento('cfg-chatLigado')) return undefined;
+    return { ligado: marcado('chatLigado'), metaDoMes: valorDe('chatMetaDoMes'),
+      metaDoDia: valorDe('chatMetaDoDia') };
   }
 
   var statusDaAba1 = [];

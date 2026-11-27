@@ -1804,6 +1804,68 @@ inventado estaria na tela da operação amanhã, medindo o que ninguém pediu.
 
 ---
 
+## O aviso de retenção no Google Chat (Etapa 95)
+
+Quando um caso da RET **passa a Retido** e é salvo, o Prisma posta no espaço do Google Chat da
+equipe, no lugar do print da calculadora:
+
+```
+✅ Nova retenção — RET
+Ana Martins reteve agora: R$ 1.250,00 · Canal de origem: URA
+
+Ana Martins hoje: 4 de 6 retenções (faltam 2)
+Acumulado de novembro: R$ 48.300,00
+Meta do mês: R$ 60.000,00 · Falta: R$ 11.700,00
+```
+
+**As contas são as da Produtividade:**
+
+- **Acumulado do mês (da equipe):** a soma do "valor do prêmio retido" dos casos que **estão** Retido,
+  pela "Data reteve", do dia 1 até hoje — a mesma conta do gráfico do retido acumulado (Etapa 77).
+- **Falta:** a meta do mês menos o acumulado. Passou da meta: "Meta batida! (+R$ …)".
+- **Hoje:** quantos casos o analista do caso tem com a "Data reteve" de hoje. Zera sozinho na virada
+  do dia. Bateu a meta do dia: "meta do dia batida 🎯".
+
+**Quando posta:**
+
+- Ao **passar** a Retido, em qualquer porta: Trabalhar no caso, Alterar status ou Cadastrar caso.
+  Salvar de novo um caso que já era Retido não posta.
+- **Uma vez por caso no dia.** O caso que volta a Retido guarda a "Data reteve" da primeira vez (a
+  regra do carimbo), não conta de novo na Produtividade e não é avisado de novo.
+- **Nada do cliente** vai para o Chat: só o nome de quem reteve, o valor e o canal de origem.
+- **Gravar nunca depende do Chat.** O aviso sai numa chamada separada, depois que o caso já está
+  salvo. Se o Chat falhar, aparece "O caso está salvo, mas o aviso no Chat não foi enviado", o erro
+  vai para a aba ERROS, e o próximo salvamento do mesmo caso no dia tenta de novo.
+
+### Como ligar
+
+Em **Configurações › Canais de trabalho › RET**, no bloco **Aviso de retenção no Google Chat**:
+
+1. **Avisar no Chat** — ligado (a RET já vem ligada).
+2. **Meta de valor retido do mês (R$, da equipe)** — é dela que sai o "Falta". Em branco, o cartão
+   mostra só o acumulado.
+3. **Meta de retenções por analista no dia** — vem com **6**. Em branco, mostra só quantas a pessoa
+   tem hoje.
+4. As metas gravam no **Salvar** do canal.
+5. **O endereço do Chat (webhook):**
+   1. No Google Chat, abra o espaço da equipe e clique no **nome do espaço**.
+   2. **Apps e integrações › Webhooks › Adicionar webhook**. Dê um nome (ex.: "Prisma") e salve.
+   3. Copie o endereço (começa com `https://chat.googleapis.com/v1/spaces/`).
+   4. No Prisma, cole em **Endereço do Chat** e clique **Guardar endereço** (pede a senha de
+      administrador).
+   5. Clique **Enviar mensagem de teste** e confira no espaço.
+
+Se a opção **Webhooks** não aparecer no espaço, o administrador do Google Workspace da empresa
+bloqueou: é com a TI.
+
+**O endereço é segredo:** quem tem o endereço posta no espaço. Ele fica nas propriedades do script —
+não na planilha, não na tela (o campo nunca mostra o que está guardado). Só endereço do próprio
+Google Chat é aceito. **Apagar endereço** para os avisos.
+
+**A primeira vez, depois de colar a 1.95:** o Prisma passa a falar com um serviço de fora (o Chat).
+Ao rodar `atualizarPGO()` no editor, o Google pede uma autorização nova ("Conectar a um serviço
+externo"): aceite. Como o aplicativo roda "como você", só você autoriza; a equipe não vê nada.
+
 ## A Agenda da Mesa: reuniões com corretores
 
 A Mesa Diamante registra as reuniões com corretores (Etapa 79, pedido do PO). Elas
@@ -2123,7 +2185,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.94** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.95** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).
