@@ -69,3 +69,9 @@ clique depois que os 5 minutos vencem.
 **Recomendação do estudo:** **A** (com a USUARIOS em 5 min e o gatilho de edição) e **B**. Os dois
 mantêm as Configurações como estão e não tocam em regra de negócio, permissão, indicador ou
 estrutura das planilhas. **C e D, não.** Nada disso foi implementado: depende da aprovação do PO.
+
+## Decisão do PO (27/11/2026)
+
+**"Não deixa."** Nenhum dos caminhos (A, B, C ou D) será implementado. O sistema continua como na
+1.94: a configuração na planilha, editada pelas telas de Configurações, com o cache de 5 minutos.
+O estudo e a ferramenta `medir-por-aba.js` ficam para quando o assunto voltar.
