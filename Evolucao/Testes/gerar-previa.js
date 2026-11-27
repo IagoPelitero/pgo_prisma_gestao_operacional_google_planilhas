@@ -165,7 +165,7 @@ function pontePreparada(respostas) {
     + '          || respostas.propostas.avulsa || { situacao: "VAZIA", mensagem: "" });\n'
     + '      },\n'
     // As sub-abas do Trabalho (Etapa 84): um painel gravado por aba.
-    + '      resumoDoCanal: function (idDoCanal, filtros, periodo, quantos, aviso, subAba) {\n'
+    + '      resumoDoCanal: function (idDoCanal, filtros, periodo, quantos, aviso, subAba, pagina) {\n'
     + '        var painel = respostas.paineis[idDoCanal].abas[Number(subAba) === 2 ? 2 : 1];\n'
     + '        var chave = "";\n'
     + '        Object.keys(filtros || {}).forEach(function (campo) {\n'
@@ -187,6 +187,15 @@ function pontePreparada(respostas) {
     + '            return JSON.stringify(caso.celulas).toLowerCase().indexOf(termo) >= 0;\n'
     + '          });\n'
     + '          resumo.total = resumo.fila.length;\n'
+    + '        }\n'
+    // A página da fila (Etapa 97): a prévia guardou a fila desde o começo; a
+    // página pedida é cortada dela, como o servidor faz.
+    + '        if (quantos !== "todos") {\n'
+    + '          var tamanho = Number(quantos) > 0 ? Number(quantos) : 5;\n'
+    + '          var paginas = Math.max(1, Math.ceil(resumo.total / tamanho));\n'
+    + '          var atual = Math.min(Math.max(1, Number(pagina) || 1), paginas);\n'
+    + '          resumo.fila = resumo.fila.slice((atual - 1) * tamanho);\n'
+    + '          resumo.pagina = { atual: atual, paginas: paginas, tamanho: tamanho, inicio: (atual - 1) * tamanho };\n'
     + '        }\n'
     + '        responder(resumo);\n'
     + '      },\n'

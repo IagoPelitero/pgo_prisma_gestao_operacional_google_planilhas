@@ -54,6 +54,16 @@ var TelaTrabalho = (function () {
     if (mostrarLembrado > 0) quantosNaFila = mostrarLembrado;
   } catch (semArmazenamento) { podeLembrarOMostrar = false; }
   var focarNoMostrar = '';
+  /*
+    A PÁGINA DA FILA (Etapa 97). Pedido do PO: "filtro de 10 com página para
+    próximos 10 ou volta os 10 que estava". Conta de 1. Trocar o filtro, a
+    sub-aba, o canal ou o "Mostrar" volta para a 1; salvar um caso fica na
+    mesma (decisão dele) — se ela esvaziar, o servidor devolve a anterior. A
+    página não é lembrada no navegador: só vale enquanto a tela está aberta.
+  */
+  var paginaDaFila = 1;
+  var chaveDaPagina = '';
+  var focarNaPagina = '';
   var resumo = null;
   // O aviso dos casos perto de vencer sai UMA VEZ por canal, quando a pessoa
   // entra nele — não a cada filtro, nem depois de cada gravação. Ver
@@ -369,11 +379,46 @@ var TelaTrabalho = (function () {
     });
   }
 
-  /** Quantos casos aparecem agora: a escolha da pessoa, ou o padrão (5). */
+  /** Quantos casos aparecem agora: os da página aberta (Etapa 97). */
   function limiteDaFila() {
-    var veio = resumo.fila.length;
-    if (quantosNaFila === 'todos') return veio;
-    return Math.min(quantosNaFila || resumo.mostrarNaFila.padrao, veio);
+    return casosDaPagina().length;
+  }
+
+  /** Quantos casos por página: a escolha da pessoa, ou o padrão (5). O "Todos" é uma página só. */
+  function tamanhoDaPagina() {
+    if (quantosNaFila === 'todos') return Math.max(totalDaFila(), 1);
+    return quantosNaFila || resumo.mostrarNaFila.padrao;
+  }
+
+  function quantasPaginas() {
+    return Math.max(1, Math.ceil(totalDaFila() / tamanhoDaPagina()));
+  }
+
+  /** Onde, na tela, está o primeiro caso que veio: o servidor manda a partir da página pedida. */
+  function inicioDoQueVeio() {
+    return resumo.pagina ? resumo.pagina.inicio : 0;
+  }
+
+  /** Os casos da página aberta, dentre os que vieram. */
+  function casosDaPagina() {
+    var de = (paginaDaFila - 1) * tamanhoDaPagina() - inicioDoQueVeio();
+    return de < 0 ? [] : resumo.fila.slice(de, de + tamanhoDaPagina());
+  }
+
+  /**
+   * A página já veio inteira? Com 5 por página, as seguintes vêm junto e virar
+   * a página é na hora; a que não veio, o servidor traz.
+   */
+  function paginaJaVeio(qual) {
+    var de = (qual - 1) * tamanhoDaPagina();
+    var precisa = Math.min(tamanhoDaPagina(), totalDaFila() - de);
+    var aqui = de - inicioDoQueVeio();
+    return aqui >= 0 && aqui + precisa <= resumo.fila.length;
+  }
+
+  /** O que, mudando, volta a fila para a página 1. */
+  function chaveDaPaginaAgora() {
+    return JSON.stringify([canalEscolhido, subAbaDoCanal(canalEscolhido), quantosNaFila, filtrosEscolhidos]);
   }
 
   /** A fila inteira — `total` —, e não só os casos que vieram para a tela. */
@@ -400,24 +445,45 @@ var TelaTrabalho = (function () {
     var total = totalDaFila();
     var opcoes = opcoesDeMostrar(total, resumo.mostrarNaFila.opcoes);
 
+    // O ligado é a ESCOLHA, e não quantos aparecem: a última página pode ter
+    // menos casos (Etapa 97).
+    var escolhido = quantosNaFila === 'todos' ? 'todos' : (quantosNaFila || resumo.mostrarNaFila.padrao);
+    var primeiro = (paginaDaFila - 1) * tamanhoDaPagina();
     var botoes = opcoes.map(function (quantos) {
-      var ligado = quantos === 'todos' ? visiveis === total : quantos === visiveis;
+      var ligado = quantos === 'todos' ? (escolhido === 'todos' || visiveis === total) : quantos === escolhido;
       return '<button type="button" class="mostrar-quantos" data-mostrar="' + quantos + '"'
         + ' aria-pressed="' + ligado + '">'
         + (quantos === 'todos' ? 'Todos (' + total + ')' : quantos) + '</button>';
     }).join('');
 
     return '<div class="fila-mostrar">'
-      + '<span class="fila-mostrando">' + (visiveis < total
-        ? (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
-          : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)
-        : 'Mostrando todos os ' + total + ' casos') + '</span>'
+      + '<span class="fila-mostrando">' + (visiveis >= total ? 'Mostrando todos os ' + total + ' casos'
+        : primeiro > 0 ? 'Mostrando ' + (primeiro + 1) + ' a ' + (primeiro + visiveis) + ' de ' + total
+          + (resumo.subAbas ? ' · ' + ordemDaFila() : '')
+        : (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
+          : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)) + '</span>'
       + legendaDoPrazo()
       + (opcoes.length ? '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
         + '<span>Mostrar</span>' + botoes + '</div>'
         + (podeLembrarOMostrar ? '<span class="mostrar-salvo">' + Moldura.icone('confirmado') + 'Sua escolha fica salva</span>' : '')
         : '')
       + '</div>';
+  }
+
+  /**
+   * Embaixo da tabela: "‹ Anterior · Página 2 de 14 · Próxima ›" (Etapa 97).
+   * Com uma página só (ou o "Todos"), não aparece.
+   */
+  function barraDePaginas() {
+    var paginas = quantasPaginas();
+    if (paginas <= 1) return '';
+    return '<nav class="fila-paginas" aria-label="Páginas da fila">'
+      + '<button type="button" class="mostrar-quantos" data-pagina="anterior"'
+      + (paginaDaFila <= 1 ? ' disabled' : '') + '>‹ Anterior</button>'
+      + '<span class="fila-pagina-atual">Página ' + paginaDaFila + ' de ' + paginas + '</span>'
+      + '<button type="button" class="mostrar-quantos" data-pagina="proxima"'
+      + (paginaDaFila >= paginas ? ' disabled' : '') + '>Próxima ›</button>'
+      + '</nav>';
   }
 
   /*
@@ -485,9 +551,9 @@ var TelaTrabalho = (function () {
       return '<th>' + escapar(grupo.titulo) + '</th>';
     }).join('') + '<th class="acoes-coluna">Ações</th>';
 
-    // A fila veio inteira, o mais recente em cima; aparecem só os primeiros.
+    // O mais recente em cima; aparecem só os da página aberta (Etapa 97).
     var visiveis = limiteDaFila();
-    var linhas = resumo.fila.slice(0, visiveis).map(function (caso) {
+    var linhas = casosDaPagina().map(function (caso) {
       var celulas = caso.celulas.map(function (grupo, i) {
         // O selo do SLA mora junto da situação, no primeiro grupo: é onde o
         // olho já procura "como este caso está".
@@ -508,7 +574,8 @@ var TelaTrabalho = (function () {
       + filtrandoPor()
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div></div>';
+      + '<tbody>' + linhas + '</tbody></table></div>'
+      + barraDePaginas() + '</div>';
   }
 
   /**
@@ -816,6 +883,14 @@ var TelaTrabalho = (function () {
       && document.querySelector('[data-mostrar="' + focarNoMostrar + '"]');
     if (mostrar) mostrar.focus();
     focarNoMostrar = '';
+    // A página virada: o foco fica no botão clicado — ou no outro, se o clicado
+    // desligou (a última página não tem "Próxima").
+    if (focarNaPagina) {
+      var virar = document.querySelector('[data-pagina="' + focarNaPagina + '"]:not([disabled])')
+        || document.querySelector('[data-pagina]:not([disabled])');
+      if (virar) virar.focus();
+    }
+    focarNaPagina = '';
   }
 
   /* ---------------------------------------------------------- comportamento */
@@ -856,6 +931,10 @@ var TelaTrabalho = (function () {
 
   function carregar(recado) {
     var meuPedido = ++pedidoDoPainel;
+    // A página (Etapa 97): outro filtro, sub-aba, canal ou "Mostrar" volta para
+    // a 1; a mesma tela de antes (salvou um caso, excluiu) fica na mesma.
+    var chave = chaveDaPaginaAgora();
+    if (chave !== chaveDaPagina) { paginaDaFila = 1; chaveDaPagina = chave; }
     var painel = elemento('painel');
     // F5: o mesmo painel fica na tela, esmaecido, até a resposta nova chegar.
     if (painel && painelDesenhadoPara === chaveDoPainel() && painel.querySelector('.cartoes')) {
@@ -870,10 +949,13 @@ var TelaTrabalho = (function () {
     // O aviso de prazo lê os casos abertos da planilha toda (Etapa 70): só se
     // pede quando ele vai abrir, na primeira carga do canal.
     Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, null,
-      quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))
+      quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido), paginaDaFila)
       .entao(function (resposta) {
         if (meuPedido !== pedidoDoPainel) return;   // um pedido mais novo já saiu (F6)
         resumo = resposta;
+        // A página que valeu: a pedida, ou a última, se a pedida esvaziou.
+        if (resposta.pagina) paginaDaFila = resposta.pagina.atual;
+        paginaDaFila = Math.min(paginaDaFila, quantasPaginas());
         if (resposta.filaCompacta) {
           resumo.fila = expandirFila(resposta.fila, resposta.colunas);
           resumo.pertoDeVencer = expandirFila(resposta.pertoDeVencer, resposta.colunas);
@@ -948,15 +1030,27 @@ var TelaTrabalho = (function () {
         try { window.localStorage.setItem(CHAVE_DO_MOSTRAR, String(quantosNaFila)); } catch (semArmazenamento) { /* vale só agora */ }
       }
       focarNoMostrar = escolha;
-      // Faltam casos na tela (o "Todos", ou — numa aba grande, Etapa 84 — o 50 e
-      // o 100): o servidor traz o resto.
-      var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;
-      if (querMais && resumo.fila.length < totalDaFila()) {
+      // Volta para a página 1 (Etapa 97). Faltam casos na tela (o "Todos", ou —
+      // numa aba grande, Etapa 84 — o 50 e o 100, ou a pessoa estava noutra
+      // página): o servidor traz o resto.
+      paginaDaFila = 1;
+      if (!paginaJaVeio(1)) {
         carregar('Trazendo os ' + (escolha === 'todos' ? totalDaFila()
           : Math.min(Number(escolha), totalDaFila())) + ' casos…');
         return;
       }
+      chaveDaPagina = chaveDaPaginaAgora();
       desenharPainel();
+    });
+
+    // A página (Etapa 97): a que já veio é na hora; a que não veio, o servidor traz.
+    ligarCliques('[data-pagina]', function (botao) {
+      var qual = paginaDaFila + (botao.getAttribute('data-pagina') === 'proxima' ? 1 : -1);
+      if (qual < 1 || qual > quantasPaginas()) return;
+      paginaDaFila = qual;
+      focarNaPagina = botao.getAttribute('data-pagina');
+      if (paginaJaVeio(qual)) { desenharPainel(); return; }
+      carregar('Trazendo a página ' + qual + '…');
     });
 
     // V2: o × do cartão e da busca, e o "Limpar tudo" (o mesmo do "Limpar filtros").

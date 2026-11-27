@@ -1505,6 +1505,59 @@ async function rodar() {
     contem(await pagina.textContent('.fila-mostrando'), 'Mostrando todos os ' + totalDaAba);
   });
 
+  await teste('Trabalho: a página da fila — Próxima, Anterior, e depois de salvar a mesma página (Etapa 97)', async () => {
+    // Pedido do PO: "filtro de 10 com página para próximos 10 ou volta os 10 que
+    // estava". Os 150 "Fila grande" do teste anterior estão na aba 1.
+    const pronta = (texto) => pagina.waitForFunction((t) => {
+      const barra = document.querySelector('.fila-paginas');
+      return barra && barra.textContent.indexOf(t) >= 0
+        && !document.getElementById('painel').classList.contains('atualizando');
+    }, texto, { timeout: 15000 });
+    const ids = () => pagina.$$eval('table.fila.agrupada tbody [data-trabalhar]',
+      (es) => es.map((e) => e.getAttribute('data-trabalhar')));
+    await pagina.click('[data-mostrar="10"]');
+    const total = Number((await pagina.textContent('[data-sub-aba="1"] .numero-da-aba')).replace(/\D/g, ''));
+    const paginas = Math.ceil(total / 10);
+    await pronta('Página 1 de ' + paginas);
+    igual((await ids()).length, 10);
+    igual(await pagina.isDisabled('[data-pagina="anterior"]'), true, 'na primeira, o Anterior desliga');
+    const primeira = await ids();
+
+    await pagina.click('[data-pagina="proxima"]');
+    await pronta('Página 2 de ' + paginas);
+    const segunda = await ids();
+    igual(segunda.length, 10);
+    verdadeiro(segunda.every((id) => primeira.indexOf(id) < 0), 'os próximos 10, outros casos');
+    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando 11 a 20 de ' + total);
+    igual(await pagina.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-pagina')),
+      'proxima', 'o foco fica no botão');
+
+    await pagina.click('[data-pagina="anterior"]');
+    await pronta('Página 1 de ' + paginas);
+    igual(JSON.stringify(await ids()), JSON.stringify(primeira), 'volta os 10 que estavam');
+
+    // Salvar um caso da página 2: a fila recarrega e fica na 2 (decisão do PO).
+    await pagina.click('[data-pagina="proxima"]');
+    await pronta('Página 2 de ' + paginas);
+    const antes = chamadasDoNavegador.resumoDoCanal;
+    await pagina.click('table.fila.agrupada tbody [data-trabalhar="' + segunda[0] + '"]');
+    await pagina.waitForFunction(() => {
+      const salvar = document.getElementById('modal-salvar');
+      return salvar && !salvar.disabled;
+    }, { timeout: 10000 });
+    await pagina.click('#modal-salvar');
+    for (let i = 0; i < 50 && chamadasDoNavegador.resumoDoCanal === antes; i++) await pagina.waitForTimeout(200);
+    verdadeiro(chamadasDoNavegador.resumoDoCanal > antes, 'salvar recarregou a fila');
+    await pronta('Página 2 de ' + paginas);
+    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando 11 a 20 de ');
+
+    // Trocar o "Mostrar" volta para a página 1.
+    await pagina.click('[data-mostrar="20"]');
+    await pronta('Página 1 de ' + Math.ceil(total / 20));
+    await pagina.click('[data-mostrar="5"]');
+    await pronta('Página 1 de ');
+  });
+
   await teste('na Produtividade, a fatia do gráfico abre com 100 e "Mostrar todos" traz o resto', async () => {
     // Os 150 casos "Pendente" do teste anterior estão na RET.
     await pagina.click('[data-tela="produtividade"]');

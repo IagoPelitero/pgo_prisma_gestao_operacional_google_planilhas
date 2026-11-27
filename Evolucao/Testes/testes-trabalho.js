@@ -1766,7 +1766,8 @@ function rodarTestesDoTrabalho() {
     const corpo = clique.substring(0, clique.indexOf('\n    });'));
     contem(corpo, 'desenharPainel();');
     verdadeiro(corpo.indexOf('carregar()') < 0, 'a quantidade, sozinha, não chama o servidor');
-    contem(corpo, "if (querMais && resumo.fila.length < totalDaFila()) {",
+    // Etapa 97: com a página, a pergunta é "a página 1 já veio?".
+    contem(corpo, "if (!paginaJaVeio(1)) {",
       'só quem pede casos que faltam vai ao servidor');
   });
 

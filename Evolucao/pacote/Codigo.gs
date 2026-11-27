@@ -9,7 +9,7 @@
 
        node Evolucao/Testes/gerar-pacote.js
 
-   Gerado em 2026-11-27 19:07
+   Gerado em 2026-11-27 20:54
    ========================================================================== */
 
 
@@ -1533,7 +1533,14 @@ function abrirPlanilhaDeFora_(idDaPlanilha) {
 }
 
 function ultimaLinhaComConteudo_(estrutura) {
-  return Math.max(estrutura.aba.getLastRow(), 1);
+
+  var memoria = RECC_MEMORIA_DA_CARGA;
+  var nome = estrutura.nomeDaAba;
+  var lembrar = memoria && nome && memoria.abasLembradas[nome];
+  if (lembrar && memoria.ultimas[nome] !== undefined) return memoria.ultimas[nome];
+  var ultima = Math.max(estrutura.aba.getLastRow(), 1);
+  if (lembrar) memoria.ultimas[nome] = ultima;
+  return ultima;
 }
 
 function quantidadeDeRegistros_(estrutura) {
@@ -1616,9 +1623,13 @@ function lerRegistrosSemRelogio_(nomeDaAba, opcoes) {
 
 var RECC_MEMORIA_DA_CARGA = null;
 
+function memoriaDaCargaVazia_() {
+  return { colunas: {}, linhas: {}, ultimas: {}, abasLembradas: {} };
+}
+
 function comMemoriaDaCarga_(fazer, argumentos) {
   if (RECC_MEMORIA_DA_CARGA) return fazer.apply(null, argumentos);
-  RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} };
+  RECC_MEMORIA_DA_CARGA = memoriaDaCargaVazia_();
   try {
     return fazer.apply(null, argumentos);
   } finally {
@@ -1628,10 +1639,59 @@ function comMemoriaDaCarga_(fazer, argumentos) {
 
 function esquecerMemoriaDaCarga_(nomeDaAba) {
   if (!RECC_MEMORIA_DA_CARGA) return;
-  if (!nomeDaAba) { RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} }; return; }
+  if (!nomeDaAba) {
+    var lembradas = RECC_MEMORIA_DA_CARGA.abasLembradas;
+    RECC_MEMORIA_DA_CARGA = memoriaDaCargaVazia_();
+    RECC_MEMORIA_DA_CARGA.abasLembradas = lembradas;
+    return;
+  }
   delete RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba];
+  delete RECC_MEMORIA_DA_CARGA.ultimas[nomeDaAba];
   Object.keys(RECC_MEMORIA_DA_CARGA.colunas).forEach(function (chave) {
     if (chave.indexOf(nomeDaAba + '|') === 0) delete RECC_MEMORIA_DA_CARGA.colunas[chave];
+  });
+}
+
+function lembrarAUltimaLinhaDe_(nomeDaAba) {
+  if (RECC_MEMORIA_DA_CARGA && nomeDaAba) RECC_MEMORIA_DA_CARGA.abasLembradas[nomeDaAba] = true;
+}
+
+var RECC_CELULAS_POR_IDA_NA_LEITURA_JUNTA = 40000;
+
+function lerColunasJuntas_(nomeDaAba, cabecalhos) {
+  if (!RECC_MEMORIA_DA_CARGA) return;
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return;
+  var vistas = {};
+  var posicoes = [];
+  (cabecalhos || []).forEach(function (nome) {
+    if (!nome) return;
+    var i = posicaoDaColuna_(estrutura, nome);
+    if (i < 0 || vistas[i]) return;
+    vistas[i] = true;
+    if (RECC_MEMORIA_DA_CARGA.colunas[nomeDaAba + '|' + i + '|' + total]) return;
+    posicoes.push(i);
+  });
+  if (posicoes.length < 2) return;
+  posicoes.sort(function (a, b) { return a - b; });
+  var buraco = Math.floor(RECC_CELULAS_POR_IDA_NA_LEITURA_JUNTA / total);
+  var blocos = [];
+  posicoes.forEach(function (i) {
+    var ultimo = blocos.length ? blocos[blocos.length - 1] : null;
+    if (ultimo && i - ultimo.fim - 1 <= buraco) { ultimo.fim = i; ultimo.colunas.push(i); }
+    else blocos.push({ inicio: i, fim: i, colunas: [i] });
+  });
+  blocos.forEach(function (bloco) {
+    if (bloco.colunas.length < 2) return;
+    var valores = lendoAPlanilha_(function () {
+      return estrutura.aba.getRange(2, bloco.inicio + 1, total, bloco.fim - bloco.inicio + 1).getValues();
+    }, []);
+    bloco.colunas.forEach(function (i) {
+      RECC_MEMORIA_DA_CARGA.colunas[nomeDaAba + '|' + i + '|' + total] = valores.map(function (linha) {
+        return linha[i - bloco.inicio];
+      });
+    });
   });
 }
 
@@ -10211,7 +10271,7 @@ function montarPacoteDePartida_(quem) {
 }
 
 const RECC_VERSAO = {
-  numero: '1.96',
+  numero: '1.97',
   data: '27/11/2026'
 };
 
@@ -10272,8 +10332,9 @@ var RECC_COLUNAS_QUE_O_CANAL_DECLARA = ['colunaDaData', 'colunaDaHora', 'colunaD
   'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'];
 
 function comAGrafiaDaAba_(canal) {
-  if (!canal || canal.grafiaConferida || !canal.aba
-    || !planilhaAtiva_().getSheetByName(String(canal.aba))) return canal;
+  if (!canal || canal.grafiaConferida || !canal.aba) return canal;
+
+  try { estruturaDaAba_(String(canal.aba)); } catch (semAba) { return canal; }
   RECC_COLUNAS_QUE_O_CANAL_DECLARA.forEach(function (chave) {
     if (canal[chave]) canal[chave] = grafiaDaColuna_(canal.aba, canal[chave]);
   });
@@ -11327,7 +11388,7 @@ function tomValido_(cor) {
   return RECC_TONS.indexOf(tom) >= 0 ? tom : 'neutro';
 }
 
-function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba, pagina) {
   return cronometrado_('resumoDoCanal', resumoDoCanalComMemoria_, arguments);
 }
 
@@ -11335,9 +11396,10 @@ function resumoDoCanalComMemoria_() {
   return comMemoriaDaCarga_(resumoDoCanalSemRelogio_, arguments);
 }
 
-function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
+function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba, pagina) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  lembrarAUltimaLinhaDe_(canal.aba);
 
   var sub = subAbasDoCanal_(canal);
   var qualAba = sub ? (Number(subAba) === 2 ? 2 : 1) : 0;
@@ -11384,6 +11446,7 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     : filtrarPeloCartao_(filtrados, canal, (filtros || {}).cartao);
 
   if (sub) naFila = ordenarNaSubAba_(naFila, canal, sub, qualAba).reverse();
+  var daPagina = paginaDaFila_(naFila, quantosNaFila, pagina);
 
   return {
     canal: canal,
@@ -11399,9 +11462,9 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     filtrosDisponiveis: comAContagemDasOpcoes_(disponiveis, meus),
     colunas: colunasDaFila_(canal),
 
-    fila: compactarFila_(montarFila_(completarRegistros_(canal, quantosNaFila === 'todos'
-      ? naFila : naFila.slice(-quantosNaFilaQueVao_(naFila, quantosNaFila)), quem), canal)),
+    fila: compactarFila_(montarFila_(completarRegistros_(canal, daPagina.casos, quem), canal)),
     filaCompacta: true,
+    pagina: daPagina.pagina,
 
     pertoDeVencer: compactarFila_(montarFila_(
       pertoDeVencer.slice(-RECC_FILA_NA_ABERTURA), canal)),
@@ -11421,6 +11484,21 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
 function quantosNaFilaQueVao_(naFila, quantosNaFila) {
   var leve = naFila.length > 0 && naFila[0].__leve === true;
   return Math.max(Number(quantosNaFila) || 0, leve ? RECC_FILA_NA_LEITURA_LEVE : RECC_FILA_NA_ABERTURA);
+}
+
+function paginaDaFila_(naFila, quantosNaFila, pagina) {
+  var total = naFila.length;
+  if (quantosNaFila === 'todos') {
+    return { casos: naFila, pagina: { atual: 1, paginas: 1, tamanho: total, inicio: 0 } };
+  }
+  var tamanho = Number(quantosNaFila) > 0 ? Math.floor(Number(quantosNaFila)) : RECC_CASOS_NA_FILA;
+  var paginas = Math.max(1, Math.ceil(total / tamanho));
+  var atual = Math.min(Math.max(1, Math.floor(Number(pagina)) || 1), paginas);
+  var inicio = (atual - 1) * tamanho;
+  var fim = Math.min(total, inicio + quantosNaFilaQueVao_(naFila, quantosNaFila));
+
+  return { casos: naFila.slice(total - fim, total - inicio),
+    pagina: { atual: atual, paginas: paginas, tamanho: tamanho, inicio: inicio } };
 }
 
 function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
@@ -12036,6 +12114,10 @@ function completarRegistros_(canal, registros, quem) {
 }
 
 function registrosDaSubAba_(canal, sub, qualAba, quem, disponiveis) {
+
+  lerColunasJuntas_(canal.aba, [canal.colunaDoStatus]
+    .concat(sub.regras.map(function (regra) { return regra.coluna; }))
+    .concat(colunasDaLeituraLeve_(canal, sub, estruturaDaAba_(canal.aba), disponiveis)));
   var linhas = linhasDasSubAbas_(canal, sub, quem);
   var teto = linhasQueOPainelOlha_();
   var contagem = [linhas.aba1.length, linhas.aba2.length];
@@ -13509,12 +13591,17 @@ function tentativasAteOSucesso_(casos, canal) {
 }
 
 function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
-  return cronometrado_('produtividadeDaEquipe', produtividadeDaEquipeSemRelogio_, arguments);
+  return cronometrado_('produtividadeDaEquipe', produtividadeDaEquipeComMemoria_, arguments);
+}
+
+function produtividadeDaEquipeComMemoria_() {
+  return comMemoriaDaCarga_(produtividadeDaEquipeSemRelogio_, arguments);
 }
 
 function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  lembrarAUltimaLinhaDe_(canal.aba);
 
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);

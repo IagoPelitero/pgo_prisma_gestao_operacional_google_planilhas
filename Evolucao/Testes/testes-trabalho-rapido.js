@@ -174,9 +174,10 @@ function rodarTestesDoTrabalhoRapido() {
 
   teste('pedir mais casos do que vieram vai ao servidor; o que já veio, não', () => {
     const tela = lerTela('Trabalho.html');
-    contem(tela, "var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;");
-    contem(tela, "if (querMais && resumo.fila.length < totalDaFila()) {");
-    contem(tela, "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))");
+    // Etapa 97: com a página, "faltam casos" é "a página 1 não veio inteira".
+    contem(tela, "if (!paginaJaVeio(1)) {");
+    contem(tela, 'return aqui >= 0 && aqui + precisa <= resumo.fila.length;');
+    contem(tela, "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido), paginaDaFila)");
   });
 
   teste('a barra do "Mostrar" fala da fila inteira, e não só do que veio', () => {

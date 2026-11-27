@@ -2118,6 +2118,15 @@ table.fila.legado td { color: var(--suave); }
 .mostrar-salvo { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--suave); }
 .mostrar-salvo svg { width: 14px; height: 14px; }
 
+.fila-paginas {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 8px 14px; padding: 10px 16px; border-top: 1px solid var(--linha);
+  font-size: 13px; color: var(--suave); background: var(--superficie-2);
+}
+.fila-pagina-atual { color: var(--texto); font-weight: 600; }
+.mostrar-quantos:disabled { opacity: .45; cursor: default; }
+.mostrar-quantos:disabled:hover { border-color: var(--linha); color: var(--texto); }
+
 .filtrando-por {
   margin: 0; padding: 9px 16px; border-bottom: 1px solid var(--linha);
   background: var(--superficie); flex-basis: auto;
@@ -5560,6 +5569,10 @@ var TelaTrabalho = (function () {
     if (mostrarLembrado > 0) quantosNaFila = mostrarLembrado;
   } catch (semArmazenamento) { podeLembrarOMostrar = false; }
   var focarNoMostrar = '';
+
+  var paginaDaFila = 1;
+  var chaveDaPagina = '';
+  var focarNaPagina = '';
   var resumo = null;
 
   var jaAvisouNoCanal = {};
@@ -5796,9 +5809,36 @@ var TelaTrabalho = (function () {
   }
 
   function limiteDaFila() {
-    var veio = resumo.fila.length;
-    if (quantosNaFila === 'todos') return veio;
-    return Math.min(quantosNaFila || resumo.mostrarNaFila.padrao, veio);
+    return casosDaPagina().length;
+  }
+
+  function tamanhoDaPagina() {
+    if (quantosNaFila === 'todos') return Math.max(totalDaFila(), 1);
+    return quantosNaFila || resumo.mostrarNaFila.padrao;
+  }
+
+  function quantasPaginas() {
+    return Math.max(1, Math.ceil(totalDaFila() / tamanhoDaPagina()));
+  }
+
+  function inicioDoQueVeio() {
+    return resumo.pagina ? resumo.pagina.inicio : 0;
+  }
+
+  function casosDaPagina() {
+    var de = (paginaDaFila - 1) * tamanhoDaPagina() - inicioDoQueVeio();
+    return de < 0 ? [] : resumo.fila.slice(de, de + tamanhoDaPagina());
+  }
+
+  function paginaJaVeio(qual) {
+    var de = (qual - 1) * tamanhoDaPagina();
+    var precisa = Math.min(tamanhoDaPagina(), totalDaFila() - de);
+    var aqui = de - inicioDoQueVeio();
+    return aqui >= 0 && aqui + precisa <= resumo.fila.length;
+  }
+
+  function chaveDaPaginaAgora() {
+    return JSON.stringify([canalEscolhido, subAbaDoCanal(canalEscolhido), quantosNaFila, filtrosEscolhidos]);
   }
 
   function totalDaFila() {
@@ -5814,24 +5854,39 @@ var TelaTrabalho = (function () {
     var total = totalDaFila();
     var opcoes = opcoesDeMostrar(total, resumo.mostrarNaFila.opcoes);
 
+    var escolhido = quantosNaFila === 'todos' ? 'todos' : (quantosNaFila || resumo.mostrarNaFila.padrao);
+    var primeiro = (paginaDaFila - 1) * tamanhoDaPagina();
     var botoes = opcoes.map(function (quantos) {
-      var ligado = quantos === 'todos' ? visiveis === total : quantos === visiveis;
+      var ligado = quantos === 'todos' ? (escolhido === 'todos' || visiveis === total) : quantos === escolhido;
       return '<button type="button" class="mostrar-quantos" data-mostrar="' + quantos + '"'
         + ' aria-pressed="' + ligado + '">'
         + (quantos === 'todos' ? 'Todos (' + total + ')' : quantos) + '</button>';
     }).join('');
 
     return '<div class="fila-mostrar">'
-      + '<span class="fila-mostrando">' + (visiveis < total
-        ? (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
-          : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)
-        : 'Mostrando todos os ' + total + ' casos') + '</span>'
+      + '<span class="fila-mostrando">' + (visiveis >= total ? 'Mostrando todos os ' + total + ' casos'
+        : primeiro > 0 ? 'Mostrando ' + (primeiro + 1) + ' a ' + (primeiro + visiveis) + ' de ' + total
+          + (resumo.subAbas ? ' · ' + ordemDaFila() : '')
+        : (resumo.subAbas ? 'Mostrando ' + visiveis + ' de ' + total + ' · ' + ordemDaFila()
+          : 'Mostrando os ' + visiveis + ' casos mais recentes de ' + total)) + '</span>'
       + legendaDoPrazo()
       + (opcoes.length ? '<div class="mostrar-grupo" role="group" aria-label="Quantos casos mostrar na fila">'
         + '<span>Mostrar</span>' + botoes + '</div>'
         + (podeLembrarOMostrar ? '<span class="mostrar-salvo">' + Moldura.icone('confirmado') + 'Sua escolha fica salva</span>' : '')
         : '')
       + '</div>';
+  }
+
+  function barraDePaginas() {
+    var paginas = quantasPaginas();
+    if (paginas <= 1) return '';
+    return '<nav class="fila-paginas" aria-label="Páginas da fila">'
+      + '<button type="button" class="mostrar-quantos" data-pagina="anterior"'
+      + (paginaDaFila <= 1 ? ' disabled' : '') + '>‹ Anterior</button>'
+      + '<span class="fila-pagina-atual">Página ' + paginaDaFila + ' de ' + paginas + '</span>'
+      + '<button type="button" class="mostrar-quantos" data-pagina="proxima"'
+      + (paginaDaFila >= paginas ? ' disabled' : '') + '>Próxima ›</button>'
+      + '</nav>';
   }
 
   function tomDoPrazoDaLinha(caso) {
@@ -5890,7 +5945,7 @@ var TelaTrabalho = (function () {
     }).join('') + '<th class="acoes-coluna">Ações</th>';
 
     var visiveis = limiteDaFila();
-    var linhas = resumo.fila.slice(0, visiveis).map(function (caso) {
+    var linhas = casosDaPagina().map(function (caso) {
       var celulas = caso.celulas.map(function (grupo, i) {
 
         return '<td>' + desenharGrupo(grupo, caso, i === 0)
@@ -5907,7 +5962,8 @@ var TelaTrabalho = (function () {
       + filtrandoPor()
       + '<div class="rolagem-tabela"><table class="fila agrupada">'
       + '<thead><tr>' + cabecalho + '</tr></thead>'
-      + '<tbody>' + linhas + '</tbody></table></div></div>';
+      + '<tbody>' + linhas + '</tbody></table></div>'
+      + barraDePaginas() + '</div>';
   }
 
   function desenharGrupo(grupo, caso, ehOPrimeiro) {
@@ -6136,6 +6192,13 @@ var TelaTrabalho = (function () {
       && document.querySelector('[data-mostrar="' + focarNoMostrar + '"]');
     if (mostrar) mostrar.focus();
     focarNoMostrar = '';
+
+    if (focarNaPagina) {
+      var virar = document.querySelector('[data-pagina="' + focarNaPagina + '"]:not([disabled])')
+        || document.querySelector('[data-pagina]:not([disabled])');
+      if (virar) virar.focus();
+    }
+    focarNaPagina = '';
   }
 
   function proximoDaFila(idAtual) {
@@ -6160,6 +6223,9 @@ var TelaTrabalho = (function () {
 
   function carregar(recado) {
     var meuPedido = ++pedidoDoPainel;
+
+    var chave = chaveDaPaginaAgora();
+    if (chave !== chaveDaPagina) { paginaDaFila = 1; chaveDaPagina = chave; }
     var painel = elemento('painel');
 
     if (painel && painelDesenhadoPara === chaveDoPainel() && painel.querySelector('.cartoes')) {
@@ -6172,10 +6238,13 @@ var TelaTrabalho = (function () {
     }
 
     Servidor.chamar('resumoDoCanal', canalEscolhido, filtrosEscolhidos, null,
-      quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))
+      quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido), paginaDaFila)
       .entao(function (resposta) {
         if (meuPedido !== pedidoDoPainel) return;
         resumo = resposta;
+
+        if (resposta.pagina) paginaDaFila = resposta.pagina.atual;
+        paginaDaFila = Math.min(paginaDaFila, quantasPaginas());
         if (resposta.filaCompacta) {
           resumo.fila = expandirFila(resposta.fila, resposta.colunas);
           resumo.pertoDeVencer = expandirFila(resposta.pertoDeVencer, resposta.colunas);
@@ -6244,13 +6313,23 @@ var TelaTrabalho = (function () {
       }
       focarNoMostrar = escolha;
 
-      var querMais = escolha === 'todos' || Number(escolha) > resumo.fila.length;
-      if (querMais && resumo.fila.length < totalDaFila()) {
+      paginaDaFila = 1;
+      if (!paginaJaVeio(1)) {
         carregar('Trazendo os ' + (escolha === 'todos' ? totalDaFila()
           : Math.min(Number(escolha), totalDaFila())) + ' casos…');
         return;
       }
+      chaveDaPagina = chaveDaPaginaAgora();
       desenharPainel();
+    });
+
+    ligarCliques('[data-pagina]', function (botao) {
+      var qual = paginaDaFila + (botao.getAttribute('data-pagina') === 'proxima' ? 1 : -1);
+      if (qual < 1 || qual > quantasPaginas()) return;
+      paginaDaFila = qual;
+      focarNaPagina = botao.getAttribute('data-pagina');
+      if (paginaJaVeio(qual)) { desenharPainel(); return; }
+      carregar('Trazendo a página ' + qual + '…');
     });
 
     ligarCliques('[data-tirar-cartao]', function () { filtrosEscolhidos.cartao = ''; carregar(); });

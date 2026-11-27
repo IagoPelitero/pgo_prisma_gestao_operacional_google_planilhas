@@ -280,7 +280,7 @@ function rodarTestesDasSubAbasDoTrabalho() {
   /* ----------------------------------------------------------------------- */
   secao('A velocidade');
 
-  teste('a aba 1 não lê os concluídos: com 3.000 encerrados, lê só as colunas e os abertos', () => {
+  teste('a aba 1 com 3.000 encerrados: poucas idas, e nunca mais que a base uma vez', () => {
     const v = retDoPO();
     const lote = [];
     for (let i = 0; i < 3000; i++) lote.push({ [DA_RET]: diasAtras(100), status: 'Não retido', 'nome do cliente': 'Velho ' + i });
@@ -291,10 +291,13 @@ function rodarTestesDasSubAbasDoTrabalho() {
     const resumo = v.chamar('resumoDoCanal')(v.ret.id, {}, null, '', false, 1);
     const lidas = v.ambiente.medidor.retrato().celulasLidas;
     igual(resumo.total, 20);
+    // Etapa 97: a régua mudou. O Medir a velocidade da planilha do PO (27/11/2026)
+    // mostrou a IDA cara (~1 s na BASE_RET) e a célula barata (240 mil em 2,2 s):
+    // o que se protege agora é o número de idas — e nunca ler mais que a base
+    // inteira uma vez.
     const largura = v.chamar('estruturaDaAba_')('BASE_RET').cabecalhos.length;
-    verdadeiro(lidas < 3020 * 4 + 20 * largura + 500,
-      'leu ' + lidas + ' células: as colunas do status e da condição, e as 20 linhas abertas');
-    verdadeiro(lidas < 3020 * largura / 4, 'muito menos que a base inteira (' + 3020 * largura + ')');
+    verdadeiro(v.ambiente.medidor.retrato().idasParaLer <= 6, 'idas: ' + v.ambiente.medidor.retrato().idasParaLer);
+    verdadeiro(lidas <= 3020 * largura * 1.05, 'leu ' + lidas + ' células, no máximo a base uma vez (' + 3020 * largura + ')');
   });
 
   teste('a aba 1 com abertos espalhados lê em poucas idas', () => {
@@ -361,12 +364,23 @@ function rodarTestesDasSubAbasDoTrabalho() {
     v.ambiente.medidor.zerar();
     v.chamar('resumoDoCanal')(v.ret.id, {}, null, '', false, 1);
     const celulasLeve = v.ambiente.medidor.retrato().celulasLidas;
+    const idasLeve = v.ambiente.medidor.retrato().idasParaLer;
     v.chamar("RECC_LEITURA_DA_SUB_ABA = 'linhas'");
     const inteira = casos.map((c) => oQueImporta(c[0], c[1]));
     v.chamar("RECC_LEITURA_DA_SUB_ABA = ''");
     casos.forEach((c, i) => igual(leve[i], inteira[i], 'aba ' + c[0] + ' ' + JSON.stringify(c[1] || {})));
     const largura = v.chamar('estruturaDaAba_')('BASE_RET').cabecalhos.length;
-    verdadeiro(celulasLeve < 400 * largura, 'a leve leu ' + celulasLeve + ' células, menos que as linhas inteiras');
+    // Etapa 97: a régua mudou. O Medir a velocidade da planilha do PO (27/11/2026)
+    // mostrou a IDA cara (~1 s na BASE_RET) e a célula barata (240 mil em 2,2 s):
+    // o que se protege agora é o número de idas — e nunca ler mais que a base
+    // inteira uma vez.
+    verdadeiro(idasLeve <= 6, 'a leve foi ' + idasLeve + ' vezes à planilha');
+    // O teto: as colunas lidas juntas (no máximo a base uma vez) mais as 20
+    // linhas da fila, cada uma com no máximo o buraco da régua ao redor.
+    const dados = (v.chamar('planilhaAtiva_()').getSheetByName('BASE_RET').getLastRow() - 1) * largura;
+    const estrutura = v.chamar('estruturaDaAba_')('BASE_RET');
+    const teto = dados * 1.05 + 20 * v.chamar('buracoDaRegua_')(estrutura) * largura;
+    verdadeiro(celulasLeve <= teto, 'a leve leu ' + celulasLeve + ' células (teto ' + Math.round(teto) + ')');
   });
 
   teste('na leitura leve, só 20 linhas vêm inteiras; pedir 50 traz 50', () => {
@@ -537,7 +551,7 @@ function rodarTestesDasSubAbasDoTrabalho() {
   teste('o Trabalho não tem período, e manda a sub-aba ao servidor', () => {
     const tela = lerTela('Trabalho.html');
     verdadeiro(tela.indexOf('SeletorDePeriodo') < 0 && tela.indexOf('resumo.periodo') < 0);
-    contem(tela, "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))");
+    contem(tela, "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido), paginaDaFila)");
   });
 
   teste('as sub-abas com o número de casos; na Mesa, as Reuniões na mesma linha', () => {

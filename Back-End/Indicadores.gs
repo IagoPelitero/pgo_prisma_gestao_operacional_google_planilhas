@@ -128,7 +128,7 @@ function tomValido_(cor) {
  * vêm da própria resposta anterior, em `filtrosDisponiveis` — a tela não
  * inventa filtro, ela oferece o que o canal tem.
  */
-function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
+function resumoDoCanal(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba, pagina) {
   return cronometrado_('resumoDoCanal', resumoDoCanalComMemoria_, arguments);
 }
 
@@ -137,9 +137,10 @@ function resumoDoCanalComMemoria_() {
   return comMemoriaDaCarga_(resumoDoCanalSemRelogio_, arguments);
 }
 
-function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba) {
+function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFila, comOAviso, subAba, pagina) {
   var quem = exigirTela_('trabalho');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  lembrarAUltimaLinhaDe_(canal.aba);   // Etapa 97: uma pergunta só por carga
 
   // SEM PERÍODO (Etapa 84, pedido do PO: "retire o filtro que permite
   // selecionar por data ou por mês"). `periodoPedido` fica na assinatura só
@@ -207,6 +208,7 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
   // e vai invertida porque montarFila_ desenha o fim primeiro (o mais recente
   // em cima, a regra de sempre). Sem sub-abas, segue a ordem da planilha.
   if (sub) naFila = ordenarNaSubAba_(naFila, canal, sub, qualAba).reverse();
+  var daPagina = paginaDaFila_(naFila, quantosNaFila, pagina);
 
   return {
     canal: canal,
@@ -228,9 +230,10 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
     // valores; o nome de cada coluna já está em `colunas`, e a tela remonta.
     // `total` continua sendo a fila inteira.
     // Da leitura leve (Etapa 84), só as linhas que vão para a tela vêm inteiras.
-    fila: compactarFila_(montarFila_(completarRegistros_(canal, quantosNaFila === 'todos'
-      ? naFila : naFila.slice(-quantosNaFilaQueVao_(naFila, quantosNaFila)), quem), canal)),
+    // Com a PÁGINA (Etapa 97), a fila começa no primeiro caso dela.
+    fila: compactarFila_(montarFila_(completarRegistros_(canal, daPagina.casos, quem), canal)),
     filaCompacta: true,
+    pagina: daPagina.pagina,
     // O aviso de prazo olha todos os casos ABERTOS da planilha (Etapa 70), e não
     // só a fila — um caso perto de vencer que não está entre os 100 mais
     // recentes, ou nem no período, é justamente o que mais precisa do aviso.
@@ -265,6 +268,40 @@ function resumoDoCanalSemRelogio_(idDoCanal, filtros, periodoPedido, quantosNaFi
 function quantosNaFilaQueVao_(naFila, quantosNaFila) {
   var leve = naFila.length > 0 && naFila[0].__leve === true;
   return Math.max(Number(quantosNaFila) || 0, leve ? RECC_FILA_NA_LEITURA_LEVE : RECC_FILA_NA_ABERTURA);
+}
+
+/*
+ * A PÁGINA DA FILA (Etapa 97). Pedido do PO: "mostra os filtros de 5 10 20 50
+ * e 100, mas também tem a opção de próxima página… filtro de 10 com página para
+ * próximos 10 ou volta os 10 que estava". O "Todos" fica (decisão dele), sem
+ * páginas.
+ *
+ * `pagina` conta de 1, na ordem da tela (o mais recente em cima). A fila que
+ * volta COMEÇA no primeiro caso da página e leva tantos quantos levaria a
+ * primeira (quantosNaFilaQueVao_) — com 5 por página, as seguintes já vêm e a
+ * tela vira a página sem voltar ao servidor; na leitura leve, só essas linhas
+ * vêm inteiras. Página além da última (salvar tirou o último caso dela, ou um
+ * filtro diminuiu a fila) vira a última: decisão do PO, "depois de salvar, fica
+ * na mesma página; se ficar vazia, volta uma". Sem `pagina` (a tela aberta antes
+ * da atualização), é a página 1 — o mesmo de antes.
+ *
+ * Devolve { casos, pagina: { atual, paginas, tamanho, inicio } }, com `inicio`
+ * = a posição, na tela, do primeiro caso que vai.
+ */
+function paginaDaFila_(naFila, quantosNaFila, pagina) {
+  var total = naFila.length;
+  if (quantosNaFila === 'todos') {
+    return { casos: naFila, pagina: { atual: 1, paginas: 1, tamanho: total, inicio: 0 } };
+  }
+  var tamanho = Number(quantosNaFila) > 0 ? Math.floor(Number(quantosNaFila)) : RECC_CASOS_NA_FILA;
+  var paginas = Math.max(1, Math.ceil(total / tamanho));
+  var atual = Math.min(Math.max(1, Math.floor(Number(pagina)) || 1), paginas);
+  var inicio = (atual - 1) * tamanho;
+  var fim = Math.min(total, inicio + quantosNaFilaQueVao_(naFila, quantosNaFila));
+  // naFila está de baixo para cima (montarFila_ inverte): a posição p da tela
+  // é naFila[total - 1 - p].
+  return { casos: naFila.slice(total - fim, total - inicio),
+    pagina: { atual: atual, paginas: paginas, tamanho: tamanho, inicio: inicio } };
 }
 
 function filtrarPeloPeriodo_(registros, canal, dias, recuo) {
@@ -1189,6 +1226,11 @@ function completarRegistros_(canal, registros, quem) {
  * { registros, contagem: [n1, n2], truncada }.
  */
 function registrosDaSubAba_(canal, sub, qualAba, quem, disponiveis) {
+  // Etapa 97: o status, as colunas das condições e as da leitura leve vêm
+  // juntas, numa ida, em vez de uma ida por coluna (só dentro da carga).
+  lerColunasJuntas_(canal.aba, [canal.colunaDoStatus]
+    .concat(sub.regras.map(function (regra) { return regra.coluna; }))
+    .concat(colunasDaLeituraLeve_(canal, sub, estruturaDaAba_(canal.aba), disponiveis)));
   var linhas = linhasDasSubAbas_(canal, sub, quem);
   var teto = linhasQueOPainelOlha_();
   var contagem = [linhas.aba1.length, linhas.aba2.length];
@@ -3188,12 +3230,18 @@ function tentativasAteOSucesso_(casos, canal) {
  * seis idas ao servidor fariam a tela montar aos pedaços.
  */
 function produtividadeDaEquipe(idDoCanal, filtros, periodoPedido) {
-  return cronometrado_('produtividadeDaEquipe', produtividadeDaEquipeSemRelogio_, arguments);
+  return cronometrado_('produtividadeDaEquipe', produtividadeDaEquipeComMemoria_, arguments);
+}
+
+/** A Produtividade só lê: a memória da carga vale para ela também (Etapa 97). */
+function produtividadeDaEquipeComMemoria_() {
+  return comMemoriaDaCarga_(produtividadeDaEquipeSemRelogio_, arguments);
 }
 
 function produtividadeDaEquipeSemRelogio_(idDoCanal, filtros, periodoPedido) {
   var quem = exigirTela_('produtividade');
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  lembrarAUltimaLinhaDe_(canal.aba);   // Etapa 97
 
   var periodo = resolverPeriodo_(periodoPedido);
   var antes = periodoAnterior_(periodo);

@@ -2583,6 +2583,15 @@ table.fila.legado td { color: var(--suave); }
 .mostrar-quantos[aria-pressed="true"] { position: relative; z-index: 1; }
 .mostrar-salvo { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--suave); }
 .mostrar-salvo svg { width: 14px; height: 14px; }
+/* A PÁGINA DA FILA (Etapa 97): embaixo da tabela, "‹ Anterior · Página 2 de 14 · Próxima ›". */
+.fila-paginas {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 8px 14px; padding: 10px 16px; border-top: 1px solid var(--linha);
+  font-size: 13px; color: var(--suave); background: var(--superficie-2);
+}
+.fila-pagina-atual { color: var(--texto); font-weight: 600; }
+.mostrar-quantos:disabled { opacity: .45; cursor: default; }
+.mostrar-quantos:disabled:hover { border-color: var(--linha); color: var(--texto); }
 
 /* V2: "Filtrando por", em cima da fila. */
 .filtrando-por {

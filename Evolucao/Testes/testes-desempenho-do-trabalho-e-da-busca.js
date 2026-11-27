@@ -41,6 +41,19 @@ function retComCasos(quantos, abertos) {
   return t;
 }
 
+/**
+ * Etapa 97: quantas vezes `fazer` vai à BASE_RET (leituras de faixa). As abas
+ * de configuração, lidas na primeira carga, ficam de fora: o que pesa na
+ * planilha do PO é a ida à base (~1 s cada).
+ */
+function idasABaseRet(t, fazer) {
+  const proto = Object.getPrototypeOf(t.chamar('planilhaAtiva_()').getSheetByName('BASE_RET').getRange(1, 1));
+  const original = proto.getValues;
+  let idas = 0;
+  proto.getValues = function () { if (this.aba.nome === 'BASE_RET') idas++; return original.apply(this, arguments); };
+  try { const resposta = fazer(); return { idas, resposta }; } finally { proto.getValues = original; }
+}
+
 /** O que a tela usa da resposta — sem o que é medida de tempo. */
 function oQueImporta(r) {
   return JSON.stringify({ total: r.total, sub: r.subAbas, cartoes: r.cartoes, filtros: r.filtrosDisponiveis,
@@ -53,13 +66,19 @@ function rodarTestesDeDesempenhoDoTrabalhoEDaBusca() {
   /* ----------------------------------------------------------------------- */
   secao('B3: a aba dos concluídos não lê mais a base inteira');
 
-  teste('a aba 2 lê bem menos que a RET inteira, e mostra o mesmo que a leitura das linhas inteiras', () => {
+  teste('a aba 2 lê em poucas idas, nunca mais que a RET uma vez, e mostra o mesmo que as linhas inteiras', () => {
     const t = retComCasos(2000, 150);
     const largura = t.chamar('estruturaDaAba_')('BASE_RET').cabecalhos.length;
     t.novaExecucao(); medidor.zerar();
-    const agora = t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 2);
+    const medida = idasABaseRet(t, () => t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 2));
+    const agora = medida.resposta;
     const celulas = medidor.retrato().celulasLidas;
-    verdadeiro(celulas < 2000 * largura * 0.4, celulas + ' células, contra ' + (2000 * largura) + ' da base inteira');
+    // Etapa 97: a régua mudou. O Medir a velocidade da planilha do PO (27/11/2026)
+    // mostrou a IDA cara (~1 s na BASE_RET) e a célula barata (240 mil em 2,2 s):
+    // o que se protege agora é o número de idas — e nunca ler mais que a base
+    // inteira uma vez.
+    verdadeiro(medida.idas <= 4, 'idas à BASE_RET: ' + medida.idas);
+    verdadeiro(celulas <= 2000 * largura * 1.05 + 3000, celulas + ' células (com as abas de configuração), contra ' + (2000 * largura) + ' da base inteira');
     t.chamar("RECC_LEITURA_DA_SUB_ABA = 'linhas'");
     let inteira;
     try { inteira = t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 2); }
@@ -86,10 +105,14 @@ function rodarTestesDeDesempenhoDoTrabalhoEDaBusca() {
     // Conta cada LINHA inteira e cada COLUNA inteira lidas, e não cada faixa: o
     // aviso lê um pedaço das linhas da fila, e o pedaço repetido também conta.
     const linhas = {}; const colunas = {};
+    // Etapa 97: um bloco de colunas (as colunas lidas juntas, da linha 2 até o
+    // fim) conta como cada uma das colunas dele, e não como linhas.
+    const fim = aba.getLastRow();
     proto.getValues = function () {
       if (this.aba.nome === 'BASE_RET' && this.linha > 1) {
-        if (this.nColunas === 1) colunas[this.coluna] = (colunas[this.coluna] || 0) + 1;
-        else for (let l = this.linha; l < this.linha + this.nLinhas; l++) linhas[l] = (linhas[l] || 0) + 1;
+        if (this.nColunas === 1 || (this.linha === 2 && this.linha + this.nLinhas - 1 === fim)) {
+          for (let c = this.coluna; c < this.coluna + this.nColunas; c++) colunas[c] = (colunas[c] || 0) + 1;
+        } else for (let l = this.linha; l < this.linha + this.nLinhas; l++) linhas[l] = (linhas[l] || 0) + 1;
       }
       return original.apply(this, arguments);
     };
@@ -200,15 +223,26 @@ function rodarTestesDeDesempenhoDoTrabalhoEDaBusca() {
     const t = retEspalhada(600, 2);
     const estrutura = t.chamar('estruturaDaAba_')('BASE_RET');
     igual(t.chamar('buracoDaRegua_')(estrutura), Math.floor(1000 / estrutura.cabecalhos.length));
+    // Etapa 97: conta só as LINHAS INTEIRAS lidas (as que completam a fila); as
+    // colunas lidas juntas são outra coisa, medida pelas idas.
+    const proto = Object.getPrototypeOf(t.chamar('planilhaAtiva_()').getSheetByName('BASE_RET').getRange(1, 1));
+    const original = proto.getValues;
+    let celulasDeLinhas = 0;
+    proto.getValues = function () {
+      if (this.aba.nome === 'BASE_RET' && this.linha > 1 && this.nColunas === estrutura.cabecalhos.length) {
+        celulasDeLinhas += this.nLinhas * this.nColunas;
+      }
+      return original.apply(this, arguments);
+    };
     t.chamar("RECC_LEITURA_DA_SUB_ABA = 'leve'");
     try {
       t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 1);
-      medidor.zerar();
+      celulasDeLinhas = 0;
       const r = t.chamar('resumoDoCanal')(t.ret.id, {}, null, '', false, 1);
       igual(r.fila.length, 20);
-      verdadeiro(medidor.retrato().celulasLidas < 600 * estrutura.cabecalhos.length / 3,
-        medidor.retrato().celulasLidas + ' células — antes, um bloco de quase a base inteira');
-    } finally { t.chamar("RECC_LEITURA_DA_SUB_ABA = ''"); }
+      verdadeiro(celulasDeLinhas < 600 * estrutura.cabecalhos.length / 3,
+        celulasDeLinhas + ' células de linhas inteiras — antes, um bloco de quase a base inteira');
+    } finally { t.chamar("RECC_LEITURA_DA_SUB_ABA = ''"); proto.getValues = original; }
   });
 
   /* ----------------------------------------------------------------------- */

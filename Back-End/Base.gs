@@ -2532,7 +2532,18 @@ function abrirPlanilhaDeFora_(idDaPlanilha) {
  * para carimbá-la —, e a próxima inserção do sistema gravaria POR CIMA dela.
  */
 function ultimaLinhaComConteudo_(estrutura) {
-  return Math.max(estrutura.aba.getLastRow(), 1);
+  // A ÚLTIMA LINHA LEMBRADA (Etapa 97). Na planilha do PO, cada ida à BASE_RET
+  // custa ~1 s (Medir a velocidade, 27/11/2026), e uma carga do Trabalho
+  // perguntava a última linha DEZ vezes. Dentro de uma carga que só lê, e só
+  // para a aba que ela registrou, a resposta vale até o fim da carga — e
+  // qualquer gravação na aba a esquece (esquecerMemoriaDaCarga_).
+  var memoria = RECC_MEMORIA_DA_CARGA;
+  var nome = estrutura.nomeDaAba;
+  var lembrar = memoria && nome && memoria.abasLembradas[nome];
+  if (lembrar && memoria.ultimas[nome] !== undefined) return memoria.ultimas[nome];
+  var ultima = Math.max(estrutura.aba.getLastRow(), 1);
+  if (lembrar) memoria.ultimas[nome] = ultima;
+  return ultima;
 }
 
 /** Quantas linhas de dado a aba tem (sem contar o cabeçalho). */
@@ -2655,9 +2666,14 @@ function lerRegistrosSemRelogio_(nomeDaAba, opcoes) {
  */
 var RECC_MEMORIA_DA_CARGA = null;
 
+/** Uma memória vazia: colunas, linhas, últimas linhas e as abas que as lembram (Etapa 97). */
+function memoriaDaCargaVazia_() {
+  return { colunas: {}, linhas: {}, ultimas: {}, abasLembradas: {} };
+}
+
 function comMemoriaDaCarga_(fazer, argumentos) {
   if (RECC_MEMORIA_DA_CARGA) return fazer.apply(null, argumentos);
-  RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} };
+  RECC_MEMORIA_DA_CARGA = memoriaDaCargaVazia_();
   try {
     return fazer.apply(null, argumentos);
   } finally {
@@ -2667,10 +2683,73 @@ function comMemoriaDaCarga_(fazer, argumentos) {
 
 function esquecerMemoriaDaCarga_(nomeDaAba) {
   if (!RECC_MEMORIA_DA_CARGA) return;
-  if (!nomeDaAba) { RECC_MEMORIA_DA_CARGA = { colunas: {}, linhas: {} }; return; }
+  if (!nomeDaAba) {
+    var lembradas = RECC_MEMORIA_DA_CARGA.abasLembradas;
+    RECC_MEMORIA_DA_CARGA = memoriaDaCargaVazia_();
+    RECC_MEMORIA_DA_CARGA.abasLembradas = lembradas;
+    return;
+  }
   delete RECC_MEMORIA_DA_CARGA.linhas[nomeDaAba];
+  delete RECC_MEMORIA_DA_CARGA.ultimas[nomeDaAba];
   Object.keys(RECC_MEMORIA_DA_CARGA.colunas).forEach(function (chave) {
     if (chave.indexOf(nomeDaAba + '|') === 0) delete RECC_MEMORIA_DA_CARGA.colunas[chave];
+  });
+}
+
+/** A carga diz qual aba é a dela: só essa lembra a última linha (Etapa 97). */
+function lembrarAUltimaLinhaDe_(nomeDaAba) {
+  if (RECC_MEMORIA_DA_CARGA && nomeDaAba) RECC_MEMORIA_DA_CARGA.abasLembradas[nomeDaAba] = true;
+}
+
+/*
+ * AS COLUNAS LIDAS JUNTAS (Etapa 97). A carga do Trabalho lia cada coluna de
+ * que precisa numa ida própria — oito idas à BASE_RET, ~1 s cada na planilha do
+ * PO. Aqui, dentro da memória da carga, as colunas pedidas que estão perto umas
+ * das outras vêm num bloco só, numa ida, e cada uma fica na memória como se
+ * tivesse sido lida sozinha (a mesma chave do lerColunaInteira_).
+ *
+ * "Perto" é pela medida da planilha do PO: ler a BASE_RET inteira (240 mil
+ * células) levou 2,2 s e uma ida pequena 1,1 s — uma ida vale dezenas de
+ * milhares de células. Juntar duas colunas vale enquanto as colunas do meio
+ * custam menos que RECC_CELULAS_POR_IDA_NA_LEITURA_JUNTA (40 mil, do lado
+ * seguro). Fora da memória da carga, não faz nada.
+ */
+var RECC_CELULAS_POR_IDA_NA_LEITURA_JUNTA = 40000;
+
+function lerColunasJuntas_(nomeDaAba, cabecalhos) {
+  if (!RECC_MEMORIA_DA_CARGA) return;
+  var estrutura = estruturaDaAba_(nomeDaAba);
+  var total = quantidadeDeRegistros_(estrutura);
+  if (total <= 0) return;
+  var vistas = {};
+  var posicoes = [];
+  (cabecalhos || []).forEach(function (nome) {
+    if (!nome) return;
+    var i = posicaoDaColuna_(estrutura, nome);
+    if (i < 0 || vistas[i]) return;
+    vistas[i] = true;
+    if (RECC_MEMORIA_DA_CARGA.colunas[nomeDaAba + '|' + i + '|' + total]) return;   // já veio
+    posicoes.push(i);
+  });
+  if (posicoes.length < 2) return;
+  posicoes.sort(function (a, b) { return a - b; });
+  var buraco = Math.floor(RECC_CELULAS_POR_IDA_NA_LEITURA_JUNTA / total);
+  var blocos = [];
+  posicoes.forEach(function (i) {
+    var ultimo = blocos.length ? blocos[blocos.length - 1] : null;
+    if (ultimo && i - ultimo.fim - 1 <= buraco) { ultimo.fim = i; ultimo.colunas.push(i); }
+    else blocos.push({ inicio: i, fim: i, colunas: [i] });
+  });
+  blocos.forEach(function (bloco) {
+    if (bloco.colunas.length < 2) return;   // sozinha, vai pelo caminho de sempre
+    var valores = lendoAPlanilha_(function () {
+      return estrutura.aba.getRange(2, bloco.inicio + 1, total, bloco.fim - bloco.inicio + 1).getValues();
+    }, []);
+    bloco.colunas.forEach(function (i) {
+      RECC_MEMORIA_DA_CARGA.colunas[nomeDaAba + '|' + i + '|' + total] = valores.map(function (linha) {
+        return linha[i - bloco.inicio];
+      });
+    });
   });
 }
 

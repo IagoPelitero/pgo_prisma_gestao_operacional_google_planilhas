@@ -235,7 +235,7 @@ function montarPacoteDePartida_(quem) {
  * o que mudou em Evolucao/05-progresso.md.
  */
 const RECC_VERSAO = {
-  numero: '1.96',
+  numero: '1.97',
   data: '27/11/2026'
 };
 
@@ -336,8 +336,11 @@ var RECC_COLUNAS_QUE_O_CANAL_DECLARA = ['colunaDaData', 'colunaDaHora', 'colunaD
   'colunaDaPrimeiraResposta', 'colunaDaHoraDaPrimeiraResposta'];
 
 function comAGrafiaDaAba_(canal) {
-  if (!canal || canal.grafiaConferida || !canal.aba
-    || !planilhaAtiva_().getSheetByName(String(canal.aba))) return canal;
+  if (!canal || canal.grafiaConferida || !canal.aba) return canal;
+  // A aba existe? A própria leitura da estrutura responde — e fica guardada
+  // para quem vem depois (Etapa 97: uma ida a menos, a mesma resposta). Aba
+  // que não existe segue como antes: o canal volta sem a grafia conferida.
+  try { estruturaDaAba_(String(canal.aba)); } catch (semAba) { return canal; }
   RECC_COLUNAS_QUE_O_CANAL_DECLARA.forEach(function (chave) {
     if (canal[chave]) canal[chave] = grafiaDaColuna_(canal.aba, canal[chave]);
   });

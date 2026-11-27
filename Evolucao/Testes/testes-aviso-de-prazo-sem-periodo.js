@@ -132,7 +132,7 @@ function rodarTestesDoAvisoDePrazoSemPeriodo() {
     const t = preparar();
     igual(t.trabalho({}, false).pertoDeVencer.length, 0);
     igual(t.trabalho({}, false).quantosPertoDeVencer, 0);
-    contem(tela('Trabalho'), "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido))",
+    contem(tela('Trabalho'), "quantosNaFila || '', avisarQuandoChegar, subAbaDoCanal(canalEscolhido), paginaDaFila)",
       'a tela só pede o aviso na primeira carga do canal');
   });
 
