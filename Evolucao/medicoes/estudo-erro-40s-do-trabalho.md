@@ -31,6 +31,25 @@ verdade. Suspeitas, em ordem:
 (linhas, grade vazia, fórmulas pesadas e tempos por aba) e as linhas `lento · resumoDoCanal` da aba
 ERROS (o tempo "lendo a planilha" contra "no resto").
 
+## O que a aba ERROS mostrou (print do PO, 27/11/2026, 16:52–17:13)
+
+- **Toda carga do Trabalho** (`resumoDoCanal`) leva **10 a 15 s no servidor**, para 5 pessoas
+  diferentes, a cada minuto mais ou menos — não só depois de salvar.
+- O tempo é quase todo **"lendo a planilha"** (9 a 14,6 s). Trava, busca e datas: 0 s. "No resto"
+  (o código): 0,5 a 1,4 s.
+- A Produtividade: 9,4 s (7 s lendo). A tela do Buscar esperou 8 s.
+- O "não respondeu em 40 segundos" (17:00) aparece com o servidor registrando ~10 s naquele
+  minuto: os outros ~30 s foram FORA da função — fila, carga do projeto ou espera da planilha
+  ocupada com as gravações das outras pessoas.
+
+**Leitura:** o código não é o gargalo (≤ 1,4 s). Cada ida à planilha está custando muito mais do que
+a régua estimava: ~26 idas e ~46 mil células em ~10 s, cerca de 3 vezes a régua PO. Com 5 pessoas
+gravando o tempo todo, cada gravação faz o arquivo recalcular, e as leituras dos outros esperam.
+
+**Falta o Medir a velocidade** para separar: o custo por ida (pedágio fixo de cada chamada) ou por
+célula, as fórmulas pesadas e as linhas vazias da grade, aba por aba. É ele que decide a correção:
+juntar as idas (se o pedágio é o problema) ou tirar o peso da planilha (se são as fórmulas).
+
 ## A paginação (decisões do PO)
 
 Pedido: "mostra os filtros de 5, 10, 20, 50 e 100, mas também tem a opção de próxima página".
