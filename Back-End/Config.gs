@@ -1641,7 +1641,11 @@ function avisoNoChatParaATela_(linha) {
       ligado: normalizarParaComparar_(linha.AvisoDeRetencaoNoChat) === 'sim',
       metaDoMes: metaDoMes === '' ? '' : metaDoMes,
       metaDoDia: metaDoDia === '' ? '' : metaDoDia,
-      temWebhook: webhookDoCanal_(linha.Id) !== ''
+      temWebhook: webhookDoCanal_(linha.Id) !== '',
+      // Etapa 96: para saber QUAL é a conversa — o começo do endereço (o código
+      // do espaço) e o nome que o PO deu; a chave e o token nunca vêm.
+      enderecoParcial: enderecoParcialDoChat_(webhookDoCanal_(linha.Id)),
+      nomeDaConversa: nomeDaConversaDoChat_(linha.Id)
     };
   } catch (semAviso) {
     return null;

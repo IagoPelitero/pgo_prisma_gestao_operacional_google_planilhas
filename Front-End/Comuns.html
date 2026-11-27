@@ -3271,7 +3271,9 @@ var CasoEmModal = (function () {
   /** O botão que abriu o status gira e fica travado até o diálogo abrir (Etapa 93). */
   function botaoCarregando(botao, carregando) {
     if (!botao || !botao.classList) return;
-    botao.classList.toggle('carregando', carregando);
+    // `girando`, e não `carregando`: essa é da tela de abertura (altura da tela
+    // inteira) — com ela, o botão esticava até o fim da tela (achado 120).
+    botao.classList.toggle('girando', carregando);
     botao.disabled = carregando;
     if (carregando) botao.setAttribute('aria-busy', 'true');
     else botao.removeAttribute('aria-busy');

@@ -144,6 +144,7 @@ function pontePreparada(respostas) {
     + '      avisarRetencaoNoChat: function () { responder({ enviado: false, motivo: \'prévia\' }); },\n'
     + '      salvarWebhookDoChat: function (canal, endereco) { responder({ configurado: !!endereco }); },\n'
     + '      testarAvisoNoChat: function () { responder({ ok: true }); },\n'
+    + '      salvarAvisoDoChat: function () { responder(true); },\n'
     + '      formularioDoCanal: function (idDoCanal) {\n'
     + '        responder(respostas.formularios[idDoCanal]);\n'
     + '      },\n'

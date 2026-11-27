@@ -938,6 +938,7 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   carimbarOEncaminhamento_(canal, atual, paraGravar);
   carimbarAParadaDoPrazo_(canal, atual, paraGravar);
   carimbarOsItensDeLista_(canal, atual, paraGravar);
+  limparARetencaoAoSairDoRetido_(canal, atual, paraGravar);   // Etapa 96
 
   // E a conta refaz: é o que faz o número acompanhar quando o analista
   // corrige a data de início da vigência.
@@ -1117,6 +1118,7 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   dependentesQueSomem_(canal.id, atual, alteracao).forEach(function (coluna) {
     alteracao[coluna] = '';
   });
+  limparARetencaoAoSairDoRetido_(canal, atual, alteracao);   // Etapa 96
   carimbarAParadaDoPrazo_(canal, atual, alteracao);
 
   carimbarOStatus_(canal, achada, atual, alteracao);
@@ -4975,6 +4977,7 @@ function apagarRascunho(idDoCanal) {
 
 var RECC_PREFIXO_DO_WEBHOOK = 'RECC.CHAT.WEBHOOK.';
 var RECC_PREFIXO_DOS_AVISADOS = 'RECC.CHAT.AVISADOS.';
+var RECC_PREFIXO_DO_NOME_DA_CONVERSA = 'RECC.CHAT.NOME.';
 var RECC_FORMATO_DO_WEBHOOK = /^https:\/\/chat\.googleapis\.com\/v1\/spaces\/[A-Za-z0-9_-]+\/messages\?\S+$/;
 
 /** O status que avisa, do catálogo do canal — ou null, no canal sem Retido. */
@@ -4990,6 +4993,23 @@ function statusQueAvisaNoChat_(canal) {
 function webhookDoCanal_(idDoCanal) {
   return String(PropertiesService.getScriptProperties()
     .getProperty(RECC_PREFIXO_DO_WEBHOOK + converterParaIdentificador_(idDoCanal)) || '');
+}
+
+/**
+ * O endereço para MOSTRAR (Etapa 96, decisão do PO): até o código do espaço,
+ * que diz qual é a conversa; a chave e o token — o que dá o poder de postar —
+ * ficam escondidos.
+ */
+function enderecoParcialDoChat_(endereco) {
+  var texto = String(endereco || '');
+  var corte = texto.indexOf('/messages');
+  return corte > 0 ? texto.slice(0, corte) + '/messages?… (chave e token escondidos)' : '';
+}
+
+/** O nome que o PO deu à conversa, para reconhecer qual é. */
+function nomeDaConversaDoChat_(idDoCanal) {
+  return String(PropertiesService.getScriptProperties()
+    .getProperty(RECC_PREFIXO_DO_NOME_DA_CONVERSA + converterParaIdentificador_(idDoCanal)) || '');
 }
 
 /** O que o canal diz sobre o aviso: ligado, as duas metas e se há endereço. */
@@ -5034,6 +5054,46 @@ function retencaoParaAvisar_(canal, atual, gravado, id) {
   }
 }
 
+/*
+ * SAIR DE RETIDO APAGA A RETENÇÃO (Etapa 96, decisão do PO). Relato: "coloquei
+ * um status como retido, ele manda a mensagem; mudo para não retido, ele não
+ * apaga o valor de prêmio retido; e quando coloco retido de novo ele não manda
+ * a mensagem. Precisa mandar."
+ *
+ * O caso que estava Retido e vai para outro status perde o "valor do prêmio
+ * retido" e a "Data reteve" (o carimbo do Retido). Voltar a Retido carimba de
+ * novo, com a data de hoje: conta como uma retenção nova — no dia, no mês da
+ * Produtividade e no aviso do Chat. É uma exceção à regra do carimbo ("carimba
+ * só se estiver vazio"), só para o Retido, porque a retenção desfeita não é
+ * dinheiro retido.
+ */
+function limparARetencaoAoSairDoRetido_(canal, atual, alteracao) {
+  var retido = statusQueAvisaNoChat_(canal);
+  if (!retido || !canal.colunaDoStatus || !atual) return;
+  var alvo = normalizarParaComparar_(canal.colunaDoStatus);
+  var novo = null;
+  var antes = '';
+  Object.keys(alteracao).forEach(function (chave) {
+    if (normalizarParaComparar_(chave) === alvo) novo = alteracao[chave];
+  });
+  Object.keys(atual).forEach(function (chave) {
+    if (normalizarParaComparar_(chave) === alvo) antes = atual[chave];
+  });
+  if (novo === null || normalizarParaComparar_(antes) !== retido.chave
+    || normalizarParaComparar_(novo) === retido.chave) return;
+
+  var estrutura = estruturaDaAba_(canal.aba);
+  ['valor do prêmio retido', retido.colunaDeCarimbo || 'Data reteve'].forEach(function (nome) {
+    var posicao = posicaoDaColuna_(estrutura, nome);
+    if (posicao < 0) return;
+    var procurada = normalizarParaComparar_(estrutura.cabecalhos[posicao]);
+    Object.keys(alteracao).forEach(function (chave) {
+      if (normalizarParaComparar_(chave) === procurada) delete alteracao[chave];
+    });
+    alteracao[estrutura.cabecalhos[posicao]] = '';
+  });
+}
+
 /** "R$ 48.300,00" — dinheiro como a operação escreve. */
 function reaisNoChat_(valor) {
   var numero = Math.round((Number(valor) || 0) * 100) / 100;
@@ -5069,13 +5129,20 @@ function numerosDaRetencao_(canal, caso, retido, quemSalvou) {
   var analista = String((colunaDoAnalista && caso[colunaDoAnalista]) || quemSalvou || '').trim();
   var acumulado = 0;
   var hojeDoAnalista = 0;
+  var hojePorAnalista = {};
   doMes.forEach(function (registro) {
     var valor = colunaDoValor ? converterParaNumero_(registro[colunaDoValor]) : '';
     acumulado += valor === '' ? 0 : valor;
     var data = converterParaData_(registro[colunaDaData]);
     if (!data || formatarData_(data, 'yyyy-MM-dd') !== hoje) return;
-    var dele = colunaDoAnalista ? String(registro[colunaDoAnalista] || '').trim() : '';
-    if (normalizarParaComparar_(dele) === normalizarParaComparar_(analista)) hojeDoAnalista++;
+    var dele = normalizarParaComparar_(colunaDoAnalista ? String(registro[colunaDoAnalista] || '').trim() : '');
+    hojePorAnalista[dele] = (hojePorAnalista[dele] || 0) + 1;
+    if (dele === normalizarParaComparar_(analista)) hojeDoAnalista++;
+  });
+  // A lista da calculadora do PO (Etapa 96): os analistas da RET disponíveis
+  // hoje, cada um com as retenções de hoje — a mesma regra da divisão de casos.
+  var equipe = analistasDaRetencao_(canal).map(function (nome) {
+    return { nome: nome, hoje: hojePorAnalista[normalizarParaComparar_(nome)] || 0 };
   });
   var doCaso = colunaDoValor ? converterParaNumero_(caso[colunaDoValor]) : '';
 
@@ -5088,29 +5155,50 @@ function numerosDaRetencao_(canal, caso, retido, quemSalvou) {
   });
 
   return { analista: analista, valorDoCaso: doCaso === '' ? 0 : doCaso, origem: origem,
-    hojeDoAnalista: hojeDoAnalista, acumulado: acumulado,
+    hojeDoAnalista: hojeDoAnalista, acumulado: acumulado, equipe: equipe,
     nomeDoMes: RECC_NOMES_DOS_MESES[Number(mes.slice(5, 7)) - 1] };
 }
 
-/** O texto do cartão. Só nomes da equipe e números: nada do cliente. */
-function textoDoAvisoDeRetencao_(canal, numeros, config) {
-  var linhas = ['✅ *Nova retenção — ' + canal.nome + '*',
-    '*' + (numeros.analista || 'Alguém da equipe') + '* reteve agora: ' + reaisNoChat_(numeros.valorDoCaso)
-      + (numeros.origem ? ' · Canal de origem: ' + numeros.origem : ''), ''];
-  var doDia = '*' + (numeros.analista || 'Hoje') + ' hoje:* ';
-  if (config.metaDoDia > 0) {
-    var faltamNoDia = config.metaDoDia - numeros.hojeDoAnalista;
-    doDia += numeros.hojeDoAnalista + ' de ' + config.metaDoDia + ' retenções'
-      + (faltamNoDia > 0 ? ' (faltam ' + faltamNoDia + ')' : ' — meta do dia batida 🎯');
-  } else {
-    doDia += numeros.hojeDoAnalista + (numeros.hojeDoAnalista === 1 ? ' retenção' : ' retenções');
+/**
+ * Os analistas do canal DISPONÍVEIS hoje (decisão do PO, Etapa 96): ativos no
+ * cadastro de Usuários, com este canal, e sem férias nem afastamento — a mesma
+ * regra da divisão de casos na Importação. Em ordem alfabética.
+ */
+function analistasDaRetencao_(canal) {
+  try {
+    return analistasParaDistribuir_(canal).map(function (um) { return um.nome; });
+  } catch (semLista) {
+    return [];
   }
-  linhas.push(doDia);
-  linhas.push('*Acumulado de ' + String(numeros.nomeDoMes || '').toLowerCase() + ':* ' + reaisNoChat_(numeros.acumulado));
+}
+
+/**
+ * O texto do cartão, no LAYOUT DA CALCULADORA do PO (Etapa 96): no topo, quem
+ * acabou de reter; depois o mês, a meta e quanto falta; e os analistas da RET
+ * disponíveis hoje, cada um com "X/6". Só nomes da equipe e números: nada do
+ * cliente.
+ */
+function textoDoAvisoDeRetencao_(canal, numeros, config) {
+  var mes = String(numeros.nomeDoMes || '');
+  var Mes = mes.charAt(0).toUpperCase() + mes.slice(1);
+  var linhas = ['✅ *Nova retenção — ' + canal.nome + '* · *' + (numeros.analista || 'Alguém da equipe')
+    + '* reteve ' + reaisNoChat_(numeros.valorDoCaso)
+    + (numeros.origem ? ' · Canal de origem: ' + numeros.origem : ''), ''];
+  linhas.push('*' + Mes + ':* ' + reaisNoChat_(numeros.acumulado));
   if (config.metaDoMes > 0) {
     var falta = config.metaDoMes - numeros.acumulado;
-    linhas.push('*Meta do mês:* ' + reaisNoChat_(config.metaDoMes) + ' · '
-      + (falta > 0 ? '*Falta:* ' + reaisNoChat_(falta) : '*Meta batida!* (+' + reaisNoChat_(-falta) + ')'));
+    linhas.push('*Meta:* ' + reaisNoChat_(config.metaDoMes));
+    linhas.push(falta > 0
+      ? '*Quanto falta (meta de ' + mes + '):* ' + reaisNoChat_(falta)
+      : '*Meta de ' + mes + ' batida!* (+' + reaisNoChat_(-falta) + ')');
+  }
+  var equipe = numeros.equipe || [];
+  if (equipe.length) {
+    linhas.push('');
+    equipe.forEach(function (um) {
+      var conta = config.metaDoDia > 0 ? um.hoje + '/' + config.metaDoDia : String(um.hoje);
+      linhas.push(um.nome + ' — ' + conta + (config.metaDoDia > 0 && um.hoje >= config.metaDoDia ? ' 🎯' : ''));
+    });
   }
   return linhas.join('\n');
 }
@@ -5168,9 +5256,11 @@ function avisarRetencaoNoChat(idDoCanal, idDoCaso) {
     // Reserva ANTES de postar: duas chamadas juntas não postam duas vezes. Se
     // a postagem falhar, a reserva sai, e o próximo salvamento tenta de novo.
     var props = PropertiesService.getScriptProperties();
-    var marca = converterParaIdentificador_(canal.id) + ':' + alvo;
+    // A marca leva o carimbo: o caso que saiu de Retido e voltou ganhou outra
+    // "Data reteve" (Etapa 96) — é outra retenção, e é avisada de novo.
+    var marca = converterParaIdentificador_(canal.id) + ':' + alvo + ':' + data.getTime();
     var avisados = avisadosDeHoje_(props, hoje);
-    if (avisados.indexOf(marca) >= 0) return { enviado: false, motivo: 'já avisado hoje' };
+    if (avisados.indexOf(marca) >= 0) return { enviado: false, motivo: 'já avisado' };
     avisados.push(marca);
     props.setProperty(RECC_PREFIXO_DOS_AVISADOS + hoje, JSON.stringify(avisados));
 
@@ -5198,30 +5288,60 @@ function avisarRetencaoNoChat(idDoCanal, idDoCaso) {
 }
 
 /**
- * Configurações: guarda (ou apaga, com '') o endereço do Chat do canal. Pede a
- * senha de administrador. Só aceita endereço do próprio Google Chat — o
+ * Configurações: guarda o endereço do Chat do canal e o nome da conversa. Pede
+ * a senha de administrador. Só aceita endereço do próprio Google Chat — o
  * sistema não manda número da operação para outro lugar.
+ *
+ *   endereco: o novo; vazio ('') APAGA endereço e nome; null mantém o guardado
+ *             (só troca o nome).
+ *   nomeDaConversa: como o PO chama o espaço (ex.: "Retenção RET").
  */
-function salvarWebhookDoChat(idDoCanal, endereco) {
+function salvarWebhookDoChat(idDoCanal, endereco, nomeDaConversa) {
   exigirPermissao_(RECC_ACOES.CONFIGURAR);
   exigirSenhaDeAdministrador_();
   var canal = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(idDoCanal), 1)[0];
   if (!canal) throw new Error('Canal ' + idDoCanal + ' não encontrado.');
   var props = PropertiesService.getScriptProperties();
   var chave = RECC_PREFIXO_DO_WEBHOOK + converterParaIdentificador_(idDoCanal);
-  var texto = String(endereco || '').trim();
-  if (!texto) {
+  var chaveDoNome = RECC_PREFIXO_DO_NOME_DA_CONVERSA + converterParaIdentificador_(idDoCanal);
+  var nome = String(nomeDaConversa || '').trim().slice(0, 80);
+
+  if (endereco === '') {
     props.deleteProperty(chave);
+    props.deleteProperty(chaveDoNome);
     registrarAuditoria_('chat.webhook.apagar', 'CANAIS', canal.Id, String(canal.Nome));
-    return { configurado: false };
+    return { configurado: false, enderecoParcial: '', nomeDaConversa: '' };
   }
-  if (!RECC_FORMATO_DO_WEBHOOK.test(texto)) {
+  var texto = endereco === null || endereco === undefined ? '' : String(endereco).trim();
+  if (texto && !RECC_FORMATO_DO_WEBHOOK.test(texto)) {
     throw new Error('Esse não é um endereço de webhook do Google Chat. Ele começa com '
       + '"https://chat.googleapis.com/v1/spaces/" — copie de novo em Apps e integrações › Webhooks, no espaço do Chat.');
   }
-  props.setProperty(chave, texto);
+  if (!texto && !props.getProperty(chave)) {
+    throw new Error('Cole o endereço do webhook antes de guardar.');
+  }
+  if (texto) props.setProperty(chave, texto);
+  if (nome) props.setProperty(chaveDoNome, nome); else props.deleteProperty(chaveDoNome);
   registrarAuditoria_('chat.webhook.salvar', 'CANAIS', canal.Id, String(canal.Nome));
-  return { configurado: true };
+  return { configurado: true, enderecoParcial: enderecoParcialDoChat_(props.getProperty(chave)),
+    nomeDaConversa: nome };
+}
+
+/**
+ * Configurações: grava só o aviso no Chat do canal — ligado e as duas metas
+ * (Etapa 96). Antes as metas iam no "Salvar" do fim do formulário do canal, e
+ * a meta digitada no bloco do Chat ficava sem gravar.
+ */
+function salvarAvisoDoChat(idDoCanal, aviso) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var canal = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(idDoCanal), 1)[0];
+  if (!canal) throw new Error('Canal ' + idDoCanal + ' não encontrado.');
+  var mudar = avisoNoChatDoFormulario_({ avisoNoChat: aviso || {} });
+  if (!Object.keys(mudar).length) throw new Error('Rode atualizarPGO() antes: faltam as colunas do aviso na CANAIS.');
+  atualizarRegistro_('CANAIS', canal.Id, mudar);
+  esquecerEstruturaLida_('CANAIS');
+  registrarAuditoria_('chat.metas', 'CANAIS', canal.Id, String(canal.Nome));
+  return true;
 }
 
 /** Configurações: posta uma mensagem de teste no espaço do canal. */

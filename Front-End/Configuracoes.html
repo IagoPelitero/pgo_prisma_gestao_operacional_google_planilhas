@@ -2041,51 +2041,71 @@ var TelaConfiguracoes = (function () {
     return '<fieldset class="config-bloco-chat"><legend>Aviso de retenção no Google Chat</legend>'
       + '<p class="config-explica">Quando um caso passa a <strong>Retido</strong> e é salvo (Trabalhar no '
       + 'caso, Alterar status ou Cadastrar), o Prisma posta no espaço do Chat: quem reteve e o valor, '
-      + 'quantas retenções a pessoa tem hoje, o acumulado da equipe no mês e quanto falta. Nada do '
-      + 'cliente vai para o Chat.</p>'
+      + 'o acumulado da equipe no mês, a meta, quanto falta e as retenções de hoje de cada analista da '
+      + 'RET disponível. Nada do cliente vai para o Chat.</p>'
       + caixaDeSimNao('chatLigado', 'Avisar no Chat', chat.ligado)
       + campoDeTexto('chatMetaDoMes', 'Meta de valor retido do mês (R$, da equipe)', chat.metaDoMes,
-        'É dela que sai o "Falta". Em branco, o cartão mostra só o acumulado. Grava no Salvar, embaixo.')
+        'É dela que sai o "Quanto falta". Pode mudar quando quiser. Em branco, o cartão mostra só o acumulado.')
       + campoDeTexto('chatMetaDoDia', 'Meta de retenções por analista no dia', chat.metaDoDia,
-        'Zera todo dia. Em branco, o cartão mostra só quantas a pessoa tem hoje. Grava no Salvar, embaixo.')
-      + '<div class="config-campo"><span>Endereço do Chat (webhook)</span>'
-      + '<p class="config-explica" id="chat-estado">' + (chat.temWebhook
-        ? '✓ Guardado. Por segurança, o endereço não aparece aqui.'
-        : 'Ainda não guardado: sem ele, nenhum aviso é enviado.') + '</p>'
-      + '<input type="password" id="cfg-chatWebhook" autocomplete="off" '
-      + 'placeholder="https://chat.googleapis.com/v1/spaces/…">'
+        'Zera todo dia. Em branco, mostra só quantas cada um tem hoje.')
+      + '<div class="config-acoes"><button type="button" class="botao" id="chat-salvar-metas">'
+      + 'Salvar metas</button></div>'
+      + '<div class="config-campo"><span>Conversa do Chat (webhook)</span>'
+      + '<div class="chat-conversa" id="chat-estado">' + estadoDaConversa(chat) + '</div>'
+      + '<label class="config-campo"><span>Nome da conversa</span>'
+      + '<input type="text" id="cfg-chatNome" maxlength="80" placeholder="Ex.: Retenção RET" value="'
+      + escapar(chat.nomeDaConversa || '') + '"></label>'
+      + '<label class="config-campo"><span>' + (chat.temWebhook ? 'Trocar o endereço (opcional)' : 'Endereço do webhook')
+      + '</span><input type="password" id="cfg-chatWebhook" autocomplete="off" '
+      + 'placeholder="https://chat.googleapis.com/v1/spaces/…"></label>'
       + '<em>Como pegar: no Google Chat, abra o espaço › clique no nome dele › Apps e integrações › '
       + 'Webhooks › Adicionar webhook › dê um nome (ex.: Prisma) › copie o endereço e cole aqui.</em>'
       + '<div class="config-acoes">'
-      + '<button type="button" class="botao vazado" id="chat-guardar">Guardar endereço</button>'
+      + '<button type="button" class="botao vazado" id="chat-guardar">Guardar conversa</button>'
       + '<button type="button" class="botao vazado" id="chat-testar">Enviar mensagem de teste</button>'
-      + '<button type="button" class="botao vazado perigo" id="chat-apagar">Apagar endereço</button>'
+      + '<button type="button" class="botao vazado perigo" id="chat-apagar">Apagar conversa</button>'
       + '</div></div></fieldset>';
+  }
+
+  /** Qual conversa está guardada: o nome e o começo do endereço (o código do espaço). */
+  function estadoDaConversa(chat) {
+    if (!chat.temWebhook) return '<p class="config-explica">Nenhuma conversa guardada: sem ela, nenhum aviso é enviado.</p>';
+    return '<p class="config-explica">✓ Guardada' + (chat.nomeDaConversa ? ': <strong>' + escapar(chat.nomeDaConversa) + '</strong>' : '')
+      + '</p><code class="chat-endereco">' + escapar(chat.enderecoParcial || '') + '</code>';
   }
 
   function ligarEditorDoChat(canal) {
     if (!canal.avisoNoChat || !elemento('chat-guardar')) return;
+    var chat = canal.avisoNoChat;
     function guardar(endereco, recado) {
       comSenhaDeAdministrador(function () {
-        Servidor.chamar('salvarWebhookDoChat', canal.id, endereco)
+        Servidor.chamar('salvarWebhookDoChat', canal.id, endereco, valorDe('chatNome'))
           .entao(function (resposta) {
-            canal.avisoNoChat.temWebhook = !!resposta.configurado;
+            chat.temWebhook = !!resposta.configurado;
+            chat.enderecoParcial = resposta.enderecoParcial || '';
+            chat.nomeDaConversa = resposta.nomeDaConversa || '';
             elemento('cfg-chatWebhook').value = '';
-            elemento('chat-estado').textContent = resposta.configurado
-              ? '✓ Guardado. Por segurança, o endereço não aparece aqui.'
-              : 'Ainda não guardado: sem ele, nenhum aviso é enviado.';
+            if (!resposta.configurado) elemento('cfg-chatNome').value = '';
+            elemento('chat-estado').innerHTML = estadoDaConversa(chat);
             avisarSalvo(recado);
           })
           .senao(mostrarErroNoPainel);
       });
     }
+    elemento('chat-salvar-metas').addEventListener('click', function () {
+      var botao = elemento('chat-salvar-metas');
+      Formulario.comecouAGravar(botao, null);
+      Servidor.chamar('salvarAvisoDoChat', canal.id, avisoNoChatDaTela(canal))
+        .entao(function () { Formulario.acabouDeGravar(botao, null); avisarSalvo('Metas do aviso no Chat salvas.'); })
+        .senao(function (erro) { Formulario.acabouDeGravar(botao, null); mostrarErroNoPainel(erro); });
+    });
     elemento('chat-guardar').addEventListener('click', function () {
       var endereco = String(elemento('cfg-chatWebhook').value || '').trim();
-      if (!endereco) { avisar('Cole o endereço do webhook antes de guardar.', 'atencao'); return; }
-      guardar(endereco, 'Endereço do Chat guardado. Use "Enviar mensagem de teste" para conferir.');
+      if (!endereco && !chat.temWebhook) { avisar('Cole o endereço do webhook antes de guardar.', 'atencao'); return; }
+      guardar(endereco || null, 'Conversa do Chat guardada. Use "Enviar mensagem de teste" para conferir.');
     });
     elemento('chat-apagar').addEventListener('click', function () {
-      guardar('', 'Endereço do Chat apagado: os avisos param.');
+      guardar('', 'Conversa do Chat apagada: os avisos param.');
     });
     elemento('chat-testar').addEventListener('click', function () {
       var botao = elemento('chat-testar');

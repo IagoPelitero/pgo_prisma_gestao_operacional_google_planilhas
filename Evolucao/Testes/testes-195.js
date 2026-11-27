@@ -15,6 +15,9 @@ const { secao, teste, igual, verdadeiro, contem, lanca } = require('./ferramenta
 const { retDoPO } = require('./testes-sub-abas-do-trabalho');
 
 const WEBHOOK = 'https://chat.googleapis.com/v1/spaces/AAAAteste/messages?key=chave&token=segredo';
+// O mês de hoje, como o cartão escreve ("novembro").
+const MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro',
+  'outubro', 'novembro', 'dezembro'][new Date().getMonth()];
 const ler = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'Front-End', nome), 'utf8');
 
 function comChat(semWebhook) {
@@ -62,7 +65,10 @@ function rodarTestesDa195() {
     lanca(() => t.chamar('salvarWebhookDoChat')(t.ret.id, 'https://exemplo.com/roubar?dados=1'), 'não é um endereço de webhook do Google Chat');
     t.chamar('salvarWebhookDoChat')(t.ret.id, WEBHOOK);
     const tela = JSON.stringify(t.chamar('listarCanaisConfiguraveis')());
-    verdadeiro(tela.indexOf('segredo') < 0 && tela.indexOf('chat.googleapis') < 0, 'o endereço não vai para a tela');
+    // Etapa 96: o começo do endereço (o código do espaço) vai, para saber qual é
+    // a conversa; a chave e o token, que dão o poder de postar, nunca.
+    verdadeiro(tela.indexOf('segredo') < 0 && tela.indexOf('key=chave') < 0, 'a chave e o token não vão para a tela');
+    contem(tela, 'spaces/AAAAteste/messages?… (chave e token escondidos)');
     const ret = t.chamar('listarCanaisConfiguraveis')().find((c) => c.aba === 'BASE_RET');
     igual(ret.avisoNoChat.temWebhook, true);
     igual(t.chamar('listarCanaisConfiguraveis')().find((c) => c.aba === 'BASE_MESA').avisoNoChat, null, 'a Mesa não tem Retido');
@@ -127,11 +133,11 @@ function rodarTestesDa195() {
     igual(e.url, WEBHOOK);
     igual(e.opcoes.method, 'post');
     const texto = e.corpo.text;
-    contem(texto, 'reteve agora: R$ 2.500,50');
-    contem(texto, 'hoje:* 2 de 6 retenções (faltam 4)');
-    contem(texto, 'Acumulado de ');
-    contem(texto, 'R$ 3.500,50');
-    contem(texto, '*Meta do mês:* R$ 10.000,00 · *Falta:* R$ 6.499,50');
+    // Etapa 96: o layout da calculadora do PO.
+    contem(texto, '* reteve R$ 2.500,50');
+    contem(texto, '*' + MES.charAt(0).toUpperCase() + MES.slice(1) + ':* R$ 3.500,50');
+    contem(texto, '*Meta:* R$ 10.000,00');
+    contem(texto, '*Quanto falta (meta de ' + MES + '):* R$ 6.499,50');
   });
 
   teste('nada do cliente no Chat', () => {
@@ -141,11 +147,11 @@ function rodarTestesDa195() {
     verdadeiro(t.envios()[0].corpo.text.indexOf('Sigiloso') < 0, 'sem o nome do cliente');
   });
 
-  teste('o mesmo caso não é avisado duas vezes no dia', () => {
+  teste('a mesma retenção não é avisada duas vezes', () => {
     const t = comChat();
     const id = t.novo().id; t.reter(id);
     t.avisar(id);
-    igual(t.avisar(id).motivo, 'já avisado hoje');
+    igual(t.avisar(id).motivo, 'já avisado');
     igual(t.envios().length, 1);
   });
 
@@ -172,14 +178,12 @@ function rodarTestesDa195() {
     const id = t.novo().id; t.reter(id, '800,00');
     t.avisar(id);
     const texto = t.envios()[0].corpo.text;
-    contem(texto, 'meta do dia batida');
-    contem(texto, '*Meta batida!* (+R$ 300,00)');
+    contem(texto, '*Meta de ' + MES + ' batida!* (+R$ 300,00)');
     const s = comChat();
     s.metas('', '');
     const id2 = s.novo().id; s.reter(id2);
     s.avisar(id2);
-    verdadeiro(s.envios()[0].corpo.text.indexOf('Meta do mês') < 0, 'sem meta do mês, sem a linha');
-    contem(s.envios()[0].corpo.text, 'hoje:* 1 retenção');
+    verdadeiro(s.envios()[0].corpo.text.indexOf('*Meta:*') < 0, 'sem meta do mês, sem a linha');
   });
 
   /* ----------------------------------------------------------------------- */
@@ -229,7 +233,7 @@ function rodarTestesDa195() {
   teste('Configurações: o endereço é campo de senha e nunca é preenchido pela tela', () => {
     const tela = ler('Configuracoes.html');
     contem(tela, '<input type="password" id="cfg-chatWebhook" autocomplete="off" ');
-    contem(tela, "Servidor.chamar('salvarWebhookDoChat', canal.id, endereco)");
+    contem(tela, "Servidor.chamar('salvarWebhookDoChat', canal.id, endereco, valorDe('chatNome'))");
     contem(tela, "Servidor.chamar('testarAvisoNoChat', canal.id)");
   });
 }

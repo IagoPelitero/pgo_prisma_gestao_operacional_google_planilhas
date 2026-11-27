@@ -1230,9 +1230,9 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
 }
 /* Enquanto o servidor busca os status, o desenho dá lugar a um círculo que
    gira, e o botão não aceita outro clique (Etapa 93). */
-.acao-secundaria.carregando { cursor: progress; opacity: .8; }
-.acao-secundaria.carregando svg { display: none; }
-.acao-secundaria.carregando::before {
+.acao-secundaria.girando { cursor: progress; opacity: .8; }
+.acao-secundaria.girando svg { display: none; }
+.acao-secundaria.girando::before {
   content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%;
   border: 2px solid var(--destaque-tenue); border-top-color: var(--destaque);
   animation: atualizando-gira 0.8s linear infinite;
@@ -1257,7 +1257,7 @@ table.fila tr.aberta td.acoes-coluna { background: var(--destaque-tenue); }
   color: inherit; font: inherit; text-decoration: underline;
 }
 @media (prefers-reduced-motion: reduce) {
-  .acao-secundaria.carregando::before, .carregando-status::before { animation: none; }
+  .acao-secundaria.girando::before, .carregando-status::before { animation: none; }
 }
 
 @media (max-width: 560px) {
@@ -2140,6 +2140,12 @@ body.com-casca.menu-encolhido .dialogo { padding-left: calc(var(--lateral-encolh
 }
 .config-bloco-chat legend { padding: 0 6px; font-weight: 700; font-size: 14px; color: var(--texto); }
 .config-bloco-chat .config-acoes { flex-wrap: wrap; }
+.chat-conversa { margin: 2px 0 6px; }
+.chat-conversa .config-explica { margin: 0 0 4px; }
+.chat-endereco {
+  display: block; margin: 4px 0 8px; padding: 6px 8px; border-radius: var(--raio-pequeno);
+  background: var(--superficie); border: 1px solid var(--linha); font-size: 12px; overflow-wrap: anywhere;
+}
 
 /* Dentro do modal o formulário não tem cartão próprio — o modal já é um. */
 .formulario.no-modal { background: none; border: 0; padding: 0; box-shadow: none; }

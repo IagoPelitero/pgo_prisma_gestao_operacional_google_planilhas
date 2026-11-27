@@ -2352,13 +2352,16 @@ async function rodar() {
     const botao = pagina.locator('.fila-do-trabalho [data-status-do-caso]').first();
     await botao.click();
     await pagina.waitForTimeout(250);
-    const girando = await botao.evaluate((b) => ({ classe: b.classList.contains('carregando'), travado: b.disabled,
+    const girando = await botao.evaluate((b) => ({ classe: b.classList.contains('girando'), travado: b.disabled,
       ocupado: b.getAttribute('aria-busy') }));
     igual(JSON.stringify(girando), JSON.stringify({ classe: true, travado: true, ocupado: 'true' }), 'girando e travado');
+    // Achado 120: a classe antiga esticava o botão até a altura da tela.
+    const altura = await botao.evaluate((b) => Math.round(b.getBoundingClientRect().height));
+    verdadeiro(altura <= 40, 'o botão não cresce enquanto gira: ' + altura + ' px');
     await botao.click({ force: true }).catch(() => {});
     await pagina.waitForSelector('#situacao-nova', { timeout: 10000 });
     igual(await pagina.locator('.dialogo#dialogo-situacao').count(), 1, 'um diálogo só');
-    igual(await botao.evaluate((b) => b.classList.contains('carregando') || b.disabled), false, 'o botão volta ao normal');
+    igual(await botao.evaluate((b) => b.classList.contains('girando') || b.disabled), false, 'o botão volta ao normal');
     // Os campos do status ainda a caminho: o aviso aparece e o Salvar fica travado.
     contem(await pagina.textContent('#campos-da-situacao'), 'Carregando o que este status pede');
     igual(await pagina.isDisabled('#salvar-situacao'), true, 'Salvar travado enquanto carrega');
@@ -2513,7 +2516,7 @@ async function rodar() {
     await pagina.waitForFunction(() => /Retenção avisada no Chat/.test(document.body.innerText), null, { timeout: 10000 });
     igual(ambiente.enviosDaRede.length, antes + 1, 'um envio');
     const texto = ambiente.enviosDaRede[ambiente.enviosDaRede.length - 1].corpo.text;
-    contem(texto, 'reteve agora: R$ 1.234,56');
+    contem(texto, '* reteve R$ 1.234,56');   // Etapa 96: o layout da calculadora
     verdadeiro(texto.indexOf('Cliente do Chat') < 0, 'nada do cliente');
     igual(String(naPlanilha('BASE_RET').find((l) => String(l.__id) === String(idDoCaso)).status), 'Retido');
   });

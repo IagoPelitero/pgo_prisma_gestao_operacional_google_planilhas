@@ -61,6 +61,7 @@ const { rodarTestesDaDataDaFinalizacao } = require('./testes-data-da-finalizacao
 const { rodarTestesDa193 } = require('./testes-193');
 const { rodarTestesDa194 } = require('./testes-194');
 const { rodarTestesDa195 } = require('./testes-195');
+const { rodarTestesDa196 } = require('./testes-196');
 const { rodarTestesDoEnvioUnico } = require('./testes-envio-unico');
 const { rodarTestesDoFusoDoProjeto } = require('./testes-fuso-do-projeto');
 const { rodarTestesDaAuditoriaForaDaTrava } = require('./testes-auditoria-fora-da-trava');
@@ -134,6 +135,7 @@ rodarTestesDaDataDaFinalizacao();
 rodarTestesDa193();
 rodarTestesDa194();
 rodarTestesDa195();
+rodarTestesDa196();
 rodarTestesDoEnvioUnico();
 rodarTestesDoFusoDoProjeto();
 rodarTestesDaAuditoriaForaDaTrava();

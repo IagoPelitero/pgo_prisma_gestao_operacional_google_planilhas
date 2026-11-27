@@ -297,20 +297,25 @@ var TelaBuscarCaso = (function () {
    * As MESMAS três ações da fila do Trabalho, na mesma ordem: quem acha um
    * caso aqui quer fazer com ele o que faria lá, e aprender duas telas para o
    * mesmo caso é uma a mais do que o necessário. Ver `acoesDaLinha`, no
-   * Trabalho.
+   * Trabalho — e, desde a Etapa 96 (pedido do PO), o MESMO desenho: "Trabalhar
+   * no caso" em cima; "Status" e "Excluir", com texto, embaixo (proposta C).
    */
   function acoesDoAchado(caso, origem) {
     var ids = '="' + escapar(caso.id) + '" data-canal="' + escapar(origem.id) + '"';
-    return (podeEditar
+    var principal = podeEditar
       ? '<button type="button" class="acao" data-achado' + ids + '>'
         + Moldura.icone('editar') + ' Trabalhar no caso</button>'
-        + '<button type="button" class="acao-icone" data-status-do-achado' + ids
+      : '';
+    var secundarias = (podeEditar
+      ? '<button type="button" class="acao-secundaria" data-status-do-achado' + ids
         + ' title="Alterar status" aria-label="Alterar status">'
-        + Moldura.icone('trocarSituacao') + '</button>'
+        + Moldura.icone('trocarSituacao') + '<span>Status</span></button>'
       : '')
-      + '<button type="button" class="acao-icone perigo" data-excluir-achado' + ids
+      + '<button type="button" class="acao-secundaria perigo" data-excluir-achado' + ids
       + ' title="Excluir caso" aria-label="Excluir caso">'
-      + Moldura.icone('ocultar') + '</button>';
+      + Moldura.icone('ocultar') + '<span>Excluir</span></button>';
+    return '<div class="acoes-do-caso">' + principal
+      + '<div class="acoes-secundarias">' + secundarias + '</div></div>';
   }
 
   function ligarResultado() {
@@ -320,8 +325,9 @@ var TelaBuscarCaso = (function () {
     cliques('[data-achado]', function (canal, caso) {
       CasoEmModal.abrir(canal, caso, procurarDeNovo);
     }, 'data-achado');
-    cliques('[data-status-do-achado]', function (canal, caso) {
-      CasoEmModal.trocarSituacao(canal, caso, procurarDeNovo);
+    cliques('[data-status-do-achado]', function (canal, caso, botao) {
+      // O botão vai junto: gira e fica travado enquanto carrega (Etapa 93).
+      CasoEmModal.trocarSituacao(canal, caso, procurarDeNovo, botao);
     }, 'data-status-do-achado');
     cliques('[data-excluir-achado]', function (canal, caso) {
       Formulario.confirmarExclusao(caso, function () {
@@ -336,7 +342,7 @@ var TelaBuscarCaso = (function () {
     var botoes = document.querySelectorAll(seletor);
     for (var i = 0; i < botoes.length; i++) {
       botoes[i].addEventListener('click', function () {
-        oQueFazer(this.getAttribute('data-canal'), this.getAttribute(atributoDoCaso));
+        oQueFazer(this.getAttribute('data-canal'), this.getAttribute(atributoDoCaso), this);
       });
     }
   }
