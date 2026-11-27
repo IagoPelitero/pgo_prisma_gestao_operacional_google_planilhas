@@ -44,3 +44,8 @@ Medido com `node Evolucao/Testes/medir-telas.js` e com o rastreio por chamada (a
 **Fora:** guardar as colunas das bases entre cliques (risco de gravar na coluna errada) e ler só
 algumas colunas no Trabalho (a leitura leve já faz isso quando compensa; era o caminho B da aba
 ERROS, deixado de lado pelo PO).
+
+## Decisão do PO (27/11/2026)
+
+**"Nenhuma, deixa como está."** As propostas 1, 2 e 3 não serão implementadas. O sistema continua
+na 1.94. O estudo fica registrado para quando o assunto voltar.
