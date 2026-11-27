@@ -230,7 +230,11 @@ function rodarTestesDeDesempenhoDoTrabalhoEDaBusca() {
 
   teste('nenhuma busca ficou mais cara: nem mais localizador, nem mais células', () => {
     const r = comparar();
-    const piores = Object.keys(da187).filter((k) => r[k].localizador > da187[k].localizador || r[k].celulas > da187[k].celulas);
+    // Etapa 95: a CANAIS ganhou 3 colunas (o aviso no Chat). Quem lê a CANAIS com o
+    // cache frio lê 3 × (cabeçalho + 3 canais) = 12 células a mais — e só isso.
+    const daCanais = 12;
+    const piores = Object.keys(da187).filter((k) => r[k].localizador > da187[k].localizador
+      || r[k].celulas > da187[k].celulas + daCanais);
     igual(piores.join(' | '), '', 'o identificador continua procurando (sem ele, a busca leria a coluna inteira)');
   });
 

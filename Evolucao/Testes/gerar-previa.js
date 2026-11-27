@@ -140,6 +140,10 @@ function pontePreparada(respostas) {
     // F3 (Etapa 90): na prévia o rascunho não vai a lugar nenhum — só responde.
     + '      guardarRascunho: function () { responder({ guardado: true }); },\n'
     + '      apagarRascunho: function () { responder(true); },\n'
+    // Etapa 95: na prévia nada vai ao Google Chat — só responde.
+    + '      avisarRetencaoNoChat: function () { responder({ enviado: false, motivo: \'prévia\' }); },\n'
+    + '      salvarWebhookDoChat: function (canal, endereco) { responder({ configurado: !!endereco }); },\n'
+    + '      testarAvisoNoChat: function () { responder({ ok: true }); },\n'
     + '      formularioDoCanal: function (idDoCanal) {\n'
     + '        responder(respostas.formularios[idDoCanal]);\n'
     + '      },\n'

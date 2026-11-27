@@ -1528,7 +1528,10 @@ function listarCanaisConfiguraveis() {
         ordem: Number(canal.Ordem) || 0,
         ativo: normalizarParaComparar_(canal.Ativo) === 'sim',
         colunasDaBase: colunas,
-        situacoes: situacoes
+        situacoes: situacoes,
+        // O aviso de retenção no Chat (Etapa 95). Só o canal que tem o status
+        // Retido mostra a parte do Chat; o endereço não vem, só se existe.
+        avisoNoChat: avisoNoChatParaATela_(canal)
       };
     });
 }
@@ -1595,8 +1598,9 @@ function salvarCanal(dados) {
 
   var sla = slaDoFormulario_(dados, atual);
   var doTrabalho = trabalhoDoFormulario_(dados, atual, estrutura);
+  var doChat = avisoNoChatDoFormulario_(dados);
 
-  atualizarRegistro_('CANAIS', id, Object.assign(sla, doTrabalho, {
+  atualizarRegistro_('CANAIS', id, Object.assign(sla, doTrabalho, doChat, {
     Nome: nome,
     Descricao: String(dados.descricao === undefined ? atual.Descricao : dados.descricao),
     ColunaDaData: String(dados.colunaDaData || ''),
@@ -1623,6 +1627,49 @@ function salvarCanal(dados) {
   esquecerEstruturaLida_();
   registrarAuditoria_('canal.editar', 'CANAIS', id, nome);
   return true;
+}
+
+/** O aviso de retenção no Chat do canal, para a tela de Configurações (Etapa 95). */
+function avisoNoChatParaATela_(linha) {
+  try {
+    if (posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'MetaDeRetencoesPorDia') < 0) return null;
+    var canal = { id: linha.Id, aba: String(linha.Aba) };
+    if (!statusQueAvisaNoChat_(canal)) return null;
+    var metaDoMes = converterParaNumero_(linha.MetaDeRetencaoDoMes);
+    var metaDoDia = converterParaNumero_(linha.MetaDeRetencoesPorDia);
+    return {
+      ligado: normalizarParaComparar_(linha.AvisoDeRetencaoNoChat) === 'sim',
+      metaDoMes: metaDoMes === '' ? '' : metaDoMes,
+      metaDoDia: metaDoDia === '' ? '' : metaDoDia,
+      temWebhook: webhookDoCanal_(linha.Id) !== ''
+    };
+  } catch (semAviso) {
+    return null;
+  }
+}
+
+/**
+ * O aviso no Chat vindo de Configurações: `avisoNoChat` = { ligado, metaDoMes,
+ * metaDoDia }. A tela que não mandar não mexe em nada. O endereço do Chat NÃO
+ * passa por aqui (ver salvarWebhookDoChat, que pede a senha).
+ */
+function avisoNoChatDoFormulario_(dados) {
+  var pedido = dados.avisoNoChat;
+  if (!pedido || typeof pedido !== 'object') return {};
+  if (posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'MetaDeRetencoesPorDia') < 0) return {};
+  function numero(valor, nome, inteiro) {
+    if (valor === '' || valor === null || valor === undefined) return '';
+    var n = converterParaNumero_(valor);
+    if (n === '' || n < 0 || (inteiro && Math.round(n) !== n)) {
+      throw new Error('A ' + nome + ' precisa ser um número' + (inteiro ? ' inteiro' : '') + ', zero ou maior.');
+    }
+    return n;
+  }
+  return {
+    AvisoDeRetencaoNoChat: pedido.ligado === true ? 'SIM' : 'NAO',
+    MetaDeRetencaoDoMes: numero(pedido.metaDoMes, 'meta do mês', false),
+    MetaDeRetencoesPorDia: numero(pedido.metaDoDia, 'meta do dia', true)
+  };
 }
 
 /**

@@ -862,7 +862,8 @@ function cadastrarCasoUmaVez_(idDoCanal, valores) {
   var gravado = inserirRegistro_(canal.aba, paraGravar, { origem: RECC_ORIGEM_SISTEMA });
   registrarAuditoria_('caso.criar', canal.aba, gravado.__id, canal.nome);
 
-  return { id: gravado.__id, canal: canal.nome, aba: canal.aba };
+  return { id: gravado.__id, canal: canal.nome, aba: canal.aba,
+    avisoNoChat: retencaoParaAvisar_(canal, null, paraGravar, gravado.__id) };   // Etapa 95
 }
 
 /**
@@ -950,7 +951,8 @@ function editarCasoUmaVez_(idDoCanal, idDoCaso, valores, versaoQueAbriu, colunas
   } : null, comEsteId.length === 1 ? atual.__linha : 0);   // a linha já achada (Etapa 89)
   registrarAuditoria_('caso.editar', canal.aba, alvo, canal.nome);
 
-  return { id: alvo, canal: canal.nome, destino: destinoDepoisDeGravar_(canal, atual, paraGravar) };
+  return { id: alvo, canal: canal.nome, destino: destinoDepoisDeGravar_(canal, atual, paraGravar),
+    avisoNoChat: retencaoParaAvisar_(canal, atual, paraGravar, alvo) };   // Etapa 95
 }
 
 /**
@@ -1146,7 +1148,8 @@ function alterarSituacaoDoCasoUmaVez_(idDoCanal, idDoCaso, situacaoNova, valores
   // ocultar, mexer em configuração.
 
   return { id: alvo, situacao: achada.gravadoComo, tom: achada.tom,
-    destino: destinoDepoisDeGravar_(canal, atual, alteracao) };   // F8 (Etapa 90)
+    destino: destinoDepoisDeGravar_(canal, atual, alteracao),   // F8 (Etapa 90)
+    avisoNoChat: retencaoParaAvisar_(canal, atual, alteracao, alvo) };   // Etapa 95
 }
 
 /**
@@ -4938,4 +4941,306 @@ function apagarRascunho(idDoCanal) {
   var canal = canalQueEuPossoVer_(idDoCanal, quem);
   cacheDoRascunho_().remove(chaveDoRascunho_(quem, canal));
   return true;
+}
+
+// ============================================================================
+// O AVISO DE RETENÇÃO NO GOOGLE CHAT (Etapa 95, pedido do PO)
+// ============================================================================
+//
+// "Quando o caso for retido e o analista clicar em salvar ele deve mandar numa
+// conversa do chat: o quanto o valor está acumulado, quanto falta (vou editar
+// no prisma na aba de configurações) e a quantidade já retida no dia zerando a
+// do dia anterior: atualmente a meta é 6 por analista." Decisões do PO: o
+// acumulado e a meta do mês são da EQUIPE do canal; as duas metas se editam em
+// Configurações › Canais de trabalho; o cartão mostra só quem reteve agora.
+//
+// COMO FUNCIONA, EM DOIS TEMPOS:
+//   1. Gravar (Trabalhar no caso, Alterar status, Cadastrar) só DIZ se o caso
+//      acabou de PASSAR a Retido (`avisoNoChat` na resposta). Nenhuma ida à
+//      internet dentro da gravação: ela continua com o tempo de sempre, e um
+//      Chat fora do ar nunca impede salvar.
+//   2. A tela, já com o caso salvo, chama `avisarRetencaoNoChat`, que confere
+//      tudo de novo no servidor (o caso está Retido, a "Data reteve" é de hoje,
+//      ainda não foi avisado hoje) e posta. Falhou: vai para a aba ERROS.
+//
+// As contas são as da Produtividade: o acumulado é a soma do "valor do prêmio
+// retido" dos casos que ESTÃO Retido, pela "Data reteve", do dia 1 até hoje
+// (como o gráfico da Etapa 77); "hoje" são os casos com a "Data reteve" de hoje.
+// A "Data reteve" se carimba uma vez só: o caso que volta a Retido não conta de
+// novo — e não é avisado de novo.
+//
+// O ENDEREÇO DO CHAT (webhook) é SEGREDO: quem tem o endereço posta no espaço.
+// Fica nas propriedades do script, nunca na planilha nem na tela, e só um
+// endereço do próprio Google Chat é aceito.
+
+var RECC_PREFIXO_DO_WEBHOOK = 'RECC.CHAT.WEBHOOK.';
+var RECC_PREFIXO_DOS_AVISADOS = 'RECC.CHAT.AVISADOS.';
+var RECC_FORMATO_DO_WEBHOOK = /^https:\/\/chat\.googleapis\.com\/v1\/spaces\/[A-Za-z0-9_-]+\/messages\?\S+$/;
+
+/** O status que avisa, do catálogo do canal — ou null, no canal sem Retido. */
+function statusQueAvisaNoChat_(canal) {
+  try {
+    return situacoesPorChave_(canal)[normalizarParaComparar_('Retido')] || null;
+  } catch (semCatalogo) {
+    return null;
+  }
+}
+
+/** O endereço guardado do canal ('' quando não há). Nunca vai para a tela. */
+function webhookDoCanal_(idDoCanal) {
+  return String(PropertiesService.getScriptProperties()
+    .getProperty(RECC_PREFIXO_DO_WEBHOOK + converterParaIdentificador_(idDoCanal)) || '');
+}
+
+/** O que o canal diz sobre o aviso: ligado, as duas metas e se há endereço. */
+function configuracaoDoChat_(canal) {
+  var linha = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(canal.id), 1)[0] || {};
+  var metaDoMes = converterParaNumero_(linha.MetaDeRetencaoDoMes);
+  var metaDoDia = converterParaNumero_(linha.MetaDeRetencoesPorDia);
+  return {
+    ligado: normalizarParaComparar_(linha.AvisoDeRetencaoNoChat) === 'sim',
+    metaDoMes: metaDoMes === '' ? 0 : metaDoMes,
+    metaDoDia: metaDoDia === '' ? 0 : Math.round(metaDoDia),
+    temWebhook: webhookDoCanal_(canal.id) !== ''
+  };
+}
+
+/**
+ * Depois de gravar: o caso acabou de PASSAR a Retido, num canal com o aviso
+ * ligado e com endereço? Devolve { canal, id } para a tela chamar o aviso, ou
+ * null. Nunca estoura: um problema aqui não pode virar erro de uma gravação
+ * que deu certo.
+ */
+function retencaoParaAvisar_(canal, atual, gravado, id) {
+  try {
+    var retido = statusQueAvisaNoChat_(canal);
+    if (!retido || !canal.colunaDoStatus || !gravado) return null;
+    var alvo = normalizarParaComparar_(canal.colunaDoStatus);
+    var novo = null;
+    Object.keys(gravado).forEach(function (chave) {
+      if (normalizarParaComparar_(chave) === alvo) novo = gravado[chave];
+    });
+    if (novo === null || normalizarParaComparar_(novo) !== retido.chave) return null;
+    var antes = '';
+    Object.keys(atual || {}).forEach(function (chave) {
+      if (normalizarParaComparar_(chave) === alvo) antes = atual[chave];
+    });
+    if (normalizarParaComparar_(antes) === retido.chave) return null;   // já era Retido
+    var config = configuracaoDoChat_(canal);
+    if (!config.ligado || !config.temWebhook) return null;
+    return { canal: canal.id, id: String(id) };
+  } catch (semAviso) {
+    return null;
+  }
+}
+
+/** "R$ 48.300,00" — dinheiro como a operação escreve. */
+function reaisNoChat_(valor) {
+  var numero = Math.round((Number(valor) || 0) * 100) / 100;
+  var negativo = numero < 0;
+  var partes = Math.abs(numero).toFixed(2).split('.');
+  return (negativo ? '-' : '') + 'R$ ' + partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + partes[1];
+}
+
+/**
+ * Os números do cartão, lidos da base AGORA: o acumulado do mês da equipe e
+ * quantas retenções o analista do caso tem hoje. Lê a coluna da "Data reteve"
+ * inteira (uma coluna) e só as linhas do mês.
+ */
+function numerosDaRetencao_(canal, caso, retido, quemSalvou) {
+  var estrutura = estruturaDaAba_(canal.aba);
+  var iValor = posicaoDaColuna_(estrutura, 'valor do prêmio retido');
+  var iData = posicaoDaColuna_(estrutura, retido.colunaDeCarimbo || 'Data reteve');
+  if (iData < 0) throw new Error('A coluna "' + (retido.colunaDeCarimbo || 'Data reteve') + '" não existe em ' + canal.aba + '.');
+  var colunaDoValor = iValor >= 0 ? estrutura.cabecalhos[iValor] : '';
+  var colunaDaData = estrutura.cabecalhos[iData];
+  var colunaDoAnalista = colunaDoResponsavel_(estrutura);
+
+  var hoje = formatarData_(new Date(), 'yyyy-MM-dd');
+  var mes = hoje.slice(0, 7);
+  var linhas = [];
+  lerColunaInteira_(canal.aba, colunaDaData).forEach(function (valor, i) {
+    var data = converterParaData_(valor);
+    if (data && formatarData_(data, 'yyyy-MM-dd').slice(0, 7) === mes) linhas.push(i + 2);
+  });
+  var doMes = semExcluidasNemVazias_(estrutura, lerLinhasEspecificas_(canal.aba, linhas))
+    .filter(function (registro) { return normalizarParaComparar_(registro[canal.colunaDoStatus]) === retido.chave; });
+
+  var analista = String((colunaDoAnalista && caso[colunaDoAnalista]) || quemSalvou || '').trim();
+  var acumulado = 0;
+  var hojeDoAnalista = 0;
+  doMes.forEach(function (registro) {
+    var valor = colunaDoValor ? converterParaNumero_(registro[colunaDoValor]) : '';
+    acumulado += valor === '' ? 0 : valor;
+    var data = converterParaData_(registro[colunaDaData]);
+    if (!data || formatarData_(data, 'yyyy-MM-dd') !== hoje) return;
+    var dele = colunaDoAnalista ? String(registro[colunaDoAnalista] || '').trim() : '';
+    if (normalizarParaComparar_(dele) === normalizarParaComparar_(analista)) hojeDoAnalista++;
+  });
+  var doCaso = colunaDoValor ? converterParaNumero_(caso[colunaDoValor]) : '';
+
+  // O Canal de origem do caso, quando o canal tem o campo (Etapa 91).
+  var origem = '';
+  camposAtivosDoCanal_(canal.id).forEach(function (campo) {
+    if (normalizarParaComparar_(campo.ChaveTecnica) !== 'canal') return;
+    var posicao = posicaoDaColuna_(estrutura, String(campo.Cabecalho || ''));
+    if (posicao >= 0) origem = String(caso[estrutura.cabecalhos[posicao]] || '').trim();
+  });
+
+  return { analista: analista, valorDoCaso: doCaso === '' ? 0 : doCaso, origem: origem,
+    hojeDoAnalista: hojeDoAnalista, acumulado: acumulado,
+    nomeDoMes: RECC_NOMES_DOS_MESES[Number(mes.slice(5, 7)) - 1] };
+}
+
+/** O texto do cartão. Só nomes da equipe e números: nada do cliente. */
+function textoDoAvisoDeRetencao_(canal, numeros, config) {
+  var linhas = ['✅ *Nova retenção — ' + canal.nome + '*',
+    '*' + (numeros.analista || 'Alguém da equipe') + '* reteve agora: ' + reaisNoChat_(numeros.valorDoCaso)
+      + (numeros.origem ? ' · Canal de origem: ' + numeros.origem : ''), ''];
+  var doDia = '*' + (numeros.analista || 'Hoje') + ' hoje:* ';
+  if (config.metaDoDia > 0) {
+    var faltamNoDia = config.metaDoDia - numeros.hojeDoAnalista;
+    doDia += numeros.hojeDoAnalista + ' de ' + config.metaDoDia + ' retenções'
+      + (faltamNoDia > 0 ? ' (faltam ' + faltamNoDia + ')' : ' — meta do dia batida 🎯');
+  } else {
+    doDia += numeros.hojeDoAnalista + (numeros.hojeDoAnalista === 1 ? ' retenção' : ' retenções');
+  }
+  linhas.push(doDia);
+  linhas.push('*Acumulado de ' + String(numeros.nomeDoMes || '').toLowerCase() + ':* ' + reaisNoChat_(numeros.acumulado));
+  if (config.metaDoMes > 0) {
+    var falta = config.metaDoMes - numeros.acumulado;
+    linhas.push('*Meta do mês:* ' + reaisNoChat_(config.metaDoMes) + ' · '
+      + (falta > 0 ? '*Falta:* ' + reaisNoChat_(falta) : '*Meta batida!* (+' + reaisNoChat_(-falta) + ')'));
+  }
+  return linhas.join('\n');
+}
+
+/** Posta no endereço; devolve o código HTTP (200 é sucesso). */
+function postarNoChat_(webhook, texto) {
+  var resposta = UrlFetchApp.fetch(webhook, {
+    method: 'post',
+    contentType: 'application/json; charset=UTF-8',
+    payload: JSON.stringify({ text: texto }),
+    muteHttpExceptions: true
+  });
+  return resposta.getResponseCode();
+}
+
+/** A lista de hoje dos casos já avisados; apaga a dos dias anteriores. */
+function avisadosDeHoje_(props, hoje) {
+  Object.keys(props.getProperties()).forEach(function (chave) {
+    if (chave.indexOf(RECC_PREFIXO_DOS_AVISADOS) === 0 && chave !== RECC_PREFIXO_DOS_AVISADOS + hoje) {
+      props.deleteProperty(chave);
+    }
+  });
+  try {
+    return JSON.parse(props.getProperty(RECC_PREFIXO_DOS_AVISADOS + hoje) || '[]');
+  } catch (estragada) {
+    return [];
+  }
+}
+
+/**
+ * Chamada pela tela depois de salvar um caso que passou a Retido. Confere tudo
+ * de novo: chamar à toa não posta nada, e o mesmo caso não é avisado duas vezes
+ * no dia. Devolve { enviado, motivo }; nunca estoura para a tela — o caso já
+ * está salvo, e o aviso é um extra.
+ */
+function avisarRetencaoNoChat(idDoCanal, idDoCaso) {
+  var quem = exigirPermissao_(RECC_ACOES.EDITAR);
+  var canal = canalQueEuPossoVer_(idDoCanal, quem);
+  var alvo = converterParaIdentificador_(idDoCaso);
+  try {
+    var retido = statusQueAvisaNoChat_(canal);
+    var config = configuracaoDoChat_(canal);
+    if (!retido || !config.ligado || !config.temWebhook) return { enviado: false, motivo: 'desligado' };
+
+    var caso = buscarRegistros_(canal.aba, 'Id', alvo, 1)[0];
+    if (!caso || normalizarParaComparar_(caso[canal.colunaDoStatus]) !== retido.chave) {
+      return { enviado: false, motivo: 'não está Retido' };
+    }
+    var estrutura = estruturaDaAba_(canal.aba);
+    var iData = posicaoDaColuna_(estrutura, retido.colunaDeCarimbo || 'Data reteve');
+    var data = iData >= 0 ? converterParaData_(caso[estrutura.cabecalhos[iData]]) : '';
+    var hoje = formatarData_(new Date(), 'yyyy-MM-dd');
+    if (!data || formatarData_(data, 'yyyy-MM-dd') !== hoje) return { enviado: false, motivo: 'não reteve hoje' };
+
+    // Reserva ANTES de postar: duas chamadas juntas não postam duas vezes. Se
+    // a postagem falhar, a reserva sai, e o próximo salvamento tenta de novo.
+    var props = PropertiesService.getScriptProperties();
+    var marca = converterParaIdentificador_(canal.id) + ':' + alvo;
+    var avisados = avisadosDeHoje_(props, hoje);
+    if (avisados.indexOf(marca) >= 0) return { enviado: false, motivo: 'já avisado hoje' };
+    avisados.push(marca);
+    props.setProperty(RECC_PREFIXO_DOS_AVISADOS + hoje, JSON.stringify(avisados));
+
+    var codigo = 0;
+    try {
+      var texto = textoDoAvisoDeRetencao_(canal, numerosDaRetencao_(canal, caso, retido, quem.nome), config);
+      codigo = postarNoChat_(webhookDoCanal_(canal.id), texto);
+    } finally {
+      if (codigo !== 200) {
+        var deNovo = avisadosDeHoje_(props, hoje).filter(function (uma) { return uma !== marca; });
+        props.setProperty(RECC_PREFIXO_DOS_AVISADOS + hoje, JSON.stringify(deNovo));
+      }
+    }
+    if (codigo !== 200) {
+      registrarErro_('servidor', 'avisarRetencaoNoChat', 'O Google Chat respondeu ' + codigo
+        + ' ao aviso de retenção (canal ' + canal.nome + ').', 'caso ' + alvo);
+      return { enviado: false, falhou: true, motivo: 'o Chat respondeu ' + codigo };
+    }
+    return { enviado: true };
+  } catch (erro) {
+    registrarErro_('servidor', 'avisarRetencaoNoChat', 'O aviso de retenção no Chat falhou: ' + erro.message,
+      'canal ' + canal.nome + ' · caso ' + alvo);
+    return { enviado: false, falhou: true, motivo: erro.message };
+  }
+}
+
+/**
+ * Configurações: guarda (ou apaga, com '') o endereço do Chat do canal. Pede a
+ * senha de administrador. Só aceita endereço do próprio Google Chat — o
+ * sistema não manda número da operação para outro lugar.
+ */
+function salvarWebhookDoChat(idDoCanal, endereco) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  exigirSenhaDeAdministrador_();
+  var canal = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(idDoCanal), 1)[0];
+  if (!canal) throw new Error('Canal ' + idDoCanal + ' não encontrado.');
+  var props = PropertiesService.getScriptProperties();
+  var chave = RECC_PREFIXO_DO_WEBHOOK + converterParaIdentificador_(idDoCanal);
+  var texto = String(endereco || '').trim();
+  if (!texto) {
+    props.deleteProperty(chave);
+    registrarAuditoria_('chat.webhook.apagar', 'CANAIS', canal.Id, String(canal.Nome));
+    return { configurado: false };
+  }
+  if (!RECC_FORMATO_DO_WEBHOOK.test(texto)) {
+    throw new Error('Esse não é um endereço de webhook do Google Chat. Ele começa com '
+      + '"https://chat.googleapis.com/v1/spaces/" — copie de novo em Apps e integrações › Webhooks, no espaço do Chat.');
+  }
+  props.setProperty(chave, texto);
+  registrarAuditoria_('chat.webhook.salvar', 'CANAIS', canal.Id, String(canal.Nome));
+  return { configurado: true };
+}
+
+/** Configurações: posta uma mensagem de teste no espaço do canal. */
+function testarAvisoNoChat(idDoCanal) {
+  exigirPermissao_(RECC_ACOES.CONFIGURAR);
+  var canal = buscarRegistros_('CANAIS', 'Id', converterParaIdentificador_(idDoCanal), 1)[0];
+  if (!canal) throw new Error('Canal ' + idDoCanal + ' não encontrado.');
+  var webhook = webhookDoCanal_(canal.Id);
+  if (!webhook) throw new Error('Guarde o endereço do Chat (webhook) antes de testar.');
+  var codigo;
+  try {
+    codigo = postarNoChat_(webhook, '🔔 Teste do Prisma: os avisos de retenção do canal '
+      + String(canal.Nome) + ' vão chegar neste espaço.');
+  } catch (erro) {
+    throw new Error('Não deu para falar com o Google Chat: ' + erro.message);
+  }
+  if (codigo !== 200) {
+    throw new Error('O Google Chat recusou (código ' + codigo + '). Confira se o endereço está '
+      + 'completo e se o webhook ainda existe no espaço.');
+  }
+  return { ok: true };
 }

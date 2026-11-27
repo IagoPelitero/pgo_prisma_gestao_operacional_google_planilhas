@@ -508,6 +508,7 @@ var TelaCadastrarCaso = (function () {
         Formulario.acabouDeGravar(elemento('salvar-caso'),
           elemento('formulario-do-caso'));
         apagarORascunho();   // F3: cadastrou, o rascunho não serve mais
+        AvisoDeRetencao.depoisDeSalvar(resposta);   // Etapa 95: nasceu Retido
         mostrarCadastroConcluido(resposta);
       })
       .senao(function (erro) {

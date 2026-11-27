@@ -320,6 +320,10 @@ function semearDadosIniciais_(emailDoInstalador) {
       FimDoExpediente: '',
       ColunaDaPrimeiraResposta: '',
       ColunaDaHoraDaPrimeiraResposta: '',
+      // O aviso de retenção no Google Chat (Etapa 95): ligado, com a meta do dia
+      // do PO. Sem o endereço do Chat (Configurações), nada é enviado.
+      AvisoDeRetencaoNoChat: true,
+      MetaDeRetencoesPorDia: 6,
       Icone: 'escudo',
       Ordem: 1,
       Ativo: true
@@ -1342,7 +1346,11 @@ function atualizarPGO() {
    ['CANAIS', 'ColunaDaHoraDaPrimeiraResposta', 'texto'],
    // As sub-abas e os filtros do Trabalho (Etapa 84).
    ['CANAIS', 'SubAbasDoTrabalho', 'textoLongo'],
-   ['CANAIS', 'FiltrosDoTrabalho', 'texto']].forEach(function (trio) {
+   ['CANAIS', 'FiltrosDoTrabalho', 'texto'],
+   // O aviso de retenção no Google Chat (Etapa 95).
+   ['CANAIS', 'AvisoDeRetencaoNoChat', 'simOuNao'],
+   ['CANAIS', 'MetaDeRetencaoDoMes', 'numero'],
+   ['CANAIS', 'MetaDeRetencoesPorDia', 'numero']].forEach(function (trio) {
     var aba = planilhaAtiva_().getSheetByName(trio[0]);
     if (!aba) { pulados.push('aba ' + trio[0] + ' não existe'); return; }
     if (posicaoDaColuna_(estruturaDaAba_(trio[0]), trio[1]) >= 0) {
@@ -1502,6 +1510,9 @@ function atualizarPGO() {
 
   // --- Etapa 94: a descrição de cada canal, embaixo do nome ----------------
   feito = feito.concat(trocarAsDescricoesDosCanais_(pulados, paraVoce));
+
+  // --- Etapa 95: o aviso de retenção no Chat — a meta do dia da RET --------
+  feito = feito.concat(prepararOAvisoNoChatDaRet_(pulados));
 
   esquecerCacheDaConfiguracao_();
   var recado = laudoDaAtualizacao_('ATUALIZAÇÃO DO PGO', feito, pulados, paraVoce);
@@ -5449,6 +5460,34 @@ function montarOsFiltrosDaRet_(canais, paraVoce) {
   }
   return ['RET: os filtros do Trabalho ficaram ' + chaves.length + ' (Status, Tentativas de contato, '
     + 'Status proposta, Analista, Canal de origem, Cód. do produto e produto — os que existem)'];
+}
+
+/**
+ * O aviso de retenção no Chat da RET (Etapa 95): liga o aviso e põe a meta do
+ * dia que o PO informou (6 retenções por analista) — só se os campos estão
+ * vazios, para não desfazer o que for mudado em Configurações. A meta do mês
+ * fica em branco: quem informa é o PO. Sem o endereço do Chat, nada é enviado.
+ */
+function prepararOAvisoNoChatDaRet_(pulados) {
+  if (!planilhaAtiva_().getSheetByName('CANAIS')
+      || posicaoDaColuna_(estruturaDaAba_('CANAIS'), 'MetaDeRetencoesPorDia') < 0) {
+    pulados.push('o aviso no Chat: as colunas novas da CANAIS ainda não existem');
+    return [];
+  }
+  var ret = lerRegistros_('CANAIS').filter(function (canal) { return canal.Aba === 'BASE_RET'; })[0];
+  if (!ret) return [];
+  var mudar = {};
+  if (String(ret.AvisoDeRetencaoNoChat === undefined ? '' : ret.AvisoDeRetencaoNoChat).trim() === '') {
+    mudar.AvisoDeRetencaoNoChat = 'SIM';
+  }
+  if (String(ret.MetaDeRetencoesPorDia === undefined ? '' : ret.MetaDeRetencoesPorDia).trim() === '') {
+    mudar.MetaDeRetencoesPorDia = 6;
+  }
+  if (!Object.keys(mudar).length) return [];
+  atualizarRegistro_('CANAIS', ret.Id, mudar);
+  esquecerEstruturaLida_('CANAIS');
+  return ['RET: o aviso de retenção no Chat ficou ligado, com a meta do dia de 6 retenções por '
+    + 'analista. Falta o endereço do Chat e a meta do mês, em Configurações › Canais de trabalho'];
 }
 
 /**

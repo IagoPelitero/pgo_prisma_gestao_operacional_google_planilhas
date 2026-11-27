@@ -573,7 +573,8 @@ function rodarTestesDeDiagnostico() {
    */
   const SO_NO_NAVEGADOR = [
     /\bdocument\b/, /\bwindow\b/, /\blocalStorage\b/, /\bsessionStorage\b/,
-    /\balert\s*\(/, /\bnavigator\b/, /\bfetch\s*\(/, /\bXMLHttpRequest\b/,
+    /\balert\s*\(/, /\bnavigator\b/, /(^|[^.\w])fetch\s*\(/,   // o `UrlFetchApp.fetch` do Apps Script vale (Etapa 95)
+    /\bXMLHttpRequest\b/,
     /google\.script\.run/
   ];
 

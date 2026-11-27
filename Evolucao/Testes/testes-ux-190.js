@@ -209,7 +209,9 @@ function rodarTestesDeUX190() {
 
   teste('nada em log: sem auditoria, sem Logger, sem cronômetro nas funções do rascunho', () => {
     const casos = fs.readFileSync(path.join(__dirname, '..', '..', 'Back-End', 'Casos.gs'), 'utf8');
-    const f3 = casos.slice(casos.indexOf('var RECC_RASCUNHO_SEGUNDOS'));
+    // Até onde começa o aviso do Chat (Etapa 95), que é outra coisa e registra erro de propósito.
+    const fimDoF3 = casos.indexOf('// O AVISO DE RETENÇÃO NO GOOGLE CHAT');
+    const f3 = casos.slice(casos.indexOf('var RECC_RASCUNHO_SEGUNDOS'), fimDoF3 > 0 ? fimDoF3 : undefined);
     ['registrarAuditoria_', 'Logger.', 'console.', 'cronometrado_', 'registrarErro'].forEach((proibido) => {
       igual(f3.indexOf(proibido), -1, proibido + ' não aparece');
     });

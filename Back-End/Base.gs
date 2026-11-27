@@ -857,6 +857,12 @@ const RECC_ESQUEMA = {
        */
       { cabecalho: 'SubAbasDoTrabalho', tipo: 'textoLongo', protegido: false },
       { cabecalho: 'FiltrosDoTrabalho', tipo: 'texto', protegido: false },
+      // O aviso de retenção no Google Chat (Etapa 95): ligado, a meta de valor
+      // retido do mês (da equipe) e a de retenções por analista no dia. O
+      // endereço do Chat NÃO mora aqui: é segredo, e fica nas propriedades.
+      { cabecalho: 'AvisoDeRetencaoNoChat', tipo: 'simOuNao', protegido: false },
+      { cabecalho: 'MetaDeRetencaoDoMes', tipo: 'numero', protegido: false },
+      { cabecalho: 'MetaDeRetencoesPorDia', tipo: 'numero', protegido: false },
       { cabecalho: 'Icone', tipo: 'texto', protegido: false },
       { cabecalho: 'Ordem', tipo: 'numero', protegido: false },
       { cabecalho: 'Ativo', tipo: 'simOuNao', protegido: true }

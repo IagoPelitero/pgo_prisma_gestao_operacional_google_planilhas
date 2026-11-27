@@ -2456,6 +2456,33 @@ var Formulario = (function () {
    que prende é modal que a pessoa aprende a não abrir.
    ============================================================================ */
 
+/* ============================================================================
+   O AVISO DE RETENÇÃO NO GOOGLE CHAT (Etapa 95)
+   ============================================================================
+   Depois de salvar, a resposta diz se o caso acabou de passar a Retido
+   (`avisoNoChat`). Aí a tela pede ao servidor para postar no Chat — numa
+   chamada SEPARADA, que não atrasa nem derruba a gravação: o caso já está
+   salvo. O servidor confere tudo de novo e não avisa o mesmo caso duas vezes
+   no dia. Deu certo: um recado curto. Não deu: um aviso de atenção.
+*/
+var AvisoDeRetencao = (function () {
+  function depoisDeSalvar(resposta) {
+    var aviso = resposta && resposta.avisoNoChat;
+    if (!aviso || !aviso.canal || !aviso.id) return;
+    Servidor.chamar('avisarRetencaoNoChat', aviso.canal, aviso.id)
+      .entao(function (r) {
+        if (r && r.enviado) Moldura.toast('Retenção avisada no Chat.', 'bom');
+        else if (r && r.falhou) {
+          Moldura.toast('O caso está salvo, mas o aviso no Chat não foi enviado.', 'atencao');
+        }
+      })
+      .senao(function () {
+        Moldura.toast('O caso está salvo, mas o aviso no Chat não foi enviado.', 'atencao');
+      });
+  }
+  return { depoisDeSalvar: depoisDeSalvar };
+})();
+
 var CasoEmModal = (function () {
 
   var canalAtual = '';
@@ -3024,6 +3051,7 @@ var CasoEmModal = (function () {
         salvando = false;
         mudouAlgo = true;
         oQueFoiGravado = { id: idAtual, destino: (resposta && resposta.destino) || '' };
+        AvisoDeRetencao.depoisDeSalvar(resposta);   // Etapa 95
         retratoAoAbrir = null;   // gravou: não há o que perder ao fechar
         /*
           O MODAL FECHA depois de gravar.
@@ -3219,6 +3247,7 @@ var CasoEmModal = (function () {
             .entao(function (resposta) {
               gravando = false;
               oQueFoiGravado = { id: idDoCaso, destino: (resposta && resposta.destino) || '' };
+              AvisoDeRetencao.depoisDeSalvar(resposta);   // Etapa 95
               sair();
               if (quandoMudar) quandoMudar();
             })

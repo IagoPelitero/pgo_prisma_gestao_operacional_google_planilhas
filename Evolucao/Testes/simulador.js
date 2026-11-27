@@ -524,6 +524,9 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
   const ambienteDoFuso = { fusoDoProjeto: 'America/Sao_Paulo' };
   // A trava do script (Etapa 61): livre, até o teste ocupar.
   const ambienteDaTrava = { ocupada: false, esperas: [], seguradas: 0 };
+  // Etapa 95: o que iria para a internet (o webhook do Google Chat). Nada sai
+  // daqui: o teste lê os envios e escolhe a resposta (código, ou "cair").
+  const ambienteDaRede = { envios: [], codigo: 200, cair: false };
   let adiantadoEmMs = 0;
   const cache = {
     agora: () => Date.now() + adiantadoEmMs,
@@ -576,6 +579,9 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
     // Etapa 86 (B1): quantas travas foram pegas e ainda não soltas — tem de
     // voltar a zero até quando a gravação é recusada no meio.
     get travasSeguradas() { return ambienteDaTrava.seguradas; },
+    get enviosDaRede() { return ambienteDaRede.envios; },
+    set respostaDaRede(codigo) { ambienteDaRede.codigo = Number(codigo); },
+    set redeFora(sim) { ambienteDaRede.cair = !!sim; },
     /**
      * Cria uma planilha "de fora" e devolve o Id.
      *
@@ -733,6 +739,15 @@ function criarAmbienteFalso(email = 'analista@exemplo.com') {
         getEffectiveUser: () => ({ getEmail: () => email })
       },
       Logger: { log: (m) => registros.push(String(m)) },
+      UrlFetchApp: {
+        fetch: (url, opcoes) => {
+          if (ambienteDaRede.cair) throw new Error('Address unavailable: ' + url);
+          ambienteDaRede.envios.push({ url: String(url), opcoes: opcoes || {},
+            corpo: opcoes && opcoes.payload ? JSON.parse(opcoes.payload) : null });
+          const codigo = ambienteDaRede.codigo;
+          return { getResponseCode: () => codigo, getContentText: () => (codigo === 200 ? '{}' : '{"error":"simulado"}') };
+        }
+      },
       Utilities: {
         // O envio único espera a gravação anterior em passos de 1 segundo; aqui
         // não há o que esperar — o teste controla o cache.

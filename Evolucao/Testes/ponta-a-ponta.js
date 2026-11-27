@@ -2482,6 +2482,42 @@ async function rodar() {
     }
   });
 
+  /* ------------------------------------------------- a versão 1.95 -- */
+
+  console.log('\nO aviso de retenção no Google Chat (Etapa 95)');
+
+  await teste('Alterar status para Retido: o caso grava e o aviso vai ao Chat, uma vez', async () => {
+    const idDoCaso = vm.runInContext(`(function () {
+      var ret = canaisVisiveis_().filter(function (c) { return c.aba === 'BASE_RET'; })[0];
+      salvarWebhookDoChat(ret.id, 'https://chat.googleapis.com/v1/spaces/AAAE2E/messages?key=k&token=t');
+      return cadastrarCaso(ret.id, { nomedocliente: 'Cliente do Chat', status: 'Pendente' }).id;
+    })()`, contexto);
+    const antes = ambiente.enviosDaRede.length;
+    await pagina.reload();
+    await pagina.waitForSelector('.lateral-item', { timeout: 10000 });
+    await pagina.click('[data-tela="trabalho"]');
+    await pagina.waitForSelector('[data-sub-aba="1"]', { timeout: 10000 });
+    await pagina.click('[data-sub-aba="1"]');
+    await pagina.waitForSelector('.fila-do-trabalho [data-trabalhar]', { timeout: 10000 });
+    if (await pagina.locator('[data-mostrar="todos"]').count()) await pagina.click('[data-mostrar="todos"]');
+    await pagina.waitForSelector('[data-status-do-caso="' + idDoCaso + '"]', { timeout: 10000 });
+    await pagina.click('[data-status-do-caso="' + idDoCaso + '"]');
+    await pagina.waitForSelector('#situacao-nova', { timeout: 10000 });
+    await pagina.selectOption('#situacao-nova', 'Retido');
+    await pagina.waitForSelector('#situacao-campo-valordopremioretido', { timeout: 10000 });
+    await pagina.fill('#situacao-campo-valordopremioretido', '1.234,56');
+    if (await pagina.locator('#situacao-campo-statusproposta').count()) {
+      await pagina.selectOption('#situacao-campo-statusproposta', 'Transmitido');
+    }
+    await pagina.click('#salvar-situacao');
+    await pagina.waitForFunction(() => /Retenção avisada no Chat/.test(document.body.innerText), null, { timeout: 10000 });
+    igual(ambiente.enviosDaRede.length, antes + 1, 'um envio');
+    const texto = ambiente.enviosDaRede[ambiente.enviosDaRede.length - 1].corpo.text;
+    contem(texto, 'reteve agora: R$ 1.234,56');
+    verdadeiro(texto.indexOf('Cliente do Chat') < 0, 'nada do cliente');
+    igual(String(naPlanilha('BASE_RET').find((l) => String(l.__id) === String(idDoCaso)).status), 'Retido');
+  });
+
   await navegador.close();
   fs.rmSync(pasta, { recursive: true, force: true });
   if (process.env.PGO_GRAVAR_CHAMADAS) {
