@@ -716,8 +716,9 @@ três sinalizadores rodando `atualizarPGO()` uma vez.
 ### As três ações de cada caso
 
 Cada linha da fila tem três ações, nesta ordem, **em todos os canais** — RET,
-Mesa Diamante e VG —, a pedido do PO. Desde a Etapa 93 (proposta C aprovada pelo
-PO), **"Trabalhar no caso"** fica em cima, cheio, e embaixo **"Status"** e
+Mesa Diamante e VG —, a pedido do PO, e com o mesmo desenho no **Buscar Caso** (Etapa 96).
+Desde a Etapa 93 (proposta C aprovada pelo PO), **"Trabalhar no caso"** fica em cima, cheio, e
+embaixo **"Status"** e
 **"Excluir"**, menores, lado a lado e **com texto** — antes eram só o desenho, e a
 pessoa precisava passar o mouse para saber o que faziam:
 
@@ -1804,63 +1805,73 @@ inventado estaria na tela da operação amanhã, medindo o que ninguém pediu.
 
 ---
 
-## O aviso de retenção no Google Chat (Etapa 95)
+## O aviso de retenção no Google Chat (Etapas 95 e 96)
 
 Quando um caso da RET **passa a Retido** e é salvo, o Prisma posta no espaço do Google Chat da
-equipe, no lugar do print da calculadora:
+equipe, no layout da calculadora que a equipe usava (Etapa 96):
 
 ```
-✅ Nova retenção — RET
-Ana Martins reteve agora: R$ 1.250,00 · Canal de origem: URA
+✅ Nova retenção — RET · Eli reteve R$ 1.250,00 · Canal de origem: URA
 
-Ana Martins hoje: 4 de 6 retenções (faltam 2)
-Acumulado de novembro: R$ 48.300,00
-Meta do mês: R$ 60.000,00 · Falta: R$ 11.700,00
+Novembro: R$ 616.397,66
+Meta: R$ 1.400.000,00
+Quanto falta (meta de novembro): R$ 783.602,34
+
+Eli — 1/6
+Gee — 3/6
+Ju Migli — 0/6
+Kathe — 0/6
 ```
 
 **As contas são as da Produtividade:**
 
-- **Acumulado do mês (da equipe):** a soma do "valor do prêmio retido" dos casos que **estão** Retido,
-  pela "Data reteve", do dia 1 até hoje — a mesma conta do gráfico do retido acumulado (Etapa 77).
-- **Falta:** a meta do mês menos o acumulado. Passou da meta: "Meta batida! (+R$ …)".
-- **Hoje:** quantos casos o analista do caso tem com a "Data reteve" de hoje. Zera sozinho na virada
-  do dia. Bateu a meta do dia: "meta do dia batida 🎯".
+- **O mês (acumulado da equipe):** a soma do "valor do prêmio retido" dos casos que **estão**
+  Retido, pela "Data reteve", do dia 1 até hoje — a mesma conta do gráfico do retido acumulado.
+- **Quanto falta:** a meta do mês menos o acumulado. Passou da meta: "Meta de novembro batida!".
+- **A lista:** os analistas **da RET disponíveis hoje** — ativos no cadastro de Usuários, com o canal
+  RET, sem férias nem afastamento (a mesma regra da divisão de casos na Importação), em ordem
+  alfabética. Cada um com as retenções de hoje ("Data reteve" de hoje) sobre a meta do dia. Zera
+  sozinho na virada do dia. Bateu a meta: 🎯.
 
 **Quando posta:**
 
 - Ao **passar** a Retido, em qualquer porta: Trabalhar no caso, Alterar status ou Cadastrar caso.
   Salvar de novo um caso que já era Retido não posta.
-- **Uma vez por caso no dia.** O caso que volta a Retido guarda a "Data reteve" da primeira vez (a
-  regra do carimbo), não conta de novo na Produtividade e não é avisado de novo.
-- **Nada do cliente** vai para o Chat: só o nome de quem reteve, o valor e o canal de origem.
+- **Uma vez por retenção.** A mesma retenção não é avisada duas vezes.
+- **Nada do cliente** vai para o Chat: só nomes da equipe, valores e o canal de origem.
 - **Gravar nunca depende do Chat.** O aviso sai numa chamada separada, depois que o caso já está
   salvo. Se o Chat falhar, aparece "O caso está salvo, mas o aviso no Chat não foi enviado", o erro
-  vai para a aba ERROS, e o próximo salvamento do mesmo caso no dia tenta de novo.
+  vai para a aba ERROS, e o próximo salvamento tenta de novo.
+
+**Sair de Retido apaga a retenção** (Etapa 96, decisão do PO). O caso que estava Retido e vai para
+outro status (Não retido, Pago…) perde o "valor do prêmio retido" e a "Data reteve". Voltar a Retido
+carimba a data de hoje: conta como uma **retenção nova** — no dia, no mês da Produtividade e no
+Chat, que avisa de novo. É a única exceção à regra do carimbo ("carimba só a primeira vez"): a
+retenção desfeita não é dinheiro retido.
 
 ### Como ligar
 
 Em **Configurações › Canais de trabalho › RET**, no bloco **Aviso de retenção no Google Chat**:
 
 1. **Avisar no Chat** — ligado (a RET já vem ligada).
-2. **Meta de valor retido do mês (R$, da equipe)** — é dela que sai o "Falta". Em branco, o cartão
-   mostra só o acumulado.
-3. **Meta de retenções por analista no dia** — vem com **6**. Em branco, mostra só quantas a pessoa
-   tem hoje.
-4. As metas gravam no **Salvar** do canal.
-5. **O endereço do Chat (webhook):**
+2. **Meta de valor retido do mês (R$, da equipe)** — ex.: 1.400.000,00. Muda quando quiser.
+3. **Meta de retenções por analista no dia** — vem com **6**.
+4. Clique **Salvar metas** (no próprio bloco). A próxima mensagem já usa as metas novas.
+5. **A conversa do Chat (webhook):**
    1. No Google Chat, abra o espaço da equipe e clique no **nome do espaço**.
    2. **Apps e integrações › Webhooks › Adicionar webhook**. Dê um nome (ex.: "Prisma") e salve.
    3. Copie o endereço (começa com `https://chat.googleapis.com/v1/spaces/`).
-   4. No Prisma, cole em **Endereço do Chat** e clique **Guardar endereço** (pede a senha de
-      administrador).
+   4. No Prisma, dê um **Nome da conversa** (ex.: "Retenção RET"), cole o endereço e clique
+      **Guardar conversa** (pede a senha de administrador).
    5. Clique **Enviar mensagem de teste** e confira no espaço.
+
+Depois de guardada, a tela mostra o **nome da conversa** e o **começo do endereço** (até o código do
+espaço, `…/spaces/AAAA…`), para você saber qual é. A chave e o token — o que dá o poder de postar —
+ficam escondidos: quem tem o endereço inteiro posta no espaço. Trocar só o nome não pede o endereço
+de novo. **Apagar conversa** para os avisos.
 
 Se a opção **Webhooks** não aparecer no espaço, o administrador do Google Workspace da empresa
 bloqueou: é com a TI.
-
-**O endereço é segredo:** quem tem o endereço posta no espaço. Ele fica nas propriedades do script —
-não na planilha, não na tela (o campo nunca mostra o que está guardado). Só endereço do próprio
-Google Chat é aceito. **Apagar endereço** para os avisos.
 
 **A primeira vez, depois de colar a 1.95:** o Prisma passa a falar com um serviço de fora (o Chat).
 Ao rodar `atualizarPGO()` no editor, o Google pede uma autorização nova ("Conectar a um serviço
@@ -2185,7 +2196,7 @@ prejuízo — a lista completa, com sintoma e causa, está em
 
 ## Estado atual
 
-**Versão 1.95** — "1" é este sistema, construído do zero; depois do ponto, a
+**Versão 1.96** — "1" é este sistema, construído do zero; depois do ponto, a
 última etapa entregue. Duas telas saíram a pedido do PO: a Minha Performance
 (Etapa 52) e a tela inicial (Etapa 68). O detalhe de cada etapa está em
 [`05-progresso.md`](05-progresso.md).

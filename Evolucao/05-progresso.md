@@ -4751,6 +4751,61 @@ teste.
 
 ---
 
+## Etapa 96 — Os ajustes do aviso no Chat (versão 1.96)
+
+**Relatos do PO depois da 1.95** (o aviso funcionou):
+
+1. "Não fica nas configurações o link do webhook para saber que a conversa é aquela."
+2. "Na conversa não está indo o valor que coloco de meta. Hoje são R$ 1.400.000,00, podendo ser mais
+   ou menos amanhã."
+3. "O botão de mudar status tem um bug que aumenta de tamanho do nada e depois traz o modal."
+4. "Quando busco o caso na aba Buscar Caso, ele não vem estilizado com os botões iguais aos do
+   Trabalho."
+5. "Coloquei retido, ele manda a mensagem; mudo para não retido, ele não apaga o valor de prêmio
+   retido; e quando coloco retido de novo ele não manda a mensagem. Precisa mandar."
+6. "Precisa aparecer o nome apenas dos analistas da RET; a calculadora deve manter o estilo que você
+   criou, mas com o layout que mandei pela foto."
+
+**Decisões do PO:**
+
+| Pergunta | Resposta |
+|---|---|
+| Sair de Retido e voltar | **Apagar o valor e a Data reteve**; voltar conta como retenção nova e avisa |
+| Quais analistas na lista | **Só os disponíveis hoje** (sem férias e afastados) |
+| O endereço em Configurações | **Parcial + nome da conversa** |
+| A linha de quem reteve | **Fica no topo**, e embaixo o layout da calculadora |
+
+**O que mudou:**
+
+- **(3) O botão que crescia** (achado 120): a classe `carregando` era da tela de abertura
+  (`min-height: 100vh`); virou `girando`.
+- **(2) A meta** (achado 121): o bloco do Chat ganhou **Salvar metas** (`salvarAvisoDoChat`). A meta
+  aceita "R$ 1.400.000,00", "1.400.000,00" ou "1400000".
+- **(1) A conversa:** o bloco mostra o **nome da conversa** (novo campo, guardado nas propriedades) e
+  o **começo do endereço**, até o código do espaço (`enderecoParcialDoChat_`). A chave e o token
+  seguem escondidos. Trocar só o nome não pede o endereço de novo.
+- **(4) O Buscar Caso** usa o mesmo desenho da fila do Trabalho (proposta C), e o "Status" gira lá
+  também.
+- **(5) Sair de Retido apaga a retenção** (`limparARetencaoAoSairDoRetido_`, no Alterar status e no
+  Trabalhar no caso): o "valor do prêmio retido" e a "Data reteve" ficam vazios. Voltar a Retido
+  carimba de novo e avisa de novo: a marca do "já avisado" passou a levar o carimbo (o caso + a data
+  da retenção), e não mais "um por dia". É uma exceção à regra do carimbo, só para o Retido, aprovada
+  pelo PO: muda a Produtividade (a retenção conta na data nova).
+- **(6) A mensagem no layout da calculadora:** a linha de quem reteve no topo; depois o mês, a meta e
+  o "Quanto falta (meta de novembro)"; e os analistas da RET disponíveis hoje (`analistasDaRetencao_`,
+  a regra da divisão de casos), cada um com "X/6" (🎯 quem bateu).
+
+**Testes:** `testes-196.js` (novo), 13 testes. `testes-195.js` ajustado ao layout novo (e o endereço
+parcial, que agora aparece de propósito). No navegador, o teste do status mede a altura do botão. Suíte 1969/1969;
+ponta a ponta 60/60; responsividade (96 combinações) e varredura de cliques sem problema. O
+diagnóstico do próprio Prisma pegou uma classe nova sem estilo (`chat-conversa`) antes da entrega.
+**Quebras de propósito:** sem a limpeza ao sair de Retido → 2 falham; a marca sem o carimbo → o
+"avisa de novo" falha.
+
+**Versão:** 1.96. O Excel marca com ◆ o que mudou desde a 1.95.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |

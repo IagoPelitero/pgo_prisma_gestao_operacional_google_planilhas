@@ -2391,6 +2391,28 @@ conteúdo que não quebra — e a barra de abas não quebra linha. O primeiro te
 o lado. O teste mede em 320 px e exige a barra de abas na tela. Sem a correção, ele falha
 (376 px).
 
+### 120 · O botão "Status" crescia até a altura da tela antes de abrir o diálogo
+
+**Sintoma.** Relato do PO depois da 1.95: o botão de mudar status "aumenta de tamanho do nada e
+depois traz o modal".
+
+**Causa.** Na Etapa 93, o botão ganhou a classe `carregando` enquanto o servidor busca os status. O
+nome já existia: é a tela de abertura do sistema, com `min-height: 100vh`. O botão herdava a altura
+da tela inteira. O teste conferia a classe e o "travado", nunca o tamanho.
+
+**Defesa.** A classe virou `girando`. O ponta a ponta mede a altura do botão enquanto ele gira (até
+40 px).
+
+### 121 · A meta do mês digitada no bloco do Chat não chegava à mensagem
+
+**Sintoma.** Relato do PO: "não está indo o valor que coloco de meta".
+
+**Causa.** As metas só gravavam no **Salvar** do fim do formulário do canal, longe do bloco do Chat.
+Quem digitava a meta e clicava em "Guardar endereço" (o botão do próprio bloco) saía sem gravar.
+
+**Defesa.** O bloco ganhou o botão **Salvar metas**, que grava só o aviso (`salvarAvisoDoChat`). O
+teste grava "R$ 1.400.000,00", retém e confere a meta e o "Quanto falta" na mensagem.
+
 ---
 
 ## O que esta lista ensina
@@ -2657,6 +2679,10 @@ Daí as duas práticas que o projeto não abre mão:
 68. **Esconder é uma decisão de quem lê, e o erro tem de desfazê-la.** No item 118 recolher e
     trocar de aba eram ótimos para trabalhar e péssimos para corrigir. Quem esconde precisa de
     um caminho de volta quando o problema está lá dentro.
+70. **Nome de classe é global.** No item 120 um nome curto e comum (`carregando`) já tinha dono. Antes
+    de batizar uma classe nova, procure se ela já existe no CSS.
+71. **O botão de gravar fica perto do que ele grava.** No item 121 o campo estava num bloco e o
+    "Salvar" em outro, a meia tela de distância.
 69. **A quebra de propósito testa o teste.** No item 119 o teste do celular passou sem a correção,
     e só a quebra mostrou isso. Teste que não falha quando devia é pior que nenhum: dá
     confiança falsa.
