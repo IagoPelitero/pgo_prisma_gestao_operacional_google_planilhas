@@ -2089,6 +2089,12 @@ produtividade, regra Diamante/SUSEP ou estrutura de planilha mudou.**
   embaixo da barra ao rolar.
 - **"Mostrar" lembrado (F9).** A quantidade da fila fica lembrada neste navegador. Só o número
   é guardado: o "Todos" nunca é lembrado.
+- **A página da fila (Etapa 97).** Embaixo da tabela: **‹ Anterior · Página 2 de 14 · Próxima ›**,
+  com tantos casos por página quanto o "Mostrar" (5, 10, 20, 50 ou 100); em cima, "Mostrando 11 a
+  20 de 137". O "Todos" continua, numa página só. Trocar o filtro, a sub-aba, o canal ou o
+  "Mostrar" volta para a página 1; salvar ou excluir um caso fica na mesma página (se ela esvaziar,
+  volta uma). A página não fica guardada no navegador. A página que já veio vira na hora; a que
+  não veio, o servidor traz ("Trazendo a página 3…").
 - **Para onde o caso foi (F8).** Depois de salvar, aparece "Caso 123 atualizado. Agora está em
   Casos concluídos." O destino é calculado pela mesma regra que monta a fila.
 - **Salvar e abrir o próximo (F10).** No "Trabalhar no caso" aberto pela fila, esse botão grava

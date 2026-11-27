@@ -60,4 +60,24 @@ Pedido: "mostra os filtros de 5, 10, 20, 50 e 100, mas também tem a opção de 
 | Depois de salvar, em que página? | **Na mesma página** (se ficar vazia, volta uma) |
 | Quando fazer | **Junto** com a correção do erro de 40 s, depois do print |
 
-Nada foi implementado ainda.
+## O que o Medir a velocidade mostrou (vídeo do PO, 27/11/2026)
+
+| Aba | Tamanho | Ida pequena | Aba inteira |
+|---|---|---|---|
+| BASE_RET | 4.292 × 56, 0 fórmulas, 0 formatação condicional, grade = dados | **1,1 s** | **2,2 s** |
+| As outras | — | 80 a 190 ms | — |
+
+**Leitura:** nem fórmulas, nem linhas fantasmas — as duas hipóteses caíram. O que pesa é a **ida** à
+BASE_RET: ~0,5 a 1 s cada, enquanto 240 mil células saem em 2,2 s (~5 a 9 µs por célula). A régua da
+Etapa 88 (ida ≈ 1.000 células) estava errada para essa planilha, e o Trabalho fazia 23 idas.
+
+## A correção (Etapa 97, versão 1.97)
+
+- A última linha da BASE_RET é perguntada **uma vez por carga**.
+- O status, as colunas das condições e as da leitura leve vêm **juntas**, num bloco.
+- A Produtividade passou a usar a memória da carga.
+
+No simulador, com uma RET do tamanho da do PO e os filtros do relato: **Trabalho 23 → 7 idas**,
+**Produtividade 9 → 7**. Com ~1 s por ida, a carga deve cair de 10–15 s para algo perto de 5–7 s
+— a confirmar na aba ERROS, depois da 1.97 colada. A paginação entrou na mesma versão, como o PO
+decidiu (ver a Etapa 97 em `05-progresso.md`).

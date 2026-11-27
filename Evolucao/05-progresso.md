@@ -4806,6 +4806,67 @@ diagnóstico do próprio Prisma pegou uma classe nova sem estilo (`chat-conversa
 
 ---
 
+## Etapa 97 — Menos idas à BASE_RET e a página da fila (versão 1.97)
+
+**Relato do PO (27/11/2026):** "coloquei o filtro de não trabalhados mais o filtro de canal de
+origem e toda vez que trabalho num caso, atualizo e salvo, ele carrega e dá a mensagem" — o
+"não respondeu em 40 segundos". E o pedido: "mostra os filtros de 5, 10, 20, 50 e 100, mas também
+tem a opção de próxima página… filtro de 10 com página para próximos 10 ou volta os 10 que estava".
+
+**O que as medidas mostraram** (ver `medicoes/estudo-erro-40s-do-trabalho.md`):
+
+- A aba ERROS: toda carga do Trabalho levava 10 a 15 s no servidor, quase tudo "lendo a planilha".
+- O **Medir a velocidade** da planilha do PO: BASE_RET com 4.292 linhas × 56 colunas, **0 fórmulas,
+  0 formatação condicional, grade = dados**. Uma ida pequena à BASE_RET leva **1,1 s**; a aba
+  inteira, **2,2 s**. As outras abas, 80 a 190 ms por ida.
+- Ou seja: na BASE_RET **a ida é cara e a célula é barata**. A régua da Etapa 88 supunha o
+  contrário (ida ≈ 1.000 células), e o Trabalho fazia **23 idas** à BASE_RET (achado 122).
+
+**Decisões do PO:**
+
+| Pergunta | Resposta |
+|---|---|
+| Corrigir a lentidão e fazer a paginação | **"Sim pode seguir"**, as duas juntas |
+| O "Todos" sai? | **Fica**, sem páginas |
+| Depois de salvar, em que página? | **Na mesma** (se ficar vazia, volta uma) |
+
+**O que mudou:**
+
+1. **A última linha, uma vez por carga** (`lembrarAUltimaLinhaDe_`, `ultimaLinhaComConteudo_`): dentro
+   da memória da carga (Etapa 88), o `getLastRow` da BASE_RET é perguntado uma vez só.
+2. **As colunas juntas** (`lerColunasJuntas_`): o status, as colunas das condições das sub-abas e as
+   da leitura leve vêm num bloco (ou poucos), em vez de uma ida por coluna. Junta enquanto o buraco
+   entre elas custa menos que uma ida (`RECC_CELULAS_POR_IDA_NA_LEITURA_JUNTA = 40000` células).
+3. **A Produtividade** passou a usar a memória da carga também.
+4. **A grafia da aba** (`comAGrafiaDaAba_`) usa a estrutura já lida, em vez de pedir a aba de novo.
+5. **A página da fila** (`paginaDaFila_` no servidor; `paginaDaFila`, `paginaJaVeio` e
+   `barraDePaginas` no Trabalho): embaixo da tabela, **‹ Anterior · Página 2 de 14 · Próxima ›**; em
+   cima, "Mostrando 11 a 20 de 137". O servidor recebe a página e devolve a fila **a partir dela**,
+   levando as seguintes que caberiam na primeira (com 5 por página, as próximas viram na hora); na
+   leitura leve, só as linhas da página vêm inteiras. Trocar filtro, sub-aba, canal ou "Mostrar"
+   volta para a 1; salvar ou excluir fica na mesma. A página não é guardada no navegador.
+
+**Resultado no simulador, com uma RET do tamanho da do PO** (4.291 casos, filtros "Não trabalhado"
++ canal, Mostrar 20): o Trabalho foi de **23 para 7 idas** à BASE_RET (a aba, a última coluna, o
+cabeçalho, a última linha, dois blocos de colunas e um bloco de 115 linhas da fila). A Produtividade,
+de **9 para 7**. As gravações, a B1 e o que a tela mostra não mudaram (o teste compara a resposta com
+e sem as duas mudanças, campo a campo).
+
+**Testes:** `testes-197.js` (novo), 17 testes — as idas do Trabalho e da Produtividade, a memória que
+não passa de uma carga para a outra, as páginas (meio, fim, além do fim, com filtro, "Todos", depois
+de salvar, leitura leve) e a tela. Cinco testes de leitura antigos mediam células pela régua velha e
+passaram a medir **idas** (e nunca mais que a base uma vez); as comparações de resultado continuam.
+No navegador, um teste novo: Próxima, Anterior, foco no botão, gravar na página 2 (excluir um caso,
+que recarrega pelo mesmo caminho do salvar) e continuar nela, e trocar o "Mostrar" voltando para a 1. A prévia também vira página.
+Suíte 1986/1986; ponta a ponta 61/61; responsividade (96 combinações) e varredura de cliques com a
+base suja sem problema.
+**Quebras de propósito:** sem lembrar a última linha → 2 falham; sem as colunas juntas → 1; a página
+ignorada → 5; sem voltar para a última → 2; só a página, sem as seguintes → 1.
+
+**Versão:** 1.97. O Excel marca com ◆ o que mudou desde a 1.96.
+
+---
+
 ## O que ainda está em aberto
 
 | Assunto | Situação |
@@ -4814,6 +4875,6 @@ diagnóstico do próprio Prisma pegou uma classe nova sem estilo (`chat-conversa
 | **Logo da operação** | A chave `IDENTIDADE.LOGO_URL` aceita endereço `https` ou a imagem embutida em texto. Enquanto vazia, o nome faz as vezes da logo |
 | **Janela da fila e tema padrão** | Moram em `CONFIG` e ainda se ajustam só na planilha (a janela deixou de ser a abertura na Etapa 56 — hoje só vale para pedido sem período). São os próximos a ganhar tela. O **nome das telas** saiu desta lista: ganhou campo em Configurações › Identidade |
 | **Apagar canal** | Criar um canal novo já passa por Configurações › Canais de trabalho (cria a aba; pede senha). Apagar não existe de propósito: o canal se desliga, e a aba com os casos fica |
-| **Trabalho: "não respondeu em 40 segundos" depois de salvar** | Relato de 27/11/2026, com os filtros "Não trabalhado" e "Canal de origem". No simulador o caminho custa ~3 a 6 s; a causa está na planilha (recálculo de fórmulas depois de gravar, ou linhas fantasmas). **Aguardando o PO:** o print do Medir a velocidade e as linhas `lento · resumoDoCanal` da ERROS. Junto, a paginação da fila (5/10/20/50/100 + Anterior/Próxima, mantendo o Todos). Ver `medicoes/estudo-erro-40s-do-trabalho.md` |
+| **Trabalho: "não respondeu em 40 segundos"** | **Corrigido na Etapa 97** (23 → 7 idas à BASE_RET) e a paginação entregue. Falta só, na planilha do PO: colar a 1.97 e olhar a aba ERROS depois de um dia de uso, para ver o `resumoDoCanal` abaixo dos 10–15 s de antes. Ver `medicoes/estudo-erro-40s-do-trabalho.md` |
 | **Retenção no Google Chat** | **Feito na Etapa 95.** Falta só, na planilha do PO: a TI liberar os webhooks do Chat (se a opção não aparecer no espaço), guardar o endereço e informar a meta do mês em Configurações › Canais de trabalho |
 | **Volume** | 30 mil linhas hoje ocupam ~9% do teto de 10 milhões de células. Ver a seção 8 de [`01-arquitetura.md`](01-arquitetura.md) |

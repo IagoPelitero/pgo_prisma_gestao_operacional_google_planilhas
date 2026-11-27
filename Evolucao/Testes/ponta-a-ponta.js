@@ -1536,20 +1536,21 @@ async function rodar() {
     await pronta('Página 1 de ' + paginas);
     igual(JSON.stringify(await ids()), JSON.stringify(primeira), 'volta os 10 que estavam');
 
-    // Salvar um caso da página 2: a fila recarrega e fica na 2 (decisão do PO).
+    // Gravar na página 2 recarrega a fila e fica na 2 (decisão do PO). Salvar e
+    // excluir recarregam pelo mesmo caminho (carregar, com a mesma tela); os
+    // casos "Fila grande" não têm os obrigatórios para o Salvar, então o teste
+    // exclui um. O "se esvaziar, volta uma" é provado em testes-197.js.
     await pagina.click('[data-pagina="proxima"]');
     await pronta('Página 2 de ' + paginas);
     const antes = chamadasDoNavegador.resumoDoCanal;
-    await pagina.click('table.fila.agrupada tbody [data-trabalhar="' + segunda[0] + '"]');
-    await pagina.waitForFunction(() => {
-      const salvar = document.getElementById('modal-salvar');
-      return salvar && !salvar.disabled;
-    }, { timeout: 10000 });
-    await pagina.click('#modal-salvar');
+    await pagina.click('table.fila.agrupada tbody [data-excluir="' + segunda[0] + '"]');
+    await pagina.waitForSelector('#confirmar-exclusao', { timeout: 10000 });
+    await pagina.click('#confirmar-exclusao');
     for (let i = 0; i < 50 && chamadasDoNavegador.resumoDoCanal === antes; i++) await pagina.waitForTimeout(200);
-    verdadeiro(chamadasDoNavegador.resumoDoCanal > antes, 'salvar recarregou a fila');
-    await pronta('Página 2 de ' + paginas);
-    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando 11 a 20 de ');
+    verdadeiro(chamadasDoNavegador.resumoDoCanal > antes, 'gravar recarregou a fila');
+    await pronta('Página 2 de ' + Math.ceil((total - 1) / 10));
+    contem(await pagina.textContent('.fila-mostrando'), 'Mostrando 11 a 20 de ' + (total - 1));
+    verdadeiro((await ids()).indexOf(segunda[0]) < 0, 'o caso excluído saiu da página');
 
     // Trocar o "Mostrar" volta para a página 1.
     await pagina.click('[data-mostrar="20"]');

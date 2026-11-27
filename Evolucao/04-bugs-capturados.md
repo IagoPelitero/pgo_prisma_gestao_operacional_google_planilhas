@@ -2413,6 +2413,23 @@ Quem digitava a meta e clicava em "Guardar endereço" (o botão do próprio bloc
 **Defesa.** O bloco ganhou o botão **Salvar metas**, que grava só o aviso (`salvarAvisoDoChat`). O
 teste grava "R$ 1.400.000,00", retém e confere a meta e o "Quanto falta" na mensagem.
 
+### 122 · A régua de custo supunha a ida à planilha barata, e o Trabalho ia 23 vezes à BASE_RET
+
+**Sintoma.** Relato do PO: com os filtros "Não trabalhado" e "Canal de origem", cada recarga do
+Trabalho demorava e às vezes dava "não respondeu em 40 segundos". A aba ERROS mostrava 10 a 15 s por
+carga, quase tudo "lendo a planilha".
+
+**Causa.** A régua da Etapa 88 estimava a ida em ~1.000 células (25 ms por ida, 53 µs por célula) e,
+por ela, ler cada coluna sozinha e perguntar a última linha a cada leitura parecia barato. O Medir a
+velocidade da planilha do PO mostrou o contrário: na BASE_RET (4.292 × 56, sem fórmulas), uma ida
+pequena leva 1,1 s e a aba inteira 2,2 s — a ida é cara, a célula quase de graça. Os testes mediam
+**células**, e por isso premiavam muitas idas pequenas.
+
+**Defesa.** A última linha é perguntada uma vez por carga, e as colunas que a carga lê vêm juntas
+(Etapa 97). Os testes de desempenho passaram a contar **idas à BASE_RET** (o Trabalho do relato no
+máximo 7, a Produtividade no máximo 7), com o teto de nunca ler mais que a base uma vez. A régua das
+linhas da fila (1.000 células por ida) ficou como estava: ali o bloco já é um só.
+
 ---
 
 ## O que esta lista ensina
